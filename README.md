@@ -1,10 +1,18 @@
 # Tiqora
 
-> **⚠️ Under active development — not production ready.**
+> **⚠️ Beta — parallel operation.**
 >
-> APIs, schema conventions, and operational behaviour may change without notice.
-> Do not run Tiqora against production Znuny databases until Phase 2 write-path
-> golden-master tests have been completed and documented.
+> Phases 0–5 mechanics are implemented and covered by golden-master and
+> compat test suites: legacy models/auth/permissions, read-only UI +
+> indexing, TicketService write path + GenericInterface compat + MCP, portal
+> + KB + admin + OIDC/Kerberos/TOTP, daemon takeover feature flags, and the
+> cutover mechanics (schema-ownership gate, additive owned migrations,
+> [cutover runbook](./docs/cutover.md), [AI integration
+> contract](./docs/ai-integration.md)). No production cutover has been
+> performed with this codebase yet — schema ownership defaults OFF and
+> requires an explicit, gated operator action (see the runbook). APIs,
+> schema conventions, and operational behaviour may still change without
+> notice.
 
 **Tiqora** is a modern, self-hosted ticket / helpdesk system that is **database-compatible
 with Znuny / OTRS 6.5**. It is a clean-room reimplementation (Python FastAPI + React),
@@ -38,22 +46,25 @@ existing schema during parallel operation.
 
 | Area | Status | Notes |
 |---|---|---|
-| Project scaffolding, CI, Docker images | ✅ Scaffolded (Phase 0) | This repository state |
-| Dev stack (MariaDB, Postgres, Redis, Meili, Mailpit) | ✅ Scaffolded | `docker-compose.dev.yml` |
-| Config, async DB engine, health/ready/metrics | ✅ Minimal | `backend/src/tiqora` |
-| Znuny legacy models + schema conformance tests | 🔲 Planned (Phase 0) | ~45 V1 tables |
-| Auth: legacy password hashes, Redis sessions, API keys | 🔲 Planned (Phase 0) | bcrypt / sha256 / md5-crypt |
-| Permission engine (groups, roles, ACL) | 🔲 Planned (Phase 0) | Shared by UI / REST / MCP |
-| Read-only agent UI + Meilisearch index | 🔲 Planned (Phase 1) | Safe parallel entry |
-| TicketService write path + Znuny invariants | 🔲 Planned (Phase 2) | Highest risk phase |
-| GenericInterface compatibility layer | 🔲 Planned (Phase 2) | TicketCreate/Update/Get/Search, SessionCreate |
-| MCP server tools | 🔲 Planned (Phase 2) | ticket_*, customer_lookup, kb_* |
+| Project scaffolding, CI, Docker images | ✅ Done (Phase 0) | This repository state |
+| Dev stack (MariaDB, Postgres, Redis, Meili, Mailpit) | ✅ Done | `docker-compose.dev.yml` |
+| Config, async DB engine, health/ready/metrics | ✅ Done | `backend/src/tiqora` |
+| Znuny legacy models + schema conformance tests | ✅ Done (Phase 0) | ~45 V1 tables, `tests/test_schema_conformance.py` |
+| Auth: legacy password hashes, Redis sessions, API keys | ✅ Done (Phase 0) | bcrypt / sha256 / md5-crypt |
+| Permission engine (groups, roles, ACL) | ✅ Done (Phase 0) | Shared by UI / REST / MCP |
+| Read-only agent UI + Meilisearch index | ✅ Done (Phase 1) | Znuny-write poller, queue/zoom/search |
+| TicketService write path + Znuny invariants | ✅ Done (Phase 2) | Golden-master validated against real Znuny 6.5.22 |
+| GenericInterface compatibility layer | ✅ Done (Phase 2c) | TicketCreate/Update/Get/Search, SessionCreate, dynamic router |
+| MCP server tools | ✅ Done (Phase 2c) | ticket_*, customer_lookup, kb_* — see `docs/ai-integration.md` |
 | Customer portal | ✅ API + UI (Phase 3a/3b) | REST at `/api/portal/*`, UI at `/portal` |
 | Knowledge base (`tiqora_kb_*`, RAG-ready) | ✅ API + UI (Phase 3a/3b) | Markdown, chunking, Meilisearch; agent editor + portal search UI |
 | Admin CRUD (queues, DF, ACL, GenericAgent) | ✅ API + UI (Phase 3a/3b) | REST at `/api/v1/admin/*`, UI at `/admin` |
-| OIDC, Kerberos/SPNEGO, TOTP | 🔲 Planned (Phase 3) | |
-| Daemon takeover (mail, escalation, notify, GA) | 🔲 Planned (Phase 4) | Per-function feature flags |
-| Schema ownership + AI webhooks | 🔲 Planned (Phase 5) | Cutover runbook |
+| OIDC, Kerberos/SPNEGO, TOTP | ✅ Done (Phase 3c) | Feature-flagged, off by default |
+| Daemon takeover (mail, escalation, notify, GA) | ✅ Done (Phase 4) | Per-function `daemon.*.enabled` flags, default OFF |
+| Schema-ownership gate + CLI + preflight | ✅ Done (Phase 5) | `tiqora ownership status/enable/orphan-report` |
+| First owned migration + orphan report | ✅ Done (Phase 5) | Additive composite indexes only; read-only orphan counts |
+| Cutover runbook | ✅ Done (Phase 5) | [docs/cutover.md](./docs/cutover.md) — no cutover performed yet |
+| AI integration contract (webhooks + MCP) | ✅ Done (Phase 5) | [docs/ai-integration.md](./docs/ai-integration.md); no LLM code |
 | Process management, calendar, stats, PGP/S-MIME | ⏸ Deferred | Not in V1 |
 | SOAP, package manager | ⏸ Deferred | Not in V1 |
 | Phone/SMS, WhatsApp Business channels | 🔲 Planned (post-V1) | Plugin architecture |
@@ -252,7 +263,12 @@ Summarised from the design plan. Durations are indicative.
 | **2 — Write path + compat + MCP** (5–6 w) | TicketService, invariants, TiqoraSync, SMTP, compat API, MCP | Golden-master API/DB diffs; TN concurrency with mixed writers |
 | **3 — Portal + KB + Admin** (4–5 w) | Portal, KB, admin CRUD, OIDC/Kerberos/TOTP | Queue created in Tiqora appears in Znuny (cache path proven) |
 | **4 — Daemon takeover** (4–6 w) | Postmaster, escalation, notifications, GenericAgent, auto-responses | Mail round-trip via Mailpit; notification diffs |
-| **5 — Cutover + ownership + AI** (2–3 w) | Runbook, ownership flag, additive FKs/indexes, webhooks | Regression on production clone; rollback drill |
+| **5 — Cutover + ownership + AI** (2–3 w) | Runbook, ownership flag, additive indexes, webhooks | ✅ Mechanics complete; production cutover/rollback drill still pending |
+
+Phases 0–5 mechanics are complete. **Project status: beta — parallel
+operation.** No production cutover (Phase 5's runbook) has been executed
+against a real Znuny instance with this codebase; that remains the next
+real-world milestone, not a code deliverable.
 
 Detailed design: [docs/specs/2026-07-19-tiqora-design.md](./docs/specs/2026-07-19-tiqora-design.md).
 
@@ -265,6 +281,8 @@ Detailed design: [docs/specs/2026-07-19-tiqora-design.md](./docs/specs/2026-07-1
 | [docs/compatibility.md](./docs/compatibility.md) | GenericInterface compatibility layer |
 | [docs/deployment.md](./docs/deployment.md) | Production-oriented deployment notes |
 | [docs/development.md](./docs/development.md) | Local development workflow |
+| [docs/cutover.md](./docs/cutover.md) | Step-by-step cutover runbook with rollback per stage |
+| [docs/ai-integration.md](./docs/ai-integration.md) | Webhook schema, MCP interface, AI agent patterns, prompt-injection guidance |
 | [docs/specs/2026-07-19-tiqora-design.md](./docs/specs/2026-07-19-tiqora-design.md) | Full design specification |
 
 ## Compatibility statement
