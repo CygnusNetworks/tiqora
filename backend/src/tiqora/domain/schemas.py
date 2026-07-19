@@ -173,3 +173,48 @@ class SearchResponse(BaseModel):
     query: str
     hits: list[SearchHit]
     estimated_total: int
+
+
+# ---------------------------------------------------------------------------
+# Customer portal (Phase 3a)
+# ---------------------------------------------------------------------------
+
+
+class CustomerMe(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    login: str
+    email: str
+    customer_id: str
+    first_name: str
+    last_name: str
+
+
+class CustomerLoginResponse(BaseModel):
+    customer: CustomerMe
+
+
+class PortalTicketCreateRequest(BaseModel):
+    title: str
+    body: str
+    queue_id: int | None = None
+
+
+class PortalTicketCreateResponse(BaseModel):
+    ticket_id: int
+
+
+class PortalReplyRequest(BaseModel):
+    body: str
+    subject: str | None = None
+
+
+class PortalReplyResponse(BaseModel):
+    article_id: int
+    reopened: bool = False
+
+
+class PortalAttachmentUploadResponse(BaseModel):
+    article_id: int
+    attachment_ids: list[int]

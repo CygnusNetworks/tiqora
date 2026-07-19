@@ -73,6 +73,13 @@ class Settings(BaseSettings):
         validation_alias="TIQORA_SESSION_COOKIE_SAMESITE",
     )
 
+    # Customer portal sessions (Redis, separate opaque token/cookie from agent
+    # sessions — same store/TTL/secure/samesite knobs are reused for simplicity).
+    customer_session_cookie_name: str = Field(
+        default="tiqora_customer_session",
+        validation_alias="TIQORA_CUSTOMER_SESSION_COOKIE",
+    )
+
     # Znuny-write poller
     poller_interval_seconds: int = Field(
         default=15,
