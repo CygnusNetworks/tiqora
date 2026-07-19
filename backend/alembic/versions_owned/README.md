@@ -16,10 +16,17 @@ Activation requires:
 Until then, only `versions_tiqora/` is active. That chain creates exclusively
 `tiqora_*` tables and never alters Znuny DDL.
 
-## Intended first owned migrations (post-cutover)
+## First owned migration (Phase 5, subtask 2)
 
-- Additive foreign keys where safe
-- Helpful indexes for Tiqora query patterns
-- Orphan report / cleanup scaffolding
+- `20260719_0006_owned_indexes.py` — three additive composite indexes
+  (`ticket(customer_user_id, archive_flag)`, `ticket(queue_id, ticket_state_id)`,
+  `dynamic_field_value(object_id, field_id)`) covering multi-column filter
+  patterns Tiqora's own query code uses that Znuny's single-column indexes
+  don't. Index-only: a strict no-op on data, fully reversible.
+
+The orphan-FK report (`tiqora ownership orphan-report`) is **not** a
+migration — it is a read-only query (`tiqora.domain.orphan_report`) run
+on-demand against the ~15 most important Znuny relations. No destructive
+cleanup is implemented in v1.
 
 All changes must remain reverse-friendly for the documented rollback probe.
