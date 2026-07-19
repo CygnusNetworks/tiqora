@@ -9,6 +9,7 @@ import structlog
 
 from tiqora.config import get_settings
 from tiqora.logging_setup import configure_logging
+from tiqora.worker.escalation import run_escalation_tick
 from tiqora.worker.poller import poll_once
 from tiqora.worker.postmaster import run_postmaster_tick
 
@@ -50,8 +51,27 @@ async def _postmaster_loop(stop: asyncio.Event) -> None:
     logger.info("postmaster_loop_stopped")
 
 
+async def _escalation_loop(stop: asyncio.Event) -> None:
+    """Escalation sweep tick loop. A no-op unless daemon.escalation.enabled=1 (see
+    tiqora.domain.settings_store) — the tick itself checks the flag every cycle
+    so it can be toggled at runtime without a worker restart."""
+    settings = get_settings()
+    interval = max(5, settings.escalation_interval_seconds)
+    logger.info("escalation_loop_started", interval_seconds=interval)
+    while not stop.is_set():
+        try:
+            await run_escalation_tick(settings=settings)
+        except Exception:  # noqa: BLE001 — keep loop alive
+            logger.exception("escalation_loop_error")
+        try:
+            await asyncio.wait_for(stop.wait(), timeout=interval)
+        except TimeoutError:
+            continue
+    logger.info("escalation_loop_stopped")
+
+
 async def _run_all_loops(stop: asyncio.Event) -> None:
-    await asyncio.gather(_poller_loop(stop), _postmaster_loop(stop))
+    await asyncio.gather(_poller_loop(stop), _postmaster_loop(stop), _escalation_loop(stop))
 
 
 def run_worker() -> None:
