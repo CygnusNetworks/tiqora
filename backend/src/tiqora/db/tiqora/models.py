@@ -5,8 +5,10 @@ from __future__ import annotations
 from datetime import datetime
 
 from sqlalchemy import (
+    BigInteger,
     Boolean,
     DateTime,
+    Index,
     Integer,
     String,
     Text,
@@ -41,3 +43,21 @@ class TiqoraSettings(TiqoraBase):
 
     key: Mapped[str] = mapped_column(String(200), primary_key=True, nullable=False)
     value: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+
+class TiqoraCacheInvalidation(TiqoraBase):
+    """Ticket cache invalidation queue consumed by the Znuny TiqoraSync addon."""
+
+    __tablename__ = "tiqora_cache_invalidation"
+
+    id: Mapped[int] = mapped_column(
+        BigInteger, primary_key=True, autoincrement=True, nullable=False
+    )
+    ticket_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    created: Mapped[datetime] = mapped_column(
+        DateTime,
+        nullable=False,
+        server_default=func.now(),
+    )
+
+    __table_args__ = (Index("ix_tiqora_cache_inv_id", "id"),)
