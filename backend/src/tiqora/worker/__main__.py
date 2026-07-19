@@ -10,6 +10,7 @@ import structlog
 from tiqora.config import get_settings
 from tiqora.logging_setup import configure_logging
 from tiqora.worker.escalation import run_escalation_tick
+from tiqora.worker.generic_agent import run_generic_agent_tick
 from tiqora.worker.notifications import run_notifications_tick
 from tiqora.worker.poller import poll_once
 from tiqora.worker.postmaster import run_postmaster_tick
@@ -90,12 +91,33 @@ async def _notifications_loop(stop: asyncio.Event) -> None:
     logger.info("notifications_loop_stopped")
 
 
+async def _generic_agent_loop(stop: asyncio.Event) -> None:
+    """GenericAgent tick loop. A no-op unless daemon.generic_agent.enabled=1
+    (see tiqora.domain.settings_store) — the tick itself checks the flag every
+    cycle so it can be toggled at runtime without a worker restart. Evaluated
+    every minute (Znuny's own GenericAgent daemon task cron granularity)."""
+    settings = get_settings()
+    interval = max(5, settings.generic_agent_interval_seconds)
+    logger.info("generic_agent_loop_started", interval_seconds=interval)
+    while not stop.is_set():
+        try:
+            await run_generic_agent_tick(settings=settings)
+        except Exception:  # noqa: BLE001 — keep loop alive
+            logger.exception("generic_agent_loop_error")
+        try:
+            await asyncio.wait_for(stop.wait(), timeout=interval)
+        except TimeoutError:
+            continue
+    logger.info("generic_agent_loop_stopped")
+
+
 async def _run_all_loops(stop: asyncio.Event) -> None:
     await asyncio.gather(
         _poller_loop(stop),
         _postmaster_loop(stop),
         _escalation_loop(stop),
         _notifications_loop(stop),
+        _generic_agent_loop(stop),
     )
 
 
