@@ -106,9 +106,7 @@ class Settings(BaseSettings):
     oidc_issuer: str = Field(default="", validation_alias="TIQORA_OIDC_ISSUER")
     oidc_client_id: str = Field(default="", validation_alias="TIQORA_OIDC_CLIENT_ID")
     oidc_client_secret: str = Field(default="", validation_alias="TIQORA_OIDC_CLIENT_SECRET")
-    oidc_scopes: str = Field(
-        default="openid profile email", validation_alias="TIQORA_OIDC_SCOPES"
-    )
+    oidc_scopes: str = Field(default="openid profile email", validation_alias="TIQORA_OIDC_SCOPES")
     oidc_claim: str = Field(default="preferred_username", validation_alias="TIQORA_OIDC_CLAIM")
     oidc_redirect_uri: str = Field(default="", validation_alias="TIQORA_OIDC_REDIRECT_URI")
 
@@ -118,15 +116,11 @@ class Settings(BaseSettings):
     krb5_ktname: str = Field(default="", validation_alias="KRB5_KTNAME")
 
     # TOTP 2FA (Phase 3c)
-    totp_pending_ttl_seconds: int = Field(
-        default=300, validation_alias="TIQORA_TOTP_PENDING_TTL"
-    )
+    totp_pending_ttl_seconds: int = Field(default=300, validation_alias="TIQORA_TOTP_PENDING_TTL")
     totp_issuer: str = Field(default="Tiqora", validation_alias="TIQORA_TOTP_ISSUER")
 
     # Webhooks (Phase 3c)
-    webhook_timeout_seconds: float = Field(
-        default=10.0, validation_alias="TIQORA_WEBHOOK_TIMEOUT"
-    )
+    webhook_timeout_seconds: float = Field(default=10.0, validation_alias="TIQORA_WEBHOOK_TIMEOUT")
     webhook_max_attempts: int = Field(default=3, validation_alias="TIQORA_WEBHOOK_MAX_ATTEMPTS")
 
     @property

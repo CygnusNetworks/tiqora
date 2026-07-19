@@ -73,12 +73,14 @@ def _seed_user(sync_url: str) -> tuple[int, str]:
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("url_fixture", ["mariadb_znuny_url", "postgres_znuny_url"])
-async def test_enroll_confirm_verify_disable(url_fixture: str, request: pytest.FixtureRequest) -> None:
+async def test_enroll_confirm_verify_disable(
+    url_fixture: str, request: pytest.FixtureRequest
+) -> None:
     sync_url: str = request.getfixturevalue(url_fixture)
     user_id, login = _seed_user(sync_url)
     engine = create_async_engine(_to_async_url(sync_url))
     factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
-    settings = Settings(secret_key="unit-test-secret-key")  # type: ignore[arg-type]
+    settings = Settings(secret_key="unit-test-secret-key")
 
     async with factory() as session:
         totp = TOTPService(session, settings)
@@ -121,7 +123,7 @@ async def test_pending_session_cannot_resolve_as_full_session(
     user_id, login = _seed_user(sync_url)
     engine = create_async_engine(_to_async_url(sync_url))
     factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
-    settings = Settings(secret_key="unit-test-secret-key", totp_pending_ttl_seconds=300)  # type: ignore[arg-type]
+    settings = Settings(secret_key="unit-test-secret-key", totp_pending_ttl_seconds=300)
     sessions = SessionStore(_FakeRedis(), settings)  # type: ignore[arg-type]
 
     async with factory() as session:
@@ -159,7 +161,7 @@ async def test_promote_pending_session_issues_full_session(
     user_id, login = _seed_user(sync_url)
     engine = create_async_engine(_to_async_url(sync_url))
     factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
-    settings = Settings(secret_key="unit-test-secret-key", totp_pending_ttl_seconds=300)  # type: ignore[arg-type]
+    settings = Settings(secret_key="unit-test-secret-key", totp_pending_ttl_seconds=300)
     sessions = SessionStore(_FakeRedis(), settings)  # type: ignore[arg-type]
 
     async with factory() as session:

@@ -95,6 +95,9 @@ export type AutoResponseUpdate = Schemas["AutoResponseUpdate"];
 export type DynamicFieldOut = Schemas["DynamicFieldOut"];
 export type DynamicFieldCreate = Schemas["DynamicFieldCreate"];
 export type DynamicFieldUpdate = Schemas["DynamicFieldUpdate"];
+export type WebhookOut = Schemas["WebhookOut"];
+export type WebhookCreate = Schemas["WebhookCreate"];
+export type WebhookUpdate = Schemas["WebhookUpdate"];
 export type PostmasterFilterOut = Schemas["PostmasterFilterOut"];
 export type AclOut = Schemas["AclOut"];
 export type GenericAgentJobOut = Schemas["GenericAgentJobOut"];
@@ -623,6 +626,10 @@ export class ApiClient {
     return this.adminCrud<DynamicFieldOut, DynamicFieldCreate, DynamicFieldUpdate>(
       "/api/v1/admin/dynamic-fields",
     );
+  }
+
+  get adminWebhooks() {
+    return this.adminCrud<WebhookOut, WebhookCreate, WebhookUpdate>("/api/v1/admin/webhooks");
   }
 
   // Read-only automation config.

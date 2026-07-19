@@ -25,7 +25,9 @@ class OIDCError(Exception):
 
 
 class OIDCService:
-    def __init__(self, settings: Settings, *, transport: httpx.AsyncBaseTransport | None = None) -> None:
+    def __init__(
+        self, settings: Settings, *, transport: httpx.AsyncBaseTransport | None = None
+    ) -> None:
         self._settings = settings
         self._transport = transport
         self._discovery: dict[str, Any] | None = None

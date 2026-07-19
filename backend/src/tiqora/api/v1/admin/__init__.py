@@ -21,6 +21,7 @@ from tiqora.api.v1.admin import (
     states,
     templates,
     users,
+    webhooks,
 )
 
 admin_router = APIRouter(prefix="/admin")
@@ -35,5 +36,6 @@ admin_router.include_router(templates.router)
 admin_router.include_router(auto_responses.router)
 admin_router.include_router(dynamic_fields.router)
 admin_router.include_router(readonly.router)
+admin_router.include_router(webhooks.router)
 
 __all__ = ["admin_router"]

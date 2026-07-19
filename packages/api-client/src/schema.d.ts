@@ -1406,6 +1406,47 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/webhooks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Webhooks */
+        get: operations["list_webhooks_api_v1_admin_webhooks_get"];
+        put?: never;
+        /** Create Webhook */
+        post: operations["create_webhook_api_v1_admin_webhooks_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/webhooks/{webhook_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Webhook */
+        get: operations["get_webhook_api_v1_admin_webhooks__webhook_id__get"];
+        put?: never;
+        post?: never;
+        /**
+         * Deactivate Webhook
+         * @description Soft-deactivate (``valid = False``); matches the invariant used by
+         *     other admin CRUD resources (queues, states, ...) that are never hard-deleted.
+         */
+        delete: operations["deactivate_webhook_api_v1_admin_webhooks__webhook_id__delete"];
+        options?: never;
+        head?: never;
+        /** Update Webhook */
+        patch: operations["update_webhook_api_v1_admin_webhooks__webhook_id__patch"];
+        trace?: never;
+    };
     "/znuny-compat/Session": {
         parameters: {
             query?: never;
@@ -3708,6 +3749,58 @@ export interface components {
             input?: unknown;
             /** Context */
             ctx?: Record<string, never>;
+        };
+        /** WebhookCreate */
+        WebhookCreate: {
+            /** Name */
+            name: string;
+            /** Url */
+            url: string;
+            /** Secret */
+            secret: string;
+            /** Events */
+            events?: string[];
+            /**
+             * Valid
+             * @default true
+             */
+            valid: boolean;
+        };
+        /** WebhookOut */
+        WebhookOut: {
+            /** Id */
+            id: number;
+            /** Name */
+            name: string;
+            /** Url */
+            url: string;
+            /** Events */
+            events: string[];
+            /** Valid */
+            valid: boolean;
+            /**
+             * Created
+             * Format: date-time
+             */
+            created: string;
+            /**
+             * Changed
+             * Format: date-time
+             */
+            changed: string;
+        };
+        /** WebhookUpdate */
+        WebhookUpdate: {
+            /** Name */
+            name?: string | null;
+            /** Url */
+            url?: string | null;
+            /** Secret */
+            secret?: string | null;
+            /** Events */
+            events?: string[] | null;
+            /** Valid */
+            valid?: boolean | null;
         };
     };
     responses: never;
@@ -8121,6 +8214,183 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["GenericAgentJobOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_webhooks_api_v1_admin_webhooks_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WebhookOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_webhook_api_v1_admin_webhooks_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WebhookCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WebhookOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_webhook_api_v1_admin_webhooks__webhook_id__get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                webhook_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WebhookOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    deactivate_webhook_api_v1_admin_webhooks__webhook_id__delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                webhook_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_webhook_api_v1_admin_webhooks__webhook_id__patch: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                webhook_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WebhookUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WebhookOut"];
                 };
             };
             /** @description Validation Error */
