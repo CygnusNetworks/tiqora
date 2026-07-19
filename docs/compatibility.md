@@ -133,3 +133,65 @@ Integrators needing those should migrate to `/api/v1` or MCP.
 - **Hot-reload**: Dynamic webservice routes require a process restart to take effect.
   The `/admin/reload` endpoint logs and validates but cannot actually re-register
   FastAPI routes in a running process without a restart.
+
+## Phase 3a uncertainties
+
+**Customer portal**
+
+- `queue.follow_up_id == 3` ("new ticket" split) is not implemented — treated
+  identically to `1` (reopen same ticket). `POST /portal/tickets/{id}/reply`
+  always replies in-place; a real split-into-new-ticket flow is deferred.
+- Reject-on-followup (`follow_up_id == 2`) returns HTTP 409 (business-state
+  conflict), not 403 (authz failure) — spec allowed either.
+- `portal.default_queue_id` unset falls back to Znuny seed queue id 2 ("Raw");
+  `portal.followup_reopen_state` unset falls back to state name `"open"`.
+- Portal-originated tickets/articles record `create_by`/owner as user id 1
+  (root@localhost), matching the existing convention for postmaster-style
+  writes elsewhere, since portal writes have no `users` row to attribute to.
+- `POST /portal/tickets/{id}/attachments` always creates a new customer
+  article carrying the file (subject to the same reopen/reject rules) — Znuny
+  has no "attachment without an article" concept.
+
+**Knowledge base**
+
+- Chunk indexing on `publish()` is synchronous, direct-to-Meilisearch —
+  it does not go through `tiqora_event_outbox` (which is ticket-shaped,
+  keyed by `ticket_id`). Acceptable since publish is a low-frequency admin
+  action; revisit if KB write volume grows.
+- KB tables have no FK constraints, matching the existing `tiqora_*` migration
+  style (e.g. `tiqora_form_draft.ticket_id`) — referential integrity is
+  application-enforced only.
+- Soft deletes: categories → `valid = False`; articles → `state = "archived"`
+  (content/chunks retained for audit/citation, not indexed for search).
+- Migration `20260719_0001_api_key_and_settings.py` (pre-existing, Phase 2)
+  fails to apply on PostgreSQL (`server_default=sa.text("1")` on a boolean
+  column → `DatatypeMismatchError`). Discovered while validating the new KB
+  migration (0004) on Postgres; 0004 itself applies/downgrades cleanly on
+  MariaDB. The Postgres leg of the full migration chain needs a follow-up fix
+  to 0001, tracked separately from Phase 3a.
+
+**Admin CRUD API**
+
+- Admin check: `PermissionEngine.is_admin()` requires `rw` on the group
+  literally named `admin` (direct `group_user`, or via `role_user` →
+  `group_role`) — there is no separate "is superuser" flag in Znuny's schema.
+- Fixed a latent bug while wiring `dynamic_fields` writes:
+  `db/legacy/dynamic_field.py`'s `DynamicField.config` was mapped as
+  `LargeBinary`, but Znuny's real column is `TEXT`/`LONGBLOB`-as-text
+  (same convention already documented for `Acl.config_match`). Writing
+  through the `LargeBinary` mapping caused PostgreSQL to implicitly hex-encode
+  the bytea parameter on INSERT, silently corrupting stored YAML — only read
+  paths had previously exercised this column. Column now mapped as `Text`.
+- Dynamic field YAML `config` keys per type (validated on admin
+  create/update): Text/TextArea — `DefaultValue`, `Link`, `RegExList`
+  (TextArea adds `Rows`, `Cols`); Checkbox — `DefaultValue`; Dropdown/
+  Multiselect — `PossibleValues` (required dict), `PossibleNone`,
+  `TranslatableValues`, `DefaultValue`, `Link`; Date/DateTime —
+  `DefaultValue`, `YearsPeriod`, `YearsInPast`, `YearsInFuture`. Unknown keys
+  are rejected; per-type required keys are enforced (422 on violation).
+- No per-config-row cache-invalidation entity exists in `tiqora_*`; admin
+  writes to queues/states/priorities enumerate and invalidate every
+  currently-affected `ticket.id` directly instead.
+- Deferred: ACL *editing* (list/detail only, as specified), and
+  `group_customer`/`group_customer_user` assignment endpoints (not in the
+  originally requested resource list).

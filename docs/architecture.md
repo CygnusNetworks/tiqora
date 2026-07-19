@@ -112,6 +112,82 @@ Key endpoints: `/auth/login|me|logout`, `/queues`, `/tickets`,
 - Planned: OIDC, Kerberos/SPNEGO (Linux KDC), optional TOTP per user;
   GenericInterface SessionIDs against Znuny `sessions`.
 
+### Customer portal (Phase 3a)
+
+Mounted at `/api/portal` in the main API process (same `tiqora-api`), parallel
+to `/api/v1`:
+
+- **Auth:** separate identity plane from agents. `domain/customer_auth.py`
+  (`CustomerAuthService`, `CustomerSessionStore`) verifies `customer_user.pw`
+  (`valid_id = 1`) with the same `znuny.password` module used for agents, but
+  keeps its own Redis key prefix (`tiqora:csession:`) and cookie
+  (`tiqora_customer_session`) so agent and customer sessions never collide.
+- **Scope:** a dedicated filter in `domain/portal_ticket_service.py` — not the
+  agent `PermissionEngine` — restricts a customer to tickets where
+  `ticket.customer_user_id == login`, plus (if the `tiqora_settings` flag for
+  company-wide visibility is enabled) tickets whose `customer_id` matches any
+  `customer_user_customer` row for that login.
+- **Endpoints:** `/auth/login|logout`, `/auth/me`, `/tickets` (list/get/create),
+  `/tickets/{id}/reply`, `/tickets/{id}/articles` (visibility-filtered to
+  `is_visible_for_customer = 1`), `/tickets/{id}/attachments` (upload/download,
+  same visibility filter). Ticket/article writes go through the existing
+  `ticket_write_service` functions — the portal never hand-rolls history rows.
+- **Reopen-on-followup:** ported from `Kernel/System/PostMaster/FollowUp.pm`.
+  A customer reply to a ticket whose current state has StateType *closed*
+  transitions the ticket to a configurable reopen state
+  (`tiqora_settings` key `portal.followup_reopen_state`, default `"open"`)
+  unless the ticket's queue has `follow_up_id == 2` ("reject"), in which case
+  the reply is refused (HTTP 409). Splitting into a brand-new ticket
+  (`follow_up_id == 3`) is not yet implemented — treated the same as reopen;
+  see `docs/compatibility.md` uncertainties.
+
+### Knowledge base (Phase 3a)
+
+New module `tiqora.kb`, backed by dedicated `tiqora_kb_*` tables
+(`versions_tiqora/20260719_0004_kb_tables.py`): category, article,
+article_version, attachment, chunk, tag, article_tag, link. No Znuny tables
+are touched.
+
+- **Versioning:** every content-changing update to an article snapshots the
+  prior row into `tiqora_kb_article_version` before applying the change and
+  bumps `version`.
+- **Chunker (`kb/chunker.py`):** pure function, no I/O. Splits `content_md` at
+  H2/H3 boundaries targeting ~500 tokens (approximated as `len(text) // 4`),
+  falling back to paragraph splits for oversized sections. Produces
+  `heading_path` breadcrumbs (`"H1 > H2 > H3"`) and slugified, per-article-unique
+  `anchor`s.
+- **Publish:** `kb/service.py` `publish()` sets `state = "published"`, replaces
+  the article's chunks, and pushes chunk documents to the Meilisearch `kb`
+  index directly (not via `tiqora_event_outbox`, which is ticket-shaped) —
+  acceptable since publishing is a low-frequency admin action.
+- **Scoping:** agent search filters by `permission_group_id` (denormalized
+  from category onto each chunk doc) via `PermissionEngine`; portal search is
+  hard-restricted to `customer_visible = true AND state = "published"`.
+- **Surfaces:** REST at `/api/v1/kb/*` (agent CRUD + publish + versions) and
+  `/api/portal/kb/*` (customer search + read, published+visible only); MCP
+  tools `kb_search` / `kb_get_article` in `mcp_server/server.py` call the same
+  `kb/service.py` functions.
+
+### Admin CRUD API (Phase 3a)
+
+`/api/v1/admin/*`, guarded by `AdminUser` (`api/v1/admin/deps.py`): Znuny
+"admin" semantics — membership (direct via `group_user`, or via
+`role_user` → `group_role`) in the group literally named `admin` with `rw`,
+checked by `PermissionEngine.is_admin()`. Non-admins get 403.
+
+CRUD (soft-invalidate via `valid_id`/`valid`, never hard `DELETE`, matching
+Znuny conventions) for users (+ group/role assignment, BCRYPT hash via
+`znuny.password`), groups, roles, queues (incl. escalation minutes,
+salutation/signature/system_address/follow_up), states, priorities,
+customer_users, customer_companies (+ `customer_user_customer`),
+salutations/signatures/standard templates (+ queue assignment),
+auto_responses (+ `queue_auto_response`), and dynamic_fields (per-type YAML
+`config` validation — e.g. Dropdown requires `PossibleValues`). Read-only
+list/detail for postmaster_filter, ACL (edit deferred), and
+generic_agent_jobs. Writes to queue/state/priority additionally invalidate
+every currently-affected ticket (no per-config-row cache-invalidation entity
+exists, so admin writes enumerate affected `ticket.id`s directly).
+
 ### Events and workers
 
 - Writes emit events via a transactional outbox (`tiqora_event_outbox`).
