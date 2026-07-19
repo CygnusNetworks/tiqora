@@ -1,0 +1,43 @@
+name: Golden-master (real Znuny vs Tiqora)
+
+# Manual-only: building and booting a full Znuny 6.5.22 container (from
+# source, no official image exists) is heavy and not needed for day-to-day
+# CI turnaround. Run from the Actions tab when validating a change that
+# touches ticket numbering, ticket_history formats, escalation math, or the
+# compat GenericInterface layer. See docs/testing.md.
+on:
+  workflow_dispatch: {}
+
+jobs:
+  golden:
+    name: Golden-master suite
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install backend dependencies
+        working-directory: backend
+        run: uv sync --extra dev
+      - name: Build + start golden stack
+        run: |
+          docker compose -f tests/golden/docker-compose.golden.yml up -d --build --wait
+      - name: Seed baseline fixtures
+        run: bash tests/golden/seed.sh
+      - name: Run golden-master suite
+        working-directory: backend
+        env:
+          GOLDEN: "1"
+          GOLDEN_DB_URL: "mysql+pymysql://znuny:znuny@127.0.0.1:3307/znuny"
+        run: uv run pytest -q -m golden ../tests/golden
+      - name: Dump Znuny container logs on failure
+        if: failure()
+        run: docker compose -f tests/golden/docker-compose.golden.yml logs znuny mariadb
+      - name: Tear down
+        if: always()
+        run: docker compose -f tests/golden/docker-compose.golden.yml down -v

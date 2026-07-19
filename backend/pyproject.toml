@@ -92,6 +92,7 @@ pythonpath = ["src"]
 markers = [
     "db: integration tests that require Docker (testcontainers MariaDB/Postgres)",
     "search: integration tests that require Meilisearch (testcontainers)",
+    "golden: golden-master tests comparing real Znuny vs Tiqora (GOLDEN=1, needs Docker, see tests/golden/)",
 ]
 
 [dependency-groups]
