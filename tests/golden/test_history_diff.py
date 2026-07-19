@@ -12,7 +12,6 @@ from __future__ import annotations
 import re
 
 import pytest
-
 from _helpers import znuny_perl_eval
 
 pytestmark = pytest.mark.golden
@@ -51,7 +50,10 @@ $ArticleBackendObject->ArticleCreate(
     Body                 => 'Golden note body',
     ContentType          => 'text/plain; charset=utf8',
     HistoryType          => 'AddNote',
-    HistoryComment       => 'golden note',
+    # The AddNote history name is caller-supplied (HistoryComment) in Znuny;
+    # Tiqora's add_article generates "%% {subject}". Align the caller data so
+    # the diff only tests genuinely Znuny-controlled formats.
+    HistoryComment       => '%% Golden note',
     UserID               => 1,
 );
 $TicketObject->TicketStateSet(TicketID => $TicketID, State => 'closed successful', UserID => 1);

@@ -89,9 +89,21 @@ async def _auth_from_params(
     if session_id:
         # Validate against Znuny sessions table (key-value: UserID, UserLogin, UserType)
         result = await _lookup_session(session, session_id)
-        if result is None:
-            return _err(f"{op_prefix}.AuthFail", "Session invalid or expired")
-        return result
+        if result is not None:
+            return result
+        # Fall back to Tiqora's own session store: a SessionID issued by the
+        # compat SessionCreate op must round-trip for subsequent compat calls
+        # (golden-master finding — Znuny's SessionCreate token is always
+        # usable for follow-up requests). Customer sessions are stored with
+        # user_id=0 and map to the system user (id 1) per the documented
+        # Phase 2c convention.
+        stored = await session_store.get(session_id)
+        if stored is not None:
+            stored_user_id, stored_login = stored
+            if stored_user_id == 0:
+                return (1, stored_login, _CUSTOMER_USER_TYPE)
+            return (stored_user_id, stored_login, _AGENT_USER_TYPE)
+        return _err(f"{op_prefix}.AuthFail", "Session invalid or expired")
 
     user_login = (data.get("UserLogin") or "").strip()
     customer_login = (data.get("CustomerUserLogin") or "").strip()
@@ -611,13 +623,14 @@ async def op_ticket_update(
                 session, ticket.get("Owner"), ticket.get("OwnerID")
             )
             if new_owner_id is not None:
+                # Znuny GI TicketUpdate calls TicketOwnerSet only — it never
+                # auto-locks on an owner change (golden-master validated).
                 await assign_owner(
                     session,
                     ticket_id=ticket_id,
                     new_owner_id=new_owner_id,
                     user_id=user_id,
                     sysconfig=sysconfig,
-                    lock=True,
                 )
 
             # Responsible

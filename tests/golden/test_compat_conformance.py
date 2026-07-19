@@ -12,11 +12,9 @@ defaults, see docs/compatibility.md "Known gotchas").
 from __future__ import annotations
 
 import contextlib
-from typing import Any
 
 import httpx
 import pytest
-
 from _helpers import znuny_console
 
 pytestmark = pytest.mark.golden

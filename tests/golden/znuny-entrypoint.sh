@@ -60,7 +60,7 @@ else
 fi
 
 echo "[znuny-entrypoint] fixing permissions"
-su -s /bin/bash otrs -c "perl /opt/otrs/bin/otrs.SetPermissions.pl --otrs-user=otrs --web-group=www-data" || true
+perl /opt/otrs/bin/otrs.SetPermissions.pl --otrs-user=otrs --web-group=www-data || true
 
 echo "[znuny-entrypoint] running SetPackageList / rebuild config cache"
 su -s /bin/bash otrs -c "perl /opt/otrs/bin/otrs.Console.pl Maint::Config::Rebuild" || true
