@@ -1,0 +1,69 @@
+"""Outbox drain task: reads tiqora_event_outbox and re-indexes affected tickets.
+
+Runs every minute via taskiq scheduler. Marks rows as processed after
+successful Meilisearch indexing, so a crash between index and mark will
+cause double-processing (idempotent: re-index is harmless).
+"""
+
+from __future__ import annotations
+
+import structlog
+from sqlalchemy import text
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
+
+from tiqora.config import Settings, get_settings
+from tiqora.db.engine import get_session_factory
+from tiqora.domain.search import SearchIndexService
+
+logger = structlog.get_logger(__name__)
+
+# How many outbox rows to process per run
+_BATCH_SIZE = 500
+
+
+async def drain_outbox(
+    *,
+    settings: Settings | None = None,
+    session_factory: async_sessionmaker[AsyncSession] | None = None,
+) -> dict[str, int]:
+    """Drain unprocessed outbox rows, re-index affected tickets, mark done.
+
+    Returns {"processed": N, "ticket_ids": M}.
+    """
+    cfg = settings or get_settings()
+    factory = session_factory or get_session_factory()
+
+    async with factory() as session:
+        rows = (
+            await session.execute(
+                text(
+                    "SELECT id, ticket_id FROM tiqora_event_outbox"
+                    " WHERE processed = 0 ORDER BY id ASC LIMIT :n"
+                ),
+                {"n": _BATCH_SIZE},
+            )
+        ).fetchall()
+
+    if not rows:
+        return {"processed": 0, "ticket_ids": 0}
+
+    row_ids = [int(r[0]) for r in rows]
+    ticket_ids = sorted({int(r[1]) for r in rows})
+
+    # Re-index in Meilisearch
+    async with factory() as session:
+        svc = SearchIndexService(session, cfg)
+        try:
+            await svc.index_tickets(ticket_ids)
+        finally:
+            await svc.close()
+
+    # Mark as processed
+    in_clause = ",".join(str(i) for i in row_ids)
+    async with factory() as session, session.begin():
+        await session.execute(
+            text(f"UPDATE tiqora_event_outbox SET processed = 1 WHERE id IN ({in_clause})")
+        )
+
+    logger.info("outbox_drain", processed=len(row_ids), ticket_ids=len(ticket_ids))
+    return {"processed": len(row_ids), "ticket_ids": len(ticket_ids)}
