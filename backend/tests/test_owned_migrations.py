@@ -61,30 +61,27 @@ def _run_alembic_upgrade_head(database_url: str) -> None:
         get_settings.cache_clear()
 
 
-_TIQORA_TABLES = [
-    "tiqora_alembic_version",
-    "tiqora_api_key",
-    "tiqora_settings",
-    "tiqora_cache_invalidation",
-    "tiqora_event_outbox",
-    "tiqora_form_draft",
-    "tiqora_user_totp",
-    "tiqora_webhook",
-    "tiqora_kb_article",
-    "tiqora_kb_chunk",
-]
-
-
 def _drop_tiqora_tables(sync_url: str) -> None:
     """The testcontainer fixture is session-scoped and shared with other test
     modules (e.g. ``test_ownership.py`` seeds ``tiqora_settings`` via raw
-    SQL). Start each migration run from a clean slate so ``alembic upgrade``
-    from base doesn't collide with tables created outside Alembic's control.
+    SQL, other suites exercise the KB/webhook/outbox models directly). Start
+    each migration run from a clean slate — introspect and drop every
+    ``tiqora_*`` table rather than hardcoding names, so this stays correct
+    as new tiqora_* tables are added — so ``alembic upgrade`` from base
+    doesn't collide with tables created outside Alembic's control.
     """
+    is_mysql = "mysql" in sync_url
     engine = create_engine(sync_url)
+    insp = inspect(engine)
+    tables = [name for name in insp.get_table_names() if name.startswith("tiqora_")]
     with engine.begin() as conn:
-        for table in _TIQORA_TABLES:
-            conn.execute(text(f"DROP TABLE IF EXISTS {table}"))
+        if is_mysql:
+            conn.execute(text("SET FOREIGN_KEY_CHECKS=0"))
+        for table in tables:
+            cascade = "" if is_mysql else " CASCADE"
+            conn.execute(text(f"DROP TABLE IF EXISTS {table}{cascade}"))
+        if is_mysql:
+            conn.execute(text("SET FOREIGN_KEY_CHECKS=1"))
     engine.dispose()
 
 

@@ -95,6 +95,14 @@ async def _seed_tiqora_settings_table(session: AsyncSession) -> None:
             )
         )
     await session.commit()
+    # The testcontainer fixture is session-scoped and shared with
+    # tests/test_owned_migrations.py, which also writes the ownership marker
+    # row directly. Clear it so each test here starts from a clean slate.
+    with contextlib.suppress(Exception):
+        await session.execute(
+            text("DELETE FROM tiqora_settings WHERE `key` LIKE 'schema.ownership%'")
+        )
+        await session.commit()
 
 
 async def _insert_ticket_history(session: AsyncSession, change_time: datetime) -> None:
