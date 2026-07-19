@@ -30,6 +30,12 @@ logger = structlog.get_logger(__name__)
 _X_OTRS_PREFIX = "x-otrs-"
 
 
+def _msgid(value: str | None) -> str | None:
+    """Re-wrap a bare Message-ID (parser strips <>) for storage/headers, matching
+    Znuny's convention of keeping the angle brackets in a_message_id/a_in_reply_to."""
+    return f"<{value}>" if value else None
+
+
 @dataclass
 class PipelineResult:
     outcome: str  # new_ticket|follow_up|follow_up_reject|follow_up_new_ticket|ignored|error
@@ -103,7 +109,7 @@ def _build_get_param(parsed: ParsedEmail, *, trusted: bool) -> dict[str, str]:
         "Subject": parsed.subject,
         "Body": parsed.body,
         "Message-ID": f"<{parsed.message_id}>" if parsed.message_id else "",
-        "In-Reply-To": parsed.in_reply_to or "",
+        "In-Reply-To": f"<{parsed.in_reply_to}>" if parsed.in_reply_to else "",
         "References": " ".join(f"<{r}>" for r in parsed.references),
         "SenderEmailAddress": parsed.from_address,
     }
@@ -282,8 +288,8 @@ async def process_message(
                 from_address=parsed.from_header,
                 to_address=get_param.get("To"),
                 cc=get_param.get("Cc") or None,
-                message_id=parsed.message_id,
-                in_reply_to=parsed.in_reply_to,
+                message_id=_msgid(parsed.message_id),
+                in_reply_to=_msgid(parsed.in_reply_to),
                 references=get_param.get("References") or None,
                 channel="email",
                 attachments=[(a.filename, a.content_type, a.content) for a in parsed.attachments],
@@ -316,7 +322,7 @@ async def process_message(
                 recipient=parsed.from_header,
                 orig_subject=parsed.subject,
                 orig_body=parsed.body,
-                orig_message_id=parsed.message_id,
+                orig_message_id=_msgid(parsed.message_id),
                 orig_x_otrs_loop=get_param.get("X-OTRS-Loop"),
             )
 
@@ -331,7 +337,7 @@ async def process_message(
                 recipient=parsed.from_header,
                 orig_subject=parsed.subject,
                 orig_body=parsed.body,
-                orig_message_id=parsed.message_id,
+                orig_message_id=_msgid(parsed.message_id),
                 orig_x_otrs_loop=get_param.get("X-OTRS-Loop"),
             )
 
@@ -367,8 +373,8 @@ async def process_message(
             from_address=parsed.from_header,
             to_address=get_param.get("To"),
             cc=get_param.get("Cc") or None,
-            message_id=parsed.message_id,
-            in_reply_to=parsed.in_reply_to,
+            message_id=_msgid(parsed.message_id),
+            in_reply_to=_msgid(parsed.in_reply_to),
             references=get_param.get("References") or None,
             channel="email",
             attachments=[(a.filename, a.content_type, a.content) for a in parsed.attachments],
@@ -386,7 +392,7 @@ async def process_message(
             recipient=parsed.from_header,
             orig_subject=parsed.subject,
             orig_body=parsed.body,
-            orig_message_id=parsed.message_id,
+            orig_message_id=_msgid(parsed.message_id),
             orig_x_otrs_loop=get_param.get("X-OTRS-Loop"),
         )
 
@@ -405,8 +411,8 @@ async def process_message(
         from_address=parsed.from_header,
         to_address=get_param.get("To"),
         cc=get_param.get("Cc") or None,
-        message_id=parsed.message_id,
-        in_reply_to=parsed.in_reply_to,
+        message_id=_msgid(parsed.message_id),
+        in_reply_to=_msgid(parsed.in_reply_to),
         references=get_param.get("References") or None,
         channel="email",
         attachments=[(a.filename, a.content_type, a.content) for a in parsed.attachments],
@@ -434,7 +440,7 @@ async def process_message(
         recipient=parsed.from_header,
         orig_subject=parsed.subject,
         orig_body=parsed.body,
-        orig_message_id=parsed.message_id,
+        orig_message_id=_msgid(parsed.message_id),
         orig_x_otrs_loop=get_param.get("X-OTRS-Loop"),
     )
 

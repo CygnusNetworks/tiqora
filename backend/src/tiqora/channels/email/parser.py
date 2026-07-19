@@ -119,8 +119,8 @@ def parse_email(raw: bytes) -> ParsedEmail:
     to_header = _decode_header_value(str(msg.get("To", "")))
     cc_header = _decode_header_value(str(msg.get("Cc", "")))
     reply_to_header = _decode_header_value(str(msg.get("Reply-To", "")))
-    message_id = (str(msg.get("Message-ID", "")) or "").strip() or None
-    in_reply_to = (str(msg.get("In-Reply-To", "")) or "").strip() or None
+    message_id = (str(msg.get("Message-ID", "")) or "").strip().strip("<>") or None
+    in_reply_to = (str(msg.get("In-Reply-To", "")) or "").strip().strip("<>") or None
 
     references_raw = str(msg.get("References", "") or "")
     references = [r.strip("<>") for r in references_raw.split() if r.strip("<>")]

@@ -53,20 +53,19 @@ async def check(
 
 
 async def record(session: AsyncSession, *, to: str, now: datetime | None = None) -> None:
-    """Record one auto-response send and prune rows from earlier days."""
+    """Record one auto-response send and prune rows from earlier days.
+
+    Znuny's ``ticket_loop_protection`` table (``schema.xml``) has **no**
+    primary key or unique constraint on ``(sent_to, sent_date)`` — every send
+    is a plain ``INSERT``, so the row count for a given day *is* the
+    send-count ``Check()`` compares against ``PostmasterMaxEmails``. Do not
+    "optimize" this into an upsert.
+    """
     if not to:
         return
     date_str = loop_protection_date(now)
-    exists = (
-        await session.execute(
-            select(TicketLoopProtection).where(
-                TicketLoopProtection.sent_to == to, TicketLoopProtection.sent_date == date_str
-            )
-        )
-    ).first()
-    if exists is None:
-        session.add(TicketLoopProtection(sent_to=to, sent_date=date_str))
-        await session.flush()
+    session.add(TicketLoopProtection(sent_to=to, sent_date=date_str))
+    await session.flush()
     await session.execute(
         text("DELETE FROM ticket_loop_protection WHERE sent_date != :ds"), {"ds": date_str}
     )
