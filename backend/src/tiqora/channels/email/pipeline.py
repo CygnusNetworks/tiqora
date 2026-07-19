@@ -45,6 +45,7 @@ class PipelineResult:
     orig_body: str = ""
     orig_message_id: str | None = None
     orig_x_otrs_loop: str | None = None
+    autoresponse_article_id: int | None = None
 
 
 async def _lookup_id(session: AsyncSession, table: str, name_col: str, value: str) -> int | None:
@@ -460,7 +461,7 @@ async def process_message_and_respond(
         and result.auto_response_type is not None
         and result.outcome != "ignored"
     ):
-        await send_auto_response(
+        result.autoresponse_article_id = await send_auto_response(
             session,
             session_factory,
             sysconfig,
