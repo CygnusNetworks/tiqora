@@ -28,6 +28,17 @@ ZNUNY_SETTING_DEFAULTS: Final[dict[str, Any]] = {
     "OTRSTimeZone": "UTC",
     "DefaultLanguage": "en",
     "FQDN": "yourhost.example.com",
+    # Postmaster (Phase 4a) — Kernel/Config/Files/XML/Ticket.xml defaults.
+    "PostmasterMaxEmails": 40,
+    "PostmasterMaxEmailsPerAddress": {},
+    "PostMasterMaxEmailSize": 16384,
+    "PostmasterDefaultQueue": "Raw",
+    "PostmasterDefaultPriority": "3 normal",
+    "PostmasterDefaultState": "new",
+    "PostmasterFollowUpState": "open",
+    "PostmasterFollowUpStateClosed": "open",
+    "PostmasterBounceEmailAsFollowUp": 1,
+    "PostmasterUserID": 1,
 }
 
 # Settings Tiqora currently needs typed accessors for.
@@ -153,6 +164,39 @@ class SysConfig:
 
     async def fqdn(self) -> str:
         return await self.get_str("FQDN")
+
+    # --- postmaster (Phase 4a) ---
+
+    async def postmaster_max_emails(self) -> int:
+        return int(await self.get("PostmasterMaxEmails", 40) or 40)
+
+    async def postmaster_max_emails_per_address(self) -> dict[str, Any]:
+        value = await self.get("PostmasterMaxEmailsPerAddress", {})
+        return value if isinstance(value, dict) else {}
+
+    async def postmaster_max_email_size_kb(self) -> int:
+        return int(await self.get("PostMasterMaxEmailSize", 16384) or 16384)
+
+    async def postmaster_default_queue(self) -> str:
+        return await self.get_str("PostmasterDefaultQueue", "Raw")
+
+    async def postmaster_default_priority(self) -> str:
+        return await self.get_str("PostmasterDefaultPriority", "3 normal")
+
+    async def postmaster_default_state(self) -> str:
+        return await self.get_str("PostmasterDefaultState", "new")
+
+    async def postmaster_followup_state(self) -> str:
+        return await self.get_str("PostmasterFollowUpState", "open")
+
+    async def postmaster_followup_state_closed(self) -> str:
+        return await self.get_str("PostmasterFollowUpStateClosed", "open")
+
+    async def postmaster_bounce_as_followup(self) -> bool:
+        return bool(await self.get("PostmasterBounceEmailAsFollowUp", 1))
+
+    async def postmaster_user_id(self) -> int:
+        return int(await self.get("PostmasterUserID", 1) or 1)
 
     async def tiqora_settings(self) -> dict[str, Any]:
         """All settings currently required by Tiqora core."""

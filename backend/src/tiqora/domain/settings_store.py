@@ -13,6 +13,21 @@ KEY_ARTICLE_WATERMARK = "poller.article.max_id"
 KEY_INDEX_REBUILD_WATERMARK = "index.rebuild.ticket_id"
 KEY_INDEX_REBUILD_STATUS = "index.rebuild.status"
 
+# Postmaster (Phase 4a) feature flags — daemon takeover switches. Default OFF:
+# Znuny's own daemon task (Daemon::SchedulerCronTaskManager::Task###MailAccountFetch)
+# must remain the sole mail-fetching path until an operator flips these keys.
+# See docs/parallel-operation.md → "Taking over mail processing".
+KEY_POSTMASTER_ENABLED = "daemon.postmaster.enabled"
+KEY_POSTMASTER_LEAVE_ON_SERVER = "daemon.postmaster.leave_on_server"
+KEY_POSTMASTER_INTERVAL_SECONDS = "daemon.postmaster.interval_seconds"
+
+
+async def get_setting_bool(session: AsyncSession, key: str, default: bool = False) -> bool:
+    raw = await get_setting(session, key)
+    if raw is None or raw == "":
+        return default
+    return raw.strip().lower() in ("1", "true", "yes", "on")
+
 
 async def get_setting(session: AsyncSession, key: str) -> str | None:
     result = await session.execute(select(TiqoraSettings.value).where(TiqoraSettings.key == key))
