@@ -39,7 +39,14 @@
     "username": "Benutzername",
     "password": "Passwort",
     "invalidCredentials": "Ungültiger Benutzername oder Passwort",
-    "loginFailed": "Anmeldung fehlgeschlagen. Bitte erneut versuchen."
+    "loginFailed": "Anmeldung fehlgeschlagen. Bitte erneut versuchen.",
+    "ssoButton": "Mit SSO anmelden",
+    "or": "oder",
+    "totpTitle": "Zwei-Faktor-Authentifizierung",
+    "totpHint": "Gib den 6-stelligen Code aus deiner Authenticator-App ein.",
+    "totpCode": "Authentifizierungscode",
+    "totpVerify": "Bestätigen",
+    "totpInvalid": "Ungültiger oder abgelaufener Code."
   },
   "dashboard": {
     "title": "Dashboard",

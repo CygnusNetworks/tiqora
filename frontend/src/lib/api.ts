@@ -21,6 +21,10 @@ export const api = new ApiClient({
 export { ApiError } from "@tiqora/api-client";
 export type {
   UserMe,
+  AuthMethodsOut,
+  TOTPCodeIn,
+  TOTPEnrollOut,
+  TOTPStatusOut,
   QueueNode,
   TicketListItem,
   PaginatedTickets,

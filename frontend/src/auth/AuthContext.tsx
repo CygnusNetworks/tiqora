@@ -14,7 +14,10 @@ type AuthContextValue = {
   user: UserMe | null;
   isLoading: boolean;
   isAuthenticated: boolean;
+  /** True right after login()/verifyTotp() when a TOTP code is still required. */
+  pending2fa: boolean;
   login: (login: string, password: string) => Promise<void>;
+  verifyTotp: (code: string) => Promise<void>;
   logout: () => Promise<void>;
   refresh: () => Promise<void>;
 };
@@ -24,6 +27,7 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const queryClient = useQueryClient();
   const [bootstrapped, setBootstrapped] = useState(false);
+  const [pending2fa, setPending2fa] = useState(false);
 
   const meQuery = useQuery({
     queryKey: ["auth", "me"],
@@ -48,6 +52,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const login = useCallback(
     async (loginName: string, password: string) => {
       const res = await api.login({ login: loginName, password });
+      if (res.pending_2fa) {
+        setPending2fa(true);
+        return;
+      }
+      setPending2fa(false);
+      queryClient.setQueryData(["auth", "me"], res.user);
+      await queryClient.invalidateQueries({ queryKey: ["auth", "me"] });
+    },
+    [queryClient],
+  );
+
+  const verifyTotp = useCallback(
+    async (code: string) => {
+      const res = await api.totpVerify({ code });
+      setPending2fa(false);
       queryClient.setQueryData(["auth", "me"], res.user);
       await queryClient.invalidateQueries({ queryKey: ["auth", "me"] });
     },
@@ -60,6 +79,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } catch {
       /* ignore network errors on logout */
     }
+    setPending2fa(false);
     queryClient.setQueryData(["auth", "me"], null);
     queryClient.clear();
   }, [queryClient]);
@@ -73,11 +93,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       user: meQuery.data ?? null,
       isLoading: !bootstrapped || meQuery.isLoading,
       isAuthenticated: Boolean(meQuery.data),
+      pending2fa,
       login,
+      verifyTotp,
       logout,
       refresh,
     }),
-    [meQuery.data, meQuery.isLoading, bootstrapped, login, logout, refresh],
+    [meQuery.data, meQuery.isLoading, bootstrapped, pending2fa, login, verifyTotp, logout, refresh],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

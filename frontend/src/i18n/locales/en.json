@@ -39,7 +39,14 @@
     "username": "Username",
     "password": "Password",
     "invalidCredentials": "Invalid username or password",
-    "loginFailed": "Sign-in failed. Please try again."
+    "loginFailed": "Sign-in failed. Please try again.",
+    "ssoButton": "Sign in with SSO",
+    "or": "or",
+    "totpTitle": "Two-factor authentication",
+    "totpHint": "Enter the 6-digit code from your authenticator app.",
+    "totpCode": "Authentication code",
+    "totpVerify": "Verify",
+    "totpInvalid": "Invalid or expired code."
   },
   "dashboard": {
     "title": "Dashboard",

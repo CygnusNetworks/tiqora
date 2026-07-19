@@ -130,3 +130,50 @@ class TiqoraFormDraft(TiqoraBase):
     )
 
     __table_args__ = (Index("ix_tiqora_form_draft_ticket_user", "ticket_id", "user_id"),)
+
+
+class TiqoraUserTotp(TiqoraBase):
+    """Per-agent TOTP 2FA enrollment (Phase 3c).
+
+    ``secret`` is stored Fernet-encrypted (using ``settings.secret_key``),
+    never in plaintext.
+    """
+
+    __tablename__ = "tiqora_user_totp"
+
+    user_id: Mapped[int] = mapped_column(Integer, primary_key=True, nullable=False)
+    secret: Mapped[str] = mapped_column(String(255), nullable=False)
+    enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    created: Mapped[datetime] = mapped_column(
+        DateTime,
+        nullable=False,
+        server_default=func.now(),
+    )
+
+
+class TiqoraWebhook(TiqoraBase):
+    """Admin-configured outbound webhook subscription (Phase 3c).
+
+    ``events`` is a JSON-encoded array of event-type strings (matching
+    ``tiqora_event_outbox.event_type``); an empty/``["*"]`` list means "all
+    events". Deliveries are HMAC-SHA256 signed with ``secret``.
+    """
+
+    __tablename__ = "tiqora_webhook"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True, nullable=False)
+    name: Mapped[str] = mapped_column(String(200), nullable=False)
+    url: Mapped[str] = mapped_column(String(500), nullable=False)
+    secret: Mapped[str] = mapped_column(String(255), nullable=False)
+    events: Mapped[str] = mapped_column(Text, nullable=False, default="[]")
+    valid: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    created: Mapped[datetime] = mapped_column(
+        DateTime,
+        nullable=False,
+        server_default=func.now(),
+    )
+    changed: Mapped[datetime] = mapped_column(
+        DateTime,
+        nullable=False,
+        server_default=func.now(),
+    )

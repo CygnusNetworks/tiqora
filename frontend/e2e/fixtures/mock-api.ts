@@ -307,6 +307,10 @@ export async function mockApi(page: Page) {
     const method = req.method();
 
     // Auth
+    if (path.endsWith("/api/v1/auth/methods") && method === "GET") {
+      await json(route, 200, { password: true, oidc: false, spnego: false });
+      return;
+    }
     if (path.endsWith("/api/v1/auth/login") && method === "POST") {
       const body = req.postDataJSON() as { login?: string; password?: string };
       if (body.login === "agent" && body.password === "secret") {

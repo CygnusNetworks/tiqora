@@ -12,6 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from tiqora.config import Settings, get_settings
 from tiqora.db.engine import get_session_factory
 from tiqora.domain.auth import AuthenticatedUser, AuthService, SessionStore
+from tiqora.domain.totp import TOTPService
 
 _redis_client: redis.Redis | None = None
 
@@ -96,6 +97,14 @@ async def get_current_user(
     )
 
 
+async def get_totp_service(
+    session: Annotated[AsyncSession, Depends(get_db)],
+    settings: Annotated[Settings, Depends(get_app_settings)],
+) -> TOTPService:
+    return TOTPService(session, settings)
+
+
 CurrentUser = Annotated[AuthenticatedUser, Depends(get_current_user)]
 DbSession = Annotated[AsyncSession, Depends(get_db)]
 AppSettings = Annotated[Settings, Depends(get_app_settings)]
+TOTPServiceDep = Annotated[TOTPService, Depends(get_totp_service)]

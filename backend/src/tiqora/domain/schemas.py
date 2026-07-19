@@ -23,8 +23,28 @@ class LoginRequest(BaseModel):
     password: str
 
 
+class AuthMethodsOut(BaseModel):
+    password: bool = True
+    oidc: bool = False
+    spnego: bool = False
+
+
+class TOTPEnrollOut(BaseModel):
+    secret: str
+    otpauth_uri: str
+
+
+class TOTPCodeIn(BaseModel):
+    code: str
+
+
+class TOTPStatusOut(BaseModel):
+    enabled: bool
+
+
 class LoginResponse(BaseModel):
-    user: UserMe
+    user: UserMe | None = None
+    pending_2fa: bool = False
 
 
 class QueueCounts(BaseModel):
