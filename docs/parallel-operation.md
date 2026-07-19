@@ -245,6 +245,193 @@ likely impact:
   implemented — Tiqora fetches an account's whole mailbox in one pass rather
   than reconnecting every N messages.
 
+## Taking over escalation index rebuild (Phase 4b)
+
+Tiqora's escalation sweep (`tiqora.worker.escalation`, math in
+`tiqora.znuny.escalation`) is a behavioural port of
+`Kernel::System::Console::Command::Maint::Ticket::EscalationIndexRebuild`
+(scheduled via `Daemon::SchedulerCronTaskManager::Task###EscalationCheck`)
+plus the `TriggerEscalationStartEvents` semantics: it batches open
+(non-`merge`/`close`/`remove` state-type) tickets, recomputes the four
+`ticket.escalation_*` columns, and fires
+`Escalation{ResponseTime,UpdateTime,SolutionTime}{Start,Stop,NotifyBefore}`
+`ticket_history` rows + `tiqora_event_outbox` events on state transitions.
+
+**It is OFF by default** and **mutually exclusive** with Znuny's own
+`EscalationCheck` scheduler task. Both sides recomputing the same columns is
+harmless *by itself* (the math is deterministic), but both sides firing
+Start/Stop/NotifyBefore events independently will double the ticket_history
+rows and duplicate any downstream notification.
+
+### Enabling the takeover
+
+1. Disable Znuny's `EscalationCheck` daemon task (SysConfig UI → *Daemon →
+   SchedulerCronTaskManager* → `EscalationCheck`, or set it invalid via
+   `Admin::Config::Update`).
+2. Set `daemon.escalation.enabled = 1` in `tiqora_settings` (see the SQL
+   pattern in "Taking over mail processing" above).
+3. The worker polls this flag every tick (default 300s,
+   `TIQORA_ESCALATION_INTERVAL`).
+4. Verify: a ticket crossing its escalation time gets exactly one
+   `EscalationResponseTimeStart`-type history row, not one from each side.
+
+### Rollback
+
+1. Set `daemon.escalation.enabled` back to `0`.
+2. Re-enable Znuny's `EscalationCheck` task. Znuny's own rebuild will
+   re-converge the columns on its next run (the math is deterministic and
+   idempotent either way).
+
+### Safety flags
+
+- `daemon.escalation.enabled` (`tiqora_settings`, default unset = OFF).
+- `daemon.escalation.batch_size` (`tiqora_settings`, default 500) — tickets
+  swept per tick.
+- `daemon.escalation.notify_before_seconds` (`tiqora_settings`, default
+  86400) — window before a destination time in which a one-shot
+  `*NotifyBefore` event fires; a simplified, fixed-window substitute for
+  Znuny's per-SLA/queue notify-before percentage (see Uncertainties below).
+
+## Taking over event notifications (Phase 4b)
+
+Tiqora's notification engine (`tiqora.worker.notifications`) is a
+behavioural port of `Kernel::System::Ticket::Event::NotificationEvent` (+ its
+`::Transport::Email` backend): it reads `notification_event` /
+`notification_event_item` / `notification_event_message`, matches them
+against `tiqora_event_outbox` rows via a monotonic per-event watermark
+(loop-safe — each outbox row is consumed exactly once, ever), resolves
+recipients (`AgentOwner`/`AgentResponsible`/`RecipientAgents`/
+`RecipientGroups`/`Customer`), evaluates ticket-attribute and `ArticleFilter`
+matching, renders the subject/body with the shared `<OTRS_...>` placeholder
+module (`tiqora.channels.email.placeholder`, reused from the Phase 4a
+postmaster auto-response path rather than duplicated), and sends via SMTP.
+
+**It is OFF by default** and **mutually exclusive** with Znuny's own event
+handler chain (which calls `NotificationEvent` synchronously on every
+ticket/article write). Both sides active means every matching notification
+is sent twice.
+
+### Enabling the takeover
+
+1. Disable Znuny's `NotificationEvent` ticket event handler
+   (`Ticket::EventModulePost###900-NotificationEvent` → invalid in
+   SysConfig), or accept that Tiqora only needs to win the race for writes
+   it itself performs (interactive Znuny GUI edits still trigger Znuny's own
+   handler) — **recommended**: disable it, since Tiqora's outbox sees writes
+   from *both* Znuny and Tiqora, so leaving Znuny's handler on double-sends
+   for every write regardless of origin.
+2. Set `daemon.notifications.enabled = 1` in `tiqora_settings`.
+3. The worker polls this flag every tick (default 60s,
+   `TIQORA_NOTIFICATIONS_INTERVAL`).
+4. Verify: a matching event produces exactly one email/article per
+   recipient, with a `SendAgentNotification`/`SendCustomerNotification`
+   history row.
+
+### Rollback
+
+1. Set `daemon.notifications.enabled` back to `0`.
+2. Re-enable Znuny's `NotificationEvent` event handler.
+3. The watermark (`daemon.notifications.outbox_watermark` in
+   `tiqora_settings`) is left in place; re-enabling later resumes from where
+   it left off rather than replaying old events.
+
+### Safety flags
+
+- `daemon.notifications.enabled` (`tiqora_settings`, default unset = OFF).
+
+## Taking over GenericAgent (Phase 4b)
+
+Tiqora's GenericAgent executor (`tiqora.worker.generic_agent`) is a
+behavioural port of a pragmatic subset of `Kernel::System::GenericAgent`
+(`JobGet`/`JobRun`/`_JobRunTicket`): it reads `generic_agent_jobs`, matches
+tickets over a supported criteria subset (`StateIDs`/`QueueIDs`/
+`PriorityIDs`/`OwnerIDs`/`LockIDs`/`TypeIDs`, `Title`/`CustomerID` LIKE, a
+`Ticket*Time*Older/NewerMinutes` range subset), and applies `New*` actions
+through `domain.ticket_write_service` (so every Znuny invariant — history,
+ticket_index, escalation recompute, cache invalidation, outbox event — fires
+exactly as for an interactive edit).
+
+**It is OFF by default** and **mutually exclusive** with Znuny's own
+`GenericAgent` scheduler task. Both sides running the same job doubles every
+action (double note, double state-flap history, etc.).
+
+### Enabling the takeover
+
+1. Disable Znuny's `GenericAgent` daemon task (SysConfig UI → *Daemon →
+   SchedulerCronTaskManager* → `GenericAgent`).
+2. Set `daemon.generic_agent.enabled = 1` in `tiqora_settings`.
+3. The worker polls this flag every tick (default 60s,
+   `TIQORA_GENERIC_AGENT_INTERVAL`) and evaluates each valid job's
+   `ScheduleDays`/`Hours`/`Minutes` against the current time every tick.
+4. `NewDelete` jobs stay inert (matched but not acted on, logged as
+   `generic_agent_delete_blocked`) until `daemon.generic_agent.allow_delete`
+   is also set — enable only after confirming the job's search criteria are
+   correct against a read-only run.
+5. Verify: a job's matched tickets get acted on exactly once per tick, not
+   once from each side.
+
+### Rollback
+
+1. Set `daemon.generic_agent.enabled` back to `0`.
+2. Re-enable Znuny's `GenericAgent` daemon task.
+
+### Safety flags
+
+- `daemon.generic_agent.enabled` (`tiqora_settings`, default unset = OFF).
+- `daemon.generic_agent.allow_delete` (`tiqora_settings`, default unset =
+  OFF) — required in addition to the takeover flag before any job's
+  `NewDelete` action actually deletes a ticket.
+
+## Uncertainties (Phase 4b — escalation, notifications, GenericAgent)
+
+Documented simplifications vs. exact Znuny behaviour, in descending order of
+likely impact:
+
+- **Escalation NotifyBefore window**: Znuny derives the notify-before point
+  per SLA/queue from configured percentages
+  (`{FirstResponse,Update,Solution}Notify`); Tiqora uses one fixed window
+  (`daemon.escalation.notify_before_seconds`, default 24h) across all
+  tickets regardless of SLA/queue configuration.
+- **Escalation sweep ordering**: batches tickets by `change_time ASC` to
+  guarantee eventual coverage under a batch-size cap; Znuny's console command
+  processes an unordered full-table scan every invocation (no batching).
+- **Notification transports**: only `Email` is implemented. Znuny's
+  `SMS`/custom transports and its `Notification::Transport` config table are
+  not consulted.
+- **Notification recipient preferences**: Znuny checks each user's
+  `Notification-<id>-<Transport>` preference before sending (agents can
+  individually opt out); Tiqora sends to every matched recipient
+  unconditionally.
+- **Notification recipients**: `AgentMyQueues`/`AgentMyServices`/
+  `AgentWatcher`/`AgentWritePermissions`/`AgentCreateBy` are **not
+  implemented** (they require queue-subscription/ticket-watcher/permission
+  joins not yet modelled in the notification engine). `RecipientGroups`
+  resolves direct `group_user` members only — no role→group expansion via
+  `PermissionGroupRoleGet`.
+- **Notification history divergence**: Znuny writes no `ticket_history` row
+  for agent email notifications (only customer notifications, via the
+  article backend); Tiqora deliberately writes a `SendAgentNotification` row
+  for both, for auditability. This is an intentional divergence, not a bug —
+  golden-master history-row comparisons for agent notifications will differ.
+- **GenericAgent time criteria**: only the `Older/NewerMinutes` variant of
+  each supported `Ticket*Time*` key is implemented; Znuny's `TimeSlot`
+  (absolute date range) and `TimePoint` (relative unit) UI variants, and
+  dynamic-field search criteria, are **not implemented**.
+- **GenericAgent recipient/notification interplay**: jobs with
+  `SendNoNotification` are not distinguished — Tiqora's actions always run
+  through the normal `ticket_write_service` path, so any *separately
+  enabled* Tiqora notification engine will see the resulting events like any
+  other write. Disable the notification engine (or scope its
+  `notification_event` rows away from GenericAgent-driven states/queues) if
+  a job must stay silent.
+- **GenericAgent delete port**: `_delete_ticket` is a best-effort ordered
+  delete of `article_data_mime`/`article`/`ticket_history`/
+  `dynamic_field_value`/`ticket` rows, not a full port of
+  `Ticket.pm::TicketDelete` (which also clears the search index, cache,
+  links, and other tables). Links, cache, and the search index are left to
+  the normal outbox/reindex path (a deleted ticket's stale search entry is
+  removed on the next full reindex, not immediately).
+
 ## Schema ownership (Phase 5)
 
 When parallel operation ends:
