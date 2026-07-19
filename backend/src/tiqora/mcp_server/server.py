@@ -117,9 +117,7 @@ class TiqoraBearerAuth(BaseHTTPMiddleware):
         return await call_next(request)
 
 
-async def _resolve_api_key(
-    factory: async_sessionmaker[AsyncSession], raw_key: str
-) -> int | None:
+async def _resolve_api_key(factory: async_sessionmaker[AsyncSession], raw_key: str) -> int | None:
     """Resolve tiqora_api_key to user_id via SHA-256 hash lookup."""
     key_hash = hashlib.sha256(raw_key.encode("utf-8")).hexdigest()
     async with factory() as session:
@@ -134,9 +132,7 @@ async def _resolve_api_key(
         if row is None:
             return None
         user = (
-            await session.execute(
-                select(Users).where(Users.id == row.user_id, Users.valid_id == 1)
-            )
+            await session.execute(select(Users).where(Users.id == row.user_id, Users.valid_id == 1))
         ).scalar_one_or_none()
         return user.id if user else None
 
@@ -212,13 +208,17 @@ async def ticket_search(
 
         # Get allowed queue IDs
         allowed_q_rows = (
-            await session.execute(
-                select(Queue.id).where(
-                    Queue.group_id.in_(allowed_groups),
-                    Queue.valid_id == 1,
+            (
+                await session.execute(
+                    select(Queue.id).where(
+                        Queue.group_id.in_(allowed_groups),
+                        Queue.valid_id == 1,
+                    )
                 )
             )
-        ).scalars().all()
+            .scalars()
+            .all()
+        )
         allowed_queues: set[int] = set(allowed_q_rows)
 
         if queue_ids:
@@ -237,9 +237,7 @@ async def ticket_search(
             logger.debug("mcp_meili_search_failed", error=str(exc))
 
         # DB fallback
-        return await _db_search(
-            session, allowed_queues, query, state_type, customer_user_id, limit
-        )
+        return await _db_search(session, allowed_queues, query, state_type, customer_user_id, limit)
 
 
 async def _meili_search(
@@ -306,12 +304,16 @@ async def _db_search(
 
     if state_type:
         sid_rows = (
-            await session.execute(
-                select(TicketState.id)
-                .join(TicketStateType, TicketStateType.id == TicketState.type_id)
-                .where(TicketStateType.name == state_type)
+            (
+                await session.execute(
+                    select(TicketState.id)
+                    .join(TicketStateType, TicketStateType.id == TicketState.type_id)
+                    .where(TicketStateType.name == state_type)
+                )
             )
-        ).scalars().all()
+            .scalars()
+            .all()
+        )
         if not sid_rows:
             return []
         s_ph = ",".join(f":s{i}" for i in range(len(sid_rows)))
@@ -494,11 +496,7 @@ async def ticket_get(
 # ---------------------------------------------------------------------------
 
 
-@mcp.tool(
-    description=(
-        "Create a new ticket. Returns the new TicketID and TicketNumber."
-    )
-)
+@mcp.tool(description=("Create a new ticket. Returns the new TicketID and TicketNumber."))
 async def ticket_create(
     ctx: Context,
     title: str,
@@ -553,8 +551,7 @@ async def ticket_create(
         try:
             async with session.begin():
                 ticket_id = await create_ticket(
-                    session, state.session_factory, sysconfig,
-                    params=ticket_in, user_id=user_id
+                    session, state.session_factory, sysconfig, params=ticket_in, user_id=user_id
                 )
             tn = (
                 await session.execute(
@@ -574,9 +571,7 @@ async def ticket_create(
 
 
 @mcp.tool(
-    description=(
-        "Add a reply article to a ticket. By default creates a customer-visible reply."
-    )
+    description=("Add a reply article to a ticket. By default creates a customer-visible reply.")
 )
 async def ticket_reply(
     ctx: Context,
@@ -610,8 +605,11 @@ async def ticket_reply(
                     channel=channel,
                 )
                 article_id = await add_article(
-                    session, ticket_id=ticket_id, article=article_in,
-                    user_id=user_id, sysconfig=sysconfig
+                    session,
+                    ticket_id=ticket_id,
+                    article=article_in,
+                    user_id=user_id,
+                    sysconfig=sysconfig,
                 )
             return {"article_id": article_id, "ticket_id": ticket_id}
         except TicketNotFound:
@@ -628,9 +626,7 @@ async def ticket_reply(
 
 
 @mcp.tool(
-    description=(
-        "Add an internal note to a ticket. Notes are NOT visible to customers by default."
-    )
+    description=("Add an internal note to a ticket. Notes are NOT visible to customers by default.")
 )
 async def ticket_note(
     ctx: Context,
@@ -662,8 +658,11 @@ async def ticket_note(
                     channel="note",
                 )
                 article_id = await add_article(
-                    session, ticket_id=ticket_id, article=article_in,
-                    user_id=user_id, sysconfig=sysconfig
+                    session,
+                    ticket_id=ticket_id,
+                    article=article_in,
+                    user_id=user_id,
+                    sysconfig=sysconfig,
                 )
             return {"article_id": article_id, "ticket_id": ticket_id}
         except (TicketNotFound, TicketAccessDenied, InvalidInput) as e:
@@ -695,8 +694,11 @@ async def ticket_update_state(
         try:
             async with session.begin():
                 await change_state(
-                    session, ticket_id=ticket_id, new_state_id=state_id,
-                    user_id=user_id, sysconfig=sysconfig
+                    session,
+                    ticket_id=ticket_id,
+                    new_state_id=state_id,
+                    user_id=user_id,
+                    sysconfig=sysconfig,
                 )
             return {"ok": True, "ticket_id": ticket_id, "state_id": state_id}
         except (TicketNotFound, TicketAccessDenied, InvalidInput) as e:
@@ -728,8 +730,11 @@ async def ticket_update_queue(
         try:
             async with session.begin():
                 await move_queue(
-                    session, ticket_id=ticket_id, new_queue_id=queue_id,
-                    user_id=user_id, sysconfig=sysconfig
+                    session,
+                    ticket_id=ticket_id,
+                    new_queue_id=queue_id,
+                    user_id=user_id,
+                    sysconfig=sysconfig,
                 )
             return {"ok": True, "ticket_id": ticket_id, "queue_id": queue_id}
         except (TicketNotFound, TicketAccessDenied, InvalidInput) as e:
@@ -761,8 +766,11 @@ async def ticket_update_priority(
         try:
             async with session.begin():
                 await change_priority(
-                    session, ticket_id=ticket_id, new_priority_id=priority_id,
-                    user_id=user_id, sysconfig=sysconfig
+                    session,
+                    ticket_id=ticket_id,
+                    new_priority_id=priority_id,
+                    user_id=user_id,
+                    sysconfig=sysconfig,
                 )
             return {"ok": True, "ticket_id": ticket_id, "priority_id": priority_id}
         except (TicketNotFound, TicketAccessDenied, InvalidInput) as e:
@@ -796,8 +804,12 @@ async def ticket_update_owner(
         try:
             async with session.begin():
                 await assign_owner(
-                    session, ticket_id=ticket_id, new_owner_id=owner_id,
-                    user_id=user_id, sysconfig=sysconfig, lock=lock
+                    session,
+                    ticket_id=ticket_id,
+                    new_owner_id=owner_id,
+                    user_id=user_id,
+                    sysconfig=sysconfig,
+                    lock=lock,
                 )
             return {"ok": True, "ticket_id": ticket_id, "owner_id": owner_id}
         except (TicketNotFound, TicketAccessDenied, InvalidInput) as e:
