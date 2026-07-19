@@ -12,10 +12,9 @@ from sqlalchemy.ext.asyncio import async_engine_from_config
 
 from tiqora.config import get_settings
 from tiqora.db.engine import _normalize_url
+from tiqora.db.tiqora import tiqora_metadata
 
-# Import models' MetaData here once tiqora_* models exist.
-# from tiqora.db.tiqora import Base
-target_metadata = None
+target_metadata = tiqora_metadata
 
 config = context.config
 if config.config_file_name is not None:
