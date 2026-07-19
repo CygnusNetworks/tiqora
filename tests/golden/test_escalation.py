@@ -11,7 +11,6 @@ in that queue via both paths and compares the four
 from __future__ import annotations
 
 import pytest
-
 from _helpers import znuny_perl_eval
 
 pytestmark = pytest.mark.golden
@@ -72,24 +71,27 @@ async def test_escalation_columns_match_and_zero_on_close(
     golden_session_factory, golden_conn
 ) -> None:
     from _helpers import GOLDEN_DIR  # noqa: F401 (kept for readability of intent)
+    from sqlalchemy import text
+
     from tiqora.domain.ticket_write_service import TicketIn, change_state, create_ticket
     from tiqora.znuny.sysconfig import SysConfig
-    from sqlalchemy import text
 
     znuny_ticket_id = int(znuny_perl_eval(_ZNUNY_CREATE_IN_GOLDEN_QUEUE).strip())
 
     async with golden_session_factory() as session:
         golden_queue_id = int(
-            (
-                await session.execute(text("SELECT id FROM queue WHERE name = 'Golden'"))
-            ).scalar_one()
+            (await session.execute(text("SELECT id FROM queue WHERE name = 'Golden'"))).scalar_one()
         )
         state_new_id = int(
-            (await session.execute(text("SELECT id FROM ticket_state WHERE name = 'new'"))).scalar_one()
+            (
+                await session.execute(text("SELECT id FROM ticket_state WHERE name = 'new'"))
+            ).scalar_one()
         )
         prio_id = int(
             (
-                await session.execute(text("SELECT id FROM ticket_priority WHERE name = '3 normal'"))
+                await session.execute(
+                    text("SELECT id FROM ticket_priority WHERE name = '3 normal'")
+                )
             ).scalar_one()
         )
 
@@ -152,7 +154,9 @@ async def test_escalation_columns_match_and_zero_on_close(
     znuny_esc_closed = _escalation_row(golden_conn, znuny_ticket_id)
     tiqora_esc_closed = _escalation_row(golden_conn, tiqora_ticket_id)
     for col in _ESCALATION_COLUMNS:
-        assert znuny_esc_closed[col] == 0, f"znuny {col} not zeroed on close: {znuny_esc_closed[col]}"
+        assert znuny_esc_closed[col] == 0, (
+            f"znuny {col} not zeroed on close: {znuny_esc_closed[col]}"
+        )
         assert tiqora_esc_closed[col] == 0, (
             f"tiqora {col} not zeroed on close: {tiqora_esc_closed[col]}"
         )

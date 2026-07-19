@@ -9,8 +9,8 @@ correctly formatted.
 from __future__ import annotations
 
 import pytest
-
 from _helpers import znuny_perl_eval
+
 from tiqora.znuny.sysconfig import SysConfig
 from tiqora.znuny.ticket_number import ticket_create_number
 
@@ -34,7 +34,7 @@ my $TicketID = $TicketObject->TicketCreate(
     OwnerID      => 1,
     UserID       => 1,
 );
-my %%Ticket = $TicketObject->TicketGet(TicketID => $TicketID);
+my %Ticket = $TicketObject->TicketGet(TicketID => $TicketID);
 print $Ticket{TicketNumber};
 """
 
@@ -50,31 +50,36 @@ async def test_ticket_numbers_unique_interleaved(golden_session_factory, golden_
         generator = await sysconfig.ticket_number_generator()
 
     tns: list[str] = []
+    sides: list[str] = []
     for i in range(6):
         if i % 2 == 0:
+            # Tiqora side: allocate a TN from the shared counter (the ticket
+            # row itself is exercised in test_history_diff.py — here only the
+            # counter interleaving is under test).
             async with golden_session_factory() as cfg_session:
                 sysconfig = SysConfig(cfg_session)
                 tns.append(await ticket_create_number(golden_session_factory, sysconfig))
+            sides.append("tiqora")
         else:
             tns.append(_znuny_create_ticket_tn())
+            sides.append("znuny")
 
     assert len(tns) == len(set(tns)), f"duplicate ticket numbers produced: {tns}"
 
     async with golden_session_factory() as cfg_session:
         system_id = await SysConfig(cfg_session).system_id()
     for tn in tns:
-        assert tn.startswith(_prefix_for_generator(generator)) or system_id in tn, (
+        assert system_id in tn, (
             f"TN {tn!r} does not look like a {generator} number for SystemID {system_id!r}"
         )
 
-    # Every TN must resolve to exactly one ticket.id in the shared DB.
+    # Znuny-created TNs must resolve to exactly one ticket row; Tiqora-side
+    # allocations were counter-only (no ticket insert), so those TNs must NOT
+    # exist yet — proving Znuny's collision-retry cannot re-issue them either
+    # way (the counter is shared, not the ticket table).
     with golden_conn.cursor() as cur:
-        for tn in tns:
+        for tn, side in zip(tns, sides, strict=True):
             cur.execute("SELECT COUNT(*) FROM ticket WHERE tn = %s", (tn,))
             (count,) = cur.fetchone()
-            assert count == 1, f"TN {tn!r} not found (or duplicated) in ticket table: count={count}"
-
-
-def _prefix_for_generator(generator: str) -> str:
-    # Loose sanity prefix check; exact format is verified in test_date_checksum.py.
-    return ""
+            expected = 1 if side == "znuny" else 0
+            assert count == expected, f"TN {tn!r} ({side}): expected {expected} rows, got {count}"

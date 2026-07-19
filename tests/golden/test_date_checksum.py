@@ -14,8 +14,8 @@ from __future__ import annotations
 import re
 
 import pytest
-
 from _helpers import znuny_console, znuny_perl_eval
+
 from tiqora.znuny.ticket_number import format_date_checksum
 
 pytestmark = pytest.mark.golden
@@ -38,7 +38,7 @@ my $TicketID = $TicketObject->TicketCreate(
     OwnerID      => 1,
     UserID       => 1,
 );
-my %%Ticket = $TicketObject->TicketGet(TicketID => $TicketID);
+my %Ticket = $TicketObject->TicketGet(TicketID => $TicketID);
 print $Ticket{TicketNumber};
 """
 

@@ -39,6 +39,7 @@ from tiqora.znuny.escalation import escalation_index_build
 from tiqora.znuny.history import (
     TYPE_ADD_NOTE,
     TYPE_EMAIL_AGENT,
+    TYPE_MISC,
     TYPE_PHONE_CALL_AGENT,
     add_archive_flag_update,
     add_article_history,
@@ -56,6 +57,7 @@ from tiqora.znuny.history import (
     add_subscribe,
     add_title_update,
     add_unsubscribe,
+    history_add,
 )
 from tiqora.znuny.search_flag import mark_search_rebuild, message_id_md5
 from tiqora.znuny.sysconfig import SysConfig
@@ -367,6 +369,19 @@ async def create_ticket(
         queue_id=params.queue_id,
     )
 
+    # Customer data history: Znuny TicketCreate calls TicketCustomerSet when
+    # CustomerID/CustomerUser is given, writing a CustomerUpdate row with BOTH
+    # parts (empty string for a missing one — both params are defined in that
+    # internal call). Golden-master validated against Znuny 6.5.22.
+    if params.customer_id is not None or params.customer_user_id is not None:
+        await add_customer_update(
+            session,
+            ticket_id=ticket_id,
+            customer_id=params.customer_id or "",
+            customer_user=params.customer_user_id or "",
+            user_id=user_id,
+        )
+
     # Escalation
     await escalation_index_build(session, ticket_id, user_id, sysconfig)
 
@@ -565,6 +580,51 @@ async def add_article(
         user_id=user_id,
     )
 
+    # Unlock-timeout reset (port of MIMEBase::ArticleCreate → Ticket.pm::
+    # TicketUnlockTimeoutUpdate). Golden-master validated against 6.5.22:
+    # - agent article: always reset ticket.timeout to the article's
+    #   incoming_time; when the value actually changes this writes a
+    #   Misc "Reset of unlock time." history row.
+    # - customer article: same reset, but only when the previous
+    #   non-system article was from an agent.
+    reset_unlock = False
+    if article.sender_type == "agent":
+        reset_unlock = True
+    elif article.sender_type == "customer":
+        prev = (
+            await session.execute(
+                text(
+                    "SELECT st.name FROM article a"
+                    " JOIN article_sender_type st ON st.id = a.article_sender_type_id"
+                    " WHERE a.ticket_id = :tid AND a.id <> :aid AND st.name <> 'system'"
+                    " ORDER BY a.id DESC LIMIT 1"
+                ),
+                {"tid": ticket_id, "aid": article_id},
+            )
+        ).first()
+        reset_unlock = prev is not None and prev[0] == "agent"
+    if reset_unlock:
+        current_timeout = (
+            await session.execute(
+                text("SELECT timeout FROM ticket WHERE id = :tid"), {"tid": ticket_id}
+            )
+        ).scalar_one()
+        if int(current_timeout or 0) != incoming_time:
+            await session.execute(
+                text(
+                    "UPDATE ticket SET timeout = :to, change_time = current_timestamp,"
+                    " change_by = :uid WHERE id = :tid"
+                ),
+                {"to": incoming_time, "uid": user_id, "tid": ticket_id},
+            )
+            await history_add(
+                session,
+                ticket_id=ticket_id,
+                history_type=TYPE_MISC,
+                name="Reset of unlock time.",
+                user_id=user_id,
+            )
+
     # Outbox event
     await _emit_event(
         session, "ArticleCreate", ticket_id, {"article_id": article_id, "channel": article.channel}
@@ -656,6 +716,22 @@ async def change_state(
             day=pending_time.day,
             hour=pending_time.hour,
             minute=pending_time.minute,
+            user_id=user_id,
+        )
+    elif not new_state_type.lower().startswith("pending"):
+        # Port of Ticket::EventModulePost###3300-TicketPendingTimeReset:
+        # on every TicketStateUpdate to a non-pending state, Znuny resets the
+        # pending time via TicketPendingTimeSet('0000-00-00 00:00:00'), which
+        # writes a SetPendingTime history row `%%00-00-00 00:00` even if
+        # until_time was already 0. Golden-master validated against 6.5.22.
+        await add_pending_time(
+            session,
+            ticket_id=ticket_id,
+            year=0,
+            month=0,
+            day=0,
+            hour=0,
+            minute=0,
             user_id=user_id,
         )
     # Recompute escalation (close zeroes it out)
@@ -766,17 +842,29 @@ async def assign_owner(
     new_owner_id: int,
     user_id: int,
     sysconfig: SysConfig,
-    lock: bool = True,
+    lock: bool = False,
 ) -> None:
-    """Assign ticket owner.
+    """Assign ticket owner (port of ``Ticket.pm::TicketOwnerSet``).
 
-    Ports TicketOwnerSet lock semantics: if lock=True and the ticket is
-    currently unlocked, it is locked to the new owner.
+    Golden-master validated behaviours (Znuny 6.5.22):
+
+    - No-op (no UPDATE, no history) when the ticket already has that owner —
+      Znuny returns 2 without any write.
+    - ``TicketOwnerSet`` itself never locks the ticket; auto-locking is a
+      *frontend* behaviour (AgentTicketOwner with a lock config), not part of
+      the core write. ``lock=True`` remains available for callers that want
+      the explicit combined behaviour (writes the same rows Znuny's frontend
+      would via a separate TicketLockSet call), but defaults to False.
     """
     t = await _ticket_must_exist(session, ticket_id)
+
+    # Znuny: "check if update is needed!" — same owner is a silent no-op.
+    if int(t["user_id"]) == new_owner_id:
+        return
+
     new_login = await _user_login(session, new_owner_id)
 
-    # Lock semantics: if requested and currently unlock(id=1), lock it (id=2)
+    # Optional explicit lock (frontend-equivalent): lock if currently unlocked.
     current_lock_id = int(t["ticket_lock_id"])
     new_lock_id = current_lock_id
     if lock and current_lock_id == 1:  # 1=unlock

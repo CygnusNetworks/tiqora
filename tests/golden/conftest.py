@@ -23,9 +23,8 @@ from pathlib import Path
 import pymysql
 import pytest
 import pytest_asyncio
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
-
 from _helpers import znuny_console, znuny_perl_eval  # noqa: F401 — re-exported for test modules
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 GOLDEN_DIR = Path(__file__).resolve().parent
 DEFAULT_DB_URL = "mysql+pymysql://znuny:znuny@127.0.0.1:3307/znuny"
