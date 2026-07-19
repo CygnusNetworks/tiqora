@@ -69,19 +69,48 @@ Adapters (REST, MCP, workers) must not invent partial writes.
 
 ### Search and attachments
 
-- **Meilisearch** holds ticket/article/KB indexes. During parallel operation a
-  poller watches Znuny write watermarks (`ticket_history.id`, `article.id`) and
-  a nightly reconcile uses `ticket.change_time`.
-- **Attachments** stay in the DB as LONGBLOB/bytea behind a `StorageBackend`
-  interface (S3/filesystem later).
+- **Meilisearch** holds ticket indexes (`tickets` by default). Document shape:
+  id, tn, title, queue, state/state_type, priority, owner, customer, escalation
+  flags, latest article excerpt, flattened dynamic fields.
+- **Filterable:** `queue_id`, `state_type`, `owner_id`, `customer_id`.
+  **Sortable:** `changed`, `created`. Search always applies
+  `queue_id IN [allowed]` from the permission engine.
+- **Bulk backfill:** `tiqora index rebuild` (taskiq task too) batches of 500
+  with resumable watermark in `tiqora_settings` (`index.rebuild.ticket_id`).
+- **Znuny-write poller** (worker, default every 15s): watermarks on
+  `ticket_history.id` and `article.id` in `tiqora_settings`; re-indexes distinct
+  ticket ids; exposes Prometheus lag gauges
+  (`tiqora_poller_history_lag`, `tiqora_poller_article_lag`).
+- **Attachments** stay in the DB as LONGBLOB/bytea behind `StorageBackend`
+  (`DbMimeStorage` in V1). REST streams content with correct Content-Type and
+  disposition; `cid:` bodies rewrite to
+  `/api/v1/tickets/{id}/articles/{aid}/attachments/by-cid/{cid}`.
+
+### Read path (Phase 1a)
+
+```
+Browser / agent UI
+    → REST /api/v1 (session cookie or API-key Bearer)
+    → domain services (QueueService, TicketService, CustomerService, SearchIndexService)
+    → permissions.PermissionEngine (ro on queue group)
+    → db/legacy (Znuny tables, read-only) + Meilisearch
+```
+
+Key endpoints: `/auth/login|me|logout`, `/queues`, `/tickets`,
+`/tickets/{id}/articles`, attachments, `/tickets/{id}/history`,
+`/customers/{login}`, `/search?q=`. HTML article bodies are sanitised server-side
+(`nh3` allowlist, cid rewrite, external images → `data-external-src`).
 
 ### Auth and sessions
 
 - Password verification reuses Znuny hash formats (`BCRYPT:…`, sha256/512,
-  md5-crypt).
-- Sessions are **server-side in Redis** (not JWT). The GenericInterface compat
-  layer additionally validates SessionIDs against Znuny’s `sessions` table.
-- Planned: OIDC, Kerberos/SPNEGO (Linux KDC), optional TOTP per user.
+  md5-crypt) against `users.pw` (`valid_id = 1` only).
+- Sessions are **server-side in Redis** (opaque token, httpOnly cookie
+  `tiqora_session`, sliding TTL). Not JWT.
+- API keys: `tiqora_api_key` (sha256 of key, linked to `user_id`);
+  `Authorization: Bearer`.
+- Planned: OIDC, Kerberos/SPNEGO (Linux KDC), optional TOTP per user;
+  GenericInterface SessionIDs against Znuny `sessions`.
 
 ### Events and workers
 

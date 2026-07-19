@@ -35,17 +35,21 @@ def pytest_configure(config: pytest.Config) -> None:
         "markers",
         "db: integration tests that require Docker (testcontainers MariaDB/Postgres)",
     )
+    config.addinivalue_line(
+        "markers",
+        "search: integration tests that require Meilisearch (testcontainers)",
+    )
 
 
 def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item]) -> None:
-    """Skip db-marked tests when Docker is not available (unless forced)."""
+    """Skip db/search-marked tests when Docker is not available (unless forced)."""
     if os.environ.get("TIQORA_FORCE_DB_TESTS") == "1":
         return
     if docker_available():
         return
-    skip = pytest.mark.skip(reason="Docker not available for db-marked tests")
+    skip = pytest.mark.skip(reason="Docker not available for db/search-marked tests")
     for item in items:
-        if "db" in item.keywords:
+        if "db" in item.keywords or "search" in item.keywords:
             item.add_marker(skip)
 
 
