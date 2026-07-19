@@ -22,7 +22,7 @@ export function Tabs({
     <div
       role="tablist"
       className={cn(
-        "flex flex-wrap gap-1 border-b border-border",
+        "flex flex-wrap gap-1 border-b border-hairline",
         className,
       )}
     >
@@ -36,7 +36,7 @@ export function Tabs({
             aria-selected={active}
             onClick={() => onChange(item.id)}
             className={cn(
-              "relative -mb-px px-3 py-2 text-sm font-medium transition",
+              "relative -mb-px px-3 py-2 text-sm font-medium transition-colors duration-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent",
               active
                 ? "border-b-2 border-accent text-accent"
                 : "text-muted hover:text-ink",
@@ -44,7 +44,7 @@ export function Tabs({
           >
             {item.label}
             {item.count != null && (
-              <span className="ml-1.5 text-xs tabular-nums text-muted">
+              <span className="ml-1.5 font-mono text-xs tabular-nums text-muted">
                 {item.count}
               </span>
             )}

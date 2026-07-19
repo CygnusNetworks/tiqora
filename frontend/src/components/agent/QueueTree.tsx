@@ -31,10 +31,10 @@ function QueueItem({
         data-testid={`queue-node-${node.id}`}
         onClick={() => onSelect(node.id)}
         className={cn(
-          "flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-sm transition",
+          "flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-sm transition-colors duration-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent",
           active
-            ? "bg-accent/15 text-accent font-medium"
-            : "text-ink hover:bg-surface",
+            ? "bg-surface-subtle font-medium text-accent"
+            : "text-ink hover:bg-surface-subtle",
           !node.valid && "opacity-50",
         )}
         style={{ paddingLeft: 8 + depth * 12 }}
@@ -44,10 +44,10 @@ function QueueItem({
             ? node.name.split("::").pop()
             : node.name}
         </span>
-        <span className="shrink-0 tabular-nums text-xs text-muted">
+        <span className="shrink-0 font-mono text-xs tabular-nums text-muted">
           {open}
           {total !== open ? (
-            <span className="text-muted/70">/{total}</span>
+            <span className="text-muted/60">/{total}</span>
           ) : null}
         </span>
       </button>
@@ -87,10 +87,10 @@ export function QueueTree({
         data-testid="queue-node-all"
         onClick={() => onSelect(null)}
         className={cn(
-          "flex w-full items-center rounded px-2 py-1.5 text-left text-sm transition",
+          "flex w-full items-center rounded px-2 py-1.5 text-left text-sm transition-colors duration-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent",
           selectedId == null
-            ? "bg-accent/15 font-medium text-accent"
-            : "text-ink hover:bg-surface",
+            ? "bg-surface-subtle font-medium text-accent"
+            : "text-ink hover:bg-surface-subtle",
         )}
       >
         {t("queue.allQueues")}
