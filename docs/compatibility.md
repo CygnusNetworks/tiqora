@@ -115,6 +115,20 @@ Integrators needing those should migrate to `/api/v1` or MCP.
 3. Move production webservice routes (or reverse proxy) when diffs are clean.
 4. Plan a later move to `/api/v1` for new integrations.
 
+## Golden-master validation (2026-07-19)
+
+The golden-master suite (`tests/golden/`, see docs/testing.md) runs a REAL
+Znuny 6.5.22 container on the same MariaDB and validated:
+
+- SessionCreate / TicketSearch / empty-search wire shapes against Znuny's
+  shipped `GenericTicketConnectorREST` webservice.
+- The `StateType` singular gotcha on both sides.
+- **Divergence found and fixed**: a compat-issued SessionID (Redis) could not
+  authenticate follow-up compat calls (`_auth_from_params` only consulted the
+  Znuny `sessions` table); it now falls back to the Tiqora session store.
+- **Divergence found and fixed**: compat TicketUpdate auto-locked the ticket
+  on owner change; Znuny's GI TicketUpdate never does.
+
 ## Phase 2c uncertainties
 
 - **SessionID TTL**: The compat layer validates `UserID`/`UserLogin`/`UserType`
