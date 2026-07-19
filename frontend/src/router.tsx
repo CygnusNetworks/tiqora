@@ -11,9 +11,20 @@ import { QueuesPage, type QueuesSearch } from "@/routes/agent/QueuesPage";
 import { TicketZoomPage } from "@/routes/agent/TicketZoomPage";
 import { SearchPage, type SearchSearch } from "@/routes/agent/SearchPage";
 import { AgentShell } from "@/components/layout/AgentShell";
+import { PortalShell } from "@/components/layout/PortalShell";
 import { RequireAuth } from "@/auth/RequireAuth";
+import { RequirePortalAuth } from "@/auth/RequirePortalAuth";
+import { CustomerAuthProvider } from "@/auth/CustomerAuthContext";
 import { HomeRedirect } from "@/routes/HomeRedirect";
-import PortalPage from "@/routes/PortalPage";
+import { PortalLoginPage } from "@/routes/portal/PortalLoginPage";
+import {
+  TicketListPage,
+  type PortalTicketListSearch,
+} from "@/routes/portal/TicketListPage";
+import { NewTicketPage } from "@/routes/portal/NewTicketPage";
+import { TicketDetailPage } from "@/routes/portal/TicketDetailPage";
+import { KbSearchPage, type PortalKbSearch } from "@/routes/portal/KbSearchPage";
+import { KbArticlePage } from "@/routes/portal/KbArticlePage";
 import AdminPage from "@/routes/AdminPage";
 
 const rootRoute = createRootRoute({
@@ -105,10 +116,78 @@ const agentSearchRoute = createRoute({
   component: SearchPage,
 });
 
-const portalRoute = createRoute({
+// /portal/login: mounts its own CustomerAuthProvider (a separate session from
+// the agent AuthProvider) — not gated, since it must render for a
+// not-yet-authenticated customer.
+const portalLoginRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/portal/login",
+  validateSearch: (s: Record<string, unknown>): { next?: string } => ({
+    next: typeof s.next === "string" ? s.next : undefined,
+  }),
+  component: () => (
+    <CustomerAuthProvider>
+      <PortalLoginPage />
+    </CustomerAuthProvider>
+  ),
+});
+
+// /portal: gated portal shell — CustomerAuthProvider + RequirePortalAuth.
+const portalLayoutRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/portal",
-  component: PortalPage,
+  component: () => (
+    <CustomerAuthProvider>
+      <RequirePortalAuth>
+        <PortalShell>
+          <Outlet />
+        </PortalShell>
+      </RequirePortalAuth>
+    </CustomerAuthProvider>
+  ),
+});
+
+const portalIndexRoute = createRoute({
+  getParentRoute: () => portalLayoutRoute,
+  path: "/",
+  validateSearch: (s: Record<string, unknown>): PortalTicketListSearch => {
+    const state =
+      s.state_type === "open" ||
+      s.state_type === "pending" ||
+      s.state_type === "closed" ||
+      s.state_type === "all"
+        ? s.state_type
+        : undefined;
+    return { state_type: state };
+  },
+  component: TicketListPage,
+});
+
+const portalNewTicketRoute = createRoute({
+  getParentRoute: () => portalLayoutRoute,
+  path: "/tickets/new",
+  component: NewTicketPage,
+});
+
+const portalTicketRoute = createRoute({
+  getParentRoute: () => portalLayoutRoute,
+  path: "/tickets/$ticketId",
+  component: TicketDetailPage,
+});
+
+const portalKbRoute = createRoute({
+  getParentRoute: () => portalLayoutRoute,
+  path: "/kb",
+  validateSearch: (s: Record<string, unknown>): PortalKbSearch => ({
+    q: typeof s.q === "string" ? s.q : undefined,
+  }),
+  component: KbSearchPage,
+});
+
+const portalKbArticleRoute = createRoute({
+  getParentRoute: () => portalLayoutRoute,
+  path: "/kb/$slug",
+  component: KbArticlePage,
 });
 
 const adminRoute = createRoute({
@@ -134,7 +213,14 @@ const routeTree = rootRoute.addChildren([
     agentTicketRoute,
     agentSearchRoute,
   ]),
-  portalRoute,
+  portalLoginRoute,
+  portalLayoutRoute.addChildren([
+    portalIndexRoute,
+    portalNewTicketRoute,
+    portalTicketRoute,
+    portalKbRoute,
+    portalKbArticleRoute,
+  ]),
   adminRoute,
   catchAllRoute,
 ]);
