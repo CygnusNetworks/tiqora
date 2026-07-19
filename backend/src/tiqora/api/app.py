@@ -3,16 +3,18 @@
 from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import asynccontextmanager
 
+import redis.asyncio as redis
 import structlog
 from fastapi import FastAPI, Response
 from fastapi.middleware.cors import CORSMiddleware
-from prometheus_client import CONTENT_TYPE_LATEST, Counter, Histogram, generate_latest
+from prometheus_client import CONTENT_TYPE_LATEST, Counter, Gauge, Histogram, generate_latest
 from starlette.requests import Request
 from starlette.responses import Response as StarletteResponse
 
 from tiqora import __version__
+from tiqora.api.v1 import api_v1_router
 from tiqora.config import Settings, get_settings
-from tiqora.db.engine import check_database
+from tiqora.db.engine import check_database, get_session_factory
 from tiqora.logging_setup import configure_logging
 
 logger = structlog.get_logger(__name__)
@@ -27,6 +29,23 @@ REQUEST_LATENCY = Histogram(
     "HTTP request latency in seconds",
     ["method", "path"],
 )
+POLLER_HISTORY_LAG = Gauge(
+    "tiqora_poller_history_lag",
+    "Rows behind max ticket_history.id watermark",
+)
+POLLER_ARTICLE_LAG = Gauge(
+    "tiqora_poller_article_lag",
+    "Rows behind max article.id watermark",
+)
+POLLER_RUNS = Counter(
+    "tiqora_poller_runs_total",
+    "Znuny-write poller runs",
+    ["status"],
+)
+INDEX_DOCS = Counter(
+    "tiqora_index_documents_total",
+    "Documents sent to Meilisearch",
+)
 
 CallNext = Callable[[Request], Awaitable[StarletteResponse]]
 
@@ -36,12 +55,17 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     """Application startup / shutdown hooks."""
     settings: Settings = app.state.settings
     configure_logging(settings)
+    app.state.session_factory = get_session_factory()
+    app.state.redis = redis.from_url(settings.redis_url, decode_responses=True)
     logger.info(
         "tiqora_starting",
         version=__version__,
         environment=settings.environment,
     )
     yield
+    redis_client = getattr(app.state, "redis", None)
+    if redis_client is not None:
+        await redis_client.aclose()
     logger.info("tiqora_stopped")
 
 
@@ -68,8 +92,18 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     @app.middleware("http")
     async def metrics_middleware(request: Request, call_next: CallNext) -> StarletteResponse:
         path = request.url.path
-        # Avoid high-cardinality labels for dynamic paths later; root ops only for now
-        label_path = path if path in {"/health", "/ready", "/metrics", "/"} else "other"
+        if path.startswith(cfg.api_prefix):
+            # Collapse dynamic segments for low-cardinality labels
+            parts = path.split("/")
+            label_parts: list[str] = []
+            for p in parts:
+                if p.isdigit():
+                    label_parts.append("{id}")
+                else:
+                    label_parts.append(p)
+            label_path = "/".join(label_parts)
+        else:
+            label_path = path if path in {"/health", "/ready", "/metrics", "/"} else "other"
         method = request.method
         with REQUEST_LATENCY.labels(method=method, path=label_path).time():
             response = await call_next(request)
@@ -80,6 +114,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         ).inc()
         return response
 
+    app.include_router(api_v1_router, prefix=cfg.api_prefix)
+
     @app.get("/health", tags=["ops"])
     async def health() -> dict[str, str]:
         """Liveness probe — process is up."""
@@ -89,9 +125,18 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     async def ready() -> dict[str, object]:
         """Readiness probe — critical dependencies reachable."""
         db_ok = await check_database(cfg)
+        redis_ok = False
+        try:
+            client = getattr(app.state, "redis", None)
+            if client is not None:
+                redis_ok = bool(await client.ping())
+        except Exception:  # noqa: BLE001
+            redis_ok = False
+        ready_ok = db_ok  # Redis optional for readiness in dev
         return {
-            "status": "ready" if db_ok else "not_ready",
+            "status": "ready" if ready_ok else "not_ready",
             "database": db_ok,
+            "redis": redis_ok,
             "version": __version__,
         }
 
