@@ -82,7 +82,11 @@ export interface paths {
         /** List Tickets */
         get: operations["list_tickets_api_v1_tickets_get"];
         put?: never;
-        post?: never;
+        /**
+         * Create Ticket
+         * @description Create a new ticket. Requires ``create`` permission on the queue's group.
+         */
+        post: operations["create_ticket_api_v1_tickets_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -103,7 +107,11 @@ export interface paths {
         delete?: never;
         options?: never;
         head?: never;
-        patch?: never;
+        /**
+         * Patch Ticket
+         * @description Apply one or more field mutations to a ticket.
+         */
+        patch: operations["patch_ticket_api_v1_tickets__ticket_id__patch"];
         trace?: never;
     };
     "/api/v1/tickets/{ticket_id}/articles": {
@@ -116,7 +124,11 @@ export interface paths {
         /** List Articles */
         get: operations["list_articles_api_v1_tickets__ticket_id__articles_get"];
         put?: never;
-        post?: never;
+        /**
+         * Create Article
+         * @description Add an article to a ticket. Requires ``rw`` permission.
+         */
+        post: operations["create_article_api_v1_tickets__ticket_id__articles_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -208,6 +220,70 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/tickets/{ticket_id}/merge": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Merge Ticket
+         * @description Merge ticket_id into main_ticket_id. Requires ``rw`` on both queues.
+         */
+        post: operations["merge_ticket_api_v1_tickets__ticket_id__merge_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tickets/{ticket_id}/drafts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Drafts
+         * @description List form drafts for a ticket (current user only).
+         */
+        get: operations["list_drafts_api_v1_tickets__ticket_id__drafts_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tickets/{ticket_id}/drafts/{action}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Upsert Draft
+         * @description Create or update a draft for (ticket, user, action).
+         */
+        put: operations["upsert_draft_api_v1_tickets__ticket_id__drafts__action__put"];
+        post?: never;
+        /**
+         * Delete Draft
+         * @description Delete a draft for (ticket, user, action).
+         */
+        delete: operations["delete_draft_api_v1_tickets__ticket_id__drafts__action__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/customers/{login}": {
         parameters: {
             query?: never;
@@ -234,6 +310,1215 @@ export interface paths {
         };
         /** Search */
         get: operations["search_api_v1_search_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/kb/categories": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Categories */
+        get: operations["list_categories_api_v1_kb_categories_get"];
+        put?: never;
+        /** Create Category */
+        post: operations["create_category_api_v1_kb_categories_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/kb/categories/{category_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Category */
+        get: operations["get_category_api_v1_kb_categories__category_id__get"];
+        put?: never;
+        post?: never;
+        /** Delete Category */
+        delete: operations["delete_category_api_v1_kb_categories__category_id__delete"];
+        options?: never;
+        head?: never;
+        /** Update Category */
+        patch: operations["update_category_api_v1_kb_categories__category_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/kb/articles": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Articles */
+        get: operations["list_articles_api_v1_kb_articles_get"];
+        put?: never;
+        /** Create Article */
+        post: operations["create_article_api_v1_kb_articles_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/kb/articles/{article_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Article */
+        get: operations["get_article_api_v1_kb_articles__article_id__get"];
+        put?: never;
+        post?: never;
+        /** Delete Article */
+        delete: operations["delete_article_api_v1_kb_articles__article_id__delete"];
+        options?: never;
+        head?: never;
+        /** Update Article */
+        patch: operations["update_article_api_v1_kb_articles__article_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/kb/articles/{article_id}/publish": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Publish Article */
+        post: operations["publish_article_api_v1_kb_articles__article_id__publish_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/kb/articles/{article_id}/versions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Versions */
+        get: operations["list_versions_api_v1_kb_articles__article_id__versions_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/kb/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Search */
+        get: operations["search_api_v1_kb_search_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/users": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Users */
+        get: operations["list_users_api_v1_admin_users_get"];
+        put?: never;
+        /** Create User */
+        post: operations["create_user_api_v1_admin_users_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/users/{user_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get User */
+        get: operations["get_user_api_v1_admin_users__user_id__get"];
+        put?: never;
+        post?: never;
+        /**
+         * Deactivate User
+         * @description Soft-invalidate (``valid_id = 2``) — Znuny never hard-deletes users.
+         */
+        delete: operations["deactivate_user_api_v1_admin_users__user_id__delete"];
+        options?: never;
+        head?: never;
+        /** Update User */
+        patch: operations["update_user_api_v1_admin_users__user_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/admin/users/{user_id}/groups": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Assign Group */
+        put: operations["assign_group_api_v1_admin_users__user_id__groups_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/users/{user_id}/groups/{group_id}/{permission_key}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Revoke Group */
+        delete: operations["revoke_group_api_v1_admin_users__user_id__groups__group_id___permission_key__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/users/{user_id}/roles": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Assign Role */
+        put: operations["assign_role_api_v1_admin_users__user_id__roles_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/users/{user_id}/roles/{role_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Revoke Role */
+        delete: operations["revoke_role_api_v1_admin_users__user_id__roles__role_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/groups": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Groups */
+        get: operations["list_groups_api_v1_admin_groups_get"];
+        put?: never;
+        /** Create Group */
+        post: operations["create_group_api_v1_admin_groups_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/groups/{group_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Group */
+        get: operations["get_group_api_v1_admin_groups__group_id__get"];
+        put?: never;
+        post?: never;
+        /**
+         * Deactivate Group
+         * @description Soft-invalidate (``valid_id = 2``).
+         */
+        delete: operations["deactivate_group_api_v1_admin_groups__group_id__delete"];
+        options?: never;
+        head?: never;
+        /** Update Group */
+        patch: operations["update_group_api_v1_admin_groups__group_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/admin/roles": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Roles */
+        get: operations["list_roles_api_v1_admin_roles_get"];
+        put?: never;
+        /** Create Role */
+        post: operations["create_role_api_v1_admin_roles_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/roles/{role_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Role */
+        get: operations["get_role_api_v1_admin_roles__role_id__get"];
+        put?: never;
+        post?: never;
+        /** Deactivate Role */
+        delete: operations["deactivate_role_api_v1_admin_roles__role_id__delete"];
+        options?: never;
+        head?: never;
+        /** Update Role */
+        patch: operations["update_role_api_v1_admin_roles__role_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/admin/roles/{role_id}/groups": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Assign Group Role */
+        put: operations["assign_group_role_api_v1_admin_roles__role_id__groups_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/roles/{role_id}/groups/{group_id}/{permission_key}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Revoke Group Role */
+        delete: operations["revoke_group_role_api_v1_admin_roles__role_id__groups__group_id___permission_key__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/queues": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Queues */
+        get: operations["list_queues_api_v1_admin_queues_get"];
+        put?: never;
+        /** Create Queue */
+        post: operations["create_queue_api_v1_admin_queues_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/queues/{queue_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Queue */
+        get: operations["get_queue_api_v1_admin_queues__queue_id__get"];
+        put?: never;
+        post?: never;
+        /**
+         * Deactivate Queue
+         * @description Soft-invalidate (``valid_id = 2``) — queues with tickets are never hard-deleted.
+         */
+        delete: operations["deactivate_queue_api_v1_admin_queues__queue_id__delete"];
+        options?: never;
+        head?: never;
+        /** Update Queue */
+        patch: operations["update_queue_api_v1_admin_queues__queue_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/admin/states": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List States */
+        get: operations["list_states_api_v1_admin_states_get"];
+        put?: never;
+        /** Create State */
+        post: operations["create_state_api_v1_admin_states_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/states/{state_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get State */
+        get: operations["get_state_api_v1_admin_states__state_id__get"];
+        put?: never;
+        post?: never;
+        /** Deactivate State */
+        delete: operations["deactivate_state_api_v1_admin_states__state_id__delete"];
+        options?: never;
+        head?: never;
+        /** Update State */
+        patch: operations["update_state_api_v1_admin_states__state_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/admin/priorities": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Priorities */
+        get: operations["list_priorities_api_v1_admin_priorities_get"];
+        put?: never;
+        /** Create Priority */
+        post: operations["create_priority_api_v1_admin_priorities_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/priorities/{priority_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Priority */
+        get: operations["get_priority_api_v1_admin_priorities__priority_id__get"];
+        put?: never;
+        post?: never;
+        /** Deactivate Priority */
+        delete: operations["deactivate_priority_api_v1_admin_priorities__priority_id__delete"];
+        options?: never;
+        head?: never;
+        /** Update Priority */
+        patch: operations["update_priority_api_v1_admin_priorities__priority_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/admin/customer-users": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Customer Users */
+        get: operations["list_customer_users_api_v1_admin_customer_users_get"];
+        put?: never;
+        /** Create Customer User */
+        post: operations["create_customer_user_api_v1_admin_customer_users_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/customer-users/{customer_user_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Customer User */
+        get: operations["get_customer_user_api_v1_admin_customer_users__customer_user_id__get"];
+        put?: never;
+        post?: never;
+        /** Deactivate Customer User */
+        delete: operations["deactivate_customer_user_api_v1_admin_customer_users__customer_user_id__delete"];
+        options?: never;
+        head?: never;
+        /** Update Customer User */
+        patch: operations["update_customer_user_api_v1_admin_customer_users__customer_user_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/admin/customer-companies": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Customer Companies */
+        get: operations["list_customer_companies_api_v1_admin_customer_companies_get"];
+        put?: never;
+        /** Create Customer Company */
+        post: operations["create_customer_company_api_v1_admin_customer_companies_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/customer-companies/{customer_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Customer Company */
+        get: operations["get_customer_company_api_v1_admin_customer_companies__customer_id__get"];
+        put?: never;
+        post?: never;
+        /** Deactivate Customer Company */
+        delete: operations["deactivate_customer_company_api_v1_admin_customer_companies__customer_id__delete"];
+        options?: never;
+        head?: never;
+        /** Update Customer Company */
+        patch: operations["update_customer_company_api_v1_admin_customer_companies__customer_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/admin/customer-users/{customer_user_login}/companies": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Assign Customer Company
+         * @description Grant *customer_user_login* additional visibility into *customer_id*'s
+         *     tickets (Znuny ``customer_user_customer`` — distinct from the user's
+         *     primary ``customer_user.customer_id``).
+         */
+        put: operations["assign_customer_company_api_v1_admin_customer_users__customer_user_login__companies_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/customer-users/{customer_user_login}/companies/{customer_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Revoke Customer Company */
+        delete: operations["revoke_customer_company_api_v1_admin_customer_users__customer_user_login__companies__customer_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/salutations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Salutations */
+        get: operations["list_salutations_api_v1_admin_salutations_get"];
+        put?: never;
+        /** Create Salutation */
+        post: operations["create_salutation_api_v1_admin_salutations_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/salutations/{salutation_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Salutation */
+        get: operations["get_salutation_api_v1_admin_salutations__salutation_id__get"];
+        put?: never;
+        post?: never;
+        /** Deactivate Salutation */
+        delete: operations["deactivate_salutation_api_v1_admin_salutations__salutation_id__delete"];
+        options?: never;
+        head?: never;
+        /** Update Salutation */
+        patch: operations["update_salutation_api_v1_admin_salutations__salutation_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/admin/signatures": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Signatures */
+        get: operations["list_signatures_api_v1_admin_signatures_get"];
+        put?: never;
+        /** Create Signature */
+        post: operations["create_signature_api_v1_admin_signatures_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/signatures/{signature_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Signature */
+        get: operations["get_signature_api_v1_admin_signatures__signature_id__get"];
+        put?: never;
+        post?: never;
+        /** Deactivate Signature */
+        delete: operations["deactivate_signature_api_v1_admin_signatures__signature_id__delete"];
+        options?: never;
+        head?: never;
+        /** Update Signature */
+        patch: operations["update_signature_api_v1_admin_signatures__signature_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/admin/templates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Templates */
+        get: operations["list_templates_api_v1_admin_templates_get"];
+        put?: never;
+        /** Create Template */
+        post: operations["create_template_api_v1_admin_templates_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/templates/{template_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Template */
+        get: operations["get_template_api_v1_admin_templates__template_id__get"];
+        put?: never;
+        post?: never;
+        /** Deactivate Template */
+        delete: operations["deactivate_template_api_v1_admin_templates__template_id__delete"];
+        options?: never;
+        head?: never;
+        /** Update Template */
+        patch: operations["update_template_api_v1_admin_templates__template_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/admin/queues/{queue_id}/templates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Assign Queue Template */
+        put: operations["assign_queue_template_api_v1_admin_queues__queue_id__templates_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/queues/{queue_id}/templates/{standard_template_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Revoke Queue Template */
+        delete: operations["revoke_queue_template_api_v1_admin_queues__queue_id__templates__standard_template_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/auto-responses": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Auto Responses */
+        get: operations["list_auto_responses_api_v1_admin_auto_responses_get"];
+        put?: never;
+        /** Create Auto Response */
+        post: operations["create_auto_response_api_v1_admin_auto_responses_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/auto-responses/{auto_response_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Auto Response */
+        get: operations["get_auto_response_api_v1_admin_auto_responses__auto_response_id__get"];
+        put?: never;
+        post?: never;
+        /** Deactivate Auto Response */
+        delete: operations["deactivate_auto_response_api_v1_admin_auto_responses__auto_response_id__delete"];
+        options?: never;
+        head?: never;
+        /** Update Auto Response */
+        patch: operations["update_auto_response_api_v1_admin_auto_responses__auto_response_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/admin/queues/{queue_id}/auto-responses": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Assign Queue Auto Response */
+        put: operations["assign_queue_auto_response_api_v1_admin_queues__queue_id__auto_responses_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/queues/{queue_id}/auto-responses/{auto_response_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Revoke Queue Auto Response */
+        delete: operations["revoke_queue_auto_response_api_v1_admin_queues__queue_id__auto_responses__auto_response_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/dynamic-fields": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Dynamic Fields */
+        get: operations["list_dynamic_fields_api_v1_admin_dynamic_fields_get"];
+        put?: never;
+        /** Create Dynamic Field */
+        post: operations["create_dynamic_field_api_v1_admin_dynamic_fields_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/dynamic-fields/{field_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Dynamic Field */
+        get: operations["get_dynamic_field_api_v1_admin_dynamic_fields__field_id__get"];
+        put?: never;
+        post?: never;
+        /**
+         * Deactivate Dynamic Field
+         * @description Soft-invalidate — dynamic field values referencing this field must survive.
+         */
+        delete: operations["deactivate_dynamic_field_api_v1_admin_dynamic_fields__field_id__delete"];
+        options?: never;
+        head?: never;
+        /** Update Dynamic Field */
+        patch: operations["update_dynamic_field_api_v1_admin_dynamic_fields__field_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/admin/postmaster-filters": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Postmaster Filters */
+        get: operations["list_postmaster_filters_api_v1_admin_postmaster_filters_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/postmaster-filters/{filter_name}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Postmaster Filter */
+        get: operations["get_postmaster_filter_api_v1_admin_postmaster_filters__filter_name__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/acl": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Acls */
+        get: operations["list_acls_api_v1_admin_acl_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/acl/{acl_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Acl */
+        get: operations["get_acl_api_v1_admin_acl__acl_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/generic-agent-jobs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Generic Agent Jobs */
+        get: operations["list_generic_agent_jobs_api_v1_admin_generic_agent_jobs_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/generic-agent-jobs/{job_name}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Generic Agent Job */
+        get: operations["get_generic_agent_job_api_v1_admin_generic_agent_jobs__job_name__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/znuny-compat/Session": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Canonical Session Create */
+        post: operations["canonical_session_create_znuny_compat_Session_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/znuny-compat/Ticket": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Canonical Ticket Create */
+        post: operations["canonical_ticket_create_znuny_compat_Ticket_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/znuny-compat/Ticket/{ticket_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Canonical Ticket Get */
+        get: operations["canonical_ticket_get_znuny_compat_Ticket__ticket_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Canonical Ticket Update */
+        patch: operations["canonical_ticket_update_znuny_compat_Ticket__ticket_id__patch"];
+        trace?: never;
+    };
+    "/znuny-compat/TicketSearch": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Canonical Ticket Search */
+        get: operations["canonical_ticket_search_znuny_compat_TicketSearch_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/znuny-compat/admin/reload": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Admin Reload Routes
+         * @description Re-mount dynamic webservice routes without restart (authenticated).
+         */
+        post: operations["admin_reload_routes_znuny_compat_admin_reload_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/portal/auth/login": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Login */
+        post: operations["login_api_portal_auth_login_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/portal/auth/me": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Me */
+        get: operations["me_api_portal_auth_me_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/portal/auth/logout": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Logout */
+        post: operations["logout_api_portal_auth_logout_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/portal/tickets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Tickets */
+        get: operations["list_tickets_api_portal_tickets_get"];
+        put?: never;
+        /** Create Ticket */
+        post: operations["create_ticket_api_portal_tickets_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/portal/tickets/{ticket_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Ticket */
+        get: operations["get_ticket_api_portal_tickets__ticket_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/portal/tickets/{ticket_id}/articles": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Articles
+         * @description Only articles with ``is_visible_for_customer == 1`` — internal notes never returned.
+         */
+        get: operations["list_articles_api_portal_tickets__ticket_id__articles_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/portal/tickets/{ticket_id}/reply": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Reply */
+        post: operations["reply_api_portal_tickets__ticket_id__reply_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/portal/tickets/{ticket_id}/attachments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Upload Attachment */
+        post: operations["upload_attachment_api_portal_tickets__ticket_id__attachments_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/portal/tickets/{ticket_id}/attachments/{attachment_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Download Attachment */
+        get: operations["download_attachment_api_portal_tickets__ticket_id__attachments__attachment_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/portal/kb/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Search */
+        get: operations["search_api_portal_kb_search_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/portal/kb/articles/{slug_or_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Article */
+        get: operations["get_article_api_portal_kb_articles__slug_or_id__get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -323,6 +1608,35 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** AclOut */
+        AclOut: {
+            /** Id */
+            id: number;
+            /** Name */
+            name: string;
+            /** Comments */
+            comments: string | null;
+            /** Description */
+            description: string | null;
+            /** Valid Id */
+            valid_id: number;
+            /** Stop After Match */
+            stop_after_match: number | null;
+            /** Config Match */
+            config_match: string | null;
+            /** Config Change */
+            config_change: string | null;
+            /**
+             * Create Time
+             * Format: date-time
+             */
+            create_time: string;
+            /**
+             * Change Time
+             * Format: date-time
+             */
+            change_time: string;
+        };
         /** ArticleBody */
         ArticleBody: {
             /** Article Id */
@@ -333,6 +1647,62 @@ export interface components {
             is_html: boolean;
             /** Body */
             body: string;
+        };
+        /** ArticleCreateRequest */
+        ArticleCreateRequest: {
+            /**
+             * Sender Type
+             * @default agent
+             */
+            sender_type: string;
+            /**
+             * Is Visible For Customer
+             * @default true
+             */
+            is_visible_for_customer: boolean;
+            /** Subject */
+            subject: string;
+            /** Body */
+            body: string;
+            /**
+             * Content Type
+             * @default text/plain; charset=utf-8
+             */
+            content_type: string;
+            /** From Address */
+            from_address?: string | null;
+            /** To Address */
+            to_address?: string | null;
+            /** Cc */
+            cc?: string | null;
+            /**
+             * Channel
+             * @default note
+             */
+            channel: string;
+        };
+        /** ArticleCreateResponse */
+        ArticleCreateResponse: {
+            /** Article Id */
+            article_id: number;
+        };
+        /** ArticleIn */
+        ArticleIn: {
+            /** Category Id */
+            category_id: number;
+            /** Title */
+            title: string;
+            /** Slug */
+            slug: string;
+            /**
+             * Language
+             * @default en
+             */
+            language: string;
+            /** Content Md */
+            content_md: string;
+            /** Tags */
+            tags?: string[];
         };
         /** ArticleListItem */
         ArticleListItem: {
@@ -366,6 +1736,98 @@ export interface components {
             /** Incoming Time */
             incoming_time?: number | null;
         };
+        /** ArticleOut */
+        ArticleOut: {
+            /** Id */
+            id: number;
+            /** Category Id */
+            category_id: number;
+            /** Title */
+            title: string;
+            /** Slug */
+            slug: string;
+            /** Language */
+            language: string;
+            /** State */
+            state: string;
+            /** Content Md */
+            content_md: string;
+            /** Version */
+            version: number;
+            /** Create By */
+            create_by: number;
+            /**
+             * Create Time
+             * Format: date-time
+             */
+            create_time: string;
+            /** Change By */
+            change_by: number;
+            /**
+             * Change Time
+             * Format: date-time
+             */
+            change_time: string;
+            /** Tags */
+            tags?: string[];
+        };
+        /** ArticleSummary */
+        ArticleSummary: {
+            /** Id */
+            id: number;
+            /** Category Id */
+            category_id: number;
+            /** Title */
+            title: string;
+            /** Slug */
+            slug: string;
+            /** Language */
+            language: string;
+            /** State */
+            state: string;
+            /** Version */
+            version: number;
+            /**
+             * Change Time
+             * Format: date-time
+             */
+            change_time: string;
+        };
+        /** ArticleUpdateIn */
+        ArticleUpdateIn: {
+            /** Category Id */
+            category_id?: number | null;
+            /** Title */
+            title?: string | null;
+            /** Content Md */
+            content_md?: string | null;
+            /** Language */
+            language?: string | null;
+            /** State */
+            state?: string | null;
+            /** Tags */
+            tags?: string[] | null;
+        };
+        /** ArticleVersionOut */
+        ArticleVersionOut: {
+            /** Id */
+            id: number;
+            /** Article Id */
+            article_id: number;
+            /** Version */
+            version: number;
+            /** Title */
+            title: string;
+            /** Content Md */
+            content_md: string;
+            /** Changed By */
+            changed_by: number;
+            /**
+             * Changed At
+             * Format: date-time
+             */
+            changed_at: string;
+        };
         /** AttachmentMetaOut */
         AttachmentMetaOut: {
             /** Id */
@@ -382,6 +1844,376 @@ export interface components {
             content_id?: string | null;
             /** Disposition */
             disposition?: string | null;
+        };
+        /** AutoResponseCreate */
+        AutoResponseCreate: {
+            /** Name */
+            name: string;
+            /** Text0 */
+            text0?: string | null;
+            /** Text1 */
+            text1?: string | null;
+            /** Type Id */
+            type_id: number;
+            /** System Address Id */
+            system_address_id: number;
+            /** Content Type */
+            content_type?: string | null;
+            /** Comments */
+            comments?: string | null;
+            /**
+             * Valid Id
+             * @default 1
+             */
+            valid_id: number;
+        };
+        /** AutoResponseOut */
+        AutoResponseOut: {
+            /** Id */
+            id: number;
+            /** Name */
+            name: string;
+            /** Text0 */
+            text0: string | null;
+            /** Text1 */
+            text1: string | null;
+            /** Type Id */
+            type_id: number;
+            /** System Address Id */
+            system_address_id: number;
+            /** Content Type */
+            content_type: string | null;
+            /** Comments */
+            comments: string | null;
+            /** Valid Id */
+            valid_id: number;
+            /**
+             * Create Time
+             * Format: date-time
+             */
+            create_time: string;
+            /**
+             * Change Time
+             * Format: date-time
+             */
+            change_time: string;
+        };
+        /** AutoResponseUpdate */
+        AutoResponseUpdate: {
+            /** Name */
+            name?: string | null;
+            /** Text0 */
+            text0?: string | null;
+            /** Text1 */
+            text1?: string | null;
+            /** Type Id */
+            type_id?: number | null;
+            /** System Address Id */
+            system_address_id?: number | null;
+            /** Content Type */
+            content_type?: string | null;
+            /** Comments */
+            comments?: string | null;
+            /** Valid Id */
+            valid_id?: number | null;
+        };
+        /** Body_upload_attachment_api_portal_tickets__ticket_id__attachments_post */
+        Body_upload_attachment_api_portal_tickets__ticket_id__attachments_post: {
+            /** File */
+            file: string;
+            /**
+             * Note
+             * @default
+             */
+            note: string;
+        };
+        /** CategoryIn */
+        CategoryIn: {
+            /** Parent Id */
+            parent_id?: number | null;
+            /** Name */
+            name: string;
+            /** Slug */
+            slug: string;
+            /** Permission Group Id */
+            permission_group_id?: number | null;
+            /**
+             * Customer Visible
+             * @default false
+             */
+            customer_visible: boolean;
+            /**
+             * Sort
+             * @default 0
+             */
+            sort: number;
+            /**
+             * Valid
+             * @default true
+             */
+            valid: boolean;
+        };
+        /** CategoryOut */
+        CategoryOut: {
+            /** Id */
+            id: number;
+            /** Parent Id */
+            parent_id: number | null;
+            /** Name */
+            name: string;
+            /** Slug */
+            slug: string;
+            /** Permission Group Id */
+            permission_group_id: number | null;
+            /** Customer Visible */
+            customer_visible: boolean;
+            /** Sort */
+            sort: number;
+            /** Valid */
+            valid: boolean;
+            /**
+             * Create Time
+             * Format: date-time
+             */
+            create_time: string;
+            /**
+             * Change Time
+             * Format: date-time
+             */
+            change_time: string;
+        };
+        /** CategoryUpdateIn */
+        CategoryUpdateIn: {
+            /** Parent Id */
+            parent_id?: number | null;
+            /** Name */
+            name?: string | null;
+            /** Slug */
+            slug?: string | null;
+            /** Permission Group Id */
+            permission_group_id?: number | null;
+            /** Customer Visible */
+            customer_visible?: boolean | null;
+            /** Sort */
+            sort?: number | null;
+            /** Valid */
+            valid?: boolean | null;
+        };
+        /** CustomerCompanyCreate */
+        CustomerCompanyCreate: {
+            /** Customer Id */
+            customer_id: string;
+            /** Name */
+            name: string;
+            /** Street */
+            street?: string | null;
+            /** Zip */
+            zip?: string | null;
+            /** City */
+            city?: string | null;
+            /** Country */
+            country?: string | null;
+            /** Url */
+            url?: string | null;
+            /** Comments */
+            comments?: string | null;
+            /**
+             * Valid Id
+             * @default 1
+             */
+            valid_id: number;
+        };
+        /** CustomerCompanyOut */
+        CustomerCompanyOut: {
+            /** Customer Id */
+            customer_id: string;
+            /** Name */
+            name: string;
+            /** Street */
+            street: string | null;
+            /** Zip */
+            zip: string | null;
+            /** City */
+            city: string | null;
+            /** Country */
+            country: string | null;
+            /** Url */
+            url: string | null;
+            /** Comments */
+            comments: string | null;
+            /** Valid Id */
+            valid_id: number;
+            /**
+             * Create Time
+             * Format: date-time
+             */
+            create_time: string;
+            /**
+             * Change Time
+             * Format: date-time
+             */
+            change_time: string;
+        };
+        /** CustomerCompanyUpdate */
+        CustomerCompanyUpdate: {
+            /** Name */
+            name?: string | null;
+            /** Street */
+            street?: string | null;
+            /** Zip */
+            zip?: string | null;
+            /** City */
+            city?: string | null;
+            /** Country */
+            country?: string | null;
+            /** Url */
+            url?: string | null;
+            /** Comments */
+            comments?: string | null;
+            /** Valid Id */
+            valid_id?: number | null;
+        };
+        /** CustomerLoginResponse */
+        CustomerLoginResponse: {
+            customer: components["schemas"]["CustomerMe"];
+        };
+        /** CustomerMe */
+        CustomerMe: {
+            /** Id */
+            id: number;
+            /** Login */
+            login: string;
+            /** Email */
+            email: string;
+            /** Customer Id */
+            customer_id: string;
+            /** First Name */
+            first_name: string;
+            /** Last Name */
+            last_name: string;
+        };
+        /** CustomerUserAdminCreate */
+        CustomerUserAdminCreate: {
+            /** Login */
+            login: string;
+            /** Email */
+            email: string;
+            /** Customer Id */
+            customer_id: string;
+            /** Password */
+            password?: string | null;
+            /** Title */
+            title?: string | null;
+            /** First Name */
+            first_name: string;
+            /** Last Name */
+            last_name: string;
+            /** Phone */
+            phone?: string | null;
+            /** Fax */
+            fax?: string | null;
+            /** Mobile */
+            mobile?: string | null;
+            /** Street */
+            street?: string | null;
+            /** Zip */
+            zip?: string | null;
+            /** City */
+            city?: string | null;
+            /** Country */
+            country?: string | null;
+            /** Comments */
+            comments?: string | null;
+            /**
+             * Valid Id
+             * @default 1
+             */
+            valid_id: number;
+        };
+        /** CustomerUserAdminOut */
+        CustomerUserAdminOut: {
+            /** Id */
+            id: number;
+            /** Login */
+            login: string;
+            /** Email */
+            email: string;
+            /** Customer Id */
+            customer_id: string;
+            /** Title */
+            title: string | null;
+            /** First Name */
+            first_name: string;
+            /** Last Name */
+            last_name: string;
+            /** Phone */
+            phone: string | null;
+            /** Fax */
+            fax: string | null;
+            /** Mobile */
+            mobile: string | null;
+            /** Street */
+            street: string | null;
+            /** Zip */
+            zip: string | null;
+            /** City */
+            city: string | null;
+            /** Country */
+            country: string | null;
+            /** Comments */
+            comments: string | null;
+            /** Valid Id */
+            valid_id: number;
+            /**
+             * Create Time
+             * Format: date-time
+             */
+            create_time: string;
+            /**
+             * Change Time
+             * Format: date-time
+             */
+            change_time: string;
+        };
+        /** CustomerUserAdminUpdate */
+        CustomerUserAdminUpdate: {
+            /** Login */
+            login?: string | null;
+            /** Email */
+            email?: string | null;
+            /** Customer Id */
+            customer_id?: string | null;
+            /** Password */
+            password?: string | null;
+            /** Title */
+            title?: string | null;
+            /** First Name */
+            first_name?: string | null;
+            /** Last Name */
+            last_name?: string | null;
+            /** Phone */
+            phone?: string | null;
+            /** Fax */
+            fax?: string | null;
+            /** Mobile */
+            mobile?: string | null;
+            /** Street */
+            street?: string | null;
+            /** Zip */
+            zip?: string | null;
+            /** City */
+            city?: string | null;
+            /** Country */
+            country?: string | null;
+            /** Comments */
+            comments?: string | null;
+            /** Valid Id */
+            valid_id?: number | null;
+        };
+        /** CustomerUserCustomerAssignment */
+        CustomerUserCustomerAssignment: {
+            /** Customer Id */
+            customer_id: string;
         };
         /** CustomerUserOut */
         CustomerUserOut: {
@@ -402,6 +2234,115 @@ export interface components {
             /** Company Name */
             company_name?: string | null;
         };
+        /** DraftIn */
+        DraftIn: {
+            /** Action */
+            action: string;
+            /** Title */
+            title?: string | null;
+            /**
+             * Content
+             * @default {}
+             */
+            content: string;
+        };
+        /** DraftOut */
+        DraftOut: {
+            /** Id */
+            id: number;
+            /** Ticket Id */
+            ticket_id: number;
+            /** User Id */
+            user_id: number;
+            /** Action */
+            action: string;
+            /** Title */
+            title?: string | null;
+            /** Content */
+            content: string;
+            /**
+             * Created
+             * Format: date-time
+             */
+            created: string;
+            /**
+             * Changed
+             * Format: date-time
+             */
+            changed: string;
+        };
+        /** DynamicFieldCreate */
+        DynamicFieldCreate: {
+            /** Name */
+            name: string;
+            /** Label */
+            label: string;
+            /** Field Order */
+            field_order: number;
+            /** Field Type */
+            field_type: string;
+            /**
+             * Object Type
+             * @default Ticket
+             * @enum {string}
+             */
+            object_type: "Ticket" | "Article" | "CustomerUser" | "CustomerCompany";
+            /** Config */
+            config?: {
+                [key: string]: unknown;
+            };
+            /**
+             * Valid Id
+             * @default 1
+             */
+            valid_id: number;
+        };
+        /** DynamicFieldOut */
+        DynamicFieldOut: {
+            /** Id */
+            id: number;
+            /** Internal Field */
+            internal_field: number;
+            /** Name */
+            name: string;
+            /** Label */
+            label: string;
+            /** Field Order */
+            field_order: number;
+            /** Field Type */
+            field_type: string;
+            /** Object Type */
+            object_type: string;
+            /** Config */
+            config: {
+                [key: string]: unknown;
+            };
+            /** Valid Id */
+            valid_id: number;
+            /**
+             * Create Time
+             * Format: date-time
+             */
+            create_time: string;
+            /**
+             * Change Time
+             * Format: date-time
+             */
+            change_time: string;
+        };
+        /** DynamicFieldUpdate */
+        DynamicFieldUpdate: {
+            /** Label */
+            label?: string | null;
+            /** Field Order */
+            field_order?: number | null;
+            /** Config */
+            config?: {
+                [key: string]: unknown;
+            } | null;
+            /** Valid Id */
+            valid_id?: number | null;
+        };
         /** DynamicFieldValueOut */
         DynamicFieldValueOut: {
             /** Name */
@@ -412,6 +2353,85 @@ export interface components {
             field_type?: string | null;
             /** Values */
             values?: unknown[];
+        };
+        /**
+         * GenericAgentJobOut
+         * @description Grouped by ``job_name`` (key/value rows per Znuny ``generic_agent_jobs``).
+         */
+        GenericAgentJobOut: {
+            /** Job Name */
+            job_name: string;
+            /** Settings */
+            settings: {
+                [key: string]: string | null;
+            };
+        };
+        /** GroupAssignment */
+        GroupAssignment: {
+            /** Group Id */
+            group_id: number;
+            /**
+             * Permission Key
+             * @enum {string}
+             */
+            permission_key: "ro" | "move_into" | "create" | "note" | "owner" | "priority" | "rw";
+        };
+        /** GroupCreate */
+        GroupCreate: {
+            /** Name */
+            name: string;
+            /** Comments */
+            comments?: string | null;
+            /**
+             * Valid Id
+             * @default 1
+             */
+            valid_id: number;
+        };
+        /** GroupOut */
+        GroupOut: {
+            /** Id */
+            id: number;
+            /** Name */
+            name: string;
+            /** Comments */
+            comments: string | null;
+            /** Valid Id */
+            valid_id: number;
+            /**
+             * Create Time
+             * Format: date-time
+             */
+            create_time: string;
+            /**
+             * Change Time
+             * Format: date-time
+             */
+            change_time: string;
+        };
+        /** GroupRoleAssignment */
+        GroupRoleAssignment: {
+            /** Group Id */
+            group_id: number;
+            /**
+             * Permission Key
+             * @enum {string}
+             */
+            permission_key: "ro" | "move_into" | "create" | "note" | "owner" | "priority" | "rw";
+            /**
+             * Permission Value
+             * @default 1
+             */
+            permission_value: number;
+        };
+        /** GroupUpdate */
+        GroupUpdate: {
+            /** Name */
+            name?: string | null;
+            /** Comments */
+            comments?: string | null;
+            /** Valid Id */
+            valid_id?: number | null;
         };
         /** HTTPValidationError */
         HTTPValidationError: {
@@ -442,6 +2462,46 @@ export interface components {
             /** Create By */
             create_by: number;
         };
+        /** KbSearchHit */
+        KbSearchHit: {
+            /** Article Id */
+            article_id: number;
+            /** Chunk Id */
+            chunk_id: number;
+            /** Title */
+            title: string;
+            /** Heading Path */
+            heading_path: string;
+            /** Anchor */
+            anchor: string;
+            /** Content */
+            content: string;
+            /** Language */
+            language: string;
+            /**
+             * State
+             * @default draft
+             */
+            state: string;
+            /**
+             * Customer Visible
+             * @default false
+             */
+            customer_visible: boolean;
+            /** Permission Group Id */
+            permission_group_id?: number | null;
+            /** Score */
+            score?: number | null;
+        };
+        /** KbSearchResponse */
+        KbSearchResponse: {
+            /** Query */
+            query: string;
+            /** Hits */
+            hits: components["schemas"]["KbSearchHit"][];
+            /** Estimated Total */
+            estimated_total: number;
+        };
         /** LoginRequest */
         LoginRequest: {
             /** Login */
@@ -453,6 +2513,45 @@ export interface components {
         LoginResponse: {
             user: components["schemas"]["UserMe"];
         };
+        /** MergeRequest */
+        MergeRequest: {
+            /** Main Ticket Id */
+            main_ticket_id: number;
+        };
+        /**
+         * MutationRequest
+         * @description Generic mutation payload (flexible).
+         */
+        MutationRequest: {
+            /** Queue Id */
+            queue_id?: number | null;
+            /** State Id */
+            state_id?: number | null;
+            /** Priority Id */
+            priority_id?: number | null;
+            /** Title */
+            title?: string | null;
+            /** Customer Id */
+            customer_id?: string | null;
+            /** Customer User Id */
+            customer_user_id?: string | null;
+            /** Owner Id */
+            owner_id?: number | null;
+            /** Responsible Id */
+            responsible_id?: number | null;
+            /** Lock */
+            lock?: string | null;
+            /** Archive */
+            archive?: boolean | null;
+            /** Pending Time */
+            pending_time?: string | null;
+            /** Field Name */
+            field_name?: string | null;
+            /** Field Values */
+            field_values?: string[] | null;
+            /** Watcher User Id */
+            watcher_user_id?: number | null;
+        };
         /** PaginatedTickets */
         PaginatedTickets: {
             /** Items */
@@ -463,6 +2562,128 @@ export interface components {
             offset: number;
             /** Limit */
             limit: number;
+        };
+        /** PortalArticleOut */
+        PortalArticleOut: {
+            /** Id */
+            id: number;
+            /** Title */
+            title: string;
+            /** Slug */
+            slug: string;
+            /** Language */
+            language: string;
+            /** Content Md */
+            content_md: string;
+            /**
+             * Tags
+             * @default []
+             */
+            tags: string[];
+        };
+        /** PortalAttachmentUploadResponse */
+        PortalAttachmentUploadResponse: {
+            /** Article Id */
+            article_id: number;
+            /** Attachment Ids */
+            attachment_ids: number[];
+        };
+        /** PortalReplyRequest */
+        PortalReplyRequest: {
+            /** Body */
+            body: string;
+            /** Subject */
+            subject?: string | null;
+        };
+        /** PortalReplyResponse */
+        PortalReplyResponse: {
+            /** Article Id */
+            article_id: number;
+            /**
+             * Reopened
+             * @default false
+             */
+            reopened: boolean;
+        };
+        /** PortalTicketCreateRequest */
+        PortalTicketCreateRequest: {
+            /** Title */
+            title: string;
+            /** Body */
+            body: string;
+            /** Queue Id */
+            queue_id?: number | null;
+        };
+        /** PortalTicketCreateResponse */
+        PortalTicketCreateResponse: {
+            /** Ticket Id */
+            ticket_id: number;
+        };
+        /**
+         * PostmasterFilterOut
+         * @description Grouped by ``f_name`` (Znuny's filter identity is the name, not a single row).
+         */
+        PostmasterFilterOut: {
+            /** Name */
+            name: string;
+            /** Rules */
+            rules: components["schemas"]["PostmasterFilterRuleOut"][];
+        };
+        /** PostmasterFilterRuleOut */
+        PostmasterFilterRuleOut: {
+            /** F Name */
+            f_name: string;
+            /** F Stop */
+            f_stop: number | null;
+            /** F Type */
+            f_type: string;
+            /** F Key */
+            f_key: string;
+            /** F Value */
+            f_value: string;
+            /** F Not */
+            f_not: number | null;
+        };
+        /** PriorityCreate */
+        PriorityCreate: {
+            /** Name */
+            name: string;
+            /**
+             * Valid Id
+             * @default 1
+             */
+            valid_id: number;
+        };
+        /** PriorityOut */
+        PriorityOut: {
+            /** Id */
+            id: number;
+            /** Name */
+            name: string;
+            /** Valid Id */
+            valid_id: number;
+            /**
+             * Create Time
+             * Format: date-time
+             */
+            create_time: string;
+            /**
+             * Change Time
+             * Format: date-time
+             */
+            change_time: string;
+        };
+        /** PriorityUpdate */
+        PriorityUpdate: {
+            /** Name */
+            name?: string | null;
+            /** Valid Id */
+            valid_id?: number | null;
+        };
+        /** QueueAutoResponseAssignment */
+        QueueAutoResponseAssignment: {
+            /** Auto Response Id */
+            auto_response_id: number;
         };
         /** QueueCounts */
         QueueCounts: {
@@ -487,6 +2708,51 @@ export interface components {
              */
             total: number;
         };
+        /** QueueCreate */
+        QueueCreate: {
+            /** Name */
+            name: string;
+            /** Group Id */
+            group_id: number;
+            /** System Address Id */
+            system_address_id: number;
+            /** Salutation Id */
+            salutation_id: number;
+            /** Signature Id */
+            signature_id: number;
+            /** Follow Up Id */
+            follow_up_id: number;
+            /**
+             * Follow Up Lock
+             * @default 0
+             */
+            follow_up_lock: number;
+            /** Unlock Timeout */
+            unlock_timeout?: number | null;
+            /** First Response Time */
+            first_response_time?: number | null;
+            /** First Response Notify */
+            first_response_notify?: number | null;
+            /** Update Time */
+            update_time?: number | null;
+            /** Update Notify */
+            update_notify?: number | null;
+            /** Solution Time */
+            solution_time?: number | null;
+            /** Solution Notify */
+            solution_notify?: number | null;
+            /** Calendar Name */
+            calendar_name?: string | null;
+            /** Default Sign Key */
+            default_sign_key?: string | null;
+            /** Comments */
+            comments?: string | null;
+            /**
+             * Valid Id
+             * @default 1
+             */
+            valid_id: number;
+        };
         /** QueueNode */
         QueueNode: {
             /** Id */
@@ -505,6 +2771,202 @@ export interface components {
             counts?: components["schemas"]["QueueCounts"];
             /** Children */
             children?: components["schemas"]["QueueNode"][];
+        };
+        /** QueueOut */
+        QueueOut: {
+            /** Id */
+            id: number;
+            /** Name */
+            name: string;
+            /** Group Id */
+            group_id: number;
+            /** Unlock Timeout */
+            unlock_timeout: number | null;
+            /** First Response Time */
+            first_response_time: number | null;
+            /** First Response Notify */
+            first_response_notify: number | null;
+            /** Update Time */
+            update_time: number | null;
+            /** Update Notify */
+            update_notify: number | null;
+            /** Solution Time */
+            solution_time: number | null;
+            /** Solution Notify */
+            solution_notify: number | null;
+            /** System Address Id */
+            system_address_id: number;
+            /** Calendar Name */
+            calendar_name: string | null;
+            /** Default Sign Key */
+            default_sign_key: string | null;
+            /** Salutation Id */
+            salutation_id: number;
+            /** Signature Id */
+            signature_id: number;
+            /** Follow Up Id */
+            follow_up_id: number;
+            /** Follow Up Lock */
+            follow_up_lock: number;
+            /** Comments */
+            comments: string | null;
+            /** Valid Id */
+            valid_id: number;
+            /**
+             * Create Time
+             * Format: date-time
+             */
+            create_time: string;
+            /**
+             * Change Time
+             * Format: date-time
+             */
+            change_time: string;
+        };
+        /** QueueTemplateAssignment */
+        QueueTemplateAssignment: {
+            /** Standard Template Id */
+            standard_template_id: number;
+        };
+        /** QueueUpdate */
+        QueueUpdate: {
+            /** Name */
+            name?: string | null;
+            /** Group Id */
+            group_id?: number | null;
+            /** System Address Id */
+            system_address_id?: number | null;
+            /** Salutation Id */
+            salutation_id?: number | null;
+            /** Signature Id */
+            signature_id?: number | null;
+            /** Follow Up Id */
+            follow_up_id?: number | null;
+            /** Follow Up Lock */
+            follow_up_lock?: number | null;
+            /** Unlock Timeout */
+            unlock_timeout?: number | null;
+            /** First Response Time */
+            first_response_time?: number | null;
+            /** First Response Notify */
+            first_response_notify?: number | null;
+            /** Update Time */
+            update_time?: number | null;
+            /** Update Notify */
+            update_notify?: number | null;
+            /** Solution Time */
+            solution_time?: number | null;
+            /** Solution Notify */
+            solution_notify?: number | null;
+            /** Calendar Name */
+            calendar_name?: string | null;
+            /** Default Sign Key */
+            default_sign_key?: string | null;
+            /** Comments */
+            comments?: string | null;
+            /** Valid Id */
+            valid_id?: number | null;
+        };
+        /** RoleAssignment */
+        RoleAssignment: {
+            /** Role Id */
+            role_id: number;
+        };
+        /** RoleCreate */
+        RoleCreate: {
+            /** Name */
+            name: string;
+            /** Comments */
+            comments?: string | null;
+            /**
+             * Valid Id
+             * @default 1
+             */
+            valid_id: number;
+        };
+        /** RoleOut */
+        RoleOut: {
+            /** Id */
+            id: number;
+            /** Name */
+            name: string;
+            /** Comments */
+            comments: string | null;
+            /** Valid Id */
+            valid_id: number;
+            /**
+             * Create Time
+             * Format: date-time
+             */
+            create_time: string;
+            /**
+             * Change Time
+             * Format: date-time
+             */
+            change_time: string;
+        };
+        /** RoleUpdate */
+        RoleUpdate: {
+            /** Name */
+            name?: string | null;
+            /** Comments */
+            comments?: string | null;
+            /** Valid Id */
+            valid_id?: number | null;
+        };
+        /** SalutationOut */
+        SalutationOut: {
+            /** Id */
+            id: number;
+            /** Name */
+            name: string;
+            /** Text */
+            text: string;
+            /** Content Type */
+            content_type: string | null;
+            /** Comments */
+            comments: string | null;
+            /** Valid Id */
+            valid_id: number;
+            /**
+             * Create Time
+             * Format: date-time
+             */
+            create_time: string;
+            /**
+             * Change Time
+             * Format: date-time
+             */
+            change_time: string;
+        };
+        /** SalutationUpdate */
+        SalutationUpdate: {
+            /** Name */
+            name?: string | null;
+            /** Text */
+            text?: string | null;
+            /** Content Type */
+            content_type?: string | null;
+            /** Comments */
+            comments?: string | null;
+            /** Valid Id */
+            valid_id?: number | null;
+        };
+        /** SalutationWrite */
+        SalutationWrite: {
+            /** Name */
+            name: string;
+            /** Text */
+            text: string;
+            /** Content Type */
+            content_type?: string | null;
+            /** Comments */
+            comments?: string | null;
+            /**
+             * Valid Id
+             * @default 1
+             */
+            valid_id: number;
         };
         /** SearchHit */
         SearchHit: {
@@ -543,6 +3005,215 @@ export interface components {
             hits: components["schemas"]["SearchHit"][];
             /** Estimated Total */
             estimated_total: number;
+        };
+        /** SignatureOut */
+        SignatureOut: {
+            /** Id */
+            id: number;
+            /** Name */
+            name: string;
+            /** Text */
+            text: string;
+            /** Content Type */
+            content_type: string | null;
+            /** Comments */
+            comments: string | null;
+            /** Valid Id */
+            valid_id: number;
+            /**
+             * Create Time
+             * Format: date-time
+             */
+            create_time: string;
+            /**
+             * Change Time
+             * Format: date-time
+             */
+            change_time: string;
+        };
+        /** SignatureUpdate */
+        SignatureUpdate: {
+            /** Name */
+            name?: string | null;
+            /** Text */
+            text?: string | null;
+            /** Content Type */
+            content_type?: string | null;
+            /** Comments */
+            comments?: string | null;
+            /** Valid Id */
+            valid_id?: number | null;
+        };
+        /** SignatureWrite */
+        SignatureWrite: {
+            /** Name */
+            name: string;
+            /** Text */
+            text: string;
+            /** Content Type */
+            content_type?: string | null;
+            /** Comments */
+            comments?: string | null;
+            /**
+             * Valid Id
+             * @default 1
+             */
+            valid_id: number;
+        };
+        /** StandardTemplateCreate */
+        StandardTemplateCreate: {
+            /** Name */
+            name: string;
+            /** Text */
+            text?: string | null;
+            /** Content Type */
+            content_type?: string | null;
+            /**
+             * Template Type
+             * @default Answer
+             */
+            template_type: string;
+            /** Comments */
+            comments?: string | null;
+            /**
+             * Valid Id
+             * @default 1
+             */
+            valid_id: number;
+        };
+        /** StandardTemplateOut */
+        StandardTemplateOut: {
+            /** Id */
+            id: number;
+            /** Name */
+            name: string;
+            /** Text */
+            text: string | null;
+            /** Content Type */
+            content_type: string | null;
+            /** Template Type */
+            template_type: string;
+            /** Comments */
+            comments: string | null;
+            /** Valid Id */
+            valid_id: number;
+            /**
+             * Create Time
+             * Format: date-time
+             */
+            create_time: string;
+            /**
+             * Change Time
+             * Format: date-time
+             */
+            change_time: string;
+        };
+        /** StandardTemplateUpdate */
+        StandardTemplateUpdate: {
+            /** Name */
+            name?: string | null;
+            /** Text */
+            text?: string | null;
+            /** Content Type */
+            content_type?: string | null;
+            /** Template Type */
+            template_type?: string | null;
+            /** Comments */
+            comments?: string | null;
+            /** Valid Id */
+            valid_id?: number | null;
+        };
+        /** StateCreate */
+        StateCreate: {
+            /** Name */
+            name: string;
+            /** Type Id */
+            type_id: number;
+            /** Comments */
+            comments?: string | null;
+            /**
+             * Valid Id
+             * @default 1
+             */
+            valid_id: number;
+        };
+        /** StateOut */
+        StateOut: {
+            /** Id */
+            id: number;
+            /** Name */
+            name: string;
+            /** Comments */
+            comments: string | null;
+            /** Type Id */
+            type_id: number;
+            /** Valid Id */
+            valid_id: number;
+            /**
+             * Create Time
+             * Format: date-time
+             */
+            create_time: string;
+            /**
+             * Change Time
+             * Format: date-time
+             */
+            change_time: string;
+        };
+        /** StateUpdate */
+        StateUpdate: {
+            /** Name */
+            name?: string | null;
+            /** Type Id */
+            type_id?: number | null;
+            /** Comments */
+            comments?: string | null;
+            /** Valid Id */
+            valid_id?: number | null;
+        };
+        /** TicketCreateRequest */
+        TicketCreateRequest: {
+            /** Title */
+            title: string;
+            /** Queue Id */
+            queue_id: number;
+            /** State Id */
+            state_id: number;
+            /** Priority Id */
+            priority_id: number;
+            /** Owner Id */
+            owner_id: number;
+            /**
+             * Lock Id
+             * @default 1
+             */
+            lock_id: number;
+            /** Type Id */
+            type_id?: number | null;
+            /** Service Id */
+            service_id?: number | null;
+            /** Sla Id */
+            sla_id?: number | null;
+            /** Responsible Id */
+            responsible_id?: number | null;
+            /** Customer Id */
+            customer_id?: string | null;
+            /** Customer User Id */
+            customer_user_id?: string | null;
+            /**
+             * Archive Flag
+             * @default 0
+             */
+            archive_flag: number;
+            /** Dynamic Fields */
+            dynamic_fields?: {
+                [key: string]: string[];
+            };
+        };
+        /** TicketCreateResponse */
+        TicketCreateResponse: {
+            /** Ticket Id */
+            ticket_id: number;
         };
         /** TicketDetail */
         TicketDetail: {
@@ -711,6 +3382,24 @@ export interface components {
              */
             until_time: number;
         };
+        /** UserCreate */
+        UserCreate: {
+            /** Login */
+            login: string;
+            /** Password */
+            password: string;
+            /** Title */
+            title?: string | null;
+            /** First Name */
+            first_name: string;
+            /** Last Name */
+            last_name: string;
+            /**
+             * Valid Id
+             * @default 1
+             */
+            valid_id: number;
+        };
         /** UserMe */
         UserMe: {
             /** Id */
@@ -723,6 +3412,46 @@ export interface components {
             last_name: string;
             /** Auth Method */
             auth_method: string;
+        };
+        /** UserOut */
+        UserOut: {
+            /** Id */
+            id: number;
+            /** Login */
+            login: string;
+            /** Title */
+            title: string | null;
+            /** First Name */
+            first_name: string;
+            /** Last Name */
+            last_name: string;
+            /** Valid Id */
+            valid_id: number;
+            /**
+             * Create Time
+             * Format: date-time
+             */
+            create_time: string;
+            /**
+             * Change Time
+             * Format: date-time
+             */
+            change_time: string;
+        };
+        /** UserUpdate */
+        UserUpdate: {
+            /** Login */
+            login?: string | null;
+            /** Password */
+            password?: string | null;
+            /** Title */
+            title?: string | null;
+            /** First Name */
+            first_name?: string | null;
+            /** Last Name */
+            last_name?: string | null;
+            /** Valid Id */
+            valid_id?: number | null;
         };
         /** ValidationError */
         ValidationError: {
@@ -905,6 +3634,43 @@ export interface operations {
             };
         };
     };
+    create_ticket_api_v1_tickets_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TicketCreateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TicketCreateResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     get_ticket_api_v1_tickets__ticket_id__get: {
         parameters: {
             query?: never;
@@ -940,6 +3706,43 @@ export interface operations {
             };
         };
     };
+    patch_ticket_api_v1_tickets__ticket_id__patch: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                ticket_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MutationRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_articles_api_v1_tickets__ticket_id__articles_get: {
         parameters: {
             query?: never;
@@ -962,6 +3765,45 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ArticleListItem"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_article_api_v1_tickets__ticket_id__articles_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                ticket_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ArticleCreateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ArticleCreateResponse"];
                 };
             };
             /** @description Validation Error */
@@ -1158,6 +4000,152 @@ export interface operations {
             };
         };
     };
+    merge_ticket_api_v1_tickets__ticket_id__merge_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                ticket_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MergeRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_drafts_api_v1_tickets__ticket_id__drafts_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                ticket_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DraftOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    upsert_draft_api_v1_tickets__ticket_id__drafts__action__put: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                ticket_id: number;
+                action: string;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DraftIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DraftOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_draft_api_v1_tickets__ticket_id__drafts__action__delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                ticket_id: number;
+                action: string;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     get_customer_api_v1_customers__login__get: {
         parameters: {
             query?: never;
@@ -1217,6 +4205,3954 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SearchResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_categories_api_v1_kb_categories_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CategoryOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_category_api_v1_kb_categories_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CategoryIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CategoryOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_category_api_v1_kb_categories__category_id__get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                category_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CategoryOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_category_api_v1_kb_categories__category_id__delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                category_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_category_api_v1_kb_categories__category_id__patch: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                category_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CategoryUpdateIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CategoryOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_articles_api_v1_kb_articles_get: {
+        parameters: {
+            query?: {
+                category_id?: number | null;
+                state?: string | null;
+            };
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ArticleSummary"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_article_api_v1_kb_articles_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ArticleIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ArticleOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_article_api_v1_kb_articles__article_id__get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                article_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ArticleOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_article_api_v1_kb_articles__article_id__delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                article_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_article_api_v1_kb_articles__article_id__patch: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                article_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ArticleUpdateIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ArticleOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    publish_article_api_v1_kb_articles__article_id__publish_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                article_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ArticleOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_versions_api_v1_kb_articles__article_id__versions_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                article_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ArticleVersionOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    search_api_v1_kb_search_get: {
+        parameters: {
+            query: {
+                q: string;
+                offset?: number;
+                limit?: number;
+            };
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KbSearchResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_users_api_v1_admin_users_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_user_api_v1_admin_users_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UserCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_user_api_v1_admin_users__user_id__get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                user_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    deactivate_user_api_v1_admin_users__user_id__delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                user_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_user_api_v1_admin_users__user_id__patch: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                user_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UserUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    assign_group_api_v1_admin_users__user_id__groups_put: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                user_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GroupAssignment"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    revoke_group_api_v1_admin_users__user_id__groups__group_id___permission_key__delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                user_id: number;
+                group_id: number;
+                permission_key: string;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    assign_role_api_v1_admin_users__user_id__roles_put: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                user_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RoleAssignment"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    revoke_role_api_v1_admin_users__user_id__roles__role_id__delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                user_id: number;
+                role_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_groups_api_v1_admin_groups_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GroupOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_group_api_v1_admin_groups_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GroupCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GroupOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_group_api_v1_admin_groups__group_id__get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                group_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GroupOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    deactivate_group_api_v1_admin_groups__group_id__delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                group_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_group_api_v1_admin_groups__group_id__patch: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                group_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GroupUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GroupOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_roles_api_v1_admin_roles_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RoleOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_role_api_v1_admin_roles_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RoleCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RoleOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_role_api_v1_admin_roles__role_id__get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                role_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RoleOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    deactivate_role_api_v1_admin_roles__role_id__delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                role_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_role_api_v1_admin_roles__role_id__patch: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                role_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RoleUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RoleOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    assign_group_role_api_v1_admin_roles__role_id__groups_put: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                role_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GroupRoleAssignment"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    revoke_group_role_api_v1_admin_roles__role_id__groups__group_id___permission_key__delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                role_id: number;
+                group_id: number;
+                permission_key: string;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_queues_api_v1_admin_queues_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QueueOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_queue_api_v1_admin_queues_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["QueueCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QueueOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_queue_api_v1_admin_queues__queue_id__get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                queue_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QueueOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    deactivate_queue_api_v1_admin_queues__queue_id__delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                queue_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_queue_api_v1_admin_queues__queue_id__patch: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                queue_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["QueueUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QueueOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_states_api_v1_admin_states_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StateOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_state_api_v1_admin_states_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StateCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StateOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_state_api_v1_admin_states__state_id__get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                state_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StateOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    deactivate_state_api_v1_admin_states__state_id__delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                state_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_state_api_v1_admin_states__state_id__patch: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                state_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StateUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StateOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_priorities_api_v1_admin_priorities_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PriorityOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_priority_api_v1_admin_priorities_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PriorityCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PriorityOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_priority_api_v1_admin_priorities__priority_id__get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                priority_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PriorityOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    deactivate_priority_api_v1_admin_priorities__priority_id__delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                priority_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_priority_api_v1_admin_priorities__priority_id__patch: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                priority_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PriorityUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PriorityOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_customer_users_api_v1_admin_customer_users_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustomerUserAdminOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_customer_user_api_v1_admin_customer_users_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CustomerUserAdminCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustomerUserAdminOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_customer_user_api_v1_admin_customer_users__customer_user_id__get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                customer_user_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustomerUserAdminOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    deactivate_customer_user_api_v1_admin_customer_users__customer_user_id__delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                customer_user_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_customer_user_api_v1_admin_customer_users__customer_user_id__patch: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                customer_user_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CustomerUserAdminUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustomerUserAdminOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_customer_companies_api_v1_admin_customer_companies_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustomerCompanyOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_customer_company_api_v1_admin_customer_companies_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CustomerCompanyCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustomerCompanyOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_customer_company_api_v1_admin_customer_companies__customer_id__get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                customer_id: string;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustomerCompanyOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    deactivate_customer_company_api_v1_admin_customer_companies__customer_id__delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                customer_id: string;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_customer_company_api_v1_admin_customer_companies__customer_id__patch: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                customer_id: string;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CustomerCompanyUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustomerCompanyOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    assign_customer_company_api_v1_admin_customer_users__customer_user_login__companies_put: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                customer_user_login: string;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CustomerUserCustomerAssignment"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    revoke_customer_company_api_v1_admin_customer_users__customer_user_login__companies__customer_id__delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                customer_user_login: string;
+                customer_id: string;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_salutations_api_v1_admin_salutations_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SalutationOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_salutation_api_v1_admin_salutations_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SalutationWrite"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SalutationOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_salutation_api_v1_admin_salutations__salutation_id__get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                salutation_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SalutationOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    deactivate_salutation_api_v1_admin_salutations__salutation_id__delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                salutation_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_salutation_api_v1_admin_salutations__salutation_id__patch: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                salutation_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SalutationUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SalutationOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_signatures_api_v1_admin_signatures_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SignatureOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_signature_api_v1_admin_signatures_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SignatureWrite"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SignatureOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_signature_api_v1_admin_signatures__signature_id__get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                signature_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SignatureOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    deactivate_signature_api_v1_admin_signatures__signature_id__delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                signature_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_signature_api_v1_admin_signatures__signature_id__patch: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                signature_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SignatureUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SignatureOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_templates_api_v1_admin_templates_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StandardTemplateOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_template_api_v1_admin_templates_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StandardTemplateCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StandardTemplateOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_template_api_v1_admin_templates__template_id__get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                template_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StandardTemplateOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    deactivate_template_api_v1_admin_templates__template_id__delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                template_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_template_api_v1_admin_templates__template_id__patch: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                template_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StandardTemplateUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StandardTemplateOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    assign_queue_template_api_v1_admin_queues__queue_id__templates_put: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                queue_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["QueueTemplateAssignment"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    revoke_queue_template_api_v1_admin_queues__queue_id__templates__standard_template_id__delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                queue_id: number;
+                standard_template_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_auto_responses_api_v1_admin_auto_responses_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AutoResponseOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_auto_response_api_v1_admin_auto_responses_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AutoResponseCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AutoResponseOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_auto_response_api_v1_admin_auto_responses__auto_response_id__get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                auto_response_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AutoResponseOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    deactivate_auto_response_api_v1_admin_auto_responses__auto_response_id__delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                auto_response_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_auto_response_api_v1_admin_auto_responses__auto_response_id__patch: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                auto_response_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AutoResponseUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AutoResponseOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    assign_queue_auto_response_api_v1_admin_queues__queue_id__auto_responses_put: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                queue_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["QueueAutoResponseAssignment"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    revoke_queue_auto_response_api_v1_admin_queues__queue_id__auto_responses__auto_response_id__delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                queue_id: number;
+                auto_response_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_dynamic_fields_api_v1_admin_dynamic_fields_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DynamicFieldOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_dynamic_field_api_v1_admin_dynamic_fields_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DynamicFieldCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DynamicFieldOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_dynamic_field_api_v1_admin_dynamic_fields__field_id__get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                field_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DynamicFieldOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    deactivate_dynamic_field_api_v1_admin_dynamic_fields__field_id__delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                field_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_dynamic_field_api_v1_admin_dynamic_fields__field_id__patch: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                field_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DynamicFieldUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DynamicFieldOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_postmaster_filters_api_v1_admin_postmaster_filters_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PostmasterFilterOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_postmaster_filter_api_v1_admin_postmaster_filters__filter_name__get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                filter_name: string;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PostmasterFilterOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_acls_api_v1_admin_acl_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AclOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_acl_api_v1_admin_acl__acl_id__get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                acl_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AclOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_generic_agent_jobs_api_v1_admin_generic_agent_jobs_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GenericAgentJobOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_generic_agent_job_api_v1_admin_generic_agent_jobs__job_name__get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                job_name: string;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GenericAgentJobOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    canonical_session_create_znuny_compat_Session_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+        };
+    };
+    canonical_ticket_create_znuny_compat_Ticket_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+        };
+    };
+    canonical_ticket_get_znuny_compat_Ticket__ticket_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                ticket_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    canonical_ticket_update_znuny_compat_Ticket__ticket_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                ticket_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    canonical_ticket_search_znuny_compat_TicketSearch_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+        };
+    };
+    admin_reload_routes_znuny_compat_admin_reload_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    login_api_portal_auth_login_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LoginRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustomerLoginResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    me_api_portal_auth_me_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                tiqora_customer_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustomerMe"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    logout_api_portal_auth_logout_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    list_tickets_api_portal_tickets_get: {
+        parameters: {
+            query?: {
+                state?: number | null;
+                offset?: number;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: {
+                tiqora_customer_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaginatedTickets"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_ticket_api_portal_tickets_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                tiqora_customer_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PortalTicketCreateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PortalTicketCreateResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_ticket_api_portal_tickets__ticket_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                ticket_id: number;
+            };
+            cookie?: {
+                tiqora_customer_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TicketDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_articles_api_portal_tickets__ticket_id__articles_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                ticket_id: number;
+            };
+            cookie?: {
+                tiqora_customer_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ArticleListItem"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    reply_api_portal_tickets__ticket_id__reply_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                ticket_id: number;
+            };
+            cookie?: {
+                tiqora_customer_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PortalReplyRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PortalReplyResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    upload_attachment_api_portal_tickets__ticket_id__attachments_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                ticket_id: number;
+            };
+            cookie?: {
+                tiqora_customer_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_upload_attachment_api_portal_tickets__ticket_id__attachments_post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PortalAttachmentUploadResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    download_attachment_api_portal_tickets__ticket_id__attachments__attachment_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                ticket_id: number;
+                attachment_id: number;
+            };
+            cookie?: {
+                tiqora_customer_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    search_api_portal_kb_search_get: {
+        parameters: {
+            query: {
+                q: string;
+                offset?: number;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: {
+                tiqora_customer_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KbSearchResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_article_api_portal_kb_articles__slug_or_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug_or_id: string;
+            };
+            cookie?: {
+                tiqora_customer_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PortalArticleOut"];
                 };
             };
             /** @description Validation Error */
