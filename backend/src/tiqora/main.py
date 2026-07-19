@@ -1,6 +1,10 @@
-"""CLI entrypoint for running the Tiqora API process."""
+"""CLI entrypoint for running the Tiqora API, worker, MCP, and index tools."""
+
+from __future__ import annotations
 
 import argparse
+import asyncio
+import sys
 
 import uvicorn
 
@@ -8,23 +12,36 @@ from tiqora import __version__
 from tiqora.config import get_settings
 
 
-def main() -> None:
-    """Parse CLI args and run uvicorn for the API factory."""
+def main(argv: list[str] | None = None) -> None:
+    """Parse CLI args and dispatch to the requested process role."""
     parser = argparse.ArgumentParser(prog="tiqora", description="Tiqora ticket system")
     parser.add_argument("--version", action="version", version=f"tiqora {__version__}")
-    parser.add_argument(
-        "command",
-        nargs="?",
-        default="api",
-        choices=["api", "worker", "mcp"],
-        help="Process role (default: api)",
+    sub = parser.add_subparsers(dest="command")
+
+    # Default-friendly: `tiqora` / `tiqora api` / `tiqora worker` / `tiqora mcp`
+    sub.add_parser("api", help="Run the FastAPI HTTP server")
+    sub.add_parser("worker", help="Run the background worker (poller)")
+    sub.add_parser("mcp", help="Run the MCP server")
+
+    index_p = sub.add_parser("index", help="Search index maintenance")
+    index_sub = index_p.add_subparsers(dest="index_command")
+    rebuild_p = index_sub.add_parser("rebuild", help="Bulk re-index all tickets")
+    rebuild_p.add_argument(
+        "--no-resume",
+        action="store_true",
+        help="Ignore watermark and rebuild from ticket id 0",
     )
+    rebuild_p.add_argument("--batch-size", type=int, default=None)
+
+    # Also accept legacy positional: tiqora api --host ...
     parser.add_argument("--host", default="0.0.0.0")
     parser.add_argument("--port", type=int, default=8000)
     parser.add_argument("--reload", action="store_true")
-    args = parser.parse_args()
 
-    if args.command == "api":
+    args = parser.parse_args(argv)
+    command = args.command or "api"
+
+    if command == "api":
         settings = get_settings()
         uvicorn.run(
             "tiqora.api.app:create_app",
@@ -34,14 +51,31 @@ def main() -> None:
             reload=args.reload or settings.debug,
             log_level=settings.log_level.lower(),
         )
-    elif args.command == "worker":
+    elif command == "worker":
         from tiqora.worker.__main__ import run_worker
 
         run_worker()
-    elif args.command == "mcp":
+    elif command == "mcp":
         from tiqora.mcp_server.__main__ import run_mcp
 
         run_mcp()
+    elif command == "index":
+        if args.index_command == "rebuild":
+            from tiqora.worker.indexer import rebuild_index
+
+            result = asyncio.run(
+                rebuild_index(
+                    resume=not args.no_resume,
+                    batch_size=args.batch_size,
+                )
+            )
+            print(result)  # noqa: T201 — CLI output
+        else:
+            index_p.print_help()
+            sys.exit(2)
+    else:
+        parser.print_help()
+        sys.exit(2)
 
 
 if __name__ == "__main__":
