@@ -63,6 +63,7 @@
     "empty": "No queues available.",
     "openBadge": "{{count}} open",
     "metaLine": "All queues · sorted by urgency",
+    "exportCsv": "Export CSV",
     "state": {
       "open": "Open",
       "pending": "Pending",

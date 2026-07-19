@@ -9,6 +9,7 @@ import sys
 import uvicorn
 
 from tiqora import __version__
+from tiqora.cli.dev import add_dev_subparser
 from tiqora.cli.ownership import add_ownership_subparser
 from tiqora.config import get_settings
 
@@ -24,6 +25,7 @@ def main(argv: list[str] | None = None) -> None:
     sub.add_parser("worker", help="Run the background worker (poller)")
     sub.add_parser("mcp", help="Run the MCP server")
     add_ownership_subparser(sub)
+    add_dev_subparser(sub)
 
     index_p = sub.add_parser("index", help="Search index maintenance")
     index_sub = index_p.add_subparsers(dest="index_command")
@@ -79,6 +81,13 @@ def main(argv: list[str] | None = None) -> None:
         func = getattr(args, "func", None)
         if func is None:
             sub.choices["ownership"].print_help()
+            sys.exit(2)
+        exit_code = asyncio.run(func(args))
+        sys.exit(exit_code)
+    elif command == "dev":
+        func = getattr(args, "func", None)
+        if func is None:
+            sub.choices["dev"].print_help()
             sys.exit(2)
         exit_code = asyncio.run(func(args))
         sys.exit(exit_code)

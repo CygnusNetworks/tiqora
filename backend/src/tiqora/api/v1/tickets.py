@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
+import csv
+from collections.abc import AsyncGenerator
 from datetime import datetime
 from typing import Any
 from urllib.parse import quote
 
 from fastapi import APIRouter, HTTPException, Query, status
-from fastapi.responses import Response
+from fastapi.responses import Response, StreamingResponse
 from pydantic import BaseModel, Field
 
 from tiqora.api.deps import AppSettings, CurrentUser, DbSession
@@ -19,6 +21,7 @@ from tiqora.domain.schemas import (
     HistoryEntry,
     PaginatedTickets,
     TicketDetail,
+    TicketListItem,
 )
 from tiqora.domain.ticket_service import (
     TicketAccessDenied,
@@ -164,6 +167,111 @@ async def list_tickets(
         limit=limit,
         sort=sort,
         order=order,
+    )
+
+
+class _EchoWriter:
+    """File-like shim so ``csv.writer`` yields each row as a string.
+
+    ``csv.writer(target).writerow(...)`` calls ``target.write(row_string)``
+    and returns whatever ``write`` returns — echoing the string back turns
+    the writer into a per-row string generator instead of one requiring a
+    real (buffering) file object, which is what lets the CSV export stream
+    row-by-row instead of materializing the whole file in memory.
+    """
+
+    def write(self, value: str) -> str:
+        return value
+
+
+_CSV_HEADER = [
+    "Number",
+    "Title",
+    "Queue",
+    "State",
+    "Priority",
+    "Owner",
+    "Customer",
+    "Created",
+    "Changed",
+]
+
+
+def _ticket_csv_row(item: TicketListItem) -> list[str]:
+    return [
+        item.tn,
+        item.title or "",
+        item.queue_name or "",
+        item.state or "",
+        item.priority or "",
+        item.owner_login or item.owner_name or "",
+        item.customer_id or "",
+        item.create_time.isoformat(),
+        item.change_time.isoformat(),
+    ]
+
+
+async def _export_tickets_csv_stream(
+    svc: TicketService,
+    user_id: int,
+    *,
+    queue_id: int | None,
+    state_id: int | None,
+    state_type: str | None,
+    owner_id: int | None,
+    sort: str,
+    order: str,
+) -> AsyncGenerator[bytes, None]:
+    writer = csv.writer(_EchoWriter(), delimiter=";")
+    # UTF-8 BOM first, so Excel opens the file as UTF-8 instead of guessing
+    # the system codepage.
+    yield b"\xef\xbb\xbf"
+    yield writer.writerow(_CSV_HEADER).encode("utf-8")
+    async for item in svc.iter_tickets_for_export(
+        user_id,
+        queue_id=queue_id,
+        state_id=state_id,
+        state_type=state_type,
+        owner_id=owner_id,
+        sort=sort,
+        order=order,
+    ):
+        yield writer.writerow(_ticket_csv_row(item)).encode("utf-8")
+
+
+@router.get("/export.csv")
+async def export_tickets_csv(
+    user: CurrentUser,
+    session: DbSession,
+    queue_id: int | None = None,
+    state_id: int | None = None,
+    state_type: str | None = None,
+    owner_id: int | None = None,
+    sort: str = Query("age"),
+    order: str = Query("desc"),
+) -> StreamingResponse:
+    """Stream every ticket matching the same filters as ``GET /tickets`` as CSV.
+
+    Unlike the paginated list endpoint, this has no 200-row cap — rows are
+    streamed server-side (``TicketService.iter_tickets_for_export``) so
+    exporting a large queue stays memory-safe. Route registered *before*
+    ``/{ticket_id}`` so FastAPI does not try to parse "export.csv" as a
+    ticket id.
+    """
+    svc = TicketService(session)
+    return StreamingResponse(
+        _export_tickets_csv_stream(
+            svc,
+            user.id,
+            queue_id=queue_id,
+            state_id=state_id,
+            state_type=state_type,
+            owner_id=owner_id,
+            sort=sort,
+            order=order,
+        ),
+        media_type="text/csv; charset=utf-8",
+        headers={"Content-Disposition": 'attachment; filename="tickets.csv"'},
     )
 
 
