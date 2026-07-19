@@ -65,6 +65,10 @@ existing schema during parallel operation.
 | First owned migration + orphan report | ✅ Done (Phase 5) | Additive composite indexes only; read-only orphan counts |
 | Cutover runbook | ✅ Done (Phase 5) | [docs/cutover.md](./docs/cutover.md) — no cutover performed yet |
 | AI integration contract (webhooks + MCP) | ✅ Done (Phase 5) | [docs/ai-integration.md](./docs/ai-integration.md); no LLM code |
+| TiqoraSync Znuny addon (cache coherence) | ✅ Done | OPM package in `packages/znuny-addon/TiqoraSync/` — daemon cron clears stale Znuny ticket caches |
+| SSE realtime + agent presence | ✅ Done | `GET /api/v1/events/stream`; presence chips + stale-reply warning on ticket zoom |
+| CSV ticket export | ✅ Done | `GET /api/v1/tickets/export.csv` — permission-filtered, streaming, Excel-friendly |
+| Dev tooling: seed + dump anonymizer | ✅ Done | `tiqora dev seed` / `tiqora dev anonymize` — [docs/development.md](./docs/development.md) |
 | Process management, calendar, stats, PGP/S-MIME | ⏸ Deferred | Not in V1 |
 | SOAP, package manager | ⏸ Deferred | Not in V1 |
 | Phone/SMS, WhatsApp Business channels | 🔲 Planned (post-V1) | Plugin architecture |
