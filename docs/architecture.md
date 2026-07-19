@@ -196,16 +196,27 @@ exists, so admin writes enumerate affected `ticket.id`s directly).
 
 ### Frontend
 
-One Vite application with three route trees:
+One Vite application with three route trees, each wrapped in its own shell
+layout component (`components/layout/{Agent,Portal,Admin}Shell.tsx`):
 
-| Path | Audience |
-|---|---|
-| `/agent` | Agents (queue views, ticket zoom, compose) |
-| `/portal` | Customers |
-| `/admin` | Configuration |
+| Path | Audience | Shell | Highlights |
+|---|---|---|---|
+| `/agent` | Agents (queue views, ticket zoom, compose, KB editor) | `AgentShell` | Queue tree, ticket zoom, search, `kb/*` article editor + publish flow |
+| `/portal` | Customers | `PortalShell` | Ticket list/detail, follow-up replies, KB search + reader |
+| `/admin` | Configuration | `AdminShell` | Generic CRUD over queues, users, dynamic fields, ACLs |
 
 Code-split per tree. Theming uses CSS variables and `data-theme` (`light` /
-`dark`). i18n via `react-i18next` (English + German from day one).
+`dark`) via a shared design-token stylesheet (`themes/tokens.css` +
+`themes/theme.tsx`), consumed by all three shells so agent/portal/admin share
+one visual language. i18n via `react-i18next` (English + German from day
+one; `i18n/locales/{en,de}.json` are kept key-for-key in sync).
+
+Admin CRUD screens are generated from a generic pattern rather than
+hand-rolled per resource: `components/admin/DataTable.tsx` (sortable/paginated
+table) plus `components/admin/CrudDrawer.tsx` (create/edit form drawer with
+validation) are composed per resource in `components/admin/AdminResourcePage.tsx`,
+with `DynamicFieldConfigEditor.tsx` handling the dynamic-field-specific
+possible-values editing UI.
 
 ## Observability
 
