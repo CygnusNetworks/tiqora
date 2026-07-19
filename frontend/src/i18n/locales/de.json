@@ -15,6 +15,16 @@
     "queues": "Queues",
     "kb": "Wissensdatenbank"
   },
+  "sidebar": {
+    "workspace": "Arbeitsbereich",
+    "inbox": "Eingang",
+    "myTickets": "Meine Tickets",
+    "watched": "Beobachtet",
+    "queues": "Queues",
+    "knowledge": "Wissen",
+    "knowledgeBase": "Knowledge Base",
+    "toggle": "Navigation umschalten"
+  },
   "common": {
     "prev": "Zurück",
     "next": "Weiter",
@@ -65,6 +75,7 @@
     "noTickets": "Keine Tickets für diesen Filter.",
     "pagination": "{{from}}–{{to}} von {{total}}",
     "escalated": "Eskaliert",
+    "slaCountdown": "SLA {{value}}",
     "escResponse": "Antwort-SLA",
     "escUpdate": "Update-SLA",
     "escSolution": "Lösungs-SLA",
@@ -92,6 +103,7 @@
   "search": {
     "title": "Suche",
     "placeholder": "Tickets suchen…",
+    "commandHint": "Suchen oder Befehl…",
     "submit": "Suchen",
     "hint": "Ticketnummer, Betreff oder Text eingeben.",
     "results": "{{total}} Treffer für „{{query}}“",
