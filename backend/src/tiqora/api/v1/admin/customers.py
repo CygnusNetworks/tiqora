@@ -1,0 +1,212 @@
+"""Admin CRUD for customer_user / customer_company + customer_user_customer assignment."""
+
+from __future__ import annotations
+
+from fastapi import APIRouter, HTTPException, status
+from sqlalchemy import select
+
+from tiqora.api.deps import DbSession
+from tiqora.api.v1.admin.common import now
+from tiqora.api.v1.admin.deps import AdminUser
+from tiqora.api.v1.admin.schemas import (
+    CustomerCompanyCreate,
+    CustomerCompanyOut,
+    CustomerCompanyUpdate,
+    CustomerUserAdminCreate,
+    CustomerUserAdminOut,
+    CustomerUserAdminUpdate,
+    CustomerUserCustomerAssignment,
+)
+from tiqora.db.legacy.customer import CustomerCompany, CustomerUser, CustomerUserCustomer
+from tiqora.znuny.password import hash_password
+
+router = APIRouter(tags=["admin:customers"])
+
+
+@router.get("/customer-users", response_model=list[CustomerUserAdminOut])
+async def list_customer_users(admin: AdminUser, session: DbSession) -> list[CustomerUser]:
+    _ = admin
+    result = await session.execute(select(CustomerUser).order_by(CustomerUser.login))
+    return list(result.scalars().all())
+
+
+@router.get("/customer-users/{customer_user_id}", response_model=CustomerUserAdminOut)
+async def get_customer_user(
+    customer_user_id: int, admin: AdminUser, session: DbSession
+) -> CustomerUser:
+    _ = admin
+    cu = await session.get(CustomerUser, customer_user_id)
+    if cu is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Customer user not found")
+    return cu
+
+
+@router.post(
+    "/customer-users", response_model=CustomerUserAdminOut, status_code=status.HTTP_201_CREATED
+)
+async def create_customer_user(
+    body: CustomerUserAdminCreate, admin: AdminUser, session: DbSession
+) -> CustomerUser:
+    ts = now()
+    data = body.model_dump(exclude={"password"})
+    cu = CustomerUser(
+        **data,
+        pw=hash_password(body.password) if body.password else None,
+        create_time=ts,
+        create_by=admin.id,
+        change_time=ts,
+        change_by=admin.id,
+    )
+    session.add(cu)
+    await session.commit()
+    await session.refresh(cu)
+    return cu
+
+
+@router.patch("/customer-users/{customer_user_id}", response_model=CustomerUserAdminOut)
+async def update_customer_user(
+    customer_user_id: int,
+    body: CustomerUserAdminUpdate,
+    admin: AdminUser,
+    session: DbSession,
+) -> CustomerUser:
+    cu = await session.get(CustomerUser, customer_user_id)
+    if cu is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Customer user not found")
+    data = body.model_dump(exclude_unset=True)
+    if "password" in data:
+        password = data.pop("password")
+        if password:
+            cu.pw = hash_password(password)
+    for field, value in data.items():
+        setattr(cu, field, value)
+    cu.change_time = now()
+    cu.change_by = admin.id
+    await session.commit()
+    await session.refresh(cu)
+    return cu
+
+
+@router.delete("/customer-users/{customer_user_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def deactivate_customer_user(
+    customer_user_id: int, admin: AdminUser, session: DbSession
+) -> None:
+    cu = await session.get(CustomerUser, customer_user_id)
+    if cu is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Customer user not found")
+    cu.valid_id = 2
+    cu.change_time = now()
+    cu.change_by = admin.id
+    await session.commit()
+
+
+@router.get("/customer-companies", response_model=list[CustomerCompanyOut])
+async def list_customer_companies(admin: AdminUser, session: DbSession) -> list[CustomerCompany]:
+    _ = admin
+    result = await session.execute(select(CustomerCompany).order_by(CustomerCompany.name))
+    return list(result.scalars().all())
+
+
+@router.get("/customer-companies/{customer_id}", response_model=CustomerCompanyOut)
+async def get_customer_company(
+    customer_id: str, admin: AdminUser, session: DbSession
+) -> CustomerCompany:
+    _ = admin
+    co = await session.get(CustomerCompany, customer_id)
+    if co is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Company not found")
+    return co
+
+
+@router.post(
+    "/customer-companies", response_model=CustomerCompanyOut, status_code=status.HTTP_201_CREATED
+)
+async def create_customer_company(
+    body: CustomerCompanyCreate, admin: AdminUser, session: DbSession
+) -> CustomerCompany:
+    ts = now()
+    co = CustomerCompany(
+        **body.model_dump(),
+        create_time=ts,
+        create_by=admin.id,
+        change_time=ts,
+        change_by=admin.id,
+    )
+    session.add(co)
+    await session.commit()
+    await session.refresh(co)
+    return co
+
+
+@router.patch("/customer-companies/{customer_id}", response_model=CustomerCompanyOut)
+async def update_customer_company(
+    customer_id: str,
+    body: CustomerCompanyUpdate,
+    admin: AdminUser,
+    session: DbSession,
+) -> CustomerCompany:
+    co = await session.get(CustomerCompany, customer_id)
+    if co is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Company not found")
+    for field, value in body.model_dump(exclude_unset=True).items():
+        setattr(co, field, value)
+    co.change_time = now()
+    co.change_by = admin.id
+    await session.commit()
+    await session.refresh(co)
+    return co
+
+
+@router.delete("/customer-companies/{customer_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def deactivate_customer_company(
+    customer_id: str, admin: AdminUser, session: DbSession
+) -> None:
+    co = await session.get(CustomerCompany, customer_id)
+    if co is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Company not found")
+    co.valid_id = 2
+    co.change_time = now()
+    co.change_by = admin.id
+    await session.commit()
+
+
+@router.put(
+    "/customer-users/{customer_user_login}/companies", status_code=status.HTTP_204_NO_CONTENT
+)
+async def assign_customer_company(
+    customer_user_login: str,
+    body: CustomerUserCustomerAssignment,
+    admin: AdminUser,
+    session: DbSession,
+) -> None:
+    """Grant *customer_user_login* additional visibility into *customer_id*'s
+    tickets (Znuny ``customer_user_customer`` — distinct from the user's
+    primary ``customer_user.customer_id``)."""
+    existing = await session.get(CustomerUserCustomer, (customer_user_login, body.customer_id))
+    ts = now()
+    if existing is None:
+        session.add(
+            CustomerUserCustomer(
+                user_id=customer_user_login,
+                customer_id=body.customer_id,
+                create_time=ts,
+                create_by=admin.id,
+                change_time=ts,
+                change_by=admin.id,
+            )
+        )
+        await session.commit()
+
+
+@router.delete(
+    "/customer-users/{customer_user_login}/companies/{customer_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+async def revoke_customer_company(
+    customer_user_login: str, customer_id: str, admin: AdminUser, session: DbSession
+) -> None:
+    _ = admin
+    existing = await session.get(CustomerUserCustomer, (customer_user_login, customer_id))
+    if existing is not None:
+        await session.delete(existing)
+        await session.commit()

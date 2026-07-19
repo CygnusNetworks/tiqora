@@ -1,0 +1,244 @@
+"""Admin CRUD for salutations, signatures, standard templates + queue assignment.
+
+Auto-response templates live in :mod:`tiqora.api.v1.admin.auto_responses`.
+"""
+
+from __future__ import annotations
+
+from fastapi import APIRouter, HTTPException, status
+from sqlalchemy import select
+
+from tiqora.api.deps import DbSession
+from tiqora.api.v1.admin.common import now
+from tiqora.api.v1.admin.deps import AdminUser
+from tiqora.api.v1.admin.schemas import (
+    QueueTemplateAssignment,
+    SalutationOut,
+    SalutationUpdate,
+    SalutationWrite,
+    SignatureOut,
+    SignatureUpdate,
+    SignatureWrite,
+    StandardTemplateCreate,
+    StandardTemplateOut,
+    StandardTemplateUpdate,
+)
+from tiqora.db.legacy.queue import (
+    QueueStandardTemplate,
+    Salutation,
+    Signature,
+    StandardTemplate,
+)
+
+router = APIRouter(tags=["admin:templates"])
+
+
+# --- Salutations ------------------------------------------------------------
+
+
+@router.get("/salutations", response_model=list[SalutationOut])
+async def list_salutations(admin: AdminUser, session: DbSession) -> list[Salutation]:
+    _ = admin
+    result = await session.execute(select(Salutation).order_by(Salutation.name))
+    return list(result.scalars().all())
+
+
+@router.get("/salutations/{salutation_id}", response_model=SalutationOut)
+async def get_salutation(salutation_id: int, admin: AdminUser, session: DbSession) -> Salutation:
+    _ = admin
+    row = await session.get(Salutation, salutation_id)
+    if row is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Salutation not found")
+    return row
+
+
+@router.post("/salutations", response_model=SalutationOut, status_code=status.HTTP_201_CREATED)
+async def create_salutation(
+    body: SalutationWrite, admin: AdminUser, session: DbSession
+) -> Salutation:
+    ts = now()
+    row = Salutation(
+        **body.model_dump(), create_time=ts, create_by=admin.id, change_time=ts, change_by=admin.id
+    )
+    session.add(row)
+    await session.commit()
+    await session.refresh(row)
+    return row
+
+
+@router.patch("/salutations/{salutation_id}", response_model=SalutationOut)
+async def update_salutation(
+    salutation_id: int, body: SalutationUpdate, admin: AdminUser, session: DbSession
+) -> Salutation:
+    row = await session.get(Salutation, salutation_id)
+    if row is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Salutation not found")
+    for field, value in body.model_dump(exclude_unset=True).items():
+        setattr(row, field, value)
+    row.change_time = now()
+    row.change_by = admin.id
+    await session.commit()
+    await session.refresh(row)
+    return row
+
+
+@router.delete("/salutations/{salutation_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def deactivate_salutation(salutation_id: int, admin: AdminUser, session: DbSession) -> None:
+    row = await session.get(Salutation, salutation_id)
+    if row is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Salutation not found")
+    row.valid_id = 2
+    row.change_time = now()
+    row.change_by = admin.id
+    await session.commit()
+
+
+# --- Signatures --------------------------------------------------------------
+
+
+@router.get("/signatures", response_model=list[SignatureOut])
+async def list_signatures(admin: AdminUser, session: DbSession) -> list[Signature]:
+    _ = admin
+    result = await session.execute(select(Signature).order_by(Signature.name))
+    return list(result.scalars().all())
+
+
+@router.get("/signatures/{signature_id}", response_model=SignatureOut)
+async def get_signature(signature_id: int, admin: AdminUser, session: DbSession) -> Signature:
+    _ = admin
+    row = await session.get(Signature, signature_id)
+    if row is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Signature not found")
+    return row
+
+
+@router.post("/signatures", response_model=SignatureOut, status_code=status.HTTP_201_CREATED)
+async def create_signature(body: SignatureWrite, admin: AdminUser, session: DbSession) -> Signature:
+    ts = now()
+    row = Signature(
+        **body.model_dump(), create_time=ts, create_by=admin.id, change_time=ts, change_by=admin.id
+    )
+    session.add(row)
+    await session.commit()
+    await session.refresh(row)
+    return row
+
+
+@router.patch("/signatures/{signature_id}", response_model=SignatureOut)
+async def update_signature(
+    signature_id: int, body: SignatureUpdate, admin: AdminUser, session: DbSession
+) -> Signature:
+    row = await session.get(Signature, signature_id)
+    if row is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Signature not found")
+    for field, value in body.model_dump(exclude_unset=True).items():
+        setattr(row, field, value)
+    row.change_time = now()
+    row.change_by = admin.id
+    await session.commit()
+    await session.refresh(row)
+    return row
+
+
+@router.delete("/signatures/{signature_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def deactivate_signature(signature_id: int, admin: AdminUser, session: DbSession) -> None:
+    row = await session.get(Signature, signature_id)
+    if row is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Signature not found")
+    row.valid_id = 2
+    row.change_time = now()
+    row.change_by = admin.id
+    await session.commit()
+
+
+# --- Standard templates + queue assignment -----------------------------------
+
+
+@router.get("/templates", response_model=list[StandardTemplateOut])
+async def list_templates(admin: AdminUser, session: DbSession) -> list[StandardTemplate]:
+    _ = admin
+    result = await session.execute(select(StandardTemplate).order_by(StandardTemplate.name))
+    return list(result.scalars().all())
+
+
+@router.get("/templates/{template_id}", response_model=StandardTemplateOut)
+async def get_template(template_id: int, admin: AdminUser, session: DbSession) -> StandardTemplate:
+    _ = admin
+    row = await session.get(StandardTemplate, template_id)
+    if row is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Template not found")
+    return row
+
+
+@router.post("/templates", response_model=StandardTemplateOut, status_code=status.HTTP_201_CREATED)
+async def create_template(
+    body: StandardTemplateCreate, admin: AdminUser, session: DbSession
+) -> StandardTemplate:
+    ts = now()
+    row = StandardTemplate(
+        **body.model_dump(), create_time=ts, create_by=admin.id, change_time=ts, change_by=admin.id
+    )
+    session.add(row)
+    await session.commit()
+    await session.refresh(row)
+    return row
+
+
+@router.patch("/templates/{template_id}", response_model=StandardTemplateOut)
+async def update_template(
+    template_id: int, body: StandardTemplateUpdate, admin: AdminUser, session: DbSession
+) -> StandardTemplate:
+    row = await session.get(StandardTemplate, template_id)
+    if row is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Template not found")
+    for field, value in body.model_dump(exclude_unset=True).items():
+        setattr(row, field, value)
+    row.change_time = now()
+    row.change_by = admin.id
+    await session.commit()
+    await session.refresh(row)
+    return row
+
+
+@router.delete("/templates/{template_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def deactivate_template(template_id: int, admin: AdminUser, session: DbSession) -> None:
+    row = await session.get(StandardTemplate, template_id)
+    if row is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Template not found")
+    row.valid_id = 2
+    row.change_time = now()
+    row.change_by = admin.id
+    await session.commit()
+
+
+@router.put("/queues/{queue_id}/templates", status_code=status.HTTP_204_NO_CONTENT)
+async def assign_queue_template(
+    queue_id: int, body: QueueTemplateAssignment, admin: AdminUser, session: DbSession
+) -> None:
+    existing = await session.get(QueueStandardTemplate, (queue_id, body.standard_template_id))
+    ts = now()
+    if existing is None:
+        session.add(
+            QueueStandardTemplate(
+                queue_id=queue_id,
+                standard_template_id=body.standard_template_id,
+                create_time=ts,
+                create_by=admin.id,
+                change_time=ts,
+                change_by=admin.id,
+            )
+        )
+        await session.commit()
+
+
+@router.delete(
+    "/queues/{queue_id}/templates/{standard_template_id}", status_code=status.HTTP_204_NO_CONTENT
+)
+async def revoke_queue_template(
+    queue_id: int, standard_template_id: int, admin: AdminUser, session: DbSession
+) -> None:
+    _ = admin
+    existing = await session.get(QueueStandardTemplate, (queue_id, standard_template_id))
+    if existing is not None:
+        await session.delete(existing)
+        await session.commit()
