@@ -155,6 +155,7 @@ async def test_dispatch_delivers_signed_payload_and_filters_events(
     assert sig_header == expected
 
     parsed = json.loads(body)
+    assert parsed["schema_version"] == 1
     assert parsed["event"] == "TicketCreate"
     assert parsed["ticket_id"] == 42
     assert parsed["payload"] == {"tn": "20260719000001"}
