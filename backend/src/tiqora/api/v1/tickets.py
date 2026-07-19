@@ -1,13 +1,17 @@
-"""Ticket, article, attachment, and history read endpoints."""
+"""Ticket, article, attachment, and history read + write endpoints."""
 
 from __future__ import annotations
 
+from datetime import datetime
+from typing import Any
 from urllib.parse import quote
 
 from fastapi import APIRouter, HTTPException, Query, status
 from fastapi.responses import Response
+from pydantic import BaseModel, Field
 
-from tiqora.api.deps import CurrentUser, DbSession
+from tiqora.api.deps import AppSettings, CurrentUser, DbSession
+from tiqora.db.engine import get_session_factory
 from tiqora.domain.schemas import (
     ArticleBody,
     ArticleListItem,
@@ -21,16 +25,119 @@ from tiqora.domain.ticket_service import (
     TicketNotFound,
     TicketService,
 )
+from tiqora.domain.ticket_write_service import (
+    ArticleIn,
+    InvalidInput,
+    TicketIn,
+    TicketWriteService,
+)
+from tiqora.domain.ticket_write_service import (
+    TicketAccessDenied as WriteAccessDenied,
+)
+from tiqora.domain.ticket_write_service import (
+    TicketNotFound as WriteNotFound,
+)
+from tiqora.znuny.sysconfig import SysConfig
+
+# ---------------------------------------------------------------------------
+# Write schemas
+# ---------------------------------------------------------------------------
+
+
+class TicketCreateRequest(BaseModel):
+    title: str
+    queue_id: int
+    state_id: int
+    priority_id: int
+    owner_id: int
+    lock_id: int = 1
+    type_id: int | None = None
+    service_id: int | None = None
+    sla_id: int | None = None
+    responsible_id: int | None = None
+    customer_id: str | None = None
+    customer_user_id: str | None = None
+    archive_flag: int = 0
+    dynamic_fields: dict[str, list[str]] = Field(default_factory=dict)
+
+
+class TicketCreateResponse(BaseModel):
+    ticket_id: int
+
+
+class ArticleCreateRequest(BaseModel):
+    sender_type: str = "agent"
+    is_visible_for_customer: bool = True
+    subject: str
+    body: str
+    content_type: str = "text/plain; charset=utf-8"
+    from_address: str | None = None
+    to_address: str | None = None
+    cc: str | None = None
+    channel: str = "note"
+
+
+class ArticleCreateResponse(BaseModel):
+    article_id: int
+
+
+class MutationRequest(BaseModel):
+    """Generic mutation payload (flexible)."""
+
+    queue_id: int | None = None
+    state_id: int | None = None
+    priority_id: int | None = None
+    title: str | None = None
+    customer_id: str | None = None
+    customer_user_id: str | None = None
+    owner_id: int | None = None
+    responsible_id: int | None = None
+    lock: str | None = None  # "lock" | "unlock"
+    archive: bool | None = None
+    pending_time: datetime | None = None
+    field_name: str | None = None
+    field_values: list[str] | None = None
+    watcher_user_id: int | None = None
+
+
+class MergeRequest(BaseModel):
+    main_ticket_id: int
+
+
+class DraftIn(BaseModel):
+    action: str
+    title: str | None = None
+    content: str = "{}"
+
+
+class DraftOut(BaseModel):
+    id: int
+    ticket_id: int
+    user_id: int
+    action: str
+    title: str | None = None
+    content: str
+    created: datetime
+    changed: datetime
+
 
 router = APIRouter(prefix="/tickets", tags=["tickets"])
 
 
 def _map_exc(exc: Exception) -> HTTPException:
-    if isinstance(exc, TicketNotFound):
+    if isinstance(exc, (TicketNotFound, WriteNotFound)):
         return HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not found")
-    if isinstance(exc, TicketAccessDenied):
+    if isinstance(exc, (TicketAccessDenied, WriteAccessDenied)):
         return HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden")
+    if isinstance(exc, InvalidInput):
+        return HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc))
     return HTTPException(status_code=500, detail="Internal error")
+
+
+def _write_service(session: Any, settings: Any) -> TicketWriteService:
+    factory = get_session_factory()
+    sysconfig = SysConfig(session)
+    return TicketWriteService(session, factory, sysconfig)
 
 
 @router.get("", response_model=PaginatedTickets)
@@ -201,3 +308,333 @@ async def ticket_history(
         return await TicketService(session).list_history(user.id, ticket_id)
     except (TicketNotFound, TicketAccessDenied) as exc:
         raise _map_exc(exc) from exc
+
+
+# ---------------------------------------------------------------------------
+# Write endpoints
+# ---------------------------------------------------------------------------
+
+
+@router.post("", response_model=TicketCreateResponse, status_code=status.HTTP_201_CREATED)
+async def create_ticket(
+    body: TicketCreateRequest,
+    user: CurrentUser,
+    session: DbSession,
+    settings: AppSettings,
+) -> TicketCreateResponse:
+    """Create a new ticket. Requires ``create`` permission on the queue's group."""
+    svc = _write_service(session, settings)
+    try:
+        async with session.begin():
+            tid = await svc.create_ticket(
+                user.id,
+                TicketIn(
+                    title=body.title,
+                    queue_id=body.queue_id,
+                    state_id=body.state_id,
+                    priority_id=body.priority_id,
+                    owner_id=body.owner_id,
+                    lock_id=body.lock_id,
+                    type_id=body.type_id,
+                    service_id=body.service_id,
+                    sla_id=body.sla_id,
+                    responsible_id=body.responsible_id,
+                    customer_id=body.customer_id,
+                    customer_user_id=body.customer_user_id,
+                    archive_flag=body.archive_flag,
+                    dynamic_fields=body.dynamic_fields,
+                ),
+            )
+    except (WriteAccessDenied, WriteNotFound, InvalidInput) as exc:
+        raise _map_exc(exc) from exc
+    return TicketCreateResponse(ticket_id=tid)
+
+
+@router.post(
+    "/{ticket_id}/articles",
+    response_model=ArticleCreateResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+async def create_article(
+    ticket_id: int,
+    body: ArticleCreateRequest,
+    user: CurrentUser,
+    session: DbSession,
+    settings: AppSettings,
+) -> ArticleCreateResponse:
+    """Add an article to a ticket. Requires ``rw`` permission."""
+    svc = _write_service(session, settings)
+    try:
+        async with session.begin():
+            aid = await svc.add_article(
+                user.id,
+                ticket_id,
+                ArticleIn(
+                    sender_type=body.sender_type,
+                    is_visible_for_customer=body.is_visible_for_customer,
+                    subject=body.subject,
+                    body=body.body,
+                    content_type=body.content_type,
+                    from_address=body.from_address,
+                    to_address=body.to_address,
+                    cc=body.cc,
+                    channel=body.channel,
+                ),
+            )
+    except (WriteAccessDenied, WriteNotFound, InvalidInput) as exc:
+        raise _map_exc(exc) from exc
+    return ArticleCreateResponse(article_id=aid)
+
+
+@router.patch("/{ticket_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def patch_ticket(
+    ticket_id: int,
+    body: MutationRequest,
+    user: CurrentUser,
+    session: DbSession,
+    settings: AppSettings,
+) -> None:
+    """Apply one or more field mutations to a ticket."""
+    svc = _write_service(session, settings)
+    try:
+        async with session.begin():
+            if body.queue_id is not None:
+                await svc.move_queue(user.id, ticket_id, body.queue_id)
+            if body.state_id is not None:
+                await svc.change_state(
+                    user.id, ticket_id, body.state_id, pending_time=body.pending_time
+                )
+            if body.priority_id is not None:
+                from tiqora.domain.ticket_write_service import change_priority
+
+                await svc._assert_rw.__self__._assert_rw(user.id, ticket_id)  # type: ignore[attr-defined]
+                await change_priority(
+                    session,
+                    ticket_id=ticket_id,
+                    new_priority_id=body.priority_id,
+                    user_id=user.id,
+                    sysconfig=svc._sysconfig,
+                )
+            if body.title is not None:
+                from tiqora.domain.ticket_write_service import change_title
+
+                await change_title(
+                    session, ticket_id=ticket_id, new_title=body.title, user_id=user.id
+                )
+            if body.customer_id is not None or body.customer_user_id is not None:
+                from tiqora.domain.ticket_write_service import set_customer
+
+                await set_customer(
+                    session,
+                    ticket_id=ticket_id,
+                    customer_id=body.customer_id,
+                    customer_user_id=body.customer_user_id,
+                    user_id=user.id,
+                )
+            if body.owner_id is not None:
+                from tiqora.domain.ticket_write_service import assign_owner
+
+                await assign_owner(
+                    session,
+                    ticket_id=ticket_id,
+                    new_owner_id=body.owner_id,
+                    user_id=user.id,
+                    sysconfig=svc._sysconfig,
+                )
+            if body.responsible_id is not None:
+                from tiqora.domain.ticket_write_service import assign_responsible
+
+                await assign_responsible(
+                    session,
+                    ticket_id=ticket_id,
+                    new_responsible_id=body.responsible_id,
+                    user_id=user.id,
+                )
+            if body.lock is not None:
+                if body.lock == "lock":
+                    from tiqora.domain.ticket_write_service import lock_ticket
+
+                    await lock_ticket(
+                        session, ticket_id=ticket_id, user_id=user.id, sysconfig=svc._sysconfig
+                    )
+                elif body.lock == "unlock":
+                    from tiqora.domain.ticket_write_service import unlock_ticket
+
+                    await unlock_ticket(
+                        session, ticket_id=ticket_id, user_id=user.id, sysconfig=svc._sysconfig
+                    )
+            if body.archive is not None:
+                from tiqora.domain.ticket_write_service import archive_ticket
+
+                await archive_ticket(
+                    session,
+                    ticket_id=ticket_id,
+                    archive=body.archive,
+                    user_id=user.id,
+                    sysconfig=svc._sysconfig,
+                )
+            if body.field_name is not None and body.field_values is not None:
+                from tiqora.domain.ticket_write_service import update_dynamic_field
+
+                await update_dynamic_field(
+                    session,
+                    ticket_id=ticket_id,
+                    field_name=body.field_name,
+                    values=body.field_values,
+                    user_id=user.id,
+                )
+            if body.watcher_user_id is not None:
+                from tiqora.domain.ticket_write_service import watch_ticket
+
+                await watch_ticket(
+                    session,
+                    ticket_id=ticket_id,
+                    watcher_user_id=body.watcher_user_id,
+                    user_id=user.id,
+                )
+    except (WriteAccessDenied, WriteNotFound, InvalidInput) as exc:
+        raise _map_exc(exc) from exc
+
+
+@router.post("/{ticket_id}/merge", status_code=status.HTTP_204_NO_CONTENT)
+async def merge_ticket(
+    ticket_id: int,
+    body: MergeRequest,
+    user: CurrentUser,
+    session: DbSession,
+    settings: AppSettings,
+) -> None:
+    """Merge ticket_id into main_ticket_id. Requires ``rw`` on both queues."""
+    svc = _write_service(session, settings)
+    try:
+        async with session.begin():
+            await svc.merge_tickets(user.id, body.main_ticket_id, ticket_id)
+    except (WriteAccessDenied, WriteNotFound, InvalidInput) as exc:
+        raise _map_exc(exc) from exc
+
+
+# ---------------------------------------------------------------------------
+# Draft endpoints (tiqora_form_draft)
+# ---------------------------------------------------------------------------
+
+
+@router.get("/{ticket_id}/drafts", response_model=list[DraftOut])
+async def list_drafts(
+    ticket_id: int,
+    user: CurrentUser,
+    session: DbSession,
+) -> list[DraftOut]:
+    """List form drafts for a ticket (current user only)."""
+    from sqlalchemy import text
+
+    rows = (
+        (
+            await session.execute(
+                text(
+                    "SELECT id, ticket_id, user_id, action, title, content, created, changed"
+                    " FROM tiqora_form_draft"
+                    " WHERE ticket_id = :tid AND user_id = :uid ORDER BY changed DESC"
+                ),
+                {"tid": ticket_id, "uid": user.id},
+            )
+        )
+        .mappings()
+        .fetchall()
+    )
+    return [DraftOut(**dict(r)) for r in rows]
+
+
+@router.put(
+    "/{ticket_id}/drafts/{action}",
+    response_model=DraftOut,
+    status_code=status.HTTP_200_OK,
+)
+async def upsert_draft(
+    ticket_id: int,
+    action: str,
+    body: DraftIn,
+    user: CurrentUser,
+    session: DbSession,
+) -> DraftOut:
+    """Create or update a draft for (ticket, user, action)."""
+    from sqlalchemy import text
+
+    async with session.begin():
+        existing = (
+            await session.execute(
+                text(
+                    "SELECT id FROM tiqora_form_draft"
+                    " WHERE ticket_id = :tid AND user_id = :uid AND action = :act LIMIT 1"
+                ),
+                {"tid": ticket_id, "uid": user.id, "act": action},
+            )
+        ).first()
+        if existing is not None:
+            await session.execute(
+                text(
+                    "UPDATE tiqora_form_draft SET title = :title, content = :content,"
+                    " changed = current_timestamp"
+                    " WHERE ticket_id = :tid AND user_id = :uid AND action = :act"
+                ),
+                {
+                    "title": body.title,
+                    "content": body.content,
+                    "tid": ticket_id,
+                    "uid": user.id,
+                    "act": action,
+                },
+            )
+        else:
+            await session.execute(
+                text(
+                    "INSERT INTO tiqora_form_draft"
+                    " (ticket_id, user_id, action, title, content, created, changed)"
+                    " VALUES (:tid, :uid, :act, :title, :content,"
+                    " current_timestamp, current_timestamp)"
+                ),
+                {
+                    "tid": ticket_id,
+                    "uid": user.id,
+                    "act": action,
+                    "title": body.title,
+                    "content": body.content,
+                },
+            )
+
+    row = (
+        (
+            await session.execute(
+                text(
+                    "SELECT id, ticket_id, user_id, action, title, content, created, changed"
+                    " FROM tiqora_form_draft"
+                    " WHERE ticket_id = :tid AND user_id = :uid AND action = :act LIMIT 1"
+                ),
+                {"tid": ticket_id, "uid": user.id, "act": action},
+            )
+        )
+        .mappings()
+        .first()
+    )
+    if row is None:
+        raise HTTPException(status_code=500, detail="Draft upsert failed")
+    return DraftOut(**dict(row))
+
+
+@router.delete("/{ticket_id}/drafts/{action}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_draft(
+    ticket_id: int,
+    action: str,
+    user: CurrentUser,
+    session: DbSession,
+) -> None:
+    """Delete a draft for (ticket, user, action)."""
+    from sqlalchemy import text
+
+    async with session.begin():
+        await session.execute(
+            text(
+                "DELETE FROM tiqora_form_draft"
+                " WHERE ticket_id = :tid AND user_id = :uid AND action = :act"
+            ),
+            {"tid": ticket_id, "uid": user.id, "act": action},
+        )

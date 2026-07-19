@@ -35,4 +35,14 @@ async def rebuild_index_task(resume: bool = True) -> dict[str, int]:
     return await rebuild_index(resume=resume)
 
 
+@broker.task(
+    schedule=[{"cron": "* * * * *"}],
+)
+async def drain_outbox_task() -> dict[str, int]:
+    """Drain tiqora_event_outbox: re-index affected tickets in Meilisearch."""
+    from tiqora.worker.outbox_drain import drain_outbox
+
+    return await drain_outbox()
+
+
 scheduler = TaskiqScheduler(broker=broker, sources=[LabelScheduleSource(broker)])
