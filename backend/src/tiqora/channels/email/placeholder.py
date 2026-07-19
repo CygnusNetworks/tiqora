@@ -16,7 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from tiqora.znuny.sysconfig import SysConfig
 
-_TAG_RE = re.compile(r"<OTRS_([A-Z0-9_]+)(?:\[(\d+)\])?>")
+_TAG_RE = re.compile(r"<OTRS_([A-Za-z0-9_]+?)(?:\[(\d+)\])?>")
 
 
 async def expand_placeholders(
