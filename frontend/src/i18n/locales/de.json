@@ -169,7 +169,195 @@
   },
   "admin": {
     "title": "Administration",
-    "placeholder": "Queues, Dynamische Felder, ACL und GenericAgent-Editoren folgen (Phase 3)."
+    "toggleSidebar": "Admin-Navigation umschalten",
+    "readOnly": "Nur lesend",
+    "accessDenied": {
+      "title": "Zugriff verweigert",
+      "body": "Ihr Konto hat keine Admin-Berechtigung.",
+      "error": "Admin-Zugriff konnte nicht geprüft werden. Bitte erneut versuchen."
+    },
+    "group": {
+      "usersPermissions": "Benutzer & Berechtigungen",
+      "ticketConfig": "Ticket-Konfiguration",
+      "customers": "Kunden",
+      "communication": "Kommunikation",
+      "automation": "Automatisierung",
+      "system": "System"
+    },
+    "nav": {
+      "users": "Benutzer",
+      "groups": "Gruppen",
+      "roles": "Rollen",
+      "queues": "Queues",
+      "states": "Status",
+      "priorities": "Prioritäten",
+      "customerUsers": "Kundenbenutzer",
+      "customerCompanies": "Kundenunternehmen",
+      "templates": "Vorlagen",
+      "salutations": "Anreden",
+      "signatures": "Signaturen",
+      "autoResponses": "Autoantworten",
+      "postmasterFilters": "Postmaster-Filter",
+      "acl": "ACLs",
+      "genericAgentJobs": "GenericAgent-Jobs",
+      "dynamicFields": "Dynamische Felder"
+    },
+    "table": {
+      "id": "ID",
+      "status": "Status",
+      "valid": "Gültig",
+      "invalid": "Ungültig",
+      "comments": "Kommentare",
+      "changed": "Geändert",
+      "actions": "Aktionen",
+      "edit": "Bearbeiten",
+      "deactivate": "Deaktivieren",
+      "empty": "Noch keine Einträge."
+    },
+    "form": {
+      "cancel": "Abbrechen",
+      "save": "Speichern",
+      "saving": "Speichert…",
+      "required": "Dieses Feld ist erforderlich.",
+      "selectPlaceholder": "Auswählen…",
+      "editTitle": "{{title}} bearbeiten",
+      "genericError": "Etwas ist schiefgelaufen. Bitte erneut versuchen."
+    },
+    "users": {
+      "title_plural": "Benutzer",
+      "new": "Neuer Benutzer",
+      "login": "Login",
+      "password": "Passwort",
+      "passwordHelp": "Leer lassen, um das aktuelle Passwort zu behalten.",
+      "title": "Titel",
+      "firstName": "Vorname",
+      "lastName": "Nachname",
+      "name": "Name"
+    },
+    "groups": {
+      "title_plural": "Gruppen",
+      "new": "Neue Gruppe",
+      "name": "Name"
+    },
+    "roles": {
+      "title_plural": "Rollen",
+      "new": "Neue Rolle",
+      "name": "Name"
+    },
+    "queues": {
+      "title_plural": "Queues",
+      "new": "Neue Queue",
+      "name": "Name",
+      "groupId": "Gruppen-ID",
+      "systemAddressId": "Systemadressen-ID",
+      "salutationId": "Anreden-ID",
+      "signatureId": "Signatur-ID",
+      "followUpId": "Follow-up-ID",
+      "followUpLock": "Bei Follow-up sperren",
+      "unlockTimeout": "Entsperr-Timeout (s)"
+    },
+    "states": {
+      "title_plural": "Status",
+      "new": "Neuer Status",
+      "name": "Name",
+      "typeId": "Typ"
+    },
+    "priorities": {
+      "title_plural": "Prioritäten",
+      "new": "Neue Priorität",
+      "name": "Name"
+    },
+    "customerUsers": {
+      "title_plural": "Kundenbenutzer",
+      "new": "Neuer Kundenbenutzer",
+      "login": "Login",
+      "email": "E-Mail",
+      "customerId": "Kunden-ID",
+      "firstName": "Vorname",
+      "lastName": "Nachname",
+      "name": "Name",
+      "phone": "Telefon",
+      "street": "Straße",
+      "city": "Stadt",
+      "country": "Land"
+    },
+    "customerCompanies": {
+      "title_plural": "Kundenunternehmen",
+      "new": "Neues Kundenunternehmen",
+      "customerId": "Kunden-ID",
+      "name": "Name",
+      "url": "URL"
+    },
+    "templates": {
+      "title_plural": "Vorlagen",
+      "new": "Neue Vorlage",
+      "name": "Name",
+      "type": "Typ",
+      "text": "Text"
+    },
+    "salutations": {
+      "title_plural": "Anreden",
+      "new": "Neue Anrede",
+      "name": "Name",
+      "text": "Text"
+    },
+    "signatures": {
+      "title_plural": "Signaturen",
+      "new": "Neue Signatur",
+      "name": "Name",
+      "text": "Text"
+    },
+    "autoResponses": {
+      "title_plural": "Autoantworten",
+      "new": "Neue Autoantwort",
+      "name": "Name",
+      "typeId": "Typ-ID",
+      "subject": "Betreff",
+      "body": "Text"
+    },
+    "dynamicFields": {
+      "title_plural": "Dynamische Felder",
+      "new": "Neues dynamisches Feld",
+      "name": "Name",
+      "label": "Label",
+      "fieldOrder": "Feldreihenfolge",
+      "fieldType": "Feldtyp",
+      "objectType": "Objekttyp",
+      "config": "Konfiguration",
+      "possibleValues": "Mögliche Werte",
+      "possibleValuesRequired": "Fügen Sie mindestens eine Option hinzu.",
+      "optionKey": "Wert",
+      "optionLabel": "Label",
+      "addOption": "Option hinzufügen",
+      "removeOption": "Option entfernen",
+      "possibleNone": "Leere Auswahl erlauben",
+      "defaultValue": "Standardwert",
+      "yearsInPast": "Jahre in der Vergangenheit",
+      "yearsInFuture": "Jahre in der Zukunft"
+    },
+    "postmasterFilters": {
+      "title_plural": "Postmaster-Filter",
+      "name": "Name",
+      "rules": "Regeln",
+      "type": "Typ",
+      "key": "Schlüssel",
+      "value": "Wert",
+      "stop": "Stopp"
+    },
+    "acl": {
+      "title_plural": "ACLs",
+      "name": "Name",
+      "description": "Beschreibung",
+      "match": "Match",
+      "change": "Change"
+    },
+    "genericAgentJobs": {
+      "title_plural": "GenericAgent-Jobs",
+      "name": "Job-Name",
+      "settings": "Einstellungen",
+      "key": "Schlüssel",
+      "value": "Wert"
+    }
   },
   "kb": {
     "title": "Wissensdatenbank",

@@ -169,7 +169,195 @@
   },
   "admin": {
     "title": "Administration",
-    "placeholder": "Queues, dynamic fields, ACL, and GenericAgent editors will appear here (Phase 3)."
+    "toggleSidebar": "Toggle admin navigation",
+    "readOnly": "Read-only",
+    "accessDenied": {
+      "title": "Access denied",
+      "body": "Your account doesn't have admin privileges.",
+      "error": "Could not check admin access. Please try again."
+    },
+    "group": {
+      "usersPermissions": "Users & permissions",
+      "ticketConfig": "Ticket config",
+      "customers": "Customers",
+      "communication": "Communication",
+      "automation": "Automation",
+      "system": "System"
+    },
+    "nav": {
+      "users": "Users",
+      "groups": "Groups",
+      "roles": "Roles",
+      "queues": "Queues",
+      "states": "States",
+      "priorities": "Priorities",
+      "customerUsers": "Customer users",
+      "customerCompanies": "Customer companies",
+      "templates": "Templates",
+      "salutations": "Salutations",
+      "signatures": "Signatures",
+      "autoResponses": "Auto responses",
+      "postmasterFilters": "Postmaster filters",
+      "acl": "ACLs",
+      "genericAgentJobs": "Generic agent jobs",
+      "dynamicFields": "Dynamic fields"
+    },
+    "table": {
+      "id": "ID",
+      "status": "Status",
+      "valid": "Valid",
+      "invalid": "Invalid",
+      "comments": "Comments",
+      "changed": "Changed",
+      "actions": "Actions",
+      "edit": "Edit",
+      "deactivate": "Deactivate",
+      "empty": "No records yet."
+    },
+    "form": {
+      "cancel": "Cancel",
+      "save": "Save",
+      "saving": "Saving…",
+      "required": "This field is required.",
+      "selectPlaceholder": "Select…",
+      "editTitle": "Edit {{title}}",
+      "genericError": "Something went wrong. Please try again."
+    },
+    "users": {
+      "title_plural": "Users",
+      "new": "New user",
+      "login": "Login",
+      "password": "Password",
+      "passwordHelp": "Leave blank to keep the current password.",
+      "title": "Title",
+      "firstName": "First name",
+      "lastName": "Last name",
+      "name": "Name"
+    },
+    "groups": {
+      "title_plural": "Groups",
+      "new": "New group",
+      "name": "Name"
+    },
+    "roles": {
+      "title_plural": "Roles",
+      "new": "New role",
+      "name": "Name"
+    },
+    "queues": {
+      "title_plural": "Queues",
+      "new": "New queue",
+      "name": "Name",
+      "groupId": "Group ID",
+      "systemAddressId": "System address ID",
+      "salutationId": "Salutation ID",
+      "signatureId": "Signature ID",
+      "followUpId": "Follow-up ID",
+      "followUpLock": "Lock on follow-up",
+      "unlockTimeout": "Unlock timeout (s)"
+    },
+    "states": {
+      "title_plural": "States",
+      "new": "New state",
+      "name": "Name",
+      "typeId": "Type"
+    },
+    "priorities": {
+      "title_plural": "Priorities",
+      "new": "New priority",
+      "name": "Name"
+    },
+    "customerUsers": {
+      "title_plural": "Customer users",
+      "new": "New customer user",
+      "login": "Login",
+      "email": "Email",
+      "customerId": "Customer ID",
+      "firstName": "First name",
+      "lastName": "Last name",
+      "name": "Name",
+      "phone": "Phone",
+      "street": "Street",
+      "city": "City",
+      "country": "Country"
+    },
+    "customerCompanies": {
+      "title_plural": "Customer companies",
+      "new": "New customer company",
+      "customerId": "Customer ID",
+      "name": "Name",
+      "url": "URL"
+    },
+    "templates": {
+      "title_plural": "Templates",
+      "new": "New template",
+      "name": "Name",
+      "type": "Type",
+      "text": "Text"
+    },
+    "salutations": {
+      "title_plural": "Salutations",
+      "new": "New salutation",
+      "name": "Name",
+      "text": "Text"
+    },
+    "signatures": {
+      "title_plural": "Signatures",
+      "new": "New signature",
+      "name": "Name",
+      "text": "Text"
+    },
+    "autoResponses": {
+      "title_plural": "Auto responses",
+      "new": "New auto response",
+      "name": "Name",
+      "typeId": "Type ID",
+      "subject": "Subject",
+      "body": "Body"
+    },
+    "dynamicFields": {
+      "title_plural": "Dynamic fields",
+      "new": "New dynamic field",
+      "name": "Name",
+      "label": "Label",
+      "fieldOrder": "Field order",
+      "fieldType": "Field type",
+      "objectType": "Object type",
+      "config": "Configuration",
+      "possibleValues": "Possible values",
+      "possibleValuesRequired": "Add at least one option.",
+      "optionKey": "Value",
+      "optionLabel": "Label",
+      "addOption": "Add option",
+      "removeOption": "Remove option",
+      "possibleNone": "Allow empty selection",
+      "defaultValue": "Default value",
+      "yearsInPast": "Years in past",
+      "yearsInFuture": "Years in future"
+    },
+    "postmasterFilters": {
+      "title_plural": "Postmaster filters",
+      "name": "Name",
+      "rules": "Rules",
+      "type": "Type",
+      "key": "Key",
+      "value": "Value",
+      "stop": "Stop"
+    },
+    "acl": {
+      "title_plural": "ACLs",
+      "name": "Name",
+      "description": "Description",
+      "match": "Match",
+      "change": "Change"
+    },
+    "genericAgentJobs": {
+      "title_plural": "Generic agent jobs",
+      "name": "Job name",
+      "settings": "Settings",
+      "key": "Key",
+      "value": "Value"
+    }
   },
   "kb": {
     "title": "Knowledge base",
