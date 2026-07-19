@@ -48,9 +48,9 @@ existing schema during parallel operation.
 | TicketService write path + Znuny invariants | 🔲 Planned (Phase 2) | Highest risk phase |
 | GenericInterface compatibility layer | 🔲 Planned (Phase 2) | TicketCreate/Update/Get/Search, SessionCreate |
 | MCP server tools | 🔲 Planned (Phase 2) | ticket_*, customer_lookup, kb_* |
-| Customer portal | 🔲 Planned (Phase 3) | |
-| Knowledge base (`tiqora_kb_*`, RAG-ready) | 🔲 Planned (Phase 3) | Markdown, chunking, Meilisearch |
-| Admin CRUD (queues, DF, ACL, GenericAgent) | 🔲 Planned (Phase 3) | |
+| Customer portal | ✅ API + UI (Phase 3a/3b) | REST at `/api/portal/*`, UI at `/portal` |
+| Knowledge base (`tiqora_kb_*`, RAG-ready) | ✅ API + UI (Phase 3a/3b) | Markdown, chunking, Meilisearch; agent editor + portal search UI |
+| Admin CRUD (queues, DF, ACL, GenericAgent) | ✅ API + UI (Phase 3a/3b) | REST at `/api/v1/admin/*`, UI at `/admin` |
 | OIDC, Kerberos/SPNEGO, TOTP | 🔲 Planned (Phase 3) | |
 | Daemon takeover (mail, escalation, notify, GA) | 🔲 Planned (Phase 4) | Per-function feature flags |
 | Schema ownership + AI webhooks | 🔲 Planned (Phase 5) | Cutover runbook |
@@ -213,7 +213,7 @@ curl -s http://localhost:8000/metrics | head
 cd frontend
 pnpm install
 pnpm dev
-# http://localhost:5173  — stubs for /agent, /portal, /admin
+# http://localhost:5173  — agent, portal, and admin UI
 ```
 
 ### Makefile / just shortcuts
