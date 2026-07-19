@@ -109,7 +109,60 @@
   },
   "portal": {
     "title": "Customer portal",
-    "placeholder": "Customer ticket list and create flow will appear here (Phase 3)."
+    "subtitle": "Support",
+    "nav": {
+      "myTickets": "My tickets",
+      "newTicket": "New ticket",
+      "kb": "Help articles"
+    },
+    "login": {
+      "subtitle": "Sign in to your support account",
+      "email": "Email or username"
+    },
+    "tickets": {
+      "title": "My tickets",
+      "unknownState": "unknown",
+      "updated": "Updated {{date}}",
+      "stateTabs": {
+        "all": "All",
+        "open": "Open",
+        "pending": "Pending",
+        "closed": "Closed"
+      },
+      "emptyNone": "You haven't opened any support tickets yet.",
+      "emptyFiltered": "No tickets match this filter.",
+      "emptyHint": "Need help with something? Start a new ticket and we'll get back to you."
+    },
+    "newTicket": {
+      "title": "New ticket",
+      "intro": "Tell us what's going on and we'll get back to you as soon as we can.",
+      "subject": "Subject",
+      "message": "Message",
+      "submit": "Submit ticket",
+      "validationError": "Please fill in a subject and a message.",
+      "submitError": "Could not submit your ticket. Please try again."
+    },
+    "ticket": {
+      "you": "You",
+      "support": "Support",
+      "bodyUnavailable": "Message text isn't available in this view yet.",
+      "replyLabel": "Add a reply",
+      "replyPlaceholder": "Type your message…",
+      "send": "Send",
+      "attachFile": "Attach file",
+      "replyFailed": "Could not send your reply. Please try again.",
+      "uploadFailed": "Could not upload the attachment. Please try again.",
+      "followUpRejected": "This ticket no longer accepts replies because it's closed."
+    },
+    "kb": {
+      "title": "Help articles",
+      "searchPlaceholder": "Search help articles…",
+      "hint": "Search our help articles for quick answers.",
+      "noResults": "No matching articles.",
+      "noResultsHint": "Try a different search term, or open a new ticket for help.",
+      "loadError": "Could not load this article.",
+      "backToSearch": "Back to search"
+    }
   },
   "admin": {
     "title": "Administration",

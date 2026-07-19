@@ -22,7 +22,9 @@
     "@tanstack/react-router": "^1.97.0",
     "@tiqora/api-client": "workspace:*",
     "clsx": "^2.1.1",
+    "dompurify": "^3.4.12",
     "i18next": "^24.2.0",
+    "marked": "^18.0.6",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "react-i18next": "^15.4.0"
@@ -32,6 +34,7 @@
     "@playwright/test": "^1.50.0",
     "@testing-library/jest-dom": "^6.6.3",
     "@testing-library/react": "^16.2.0",
+    "@types/dompurify": "^3.2.0",
     "@types/node": "^22.10.0",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",

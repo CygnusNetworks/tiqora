@@ -21,7 +21,15 @@ export default tseslint.config(
       ...reactHooks.configs.recommended.rules,
       "react-refresh/only-export-components": [
         "warn",
-        { allowConstantExport: true, allowExportNames: ["useAuth", "useTheme", "flattenQueues"] },
+        {
+          allowConstantExport: true,
+          allowExportNames: [
+            "useAuth",
+            "useTheme",
+            "flattenQueues",
+            "useCustomerAuth",
+          ],
+        },
       ],
       "@typescript-eslint/no-unused-vars": [
         "error",

@@ -109,7 +109,60 @@
   },
   "portal": {
     "title": "Kundenportal",
-    "placeholder": "Ticketliste und Erstellflow folgen (Phase 3)."
+    "subtitle": "Support",
+    "nav": {
+      "myTickets": "Meine Tickets",
+      "newTicket": "Neues Ticket",
+      "kb": "Hilfeartikel"
+    },
+    "login": {
+      "subtitle": "Bei Ihrem Support-Konto anmelden",
+      "email": "E-Mail oder Benutzername"
+    },
+    "tickets": {
+      "title": "Meine Tickets",
+      "unknownState": "unbekannt",
+      "updated": "Aktualisiert am {{date}}",
+      "stateTabs": {
+        "all": "Alle",
+        "open": "Offen",
+        "pending": "Wartend",
+        "closed": "Geschlossen"
+      },
+      "emptyNone": "Sie haben noch keine Support-Tickets eröffnet.",
+      "emptyFiltered": "Keine Tickets für diesen Filter.",
+      "emptyHint": "Brauchen Sie Hilfe? Eröffnen Sie ein neues Ticket, wir melden uns bei Ihnen."
+    },
+    "newTicket": {
+      "title": "Neues Ticket",
+      "intro": "Beschreiben Sie Ihr Anliegen — wir melden uns so schnell wie möglich.",
+      "subject": "Betreff",
+      "message": "Nachricht",
+      "submit": "Ticket absenden",
+      "validationError": "Bitte Betreff und Nachricht ausfüllen.",
+      "submitError": "Ticket konnte nicht gesendet werden. Bitte erneut versuchen."
+    },
+    "ticket": {
+      "you": "Sie",
+      "support": "Support",
+      "bodyUnavailable": "Der Nachrichtentext ist in dieser Ansicht noch nicht verfügbar.",
+      "replyLabel": "Antwort hinzufügen",
+      "replyPlaceholder": "Nachricht eingeben…",
+      "send": "Senden",
+      "attachFile": "Datei anhängen",
+      "replyFailed": "Antwort konnte nicht gesendet werden. Bitte erneut versuchen.",
+      "uploadFailed": "Anhang konnte nicht hochgeladen werden. Bitte erneut versuchen.",
+      "followUpRejected": "Dieses Ticket ist geschlossen und akzeptiert keine weiteren Antworten."
+    },
+    "kb": {
+      "title": "Hilfeartikel",
+      "searchPlaceholder": "Hilfeartikel durchsuchen…",
+      "hint": "Durchsuchen Sie unsere Hilfeartikel nach schnellen Antworten.",
+      "noResults": "Keine passenden Artikel.",
+      "noResultsHint": "Versuchen Sie einen anderen Suchbegriff oder eröffnen Sie ein Ticket.",
+      "loadError": "Artikel konnte nicht geladen werden.",
+      "backToSearch": "Zurück zur Suche"
+    }
   },
   "admin": {
     "title": "Administration",
