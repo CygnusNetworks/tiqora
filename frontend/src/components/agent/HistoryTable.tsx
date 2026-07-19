@@ -24,10 +24,10 @@ export function HistoryTable({ ticketId }: { ticketId: number }) {
   const rows = histQ.data ?? [];
 
   return (
-    <div className="overflow-x-auto rounded-lg border border-border" data-testid="history-table">
+    <div className="overflow-x-auto rounded-lg border border-hairline" data-testid="history-table">
       <table className="w-full min-w-[560px] border-collapse text-left text-sm">
         <thead>
-          <tr className="border-b border-border bg-surface text-xs uppercase text-muted">
+          <tr className="border-b border-hairline bg-surface-subtle text-xs uppercase tracking-wide text-muted">
             <th className="px-2 py-1.5 font-medium">{t("ticket.historyTime")}</th>
             <th className="px-2 py-1.5 font-medium">{t("ticket.historyType")}</th>
             <th className="px-2 py-1.5 font-medium">{t("ticket.historyName")}</th>
@@ -43,13 +43,13 @@ export function HistoryTable({ ticketId }: { ticketId: number }) {
             </tr>
           )}
           {rows.map((h) => (
-            <tr key={h.id} className="border-b border-border/60">
-              <td className="px-2 py-1 text-xs tabular-nums text-muted">
+            <tr key={h.id} className="border-b border-hairline/60 hover:bg-surface-subtle">
+              <td className="px-2 py-1 font-mono text-xs tabular-nums text-muted">
                 {formatDateTime(h.create_time, locale)}
               </td>
               <td className="px-2 py-1 text-xs">{h.history_type || h.history_type_id}</td>
               <td className="px-2 py-1 font-mono text-xs">{h.name}</td>
-              <td className="px-2 py-1 text-xs tabular-nums">{h.create_by}</td>
+              <td className="px-2 py-1 font-mono text-xs tabular-nums text-muted">{h.create_by}</td>
             </tr>
           ))}
         </tbody>

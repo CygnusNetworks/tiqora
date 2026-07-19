@@ -2,6 +2,13 @@ import { useTranslation } from "react-i18next";
 import type { TicketDetail } from "@/lib/api";
 import { formatDateTime, isEscalated } from "@/lib/format";
 import { Badge } from "@/components/ui/Badge";
+import {
+  combinedEscalationLevel,
+  formatCountdown,
+  spineClassName,
+  stateColorVar,
+} from "@/lib/status";
+import type { CSSProperties } from "react";
 
 export function TicketHeader({ ticket }: { ticket: TicketDetail }) {
   const { t, i18n } = useTranslation();
@@ -21,15 +28,40 @@ export function TicketHeader({ ticket }: { ticket: TicketDetail }) {
     badges.push({ label: t("ticket.escalated"), tone: "danger" });
   }
 
+  const escLevel = combinedEscalationLevel([
+    ticket.escalation_time,
+    ticket.escalation_response_time,
+    ticket.escalation_update_time,
+    ticket.escalation_solution_time,
+  ]);
+  const spineColor = escLevel === "none" ? stateColorVar(ticket.state) : undefined;
+  const countdown =
+    escLevel !== "none"
+      ? formatCountdown(
+          ticket.escalation_time ??
+            ticket.escalation_response_time ??
+            ticket.escalation_update_time ??
+            ticket.escalation_solution_time,
+        )
+      : null;
+
   return (
     <header
-      className="space-y-3 rounded-lg border border-border bg-surface-elevated p-4"
+      className={`space-y-3 rounded-lg border border-hairline bg-surface p-4 pl-5 ${spineClassName(
+        escLevel,
+      )}`}
+      style={{ "--spine-color": spineColor } as CSSProperties}
       data-testid="ticket-header"
     >
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <div className="flex flex-wrap items-center gap-2">
             <span className="font-mono text-sm text-accent">{ticket.tn}</span>
+            {countdown && (
+              <span className="rounded bg-escalation/15 px-1.5 py-0.5 font-mono text-[11px] tabular-nums text-escalation">
+                {countdown}
+              </span>
+            )}
             {badges.map((b) => (
               <Badge key={b.label} tone={b.tone}>
                 {b.label}
@@ -39,7 +71,7 @@ export function TicketHeader({ ticket }: { ticket: TicketDetail }) {
               <Badge tone="warn">{ticket.lock}</Badge>
             )}
           </div>
-          <h1 className="mt-1 text-xl font-semibold text-ink">
+          <h1 className="mt-1 font-display text-xl font-semibold text-ink">
             {ticket.title || t("ticket.noTitle")}
           </h1>
         </div>
@@ -66,7 +98,7 @@ export function TicketHeader({ ticket }: { ticket: TicketDetail }) {
         />
       </dl>
       {ticket.dynamic_fields && ticket.dynamic_fields.length > 0 && (
-        <details className="rounded border border-border bg-surface px-3 py-2 text-sm">
+        <details className="rounded border border-hairline bg-surface-subtle px-3 py-2 text-sm">
           <summary className="cursor-pointer font-medium text-muted">
             {t("ticket.dynamicFields")}
           </summary>
@@ -95,7 +127,7 @@ function Meta({
 }) {
   return (
     <div>
-      <dt className="text-xs text-muted">{label}</dt>
+      <dt className="text-xs uppercase tracking-wide text-muted">{label}</dt>
       <dd className="font-medium text-ink">{value || "—"}</dd>
     </div>
   );

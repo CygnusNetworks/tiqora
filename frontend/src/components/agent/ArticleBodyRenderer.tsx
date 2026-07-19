@@ -99,7 +99,7 @@ export function ArticleBodyRenderer({
     return (
       <pre
         className={cn(
-          "max-h-[32rem] overflow-auto whitespace-pre-wrap break-words rounded border border-border bg-surface p-3 font-mono text-xs text-ink",
+          "max-h-[32rem] overflow-auto whitespace-pre-wrap break-words rounded border border-hairline bg-surface-subtle p-3 font-mono text-xs text-ink",
           className,
         )}
         data-testid="article-body-plain"
@@ -113,7 +113,7 @@ export function ArticleBodyRenderer({
     <div className={cn("space-y-2", className)} data-testid="article-body-html">
       {hasExternal && !loadExternal && (
         <div
-          className="flex flex-wrap items-center justify-between gap-2 rounded border border-warn/40 bg-warn/10 px-3 py-2 text-xs text-warn"
+          className="flex flex-wrap items-center justify-between gap-2 rounded border border-escalation/40 bg-escalation/10 px-3 py-2 text-xs text-escalation"
           data-testid="external-images-banner"
         >
           <span>{t("ticket.externalImagesBlocked")}</span>
@@ -126,7 +126,7 @@ export function ArticleBodyRenderer({
         title={t("ticket.articleBody")}
         srcDoc={srcDoc}
         sandbox="allow-scripts"
-        className="w-full rounded border border-border bg-white"
+        className="w-full rounded border border-hairline bg-white"
         style={{ height, minHeight: 40 }}
         data-testid="article-body-iframe"
       />

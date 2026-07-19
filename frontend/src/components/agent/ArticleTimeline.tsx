@@ -10,12 +10,12 @@ import { cn } from "@/lib/cn";
 
 function senderTone(
   senderType: string | null | undefined,
-): "accent" | "muted" | "warn" | "default" {
+): "accent" | "muted" | "success" | "default" {
   const s = (senderType || "").toLowerCase();
   if (s === "customer") return "accent";
-  if (s === "agent") return "default";
+  if (s === "agent") return "success";
   if (s === "system") return "muted";
-  return "warn";
+  return "default";
 }
 
 function dayKey(iso: string, locale: string): string {
@@ -59,7 +59,7 @@ export function ArticleTimeline({ ticketId }: { ticketId: number }) {
     <div className="space-y-6" data-testid="article-timeline">
       {groups.map((g) => (
         <section key={g.day}>
-          <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted">
+          <h3 className="mb-2 font-mono text-xs font-semibold uppercase tracking-wide text-muted">
             {g.day}
           </h3>
           <ul className="space-y-3">
@@ -68,7 +68,7 @@ export function ArticleTimeline({ ticketId }: { ticketId: number }) {
               return (
                 <li
                   key={article.id}
-                  className="rounded-lg border border-border bg-surface-elevated"
+                  className="rounded-lg border border-hairline bg-surface"
                   data-testid={`article-${article.id}`}
                 >
                   <button
@@ -100,7 +100,7 @@ export function ArticleTimeline({ ticketId }: { ticketId: number }) {
                             ? t("ticket.visibleCustomer")
                             : t("ticket.internal")}
                         </Badge>
-                        <span className="text-xs text-muted">
+                        <span className="font-mono text-xs tabular-nums text-muted">
                           {formatDateTime(article.create_time, locale)}
                         </span>
                       </div>
@@ -114,7 +114,7 @@ export function ArticleTimeline({ ticketId }: { ticketId: number }) {
                     </div>
                   </button>
                   {open && (
-                    <div className="space-y-3 border-t border-border px-3 py-3">
+                    <div className="space-y-3 border-t border-hairline px-3 py-3">
                       <ArticleBodyLoader
                         ticketId={ticketId}
                         articleId={article.id}

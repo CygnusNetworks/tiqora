@@ -4,12 +4,12 @@ import type { ReactNode } from "react";
 type Tone = "default" | "accent" | "warn" | "danger" | "success" | "muted";
 
 const tones: Record<Tone, string> = {
-  default: "bg-surface text-ink border-border",
+  default: "bg-surface-subtle text-ink border-hairline",
   accent: "bg-accent/15 text-accent border-accent/30",
-  warn: "bg-warn/15 text-warn border-warn/30",
-  danger: "bg-danger/15 text-danger border-danger/30",
-  success: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border-emerald-500/30",
-  muted: "bg-surface text-muted border-border",
+  warn: "bg-escalation/15 text-escalation border-escalation/30",
+  danger: "bg-escalation/15 text-escalation border-escalation/30",
+  success: "bg-state-open/15 text-state-open border-state-open/30",
+  muted: "bg-surface-subtle text-muted border-hairline",
 };
 
 export function Badge({
