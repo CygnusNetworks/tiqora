@@ -53,9 +53,7 @@ class QueueService:
         # Lock type ids
         lock_rows = await self._session.execute(select(TicketLockType.id, TicketLockType.name))
         lock_map = {name: lid for lid, name in lock_rows.all()}
-        locked_ids = {
-            lid for name, lid in lock_map.items() if name in {"lock", "tmp_lock"}
-        }
+        locked_ids = {lid for name, lid in lock_map.items() if name in {"lock", "tmp_lock"}}
         unlock_id = lock_map.get("unlock")
 
         counts_by_queue: dict[int, QueueCounts] = defaultdict(QueueCounts)

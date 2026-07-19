@@ -15,9 +15,7 @@ KEY_INDEX_REBUILD_STATUS = "index.rebuild.status"
 
 
 async def get_setting(session: AsyncSession, key: str) -> str | None:
-    result = await session.execute(
-        select(TiqoraSettings.value).where(TiqoraSettings.key == key)
-    )
+    result = await session.execute(select(TiqoraSettings.value).where(TiqoraSettings.key == key))
     return result.scalar_one_or_none()
 
 

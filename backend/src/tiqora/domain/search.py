@@ -159,9 +159,7 @@ class SearchIndexService:
         state_type = state_row[1] if state_row else None
         priority_name = (
             await self._session.execute(
-                select(TicketPriority.name).where(
-                    TicketPriority.id == ticket.ticket_priority_id
-                )
+                select(TicketPriority.name).where(TicketPriority.id == ticket.ticket_priority_id)
             )
         ).scalar_one_or_none()
         user = (
@@ -183,9 +181,7 @@ class SearchIndexService:
         if latest_art is not None:
             body = (
                 await self._session.execute(
-                    select(ArticleDataMime.a_body).where(
-                        ArticleDataMime.article_id == latest_art
-                    )
+                    select(ArticleDataMime.a_body).where(ArticleDataMime.article_id == latest_art)
                 )
             ).scalar_one_or_none()
             if body:
@@ -193,23 +189,31 @@ class SearchIndexService:
 
         # Flatten dynamic field values
         fields = (
-            await self._session.execute(
-                select(DynamicField).where(
-                    DynamicField.object_type == "Ticket", DynamicField.valid_id == 1
+            (
+                await self._session.execute(
+                    select(DynamicField).where(
+                        DynamicField.object_type == "Ticket", DynamicField.valid_id == 1
+                    )
                 )
             )
-        ).scalars().all()
+            .scalars()
+            .all()
+        )
         df_map: dict[str, Any] = {}
         if fields:
             fid_to_name = {f.id: f.name for f in fields}
             vals = (
-                await self._session.execute(
-                    select(DynamicFieldValue).where(
-                        DynamicFieldValue.object_id == ticket.id,
-                        DynamicFieldValue.field_id.in_(fid_to_name.keys()),
+                (
+                    await self._session.execute(
+                        select(DynamicFieldValue).where(
+                            DynamicFieldValue.object_id == ticket.id,
+                            DynamicFieldValue.field_id.in_(fid_to_name.keys()),
+                        )
                     )
                 )
-            ).scalars().all()
+                .scalars()
+                .all()
+            )
             multi: dict[str, list[Any]] = {}
             for v in vals:
                 name = fid_to_name.get(v.field_id)

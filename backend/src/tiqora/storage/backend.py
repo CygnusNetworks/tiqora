@@ -44,9 +44,7 @@ class StorageBackend(Protocol):
         """Load one attachment by primary key."""
         ...
 
-    async def get_by_content_id(
-        self, article_id: int, content_id: str
-    ) -> AttachmentContent | None:
+    async def get_by_content_id(self, article_id: int, content_id: str) -> AttachmentContent | None:
         """Resolve a ``cid:`` reference for an article."""
         ...
 
@@ -99,20 +97,14 @@ class DbMimeStorage:
 
     async def get_attachment(self, attachment_id: int) -> AttachmentContent | None:
         result = await self._session.execute(
-            select(ArticleDataMimeAttachment).where(
-                ArticleDataMimeAttachment.id == attachment_id
-            )
+            select(ArticleDataMimeAttachment).where(ArticleDataMimeAttachment.id == attachment_id)
         )
         row = result.scalar_one_or_none()
         if row is None:
             return None
-        return AttachmentContent(
-            meta=_row_to_meta(row), content=_as_bytes(row.content)
-        )
+        return AttachmentContent(meta=_row_to_meta(row), content=_as_bytes(row.content))
 
-    async def get_by_content_id(
-        self, article_id: int, content_id: str
-    ) -> AttachmentContent | None:
+    async def get_by_content_id(self, article_id: int, content_id: str) -> AttachmentContent | None:
         # Znuny stores content_id with or without angle brackets / cid: prefix.
         candidates = {
             content_id,

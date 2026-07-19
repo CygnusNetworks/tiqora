@@ -65,8 +65,7 @@ class TicketService:
 
     async def _lookup_maps(self) -> dict[str, Any]:
         states = {
-            r.id: r.name
-            for r in (await self._session.execute(select(TicketState))).scalars()
+            r.id: r.name for r in (await self._session.execute(select(TicketState))).scalars()
         }
         state_types_by_state: dict[int, str] = {}
         st_rows = await self._session.execute(
@@ -77,16 +76,12 @@ class TicketService:
         for sid, stname in st_rows.all():
             state_types_by_state[sid] = stname
         priorities = {
-            r.id: r.name
-            for r in (await self._session.execute(select(TicketPriority))).scalars()
+            r.id: r.name for r in (await self._session.execute(select(TicketPriority))).scalars()
         }
         locks = {
-            r.id: r.name
-            for r in (await self._session.execute(select(TicketLockType))).scalars()
+            r.id: r.name for r in (await self._session.execute(select(TicketLockType))).scalars()
         }
-        queues = {
-            r.id: r.name for r in (await self._session.execute(select(Queue))).scalars()
-        }
+        queues = {r.id: r.name for r in (await self._session.execute(select(Queue))).scalars()}
         users: dict[int, tuple[str, str]] = {
             r.id: (r.login, f"{r.first_name} {r.last_name}".strip())
             for r in (await self._session.execute(select(Users))).scalars()
@@ -179,12 +174,16 @@ class TicketService:
             count_stmt = count_stmt.where(Ticket.user_id == owner_id)
         if state_type is not None:
             state_ids = (
-                await self._session.execute(
-                    select(TicketState.id)
-                    .join(TicketStateType, TicketStateType.id == TicketState.type_id)
-                    .where(TicketStateType.name == state_type)
+                (
+                    await self._session.execute(
+                        select(TicketState.id)
+                        .join(TicketStateType, TicketStateType.id == TicketState.type_id)
+                        .where(TicketStateType.name == state_type)
+                    )
                 )
-            ).scalars().all()
+                .scalars()
+                .all()
+            )
             if not state_ids:
                 return PaginatedTickets(items=[], total=0, offset=offset, limit=limit)
             stmt = stmt.where(Ticket.ticket_state_id.in_(state_ids))
@@ -229,24 +228,32 @@ class TicketService:
 
     async def _load_dynamic_fields(self, ticket_id: int) -> list[DynamicFieldValueOut]:
         fields = (
-            await self._session.execute(
-                select(DynamicField).where(
-                    DynamicField.object_type == "Ticket",
-                    DynamicField.valid_id == 1,
+            (
+                await self._session.execute(
+                    select(DynamicField).where(
+                        DynamicField.object_type == "Ticket",
+                        DynamicField.valid_id == 1,
+                    )
                 )
             )
-        ).scalars().all()
+            .scalars()
+            .all()
+        )
         if not fields:
             return []
         field_by_id = {f.id: f for f in fields}
         values = (
-            await self._session.execute(
-                select(DynamicFieldValue).where(
-                    DynamicFieldValue.object_id == ticket_id,
-                    DynamicFieldValue.field_id.in_(field_by_id.keys()),
+            (
+                await self._session.execute(
+                    select(DynamicFieldValue).where(
+                        DynamicFieldValue.object_id == ticket_id,
+                        DynamicFieldValue.field_id.in_(field_by_id.keys()),
+                    )
                 )
             )
-        ).scalars().all()
+            .scalars()
+            .all()
+        )
         grouped: dict[int, list[Any]] = {fid: [] for fid in field_by_id}
         for v in values:
             val: Any
@@ -288,22 +295,29 @@ class TicketService:
     async def list_articles(self, user_id: int, ticket_id: int) -> list[ArticleListItem]:
         await self._assert_ticket_ro(user_id, ticket_id)
         sender_types = {
-            r.id: r.name
-            for r in (await self._session.execute(select(ArticleSenderType))).scalars()
+            r.id: r.name for r in (await self._session.execute(select(ArticleSenderType))).scalars()
         }
         articles = (
-            await self._session.execute(
-                select(Article).where(Article.ticket_id == ticket_id).order_by(Article.id)
+            (
+                await self._session.execute(
+                    select(Article).where(Article.ticket_id == ticket_id).order_by(Article.id)
+                )
             )
-        ).scalars().all()
+            .scalars()
+            .all()
+        )
         if not articles:
             return []
         article_ids = [a.id for a in articles]
         mime_rows = (
-            await self._session.execute(
-                select(ArticleDataMime).where(ArticleDataMime.article_id.in_(article_ids))
+            (
+                await self._session.execute(
+                    select(ArticleDataMime).where(ArticleDataMime.article_id.in_(article_ids))
+                )
             )
-        ).scalars().all()
+            .scalars()
+            .all()
+        )
         mime_by_aid = {m.article_id: m for m in mime_rows}
 
         out: list[ArticleListItem] = []
@@ -359,9 +373,7 @@ class TicketService:
         await self._assert_ticket_ro(user_id, ticket_id)
         art = (
             await self._session.execute(
-                select(Article.id).where(
-                    Article.id == article_id, Article.ticket_id == ticket_id
-                )
+                select(Article.id).where(Article.id == article_id, Article.ticket_id == ticket_id)
             )
         ).scalar_one_or_none()
         if art is None:
@@ -390,9 +402,7 @@ class TicketService:
         await self._assert_ticket_ro(user_id, ticket_id)
         art = (
             await self._session.execute(
-                select(Article.id).where(
-                    Article.id == article_id, Article.ticket_id == ticket_id
-                )
+                select(Article.id).where(Article.id == article_id, Article.ticket_id == ticket_id)
             )
         ).scalar_one_or_none()
         if art is None:
@@ -412,9 +422,7 @@ class TicketService:
         await self._assert_ticket_ro(user_id, ticket_id)
         art = (
             await self._session.execute(
-                select(Article.id).where(
-                    Article.id == article_id, Article.ticket_id == ticket_id
-                )
+                select(Article.id).where(Article.id == article_id, Article.ticket_id == ticket_id)
             )
         ).scalar_one_or_none()
         if art is None:
@@ -427,16 +435,19 @@ class TicketService:
     async def list_history(self, user_id: int, ticket_id: int) -> list[HistoryEntry]:
         await self._assert_ticket_ro(user_id, ticket_id)
         types = {
-            r.id: r.name
-            for r in (await self._session.execute(select(TicketHistoryType))).scalars()
+            r.id: r.name for r in (await self._session.execute(select(TicketHistoryType))).scalars()
         }
         rows = (
-            await self._session.execute(
-                select(TicketHistory)
-                .where(TicketHistory.ticket_id == ticket_id)
-                .order_by(TicketHistory.id)
+            (
+                await self._session.execute(
+                    select(TicketHistory)
+                    .where(TicketHistory.ticket_id == ticket_id)
+                    .order_by(TicketHistory.id)
+                )
             )
-        ).scalars().all()
+            .scalars()
+            .all()
+        )
         return [
             HistoryEntry(
                 id=h.id,

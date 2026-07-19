@@ -22,9 +22,7 @@ class TiqoraApiKey(TiqoraBase):
 
     __tablename__ = "tiqora_api_key"
 
-    id: Mapped[int] = mapped_column(
-        Integer, primary_key=True, autoincrement=True, nullable=False
-    )
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True, nullable=False)
     name: Mapped[str] = mapped_column(String(200), nullable=False)
     key_hash: Mapped[str] = mapped_column(String(64), nullable=False, unique=True)
     user_id: Mapped[int] = mapped_column(Integer, nullable=False)

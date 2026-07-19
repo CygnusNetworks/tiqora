@@ -90,9 +90,7 @@ class RenderedArticleBody:
 def _attachment_url(ticket_id: int, article_id: int, content_id: str) -> str:
     """Build relative API path for cid content-id lookup."""
     cid = quote(content_id.strip("<>"), safe="")
-    return (
-        f"/api/v1/tickets/{ticket_id}/articles/{article_id}/attachments/by-cid/{cid}"
-    )
+    return f"/api/v1/tickets/{ticket_id}/articles/{article_id}/attachments/by-cid/{cid}"
 
 
 def rewrite_cid_urls(html_body: str, ticket_id: int, article_id: int) -> str:
@@ -101,7 +99,7 @@ def rewrite_cid_urls(html_body: str, ticket_id: int, article_id: int) -> str:
     def repl(match: re.Match[str]) -> str:
         cid = match.group("cid")
         url = _attachment_url(ticket_id, article_id, cid)
-        return f'{match.group("prefix")}{url}{match.group("suffix")}'
+        return f"{match.group('prefix')}{url}{match.group('suffix')}"
 
     return _CID_SRC_RE.sub(repl, html_body)
 
@@ -117,9 +115,7 @@ def mark_external_images(html_body: str) -> str:
         src = match.group("src")
         q = match.group("q")
         after = match.group(4) or ""
-        return (
-            f"<img{before} src={q}{q} data-external-src={q}{src}{q}{after}>"
-        )
+        return f"<img{before} src={q}{q} data-external-src={q}{src}{q}{after}>"
 
     return _IMG_SRC_RE.sub(repl, html_body)
 

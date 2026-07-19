@@ -11,7 +11,7 @@ from tiqora.domain.article_html import (
 
 
 def test_sanitize_removes_script() -> None:
-    raw = '<p>Hello</p><script>alert(1)</script><img src=x onerror=alert(1)>'
+    raw = "<p>Hello</p><script>alert(1)</script><img src=x onerror=alert(1)>"
     cleaned = sanitize_html(raw)
     assert "script" not in cleaned.lower()
     assert "onerror" not in cleaned.lower()
@@ -37,7 +37,7 @@ def test_mark_external_images() -> None:
 def test_render_html_full_pipeline() -> None:
     raw = (
         "<p>Hi</p>"
-        '<script>evil()</script>'
+        "<script>evil()</script>"
         '<img src="cid:inline1">'
         '<img src="https://cdn.example/x.png">'
     )

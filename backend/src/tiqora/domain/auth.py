@@ -90,9 +90,7 @@ class AuthService:
         self._sessions = sessions
         self._settings = settings
 
-    async def authenticate_password(
-        self, login: str, password: str
-    ) -> AuthenticatedUser | None:
+    async def authenticate_password(self, login: str, password: str) -> AuthenticatedUser | None:
         """Verify agent credentials against ``users.pw`` (valid_id must be 1)."""
         result = await self._session.execute(
             select(Users).where(Users.login == login, Users.valid_id == 1)

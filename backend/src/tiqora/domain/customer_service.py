@@ -24,9 +24,7 @@ class CustomerService:
         if cu.customer_id:
             co = (
                 await self._session.execute(
-                    select(CustomerCompany).where(
-                        CustomerCompany.customer_id == cu.customer_id
-                    )
+                    select(CustomerCompany).where(CustomerCompany.customer_id == cu.customer_id)
                 )
             ).scalar_one_or_none()
             if co is not None:

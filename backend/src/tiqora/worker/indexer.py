@@ -40,9 +40,7 @@ async def rebuild_index(
     async with factory() as session:
         await set_setting(session, KEY_INDEX_REBUILD_STATUS, "running")
         watermark = await get_setting_int(session, KEY_INDEX_REBUILD_WATERMARK, 0) if resume else 0
-        max_id = (
-            await session.execute(select(func.coalesce(func.max(Ticket.id), 0)))
-        ).scalar_one()
+        max_id = (await session.execute(select(func.coalesce(func.max(Ticket.id), 0)))).scalar_one()
         max_id = int(max_id)
 
         svc = SearchIndexService(session, cfg)
@@ -51,13 +49,17 @@ async def rebuild_index(
             current = watermark
             while current < max_id:
                 rows = (
-                    await session.execute(
-                        select(Ticket.id)
-                        .where(Ticket.id > current)
-                        .order_by(Ticket.id)
-                        .limit(size)
+                    (
+                        await session.execute(
+                            select(Ticket.id)
+                            .where(Ticket.id > current)
+                            .order_by(Ticket.id)
+                            .limit(size)
+                        )
                     )
-                ).scalars().all()
+                    .scalars()
+                    .all()
+                )
                 if not rows:
                     break
                 ids = list(rows)

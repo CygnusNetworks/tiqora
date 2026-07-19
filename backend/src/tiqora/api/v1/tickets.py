@@ -92,9 +92,7 @@ async def get_article_body(
     session: DbSession,
 ) -> ArticleBody:
     try:
-        rendered = await TicketService(session).get_article_body(
-            user.id, ticket_id, article_id
-        )
+        rendered = await TicketService(session).get_article_body(user.id, ticket_id, article_id)
     except (TicketNotFound, TicketAccessDenied) as exc:
         raise _map_exc(exc) from exc
     return ArticleBody(
@@ -116,9 +114,7 @@ async def list_attachments(
     session: DbSession,
 ) -> list[AttachmentMetaOut]:
     try:
-        return await TicketService(session).list_attachments(
-            user.id, ticket_id, article_id
-        )
+        return await TicketService(session).list_attachments(user.id, ticket_id, article_id)
     except (TicketNotFound, TicketAccessDenied) as exc:
         raise _map_exc(exc) from exc
 
@@ -132,13 +128,15 @@ def _attachment_response(
     force_download: bool = False,
 ) -> Response:
     ct = (content_type or "application/octet-stream").split(";", 1)[0].strip()
-    disp_kind = "attachment" if force_download else (
-        "inline" if (disposition or "").lower() == "inline" else "attachment"
+    disp_kind = (
+        "attachment"
+        if force_download
+        else ("inline" if (disposition or "").lower() == "inline" else "attachment")
     )
     headers: dict[str, str] = {}
     if filename:
         headers["Content-Disposition"] = (
-            f'{disp_kind}; filename="{filename}"; filename*=UTF-8\'\'{quote(filename)}'
+            f"{disp_kind}; filename=\"{filename}\"; filename*=UTF-8''{quote(filename)}"
         )
     else:
         headers["Content-Disposition"] = disp_kind
