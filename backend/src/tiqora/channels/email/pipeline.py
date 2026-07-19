@@ -38,9 +38,13 @@ class PipelineResult:
     article_id: int | None = None
     auto_response_type: str | None = None
     queue_id: int | None = None
-    recipient: str = ""
+    recipient: str = ""  # raw From: header (auto-response may fan out to >1 address)
     error: str | None = None
     dynamic_fields_skipped: list[str] = field(default_factory=list)
+    orig_subject: str = ""
+    orig_body: str = ""
+    orig_message_id: str | None = None
+    orig_x_otrs_loop: str | None = None
 
 
 async def _lookup_id(session: AsyncSession, table: str, name_col: str, value: str) -> int | None:
@@ -308,7 +312,11 @@ async def process_message(
                 ticket_id=new_ticket_id,
                 queue_id=new_queue_id,
                 auto_response_type="auto reply/new ticket",
-                recipient=parsed.from_address,
+                recipient=parsed.from_header,
+                orig_subject=parsed.subject,
+                orig_body=parsed.body,
+                orig_message_id=parsed.message_id,
+                orig_x_otrs_loop=get_param.get("X-OTRS-Loop"),
             )
 
         if not bounce_as_followup and is_closed and follow_up_option == "reject":
@@ -317,8 +325,13 @@ async def process_message(
                 outcome="follow_up_reject",
                 ticket_id=ticket_id,
                 tn=tn,
+                queue_id=queue_id,
                 auto_response_type="auto reject",
-                recipient=parsed.from_address,
+                recipient=parsed.from_header,
+                orig_subject=parsed.subject,
+                orig_body=parsed.body,
+                orig_message_id=parsed.message_id,
+                orig_x_otrs_loop=get_param.get("X-OTRS-Loop"),
             )
 
         # Normal follow-up: append article, reopen if closed.
@@ -369,7 +382,11 @@ async def process_message(
             article_id=article_id,
             auto_response_type="auto follow up",
             queue_id=queue_id,
-            recipient=parsed.from_address,
+            recipient=parsed.from_header,
+            orig_subject=parsed.subject,
+            orig_body=parsed.body,
+            orig_message_id=parsed.message_id,
+            orig_x_otrs_loop=get_param.get("X-OTRS-Loop"),
         )
 
     # New ticket.
@@ -413,5 +430,49 @@ async def process_message(
         ticket_id=ticket_id,
         queue_id=queue_id,
         auto_response_type="auto reply",
-        recipient=parsed.from_address,
+        recipient=parsed.from_header,
+        orig_subject=parsed.subject,
+        orig_body=parsed.body,
+        orig_message_id=parsed.message_id,
+        orig_x_otrs_loop=get_param.get("X-OTRS-Loop"),
     )
+
+
+async def process_message_and_respond(
+    session: AsyncSession,
+    session_factory: async_sessionmaker[AsyncSession],
+    sysconfig: SysConfig,
+    mail_sender: Any,
+    *,
+    raw: bytes,
+    account: MailAccount,
+    user_id: int,
+) -> PipelineResult:
+    """``process_message`` followed by the matching auto-response send, if any."""
+    from tiqora.channels.email.autoresponse import send_auto_response
+
+    result = await process_message(
+        session, session_factory, sysconfig, raw=raw, account=account, user_id=user_id
+    )
+    if (
+        result.ticket_id is not None
+        and result.queue_id is not None
+        and result.auto_response_type is not None
+        and result.outcome != "ignored"
+    ):
+        await send_auto_response(
+            session,
+            session_factory,
+            sysconfig,
+            mail_sender,
+            ticket_id=result.ticket_id,
+            queue_id=result.queue_id,
+            auto_response_type=result.auto_response_type,
+            recipient_from_header=result.recipient,
+            orig_subject=result.orig_subject,
+            orig_body=result.orig_body,
+            orig_message_id=result.orig_message_id,
+            orig_x_otrs_loop=result.orig_x_otrs_loop,
+            user_id=user_id,
+        )
+    return result
