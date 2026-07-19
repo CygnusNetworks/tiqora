@@ -390,7 +390,71 @@ async def test_mcp_tools_list(mcp_mariadb: dict[str, Any]) -> None:
         "ticket_update_queue",
         "ticket_update_priority",
         "ticket_update_owner",
+        "kb_search",
+        "kb_get_article",
         "customer_lookup",
     }
     missing = expected - tool_names
     assert not missing, f"Missing MCP tools: {missing}"
+
+
+@pytest.mark.db
+async def test_mcp_kb_get_article(mcp_mariadb: dict[str, Any]) -> None:
+    """kb_get_article returns the article's Markdown content and tags."""
+    state = _make_mock_state(mcp_mariadb["async_url"])
+    async with state.session_factory() as session:
+        await _create_tiqora_tables(session)
+
+    from tiqora.kb.schemas import ArticleIn, CategoryIn
+    from tiqora.kb.service import KbService
+
+    async with state.session_factory() as session:
+        svc = KbService(session, state.settings)
+        async with session.begin():
+            cat = await svc.create_category(
+                AGENT_FULL_ID, CategoryIn(name="MCP Docs", slug="mcp-docs-1")
+            )
+        async with session.begin():
+            article = await svc.create_article(
+                AGENT_FULL_ID,
+                ArticleIn(
+                    category_id=cat.id,
+                    title="MCP KB Article",
+                    slug="mcp-kb-article-1",
+                    content_md="## Body\n\nHello from the KB.",
+                    tags=["mcp"],
+                ),
+            )
+        article_id = article.id
+
+    import tiqora.mcp_server.server as srv
+
+    srv._mcp_state = state
+    try:
+        with _patch_user_id(AGENT_FULL_ID):
+            async with Client(mcp) as client:
+                result = await client.call_tool("kb_get_article", {"article_id": article_id})
+        assert not result.is_error, f"Unexpected error: {result}"
+
+        import json
+
+        data = result.data
+        if isinstance(data, str):
+            data = json.loads(data)
+        assert data["id"] == article_id
+        assert data["title"] == "MCP KB Article"
+        assert "Hello from the KB" in data["content_md"]
+        assert data["tags"] == ["mcp"]
+
+        # Unknown article id returns an error dict, not an MCP protocol error.
+        with _patch_user_id(AGENT_FULL_ID):
+            async with Client(mcp) as client:
+                missing_result = await client.call_tool("kb_get_article", {"article_id": 99999999})
+        assert not missing_result.is_error
+        missing_data = missing_result.data
+        if isinstance(missing_data, str):
+            missing_data = json.loads(missing_data)
+        assert "error" in missing_data
+    finally:
+        await state.aclose()
+        srv._mcp_state = None
