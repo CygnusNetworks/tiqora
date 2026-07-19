@@ -33,6 +33,11 @@ PERMISSION_KEYS: Final[frozenset[str]] = frozenset(
     {"ro", "move_into", "create", "note", "owner", "priority", "rw"}
 )
 
+# Znuny convention: membership in the group literally named "admin" with
+# ``rw`` permission (direct group_user or via role → group_role) grants
+# administrator rights. There is no separate "is_admin" flag on `users`.
+ADMIN_GROUP_NAME: Final[str] = "admin"
+
 
 class PermissionEngine:
     """Async permission resolution against a Znuny-compatible database."""
@@ -112,6 +117,28 @@ class PermissionEngine:
             if "rw" in keys or perm in keys:
                 out.add(group_id)
         return out
+
+    async def is_admin(self, user_id: int) -> bool:
+        """Return True if *user_id* has ``rw`` on the ``admin`` group.
+
+        Znuny semantics: no dedicated admin flag exists on ``users``; the
+        "admin" role is membership (direct ``group_user`` or via
+        ``role_user`` → ``group_role``) in the group literally named
+        ``admin`` with the ``rw`` permission key (``rw`` implies all other
+        keys, so no narrower key qualifies as "admin" here).
+        """
+        group_result = await self._session.execute(
+            select(PermissionGroups.id).where(
+                PermissionGroups.name == ADMIN_GROUP_NAME,
+                PermissionGroups.valid_id == 1,
+            )
+        )
+        admin_group_id = group_result.scalar_one_or_none()
+        if admin_group_id is None:
+            return False
+
+        perms = await self.queue_permissions(user_id)
+        return "rw" in perms.get(admin_group_id, set())
 
     async def _user_is_valid(self, user_id: int) -> bool:
         result = await self._session.execute(
