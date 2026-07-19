@@ -99,4 +99,5 @@ markers = [
 dev = [
     "psycopg2-binary>=2.9.12",
     "pymysql>=1.2.0",
+    "faker>=37.0.0",
 ]

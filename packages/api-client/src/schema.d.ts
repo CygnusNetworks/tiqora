@@ -252,6 +252,32 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/tickets/export.csv": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Export Tickets Csv
+         * @description Stream every ticket matching the same filters as ``GET /tickets`` as CSV.
+         *
+         *     Unlike the paginated list endpoint, this has no 200-row cap — rows are
+         *     streamed server-side (``TicketService.iter_tickets_for_export``) so
+         *     exporting a large queue stays memory-safe. Route registered *before*
+         *     ``/{ticket_id}`` so FastAPI does not try to parse "export.csv" as a
+         *     ticket id.
+         */
+        get: operations["export_tickets_csv_api_v1_tickets_export_csv_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/tickets/{ticket_id}": {
         parameters: {
             query?: never;
@@ -4336,6 +4362,46 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["TicketCreateResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    export_tickets_csv_api_v1_tickets_export_csv_get: {
+        parameters: {
+            query?: {
+                queue_id?: number | null;
+                state_id?: number | null;
+                state_type?: string | null;
+                owner_id?: number | null;
+                sort?: string;
+                order?: string;
+            };
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
                 };
             };
             /** @description Validation Error */

@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
+from collections.abc import AsyncGenerator
 from typing import Any
 
 import yaml
-from sqlalchemy import func, select
+from sqlalchemy import Select, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from tiqora.db.legacy.article import (
@@ -125,33 +126,47 @@ class TicketService:
             until_time=t.until_time,
         )
 
-    async def list_tickets(
+    _SORT_COLUMNS = {
+        "age": Ticket.create_time,
+        "created": Ticket.create_time,
+        "changed": Ticket.change_time,
+        "tn": Ticket.tn,
+        "title": Ticket.title,
+        "priority": Ticket.ticket_priority_id,
+    }
+
+    async def _filtered_ticket_stmt(
         self,
         user_id: int,
         *,
-        queue_id: int | None = None,
-        state_id: int | None = None,
-        state_type: str | None = None,
-        owner_id: int | None = None,
-        offset: int = 0,
-        limit: int = 50,
-        sort: str = "age",
-        order: str = "desc",
-    ) -> PaginatedTickets:
+        queue_id: int | None,
+        state_id: int | None,
+        state_type: str | None,
+        owner_id: int | None,
+    ) -> Select[tuple[Ticket]] | None:
+        """Build the permission-filtered, unordered ``Ticket`` select.
+
+        Shared by :meth:`list_tickets` (paginated UI) and
+        :meth:`iter_tickets_for_export` (unbounded CSV export) so both apply
+        identical ``ro`` permission scoping and query filters. Returns
+        ``None`` when the result set is guaranteed empty (no permission, no
+        allowed queues, or a ``state_type`` with no matching states) — every
+        caller treats ``None`` as "zero rows".
+        """
         allowed_groups = await self._perms.groups_for_permission(user_id, "ro")
         if not allowed_groups:
-            return PaginatedTickets(items=[], total=0, offset=offset, limit=limit)
+            return None
 
         q_ids_result = await self._session.execute(
             select(Queue.id).where(Queue.group_id.in_(allowed_groups), Queue.valid_id == 1)
         )
         allowed_queues = set(q_ids_result.scalars().all())
         if not allowed_queues:
-            return PaginatedTickets(items=[], total=0, offset=offset, limit=limit)
+            return None
 
         if queue_id is not None:
             if queue_id not in allowed_queues:
-                return PaginatedTickets(items=[], total=0, offset=offset, limit=limit)
+                return None
             filter_queues = {queue_id}
         else:
             filter_queues = allowed_queues
@@ -160,18 +175,11 @@ class TicketService:
             Ticket.queue_id.in_(filter_queues),
             Ticket.archive_flag == 0,
         )
-        count_stmt = (
-            select(func.count())
-            .select_from(Ticket)
-            .where(Ticket.queue_id.in_(filter_queues), Ticket.archive_flag == 0)
-        )
 
         if state_id is not None:
             stmt = stmt.where(Ticket.ticket_state_id == state_id)
-            count_stmt = count_stmt.where(Ticket.ticket_state_id == state_id)
         if owner_id is not None:
             stmt = stmt.where(Ticket.user_id == owner_id)
-            count_stmt = count_stmt.where(Ticket.user_id == owner_id)
         if state_type is not None:
             state_ids = (
                 (
@@ -185,29 +193,84 @@ class TicketService:
                 .all()
             )
             if not state_ids:
-                return PaginatedTickets(items=[], total=0, offset=offset, limit=limit)
+                return None
             stmt = stmt.where(Ticket.ticket_state_id.in_(state_ids))
-            count_stmt = count_stmt.where(Ticket.ticket_state_id.in_(state_ids))
 
-        sort_col = {
-            "age": Ticket.create_time,
-            "created": Ticket.create_time,
-            "changed": Ticket.change_time,
-            "tn": Ticket.tn,
-            "title": Ticket.title,
-            "priority": Ticket.ticket_priority_id,
-        }.get(sort, Ticket.create_time)
+        return stmt
+
+    def _order_by(
+        self, stmt: Select[tuple[Ticket]], sort: str, order: str
+    ) -> Select[tuple[Ticket]]:
+        sort_col = self._SORT_COLUMNS.get(sort, Ticket.create_time)
         if order.lower() == "asc":
-            stmt = stmt.order_by(sort_col.asc())
-        else:
-            stmt = stmt.order_by(sort_col.desc())
+            return stmt.order_by(sort_col.asc())
+        return stmt.order_by(sort_col.desc())
 
+    async def list_tickets(
+        self,
+        user_id: int,
+        *,
+        queue_id: int | None = None,
+        state_id: int | None = None,
+        state_type: str | None = None,
+        owner_id: int | None = None,
+        offset: int = 0,
+        limit: int = 50,
+        sort: str = "age",
+        order: str = "desc",
+    ) -> PaginatedTickets:
+        stmt = await self._filtered_ticket_stmt(
+            user_id,
+            queue_id=queue_id,
+            state_id=state_id,
+            state_type=state_type,
+            owner_id=owner_id,
+        )
+        if stmt is None:
+            return PaginatedTickets(items=[], total=0, offset=offset, limit=limit)
+
+        count_stmt = select(func.count()).select_from(stmt.subquery())
         total = int((await self._session.execute(count_stmt)).scalar_one())
-        result = await self._session.execute(stmt.offset(offset).limit(min(limit, 200)))
+
+        ordered = self._order_by(stmt, sort, order)
+        result = await self._session.execute(ordered.offset(offset).limit(min(limit, 200)))
         tickets = list(result.scalars().all())
         maps = await self._lookup_maps()
         items = [self._to_list_item(t, maps) for t in tickets]
         return PaginatedTickets(items=items, total=total, offset=offset, limit=limit)
+
+    async def iter_tickets_for_export(
+        self,
+        user_id: int,
+        *,
+        queue_id: int | None = None,
+        state_id: int | None = None,
+        state_type: str | None = None,
+        owner_id: int | None = None,
+        sort: str = "age",
+        order: str = "desc",
+        batch_size: int = 500,
+    ) -> AsyncGenerator[TicketListItem, None]:
+        """Yield every matching ticket (no page cap), same filters as ``list_tickets``.
+
+        Streams server-side via ``AsyncSession.stream`` with ``yield_per`` so
+        exporting a large queue never buffers the whole result set in memory.
+        """
+        stmt = await self._filtered_ticket_stmt(
+            user_id,
+            queue_id=queue_id,
+            state_id=state_id,
+            state_type=state_type,
+            owner_id=owner_id,
+        )
+        if stmt is None:
+            return
+
+        ordered = self._order_by(stmt, sort, order).execution_options(yield_per=batch_size)
+        maps = await self._lookup_maps()
+        result = await self._session.stream(ordered)
+        async for ticket in result.scalars():
+            yield self._to_list_item(ticket, maps)
 
     async def get_ticket(self, user_id: int, ticket_id: int) -> TicketDetail:
         ticket = await self._assert_ticket_ro(user_id, ticket_id)

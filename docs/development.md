@@ -97,6 +97,83 @@ make fmt    # auto-fix
 If Docker is not running, db-marked tests are skipped automatically. CI runs the same
 tools with MariaDB and Postgres service containers (or testcontainers where configured).
 
+### Dev database tools: `tiqora dev seed` / `tiqora dev anonymize`
+
+Two CLI subcommands under `tiqora dev` support local development and
+"debug a copy of prod" workflows. Both live in
+`backend/src/tiqora/cli/dev.py` and depend on
+[Faker](https://faker.readthedocs.io/), which ships in the backend `dev`
+dependency group (`uv sync --all-extras` or `uv sync --group dev`) — running
+the CLI without it prints a clear error instead of an import traceback.
+
+#### `tiqora dev seed` — fake customers, tickets, and articles
+
+```bash
+cd backend
+uv run tiqora dev seed --customers 10 --tickets 20 --seed 42
+```
+
+- Creates *N* customer companies (1–3 customer users each) via direct
+  `customer_company`/`customer_user` inserts.
+- Creates *M* tickets (1–4 articles each), distributed across the queues,
+  states, and priorities that already exist in the target database — it
+  fails with a clear error if the schema has no queues/states/priorities
+  (assumes an initialized Znuny install), or if the acting agent
+  (`--agent-user-id`, default `1` / `root@localhost`) has no `create`
+  permission on any queue's group.
+- Tickets and articles are written through
+  `TicketWriteService.create_ticket` / `add_article` — the same path the
+  API uses — so history rows, escalation columns, cache invalidation, and
+  outbox events are all created exactly as they would be via a real request.
+- `--seed` makes the *generated content* (names, titles, bodies, which
+  queue/state/priority each ticket gets) reproducible: it seeds both
+  Faker's instance RNG and the stdlib `random` module. Primary-key-facing
+  identifiers (`customer_id`, login) still carry a random per-run nonce, so
+  repeated invocations against the same database never collide on
+  uniqueness constraints — **except** that re-running with the *exact same*
+  `--seed` against the *same* database can still hit real unique
+  constraints such as `customer_company.name` (identical Faker sequence ->
+  identical company name). Use a fresh dev database, or vary `--seed`,
+  for repeated runs.
+- `--database-url` overrides the configured `DATABASE_URL` for one-off runs
+  against a different (e.g. throwaway) database.
+
+#### `tiqora dev anonymize` — scrub PII in a restored dump copy
+
+```bash
+cd backend
+uv run tiqora dev anonymize --database-url mysql+aiomysql://user:pass@host/dbname --seed 1
+```
+
+`--database-url` is **required** — this command never falls back to the
+configured `DATABASE_URL`, precisely so it can't accidentally be pointed at
+a live/production database. It is meant to run against a **restored dump
+copy** (e.g. after `mysqldump`/`pg_dump` + restore to a scratch instance).
+
+It performs bulk, direct SQL updates (no history/outbox invariants — there
+is no live Znuny process to keep consistent once you're scrubbing a dump):
+
+- `customer_user`: first/last name, email, login.
+- `customer_company`: company name.
+- `users` (agents): first/last name only — **logins are kept intact** so a
+  restored/anonymized dump stays correlatable against the live system for
+  debugging (auth wiring, escalation ownership, audit trails all key off
+  login).
+- `article_data_mime`: email addresses found in `a_from`/`a_to`/`a_cc` are
+  replaced in place (the rest of the header string is left alone); `a_body`
+  is replaced with lorem text that preserves the original's line count and
+  roughly the per-line length.
+
+Referential consistency: the same original value always maps to the same
+replacement everywhere it occurs (e.g. a customer's email in
+`customer_user.email` and inside an article's `a_from`/`a_to`). This is a
+pure function of `(--seed, value kind, original value)` — see
+`ValueMapper` in `backend/src/tiqora/domain/dev_anonymize.py` — so the same
+`--seed` also reproduces the same anonymized output across runs, which is
+useful for diffing or testing. Updates are batched (`--batch-size`,
+default 500) with progress output and a final summary of rows updated per
+table.
+
 ## Frontend
 
 ```bash

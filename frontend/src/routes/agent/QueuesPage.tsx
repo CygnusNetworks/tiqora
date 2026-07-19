@@ -161,6 +161,21 @@ export function QueuesPage() {
             }))}
             className="flex-1"
           />
+          <Button
+            variant="secondary"
+            size="sm"
+            data-testid="queue-export-csv"
+            onClick={() => {
+              window.location.href = api.exportTicketsCsvUrl({
+                queue_id: queueId ?? undefined,
+                state_type: stateType === "all" ? undefined : stateType,
+                sort,
+                order,
+              });
+            }}
+          >
+            {t("queue.exportCsv")}
+          </Button>
         </div>
         <TicketTable
           items={ticketsQ.data?.items ?? []}

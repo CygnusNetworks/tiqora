@@ -398,6 +398,33 @@ export class ApiClient {
     );
   }
 
+  /**
+   * Build the CSV export URL for the current ticket-list filters. Consumed
+   * via a plain navigation/anchor (cookie-authenticated download), not a
+   * fetch call — mirrors {@link ApiClient.eventStreamUrl}.
+   */
+  exportTicketsCsvUrl(
+    params: {
+      queue_id?: number;
+      state_id?: number;
+      state_type?: string;
+      owner_id?: number;
+      sort?: string;
+      order?: string;
+    } = {},
+  ): string {
+    const qs = new URLSearchParams();
+    for (const [k, v] of Object.entries(params)) {
+      if (v === undefined || v === null || v === "") continue;
+      qs.set(k, String(v));
+    }
+    const suffix = qs.toString();
+    return joinUrl(
+      this.baseUrl,
+      `/api/v1/tickets/export.csv${suffix ? `?${suffix}` : ""}`,
+    );
+  }
+
   // ── Realtime events (SSE) ────────────────────────────────────────────────
   // Consumed via the browser EventSource API directly, not a fetch call —
   // this just builds the URL against the configured base URL/credentials.
