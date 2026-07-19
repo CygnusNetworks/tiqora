@@ -12,7 +12,8 @@
     "theme": "Theme",
     "language": "Language",
     "dashboard": "Dashboard",
-    "queues": "Queues"
+    "queues": "Queues",
+    "kb": "Knowledge base"
   },
   "common": {
     "prev": "Previous",
@@ -94,7 +95,9 @@
     "submit": "Search",
     "hint": "Enter a ticket number, subject, or body text.",
     "results": "{{total}} results for “{{query}}”",
-    "noResults": "No matching tickets."
+    "noResults": "No matching tickets.",
+    "groupTickets": "Tickets",
+    "groupKb": "Knowledge base"
   },
   "shortcuts": {
     "title": "Keyboard shortcuts",
@@ -167,5 +170,50 @@
   "admin": {
     "title": "Administration",
     "placeholder": "Queues, dynamic fields, ACL, and GenericAgent editors will appear here (Phase 3)."
+  },
+  "kb": {
+    "title": "Knowledge base",
+    "sidebar": "Categories",
+    "allCategories": "All categories",
+    "noCategories": "No categories yet.",
+    "empty": "No articles match this filter.",
+    "newArticle": "New article",
+    "editArticle": "Edit article",
+    "edit": "Edit",
+    "save": "Save",
+    "cancel": "Cancel",
+    "publish": "Publish",
+    "lastChanged": "Changed {{date}}",
+    "breadcrumbs": "Breadcrumbs",
+    "version": "Version {{version}}",
+    "versionHistory": "Version history",
+    "noVersions": "No previous versions.",
+    "viewingVersion": "Viewing version {{version}} (read-only)",
+    "viewCurrent": "View current",
+    "backToBrowse": "Back to knowledge base",
+    "loadError": "Could not load this article.",
+    "validationError": "Please fill in a title, slug, category, and content.",
+    "submitError": "Could not save this article. Please try again.",
+    "publishError": "Could not publish this article. Please try again.",
+    "publishConfirmTitle": "Publish article?",
+    "publishConfirmBody": "This makes the current draft the published version. Continue?",
+    "state": {
+      "all": "All states",
+      "draft": "Draft",
+      "review": "In review",
+      "published": "Published",
+      "archived": "Archived"
+    },
+    "field": {
+      "title": "Title",
+      "slug": "Slug",
+      "category": "Category",
+      "language": "Language",
+      "state": "State",
+      "tags": "Tags",
+      "tagsPlaceholder": "comma, separated, tags",
+      "content": "Content (Markdown)",
+      "preview": "Preview"
+    }
   }
 }

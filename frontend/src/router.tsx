@@ -10,6 +10,12 @@ import { DashboardPage } from "@/routes/agent/DashboardPage";
 import { QueuesPage, type QueuesSearch } from "@/routes/agent/QueuesPage";
 import { TicketZoomPage } from "@/routes/agent/TicketZoomPage";
 import { SearchPage, type SearchSearch } from "@/routes/agent/SearchPage";
+import { KbPage, type KbSearch } from "@/routes/agent/KbPage";
+import { KbArticlePage as AgentKbArticlePage } from "@/routes/agent/KbArticlePage";
+import {
+  KbArticleNewPage,
+  KbArticleEditPage,
+} from "@/routes/agent/KbArticleEditorPage";
 import { AgentShell } from "@/components/layout/AgentShell";
 import { PortalShell } from "@/components/layout/PortalShell";
 import { RequireAuth } from "@/auth/RequireAuth";
@@ -116,6 +122,47 @@ const agentSearchRoute = createRoute({
   component: SearchPage,
 });
 
+const agentKbRoute = createRoute({
+  getParentRoute: () => agentLayoutRoute,
+  path: "/kb",
+  validateSearch: (s: Record<string, unknown>): KbSearch => {
+    const num = (v: unknown) =>
+      typeof v === "number"
+        ? v
+        : typeof v === "string" && v !== ""
+          ? Number(v)
+          : undefined;
+    const state =
+      s.state === "all" ||
+      s.state === "draft" ||
+      s.state === "review" ||
+      s.state === "published" ||
+      s.state === "archived"
+        ? s.state
+        : undefined;
+    return { category_id: num(s.category_id), state };
+  },
+  component: KbPage,
+});
+
+const agentKbNewRoute = createRoute({
+  getParentRoute: () => agentLayoutRoute,
+  path: "/kb/new",
+  component: KbArticleNewPage,
+});
+
+const agentKbArticleRoute = createRoute({
+  getParentRoute: () => agentLayoutRoute,
+  path: "/kb/$articleId",
+  component: AgentKbArticlePage,
+});
+
+const agentKbArticleEditRoute = createRoute({
+  getParentRoute: () => agentLayoutRoute,
+  path: "/kb/$articleId/edit",
+  component: KbArticleEditPage,
+});
+
 // /portal/login: mounts its own CustomerAuthProvider (a separate session from
 // the agent AuthProvider) — not gated, since it must render for a
 // not-yet-authenticated customer.
@@ -212,6 +259,10 @@ const routeTree = rootRoute.addChildren([
     agentQueuesRoute,
     agentTicketRoute,
     agentSearchRoute,
+    agentKbRoute,
+    agentKbNewRoute,
+    agentKbArticleRoute,
+    agentKbArticleEditRoute,
   ]),
   portalLoginRoute,
   portalLayoutRoute.addChildren([

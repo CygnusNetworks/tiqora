@@ -181,6 +181,107 @@ const searchHits = {
   ],
 };
 
+const categories = [
+  {
+    id: 1,
+    parent_id: null,
+    name: "General",
+    slug: "general",
+    permission_group_id: null,
+    customer_visible: true,
+    sort: 0,
+    valid: true,
+    create_time: "2026-07-01T00:00:00Z",
+    change_time: "2026-07-01T00:00:00Z",
+  },
+  {
+    id: 2,
+    parent_id: 1,
+    name: "Printers",
+    slug: "printers",
+    permission_group_id: null,
+    customer_visible: true,
+    sort: 0,
+    valid: true,
+    create_time: "2026-07-01T00:00:00Z",
+    change_time: "2026-07-01T00:00:00Z",
+  },
+];
+
+const kbArticleSummaries = [
+  {
+    id: 700,
+    category_id: 2,
+    title: "Printer offline troubleshooting",
+    slug: "printer-offline-troubleshooting",
+    language: "en",
+    state: "draft",
+    version: 2,
+    change_time: "2026-07-18T09:00:00Z",
+  },
+];
+
+function initialKbArticle() {
+  return {
+    id: 700,
+    category_id: 2,
+    title: "Printer offline troubleshooting",
+    slug: "printer-offline-troubleshooting",
+    language: "en",
+    state: "draft",
+    content_md: "# Printer offline\n\nCheck the power cable and network link.",
+    version: 2,
+    create_by: 1,
+    create_time: "2026-07-17T09:00:00Z",
+    change_by: 1,
+    change_time: "2026-07-18T09:00:00Z",
+    tags: ["hardware", "printer"],
+  };
+}
+
+let kbArticleFull = initialKbArticle();
+
+const kbArticleVersions = [
+  {
+    id: 1,
+    article_id: 700,
+    version: 1,
+    title: "Printer offline troubleshooting",
+    content_md: "# Printer offline\n\nRestart the printer.",
+    changed_by: 1,
+    changed_at: "2026-07-17T09:00:00Z",
+  },
+  {
+    id: 2,
+    article_id: 700,
+    version: 2,
+    title: "Printer offline troubleshooting",
+    content_md: "# Printer offline\n\nCheck the power cable and network link.",
+    changed_by: 1,
+    changed_at: "2026-07-18T09:00:00Z",
+  },
+];
+
+const kbSearchHits = {
+  query: "printer",
+  estimated_total: 1,
+  hits: [
+    {
+      article_id: 700,
+      chunk_id: 1,
+      title: "Printer offline troubleshooting",
+      heading_path: "Printer offline",
+      anchor: "printer-offline",
+      content: "Check the power cable and network link.",
+      language: "en",
+      state: "published",
+      customer_visible: true,
+      permission_group_id: null,
+      score: 1,
+    },
+  ],
+};
+
 let authenticated = false;
 
 async function json(route: Route, status: number, body: unknown) {
@@ -197,6 +298,7 @@ async function json(route: Route, status: number, body: unknown) {
  */
 export async function mockApi(page: Page) {
   authenticated = false;
+  kbArticleFull = initialKbArticle();
 
   await page.route("**/api/v1/**", async (route) => {
     const req = route.request();
@@ -279,6 +381,57 @@ export async function mockApi(page: Page) {
         return;
       }
       await json(route, 200, { ...searchHits, query: q });
+      return;
+    }
+
+    // Knowledge base (agent)
+    if (path.endsWith("/api/v1/kb/search") && method === "GET") {
+      const q = url.searchParams.get("q") || "";
+      if (!q) {
+        await json(route, 422, { detail: "q required" });
+        return;
+      }
+      await json(route, 200, { ...kbSearchHits, query: q });
+      return;
+    }
+    if (path.endsWith("/api/v1/kb/categories") && method === "GET") {
+      await json(route, 200, categories);
+      return;
+    }
+    if (path.match(/\/api\/v1\/kb\/articles\/\d+\/versions$/) && method === "GET") {
+      await json(route, 200, kbArticleVersions);
+      return;
+    }
+    if (path.match(/\/api\/v1\/kb\/articles\/\d+\/publish$/) && method === "POST") {
+      kbArticleFull = { ...kbArticleFull, state: "published", version: kbArticleFull.version + 1 };
+      await json(route, 200, kbArticleFull);
+      return;
+    }
+    if (path.match(/\/api\/v1\/kb\/articles\/\d+$/) && method === "GET") {
+      await json(route, 200, kbArticleFull);
+      return;
+    }
+    if (path.match(/\/api\/v1\/kb\/articles\/\d+$/) && method === "PATCH") {
+      const body = req.postDataJSON() as Record<string, unknown>;
+      kbArticleFull = { ...kbArticleFull, ...body, version: kbArticleFull.version + 1 } as typeof kbArticleFull;
+      await json(route, 200, kbArticleFull);
+      return;
+    }
+    if (path.endsWith("/api/v1/kb/articles") && method === "POST") {
+      const body = req.postDataJSON() as Record<string, unknown>;
+      const created = {
+        ...kbArticleFull,
+        id: 701,
+        state: "draft",
+        version: 1,
+        tags: [],
+        ...body,
+      };
+      await json(route, 201, created);
+      return;
+    }
+    if (path.endsWith("/api/v1/kb/articles") && method === "GET") {
+      await json(route, 200, kbArticleSummaries);
       return;
     }
 

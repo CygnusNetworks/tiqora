@@ -76,6 +76,13 @@ export function AgentShell({ children }: { children: ReactNode }) {
             >
               {t("nav.queues")}
             </Link>
+            <Link
+              to="/agent/kb"
+              className="rounded px-2 py-1 text-muted transition-colors duration-100 hover:bg-surface-subtle hover:text-ink"
+              activeProps={{ className: "text-accent" }}
+            >
+              {t("nav.kb")}
+            </Link>
           </nav>
           <form onSubmit={onSearch} className="mx-auto flex max-w-md flex-1">
             <input

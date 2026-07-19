@@ -12,7 +12,8 @@
     "theme": "Design",
     "language": "Sprache",
     "dashboard": "Dashboard",
-    "queues": "Queues"
+    "queues": "Queues",
+    "kb": "Wissensdatenbank"
   },
   "common": {
     "prev": "Zurück",
@@ -94,7 +95,9 @@
     "submit": "Suchen",
     "hint": "Ticketnummer, Betreff oder Text eingeben.",
     "results": "{{total}} Treffer für „{{query}}“",
-    "noResults": "Keine passenden Tickets."
+    "noResults": "Keine passenden Tickets.",
+    "groupTickets": "Tickets",
+    "groupKb": "Wissensdatenbank"
   },
   "shortcuts": {
     "title": "Tastenkürzel",
@@ -167,5 +170,50 @@
   "admin": {
     "title": "Administration",
     "placeholder": "Queues, Dynamische Felder, ACL und GenericAgent-Editoren folgen (Phase 3)."
+  },
+  "kb": {
+    "title": "Wissensdatenbank",
+    "sidebar": "Kategorien",
+    "allCategories": "Alle Kategorien",
+    "noCategories": "Noch keine Kategorien.",
+    "empty": "Keine Artikel für diesen Filter.",
+    "newArticle": "Neuer Artikel",
+    "editArticle": "Artikel bearbeiten",
+    "edit": "Bearbeiten",
+    "save": "Speichern",
+    "cancel": "Abbrechen",
+    "publish": "Veröffentlichen",
+    "lastChanged": "Geändert am {{date}}",
+    "breadcrumbs": "Breadcrumbs",
+    "version": "Version {{version}}",
+    "versionHistory": "Versionsverlauf",
+    "noVersions": "Keine früheren Versionen.",
+    "viewingVersion": "Version {{version}} wird angezeigt (schreibgeschützt)",
+    "viewCurrent": "Aktuelle Version anzeigen",
+    "backToBrowse": "Zurück zur Wissensdatenbank",
+    "loadError": "Artikel konnte nicht geladen werden.",
+    "validationError": "Bitte Titel, Slug, Kategorie und Inhalt ausfüllen.",
+    "submitError": "Artikel konnte nicht gespeichert werden. Bitte erneut versuchen.",
+    "publishError": "Artikel konnte nicht veröffentlicht werden. Bitte erneut versuchen.",
+    "publishConfirmTitle": "Artikel veröffentlichen?",
+    "publishConfirmBody": "Der aktuelle Entwurf wird zur veröffentlichten Version. Fortfahren?",
+    "state": {
+      "all": "Alle Status",
+      "draft": "Entwurf",
+      "review": "In Prüfung",
+      "published": "Veröffentlicht",
+      "archived": "Archiviert"
+    },
+    "field": {
+      "title": "Titel",
+      "slug": "Slug",
+      "category": "Kategorie",
+      "language": "Sprache",
+      "state": "Status",
+      "tags": "Schlagworte",
+      "tagsPlaceholder": "kommagetrennte, Schlagworte",
+      "content": "Inhalt (Markdown)",
+      "preview": "Vorschau"
+    }
   }
 }
