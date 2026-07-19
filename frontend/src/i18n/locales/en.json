@@ -54,6 +54,8 @@
     "sidebar": "Queues",
     "allQueues": "All queues",
     "empty": "No queues available.",
+    "openBadge": "{{count}} open",
+    "metaLine": "All queues · sorted by urgency",
     "state": {
       "open": "Open",
       "pending": "Pending",

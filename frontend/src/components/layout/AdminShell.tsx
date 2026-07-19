@@ -161,8 +161,9 @@ export function AdminShell({ children }: { children: ReactNode }) {
           </Button>
           <Link
             to="/admin"
-            className="shrink-0 font-display text-lg font-bold tracking-tight text-ink"
+            className="flex shrink-0 items-center gap-2 font-display text-lg font-bold tracking-tight text-ink"
           >
+            <img src="/logo.svg" alt="" width={22} height={22} className="rounded" />
             {t("app.name")}
           </Link>
           <span className="hidden shrink-0 rounded border border-hairline bg-surface-subtle px-1.5 py-0.5 text-[11px] font-medium uppercase tracking-wide text-muted sm:inline">

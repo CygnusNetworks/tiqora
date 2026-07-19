@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useNavigate, useSearch } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
 import { api } from "@/lib/api";
-import { QueueTree } from "@/components/agent/QueueTree";
+import { QueueTree, flattenQueues } from "@/components/agent/QueueTree";
 import {
   TicketTable,
   type SortKey,
@@ -68,6 +68,15 @@ export function QueuesPage() {
       }),
   });
 
+  const selectedQueueName =
+    queueId == null
+      ? t("sidebar.inbox")
+      : (() => {
+          const match = flattenQueues(queuesQ.data ?? []).find((q) => q.id === queueId);
+          if (!match) return t("sidebar.inbox");
+          return match.name.includes("::") ? (match.name.split("::").pop() ?? match.name) : match.name;
+        })();
+
   const sidebarBody = queuesQ.isLoading ? (
     <div className="flex justify-center py-6">
       <Spinner />
@@ -117,6 +126,20 @@ export function QueuesPage() {
       )}
 
       <div className="min-w-0 flex-1 space-y-3 p-3">
+        <div>
+          <div className="flex flex-wrap items-center gap-2.5">
+            <h1 className="font-display text-xl font-bold tracking-tight text-ink">
+              {selectedQueueName}
+            </h1>
+            <span
+              className="rounded-full bg-accent-dim px-2.5 py-0.5 font-mono text-[11px] tabular-nums text-accent"
+              data-testid="queue-open-badge"
+            >
+              {t("queue.openBadge", { count: ticketsQ.data?.total ?? 0 })}
+            </span>
+          </div>
+          <p className="mt-0.5 text-[12.5px] text-muted">{t("queue.metaLine")}</p>
+        </div>
         <div className="flex items-center gap-2">
           <Button
             variant="secondary"

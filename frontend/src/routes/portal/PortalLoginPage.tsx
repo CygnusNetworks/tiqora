@@ -47,6 +47,7 @@ export function PortalLoginPage() {
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-bg px-4">
       <div className="w-full max-w-sm rounded-xl border border-hairline bg-surface p-8">
+        <img src="/logo.svg" alt="" width={36} height={36} className="mx-auto mb-3" />
         <h1 className="text-center font-display text-2xl font-bold tracking-tight text-ink">
           {t("app.name")}
         </h1>

@@ -19,13 +19,7 @@ export function Tabs({
   className?: string;
 }) {
   return (
-    <div
-      role="tablist"
-      className={cn(
-        "flex flex-wrap gap-1 border-b border-hairline",
-        className,
-      )}
-    >
+    <div role="tablist" className={cn("flex flex-wrap items-center gap-1.5", className)}>
       {items.map((item) => {
         const active = item.id === value;
         return (
@@ -36,15 +30,20 @@ export function Tabs({
             aria-selected={active}
             onClick={() => onChange(item.id)}
             className={cn(
-              "relative -mb-px px-3 py-2 text-sm font-medium transition-colors duration-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent",
+              "rounded-lg border px-3 py-1.5 text-[12.5px] font-medium transition-colors duration-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent",
               active
-                ? "border-b-2 border-accent text-accent"
-                : "text-muted hover:text-ink",
+                ? "border-accent bg-accent text-accent-ink"
+                : "border-hairline bg-surface text-muted hover:border-accent/50 hover:text-ink",
             )}
           >
             {item.label}
             {item.count != null && (
-              <span className="ml-1.5 font-mono text-xs tabular-nums text-muted">
+              <span
+                className={cn(
+                  "ml-1.5 font-mono text-[11px] tabular-nums",
+                  active ? "text-accent-ink/80" : "text-muted",
+                )}
+              >
                 {item.count}
               </span>
             )}
