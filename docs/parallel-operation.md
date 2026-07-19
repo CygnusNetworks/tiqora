@@ -118,11 +118,28 @@ Older upgraded installs may still miss some constraints. Tiqora must:
 Direct SQL writes by Tiqora are invisible to Znuny’s in-process cache until TTL
 expiry or explicit invalidation.
 
-**Strategy:**
+**Implemented:** the Perl OPM addon `TiqoraSync`
+([packages/znuny-addon/TiqoraSync/](../packages/znuny-addon/TiqoraSync/)) is
+installed into the co-running Znuny instance
+(`Admin::Package::Install`, see its `install/README.md`). A daemon cron task
+(`Daemon::SchedulerCronTaskManager::Task###TiqoraSync`, every minute — Znuny's
+scheduler supports 5-field cron only, so worst-case staleness is ~60 s) invokes
+`Kernel::System::TiqoraSync::Run()`, which:
 
-1. **Preferred:** small Perl OPM addon `TiqoraSync` (~150 lines): a daemon cron
-   reads `tiqora_cache_invalidation` and clears affected ticket caches.
-2. **Fallback:** document lowered Znuny cache TTLs for co-existence environments.
+1. reads the watermark from `tiqora_settings` key `tiqorasync.watermark`,
+2. selects up to 500 rows from `tiqora_cache_invalidation` above the watermark
+   (rows are written by Tiqora in the same transaction as each ticket write),
+3. deletes the `Cache::GetTicket<ID>` entries (Cache type `Ticket`, mirroring
+   Znuny's `_TicketCacheClear`) for each affected ticket plus a coarse
+   `CleanUp(Type => 'Ticket')` for list/count caches,
+4. advances the watermark.
+
+The module is defensive: if the `tiqora_*` tables do not exist yet (Znuny
+started before Tiqora's migrations), it logs at debug level and returns
+cleanly — it never dies inside the daemon.
+
+**Fallback:** lowered Znuny cache TTLs remain a documented option for
+environments where installing the addon is not possible.
 
 Proving the path: an admin creates a queue in Tiqora and it appears in Znuny
 without restart (Phase 3 exit criterion).
@@ -137,8 +154,12 @@ Tiqora poller (Phase 1+):
 | `article.id` | append-only | Article index / SSE |
 | Nightly `ticket.change_time` | reconcile | Catch missed updates |
 
-SSE feeds TanStack Query invalidation and optional agent presence (Redis TTL
-keys) once real-time work lands (Phase 2/3).
+SSE is implemented: the outbox drain and the Znuny-write poller publish
+ticket-change notifications on the Redis pub/sub channel `tiqora:events`;
+`GET /api/v1/events/stream` forwards them to authenticated agents, feeding
+TanStack Query invalidation. Agent presence (viewing/composing) uses 30 s
+Redis TTL keys (`tiqora:presence:<ticket_id>:<user_id>`) surfaced on the
+ticket zoom.
 
 ## Feature-flag daemon takeover (Phase 4)
 
