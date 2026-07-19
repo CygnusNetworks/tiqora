@@ -47,6 +47,10 @@ class Settings(BaseSettings):
         default="tickets",
         validation_alias="MEILI_TICKETS_INDEX",
     )
+    meili_kb_index: str = Field(
+        default="kb",
+        validation_alias="MEILI_KB_INDEX",
+    )
 
     # HTTP
     cors_origins: str = Field(

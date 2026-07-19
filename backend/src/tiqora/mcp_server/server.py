@@ -13,6 +13,8 @@ Tools:
 - ticket_update_queue: move ticket to a new queue
 - ticket_update_priority: change ticket priority
 - ticket_update_owner: assign ticket owner
+- kb_search: search published knowledge base articles (permission-group scoped)
+- kb_get_article: fetch a knowledge base article's full Markdown content
 - customer_lookup: look up customer user details
 
 All fully async — NO sync DB calls, requests, or time.sleep anywhere.
@@ -53,6 +55,7 @@ from tiqora.domain.ticket_write_service import (
     create_ticket,
     move_queue,
 )
+from tiqora.kb.service import KbNotFound, KbService
 from tiqora.permissions.engine import PermissionEngine
 from tiqora.znuny.sysconfig import SysConfig
 
@@ -814,6 +817,88 @@ async def ticket_update_owner(
             return {"ok": True, "ticket_id": ticket_id, "owner_id": owner_id}
         except (TicketNotFound, TicketAccessDenied, InvalidInput) as e:
             return {"error": str(e)}
+
+
+# ---------------------------------------------------------------------------
+# Tool: kb_search / kb_get_article
+# ---------------------------------------------------------------------------
+
+
+@mcp.tool(
+    description=(
+        "Search the knowledge base for articles relevant to a query. Results are "
+        "scoped to the agent's permission groups (articles with no group restriction "
+        "are visible to everyone). Returns matching chunks with heading breadcrumbs."
+    )
+)
+async def kb_search(
+    ctx: Context,
+    query: str,
+    limit: int = 10,
+) -> list[dict[str, Any]]:
+    """Search published KB articles.
+
+    Args:
+        query: Full-text search query.
+        limit: Maximum results (1-100).
+    """
+    user_id = _get_user_id(ctx)
+    state = _get_state()
+    limit = max(1, min(limit, 100))
+
+    async with state.session_factory() as session:
+        svc = KbService(session, state.settings)
+        try:
+            result = await svc.search_agent(user_id, query, limit=limit)
+        finally:
+            await svc.close()
+
+    return [
+        {
+            "article_id": h.article_id,
+            "chunk_id": h.chunk_id,
+            "title": h.title,
+            "heading_path": h.heading_path,
+            "anchor": h.anchor,
+            "content": h.content,
+            "language": h.language,
+        }
+        for h in result.hits
+    ]
+
+
+@mcp.tool(description="Get a knowledge base article's full Markdown content by article ID.")
+async def kb_get_article(
+    ctx: Context,
+    article_id: int,
+) -> dict[str, Any]:
+    """Fetch a KB article.
+
+    Args:
+        article_id: The KB article ID (as returned by ``kb_search``).
+    """
+    _get_user_id(ctx)  # auth check
+    state = _get_state()
+
+    async with state.session_factory() as session:
+        svc = KbService(session, state.settings)
+        try:
+            row = await svc.get_article(article_id)
+        except KbNotFound:
+            return {"error": f"KB article {article_id} not found"}
+        tags = await svc.get_tags(article_id)
+
+    return {
+        "id": row.id,
+        "category_id": row.category_id,
+        "title": row.title,
+        "slug": row.slug,
+        "language": row.language,
+        "state": row.state,
+        "content_md": row.content_md,
+        "version": row.version,
+        "tags": tags,
+    }
 
 
 # ---------------------------------------------------------------------------
