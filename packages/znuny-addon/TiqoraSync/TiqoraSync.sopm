@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<otrs_package version="1.0">
+    <Name>TiqoraSync</Name>
+    <Version>1.0.0</Version>
+    <Framework>6.5.x</Framework>
+    <Vendor>Cygnus Networks GmbH</Vendor>
+    <URL>https://cygnusnetworks.de/</URL>
+    <License>AGPL-3.0-only</License>
+    <ChangeLog Version="1.0.0" Date="2026-07-20">Initial release.</ChangeLog>
+    <Description Lang="en">
+        Keeps Znuny's in-process ticket cache (Kernel::System::Cache) in
+        sync while Tiqora, a parallel Python/FastAPI reimplementation of
+        Znuny, writes tickets directly to the shared MySQL/MariaDB database.
+        Registers a daemon cron task that polls the tiqora_cache_invalidation
+        hand-off table Tiqora writes to and clears the affected Znuny ticket
+        caches, so agents using the Znuny GUI do not see stale ticket data
+        for tickets that were last modified via Tiqora.
+    </Description>
+    <Description Lang="de">
+        Haelt den prozessinternen Ticket-Cache von Znuny
+        (Kernel::System::Cache) synchron, waehrend Tiqora, eine parallele
+        Python/FastAPI-Nachimplementierung von Znuny, Tickets direkt in die
+        gemeinsam genutzte MySQL/MariaDB-Datenbank schreibt. Registriert
+        einen Daemon-Cron-Task, der die von Tiqora befuellte
+        Uebergabetabelle tiqora_cache_invalidation abfragt und die
+        betroffenen Znuny-Ticket-Caches leert, damit Agenten in der
+        Znuny-Oberflaeche keine veralteten Ticketdaten sehen, wenn ein
+        Ticket zuletzt ueber Tiqora geaendert wurde.
+    </Description>
+    <BuildDate>2026-07-20 00:00:00</BuildDate>
+    <BuildHost>build.cygnusnetworks.de</BuildHost>
+    <Filelist>
+        <File Location="Kernel/System/TiqoraSync.pm" Permission="644"></File>
+        <File Location="Kernel/Config/Files/XML/TiqoraSync.xml" Permission="644"></File>
+    </Filelist>
+</otrs_package>
