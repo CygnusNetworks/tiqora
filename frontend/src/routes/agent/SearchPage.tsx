@@ -1,0 +1,134 @@
+import { useQuery } from "@tanstack/react-query";
+import { Link, useNavigate, useSearch } from "@tanstack/react-router";
+import { useTranslation } from "react-i18next";
+import { api } from "@/lib/api";
+import { Spinner } from "@/components/ui/Spinner";
+import { Badge } from "@/components/ui/Badge";
+
+export type SearchSearch = { q?: string; offset?: number };
+
+function highlight(text: string | null | undefined, q: string): string {
+  if (!text) return "";
+  // Meilisearch may return <em> already; also do a simple client highlight
+  if (/<em>/i.test(text)) return text;
+  if (!q.trim()) return escapeHtml(text);
+  const re = new RegExp(`(${escapeRegExp(q.trim())})`, "gi");
+  return escapeHtml(text).replace(re, "<mark>$1</mark>");
+}
+
+function escapeHtml(s: string): string {
+  return s
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+function escapeRegExp(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+export function SearchPage() {
+  const { t } = useTranslation();
+  const navigate = useNavigate({ from: "/agent/search" });
+  const search = useSearch({ from: "/agent/search" }) as SearchSearch;
+  const q = search.q ?? "";
+  const offset = search.offset ?? 0;
+
+  const resultsQ = useQuery({
+    queryKey: ["search", q, offset],
+    queryFn: () => api.search({ q, offset, limit: 20 }),
+    enabled: q.trim().length > 0,
+  });
+
+  return (
+    <div className="mx-auto w-full max-w-4xl space-y-4 px-4 py-6" data-testid="search-page">
+      <h1 className="text-xl font-semibold">{t("search.title")}</h1>
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          const fd = new FormData(e.currentTarget);
+          const term = String(fd.get("q") || "").trim();
+          void navigate({ search: { q: term, offset: 0 } });
+        }}
+        className="flex gap-2"
+      >
+        <input
+          name="q"
+          defaultValue={q}
+          data-testid="search-input"
+          placeholder={t("search.placeholder")}
+          className="flex-1 rounded-md border border-border bg-surface-elevated px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+        />
+        <button
+          type="submit"
+          className="rounded-md bg-accent px-4 py-2 text-sm font-medium text-white"
+          data-testid="search-submit"
+        >
+          {t("search.submit")}
+        </button>
+      </form>
+
+      {!q.trim() && (
+        <p className="text-sm text-muted">{t("search.hint")}</p>
+      )}
+
+      {q.trim() && resultsQ.isLoading && (
+        <div className="flex justify-center py-8">
+          <Spinner />
+        </div>
+      )}
+
+      {q.trim() && resultsQ.data && (
+        <>
+          <p className="text-xs text-muted" data-testid="search-total">
+            {t("search.results", {
+              total: resultsQ.data.estimated_total,
+              query: resultsQ.data.query,
+            })}
+          </p>
+          <ul className="space-y-2" data-testid="search-results">
+            {resultsQ.data.hits.map((hit) => (
+              <li key={hit.id}>
+                <Link
+                  to="/agent/tickets/$ticketId"
+                  params={{ ticketId: String(hit.id) }}
+                  className="block rounded-lg border border-border bg-surface-elevated p-3 transition hover:border-accent"
+                  data-testid={`search-hit-${hit.id}`}
+                >
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="font-mono text-xs text-accent">{hit.tn}</span>
+                    {hit.state && <Badge tone="muted">{hit.state}</Badge>}
+                    {hit.priority && <Badge>{hit.priority}</Badge>}
+                    {hit.queue_name && (
+                      <span className="text-xs text-muted">{hit.queue_name}</span>
+                    )}
+                  </div>
+                  <p
+                    className="mt-1 text-sm font-medium text-ink"
+                    dangerouslySetInnerHTML={{
+                      __html: highlight(hit.title, q),
+                    }}
+                  />
+                  {hit.excerpt && (
+                    <p
+                      className="mt-1 text-xs text-muted line-clamp-2 [&_em]:bg-warn/30 [&_em]:not-italic [&_mark]:bg-warn/30"
+                      dangerouslySetInnerHTML={{
+                        __html: highlight(hit.excerpt, q),
+                      }}
+                    />
+                  )}
+                </Link>
+              </li>
+            ))}
+            {resultsQ.data.hits.length === 0 && (
+              <li className="py-8 text-center text-sm text-muted">
+                {t("search.noResults")}
+              </li>
+            )}
+          </ul>
+        </>
+      )}
+    </div>
+  );
+}

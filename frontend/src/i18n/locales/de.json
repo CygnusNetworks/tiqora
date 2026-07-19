@@ -10,7 +10,98 @@
     "portal": "Kundenportal",
     "admin": "Admin",
     "theme": "Design",
-    "language": "Sprache"
+    "language": "Sprache",
+    "dashboard": "Dashboard",
+    "queues": "Queues"
+  },
+  "common": {
+    "prev": "Zurück",
+    "next": "Weiter",
+    "back": "Zurück",
+    "backToQueues": "Zurück zu Queues",
+    "loading": "Laden…"
+  },
+  "auth": {
+    "login": "Anmelden",
+    "logout": "Abmelden",
+    "signIn": "Agenten-Anmeldung",
+    "username": "Benutzername",
+    "password": "Passwort",
+    "invalidCredentials": "Ungültiger Benutzername oder Passwort",
+    "loginFailed": "Anmeldung fehlgeschlagen. Bitte erneut versuchen."
+  },
+  "dashboard": {
+    "title": "Dashboard",
+    "welcome": "Willkommen, {{name}}",
+    "myTickets": "Meine offenen Tickets",
+    "noMyTickets": "Keine offenen Tickets zugewiesen.",
+    "queueShortcuts": "Queues",
+    "viewAllQueues": "Alle Queues anzeigen",
+    "openCount": "offen"
+  },
+  "queue": {
+    "sidebar": "Queues",
+    "allQueues": "Alle Queues",
+    "empty": "Keine Queues verfügbar.",
+    "state": {
+      "open": "Offen",
+      "pending": "Wartend",
+      "closed": "Geschlossen",
+      "all": "Alle"
+    }
+  },
+  "ticket": {
+    "tn": "Ticket#",
+    "title": "Titel",
+    "state": "Status",
+    "priority": "Priorität",
+    "owner": "Besitzer",
+    "customer": "Kunde",
+    "age": "Alter",
+    "changed": "Geändert",
+    "created": "Erstellt",
+    "queue": "Queue",
+    "noTickets": "Keine Tickets für diesen Filter.",
+    "pagination": "{{from}}–{{to}} von {{total}}",
+    "escalated": "Eskaliert",
+    "escResponse": "Antwort-SLA",
+    "escUpdate": "Update-SLA",
+    "escSolution": "Lösungs-SLA",
+    "dynamicFields": "Dynamische Felder",
+    "noTitle": "(kein Titel)",
+    "articles": "Artikel",
+    "history": "Historie",
+    "noArticles": "Keine Artikel zu diesem Ticket.",
+    "noHistory": "Keine Historieneinträge.",
+    "noSubject": "(kein Betreff)",
+    "unknownSender": "unbekannt",
+    "visibleCustomer": "Kundensichtbar",
+    "internal": "Intern",
+    "attachments": "Anhänge",
+    "articleBody": "Artikeltext",
+    "externalImagesBlocked": "Externe Bilder sind aus Datenschutzgründen blockiert.",
+    "loadExternalImages": "Externe Bilder laden",
+    "historyTime": "Zeit",
+    "historyType": "Typ",
+    "historyName": "Eintrag",
+    "historyBy": "Von",
+    "invalidId": "Ungültige Ticket-ID",
+    "loadError": "Ticket konnte nicht geladen werden."
+  },
+  "search": {
+    "title": "Suche",
+    "placeholder": "Tickets suchen…",
+    "submit": "Suchen",
+    "hint": "Ticketnummer, Betreff oder Text eingeben.",
+    "results": "{{total}} Treffer für „{{query}}“",
+    "noResults": "Keine passenden Tickets."
+  },
+  "shortcuts": {
+    "title": "Tastenkürzel",
+    "rowNav": "Auswahl in der Tickettabelle bewegen",
+    "openTicket": "Fokussiertes Ticket öffnen",
+    "thisHelp": "Diese Hilfe anzeigen",
+    "focusSearch": "Suchfeld fokussieren"
   },
   "agent": {
     "title": "Agenten-Arbeitsplatz",

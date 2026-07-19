@@ -10,7 +10,98 @@
     "portal": "Customer portal",
     "admin": "Admin",
     "theme": "Theme",
-    "language": "Language"
+    "language": "Language",
+    "dashboard": "Dashboard",
+    "queues": "Queues"
+  },
+  "common": {
+    "prev": "Previous",
+    "next": "Next",
+    "back": "Back",
+    "backToQueues": "Back to queues",
+    "loading": "Loading…"
+  },
+  "auth": {
+    "login": "Sign in",
+    "logout": "Sign out",
+    "signIn": "Agent sign-in",
+    "username": "Username",
+    "password": "Password",
+    "invalidCredentials": "Invalid username or password",
+    "loginFailed": "Sign-in failed. Please try again."
+  },
+  "dashboard": {
+    "title": "Dashboard",
+    "welcome": "Welcome, {{name}}",
+    "myTickets": "My open tickets",
+    "noMyTickets": "No open tickets assigned to you.",
+    "queueShortcuts": "Queues",
+    "viewAllQueues": "View all queues",
+    "openCount": "open"
+  },
+  "queue": {
+    "sidebar": "Queues",
+    "allQueues": "All queues",
+    "empty": "No queues available.",
+    "state": {
+      "open": "Open",
+      "pending": "Pending",
+      "closed": "Closed",
+      "all": "All"
+    }
+  },
+  "ticket": {
+    "tn": "Ticket#",
+    "title": "Title",
+    "state": "State",
+    "priority": "Priority",
+    "owner": "Owner",
+    "customer": "Customer",
+    "age": "Age",
+    "changed": "Changed",
+    "created": "Created",
+    "queue": "Queue",
+    "noTickets": "No tickets match this filter.",
+    "pagination": "{{from}}–{{to}} of {{total}}",
+    "escalated": "Escalated",
+    "escResponse": "Response SLA",
+    "escUpdate": "Update SLA",
+    "escSolution": "Solution SLA",
+    "dynamicFields": "Dynamic fields",
+    "noTitle": "(no title)",
+    "articles": "Articles",
+    "history": "History",
+    "noArticles": "No articles on this ticket.",
+    "noHistory": "No history entries.",
+    "noSubject": "(no subject)",
+    "unknownSender": "unknown",
+    "visibleCustomer": "Customer-visible",
+    "internal": "Internal",
+    "attachments": "Attachments",
+    "articleBody": "Article body",
+    "externalImagesBlocked": "External images are blocked for privacy.",
+    "loadExternalImages": "Load external images",
+    "historyTime": "Time",
+    "historyType": "Type",
+    "historyName": "Entry",
+    "historyBy": "By",
+    "invalidId": "Invalid ticket ID",
+    "loadError": "Could not load this ticket."
+  },
+  "search": {
+    "title": "Search",
+    "placeholder": "Search tickets…",
+    "submit": "Search",
+    "hint": "Enter a ticket number, subject, or body text.",
+    "results": "{{total}} results for “{{query}}”",
+    "noResults": "No matching tickets."
+  },
+  "shortcuts": {
+    "title": "Keyboard shortcuts",
+    "rowNav": "Move selection in ticket table",
+    "openTicket": "Open focused ticket",
+    "thisHelp": "Show this help",
+    "focusSearch": "Focus search box"
   },
   "agent": {
     "title": "Agent workspace",
