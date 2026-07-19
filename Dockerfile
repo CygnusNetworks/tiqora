@@ -6,20 +6,18 @@ ARG PYTHON_VERSION=3.12
 ARG NODE_VERSION=22
 
 # ---------- Frontend build ----------
+# The frontend lives in a pnpm workspace (root package.json + packages/api-client),
+# so the workspace context is required for the install.
 FROM node:${NODE_VERSION}-bookworm-slim AS frontend-build
-WORKDIR /frontend
-COPY frontend/package.json frontend/pnpm-lock.yaml* frontend/package-lock.json* ./
+WORKDIR /workspace
+COPY package.json pnpm-workspace.yaml pnpm-lock.yaml ./
+COPY packages/ ./packages/
+COPY frontend/package.json ./frontend/
 RUN corepack enable \
-    && if [ -f pnpm-lock.yaml ]; then \
-         corepack prepare pnpm@9 --activate \
-         && (pnpm install --frozen-lockfile || pnpm install); \
-       elif [ -f package-lock.json ]; then \
-         npm ci; \
-       else \
-         npm install; \
-       fi
-COPY frontend/ ./
-RUN if command -v pnpm >/dev/null 2>&1 && [ -f pnpm-lock.yaml ]; then pnpm build; else npm run build; fi
+    && corepack prepare --activate \
+    && pnpm install --frozen-lockfile
+COPY frontend/ ./frontend/
+RUN pnpm --filter tiqora-frontend build
 
 # ---------- Python deps ----------
 FROM python:${PYTHON_VERSION}-slim-bookworm AS python-deps
@@ -47,7 +45,7 @@ COPY backend/src /app/backend/src
 COPY backend/alembic /app/backend/alembic
 COPY backend/alembic.ini /app/backend/alembic.ini
 COPY backend/pyproject.toml /app/backend/pyproject.toml
-COPY --from=frontend-build /frontend/dist /app/frontend/dist
+COPY --from=frontend-build /workspace/frontend/dist /app/frontend/dist
 COPY docker/entrypoint.sh /app/entrypoint.sh
 
 RUN chmod +x /app/entrypoint.sh
