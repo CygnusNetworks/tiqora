@@ -17,6 +17,7 @@ from tiqora.domain.settings_store import (
     get_setting_int,
     set_setting,
 )
+from tiqora.events.pubsub import get_pubsub_redis, publish_ticket_event
 from tiqora.worker.indexer import reindex_ticket_ids
 
 logger = structlog.get_logger(__name__)
@@ -97,6 +98,16 @@ async def poll_once(
                 session_factory=factory,
             )
             POLLER_TICKETS.inc(indexed)
+            # Notify SSE subscribers of Znuny-side writes the poller found.
+            # Best-effort — the exact Znuny event type isn't cheaply
+            # threaded through here, so event="poller" tells the frontend
+            # "this ticket changed" without a precise cause.
+            try:
+                pubsub_client = get_pubsub_redis(cfg)
+                for tid in sorted(ticket_ids):
+                    await publish_ticket_event(pubsub_client, tid, "poller")
+            except Exception:  # noqa: BLE001 — pub/sub notification must not fail the poller
+                logger.exception("poller_pubsub_publish_error")
         POLLER_RUNS.labels(status="ok").inc()
     except Exception:
         POLLER_RUNS.labels(status="error").inc()

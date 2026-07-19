@@ -29,6 +29,10 @@ export type CustomerUserOut = Schemas["CustomerUserOut"];
 export type SearchHit = Schemas["SearchHit"];
 export type SearchResponse = Schemas["SearchResponse"];
 export type DynamicFieldValueOut = Schemas["DynamicFieldValueOut"];
+export type PresenceIn = Schemas["PresenceIn"];
+export type PresenceEntry = Schemas["PresenceEntry"];
+export type ArticleCreateRequest = Schemas["ArticleCreateRequest"];
+export type ArticleCreateResponse = Schemas["ArticleCreateResponse"];
 
 // ── Portal ────────────────────────────────────────────────────────────────
 export type CustomerMe = Schemas["CustomerMe"];
@@ -369,6 +373,37 @@ export class ApiClient {
       `/api/v1/tickets/${ticketId}/history`,
       { signal },
     );
+  }
+
+  createArticle(ticketId: number, body: ArticleCreateRequest, signal?: AbortSignal) {
+    return this.request<ArticleCreateResponse>(
+      "POST",
+      `/api/v1/tickets/${ticketId}/articles`,
+      { body, signal },
+    );
+  }
+
+  postPresence(ticketId: number, body: PresenceIn, signal?: AbortSignal) {
+    return this.request<void>("POST", `/api/v1/tickets/${ticketId}/presence`, {
+      body,
+      signal,
+    });
+  }
+
+  getPresence(ticketId: number, signal?: AbortSignal) {
+    return this.request<PresenceEntry[]>(
+      "GET",
+      `/api/v1/tickets/${ticketId}/presence`,
+      { signal },
+    );
+  }
+
+  // ── Realtime events (SSE) ────────────────────────────────────────────────
+  // Consumed via the browser EventSource API directly, not a fetch call —
+  // this just builds the URL against the configured base URL/credentials.
+
+  eventStreamUrl(): string {
+    return joinUrl(this.baseUrl, "/api/v1/events/stream");
   }
 
   // ── Customers ─────────────────────────────────────────────────────────

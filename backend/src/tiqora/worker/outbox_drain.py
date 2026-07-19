@@ -14,6 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from tiqora.config import Settings, get_settings
 from tiqora.db.engine import get_session_factory
 from tiqora.domain.search import SearchIndexService
+from tiqora.events.pubsub import get_pubsub_redis, publish_ticket_event
 from tiqora.worker.webhooks import dispatch_webhooks
 
 logger = structlog.get_logger(__name__)
@@ -65,6 +66,17 @@ async def drain_outbox(
         await dispatch_webhooks(webhook_rows, settings=cfg, session_factory=factory)
     except Exception:  # noqa: BLE001 — webhook delivery must not fail the drain
         logger.exception("webhook_dispatch_error")
+
+    # Notify SSE subscribers (frontend cache invalidation) — best-effort,
+    # fire-and-forget, never blocks the drain. One message per distinct
+    # (ticket_id, event_type) pair already grouped by the outbox rows.
+    try:
+        pubsub_client = get_pubsub_redis(cfg)
+        distinct_events = sorted({(int(r[2]), str(r[1])) for r in rows})
+        for ticket_id, event_type in distinct_events:
+            await publish_ticket_event(pubsub_client, ticket_id, event_type)
+    except Exception:  # noqa: BLE001 — pub/sub notification must not fail the drain
+        logger.exception("pubsub_publish_error")
 
     # Mark as processed
     in_clause = ",".join(str(i) for i in row_ids)
