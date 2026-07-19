@@ -2,11 +2,13 @@
 
 For each outbox row, every ``valid`` webhook whose ``events`` filter matches
 the row's ``event_type`` (empty list / ``["*"]`` = all events) receives
-``POST {url}`` with body ``{event, ticket_id, payload, timestamp}`` and an
-``X-Tiqora-Signature: sha256=<hex hmac>`` header. Delivery retries up to
-``settings.webhook_max_attempts`` times with exponential backoff; a row that
-exhausts retries is logged and counted, never raised (must not block the
-outbox drain).
+``POST {url}`` with body ``{schema_version, event, ticket_id, payload,
+timestamp}`` and an ``X-Tiqora-Signature: sha256=<hex hmac>`` header.
+``schema_version`` is the versioned envelope contract documented in
+``docs/ai-integration.md`` — bump it only on a breaking change to this body
+shape. Delivery retries up to ``settings.webhook_max_attempts`` times with
+exponential backoff; a row that exhausts retries is logged and counted,
+never raised (must not block the outbox drain).
 """
 
 from __future__ import annotations
@@ -117,6 +119,7 @@ async def dispatch_webhooks(
                 if not webhook_matches_event(webhook.events, event_type):
                     continue
                 body_obj = {
+                    "schema_version": 1,
                     "event": event_type,
                     "ticket_id": ticket_id,
                     "payload": json.loads(payload) if payload else None,
