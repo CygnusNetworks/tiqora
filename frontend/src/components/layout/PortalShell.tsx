@@ -23,13 +23,16 @@ export function PortalShell({ children }: { children: ReactNode }) {
         <div className="mx-auto flex max-w-3xl flex-wrap items-center gap-3 px-4 py-3">
           <Link
             to="/portal"
-            className="flex min-w-0 flex-col leading-tight"
+            className="flex min-w-0 items-center gap-2"
             data-testid="portal-home-link"
           >
-            <span className="font-display text-lg font-bold tracking-tight text-ink">
-              {t("app.name")}
+            <img src="/logo.svg" alt="" width={24} height={24} className="rounded" />
+            <span className="flex flex-col leading-tight">
+              <span className="font-display text-lg font-bold tracking-tight text-ink">
+                {t("app.name")}
+              </span>
+              <span className="text-xs text-muted">{t("portal.subtitle")}</span>
             </span>
-            <span className="text-xs text-muted">{t("portal.subtitle")}</span>
           </Link>
           <div className="ml-auto flex items-center gap-1.5 text-sm">
             <Button variant="ghost" size="sm" onClick={toggleTheme}>

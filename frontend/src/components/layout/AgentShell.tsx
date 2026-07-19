@@ -18,6 +18,7 @@ function NavItem({
   testId,
   onNavigate,
   disabled,
+  exact,
 }: {
   to: string;
   search?: Record<string, unknown>;
@@ -26,6 +27,7 @@ function NavItem({
   testId: string;
   onNavigate?: () => void;
   disabled?: boolean;
+  exact?: boolean;
 }) {
   if (disabled) {
     return (
@@ -45,6 +47,7 @@ function NavItem({
       search={search}
       onClick={onNavigate}
       data-testid={testId}
+      activeOptions={{ exact }}
       className="flex items-center justify-between rounded-lg px-2.5 py-[7px] text-[13.5px] text-ink/80 transition-colors duration-100 hover:bg-surface-subtle focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent"
       activeProps={{
         className:
@@ -116,6 +119,7 @@ function SidebarBody({ onNavigate }: { onNavigate?: () => void }) {
               label={t("sidebar.myTickets")}
               testId="agent-nav-my-tickets"
               onNavigate={onNavigate}
+              exact
             />
             <NavItem
               to="/agent"
