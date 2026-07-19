@@ -40,9 +40,17 @@ mcp:
 
 # --- Quality ---
 
-# Run backend unit/integration tests
+# Run backend unit/integration tests (db tests auto-skip without Docker)
 test:
     cd backend && uv run pytest -q
+
+# Unit tests only (no Docker / testcontainers)
+test-unit:
+    cd backend && uv run pytest -q -m "not db"
+
+# DB integration tests (MariaDB + Postgres via testcontainers)
+test-db:
+    cd backend && uv run pytest -q -m db
 
 # Lint (ruff) + type-check (mypy)
 lint:

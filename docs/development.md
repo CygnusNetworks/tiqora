@@ -82,12 +82,20 @@ uv run alembic -c alembic.ini history
 ### Tests and lint
 
 ```bash
-make test   # pytest
+make test   # pytest (unit always; db-marked tests when Docker is up)
+make test-unit
+make test-db   # schema conformance + permission engine (testcontainers)
 make lint   # ruff + mypy
 make fmt    # auto-fix
 ```
 
-CI runs the same tools plus MariaDB and Postgres service containers.
+- **Unit tests** (`not db`): password hashes, SysConfig YAML resolution, config/health.
+- **DB tests** (`pytest -m db`): start MariaDB 10.11 and Postgres 16 via testcontainers,
+  load Znuny 6.5 DDL from `backend/tests/fixtures/znuny-schema/`, assert legacy models
+  match the real schema, and exercise the permission engine.
+
+If Docker is not running, db-marked tests are skipped automatically. CI runs the same
+tools with MariaDB and Postgres service containers (or testcontainers where configured).
 
 ## Frontend
 

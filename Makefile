@@ -1,9 +1,9 @@
 # Tiqora Makefile (mirrors justfile for environments without just)
 
-.PHONY: help dev-up dev-down sync api worker mcp test lint fmt fe-install fe-dev fe-build build compose-check
+.PHONY: help dev-up dev-down sync api worker mcp test test-unit test-db lint fmt fe-install fe-dev fe-build build compose-check
 
 help:
-	@echo "Targets: dev-up dev-down sync api worker mcp test lint fmt fe-install fe-dev fe-build build compose-check"
+	@echo "Targets: dev-up dev-down sync api worker mcp test test-unit test-db lint fmt fe-install fe-dev fe-build build compose-check"
 
 dev-up:
 	docker compose -f docker-compose.dev.yml up -d
@@ -25,6 +25,12 @@ mcp:
 
 test:
 	cd backend && uv run pytest -q
+
+test-unit:
+	cd backend && uv run pytest -q -m "not db"
+
+test-db:
+	cd backend && uv run pytest -q -m db
 
 lint:
 	cd backend && uv run ruff check src tests
