@@ -31,7 +31,28 @@ import { NewTicketPage } from "@/routes/portal/NewTicketPage";
 import { TicketDetailPage } from "@/routes/portal/TicketDetailPage";
 import { KbSearchPage, type PortalKbSearch } from "@/routes/portal/KbSearchPage";
 import { KbArticlePage } from "@/routes/portal/KbArticlePage";
-import AdminPage from "@/routes/AdminPage";
+import { AdminShell } from "@/components/layout/AdminShell";
+import { RequireAdmin } from "@/auth/RequireAdmin";
+import { AdminHomePage } from "@/routes/admin/AdminHomePage";
+import { UsersPage } from "@/routes/admin/UsersPage";
+import { GroupsPage } from "@/routes/admin/GroupsPage";
+import { RolesPage } from "@/routes/admin/RolesPage";
+import { QueuesPage as AdminQueuesPage } from "@/routes/admin/QueuesPage";
+import { StatesPage } from "@/routes/admin/StatesPage";
+import { PrioritiesPage } from "@/routes/admin/PrioritiesPage";
+import { CustomerUsersPage } from "@/routes/admin/CustomerUsersPage";
+import { CustomerCompaniesPage } from "@/routes/admin/CustomerCompaniesPage";
+import { TemplatesPage } from "@/routes/admin/TemplatesPage";
+import { SalutationsPage } from "@/routes/admin/SalutationsPage";
+import { SignaturesPage } from "@/routes/admin/SignaturesPage";
+import { AutoResponsesPage } from "@/routes/admin/AutoResponsesPage";
+import { DynamicFieldsPage } from "@/routes/admin/DynamicFieldsPage";
+import { PostmasterFiltersPage } from "@/routes/admin/PostmasterFiltersPage";
+import { PostmasterFilterDetailPage } from "@/routes/admin/PostmasterFilterDetailPage";
+import { AclPage } from "@/routes/admin/AclPage";
+import { AclDetailPage } from "@/routes/admin/AclDetailPage";
+import { GenericAgentJobsPage } from "@/routes/admin/GenericAgentJobsPage";
+import { GenericAgentJobDetailPage } from "@/routes/admin/GenericAgentJobDetailPage";
 
 const rootRoute = createRootRoute({
   component: () => <Outlet />,
@@ -237,10 +258,138 @@ const portalKbArticleRoute = createRoute({
   component: KbArticlePage,
 });
 
-const adminRoute = createRoute({
+// /admin: agent session (RequireAuth) + admin-capability probe (RequireAdmin)
+// gated shell with a grouped left sidebar nav (see AdminShell).
+const adminLayoutRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/admin",
-  component: AdminPage,
+  component: () => (
+    <RequireAdmin>
+      <AdminShell>
+        <Outlet />
+      </AdminShell>
+    </RequireAdmin>
+  ),
+});
+
+const adminIndexRoute = createRoute({
+  getParentRoute: () => adminLayoutRoute,
+  path: "/",
+  component: AdminHomePage,
+});
+
+const adminUsersRoute = createRoute({
+  getParentRoute: () => adminLayoutRoute,
+  path: "/users",
+  component: UsersPage,
+});
+
+const adminGroupsRoute = createRoute({
+  getParentRoute: () => adminLayoutRoute,
+  path: "/groups",
+  component: GroupsPage,
+});
+
+const adminRolesRoute = createRoute({
+  getParentRoute: () => adminLayoutRoute,
+  path: "/roles",
+  component: RolesPage,
+});
+
+const adminQueuesRoute = createRoute({
+  getParentRoute: () => adminLayoutRoute,
+  path: "/queues",
+  component: AdminQueuesPage,
+});
+
+const adminStatesRoute = createRoute({
+  getParentRoute: () => adminLayoutRoute,
+  path: "/states",
+  component: StatesPage,
+});
+
+const adminPrioritiesRoute = createRoute({
+  getParentRoute: () => adminLayoutRoute,
+  path: "/priorities",
+  component: PrioritiesPage,
+});
+
+const adminCustomerUsersRoute = createRoute({
+  getParentRoute: () => adminLayoutRoute,
+  path: "/customer-users",
+  component: CustomerUsersPage,
+});
+
+const adminCustomerCompaniesRoute = createRoute({
+  getParentRoute: () => adminLayoutRoute,
+  path: "/customer-companies",
+  component: CustomerCompaniesPage,
+});
+
+const adminTemplatesRoute = createRoute({
+  getParentRoute: () => adminLayoutRoute,
+  path: "/templates",
+  component: TemplatesPage,
+});
+
+const adminSalutationsRoute = createRoute({
+  getParentRoute: () => adminLayoutRoute,
+  path: "/salutations",
+  component: SalutationsPage,
+});
+
+const adminSignaturesRoute = createRoute({
+  getParentRoute: () => adminLayoutRoute,
+  path: "/signatures",
+  component: SignaturesPage,
+});
+
+const adminAutoResponsesRoute = createRoute({
+  getParentRoute: () => adminLayoutRoute,
+  path: "/auto-responses",
+  component: AutoResponsesPage,
+});
+
+const adminDynamicFieldsRoute = createRoute({
+  getParentRoute: () => adminLayoutRoute,
+  path: "/dynamic-fields",
+  component: DynamicFieldsPage,
+});
+
+const adminPostmasterFiltersRoute = createRoute({
+  getParentRoute: () => adminLayoutRoute,
+  path: "/postmaster-filters",
+  component: PostmasterFiltersPage,
+});
+
+const adminPostmasterFilterDetailRoute = createRoute({
+  getParentRoute: () => adminLayoutRoute,
+  path: "/postmaster-filters/$name",
+  component: PostmasterFilterDetailPage,
+});
+
+const adminAclRoute = createRoute({
+  getParentRoute: () => adminLayoutRoute,
+  path: "/acl",
+  component: AclPage,
+});
+
+const adminAclDetailRoute = createRoute({
+  getParentRoute: () => adminLayoutRoute,
+  path: "/acl/$aclId",
+  component: AclDetailPage,
+});
+
+const adminGenericAgentJobsRoute = createRoute({
+  getParentRoute: () => adminLayoutRoute,
+  path: "/generic-agent-jobs",
+  component: GenericAgentJobsPage,
+});
+
+const adminGenericAgentJobDetailRoute = createRoute({
+  getParentRoute: () => adminLayoutRoute,
+  path: "/generic-agent-jobs/$jobName",
+  component: GenericAgentJobDetailPage,
 });
 
 const catchAllRoute = createRoute({
@@ -272,7 +421,28 @@ const routeTree = rootRoute.addChildren([
     portalKbRoute,
     portalKbArticleRoute,
   ]),
-  adminRoute,
+  adminLayoutRoute.addChildren([
+    adminIndexRoute,
+    adminUsersRoute,
+    adminGroupsRoute,
+    adminRolesRoute,
+    adminQueuesRoute,
+    adminStatesRoute,
+    adminPrioritiesRoute,
+    adminCustomerUsersRoute,
+    adminCustomerCompaniesRoute,
+    adminTemplatesRoute,
+    adminSalutationsRoute,
+    adminSignaturesRoute,
+    adminAutoResponsesRoute,
+    adminDynamicFieldsRoute,
+    adminPostmasterFiltersRoute,
+    adminPostmasterFilterDetailRoute,
+    adminAclRoute,
+    adminAclDetailRoute,
+    adminGenericAgentJobsRoute,
+    adminGenericAgentJobDetailRoute,
+  ]),
   catchAllRoute,
 ]);
 
