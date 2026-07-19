@@ -88,12 +88,19 @@ threads correctly.
 
 ## Foreign keys and orphans
 
-Real Znuny DDL has **no foreign key constraints**. Integrity is application-side.
-Tiqora must:
+Znuny’s **base** schema (`schema.*.sql`) declares tables without foreign keys.
+The installer then applies **`schema-post.*.sql` after `initial_insert`**, which
+**does** add FK constraints (including the circular `users`↔`valid` pair that
+only works in that order). Fresh Znuny installs therefore **have** FK
+constraints.
 
+Older upgraded installs may still miss some constraints. Tiqora must:
+
+- write in FK-safe order (seed/reference rows before dependents; reuse
+  `users` id 1 / `valid` id 1 from initial_insert when testing),
 - enforce referential integrity in domain code,
-- tolerate and report orphans,
-- only introduce real FKs after schema-ownership mode (Phase 5).
+- tolerate and report orphans on legacy databases that lack constraints,
+- only own/alter FKs after schema-ownership mode (Phase 5).
 
 ## Znuny cache invalidation
 

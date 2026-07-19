@@ -7,12 +7,16 @@ the developer-only reference tree (`znuny-6.5.22/`, gitignored).
 
 | File | Role |
 |---|---|
-| `schema.mysql.sql` | MySQL/MariaDB table DDL |
-| `schema-post.mysql.sql` | MySQL indexes / FK follow-up |
-| `schema.postgresql.sql` | PostgreSQL table DDL |
-| `schema-post.postgresql.sql` | PostgreSQL indexes / FK follow-up |
+| `schema.mysql.sql` | MySQL/MariaDB table DDL (no FKs) |
 | `initial_insert.mysql.sql` | Seed data (valid, users, states, …) |
+| `schema-post.mysql.sql` | MySQL indexes / FK follow-up |
+| `schema.postgresql.sql` | PostgreSQL table DDL (no FKs) |
 | `initial_insert.postgresql.sql` | Seed data (PostgreSQL dialect) |
+| `schema-post.postgresql.sql` | PostgreSQL indexes / FK follow-up |
+
+**Installer order (required):** `schema` → `initial_insert` → `schema-post`.
+Foreign keys (including circular `users`↔`valid`) are only added after seed
+data exists. Test fixtures load files in this order.
 
 ## Origin and licence
 

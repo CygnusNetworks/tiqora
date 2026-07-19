@@ -130,11 +130,21 @@ def _model_category(col_type: Any) -> str:
 
 
 def _compatible(model_cat: str, db_cat: str) -> bool:
-    """Allow string↔text when Znuny promotes huge VARCHAR to TEXT/MEDIUMTEXT."""
+    """Allow Znuny dialect-specific type remappings.
+
+    - string↔text: huge VARCHAR promoted to TEXT/MEDIUMTEXT
+    - binary↔text: Znuny maps MySQL LONGBLOB → PostgreSQL TEXT for YAML/config
+      blobs and large payloads (acl.config_*, sysconfig_*, attachments, …).
+      Models keep ``LargeBinary`` for MySQL fidelity; PG stores the same bytes
+      as text. Application code must round-trip both (see decode helpers).
+    """
     if model_cat == db_cat:
         return True
-    # string↔text is OK when Znuny promotes huge VARCHAR to TEXT/MEDIUMTEXT
-    return {model_cat, db_cat} <= {"string", "text"}
+    # string↔text (huge VARCHAR→TEXT) or binary↔text (MySQL LONGBLOB→PG TEXT)
+    return {model_cat, db_cat} <= {"string", "text"} or {model_cat, db_cat} <= {
+        "binary",
+        "text",
+    }
 
 
 @pytest.fixture(scope="module")

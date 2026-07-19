@@ -17,53 +17,21 @@ NOW = datetime(2024, 1, 1, 12, 0, 0)
 
 
 def _seed_permissions(sync_url: str) -> dict[str, Any]:
-    """Insert users/groups/roles/queues for permission tests. Returns ids."""
+    """Insert users/groups/roles/queues for permission tests. Returns ids.
+
+    Relies on Znuny ``initial_insert`` already providing:
+
+    - ``valid`` rows (id 1=valid, 2=invalid, 3=invalid-temporarily)
+    - ``users`` id 1 (``root@localhost``) for create_by/change_by FKs
+    - ``system_address`` / ``salutation`` / ``signature`` / ``follow_up_possible`` id 1
+
+    Additional rows use create_by/change_by=1 and valid_id in {1,2} so they
+    satisfy ``schema-post`` foreign keys. Queue names/ids avoid collisions with
+    the default Postmaster/Raw/Junk/Misc queues from initial_insert.
+    """
     engine = create_engine(sync_url)
     ids: dict[str, Any] = {}
     with engine.begin() as conn:
-        # valid table may already have rows from initial_insert — ensure id=1 exists
-        conn.execute(
-            text(
-                """
-                INSERT INTO valid (id, name, create_time, create_by, change_time, change_by)
-                VALUES (1, 'valid', :t, 1, :t, 1)
-                ON CONFLICT DO NOTHING
-                """
-                if "postgresql" in sync_url
-                else """
-                INSERT IGNORE INTO valid (id, name, create_time, create_by, change_time, change_by)
-                VALUES (1, 'valid', :t, 1, :t, 1)
-                """
-            ),
-            {"t": NOW},
-        )
-        # For MySQL without ON CONFLICT — use INSERT IGNORE above.
-        # Ensure user root-ish for create_by
-        if "postgresql" in sync_url:
-            conn.execute(
-                text(
-                    """
-                    INSERT INTO users (id, login, pw, first_name, last_name, valid_id,
-                                      create_time, create_by, change_time, change_by)
-                    VALUES (1, 'root@localhost', 'x', 'Admin', 'User', 1, :t, 1, :t, 1)
-                    ON CONFLICT (id) DO NOTHING
-                    """
-                ),
-                {"t": NOW},
-            )
-        else:
-            conn.execute(
-                text(
-                    """
-                    INSERT IGNORE INTO users
-                    (id, login, pw, first_name, last_name, valid_id,
-                     create_time, create_by, change_time, change_by)
-                    VALUES (1, 'root@localhost', 'x', 'Admin', 'User', 1, :t, 1, :t, 1)
-                    """
-                ),
-                {"t": NOW},
-            )
-
         # Agent with direct perms, agent with role perms, invalid agent
         for uid, login, valid in (
             (100, "agent.direct", 1),
@@ -180,9 +148,9 @@ def _seed_permissions(sync_url: str) -> dict[str, Any]:
             {"t": NOW},
         )
 
-        # Minimal queue rows (need system_address etc. — use bare inserts with defaults)
-        # Check if we need more tables; queue has NOT NULL FKs without constraints enforced
-        for qid, gid, qname in ((1, 10, "Raw"), (2, 11, "Junk")):
+        # Queues: high ids / unique names avoid clashing with initial_insert defaults.
+        # system_address/salutation/signature/follow_up id 1 come from initial_insert.
+        for qid, gid, qname in ((100, 10, "perm-alpha"), (101, 11, "perm-beta")):
             conn.execute(
                 text(
                     """
@@ -202,8 +170,8 @@ def _seed_permissions(sync_url: str) -> dict[str, Any]:
     ids["direct_user"] = 100
     ids["role_user"] = 101
     ids["invalid_user"] = 102
-    ids["queue_alpha"] = 1
-    ids["queue_beta"] = 2
+    ids["queue_alpha"] = 100
+    ids["queue_beta"] = 101
     ids["group_alpha"] = 10
     ids["group_beta"] = 11
     return ids

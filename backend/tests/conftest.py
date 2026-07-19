@@ -54,27 +54,31 @@ def znuny_schema_dir() -> Path:
     return FIXTURES
 
 
-def _strip_mysql_comments(sql: str) -> str:
-    lines: list[str] = []
-    for line in sql.splitlines():
-        stripped = line.lstrip()
-        if stripped.startswith("#") or stripped.startswith("--"):
-            continue
-        lines.append(line)
-    return "\n".join(lines)
+def _split_sql_statements(sql: str, *, mysql_backslash_escapes: bool = False) -> list[str]:
+    """Split SQL on semicolons outside quotes / dollar-quotes.
 
+    Znuny seed data embeds multi-line string literals that contain both
+    semicolons (``text/plain; charset=utf-8``), MySQL ``\\;`` URL escapes, and
+    ``--`` comment-like lines (signature ASCII art). Naive split/comment-stripping
+    corrupts those inserts.
 
-def _split_sql_statements(sql: str) -> list[str]:
-    """Split SQL on semicolons, keeping PostgreSQL dollar-quoted blocks intact."""
+    Parameters
+    ----------
+    mysql_backslash_escapes:
+        When True, treat ``\\X`` inside single-quoted strings as an escaped pair
+        (MySQL/MariaDB default). PostgreSQL with standard_conforming_strings keeps
+        backslash as a literal, so leave this False for PG.
+    """
     statements: list[str] = []
     buf: list[str] = []
     i = 0
     n = len(sql)
+    in_single = False
+    in_double = False
     in_dollar = False
     dollar_tag = ""
     while i < n:
-        if not in_dollar and sql.startswith("$$", i):
-            # Find tag: $tag$ ... $tag$
+        if not in_single and not in_double and not in_dollar:
             m = re.match(r"\$([A-Za-z0-9_]*)\$", sql[i:])
             if m:
                 in_dollar = True
@@ -93,7 +97,28 @@ def _split_sql_statements(sql: str) -> list[str]:
             i += 1
             continue
         ch = sql[i]
-        if ch == ";":
+        # MySQL backslash escapes inside single-quoted strings (\' \; \\ …)
+        if in_single and mysql_backslash_escapes and ch == "\\" and i + 1 < n:
+            buf.append(ch)
+            buf.append(sql[i + 1])
+            i += 2
+            continue
+        if not in_double and ch == "'":
+            # SQL standard escaped quote: ''
+            if in_single and i + 1 < n and sql[i + 1] == "'":
+                buf.append("''")
+                i += 2
+                continue
+            in_single = not in_single
+            buf.append(ch)
+            i += 1
+            continue
+        if not in_single and ch == '"':
+            in_double = not in_double
+            buf.append(ch)
+            i += 1
+            continue
+        if not in_single and not in_double and ch == ";":
             stmt = "".join(buf).strip()
             if stmt:
                 statements.append(stmt)
@@ -132,9 +157,11 @@ def _load_sql_mysql(container_url: str, sql_path: Path) -> None:
         client_flag=CLIENT.MULTI_STATEMENTS,
     )
     try:
-        sql = _strip_mysql_comments(sql_path.read_text(encoding="utf-8", errors="replace"))
+        # Do not strip ``--`` lines: Znuny seed strings contain signature art with ``--``.
+        # MySQL/MariaDB understand ``#`` / ``--`` comments outside of string literals.
+        sql = sql_path.read_text(encoding="utf-8", errors="replace")
         with conn.cursor() as cur:
-            for stmt in _split_sql_statements(sql):
+            for stmt in _split_sql_statements(sql, mysql_backslash_escapes=True):
                 if not stmt.strip():
                     continue
                 try:
@@ -142,7 +169,7 @@ def _load_sql_mysql(container_url: str, sql_path: Path) -> None:
                     while cur.nextset():
                         pass
                 except pymysql.err.Error as exc:
-                    # Ignore "already exists" style noise on re-runs
+                    # Ignore "already exists" / "unknown key" style noise on re-runs
                     if getattr(exc, "args", None) and exc.args[0] in {1050, 1061, 1091}:
                         continue
                     raise
@@ -163,7 +190,7 @@ def _load_sql_postgres(dsn: str, sql_path: Path) -> None:
     try:
         sql = sql_path.read_text(encoding="utf-8", errors="replace")
         with conn.cursor() as cur:
-            for stmt in _split_sql_statements(sql):
+            for stmt in _split_sql_statements(sql, mysql_backslash_escapes=False):
                 if not stmt.strip():
                     continue
                 try:
@@ -180,7 +207,17 @@ def _load_sql_postgres(dsn: str, sql_path: Path) -> None:
 
 @pytest.fixture(scope="session")
 def mariadb_znuny_url(znuny_schema_dir: Path) -> Generator[str, None, None]:
-    """Start MariaDB 10.11, load Znuny schema (+ post), yield SQLAlchemy URL."""
+    """Start MariaDB 10.11, load Znuny DDL in installer order, yield SQLAlchemy URL.
+
+    Znuny installer order is required for circular FKs (users↔valid):
+
+    1. ``schema.mysql.sql`` — tables without FK constraints
+    2. ``initial_insert.mysql.sql`` — seed data (root user, valid rows, …)
+    3. ``schema-post.mysql.sql`` — indexes and foreign keys
+
+    Yields a ``mysql+pymysql://`` URL so sync SQLAlchemy engines use PyMySQL
+    (not the default MySQLdb/mysqlclient driver).
+    """
     if not docker_available():
         pytest.skip("Docker not available")
 
@@ -191,19 +228,22 @@ def mariadb_znuny_url(znuny_schema_dir: Path) -> Generator[str, None, None]:
     except ImportError:
         pytest.skip("pymysql not installed (needed to load MySQL DDL fixtures)")
 
-    with MySqlContainer("mariadb:10.11") as mysql:
+    # dialect="pymysql" → mysql+pymysql:// (SQLAlchemy default mysql:// needs MySQLdb)
+    with MySqlContainer("mariadb:10.11", dialect="pymysql") as mysql:
         url = mysql.get_connection_url()
         _load_sql_mysql(url, znuny_schema_dir / "schema.mysql.sql")
-        try:
-            _load_sql_mysql(url, znuny_schema_dir / "schema-post.mysql.sql")
-        except Exception as exc:  # noqa: BLE001
-            print(f"warning: schema-post.mysql.sql partial failure: {exc}")
+        _load_sql_mysql(url, znuny_schema_dir / "initial_insert.mysql.sql")
+        _load_sql_mysql(url, znuny_schema_dir / "schema-post.mysql.sql")
         yield url
 
 
 @pytest.fixture(scope="session")
 def postgres_znuny_url(znuny_schema_dir: Path) -> Generator[str, None, None]:
-    """Start Postgres 16, load Znuny schema (+ post), yield SQLAlchemy URL."""
+    """Start Postgres 16, load Znuny DDL in installer order, yield SQLAlchemy URL.
+
+    Same order as MariaDB: schema → initial_insert → schema-post. Real Znuny
+    installs apply ``schema-post`` *after* seed data so users↔valid FKs succeed.
+    """
     if not docker_available():
         pytest.skip("Docker not available")
 
@@ -217,8 +257,6 @@ def postgres_znuny_url(znuny_schema_dir: Path) -> Generator[str, None, None]:
     with PostgresContainer("postgres:16") as pg:
         url = pg.get_connection_url()
         _load_sql_postgres(url, znuny_schema_dir / "schema.postgresql.sql")
-        try:
-            _load_sql_postgres(url, znuny_schema_dir / "schema-post.postgresql.sql")
-        except Exception as exc:  # noqa: BLE001
-            print(f"warning: schema-post.postgresql.sql partial failure: {exc}")
+        _load_sql_postgres(url, znuny_schema_dir / "initial_insert.postgresql.sql")
+        _load_sql_postgres(url, znuny_schema_dir / "schema-post.postgresql.sql")
         yield url

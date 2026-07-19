@@ -70,7 +70,9 @@ TN regex in subject, `a_message_id_md5` / References, merge chain depth 10.
 
 ### Integrity
 
-No FK constraints in real DDL → application-side integrity; plan for orphans.
+Base schema has no FKs; `schema-post` (applied after `initial_insert`) adds them
+on real installs. Write FK-safe; tolerate orphans on legacy upgraded DBs;
+application-side integrity remains required.
 
 ### Cache staleness
 

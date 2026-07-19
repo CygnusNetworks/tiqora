@@ -17,7 +17,14 @@ from tiqora.db.legacy.base import LegacyBase
 
 
 class Acl(LegacyBase):
-    """Znuny table `acl`."""
+    """Znuny table `acl`.
+
+    ``config_match`` / ``config_change`` store YAML text. MySQL DDL uses
+    LONGBLOB; PostgreSQL maps them to TEXT (Znuny's LONGBLOB→TEXT convention
+    for YAML/config columns). Models use :class:`~sqlalchemy.Text` so both
+    dialects round-trip as Unicode strings; binary attachment-style LONGBLOBs
+    elsewhere remain :class:`~sqlalchemy.LargeBinary`.
+    """
 
     __tablename__ = "acl"
 
@@ -27,8 +34,8 @@ class Acl(LegacyBase):
     description: Mapped[str | None] = mapped_column(String(250), nullable=True)
     valid_id: Mapped[int] = mapped_column(SmallInteger, nullable=False)
     stop_after_match: Mapped[int | None] = mapped_column(SmallInteger, nullable=True)
-    config_match: Mapped[bytes | None] = mapped_column(LargeBinary, nullable=True)
-    config_change: Mapped[bytes | None] = mapped_column(LargeBinary, nullable=True)
+    config_match: Mapped[str | None] = mapped_column(Text, nullable=True)
+    config_change: Mapped[str | None] = mapped_column(Text, nullable=True)
     create_time: Mapped[datetime] = mapped_column(DateTime, nullable=False)
     create_by: Mapped[int] = mapped_column(Integer, nullable=False)
     change_time: Mapped[datetime] = mapped_column(DateTime, nullable=False)

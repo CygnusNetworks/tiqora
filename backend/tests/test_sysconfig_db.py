@@ -28,37 +28,17 @@ def _to_async_url(sync_url: str) -> str:
 
 
 def _seed_sysconfig(sync_url: str) -> None:
+    """Seed sysconfig rows on top of Znuny initial_insert.
+
+    ``users`` id 1 (root@localhost) and ``valid`` id 1 already exist from
+    initial_insert; create_by/change_by=1 satisfy schema-post FKs.
+    """
     engine = create_engine(sync_url)
     with engine.begin() as conn:
-        # Minimal user for create_by/change_by
-        if "postgresql" in sync_url:
-            conn.execute(
-                text(
-                    """
-                    INSERT INTO users (id, login, pw, first_name, last_name, valid_id,
-                                      create_time, create_by, change_time, change_by)
-                    VALUES (1, 'root@localhost', 'x', 'Admin', 'User', 1, :t, 1, :t, 1)
-                    ON CONFLICT (id) DO NOTHING
-                    """
-                ),
-                {"t": NOW},
-            )
-        else:
-            conn.execute(
-                text(
-                    """
-                    INSERT IGNORE INTO users
-                    (id, login, pw, first_name, last_name, valid_id,
-                     create_time, create_by, change_time, change_by)
-                    VALUES (1, 'root@localhost', 'x', 'Admin', 'User', 1, :t, 1, :t, 1)
-                    """
-                ),
-                {"t": NOW},
-            )
-
-        default_val = yaml_encode_effective("10")
-        modified_val = yaml_encode_effective("42")
-        hook_val = yaml_encode_effective("Ticket#")
+        # YAML text as str so both MySQL LONGBLOB and PG TEXT accept the bind.
+        default_val = yaml_encode_effective("10").decode("utf-8")
+        modified_val = yaml_encode_effective("42").decode("utf-8")
+        hook_val = yaml_encode_effective("Ticket#").decode("utf-8")
 
         conn.execute(
             text(
@@ -80,7 +60,7 @@ def _seed_sysconfig(sync_url: str) -> None:
                 )
                 """
             ),
-            {"desc": b"SystemID", "eff": default_val, "t": NOW},
+            {"desc": "SystemID", "eff": default_val, "t": NOW},
         )
         conn.execute(
             text(
@@ -102,7 +82,7 @@ def _seed_sysconfig(sync_url: str) -> None:
                 )
                 """
             ),
-            {"desc": b"Hook", "eff": hook_val, "t": NOW},
+            {"desc": "Hook", "eff": hook_val, "t": NOW},
         )
         # System-wide modified override for SystemID
         conn.execute(
