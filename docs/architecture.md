@@ -109,8 +109,43 @@ Key endpoints: `/auth/login|me|logout`, `/queues`, `/tickets`,
   `tiqora_session`, sliding TTL). Not JWT.
 - API keys: `tiqora_api_key` (sha256 of key, linked to `user_id`);
   `Authorization: Bearer`.
-- Planned: OIDC, Kerberos/SPNEGO (Linux KDC), optional TOTP per user;
-  GenericInterface SessionIDs against Znuny `sessions`.
+- `GET /api/v1/auth/methods` is a discovery endpoint (`{password, oidc,
+  spnego}`) the agent login page uses to decide which buttons to show.
+- **OIDC/SSO** (Phase 3c, authlib): `/api/v1/auth/oidc/login` redirects to the
+  provider's authorization endpoint (state stored in Redis, short TTL);
+  `/callback` exchanges the code, fetches `userinfo`, and maps a configurable
+  claim (`TIQORA_OIDC_CLAIM`, default `preferred_username`) to `users.login`.
+  **No auto-provisioning in v1** — the claim must match an existing,
+  `valid_id = 1` user or the login is rejected (403). Same Redis session as
+  password login is created on success.
+- **Kerberos/SPNEGO** (Phase 3c, optional `kerberos` extra / `gssapi`):
+  `/api/v1/auth/spnego` implements the Negotiate challenge/response
+  (`401 WWW-Authenticate: Negotiate` → `Authorization: Negotiate <token>`).
+  All `gssapi` calls run in an executor (it's a sync, C-extension-backed
+  library). Feature-flagged off by default (`TIQORA_SPNEGO_ENABLED`); returns
+  `501` if `gssapi` isn't installed. Principal's primary part maps to
+  `users.login`.
+- **TOTP 2FA** (Phase 3c, pyotp, per-user opt-in): `tiqora_user_totp` stores a
+  Fernet-encrypted secret (key derived from `TIQORA_SECRET_KEY`). After a
+  successful password/SSO/SPNEGO login for a user with TOTP enabled, the
+  session is created in a **pending-2FA state** — tagged so it is invisible
+  to the normal session-resolve path (`get_current_user`) and cannot touch
+  any other endpoint. `POST /api/v1/auth/totp/verify` (±1 step / ~90s
+  window) promotes it to a full session.
+- Planned: GenericInterface SessionIDs against Znuny `sessions`.
+
+### Webhooks (Phase 3c)
+
+`tiqora_webhook` (admin CRUD under `/api/v1/admin/webhooks`) subscribes to
+`tiqora_event_outbox` event types (empty list / `["*"]` = all events). The
+worker's per-minute outbox drain (`worker/outbox_drain.py`) fans out each
+batch to matching, valid webhooks via `worker/webhooks.py`:
+`POST {event, ticket_id, payload, timestamp}` with an
+`X-Tiqora-Signature: sha256=<hmac>` header (HMAC-SHA256 over the raw body,
+keyed by the webhook's `secret`). Delivery retries up to
+`TIQORA_WEBHOOK_MAX_ATTEMPTS` times with exponential backoff; exhausted
+retries are logged and counted in `tiqora_webhook_deliveries_total{status}`
+but never raised — webhook delivery must not block Meilisearch re-indexing.
 
 ### Customer portal (Phase 3a)
 
