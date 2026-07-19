@@ -105,6 +105,10 @@ class ArticleIn:
     channel: str = "note"
     # Binary attachments: list of (filename, content_type, content_bytes)
     attachments: list[tuple[str, str, bytes]] = field(default_factory=list)
+    # Override the derived ticket_history type (e.g. postmaster auto-responses
+    # use SendAutoReply/SendAutoFollowUp/SendAutoReject instead of the
+    # channel/sender-derived EmailAgent/EmailCustomer names).
+    history_type_override: str | None = None
 
 
 @dataclass
@@ -529,10 +533,12 @@ async def add_article(
     # Search rebuild flag
     await mark_search_rebuild(session, article_id)
 
-    # History type by channel and sender
+    # History type by channel and sender (or explicit override)
     history_type: str
     channel_lower = article.channel.lower()
-    if channel_lower == "email":
+    if article.history_type_override:
+        history_type = article.history_type_override
+    elif channel_lower == "email":
         if article.sender_type == "agent":
             history_type = TYPE_EMAIL_AGENT
         else:
