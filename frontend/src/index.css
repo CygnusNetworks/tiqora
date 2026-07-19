@@ -1,11 +1,73 @@
+@import "@fontsource/ibm-plex-sans/400.css";
+@import "@fontsource/ibm-plex-sans/500.css";
+@import "@fontsource/ibm-plex-sans/600.css";
+@import "@fontsource/ibm-plex-mono/400.css";
+@import "@fontsource/ibm-plex-mono/500.css";
+@import "@fontsource/archivo/600.css";
+@import "@fontsource/archivo/700.css";
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
+html {
+  background: var(--color-bg);
+}
+
 body {
   margin: 0;
   min-height: 100vh;
-  background: var(--color-surface);
+  background: var(--color-bg);
   color: var(--color-ink);
   font-family: var(--font-sans);
+  font-size: 14px;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1,
+h2,
+h3 {
+  font-family: var(--font-display);
+  font-weight: 600;
+  letter-spacing: 0.005em;
+}
+
+.tabular-nums,
+.font-mono {
+  font-feature-settings: "tnum" 1, "lnum" 1;
+  font-variant-numeric: tabular-nums lining-nums;
+}
+
+/* Status spine — the one signature element: 3px coloured left edge. */
+.status-spine {
+  position: relative;
+}
+.status-spine::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background: var(--spine-color, var(--color-hairline));
+}
+.status-spine--escalation-approaching::before {
+  background: linear-gradient(
+    to bottom,
+    var(--color-escalation) 50%,
+    var(--spine-color, var(--color-hairline)) 50%
+  );
+}
+.status-spine--escalation-breached::before {
+  background: var(--color-escalation);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
 }

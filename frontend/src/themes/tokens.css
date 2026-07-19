@@ -1,26 +1,63 @@
-/* Theme tokens — light (default) and dark via data-theme on <html> */
+/* Theme tokens — "Schaltwarte" design system.
+   Light = "day shift", dark = "night shift" (warm dark, not pure black). */
 
 :root,
 [data-theme="light"] {
-  --color-surface: #f6f7f9;
-  --color-surface-elevated: #ffffff;
-  --color-ink: #0f172a;
-  --color-muted: #64748b;
-  --color-accent: #2563eb;
-  --color-border: #e2e8f0;
-  --color-danger: #dc2626;
-  --color-warn: #d97706;
-  --font-sans: "Inter", "Segoe UI", system-ui, sans-serif;
-  --font-mono: "JetBrains Mono", "Fira Code", ui-monospace, monospace;
+  --color-bg: #f6f7fa;
+  --color-surface: #ffffff;
+  --color-surface-subtle: #eef0f5;
+  --color-ink: #1a1e2a;
+  --color-muted: #5a6172;
+  --color-hairline: #dde1ea;
+
+  --color-accent: #2e7568; /* verdigris */
+  --color-accent-ink: #ffffff;
+  --color-escalation: #c9760a; /* amber */
+
+  /* Ticket state colour code — muted, systematic */
+  --color-state-new: #2e7568;
+  --color-state-open: #3b6ea5;
+  --color-state-pending: #8a6da3;
+  --color-state-closed: #8a90a0;
+  --color-state-removed: #9aa0ae;
+
+  --color-danger: #b3413a;
+
+  /* Aliases kept for existing component usage */
+  --color-surface-elevated: var(--color-surface);
+  --color-border: var(--color-hairline);
+  --color-warn: var(--color-escalation);
+
+  --font-sans: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", monospace;
+  --font-display: "Archivo", "IBM Plex Sans", system-ui, sans-serif;
+
+  color-scheme: light;
 }
 
 [data-theme="dark"] {
-  --color-surface: #0b1220;
-  --color-surface-elevated: #111827;
-  --color-ink: #e5e7eb;
-  --color-muted: #94a3b8;
-  --color-accent: #60a5fa;
-  --color-border: #1f2937;
-  --color-danger: #f87171;
-  --color-warn: #fbbf24;
+  --color-bg: #151923;
+  --color-surface: #1c212e;
+  --color-surface-subtle: #232937;
+  --color-ink: #e8eaf1;
+  --color-muted: #8b93a7;
+  --color-hairline: #2e3546;
+
+  --color-accent: #4fa294;
+  --color-accent-ink: #0e1420;
+  --color-escalation: #e8964a;
+
+  --color-state-new: #4fa294;
+  --color-state-open: #6d9bcf;
+  --color-state-pending: #ae91c6;
+  --color-state-closed: #7b8296;
+  --color-state-removed: #6a7182;
+
+  --color-danger: #d9776f;
+
+  --color-surface-elevated: var(--color-surface);
+  --color-border: var(--color-hairline);
+  --color-warn: var(--color-escalation);
+
+  color-scheme: dark;
 }
