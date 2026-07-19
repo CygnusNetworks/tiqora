@@ -123,6 +123,19 @@ class Settings(BaseSettings):
     webhook_timeout_seconds: float = Field(default=10.0, validation_alias="TIQORA_WEBHOOK_TIMEOUT")
     webhook_max_attempts: int = Field(default=3, validation_alias="TIQORA_WEBHOOK_MAX_ATTEMPTS")
 
+    # Postmaster (Phase 4a). The `daemon.postmaster.enabled` tiqora_settings
+    # key (default OFF) is the actual takeover switch — see
+    # docs/parallel-operation.md. This interval is only the poll cadence once
+    # enabled, mirroring Znuny's Daemon::SchedulerCronTaskManager::Task###MailAccountFetch.
+    postmaster_interval_seconds: int = Field(
+        default=60, validation_alias="TIQORA_POSTMASTER_INTERVAL"
+    )
+    smtp_host: str = Field(default="localhost", validation_alias="TIQORA_SMTP_HOST")
+    smtp_port: int = Field(default=25, validation_alias="TIQORA_SMTP_PORT")
+    smtp_use_tls: bool = Field(default=False, validation_alias="TIQORA_SMTP_USE_TLS")
+    smtp_user: str = Field(default="", validation_alias="TIQORA_SMTP_USER")
+    smtp_password: str = Field(default="", validation_alias="TIQORA_SMTP_PASSWORD")
+
     @property
     def cors_origin_list(self) -> list[str]:
         return [o.strip() for o in self.cors_origins.split(",") if o.strip()]

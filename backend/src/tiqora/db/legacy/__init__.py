@@ -37,6 +37,7 @@ from tiqora.db.legacy.dynamic_field import (  # noqa: F401
     DynamicFieldObjIdName,
     DynamicFieldValue,
 )
+from tiqora.db.legacy.mail_account import MailAccount  # noqa: F401
 from tiqora.db.legacy.misc import (  # noqa: F401
     FormDraft,
     LinkObject,
@@ -163,4 +164,5 @@ __all__ = [
     "LinkRelation",
     "LinkType",
     "LinkObject",
+    "MailAccount",
 ]
