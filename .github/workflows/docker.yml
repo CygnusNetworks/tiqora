@@ -18,16 +18,29 @@ jobs:
   build-and-push:
     name: Build multi-arch and push
     runs-on: ubuntu-latest
+    env:
+      # Docker Hub push is optional: it only happens when the secrets are configured.
+      HAS_DOCKERHUB: ${{ secrets.DOCKERHUB_USERNAME != '' && secrets.DOCKERHUB_TOKEN != '' }}
     steps:
       - uses: actions/checkout@v4
+
+      - name: Determine target images
+        id: images
+        run: |
+          {
+            echo 'list<<EOF'
+            echo "${GHCR_IMAGE}"
+            if [ "${HAS_DOCKERHUB}" = "true" ]; then
+              echo "${DOCKERHUB_IMAGE}"
+            fi
+            echo 'EOF'
+          } >> "$GITHUB_OUTPUT"
 
       - name: Docker metadata
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: |
-            ${{ env.GHCR_IMAGE }}
-            ${{ env.DOCKERHUB_IMAGE }}
+          images: ${{ steps.images.outputs.list }}
           tags: |
             type=raw,value=latest,enable={{is_default_branch}}
             type=semver,pattern={{version}}
@@ -48,6 +61,7 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Login to Docker Hub
+        if: env.HAS_DOCKERHUB == 'true'
         uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
