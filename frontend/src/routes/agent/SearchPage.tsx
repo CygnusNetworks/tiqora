@@ -43,7 +43,7 @@ export function SearchPage() {
 
   return (
     <div className="mx-auto w-full max-w-4xl space-y-4 px-4 py-6" data-testid="search-page">
-      <h1 className="text-xl font-semibold">{t("search.title")}</h1>
+      <h1 className="font-display text-xl font-semibold text-ink">{t("search.title")}</h1>
       <form
         onSubmit={(e) => {
           e.preventDefault();
@@ -58,11 +58,11 @@ export function SearchPage() {
           defaultValue={q}
           data-testid="search-input"
           placeholder={t("search.placeholder")}
-          className="flex-1 rounded-md border border-border bg-surface-elevated px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+          className="flex-1 rounded-md border border-hairline bg-surface px-3 py-2 text-sm text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent focus:border-accent"
         />
         <button
           type="submit"
-          className="rounded-md bg-accent px-4 py-2 text-sm font-medium text-white"
+          className="rounded-md bg-accent px-4 py-2 text-sm font-medium text-accent-ink transition-colors duration-100 hover:opacity-90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent"
           data-testid="search-submit"
         >
           {t("search.submit")}
@@ -93,7 +93,7 @@ export function SearchPage() {
                 <Link
                   to="/agent/tickets/$ticketId"
                   params={{ ticketId: String(hit.id) }}
-                  className="block rounded-lg border border-border bg-surface-elevated p-3 transition hover:border-accent"
+                  className="block rounded-lg border border-hairline bg-surface p-3 transition-colors duration-100 hover:border-accent/60 hover:bg-surface-subtle"
                   data-testid={`search-hit-${hit.id}`}
                 >
                   <div className="flex flex-wrap items-center gap-2">
@@ -112,7 +112,7 @@ export function SearchPage() {
                   />
                   {hit.excerpt && (
                     <p
-                      className="mt-1 text-xs text-muted line-clamp-2 [&_em]:bg-warn/30 [&_em]:not-italic [&_mark]:bg-warn/30"
+                      className="mt-1 text-xs text-muted line-clamp-2 [&_em]:bg-escalation/30 [&_em]:not-italic [&_mark]:bg-escalation/30"
                       dangerouslySetInnerHTML={{
                         __html: highlight(hit.excerpt, q),
                       }}

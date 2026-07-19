@@ -39,7 +39,9 @@ export function DashboardPage() {
   return (
     <div className="mx-auto w-full max-w-6xl space-y-8 px-4 py-6" data-testid="dashboard">
       <div>
-        <h1 className="text-2xl font-semibold">{t("dashboard.title")}</h1>
+        <h1 className="font-display text-2xl font-semibold text-ink">
+          {t("dashboard.title")}
+        </h1>
         <p className="mt-1 text-sm text-muted">
           {t("dashboard.welcome", {
             name: user?.first_name || user?.login || "",
@@ -48,27 +50,27 @@ export function DashboardPage() {
       </div>
 
       <section>
-        <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted">
+        <h2 className="mb-3 text-xs font-semibold uppercase tracking-wide text-muted">
           {t("dashboard.myTickets")}
         </h2>
         {lockedQ.isLoading ? (
           <Spinner />
         ) : (
-          <div className="overflow-hidden rounded-lg border border-border bg-surface-elevated">
+          <div className="overflow-hidden rounded-lg border border-hairline bg-surface">
             {(lockedQ.data?.items ?? []).length === 0 ? (
               <p className="px-4 py-6 text-sm text-muted">{t("dashboard.noMyTickets")}</p>
             ) : (
-              <ul className="divide-y divide-border">
+              <ul className="divide-y divide-hairline">
                 {(lockedQ.data?.items ?? []).map((ticket) => (
                   <li key={ticket.id}>
                     <Link
                       to="/agent/tickets/$ticketId"
                       params={{ ticketId: String(ticket.id) }}
-                      className="flex items-center justify-between gap-3 px-4 py-2.5 text-sm hover:bg-accent/5"
+                      className="flex items-center justify-between gap-3 px-4 py-2.5 text-sm transition-colors duration-100 hover:bg-surface-subtle"
                     >
                       <span className="font-mono text-xs text-accent">{ticket.tn}</span>
                       <span className="min-w-0 flex-1 truncate">{ticket.title}</span>
-                      <span className="shrink-0 text-xs text-muted">
+                      <span className="shrink-0 font-mono text-xs tabular-nums text-muted">
                         {formatDateTime(ticket.change_time, locale)}
                       </span>
                     </Link>
@@ -82,7 +84,7 @@ export function DashboardPage() {
 
       <section>
         <div className="mb-3 flex items-center justify-between">
-          <h2 className="text-sm font-semibold uppercase tracking-wide text-muted">
+          <h2 className="text-xs font-semibold uppercase tracking-wide text-muted">
             {t("dashboard.queueShortcuts")}
           </h2>
           <Link to="/agent/queues" className="text-xs text-accent hover:underline">
@@ -98,13 +100,13 @@ export function DashboardPage() {
                 key={q.id}
                 to="/agent/queues"
                 search={{ queue_id: q.id, state_type: "open" }}
-                className="rounded-lg border border-border bg-surface-elevated p-4 transition hover:border-accent"
+                className="rounded-lg border border-hairline bg-surface p-4 transition-colors duration-100 hover:border-accent/60"
                 data-testid={`queue-shortcut-${q.id}`}
               >
-                <p className="truncate text-sm font-medium text-ink" title={q.name}>
+                <p className="truncate text-xs uppercase tracking-wide text-muted" title={q.name}>
                   {q.name}
                 </p>
-                <p className="mt-2 text-2xl font-semibold tabular-nums text-accent">
+                <p className="mt-2 font-mono text-2xl font-semibold tabular-nums text-ink">
                   {q.counts?.open ?? 0}
                 </p>
                 <p className="text-xs text-muted">{t("dashboard.openCount")}</p>

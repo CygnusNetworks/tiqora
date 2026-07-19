@@ -21,7 +21,7 @@ export function ShortcutHelp({
       <ul className="space-y-2">
         {SHORTCUTS.map((s) => (
           <li key={s.keys} className="flex items-center justify-between gap-4">
-            <kbd className="rounded border border-border bg-surface px-2 py-0.5 font-mono text-xs">
+            <kbd className="rounded border border-hairline bg-surface-subtle px-2 py-0.5 font-mono text-xs">
               {s.keys}
             </kbd>
             <span className="text-muted">{t(s.actionKey)}</span>

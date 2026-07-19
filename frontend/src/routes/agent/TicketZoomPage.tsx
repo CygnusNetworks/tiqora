@@ -24,7 +24,7 @@ export function TicketZoomPage() {
   });
 
   if (!Number.isFinite(ticketId) || ticketId <= 0) {
-    return <p className="p-6 text-danger">{t("ticket.invalidId")}</p>;
+    return <p className="p-6 text-sm text-danger">{t("ticket.invalidId")}</p>;
   }
 
   if (ticketQ.isLoading) {
