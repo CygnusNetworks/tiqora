@@ -15,6 +15,16 @@
     "queues": "Queues",
     "kb": "Knowledge base"
   },
+  "sidebar": {
+    "workspace": "Workspace",
+    "inbox": "Inbox",
+    "myTickets": "My tickets",
+    "watched": "Watched",
+    "queues": "Queues",
+    "knowledge": "Knowledge",
+    "knowledgeBase": "Knowledge base",
+    "toggle": "Toggle navigation"
+  },
   "common": {
     "prev": "Previous",
     "next": "Next",
@@ -65,6 +75,7 @@
     "noTickets": "No tickets match this filter.",
     "pagination": "{{from}}–{{to}} of {{total}}",
     "escalated": "Escalated",
+    "slaCountdown": "SLA {{value}}",
     "escResponse": "Response SLA",
     "escUpdate": "Update SLA",
     "escSolution": "Solution SLA",
@@ -92,6 +103,7 @@
   "search": {
     "title": "Search",
     "placeholder": "Search tickets…",
+    "commandHint": "Search or command…",
     "submit": "Search",
     "hint": "Enter a ticket number, subject, or body text.",
     "results": "{{total}} results for “{{query}}”",

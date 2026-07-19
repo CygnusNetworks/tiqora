@@ -41,10 +41,15 @@ const SORT_COLUMNS: { key: SortKey; labelKey: string }[] = [
   { key: "state", labelKey: "ticket.state" },
   { key: "priority", labelKey: "ticket.priority" },
   { key: "owner", labelKey: "ticket.owner" },
-  { key: "customer", labelKey: "ticket.customer" },
   { key: "age", labelKey: "ticket.age" },
-  { key: "changed", labelKey: "ticket.changed" },
 ];
+
+/* Header cells and data cells share this exact column template so the first
+   data cell (Ticket#) always lines up under its header — the previous
+   <table> layout drifted because the status spine was an absolutely
+   positioned pseudo-element on <tr>, which some browsers exclude from
+   table column-width calculation. Grid rows don't have that failure mode. */
+const GRID_COLS = "minmax(120px,150px) minmax(0,1fr) 110px 110px minmax(0,140px) 90px";
 
 export function TicketTable({
   items,
@@ -60,7 +65,7 @@ export function TicketTable({
   const { t, i18n } = useTranslation();
   const navigate = useNavigate();
   const [focusIdx, setFocusIdx] = useState(0);
-  const tableRef = useRef<HTMLTableElement>(null);
+  const rootRef = useRef<HTMLDivElement>(null);
   const locale = i18n.language?.startsWith("de") ? "de" : "en";
 
   useEffect(() => {
@@ -68,7 +73,7 @@ export function TicketTable({
   }, [items]);
 
   useEffect(() => {
-    const el = tableRef.current;
+    const el = rootRef.current;
     if (!el) return;
 
     const onKey = (e: KeyboardEvent) => {
@@ -104,122 +109,155 @@ export function TicketTable({
   const pages = Math.max(1, Math.ceil(total / limit));
 
   return (
-    <div className="flex flex-col gap-2" data-testid="ticket-table">
-      <div className="overflow-x-auto rounded-lg border border-hairline bg-surface">
-        <table ref={tableRef} className="w-full min-w-[720px] border-collapse text-left text-sm">
-          <thead>
-            <tr className="border-b border-hairline bg-surface-subtle text-xs uppercase tracking-wide text-muted">
-              {SORT_COLUMNS.map((col) => (
-                <th key={col.key} className="py-1.5 pl-4 pr-2 font-medium">
-                  <button
-                    type="button"
-                    className="inline-flex items-center gap-1 hover:text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent"
-                    onClick={() => toggleSort(col.key)}
-                  >
-                    {t(col.labelKey)}
-                    {sort === col.key && (
-                      <span aria-hidden>{order === "asc" ? "↑" : "↓"}</span>
-                    )}
-                  </button>
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {isLoading && items.length === 0 && (
-              <tr>
-                <td colSpan={8} className="px-3 py-8 text-center text-muted">
-                  <Spinner className="mx-auto" />
-                </td>
-              </tr>
-            )}
-            {!isLoading && items.length === 0 && (
-              <tr>
-                <td colSpan={8} className="px-3 py-8 text-center text-muted">
-                  {t("ticket.noTickets")}
-                </td>
-              </tr>
-            )}
-            {items.map((ticket, idx) => {
-              const escLevel = combinedEscalationLevel([
-                ticket.escalation_time,
-                ticket.escalation_response_time,
-                ticket.escalation_update_time,
-                ticket.escalation_solution_time,
-              ]);
-              const esc =
-                isEscalated(ticket.escalation_time) ||
-                isEscalated(ticket.escalation_response_time) ||
-                isEscalated(ticket.escalation_update_time) ||
-                isEscalated(ticket.escalation_solution_time);
-              const spineColor =
-                escLevel === "none" ? stateColorVar(ticket.state) : undefined;
-              return (
-                <tr
-                  key={ticket.id}
-                  data-testid={`ticket-row-${ticket.id}`}
-                  className={cn(
-                    "h-10 cursor-pointer border-b border-hairline transition-colors duration-100 hover:bg-surface-subtle",
-                    spineClassName(escLevel),
-                    idx === focusIdx &&
-                      "bg-surface-subtle ring-1 ring-inset ring-accent/40",
-                  )}
-                  style={{ "--spine-color": spineColor } as CSSProperties}
-                  onClick={() =>
-                    void navigate({
-                      to: "/agent/tickets/$ticketId",
-                      params: { ticketId: String(ticket.id) },
-                    })
-                  }
-                  onMouseEnter={() => setFocusIdx(idx)}
-                >
-                  <td className="py-1 pl-4 pr-2 font-mono text-xs text-accent">
-                    {ticket.tn}
-                    {esc && (
-                      <span
-                        className="ml-1.5 rounded bg-escalation/15 px-1 font-mono text-[10px] tabular-nums text-escalation"
-                        title={t("ticket.escalated")}
-                      >
-                        {formatCountdown(
-                          ticket.escalation_time ??
-                            ticket.escalation_response_time ??
-                            ticket.escalation_update_time ??
-                            ticket.escalation_solution_time,
-                        )}
-                      </span>
-                    )}
-                  </td>
-                  <td className="max-w-[16rem] truncate py-1 pr-2" title={ticket.title ?? ""}>
-                    {ticket.title || "—"}
-                  </td>
-                  <td className="py-1 pr-2 text-xs">
-                    <span className="inline-flex items-center gap-1.5">
-                      <span
-                        aria-hidden
-                        className="h-1.5 w-1.5 rounded-full"
-                        style={{ background: stateColorVar(ticket.state) }}
-                      />
-                      {ticket.state ?? "—"}
-                    </span>
-                  </td>
-                  <td className="py-1 pr-2 text-xs">{ticket.priority ?? "—"}</td>
-                  <td className="py-1 pr-2 text-xs">
-                    {ticket.owner_name || ticket.owner_login || "—"}
-                  </td>
-                  <td className="py-1 pr-2 text-xs">
-                    {ticket.customer_user_id || ticket.customer_id || "—"}
-                  </td>
-                  <td className="py-1 pr-2 font-mono text-xs tabular-nums text-muted">
-                    {formatAgeSeconds(ticket.age_seconds, locale)}
-                  </td>
-                  <td className="py-1 pr-2 font-mono text-xs tabular-nums text-muted">
-                    {formatDateTime(ticket.change_time, locale)}
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
+    <div className="flex flex-col gap-2" data-testid="ticket-table" ref={rootRef}>
+      <div
+        className="overflow-hidden rounded-lg border border-hairline bg-surface"
+        role="table"
+      >
+        {/* Header row — desktop/tablet only; mobile uses cards below. */}
+        <div
+          role="row"
+          className="hidden items-center gap-3 border-b border-hairline bg-surface-subtle px-4 py-2.5 text-[10.5px] font-semibold uppercase tracking-wide text-muted md:grid"
+          style={{ gridTemplateColumns: GRID_COLS }}
+        >
+          {SORT_COLUMNS.map((col) => (
+            <button
+              key={col.key}
+              type="button"
+              role="columnheader"
+              className="inline-flex items-center gap-1 text-left hover:text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent"
+              onClick={() => toggleSort(col.key)}
+            >
+              {t(col.labelKey)}
+              {sort === col.key && <span aria-hidden>{order === "asc" ? "↑" : "↓"}</span>}
+            </button>
+          ))}
+        </div>
+
+        {isLoading && items.length === 0 && (
+          <div className="px-3 py-8 text-center text-muted">
+            <Spinner className="mx-auto" />
+          </div>
+        )}
+        {!isLoading && items.length === 0 && (
+          <div className="px-3 py-8 text-center text-muted" data-testid="ticket-table-empty">
+            {t("ticket.noTickets")}
+          </div>
+        )}
+
+        {items.map((ticket, idx) => {
+          const escLevel = combinedEscalationLevel([
+            ticket.escalation_time,
+            ticket.escalation_response_time,
+            ticket.escalation_update_time,
+            ticket.escalation_solution_time,
+          ]);
+          const esc =
+            isEscalated(ticket.escalation_time) ||
+            isEscalated(ticket.escalation_response_time) ||
+            isEscalated(ticket.escalation_update_time) ||
+            isEscalated(ticket.escalation_solution_time);
+          const spineColor = escLevel === "none" ? stateColorVar(ticket.state) : undefined;
+          const escalationBadge = esc && (
+            <span
+              className="ml-1.5 whitespace-nowrap rounded-md bg-amber px-2 py-0.5 font-mono text-[10px] font-semibold tabular-nums text-[#0E1015]"
+              title={t("ticket.escalated")}
+              data-testid={`ticket-escalation-badge-${ticket.id}`}
+            >
+              {t("ticket.slaCountdown", {
+                value: formatCountdown(
+                  ticket.escalation_time ??
+                    ticket.escalation_response_time ??
+                    ticket.escalation_update_time ??
+                    ticket.escalation_solution_time,
+                ),
+              })}
+            </span>
+          );
+
+          return (
+            <div
+              key={ticket.id}
+              role="row"
+              data-testid={`ticket-row-${ticket.id}`}
+              className={cn(
+                "relative flex cursor-pointer flex-col gap-1.5 border-b border-hairline px-4 py-2.5 transition-colors duration-100 last:border-b-0 hover:bg-surface-subtle md:grid md:items-center md:gap-3 md:py-[7px]",
+                spineClassName(escLevel),
+                idx === focusIdx && "bg-surface-subtle ring-1 ring-inset ring-accent/40",
+              )}
+              style={
+                {
+                  "--spine-color": spineColor,
+                  gridTemplateColumns: GRID_COLS,
+                } as CSSProperties
+              }
+              onClick={() =>
+                void navigate({
+                  to: "/agent/tickets/$ticketId",
+                  params: { ticketId: String(ticket.id) },
+                })
+              }
+              onMouseEnter={() => setFocusIdx(idx)}
+            >
+              {/* Mobile card header: TN + state chip + age */}
+              <div className="flex items-center justify-between gap-2 md:hidden">
+                <span className="font-mono text-xs tabular-nums text-accent">{ticket.tn}</span>
+                <span className="flex items-center gap-1 font-mono text-[11px] tabular-nums text-muted">
+                  <span
+                    aria-hidden
+                    className="h-1.5 w-1.5 rounded-full"
+                    style={{ background: stateColorVar(ticket.state) }}
+                  />
+                  {formatAgeSeconds(ticket.age_seconds, locale)}
+                </span>
+              </div>
+
+              <span className="hidden truncate font-mono text-xs text-accent md:inline">
+                {ticket.tn}
+                {escalationBadge}
+              </span>
+              <span className="min-w-0">
+                <span className="block truncate text-[12.8px] font-medium text-ink" title={ticket.title ?? ""}>
+                  {ticket.title || "—"}
+                </span>
+                <span className="block truncate text-[11.5px] text-muted">
+                  {ticket.customer_user_id || ticket.customer_id || "—"}
+                </span>
+              </span>
+              <span className="hidden items-center gap-1.5 text-xs text-muted md:inline-flex">
+                <span
+                  aria-hidden
+                  className="h-1.5 w-1.5 shrink-0 rounded-full"
+                  style={{ background: stateColorVar(ticket.state) }}
+                />
+                <span className="truncate">{ticket.state ?? "—"}</span>
+              </span>
+              <span className="hidden truncate font-mono text-[11.5px] text-muted md:inline">
+                {ticket.priority ?? "—"}
+              </span>
+              <span className="hidden truncate text-xs text-muted md:inline">
+                {ticket.owner_name || ticket.owner_login || "—"}
+              </span>
+              <span
+                className="hidden truncate text-right font-mono text-[11.5px] tabular-nums text-muted md:inline"
+                title={formatDateTime(ticket.change_time, locale)}
+              >
+                {formatAgeSeconds(ticket.age_seconds, locale)}
+              </span>
+
+              {/* Mobile card footer: title/customer already shown above; add state + owner chip */}
+              <div className="flex items-center justify-between gap-2 text-[11.5px] text-muted md:hidden">
+                <span className="truncate">
+                  {ticket.state ?? "—"} · {ticket.priority ?? "—"}
+                </span>
+                <span className="shrink-0 truncate">
+                  {ticket.owner_name || ticket.owner_login || "—"}
+                </span>
+              </div>
+              {esc && <span className="md:hidden">{escalationBadge}</span>}
+            </div>
+          );
+        })}
       </div>
       <div className="flex items-center justify-between text-xs text-muted">
         <span>

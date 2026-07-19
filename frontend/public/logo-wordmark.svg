@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 176 40" width="176" height="40" role="img" aria-label="Tiqora">
+  <g transform="translate(0,6)">
+    <rect x="0" y="0" width="28" height="6" rx="3" fill="#5B8CFF"/>
+    <rect x="0" y="9" width="20" height="6" rx="3" fill="#4A5470"/>
+    <rect x="0" y="18" width="14" height="6" rx="3" fill="#333B52"/>
+  </g>
+  <text x="40" y="28" font-family="Inter, system-ui, sans-serif" font-size="24" font-weight="800" letter-spacing="-0.5" fill="#E7EAF2">tiqora</text>
+</svg>

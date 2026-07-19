@@ -1,10 +1,10 @@
-@import "@fontsource/ibm-plex-sans/400.css";
-@import "@fontsource/ibm-plex-sans/500.css";
-@import "@fontsource/ibm-plex-sans/600.css";
-@import "@fontsource/ibm-plex-mono/400.css";
-@import "@fontsource/ibm-plex-mono/500.css";
-@import "@fontsource/archivo/600.css";
-@import "@fontsource/archivo/700.css";
+@import "@fontsource/inter/400.css";
+@import "@fontsource/inter/500.css";
+@import "@fontsource/inter/600.css";
+@import "@fontsource/inter/700.css";
+@import "@fontsource/inter/800.css";
+@import "@fontsource/jetbrains-mono/400.css";
+@import "@fontsource/jetbrains-mono/500.css";
 
 @tailwind base;
 @tailwind components;
@@ -20,7 +20,7 @@ body {
   background: var(--color-bg);
   color: var(--color-ink);
   font-family: var(--font-sans);
-  font-size: 14px;
+  font-size: 12.5px;
   -webkit-font-smoothing: antialiased;
 }
 
@@ -28,8 +28,8 @@ h1,
 h2,
 h3 {
   font-family: var(--font-display);
-  font-weight: 600;
-  letter-spacing: 0.005em;
+  font-weight: 700;
+  letter-spacing: -0.01em;
 }
 
 .tabular-nums,
@@ -38,28 +38,19 @@ h3 {
   font-variant-numeric: tabular-nums lining-nums;
 }
 
-/* Status spine — the one signature element: 3px coloured left edge. */
+/* Status spine — the one signature element: a coloured left edge.
+   Implemented as an inset box-shadow (not an absolutely-positioned
+   pseudo-element) so it never participates in table/grid column sizing —
+   it paints strictly *inside* the row's own box, so the first data cell
+   always lines up exactly under its header. */
 .status-spine {
-  position: relative;
+  box-shadow: inset 3px 0 0 0 var(--spine-color, var(--color-hairline));
 }
-.status-spine::before {
-  content: "";
-  position: absolute;
-  left: 0;
-  top: 0;
-  bottom: 0;
-  width: 3px;
-  background: var(--spine-color, var(--color-hairline));
+.status-spine--escalation-approaching {
+  box-shadow: inset 3px 0 0 0 var(--color-escalation);
 }
-.status-spine--escalation-approaching::before {
-  background: linear-gradient(
-    to bottom,
-    var(--color-escalation) 50%,
-    var(--spine-color, var(--color-hairline)) 50%
-  );
-}
-.status-spine--escalation-breached::before {
-  background: var(--color-escalation);
+.status-spine--escalation-breached {
+  box-shadow: inset 3px 0 0 0 var(--color-escalation);
 }
 
 /* Calm markdown typography for the portal knowledge-base reader. */
