@@ -1,12 +1,10 @@
-import { useMemo } from "react";
 import { useParams, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
-import { marked } from "marked";
-import DOMPurify from "dompurify";
 import { portalApi } from "@/lib/portalApi";
 import { Spinner } from "@/components/ui/Spinner";
 import { Badge } from "@/components/ui/Badge";
+import { MarkdownView } from "@/components/kb/MarkdownView";
 
 export function KbArticlePage() {
   const { t } = useTranslation();
@@ -16,12 +14,6 @@ export function KbArticlePage() {
     queryKey: ["portal", "kb", "article", slug],
     queryFn: () => portalApi.portalGetKbArticle(slug),
   });
-
-  const html = useMemo(() => {
-    if (!articleQ.data) return "";
-    const raw = marked.parse(articleQ.data.content_md, { async: false }) as string;
-    return DOMPurify.sanitize(raw);
-  }, [articleQ.data]);
 
   if (articleQ.isLoading) {
     return (
@@ -61,13 +53,7 @@ export function KbArticlePage() {
           </div>
         )}
       </header>
-      <div
-        className="prose-portal max-w-none text-sm text-ink"
-        data-testid="portal-kb-article-body"
-        // content_md is customer-facing, published KB markdown, rendered via
-        // marked and sanitised with DOMPurify before insertion.
-        dangerouslySetInnerHTML={{ __html: html }}
-      />
+      <MarkdownView markdown={article.content_md} data-testid="portal-kb-article-body" />
     </article>
   );
 }
