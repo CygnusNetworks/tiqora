@@ -57,8 +57,10 @@ def test_principal_to_login_strips_realm_and_service_component() -> None:
 
 @pytest.mark.asyncio
 async def test_accept_returns_principal_with_mocked_gssapi(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(spnego_module, "_import_gssapi", lambda: _fake_gssapi_module("alice@EXAMPLE.COM"))
-    settings = Settings(spnego_enabled=True)  # type: ignore[arg-type]
+    monkeypatch.setattr(
+        spnego_module, "_import_gssapi", lambda: _fake_gssapi_module("alice@EXAMPLE.COM")
+    )
+    settings = Settings(spnego_enabled=True)
     service = SpnegoService(settings)
     principal = await service.accept(b"client-token")
     assert principal == "alice@EXAMPLE.COM"
@@ -71,7 +73,7 @@ async def test_accept_raises_when_gssapi_not_installed(monkeypatch: pytest.Monke
         raise SpnegoUnavailable("gssapi is not installed; install the 'kerberos' extra")
 
     monkeypatch.setattr(spnego_module, "_import_gssapi", _raise)
-    settings = Settings(spnego_enabled=True)  # type: ignore[arg-type]
+    settings = Settings(spnego_enabled=True)
     service = SpnegoService(settings)
     with pytest.raises(SpnegoUnavailable):
         await service.accept(b"client-token")
@@ -79,7 +81,7 @@ async def test_accept_raises_when_gssapi_not_installed(monkeypatch: pytest.Monke
 
 @pytest.mark.asyncio
 async def test_spnego_endpoint_501_when_gssapi_missing(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Full endpoint round-trip: disabled -> 404, enabled+no negotiate -> 401, enabled+missing gssapi -> 501."""
+    """No Negotiate header -> 401; Negotiate header + missing gssapi -> 501."""
     from httpx import ASGITransport, AsyncClient
 
     from tiqora.api.app import create_app
@@ -89,7 +91,7 @@ async def test_spnego_endpoint_501_when_gssapi_missing(monkeypatch: pytest.Monke
 
     monkeypatch.setattr(spnego_module, "_import_gssapi", _raise)
 
-    settings = Settings(spnego_enabled=True)  # type: ignore[arg-type]
+    settings = Settings(spnego_enabled=True)
     app = create_app(settings)
     token = base64.b64encode(b"client-token").decode("ascii")
 
@@ -111,7 +113,7 @@ async def test_spnego_endpoint_404_when_disabled() -> None:
 
     from tiqora.api.app import create_app
 
-    settings = Settings(spnego_enabled=False)  # type: ignore[arg-type]
+    settings = Settings(spnego_enabled=False)
     app = create_app(settings)
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as client:

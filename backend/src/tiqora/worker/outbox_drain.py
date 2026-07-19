@@ -14,6 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from tiqora.config import Settings, get_settings
 from tiqora.db.engine import get_session_factory
 from tiqora.domain.search import SearchIndexService
+from tiqora.worker.webhooks import dispatch_webhooks
 
 logger = structlog.get_logger(__name__)
 
@@ -37,7 +38,7 @@ async def drain_outbox(
         rows = (
             await session.execute(
                 text(
-                    "SELECT id, ticket_id FROM tiqora_event_outbox"
+                    "SELECT id, event_type, ticket_id, payload FROM tiqora_event_outbox"
                     " WHERE processed = 0 ORDER BY id ASC LIMIT :n"
                 ),
                 {"n": _BATCH_SIZE},
@@ -48,7 +49,8 @@ async def drain_outbox(
         return {"processed": 0, "ticket_ids": 0}
 
     row_ids = [int(r[0]) for r in rows]
-    ticket_ids = sorted({int(r[1]) for r in rows})
+    ticket_ids = sorted({int(r[2]) for r in rows})
+    webhook_rows = [(str(r[1]), int(r[2]), r[3]) for r in rows]
 
     # Re-index in Meilisearch
     async with factory() as session:
@@ -57,6 +59,12 @@ async def drain_outbox(
             await svc.index_tickets(ticket_ids)
         finally:
             await svc.close()
+
+    # Fan out to webhook subscribers — best-effort, never blocks the drain.
+    try:
+        await dispatch_webhooks(webhook_rows, settings=cfg, session_factory=factory)
+    except Exception:  # noqa: BLE001 — webhook delivery must not fail the drain
+        logger.exception("webhook_dispatch_error")
 
     # Mark as processed
     in_clause = ",".join(str(i) for i in row_ids)

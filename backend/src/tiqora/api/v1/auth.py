@@ -197,7 +197,9 @@ async def oidc_callback(
     redis_client = await get_redis(request)
     state_key = f"{_OIDC_STATE_PREFIX}{state}"
     if not await redis_client.get(state_key):
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid or expired state")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid or expired state"
+        )
     await redis_client.delete(state_key)
 
     oidc = OIDCService(settings)

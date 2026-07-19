@@ -90,6 +90,11 @@ const NAV_GROUPS: NavGroup[] = [
         labelKey: "admin.nav.dynamicFields",
         testId: "admin-nav-dynamic-fields",
       },
+      {
+        to: "/admin/webhooks",
+        labelKey: "admin.nav.webhooks",
+        testId: "admin-nav-webhooks",
+      },
     ],
   },
 ];

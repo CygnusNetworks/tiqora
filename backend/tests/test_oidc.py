@@ -30,7 +30,9 @@ def _settings(**overrides: object) -> Settings:
     return Settings(**base)  # type: ignore[arg-type]
 
 
-def _make_transport(*, claims: dict[str, object] | None, userinfo_status: int = 200) -> httpx.MockTransport:
+def _make_transport(
+    *, claims: dict[str, object] | None, userinfo_status: int = 200
+) -> httpx.MockTransport:
     def handler(request: httpx.Request) -> httpx.Response:
         path = request.url.path
         if path.endswith("/.well-known/openid-configuration"):
@@ -74,7 +76,8 @@ async def test_authorize_url_contains_client_and_state() -> None:
 async def test_fetch_claims_maps_preferred_username() -> None:
     settings = _settings()
     service = OIDCService(
-        settings, transport=_make_transport(claims={"preferred_username": "jdoe", "email": "j@x.com"})
+        settings,
+        transport=_make_transport(claims={"preferred_username": "jdoe", "email": "j@x.com"}),
     )
     claims = await service.fetch_claims("auth-code-123")
     assert claims["preferred_username"] == "jdoe"
@@ -114,9 +117,9 @@ async def test_discovery_is_cached() -> None:
     service = OIDCService(_settings(), transport=httpx.MockTransport(handler))
     await service.discover()
     await service.discover()
-    assert calls == [
-        "/.well-known/openid-configuration"
-    ], f"discovery should be cached, got {calls}"
+    assert calls == ["/.well-known/openid-configuration"], (
+        f"discovery should be cached, got {calls}"
+    )
 
 
 def test_claims_serialize_roundtrip() -> None:

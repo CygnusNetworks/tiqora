@@ -221,7 +221,8 @@
       "postmasterFilters": "Postmaster filters",
       "acl": "ACLs",
       "genericAgentJobs": "Generic agent jobs",
-      "dynamicFields": "Dynamic fields"
+      "dynamicFields": "Dynamic fields",
+      "webhooks": "Webhooks"
     },
     "table": {
       "id": "ID",
@@ -378,6 +379,17 @@
       "settings": "Settings",
       "key": "Key",
       "value": "Value"
+    },
+    "webhooks": {
+      "title_plural": "Webhooks",
+      "new": "New webhook",
+      "name": "Name",
+      "url": "Target URL",
+      "secret": "Signing secret",
+      "secretHelp": "Leave blank to keep the current secret when editing.",
+      "events": "Events",
+      "eventsPlaceholder": "TicketCreate, ArticleCreate",
+      "eventsHelp": "Comma-separated event types (matches tiqora_event_outbox.event_type). Leave empty to subscribe to all events."
     }
   },
   "kb": {

@@ -568,3 +568,36 @@ class GenericAgentJobOut(BaseModel):
 
     job_name: str
     settings: dict[str, str | None]
+
+
+# ---------------------------------------------------------------------------
+# Webhooks (Phase 3c) — tiqora_webhook, event-outbox-driven fan-out
+# ---------------------------------------------------------------------------
+
+
+class WebhookOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    name: str
+    url: str
+    events: list[str]
+    valid: bool
+    created: datetime
+    changed: datetime
+
+
+class WebhookCreate(BaseModel):
+    name: str
+    url: str
+    secret: str
+    events: list[str] = Field(default_factory=list)
+    valid: bool = True
+
+
+class WebhookUpdate(BaseModel):
+    name: str | None = None
+    url: str | None = None
+    secret: str | None = None
+    events: list[str] | None = None
+    valid: bool | None = None

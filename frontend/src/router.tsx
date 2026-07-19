@@ -47,6 +47,7 @@ import { SalutationsPage } from "@/routes/admin/SalutationsPage";
 import { SignaturesPage } from "@/routes/admin/SignaturesPage";
 import { AutoResponsesPage } from "@/routes/admin/AutoResponsesPage";
 import { DynamicFieldsPage } from "@/routes/admin/DynamicFieldsPage";
+import { WebhooksPage } from "@/routes/admin/WebhooksPage";
 import { PostmasterFiltersPage } from "@/routes/admin/PostmasterFiltersPage";
 import { PostmasterFilterDetailPage } from "@/routes/admin/PostmasterFilterDetailPage";
 import { AclPage } from "@/routes/admin/AclPage";
@@ -356,6 +357,12 @@ const adminDynamicFieldsRoute = createRoute({
   component: DynamicFieldsPage,
 });
 
+const adminWebhooksRoute = createRoute({
+  getParentRoute: () => adminLayoutRoute,
+  path: "/webhooks",
+  component: WebhooksPage,
+});
+
 const adminPostmasterFiltersRoute = createRoute({
   getParentRoute: () => adminLayoutRoute,
   path: "/postmaster-filters",
@@ -436,6 +443,7 @@ const routeTree = rootRoute.addChildren([
     adminSignaturesRoute,
     adminAutoResponsesRoute,
     adminDynamicFieldsRoute,
+    adminWebhooksRoute,
     adminPostmasterFiltersRoute,
     adminPostmasterFilterDetailRoute,
     adminAclRoute,
