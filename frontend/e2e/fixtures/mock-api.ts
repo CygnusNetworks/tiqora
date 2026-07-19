@@ -345,6 +345,29 @@ export async function mockApi(page: Page) {
       return;
     }
 
+    // Realtime SSE stream — mocked as a no-op: fulfil with a single event
+    // (or nothing) and let the connection end. useSSE.ts is written
+    // defensively (EventSource's own auto-reconnect handles a closed/failed
+    // connection without throwing), so this keeps e2e green without needing
+    // a real long-lived stream.
+    if (path.endsWith("/api/v1/events/stream") && method === "GET") {
+      await route.fulfill({
+        status: 200,
+        contentType: "text/event-stream",
+        body: ": mock-stream\n\n",
+      });
+      return;
+    }
+
+    if (path.match(/\/api\/v1\/tickets\/\d+\/presence$/) && method === "POST") {
+      await route.fulfill({ status: 204, body: "" });
+      return;
+    }
+    if (path.match(/\/api\/v1\/tickets\/\d+\/presence$/) && method === "GET") {
+      await json(route, 200, []);
+      return;
+    }
+
     if (path.match(/\/api\/v1\/tickets\/\d+\/articles\/\d+\/body$/)) {
       await json(route, 200, articleBody);
       return;
@@ -359,6 +382,10 @@ export async function mockApi(page: Page) {
         contentType: "image/png",
         body: Buffer.from([0x89, 0x50, 0x4e, 0x47]),
       });
+      return;
+    }
+    if (path.match(/\/api\/v1\/tickets\/\d+\/articles$/) && method === "POST") {
+      await json(route, 201, { article_id: 999 });
       return;
     }
     if (path.match(/\/api\/v1\/tickets\/\d+\/articles$/)) {

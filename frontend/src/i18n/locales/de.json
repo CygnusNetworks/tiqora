@@ -107,7 +107,16 @@
     "historyName": "Eintrag",
     "historyBy": "Von",
     "invalidId": "Ungültige Ticket-ID",
-    "loadError": "Ticket konnte nicht geladen werden."
+    "loadError": "Ticket konnte nicht geladen werden.",
+    "presenceViewing": "schaut zu",
+    "presenceComposing": "schreibt",
+    "composerReply": "Antworten",
+    "composerNote": "Interne Notiz",
+    "composerSubjectPlaceholder": "Betreff",
+    "composerBodyPlaceholder": "Nachricht verfassen…",
+    "composerSend": "Senden",
+    "composerCancel": "Abbrechen",
+    "composeWarning": "Ein anderer Agent hat geantwortet, während du geschrieben hast."
   },
   "search": {
     "title": "Suche",

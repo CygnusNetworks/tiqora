@@ -107,7 +107,16 @@
     "historyName": "Entry",
     "historyBy": "By",
     "invalidId": "Invalid ticket ID",
-    "loadError": "Could not load this ticket."
+    "loadError": "Could not load this ticket.",
+    "presenceViewing": "viewing",
+    "presenceComposing": "composing",
+    "composerReply": "Reply",
+    "composerNote": "Internal note",
+    "composerSubjectPlaceholder": "Subject",
+    "composerBodyPlaceholder": "Write a message…",
+    "composerSend": "Send",
+    "composerCancel": "Cancel",
+    "composeWarning": "Another agent replied since you started composing."
   },
   "search": {
     "title": "Search",

@@ -23,6 +23,10 @@ export {
   type SearchHit,
   type SearchResponse,
   type DynamicFieldValueOut,
+  type PresenceIn,
+  type PresenceEntry,
+  type ArticleCreateRequest,
+  type ArticleCreateResponse,
   // Portal
   type CustomerMe,
   type CustomerLoginResponse,

@@ -443,6 +443,55 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/events/stream": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Stream Events
+         * @description Server-sent event stream of ``tiqora:events`` pub/sub messages.
+         *
+         *     Requires an authenticated agent (same session/API-key auth as the rest
+         *     of ``/api/v1``). Each message forwarded is the raw JSON payload
+         *     published to Redis — see :mod:`tiqora.events.pubsub` for the two
+         *     message shapes (``ticket_changed`` / ``presence_changed``).
+         */
+        get: operations["stream_events_api_v1_events_stream_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tickets/{ticket_id}/presence": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Presence
+         * @description Current viewers/composers on ``ticket_id`` (expired entries drop out via TTL).
+         */
+        get: operations["get_presence_api_v1_tickets__ticket_id__presence_get"];
+        put?: never;
+        /**
+         * Set Presence
+         * @description Record that ``user`` is viewing/composing on ``ticket_id`` (30s TTL).
+         */
+        post: operations["set_presence_api_v1_tickets__ticket_id__presence_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/customers/{login}": {
         parameters: {
             query?: never;
@@ -2911,6 +2960,23 @@ export interface components {
             /** F Not */
             f_not: number | null;
         };
+        /** PresenceEntry */
+        PresenceEntry: {
+            /** User Id */
+            user_id: number;
+            /** Name */
+            name: string;
+            /** Mode */
+            mode: string;
+        };
+        /** PresenceIn */
+        PresenceIn: {
+            /**
+             * Mode
+             * @enum {string}
+             */
+            mode: "viewing" | "composing";
+        };
         /** PriorityCreate */
         PriorityCreate: {
             /** Name */
@@ -4739,6 +4805,111 @@ export interface operations {
             };
         };
         requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    stream_events_api_v1_events_stream_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_presence_api_v1_tickets__ticket_id__presence_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                ticket_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PresenceEntry"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_presence_api_v1_tickets__ticket_id__presence_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                ticket_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PresenceIn"];
+            };
+        };
         responses: {
             /** @description Successful Response */
             204: {

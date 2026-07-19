@@ -9,6 +9,7 @@ import { flattenQueues } from "@/components/agent/QueueTree";
 import { Button } from "@/components/ui/Button";
 import { ShortcutHelp } from "@/components/agent/ShortcutHelp";
 import { cn } from "@/lib/cn";
+import { useSSE } from "@/lib/useSSE";
 
 function NavItem({
   to,
@@ -225,6 +226,10 @@ export function AgentShell({ children }: { children: ReactNode }) {
   const location = useLocation();
   const [helpOpen, setHelpOpen] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
+
+  // Realtime ticket-change + presence notifications for the whole
+  // authenticated agent app — mounted once here rather than per-page.
+  useSSE();
 
   useEffect(() => {
     setDrawerOpen(false);
