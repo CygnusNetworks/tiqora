@@ -12,6 +12,10 @@ export type Schemas = components["schemas"];
 export type UserMe = Schemas["UserMe"];
 export type LoginRequest = Schemas["LoginRequest"];
 export type LoginResponse = Schemas["LoginResponse"];
+export type AuthMethodsOut = Schemas["AuthMethodsOut"];
+export type TOTPCodeIn = Schemas["TOTPCodeIn"];
+export type TOTPEnrollOut = Schemas["TOTPEnrollOut"];
+export type TOTPStatusOut = Schemas["TOTPStatusOut"];
 export type QueueNode = Schemas["QueueNode"];
 export type QueueCounts = Schemas["QueueCounts"];
 export type TicketListItem = Schemas["TicketListItem"];
@@ -244,6 +248,44 @@ export class ApiClient {
 
   logout(signal?: AbortSignal) {
     return this.request<void>("POST", "/api/v1/auth/logout", { signal });
+  }
+
+  authMethods(signal?: AbortSignal) {
+    return this.request<AuthMethodsOut>("GET", "/api/v1/auth/methods", { signal });
+  }
+
+  totpVerify(body: TOTPCodeIn, signal?: AbortSignal) {
+    return this.request<LoginResponse>("POST", "/api/v1/auth/totp/verify", {
+      body,
+      signal,
+    });
+  }
+
+  totpEnroll(signal?: AbortSignal) {
+    return this.request<TOTPEnrollOut>("POST", "/api/v1/auth/totp/enroll", { signal });
+  }
+
+  totpConfirm(body: TOTPCodeIn, signal?: AbortSignal) {
+    return this.request<TOTPStatusOut>("POST", "/api/v1/auth/totp/confirm", {
+      body,
+      signal,
+    });
+  }
+
+  totpDisable(body: TOTPCodeIn, signal?: AbortSignal) {
+    return this.request<TOTPStatusOut>("DELETE", "/api/v1/auth/totp", {
+      body,
+      signal,
+    });
+  }
+
+  totpStatus(signal?: AbortSignal) {
+    return this.request<TOTPStatusOut>("GET", "/api/v1/auth/totp/status", { signal });
+  }
+
+  /** Browser-navigates to the OIDC provider; not a fetch (redirect flow). */
+  oidcLoginUrl(): string {
+    return "/api/v1/auth/oidc/login";
   }
 
   // ── Queues ────────────────────────────────────────────────────────────

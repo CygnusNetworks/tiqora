@@ -66,6 +66,42 @@ class SessionStore:
     async def delete(self, token: str) -> None:
         await self._client.delete(self._key(token))
 
+    async def create_pending(self, user_id: int, login: str, ttl_seconds: int) -> str:
+        """Create a short-lived 'pending 2FA' session (not resolvable by :meth:`get`).
+
+        The payload is tagged with a ``PENDING:`` prefix so that
+        :meth:`get`'s ``int(user_id)`` parse fails and returns ``None`` —
+        pending sessions are deliberately invisible to the normal
+        ``get_current_user`` path and only resolvable via :meth:`get_pending`.
+        """
+        token = secrets.token_urlsafe(32)
+        payload = f"PENDING:{user_id}:{login}"
+        await self._client.set(self._key(token), payload, ex=ttl_seconds)
+        return token
+
+    async def get_pending(self, token: str) -> tuple[int, str] | None:
+        raw = await self._client.get(self._key(token))
+        if raw is None:
+            return None
+        if isinstance(raw, bytes):
+            raw = raw.decode("utf-8")
+        if not raw.startswith("PENDING:"):
+            return None
+        try:
+            _, user_id_s, login = raw.split(":", 2)
+            return int(user_id_s), login
+        except (ValueError, TypeError):
+            return None
+
+    async def promote_pending(self, token: str) -> str | None:
+        """Verify+consume a pending session and issue a full session token."""
+        data = await self.get_pending(token)
+        if data is None:
+            return None
+        user_id, login = data
+        await self.delete(token)
+        return await self.create(user_id, login)
+
 
 def hash_api_key(raw_key: str) -> str:
     """SHA-256 hex digest of the opaque API key (never store plaintext)."""
@@ -133,6 +169,60 @@ class AuthService:
 
     async def logout(self, token: str) -> None:
         await self._sessions.delete(token)
+
+    async def get_user_by_login(
+        self, login: str, *, auth_method: str = "session"
+    ) -> AuthenticatedUser | None:
+        """Look up an existing, valid user by login — used by SSO/SPNEGO.
+
+        No auto-provisioning: returns ``None`` if no matching valid user
+        exists, and the caller must reject the login.
+        """
+        result = await self._session.execute(
+            select(Users).where(Users.login == login, Users.valid_id == 1)
+        )
+        user = result.scalar_one_or_none()
+        if user is None:
+            return None
+        return AuthenticatedUser(
+            id=user.id,
+            login=user.login,
+            first_name=user.first_name,
+            last_name=user.last_name,
+            auth_method=auth_method,
+        )
+
+    async def get_pending_session(self, token: str) -> tuple[int, str] | None:
+        return await self._sessions.get_pending(token)
+
+    async def create_pending_session(self, user: AuthenticatedUser) -> str:
+        """Create a short-lived pending-2FA session (password/SSO/SPNEGO step 1)."""
+        return await self._sessions.create_pending(
+            user.id, user.login, self._settings.totp_pending_ttl_seconds
+        )
+
+    async def promote_pending_session(self, token: str) -> tuple[str, AuthenticatedUser] | None:
+        """Verify a pending session still exists and issue a full session token."""
+        pending = await self._sessions.get_pending(token)
+        if pending is None:
+            return None
+        user_id, login = pending
+        result = await self._session.execute(
+            select(Users).where(Users.id == user_id, Users.login == login, Users.valid_id == 1)
+        )
+        user = result.scalar_one_or_none()
+        if user is None:
+            return None
+        new_token = await self._sessions.promote_pending(token)
+        if new_token is None:
+            return None
+        return new_token, AuthenticatedUser(
+            id=user.id,
+            login=user.login,
+            first_name=user.first_name,
+            last_name=user.last_name,
+            auth_method="session",
+        )
 
     async def resolve_api_key(self, raw_key: str) -> AuthenticatedUser | None:
         key_hash = hash_api_key(raw_key)

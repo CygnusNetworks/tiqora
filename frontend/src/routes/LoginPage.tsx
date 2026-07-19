@@ -2,19 +2,28 @@ import { useEffect, useState, type FormEvent } from "react";
 import { useNavigate, useSearch } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "@/auth/AuthContext";
-import { ApiError } from "@/lib/api";
+import { api, ApiError } from "@/lib/api";
 import { Button } from "@/components/ui/Button";
 import { Spinner } from "@/components/ui/Spinner";
 
 export function LoginPage() {
   const { t } = useTranslation();
-  const { login, isAuthenticated, isLoading } = useAuth();
+  const { login, verifyTotp, pending2fa, isAuthenticated, isLoading } = useAuth();
   const navigate = useNavigate();
   const search = useSearch({ from: "/login" }) as { next?: string };
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+  const [totpCode, setTotpCode] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [ssoEnabled, setSsoEnabled] = useState(false);
+
+  useEffect(() => {
+    api
+      .authMethods()
+      .then((methods) => setSsoEnabled(methods.oidc))
+      .catch(() => setSsoEnabled(false));
+  }, []);
 
   useEffect(() => {
     if (!isLoading && isAuthenticated) {
@@ -30,9 +39,11 @@ export function LoginPage() {
     setSubmitting(true);
     try {
       await login(username, password);
-      const next =
-        search.next && search.next.startsWith("/") ? search.next : "/agent";
-      await navigate({ to: next });
+      if (!pending2fa) {
+        const next =
+          search.next && search.next.startsWith("/") ? search.next : "/agent";
+        await navigate({ to: next });
+      }
     } catch (err) {
       if (err instanceof ApiError && err.status === 401) {
         setError(t("auth.invalidCredentials"));
@@ -43,6 +54,72 @@ export function LoginPage() {
       setSubmitting(false);
     }
   };
+
+  const onVerifyTotp = async (e: FormEvent) => {
+    e.preventDefault();
+    setError(null);
+    setSubmitting(true);
+    try {
+      await verifyTotp(totpCode);
+      const next =
+        search.next && search.next.startsWith("/") ? search.next : "/agent";
+      await navigate({ to: next });
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 401) {
+        setError(t("auth.totpInvalid"));
+      } else {
+        setError(t("auth.loginFailed"));
+      }
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  if (pending2fa) {
+    return (
+      <div className="flex min-h-screen flex-col items-center justify-center bg-bg px-4">
+        <div className="w-full max-w-sm rounded-xl border border-hairline bg-surface p-8">
+          <h1 className="text-center font-display text-2xl font-bold tracking-tight text-ink">
+            {t("auth.totpTitle")}
+          </h1>
+          <p className="mt-1.5 text-center text-sm text-muted">{t("auth.totpHint")}</p>
+          <form
+            onSubmit={(e) => void onVerifyTotp(e)}
+            className="mt-7 space-y-4"
+            data-testid="totp-form"
+          >
+            <label className="block text-sm">
+              <span className="mb-1 block text-muted">{t("auth.totpCode")}</span>
+              <input
+                data-testid="totp-code"
+                name="code"
+                inputMode="numeric"
+                autoComplete="one-time-code"
+                required
+                value={totpCode}
+                onChange={(e) => setTotpCode(e.target.value)}
+                className="w-full rounded-md border border-hairline bg-surface-subtle px-3 py-2 text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent focus:border-accent"
+              />
+            </label>
+            {error && (
+              <p className="text-sm text-danger" data-testid="totp-error" role="alert">
+                {error}
+              </p>
+            )}
+            <Button
+              type="submit"
+              variant="primary"
+              className="w-full"
+              disabled={submitting}
+              data-testid="totp-submit"
+            >
+              {submitting ? <Spinner /> : t("auth.totpVerify")}
+            </Button>
+          </form>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-bg px-4">
@@ -97,6 +174,26 @@ export function LoginPage() {
             {submitting ? <Spinner /> : t("auth.login")}
           </Button>
         </form>
+        {ssoEnabled && (
+          <>
+            <div className="my-4 flex items-center gap-3 text-xs text-muted">
+              <span className="h-px flex-1 bg-hairline" />
+              {t("auth.or")}
+              <span className="h-px flex-1 bg-hairline" />
+            </div>
+            <Button
+              type="button"
+              variant="secondary"
+              className="w-full"
+              data-testid="sso-login"
+              onClick={() => {
+                window.location.assign(api.oidcLoginUrl());
+              }}
+            >
+              {t("auth.ssoButton")}
+            </Button>
+          </>
+        )}
       </div>
     </div>
   );

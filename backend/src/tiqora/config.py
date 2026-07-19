@@ -100,6 +100,35 @@ class Settings(BaseSettings):
         validation_alias="TIQORA_SCHEMA_OWNERSHIP",
     )
 
+    # OIDC / SSO (Phase 3c). No auto-provisioning in v1: the mapped claim
+    # must match an existing, valid `users.login` row or the login is rejected.
+    oidc_enabled: bool = Field(default=False, validation_alias="TIQORA_OIDC_ENABLED")
+    oidc_issuer: str = Field(default="", validation_alias="TIQORA_OIDC_ISSUER")
+    oidc_client_id: str = Field(default="", validation_alias="TIQORA_OIDC_CLIENT_ID")
+    oidc_client_secret: str = Field(default="", validation_alias="TIQORA_OIDC_CLIENT_SECRET")
+    oidc_scopes: str = Field(
+        default="openid profile email", validation_alias="TIQORA_OIDC_SCOPES"
+    )
+    oidc_claim: str = Field(default="preferred_username", validation_alias="TIQORA_OIDC_CLAIM")
+    oidc_redirect_uri: str = Field(default="", validation_alias="TIQORA_OIDC_REDIRECT_URI")
+
+    # Kerberos / SPNEGO (Phase 3c). Off by default; requires the optional
+    # `kerberos` extra (gssapi) and a keytab reachable via KRB5_KTNAME.
+    spnego_enabled: bool = Field(default=False, validation_alias="TIQORA_SPNEGO_ENABLED")
+    krb5_ktname: str = Field(default="", validation_alias="KRB5_KTNAME")
+
+    # TOTP 2FA (Phase 3c)
+    totp_pending_ttl_seconds: int = Field(
+        default=300, validation_alias="TIQORA_TOTP_PENDING_TTL"
+    )
+    totp_issuer: str = Field(default="Tiqora", validation_alias="TIQORA_TOTP_ISSUER")
+
+    # Webhooks (Phase 3c)
+    webhook_timeout_seconds: float = Field(
+        default=10.0, validation_alias="TIQORA_WEBHOOK_TIMEOUT"
+    )
+    webhook_max_attempts: int = Field(default=3, validation_alias="TIQORA_WEBHOOK_MAX_ATTEMPTS")
+
     @property
     def cors_origin_list(self) -> list[str]:
         return [o.strip() for o in self.cors_origins.split(",") if o.strip()]
