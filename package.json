@@ -1,0 +1,19 @@
+{
+  "name": "tiqora",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Tiqora monorepo — frontend workspace root",
+  "scripts": {
+    "postinstall": "pnpm --filter @tiqora/api-client build",
+    "dev": "pnpm --filter tiqora-frontend dev",
+    "build": "pnpm --filter @tiqora/api-client build && pnpm --filter tiqora-frontend build",
+    "lint": "pnpm --filter tiqora-frontend lint",
+    "test": "pnpm --filter tiqora-frontend test",
+    "e2e": "pnpm --filter tiqora-frontend e2e",
+    "generate:api": "pnpm --filter @tiqora/api-client generate"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "packageManager": "pnpm@9.15.0"
+}

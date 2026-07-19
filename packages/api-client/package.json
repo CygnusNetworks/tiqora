@@ -1,0 +1,28 @@
+{
+  "name": "@tiqora/api-client",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Typed fetch client for Tiqora REST /api/v1 (generated from OpenAPI)",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "openapi.json",
+    "src"
+  ],
+  "scripts": {
+    "generate": "openapi-typescript openapi.json -o src/schema.d.ts",
+    "build": "pnpm run generate && tsc -p tsconfig.json && cp src/schema.d.ts dist/schema.d.ts"
+  },
+  "devDependencies": {
+    "openapi-typescript": "^7.5.2",
+    "typescript": "~5.7.2"
+  }
+}
