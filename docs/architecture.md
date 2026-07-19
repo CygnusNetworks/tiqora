@@ -141,6 +141,57 @@ Code-split per tree. Theming uses CSS variables and `data-theme` (`light` /
 | structlog JSON | Request and worker logs |
 | `deploy/zabbix/` | Zabbix template (HTTP agent on metrics/JSON) |
 
+### MCP server (Phase 2c)
+
+```
+MCP client (Claude Code, Claude Desktop, ...)
+    → HTTP  Authorization: Bearer <tiqora_api_key>
+    → TiqoraBearerAuth middleware (SHA-256 hash lookup → user_id)
+    → FastMCP tools (in tiqora.mcp_server.server)
+    → domain services (ticket_write_service, TicketService)
+    → permissions.PermissionEngine (same as REST)
+    → db/legacy (async SQLAlchemy only)
+```
+
+**Process:** `tiqora-mcp` (entrypoint `tiqora.mcp_server.__main__:run_mcp`).
+Runs as a standalone Starlette app on port 8001, mounted at `/mcp`.
+Uses `fastmcp.http_app(transport="streamable-http")`.
+
+**Auth:** Same `tiqora_api_key` table as REST. Bearer token in
+`Authorization: Bearer` header validated on every request via `TiqoraBearerAuth`
+middleware. The `user_id` is injected into `request.state.user_id` for tools.
+
+**Tools (10):**
+
+| Tool | Description |
+|------|-------------|
+| `ticket_search` | Meilisearch + DB fallback, permission-filtered |
+| `ticket_get` | Markdown-rendered ticket with articles (visibility-aware) |
+| `ticket_create` | Create ticket with optional first article |
+| `ticket_reply` | Add customer-visible reply (default `is_visible_for_customer=True`) |
+| `ticket_note` | Add internal note (default `is_visible_for_customer=False`) |
+| `ticket_update_state` | Change state by state_id |
+| `ticket_update_queue` | Move ticket to queue_id |
+| `ticket_update_priority` | Change priority by priority_id |
+| `ticket_update_owner` | Assign owner by user_id |
+| `customer_lookup` | Look up customer user details |
+
+**Constraints:** All tool handlers are `async`. No sync SQLAlchemy, no `requests`,
+no `time.sleep` anywhere in `mcp_server/`. Unavoidable sync operations (none currently)
+would use an executor helper.
+
+### GenericInterface compat layer (Phase 2c)
+
+Mounted at `/znuny-compat` in the main API process (same `tiqora-api`).
+
+- **Canonical routes** always available (see `docs/compatibility.md`).
+- **Dynamic routes** loaded from `gi_webservice_config` at startup via
+  `mount_dynamic_compat_routes()` called in the lifespan.
+- Auth: UserLogin+Password, CustomerUserLogin+Password, or Znuny SessionID
+  (validated against `sessions` key-value table).
+- Error shape: `{"Error": {"ErrorCode": "Op.ErrorType", "ErrorMessage": "..."}}`.
+- Parameter merging: query string + JSON body, body wins.
+
 ## Non-goals (V1)
 
 - ProcessManagement, calendar, stats, PGP/S-MIME
