@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent, type ReactNode } from "react";
-import { Link, useNavigate } from "@tanstack/react-router";
+import { Link, useLocation, useNavigate } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "@/auth/AuthContext";
 import { useTheme } from "@/themes/theme";
@@ -11,6 +11,7 @@ export function AgentShell({ children }: { children: ReactNode }) {
   const { user, logout } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const navigate = useNavigate();
+  const location = useLocation();
   const [q, setQ] = useState("");
   const [helpOpen, setHelpOpen] = useState(false);
 
@@ -45,25 +46,33 @@ export function AgentShell({ children }: { children: ReactNode }) {
   };
 
   return (
-    <div className="flex min-h-screen flex-col">
-      <div className="bg-warn/15 text-warn border-b border-border px-4 py-1.5 text-center text-xs font-medium">
-        ⚠️ {t("app.devBanner")}
+    <div className="flex min-h-screen flex-col bg-bg">
+      <div
+        className="border-b border-hairline bg-surface-subtle px-4 py-1 text-center font-mono text-[11px] uppercase tracking-wider text-escalation"
+        data-testid="dev-banner"
+      >
+        {t("app.devBanner")}
       </div>
-      <header className="sticky top-0 z-20 border-b border-border bg-surface-elevated">
-        <div className="flex items-center gap-3 px-3 py-2">
-          <Link to="/agent" className="shrink-0 text-base font-semibold text-accent">
+      <header className="sticky top-0 z-20 border-b border-hairline bg-surface">
+        <div className="flex h-12 items-center gap-3 px-3">
+          <Link
+            to="/agent"
+            className="shrink-0 font-display text-lg font-bold tracking-tight text-ink"
+          >
             {t("app.name")}
           </Link>
-          <nav className="hidden items-center gap-2 text-sm sm:flex">
+          <nav className="hidden items-center gap-1 text-sm sm:flex">
             <Link
               to="/agent"
-              className="rounded px-2 py-1 text-muted hover:bg-surface hover:text-ink"
+              className="rounded px-2 py-1 text-muted transition-colors duration-100 hover:bg-surface-subtle hover:text-ink"
+              activeProps={{ className: "text-accent" }}
             >
               {t("nav.dashboard")}
             </Link>
             <Link
               to="/agent/queues"
-              className="rounded px-2 py-1 text-muted hover:bg-surface hover:text-ink"
+              className="rounded px-2 py-1 text-muted transition-colors duration-100 hover:bg-surface-subtle hover:text-ink"
+              activeProps={{ className: "text-accent" }}
             >
               {t("nav.queues")}
             </Link>
@@ -76,7 +85,7 @@ export function AgentShell({ children }: { children: ReactNode }) {
               value={q}
               onChange={(e) => setQ(e.target.value)}
               placeholder={t("search.placeholder")}
-              className="w-full rounded-md border border-border bg-surface px-3 py-1.5 text-sm text-ink placeholder:text-muted focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+              className="w-full rounded-md border border-hairline bg-surface-subtle px-3 py-1.5 text-sm text-ink placeholder:text-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent focus:border-accent"
             />
           </form>
           <div className="flex shrink-0 items-center gap-1.5 text-sm">
@@ -111,7 +120,9 @@ export function AgentShell({ children }: { children: ReactNode }) {
           </div>
         </div>
       </header>
-      <main className="flex flex-1 flex-col">{children}</main>
+      <main key={location.pathname} className="flex flex-1 flex-col animate-route-in">
+        {children}
+      </main>
       <ShortcutHelp open={helpOpen} onClose={() => setHelpOpen(false)} />
     </div>
   );
