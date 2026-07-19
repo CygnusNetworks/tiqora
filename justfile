@@ -65,17 +65,36 @@ fmt:
 
 # --- Frontend ---
 
-# Install frontend deps
+# Install frontend workspace deps (pnpm monorepo)
 fe-install:
-    cd frontend && pnpm install
+    npm exec -y pnpm@9 -- install
 
 # Frontend dev server
 fe-dev:
-    cd frontend && pnpm dev
+    npm exec -y pnpm@9 -- --filter tiqora-frontend dev
 
 # Frontend production build
 fe-build:
-    cd frontend && pnpm build
+    npm exec -y pnpm@9 -- --filter @tiqora/api-client build
+    npm exec -y pnpm@9 -- --filter tiqora-frontend build
+
+# Frontend unit tests (vitest)
+fe-test:
+    npm exec -y pnpm@9 -- --filter tiqora-frontend test
+
+# Frontend lint (eslint + tsc)
+fe-lint:
+    npm exec -y pnpm@9 -- --filter tiqora-frontend lint
+
+# Generate OpenAPI types into packages/api-client
+api-client-gen:
+    cd backend && uv run python -c "from tiqora.api.app import create_app; import json; print(json.dumps(create_app().openapi(), indent=2))" > ../packages/api-client/openapi.json
+    npm exec -y pnpm@9 -- --filter @tiqora/api-client build
+
+# Playwright e2e (mocked /api/v1, chromium only)
+e2e:
+    npm exec -y pnpm@9 -- --filter tiqora-frontend exec playwright install chromium
+    npm exec -y pnpm@9 -- --filter tiqora-frontend e2e
 
 # --- Docker image ---
 

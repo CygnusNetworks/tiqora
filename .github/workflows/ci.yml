@@ -106,12 +106,9 @@ jobs:
       - name: Pytest
         run: uv run pytest -q
 
-  frontend-build:
-    name: Frontend build
+  frontend:
+    name: Frontend (lint, build, vitest, e2e)
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: frontend
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -121,9 +118,19 @@ jobs:
         with:
           node-version: "22"
           cache: pnpm
-          cache-dependency-path: frontend/pnpm-lock.yaml
+          cache-dependency-path: pnpm-lock.yaml
       - name: Install
-        run: |
-          if [ -f pnpm-lock.yaml ]; then pnpm install --frozen-lockfile; else pnpm install; fi
+        run: pnpm install --frozen-lockfile
+      - name: Build api-client
+        run: pnpm --filter @tiqora/api-client build
+      - name: Lint
+        run: pnpm --filter tiqora-frontend lint
       - name: Typecheck + build
-        run: pnpm build
+        run: pnpm --filter tiqora-frontend build
+      - name: Vitest
+        run: pnpm --filter tiqora-frontend test
+      - name: Install Playwright Chromium
+        run: pnpm --filter tiqora-frontend exec playwright install --with-deps chromium
+      - name: Playwright e2e (mocked API)
+        run: pnpm --filter tiqora-frontend e2e
+        continue-on-error: true
