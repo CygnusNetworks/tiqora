@@ -1,0 +1,64 @@
+# Golden-master validation stack: a REAL Znuny 6.5.22 (built from vendored
+# source) running against the same MariaDB Tiqora points at. See
+# docs/testing.md for how to run this and the golden-master pytest suite.
+#
+# Usage (from repo root):
+#   just golden-up
+#   GOLDEN=1 just golden-test
+#   just golden-down
+name: tiqora-golden
+
+services:
+  mariadb:
+    image: mariadb:10.11
+    container_name: tiqora-golden-mariadb
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: znuny
+      MYSQL_USER: znuny
+      MYSQL_PASSWORD: znuny
+    ports:
+      - "3307:3306"
+    volumes:
+      - tiqora_golden_mariadb_data:/var/lib/mysql
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_bin
+      - --max_allowed_packet=64M
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+
+  znuny:
+    build:
+      context: ../..
+      dockerfile: tests/golden/Dockerfile.znuny
+    container_name: tiqora-golden-znuny
+    depends_on:
+      mariadb:
+        condition: service_healthy
+    environment:
+      DB_HOST: mariadb
+      DB_PORT: "3306"
+      DB_NAME: znuny
+      DB_USER: znuny
+      DB_PASSWORD: znuny
+      DB_ROOT_PASSWORD: root
+      ZNUNY_FQDN: znuny.golden.local
+      ZNUNY_SYSTEM_ID: "10"
+    ports:
+      - "8180:80"
+    # Golden-master runs are single-threaded/interleaved from the test
+    # suite; a large startup timeout is expected (perl compile + schema
+    # load on first boot can take a couple of minutes).
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1/otrs/index.pl"]
+      interval: 10s
+      timeout: 10s
+      retries: 30
+      start_period: 60s
+
+volumes:
+  tiqora_golden_mariadb_data:

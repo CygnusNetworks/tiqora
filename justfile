@@ -106,3 +106,28 @@ build:
 compose-check:
     docker compose -f docker-compose.dev.yml config -q
     docker compose -f docker-compose.example.yml config -q
+
+# --- Golden-master (real Znuny vs Tiqora) ---
+
+# Build + start a real Znuny 6.5.22 container and shared MariaDB
+golden-up:
+    docker compose -f tests/golden/docker-compose.golden.yml up -d --build --wait
+
+# Seed baseline fixtures (admin agent, queue, customer user) into the shared DB
+golden-seed:
+    docker compose -f tests/golden/docker-compose.golden.yml exec -T znuny \
+        /usr/local/bin/znuny-entrypoint.sh console Maint::Config::Rebuild
+    bash tests/golden/seed.sh
+
+# Stop the golden-master stack (keeps the DB volume)
+golden-down:
+    docker compose -f tests/golden/docker-compose.golden.yml down
+
+# Stop the golden-master stack and remove the DB volume
+golden-clean:
+    docker compose -f tests/golden/docker-compose.golden.yml down -v
+
+# Run the golden-master pytest suite (requires golden-up + golden-seed first)
+golden-test:
+    cd backend && GOLDEN=1 GOLDEN_DB_URL="mysql+pymysql://znuny:znuny@127.0.0.1:3307/znuny" \
+        uv run pytest -q -m golden ../tests/golden

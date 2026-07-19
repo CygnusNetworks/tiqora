@@ -1,0 +1,84 @@
+# Minimal Debian image running a REAL Znuny 6.5.22 from the vendored source
+# tree (znuny-6.5.22/) for golden-master comparisons against Tiqora.
+#
+# No official `znuny/znuny` image exists on Docker Hub, so this builds one
+# from the tarball already vendored in the repo (see docs/testing.md).
+#
+# Build context MUST be the repo root:
+#   docker build -f tests/golden/Dockerfile.znuny -t tiqora-golden-znuny .
+FROM debian:bookworm-slim
+
+ENV DEBIAN_FRONTEND=noninteractive \
+    OTRS_USER=otrs \
+    OTRS_GROUP=otrs \
+    PERL5LIB=/opt/otrs:/opt/otrs/Kernel/cpan-lib:/opt/otrs/Custom
+
+# System + Perl module packages required by bin/otrs.CheckModules.pl for a
+# MySQL/MariaDB-backed install. Derived by running otrs.CheckModules.pl
+# --package-list inside a bare debian:bookworm-slim container.
+RUN apt-get update -qq && apt-get install -y -qq --no-install-recommends \
+        apache2 \
+        libapache2-mod-perl2 \
+        libapache-dbi-perl \
+        libapache2-reload-perl \
+        perl \
+        cron \
+        procps \
+        default-mysql-client \
+        ca-certificates \
+        curl \
+        libarchive-zip-perl \
+        libauthen-sasl-perl \
+        libauthen-ntlm-perl \
+        libcrypt-eksblowfish-perl \
+        libcrypt-jwt-perl \
+        libcrypt-openssl-x509-perl \
+        libcss-minifier-xs-perl \
+        libdata-uuid-perl \
+        libtimedate-perl \
+        libdatetime-perl \
+        libdatetime-timezone-perl \
+        libdbi-perl \
+        libdbd-mysql-perl \
+        libencode-hanextra-perl \
+        libhash-merge-perl \
+        libical-parser-perl \
+        libio-socket-ssl-perl \
+        libjavascript-minifier-xs-perl \
+        libjson-xs-perl \
+        liblist-moreutils-perl \
+        libmail-imapclient-perl \
+        libmoo-perl \
+        libnet-dns-perl \
+        libnet-ldap-perl \
+        libpackage-stash-perl \
+        libspreadsheet-xlsx-perl \
+        libtemplate-perl \
+        libtext-csv-xs-perl \
+        libxml-libxml-perl \
+        libxml-libxslt-perl \
+        libxml-parser-perl \
+        libyaml-libyaml-perl \
+        libcpanel-json-xs-perl \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN useradd -r -m -d /opt/otrs -s /bin/bash "$OTRS_USER" \
+    && usermod -a -G "$OTRS_USER" www-data
+
+# Vendored Znuny 6.5.22 source tree (already present in the repo, no network
+# fetch needed at build time).
+COPY --chown=otrs:otrs znuny-6.5.22/ /opt/otrs/
+
+COPY tests/golden/znuny-entrypoint.sh /usr/local/bin/znuny-entrypoint.sh
+COPY tests/golden/Config.pm.tmpl /opt/otrs/Kernel/Config.pm.tmpl
+RUN chmod +x /usr/local/bin/znuny-entrypoint.sh
+
+# apache2 config: point at the OTRS/Znuny vhost include and mod_perl startup.
+RUN sed -i 's#/opt/otrs/#/opt/otrs/#g' /opt/otrs/scripts/apache2-httpd.include.conf \
+    && cp /opt/otrs/scripts/apache2-httpd.include.conf /etc/apache2/conf-available/znuny.conf \
+    && a2enconf znuny \
+    && a2enmod perl headers deflate filter
+
+WORKDIR /opt/otrs
+EXPOSE 80
+ENTRYPOINT ["/usr/local/bin/znuny-entrypoint.sh"]
