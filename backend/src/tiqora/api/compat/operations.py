@@ -464,9 +464,12 @@ async def op_ticket_create(
             ticket_id = await create_ticket(
                 session, session_factory, sysconfig, params=ticket_in, user_id=user_id
             )
+        await session.commit()
     except TicketAccessDenied:
+        await session.rollback()
         return _err(f"{op}.AccessDenied", f"{op}: No permission!")
     except InvalidInput as e:
+        await session.rollback()
         return _err(f"{op}.InvalidParameter", str(e))
 
     return {"TicketID": ticket_id, "TicketNumber": await _get_tn(session, ticket_id)}
@@ -669,11 +672,15 @@ async def op_ticket_update(
                     sysconfig=sysconfig,
                 )
 
+        await session.commit()
     except TicketNotFound:
+        await session.rollback()
         return _err(f"{op}.InvalidParameter", f"{op}: Ticket {ticket_id} not found!")
     except TicketAccessDenied:
+        await session.rollback()
         return _err(f"{op}.AccessDenied", f"{op}: No permission!")
     except InvalidInput as e:
+        await session.rollback()
         return _err(f"{op}.InvalidParameter", str(e))
 
     return {"TicketID": ticket_id, "TicketNumber": await _get_tn(session, ticket_id)}
