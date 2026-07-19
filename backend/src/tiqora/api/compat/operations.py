@@ -154,7 +154,6 @@ async def _lookup_session(session: AsyncSession, session_id: str) -> tuple[int, 
         return None
 
 
-
 # ---------------------------------------------------------------------------
 # Lookup helpers (name→ID resolution)
 # ---------------------------------------------------------------------------
