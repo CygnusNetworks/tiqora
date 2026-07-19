@@ -1,0 +1,26 @@
+/* Theme tokens — light (default) and dark via data-theme on <html> */
+
+:root,
+[data-theme="light"] {
+  --color-surface: #f6f7f9;
+  --color-surface-elevated: #ffffff;
+  --color-ink: #0f172a;
+  --color-muted: #64748b;
+  --color-accent: #2563eb;
+  --color-border: #e2e8f0;
+  --color-danger: #dc2626;
+  --color-warn: #d97706;
+  --font-sans: "Inter", "Segoe UI", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", "Fira Code", ui-monospace, monospace;
+}
+
+[data-theme="dark"] {
+  --color-surface: #0b1220;
+  --color-surface-elevated: #111827;
+  --color-ink: #e5e7eb;
+  --color-muted: #94a3b8;
+  --color-accent: #60a5fa;
+  --color-border: #1f2937;
+  --color-danger: #f87171;
+  --color-warn: #fbbf24;
+}

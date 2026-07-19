@@ -1,0 +1,149 @@
+# Tiqora deployment example (NOT production-hardened)
+#
+# Copy to docker-compose.yml, set secrets, and review network/TLS at your reverse proxy.
+# Images: ghcr.io/cygnusnetworks/tiqora  (or docker.io/cygnusnetworks/tiqora)
+#
+# Database choice: enable EITHER postgres OR mariadb (not both), and set DATABASE_URL accordingly.
+
+services:
+  # --- Option A: PostgreSQL ---
+  postgres:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: tiqora
+      POSTGRES_USER: tiqora
+      # CHANGE ME
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change-me}
+    volumes:
+      - tiqora_pg:/var/lib/postgresql/data
+    # Do not publish DB ports publicly in production.
+    # ports:
+    #   - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U tiqora -d tiqora"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  # --- Option B: MariaDB (comment out postgres and use this instead) ---
+  # mariadb:
+  #   image: mariadb:10.11
+  #   restart: unless-stopped
+  #   environment:
+  #     MYSQL_DATABASE: tiqora
+  #     MYSQL_USER: tiqora
+  #     MYSQL_PASSWORD: ${MYSQL_PASSWORD:-change-me}
+  #     MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-change-me-root}
+  #   volumes:
+  #     - tiqora_mysql:/var/lib/mysql
+  #   command:
+  #     - --character-set-server=utf8mb4
+  #     - --collation-server=utf8mb4_unicode_ci
+  #   healthcheck:
+  #     test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+  #     interval: 10s
+  #     timeout: 5s
+  #     retries: 10
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    volumes:
+      - tiqora_redis:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+
+  meilisearch:
+    image: getmeili/meilisearch:v1.11
+    restart: unless-stopped
+    environment:
+      MEILI_ENV: production
+      # CHANGE ME — required in production
+      MEILI_MASTER_KEY: ${MEILI_MASTER_KEY:-change-me-meili-master-key}
+      MEILI_NO_ANALYTICS: "true"
+    volumes:
+      - tiqora_meili:/meili_data
+
+  tiqora-api:
+    image: ghcr.io/cygnusnetworks/tiqora:latest
+    # image: cygnusnetworks/tiqora:latest  # Docker Hub mirror
+    restart: unless-stopped
+    command: ["api"]
+    environment:
+      # PostgreSQL:
+      DATABASE_URL: postgresql+asyncpg://tiqora:${POSTGRES_PASSWORD:-change-me}@postgres:5432/tiqora
+      # MariaDB alternative:
+      # DATABASE_URL: mysql+aiomysql://tiqora:${MYSQL_PASSWORD:-change-me}@mariadb:3306/tiqora
+      REDIS_URL: redis://redis:6379/0
+      MEILI_URL: http://meilisearch:7700
+      MEILI_MASTER_KEY: ${MEILI_MASTER_KEY:-change-me-meili-master-key}
+      TIQORA_SECRET_KEY: ${TIQORA_SECRET_KEY:-change-me-use-openssl-rand-hex-32}
+      TIQORA_ENV: production
+      TIQORA_LOG_LEVEL: INFO
+      TIQORA_CORS_ORIGINS: ${TIQORA_CORS_ORIGINS:-https://helpdesk.example.com}
+      # Keep false until post-cutover schema ownership (Phase 5)
+      TIQORA_SCHEMA_OWNERSHIP: "false"
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      meilisearch:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health')"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
+  tiqora-worker:
+    image: ghcr.io/cygnusnetworks/tiqora:latest
+    restart: unless-stopped
+    command: ["worker"]
+    environment:
+      DATABASE_URL: postgresql+asyncpg://tiqora:${POSTGRES_PASSWORD:-change-me}@postgres:5432/tiqora
+      REDIS_URL: redis://redis:6379/0
+      MEILI_URL: http://meilisearch:7700
+      MEILI_MASTER_KEY: ${MEILI_MASTER_KEY:-change-me-meili-master-key}
+      TIQORA_SECRET_KEY: ${TIQORA_SECRET_KEY:-change-me-use-openssl-rand-hex-32}
+      TIQORA_ENV: production
+      TIQORA_LOG_LEVEL: INFO
+    depends_on:
+      - tiqora-api
+      - redis
+
+  tiqora-mcp:
+    image: ghcr.io/cygnusnetworks/tiqora:latest
+    restart: unless-stopped
+    command: ["mcp"]
+    environment:
+      DATABASE_URL: postgresql+asyncpg://tiqora:${POSTGRES_PASSWORD:-change-me}@postgres:5432/tiqora
+      REDIS_URL: redis://redis:6379/0
+      MEILI_URL: http://meilisearch:7700
+      MEILI_MASTER_KEY: ${MEILI_MASTER_KEY:-change-me-meili-master-key}
+      TIQORA_SECRET_KEY: ${TIQORA_SECRET_KEY:-change-me-use-openssl-rand-hex-32}
+      TIQORA_ENV: production
+      TIQORA_LOG_LEVEL: INFO
+    ports:
+      - "8001:8001"
+    depends_on:
+      - tiqora-api
+
+  # Optional: catch SMTP in non-production
+  # mailpit:
+  #   image: axllent/mailpit:latest
+  #   ports:
+  #     - "8025:8025"
+  #     - "1025:1025"
+
+volumes:
+  tiqora_pg:
+  # tiqora_mysql:
+  tiqora_redis:
+  tiqora_meili:

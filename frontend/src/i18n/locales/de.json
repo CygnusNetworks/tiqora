@@ -1,0 +1,27 @@
+{
+  "app": {
+    "name": "Tiqora",
+    "tagline": "Modernes Ticketsystem — kompatibel mit Znuny/OTRS 6.5",
+    "devBanner": "In aktiver Entwicklung — nicht produktionsreif"
+  },
+  "nav": {
+    "home": "Start",
+    "agent": "Agent",
+    "portal": "Kundenportal",
+    "admin": "Admin",
+    "theme": "Design",
+    "language": "Sprache"
+  },
+  "agent": {
+    "title": "Agenten-Arbeitsplatz",
+    "placeholder": "Queue-Ansichten, Ticket-Zoom und Compose folgen (Phase 1+)."
+  },
+  "portal": {
+    "title": "Kundenportal",
+    "placeholder": "Ticketliste und Erstellflow folgen (Phase 3)."
+  },
+  "admin": {
+    "title": "Administration",
+    "placeholder": "Queues, Dynamische Felder, ACL und GenericAgent-Editoren folgen (Phase 3)."
+  }
+}

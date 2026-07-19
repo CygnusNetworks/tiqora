@@ -1,0 +1,96 @@
+# --- Znuny reference (AGPL cleanliness: never commit) ---
+# Only root-level Znuny trees/tarballs — do not match packages/znuny-addon
+/znuny-6.5.22/
+/znuny-latest-6.5.tar.gz
+/znuny-*/
+*.tar.gz
+
+# --- Environment & secrets ---
+.env
+.env.*
+!.env.example
+!.env.*.example
+*.pem
+*.key
+secrets/
+
+# --- Python ---
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+.venv/
+venv/
+ENV/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+.nox/
+.hypothesis/
+*.cover
+.cache/
+.python-version
+
+# --- Node / frontend ---
+node_modules/
+.pnpm-store/
+.npm/
+dist/
+dist-ssr/
+*.local
+.vite/
+.turbo/
+coverage/
+
+# --- IDE / OS ---
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# --- Docker / local data ---
+docker-data/
+.docker/
+*.log
+
+# --- Tooling ---
+.uv/
+uv.lock.bak
+.justfile.local
+
+# --- Generated / runtime ---
+*.sqlite
+*.db
+tmp/
+temp/
+.meilisearch/
+mailpit-data/
+
+# --- Test artifacts ---
+playwright-report/
+test-results/
+.playwright/

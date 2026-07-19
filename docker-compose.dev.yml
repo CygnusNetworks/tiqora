@@ -1,0 +1,94 @@
+# Tiqora development infrastructure
+# Usage: docker compose -f docker-compose.dev.yml up -d
+#
+# Starts BOTH MariaDB and PostgreSQL so you can switch DATABASE_URL for dual-stack work.
+# Does not start Tiqora processes — run those via uv / pnpm on the host (see docs/development.md).
+
+services:
+  mariadb:
+    image: mariadb:10.11
+    container_name: tiqora-dev-mariadb
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: tiqora
+      MYSQL_USER: tiqora
+      MYSQL_PASSWORD: tiqora
+    ports:
+      - "3306:3306"
+    volumes:
+      - tiqora_mariadb_data:/var/lib/mysql
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  postgres:
+    image: postgres:16
+    container_name: tiqora-dev-postgres
+    environment:
+      POSTGRES_DB: tiqora
+      POSTGRES_USER: tiqora
+      POSTGRES_PASSWORD: tiqora
+    ports:
+      - "5432:5432"
+    volumes:
+      - tiqora_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U tiqora -d tiqora"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    container_name: tiqora-dev-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - tiqora_redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+
+  meilisearch:
+    image: getmeili/meilisearch:v1.11
+    container_name: tiqora-dev-meilisearch
+    environment:
+      MEILI_ENV: development
+      MEILI_MASTER_KEY: tiqora-dev-master-key
+      MEILI_NO_ANALYTICS: "true"
+    ports:
+      - "7700:7700"
+    volumes:
+      - tiqora_meili_data:/meili_data
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:7700/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  mailpit:
+    image: axllent/mailpit:latest
+    container_name: tiqora-dev-mailpit
+    ports:
+      - "1025:1025" # SMTP
+      - "8025:8025" # Web UI
+    environment:
+      MP_SMTP_AUTH_ACCEPT_ANY: 1
+      MP_SMTP_AUTH_ALLOW_INSECURE: 1
+
+  # Optional later:
+  # znuny:   # full Znuny for golden-master tests
+  # kdc:     # Kerberos for SPNEGO tests
+
+volumes:
+  tiqora_mariadb_data:
+  tiqora_postgres_data:
+  tiqora_redis_data:
+  tiqora_meili_data:
