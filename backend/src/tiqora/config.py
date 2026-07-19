@@ -43,6 +43,10 @@ class Settings(BaseSettings):
         default="tiqora-dev-master-key",
         validation_alias="MEILI_MASTER_KEY",
     )
+    meili_tickets_index: str = Field(
+        default="tickets",
+        validation_alias="MEILI_TICKETS_INDEX",
+    )
 
     # HTTP
     cors_origins: str = Field(
@@ -50,6 +54,34 @@ class Settings(BaseSettings):
         validation_alias="TIQORA_CORS_ORIGINS",
     )
     api_prefix: str = "/api/v1"
+
+    # Sessions (Redis, opaque token, httpOnly cookie)
+    session_cookie_name: str = Field(
+        default="tiqora_session",
+        validation_alias="TIQORA_SESSION_COOKIE",
+    )
+    session_ttl_seconds: int = Field(
+        default=86400,
+        validation_alias="TIQORA_SESSION_TTL",
+    )
+    session_cookie_secure: bool = Field(
+        default=False,
+        validation_alias="TIQORA_SESSION_COOKIE_SECURE",
+    )
+    session_cookie_samesite: str = Field(
+        default="lax",
+        validation_alias="TIQORA_SESSION_COOKIE_SAMESITE",
+    )
+
+    # Znuny-write poller
+    poller_interval_seconds: int = Field(
+        default=15,
+        validation_alias="TIQORA_POLLER_INTERVAL",
+    )
+    index_batch_size: int = Field(
+        default=500,
+        validation_alias="TIQORA_INDEX_BATCH_SIZE",
+    )
 
     # Schema ownership (Phase 5) — must stay false during parallel operation
     schema_ownership: bool = Field(
