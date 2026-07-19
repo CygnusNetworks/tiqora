@@ -25,7 +25,7 @@ def upgrade() -> None:
         sa.Column("name", sa.String(length=200), nullable=False),
         sa.Column("key_hash", sa.String(length=64), nullable=False),
         sa.Column("user_id", sa.Integer(), nullable=False),
-        sa.Column("valid", sa.Boolean(), server_default=sa.text("1"), nullable=False),
+        sa.Column("valid", sa.Boolean(), server_default=sa.true(), nullable=False),
         sa.Column(
             "created",
             sa.DateTime(),

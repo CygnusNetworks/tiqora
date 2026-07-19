@@ -33,9 +33,9 @@ def upgrade() -> None:
         sa.Column("name", sa.String(length=200), nullable=False),
         sa.Column("slug", sa.String(length=200), nullable=False),
         sa.Column("permission_group_id", sa.Integer(), nullable=True),
-        sa.Column("customer_visible", sa.Boolean(), server_default=sa.text("0"), nullable=False),
+        sa.Column("customer_visible", sa.Boolean(), server_default=sa.false(), nullable=False),
         sa.Column("sort", sa.Integer(), server_default=sa.text("0"), nullable=False),
-        sa.Column("valid", sa.Boolean(), server_default=sa.text("1"), nullable=False),
+        sa.Column("valid", sa.Boolean(), server_default=sa.true(), nullable=False),
         sa.Column("create_by", sa.Integer(), nullable=False),
         sa.Column(
             "create_time",
