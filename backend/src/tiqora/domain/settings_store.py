@@ -21,6 +21,27 @@ KEY_POSTMASTER_ENABLED = "daemon.postmaster.enabled"
 KEY_POSTMASTER_LEAVE_ON_SERVER = "daemon.postmaster.leave_on_server"
 KEY_POSTMASTER_INTERVAL_SECONDS = "daemon.postmaster.interval_seconds"
 
+# Escalation sweep (Phase 4b subtask 1) — takes over the
+# RebuildEscalationIndexOnline daemon task (Console::Command::Maint::Ticket::
+# EscalationIndexRebuild, scheduled via Daemon::SchedulerCronTaskManager::Task
+# ###EscalationCheck) plus TriggerEscalationStartEvents. Default OFF: see
+# docs/parallel-operation.md → "Taking over escalation index rebuild".
+KEY_ESCALATION_ENABLED = "daemon.escalation.enabled"
+KEY_ESCALATION_BATCH_SIZE = "daemon.escalation.batch_size"
+KEY_ESCALATION_NOTIFY_BEFORE_SECONDS = "daemon.escalation.notify_before_seconds"
+
+# Notification engine (Phase 4b subtask 2) — takes over
+# Kernel::System::Ticket::Event::NotificationEvent (fired by Znuny's own event
+# handler chain on every ticket/article event). Default OFF: see
+# docs/parallel-operation.md → "Taking over event notifications".
+KEY_NOTIFICATIONS_ENABLED = "daemon.notifications.enabled"
+
+# GenericAgent executor (Phase 4b subtask 3) — takes over
+# Daemon::SchedulerCronTaskManager::Task###GenericAgent (bin/znuny.Console.pl
+# Maint::Ticket::GenericAgent). Default OFF: see docs/parallel-operation.md →
+# "Taking over GenericAgent".
+KEY_GENERIC_AGENT_ENABLED = "daemon.generic_agent.enabled"
+
 
 async def get_setting_bool(session: AsyncSession, key: str, default: bool = False) -> bool:
     raw = await get_setting(session, key)

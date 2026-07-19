@@ -136,6 +136,20 @@ class Settings(BaseSettings):
     smtp_user: str = Field(default="", validation_alias="TIQORA_SMTP_USER")
     smtp_password: str = Field(default="", validation_alias="TIQORA_SMTP_PASSWORD")
 
+    # Phase 4b daemon takeovers. Each ``daemon.<name>.enabled`` tiqora_settings
+    # key (default OFF) is the actual takeover switch — see
+    # docs/parallel-operation.md. These intervals are only the poll cadence
+    # once enabled.
+    escalation_interval_seconds: int = Field(
+        default=300, validation_alias="TIQORA_ESCALATION_INTERVAL"
+    )
+    notifications_interval_seconds: int = Field(
+        default=60, validation_alias="TIQORA_NOTIFICATIONS_INTERVAL"
+    )
+    generic_agent_interval_seconds: int = Field(
+        default=60, validation_alias="TIQORA_GENERIC_AGENT_INTERVAL"
+    )
+
     @property
     def cors_origin_list(self) -> list[str]:
         return [o.strip() for o in self.cors_origins.split(",") if o.strip()]
