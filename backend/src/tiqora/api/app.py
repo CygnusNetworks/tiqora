@@ -13,6 +13,7 @@ from starlette.responses import Response as StarletteResponse
 
 from tiqora import __version__
 from tiqora.api.compat.router import compat_router, mount_dynamic_compat_routes
+from tiqora.api.portal import portal_router
 from tiqora.api.v1 import api_v1_router
 from tiqora.config import Settings, get_settings
 from tiqora.db.engine import check_database, get_session_factory
@@ -123,6 +124,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     app.include_router(api_v1_router, prefix=cfg.api_prefix)
     app.include_router(compat_router)
+    app.include_router(portal_router, prefix="/api/portal")
 
     @app.get("/health", tags=["ops"])
     async def health() -> dict[str, str]:
