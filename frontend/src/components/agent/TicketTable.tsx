@@ -1,12 +1,17 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "@tanstack/react-router";
 import type { TicketListItem } from "@/lib/api";
 import { formatAgeSeconds, formatDateTime, isEscalated } from "@/lib/format";
 import { cn } from "@/lib/cn";
-import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Spinner } from "@/components/ui/Spinner";
+import {
+  combinedEscalationLevel,
+  formatCountdown,
+  spineClassName,
+  stateColorVar,
+} from "@/lib/status";
 
 export type SortKey =
   | "tn"
@@ -100,15 +105,15 @@ export function TicketTable({
 
   return (
     <div className="flex flex-col gap-2" data-testid="ticket-table">
-      <div className="overflow-x-auto rounded-lg border border-border bg-surface-elevated">
+      <div className="overflow-x-auto rounded-lg border border-hairline bg-surface">
         <table ref={tableRef} className="w-full min-w-[720px] border-collapse text-left text-sm">
           <thead>
-            <tr className="border-b border-border bg-surface text-xs uppercase tracking-wide text-muted">
+            <tr className="border-b border-hairline bg-surface-subtle text-xs uppercase tracking-wide text-muted">
               {SORT_COLUMNS.map((col) => (
-                <th key={col.key} className="px-2 py-1.5 font-medium">
+                <th key={col.key} className="py-1.5 pl-4 pr-2 font-medium">
                   <button
                     type="button"
-                    className="inline-flex items-center gap-1 hover:text-ink"
+                    className="inline-flex items-center gap-1 hover:text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent"
                     onClick={() => toggleSort(col.key)}
                   >
                     {t(col.labelKey)}
@@ -136,19 +141,30 @@ export function TicketTable({
               </tr>
             )}
             {items.map((ticket, idx) => {
+              const escLevel = combinedEscalationLevel([
+                ticket.escalation_time,
+                ticket.escalation_response_time,
+                ticket.escalation_update_time,
+                ticket.escalation_solution_time,
+              ]);
               const esc =
                 isEscalated(ticket.escalation_time) ||
                 isEscalated(ticket.escalation_response_time) ||
                 isEscalated(ticket.escalation_update_time) ||
                 isEscalated(ticket.escalation_solution_time);
+              const spineColor =
+                escLevel === "none" ? stateColorVar(ticket.state) : undefined;
               return (
                 <tr
                   key={ticket.id}
                   data-testid={`ticket-row-${ticket.id}`}
                   className={cn(
-                    "cursor-pointer border-b border-border/70 transition hover:bg-accent/5",
-                    idx === focusIdx && "bg-accent/10 ring-1 ring-inset ring-accent/40",
+                    "h-10 cursor-pointer border-b border-hairline transition-colors duration-100 hover:bg-surface-subtle",
+                    spineClassName(escLevel),
+                    idx === focusIdx &&
+                      "bg-surface-subtle ring-1 ring-inset ring-accent/40",
                   )}
+                  style={{ "--spine-color": spineColor } as CSSProperties}
                   onClick={() =>
                     void navigate({
                       to: "/agent/tickets/$ticketId",
@@ -157,29 +173,46 @@ export function TicketTable({
                   }
                   onMouseEnter={() => setFocusIdx(idx)}
                 >
-                  <td className="px-2 py-1 font-mono text-xs text-accent">
+                  <td className="py-1 pl-4 pr-2 font-mono text-xs text-accent">
                     {ticket.tn}
                     {esc && (
-                      <Badge tone="danger" className="ml-1">
-                        {t("ticket.escalated")}
-                      </Badge>
+                      <span
+                        className="ml-1.5 rounded bg-escalation/15 px-1 font-mono text-[10px] tabular-nums text-escalation"
+                        title={t("ticket.escalated")}
+                      >
+                        {formatCountdown(
+                          ticket.escalation_time ??
+                            ticket.escalation_response_time ??
+                            ticket.escalation_update_time ??
+                            ticket.escalation_solution_time,
+                        )}
+                      </span>
                     )}
                   </td>
-                  <td className="max-w-[16rem] truncate px-2 py-1" title={ticket.title ?? ""}>
+                  <td className="max-w-[16rem] truncate py-1 pr-2" title={ticket.title ?? ""}>
                     {ticket.title || "—"}
                   </td>
-                  <td className="px-2 py-1 text-xs">{ticket.state ?? "—"}</td>
-                  <td className="px-2 py-1 text-xs">{ticket.priority ?? "—"}</td>
-                  <td className="px-2 py-1 text-xs">
+                  <td className="py-1 pr-2 text-xs">
+                    <span className="inline-flex items-center gap-1.5">
+                      <span
+                        aria-hidden
+                        className="h-1.5 w-1.5 rounded-full"
+                        style={{ background: stateColorVar(ticket.state) }}
+                      />
+                      {ticket.state ?? "—"}
+                    </span>
+                  </td>
+                  <td className="py-1 pr-2 text-xs">{ticket.priority ?? "—"}</td>
+                  <td className="py-1 pr-2 text-xs">
                     {ticket.owner_name || ticket.owner_login || "—"}
                   </td>
-                  <td className="px-2 py-1 text-xs">
+                  <td className="py-1 pr-2 text-xs">
                     {ticket.customer_user_id || ticket.customer_id || "—"}
                   </td>
-                  <td className="px-2 py-1 text-xs tabular-nums text-muted">
+                  <td className="py-1 pr-2 font-mono text-xs tabular-nums text-muted">
                     {formatAgeSeconds(ticket.age_seconds, locale)}
                   </td>
-                  <td className="px-2 py-1 text-xs tabular-nums text-muted">
+                  <td className="py-1 pr-2 font-mono text-xs tabular-nums text-muted">
                     {formatDateTime(ticket.change_time, locale)}
                   </td>
                 </tr>
