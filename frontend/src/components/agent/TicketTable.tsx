@@ -49,7 +49,8 @@ const SORT_COLUMNS: { key: SortKey; labelKey: string }[] = [
    <table> layout drifted because the status spine was an absolutely
    positioned pseudo-element on <tr>, which some browsers exclude from
    table column-width calculation. Grid rows don't have that failure mode. */
-const GRID_COLS = "minmax(120px,150px) minmax(0,1fr) 110px 110px minmax(0,140px) 90px";
+const GRID_COLS =
+  "minmax(120px,136px) minmax(180px,2.2fr) 96px 96px minmax(90px,120px) 84px";
 
 export function TicketTable({
   items,
