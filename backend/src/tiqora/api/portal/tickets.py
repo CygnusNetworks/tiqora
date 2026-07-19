@@ -12,6 +12,7 @@ from tiqora.domain.portal_ticket_service import (
     PortalTicketNotFound,
 )
 from tiqora.domain.schemas import (
+    ArticleBody,
     ArticleListItem,
     PaginatedTickets,
     PortalReplyRequest,
@@ -76,6 +77,26 @@ async def list_articles(
         return await svc.list_visible_articles(customer, ticket_id)
     except (PortalTicketNotFound, PortalTicketAccessDenied) as exc:
         raise _map_exc(exc) from exc
+
+
+@router.get("/{ticket_id}/articles/{article_id}/body", response_model=ArticleBody)
+async def get_article_body(
+    ticket_id: int,
+    article_id: int,
+    customer: CurrentCustomer,
+    svc: PortalService,
+) -> ArticleBody:
+    """Sanitised article body — 404 unless owned by the customer and customer-visible."""
+    try:
+        rendered = await svc.get_article_body(customer, ticket_id, article_id)
+    except (PortalTicketNotFound, PortalTicketAccessDenied) as exc:
+        raise _map_exc(exc) from exc
+    return ArticleBody(
+        article_id=article_id,
+        content_type=rendered.content_type,
+        is_html=rendered.is_html,
+        body=rendered.body,
+    )
 
 
 @router.post("", response_model=PortalTicketCreateResponse, status_code=status.HTTP_201_CREATED)

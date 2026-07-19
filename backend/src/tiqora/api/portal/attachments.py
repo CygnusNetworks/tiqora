@@ -72,6 +72,36 @@ async def upload_attachment(
     )
 
 
+@router.get("/{ticket_id}/articles/{article_id}/attachments/by-cid/{content_id:path}")
+async def download_attachment_by_cid(
+    ticket_id: int,
+    article_id: int,
+    content_id: str,
+    customer: CurrentCustomer,
+    svc: PortalService,
+) -> Response:
+    """Resolve a rendered article body's ``cid:`` image reference.
+
+    Same ownership + ``is_visible_for_customer`` scoping as the numeric
+    attachment endpoint below; this is what ``rewrite_cid_urls`` targets for
+    portal-rendered article bodies (see ``domain.article_html``).
+    """
+    try:
+        content = await svc.get_attachment_by_cid(customer, ticket_id, article_id, content_id)
+    except (PortalTicketNotFound, PortalTicketAccessDenied) as exc:
+        raise _map_exc(exc) from exc
+    ct = (content.meta.content_type or "application/octet-stream").split(";", 1)[0].strip()
+    filename = content.meta.filename
+    headers: dict[str, str] = {}
+    if filename:
+        headers["Content-Disposition"] = (
+            f"inline; filename=\"{filename}\"; filename*=UTF-8''{quote(filename)}"
+        )
+    else:
+        headers["Content-Disposition"] = "inline"
+    return Response(content=content.content, media_type=ct, headers=headers)
+
+
 @router.get("/{ticket_id}/attachments/{attachment_id}")
 async def download_attachment(
     ticket_id: int,

@@ -23,7 +23,7 @@ from datetime import datetime
 from typing import Any
 
 import pytest
-from sqlalchemy import create_engine, text
+from sqlalchemy import LargeBinary, bindparam, create_engine, text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from tiqora.db.tiqora.base import TiqoraBase
@@ -236,25 +236,39 @@ def _seed(sync_url: str) -> dict[str, Any]:
             t_mapped_company, f"T{t_mapped_company}", q_possible, state_open, login_eve, cid_mapped
         )
 
-        art_visible, art_internal = base + 200, base + 201
+        art_visible, art_internal, art_html = base + 200, base + 201, base + 202
         conn.execute(
             text(
                 "INSERT INTO article (id, ticket_id, article_sender_type_id,"
                 " communication_channel_id, is_visible_for_customer,"
                 " search_index_needs_rebuild, create_time, create_by, change_time, change_by)"
                 " VALUES (:av, :t_open, 3, 1, 1, 0, :t, 1, :t, 1),"
-                " (:ai, :t_open, 1, 1, 0, 0, :t, 1, :t, 1)"
+                " (:ai, :t_open, 1, 1, 0, 0, :t, 1, :t, 1),"
+                " (:ah, :t_open, 3, 1, 1, 0, :t, 1, :t, 1)"
             ),
-            {"av": art_visible, "ai": art_internal, "t_open": t_open, "t": NOW},
+            {"av": art_visible, "ai": art_internal, "ah": art_html, "t_open": t_open, "t": NOW},
         )
         conn.execute(
             text(
                 "INSERT INTO article_data_mime (id, article_id, a_subject, a_content_type,"
                 " a_body, incoming_time, create_time, create_by, change_time, change_by)"
                 " VALUES (:av, :av, 'Visible', 'text/plain', 'hi', 0, :t, 1, :t, 1),"
-                " (:ai, :ai, 'Internal note', 'text/plain', 'shh', 0, :t, 1, :t, 1)"
+                " (:ai, :ai, 'Internal note', 'text/plain', 'shh', 0, :t, 1, :t, 1),"
+                " (:ah, :ah, 'With image', 'text/html',"
+                " '<p>see</p><img src=\"cid:pic@local\">', 0, :t, 1, :t, 1)"
             ),
-            {"av": art_visible, "ai": art_internal, "t": NOW},
+            {"av": art_visible, "ai": art_internal, "ah": art_html, "t": NOW},
+        )
+        att_pic = base + 300
+        conn.execute(
+            text(
+                "INSERT INTO article_data_mime_attachment (id, article_id, filename,"
+                " content_size, content_type, content_id, content_alternative, disposition,"
+                " content, create_time, create_by, change_time, change_by)"
+                " VALUES (:id, :ah, 'pic.png', '3', 'image/png', 'pic@local', '', 'inline',"
+                " :content, :t, 1, :t, 1)"
+            ).bindparams(bindparam("content", type_=LargeBinary())),
+            {"id": att_pic, "ah": art_html, "content": b"png", "t": NOW},
         )
 
     engine.dispose()
@@ -270,6 +284,8 @@ def _seed(sync_url: str) -> dict[str, Any]:
             "ticket_mapped_company": t_mapped_company,
             "article_visible": art_visible,
             "article_internal": art_internal,
+            "article_html": art_html,
+            "attachment_pic": att_pic,
             "alice": AuthenticatedCustomer(
                 id=base + 1,
                 login=login_alice,
@@ -335,7 +351,7 @@ async def test_isolation_and_article_visibility(
 
         # Internal notes are never returned to the portal.
         articles = await svc.list_visible_articles(alice, ids["ticket_open"])
-        assert [a.id for a in articles] == [ids["article_visible"]]
+        assert {a.id for a in articles} == {ids["article_visible"], ids["article_html"]}
         assert all(a.is_visible_for_customer for a in articles)
 
     await engine.dispose()
@@ -503,5 +519,67 @@ async def test_company_tickets_setting(url_fixture: str, request: pytest.Fixture
         # Bob (unrelated company, no mapping) still sees nothing extra.
         with pytest.raises(PortalTicketAccessDenied):
             await svc.get_ticket(bob, ids["ticket_same_company"])
+
+    await engine.dispose()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("url_fixture", ["mariadb_znuny_url", "postgres_znuny_url"])
+async def test_article_body_and_cid_attachment(
+    url_fixture: str, request: pytest.FixtureRequest
+) -> None:
+    """Phase 3b gap: portal article-body retrieval + cid rewrite/attachment scoping."""
+    sync_url: str = request.getfixturevalue(url_fixture)
+    ids = _seed(sync_url)
+    alice, bob = ids["alice"], ids["bob"]
+    async_url = _to_async_url(sync_url)
+    engine = create_async_engine(async_url)
+    factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+    sysconfig = _make_sysconfig()
+
+    async with factory() as session:
+        svc = PortalTicketService(session, factory, sysconfig)
+
+        # Visible plain-text article: body retrievable by the owning customer.
+        plain = await svc.get_article_body(alice, ids["ticket_open"], ids["article_visible"])
+        assert plain.content_type == "text/plain"
+        assert "hi" in plain.body
+
+        # Visible HTML article: sanitised body with cid: rewritten to the
+        # portal's own by-cid attachment endpoint (not the agent's /api/v1 one).
+        html_body = await svc.get_article_body(alice, ids["ticket_open"], ids["article_html"])
+        assert html_body.is_html is True
+        expected_cid_path = (
+            f"/api/portal/tickets/{ids['ticket_open']}/articles/"
+            f"{ids['article_html']}/attachments/by-cid/pic%40local"
+        )
+        assert expected_cid_path in html_body.body
+        assert "/api/v1/" not in html_body.body
+
+        # Internal (not customer-visible) article: 404-equivalent, even for the owner.
+        with pytest.raises(PortalTicketNotFound):
+            await svc.get_article_body(alice, ids["ticket_open"], ids["article_internal"])
+
+        # Foreign customer's ticket: 403-equivalent regardless of article visibility.
+        with pytest.raises(PortalTicketAccessDenied):
+            await svc.get_article_body(bob, ids["ticket_open"], ids["article_visible"])
+
+        # cid attachment resolvable by the owning customer.
+        att = await svc.get_attachment_by_cid(
+            alice, ids["ticket_open"], ids["article_html"], "pic@local"
+        )
+        assert att.content == b"png"
+
+        # cid attachment scoped to owned ticket: foreign customer denied.
+        with pytest.raises(PortalTicketAccessDenied):
+            await svc.get_attachment_by_cid(
+                bob, ids["ticket_open"], ids["article_html"], "pic@local"
+            )
+
+        # cid attachment on a non-customer-visible article: not found even for the owner.
+        with pytest.raises(PortalTicketNotFound):
+            await svc.get_attachment_by_cid(
+                alice, ids["ticket_open"], ids["article_internal"], "pic@local"
+            )
 
     await engine.dispose()

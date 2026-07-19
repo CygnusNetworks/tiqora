@@ -87,18 +87,28 @@ class RenderedArticleBody:
     is_html: bool
 
 
-def _attachment_url(ticket_id: int, article_id: int, content_id: str) -> str:
+# Default base path used by the agent API. The customer portal API passes
+# base_path="/api/portal/tickets" so rewritten cid: URLs land on the portal's
+# own (visibility-enforcing) attachment endpoint instead of the agent one.
+_DEFAULT_BASE_PATH = "/api/v1/tickets"
+
+
+def _attachment_url(
+    ticket_id: int, article_id: int, content_id: str, base_path: str = _DEFAULT_BASE_PATH
+) -> str:
     """Build relative API path for cid content-id lookup."""
     cid = quote(content_id.strip("<>"), safe="")
-    return f"/api/v1/tickets/{ticket_id}/articles/{article_id}/attachments/by-cid/{cid}"
+    return f"{base_path}/{ticket_id}/articles/{article_id}/attachments/by-cid/{cid}"
 
 
-def rewrite_cid_urls(html_body: str, ticket_id: int, article_id: int) -> str:
+def rewrite_cid_urls(
+    html_body: str, ticket_id: int, article_id: int, base_path: str = _DEFAULT_BASE_PATH
+) -> str:
     """Rewrite ``cid:…`` src attributes to the attachment-by-cid endpoint."""
 
     def repl(match: re.Match[str]) -> str:
         cid = match.group("cid")
-        url = _attachment_url(ticket_id, article_id, cid)
+        url = _attachment_url(ticket_id, article_id, cid, base_path)
         return f"{match.group('prefix')}{url}{match.group('suffix')}"
 
     return _CID_SRC_RE.sub(repl, html_body)
@@ -138,16 +148,21 @@ def render_article_body(
     content_type: str | None,
     ticket_id: int,
     article_id: int,
+    base_path: str = _DEFAULT_BASE_PATH,
 ) -> RenderedArticleBody:
     """Return a safe body for display.
 
     * ``text/html`` → sanitise, rewrite cid:, mark external images
     * otherwise → HTML-escape as plain text
+
+    ``base_path`` selects which API's attachment-by-cid endpoint cid: URLs
+    are rewritten to — defaults to the agent API; callers rendering for the
+    customer portal pass ``/api/portal/tickets``.
     """
     text = body or ""
     ct = (content_type or "text/plain").split(";", 1)[0].strip().lower()
     if ct in {"text/html", "application/xhtml+xml"}:
-        rewritten = rewrite_cid_urls(text, ticket_id, article_id)
+        rewritten = rewrite_cid_urls(text, ticket_id, article_id, base_path)
         marked = mark_external_images(rewritten)
         safe = sanitize_html(marked)
         return RenderedArticleBody(content_type="text/html", body=safe, is_html=True)

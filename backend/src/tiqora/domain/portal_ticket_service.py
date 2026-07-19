@@ -34,6 +34,7 @@ from tiqora.db.legacy.ticket import (
     TicketState,
     TicketStateType,
 )
+from tiqora.domain.article_html import RenderedArticleBody, render_article_body
 from tiqora.domain.customer_auth import AuthenticatedCustomer
 from tiqora.domain.queue_service import age_seconds
 from tiqora.domain.schemas import (
@@ -303,6 +304,42 @@ class PortalTicketService:
             )
         return out
 
+    async def get_article_body(
+        self, customer: AuthenticatedCustomer, ticket_id: int, article_id: int
+    ) -> RenderedArticleBody:
+        """Sanitised article body, scoped to owned ticket + customer-visible article.
+
+        cid: URLs are rewritten to the portal's own by-cid attachment endpoint
+        (``/api/portal/...``) so image loads stay within the portal's
+        visibility-enforcing scope rather than the agent API.
+        """
+        await self._get_owned_ticket(customer, ticket_id)
+        art = (
+            await self._session.execute(
+                select(Article.id).where(
+                    Article.id == article_id,
+                    Article.ticket_id == ticket_id,
+                    Article.is_visible_for_customer == 1,
+                )
+            )
+        ).scalar_one_or_none()
+        if art is None:
+            raise PortalTicketNotFound(article_id)
+        mime = (
+            await self._session.execute(
+                select(ArticleDataMime).where(ArticleDataMime.article_id == article_id)
+            )
+        ).scalar_one_or_none()
+        body = mime.a_body if mime else None
+        ct = mime.a_content_type if mime else "text/plain"
+        return render_article_body(
+            body=body,
+            content_type=ct,
+            ticket_id=ticket_id,
+            article_id=article_id,
+            base_path="/api/portal/tickets",
+        )
+
     async def list_attachments(
         self, customer: AuthenticatedCustomer, ticket_id: int, article_id: int
     ) -> list[AttachmentMetaOut]:
@@ -351,6 +388,31 @@ class PortalTicketService:
         ).scalar_one_or_none()
         if art is None:
             raise PortalTicketNotFound(attachment_id)
+        return content
+
+    async def get_attachment_by_cid(
+        self,
+        customer: AuthenticatedCustomer,
+        ticket_id: int,
+        article_id: int,
+        content_id: str,
+    ) -> AttachmentContent:
+        """Resolve a MIME ``cid:`` reference, scoped like ``get_attachment``."""
+        await self._get_owned_ticket(customer, ticket_id)
+        art = (
+            await self._session.execute(
+                select(Article.id).where(
+                    Article.id == article_id,
+                    Article.ticket_id == ticket_id,
+                    Article.is_visible_for_customer == 1,
+                )
+            )
+        ).scalar_one_or_none()
+        if art is None:
+            raise PortalTicketNotFound(article_id)
+        content = await self._storage.get_by_content_id(article_id, content_id)
+        if content is None:
+            raise PortalTicketNotFound(content_id)
         return content
 
     # -- writes ------------------------------------------------------------
