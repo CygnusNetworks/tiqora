@@ -41,12 +41,12 @@ export function Dialog({
       />
       <div
         className={cn(
-          "relative z-10 w-full max-w-md rounded-lg border border-border bg-surface-elevated shadow-xl",
+          "relative z-10 w-full max-w-md rounded-lg border border-hairline bg-surface shadow-xl",
           className,
         )}
       >
-        <div className="flex items-center justify-between border-b border-border px-4 py-3">
-          <h2 id="dialog-title" className="text-sm font-semibold text-ink">
+        <div className="flex items-center justify-between border-b border-hairline px-4 py-3">
+          <h2 id="dialog-title" className="font-display text-sm font-semibold text-ink">
             {title}
           </h2>
           <Button variant="ghost" size="sm" onClick={onClose}>

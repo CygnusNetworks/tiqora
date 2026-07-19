@@ -45,15 +45,15 @@ export function LoginPage() {
   };
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center bg-surface px-4">
-      <div className="w-full max-w-sm rounded-xl border border-border bg-surface-elevated p-6 shadow-sm">
-        <h1 className="text-center text-xl font-semibold text-accent">
+    <div className="flex min-h-screen flex-col items-center justify-center bg-bg px-4">
+      <div className="w-full max-w-sm rounded-xl border border-hairline bg-surface p-8">
+        <h1 className="text-center font-display text-2xl font-bold tracking-tight text-ink">
           {t("app.name")}
         </h1>
-        <p className="mt-1 text-center text-sm text-muted">{t("auth.signIn")}</p>
+        <p className="mt-1.5 text-center text-sm text-muted">{t("auth.signIn")}</p>
         <form
           onSubmit={(e) => void onSubmit(e)}
-          className="mt-6 space-y-4"
+          className="mt-7 space-y-4"
           data-testid="login-form"
         >
           <label className="block text-sm">
@@ -65,7 +65,7 @@ export function LoginPage() {
               required
               value={username}
               onChange={(e) => setUsername(e.target.value)}
-              className="w-full rounded-md border border-border bg-surface px-3 py-2 text-ink focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+              className="w-full rounded-md border border-hairline bg-surface-subtle px-3 py-2 text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent focus:border-accent"
             />
           </label>
           <label className="block text-sm">
@@ -78,7 +78,7 @@ export function LoginPage() {
               required
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full rounded-md border border-border bg-surface px-3 py-2 text-ink focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+              className="w-full rounded-md border border-hairline bg-surface-subtle px-3 py-2 text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent focus:border-accent"
             />
           </label>
           {error && (
