@@ -12,6 +12,7 @@ from starlette.requests import Request
 from starlette.responses import Response as StarletteResponse
 
 from tiqora import __version__
+from tiqora.api.compat.router import compat_router, mount_dynamic_compat_routes
 from tiqora.api.v1 import api_v1_router
 from tiqora.config import Settings, get_settings
 from tiqora.db.engine import check_database, get_session_factory
@@ -62,6 +63,12 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         version=__version__,
         environment=settings.environment,
     )
+    # Mount dynamic GenericInterface compat routes from webservice config
+    try:
+        async with app.state.session_factory() as _compat_session:
+            await mount_dynamic_compat_routes(app, _compat_session)
+    except Exception as _exc:  # noqa: BLE001
+        logger.warning("compat_mount_skipped", error=str(_exc))
     yield
     redis_client = getattr(app.state, "redis", None)
     if redis_client is not None:
@@ -115,6 +122,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         return response
 
     app.include_router(api_v1_router, prefix=cfg.api_prefix)
+    app.include_router(compat_router)
 
     @app.get("/health", tags=["ops"])
     async def health() -> dict[str, str]:
