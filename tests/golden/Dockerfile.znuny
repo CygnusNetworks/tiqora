@@ -9,6 +9,7 @@
 FROM debian:bookworm-slim
 
 ENV DEBIAN_FRONTEND=noninteractive \
+    TZ=Etc/UTC \
     OTRS_USER=otrs \
     OTRS_GROUP=otrs \
     PERL5LIB=/opt/otrs:/opt/otrs/Kernel/cpan-lib:/opt/otrs/Custom
