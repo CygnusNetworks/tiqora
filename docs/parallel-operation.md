@@ -52,6 +52,17 @@ Znuny parsers depend on exact shape.
 - Regression tests compare history rows against a golden Znuny write for the
   same logical action.
 
+**Golden-master validated (2026-07-19)** against a real Znuny 6.5.22 container
+(`tests/golden/test_history_diff.py`): the full create → state → move →
+priority → owner → note → close lifecycle now produces byte-identical
+normalized history rows. Four divergences were found and fixed in the process
+(CustomerUpdate row on TicketCreate, SetPendingTime `%%00-00-00 00:00` reset on
+every non-pending state change, TicketOwnerSet same-owner no-op without
+auto-lock, and the Misc "Reset of unlock time." row on agent article
+creation). Ticket-number counter interleaving, DateChecksum checksum digits,
+and escalation columns (incl. zero-on-close) are golden-validated too — see
+docs/testing.md.
+
 ## Escalation recompute
 
 Source: `Ticket.pm` → `TicketEscalationIndexBuild`.

@@ -2607,7 +2607,21 @@ cd /Users/valerius/git/aurix && git push origin main
 
 ## Semantic Uncertainties for Golden-Master Validation
 
-These items need validation against a live Znuny 6.5 instance before Phase 2b goes to production:
+These items need validation against a live Znuny 6.5 instance before Phase 2b goes to production.
+**Status update (2026-07-19, golden-master suite `tests/golden/`, real Znuny 6.5.22 container):**
+
+- Item 2 (DateChecksum multiplier) — **VALIDATED**: `test_date_checksum.py` reproduces the exact
+  checksum digit of a Znuny-issued DateChecksum TN.
+- Item 3 (escalation math) — **VALIDATED for non-DST days**: `test_escalation.py` shows both sides
+  compute matching escalation columns (±30 s wall-clock skew) and zero them on close. The DST-night
+  fast-path caveat remains open (needs a golden run scheduled across a DST transition).
+- Interleaved counter uniqueness — **VALIDATED**: `test_ticket_number_interleaving.py` alternates
+  real Znuny TicketCreate with Tiqora `ticket_create_number` on the shared counter table.
+- History formats — **VALIDATED (and 4 divergences fixed)**: `test_history_diff.py` diffs the full
+  create/state/move/priority/owner/note/close lifecycle row-by-row; see commit
+  "fix(znuny): Phase 2c golden-master 3/4" for CustomerUpdate-on-create, SetPendingTime reset,
+  TicketOwnerSet no-op/no-lock, and unlock-timeout Misc rows.
+- Items 1, 4, 5, 6 remain open (not yet covered by golden tests).
 
 1. **ticket_number counter_uid collisions**: `_get_uid()` uses `time_ns()` + `os.getpid()`. Under very high concurrency the UID may not be 32 chars if `time_ns()` result is long. Validate uniqueness under 100 concurrent Python processes.
 
