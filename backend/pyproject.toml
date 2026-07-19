@@ -23,6 +23,8 @@ dependencies = [
     "passlib[bcrypt]>=1.7.4",
     "httpx>=0.28.0",
     "prometheus-client>=0.21.0",
+    "pyyaml>=6.0.3",
+    "bcrypt>=5.0.0",
 ]
 
 [project.optional-dependencies]
@@ -33,6 +35,7 @@ dev = [
     "ruff>=0.8.0",
     "mypy>=1.13.0",
     "types-passlib>=1.7.7",
+    "types-pyyaml>=6.0.12.20260518",
 ]
 
 [project.scripts]
@@ -70,3 +73,12 @@ warn_unused_ignores = true
 asyncio_mode = "auto"
 testpaths = ["tests"]
 pythonpath = ["src"]
+markers = [
+    "db: integration tests that require Docker (testcontainers MariaDB/Postgres)",
+]
+
+[dependency-groups]
+dev = [
+    "psycopg2-binary>=2.9.12",
+    "pymysql>=1.2.0",
+]
