@@ -33,6 +33,17 @@ export type PresenceIn = Schemas["PresenceIn"];
 export type PresenceEntry = Schemas["PresenceEntry"];
 export type ArticleCreateRequest = Schemas["ArticleCreateRequest"];
 export type ArticleCreateResponse = Schemas["ArticleCreateResponse"];
+export type ReplyDraftOut = Schemas["ReplyDraftOut"];
+export type TemplateOut = Schemas["TemplateOut"];
+export type MutationRequest = Schemas["MutationRequest"];
+export type MergeRequest = Schemas["MergeRequest"];
+export type TicketCreateRequest = Schemas["TicketCreateRequest"];
+export type TicketCreateResponse = Schemas["TicketCreateResponse"];
+export type ForwardRequest = Schemas["ForwardRequest"];
+export type BounceRequest = Schemas["BounceRequest"];
+export type SplitRequest = Schemas["SplitRequest"];
+export type TicketLinkTargetOut = Schemas["TicketLinkTargetOut"];
+export type TicketLinkCreateRequest = Schemas["TicketLinkCreateRequest"];
 
 // ── Portal ────────────────────────────────────────────────────────────────
 export type CustomerMe = Schemas["CustomerMe"];
@@ -576,10 +587,14 @@ export class ApiClient {
     );
   }
 
-  listHistory(ticketId: number, signal?: AbortSignal) {
+  listHistory(
+    ticketId: number,
+    order: "asc" | "desc" = "desc",
+    signal?: AbortSignal,
+  ) {
     return this.request<HistoryEntry[]>(
       "GET",
-      `/api/v1/tickets/${ticketId}/history`,
+      `/api/v1/tickets/${ticketId}/history?order=${order}`,
       { signal },
     );
   }
@@ -590,6 +605,106 @@ export class ApiClient {
       `/api/v1/tickets/${ticketId}/articles`,
       { body, signal },
     );
+  }
+
+  getReplyDraft(
+    ticketId: number,
+    articleId: number,
+    replyAll = false,
+    signal?: AbortSignal,
+  ) {
+    return this.request<ReplyDraftOut>(
+      "GET",
+      `/api/v1/tickets/${ticketId}/articles/${articleId}/reply-draft?reply_all=${replyAll}`,
+      { signal },
+    );
+  }
+
+  listTemplates(ticketId: number, signal?: AbortSignal) {
+    return this.request<TemplateOut[]>(
+      "GET",
+      `/api/v1/tickets/${ticketId}/templates`,
+      { signal },
+    );
+  }
+
+  patchTicket(ticketId: number, body: MutationRequest, signal?: AbortSignal) {
+    return this.request<void>("PATCH", `/api/v1/tickets/${ticketId}`, {
+      body,
+      signal,
+    });
+  }
+
+  mergeTicket(ticketId: number, body: MergeRequest, signal?: AbortSignal) {
+    return this.request<void>("POST", `/api/v1/tickets/${ticketId}/merge`, {
+      body,
+      signal,
+    });
+  }
+
+  createTicket(body: TicketCreateRequest, signal?: AbortSignal) {
+    return this.request<TicketCreateResponse>("POST", "/api/v1/tickets", {
+      body,
+      signal,
+    });
+  }
+
+  forwardArticle(
+    ticketId: number,
+    articleId: number,
+    body: ForwardRequest,
+    signal?: AbortSignal,
+  ) {
+    return this.request<ArticleCreateResponse>(
+      "POST",
+      `/api/v1/tickets/${ticketId}/articles/${articleId}/forward`,
+      { body, signal },
+    );
+  }
+
+  bounceArticle(
+    ticketId: number,
+    articleId: number,
+    body: BounceRequest,
+    signal?: AbortSignal,
+  ) {
+    return this.request<ArticleCreateResponse>(
+      "POST",
+      `/api/v1/tickets/${ticketId}/articles/${articleId}/bounce`,
+      { body, signal },
+    );
+  }
+
+  splitArticle(
+    ticketId: number,
+    articleId: number,
+    body: SplitRequest,
+    signal?: AbortSignal,
+  ) {
+    return this.request<TicketCreateResponse>(
+      "POST",
+      `/api/v1/tickets/${ticketId}/articles/${articleId}/split`,
+      { body, signal },
+    );
+  }
+
+  listTicketLinks(ticketId: number, signal?: AbortSignal) {
+    return this.request<TicketLinkTargetOut[]>(
+      "GET",
+      `/api/v1/tickets/${ticketId}/links`,
+      { signal },
+    );
+  }
+
+  createTicketLink(
+    ticketId: number,
+    body: TicketLinkCreateRequest,
+    signal?: AbortSignal,
+  ) {
+    return this.request<void>("POST", `/api/v1/tickets/${ticketId}/links`, {
+      body,
+      signal,
+    });
   }
 
   postPresence(ticketId: number, body: PresenceIn, signal?: AbortSignal) {

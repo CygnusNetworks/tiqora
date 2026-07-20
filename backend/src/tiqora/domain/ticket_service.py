@@ -15,7 +15,7 @@ from tiqora.db.legacy.article import (
     ArticleSenderType,
 )
 from tiqora.db.legacy.dynamic_field import DynamicField, DynamicFieldValue
-from tiqora.db.legacy.queue import Queue
+from tiqora.db.legacy.queue import Queue, QueueStandardTemplate, StandardTemplate
 from tiqora.db.legacy.ticket import (
     Ticket,
     TicketHistory,
@@ -24,21 +24,45 @@ from tiqora.db.legacy.ticket import (
     TicketPriority,
     TicketState,
     TicketStateType,
+    TicketWatcher,
 )
 from tiqora.db.legacy.user import Users
 from tiqora.domain.article_html import RenderedArticleBody, render_article_body
-from tiqora.domain.queue_service import age_seconds
+from tiqora.domain.history_render import render_history_entry
+from tiqora.domain.queue_service import OPEN_STATE_TYPES, age_seconds
+from tiqora.domain.quoting import (
+    build_reply_subject,
+    html_to_plaintext,
+    quote_plaintext_body,
+)
 from tiqora.domain.schemas import (
     ArticleListItem,
     AttachmentMetaOut,
     DynamicFieldValueOut,
     HistoryEntry,
     PaginatedTickets,
+    ReplyDraftOut,
+    TemplateOut,
     TicketDetail,
     TicketListItem,
 )
 from tiqora.permissions.engine import PermissionEngine
 from tiqora.storage.backend import AttachmentContent, DbMimeStorage
+
+#: Named ``state_type`` query-param views resolved to one-or-more
+#: ``ticket_state_type.name`` values. Mirrors Znuny's
+#: ``Ticket::ViewableStateType`` sysconfig (new + open + pending reminder +
+#: pending auto) so the default queue "Offen" view — previously a literal
+#: equality match against the single state type named ``open`` — no longer
+#: hides freshly-arrived ``new`` tickets. ``"new"`` is also exposed as its
+#: own view for the dedicated "Neu" tab. Any ``state_type`` value not in this
+#: map (e.g. ``"closed"``, or a raw ``ticket_state_type.name``) still falls
+#: back to a literal single-name match.
+VIEW_STATE_TYPES: dict[str, frozenset[str]] = {
+    "open": OPEN_STATE_TYPES,
+    "new": frozenset({"new"}),
+    "pending": frozenset({"pending reminder", "pending auto"}),
+}
 
 
 class TicketAccessDenied(Exception):
@@ -181,12 +205,13 @@ class TicketService:
         if owner_id is not None:
             stmt = stmt.where(Ticket.user_id == owner_id)
         if state_type is not None:
+            type_names = VIEW_STATE_TYPES.get(state_type, {state_type})
             state_ids = (
                 (
                     await self._session.execute(
                         select(TicketState.id)
                         .join(TicketStateType, TicketStateType.id == TicketState.type_id)
-                        .where(TicketStateType.name == state_type)
+                        .where(TicketStateType.name.in_(type_names))
                     )
                 )
                 .scalars()
@@ -277,6 +302,15 @@ class TicketService:
         maps = await self._lookup_maps()
         base = self._to_list_item(ticket, maps)
         dfs = await self._load_dynamic_fields(ticket.id)
+        is_watched = (
+            await self._session.execute(
+                select(TicketWatcher.user_id).where(
+                    TicketWatcher.ticket_id == ticket_id,
+                    TicketWatcher.user_id == user_id,
+                )
+            )
+        ).first() is not None
+        can_write = await self._perms.check(user_id, ticket.queue_id, "rw")
         return TicketDetail(
             **base.model_dump(),
             type_id=ticket.type_id,
@@ -287,6 +321,8 @@ class TicketService:
             create_by=ticket.create_by,
             change_by=ticket.change_by,
             dynamic_fields=dfs,
+            is_watched=is_watched,
+            can_write=can_write,
         )
 
     async def _load_dynamic_fields(self, ticket_id: int) -> list[DynamicFieldValueOut]:
@@ -332,7 +368,12 @@ class TicketService:
 
         out: list[DynamicFieldValueOut] = []
         for fid, field in sorted(field_by_id.items(), key=lambda x: x[1].field_order):
-            vals = [v for v in grouped.get(fid, []) if v is not None]
+            vals = [v for v in grouped.get(fid, []) if v is not None and str(v) != ""]
+            # Hide dynamic fields with no value for this ticket — the ticket
+            # zoom omits empty fields (and hides the panel entirely when none
+            # have a value). Fields with at least one non-empty value are kept.
+            if not vals:
+                continue
             # Optionally resolve label overrides from YAML config blob
             label = field.label
             if field.config:
@@ -495,33 +536,152 @@ class TicketService:
             raise TicketNotFound(content_id)
         return content
 
-    async def list_history(self, user_id: int, ticket_id: int) -> list[HistoryEntry]:
+    async def list_history(
+        self, user_id: int, ticket_id: int, *, order: str = "desc"
+    ) -> list[HistoryEntry]:
         await self._assert_ticket_ro(user_id, ticket_id)
         types = {
             r.id: r.name for r in (await self._session.execute(select(TicketHistoryType))).scalars()
         }
+        # login-by-user-id map so the renderer can resolve numeric ids in the
+        # %% payload (e.g. OwnerUpdate) and each row can show who acted.
+        logins: dict[int, str] = {
+            r.id: r.login for r in (await self._session.execute(select(Users))).scalars()
+        }
+        order_col = TicketHistory.id.asc() if order.lower() == "asc" else TicketHistory.id.desc()
         rows = (
             (
                 await self._session.execute(
                     select(TicketHistory)
                     .where(TicketHistory.ticket_id == ticket_id)
-                    .order_by(TicketHistory.id)
+                    .order_by(order_col)
                 )
             )
             .scalars()
             .all()
         )
+
+        def _resolve(uid: int | str | None) -> str | None:
+            if uid is None:
+                return None
+            try:
+                return logins.get(int(uid))
+            except (TypeError, ValueError):
+                return None
+
         return [
             HistoryEntry(
                 id=h.id,
                 ticket_id=h.ticket_id,
                 name=h.name,
+                rendered=render_history_entry(
+                    history_type=types.get(h.history_type_id),
+                    name=h.name,
+                    resolve_user=_resolve,
+                ),
                 history_type_id=h.history_type_id,
                 history_type=types.get(h.history_type_id),
                 article_id=h.article_id,
                 owner_id=h.owner_id,
                 create_time=h.create_time,
                 create_by=h.create_by,
+                create_by_login=logins.get(h.create_by),
             )
             for h in rows
+        ]
+
+    async def get_reply_draft(
+        self, user_id: int, ticket_id: int, article_id: int, *, reply_all: bool = False
+    ) -> ReplyDraftOut:
+        """Build a prefilled reply draft (Re: subject, To/Cc, quoted body).
+
+        Ports Znuny's reply behaviour (TicketSubjectBuild + TemplateGenerator
+        quoting): the answer area is empty and placed ABOVE the quoted
+        original. Quoting is plaintext-only (HTML bodies are down-converted);
+        see ``tiqora.domain.quoting``.
+        """
+        await self._assert_ticket_ro(user_id, ticket_id)
+        art = (
+            await self._session.execute(
+                select(Article).where(Article.id == article_id, Article.ticket_id == ticket_id)
+            )
+        ).scalar_one_or_none()
+        if art is None:
+            raise TicketNotFound(article_id)
+        mime = (
+            await self._session.execute(
+                select(ArticleDataMime).where(ArticleDataMime.article_id == article_id)
+            )
+        ).scalar_one_or_none()
+
+        subject = build_reply_subject(mime.a_subject if mime else None)
+        from_addr = (mime.a_from if mime else None) or None
+        to_addr = from_addr
+        cc: str | None = None
+        if reply_all:
+            # Reply-all: keep original recipients (To + Cc) as Cc, minus the
+            # sender we're already replying to. Simplified vs Znuny (no full
+            # address parsing / self-address stripping beyond exact match).
+            extras: list[str] = []
+            for field in ((mime.a_to if mime else None), (mime.a_cc if mime else None)):
+                if not field:
+                    continue
+                for addr in field.split(","):
+                    a = addr.strip()
+                    if a and a != from_addr and a not in extras:
+                        extras.append(a)
+            cc = ", ".join(extras) or None
+
+        raw_body = (mime.a_body if mime else None) or ""
+        ct = (mime.a_content_type if mime else "text/plain") or "text/plain"
+        is_html = ct.split(";", 1)[0].strip().lower() in {"text/html", "application/xhtml+xml"}
+        plain = html_to_plaintext(raw_body) if is_html else raw_body
+        quoted = quote_plaintext_body(plain, from_address=from_addr, sent_at=art.create_time)
+        # Empty answer area above the quote (two newlines), then the quote.
+        body = f"\n\n{quoted}\n"
+        return ReplyDraftOut(
+            to_address=to_addr,
+            cc=cc,
+            subject=subject,
+            body=body,
+            is_html=False,
+            in_reply_to=(mime.a_message_id if mime else None),
+            references=(mime.a_message_id if mime else None),
+        )
+
+    async def list_templates(self, user_id: int, ticket_id: int) -> list[TemplateOut]:
+        """Response templates for a ticket's queue (template_type='Answer').
+
+        Znuny join: ``queue_standard_template`` → ``standard_template`` on the
+        ticket's current ``queue_id``, valid Answer templates only.
+        """
+        ticket = await self._assert_ticket_ro(user_id, ticket_id)
+        rows = (
+            (
+                await self._session.execute(
+                    select(StandardTemplate)
+                    .join(
+                        QueueStandardTemplate,
+                        QueueStandardTemplate.standard_template_id == StandardTemplate.id,
+                    )
+                    .where(
+                        QueueStandardTemplate.queue_id == ticket.queue_id,
+                        StandardTemplate.template_type == "Answer",
+                        StandardTemplate.valid_id == 1,
+                    )
+                    .order_by(StandardTemplate.name)
+                )
+            )
+            .scalars()
+            .all()
+        )
+        return [
+            TemplateOut(
+                id=r.id,
+                name=r.name,
+                text=r.text or "",
+                content_type=r.content_type,
+                template_type=r.template_type,
+            )
+            for r in rows
         ]
