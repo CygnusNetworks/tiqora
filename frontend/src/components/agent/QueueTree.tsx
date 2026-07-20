@@ -20,9 +20,11 @@ function QueueItem({
   selectedId: number | null;
   onSelect: (id: number | null) => void;
 }) {
+  const { t } = useTranslation();
   const active = selectedId === node.id;
   const open = node.counts?.open ?? 0;
   const total = node.counts?.total ?? 0;
+  const newCount = node.counts?.new ?? 0;
 
   return (
     <li>
@@ -44,6 +46,14 @@ function QueueItem({
             ? node.name.split("::").pop()
             : node.name}
         </span>
+        {newCount > 0 && (
+          <span
+            className="shrink-0 rounded-full bg-accent-dim px-1.5 py-0.5 font-mono text-[10px] font-semibold tabular-nums text-accent"
+            title={t("queue.newCount", { count: newCount })}
+          >
+            {t("queue.newCount", { count: newCount })}
+          </span>
+        )}
         <span className="shrink-0 font-mono text-xs tabular-nums text-muted">
           {open}
           {total !== open ? (

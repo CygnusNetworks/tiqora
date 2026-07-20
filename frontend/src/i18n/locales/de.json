@@ -38,7 +38,11 @@
     "toggle": "Navigation umschalten",
     "reports": "Berichte",
     "stats": "Statistiken",
-    "calendar": "Kalender"
+    "calendar": "Kalender",
+    "showAllQueues": "Alle anzeigen",
+    "showActiveQueues": "Aktive anzeigen",
+    "queueSearch": "Queues filtern…",
+    "noQueueMatch": "Keine passenden Queues."
   },
   "common": {
     "prev": "Zurück",
@@ -95,7 +99,9 @@
     "openBadge": "{{count}} offen",
     "metaLine": "Alle Queues · sortiert nach Dringlichkeit",
     "exportCsv": "CSV exportieren",
+    "newCount": "{{count}} neu",
     "state": {
+      "new": "Neu",
       "open": "Offen",
       "pending": "Wartend",
       "closed": "Geschlossen",
