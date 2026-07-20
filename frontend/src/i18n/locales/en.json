@@ -110,7 +110,8 @@
     "escalatingSoon": "Escalating soon",
     "escalatingSoonEmpty": "No upcoming escalations.",
     "remindersDue": "Reminders due",
-    "remindersDueEmpty": "No reminders due."
+    "remindersDueEmpty": "No reminders due.",
+    "queueShortcutsEmpty": "No queues with open or new tickets right now."
   },
   "queue": {
     "sidebar": "Queues",
@@ -220,6 +221,8 @@
     "recipientName": "Name",
     "recipientEmail": "Email",
     "recipientRemove": "Remove",
+    "recipientConfirm": "OK",
+    "replyToRequired": "At least one To recipient is required.",
     "replySubject": "Subject",
     "replyTemplate": "Template",
     "replyTemplateNone": "— No template —",
@@ -242,6 +245,7 @@
       "owner": "Owner",
       "responsible": "Responsible",
       "customer": "Customer",
+      "customerNumber": "Customer number",
       "communication": "Communication",
       "note": "Note",
       "phoneInbound": "Phone (in)",

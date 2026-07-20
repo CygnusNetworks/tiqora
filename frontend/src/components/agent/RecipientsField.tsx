@@ -5,7 +5,7 @@ import { cn } from "@/lib/cn";
 /** One addressee: display name (may be empty) plus the email address. */
 export type Recipient = { name: string; email: string };
 
-/** A field a chip can be moved to (e.g. To → Cc). */
+/** A field a chip can be moved to (e.g. To → Cc). Kept for call-site typing. */
 export type MoveTarget = { key: string; label: string };
 
 const DND_MIME = "application/x-tiqora-recipient";
@@ -67,6 +67,27 @@ export function joinRecipients(recipients: Recipient[]): string | null {
   return recipients.length ? recipients.map(formatRecipient).join(", ") : null;
 }
 
+/** Case-insensitive mailbox identity (drag/drop rehydrates new objects). */
+export function sameRecipient(a: Recipient, b: Recipient): boolean {
+  return a.email.trim().toLowerCase() === b.email.trim().toLowerCase();
+}
+
+/**
+ * Move a recipient between two field lists: remove from source by email match,
+ * append to target with dedupe. Pure helper for ReplyDialog + tests.
+ */
+export function moveRecipientBetween(
+  source: Recipient[],
+  target: Recipient[],
+  recipient: Recipient,
+): { source: Recipient[]; target: Recipient[] } {
+  const nextSource = source.filter((x) => !sameRecipient(x, recipient));
+  const nextTarget = target.some((x) => sameRecipient(x, recipient))
+    ? target
+    : [...target, recipient];
+  return { source: nextSource, target: nextTarget };
+}
+
 const chipCls =
   "group inline-flex max-w-full items-center gap-1 rounded-full border border-hairline " +
   "bg-surface-subtle py-0.5 pl-2 pr-1 text-xs text-ink";
@@ -77,9 +98,9 @@ const inputCls =
 /**
  * Apple-Mail-style recipient editor: each address is a draggable chip showing
  * the display name (falling back to the email). Clicking a chip opens an inline
- * editor for name + email; chips can be dragged between fields or moved with the
- * explicit action buttons (the non-drag fallback). New addresses are added by
- * typing "Name <email>" or a bare address and pressing Enter.
+ * editor for name + email; chips can be dragged between fields (move, not copy).
+ * New addresses are added by typing "Name <email>" or a bare address and
+ * pressing Enter.
  */
 export function RecipientsField({
   label,
@@ -87,9 +108,9 @@ export function RecipientsField({
   recipients,
   onChange,
   onMove,
-  moveTargets = [],
   placeholder,
   testid,
+  required = false,
 }: {
   label: string;
   fieldKey: string;
@@ -97,15 +118,23 @@ export function RecipientsField({
   onChange: (next: Recipient[]) => void;
   /** Cross-field move: parent removes from `from` and appends to `to`. */
   onMove?: (from: string, to: string, recipient: Recipient) => void;
+  /** @deprecated Move UI removed; drag-drop only. Kept so call sites stay quiet. */
   moveTargets?: MoveTarget[];
   placeholder?: string;
   testid?: string;
+  /** When true, empty field shows a danger border (To is required). */
+  required?: boolean;
 }) {
   const { t } = useTranslation();
   const [draft, setDraft] = useState("");
   const [editing, setEditing] = useState<number | null>(null);
+  const [editDraft, setEditDraft] = useState<{ name: string; email: string } | null>(
+    null,
+  );
   const [dragOver, setDragOver] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  const emptyRequired = required && recipients.length === 0;
 
   const commitDraft = () => {
     const parsed = parseRecipient(draft);
@@ -114,13 +143,31 @@ export function RecipientsField({
     setDraft("");
   };
 
-  const removeAt = (i: number) => {
+  const closeEditor = () => {
     setEditing(null);
-    onChange(recipients.filter((_, idx) => idx !== i));
+    setEditDraft(null);
   };
 
-  const editAt = (i: number, patch: Partial<Recipient>) =>
-    onChange(recipients.map((r, idx) => (idx === i ? { ...r, ...patch } : r)));
+  const openEditor = (i: number, r: Recipient) => {
+    setEditing(i);
+    setEditDraft({ name: r.name, email: r.email });
+  };
+
+  const confirmEdit = () => {
+    if (editing === null || !editDraft) return;
+    const name = editDraft.name.trim();
+    const email = editDraft.email.trim();
+    if (!email.includes("@")) return;
+    onChange(
+      recipients.map((r, idx) => (idx === editing ? { name, email } : r)),
+    );
+    closeEditor();
+  };
+
+  const removeAt = (i: number) => {
+    closeEditor();
+    onChange(recipients.filter((_, idx) => idx !== i));
+  };
 
   const onDrop = (e: React.DragEvent) => {
     e.preventDefault();
@@ -143,6 +190,7 @@ export function RecipientsField({
       <span className="mb-1 block">{label}</span>
       <div
         data-testid={testid}
+        data-empty-required={emptyRequired ? "true" : undefined}
         onClick={() => inputRef.current?.focus()}
         onDragOver={(e) => {
           if (e.dataTransfer.types.includes(DND_MIME)) {
@@ -154,8 +202,12 @@ export function RecipientsField({
         onDrop={onDrop}
         className={cn(
           "flex min-h-[2.25rem] flex-wrap items-center gap-1 rounded border bg-surface px-1.5 py-1",
-          "focus-within:ring-1 focus-within:ring-accent",
-          dragOver ? "border-accent ring-1 ring-accent" : "border-hairline",
+          "focus-within:ring-1",
+          emptyRequired
+            ? "border-danger focus-within:ring-danger"
+            : dragOver
+              ? "border-accent ring-1 ring-accent focus-within:ring-accent"
+              : "border-hairline focus-within:ring-accent",
         )}
       >
         {recipients.map((r, i) => (
@@ -178,7 +230,8 @@ export function RecipientsField({
                 data-testid={testid ? `${testid}-chip` : undefined}
                 onClick={(e) => {
                   e.stopPropagation();
-                  setEditing(editing === i ? null : i);
+                  if (editing === i) closeEditor();
+                  else openEditor(i, r);
                 }}
               >
                 {r.name || r.email}
@@ -196,53 +249,59 @@ export function RecipientsField({
                 ×
               </button>
             </span>
-            {editing === i && (
+            {editing === i && editDraft && (
               <div
                 className="absolute left-0 top-full z-20 mt-1 w-64 space-y-2 rounded-lg border border-hairline bg-surface p-2 shadow-xl"
                 onClick={(e) => e.stopPropagation()}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    confirmEdit();
+                  } else if (e.key === "Escape") {
+                    e.preventDefault();
+                    closeEditor();
+                  }
+                }}
               >
                 <label className="block text-[11px] text-muted">
                   {t("ticket.recipientName")}
                   <input
                     autoFocus
                     className="mt-0.5 w-full rounded border border-hairline bg-surface px-2 py-1 text-sm text-ink focus:outline-none focus:ring-1 focus:ring-accent"
-                    value={r.name}
+                    value={editDraft.name}
                     data-testid={testid ? `${testid}-name` : undefined}
-                    onChange={(e) => editAt(i, { name: e.target.value })}
+                    onChange={(e) =>
+                      setEditDraft({ ...editDraft, name: e.target.value })
+                    }
                   />
                 </label>
                 <label className="block text-[11px] text-muted">
                   {t("ticket.recipientEmail")}
                   <input
                     className="mt-0.5 w-full rounded border border-hairline bg-surface px-2 py-1 text-sm text-ink focus:outline-none focus:ring-1 focus:ring-accent"
-                    value={r.email}
+                    value={editDraft.email}
                     data-testid={testid ? `${testid}-email` : undefined}
-                    onChange={(e) => editAt(i, { email: e.target.value })}
+                    onChange={(e) =>
+                      setEditDraft({ ...editDraft, email: e.target.value })
+                    }
                   />
                 </label>
-                <div className="flex flex-wrap items-center justify-between gap-1 pt-0.5">
-                  <div className="flex flex-wrap gap-1">
-                    {moveTargets.map((mt) => (
-                      <button
-                        key={mt.key}
-                        type="button"
-                        className="rounded border border-hairline px-1.5 py-0.5 text-[11px] text-muted hover:text-ink"
-                        data-testid={testid ? `${testid}-move-${mt.key}` : undefined}
-                        onClick={() => {
-                          setEditing(null);
-                          onMove?.(fieldKey, mt.key, r);
-                        }}
-                      >
-                        → {mt.label}
-                      </button>
-                    ))}
-                  </div>
+                <div className="flex flex-wrap items-center justify-end gap-1 pt-0.5">
                   <button
                     type="button"
                     className="rounded px-1.5 py-0.5 text-[11px] text-danger hover:bg-danger/15"
+                    data-testid={testid ? `${testid}-editor-remove` : undefined}
                     onClick={() => removeAt(i)}
                   >
                     {t("ticket.recipientRemove")}
+                  </button>
+                  <button
+                    type="button"
+                    className="rounded border border-hairline bg-surface-subtle px-1.5 py-0.5 text-[11px] text-ink hover:bg-surface"
+                    data-testid={testid ? `${testid}-editor-confirm` : undefined}
+                    onClick={confirmEdit}
+                  >
+                    {t("ticket.recipientConfirm")}
                   </button>
                 </div>
               </div>
@@ -267,6 +326,11 @@ export function RecipientsField({
           onBlur={commitDraft}
         />
       </div>
+      {emptyRequired && (
+        <p className="mt-1 text-[11px] text-danger" data-testid={testid ? `${testid}-required-hint` : undefined}>
+          {t("ticket.replyToRequired")}
+        </p>
+      )}
     </div>
   );
 }

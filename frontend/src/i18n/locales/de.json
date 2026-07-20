@@ -110,7 +110,8 @@
     "escalatingSoon": "Bald eskalierend",
     "escalatingSoonEmpty": "Keine bevorstehenden Eskalationen.",
     "remindersDue": "Erinnerungen fällig",
-    "remindersDueEmpty": "Keine fälligen Erinnerungen."
+    "remindersDueEmpty": "Keine fälligen Erinnerungen.",
+    "queueShortcutsEmpty": "Keine Queues mit offenen oder neuen Tickets."
   },
   "queue": {
     "sidebar": "Queues",
@@ -220,6 +221,8 @@
     "recipientName": "Name",
     "recipientEmail": "E-Mail",
     "recipientRemove": "Entfernen",
+    "recipientConfirm": "Übernehmen",
+    "replyToRequired": "Mindestens ein Empfänger im An-Feld ist erforderlich.",
     "replySubject": "Betreff",
     "replyTemplate": "Vorlage",
     "replyTemplateNone": "— Keine Vorlage —",
@@ -242,6 +245,7 @@
       "owner": "Besitzer",
       "responsible": "Verantwortlicher",
       "customer": "Kunde",
+      "customerNumber": "Kundennummer",
       "communication": "Kommunikation",
       "note": "Notiz",
       "phoneInbound": "Telefon (ein)",
