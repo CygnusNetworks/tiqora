@@ -4,6 +4,7 @@ from fastapi import APIRouter
 
 from tiqora.api.v1 import (
     auth,
+    channels_phone,
     channels_sms,
     channels_whatsapp,
     customers,
@@ -26,6 +27,7 @@ api_v1_router.include_router(search.router)
 api_v1_router.include_router(kb.router)
 api_v1_router.include_router(channels_sms.router)
 api_v1_router.include_router(channels_whatsapp.router)
+api_v1_router.include_router(channels_phone.router)
 api_v1_router.include_router(stats.router)
 api_v1_router.include_router(admin_router)
 
