@@ -19,10 +19,20 @@ from tiqora.api.v1.admin.schemas import (
     GenericAgentJobOut,
     PostmasterFilterOut,
     PostmasterFilterRuleOut,
+    StateTypeOut,
 )
 from tiqora.db.legacy.config import Acl, GenericAgentJobs, PostmasterFilter
+from tiqora.db.legacy.ticket import TicketStateType
 
 router = APIRouter(tags=["admin:readonly"])
+
+
+@router.get("/state-types", response_model=list[StateTypeOut])
+async def list_state_types(admin: AdminUser, session: DbSession) -> list[TicketStateType]:
+    """Reference list for resolving a state's ``type_id`` to a name."""
+    _ = admin
+    result = await session.execute(select(TicketStateType).order_by(TicketStateType.id))
+    return list(result.scalars().all())
 
 
 @router.get("/postmaster-filters", response_model=list[PostmasterFilterOut])
