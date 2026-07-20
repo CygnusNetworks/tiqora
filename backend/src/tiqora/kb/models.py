@@ -63,6 +63,23 @@ class TiqoraKbCategory(TiqoraBase):
     __table_args__ = (Index("ix_tiqora_kb_category_parent_id", "parent_id"),)
 
 
+class TiqoraKbCategoryGroup(TiqoraBase):
+    """Many-to-many category<->permission_group ACL.
+
+    A category visible to several groups has one row per group. A category
+    with **no** rows here is unrestricted (visible to every agent). Supersedes
+    the single ``TiqoraKbCategory.permission_group_id`` column, which is kept
+    (deprecated, backfilled by migration 20260720_0008) for rollback safety.
+    """
+
+    __tablename__ = "tiqora_kb_category_group"
+
+    category_id: Mapped[int] = mapped_column(Integer, primary_key=True, nullable=False)
+    permission_group_id: Mapped[int] = mapped_column(Integer, primary_key=True, nullable=False)
+
+    __table_args__ = (Index("ix_tiqora_kb_category_group_group", "permission_group_id"),)
+
+
 class TiqoraKbArticle(TiqoraBase):
     """KB article: Markdown source, versioned, chunked on publish."""
 
