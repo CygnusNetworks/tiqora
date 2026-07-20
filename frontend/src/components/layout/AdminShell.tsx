@@ -20,6 +20,16 @@ const NAV_GROUPS: NavGroup[] = [
         labelKey: "admin.nav.agentRoles",
         testId: "admin-nav-agent-roles",
       },
+      {
+        to: "/admin/agent-groups",
+        labelKey: "admin.nav.agentGroups",
+        testId: "admin-nav-agent-groups",
+      },
+      {
+        to: "/admin/role-groups",
+        labelKey: "admin.nav.roleGroups",
+        testId: "admin-nav-role-groups",
+      },
     ],
   },
   {
@@ -46,6 +56,11 @@ const NAV_GROUPS: NavGroup[] = [
         to: "/admin/customer-companies",
         labelKey: "admin.nav.customerCompanies",
         testId: "admin-nav-customer-companies",
+      },
+      {
+        to: "/admin/customer-user-customers",
+        labelKey: "admin.nav.customerUserCustomers",
+        testId: "admin-nav-customer-user-customers",
       },
     ],
   },
