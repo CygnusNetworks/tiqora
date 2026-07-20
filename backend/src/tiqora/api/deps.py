@@ -63,38 +63,55 @@ async def get_current_user(
     request: Request,
     auth: Annotated[AuthService, Depends(get_auth_service)],
     settings: Annotated[Settings, Depends(get_app_settings)],
+    session: Annotated[AsyncSession, Depends(get_db)],
     authorization: Annotated[str | None, Header()] = None,
     tiqora_session: Annotated[str | None, Cookie(alias="tiqora_session")] = None,
 ) -> AuthenticatedUser:
-    """Resolve agent via session cookie or ``Authorization: Bearer`` API key."""
+    """Resolve agent via session cookie or ``Authorization: Bearer`` API key.
+
+    The auth lookups read the DB on the *shared* request session, which
+    autobegins a transaction. We roll it back before returning so endpoints can
+    open their own ``async with session.begin()`` without hitting
+    "A transaction is already begun on this Session" (the lookups are
+    read-only, so nothing is lost).
+    """
     # Cookie name may be customised via settings
     cookie_token = tiqora_session
     if cookie_token is None:
         cookie_token = request.cookies.get(settings.session_cookie_name)
 
-    if cookie_token:
-        user = await auth.resolve_session(cookie_token)
-        if user is not None:
-            request.state.session_token = cookie_token
-            return user
+    resolved: AuthenticatedUser | None = None
+    token_for_state: str | None = None
 
-    if authorization and authorization.lower().startswith("bearer "):
+    if cookie_token:
+        resolved = await auth.resolve_session(cookie_token)
+        if resolved is not None:
+            token_for_state = cookie_token
+
+    if resolved is None and authorization and authorization.lower().startswith("bearer "):
         raw = authorization[7:].strip()
         if raw:
-            user = await auth.resolve_api_key(raw)
-            if user is not None:
-                return user
-            # Also accept session token as bearer (MCP / CLI convenience)
-            user = await auth.resolve_session(raw)
-            if user is not None:
-                request.state.session_token = raw
-                return user
+            resolved = await auth.resolve_api_key(raw)
+            if resolved is None:
+                # Also accept session token as bearer (MCP / CLI convenience)
+                resolved = await auth.resolve_session(raw)
+                if resolved is not None:
+                    token_for_state = raw
 
-    raise HTTPException(
-        status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Not authenticated",
-        headers={"WWW-Authenticate": "Bearer"},
-    )
+    # Discard the read-only transaction the auth lookups opened on the shared
+    # request session so downstream endpoints start with a clean session.
+    await session.rollback()
+
+    if resolved is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Not authenticated",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    if token_for_state is not None:
+        request.state.session_token = token_for_state
+    return resolved
 
 
 async def get_totp_service(
