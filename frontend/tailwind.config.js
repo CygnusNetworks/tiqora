@@ -30,6 +30,12 @@ export default {
           closed: "var(--color-state-closed)",
           removed: "var(--color-state-removed)",
         },
+        article: {
+          customer: "var(--color-article-customer)",
+          "customer-border": "var(--color-article-customer-border)",
+          agent: "var(--color-article-agent)",
+          system: "var(--color-article-system)",
+        },
       },
       fontFamily: {
         sans: ["var(--font-sans)", "system-ui", "sans-serif"],
