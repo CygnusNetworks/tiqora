@@ -57,6 +57,8 @@ import { AclPage } from "@/routes/admin/AclPage";
 import { AclDetailPage } from "@/routes/admin/AclDetailPage";
 import { GenericAgentJobsPage } from "@/routes/admin/GenericAgentJobsPage";
 import { GenericAgentJobDetailPage } from "@/routes/admin/GenericAgentJobDetailPage";
+import { ProcessesPage } from "@/routes/admin/ProcessesPage";
+import { ProcessDetailPage } from "@/routes/admin/ProcessDetailPage";
 
 const rootRoute = createRootRoute({
   component: () => <Outlet />,
@@ -420,6 +422,18 @@ const adminGenericAgentJobDetailRoute = createRoute({
   component: GenericAgentJobDetailPage,
 });
 
+const adminProcessesRoute = createRoute({
+  getParentRoute: () => adminLayoutRoute,
+  path: "/processes",
+  component: ProcessesPage,
+});
+
+const adminProcessDetailRoute = createRoute({
+  getParentRoute: () => adminLayoutRoute,
+  path: "/processes/$processEntityId",
+  component: ProcessDetailPage,
+});
+
 const catchAllRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "$",
@@ -474,6 +488,8 @@ const routeTree = rootRoute.addChildren([
     adminAclDetailRoute,
     adminGenericAgentJobsRoute,
     adminGenericAgentJobDetailRoute,
+    adminProcessesRoute,
+    adminProcessDetailRoute,
   ]),
   catchAllRoute,
 ]);

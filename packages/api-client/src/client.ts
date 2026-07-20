@@ -233,6 +233,88 @@ export type TicketLinkOut = {
   rule_id: string;
 };
 
+// ── ProcessManagement (BPM) ─────────────────────────────────────────────
+// Hand-written (see the Stats block above for rationale): mirrors
+// tiqora/process/schemas.py directly rather than requiring an openapi.json
+// regeneration.
+export type ProcessSummaryOut = {
+  id: number;
+  entity_id: string;
+  name: string;
+  state_entity_id: string;
+};
+
+export type ActivityDialogSummaryOut = {
+  entity_id: string;
+  name: string;
+  description_short: string;
+};
+
+export type ActivityDialogRefOut = {
+  entity_id: string;
+  name: string;
+};
+
+export type ProcessActivityOut = {
+  entity_id: string;
+  name: string;
+  activity_dialogs: ActivityDialogRefOut[];
+};
+
+export type ProcessDetailOut = {
+  id: number;
+  entity_id: string;
+  name: string;
+  state_entity_id: string;
+  start_activity_entity_id: string | null;
+  activities: ProcessActivityOut[];
+};
+
+export type TicketProcessStateOut = {
+  process_entity_id: string | null;
+  process_name: string | null;
+  activity_entity_id: string | null;
+  activity_name: string | null;
+  available_dialogs: ActivityDialogSummaryOut[];
+  available_transitions_count: number;
+};
+
+export type ActivityDialogFieldOut = {
+  display: string;
+  default_value: unknown;
+  description_short: string;
+  description_long: string;
+  config: Record<string, unknown>;
+};
+
+export type ActivityDialogDetailOut = {
+  entity_id: string;
+  name: string;
+  description_short: string;
+  description_long: string;
+  field_order: string[];
+  fields: Record<string, ActivityDialogFieldOut>;
+  submit_advice_text: string;
+  submit_button_text: string;
+};
+
+export type ProcessStartIn = {
+  process_entity_id: string;
+};
+
+export type ActivityDialogSubmitIn = {
+  activity_dialog_entity_id: string;
+  field_values: Record<string, unknown>;
+};
+
+export type ActivityDialogSubmitOut = {
+  activity_changed: boolean;
+  new_activity_entity_id: string | null;
+  transition_entity_id: string | null;
+  unsupported_actions: string[];
+  state: TicketProcessStateOut;
+};
+
 export class ApiError extends Error {
   readonly status: number;
   readonly detail: unknown;
@@ -1111,6 +1193,52 @@ export class ApiClient {
 
   calendarExportIcsUrl(calendarId: number): string {
     return joinUrl(this.baseUrl, `/api/v1/calendar/calendars/${calendarId}/export.ics`);
+  }
+
+  // ── ProcessManagement (BPM) (/api/v1/process) ────────────────────────────
+
+  listProcesses(signal?: AbortSignal) {
+    return this.request<ProcessSummaryOut[]>("GET", "/api/v1/process/", { signal });
+  }
+
+  getProcess(processEntityId: string, signal?: AbortSignal) {
+    return this.request<ProcessDetailOut>(
+      "GET",
+      `/api/v1/process/${encodeURIComponent(processEntityId)}`,
+      { signal },
+    );
+  }
+
+  getActivityDialog(activityDialogEntityId: string, signal?: AbortSignal) {
+    return this.request<ActivityDialogDetailOut>(
+      "GET",
+      `/api/v1/process/activity-dialog/${encodeURIComponent(activityDialogEntityId)}`,
+      { signal },
+    );
+  }
+
+  getTicketProcessState(ticketId: number, signal?: AbortSignal) {
+    return this.request<TicketProcessStateOut>(
+      "GET",
+      `/api/v1/process/ticket/${ticketId}/state`,
+      { signal },
+    );
+  }
+
+  startTicketProcess(ticketId: number, body: ProcessStartIn, signal?: AbortSignal) {
+    return this.request<TicketProcessStateOut>(
+      "POST",
+      `/api/v1/process/ticket/${ticketId}/start`,
+      { body, signal },
+    );
+  }
+
+  submitActivityDialog(ticketId: number, body: ActivityDialogSubmitIn, signal?: AbortSignal) {
+    return this.request<ActivityDialogSubmitOut>(
+      "POST",
+      `/api/v1/process/ticket/${ticketId}/submit`,
+      { body, signal },
+    );
   }
 }
 
