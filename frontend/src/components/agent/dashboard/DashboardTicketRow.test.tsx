@@ -1,0 +1,82 @@
+import { describe, it, expect } from "vitest";
+import { render, screen } from "@testing-library/react";
+import {
+  RouterProvider,
+  createRootRoute,
+  createRoute,
+  createRouter,
+  createMemoryHistory,
+} from "@tanstack/react-router";
+import type { TicketListItem } from "@/lib/api";
+import { DashboardTicketRow } from "./DashboardTicketRow";
+
+const ticket: TicketListItem = {
+  id: 42,
+  tn: "20240601000042",
+  title: "Printer on fire",
+  queue_id: 3,
+  queue_name: "Support::Level 2",
+  state_id: 4,
+  state: "open",
+  state_type: "open",
+  priority_id: 5,
+  priority: "5 very high",
+  lock_id: 1,
+  lock: "unlock",
+  owner_id: 1,
+  create_time: "2024-06-01T12:00:00",
+  change_time: "2024-06-01T12:00:00",
+  escalation_time: 0,
+  escalation_response_time: 0,
+  escalation_update_time: 0,
+  escalation_solution_time: 0,
+  until_time: 0,
+};
+
+async function renderInRouter(ui: React.ReactElement) {
+  const rootRoute = createRootRoute({ component: () => ui });
+  const ticketRoute = createRoute({
+    getParentRoute: () => rootRoute,
+    path: "/agent/tickets/$ticketId",
+  });
+  const router = createRouter({
+    routeTree: rootRoute.addChildren([ticketRoute]),
+    history: createMemoryHistory({ initialEntries: ["/"] }),
+  });
+  await router.load();
+  return render(
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    <RouterProvider router={router as any} />,
+  );
+}
+
+describe("DashboardTicketRow", () => {
+  it("renders number, title, queue, state chip and priority", async () => {
+    await renderInRouter(<DashboardTicketRow ticket={ticket} />);
+    const row = await screen.findByTestId("dashboard-ticket-42");
+    expect(row).toHaveTextContent("20240601000042");
+    expect(row).toHaveTextContent("Printer on fire");
+    // Short queue name (last segment) rather than the full path.
+    expect(row).toHaveTextContent("Level 2");
+    expect(row).toHaveTextContent("open");
+    // Priority shown without the numeric rank.
+    const prio = screen.getByTestId("dashboard-ticket-42-priority");
+    expect(prio).toHaveTextContent("very high");
+    expect(prio).not.toHaveTextContent("5 very");
+    // Highest priority is tinted danger.
+    expect(prio.className).toContain("text-danger");
+    // Colour dot present.
+    expect(screen.getByTestId("dashboard-ticket-42-state-dot")).toBeInTheDocument();
+  });
+
+  it("renders the trailing slot", async () => {
+    await renderInRouter(<DashboardTicketRow ticket={ticket} trailing="-2h05m" />);
+    expect(await screen.findByText("-2h05m")).toBeInTheDocument();
+  });
+
+  it("links to the ticket zoom", async () => {
+    await renderInRouter(<DashboardTicketRow ticket={ticket} />);
+    const link = await screen.findByTestId("dashboard-ticket-42");
+    expect(link.getAttribute("href")).toContain("/agent/tickets/42");
+  });
+});
