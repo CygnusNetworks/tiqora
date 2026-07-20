@@ -48,6 +48,22 @@
     "totpVerify": "Verify",
     "totpInvalid": "Invalid or expired code."
   },
+  "security": {
+    "title": "Security",
+    "totpHeading": "Two-factor authentication",
+    "totpEnabled": "Enabled",
+    "totpDisabled": "Not enabled",
+    "enrollButton": "Set up authenticator app",
+    "scanHint": "Scan this QR code with your authenticator app, then enter the 6-digit code to confirm.",
+    "secretLabel": "Or enter this secret manually:",
+    "confirmCode": "Confirmation code",
+    "confirmButton": "Confirm",
+    "confirmError": "Invalid code — please try again.",
+    "disableButton": "Disable two-factor authentication",
+    "disableCode": "Enter a code to disable",
+    "disableConfirm": "Disable",
+    "disableError": "Invalid code — please try again."
+  },
   "dashboard": {
     "title": "Dashboard",
     "welcome": "Welcome, {{name}}",

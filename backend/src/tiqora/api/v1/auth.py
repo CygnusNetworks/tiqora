@@ -12,6 +12,7 @@ from fastapi.responses import RedirectResponse
 
 from tiqora.api.deps import AppSettings, CurrentUser, TOTPServiceDep, get_auth_service, get_redis
 from tiqora.domain.auth import AuthService, user_to_dict
+from tiqora.domain.auth_ldap import LdapAuthService
 from tiqora.domain.oidc import OIDCError, OIDCService
 from tiqora.domain.schemas import (
     AuthMethodsOut,
@@ -23,6 +24,7 @@ from tiqora.domain.schemas import (
     UserMe,
 )
 from tiqora.domain.spnego import SpnegoService, SpnegoUnavailable, principal_to_login
+from tiqora.domain.totp_qr import totp_qr_svg
 
 logger = structlog.get_logger(__name__)
 
@@ -47,7 +49,12 @@ def _set_session_cookie(response: Response, settings: AppSettings, token: str) -
 @router.get("/methods", response_model=AuthMethodsOut)
 async def auth_methods(settings: AppSettings) -> AuthMethodsOut:
     """Discovery endpoint the login page uses to decide which buttons to show."""
-    return AuthMethodsOut(password=True, oidc=settings.oidc_enabled, spnego=settings.spnego_enabled)
+    return AuthMethodsOut(
+        password=True,
+        oidc=settings.oidc_enabled,
+        spnego=settings.spnego_enabled,
+        ldap=settings.ldap_enabled,
+    )
 
 
 @router.post("/login", response_model=LoginResponse)
@@ -59,6 +66,15 @@ async def login(
     settings: AppSettings,
 ) -> LoginResponse:
     user = await auth.authenticate_password(body.login, body.password)
+    if user is None and settings.ldap_enabled:
+        # LDAP is tried as a fallback when local password auth fails,
+        # mirroring Znuny's chained AuthModule::LDAP behaviour. No
+        # auto-provisioning in v1: the resolved LDAP UID must match an
+        # existing, valid `users.login` row.
+        ldap_service = LdapAuthService(settings)
+        ldap_uid = await ldap_service.authenticate(body.login, body.password)
+        if ldap_uid is not None:
+            user = await auth.get_user_by_login(ldap_uid, auth_method="ldap")
     if user is None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -134,6 +150,21 @@ async def totp_verify(
 async def totp_enroll(user: CurrentUser, totp: TOTPServiceDep) -> TOTPEnrollOut:
     secret, uri = await totp.enroll(user.id, user.login)
     return TOTPEnrollOut(secret=secret, otpauth_uri=uri)
+
+
+@router.get("/totp/enroll/qr")
+async def totp_enroll_qr(user: CurrentUser, totp: TOTPServiceDep) -> Response:
+    """SVG QR code for the pending enrollment's ``otpauth://`` URI.
+
+    404 if the caller has no pending enrollment (never called
+    ``POST /totp/enroll``, or already confirmed one — re-enroll first).
+    """
+    uri = await totp.get_pending_provisioning_uri(user.id, user.login)
+    if uri is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="No pending TOTP enrollment"
+        )
+    return Response(content=totp_qr_svg(uri), media_type="image/svg+xml")
 
 
 @router.post("/totp/confirm", response_model=TOTPStatusOut)

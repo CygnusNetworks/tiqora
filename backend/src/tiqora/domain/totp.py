@@ -67,6 +67,23 @@ class TOTPService:
         )
         return secret, uri
 
+    async def get_pending_provisioning_uri(self, user_id: int, login: str) -> str | None:
+        """Return the ``otpauth://`` URI for a not-yet-confirmed enrollment, if any.
+
+        Used by the QR endpoint: ``None`` if the user never called
+        :meth:`enroll`, or already confirmed it (``row.enabled`` is True —
+        the secret is no longer "pending", re-enroll to get a fresh QR).
+        """
+        row = await self._get_row(user_id)
+        if row is None or row.enabled:
+            return None
+        secret = self._decrypt(row.secret)
+        if secret is None:
+            return None
+        return pyotp.totp.TOTP(secret).provisioning_uri(
+            name=login, issuer_name=self._settings.totp_issuer
+        )
+
     async def _verify_code(self, row: TiqoraUserTotp, code: str) -> bool:
         secret = self._decrypt(row.secret)
         if secret is None:

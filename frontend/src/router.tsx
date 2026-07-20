@@ -12,6 +12,7 @@ import { TicketZoomPage } from "@/routes/agent/TicketZoomPage";
 import { SearchPage, type SearchSearch } from "@/routes/agent/SearchPage";
 import { KbPage, type KbSearch } from "@/routes/agent/KbPage";
 import { KbArticlePage as AgentKbArticlePage } from "@/routes/agent/KbArticlePage";
+import { SecurityPage } from "@/routes/agent/SecurityPage";
 import {
   KbArticleNewPage,
   KbArticleEditPage,
@@ -183,6 +184,12 @@ const agentKbArticleEditRoute = createRoute({
   getParentRoute: () => agentLayoutRoute,
   path: "/kb/$articleId/edit",
   component: KbArticleEditPage,
+});
+
+const agentSecurityRoute = createRoute({
+  getParentRoute: () => agentLayoutRoute,
+  path: "/security",
+  component: SecurityPage,
 });
 
 // /portal/login: mounts its own CustomerAuthProvider (a separate session from
@@ -419,6 +426,7 @@ const routeTree = rootRoute.addChildren([
     agentKbNewRoute,
     agentKbArticleRoute,
     agentKbArticleEditRoute,
+    agentSecurityRoute,
   ]),
   portalLoginRoute,
   portalLayoutRoute.addChildren([

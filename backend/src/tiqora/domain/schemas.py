@@ -27,6 +27,7 @@ class AuthMethodsOut(BaseModel):
     password: bool = True
     oidc: bool = False
     spnego: bool = False
+    ldap: bool = False
 
 
 class TOTPEnrollOut(BaseModel):

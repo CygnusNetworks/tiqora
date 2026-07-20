@@ -165,19 +165,26 @@ function SidebarBody({ onNavigate }: { onNavigate?: () => void }) {
         </div>
       </nav>
 
-      <div className="mt-2 flex items-center gap-2.5 border-t border-hairline px-2 pt-3">
-        <span
-          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-accent text-[11px] font-bold text-accent-ink"
-          aria-hidden
+      <div className="mt-2 border-t border-hairline px-2 pt-3">
+        <Link
+          to="/agent/security"
+          onClick={onNavigate}
+          data-testid="agent-nav-security"
+          className="flex items-center gap-2.5 rounded-lg py-1 transition-colors duration-100 hover:bg-surface-subtle focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent"
         >
-          {initials}
-        </span>
-        <div className="min-w-0 flex-1 leading-tight">
-          <p className="truncate text-[12.5px] font-medium text-ink" data-testid="current-user">
-            {user?.first_name || user?.login} {user?.last_name}
-          </p>
-          <p className="truncate text-[11px] text-muted">{user?.login}</p>
-        </div>
+          <span
+            className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-accent text-[11px] font-bold text-accent-ink"
+            aria-hidden
+          >
+            {initials}
+          </span>
+          <div className="min-w-0 flex-1 leading-tight">
+            <p className="truncate text-[12.5px] font-medium text-ink" data-testid="current-user">
+              {user?.first_name || user?.login} {user?.last_name}
+            </p>
+            <p className="truncate text-[11px] text-muted">{user?.login}</p>
+          </div>
+        </Link>
       </div>
     </div>
   );

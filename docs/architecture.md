@@ -110,7 +110,7 @@ Key endpoints: `/auth/login|me|logout`, `/queues`, `/tickets`,
 - API keys: `tiqora_api_key` (sha256 of key, linked to `user_id`);
   `Authorization: Bearer`.
 - `GET /api/v1/auth/methods` is a discovery endpoint (`{password, oidc,
-  spnego}`) the agent login page uses to decide which buttons to show.
+  spnego, ldap}`) the agent login page uses to decide which buttons to show.
 - **OIDC/SSO** (Phase 3c, authlib): `/api/v1/auth/oidc/login` redirects to the
   provider's authorization endpoint (state stored in Redis, short TTL);
   `/callback` exchanges the code, fetches `userinfo`, and maps a configurable
@@ -131,7 +131,23 @@ Key endpoints: `/auth/login|me|logout`, `/queues`, `/tickets`,
   session is created in a **pending-2FA state** — tagged so it is invisible
   to the normal session-resolve path (`get_current_user`) and cannot touch
   any other endpoint. `POST /api/v1/auth/totp/verify` (±1 step / ~90s
-  window) promotes it to a full session.
+  window) promotes it to a full session. `GET /api/v1/auth/totp/enroll/qr`
+  renders the pending enrollment's `otpauth://` URI as an `image/svg+xml` QR
+  code (`qrcode` lib, SVG factory — no `PIL` dependency); the agent security
+  page (`/agent/security`) consumes it as a plain cookie-authenticated
+  `<img src>`. 404 with no pending enrollment.
+- **LDAP/AD** (Phase 3c, `ldap3`, bind-search-bind): ports
+  `Kernel::System::Auth::LDAP` / `CustomerAuth::LDAP`
+  (`domain/auth_ldap.py` + `domain/customer_auth_ldap.py`, sharing the
+  bind-search-bind core in `domain/_ldap_core.py`). Tried as a **fallback**
+  when local password auth fails and `TIQORA_LDAP_ENABLED` /
+  `TIQORA_CUSTOMER_LDAP_ENABLED` is set. All `ldap3` calls run in an
+  executor (sync library, same rule as `gssapi`). **No auto-provisioning in
+  v1** — the LDAP UID resolved by the search must match an existing,
+  `valid_id = 1` `users.login` / `customer_user.login` row, or the login is
+  rejected. Optional group-membership gate (`GroupDN`/`AccessAttr`, mirrors
+  the Perl module). Simplified vs. Znuny: no `Die`/`UserSuffix`/
+  `UserLowerCase`/per-directory charset knobs.
 - Planned: GenericInterface SessionIDs against Znuny `sessions`.
 
 ### Webhooks (Phase 3c)
