@@ -292,6 +292,7 @@
   "account": {
     "menu": "Account menu",
     "settings": "Settings",
+    "security": "Security / 2FA",
     "language": "Language",
     "theme": "Theme",
     "themeLight": "Light",

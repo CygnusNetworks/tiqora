@@ -126,6 +126,15 @@ export function SettingsIcon(props: IconProps) {
   );
 }
 
+export function ShieldIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M12 3 5 6.5v5c0 4.2 2.9 7.8 7 9 4.1-1.2 7-4.8 7-9v-5L12 3Z" />
+      <path d="m9.5 12 1.8 1.8L14.8 10" />
+    </Icon>
+  );
+}
+
 export function LogOutIcon(props: IconProps) {
   return (
     <Icon {...props}>

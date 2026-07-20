@@ -292,6 +292,7 @@
   "account": {
     "menu": "Kontomenü",
     "settings": "Einstellungen",
+    "security": "Sicherheit / 2FA",
     "language": "Sprache",
     "theme": "Design",
     "themeLight": "Hell",
