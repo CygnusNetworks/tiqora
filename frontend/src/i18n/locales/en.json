@@ -4,6 +4,12 @@
     "tagline": "Modern ticket system — Znuny/OTRS 6.5 compatible",
     "beta": "Beta"
   },
+  "notifications": {
+    "title": "Notifications",
+    "empty": "No new notifications.",
+    "newTicket": "New in your queue",
+    "noSubject": "(no subject)"
+  },
   "settings": {
     "title": "Settings",
     "language": "Language",
