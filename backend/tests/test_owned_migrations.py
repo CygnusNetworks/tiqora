@@ -5,13 +5,13 @@ head`` must apply ``versions_tiqora`` *and* ``versions_owned`` cleanly on
 both PostgreSQL and MariaDB, and the resulting indexes must be pure
 additions (no data changes). Without ownership enabled, ``versions_owned``
 stays entirely inert — covered by ``tests/test_ownership.py``'s gate-logic
-unit tests and by :mod:`alembic.env`'s ``_script_locations``.
+unit tests, by :mod:`tests.test_migration_gate` (the config-level gate), and
+by ``tiqora.cli.migrate.build_alembic_config``.
 """
 
 from __future__ import annotations
 
 import os
-from pathlib import Path
 
 import pytest
 from sqlalchemy import create_engine, inspect, text
@@ -19,9 +19,6 @@ from sqlalchemy import create_engine, inspect, text
 from tiqora.config import get_settings
 
 pytestmark = pytest.mark.db
-
-BACKEND_ROOT = Path(__file__).resolve().parent.parent
-ALEMBIC_INI = BACKEND_ROOT / "alembic.ini"
 
 
 def _run_alembic_upgrade_head(database_url: str) -> None:
@@ -33,7 +30,8 @@ def _run_alembic_upgrade_head(database_url: str) -> None:
     it is process-global.
     """
     from alembic import command
-    from alembic.config import Config
+
+    from tiqora.cli.migrate import build_alembic_config
 
     async_url = (
         database_url.replace("postgresql+psycopg2://", "postgresql+asyncpg://")
@@ -44,15 +42,11 @@ def _run_alembic_upgrade_head(database_url: str) -> None:
     os.environ["DATABASE_URL"] = async_url
     get_settings.cache_clear()
     try:
-        cfg = Config(str(ALEMBIC_INI))
-        cfg.set_main_option("script_location", str(BACKEND_ROOT / "alembic"))
-        # cwd for alembic/env.py's relative "alembic/versions_tiqora" paths
-        old_cwd = os.getcwd()
-        os.chdir(BACKEND_ROOT)
-        try:
-            command.upgrade(cfg, "head")
-        finally:
-            os.chdir(old_cwd)
+        # This test module exercises the OWNED chain, so it builds the config
+        # with the owned locations included — exactly what `tiqora migrate`
+        # does once the ownership gate is active.
+        cfg = build_alembic_config(include_owned=True)
+        command.upgrade(cfg, "head")
     finally:
         if old_url is None:
             os.environ.pop("DATABASE_URL", None)
@@ -93,19 +87,6 @@ def _sync_url(async_url: str) -> str:
     )
 
 
-def _mark_ownership_enabled(sync_url: str) -> None:
-    key_col = "`key`" if "mysql" in sync_url else "key"
-    engine = create_engine(sync_url)
-    with engine.begin() as conn:
-        conn.execute(
-            text(
-                f"INSERT INTO tiqora_settings ({key_col}, value) "
-                "VALUES ('schema.ownership', 'enabled')"
-            )
-        )
-    engine.dispose()
-
-
 def _owned_indexes(sync_url: str) -> dict[str, set[str]]:
     engine = create_engine(sync_url)
     insp = inspect(engine)
@@ -120,12 +101,11 @@ def test_owned_chain_applies_cleanly_on_postgres(postgres_znuny_url: str) -> Non
     old_flag = os.environ.get("TIQORA_SCHEMA_OWNERSHIP")
     try:
         _drop_tiqora_tables(_sync_url(postgres_znuny_url))
-        # Phase 1: base tiqora_* chain only (creates tiqora_settings).
-        _run_alembic_upgrade_head(postgres_znuny_url)
-
-        # Phase 2: flip both gates and re-run — versions_owned becomes visible.
+        # Apply the full chain (tiqora + owned) — this module validates that
+        # the owned DDL runs cleanly on real DBs. The gate that keeps owned
+        # invisible without ownership is validated separately in
+        # tests/test_migration_gate.py.
         os.environ["TIQORA_SCHEMA_OWNERSHIP"] = "1"
-        _mark_ownership_enabled(_sync_url(postgres_znuny_url))
         _run_alembic_upgrade_head(postgres_znuny_url)
 
         indexes = _owned_indexes(_sync_url(postgres_znuny_url))
@@ -145,10 +125,7 @@ def test_owned_chain_applies_cleanly_on_mariadb(mariadb_znuny_url: str) -> None:
     old_flag = os.environ.get("TIQORA_SCHEMA_OWNERSHIP")
     try:
         _drop_tiqora_tables(_sync_url(mariadb_znuny_url))
-        _run_alembic_upgrade_head(mariadb_znuny_url)
-
         os.environ["TIQORA_SCHEMA_OWNERSHIP"] = "1"
-        _mark_ownership_enabled(_sync_url(mariadb_znuny_url))
         _run_alembic_upgrade_head(mariadb_znuny_url)
 
         indexes = _owned_indexes(_sync_url(mariadb_znuny_url))
