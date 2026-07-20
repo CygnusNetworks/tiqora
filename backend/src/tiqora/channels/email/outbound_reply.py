@@ -19,7 +19,6 @@ in both paths; only the send attempt is gated.
 
 from __future__ import annotations
 
-import re
 import secrets
 import socket
 import time
@@ -131,63 +130,6 @@ async def _queue_outbound_meta(
     return from_line, queue_name, sig_text, sig_ct
 
 
-async def _agent_names(session: AsyncSession, user_id: int) -> tuple[str, str]:
-    row = (
-        await session.execute(
-            text("SELECT first_name, last_name FROM users WHERE id = :uid LIMIT 1"),
-            {"uid": user_id},
-        )
-    ).first()
-    if row is None:
-        return "", ""
-    return str(row[0] or ""), str(row[1] or "")
-
-
-async def _ticket_vars(session: AsyncSession, ticket_id: int) -> dict[str, str]:
-    row = (
-        await session.execute(
-            text(
-                "SELECT t.tn, t.title, q.name AS queue_name, ts.name AS state_name,"
-                " tp.name AS priority_name"
-                " FROM ticket t"
-                " JOIN queue q ON q.id = t.queue_id"
-                " JOIN ticket_state ts ON ts.id = t.ticket_state_id"
-                " JOIN ticket_priority tp ON tp.id = t.ticket_priority_id"
-                " WHERE t.id = :tid LIMIT 1"
-            ),
-            {"tid": ticket_id},
-        )
-    ).first()
-    if row is None:
-        return {}
-    return {
-        "TicketNumber": str(row[0] or ""),
-        "Title": str(row[1] or ""),
-        "Queue": str(row[2] or ""),
-        "State": str(row[3] or ""),
-        "Priority": str(row[4] or ""),
-    }
-
-
-_AGENT_TAG_RE = re.compile(r"<OTRS_AGENT_(UserFirstname|UserLastname|UserFullname)>", re.IGNORECASE)
-
-
-def _expand_agent_signature_tags(text: str, first_name: str, last_name: str) -> str:
-    """Minimal Agent_* tags used by the default Znuny system signature."""
-
-    def _sub(match: re.Match[str]) -> str:
-        key = match.group(1).lower()
-        if key == "userfirstname":
-            return first_name
-        if key == "userlastname":
-            return last_name
-        if key == "userfullname":
-            return f"{first_name} {last_name}".strip()
-        return match.group(0)
-
-    return _AGENT_TAG_RE.sub(_sub, text)
-
-
 async def _latest_customer_message_id(session: AsyncSession, ticket_id: int) -> str | None:
     """Most recent customer-visible email Message-ID on the ticket (for In-Reply-To fallback)."""
     row = (
@@ -224,21 +166,22 @@ async def prepare_outgoing_agent_email(
 ) -> ArticleIn:
     """Return a copy of *article* ready to send and store (sig, From, Message-ID, visibility)."""
     from_line, queue_name, sig_text, _sig_ct = await _queue_outbound_meta(session, queue_id)
-    first_name, last_name = await _agent_names(session, user_id)
-    ticket_vars = await _ticket_vars(session, ticket_id)
 
     body = article.body or ""
     if sig_text and sig_text.strip():
+        # Expand against full ticket context (customer_user, agents, queue) so
+        # signature tags like OTRS_AGENT_* / OTRS_CUSTOMER_DATA_* / OTRS_TICKET_*
+        # resolve the same way as Answer templates.
         expanded = await expand_placeholders(
             session,
             sysconfig,
             sig_text,
-            ticket=ticket_vars,
-            queue_name=queue_name or ticket_vars.get("Queue", ""),
+            ticket_id=ticket_id,
+            user_id=user_id,
+            queue_name=queue_name or "",
             customer_subject=article.subject or "",
             customer_email_lines=[],
         )
-        expanded = _expand_agent_signature_tags(expanded, first_name, last_name)
         body = append_signature(body, expanded, content_type=article.content_type)
 
     message_id = article.message_id

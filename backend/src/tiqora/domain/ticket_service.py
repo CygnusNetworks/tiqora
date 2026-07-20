@@ -742,7 +742,14 @@ class TicketService:
 
         Znuny join: ``queue_standard_template`` → ``standard_template`` on the
         ticket's current ``queue_id``, valid Answer templates only.
+
+        ``<OTRS_...>`` placeholders are expanded server-side against the ticket
+        context (and the acting agent) so the frontend can insert the returned
+        text verbatim.
         """
+        from tiqora.channels.email.placeholder import expand_placeholders
+        from tiqora.znuny.sysconfig import SysConfig
+
         ticket = await self._assert_ticket_ro(user_id, ticket_id)
         rows = (
             (
@@ -763,13 +770,24 @@ class TicketService:
             .scalars()
             .all()
         )
-        return [
-            TemplateOut(
-                id=r.id,
-                name=r.name,
-                text=r.text or "",
-                content_type=r.content_type,
-                template_type=r.template_type,
+        sysconfig = SysConfig(self._session)
+        out: list[TemplateOut] = []
+        for r in rows:
+            raw = r.text or ""
+            expanded = await expand_placeholders(
+                self._session,
+                sysconfig,
+                raw,
+                ticket_id=ticket_id,
+                user_id=user_id,
             )
-            for r in rows
-        ]
+            out.append(
+                TemplateOut(
+                    id=r.id,
+                    name=r.name,
+                    text=expanded,
+                    content_type=r.content_type,
+                    template_type=r.template_type,
+                )
+            )
+        return out
