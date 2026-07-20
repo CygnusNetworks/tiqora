@@ -12,11 +12,12 @@ from tiqora.api.v1.admin.pagination import ListParamsDep, Page, apply_valid_filt
 from tiqora.api.v1.admin.schemas import (
     GroupAssignment,
     RoleAssignment,
+    RoleOut,
     UserCreate,
     UserOut,
     UserUpdate,
 )
-from tiqora.db.legacy.user import GroupUser, RoleUser, Users
+from tiqora.db.legacy.user import GroupUser, Roles, RoleUser, Users
 from tiqora.znuny.password import hash_password
 
 router = APIRouter(prefix="/users", tags=["admin:users"])
@@ -131,6 +132,18 @@ async def revoke_group(
     if existing is not None:
         await session.delete(existing)
         await session.commit()
+
+
+@router.get("/{user_id}/roles", response_model=list[RoleOut])
+async def get_user_roles(user_id: int, admin: AdminUser, session: DbSession) -> list[Roles]:
+    """Roles currently granted to *user_id* (for the assignment editor)."""
+    _ = admin
+    result = await session.execute(
+        select(Roles)
+        .join(RoleUser, RoleUser.role_id == Roles.id)
+        .where(RoleUser.user_id == user_id)
+    )
+    return list(result.scalars().all())
 
 
 @router.put("/{user_id}/roles", status_code=status.HTTP_204_NO_CONTENT)
