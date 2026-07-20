@@ -175,10 +175,13 @@ sub _TablesExist {
 
     for my $Table (qw(tiqora_cache_invalidation tiqora_settings)) {
         my $Success = eval {
+            # NB: no Limit here — Znuny's DB layer would append "LIMIT 1",
+            # and MariaDB/MySQL reject LIMIT on a SHOW TABLES statement
+            # ("error ... near 'LIMIT 1'"). An exact-name SHOW TABLES LIKE
+            # already returns at most one row, so Limit is unnecessary.
             $DBObject->Prepare(
-                SQL   => 'SHOW TABLES LIKE ?',
-                Bind  => [ \$Table ],
-                Limit => 1,
+                SQL  => 'SHOW TABLES LIKE ?',
+                Bind => [ \$Table ],
             );
         };
         return 0 if !$Success || $@;
