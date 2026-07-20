@@ -22,10 +22,48 @@ export type DataTableProps<T> = {
   emptyLabel?: string;
   onEdit?: (row: T) => void;
   onDeactivate?: (row: T) => void;
+  /** Reactivate a soft-deleted row (valid_id → 1). Shown only for invalid rows. */
+  onActivate?: (row: T) => void;
   /** True for a row whose valid_id !== 1 (or equivalent) — renders the invalid Badge. */
   isRowValid?: (row: T) => boolean;
   testId?: string;
 };
+
+function EditIcon() {
+  return (
+    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" aria-hidden="true">
+      <path
+        d="M4 20h4l10.5-10.5a2.12 2.12 0 0 0-3-3L5 17v3Z"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function DeactivateIcon() {
+  return (
+    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" aria-hidden="true">
+      <circle cx="12" cy="12" r="8.5" stroke="currentColor" strokeWidth="1.8" />
+      <path d="m6 6 12 12" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function ActivateIcon() {
+  return (
+    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" aria-hidden="true">
+      <path
+        d="m5 12.5 4.5 4.5L19 7"
+        stroke="currentColor"
+        strokeWidth="1.9"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
 
 /**
  * Generic dense admin data table: mono id-style rendering per column,
@@ -40,11 +78,12 @@ export function DataTable<T>({
   emptyLabel,
   onEdit,
   onDeactivate,
+  onActivate,
   isRowValid,
   testId = "admin-data-table",
 }: DataTableProps<T>) {
   const { t } = useTranslation();
-  const hasActions = Boolean(onEdit || onDeactivate);
+  const hasActions = Boolean(onEdit || onDeactivate || onActivate);
   const colCount = columns.length + (hasActions ? 1 : 0) + (isRowValid ? 1 : 0);
 
   return (
@@ -110,25 +149,44 @@ export function DataTable<T>({
                 )}
                 {hasActions && (
                   <td className="py-1 pr-4 text-right">
-                    <div className="inline-flex items-center gap-1">
+                    <div className="inline-flex items-center gap-1.5">
                       {onEdit && (
                         <Button
                           size="sm"
-                          variant="ghost"
+                          variant="secondary"
                           data-testid={`admin-row-edit-${rowKey(row)}`}
                           onClick={() => onEdit(row)}
                         >
-                          {t("admin.table.edit")}
+                          <span className="inline-flex items-center gap-1">
+                            <EditIcon />
+                            {t("admin.table.edit")}
+                          </span>
                         </Button>
                       )}
                       {onDeactivate && valid && (
                         <Button
                           size="sm"
-                          variant="ghost"
+                          variant="danger"
                           data-testid={`admin-row-deactivate-${rowKey(row)}`}
                           onClick={() => onDeactivate(row)}
                         >
-                          {t("admin.table.deactivate")}
+                          <span className="inline-flex items-center gap-1">
+                            <DeactivateIcon />
+                            {t("admin.table.deactivate")}
+                          </span>
+                        </Button>
+                      )}
+                      {onActivate && !valid && (
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          data-testid={`admin-row-activate-${rowKey(row)}`}
+                          onClick={() => onActivate(row)}
+                        >
+                          <span className="inline-flex items-center gap-1">
+                            <ActivateIcon />
+                            {t("admin.table.activate")}
+                          </span>
                         </Button>
                       )}
                     </div>

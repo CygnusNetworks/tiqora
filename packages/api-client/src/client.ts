@@ -73,6 +73,24 @@ export type KnowledgeArticle = Schemas["KnowledgeArticle"];
 export type KnowledgeBundle = Schemas["KnowledgeBundle"];
 
 // ── Admin ─────────────────────────────────────────────────────────────────
+/** Validity filter for admin resource lists; defaults to hiding invalid rows. */
+export type AdminValidFilter = "valid" | "invalid" | "all";
+
+/** Query params for a paginated admin list. */
+export type AdminListParams = {
+  page?: number;
+  pageSize?: number;
+  valid?: AdminValidFilter;
+};
+
+/** Paginated envelope returned by every admin resource list endpoint. */
+export type AdminPage<Out> = {
+  items: Out[];
+  total: number;
+  page: number;
+  page_size: number;
+};
+
 export type UserOut = Schemas["UserOut"];
 export type UserCreate = Schemas["UserCreate"];
 export type UserUpdate = Schemas["UserUpdate"];
@@ -959,7 +977,15 @@ export class ApiClient {
 
   private adminCrud<Out, Create, Update>(base: string) {
     return {
-      list: (signal?: AbortSignal) => this.request<Out[]>("GET", base, { signal }),
+      list: (params?: AdminListParams, signal?: AbortSignal) =>
+        this.request<AdminPage<Out>>("GET", base, {
+          query: {
+            page: params?.page,
+            page_size: params?.pageSize,
+            valid: params?.valid,
+          },
+          signal,
+        }),
       create: (body: Create, signal?: AbortSignal) =>
         this.request<Out>("POST", base, { body, signal }),
       get: (id: number | string, signal?: AbortSignal) =>
