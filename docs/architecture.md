@@ -86,6 +86,28 @@ Adapters (REST, MCP, workers) must not invent partial writes.
   disposition; `cid:` bodies rewrite to
   `/api/v1/tickets/{id}/articles/{aid}/attachments/by-cid/{cid}`.
 
+### Channels
+
+`channels/` holds one package per inbound/outbound communication path; every
+plugin funnels through `domain/ticket_write_service.{create_ticket,add_article}`
+— it never writes tickets/articles itself. `channels/common.py` has the
+building blocks shared across the non-email plugins: `communication_channel`
+row registration, phone-number → `customer_user` resolution, and
+follow-up-or-create ticket dispatch (`detect_followup` subject/body scan,
+falling back to "most recent non-closed ticket for this customer").
+
+| Package | Direction | Transport |
+|---|---|---|
+| `channels/email/` | in+out | IMAP/POP fetch, SMTP send (postmaster pipeline) |
+| `channels/sms/` | in+out | Generic HTTP webhook gateway (`SmsGateway` protocol) |
+| `channels/whatsapp/` | in+out | Meta WhatsApp Cloud API (Graph API) |
+| `channels/phone/` | in only | Thin CTI logging API (no gateway) |
+
+SMS/WhatsApp/Phone are mounted under `/api/v1/channels/{sms,whatsapp,phone}`,
+disabled by default (`channel.<name>.enabled` in `tiqora_settings`), and
+configured via `/api/v1/admin/channels`. Full details, endpoints, and config
+keys: [channels.md](./channels.md).
+
 ### Read path (Phase 1a)
 
 ```
