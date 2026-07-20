@@ -1,9 +1,11 @@
 # --
 # Copyright (C) 2026 Cygnus Networks GmbH, https://cygnusnetworks.de/
 # --
-# This software comes with ABSOLUTELY NO WARRANTY. For details, see
-# the enclosed LICENSE file (AGPL-3.0-only). If you did not receive
-# this file, see https://www.gnu.org/licenses/agpl-3.0.txt.
+# This add-on runs inside Znuny and uses Znuny's GPL-3.0-licensed APIs;
+# it is therefore licensed under GPL-3.0-only (unlike the rest of the
+# Tiqora project, which is AGPL-3.0-only). This software comes with
+# ABSOLUTELY NO WARRANTY. For details, see the enclosed LICENSE file.
+# If you did not receive it, see https://www.gnu.org/licenses/gpl-3.0.txt.
 # --
 
 package Kernel::System::TiqoraSync;
