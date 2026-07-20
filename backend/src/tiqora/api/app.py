@@ -14,6 +14,7 @@ from starlette.responses import Response as StarletteResponse
 from tiqora import __version__
 from tiqora.api.compat.router import compat_router, mount_dynamic_compat_routes
 from tiqora.api.portal import portal_router
+from tiqora.api.spa import mount_spa, spa_is_available
 from tiqora.api.v1 import api_v1_router
 from tiqora.config import Settings, get_settings
 from tiqora.db.engine import check_database, get_session_factory
@@ -84,7 +85,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app = FastAPI(
         title=cfg.app_name,
         version=__version__,
-        description=("Tiqora ticket system API. Under active development — not production ready."),
+        description="Tiqora ticket system API.",
         lifespan=lifespan,
     )
     app.state.settings = cfg
@@ -155,13 +156,21 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         """Prometheus metrics exposition."""
         return Response(content=generate_latest(), media_type=CONTENT_TYPE_LATEST)
 
-    @app.get("/", tags=["ops"])
-    async def root() -> dict[str, str]:
-        return {
-            "name": cfg.app_name,
-            "version": __version__,
-            "docs": "/docs",
-            "health": "/health",
-        }
+    # When the api serves the built SPA, "/" must return index.html — so only
+    # register the JSON root when the SPA is not mounted (dev/tests, or
+    # TIQORA_SERVE_FRONTEND=0).
+    if not spa_is_available(cfg):
+
+        @app.get("/", tags=["ops"])
+        async def root() -> dict[str, str]:
+            return {
+                "name": cfg.app_name,
+                "version": __version__,
+                "docs": "/docs",
+                "health": "/health",
+            }
+
+    # Must be last: the SPA fallback matches any remaining GET path.
+    mount_spa(app, cfg)
 
     return app

@@ -69,6 +69,9 @@ services:
       - tiqora_meili:/meili_data
 
   tiqora-api:
+    # Serves the REST/portal/compat API AND the web UI (SPA) at "/", so a single
+    # image ships backend + frontend — point your reverse proxy's "/" here.
+    # Set TIQORA_SERVE_FRONTEND=0 to disable and front the UI with a static host.
     image: ghcr.io/cygnusnetworks/tiqora:latest
     # image: cygnusnetworks/tiqora:latest  # Docker Hub mirror
     restart: unless-stopped

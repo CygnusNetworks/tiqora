@@ -59,6 +59,15 @@ class Settings(BaseSettings):
     )
     api_prefix: str = "/api/v1"
 
+    # Frontend SPA served by the api container itself (single image ships
+    # backend + UI). Disable (TIQORA_SERVE_FRONTEND=0) to front with a
+    # separate static host. Dir is where the Dockerfile copies the vite build.
+    serve_frontend: bool = Field(default=True, validation_alias="TIQORA_SERVE_FRONTEND")
+    frontend_dist_dir: str = Field(
+        default="/app/frontend/dist",
+        validation_alias="TIQORA_FRONTEND_DIST_DIR",
+    )
+
     # Sessions (Redis, opaque token, httpOnly cookie)
     session_cookie_name: str = Field(
         default="tiqora_session",

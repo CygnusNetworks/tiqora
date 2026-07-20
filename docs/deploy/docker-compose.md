@@ -15,7 +15,7 @@ cp docker-compose.example.yml docker-compose.yml
 | `postgres` (or `mariadb`, mutually exclusive) | `postgres:16` / `mariadb:10.11` | Primary datastore. Enable **exactly one**; set `DATABASE_URL` to match. |
 | `redis` | `redis:7-alpine` | Sessions, presence keys, SSE pub/sub, rate limiting. |
 | `meilisearch` | `getmeili/meilisearch:v1.11` | Ticket + knowledge-base full-text search index. |
-| `tiqora-api` | `ghcr.io/cygnusnetworks/tiqora:latest` (`command: ["api"]`) | The FastAPI HTTP server (`/api/v1`, `/api/portal`, `/znuny-compat`). Port `8000`. |
+| `tiqora-api` | `ghcr.io/cygnusnetworks/tiqora:latest` (`command: ["api"]`) | The FastAPI HTTP server (`/api/v1`, `/api/portal`, `/znuny-compat`) **and the web UI (SPA) at `/`** — one image ships backend + frontend. Port `8000`. Set `TIQORA_SERVE_FRONTEND=0` to disable and front the UI with a separate static host. |
 | `tiqora-worker` | same image (`command: ["worker"]`) | Background poller: Znuny-write detection, search indexing, webhooks, daemon takeovers (postmaster/escalation/notifications/GenericAgent). No exposed port. |
 | `tiqora-mcp` | same image (`command: ["mcp"]`) | The MCP server for AI/LLM integrations (see [`../api/mcp.md`](../api/mcp.md)). Port `8001`. |
 | `mailpit` (optional, commented out) | `axllent/mailpit` | SMTP catch-all for non-production environments — never enable against a mailbox real customers use. |
@@ -249,6 +249,8 @@ server {
     ssl_certificate     /etc/ssl/tickets.example.com/fullchain.pem;
     ssl_certificate_key /etc/ssl/tickets.example.com/privkey.pem;
 
+    # "/" proxies to the api, which serves BOTH the web UI (SPA) and the API —
+    # no separate static web root to deploy.
     location / {
         proxy_pass http://127.0.0.1:8000;
         proxy_set_header Host $host;
