@@ -42,6 +42,12 @@ KEY_NOTIFICATIONS_ENABLED = "daemon.notifications.enabled"
 # "Taking over GenericAgent".
 KEY_GENERIC_AGENT_ENABLED = "daemon.generic_agent.enabled"
 
+# GDPR retention worker (Phase 2c) — applies config-driven retention rules
+# (see tiqora.gdpr.retention.KEY_GDPR_RETENTION_RULES) on a schedule. Default
+# OFF; also gated behind the schema-ownership write gate at run time
+# (tiqora.gdpr.gate.require_write_gate).
+KEY_GDPR_RETENTION_ENABLED = "gdpr.retention.enabled"
+
 
 async def get_setting_bool(session: AsyncSession, key: str, default: bool = False) -> bool:
     raw = await get_setting(session, key)
