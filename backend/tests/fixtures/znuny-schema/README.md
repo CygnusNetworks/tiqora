@@ -18,11 +18,18 @@ the developer-only reference tree (`znuny-6.5.22/`, gitignored).
 Foreign keys (including circular `users`↔`valid`) are only added after seed
 data exists. Test fixtures load files in this order.
 
-## Origin and licence
+## Origin and licence (NOTICE)
 
-- **Upstream:** Znuny 6.5.x (`https://www.znuny.org/`)
-- **Licence:** GNU General Public License v3 (same as Znuny/OTRS core)
-- **Source path:** `znuny-6.5.22/scripts/database/`
+- **Upstream:** Znuny 6.5.22 (`https://www.znuny.org/`), taken verbatim from
+  the release tarball path `scripts/database/`.
+- **Copyright:** © 2021–2026 Znuny GmbH (https://znuny.com/); portions
+  © 2001–2021 OTRS AG (https://otrs.com/).
+- **Licence:** GNU General Public License v3.0 — these six files remain
+  licensed under **GPL-3.0** as published by their upstream authors. They are
+  included in this repository unmodified, as test fixtures (mere aggregation
+  in the sense of GPL-3.0 §5); the AGPL-3.0 licence of the rest of the Tiqora
+  project does not apply to them. The full GPL-3.0 text is available at
+  https://www.gnu.org/licenses/gpl-3.0.txt.
 
 These are plain schema/data artefacts that define the **database interface**
 Tiqora must remain compatible with during parallel operation. They are not

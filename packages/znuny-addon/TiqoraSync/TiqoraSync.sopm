@@ -5,7 +5,7 @@
     <Framework>6.5.x</Framework>
     <Vendor>Cygnus Networks GmbH</Vendor>
     <URL>https://cygnusnetworks.de/</URL>
-    <License>AGPL-3.0-only</License>
+    <License>GPL-3.0-only</License>
     <ChangeLog Version="1.0.0" Date="2026-07-20">Initial release.</ChangeLog>
     <Description Lang="en">
         Keeps Znuny's in-process ticket cache (Kernel::System::Cache) in

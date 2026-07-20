@@ -308,10 +308,15 @@ Detailed design: [docs/specs/2026-07-19-tiqora-design.md](./docs/specs/2026-07-1
 
 ## License
 
-Tiqora is licensed under the **GNU Affero General Public License v3.0** (AGPL-3.0).
-See [LICENSE](./LICENSE).
+Tiqora is licensed under the **GNU Affero General Public License v3.0**
+(AGPL-3.0) — see [LICENSE](./LICENSE) — with three documented exceptions
+(the GPL-3.0 TiqoraSync Znuny add-on, the dual-licensed
+`backend/src/tiqora/znuny/` compatibility modules, and the verbatim upstream
+schema fixtures). See [NOTICE.md](./NOTICE.md) for the complete licensing
+picture, the reimplementation statement, and trademark notes.
 
 Copyright © 2026 Cygnus Networks GmbH.
 
-Znuny is a trademark of its respective owners. Tiqora is not affiliated with or
-endorsed by the Znuny project.
+"Znuny" is a trademark of Znuny GmbH; "OTRS" is a registered trademark of
+OTRS AG. Tiqora is not affiliated with, endorsed by, or sponsored by either
+company; the names are used solely to describe factual compatibility.
