@@ -690,6 +690,40 @@ export interface paths {
         patch: operations["update_group_api_v1_admin_groups__group_id__patch"];
         trace?: never;
     };
+    "/api/v1/admin/mail/log": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Mail Log */
+        get: operations["list_mail_log_api_v1_admin_mail_log_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/mail/log/{log_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Mail Log */
+        get: operations["get_mail_log_api_v1_admin_mail_log__log_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/mail/outbound": {
         parameters: {
             query?: never;
@@ -4450,6 +4484,42 @@ export interface components {
             pending_2fa: boolean;
             user?: components["schemas"]["UserMe"] | null;
         };
+        /** MailLogOut */
+        MailLogOut: {
+            /** Article Id */
+            article_id?: number | null;
+            /** Cc Addr */
+            cc_addr?: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Detail */
+            detail?: string | null;
+            /** Direction */
+            direction: string;
+            /** Duration Ms */
+            duration_ms?: number | null;
+            /** From Addr */
+            from_addr: string;
+            /** Id */
+            id: number;
+            /** Message Id */
+            message_id?: string | null;
+            /** Queue */
+            queue?: string | null;
+            /** Smtp Code */
+            smtp_code?: number | null;
+            /** Status */
+            status: string;
+            /** Subject */
+            subject: string;
+            /** Ticket Id */
+            ticket_id?: number | null;
+            /** To Addr */
+            to_addr: string;
+        };
         /** MailOutboundOut */
         MailOutboundOut: {
             /**
@@ -4655,6 +4725,17 @@ export interface components {
         Page_GroupOut_: {
             /** Items */
             items: components["schemas"]["GroupOut"][];
+            /** Page */
+            page: number;
+            /** Page Size */
+            page_size: number;
+            /** Total */
+            total: number;
+        };
+        /** Page[MailLogOut] */
+        Page_MailLogOut_: {
+            /** Items */
+            items: components["schemas"]["MailLogOut"][];
             /** Page */
             page: number;
             /** Page Size */
@@ -8165,6 +8246,82 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["GroupOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_mail_log_api_v1_admin_mail_log_get: {
+        parameters: {
+            query?: {
+                page?: number;
+                page_size?: number;
+                direction?: ("in" | "out") | null;
+                status?: ("queued" | "sent" | "failed" | "received" | "filtered") | null;
+                q?: string | null;
+                from?: string | null;
+                to?: string | null;
+            };
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Page_MailLogOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_mail_log_api_v1_admin_mail_log__log_id__get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                log_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MailLogOut"];
                 };
             };
             /** @description Validation Error */
