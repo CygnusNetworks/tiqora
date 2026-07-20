@@ -323,6 +323,78 @@ const occurrences = [
   },
 ];
 
+const processSummaries = [
+  { id: 1, entity_id: "Process-1", name: "Onboarding", state_entity_id: "S1" },
+];
+
+const processDetail = {
+  id: 1,
+  entity_id: "Process-1",
+  name: "Onboarding",
+  state_entity_id: "S1",
+  start_activity_entity_id: "Activity-a",
+  activities: [
+    {
+      entity_id: "Activity-a",
+      name: "Collect info",
+      activity_dialogs: [{ entity_id: "ActivityDialog-1", name: "Set Title" }],
+    },
+    { entity_id: "Activity-b", name: "Done", activity_dialogs: [] },
+  ],
+};
+
+const activityDialogDetail = {
+  entity_id: "ActivityDialog-1",
+  name: "Set Title",
+  description_short: "Set the title",
+  description_long: "Fill in the ticket title.",
+  field_order: ["Title"],
+  fields: {
+    Title: {
+      display: "1",
+      default_value: "",
+      description_short: "Title",
+      description_long: "Ticket title",
+      config: {},
+    },
+  },
+  submit_advice_text: "",
+  submit_button_text: "Submit",
+};
+
+const ticketProcessStateNotInProcess = {
+  process_entity_id: null,
+  process_name: null,
+  activity_entity_id: null,
+  activity_name: null,
+  available_dialogs: [],
+  available_transitions_count: 0,
+};
+
+const ticketProcessStateActive = {
+  process_entity_id: "Process-1",
+  process_name: "Onboarding",
+  activity_entity_id: "Activity-a",
+  activity_name: "Collect info",
+  available_dialogs: [
+    { entity_id: "ActivityDialog-1", name: "Set Title", description_short: "Set the title" },
+  ],
+  available_transitions_count: 1,
+};
+
+const ticketProcessStateAfterSubmit = {
+  process_entity_id: "Process-1",
+  process_name: "Onboarding",
+  activity_entity_id: "Activity-b",
+  activity_name: "Done",
+  available_dialogs: [],
+  available_transitions_count: 0,
+};
+
+// Mutated by the /start and /submit handlers below to simulate the ticket
+// moving through the process — reset per-test in mockApi().
+let ticketProcessState: typeof ticketProcessStateNotInProcess = ticketProcessStateNotInProcess;
+
 let authenticated = false;
 
 async function json(route: Route, status: number, body: unknown) {
@@ -340,6 +412,7 @@ async function json(route: Route, status: number, body: unknown) {
 export async function mockApi(page: Page) {
   authenticated = false;
   kbArticleFull = initialKbArticle();
+  ticketProcessState = ticketProcessStateNotInProcess;
 
   await page.route("**/api/v1/**", async (route) => {
     const req = route.request();
@@ -603,6 +676,40 @@ export async function mockApi(page: Page) {
     }
     if (path.match(/\/api\/v1\/calendar\/appointments\/\d+$/) && method === "DELETE") {
       await route.fulfill({ status: 204, body: "" });
+      return;
+    }
+
+    // ProcessManagement (BPM)
+    if (path.match(/\/api\/v1\/process\/ticket\/\d+\/state$/) && method === "GET") {
+      await json(route, 200, ticketProcessState);
+      return;
+    }
+    if (path.match(/\/api\/v1\/process\/ticket\/\d+\/start$/) && method === "POST") {
+      ticketProcessState = ticketProcessStateActive;
+      await json(route, 200, ticketProcessState);
+      return;
+    }
+    if (path.match(/\/api\/v1\/process\/ticket\/\d+\/submit$/) && method === "POST") {
+      ticketProcessState = ticketProcessStateAfterSubmit;
+      await json(route, 200, {
+        activity_changed: true,
+        new_activity_entity_id: "Activity-b",
+        transition_entity_id: "Transition-1",
+        unsupported_actions: [],
+        state: ticketProcessState,
+      });
+      return;
+    }
+    if (path.match(/\/api\/v1\/process\/activity-dialog\/[^/]+$/) && method === "GET") {
+      await json(route, 200, activityDialogDetail);
+      return;
+    }
+    if (path.endsWith("/api/v1/process/") && method === "GET") {
+      await json(route, 200, processSummaries);
+      return;
+    }
+    if (path.match(/\/api\/v1\/process\/[^/]+$/) && method === "GET") {
+      await json(route, 200, processDetail);
       return;
     }
 

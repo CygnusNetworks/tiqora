@@ -251,7 +251,8 @@
       "acl": "ACLs",
       "genericAgentJobs": "GenericAgent-Jobs",
       "dynamicFields": "Dynamische Felder",
-      "webhooks": "Webhooks"
+      "webhooks": "Webhooks",
+      "processes": "Prozesse"
     },
     "table": {
       "id": "ID",
@@ -419,6 +420,18 @@
       "events": "Ereignisse",
       "eventsPlaceholder": "TicketCreate, ArticleCreate",
       "eventsHelp": "Kommagetrennte Ereignistypen (entspricht tiqora_event_outbox.event_type). Leer lassen, um alle Ereignisse zu abonnieren."
+    },
+    "processes": {
+      "title_plural": "Prozesse",
+      "name": "Name",
+      "entityId": "Entity-ID",
+      "activityCount": "Aktivitäten",
+      "readOnlyNote": "Die Prozessgestaltung muss in der Znuny-Administration erfolgen; dies ist eine reine Leseansicht.",
+      "startActivity": "Startaktivität",
+      "activities": "Aktivitäten",
+      "dialogs": "Dialoge",
+      "noDialogs": "—",
+      "loadError": "Prozess konnte nicht geladen werden."
     }
   },
   "kb": {
@@ -561,5 +574,37 @@
     "subscribe": "Abonnieren (ICS)",
     "exportIcs": ".ics exportieren",
     "linkedTickets": "Verknüpfte Tickets"
+  },
+  "process": {
+    "widget": {
+      "title": "Prozess",
+      "activity": "Aktuelle Aktivität",
+      "notInProcess": "Dieses Ticket ist Teil keines Prozesses.",
+      "startButton": "Prozess starten",
+      "actions": "Verfügbare Aktionen",
+      "loadError": "Prozessstatus konnte nicht geladen werden.",
+      "noDialogs": "Keine Aktionen bei dieser Aktivität verfügbar."
+    },
+    "start": {
+      "title": "Prozess starten",
+      "selectLabel": "Prozess",
+      "submit": "Starten",
+      "cancel": "Abbrechen",
+      "loadError": "Prozesse konnten nicht geladen werden.",
+      "startError": "Prozess konnte nicht gestartet werden.",
+      "empty": "Keine Prozesse verfügbar."
+    },
+    "dialog": {
+      "requiredMark": "*",
+      "requiredError": "Dieses Feld ist erforderlich.",
+      "submit": "Absenden",
+      "cancel": "Abbrechen",
+      "success": "Erfolgreich übermittelt.",
+      "loadError": "Dialogfelder konnten nicht geladen werden.",
+      "submitError": "Dialog konnte nicht übermittelt werden.",
+      "articleSubject": "Betreff",
+      "articleBody": "Text",
+      "fieldFallbackNote": "Texteingabe (kein spezielles Widget für diesen Feldtyp)."
+    }
   }
 }

@@ -18,6 +18,7 @@ const LINKS: { to: string; labelKey: string }[] = [
   { to: "/admin/acl", labelKey: "admin.nav.acl" },
   { to: "/admin/generic-agent-jobs", labelKey: "admin.nav.genericAgentJobs" },
   { to: "/admin/dynamic-fields", labelKey: "admin.nav.dynamicFields" },
+  { to: "/admin/processes", labelKey: "admin.nav.processes" },
 ];
 
 export function AdminHomePage() {

@@ -251,7 +251,8 @@
       "acl": "ACLs",
       "genericAgentJobs": "Generic agent jobs",
       "dynamicFields": "Dynamic fields",
-      "webhooks": "Webhooks"
+      "webhooks": "Webhooks",
+      "processes": "Processes"
     },
     "table": {
       "id": "ID",
@@ -419,6 +420,18 @@
       "events": "Events",
       "eventsPlaceholder": "TicketCreate, ArticleCreate",
       "eventsHelp": "Comma-separated event types (matches tiqora_event_outbox.event_type). Leave empty to subscribe to all events."
+    },
+    "processes": {
+      "title_plural": "Processes",
+      "name": "Name",
+      "entityId": "Entity ID",
+      "activityCount": "Activities",
+      "readOnlyNote": "Process design must be done in Znuny's admin interface; this is a read-only view.",
+      "startActivity": "Start activity",
+      "activities": "Activities",
+      "dialogs": "Dialogs",
+      "noDialogs": "—",
+      "loadError": "Could not load process."
     }
   },
   "kb": {
@@ -561,5 +574,37 @@
     "subscribe": "Subscribe (ICS)",
     "exportIcs": "Export .ics",
     "linkedTickets": "Linked tickets"
+  },
+  "process": {
+    "widget": {
+      "title": "Process",
+      "activity": "Current activity",
+      "notInProcess": "This ticket is not part of any process.",
+      "startButton": "Start process",
+      "actions": "Available actions",
+      "loadError": "Could not load process state.",
+      "noDialogs": "No actions available at this activity."
+    },
+    "start": {
+      "title": "Start process",
+      "selectLabel": "Process",
+      "submit": "Start",
+      "cancel": "Cancel",
+      "loadError": "Could not load processes.",
+      "startError": "Could not start process.",
+      "empty": "No processes available."
+    },
+    "dialog": {
+      "requiredMark": "*",
+      "requiredError": "This field is required.",
+      "submit": "Submit",
+      "cancel": "Cancel",
+      "success": "Submitted successfully.",
+      "loadError": "Could not load dialog fields.",
+      "submitError": "Could not submit dialog.",
+      "articleSubject": "Subject",
+      "articleBody": "Body",
+      "fieldFallbackNote": "Plain text input (no dedicated widget for this field type)."
+    }
   }
 }

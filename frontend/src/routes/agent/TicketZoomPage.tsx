@@ -8,6 +8,7 @@ import { TicketHeader } from "@/components/agent/TicketHeader";
 import { ArticleTimeline } from "@/components/agent/ArticleTimeline";
 import { HistoryTable } from "@/components/agent/HistoryTable";
 import { PresenceBar } from "@/components/agent/PresenceBar";
+import { ProcessWidget } from "@/components/agent/process/ProcessWidget";
 import { Tabs } from "@/components/ui/Tabs";
 import { Spinner } from "@/components/ui/Spinner";
 
@@ -77,6 +78,7 @@ export function TicketZoomPage() {
         ← {t("common.backToQueues")}
       </Link>
       <TicketHeader ticket={ticketQ.data} />
+      <ProcessWidget ticketId={ticketId} />
       <PresenceBar ticketId={ticketId} selfUserId={user?.id} />
       <Tabs
         value={tab}
