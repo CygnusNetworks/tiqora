@@ -42,13 +42,23 @@ class QueueService:
         )
         queues = list(q_result.scalars().all())
 
-        # Open state ids
+        # Open (viewable) state ids
         open_states = await self._session.execute(
             select(TicketState.id)
             .join(TicketStateType, TicketStateType.id == TicketState.type_id)
             .where(TicketStateType.name.in_(OPEN_STATE_TYPES), TicketState.valid_id == 1)
         )
         open_state_ids = set(open_states.scalars().all())
+
+        # "new" state ids — subset of open_state_ids, broken out for the
+        # per-queue "N neu" badge (issue: new tickets were invisible under
+        # the default Offen filter; the queue tree should surface them too).
+        new_states = await self._session.execute(
+            select(TicketState.id)
+            .join(TicketStateType, TicketStateType.id == TicketState.type_id)
+            .where(TicketStateType.name == "new", TicketState.valid_id == 1)
+        )
+        new_state_ids = set(new_states.scalars().all())
 
         # Lock type ids
         lock_rows = await self._session.execute(select(TicketLockType.id, TicketLockType.name))
@@ -71,6 +81,19 @@ class QueueService:
             for qid, cnt in open_q.all():
                 counts_by_queue[qid].open = int(cnt)
                 counts_by_queue[qid].total = int(cnt)
+
+            if new_state_ids:
+                new_q = await self._session.execute(
+                    select(Ticket.queue_id, func.count())
+                    .where(
+                        Ticket.queue_id.in_(allowed),
+                        Ticket.ticket_state_id.in_(new_state_ids),
+                        Ticket.archive_flag == 0,
+                    )
+                    .group_by(Ticket.queue_id)
+                )
+                for qid, cnt in new_q.all():
+                    counts_by_queue[qid].new = int(cnt)
 
             if locked_ids:
                 locked_q = await self._session.execute(
