@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/Button";
 import { ShortcutHelp } from "@/components/agent/ShortcutHelp";
 import { NotificationBell, NotificationToaster } from "@/components/agent/NotificationBell";
 import { cn } from "@/lib/cn";
+import { appVersion } from "@/lib/appVersion";
 import { useSSE } from "@/lib/useSSE";
 
 /** Small "Beta" pill rendered next to the Tiqora wordmark. Replaces the old
@@ -359,6 +360,13 @@ function SidebarBody({ onNavigate }: { onNavigate?: () => void }) {
             <p className="truncate text-[11px] text-muted">{user?.login}</p>
           </div>
         </Link>
+        <p
+          className="mt-1 px-1 text-[10px] leading-none text-muted opacity-70"
+          data-testid="app-version"
+          title={appVersion.sha ? `commit ${appVersion.sha}` : "local dev build"}
+        >
+          Tiqora {appVersion.label}
+        </p>
       </div>
     </div>
   );

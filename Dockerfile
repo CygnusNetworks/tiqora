@@ -10,6 +10,12 @@ ARG NODE_VERSION=22
 # so the workspace context is required for the install.
 FROM node:${NODE_VERSION}-bookworm-slim AS frontend-build
 WORKDIR /workspace
+# Build provenance surfaced in the UI (see frontend/src/lib/appVersion.ts).
+# Wired from CI git ref/sha via docker build-args; empty in plain local builds.
+ARG VITE_APP_VERSION=""
+ARG VITE_GIT_SHA=""
+ENV VITE_APP_VERSION=$VITE_APP_VERSION \
+    VITE_GIT_SHA=$VITE_GIT_SHA
 COPY package.json pnpm-workspace.yaml pnpm-lock.yaml ./
 COPY packages/ ./packages/
 COPY frontend/package.json ./frontend/
