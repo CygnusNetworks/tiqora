@@ -96,5 +96,17 @@ export {
   type PostmasterFilterOut,
   type AclOut,
   type GenericAgentJobOut,
+  // Stats
+  type TicketVolumeOut,
+  type VolumePointOut,
+  type OpenSnapshotOut,
+  type DimensionCountOut,
+  type SlaStatsOut,
+  type AgentWorkloadItemOut,
+  type BacklogTrendOut,
+  type BacklogPointOut,
+  type StatsGranularity,
+  type StatsDimension,
+  type StatsFilterParams,
   type paths,
 } from "./client";
