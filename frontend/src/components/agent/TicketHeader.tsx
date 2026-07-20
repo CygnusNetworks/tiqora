@@ -8,21 +8,8 @@ import {
   spineClassName,
   stateColorVar,
 } from "@/lib/status";
+import { priorityName, priorityTextClass } from "@/lib/priority";
 import type { CSSProperties } from "react";
-
-/** Priority text tone by Znuny priority id (1=lowest … 5=highest). */
-function priorityTextClass(priorityId: number | null | undefined): string {
-  if (priorityId == null) return "text-ink";
-  if (priorityId >= 5) return "text-danger";
-  if (priorityId === 4) return "text-warn";
-  return "text-ink";
-}
-
-/** Drop Znuny's leading numeric rank ("3 normal" → "normal"). */
-function priorityName(priority: string | null | undefined): string | null {
-  if (!priority) return null;
-  return priority.replace(/^\s*\d+\s+/, "");
-}
 
 export function TicketHeader({ ticket }: { ticket: TicketDetail }) {
   const { t, i18n } = useTranslation();
