@@ -1,0 +1,141 @@
+import { useNavigate } from "@tanstack/react-router";
+import { useTranslation } from "react-i18next";
+import { useAuth } from "@/auth/AuthContext";
+import { useTheme } from "@/themes/theme";
+import { Menu, MenuHeader, MenuItem, MenuLabel, MenuSeparator } from "@/components/ui/Menu";
+import {
+  ChevronDownIcon,
+  GlobeIcon,
+  LogOutIcon,
+  MoonIcon,
+  SettingsIcon,
+  SunIcon,
+} from "@/components/ui/icons";
+import { cn } from "@/lib/cn";
+
+const LANGUAGES = [
+  { code: "de", label: "Deutsch" },
+  { code: "en", label: "English" },
+] as const;
+
+/**
+ * Avatar dropdown for account actions, shared by the agent and admin shells.
+ * Opens a Menu with the signed-in identity, a link to settings, explicit
+ * language choices (Deutsch / English — replacing the old blind DE/EN cycle),
+ * a light/dark theme toggle, and finally sign-out.
+ *
+ * `logoutTestId` keeps the existing `logout-btn` (mobile) / `logout-btn-desktop`
+ * (desktop) hooks on the sign-out item so the shell tests keep passing.
+ */
+export function AccountMenu({ logoutTestId = "logout-btn" }: { logoutTestId?: string }) {
+  const { t, i18n } = useTranslation();
+  const { user, logout } = useAuth();
+  const { theme, setTheme } = useTheme();
+  const navigate = useNavigate();
+
+  const currentLang = i18n.language?.startsWith("de") ? "de" : "en";
+  const initials = (
+    (user?.first_name?.[0] ?? user?.login?.[0] ?? "?") + (user?.last_name?.[0] ?? "")
+  ).toUpperCase();
+  const fullName = [user?.first_name || user?.login, user?.last_name].filter(Boolean).join(" ");
+
+  const changeLang = (code: string) => {
+    void i18n.changeLanguage(code);
+    localStorage.setItem("tiqora-lang", code);
+  };
+
+  return (
+    <Menu
+      panelTestId="account-menu"
+      trigger={({ open, ref, toggleProps }) => (
+        <button
+          ref={ref}
+          type="button"
+          data-testid="account-menu-trigger"
+          aria-label={t("account.menu")}
+          className={cn(
+            "flex h-8 items-center gap-1.5 rounded-lg pl-1 pr-1.5 transition-colors duration-100 hover:bg-surface-subtle focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent",
+            open && "bg-surface-subtle",
+          )}
+          {...toggleProps}
+        >
+          <span
+            className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-accent text-[10.5px] font-bold text-accent-ink"
+            aria-hidden
+          >
+            {initials}
+          </span>
+          <ChevronDownIcon
+            className={cn(
+              "text-[15px] text-muted transition-transform duration-150",
+              open && "rotate-180",
+            )}
+          />
+        </button>
+      )}
+    >
+      <MenuHeader>
+        <p className="truncate text-[13px] font-semibold text-ink" data-testid="account-menu-name">
+          {fullName || user?.login}
+        </p>
+        <p className="truncate text-[11.5px] text-muted">{user?.login}</p>
+      </MenuHeader>
+
+      <div className="pt-1">
+        <MenuItem
+          icon={<SettingsIcon />}
+          testId="account-menu-settings"
+          onSelect={() => void navigate({ to: "/agent/settings" })}
+        >
+          {t("account.settings")}
+        </MenuItem>
+      </div>
+
+      <MenuLabel>{t("account.language")}</MenuLabel>
+      {LANGUAGES.map((lang) => (
+        <MenuItem
+          key={lang.code}
+          icon={<GlobeIcon />}
+          keepOpen
+          selected={currentLang === lang.code}
+          testId={`account-menu-lang-${lang.code}`}
+          onSelect={() => changeLang(lang.code)}
+        >
+          {lang.label}
+        </MenuItem>
+      ))}
+
+      <MenuLabel>{t("account.theme")}</MenuLabel>
+      <MenuItem
+        icon={<SunIcon />}
+        keepOpen
+        selected={theme === "light"}
+        testId="account-menu-theme-light"
+        onSelect={() => setTheme("light")}
+      >
+        {t("account.themeLight")}
+      </MenuItem>
+      <MenuItem
+        icon={<MoonIcon />}
+        keepOpen
+        selected={theme === "dark"}
+        testId="account-menu-theme-dark"
+        onSelect={() => setTheme("dark")}
+      >
+        {t("account.themeDark")}
+      </MenuItem>
+
+      <MenuSeparator />
+      <MenuItem
+        danger
+        icon={<LogOutIcon />}
+        testId={logoutTestId}
+        onSelect={() => {
+          void logout().then(() => navigate({ to: "/login" }));
+        }}
+      >
+        {t("auth.logout")}
+      </MenuItem>
+    </Menu>
+  );
+}

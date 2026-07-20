@@ -26,6 +26,7 @@ from tiqora.api.v1.admin import dynamic_fields as admin_dynamic_fields
 from tiqora.api.v1.admin import queues as admin_queues
 from tiqora.api.v1.admin import users as admin_users
 from tiqora.api.v1.admin.deps import get_admin_user
+from tiqora.api.v1.admin.pagination import ListParams
 from tiqora.api.v1.admin.schemas import (
     CustomerUserAdminCreate,
     DynamicFieldCreate,
@@ -353,5 +354,80 @@ async def test_admin_customer_user_create_and_soft_delete(
         await admin_customers.deactivate_customer_user(created.id, admin_user, s)
         refreshed = await admin_customers.get_customer_user(created.id, admin_user, s)
         assert refreshed.valid_id == 2
+
+    await engine.dispose()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("url_fixture", ["mariadb_znuny_url", "postgres_znuny_url"])
+async def test_admin_customer_user_list_pagination_and_valid_filter(
+    url_fixture: str, request: pytest.FixtureRequest
+) -> None:
+    """The list endpoint pages the result set and hides invalid rows by
+    default — the fix for the slow/empty Customer Users admin list."""
+    sync_url: str = request.getfixturevalue(url_fixture)
+    ids = _seed_admin_and_plain_user(sync_url)
+    session, engine = await _make_session(sync_url)
+    ns = uuid.uuid4().hex[:8]
+
+    async with session as s:
+        admin_user = AuthenticatedUser(
+            id=ids["admin_id"],
+            login="root@localhost",
+            first_name="Admin",
+            last_name="Znuny",
+            auth_method="session",
+        )
+
+        # 12 valid + 3 invalid customer users, all in a unique customer_id so
+        # the assertions are isolated from Znuny's seed data.
+        cust = f"PAGE-{ns}"
+        created_ids: list[int] = []
+        for i in range(15):
+            cu = await admin_customers.create_customer_user(
+                CustomerUserAdminCreate(
+                    login=f"pageuser.{i:02d}.{ns}@example.com",
+                    email=f"pageuser.{i:02d}.{ns}@example.com",
+                    customer_id=cust,
+                    first_name="Page",
+                    last_name=f"User{i:02d}",
+                ),
+                admin_user,
+                s,
+            )
+            created_ids.append(cu.id)
+        for cid in created_ids[:3]:
+            await admin_customers.deactivate_customer_user(cid, admin_user, s)
+
+        # Default valid filter hides the 3 invalid rows; page window caps items.
+        page1 = await admin_customers.list_customer_users(
+            admin_user, s, ListParams(page=1, page_size=5, valid="valid")
+        )
+        assert page1.total == 12
+        assert page1.page == 1
+        assert len(page1.items) == 5
+        assert all(item.valid_id == 1 for item in page1.items)
+
+        page3 = await admin_customers.list_customer_users(
+            admin_user, s, ListParams(page=3, page_size=5, valid="valid")
+        )
+        assert page3.total == 12
+        assert len(page3.items) == 2  # 12 valid → pages of 5/5/2
+
+        # No page overlap: distinct logins across the two windows.
+        assert {i.login for i in page1.items}.isdisjoint({i.login for i in page3.items})
+
+        invalid = await admin_customers.list_customer_users(
+            admin_user, s, ListParams(page=1, page_size=50, valid="invalid")
+        )
+        invalid_logins = {i.login for i in invalid.items if i.customer_id == cust}
+        assert len(invalid_logins) == 3
+        assert all(i.valid_id != 1 for i in invalid.items)
+
+        all_rows = await admin_customers.list_customer_users(
+            admin_user, s, ListParams(page=1, page_size=50, valid="all")
+        )
+        all_for_cust = {i.login for i in all_rows.items if i.customer_id == cust}
+        assert len(all_for_cust) == 15
 
     await engine.dispose()

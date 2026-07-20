@@ -8,17 +8,22 @@ from sqlalchemy import select
 from tiqora.api.deps import DbSession
 from tiqora.api.v1.admin.common import invalidate_cache_for_priority, now
 from tiqora.api.v1.admin.deps import AdminUser
+from tiqora.api.v1.admin.pagination import ListParamsDep, Page, apply_valid_filter, paginate
 from tiqora.api.v1.admin.schemas import PriorityCreate, PriorityOut, PriorityUpdate
 from tiqora.db.legacy.ticket import TicketPriority
 
 router = APIRouter(prefix="/priorities", tags=["admin:priorities"])
 
 
-@router.get("", response_model=list[PriorityOut])
-async def list_priorities(admin: AdminUser, session: DbSession) -> list[TicketPriority]:
+@router.get("", response_model=Page[PriorityOut])
+async def list_priorities(
+    admin: AdminUser, session: DbSession, params: ListParamsDep
+) -> Page[PriorityOut]:
     _ = admin
-    result = await session.execute(select(TicketPriority).order_by(TicketPriority.name))
-    return list(result.scalars().all())
+    stmt = apply_valid_filter(
+        select(TicketPriority), TicketPriority.valid_id, params.valid
+    ).order_by(TicketPriority.name)
+    return await paginate(session, PriorityOut, stmt, params)
 
 
 @router.get("/{priority_id}", response_model=PriorityOut)

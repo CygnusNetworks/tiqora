@@ -8,17 +8,20 @@ from sqlalchemy import select
 from tiqora.api.deps import DbSession
 from tiqora.api.v1.admin.common import invalidate_cache_for_queue, now
 from tiqora.api.v1.admin.deps import AdminUser
+from tiqora.api.v1.admin.pagination import ListParamsDep, Page, apply_valid_filter, paginate
 from tiqora.api.v1.admin.schemas import QueueCreate, QueueOut, QueueUpdate
 from tiqora.db.legacy.queue import Queue
 
 router = APIRouter(prefix="/queues", tags=["admin:queues"])
 
 
-@router.get("", response_model=list[QueueOut])
-async def list_queues(admin: AdminUser, session: DbSession) -> list[Queue]:
+@router.get("", response_model=Page[QueueOut])
+async def list_queues(
+    admin: AdminUser, session: DbSession, params: ListParamsDep
+) -> Page[QueueOut]:
     _ = admin
-    result = await session.execute(select(Queue).order_by(Queue.name))
-    return list(result.scalars().all())
+    stmt = apply_valid_filter(select(Queue), Queue.valid_id, params.valid).order_by(Queue.name)
+    return await paginate(session, QueueOut, stmt, params)
 
 
 @router.get("/{queue_id}", response_model=QueueOut)

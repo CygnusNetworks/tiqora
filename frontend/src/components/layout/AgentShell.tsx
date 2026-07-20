@@ -3,15 +3,19 @@ import { Link, useLocation, useNavigate } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "@/auth/AuthContext";
-import { useTheme } from "@/themes/theme";
 import { api, type QueueNode } from "@/lib/api";
 import { flattenQueues } from "@/components/agent/QueueTree";
 import { Button } from "@/components/ui/Button";
 import { ShortcutHelp } from "@/components/agent/ShortcutHelp";
 import { NotificationBell, NotificationToaster } from "@/components/agent/NotificationBell";
+import { CommandSearch } from "@/components/agent/CommandSearch";
+import { NewTicketButton } from "@/components/agent/NewTicketButton";
+import { ConnectionStatus } from "@/components/agent/ConnectionStatus";
+import { AccountMenu } from "@/components/agent/AccountMenu";
+import { HelpIcon } from "@/components/ui/icons";
 import { cn } from "@/lib/cn";
 import { appVersion } from "@/lib/appVersion";
-import { useSSE } from "@/lib/useSSE";
+import { SSEProvider } from "@/lib/useSSE";
 
 /** Small "Beta" pill rendered next to the Tiqora wordmark. Replaces the old
  * full-width "not production ready" dev ribbon. */
@@ -437,18 +441,59 @@ function SidebarSearch() {
   );
 }
 
+/** Ghost icon button used for the header's help toggle — 32px square, matching
+ * the notification bell so the cluster reads as one row of controls. */
+function HeaderIconButton({
+  onClick,
+  label,
+  children,
+  testId,
+}: {
+  onClick: () => void;
+  label: string;
+  children: ReactNode;
+  testId?: string;
+}) {
+  return (
+    <button
+      type="button"
+      data-testid={testId}
+      aria-label={label}
+      title={label}
+      onClick={onClick}
+      className="flex h-8 w-8 items-center justify-center rounded-lg text-ink/70 transition-colors duration-100 hover:bg-surface-subtle hover:text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent"
+    >
+      {children}
+    </button>
+  );
+}
+
+/** The cohesive top-right control cluster shared by the desktop and mobile
+ * agent headers: search · new · connection · bell · help │ account. */
+function HeaderControls({ onHelp, logoutTestId }: { onHelp: () => void; logoutTestId: string }) {
+  const { t } = useTranslation();
+  return (
+    <div className="flex items-center gap-1.5">
+      <CommandSearch />
+      <NewTicketButton />
+      <div className="mx-0.5 flex items-center gap-0.5">
+        <ConnectionStatus />
+        <NotificationBell />
+        <HeaderIconButton onClick={onHelp} label={t("shortcuts.title")} testId="header-help">
+          <HelpIcon className="text-[18px]" />
+        </HeaderIconButton>
+      </div>
+      <div className="mx-1 h-6 w-px bg-hairline" aria-hidden />
+      <AccountMenu logoutTestId={logoutTestId} />
+    </div>
+  );
+}
+
 export function AgentShell({ children }: { children: ReactNode }) {
-  const { t, i18n } = useTranslation();
-  const { logout } = useAuth();
-  const { theme, toggleTheme } = useTheme();
-  const navigate = useNavigate();
+  const { t } = useTranslation();
   const location = useLocation();
   const [helpOpen, setHelpOpen] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
-
-  // Realtime ticket-change + presence notifications for the whole
-  // authenticated agent app — mounted once here rather than per-page.
-  useSSE();
 
   useEffect(() => {
     setDrawerOpen(false);
@@ -471,109 +516,66 @@ export function AgentShell({ children }: { children: ReactNode }) {
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
-  const switchLang = () => {
-    const next = i18n.language?.startsWith("de") ? "en" : "de";
-    void i18n.changeLanguage(next);
-    localStorage.setItem("tiqora-lang", next);
-  };
-
+  // Realtime ticket-change + presence notifications for the whole authenticated
+  // agent app — the stream opens once here (SSEProvider) and its connection
+  // state feeds the header's ConnectionStatus dot.
   return (
-    <div className="flex min-h-screen flex-col bg-bg md:grid md:grid-cols-[216px_1fr]">
-      <aside
-        className="hidden shrink-0 flex-col border-r border-hairline bg-surface px-3 py-4 md:flex"
-        data-testid="agent-sidebar"
-      >
-        <SidebarBody />
-      </aside>
+    <SSEProvider>
+      <div className="flex min-h-screen flex-col bg-bg md:grid md:grid-cols-[216px_1fr]">
+        <aside
+          className="hidden shrink-0 flex-col border-r border-hairline bg-surface px-3 py-4 md:flex"
+          data-testid="agent-sidebar"
+        >
+          <SidebarBody />
+        </aside>
 
-      {drawerOpen && (
-        <div className="fixed inset-0 z-40 md:hidden">
-          <button
-            type="button"
-            aria-label={t("common.back")}
-            className="absolute inset-0 bg-black/40"
-            onClick={() => setDrawerOpen(false)}
-          />
-          <div className="absolute inset-y-0 left-0 flex w-72 flex-col border-r border-hairline bg-surface px-3 py-4 shadow-xl">
-            <SidebarBody onNavigate={() => setDrawerOpen(false)} />
+        {drawerOpen && (
+          <div className="fixed inset-0 z-40 md:hidden">
+            <button
+              type="button"
+              aria-label={t("common.back")}
+              className="absolute inset-0 bg-black/40"
+              onClick={() => setDrawerOpen(false)}
+            />
+            <div className="absolute inset-y-0 left-0 flex w-72 flex-col border-r border-hairline bg-surface px-3 py-4 shadow-xl">
+              <SidebarBody onNavigate={() => setDrawerOpen(false)} />
+            </div>
           </div>
-        </div>
-      )}
+        )}
 
-      <div className="flex min-h-screen min-w-0 flex-1 flex-col">
-        <header className="sticky top-0 z-20 flex h-11 items-center gap-2 border-b border-hairline bg-surface px-3 md:hidden">
-          <Button
-            variant="ghost"
-            size="sm"
-            aria-label={t("sidebar.toggle")}
-            data-testid="agent-sidebar-toggle"
-            onClick={() => setDrawerOpen((o) => !o)}
-          >
-            ☰
-          </Button>
-          <Link
-            to="/agent"
-            className="flex items-center gap-2 font-display text-[15px] font-bold tracking-tight text-ink"
-          >
-            <img src="/logo.svg" alt="" width={20} height={20} className="rounded" />
-            {t("app.name")}
-            <BetaPill />
-          </Link>
-          <div className="ml-auto flex items-center gap-1">
-            <NotificationBell />
-            <Button variant="ghost" size="sm" onClick={() => setHelpOpen(true)} title="?">
-              ?
-            </Button>
-            <Button variant="ghost" size="sm" onClick={toggleTheme}>
-              {theme === "dark" ? "☀" : "☾"}
-            </Button>
-            <Button variant="ghost" size="sm" onClick={switchLang}>
-              {i18n.language?.startsWith("de") ? "DE" : "EN"}
-            </Button>
+        <div className="flex min-h-screen min-w-0 flex-1 flex-col">
+          <header className="sticky top-0 z-20 flex h-12 items-center gap-2 border-b border-hairline bg-surface px-3 md:hidden">
             <Button
               variant="ghost"
               size="sm"
-              data-testid="logout-btn"
-              onClick={() => {
-                void logout().then(() => navigate({ to: "/login" }));
-              }}
+              aria-label={t("sidebar.toggle")}
+              data-testid="agent-sidebar-toggle"
+              onClick={() => setDrawerOpen((o) => !o)}
             >
-              {t("auth.logout")}
+              ☰
             </Button>
+            <Link
+              to="/agent"
+              className="flex items-center gap-2 font-display text-[15px] font-bold tracking-tight text-ink"
+            >
+              <img src="/logo.svg" alt="" width={20} height={20} className="rounded" />
+              {t("app.name")}
+              <BetaPill />
+            </Link>
+            <div className="ml-auto">
+              <HeaderControls onHelp={() => setHelpOpen(true)} logoutTestId="logout-btn" />
+            </div>
+          </header>
+          <div className="hidden items-center justify-end border-b border-hairline bg-surface px-4 py-1.5 md:flex">
+            <HeaderControls onHelp={() => setHelpOpen(true)} logoutTestId="logout-btn-desktop" />
           </div>
-        </header>
-        <div
-          className={cn(
-            "hidden items-center justify-end gap-1.5 border-b border-hairline bg-surface px-4 py-1.5 md:flex",
-          )}
-        >
-          <NotificationBell />
-          <Button variant="ghost" size="sm" onClick={() => setHelpOpen(true)} title="?">
-            ?
-          </Button>
-          <Button variant="ghost" size="sm" onClick={toggleTheme}>
-            {theme === "dark" ? "☀" : "☾"}
-          </Button>
-          <Button variant="ghost" size="sm" onClick={switchLang}>
-            {i18n.language?.startsWith("de") ? "DE" : "EN"}
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            data-testid="logout-btn-desktop"
-            onClick={() => {
-              void logout().then(() => navigate({ to: "/login" }));
-            }}
-          >
-            {t("auth.logout")}
-          </Button>
+          <main key={location.pathname} className="flex flex-1 flex-col animate-route-in">
+            {children}
+          </main>
         </div>
-        <main key={location.pathname} className="flex flex-1 flex-col animate-route-in">
-          {children}
-        </main>
+        <ShortcutHelp open={helpOpen} onClose={() => setHelpOpen(false)} />
+        <NotificationToaster />
       </div>
-      <ShortcutHelp open={helpOpen} onClose={() => setHelpOpen(false)} />
-      <NotificationToaster />
-    </div>
+    </SSEProvider>
   );
 }

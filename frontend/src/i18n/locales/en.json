@@ -250,6 +250,36 @@
     "groupTickets": "Tickets",
     "groupKb": "Knowledge base"
   },
+  "account": {
+    "menu": "Account menu",
+    "settings": "Settings",
+    "language": "Language",
+    "theme": "Theme",
+    "themeLight": "Light",
+    "themeDark": "Dark"
+  },
+  "newTicket": {
+    "new": "New",
+    "chooseQueue": "Choose queue",
+    "title": "New ticket",
+    "intro": "Open a ticket on behalf of a customer.",
+    "queue": "Queue",
+    "noQueues": "No queue available",
+    "customer": "Customer",
+    "customerHint": "Customer login (optional)",
+    "subject": "Subject",
+    "priority": "Priority",
+    "state": "State",
+    "message": "Message",
+    "validationError": "Please fill in queue, subject, priority, state, and message.",
+    "submitError": "Could not create the ticket. Please try again.",
+    "submit": "Create ticket",
+    "cancel": "Cancel"
+  },
+  "connection": {
+    "live": "Connected live",
+    "reconnecting": "Reconnecting…"
+  },
   "shortcuts": {
     "title": "Keyboard shortcuts",
     "rowNav": "Move selection in ticket table",
@@ -365,7 +395,21 @@
       "actions": "Actions",
       "edit": "Edit",
       "deactivate": "Deactivate",
+      "activate": "Activate",
       "empty": "No records yet."
+    },
+    "filter": {
+      "label": "Validity",
+      "valid": "Valid",
+      "invalid": "Invalid",
+      "all": "All"
+    },
+    "pagination": {
+      "prev": "Previous",
+      "next": "Next",
+      "page": "Page {{page}} of {{total}}",
+      "pageSize": "Per page",
+      "showing": "{{from}}–{{to}} of {{total}}"
     },
     "form": {
       "cancel": "Cancel",

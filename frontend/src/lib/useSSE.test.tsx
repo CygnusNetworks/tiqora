@@ -1,8 +1,12 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { renderHook } from "@testing-library/react";
-import type { ReactNode } from "react";
-import { handleSSEMessage, presenceQueryKey, useSSE } from "./useSSE";
+import { act, render, renderHook, screen } from "@testing-library/react";
+import {
+  handleSSEMessage,
+  presenceQueryKey,
+  SSEProvider,
+  useConnectionStatus,
+} from "./useSSE";
 import { clearNotifications, useNotifications } from "./notificationStore";
 
 describe("handleSSEMessage", () => {
@@ -103,14 +107,21 @@ class FakeEventSource {
       listener({ data } as MessageEvent<string>);
     }
   }
+
+  emitType(type: string) {
+    for (const listener of this.listeners[type] ?? []) {
+      listener({} as MessageEvent<string>);
+    }
+  }
 }
 
-function wrapper({ children }: { children: ReactNode }) {
-  const queryClient = new QueryClient();
-  return <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>;
+/** Reads the connection state into the DOM so the SSEProvider tests can assert
+ * on transitions without reaching into React internals. */
+function StatusProbe() {
+  return <span data-testid="probe">{useConnectionStatus()}</span>;
 }
 
-describe("useSSE", () => {
+describe("SSEProvider", () => {
   beforeEach(() => {
     FakeEventSource.instances = [];
     vi.stubGlobal("EventSource", FakeEventSource);
@@ -120,8 +131,19 @@ describe("useSSE", () => {
     vi.unstubAllGlobals();
   });
 
+  function renderProvider(enabled = true) {
+    const queryClient = new QueryClient();
+    return render(
+      <QueryClientProvider client={queryClient}>
+        <SSEProvider enabled={enabled}>
+          <StatusProbe />
+        </SSEProvider>
+      </QueryClientProvider>,
+    );
+  }
+
   it("opens a credentialed EventSource against the stream URL and handles a message", () => {
-    const { unmount } = renderHook(() => useSSE(), { wrapper });
+    const { unmount } = renderProvider();
 
     expect(FakeEventSource.instances).toHaveLength(1);
     const source = FakeEventSource.instances[0];
@@ -138,8 +160,19 @@ describe("useSSE", () => {
     expect(source.closed).toBe(true);
   });
 
+  it("reflects the stream lifecycle as connection state", () => {
+    renderProvider();
+    const source = FakeEventSource.instances[0];
+
+    expect(screen.getByTestId("probe")).toHaveTextContent("connecting");
+    act(() => source.emitType("open"));
+    expect(screen.getByTestId("probe")).toHaveTextContent("live");
+    act(() => source.emitType("error"));
+    expect(screen.getByTestId("probe")).toHaveTextContent("reconnecting");
+  });
+
   it("does not open a connection when disabled", () => {
-    renderHook(() => useSSE(false), { wrapper });
+    renderProvider(false);
     expect(FakeEventSource.instances).toHaveLength(0);
   });
 });

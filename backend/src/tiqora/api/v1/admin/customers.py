@@ -8,6 +8,12 @@ from sqlalchemy import select
 from tiqora.api.deps import DbSession
 from tiqora.api.v1.admin.common import now
 from tiqora.api.v1.admin.deps import AdminUser
+from tiqora.api.v1.admin.pagination import (
+    ListParamsDep,
+    Page,
+    apply_valid_filter,
+    paginate,
+)
 from tiqora.api.v1.admin.schemas import (
     CustomerCompanyCreate,
     CustomerCompanyOut,
@@ -23,11 +29,15 @@ from tiqora.znuny.password import hash_password
 router = APIRouter(tags=["admin:customers"])
 
 
-@router.get("/customer-users", response_model=list[CustomerUserAdminOut])
-async def list_customer_users(admin: AdminUser, session: DbSession) -> list[CustomerUser]:
+@router.get("/customer-users", response_model=Page[CustomerUserAdminOut])
+async def list_customer_users(
+    admin: AdminUser, session: DbSession, params: ListParamsDep
+) -> Page[CustomerUserAdminOut]:
     _ = admin
-    result = await session.execute(select(CustomerUser).order_by(CustomerUser.login))
-    return list(result.scalars().all())
+    stmt = apply_valid_filter(select(CustomerUser), CustomerUser.valid_id, params.valid).order_by(
+        CustomerUser.login
+    )
+    return await paginate(session, CustomerUserAdminOut, stmt, params)
 
 
 @router.get("/customer-users/{customer_user_id}", response_model=CustomerUserAdminOut)
@@ -100,11 +110,15 @@ async def deactivate_customer_user(
     await session.commit()
 
 
-@router.get("/customer-companies", response_model=list[CustomerCompanyOut])
-async def list_customer_companies(admin: AdminUser, session: DbSession) -> list[CustomerCompany]:
+@router.get("/customer-companies", response_model=Page[CustomerCompanyOut])
+async def list_customer_companies(
+    admin: AdminUser, session: DbSession, params: ListParamsDep
+) -> Page[CustomerCompanyOut]:
     _ = admin
-    result = await session.execute(select(CustomerCompany).order_by(CustomerCompany.name))
-    return list(result.scalars().all())
+    stmt = apply_valid_filter(
+        select(CustomerCompany), CustomerCompany.valid_id, params.valid
+    ).order_by(CustomerCompany.name)
+    return await paginate(session, CustomerCompanyOut, stmt, params)
 
 
 @router.get("/customer-companies/{customer_id}", response_model=CustomerCompanyOut)

@@ -11,6 +11,7 @@ from sqlalchemy import select
 from tiqora.api.deps import DbSession
 from tiqora.api.v1.admin.common import now
 from tiqora.api.v1.admin.deps import AdminUser
+from tiqora.api.v1.admin.pagination import ListParamsDep, Page, apply_valid_filter, paginate
 from tiqora.api.v1.admin.schemas import (
     QueueTemplateAssignment,
     SalutationOut,
@@ -36,11 +37,15 @@ router = APIRouter(tags=["admin:templates"])
 # --- Salutations ------------------------------------------------------------
 
 
-@router.get("/salutations", response_model=list[SalutationOut])
-async def list_salutations(admin: AdminUser, session: DbSession) -> list[Salutation]:
+@router.get("/salutations", response_model=Page[SalutationOut])
+async def list_salutations(
+    admin: AdminUser, session: DbSession, params: ListParamsDep
+) -> Page[SalutationOut]:
     _ = admin
-    result = await session.execute(select(Salutation).order_by(Salutation.name))
-    return list(result.scalars().all())
+    stmt = apply_valid_filter(select(Salutation), Salutation.valid_id, params.valid).order_by(
+        Salutation.name
+    )
+    return await paginate(session, SalutationOut, stmt, params)
 
 
 @router.get("/salutations/{salutation_id}", response_model=SalutationOut)
@@ -96,11 +101,15 @@ async def deactivate_salutation(salutation_id: int, admin: AdminUser, session: D
 # --- Signatures --------------------------------------------------------------
 
 
-@router.get("/signatures", response_model=list[SignatureOut])
-async def list_signatures(admin: AdminUser, session: DbSession) -> list[Signature]:
+@router.get("/signatures", response_model=Page[SignatureOut])
+async def list_signatures(
+    admin: AdminUser, session: DbSession, params: ListParamsDep
+) -> Page[SignatureOut]:
     _ = admin
-    result = await session.execute(select(Signature).order_by(Signature.name))
-    return list(result.scalars().all())
+    stmt = apply_valid_filter(select(Signature), Signature.valid_id, params.valid).order_by(
+        Signature.name
+    )
+    return await paginate(session, SignatureOut, stmt, params)
 
 
 @router.get("/signatures/{signature_id}", response_model=SignatureOut)
@@ -154,11 +163,15 @@ async def deactivate_signature(signature_id: int, admin: AdminUser, session: DbS
 # --- Standard templates + queue assignment -----------------------------------
 
 
-@router.get("/templates", response_model=list[StandardTemplateOut])
-async def list_templates(admin: AdminUser, session: DbSession) -> list[StandardTemplate]:
+@router.get("/templates", response_model=Page[StandardTemplateOut])
+async def list_templates(
+    admin: AdminUser, session: DbSession, params: ListParamsDep
+) -> Page[StandardTemplateOut]:
     _ = admin
-    result = await session.execute(select(StandardTemplate).order_by(StandardTemplate.name))
-    return list(result.scalars().all())
+    stmt = apply_valid_filter(
+        select(StandardTemplate), StandardTemplate.valid_id, params.valid
+    ).order_by(StandardTemplate.name)
+    return await paginate(session, StandardTemplateOut, stmt, params)
 
 
 @router.get("/templates/{template_id}", response_model=StandardTemplateOut)

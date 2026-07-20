@@ -133,4 +133,8 @@ export type {
   StateRef,
   AgentRef,
   CustomerRef,
+  AgentTicketCreateInput,
+  AdminPage,
+  AdminListParams,
+  AdminValidFilter,
 } from "@tiqora/api-client";

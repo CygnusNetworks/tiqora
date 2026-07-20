@@ -1,4 +1,11 @@
-import { useEffect } from "react";
+import {
+  createContext,
+  createElement,
+  useContext,
+  useEffect,
+  useState,
+  type ReactNode,
+} from "react";
 import { useQueryClient, type QueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { addNotification } from "@/lib/notificationStore";
@@ -78,21 +85,44 @@ export function handleSSEMessage(queryClient: QueryClient, raw: string): void {
   }
 }
 
+/** Live state of the realtime event stream, surfaced in the top bar's
+ * connection dot. "connecting" is the brief initial state; "live" once the
+ * stream is open; "reconnecting" after a drop (EventSource retries on its
+ * own). */
+export type ConnectionState = "connecting" | "live" | "reconnecting";
+
+const ConnectionContext = createContext<ConnectionState>("connecting");
+
+/** Read the current SSE connection state. Defaults to "connecting" outside a
+ * provider (e.g. the admin shell, which doesn't open the stream). */
+export function useConnectionStatus(): ConnectionState {
+  return useContext(ConnectionContext);
+}
+
 /**
  * Opens a single `EventSource` against `/api/v1/events/stream` for the
  * lifetime of the mounting component (intended to be mounted once, near
- * the app shell) and applies cache invalidation for every message.
+ * the app shell) and applies cache invalidation for every message. Also
+ * tracks the stream's connection state and provides it to descendants via
+ * `useConnectionStatus()` — wrap the app subtree in the returned element.
  *
  * Session-cookie auth: `withCredentials: true` sends the same cookie the
  * rest of the agent app uses — no separate token plumbing needed.
  *
  * Defensive by design: if the endpoint is unreachable (e.g. unmocked in a
  * test/e2e environment), `EventSource` just fires `onerror` and retries on
- * its own schedule — no unhandled rejection, no crash, no visible effect
- * beyond the cache never getting SSE-driven invalidation.
+ * its own schedule — no unhandled rejection, no crash, only the dot turning
+ * amber.
  */
-export function useSSE(enabled = true): void {
+export function SSEProvider({
+  children,
+  enabled = true,
+}: {
+  children: ReactNode;
+  enabled?: boolean;
+}) {
   const queryClient = useQueryClient();
+  const [state, setState] = useState<ConnectionState>("connecting");
 
   useEffect(() => {
     if (!enabled) return undefined;
@@ -105,13 +135,22 @@ export function useSSE(enabled = true): void {
     const onMessage = (evt: MessageEvent<string>) => {
       handleSSEMessage(queryClient, evt.data);
     };
+    const onOpen = () => setState("live");
+    // EventSource retries automatically; onerror fires on each drop. Reflect
+    // that as "reconnecting" rather than surfacing an app-level error.
+    const onError = () => setState("reconnecting");
+
     source.addEventListener("message", onMessage);
-    // No onerror handler needed: EventSource retries automatically, and we
-    // don't want a transient network blip to surface as an app-level error.
+    source.addEventListener("open", onOpen);
+    source.addEventListener("error", onError);
 
     return () => {
       source.removeEventListener("message", onMessage);
+      source.removeEventListener("open", onOpen);
+      source.removeEventListener("error", onError);
       source.close();
     };
   }, [enabled, queryClient]);
+
+  return createElement(ConnectionContext.Provider, { value: state }, children);
 }

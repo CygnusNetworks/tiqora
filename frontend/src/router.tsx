@@ -17,6 +17,10 @@ import { SecurityPage } from "@/routes/agent/SecurityPage";
 import { SettingsPage } from "@/routes/agent/SettingsPage";
 import { CalendarPage } from "@/routes/agent/CalendarPage";
 import {
+  NewTicketPage as AgentNewTicketPage,
+  type NewTicketSearch,
+} from "@/routes/agent/NewTicketPage";
+import {
   KbArticleNewPage,
   KbArticleEditPage,
 } from "@/routes/agent/KbArticleEditorPage";
@@ -129,6 +133,22 @@ const agentQueuesRoute = createRoute({
     };
   },
   component: QueuesPage,
+});
+
+// NB: register the literal "/tickets/new" route before the "$ticketId" param
+// route so "new" isn't captured as a ticket id.
+const agentNewTicketRoute = createRoute({
+  getParentRoute: () => agentLayoutRoute,
+  path: "/tickets/new",
+  validateSearch: (s: Record<string, unknown>): NewTicketSearch => ({
+    queue_id:
+      typeof s.queue_id === "number"
+        ? s.queue_id
+        : typeof s.queue_id === "string" && s.queue_id !== ""
+          ? Number(s.queue_id)
+          : undefined,
+  }),
+  component: AgentNewTicketPage,
 });
 
 const agentTicketRoute = createRoute({
@@ -463,6 +483,7 @@ const routeTree = rootRoute.addChildren([
   agentLayoutRoute.addChildren([
     agentIndexRoute,
     agentQueuesRoute,
+    agentNewTicketRoute,
     agentTicketRoute,
     agentSearchRoute,
     agentKbRoute,

@@ -8,17 +8,18 @@ from sqlalchemy import select
 from tiqora.api.deps import DbSession
 from tiqora.api.v1.admin.common import now
 from tiqora.api.v1.admin.deps import AdminUser
+from tiqora.api.v1.admin.pagination import ListParamsDep, Page, apply_valid_filter, paginate
 from tiqora.api.v1.admin.schemas import GroupRoleAssignment, RoleCreate, RoleOut, RoleUpdate
 from tiqora.db.legacy.user import GroupRole, Roles
 
 router = APIRouter(prefix="/roles", tags=["admin:roles"])
 
 
-@router.get("", response_model=list[RoleOut])
-async def list_roles(admin: AdminUser, session: DbSession) -> list[Roles]:
+@router.get("", response_model=Page[RoleOut])
+async def list_roles(admin: AdminUser, session: DbSession, params: ListParamsDep) -> Page[RoleOut]:
     _ = admin
-    result = await session.execute(select(Roles).order_by(Roles.name))
-    return list(result.scalars().all())
+    stmt = apply_valid_filter(select(Roles), Roles.valid_id, params.valid).order_by(Roles.name)
+    return await paginate(session, RoleOut, stmt, params)
 
 
 @router.get("/{role_id}", response_model=RoleOut)
