@@ -59,6 +59,22 @@ def test_spa_serves_static_assets(tmp_path: Path) -> None:
     assert "<svg/>" in favicon.text
 
 
+def test_cache_headers_bust_index_but_keep_assets(tmp_path: Path) -> None:
+    """No hard refresh on deploy: index.html revalidates every load; the
+    content-hashed assets are cached immutably."""
+    client = _app(tmp_path)
+
+    root = client.get("/")
+    assert root.headers["cache-control"] == "no-cache"
+
+    deep = client.get("/agent/queues")
+    assert deep.headers["cache-control"] == "no-cache"
+
+    asset = client.get("/assets/app.js")
+    assert "immutable" in asset.headers["cache-control"]
+    assert "max-age=31536000" in asset.headers["cache-control"]
+
+
 def test_api_routes_stay_json_not_spa(tmp_path: Path) -> None:
     client = _app(tmp_path)
 

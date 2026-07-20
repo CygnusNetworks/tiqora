@@ -18,6 +18,8 @@ import structlog
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
+from starlette.responses import Response
+from starlette.types import Scope
 
 from tiqora.config import Settings
 
@@ -36,6 +38,24 @@ _RESERVED_PREFIXES: tuple[str, ...] = (
     "/openapi.json",
     "/mcp",
 )
+
+#: Vite gives assets content-hashed names, so they never change under a fixed
+#: URL — cache them for a year. index.html and other unhashed root files
+#: (favicon, …) must be revalidated every load so a new deploy is picked up on
+#: the next normal reload (no hard refresh needed); they're tiny and return 304
+#: when unchanged (FileResponse sets ETag + Last-Modified).
+_ASSET_CACHE = "public, max-age=31536000, immutable"
+_HTML_CACHE = "no-cache"
+
+
+class _ImmutableStaticFiles(StaticFiles):
+    """StaticFiles that marks its (content-hashed) responses immutable."""
+
+    async def get_response(self, path: str, scope: Scope) -> Response:
+        response = await super().get_response(path, scope)
+        if response.status_code == 200:
+            response.headers["Cache-Control"] = _ASSET_CACHE
+        return response
 
 
 def spa_is_available(cfg: Settings) -> bool:
@@ -58,7 +78,7 @@ def mount_spa(app: FastAPI, cfg: Settings) -> bool:
     index = dist / "index.html"
     assets = dist / "assets"
     if assets.is_dir():
-        app.mount("/assets", StaticFiles(directory=str(assets)), name="assets")
+        app.mount("/assets", _ImmutableStaticFiles(directory=str(assets)), name="assets")
 
     @app.get("/{full_path:path}", include_in_schema=False)
     async def spa_fallback(full_path: str) -> FileResponse:
@@ -68,11 +88,12 @@ def mount_spa(app: FastAPI, cfg: Settings) -> bool:
             raise HTTPException(status_code=404, detail="Not found")
         # Serve a real static file if one exists (favicon, robots, …),
         # guarding against path traversal; otherwise the SPA entrypoint.
+        # These (and index.html) are unhashed, so require revalidation.
         if full_path:
             candidate = (dist / full_path).resolve()
             if candidate.is_file() and candidate.is_relative_to(dist):
-                return FileResponse(candidate)
-        return FileResponse(index)
+                return FileResponse(candidate, headers={"Cache-Control": _HTML_CACHE})
+        return FileResponse(index, headers={"Cache-Control": _HTML_CACHE})
 
     logger.info("spa_mounted", dist=str(dist))
     return True
