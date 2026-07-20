@@ -147,6 +147,92 @@ export type StatsFilterParams = {
   customer_id?: string;
 };
 
+// ── Calendar ─────────────────────────────────────────────────────────────
+// Hand-written (see the Stats block above for rationale): mirrors
+// tiqora/calendar/schemas.py directly rather than requiring an openapi.json
+// regeneration.
+export type CalendarOut = {
+  id: number;
+  group_id: number;
+  name: string;
+  color: string;
+  valid: boolean;
+};
+
+export type RecurrenceIn = {
+  type: "Daily" | "Weekly" | "Monthly" | "Yearly";
+  interval?: number;
+  count?: number | null;
+  until?: string | null;
+};
+
+export type AppointmentIn = {
+  calendar_id: number;
+  title: string;
+  description?: string | null;
+  location?: string | null;
+  start_time: string;
+  end_time: string;
+  all_day?: boolean;
+  team_id?: string | null;
+  resource_id?: string | null;
+  recurrence?: RecurrenceIn | null;
+};
+
+export type AppointmentUpdateIn = {
+  title?: string | null;
+  description?: string | null;
+  location?: string | null;
+  start_time?: string | null;
+  end_time?: string | null;
+  all_day?: boolean | null;
+  team_id?: string | null;
+  resource_id?: string | null;
+  recurrence?: RecurrenceIn | null;
+  clear_recurrence?: boolean;
+};
+
+export type AppointmentOut = {
+  id: number;
+  parent_id: number | null;
+  calendar_id: number;
+  unique_id: string;
+  title: string;
+  description: string | null;
+  location: string | null;
+  start_time: string;
+  end_time: string;
+  all_day: boolean;
+  team_id: string | null;
+  resource_id: string | null;
+  recurring: boolean;
+  recur_type: string | null;
+  recur_interval: number | null;
+  recur_count: number | null;
+  recur_until: string | null;
+  create_time: string | null;
+  change_time: string | null;
+};
+
+export type OccurrenceOut = {
+  appointment_id: number;
+  calendar_id: number;
+  title: string;
+  description: string | null;
+  location: string | null;
+  start_time: string;
+  end_time: string;
+  all_day: boolean;
+  is_recurring: boolean;
+};
+
+export type TicketLinkOut = {
+  appointment_id: number;
+  calendar_id: number;
+  ticket_id: number;
+  rule_id: string;
+};
+
 export class ApiError extends Error {
   readonly status: number;
   readonly detail: unknown;
@@ -942,6 +1028,89 @@ export class ApiClient {
     }
     const suffix = qs.toString();
     return joinUrl(this.baseUrl, `${path}${suffix ? `?${suffix}` : ""}`);
+  }
+
+  // ── Calendar (/api/v1/calendar) ──────────────────────────────────────────
+
+  listCalendars(signal?: AbortSignal) {
+    return this.request<CalendarOut[]>("GET", "/api/v1/calendar/calendars", { signal });
+  }
+
+  listAppointments(
+    params: { start: string; end: string; calendar_id?: number[] },
+    signal?: AbortSignal,
+  ) {
+    const qs = new URLSearchParams();
+    qs.set("start", params.start);
+    qs.set("end", params.end);
+    for (const id of params.calendar_id ?? []) qs.append("calendar_id", String(id));
+    return this.request<OccurrenceOut[]>(
+      "GET",
+      `/api/v1/calendar/appointments?${qs.toString()}`,
+      { signal },
+    );
+  }
+
+  createAppointment(body: AppointmentIn, signal?: AbortSignal) {
+    return this.request<AppointmentOut>("POST", "/api/v1/calendar/appointments", {
+      body,
+      signal,
+    });
+  }
+
+  getAppointment(appointmentId: number, signal?: AbortSignal) {
+    return this.request<AppointmentOut>(
+      "GET",
+      `/api/v1/calendar/appointments/${appointmentId}`,
+      { signal },
+    );
+  }
+
+  updateAppointment(appointmentId: number, body: AppointmentUpdateIn, signal?: AbortSignal) {
+    return this.request<AppointmentOut>(
+      "PATCH",
+      `/api/v1/calendar/appointments/${appointmentId}`,
+      { body, signal },
+    );
+  }
+
+  deleteAppointment(
+    appointmentId: number,
+    params: { occurrence?: string } = {},
+    signal?: AbortSignal,
+  ) {
+    return this.request<void>("DELETE", `/api/v1/calendar/appointments/${appointmentId}`, {
+      query: params,
+      signal,
+    });
+  }
+
+  linkAppointmentTicket(appointmentId: number, ticketId: number, signal?: AbortSignal) {
+    return this.request<TicketLinkOut>(
+      "POST",
+      `/api/v1/calendar/appointments/${appointmentId}/tickets/${ticketId}`,
+      { signal },
+    );
+  }
+
+  unlinkAppointmentTicket(appointmentId: number, ticketId: number, signal?: AbortSignal) {
+    return this.request<void>(
+      "DELETE",
+      `/api/v1/calendar/appointments/${appointmentId}/tickets/${ticketId}`,
+      { signal },
+    );
+  }
+
+  listAppointmentTicketLinks(appointmentId: number, signal?: AbortSignal) {
+    return this.request<TicketLinkOut[]>(
+      "GET",
+      `/api/v1/calendar/appointments/${appointmentId}/tickets`,
+      { signal },
+    );
+  }
+
+  calendarExportIcsUrl(calendarId: number): string {
+    return joinUrl(this.baseUrl, `/api/v1/calendar/calendars/${calendarId}/export.ics`);
   }
 }
 

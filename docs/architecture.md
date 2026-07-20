@@ -292,6 +292,54 @@ granularity), mono-numeral stat tiles, and hand-rolled SVG bar/line charts
 (`components/agent/stats/{BarChart,LineChart}.tsx` — no charting dependency)
 plus a CSV-downloadable agent-workload table.
 
+### Calendar / appointments
+
+`tiqora/calendar/` (`CalendarService`, `recurrence.py`, `ics.py`) plus
+`api/v1/calendar.py` (`/api/v1/calendar/*`). Reuses Znuny's **existing**
+schema — `calendar`, `calendar_appointment`, `calendar_appointment_ticket`
+(mapped in `db/legacy/calendar.py`) — verbatim, so rows written by Tiqora are
+visible unmodified to a running Znuny 6.5 and vice versa. `calendar_id` reuses
+the same `permission_groups` table as queues, so `PermissionEngine.
+groups_for_permission()` gates calendar/appointment access exactly like queue
+access (`ro` to view, `rw` to create/edit/delete); `calendar_appointment_
+plugin` (Znuny's per-appointment plugin JSON blob) is not mapped — Tiqora has
+no plugin system.
+
+Simplifications vs. Znuny's Perl `Kernel::System::Calendar::Appointment`:
+
+- **Recurrence** — Znuny's `AppointmentCreate` *materialises* one
+  `calendar_appointment` row per occurrence (`recur_id`/`parent_id` chain).
+  Tiqora keeps a single parent row and expands occurrences on read
+  (`recurrence.expand_occurrences`) from `recur_type`/`recur_interval`/
+  `recur_count`/`recur_until` — the common RRULE subset Znuny's own UI
+  exposes (`Daily`/`Weekly`/`Monthly`/`Yearly`). This is O(1) writes instead
+  of O(n) row materialisation, at the cost of not supporting Znuny's
+  "edit/detach a single occurrence" (which diverges a child row); Tiqora
+  instead supports deleting a single occurrence via a JSON-encoded exclusion
+  list in `recur_exclude`.
+- **Ticket links** — `calendar_appointment_ticket` rows are written with
+  `rule_id='manual'`; Znuny's automatic "ticket appointment rules" (deriving
+  `rule_id` from a configured queue/SLA rule) are out of scope.
+- **ICS export/subscription** — `GET /calendar/calendars/{id}/export.ics`
+  (authenticated) and a token-gated `GET /calendar/calendars/{id}/feed.ics`
+  (unauthenticated, for pasting into external calendar clients) both emit
+  RFC 5545 via a small hand-rolled writer (`calendar/ics.py`, one `VEVENT`
+  per parent appointment with a native `RRULE`/`EXDATE`, not one per expanded
+  occurrence). The feed token is `md5(f"{login}-{calendar.salt_string}")` —
+  bit-for-bit the same scheme as Znuny's
+  `Kernel::System::Calendar::GetAccessToken`, so a token minted by either
+  system authenticates against the other.
+- **Cache invalidation** — appointments do not touch the ticket search index
+  or `tiqora_event_outbox`; calendars are a separate Znuny subsystem with no
+  ticket-cache interaction, so no invalidation hook is wired here.
+
+Frontend: `/agent/calendar` (`routes/agent/CalendarPage.tsx`) — month grid
+(`components/agent/calendar/MonthGrid.tsx`, a hand-rolled 42-cell grid, no
+calendar library), week and agenda views, a calendar-switcher sidebar
+(checkbox per calendar, permission-filtered), date navigation, and a
+create/edit `AppointmentDialog` (title, calendar, start/end, all-day,
+location, description, recurrence). i18n: EN + DE (`calendar.*` keys).
+
 ### Events and workers
 
 - Writes emit events via a transactional outbox (`tiqora_event_outbox`).

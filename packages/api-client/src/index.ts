@@ -108,5 +108,13 @@ export {
   type StatsGranularity,
   type StatsDimension,
   type StatsFilterParams,
+  // Calendar
+  type CalendarOut,
+  type RecurrenceIn,
+  type AppointmentIn,
+  type AppointmentUpdateIn,
+  type AppointmentOut,
+  type OccurrenceOut,
+  type TicketLinkOut,
   type paths,
 } from "./client";

@@ -70,7 +70,8 @@ existing schema during parallel operation.
 | CSV ticket export | ✅ Done | `GET /api/v1/tickets/export.csv` — permission-filtered, streaming, Excel-friendly |
 | Dev tooling: seed + dump anonymizer | ✅ Done | `tiqora dev seed` / `tiqora dev anonymize` — [docs/development.md](./docs/development.md) |
 | Reports/stats (volume, backlog, SLA, workload) | ✅ Done | `GET /api/v1/stats/*` (+ CSV export) — `/agent/stats` UI, permission-filtered by queue |
-| Process management, calendar, PGP/S-MIME | ⏸ Deferred | Not in V1 |
+| Calendar / appointments (recurrence, ICS export/feed, ticket links) | ✅ Done | `GET/POST /api/v1/calendar/*` — `/agent/calendar` UI (month/week/agenda), reuses Znuny `calendar*` tables |
+| Process management, PGP/S-MIME | ⏸ Deferred | Not in V1 |
 | SOAP, package manager | ⏸ Deferred | Not in V1 |
 | Phone/SMS, WhatsApp Business channels | 🔲 Planned (post-V1) | Plugin architecture |
 

@@ -282,6 +282,47 @@ const kbSearchHits = {
   ],
 };
 
+const calendars = [
+  { id: 1, group_id: 1, name: "Team Calendar", color: "#3b82f6", valid: true },
+  { id: 2, group_id: 1, name: "On-call", color: "#ef4444", valid: true },
+];
+
+const calendarAppointment = {
+  id: 900,
+  parent_id: null,
+  calendar_id: 1,
+  unique_id: "900@tiqora",
+  title: "Sprint planning",
+  description: "Plan next sprint",
+  location: "Room 2",
+  start_time: "2026-07-19T09:00:00",
+  end_time: "2026-07-19T10:00:00",
+  all_day: false,
+  team_id: null,
+  resource_id: null,
+  recurring: false,
+  recur_type: null,
+  recur_interval: null,
+  recur_count: null,
+  recur_until: null,
+  create_time: "2026-07-18T09:00:00Z",
+  change_time: "2026-07-18T09:00:00Z",
+};
+
+const occurrences = [
+  {
+    appointment_id: 900,
+    calendar_id: 1,
+    title: "Sprint planning",
+    description: "Plan next sprint",
+    location: "Room 2",
+    start_time: "2026-07-19T09:00:00",
+    end_time: "2026-07-19T10:00:00",
+    all_day: false,
+    is_recurring: false,
+  },
+];
+
 let authenticated = false;
 
 async function json(route: Route, status: number, body: unknown) {
@@ -513,6 +554,55 @@ export async function mockApi(page: Page) {
       await json(route, 200, [
         { user_id: 1, login: "agent", name: "Ada Agent", owned_open: 2, closed_in_period: 1 },
       ]);
+      return;
+    }
+
+    // Calendar
+    if (path.endsWith("/api/v1/calendar/calendars") && method === "GET") {
+      await json(route, 200, calendars);
+      return;
+    }
+    if (path.endsWith("/api/v1/calendar/appointments") && method === "GET") {
+      await json(route, 200, occurrences);
+      return;
+    }
+    if (path.endsWith("/api/v1/calendar/appointments") && method === "POST") {
+      const body = req.postDataJSON() as Record<string, unknown>;
+      await json(route, 201, {
+        id: 900,
+        parent_id: null,
+        unique_id: "900@tiqora",
+        description: null,
+        location: null,
+        all_day: false,
+        team_id: null,
+        resource_id: null,
+        recurring: false,
+        recur_type: null,
+        recur_interval: null,
+        recur_count: null,
+        recur_until: null,
+        create_time: "2026-07-19T09:00:00Z",
+        change_time: "2026-07-19T09:00:00Z",
+        ...body,
+      });
+      return;
+    }
+    if (path.match(/\/api\/v1\/calendar\/appointments\/\d+\/tickets$/)) {
+      await json(route, 200, []);
+      return;
+    }
+    if (path.match(/\/api\/v1\/calendar\/appointments\/\d+$/) && method === "GET") {
+      await json(route, 200, calendarAppointment);
+      return;
+    }
+    if (path.match(/\/api\/v1\/calendar\/appointments\/\d+$/) && method === "PATCH") {
+      const body = req.postDataJSON() as Record<string, unknown>;
+      await json(route, 200, { ...calendarAppointment, ...body });
+      return;
+    }
+    if (path.match(/\/api\/v1\/calendar\/appointments\/\d+$/) && method === "DELETE") {
+      await route.fulfill({ status: 204, body: "" });
       return;
     }
 
