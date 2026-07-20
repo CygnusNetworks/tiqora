@@ -330,6 +330,21 @@ export type ActivityDialogSubmitOut = {
   state: TicketProcessStateOut;
 };
 
+// ── Reference (agent pickers) ────────────────────────────────────────────
+// Hand-written (see the Stats block above for rationale): mirrors
+// tiqora/api/v1/reference.py directly rather than requiring an openapi.json
+// regeneration (which would pull in every other in-flight backend route as an
+// unrelated diff).
+export type PriorityRef = { id: number; name: string };
+export type StateRef = { id: number; name: string; type_name: string };
+export type AgentRef = { id: number; login: string; full_name: string };
+export type CustomerRef = {
+  login: string;
+  email: string;
+  customer_id: string;
+  full_name: string;
+};
+
 export class ApiError extends Error {
   readonly status: number;
   readonly detail: unknown;
@@ -769,6 +784,30 @@ export class ApiClient {
       `/api/v1/customers/${encodeURIComponent(login)}`,
       { signal },
     );
+  }
+
+  // ── Reference (agent pickers, /api/v1/reference) ─────────────────────────
+
+  listReferencePriorities(signal?: AbortSignal) {
+    return this.request<PriorityRef[]>("GET", "/api/v1/reference/priorities", { signal });
+  }
+
+  listReferenceStates(signal?: AbortSignal) {
+    return this.request<StateRef[]>("GET", "/api/v1/reference/states", { signal });
+  }
+
+  listReferenceAgents(signal?: AbortSignal) {
+    return this.request<AgentRef[]>("GET", "/api/v1/reference/agents", { signal });
+  }
+
+  searchReferenceCustomers(
+    params: { q?: string; limit?: number } = {},
+    signal?: AbortSignal,
+  ) {
+    return this.request<CustomerRef[]>("GET", "/api/v1/reference/customers", {
+      query: params,
+      signal,
+    });
   }
 
   // ── Search ────────────────────────────────────────────────────────────
