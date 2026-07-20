@@ -25,7 +25,8 @@
     "knowledgeBase": "Knowledge Base",
     "toggle": "Navigation umschalten",
     "reports": "Berichte",
-    "stats": "Statistiken"
+    "stats": "Statistiken",
+    "calendar": "Kalender"
   },
   "common": {
     "prev": "Zurück",
@@ -508,5 +509,57 @@
       "ownedOpen": "Offen (eigene)",
       "closedInPeriod": "Geschlossen im Zeitraum"
     }
+  },
+  "calendar": {
+    "title": "Kalender",
+    "sidebar": "Kalender",
+    "noCalendars": "Keine Kalender verfügbar.",
+    "newAppointment": "Neuer Termin",
+    "editAppointment": "Termin bearbeiten",
+    "today": "Heute",
+    "view": {
+      "month": "Monat",
+      "week": "Woche",
+      "agenda": "Agenda"
+    },
+    "weekday": {
+      "mon": "Mo",
+      "tue": "Di",
+      "wed": "Mi",
+      "thu": "Do",
+      "fri": "Fr",
+      "sat": "Sa",
+      "sun": "So"
+    },
+    "more": "+{{count}} weitere",
+    "empty": "Keine Termine in diesem Zeitraum.",
+    "form": {
+      "titleLabel": "Titel",
+      "calendar": "Kalender",
+      "start": "Beginn",
+      "end": "Ende",
+      "allDay": "Ganztägig",
+      "location": "Ort",
+      "description": "Beschreibung",
+      "recurrence": "Wiederholung",
+      "recurrenceNone": "Wiederholt sich nicht",
+      "recurrenceInterval": "Alle",
+      "recurrenceCount": "Anzahl",
+      "recurrenceUntil": "Bis",
+      "save": "Speichern",
+      "delete": "Löschen",
+      "cancel": "Abbrechen",
+      "deleteOccurrence": "Diesen Termin löschen",
+      "deleteSeries": "Gesamte Serie löschen"
+    },
+    "recurrence": {
+      "Daily": "Täglich",
+      "Weekly": "Wöchentlich",
+      "Monthly": "Monatlich",
+      "Yearly": "Jährlich"
+    },
+    "subscribe": "Abonnieren (ICS)",
+    "exportIcs": ".ics exportieren",
+    "linkedTickets": "Verknüpfte Tickets"
   }
 }

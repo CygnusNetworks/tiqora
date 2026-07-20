@@ -166,6 +166,20 @@ function SidebarBody({ onNavigate }: { onNavigate?: () => void }) {
 
         <div>
           <h2 className="px-2.5 pb-1.5 text-[10.5px] font-semibold uppercase tracking-[0.12em] text-muted">
+            {t("sidebar.calendar")}
+          </h2>
+          <div className="space-y-0.5">
+            <NavItem
+              to="/agent/calendar"
+              label={t("sidebar.calendar")}
+              testId="agent-nav-calendar"
+              onNavigate={onNavigate}
+            />
+          </div>
+        </div>
+
+        <div>
+          <h2 className="px-2.5 pb-1.5 text-[10.5px] font-semibold uppercase tracking-[0.12em] text-muted">
             {t("sidebar.reports")}
           </h2>
           <div className="space-y-0.5">
