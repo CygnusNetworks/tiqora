@@ -10,15 +10,18 @@ import {
 } from "@/lib/status";
 import type { CSSProperties } from "react";
 
-/** Map a Znuny priority id (1=lowest … 5=highest) to a badge tone. */
-function priorityTone(
-  priorityId: number | null | undefined,
-): "default" | "muted" | "warn" | "danger" {
-  if (priorityId == null) return "default";
-  if (priorityId >= 5) return "danger";
-  if (priorityId === 4) return "warn";
-  if (priorityId <= 2) return "muted";
-  return "default";
+/** Priority text tone by Znuny priority id (1=lowest … 5=highest). */
+function priorityTextClass(priorityId: number | null | undefined): string {
+  if (priorityId == null) return "text-ink";
+  if (priorityId >= 5) return "text-danger";
+  if (priorityId === 4) return "text-warn";
+  return "text-ink";
+}
+
+/** Drop Znuny's leading numeric rank ("3 normal" → "normal"). */
+function priorityName(priority: string | null | undefined): string | null {
+  if (!priority) return null;
+  return priority.replace(/^\s*\d+\s+/, "");
 }
 
 export function TicketHeader({ ticket }: { ticket: TicketDetail }) {
@@ -58,7 +61,7 @@ export function TicketHeader({ ticket }: { ticket: TicketDetail }) {
 
   return (
     <header
-      className={`space-y-3 rounded-lg border border-hairline bg-surface p-4 pl-5 ${spineClassName(
+      className={`space-y-2 rounded-lg border border-hairline bg-surface p-3.5 pl-5 ${spineClassName(
         escLevel,
       )}`}
       style={{ "--spine-color": spineColor } as CSSProperties}
@@ -85,48 +88,25 @@ export function TicketHeader({ ticket }: { ticket: TicketDetail }) {
           <h1 className="mt-1 font-display text-xl font-semibold text-ink">
             {ticket.title || t("ticket.noTitle")}
           </h1>
-          <div className="mt-2 flex flex-wrap items-center gap-1.5" data-testid="ticket-badge-row">
-            {ticket.state && (
-              <span
-                className="inline-flex items-center gap-1.5 rounded border border-hairline bg-surface-subtle px-2 py-0.5 text-xs font-medium text-ink"
-                data-testid="badge-state"
-              >
-                <span
-                  className="inline-block h-2 w-2 rounded-full"
-                  style={{ background: stateColorVar(ticket.state) }}
-                />
-                {ticket.state}
-              </span>
-            )}
-            {ticket.priority && (
-              <Badge tone={priorityTone(ticket.priority_id)}>{ticket.priority}</Badge>
-            )}
-            {ticket.queue_name && (
-              <Badge tone="default">{ticket.queue_name}</Badge>
-            )}
-          </div>
         </div>
       </div>
-      <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm sm:grid-cols-3 lg:grid-cols-4">
-        <Meta label={t("ticket.state")} value={ticket.state} />
-        <Meta label={t("ticket.priority")} value={ticket.priority} />
+      {/* One compact metadata line — no redundant badge row, priority without
+          its numeric rank. Wraps on narrow screens. */}
+      <dl
+        className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm"
+        data-testid="ticket-meta-line"
+      >
+        <Meta label={t("ticket.state")} value={ticket.state} dot={stateColorVar(ticket.state)} />
+        <Meta
+          label={t("ticket.priority")}
+          value={priorityName(ticket.priority)}
+          valueClass={priorityTextClass(ticket.priority_id)}
+        />
         <Meta label={t("ticket.queue")} value={ticket.queue_name} />
-        <Meta
-          label={t("ticket.owner")}
-          value={ticket.owner_name || ticket.owner_login}
-        />
-        <Meta
-          label={t("ticket.customer")}
-          value={ticket.customer_user_id || ticket.customer_id}
-        />
-        <Meta
-          label={t("ticket.created")}
-          value={formatDateTime(ticket.create_time, locale)}
-        />
-        <Meta
-          label={t("ticket.changed")}
-          value={formatDateTime(ticket.change_time, locale)}
-        />
+        <Meta label={t("ticket.owner")} value={ticket.owner_name || ticket.owner_login} />
+        <Meta label={t("ticket.customer")} value={ticket.customer_user_id || ticket.customer_id} />
+        <Meta label={t("ticket.created")} value={formatDateTime(ticket.create_time, locale)} />
+        <Meta label={t("ticket.changed")} value={formatDateTime(ticket.change_time, locale)} />
       </dl>
       {ticket.dynamic_fields && ticket.dynamic_fields.length > 0 && (
         <details className="rounded border border-hairline bg-surface-subtle px-3 py-2 text-sm">
@@ -152,14 +132,22 @@ export function TicketHeader({ ticket }: { ticket: TicketDetail }) {
 function Meta({
   label,
   value,
+  dot,
+  valueClass,
 }: {
   label: string;
   value: string | null | undefined;
+  dot?: string;
+  valueClass?: string;
 }) {
+  if (!value) return null;
   return (
-    <div>
-      <dt className="text-xs uppercase tracking-wide text-muted">{label}</dt>
-      <dd className="font-medium text-ink">{value || "—"}</dd>
+    <div className="inline-flex items-center gap-1.5">
+      {dot && (
+        <span className="inline-block h-2 w-2 rounded-full" style={{ background: dot }} />
+      )}
+      <dt className="text-[11px] uppercase tracking-wide text-muted">{label}</dt>
+      <dd className={`font-medium ${valueClass ?? "text-ink"}`}>{value}</dd>
     </div>
   );
 }
