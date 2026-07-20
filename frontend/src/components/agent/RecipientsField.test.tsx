@@ -267,9 +267,9 @@ describe("RecipientsField", () => {
     expect(screen.queryByTestId("to-editor-confirm")).toBeNull();
   });
 
-  it("Cc is collapsed by default when empty and revealed via toggle", () => {
-    // Mirrors ReplyDialog: Cc hidden until addresses exist or the agent
-    // expands it with the Cc toggle link.
+  it("Cc toggle expands, collapses, and shows a count badge when collapsed with addresses", () => {
+    // Mirrors ReplyDialog: true expand/collapse toggle; count badge only when
+    // collapsed and non-empty. Addresses stay in state while hidden.
     function CcCollapseHarness({ initialCc }: { initialCc: Recipient[] }) {
       const [cc, setCc] = useState(initialCc);
       const [showCc, setShowCc] = useState(initialCc.length > 0);
@@ -284,15 +284,17 @@ describe("RecipientsField", () => {
               testid="cc"
             />
           )}
-          {!showCc && (
-            <button
-              type="button"
-              data-testid="reply-toggle-cc"
-              onClick={() => setShowCc(true)}
-            >
-              Cc
-            </button>
-          )}
+          <button
+            type="button"
+            data-testid="reply-toggle-cc"
+            aria-expanded={showCc}
+            onClick={() => setShowCc((v) => !v)}
+          >
+            Cc
+            {!showCc && cc.length > 0 && (
+              <span data-testid="reply-toggle-cc-count">{cc.length}</span>
+            )}
+          </button>
         </div>
       );
     }
@@ -300,17 +302,35 @@ describe("RecipientsField", () => {
     const { unmount } = wrap(<CcCollapseHarness initialCc={[]} />);
     expect(screen.queryByTestId("cc")).toBeNull();
     expect(screen.getByTestId("reply-toggle-cc")).toBeTruthy();
+    expect(screen.queryByTestId("reply-toggle-cc-count")).toBeNull();
     fireEvent.click(screen.getByTestId("reply-toggle-cc"));
     expect(screen.getByTestId("cc")).toBeTruthy();
+    // Expanded: no count badge.
+    expect(screen.queryByTestId("reply-toggle-cc-count")).toBeNull();
+    // Collapse empty field again — still no badge.
+    fireEvent.click(screen.getByTestId("reply-toggle-cc"));
+    expect(screen.queryByTestId("cc")).toBeNull();
+    expect(screen.queryByTestId("reply-toggle-cc-count")).toBeNull();
     unmount();
 
-    // With addresses, Cc is shown immediately (no toggle).
+    // With addresses, starts expanded; collapse shows count badge; addresses remain.
     wrap(
       <CcCollapseHarness
-        initialCc={[{ name: "", email: "cc@x.com" }]}
+        initialCc={[
+          { name: "", email: "cc1@x.com" },
+          { name: "", email: "cc2@x.com" },
+        ]}
       />,
     );
     expect(screen.getByTestId("cc")).toBeTruthy();
-    expect(screen.queryByTestId("reply-toggle-cc")).toBeNull();
+    expect(screen.getAllByTestId("cc-chip")).toHaveLength(2);
+    fireEvent.click(screen.getByTestId("reply-toggle-cc"));
+    expect(screen.queryByTestId("cc")).toBeNull();
+    expect(screen.getByTestId("reply-toggle-cc-count").textContent).toBe("2");
+    // Re-expand still has both chips (addresses not cleared).
+    fireEvent.click(screen.getByTestId("reply-toggle-cc"));
+    expect(screen.getByTestId("cc")).toBeTruthy();
+    expect(screen.getAllByTestId("cc-chip")).toHaveLength(2);
+    expect(screen.queryByTestId("reply-toggle-cc-count")).toBeNull();
   });
 });
