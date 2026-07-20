@@ -97,7 +97,20 @@
     "noMyTickets": "Keine offenen Tickets zugewiesen.",
     "queueShortcuts": "Queues",
     "viewAllQueues": "Alle Queues anzeigen",
-    "openCount": "offen"
+    "openCount": "offen",
+    "kpiHeading": "Kennzahlen",
+    "kpiMyOpen": "Meine offenen",
+    "kpiMyNew": "Meine neuen",
+    "kpiUnownedNew": "Zum Übernehmen",
+    "kpiEscalated": "Eskaliert",
+    "newLabel": "neu",
+    "viewAll": "Alle anzeigen",
+    "toPickUp": "Neue zum Übernehmen",
+    "toPickUpEmpty": "Keine neuen Tickets zum Übernehmen.",
+    "escalatingSoon": "Bald eskalierend",
+    "escalatingSoonEmpty": "Keine bevorstehenden Eskalationen.",
+    "remindersDue": "Erinnerungen fällig",
+    "remindersDueEmpty": "Keine fälligen Erinnerungen."
   },
   "queue": {
     "sidebar": "Queues",
