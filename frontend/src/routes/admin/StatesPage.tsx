@@ -1,9 +1,12 @@
 import { useTranslation } from "react-i18next";
+import { useQuery } from "@tanstack/react-query";
 import { api, type StateOut, type StateCreate, type StateUpdate } from "@/lib/api";
 import { AdminResourcePage } from "@/components/admin/AdminResourcePage";
 import type { FieldDef, FieldValues } from "@/components/admin/CrudDrawer";
 import type { DataTableColumn } from "@/components/admin/DataTable";
 import { formatDateTime } from "@/lib/format";
+
+type StateTypeRef = { id: number; name: string };
 
 // Znuny ticket_state_type ids: 1 new, 2 open, 3 closed, 4 pending reminder,
 // 5 pending auto, 6 removed, 7 merged.
@@ -20,10 +23,22 @@ export function StatesPage() {
   const { t, i18n } = useTranslation();
   const locale = i18n.language?.startsWith("de") ? "de" : "en";
 
+  // Resolve type_id to the state-type name (live from the DB, falling back to
+  // the static labels for offline/loading states).
+  const typesQ = useQuery({
+    queryKey: ["admin", "state-types"],
+    queryFn: () => api.request<StateTypeRef[]>("GET", "/api/v1/admin/state-types"),
+    staleTime: 5 * 60 * 1000,
+  });
+  const typeName = (id: number) =>
+    typesQ.data?.find((tp) => tp.id === id)?.name ??
+    STATE_TYPE_OPTIONS.find((o) => o.value === id)?.label ??
+    String(id);
+
   const columns: DataTableColumn<StateOut>[] = [
     { key: "id", header: t("admin.table.id"), mono: true, render: (r) => r.id },
     { key: "name", header: t("admin.states.name"), render: (r) => r.name },
-    { key: "type_id", header: t("admin.states.typeId"), mono: true, render: (r) => r.type_id },
+    { key: "type_id", header: t("admin.states.typeId"), render: (r) => typeName(r.type_id) },
     {
       key: "changed",
       header: t("admin.table.changed"),
