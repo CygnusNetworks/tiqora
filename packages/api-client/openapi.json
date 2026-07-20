@@ -4230,7 +4230,7 @@
           "events"
         ],
         "summary": "Stream Events",
-        "description": "Server-sent event stream of ``tiqora:events`` pub/sub messages.\n\nRequires an authenticated agent (same session/API-key auth as the rest\nof ``/api/v1``). Each message forwarded is the raw JSON payload\npublished to Redis \u2014 see :mod:`tiqora.events.pubsub` for the two\nmessage shapes (``ticket_changed`` / ``presence_changed``).",
+        "description": "Server-sent event stream of ``tiqora:events`` pub/sub messages.\n\nRequires an authenticated agent (same session/API-key auth as the rest\nof ``/api/v1``). Each message forwarded is the raw JSON payload\npublished to Redis \u2014 see :mod:`tiqora.events.pubsub` for the message\nshapes (``ticket_changed`` / ``presence_changed`` /\n``ticket_new_in_queue``).\n\n``ticket_new_in_queue`` notifications are filtered to the agent's\nreadable queues. ``allowed_queue_ids`` is resolved **here**, before the\n``StreamingResponse`` is returned, because the DB session dependency's\ncontext manager closes once this function returns \u2014 the streaming\ngenerator must not touch it. This snapshots the permission set for the\nlife of the connection (see the module docstring's v1 limitations).",
         "operationId": "stream_events_api_v1_events_stream_get",
         "parameters": [
           {
@@ -4757,6 +4757,76 @@
         }
       }
     },
+    "/api/v1/kb/assignable-groups": {
+      "get": {
+        "tags": [
+          "kb"
+        ],
+        "summary": "List Assignable Groups",
+        "description": "Permission groups the current user may assign to a KB category.",
+        "operationId": "list_assignable_groups_api_v1_kb_assignable_groups_get",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "tiqora_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/AssignableGroup"
+                  },
+                  "title": "Response List Assignable Groups Api V1 Kb Assignable Groups Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/kb/categories/{category_id}": {
       "get": {
         "tags": [
@@ -5019,6 +5089,22 @@
             }
           },
           {
+            "name": "tag",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tag"
+            }
+          },
+          {
             "name": "authorization",
             "in": "header",
             "required": false,
@@ -5135,6 +5221,133 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ArticleOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/kb/knowledge": {
+      "get": {
+        "tags": [
+          "kb"
+        ],
+        "summary": "Get Knowledge",
+        "description": "ACL-filtered article bundle selected by tag(s) and/or category.\n\nIntended as the context surface for an agent/LLM: pass a set of tags\nand/or a category, get back the readable articles (Markdown included by\ndefault). Content is scoped to the caller's permission groups.",
+        "operationId": "get_knowledge_api_v1_kb_knowledge_get",
+        "parameters": [
+          {
+            "name": "tags",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Comma-separated tag names",
+              "title": "Tags"
+            },
+            "description": "Comma-separated tag names"
+          },
+          {
+            "name": "category_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Category Id"
+            }
+          },
+          {
+            "name": "state",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": "published",
+              "title": "State"
+            }
+          },
+          {
+            "name": "include_content",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": true,
+              "title": "Include Content"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "tiqora_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/KnowledgeBundle"
                 }
               }
             }
@@ -5511,6 +5724,321 @@
                 }
               }
             }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/kb/articles/{article_id}/attachments": {
+      "post": {
+        "tags": [
+          "kb"
+        ],
+        "summary": "Upload Attachment",
+        "operationId": "upload_attachment_api_v1_kb_articles__article_id__attachments_post",
+        "parameters": [
+          {
+            "name": "article_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Article Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "tiqora_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_upload_attachment_api_v1_kb_articles__article_id__attachments_post"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AttachmentOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "kb"
+        ],
+        "summary": "List Attachments",
+        "operationId": "list_attachments_api_v1_kb_articles__article_id__attachments_get",
+        "parameters": [
+          {
+            "name": "article_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Article Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "tiqora_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/AttachmentOut"
+                  },
+                  "title": "Response List Attachments Api V1 Kb Articles  Article Id  Attachments Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/kb/articles/{article_id}/attachments/{attachment_id}": {
+      "get": {
+        "tags": [
+          "kb"
+        ],
+        "summary": "Download Attachment",
+        "operationId": "download_attachment_api_v1_kb_articles__article_id__attachments__attachment_id__get",
+        "parameters": [
+          {
+            "name": "article_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Article Id"
+            }
+          },
+          {
+            "name": "attachment_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Attachment Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "tiqora_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "kb"
+        ],
+        "summary": "Delete Attachment",
+        "operationId": "delete_attachment_api_v1_kb_articles__article_id__attachments__attachment_id__delete",
+        "parameters": [
+          {
+            "name": "article_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Article Id"
+            }
+          },
+          {
+            "name": "attachment_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Attachment Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "tiqora_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
           },
           "422": {
             "description": "Validation Error",
@@ -16682,13 +17210,31 @@
             "title": "Title"
           },
           "slug": {
-            "type": "string",
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Slug"
           },
           "language": {
             "type": "string",
             "title": "Language",
             "default": "en"
+          },
+          "state": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "State"
           },
           "content_md": {
             "type": "string",
@@ -16706,7 +17252,6 @@
         "required": [
           "category_id",
           "title",
-          "slug",
           "content_md"
         ],
         "title": "ArticleIn"
@@ -17066,6 +17611,25 @@
         ],
         "title": "ArticleVersionOut"
       },
+      "AssignableGroup": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name"
+        ],
+        "title": "AssignableGroup",
+        "description": "A permission group the current user may assign to a KB category."
+      },
       "AttachmentMetaOut": {
         "properties": {
           "id": {
@@ -17138,6 +17702,46 @@
           "article_id"
         ],
         "title": "AttachmentMetaOut"
+      },
+      "AttachmentOut": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "article_id": {
+            "type": "integer",
+            "title": "Article Id"
+          },
+          "filename": {
+            "type": "string",
+            "title": "Filename"
+          },
+          "content_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Content Type"
+          },
+          "size": {
+            "type": "integer",
+            "title": "Size"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "article_id",
+          "filename",
+          "size"
+        ],
+        "title": "AttachmentOut",
+        "description": "Metadata for a KB article attachment (content fetched via download route)."
       },
       "AuthMethodsOut": {
         "properties": {
@@ -17482,6 +18086,20 @@
         ],
         "title": "Body_upload_attachment_api_portal_tickets__ticket_id__attachments_post"
       },
+      "Body_upload_attachment_api_v1_kb_articles__article_id__attachments_post": {
+        "properties": {
+          "file": {
+            "type": "string",
+            "contentMediaType": "application/octet-stream",
+            "title": "File"
+          }
+        },
+        "type": "object",
+        "required": [
+          "file"
+        ],
+        "title": "Body_upload_attachment_api_v1_kb_articles__article_id__attachments_post"
+      },
       "BounceRequest": {
         "properties": {
           "to_address": {
@@ -17568,19 +18186,22 @@
             "title": "Name"
           },
           "slug": {
-            "type": "string",
-            "title": "Slug"
-          },
-          "permission_group_id": {
             "anyOf": [
               {
-                "type": "integer"
+                "type": "string"
               },
               {
                 "type": "null"
               }
             ],
-            "title": "Permission Group Id"
+            "title": "Slug"
+          },
+          "permission_group_ids": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "title": "Permission Group Ids"
           },
           "customer_visible": {
             "type": "boolean",
@@ -17600,8 +18221,7 @@
         },
         "type": "object",
         "required": [
-          "name",
-          "slug"
+          "name"
         ],
         "title": "CategoryIn"
       },
@@ -17630,16 +18250,12 @@
             "type": "string",
             "title": "Slug"
           },
-          "permission_group_id": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Permission Group Id"
+          "permission_group_ids": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "title": "Permission Group Ids"
           },
           "customer_visible": {
             "type": "boolean",
@@ -17670,7 +18286,6 @@
           "parent_id",
           "name",
           "slug",
-          "permission_group_id",
           "customer_visible",
           "sort",
           "valid",
@@ -17714,16 +18329,19 @@
             ],
             "title": "Slug"
           },
-          "permission_group_id": {
+          "permission_group_ids": {
             "anyOf": [
               {
-                "type": "integer"
+                "items": {
+                  "type": "integer"
+                },
+                "type": "array"
               },
               {
                 "type": "null"
               }
             ],
-            "title": "Permission Group Id"
+            "title": "Permission Group Ids"
           },
           "customer_visible": {
             "anyOf": [
@@ -19442,16 +20060,12 @@
             "title": "Customer Visible",
             "default": false
           },
-          "permission_group_id": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Permission Group Id"
+          "permission_group_ids": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "title": "Permission Group Ids"
           },
           "score": {
             "anyOf": [
@@ -19502,6 +20116,103 @@
           "estimated_total"
         ],
         "title": "KbSearchResponse"
+      },
+      "KnowledgeArticle": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "category_id": {
+            "type": "integer",
+            "title": "Category Id"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "slug": {
+            "type": "string",
+            "title": "Slug"
+          },
+          "language": {
+            "type": "string",
+            "title": "Language"
+          },
+          "state": {
+            "type": "string",
+            "title": "State"
+          },
+          "tags": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Tags"
+          },
+          "content_md": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Content Md"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "category_id",
+          "title",
+          "slug",
+          "language",
+          "state"
+        ],
+        "title": "KnowledgeArticle",
+        "description": "One article in a knowledge bundle handed to an agent/LLM."
+      },
+      "KnowledgeBundle": {
+        "properties": {
+          "tags": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Tags"
+          },
+          "category_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Category Id"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "articles": {
+            "items": {
+              "$ref": "#/components/schemas/KnowledgeArticle"
+            },
+            "type": "array",
+            "title": "Articles"
+          }
+        },
+        "type": "object",
+        "required": [
+          "total",
+          "articles"
+        ],
+        "title": "KnowledgeBundle",
+        "description": "ACL-filtered set of articles selected by tag(s) and/or category."
       },
       "LoginRequest": {
         "properties": {

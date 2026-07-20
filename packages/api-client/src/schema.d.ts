@@ -891,8 +891,16 @@ export interface paths {
          *
          *     Requires an authenticated agent (same session/API-key auth as the rest
          *     of ``/api/v1``). Each message forwarded is the raw JSON payload
-         *     published to Redis — see :mod:`tiqora.events.pubsub` for the two
-         *     message shapes (``ticket_changed`` / ``presence_changed``).
+         *     published to Redis — see :mod:`tiqora.events.pubsub` for the message
+         *     shapes (``ticket_changed`` / ``presence_changed`` /
+         *     ``ticket_new_in_queue``).
+         *
+         *     ``ticket_new_in_queue`` notifications are filtered to the agent's
+         *     readable queues. ``allowed_queue_ids`` is resolved **here**, before the
+         *     ``StreamingResponse`` is returned, because the DB session dependency's
+         *     context manager closes once this function returns — the streaming
+         *     generator must not touch it. This snapshots the permission set for the
+         *     life of the connection (see the module docstring's v1 limitations).
          */
         get: operations["stream_events_api_v1_events_stream_get"];
         put?: never;
@@ -979,6 +987,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/kb/assignable-groups": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Assignable Groups
+         * @description Permission groups the current user may assign to a KB category.
+         */
+        get: operations["list_assignable_groups_api_v1_kb_assignable_groups_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/kb/categories/{category_id}": {
         parameters: {
             query?: never;
@@ -1010,6 +1038,30 @@ export interface paths {
         put?: never;
         /** Create Article */
         post: operations["create_article_api_v1_kb_articles_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/kb/knowledge": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Knowledge
+         * @description ACL-filtered article bundle selected by tag(s) and/or category.
+         *
+         *     Intended as the context surface for an agent/LLM: pass a set of tags
+         *     and/or a category, get back the readable articles (Markdown included by
+         *     default). Content is scoped to the caller's permission groups.
+         */
+        get: operations["get_knowledge_api_v1_kb_knowledge_get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -1064,6 +1116,42 @@ export interface paths {
         put?: never;
         post?: never;
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/kb/articles/{article_id}/attachments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Attachments */
+        get: operations["list_attachments_api_v1_kb_articles__article_id__attachments_get"];
+        put?: never;
+        /** Upload Attachment */
+        post: operations["upload_attachment_api_v1_kb_articles__article_id__attachments_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/kb/articles/{article_id}/attachments/{attachment_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Download Attachment */
+        get: operations["download_attachment_api_v1_kb_articles__article_id__attachments__attachment_id__get"];
+        put?: never;
+        post?: never;
+        /** Delete Attachment */
+        delete: operations["delete_attachment_api_v1_kb_articles__article_id__attachments__attachment_id__delete"];
         options?: never;
         head?: never;
         patch?: never;
@@ -2983,12 +3071,14 @@ export interface components {
             /** Title */
             title: string;
             /** Slug */
-            slug: string;
+            slug?: string | null;
             /**
              * Language
              * @default en
              */
             language: string;
+            /** State */
+            state?: string | null;
             /** Content Md */
             content_md: string;
             /** Tags */
@@ -3118,6 +3208,16 @@ export interface components {
              */
             changed_at: string;
         };
+        /**
+         * AssignableGroup
+         * @description A permission group the current user may assign to a KB category.
+         */
+        AssignableGroup: {
+            /** Id */
+            id: number;
+            /** Name */
+            name: string;
+        };
         /** AttachmentMetaOut */
         AttachmentMetaOut: {
             /** Id */
@@ -3134,6 +3234,22 @@ export interface components {
             content_id?: string | null;
             /** Disposition */
             disposition?: string | null;
+        };
+        /**
+         * AttachmentOut
+         * @description Metadata for a KB article attachment (content fetched via download route).
+         */
+        AttachmentOut: {
+            /** Id */
+            id: number;
+            /** Article Id */
+            article_id: number;
+            /** Filename */
+            filename: string;
+            /** Content Type */
+            content_type?: string | null;
+            /** Size */
+            size: number;
         };
         /** AuthMethodsOut */
         AuthMethodsOut: {
@@ -3254,6 +3370,11 @@ export interface components {
              */
             note: string;
         };
+        /** Body_upload_attachment_api_v1_kb_articles__article_id__attachments_post */
+        Body_upload_attachment_api_v1_kb_articles__article_id__attachments_post: {
+            /** File */
+            file: string;
+        };
         /** BounceRequest */
         BounceRequest: {
             /** To Address */
@@ -3283,9 +3404,9 @@ export interface components {
             /** Name */
             name: string;
             /** Slug */
-            slug: string;
-            /** Permission Group Id */
-            permission_group_id?: number | null;
+            slug?: string | null;
+            /** Permission Group Ids */
+            permission_group_ids?: number[];
             /**
              * Customer Visible
              * @default false
@@ -3312,8 +3433,8 @@ export interface components {
             name: string;
             /** Slug */
             slug: string;
-            /** Permission Group Id */
-            permission_group_id: number | null;
+            /** Permission Group Ids */
+            permission_group_ids?: number[];
             /** Customer Visible */
             customer_visible: boolean;
             /** Sort */
@@ -3339,8 +3460,8 @@ export interface components {
             name?: string | null;
             /** Slug */
             slug?: string | null;
-            /** Permission Group Id */
-            permission_group_id?: number | null;
+            /** Permission Group Ids */
+            permission_group_ids?: number[] | null;
             /** Customer Visible */
             customer_visible?: boolean | null;
             /** Sort */
@@ -3886,8 +4007,8 @@ export interface components {
              * @default false
              */
             customer_visible: boolean;
-            /** Permission Group Id */
-            permission_group_id?: number | null;
+            /** Permission Group Ids */
+            permission_group_ids?: number[];
             /** Score */
             score?: number | null;
         };
@@ -3899,6 +4020,42 @@ export interface components {
             hits: components["schemas"]["KbSearchHit"][];
             /** Estimated Total */
             estimated_total: number;
+        };
+        /**
+         * KnowledgeArticle
+         * @description One article in a knowledge bundle handed to an agent/LLM.
+         */
+        KnowledgeArticle: {
+            /** Id */
+            id: number;
+            /** Category Id */
+            category_id: number;
+            /** Title */
+            title: string;
+            /** Slug */
+            slug: string;
+            /** Language */
+            language: string;
+            /** State */
+            state: string;
+            /** Tags */
+            tags?: string[];
+            /** Content Md */
+            content_md?: string | null;
+        };
+        /**
+         * KnowledgeBundle
+         * @description ACL-filtered set of articles selected by tag(s) and/or category.
+         */
+        KnowledgeBundle: {
+            /** Tags */
+            tags?: string[];
+            /** Category Id */
+            category_id?: number | null;
+            /** Total */
+            total: number;
+            /** Articles */
+            articles: components["schemas"]["KnowledgeArticle"][];
         };
         /** LoginRequest */
         LoginRequest: {
@@ -7503,6 +7660,39 @@ export interface operations {
             };
         };
     };
+    list_assignable_groups_api_v1_kb_assignable_groups_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AssignableGroup"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     get_category_api_v1_kb_categories__category_id__get: {
         parameters: {
             query?: never;
@@ -7615,6 +7805,7 @@ export interface operations {
             query?: {
                 category_id?: number | null;
                 state?: string | null;
+                tag?: string | null;
             };
             header?: {
                 authorization?: string | null;
@@ -7670,6 +7861,45 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ArticleOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_knowledge_api_v1_kb_knowledge_get: {
+        parameters: {
+            query?: {
+                /** @description Comma-separated tag names */
+                tags?: string | null;
+                category_id?: number | null;
+                state?: string | null;
+                include_content?: boolean;
+            };
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KnowledgeBundle"];
                 };
             };
             /** @description Validation Error */
@@ -7848,6 +8078,150 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["ArticleVersionOut"][];
                 };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_attachments_api_v1_kb_articles__article_id__attachments_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                article_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AttachmentOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    upload_attachment_api_v1_kb_articles__article_id__attachments_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                article_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_upload_attachment_api_v1_kb_articles__article_id__attachments_post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AttachmentOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    download_attachment_api_v1_kb_articles__article_id__attachments__attachment_id__get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                article_id: number;
+                attachment_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_attachment_api_v1_kb_articles__article_id__attachments__attachment_id__delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                article_id: number;
+                attachment_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {

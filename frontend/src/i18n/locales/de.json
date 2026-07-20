@@ -41,6 +41,7 @@
     "queues": "Queues",
     "knowledge": "Wissen",
     "knowledgeBase": "Knowledge Base",
+    "kbCategories": "Kategorien",
     "toggle": "Navigation umschalten",
     "reports": "Berichte",
     "stats": "Statistiken",
@@ -570,6 +571,37 @@
       "tagsPlaceholder": "kommagetrennte, Schlagworte",
       "content": "Inhalt (Markdown)",
       "preview": "Vorschau"
+    },
+    "slug": {
+      "editSlug": "Slug bearbeiten",
+      "useAuto": "Automatisch verwenden",
+      "autoPlaceholder": "wird aus dem Titel erzeugt"
+    },
+    "attachments": {
+      "title": "Anhänge",
+      "upload": "Datei hochladen",
+      "delete": "Löschen",
+      "empty": "Noch keine Anhänge.",
+      "uploadFailed": "Datei konnte nicht hochgeladen werden. Bitte erneut versuchen.",
+      "tooLarge": "Diese Datei ist zu groß (max. 25 MB)."
+    },
+    "category": {
+      "title": "Kategorien",
+      "new": "Neue Kategorie",
+      "edit": "Kategorie bearbeiten",
+      "name": "Name",
+      "parent": "Übergeordnete Kategorie",
+      "noParent": "Keine (oberste Ebene)",
+      "slug": "Slug (optional)",
+      "slugPlaceholder": "wird aus dem Namen erzeugt",
+      "sort": "Sortierung",
+      "customerVisible": "Für Kunden sichtbar",
+      "active": "Aktiv",
+      "groups": "Berechtigungsgruppen",
+      "groupsHelp": "Diese Kategorie auf diese Gruppen beschränken. Leer lassen, um sie für alle Agenten sichtbar zu machen.",
+      "noGroups": "Sie haben keine zuweisbaren Gruppen.",
+      "empty": "Noch keine Kategorien. Legen Sie eine an, um zu beginnen.",
+      "saveError": "Kategorie konnte nicht gespeichert werden. Bitte erneut versuchen."
     }
   },
   "stats": {

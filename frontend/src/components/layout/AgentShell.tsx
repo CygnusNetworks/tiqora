@@ -299,6 +299,12 @@ function SidebarBody({ onNavigate }: { onNavigate?: () => void }) {
               testId="agent-nav-kb"
               onNavigate={onNavigate}
             />
+            <NavItem
+              to="/agent/kb/categories"
+              label={t("sidebar.kbCategories")}
+              testId="agent-nav-kb-categories"
+              onNavigate={onNavigate}
+            />
           </div>
         </div>
 

@@ -20,6 +20,7 @@ import {
   KbArticleNewPage,
   KbArticleEditPage,
 } from "@/routes/agent/KbArticleEditorPage";
+import { KbCategoriesPage } from "@/routes/agent/KbCategoriesPage";
 import { AgentShell } from "@/components/layout/AgentShell";
 import { PortalShell } from "@/components/layout/PortalShell";
 import { RequireAuth } from "@/auth/RequireAuth";
@@ -178,6 +179,12 @@ const agentKbNewRoute = createRoute({
   getParentRoute: () => agentLayoutRoute,
   path: "/kb/new",
   component: KbArticleNewPage,
+});
+
+const agentKbCategoriesRoute = createRoute({
+  getParentRoute: () => agentLayoutRoute,
+  path: "/kb/categories",
+  component: KbCategoriesPage,
 });
 
 const agentKbArticleRoute = createRoute({
@@ -460,6 +467,7 @@ const routeTree = rootRoute.addChildren([
     agentSearchRoute,
     agentKbRoute,
     agentKbNewRoute,
+    agentKbCategoriesRoute,
     agentKbArticleRoute,
     agentKbArticleEditRoute,
     agentSecurityRoute,

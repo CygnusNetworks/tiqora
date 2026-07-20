@@ -58,6 +58,10 @@ export {
   type KbArticleUpdateIn,
   type ArticleSummary,
   type ArticleVersionOut,
+  type AssignableGroup,
+  type KbAttachmentOut,
+  type KnowledgeArticle,
+  type KnowledgeBundle,
   // Admin
   type UserOut,
   type UserCreate,

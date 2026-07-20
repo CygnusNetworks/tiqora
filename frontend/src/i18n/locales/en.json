@@ -41,6 +41,7 @@
     "queues": "Queues",
     "knowledge": "Knowledge",
     "knowledgeBase": "Knowledge base",
+    "kbCategories": "Categories",
     "toggle": "Toggle navigation",
     "reports": "Reports",
     "stats": "Statistics",
@@ -570,6 +571,37 @@
       "tagsPlaceholder": "comma, separated, tags",
       "content": "Content (Markdown)",
       "preview": "Preview"
+    },
+    "slug": {
+      "editSlug": "Edit slug",
+      "useAuto": "Use automatic",
+      "autoPlaceholder": "auto-generated from title"
+    },
+    "attachments": {
+      "title": "Attachments",
+      "upload": "Upload file",
+      "delete": "Delete",
+      "empty": "No attachments yet.",
+      "uploadFailed": "Could not upload this file. Please try again.",
+      "tooLarge": "This file is too large (max 25 MB)."
+    },
+    "category": {
+      "title": "Categories",
+      "new": "New category",
+      "edit": "Edit category",
+      "name": "Name",
+      "parent": "Parent category",
+      "noParent": "None (top level)",
+      "slug": "Slug (optional)",
+      "slugPlaceholder": "auto-generated from name",
+      "sort": "Sort order",
+      "customerVisible": "Visible to customers",
+      "active": "Active",
+      "groups": "Permission groups",
+      "groupsHelp": "Restrict this category to these groups. Leave empty to make it visible to all agents.",
+      "noGroups": "You have no groups you may assign.",
+      "empty": "No categories yet. Create one to get started.",
+      "saveError": "Could not save this category. Please try again."
     }
   },
   "stats": {
