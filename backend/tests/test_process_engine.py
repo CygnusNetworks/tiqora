@@ -15,6 +15,7 @@ Follows the same ``mariadb_znuny_url`` fixture / ``_seed_tiqora_tables`` /
 from __future__ import annotations
 
 import contextlib
+from dataclasses import dataclass
 from typing import Any
 
 import pytest
@@ -251,3 +252,419 @@ async def test_start_process_and_submit_activity_dialog_advances_activity(
         assert "StateUpdate" in hist_types
         assert hist_types.count("TicketDynamicFieldUpdate") >= 3  # 2 from start + 1 from advance
         assert "ProcessManagement" not in hist_types
+
+
+# ---------------------------------------------------------------------------
+# Conditional transition: positive (matches) + negative (does not match)
+# ---------------------------------------------------------------------------
+
+COND_ACTIVITY_DIALOG_CONFIG_YAML = """
+DescriptionShort: Set title
+FieldOrder:
+- Title
+Fields:
+  Title:
+    Display: '1'
+Interface:
+- AgentInterface
+Permission: ''
+"""
+
+# The transition only fires when the submitted Title matches exactly —
+# exercises a real Condition block (Type: String), not an unconditional one.
+COND_TRANSITION_CONFIG_YAML = """
+Condition:
+  '1':
+    Fields:
+      Title:
+        Match: Advance Me
+        Type: String
+    Type: and
+ConditionLinking: and
+"""
+
+COND_TRANSITION_ACTION_CONFIG_YAML = """
+Config:
+  State: closed successful
+Module: Kernel::System::ProcessManagement::TransitionAction::TicketStateSet
+"""
+
+
+@dataclass(frozen=True)
+class _CondProcessIds:
+    process: str
+    activity_a: str
+    activity_b: str
+    dialog: str
+    transition: str
+    action: str
+
+
+async def _seed_cond_process(session: AsyncSession, *, suffix: str) -> _CondProcessIds:
+    """Seed a fresh condition-testing process with entity ids namespaced by
+    *suffix* — the DB fixture is session-scoped, so each caller needs its
+    own unique entity ids to avoid a duplicate-key collision.
+    """
+    ids = _CondProcessIds(
+        process=f"Process-testcond-{suffix}",
+        activity_a=f"Activity-cond-a-{suffix}",
+        activity_b=f"Activity-cond-b-{suffix}",
+        dialog=f"ActivityDialog-cond-ad1-{suffix}",
+        transition=f"Transition-cond-t1-{suffix}",
+        action=f"TransitionAction-cond-ta1-{suffix}",
+    )
+    process_config_yaml = f"""
+Description: Test process with a condition
+StartActivity: {ids.activity_a}
+StartActivityDialog: {ids.dialog}
+Path:
+  {ids.activity_a}:
+    {ids.transition}:
+      ActivityEntityID: {ids.activity_b}
+      TransitionAction:
+      - {ids.action}
+  {ids.activity_b}: {{}}
+"""
+    activity_a_config_yaml = f"""
+ActivityDialog:
+  '1': {ids.dialog}
+"""
+    activity_b_config_yaml = "ActivityDialog: {}\n"
+
+    now = "current_timestamp"
+    await session.execute(
+        text(
+            "INSERT INTO pm_process (entity_id, name, state_entity_id, layout, config,"
+            f" create_time, create_by, change_time, change_by)"
+            f" VALUES (:eid, :name, 'S1', '{{}}', :cfg, {now}, 1, {now}, 1)"
+        ),
+        {
+            "eid": ids.process,
+            "name": "Test Process Cond",
+            "cfg": process_config_yaml,
+        },
+    )
+    for eid, name, cfg in (
+        (ids.activity_a, "Activity Cond A", activity_a_config_yaml),
+        (ids.activity_b, "Activity Cond B", activity_b_config_yaml),
+    ):
+        await session.execute(
+            text(
+                "INSERT INTO pm_activity (entity_id, name, config,"
+                f" create_time, create_by, change_time, change_by)"
+                f" VALUES (:eid, :name, :cfg, {now}, 1, {now}, 1)"
+            ),
+            {"eid": eid, "name": name, "cfg": cfg},
+        )
+    await session.execute(
+        text(
+            "INSERT INTO pm_activity_dialog (entity_id, name, config,"
+            f" create_time, create_by, change_time, change_by)"
+            f" VALUES (:eid, :name, :cfg, {now}, 1, {now}, 1)"
+        ),
+        {"eid": ids.dialog, "name": "Set Title", "cfg": COND_ACTIVITY_DIALOG_CONFIG_YAML},
+    )
+    await session.execute(
+        text(
+            "INSERT INTO pm_transition (entity_id, name, config,"
+            f" create_time, create_by, change_time, change_by)"
+            f" VALUES (:eid, :name, :cfg, {now}, 1, {now}, 1)"
+        ),
+        {"eid": ids.transition, "name": "Cond T1", "cfg": COND_TRANSITION_CONFIG_YAML},
+    )
+    await session.execute(
+        text(
+            "INSERT INTO pm_transition_action (entity_id, name, config,"
+            f" create_time, create_by, change_time, change_by)"
+            f" VALUES (:eid, :name, :cfg, {now}, 1, {now}, 1)"
+        ),
+        {
+            "eid": ids.action,
+            "name": "Cond TA1",
+            "cfg": COND_TRANSITION_ACTION_CONFIG_YAML,
+        },
+    )
+    await session.commit()
+    return ids
+
+
+@pytest.mark.db
+async def test_transition_with_matching_condition_advances_and_applies_action(
+    mariadb_znuny_url: str,
+) -> None:
+    """Positive case: the submitted Title matches the transition's Condition
+    block -> the transition fires, its TicketStateSet action applies, and
+    the ticket advances to the target activity.
+    """
+    url = _mysql_async(mariadb_znuny_url)
+    engine = create_async_engine(url)
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    sysconfig = _make_sysconfig()
+
+    async with factory() as session:
+        await _seed_tiqora_tables(session)
+        ids = await _seed_cond_process(session, suffix="pos")
+
+    ticket_id = await _make_ticket(factory, sysconfig)
+
+    async with factory() as session, session.begin():
+        await start_process(
+            session,
+            ticket_id=ticket_id,
+            process_entity_id=ids.process,
+            user_id=1,
+            sysconfig=sysconfig,
+        )
+
+    async with factory() as session, session.begin():
+        result = await submit_activity_dialog(
+            session,
+            ticket_id=ticket_id,
+            activity_dialog_entity_id=ids.dialog,
+            field_values={"Title": "Advance Me"},
+            user_id=1,
+            sysconfig=sysconfig,
+        )
+
+    assert result.activity_changed is True
+    assert result.new_activity_entity_id == ids.activity_b
+    assert result.transition_entity_id == ids.transition
+    assert result.unsupported_actions == []
+
+    async with factory() as session:
+        state = await get_ticket_process_state(session, ticket_id)
+        assert state is not None
+        assert state.activity_entity_id == ids.activity_b
+
+        row = (
+            await session.execute(
+                text("SELECT title, ticket_state_id FROM ticket WHERE id = :tid"),
+                {"tid": ticket_id},
+            )
+        ).one()
+        assert row[0] == "Advance Me"
+        assert row[1] == 2  # 'closed successful'
+
+
+@pytest.mark.db
+async def test_transition_with_non_matching_condition_stays_on_same_activity(
+    mariadb_znuny_url: str,
+) -> None:
+    """Negative case: the submitted Title does NOT match the transition's
+    Condition block -> the dialog submission still succeeds (no error), but
+    the ticket stays on the same activity, no TicketStateSet action runs,
+    and no transition is reported as matched.
+    """
+    url = _mysql_async(mariadb_znuny_url)
+    engine = create_async_engine(url)
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    sysconfig = _make_sysconfig()
+
+    async with factory() as session:
+        await _seed_tiqora_tables(session)
+        ids = await _seed_cond_process(session, suffix="neg")
+
+    ticket_id = await _make_ticket(factory, sysconfig)
+
+    async with factory() as session, session.begin():
+        await start_process(
+            session,
+            ticket_id=ticket_id,
+            process_entity_id=ids.process,
+            user_id=1,
+            sysconfig=sysconfig,
+        )
+
+    async with factory() as session, session.begin():
+        result = await submit_activity_dialog(
+            session,
+            ticket_id=ticket_id,
+            activity_dialog_entity_id=ids.dialog,
+            field_values={"Title": "Do Not Advance"},
+            user_id=1,
+            sysconfig=sysconfig,
+        )
+
+    assert result.activity_changed is False
+    assert result.new_activity_entity_id is None
+    assert result.transition_entity_id is None
+    assert result.unsupported_actions == []
+
+    async with factory() as session:
+        # Ticket stayed on the start activity — the condition never matched
+        # so the transition never fired and its TicketStateSet action never ran.
+        state = await get_ticket_process_state(session, ticket_id)
+        assert state is not None
+        assert state.activity_entity_id == ids.activity_a
+
+        row = (
+            await session.execute(
+                text("SELECT title, ticket_state_id FROM ticket WHERE id = :tid"),
+                {"tid": ticket_id},
+            )
+        ).one()
+        # The dialog's Title field change is applied regardless of the
+        # transition outcome (field application happens before transition
+        # evaluation) — but the state was NOT set to 'closed successful'.
+        assert row[0] == "Do Not Advance"
+        assert row[1] != 2
+
+
+# ---------------------------------------------------------------------------
+# Unsupported TransitionAction module: skipped, reported, does not block
+# ---------------------------------------------------------------------------
+
+PROCESS_ENTITY_ID_UNSUP = "Process-testunsup"
+UNSUP_ACTIVITY_A = "Activity-unsup-a"
+UNSUP_ACTIVITY_B = "Activity-unsup-b"
+UNSUP_ACTIVITY_DIALOG = "ActivityDialog-unsup-ad1"
+UNSUP_TRANSITION = "Transition-unsup-t1"
+UNSUP_TRANSITION_ACTION = "TransitionAction-unsup-ta1"
+
+UNSUP_PROCESS_CONFIG_YAML = f"""
+Description: Test process with an unsupported action
+StartActivity: {UNSUP_ACTIVITY_A}
+StartActivityDialog: {UNSUP_ACTIVITY_DIALOG}
+Path:
+  {UNSUP_ACTIVITY_A}:
+    {UNSUP_TRANSITION}:
+      ActivityEntityID: {UNSUP_ACTIVITY_B}
+      TransitionAction:
+      - {UNSUP_TRANSITION_ACTION}
+  {UNSUP_ACTIVITY_B}: {{}}
+"""
+
+UNSUP_ACTIVITY_A_CONFIG_YAML = f"""
+ActivityDialog:
+  '1': {UNSUP_ACTIVITY_DIALOG}
+"""
+
+UNSUP_ACTIVITY_B_CONFIG_YAML = "ActivityDialog: {}\n"
+
+UNSUP_ACTIVITY_DIALOG_CONFIG_YAML = """
+DescriptionShort: Set title
+FieldOrder:
+- Title
+Fields:
+  Title:
+    Display: '1'
+Interface:
+- AgentInterface
+Permission: ''
+"""
+
+UNSUP_TRANSITION_CONFIG_YAML = "ConditionLinking: and\n"
+
+# TicketSLASet is a documented deferred/unsupported TransitionAction module
+# (see engine.py's module docstring) — never implemented, always skipped.
+UNSUP_TRANSITION_ACTION_CONFIG_YAML = """
+Config:
+  SLA: some sla
+Module: Kernel::System::ProcessManagement::TransitionAction::TicketSLASet
+"""
+
+
+async def _seed_unsupported_action_process(session: AsyncSession) -> None:
+    now = "current_timestamp"
+    await session.execute(
+        text(
+            "INSERT INTO pm_process (entity_id, name, state_entity_id, layout, config,"
+            f" create_time, create_by, change_time, change_by)"
+            f" VALUES (:eid, :name, 'S1', '{{}}', :cfg, {now}, 1, {now}, 1)"
+        ),
+        {
+            "eid": PROCESS_ENTITY_ID_UNSUP,
+            "name": "Test Process Unsup",
+            "cfg": UNSUP_PROCESS_CONFIG_YAML,
+        },
+    )
+    for eid, name, cfg in (
+        (UNSUP_ACTIVITY_A, "Activity Unsup A", UNSUP_ACTIVITY_A_CONFIG_YAML),
+        (UNSUP_ACTIVITY_B, "Activity Unsup B", UNSUP_ACTIVITY_B_CONFIG_YAML),
+    ):
+        await session.execute(
+            text(
+                "INSERT INTO pm_activity (entity_id, name, config,"
+                f" create_time, create_by, change_time, change_by)"
+                f" VALUES (:eid, :name, :cfg, {now}, 1, {now}, 1)"
+            ),
+            {"eid": eid, "name": name, "cfg": cfg},
+        )
+    await session.execute(
+        text(
+            "INSERT INTO pm_activity_dialog (entity_id, name, config,"
+            f" create_time, create_by, change_time, change_by)"
+            f" VALUES (:eid, :name, :cfg, {now}, 1, {now}, 1)"
+        ),
+        {
+            "eid": UNSUP_ACTIVITY_DIALOG,
+            "name": "Set Title",
+            "cfg": UNSUP_ACTIVITY_DIALOG_CONFIG_YAML,
+        },
+    )
+    await session.execute(
+        text(
+            "INSERT INTO pm_transition (entity_id, name, config,"
+            f" create_time, create_by, change_time, change_by)"
+            f" VALUES (:eid, :name, :cfg, {now}, 1, {now}, 1)"
+        ),
+        {"eid": UNSUP_TRANSITION, "name": "Unsup T1", "cfg": UNSUP_TRANSITION_CONFIG_YAML},
+    )
+    await session.execute(
+        text(
+            "INSERT INTO pm_transition_action (entity_id, name, config,"
+            f" create_time, create_by, change_time, change_by)"
+            f" VALUES (:eid, :name, :cfg, {now}, 1, {now}, 1)"
+        ),
+        {
+            "eid": UNSUP_TRANSITION_ACTION,
+            "name": "Unsup TA1",
+            "cfg": UNSUP_TRANSITION_ACTION_CONFIG_YAML,
+        },
+    )
+    await session.commit()
+
+
+@pytest.mark.db
+async def test_unsupported_transition_action_module_is_skipped_and_reported(
+    mariadb_znuny_url: str,
+) -> None:
+    """A TransitionAction whose Module is not one of the implemented handlers
+    (e.g. TicketSLASet) is skipped — logged, not applied, and its short
+    module name is collected into ``unsupported_actions`` — while the
+    transition itself still fires and the activity still advances (an
+    unsupported action does not abort the whole submission).
+    """
+    url = _mysql_async(mariadb_znuny_url)
+    engine = create_async_engine(url)
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    sysconfig = _make_sysconfig()
+
+    async with factory() as session:
+        await _seed_tiqora_tables(session)
+        await _seed_unsupported_action_process(session)
+
+    ticket_id = await _make_ticket(factory, sysconfig)
+
+    async with factory() as session, session.begin():
+        await start_process(
+            session,
+            ticket_id=ticket_id,
+            process_entity_id=PROCESS_ENTITY_ID_UNSUP,
+            user_id=1,
+            sysconfig=sysconfig,
+        )
+
+    async with factory() as session, session.begin():
+        result = await submit_activity_dialog(
+            session,
+            ticket_id=ticket_id,
+            activity_dialog_entity_id=UNSUP_ACTIVITY_DIALOG,
+            field_values={"Title": "Whatever"},
+            user_id=1,
+            sysconfig=sysconfig,
+        )
+
+    assert result.activity_changed is True
+    assert result.new_activity_entity_id == UNSUP_ACTIVITY_B
+    assert result.unsupported_actions == ["TicketSLASet"]
