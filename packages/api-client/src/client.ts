@@ -191,6 +191,42 @@ export type DynamicFieldUpdate = Schemas["DynamicFieldUpdate"];
 export type WebhookOut = Schemas["WebhookOut"];
 export type WebhookCreate = Schemas["WebhookCreate"];
 export type WebhookUpdate = Schemas["WebhookUpdate"];
+// Hand-written until openapi.json is regenerated (schemas also appear there).
+export type MailSecurity = "none" | "starttls" | "ssl";
+export type MailAuthType = "none" | "password";
+export type MailOutboundOut = {
+  enabled: boolean;
+  host: string;
+  port: number;
+  security: MailSecurity;
+  auth_type: MailAuthType;
+  auth_user: string;
+  has_password: boolean;
+  from_default: string;
+  timeout_seconds: number;
+  change_time?: string | null;
+  change_by?: number | null;
+};
+export type MailOutboundUpdate = {
+  enabled?: boolean | null;
+  host?: string | null;
+  port?: number | null;
+  security?: MailSecurity | null;
+  auth_type?: MailAuthType | null;
+  auth_user?: string | null;
+  /** Write-only; omit or empty keeps the stored password. */
+  auth_password?: string | null;
+  from_default?: string | null;
+  timeout_seconds?: number | null;
+};
+export type MailOutboundTestIn = {
+  to_address?: string | null;
+};
+export type MailOutboundTestOut = {
+  ok: boolean;
+  message: string;
+  detail?: string | null;
+};
 export type PostmasterFilterOut = Schemas["PostmasterFilterOut"];
 export type AclOut = Schemas["AclOut"];
 export type GenericAgentJobOut = Schemas["GenericAgentJobOut"];
@@ -1284,6 +1320,21 @@ export class ApiClient {
 
   get adminWebhooks() {
     return this.adminCrud<WebhookOut, WebhookCreate, WebhookUpdate>("/api/v1/admin/webhooks");
+  }
+
+  getMailOutbound(signal?: AbortSignal) {
+    return this.request<MailOutboundOut>("GET", "/api/v1/admin/mail/outbound", { signal });
+  }
+
+  putMailOutbound(body: MailOutboundUpdate, signal?: AbortSignal) {
+    return this.request<MailOutboundOut>("PUT", "/api/v1/admin/mail/outbound", { body, signal });
+  }
+
+  testMailOutbound(body: MailOutboundTestIn = {}, signal?: AbortSignal) {
+    return this.request<MailOutboundTestOut>("POST", "/api/v1/admin/mail/outbound/test", {
+      body,
+      signal,
+    });
   }
 
   // Read-only automation config.

@@ -244,3 +244,37 @@ class TiqoraWebhook(TiqoraBase):
         nullable=False,
         server_default=func.now(),
     )
+
+
+class TiqoraMailOutbound(TiqoraBase):
+    """Single-row outbound SMTP settings (admin UI + agent reply path).
+
+    Mirrors Znuny SysConfig SendmailModule settings, stored in an additive
+    ``tiqora_*`` table rather than env vars. ``auth_password`` is Fernet-
+    encrypted at rest (see :mod:`tiqora.crypto.secret`); never log it.
+    The logical singleton uses ``id = 1``.
+    """
+
+    __tablename__ = "tiqora_mail_outbound"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, nullable=False)
+    enabled: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default=false()
+    )
+    host: Mapped[str] = mapped_column(String(255), nullable=False, default="")
+    port: Mapped[int] = mapped_column(Integer, nullable=False, default=25)
+    # "none" | "starttls" | "ssl"
+    security: Mapped[str] = mapped_column(String(20), nullable=False, default="none")
+    # "none" | "password"
+    auth_type: Mapped[str] = mapped_column(String(20), nullable=False, default="none")
+    auth_user: Mapped[str] = mapped_column(String(255), nullable=False, default="")
+    # Fernet token; empty string means no password stored.
+    auth_password: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    from_default: Mapped[str] = mapped_column(String(255), nullable=False, default="")
+    timeout_seconds: Mapped[int] = mapped_column(Integer, nullable=False, default=60)
+    change_time: Mapped[datetime] = mapped_column(
+        DateTime,
+        nullable=False,
+        server_default=func.now(),
+    )
+    change_by: Mapped[int | None] = mapped_column(Integer, nullable=True)

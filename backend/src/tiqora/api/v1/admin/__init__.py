@@ -16,6 +16,7 @@ from tiqora.api.v1.admin import (
     customers,
     dynamic_fields,
     groups,
+    mail_outbound,
     priorities,
     queues,
     readonly,
@@ -41,5 +42,6 @@ admin_router.include_router(dynamic_fields.router)
 admin_router.include_router(readonly.router)
 admin_router.include_router(webhooks.router)
 admin_router.include_router(channels.router)
+admin_router.include_router(mail_outbound.router)
 
 __all__ = ["admin_router"]
