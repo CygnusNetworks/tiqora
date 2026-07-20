@@ -1468,13 +1468,13 @@ class TicketWriteService:
             raise TicketAccessDenied(f"user {user_id} lacks create on queue {queue_id}")
 
     def _resolve_mail_sender(self) -> Any:
-        """Return the injectable sender, or a real SmtpMailSender from settings."""
-        if self._mail_sender is not None:
-            return self._mail_sender
-        from tiqora.channels.email.smtp import SmtpMailSender
-        from tiqora.config import get_settings
+        """Return the test/injectable sender override, or ``None``.
 
-        return SmtpMailSender(get_settings())
+        When ``None``, :func:`deliver_agent_email_reply` builds an
+        :class:`SmtpMailSender` from DB outbound settings (preferred) or
+        env ``TIQORA_SMTP_*``.
+        """
+        return self._mail_sender
 
     async def create_ticket(self, user_id: int, params: TicketIn) -> int:
         await self._assert_create(user_id, params.queue_id)

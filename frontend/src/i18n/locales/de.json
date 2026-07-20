@@ -427,7 +427,8 @@
       "genericAgentJobs": "GenericAgent-Jobs",
       "dynamicFields": "Dynamische Felder",
       "webhooks": "Webhooks",
-      "processes": "Prozesse"
+      "processes": "Prozesse",
+      "mailOutbound": "E-Mail (Ausgang)"
     },
     "table": {
       "id": "ID",
@@ -661,6 +662,36 @@
       "dialogs": "Dialoge",
       "noDialogs": "—",
       "loadError": "Prozess konnte nicht geladen werden."
+    },
+    "mailOutbound": {
+      "title": "Ausgehende E-Mail (SMTP)",
+      "description": "SMTP-Einstellungen für Agentenantworten. Passwort wird verschlüsselt gespeichert und nie zurückgegeben.",
+      "enabled": "Versand aktiv",
+      "host": "SMTP-Host",
+      "port": "Port",
+      "security": "Sicherheit",
+      "securityNone": "Keine",
+      "securityStarttls": "STARTTLS",
+      "securitySsl": "SSL/TLS",
+      "authType": "Authentifizierung",
+      "authNone": "Keine",
+      "authPassword": "Benutzer/Passwort",
+      "authUser": "Benutzername",
+      "authPasswordField": "Passwort",
+      "passwordSet": "gesetzt",
+      "passwordPlaceholder": "Leer lassen, um beizubehalten",
+      "fromDefault": "Standard-Absender (From)",
+      "timeoutSeconds": "Timeout (Sekunden)",
+      "save": "Speichern",
+      "saving": "Wird gespeichert…",
+      "saved": "Einstellungen gespeichert.",
+      "saveError": "Speichern fehlgeschlagen.",
+      "test": "Verbindung testen",
+      "testing": "Teste…",
+      "testTo": "Test an Adresse senden (optional)",
+      "testSuccess": "Test erfolgreich",
+      "testFailure": "Test fehlgeschlagen",
+      "loadError": "Einstellungen konnten nicht geladen werden."
     }
   },
   "kb": {

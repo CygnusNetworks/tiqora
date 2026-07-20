@@ -1,21 +1,26 @@
 """Outbound SMTP for auto-responses and agent email replies.
 
 Znuny sends via the configured ``SendmailModule`` (SMTP/SMTPS/Sendmail); Tiqora
-uses ``aiosmtplib`` directly against ``tiqora.config.Settings`` (``TIQORA_SMTP_*``).
-Wrapped behind a thin protocol so tests can inject a capturing fake.
+uses ``aiosmtplib`` against either admin-DB settings (``tiqora_mail_outbound``)
+or ``tiqora.config.Settings`` (``TIQORA_SMTP_*``). Wrapped behind a thin
+protocol so tests can inject a capturing fake.
 """
 
 from __future__ import annotations
 
 from email.message import EmailMessage
-from typing import Protocol
+from typing import TYPE_CHECKING, Literal, Protocol
 
 import aiosmtplib
 import structlog
 
-from tiqora.config import Settings
+if TYPE_CHECKING:
+    from tiqora.config import Settings
+    from tiqora.domain.mail_outbound import ResolvedOutboundSmtp
 
 logger = structlog.get_logger(__name__)
+
+MailSecurity = Literal["none", "starttls", "ssl"]
 
 
 class MailSender(Protocol):
@@ -23,19 +28,59 @@ class MailSender(Protocol):
 
 
 class SmtpMailSender:
-    """Default sender: aiosmtplib against ``Settings.smtp_*``."""
+    """Default sender: aiosmtplib against host/port/security/auth/timeout."""
 
-    def __init__(self, settings: Settings) -> None:
-        self._settings = settings
+    def __init__(
+        self,
+        settings: Settings | None = None,
+        *,
+        host: str | None = None,
+        port: int | None = None,
+        username: str | None = None,
+        password: str | None = None,
+        security: MailSecurity | None = None,
+        timeout: float | None = None,
+    ) -> None:
+        # Backward-compatible: ``SmtpMailSender(settings)`` still works.
+        if settings is not None and host is None:
+            host = settings.smtp_host
+            port = settings.smtp_port
+            username = settings.smtp_user or None
+            password = settings.smtp_password or None
+            security = "starttls" if settings.smtp_use_tls else "none"
+            timeout = 60.0
+        self._host = host or "localhost"
+        self._port = int(port if port is not None else 25)
+        self._username = username or None
+        self._password = password or None
+        self._security: MailSecurity = security or "none"
+        self._timeout = float(timeout if timeout is not None else 60.0)
+
+    @classmethod
+    def from_resolved(cls, cfg: ResolvedOutboundSmtp) -> SmtpMailSender:
+        user = cfg.auth_user if cfg.auth_type == "password" else None
+        password = cfg.auth_password if cfg.auth_type == "password" else None
+        return cls(
+            host=cfg.host,
+            port=cfg.port,
+            username=user or None,
+            password=password or None,
+            security=cfg.security,
+            timeout=float(cfg.timeout_seconds),
+        )
 
     async def send(self, message: EmailMessage) -> None:
+        use_tls = self._security == "ssl"
+        start_tls = True if self._security == "starttls" else False if use_tls else None
         await aiosmtplib.send(
             message,
-            hostname=self._settings.smtp_host,
-            port=self._settings.smtp_port,
-            username=self._settings.smtp_user or None,
-            password=self._settings.smtp_password or None,
-            start_tls=self._settings.smtp_use_tls,
+            hostname=self._host,
+            port=self._port,
+            username=self._username,
+            password=self._password,
+            timeout=self._timeout,
+            use_tls=use_tls,
+            start_tls=start_tls,
         )
 
 

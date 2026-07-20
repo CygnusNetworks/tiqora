@@ -690,6 +690,44 @@ export interface paths {
         patch: operations["update_group_api_v1_admin_groups__group_id__patch"];
         trace?: never;
     };
+    "/api/v1/admin/mail/outbound": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Mail Outbound */
+        get: operations["get_mail_outbound_api_v1_admin_mail_outbound_get"];
+        /** Put Mail Outbound */
+        put: operations["put_mail_outbound_api_v1_admin_mail_outbound_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/mail/outbound/test": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Test Mail Outbound
+         * @description Connect + AUTH with the effective config; optionally send a test mail.
+         */
+        post: operations["test_mail_outbound_api_v1_admin_mail_outbound_test_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/postmaster-filters": {
         parameters: {
             query?: never;
@@ -3070,22 +3108,16 @@ export interface components {
     schemas: {
         /** AclOut */
         AclOut: {
-            /**
-             * Change Time
-             * Format: date-time
-             */
-            change_time: string;
+            /** Change Time */
+            change_time: string | null;
             /** Comments */
             comments: string | null;
             /** Config Change */
             config_change: string | null;
             /** Config Match */
             config_match: string | null;
-            /**
-             * Create Time
-             * Format: date-time
-             */
-            create_time: string;
+            /** Create Time */
+            create_time: string | null;
             /** Description */
             description: string | null;
             /** Id */
@@ -3626,20 +3658,14 @@ export interface components {
         };
         /** AutoResponseOut */
         AutoResponseOut: {
-            /**
-             * Change Time
-             * Format: date-time
-             */
-            change_time: string;
+            /** Change Time */
+            change_time: string | null;
             /** Comments */
             comments: string | null;
             /** Content Type */
             content_type: string | null;
-            /**
-             * Create Time
-             * Format: date-time
-             */
-            create_time: string;
+            /** Create Time */
+            create_time: string | null;
             /** Id */
             id: number;
             /** Name */
@@ -3846,22 +3872,16 @@ export interface components {
         };
         /** CustomerCompanyOut */
         CustomerCompanyOut: {
-            /**
-             * Change Time
-             * Format: date-time
-             */
-            change_time: string;
+            /** Change Time */
+            change_time: string | null;
             /** City */
             city: string | null;
             /** Comments */
             comments: string | null;
             /** Country */
             country: string | null;
-            /**
-             * Create Time
-             * Format: date-time
-             */
-            create_time: string;
+            /** Create Time */
+            create_time: string | null;
             /** Customer Id */
             customer_id: string;
             /** Name */
@@ -3964,22 +3984,16 @@ export interface components {
         };
         /** CustomerUserAdminOut */
         CustomerUserAdminOut: {
-            /**
-             * Change Time
-             * Format: date-time
-             */
-            change_time: string;
+            /** Change Time */
+            change_time: string | null;
             /** City */
             city: string | null;
             /** Comments */
             comments: string | null;
             /** Country */
             country: string | null;
-            /**
-             * Create Time
-             * Format: date-time
-             */
-            create_time: string;
+            /** Create Time */
+            create_time: string | null;
             /** Customer Id */
             customer_id: string;
             /** Email */
@@ -4176,20 +4190,14 @@ export interface components {
         };
         /** DynamicFieldOut */
         DynamicFieldOut: {
-            /**
-             * Change Time
-             * Format: date-time
-             */
-            change_time: string;
+            /** Change Time */
+            change_time: string | null;
             /** Config */
             config: {
                 [key: string]: unknown;
             };
-            /**
-             * Create Time
-             * Format: date-time
-             */
-            create_time: string;
+            /** Create Time */
+            create_time: string | null;
             /** Field Order */
             field_order: number;
             /** Field Type */
@@ -4280,18 +4288,12 @@ export interface components {
         };
         /** GroupOut */
         GroupOut: {
-            /**
-             * Change Time
-             * Format: date-time
-             */
-            change_time: string;
+            /** Change Time */
+            change_time: string | null;
             /** Comments */
             comments: string | null;
-            /**
-             * Create Time
-             * Format: date-time
-             */
-            create_time: string;
+            /** Create Time */
+            create_time: string | null;
             /** Id */
             id: number;
             /** Name */
@@ -4447,6 +4449,75 @@ export interface components {
              */
             pending_2fa: boolean;
             user?: components["schemas"]["UserMe"] | null;
+        };
+        /** MailOutboundOut */
+        MailOutboundOut: {
+            /**
+             * Auth Type
+             * @enum {string}
+             */
+            auth_type: "none" | "password";
+            /** Auth User */
+            auth_user: string;
+            /** Change By */
+            change_by?: number | null;
+            /** Change Time */
+            change_time?: string | null;
+            /** Enabled */
+            enabled: boolean;
+            /** From Default */
+            from_default: string;
+            /** Has Password */
+            has_password: boolean;
+            /** Host */
+            host: string;
+            /** Port */
+            port: number;
+            /**
+             * Security
+             * @enum {string}
+             */
+            security: "none" | "starttls" | "ssl";
+            /** Timeout Seconds */
+            timeout_seconds: number;
+        };
+        /**
+         * MailOutboundTestIn
+         * @description Optional recipient; when set a short test message is sent after AUTH.
+         */
+        MailOutboundTestIn: {
+            /** To Address */
+            to_address?: string | null;
+        };
+        /** MailOutboundTestOut */
+        MailOutboundTestOut: {
+            /** Detail */
+            detail?: string | null;
+            /** Message */
+            message: string;
+            /** Ok */
+            ok: boolean;
+        };
+        /** MailOutboundUpdate */
+        MailOutboundUpdate: {
+            /** Auth Password */
+            auth_password?: string | null;
+            /** Auth Type */
+            auth_type?: ("none" | "password") | null;
+            /** Auth User */
+            auth_user?: string | null;
+            /** Enabled */
+            enabled?: boolean | null;
+            /** From Default */
+            from_default?: string | null;
+            /** Host */
+            host?: string | null;
+            /** Port */
+            port?: number | null;
+            /** Security */
+            security?: ("none" | "starttls" | "ssl") | null;
+            /** Timeout Seconds */
+            timeout_seconds?: number | null;
         };
         /** MergeRequest */
         MergeRequest: {
@@ -4846,16 +4917,10 @@ export interface components {
         };
         /** PriorityOut */
         PriorityOut: {
-            /**
-             * Change Time
-             * Format: date-time
-             */
-            change_time: string;
-            /**
-             * Create Time
-             * Format: date-time
-             */
-            create_time: string;
+            /** Change Time */
+            change_time: string | null;
+            /** Create Time */
+            create_time: string | null;
             /** Id */
             id: number;
             /** Name */
@@ -5034,18 +5099,12 @@ export interface components {
         QueueOut: {
             /** Calendar Name */
             calendar_name: string | null;
-            /**
-             * Change Time
-             * Format: date-time
-             */
-            change_time: string;
+            /** Change Time */
+            change_time: string | null;
             /** Comments */
             comments: string | null;
-            /**
-             * Create Time
-             * Format: date-time
-             */
-            create_time: string;
+            /** Create Time */
+            create_time: string | null;
             /** Default Sign Key */
             default_sign_key: string | null;
             /** First Response Notify */
@@ -5184,18 +5243,12 @@ export interface components {
         };
         /** RoleOut */
         RoleOut: {
-            /**
-             * Change Time
-             * Format: date-time
-             */
-            change_time: string;
+            /** Change Time */
+            change_time: string | null;
             /** Comments */
             comments: string | null;
-            /**
-             * Create Time
-             * Format: date-time
-             */
-            create_time: string;
+            /** Create Time */
+            create_time: string | null;
             /** Id */
             id: number;
             /** Name */
@@ -5214,20 +5267,14 @@ export interface components {
         };
         /** SalutationOut */
         SalutationOut: {
-            /**
-             * Change Time
-             * Format: date-time
-             */
-            change_time: string;
+            /** Change Time */
+            change_time: string | null;
             /** Comments */
             comments: string | null;
             /** Content Type */
             content_type: string | null;
-            /**
-             * Create Time
-             * Format: date-time
-             */
-            create_time: string;
+            /** Create Time */
+            create_time: string | null;
             /** Id */
             id: number;
             /** Name */
@@ -5306,20 +5353,14 @@ export interface components {
         };
         /** SignatureOut */
         SignatureOut: {
-            /**
-             * Change Time
-             * Format: date-time
-             */
-            change_time: string;
+            /** Change Time */
+            change_time: string | null;
             /** Comments */
             comments: string | null;
             /** Content Type */
             content_type: string | null;
-            /**
-             * Create Time
-             * Format: date-time
-             */
-            create_time: string;
+            /** Create Time */
+            create_time: string | null;
             /** Id */
             id: number;
             /** Name */
@@ -5440,22 +5481,16 @@ export interface components {
          * @description Attachment master row; ``content`` is base64-encoded binary.
          */
         StandardAttachmentOut: {
-            /**
-             * Change Time
-             * Format: date-time
-             */
-            change_time: string;
+            /** Change Time */
+            change_time: string | null;
             /** Comments */
             comments: string | null;
             /** Content */
             content: string;
             /** Content Type */
             content_type: string;
-            /**
-             * Create Time
-             * Format: date-time
-             */
-            create_time: string;
+            /** Create Time */
+            create_time: string | null;
             /** Filename */
             filename: string;
             /** Id */
@@ -5506,20 +5541,14 @@ export interface components {
         };
         /** StandardTemplateOut */
         StandardTemplateOut: {
-            /**
-             * Change Time
-             * Format: date-time
-             */
-            change_time: string;
+            /** Change Time */
+            change_time: string | null;
             /** Comments */
             comments: string | null;
             /** Content Type */
             content_type: string | null;
-            /**
-             * Create Time
-             * Format: date-time
-             */
-            create_time: string;
+            /** Create Time */
+            create_time: string | null;
             /** Id */
             id: number;
             /** Name */
@@ -5562,18 +5591,12 @@ export interface components {
         };
         /** StateOut */
         StateOut: {
-            /**
-             * Change Time
-             * Format: date-time
-             */
-            change_time: string;
+            /** Change Time */
+            change_time: string | null;
             /** Comments */
             comments: string | null;
-            /**
-             * Create Time
-             * Format: date-time
-             */
-            create_time: string;
+            /** Create Time */
+            create_time: string | null;
             /** Id */
             id: number;
             /** Name */
@@ -5980,16 +6003,10 @@ export interface components {
         };
         /** UserOut */
         UserOut: {
-            /**
-             * Change Time
-             * Format: date-time
-             */
-            change_time: string;
-            /**
-             * Create Time
-             * Format: date-time
-             */
-            create_time: string;
+            /** Change Time */
+            change_time: string | null;
+            /** Create Time */
+            create_time: string | null;
             /** First Name */
             first_name: string;
             /** Id */
@@ -8148,6 +8165,113 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["GroupOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_mail_outbound_api_v1_admin_mail_outbound_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MailOutboundOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    put_mail_outbound_api_v1_admin_mail_outbound_put: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MailOutboundUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MailOutboundOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    test_mail_outbound_api_v1_admin_mail_outbound_test_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MailOutboundTestIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MailOutboundTestOut"];
                 };
             };
             /** @description Validation Error */

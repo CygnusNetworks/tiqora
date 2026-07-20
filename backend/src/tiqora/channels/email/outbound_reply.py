@@ -4,9 +4,11 @@ Wires the existing :mod:`tiqora.channels.email.smtp` primitives into the agent
 reply path. Shared prepare step (signature, From, Message-ID, threading):
 
 1. Resolve From (queue system_address), signature, Message-ID, threading headers
-2. If outbound mail is enabled (``Settings.smtp_enabled``): SMTP send first via
-   injectable :class:`MailSender`, then store — on send failure store nothing
-   and raise :class:`OutboundMailError` (HTTP 502). Matches Znuny AgentTicketCompose.
+2. If outbound mail is enabled (DB ``tiqora_mail_outbound`` when ``enabled``,
+   else env ``Settings.smtp_enabled``): SMTP send first via injectable
+   :class:`MailSender` (or a DB/env-resolved :class:`SmtpMailSender`), then
+   store — on send failure store nothing and raise :class:`OutboundMailError`
+   (HTTP 502). Matches Znuny AgentTicketCompose.
 3. If outbound mail is **not** enabled (default): store the prepared article and
    log ``agent_email_not_dispatched`` — no SMTP attempt, no 502. Production often
    has no relay; losing the agent's typed text is worse than not sending.
@@ -304,7 +306,7 @@ async def send_prepared_agent_email(mail_sender: MailSender, article: ArticleIn)
 async def deliver_agent_email_reply(
     session: AsyncSession,
     sysconfig: SysConfig,
-    mail_sender: MailSender,
+    mail_sender: MailSender | None,
     *,
     ticket_id: int,
     queue_id: int,
@@ -314,16 +316,18 @@ async def deliver_agent_email_reply(
 ) -> int:
     """Prepare → optional SMTP send → store. Returns the new article id.
 
-    When outbound mail is enabled (``Settings.smtp_enabled`` / ``dispatch=True``):
-    **send-then-store** — a failed SMTP call leaves no article row so the agent
-    can retry without a false "sent" customer-visible note.
+    When outbound mail is enabled (DB ``tiqora_mail_outbound.enabled`` first,
+    else ``Settings.smtp_enabled`` / ``dispatch=True``): **send-then-store** —
+    a failed SMTP call leaves no article row so the agent can retry without a
+    false "sent" customer-visible note.
 
     When outbound mail is **not** enabled (default): store the fully prepared
     article (signature + threading headers identical to the send path) and log
     ``agent_email_not_dispatched`` — never attempt SMTP, never 502. Production
     often has no relay; losing the agent's typed text is worse than not sending.
     """
-    from tiqora.config import get_settings
+    from tiqora.channels.email.smtp import SmtpMailSender
+    from tiqora.domain.mail_outbound import resolve_outbound_smtp
 
     prepared = await prepare_outgoing_agent_email(
         session,
@@ -333,13 +337,25 @@ async def deliver_agent_email_reply(
         user_id=user_id,
         article=article,
     )
-    should_dispatch = get_settings().smtp_enabled if dispatch is None else dispatch
+    resolved = await resolve_outbound_smtp(session)
+    should_dispatch = resolved.enabled if dispatch is None else dispatch
     if should_dispatch:
-        await send_prepared_agent_email(mail_sender, prepared)
+        sender: MailSender
+        if mail_sender is not None:
+            sender = mail_sender
+        elif resolved.enabled:
+            sender = SmtpMailSender.from_resolved(resolved)
+        else:
+            # Explicit dispatch=True without resolved config: env-shaped default.
+            from tiqora.config import get_settings
+
+            sender = SmtpMailSender(get_settings())
+        await send_prepared_agent_email(sender, prepared)
     else:
         logger.warning(
             "agent_email_not_dispatched",
             reason="smtp_disabled",
+            source=resolved.source,
             ticket_id=ticket_id,
             to=prepared.to_address,
             subject=prepared.subject,
@@ -359,6 +375,7 @@ async def deliver_agent_email_reply(
             article_id=article_id,
             to=prepared.to_address,
             message_id=prepared.message_id,
+            source=resolved.source,
         )
     else:
         logger.info(

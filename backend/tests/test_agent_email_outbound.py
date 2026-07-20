@@ -21,6 +21,7 @@ from tiqora.channels.email.outbound_reply import (
 from tiqora.channels.email.smtp import CapturingMailSender, FailingMailSender, build_message
 from tiqora.config import get_settings
 from tiqora.db.tiqora.base import TiqoraBase
+from tiqora.db.tiqora.models import TiqoraMailOutbound  # noqa: F401 — register for create_all
 from tiqora.domain.ticket_write_service import ArticleIn, TicketWriteService
 from tiqora.znuny.password import hash_password
 from tiqora.znuny.sysconfig import SysConfig
@@ -74,6 +75,8 @@ def _seed(sync_url: str, *, ns: int) -> dict[str, Any]:
     pw = hash_password("secret")
     with engine.begin() as conn:
         TiqoraBase.metadata.create_all(conn)
+        # Isolate from admin mail tests sharing the session-scoped container.
+        conn.execute(text("DELETE FROM tiqora_mail_outbound"))
         conn.execute(
             text(
                 "INSERT INTO users (id, login, pw, first_name, last_name, valid_id,"
@@ -504,3 +507,166 @@ async def test_internal_note_does_not_send_mail(
 
     assert sender.sent == []
     await engine.dispose()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("url_fixture", ["mariadb_znuny_url", "postgres_znuny_url"])
+async def test_agent_email_uses_db_outbound_when_enabled(
+    url_fixture: str,
+    request: pytest.FixtureRequest,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """DB ``tiqora_mail_outbound.enabled`` dispatches even when env SMTP is off."""
+    monkeypatch.setenv("TIQORA_SMTP_ENABLED", "0")
+    get_settings.cache_clear()
+    try:
+        sync_url: str = request.getfixturevalue(url_fixture)
+        ids = _seed(sync_url, ns=5)
+        engine = create_async_engine(_to_async_url(sync_url))
+        factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+        sysconfig = _make_sysconfig()
+        sender = CapturingMailSender()
+
+        async with factory() as session:
+            from tiqora.config import get_settings as _gs
+            from tiqora.domain.mail_outbound import upsert_mail_outbound
+
+            await upsert_mail_outbound(
+                session,
+                settings=_gs(),
+                change_by=ids["agent"],
+                enabled=True,
+                host="smtp.db-test.example",
+                port=587,
+                security="starttls",
+                auth_type="password",
+                auth_user="relay@example.com",
+                auth_password="db-secret",
+                from_default="Help <help@example.com>",
+            )
+
+        async with factory() as session, session.begin():
+            svc = TicketWriteService(session, factory, sysconfig, mail_sender=sender)
+            article_id = await svc.add_article(
+                ids["agent"],
+                ids["ticket"],
+                ArticleIn(
+                    sender_type="agent",
+                    is_visible_for_customer=True,
+                    subject="Re: via DB SMTP",
+                    body="Dispatched from DB config.",
+                    channel="email",
+                    to_address=ids["customer_email"],
+                ),
+            )
+            assert article_id > 0
+
+        assert len(sender.sent) == 1
+        assert "Dispatched from DB config." in sender.sent[0].get_content()
+        await engine.dispose()
+    finally:
+        get_settings.cache_clear()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("url_fixture", ["mariadb_znuny_url", "postgres_znuny_url"])
+async def test_agent_email_db_disabled_falls_back_to_env(
+    url_fixture: str,
+    request: pytest.FixtureRequest,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """DB row present but disabled → env TIQORA_SMTP_ENABLED still gates send."""
+    monkeypatch.setenv("TIQORA_SMTP_ENABLED", "1")
+    get_settings.cache_clear()
+    try:
+        sync_url: str = request.getfixturevalue(url_fixture)
+        ids = _seed(sync_url, ns=6)
+        engine = create_async_engine(_to_async_url(sync_url))
+        factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+        sysconfig = _make_sysconfig()
+        sender = CapturingMailSender()
+
+        async with factory() as session:
+            from tiqora.config import get_settings as _gs
+            from tiqora.domain.mail_outbound import upsert_mail_outbound
+
+            await upsert_mail_outbound(
+                session,
+                settings=_gs(),
+                change_by=ids["agent"],
+                enabled=False,
+                host="smtp.disabled.example",
+                port=25,
+            )
+
+        async with factory() as session, session.begin():
+            svc = TicketWriteService(session, factory, sysconfig, mail_sender=sender)
+            article_id = await svc.add_article(
+                ids["agent"],
+                ids["ticket"],
+                ArticleIn(
+                    sender_type="agent",
+                    is_visible_for_customer=True,
+                    subject="Re: env fallback",
+                    body="Env still works when DB disabled.",
+                    channel="email",
+                    to_address=ids["customer_email"],
+                ),
+            )
+            assert article_id > 0
+
+        assert len(sender.sent) == 1
+        await engine.dispose()
+    finally:
+        get_settings.cache_clear()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("url_fixture", ["mariadb_znuny_url", "postgres_znuny_url"])
+async def test_agent_email_db_disabled_and_env_off_stores_only(
+    url_fixture: str,
+    request: pytest.FixtureRequest,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("TIQORA_SMTP_ENABLED", "0")
+    get_settings.cache_clear()
+    try:
+        sync_url: str = request.getfixturevalue(url_fixture)
+        ids = _seed(sync_url, ns=7)
+        engine = create_async_engine(_to_async_url(sync_url))
+        factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+        sysconfig = _make_sysconfig()
+        sender = CapturingMailSender()
+
+        async with factory() as session:
+            from tiqora.config import get_settings as _gs
+            from tiqora.domain.mail_outbound import upsert_mail_outbound
+
+            await upsert_mail_outbound(
+                session,
+                settings=_gs(),
+                change_by=ids["agent"],
+                enabled=False,
+                host="smtp.off.example",
+            )
+
+        async with factory() as session, session.begin():
+            svc = TicketWriteService(session, factory, sysconfig, mail_sender=sender)
+            article_id = await svc.add_article(
+                ids["agent"],
+                ids["ticket"],
+                ArticleIn(
+                    sender_type="agent",
+                    is_visible_for_customer=True,
+                    subject="Re: store only",
+                    body="No relay at all.",
+                    channel="email",
+                    to_address=ids["customer_email"],
+                ),
+            )
+            assert article_id > 0
+
+        assert sender.sent == []
+        await engine.dispose()
+    finally:
+        get_settings.cache_clear()
