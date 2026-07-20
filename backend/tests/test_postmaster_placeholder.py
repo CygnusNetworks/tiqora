@@ -3,10 +3,14 @@
 from __future__ import annotations
 
 from typing import Any
+from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from tiqora.channels.email.placeholder import expand_placeholders
+from tiqora.channels.email.placeholder import (
+    PlaceholderContext,
+    expand_placeholders,
+)
 from tiqora.znuny.sysconfig import SysConfig
 
 
@@ -76,15 +80,87 @@ async def test_config_tag_expands_via_sysconfig() -> None:
 
 
 @pytest.mark.asyncio
-async def test_unsupported_tag_left_verbatim() -> None:
-    text = "See <OTRS_AGENT_SUBJECT> here."
+async def test_unknown_tag_replaced_with_empty() -> None:
+    """Unresolved tags become empty — never left as raw <OTRS_...> markup."""
     result = await expand_placeholders(
         None,  # type: ignore[arg-type]
         _sysconfig(),
-        text,
+        "See <OTRS_COMPLETELY_UNKNOWN_TAG> here.",
         ticket={},
         queue_name="Raw",
         customer_subject="",
         customer_email_lines=[],
     )
-    assert result == text
+    assert result == "See  here."
+    assert "<OTRS_" not in result
+
+
+@pytest.mark.asyncio
+async def test_agent_and_current_tags_from_context() -> None:
+    ctx = PlaceholderContext(
+        current_user={
+            "userfirstname": "Ada",
+            "userlastname": "Lovelace",
+            "userfullname": "Ada Lovelace",
+            "userlogin": "ada",
+        },
+        ticket={"ticketnumber": "T1", "title": "Hello"},
+        queue_name="Support",
+    )
+    result = await expand_placeholders(
+        None,  # type: ignore[arg-type]
+        _sysconfig(),
+        "<OTRS_AGENT_UserFirstname> <OTRS_CURRENT_UserLastname> / <OTRS_TICKET_Title>",
+        context=ctx,
+    )
+    assert result == "Ada Lovelace / Hello"
+
+
+@pytest.mark.asyncio
+async def test_customer_data_and_queue_field_from_context() -> None:
+    ctx = PlaceholderContext(
+        customer={"wpnum": "WP-42", "userfirstname": "Bob"},
+        queue={"name": "Support", "comment": "main"},
+        queue_name="Support",
+    )
+    result = await expand_placeholders(
+        None,  # type: ignore[arg-type]
+        _sysconfig(),
+        "wp=<OTRS_CUSTOMER_DATA_wpnum> q=<OTRS_QUEUE_Name> c=<OTRS_QUEUE_Comment>",
+        context=ctx,
+    )
+    assert result == "wp=WP-42 q=Support c=main"
+
+
+@pytest.mark.asyncio
+async def test_unknown_queue_field_empty_not_raw() -> None:
+    ctx = PlaceholderContext(queue={"name": "Support"}, queue_name="Support")
+    result = await expand_placeholders(
+        None,  # type: ignore[arg-type]
+        _sysconfig(),
+        "https://startup.<OTRS_QUEUE_Domain>/?wpn=<OTRS_CUSTOMER_DATA_wpnum>",
+        context=ctx,
+    )
+    assert result == "https://startup./?wpn="
+    assert "<OTRS_" not in result
+
+
+@pytest.mark.asyncio
+async def test_expansion_error_returns_original_text() -> None:
+    """Best-effort: failures must not raise; original text is returned."""
+    with patch(
+        "tiqora.channels.email.placeholder._expand_placeholders_inner",
+        new_callable=AsyncMock,
+        side_effect=RuntimeError("boom"),
+    ):
+        original = "Keep <OTRS_TICKET_TicketNumber> raw on error"
+        result = await expand_placeholders(
+            None,  # type: ignore[arg-type]
+            _sysconfig(),
+            original,
+            ticket={"TicketNumber": "1"},
+            queue_name="Raw",
+            customer_subject="",
+            customer_email_lines=[],
+        )
+    assert result == original
