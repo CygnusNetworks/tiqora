@@ -111,6 +111,10 @@ export function ReplyDialog({
         cc: joinRecipients(cc),
         bcc: joinRecipients(bcc),
         reply_to: replyTo.trim() || null,
+        // Threading headers from the reply-draft endpoint so the outbound
+        // Message-ID chain matches Znuny follow-up detection.
+        in_reply_to: draftQ.data?.in_reply_to ?? null,
+        references: draftQ.data?.references ?? null,
       }),
     onSuccess: () => {
       void queryClient.invalidateQueries({
