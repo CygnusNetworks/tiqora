@@ -19,6 +19,13 @@ of two shapes:
   carry the presence payload itself: clients are expected to react by
   re-fetching ``GET /api/v1/tickets/{id}/presence`` (poll-via-invalidation),
   not by receiving full presence state over SSE.
+* ``{"type": "ticket_new_in_queue", "ticket_id": <int>, "tn": <str>,
+  "title": <str>, "queue_id": <int>, "queue_name": <str>}`` — a brand-new
+  ticket, or a new customer reply, landed in a queue. Carries enough
+  payload (tn/title/queue) for the frontend to render a bell notification +
+  toast without an extra fetch. Unlike ``ticket_changed`` this is filtered
+  per-connection by the SSE endpoint to the agent's readable queues (see
+  :mod:`tiqora.api.v1.events`).
 
 Publishing is always best-effort: this module never raises out of its
 publish functions, so callers (outbox drain, poller, presence writes) don't
@@ -72,6 +79,32 @@ async def publish_ticket_event(redis_client: redis.Redis, ticket_id: int, event_
 async def publish_presence_changed(redis_client: redis.Redis, ticket_id: int) -> None:
     """Publish a ``presence_changed`` notification. Best-effort — never raises."""
     payload: dict[str, Any] = {"type": "presence_changed", "ticket_id": ticket_id}
+    await _publish(redis_client, payload)
+
+
+async def publish_new_ticket_in_queue(
+    redis_client: redis.Redis,
+    *,
+    ticket_id: int,
+    tn: str,
+    title: str,
+    queue_id: int,
+    queue_name: str,
+) -> None:
+    """Publish a ``ticket_new_in_queue`` notification. Best-effort — never raises.
+
+    Emitted for brand-new tickets and new customer replies so agents can get
+    a bell/toast. The SSE endpoint filters these per-connection to the
+    agent's readable queues via the ``queue_id`` field.
+    """
+    payload: dict[str, Any] = {
+        "type": "ticket_new_in_queue",
+        "ticket_id": ticket_id,
+        "tn": tn,
+        "title": title,
+        "queue_id": queue_id,
+        "queue_name": queue_name,
+    }
     await _publish(redis_client, payload)
 
 
