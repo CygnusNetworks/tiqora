@@ -1,0 +1,54 @@
+# Tiqora documentation index
+
+## Getting started
+
+| Document | Content |
+|---|---|
+| [architecture.md](architecture.md) | System components and data flow |
+| [development.md](development.md) | Local development workflow |
+| [testing.md](testing.md) | Test suite layout, golden-master tests, testcontainers |
+| [deployment.md](deployment.md) | Production-oriented deployment notes |
+| [deploy/docker-compose.md](deploy/docker-compose.md) | Full Docker Compose walkthrough: services, env vars, external DB, reverse proxy, TLS, MCP streaming |
+
+## API reference
+
+| Document | Content |
+|---|---|
+| [api/README.md](api/README.md) | Overview of all four API surfaces, auth, pagination/error conventions |
+| [api/rest-v1.md](api/rest-v1.md) | Guided `/api/v1` reference with curl examples |
+| [api/openapi.json](api/openapi.json) | Generated OpenAPI schema (exhaustive; also served live at `GET /openapi.json`) |
+| [api/compat.md](api/compat.md) | `/znuny-compat` GenericInterface emulation — quick pointer into [compatibility.md](compatibility.md) |
+| [api/mcp.md](api/mcp.md) | MCP server: transport, auth, tool list, prompt-injection warning |
+| [ai-integration.md](ai-integration.md) | Webhook payload schema, MCP as the primary AI interface, recommended agent patterns |
+
+## Znuny parallel operation and migration
+
+| Document | Content |
+|---|---|
+| [guide/znuny-to-tiqora.md](guide/znuny-to-tiqora.md) | Operator playbook: backup → read-only deploy → TiqoraSync + writes → daemon takeover → cutover |
+| [parallel-operation.md](parallel-operation.md) | Behavioural invariants Tiqora maintains while co-running with Znuny; per-function daemon-takeover procedures |
+| [cutover.md](cutover.md) | Detailed, checklist-driven cutover runbook with rollback per stage |
+| [compatibility.md](compatibility.md) | GenericInterface compatibility layer: scope, gotchas, golden-master validation |
+
+## Feature areas
+
+| Document | Content |
+|---|---|
+| [channels.md](channels.md) | SMS, WhatsApp Business, and Phone/CTI channel plugins |
+| [gdpr.md](gdpr.md) | Customer anonymization and retention-policy tooling, ownership write-gate |
+
+## Design and specs
+
+| Document | Content |
+|---|---|
+| [specs/2026-07-19-tiqora-design.md](specs/2026-07-19-tiqora-design.md) | Full design specification |
+
+---
+
+Documentation conventions: all docs are vendor-neutral (generic placeholders
+like `tickets.example.com`, `db.example.internal` — no real deployment
+hostnames, IPs, or credentials) and written in English. The published
+container images (`ghcr.io/cygnusnetworks/tiqora`,
+`docker.io/cygnusnetworks/tiqora`) and the GitHub repository
+(`CygnusNetworks/tiqora`) are the actual public artifacts and are fine to
+reference directly.
