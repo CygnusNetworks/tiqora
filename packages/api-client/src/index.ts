@@ -14,6 +14,7 @@ export {
   type QueueCounts,
   type TicketListItem,
   type PaginatedTickets,
+  type MyTicketCounts,
   type TicketDetail,
   type ArticleListItem,
   type ArticleBody,

@@ -421,6 +421,29 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/tickets/my-counts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * My Ticket Counts
+         * @description Open/new counts for tickets owned by the current agent.
+         *
+         *     Registered before ``/{ticket_id}`` so "my-counts" is not parsed as a
+         *     ticket id.
+         */
+        get: operations["my_ticket_counts_api_v1_tickets_my_counts_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/tickets/export.csv": {
         parameters: {
             query?: never;
@@ -944,6 +967,83 @@ export interface paths {
         };
         /** Get Customer */
         get: operations["get_customer_api_v1_customers__login__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/reference/priorities": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Priorities */
+        get: operations["list_priorities_api_v1_reference_priorities_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/reference/states": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List States */
+        get: operations["list_states_api_v1_reference_states_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/reference/agents": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Agents
+         * @description Valid agents for owner/responsible pickers.
+         *
+         *     Kept simple: returns all valid users. Finer per-queue owner scoping (only
+         *     agents with ``owner`` permission on the ticket's queue group) can come later.
+         */
+        get: operations["list_agents_api_v1_reference_agents_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/reference/customers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Search Customers
+         * @description Search valid customer users for the customer-assignment picker.
+         */
+        get: operations["search_customers_api_v1_reference_customers_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -2899,6 +2999,15 @@ export interface components {
             /** Description Short */
             description_short: string;
         };
+        /** AgentRefOut */
+        AgentRefOut: {
+            /** Id */
+            id: number;
+            /** Login */
+            login: string;
+            /** Full Name */
+            full_name: string;
+        };
         /** AgentWorkloadItemOut */
         AgentWorkloadItemOut: {
             /** User Id */
@@ -3053,6 +3162,10 @@ export interface components {
             to_address?: string | null;
             /** Cc */
             cc?: string | null;
+            /** Bcc */
+            bcc?: string | null;
+            /** Reply To */
+            reply_to?: string | null;
             /**
              * Channel
              * @default note
@@ -3585,6 +3698,17 @@ export interface components {
             /** Last Name */
             last_name: string;
         };
+        /** CustomerRefOut */
+        CustomerRefOut: {
+            /** Login */
+            login: string;
+            /** Email */
+            email: string;
+            /** Customer Id */
+            customer_id: string;
+            /** Full Name */
+            full_name: string;
+        };
         /** CustomerUserAdminCreate */
         CustomerUserAdminCreate: {
             /** Login */
@@ -4115,6 +4239,16 @@ export interface components {
             unwatch_user_id?: number | null;
         };
         /**
+         * MyTicketCounts
+         * @description Owned-ticket counts for the "My tickets" sidebar badges.
+         */
+        MyTicketCounts: {
+            /** Open */
+            open: number;
+            /** New */
+            new: number;
+        };
+        /**
          * OccurrenceOut
          * @description A single expanded occurrence within a queried date range.
          */
@@ -4312,6 +4446,13 @@ export interface components {
              * Format: date-time
              */
             change_time: string;
+        };
+        /** PriorityRefOut */
+        PriorityRefOut: {
+            /** Id */
+            id: number;
+            /** Name */
+            name: string;
         };
         /** PriorityUpdate */
         PriorityUpdate: {
@@ -4956,6 +5097,15 @@ export interface components {
              * Format: date-time
              */
             change_time: string;
+        };
+        /** StateRefOut */
+        StateRefOut: {
+            /** Id */
+            id: number;
+            /** Name */
+            name: string;
+            /** Type Name */
+            type_name: string;
         };
         /** StateUpdate */
         StateUpdate: {
@@ -6413,6 +6563,39 @@ export interface operations {
             };
         };
     };
+    my_ticket_counts_api_v1_tickets_my_counts_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MyTicketCounts"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     export_tickets_csv_api_v1_tickets_export_csv_get: {
         parameters: {
             query?: {
@@ -7540,6 +7723,142 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CustomerUserOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_priorities_api_v1_reference_priorities_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PriorityRefOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_states_api_v1_reference_states_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StateRefOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_agents_api_v1_reference_agents_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AgentRefOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    search_customers_api_v1_reference_customers_get: {
+        parameters: {
+            query?: {
+                /** @description Substring matched against login, email, or name */
+                q?: string;
+                limit?: number;
+            };
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustomerRefOut"][];
                 };
             };
             /** @description Validation Error */

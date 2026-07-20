@@ -297,6 +297,31 @@ class TicketService:
         async for ticket in result.scalars():
             yield self._to_list_item(ticket, maps)
 
+    async def count_owned(self, user_id: int) -> dict[str, int]:
+        """Open/new ticket counts for tickets owned by ``user_id``.
+
+        Powers the "My tickets" sidebar badges. Reuses the same permission
+        scoping and ``state_type`` view resolution as the ticket list, so the
+        numbers agree with what the agent sees after clicking through. Two
+        cheap ``COUNT(*)`` queries — no rows or lookup maps are materialised.
+        ``open`` uses the viewable-state view (new + open + pending), ``new``
+        counts only freshly-arrived tickets.
+        """
+        counts: dict[str, int] = {"open": 0, "new": 0}
+        for view in counts:
+            stmt = await self._filtered_ticket_stmt(
+                user_id,
+                queue_id=None,
+                state_id=None,
+                state_type=view,
+                owner_id=user_id,
+            )
+            if stmt is None:
+                continue
+            count_stmt = select(func.count()).select_from(stmt.subquery())
+            counts[view] = int((await self._session.execute(count_stmt)).scalar_one())
+        return counts
+
     async def get_ticket(self, user_id: int, ticket_id: int) -> TicketDetail:
         ticket = await self._assert_ticket_ro(user_id, ticket_id)
         maps = await self._lookup_maps()

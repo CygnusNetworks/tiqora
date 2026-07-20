@@ -323,6 +323,13 @@ async def test_queue_ticket_detail_attachment_permissions(
         listed_none = await ts.list_tickets(ids["no_access"])
         assert listed_none.total == 0
 
+        # "My tickets" sidebar badges: counts scoped to tickets OWNED by the
+        # agent. reader owns only ticket 500 (open state); the new-state
+        # ticket 501 is owned by root, so it must not leak into reader's
+        # badge. no-access agent sees zero.
+        assert await ts.count_owned(ids["reader"]) == {"open": 1, "new": 0}
+        assert await ts.count_owned(ids["no_access"]) == {"open": 0, "new": 0}
+
         detail = await ts.get_ticket(ids["reader"], ids["ticket"])
         assert detail.title == "Test ticket"
         assert any(df.name == "TiqoraTestField" for df in detail.dynamic_fields)

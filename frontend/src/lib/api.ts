@@ -28,6 +28,7 @@ export type {
   QueueNode,
   TicketListItem,
   PaginatedTickets,
+  MyTicketCounts,
   TicketDetail,
   ArticleListItem,
   ArticleBody,
