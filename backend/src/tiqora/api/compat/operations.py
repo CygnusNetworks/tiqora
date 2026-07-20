@@ -442,6 +442,12 @@ async def op_ticket_create(
     art_data = data.get("Article")
     if art_data and isinstance(art_data, dict):
         article_in = _build_article_in(art_data, user_type)
+        security = art_data.get("EmailSecurity")
+        if isinstance(security, dict) and security:
+            from tiqora.config import get_settings
+            from tiqora.crypto.outbound import apply_email_security
+
+            article_in = await apply_email_security(article_in, security, get_settings())
 
     ticket_in = TicketIn(
         title=title,
