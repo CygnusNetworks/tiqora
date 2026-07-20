@@ -1,4 +1,5 @@
 import { useTranslation } from "react-i18next";
+import { useQuery } from "@tanstack/react-query";
 import { api, type QueueOut, type QueueCreate, type QueueUpdate } from "@/lib/api";
 import { AdminResourcePage } from "@/components/admin/AdminResourcePage";
 import type { FieldDef, FieldValues } from "@/components/admin/CrudDrawer";
@@ -9,10 +10,19 @@ export function QueuesPage() {
   const { t, i18n } = useTranslation();
   const locale = i18n.language?.startsWith("de") ? "de" : "en";
 
+  // Reference map so the list shows the group's name, not its raw id.
+  const groupsQ = useQuery({
+    queryKey: ["admin", "groups", "ref"],
+    queryFn: () => api.adminGroups.list({ valid: "all", pageSize: 500 }),
+    staleTime: 5 * 60 * 1000,
+  });
+  const groupName = (id: number) =>
+    groupsQ.data?.items.find((g) => g.id === id)?.name ?? String(id);
+
   const columns: DataTableColumn<QueueOut>[] = [
     { key: "id", header: t("admin.table.id"), mono: true, render: (r) => r.id },
     { key: "name", header: t("admin.queues.name"), render: (r) => r.name },
-    { key: "group_id", header: t("admin.queues.groupId"), mono: true, render: (r) => r.group_id },
+    { key: "group_id", header: t("admin.queues.groupId"), render: (r) => groupName(r.group_id) },
     {
       key: "changed",
       header: t("admin.table.changed"),

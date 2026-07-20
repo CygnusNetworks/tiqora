@@ -209,6 +209,15 @@ class StateOut(BaseModel):
     change_time: datetime
 
 
+class StateTypeOut(BaseModel):
+    """Reference row for resolving ``ticket_state.type_id`` to a name."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    name: str
+
+
 class StateCreate(BaseModel):
     name: str
     type_id: int

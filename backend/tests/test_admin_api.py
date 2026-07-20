@@ -24,6 +24,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 from tiqora.api.v1.admin import customers as admin_customers
 from tiqora.api.v1.admin import dynamic_fields as admin_dynamic_fields
 from tiqora.api.v1.admin import queues as admin_queues
+from tiqora.api.v1.admin import readonly as admin_readonly
 from tiqora.api.v1.admin import users as admin_users
 from tiqora.api.v1.admin.deps import get_admin_user
 from tiqora.api.v1.admin.pagination import ListParams
@@ -429,5 +430,31 @@ async def test_admin_customer_user_list_pagination_and_valid_filter(
         )
         all_for_cust = {i.login for i in all_rows.items if i.customer_id == cust}
         assert len(all_for_cust) == 15
+
+    await engine.dispose()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("url_fixture", ["mariadb_znuny_url", "postgres_znuny_url"])
+async def test_admin_state_types_reference(
+    url_fixture: str, request: pytest.FixtureRequest
+) -> None:
+    """The state-types reference resolves ticket_state.type_id to a name."""
+    sync_url: str = request.getfixturevalue(url_fixture)
+    ids = _seed_admin_and_plain_user(sync_url)
+    session, engine = await _make_session(sync_url)
+
+    async with session as s:
+        admin_user = AuthenticatedUser(
+            id=ids["admin_id"],
+            login="root@localhost",
+            first_name="Admin",
+            last_name="Znuny",
+            auth_method="session",
+        )
+        types = await admin_readonly.list_state_types(admin_user, s)
+        names = {t.name for t in types}
+        # Znuny's initial_insert seeds these ticket_state_type rows.
+        assert {"new", "open", "closed"} <= names
 
     await engine.dispose()
