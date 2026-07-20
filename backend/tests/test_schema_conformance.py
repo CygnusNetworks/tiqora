@@ -12,6 +12,7 @@ from typing import Any
 import pytest
 from sqlalchemy import create_engine, inspect
 from sqlalchemy.engine import Engine
+from sqlalchemy.types import TypeDecorator
 
 # Import all models so they register on legacy_metadata
 from tiqora.db.legacy import (  # noqa: F401
@@ -112,6 +113,10 @@ def _category(sa_type: Any, dialect: str) -> str:
 
 
 def _model_category(col_type: Any) -> str:
+    # Unwrap TypeDecorators (e.g. LegacyDateTime over DateTime) to their
+    # underlying impl so a decorated column keeps its base type category.
+    if isinstance(col_type, TypeDecorator):
+        col_type = col_type.impl_instance
     name = type(col_type).__name__
     if name in {"Integer", "BigInteger", "SmallInteger"}:
         return "int"
