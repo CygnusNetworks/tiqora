@@ -18,9 +18,16 @@ from tiqora.domain.schemas import (
     ArticleBody,
     ArticleListItem,
     AttachmentMetaOut,
+    BounceRequest,
+    ForwardRequest,
     HistoryEntry,
     PaginatedTickets,
+    ReplyDraftOut,
+    SplitRequest,
+    TemplateOut,
     TicketDetail,
+    TicketLinkCreateRequest,
+    TicketLinkTargetOut,
     TicketListItem,
 )
 from tiqora.domain.ticket_service import (
@@ -101,6 +108,7 @@ class MutationRequest(BaseModel):
     field_name: str | None = None
     field_values: list[str] | None = None
     watcher_user_id: int | None = None
+    unwatch_user_id: int | None = None
 
 
 class MergeRequest(BaseModel):
@@ -411,9 +419,43 @@ async def ticket_history(
     ticket_id: int,
     user: CurrentUser,
     session: DbSession,
+    order: str = Query("desc"),
 ) -> list[HistoryEntry]:
     try:
-        return await TicketService(session).list_history(user.id, ticket_id)
+        return await TicketService(session).list_history(user.id, ticket_id, order=order)
+    except (TicketNotFound, TicketAccessDenied) as exc:
+        raise _map_exc(exc) from exc
+
+
+@router.get(
+    "/{ticket_id}/articles/{article_id}/reply-draft",
+    response_model=ReplyDraftOut,
+)
+async def article_reply_draft(
+    ticket_id: int,
+    article_id: int,
+    user: CurrentUser,
+    session: DbSession,
+    reply_all: bool = Query(False),
+) -> ReplyDraftOut:
+    """Prefilled reply draft (Re: subject, To/Cc, quoted body) for one article."""
+    try:
+        return await TicketService(session).get_reply_draft(
+            user.id, ticket_id, article_id, reply_all=reply_all
+        )
+    except (TicketNotFound, TicketAccessDenied) as exc:
+        raise _map_exc(exc) from exc
+
+
+@router.get("/{ticket_id}/templates", response_model=list[TemplateOut])
+async def ticket_templates(
+    ticket_id: int,
+    user: CurrentUser,
+    session: DbSession,
+) -> list[TemplateOut]:
+    """Response templates (template_type='Answer') for the ticket's queue."""
+    try:
+        return await TicketService(session).list_templates(user.id, ticket_id)
     except (TicketNotFound, TicketAccessDenied) as exc:
         raise _map_exc(exc) from exc
 
@@ -600,6 +642,15 @@ async def patch_ticket(
                     watcher_user_id=body.watcher_user_id,
                     user_id=user.id,
                 )
+            if body.unwatch_user_id is not None:
+                from tiqora.domain.ticket_write_service import unwatch_ticket
+
+                await unwatch_ticket(
+                    session,
+                    ticket_id=ticket_id,
+                    watcher_user_id=body.unwatch_user_id,
+                    user_id=user.id,
+                )
     except (WriteAccessDenied, WriteNotFound, InvalidInput) as exc:
         raise _map_exc(exc) from exc
 
@@ -619,6 +670,132 @@ async def merge_ticket(
             await svc.merge_tickets(user.id, body.main_ticket_id, ticket_id)
     except (WriteAccessDenied, WriteNotFound, InvalidInput) as exc:
         raise _map_exc(exc) from exc
+
+
+@router.post(
+    "/{ticket_id}/articles/{article_id}/forward",
+    response_model=ArticleCreateResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+async def forward_article_endpoint(
+    ticket_id: int,
+    article_id: int,
+    body: ForwardRequest,
+    user: CurrentUser,
+    session: DbSession,
+    settings: AppSettings,
+) -> ArticleCreateResponse:
+    """Forward an article by email (history type 'Forward'). Requires ``rw``."""
+    svc = _write_service(session, settings)
+    fwd_body = f"{body.note}\n\n{body.body}" if body.note else body.body
+    subject = body.subject or "Fwd:"
+    try:
+        async with session.begin():
+            aid = await svc.forward_article(
+                user.id,
+                ticket_id,
+                subject=subject,
+                body=fwd_body,
+                to_address=body.to_address,
+                cc=body.cc,
+            )
+    except (WriteAccessDenied, WriteNotFound, InvalidInput) as exc:
+        raise _map_exc(exc) from exc
+    return ArticleCreateResponse(article_id=aid)
+
+
+@router.post(
+    "/{ticket_id}/articles/{article_id}/bounce",
+    response_model=ArticleCreateResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+async def bounce_article_endpoint(
+    ticket_id: int,
+    article_id: int,
+    body: BounceRequest,
+    user: CurrentUser,
+    session: DbSession,
+    settings: AppSettings,
+) -> ArticleCreateResponse:
+    """Bounce (resend) an article verbatim to a new recipient. Requires ``rw``."""
+    svc = _write_service(session, settings)
+    try:
+        async with session.begin():
+            aid = await svc.bounce_article(
+                user.id,
+                ticket_id,
+                article_id,
+                to_address=body.to_address,
+                state_id=body.state_id,
+            )
+    except (WriteAccessDenied, WriteNotFound, InvalidInput) as exc:
+        raise _map_exc(exc) from exc
+    return ArticleCreateResponse(article_id=aid)
+
+
+@router.post(
+    "/{ticket_id}/articles/{article_id}/split",
+    response_model=TicketCreateResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+async def split_article_endpoint(
+    ticket_id: int,
+    article_id: int,
+    body: SplitRequest,
+    user: CurrentUser,
+    session: DbSession,
+    settings: AppSettings,
+) -> TicketCreateResponse:
+    """Split an article into a new linked ticket. Requires ``rw`` + ``create``."""
+    svc = _write_service(session, settings)
+    try:
+        async with session.begin():
+            new_id = await svc.split_article(
+                user.id, ticket_id, article_id, queue_id=body.queue_id, title=body.title
+            )
+    except (WriteAccessDenied, WriteNotFound, InvalidInput) as exc:
+        raise _map_exc(exc) from exc
+    return TicketCreateResponse(ticket_id=new_id)
+
+
+@router.get("/{ticket_id}/links", response_model=list[TicketLinkTargetOut])
+async def list_ticket_links(
+    ticket_id: int,
+    user: CurrentUser,
+    session: DbSession,
+    settings: AppSettings,
+) -> list[TicketLinkTargetOut]:
+    """List tickets linked to this one."""
+    svc = _write_service(session, settings)
+    try:
+        rows = await svc.list_links(user.id, ticket_id)
+    except (WriteAccessDenied, WriteNotFound, InvalidInput) as exc:
+        raise _map_exc(exc) from exc
+    return [TicketLinkTargetOut(**r) for r in rows]
+
+
+@router.post(
+    "/{ticket_id}/links",
+    status_code=status.HTTP_201_CREATED,
+    response_model=None,
+)
+async def create_ticket_link(
+    ticket_id: int,
+    body: TicketLinkCreateRequest,
+    user: CurrentUser,
+    session: DbSession,
+    settings: AppSettings,
+) -> Response:
+    """Link this ticket to another. Requires ``rw`` on both."""
+    svc = _write_service(session, settings)
+    try:
+        async with session.begin():
+            await svc.link_tickets(
+                user.id, ticket_id, body.target_ticket_id, link_type=body.link_type
+            )
+    except (WriteAccessDenied, WriteNotFound, InvalidInput) as exc:
+        raise _map_exc(exc) from exc
+    return Response(status_code=status.HTTP_201_CREATED)
 
 
 # ---------------------------------------------------------------------------

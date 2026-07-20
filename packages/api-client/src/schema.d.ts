@@ -112,6 +112,29 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/auth/totp/enroll/qr": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Totp Enroll Qr
+         * @description SVG QR code for the pending enrollment's ``otpauth://`` URI.
+         *
+         *     404 if the caller has no pending enrollment (never called
+         *     ``POST /totp/enroll``, or already confirmed one — re-enroll first).
+         */
+        get: operations["totp_enroll_qr_api_v1_auth_totp_enroll_qr_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/auth/totp/confirm": {
         parameters: {
             query?: never;
@@ -206,6 +229,152 @@ export interface paths {
         };
         /** Spnego */
         get: operations["spnego_api_v1_auth_spnego_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/calendar/calendars": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Calendars */
+        get: operations["list_calendars_api_v1_calendar_calendars_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/calendar/calendars/{calendar_id}/export.ics": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Export Calendar Ics */
+        get: operations["export_calendar_ics_api_v1_calendar_calendars__calendar_id__export_ics_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/calendar/calendars/{calendar_id}/feed-token": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Feed Token
+         * @description Mint the Znuny-compatible subscription token for the current user.
+         */
+        get: operations["get_feed_token_api_v1_calendar_calendars__calendar_id__feed_token_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/calendar/calendars/{calendar_id}/feed.ics": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Calendar Feed
+         * @description Unauthenticated, token-gated read-only ICS subscription feed.
+         */
+        get: operations["calendar_feed_api_v1_calendar_calendars__calendar_id__feed_ics_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/calendar/appointments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Appointments */
+        get: operations["list_appointments_api_v1_calendar_appointments_get"];
+        put?: never;
+        /** Create Appointment */
+        post: operations["create_appointment_api_v1_calendar_appointments_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/calendar/appointments/{appointment_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Appointment */
+        get: operations["get_appointment_api_v1_calendar_appointments__appointment_id__get"];
+        put?: never;
+        post?: never;
+        /** Delete Appointment */
+        delete: operations["delete_appointment_api_v1_calendar_appointments__appointment_id__delete"];
+        options?: never;
+        head?: never;
+        /** Update Appointment */
+        patch: operations["update_appointment_api_v1_calendar_appointments__appointment_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/calendar/appointments/{appointment_id}/tickets/{ticket_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Link Ticket */
+        post: operations["link_ticket_api_v1_calendar_appointments__appointment_id__tickets__ticket_id__post"];
+        /** Unlink Ticket */
+        delete: operations["unlink_ticket_api_v1_calendar_appointments__appointment_id__tickets__ticket_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/calendar/appointments/{appointment_id}/tickets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Ticket Links */
+        get: operations["list_ticket_links_api_v1_calendar_appointments__appointment_id__tickets_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -405,6 +574,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/tickets/{ticket_id}/articles/{article_id}/reply-draft": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Article Reply Draft
+         * @description Prefilled reply draft (Re: subject, To/Cc, quoted body) for one article.
+         */
+        get: operations["article_reply_draft_api_v1_tickets__ticket_id__articles__article_id__reply_draft_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tickets/{ticket_id}/templates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Ticket Templates
+         * @description Response templates (template_type='Answer') for the ticket's queue.
+         */
+        get: operations["ticket_templates_api_v1_tickets__ticket_id__templates_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/tickets/{ticket_id}/merge": {
         parameters: {
             query?: never;
@@ -419,6 +628,90 @@ export interface paths {
          * @description Merge ticket_id into main_ticket_id. Requires ``rw`` on both queues.
          */
         post: operations["merge_ticket_api_v1_tickets__ticket_id__merge_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tickets/{ticket_id}/articles/{article_id}/forward": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Forward Article Endpoint
+         * @description Forward an article by email (history type 'Forward'). Requires ``rw``.
+         */
+        post: operations["forward_article_endpoint_api_v1_tickets__ticket_id__articles__article_id__forward_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tickets/{ticket_id}/articles/{article_id}/bounce": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Bounce Article Endpoint
+         * @description Bounce (resend) an article verbatim to a new recipient. Requires ``rw``.
+         */
+        post: operations["bounce_article_endpoint_api_v1_tickets__ticket_id__articles__article_id__bounce_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tickets/{ticket_id}/articles/{article_id}/split": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Split Article Endpoint
+         * @description Split an article into a new linked ticket. Requires ``rw`` + ``create``.
+         */
+        post: operations["split_article_endpoint_api_v1_tickets__ticket_id__articles__article_id__split_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tickets/{ticket_id}/links": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Ticket Links
+         * @description List tickets linked to this one.
+         */
+        get: operations["list_ticket_links_api_v1_tickets__ticket_id__links_get"];
+        put?: never;
+        /**
+         * Create Ticket Link
+         * @description Link this ticket to another. Requires ``rw`` on both.
+         */
+        post: operations["create_ticket_link_api_v1_tickets__ticket_id__links_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -464,6 +757,122 @@ export interface paths {
          * @description Delete a draft for (ticket, user, action).
          */
         delete: operations["delete_draft_api_v1_tickets__ticket_id__drafts__action__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/process/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Processes */
+        get: operations["list_processes_api_v1_process__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/process/{process_entity_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Process */
+        get: operations["get_process_api_v1_process__process_entity_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/process/activity-dialog/{activity_dialog_entity_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Activity Dialog */
+        get: operations["get_activity_dialog_api_v1_process_activity_dialog__activity_dialog_entity_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/process/ticket/{ticket_id}/state": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Ticket State
+         * @description A ticket's current process/activity position.
+         *
+         *     Returns an all-``None``/empty-fields ``TicketProcessStateOut`` (HTTP 200)
+         *     if the ticket is not part of any process — that is a normal state, not
+         *     an error. A 404 is only raised if the ticket itself does not exist.
+         */
+        get: operations["get_ticket_state_api_v1_process_ticket__ticket_id__state_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/process/ticket/{ticket_id}/start": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Start Ticket Process */
+        post: operations["start_ticket_process_api_v1_process_ticket__ticket_id__start_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/process/ticket/{ticket_id}/submit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Submit Ticket Activity Dialog
+         * @description Submit an activity dialog for *ticket_id*.
+         *
+         *     Requires ``rw`` on the ticket's queue as a coarse gate — the dialog's own
+         *     (finer-grained) ``Permission`` config, if set, is enforced again inside
+         *     ``engine.submit_activity_dialog`` itself.
+         */
+        post: operations["submit_ticket_activity_dialog_api_v1_process_ticket__ticket_id__submit_post"];
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -669,6 +1078,292 @@ export interface paths {
         };
         /** Search */
         get: operations["search_api_v1_kb_search_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/channels/sms/inbound": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Inbound Sms
+         * @description Receive one inbound SMS from the configured gateway driver.
+         */
+        post: operations["inbound_sms_api_v1_channels_sms_inbound_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/channels/sms/send": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Send Sms
+         * @description Agent-triggered outbound SMS: appends an article and delivers via the
+         *     configured gateway (``channel.sms.outbound_webhook_url``).
+         */
+        post: operations["send_sms_api_v1_channels_sms_send_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/channels/whatsapp/webhook": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Verify Webhook
+         * @description Meta's webhook subscription handshake.
+         */
+        get: operations["verify_webhook_api_v1_channels_whatsapp_webhook_get"];
+        put?: never;
+        /**
+         * Receive Webhook
+         * @description Meta message delivery webhook (HMAC-SHA256 signed with the app secret).
+         */
+        post: operations["receive_webhook_api_v1_channels_whatsapp_webhook_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/channels/whatsapp/send": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Send Text */
+        post: operations["send_text_api_v1_channels_whatsapp_send_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/channels/whatsapp/send-template": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Send Template */
+        post: operations["send_template_api_v1_channels_whatsapp_send_template_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/channels/phone/note": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Log Note */
+        post: operations["log_note_api_v1_channels_phone_note_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/stats/volume": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Ticket Volume */
+        get: operations["ticket_volume_api_v1_stats_volume_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/stats/volume.csv": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Ticket Volume Csv */
+        get: operations["ticket_volume_csv_api_v1_stats_volume_csv_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/stats/open-snapshot": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Open Snapshot */
+        get: operations["open_snapshot_api_v1_stats_open_snapshot_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/stats/open-snapshot.csv": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Open Snapshot Csv */
+        get: operations["open_snapshot_csv_api_v1_stats_open_snapshot_csv_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/stats/sla": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Sla Stats */
+        get: operations["sla_stats_api_v1_stats_sla_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/stats/sla.csv": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Sla Stats Csv */
+        get: operations["sla_stats_csv_api_v1_stats_sla_csv_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/stats/agent-workload": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Agent Workload */
+        get: operations["agent_workload_api_v1_stats_agent_workload_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/stats/agent-workload.csv": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Agent Workload Csv */
+        get: operations["agent_workload_csv_api_v1_stats_agent_workload_csv_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/stats/backlog": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Backlog Trend */
+        get: operations["backlog_trend_api_v1_stats_backlog_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/stats/backlog.csv": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Backlog Trend Csv */
+        get: operations["backlog_trend_csv_api_v1_stats_backlog_csv_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1522,6 +2217,41 @@ export interface paths {
         patch: operations["update_webhook_api_v1_admin_webhooks__webhook_id__patch"];
         trace?: never;
     };
+    "/api/v1/admin/channels": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Channels */
+        get: operations["list_channels_api_v1_admin_channels_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/channels/{channel}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Channel */
+        get: operations["get_channel_api_v1_admin_channels__channel__get"];
+        /** Update Channel */
+        put: operations["update_channel_api_v1_admin_channels__channel__put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/znuny-compat/Session": {
         parameters: {
             query?: never;
@@ -1585,6 +2315,34 @@ export interface paths {
         get: operations["canonical_ticket_search_znuny_compat_TicketSearch_get"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/znuny-compat/soap/{webservice}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Canonical Soap Endpoint
+         * @description Canonical always-available SOAP provider endpoint.
+         *
+         *     Unlike REST, SOAP has no per-operation route mapping in Znuny — a single
+         *     endpoint per webservice accepts any operation, dispatched from the SOAP
+         *     Body wrapper element name. This fallback route uses the default Znuny
+         *     ``NameSpace`` (``http://www.otrs.org/TicketConnector/``); webservices
+         *     configured in ``gi_webservice_config`` with their own NameSpace are
+         *     additionally mounted at ``/Webservice/{name}`` and ``/WebserviceID/{id}``
+         *     (see :func:`_load_soap_webservices` / :func:`build_soap_router`).
+         */
+        post: operations["canonical_soap_endpoint_znuny_compat_soap__webservice__post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1956,6 +2714,219 @@ export interface components {
              */
             change_time: string;
         };
+        /**
+         * ActivityDialogDetailOut
+         * @description Full field definitions for one activity dialog.
+         */
+        ActivityDialogDetailOut: {
+            /** Entity Id */
+            entity_id: string;
+            /** Name */
+            name: string;
+            /** Description Short */
+            description_short: string;
+            /** Description Long */
+            description_long: string;
+            /** Field Order */
+            field_order: string[];
+            /** Fields */
+            fields: {
+                [key: string]: components["schemas"]["ActivityDialogFieldOut"];
+            };
+            /** Submit Advice Text */
+            submit_advice_text: string;
+            /** Submit Button Text */
+            submit_button_text: string;
+        };
+        /**
+         * ActivityDialogFieldOut
+         * @description One field definition within :class:`ActivityDialogDetailOut`, for the
+         *     frontend to build a dynamic form.
+         */
+        ActivityDialogFieldOut: {
+            /** Display */
+            display: string;
+            /** Default Value */
+            default_value?: unknown;
+            /** Description Short */
+            description_short: string;
+            /** Description Long */
+            description_long: string;
+            /** Config */
+            config: {
+                [key: string]: unknown;
+            };
+        };
+        /**
+         * ActivityDialogRefOut
+         * @description A dialog reference within :class:`ProcessDetailOut` — entity id + name
+         *     only, no field-level detail (that is ``ActivityDialogDetailOut``, fetched
+         *     per-dialog by the frontend as needed).
+         */
+        ActivityDialogRefOut: {
+            /** Entity Id */
+            entity_id: string;
+            /** Name */
+            name: string;
+        };
+        /**
+         * ActivityDialogSubmitIn
+         * @description Body of ``POST /api/v1/process/ticket/{ticket_id}/submit``.
+         */
+        ActivityDialogSubmitIn: {
+            /** Activity Dialog Entity Id */
+            activity_dialog_entity_id: string;
+            /** Field Values */
+            field_values?: {
+                [key: string]: unknown;
+            };
+        };
+        /**
+         * ActivityDialogSubmitOut
+         * @description Outcome of submitting an activity dialog, mirroring
+         *     :class:`tiqora.process.engine.ActivityDialogSubmitResult`, plus the
+         *     freshly re-fetched ticket process state so the frontend can immediately
+         *     re-render without a second round-trip.
+         */
+        ActivityDialogSubmitOut: {
+            /** Activity Changed */
+            activity_changed: boolean;
+            /** New Activity Entity Id */
+            new_activity_entity_id: string | null;
+            /** Transition Entity Id */
+            transition_entity_id: string | null;
+            /** Unsupported Actions */
+            unsupported_actions: string[];
+            state: components["schemas"]["TicketProcessStateOut"];
+        };
+        /**
+         * ActivityDialogSummaryOut
+         * @description A candidate activity dialog available at a ticket's current activity.
+         */
+        ActivityDialogSummaryOut: {
+            /** Entity Id */
+            entity_id: string;
+            /** Name */
+            name: string;
+            /** Description Short */
+            description_short: string;
+        };
+        /** AgentWorkloadItemOut */
+        AgentWorkloadItemOut: {
+            /** User Id */
+            user_id: number;
+            /** Login */
+            login: string;
+            /** Name */
+            name: string;
+            /** Owned Open */
+            owned_open: number;
+            /** Closed In Period */
+            closed_in_period: number;
+        };
+        /** AppointmentIn */
+        AppointmentIn: {
+            /** Calendar Id */
+            calendar_id: number;
+            /** Title */
+            title: string;
+            /** Description */
+            description?: string | null;
+            /** Location */
+            location?: string | null;
+            /**
+             * Start Time
+             * Format: date-time
+             */
+            start_time: string;
+            /**
+             * End Time
+             * Format: date-time
+             */
+            end_time: string;
+            /**
+             * All Day
+             * @default false
+             */
+            all_day: boolean;
+            /** Team Id */
+            team_id?: string | null;
+            /** Resource Id */
+            resource_id?: string | null;
+            recurrence?: components["schemas"]["RecurrenceIn"] | null;
+        };
+        /** AppointmentOut */
+        AppointmentOut: {
+            /** Id */
+            id: number;
+            /** Parent Id */
+            parent_id: number | null;
+            /** Calendar Id */
+            calendar_id: number;
+            /** Unique Id */
+            unique_id: string;
+            /** Title */
+            title: string;
+            /** Description */
+            description: string | null;
+            /** Location */
+            location: string | null;
+            /**
+             * Start Time
+             * Format: date-time
+             */
+            start_time: string;
+            /**
+             * End Time
+             * Format: date-time
+             */
+            end_time: string;
+            /** All Day */
+            all_day: boolean;
+            /** Team Id */
+            team_id: string | null;
+            /** Resource Id */
+            resource_id: string | null;
+            /** Recurring */
+            recurring: boolean;
+            /** Recur Type */
+            recur_type: string | null;
+            /** Recur Interval */
+            recur_interval: number | null;
+            /** Recur Count */
+            recur_count: number | null;
+            /** Recur Until */
+            recur_until: string | null;
+            /** Create Time */
+            create_time: string | null;
+            /** Change Time */
+            change_time: string | null;
+        };
+        /** AppointmentUpdateIn */
+        AppointmentUpdateIn: {
+            /** Title */
+            title?: string | null;
+            /** Description */
+            description?: string | null;
+            /** Location */
+            location?: string | null;
+            /** Start Time */
+            start_time?: string | null;
+            /** End Time */
+            end_time?: string | null;
+            /** All Day */
+            all_day?: boolean | null;
+            /** Team Id */
+            team_id?: string | null;
+            /** Resource Id */
+            resource_id?: string | null;
+            recurrence?: components["schemas"]["RecurrenceIn"] | null;
+            /**
+             * Clear Recurrence
+             * @default false
+             */
+            clear_recurrence: boolean;
+        };
         /** ArticleBody */
         ArticleBody: {
             /** Article Id */
@@ -2181,6 +3152,11 @@ export interface components {
              * @default false
              */
             spnego: boolean;
+            /**
+             * Ldap
+             * @default false
+             */
+            ldap: boolean;
         };
         /** AutoResponseCreate */
         AutoResponseCreate: {
@@ -2254,6 +3230,20 @@ export interface components {
             /** Valid Id */
             valid_id?: number | null;
         };
+        /** BacklogPointOut */
+        BacklogPointOut: {
+            /** Bucket */
+            bucket: string;
+            /** Open Count */
+            open_count: number;
+        };
+        /** BacklogTrendOut */
+        BacklogTrendOut: {
+            /** Granularity */
+            granularity: string;
+            /** Points */
+            points: components["schemas"]["BacklogPointOut"][];
+        };
         /** Body_upload_attachment_api_portal_tickets__ticket_id__attachments_post */
         Body_upload_attachment_api_portal_tickets__ticket_id__attachments_post: {
             /** File */
@@ -2263,6 +3253,28 @@ export interface components {
              * @default
              */
             note: string;
+        };
+        /** BounceRequest */
+        BounceRequest: {
+            /** To Address */
+            to_address: string;
+            /** Note */
+            note?: string | null;
+            /** State Id */
+            state_id?: number | null;
+        };
+        /** CalendarOut */
+        CalendarOut: {
+            /** Id */
+            id: number;
+            /** Group Id */
+            group_id: number;
+            /** Name */
+            name: string;
+            /** Color */
+            color: string;
+            /** Valid */
+            valid: boolean;
         };
         /** CategoryIn */
         CategoryIn: {
@@ -2335,6 +3347,29 @@ export interface components {
             sort?: number | null;
             /** Valid */
             valid?: boolean | null;
+        };
+        /** ChannelConfigOut */
+        ChannelConfigOut: {
+            /** Channel */
+            channel: string;
+            /** Enabled */
+            enabled: boolean;
+            /** Config */
+            config: {
+                [key: string]: string | null;
+            };
+        };
+        /** ChannelConfigUpdate */
+        ChannelConfigUpdate: {
+            /** Enabled */
+            enabled?: boolean | null;
+            /**
+             * Config
+             * @default {}
+             */
+            config: {
+                [key: string]: string;
+            };
         };
         /** CustomerCompanyCreate */
         CustomerCompanyCreate: {
@@ -2571,6 +3606,15 @@ export interface components {
             /** Company Name */
             company_name?: string | null;
         };
+        /** DimensionCountOut */
+        DimensionCountOut: {
+            /** Id */
+            id: number | null;
+            /** Label */
+            label: string;
+            /** Count */
+            count: number;
+        };
         /** DraftIn */
         DraftIn: {
             /** Action */
@@ -2691,6 +3735,19 @@ export interface components {
             /** Values */
             values?: unknown[];
         };
+        /** ForwardRequest */
+        ForwardRequest: {
+            /** To Address */
+            to_address: string;
+            /** Cc */
+            cc?: string | null;
+            /** Subject */
+            subject?: string | null;
+            /** Body */
+            body: string;
+            /** Note */
+            note?: string | null;
+        };
         /**
          * GenericAgentJobOut
          * @description Grouped by ``job_name`` (key/value rows per Znuny ``generic_agent_jobs``).
@@ -2783,6 +3840,8 @@ export interface components {
             ticket_id: number;
             /** Name */
             name: string;
+            /** Rendered */
+            rendered: string;
             /** History Type Id */
             history_type_id: number;
             /** History Type */
@@ -2798,6 +3857,8 @@ export interface components {
             create_time: string;
             /** Create By */
             create_by: number;
+            /** Create By Login */
+            create_by_login?: string | null;
         };
         /** KbSearchHit */
         KbSearchHit: {
@@ -2893,6 +3954,45 @@ export interface components {
             field_values?: string[] | null;
             /** Watcher User Id */
             watcher_user_id?: number | null;
+            /** Unwatch User Id */
+            unwatch_user_id?: number | null;
+        };
+        /**
+         * OccurrenceOut
+         * @description A single expanded occurrence within a queried date range.
+         */
+        OccurrenceOut: {
+            /** Appointment Id */
+            appointment_id: number;
+            /** Calendar Id */
+            calendar_id: number;
+            /** Title */
+            title: string;
+            /** Description */
+            description: string | null;
+            /** Location */
+            location: string | null;
+            /**
+             * Start Time
+             * Format: date-time
+             */
+            start_time: string;
+            /**
+             * End Time
+             * Format: date-time
+             */
+            end_time: string;
+            /** All Day */
+            all_day: boolean;
+            /** Is Recurring */
+            is_recurring: boolean;
+        };
+        /** OpenSnapshotOut */
+        OpenSnapshotOut: {
+            /** Dimension */
+            dimension: string;
+            /** Items */
+            items: components["schemas"]["DimensionCountOut"][];
         };
         /** PaginatedTickets */
         PaginatedTickets: {
@@ -2904,6 +4004,30 @@ export interface components {
             offset: number;
             /** Limit */
             limit: number;
+        };
+        /** PhoneNoteRequest */
+        PhoneNoteRequest: {
+            /** Direction */
+            direction: string;
+            /** Caller Number */
+            caller_number: string;
+            /** Note */
+            note: string;
+            /** Ticket Id */
+            ticket_id?: number | null;
+            /** Subject */
+            subject?: string | null;
+            /** Agent User Id */
+            agent_user_id?: number | null;
+        };
+        /** PhoneNoteResponse */
+        PhoneNoteResponse: {
+            /** Ticket Id */
+            ticket_id: number;
+            /** Article Id */
+            article_id: number;
+            /** Created */
+            created: boolean;
         };
         /** PortalArticleOut */
         PortalArticleOut: {
@@ -3039,6 +4163,62 @@ export interface components {
             /** Valid Id */
             valid_id?: number | null;
         };
+        /**
+         * ProcessActivityOut
+         * @description One activity within :class:`ProcessDetailOut`.
+         */
+        ProcessActivityOut: {
+            /** Entity Id */
+            entity_id: string;
+            /** Name */
+            name: string;
+            /** Activity Dialogs */
+            activity_dialogs: components["schemas"]["ActivityDialogRefOut"][];
+        };
+        /**
+         * ProcessDetailOut
+         * @description A single process's full graph: activities and their dialogs.
+         *
+         *     Transition/condition internals are intentionally not exposed here — the
+         *     frontend does not need them to render a process, and Tiqora does not
+         *     leak internal BPM routing logic to clients (see ``TicketProcessStateOut``).
+         */
+        ProcessDetailOut: {
+            /** Id */
+            id: number;
+            /** Entity Id */
+            entity_id: string;
+            /** Name */
+            name: string;
+            /** State Entity Id */
+            state_entity_id: string;
+            /** Start Activity Entity Id */
+            start_activity_entity_id: string | null;
+            /** Activities */
+            activities: components["schemas"]["ProcessActivityOut"][];
+        };
+        /**
+         * ProcessStartIn
+         * @description Body of ``POST /api/v1/process/ticket/{ticket_id}/start``.
+         */
+        ProcessStartIn: {
+            /** Process Entity Id */
+            process_entity_id: string;
+        };
+        /**
+         * ProcessSummaryOut
+         * @description One row from :meth:`tiqora.process.graph.ProcessRepository.list_processes`.
+         */
+        ProcessSummaryOut: {
+            /** Id */
+            id: number;
+            /** Entity Id */
+            entity_id: string;
+            /** Name */
+            name: string;
+            /** State Entity Id */
+            state_entity_id: string;
+        };
         /** QueueAutoResponseAssignment */
         QueueAutoResponseAssignment: {
             /** Auto Response Id */
@@ -3051,6 +4231,11 @@ export interface components {
              * @default 0
              */
             open: number;
+            /**
+             * New
+             * @default 0
+             */
+            new: number;
             /**
              * Locked
              * @default 0
@@ -3225,6 +4410,46 @@ export interface components {
             comments?: string | null;
             /** Valid Id */
             valid_id?: number | null;
+        };
+        /**
+         * RecurrenceIn
+         * @description Common RRULE subset: FREQ + INTERVAL + (COUNT xor UNTIL).
+         */
+        RecurrenceIn: {
+            /**
+             * Type
+             * @description Daily | Weekly | Monthly | Yearly
+             */
+            type: string;
+            /**
+             * Interval
+             * @default 1
+             */
+            interval: number;
+            /** Count */
+            count?: number | null;
+            /** Until */
+            until?: string | null;
+        };
+        /**
+         * ReplyDraftOut
+         * @description Prefilled reply/reply-all draft for one article (see quoting.py).
+         */
+        ReplyDraftOut: {
+            /** To Address */
+            to_address?: string | null;
+            /** Cc */
+            cc?: string | null;
+            /** Subject */
+            subject: string;
+            /** Body */
+            body: string;
+            /** Is Html */
+            is_html: boolean;
+            /** In Reply To */
+            in_reply_to?: string | null;
+            /** References */
+            references?: string | null;
         };
         /** RoleAssignment */
         RoleAssignment: {
@@ -3419,6 +4644,62 @@ export interface components {
              */
             valid_id: number;
         };
+        /** SlaStatsOut */
+        SlaStatsOut: {
+            /** Total */
+            total: number;
+            /** Escalated */
+            escalated: number;
+            /** First Response Breached */
+            first_response_breached: number;
+            /** Update Breached */
+            update_breached: number;
+            /** Solution Breached */
+            solution_breached: number;
+            /** First Response Minutes */
+            first_response_minutes: number[];
+            /** Solution Minutes */
+            solution_minutes: number[];
+        };
+        /** SmsInboundRequest */
+        SmsInboundRequest: {
+            /** From Number */
+            from_number: string;
+            /** To Number */
+            to_number?: string | null;
+            /** Body */
+            body: string;
+        };
+        /** SmsInboundResponse */
+        SmsInboundResponse: {
+            /** Ticket Id */
+            ticket_id: number;
+            /** Article Id */
+            article_id: number;
+            /** Created */
+            created: boolean;
+        };
+        /** SmsSendRequest */
+        SmsSendRequest: {
+            /** Ticket Id */
+            ticket_id: number;
+            /** To Number */
+            to_number: string;
+            /** Body */
+            body: string;
+        };
+        /** SmsSendResponse */
+        SmsSendResponse: {
+            /** Article Id */
+            article_id: number;
+        };
+        /** SplitRequest */
+        SplitRequest: {
+            /** Queue Id */
+            queue_id: number;
+            /** Title */
+            title?: string | null;
+        };
         /** StandardTemplateCreate */
         StandardTemplateCreate: {
             /** Name */
@@ -3546,6 +4827,19 @@ export interface components {
         TOTPStatusOut: {
             /** Enabled */
             enabled: boolean;
+        };
+        /** TemplateOut */
+        TemplateOut: {
+            /** Id */
+            id: number;
+            /** Name */
+            name: string;
+            /** Text */
+            text: string;
+            /** Content Type */
+            content_type?: string | null;
+            /** Template Type */
+            template_type?: string | null;
         };
         /** TicketCreateRequest */
         TicketCreateRequest: {
@@ -3683,6 +4977,54 @@ export interface components {
             change_by?: number | null;
             /** Dynamic Fields */
             dynamic_fields?: components["schemas"]["DynamicFieldValueOut"][];
+            /**
+             * Is Watched
+             * @default false
+             */
+            is_watched: boolean;
+            /**
+             * Can Write
+             * @default false
+             */
+            can_write: boolean;
+        };
+        /** TicketLinkCreateRequest */
+        TicketLinkCreateRequest: {
+            /** Target Ticket Id */
+            target_ticket_id: number;
+            /**
+             * Link Type
+             * @default Normal
+             */
+            link_type: string;
+        };
+        /** TicketLinkOut */
+        TicketLinkOut: {
+            /** Appointment Id */
+            appointment_id: number;
+            /** Calendar Id */
+            calendar_id: number;
+            /** Ticket Id */
+            ticket_id: number;
+            /** Rule Id */
+            rule_id: string;
+        };
+        /** TicketLinkTargetOut */
+        TicketLinkTargetOut: {
+            /** Source Key */
+            source_key: string;
+            /** Target Key */
+            target_key: string;
+            /** Link Type */
+            link_type: string;
+            /** State */
+            state: string;
+            /** Other Ticket Id */
+            other_ticket_id: number;
+            /** Other Tn */
+            other_tn?: string | null;
+            /** Other Title */
+            other_title?: string | null;
         };
         /** TicketListItem */
         TicketListItem: {
@@ -3757,6 +5099,43 @@ export interface components {
              * @default 0
              */
             until_time: number;
+        };
+        /**
+         * TicketProcessStateOut
+         * @description A ticket's current process/activity position, for the REST layer.
+         *
+         *     All fields are ``None``/empty when the ticket is not part of any
+         *     process — that is a normal state (HTTP 200), not an error; see
+         *     ``GET /api/v1/process/ticket/{ticket_id}/state``.
+         *
+         *     ``available_transitions_count`` is informational only (how many outgoing
+         *     transitions the current activity has) — the transitions' own
+         *     conditions/actions are not exposed to avoid leaking internal BPM routing
+         *     logic to the client.
+         */
+        TicketProcessStateOut: {
+            /** Process Entity Id */
+            process_entity_id?: string | null;
+            /** Process Name */
+            process_name?: string | null;
+            /** Activity Entity Id */
+            activity_entity_id?: string | null;
+            /** Activity Name */
+            activity_name?: string | null;
+            /** Available Dialogs */
+            available_dialogs?: components["schemas"]["ActivityDialogSummaryOut"][];
+            /**
+             * Available Transitions Count
+             * @default 0
+             */
+            available_transitions_count: number;
+        };
+        /** TicketVolumeOut */
+        TicketVolumeOut: {
+            /** Granularity */
+            granularity: string;
+            /** Points */
+            points: components["schemas"]["VolumePointOut"][];
         };
         /** UserCreate */
         UserCreate: {
@@ -3842,6 +5221,15 @@ export interface components {
             /** Context */
             ctx?: Record<string, never>;
         };
+        /** VolumePointOut */
+        VolumePointOut: {
+            /** Bucket */
+            bucket: string;
+            /** Created */
+            created: number;
+            /** Closed */
+            closed: number;
+        };
         /** WebhookCreate */
         WebhookCreate: {
             /** Name */
@@ -3893,6 +5281,39 @@ export interface components {
             events?: string[] | null;
             /** Valid */
             valid?: boolean | null;
+        };
+        /** WhatsAppSendResponse */
+        WhatsAppSendResponse: {
+            /** Article Id */
+            article_id: number;
+        };
+        /** WhatsAppSendTemplateRequest */
+        WhatsAppSendTemplateRequest: {
+            /** Ticket Id */
+            ticket_id: number;
+            /** To */
+            to: string;
+            /** Template Name */
+            template_name: string;
+            /**
+             * Language Code
+             * @default en_US
+             */
+            language_code: string;
+        };
+        /** WhatsAppSendTextRequest */
+        WhatsAppSendTextRequest: {
+            /** Ticket Id */
+            ticket_id: number;
+            /** To */
+            to: string;
+            /** Body */
+            body: string;
+        };
+        /** WhatsAppWebhookResponse */
+        WhatsAppWebhookResponse: {
+            /** Processed */
+            processed: number;
         };
     };
     responses: never;
@@ -4060,6 +5481,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["TOTPEnrollOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    totp_enroll_qr_api_v1_auth_totp_enroll_qr_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
                 };
             };
             /** @description Validation Error */
@@ -4250,6 +5704,433 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["LoginResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_calendars_api_v1_calendar_calendars_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CalendarOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    export_calendar_ics_api_v1_calendar_calendars__calendar_id__export_ics_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                calendar_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_feed_token_api_v1_calendar_calendars__calendar_id__feed_token_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                calendar_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    calendar_feed_api_v1_calendar_calendars__calendar_id__feed_ics_get: {
+        parameters: {
+            query: {
+                login: string;
+                token: string;
+            };
+            header?: never;
+            path: {
+                calendar_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_appointments_api_v1_calendar_appointments_get: {
+        parameters: {
+            query: {
+                start: string;
+                end: string;
+                calendar_id?: number[] | null;
+            };
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OccurrenceOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_appointment_api_v1_calendar_appointments_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AppointmentIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AppointmentOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_appointment_api_v1_calendar_appointments__appointment_id__get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                appointment_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AppointmentOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_appointment_api_v1_calendar_appointments__appointment_id__delete: {
+        parameters: {
+            query?: {
+                occurrence?: string | null;
+            };
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                appointment_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_appointment_api_v1_calendar_appointments__appointment_id__patch: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                appointment_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AppointmentUpdateIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AppointmentOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    link_ticket_api_v1_calendar_appointments__appointment_id__tickets__ticket_id__post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                appointment_id: number;
+                ticket_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TicketLinkOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    unlink_ticket_api_v1_calendar_appointments__appointment_id__tickets__ticket_id__delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                appointment_id: number;
+                ticket_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_ticket_links_api_v1_calendar_appointments__appointment_id__tickets_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                appointment_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TicketLinkOut"][];
                 };
             };
             /** @description Validation Error */
@@ -4711,7 +6592,9 @@ export interface operations {
     };
     ticket_history_api_v1_tickets__ticket_id__history_get: {
         parameters: {
-            query?: never;
+            query?: {
+                order?: string;
+            };
             header?: {
                 authorization?: string | null;
             };
@@ -4731,6 +6614,79 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HistoryEntry"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    article_reply_draft_api_v1_tickets__ticket_id__articles__article_id__reply_draft_get: {
+        parameters: {
+            query?: {
+                reply_all?: boolean;
+            };
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                ticket_id: number;
+                article_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReplyDraftOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    ticket_templates_api_v1_tickets__ticket_id__templates_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                ticket_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TemplateOut"][];
                 };
             };
             /** @description Validation Error */
@@ -4769,6 +6725,200 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    forward_article_endpoint_api_v1_tickets__ticket_id__articles__article_id__forward_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                ticket_id: number;
+                article_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ForwardRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ArticleCreateResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    bounce_article_endpoint_api_v1_tickets__ticket_id__articles__article_id__bounce_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                ticket_id: number;
+                article_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BounceRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ArticleCreateResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    split_article_endpoint_api_v1_tickets__ticket_id__articles__article_id__split_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                ticket_id: number;
+                article_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SplitRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TicketCreateResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_ticket_links_api_v1_tickets__ticket_id__links_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                ticket_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TicketLinkTargetOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_ticket_link_api_v1_tickets__ticket_id__links_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                ticket_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TicketLinkCreateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
             };
             /** @description Validation Error */
             422: {
@@ -4878,6 +7028,222 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_processes_api_v1_process__get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProcessSummaryOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_process_api_v1_process__process_entity_id__get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                process_entity_id: string;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProcessDetailOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_activity_dialog_api_v1_process_activity_dialog__activity_dialog_entity_id__get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                activity_dialog_entity_id: string;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ActivityDialogDetailOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_ticket_state_api_v1_process_ticket__ticket_id__state_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                ticket_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TicketProcessStateOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    start_ticket_process_api_v1_process_ticket__ticket_id__start_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                ticket_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProcessStartIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TicketProcessStateOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    submit_ticket_activity_dialog_api_v1_process_ticket__ticket_id__submit_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                ticket_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ActivityDialogSubmitIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ActivityDialogSubmitOut"];
+                };
             };
             /** @description Validation Error */
             422: {
@@ -5518,6 +7884,667 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["KbSearchResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    inbound_sms_api_v1_channels_sms_inbound_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-tiqora-sms-secret"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SmsInboundRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SmsInboundResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    send_sms_api_v1_channels_sms_send_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SmsSendRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SmsSendResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    verify_webhook_api_v1_channels_whatsapp_webhook_get: {
+        parameters: {
+            query?: {
+                "hub.mode"?: string | null;
+                "hub.verify_token"?: string | null;
+                "hub.challenge"?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    receive_webhook_api_v1_channels_whatsapp_webhook_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-hub-signature-256"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WhatsAppWebhookResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    send_text_api_v1_channels_whatsapp_send_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WhatsAppSendTextRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WhatsAppSendResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    send_template_api_v1_channels_whatsapp_send_template_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WhatsAppSendTemplateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WhatsAppSendResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    log_note_api_v1_channels_phone_note_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-tiqora-phone-secret"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PhoneNoteRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PhoneNoteResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    ticket_volume_api_v1_stats_volume_get: {
+        parameters: {
+            query?: {
+                date_from?: string | null;
+                date_to?: string | null;
+                queue_id?: number | null;
+                state_id?: number | null;
+                priority_id?: number | null;
+                type_id?: number | null;
+                customer_id?: string | null;
+                granularity?: "day" | "week" | "month";
+            };
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TicketVolumeOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    ticket_volume_csv_api_v1_stats_volume_csv_get: {
+        parameters: {
+            query?: {
+                date_from?: string | null;
+                date_to?: string | null;
+                queue_id?: number | null;
+                state_id?: number | null;
+                priority_id?: number | null;
+                type_id?: number | null;
+                customer_id?: string | null;
+                granularity?: "day" | "week" | "month";
+            };
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    open_snapshot_api_v1_stats_open_snapshot_get: {
+        parameters: {
+            query?: {
+                dimension?: "queue" | "state" | "priority" | "owner";
+                date_from?: string | null;
+                date_to?: string | null;
+                queue_id?: number | null;
+                state_id?: number | null;
+                priority_id?: number | null;
+                type_id?: number | null;
+                customer_id?: string | null;
+            };
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OpenSnapshotOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    open_snapshot_csv_api_v1_stats_open_snapshot_csv_get: {
+        parameters: {
+            query?: {
+                dimension?: "queue" | "state" | "priority" | "owner";
+                date_from?: string | null;
+                date_to?: string | null;
+                queue_id?: number | null;
+                state_id?: number | null;
+                priority_id?: number | null;
+                type_id?: number | null;
+                customer_id?: string | null;
+            };
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    sla_stats_api_v1_stats_sla_get: {
+        parameters: {
+            query?: {
+                date_from?: string | null;
+                date_to?: string | null;
+                queue_id?: number | null;
+                state_id?: number | null;
+                priority_id?: number | null;
+                type_id?: number | null;
+                customer_id?: string | null;
+            };
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SlaStatsOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    sla_stats_csv_api_v1_stats_sla_csv_get: {
+        parameters: {
+            query?: {
+                date_from?: string | null;
+                date_to?: string | null;
+                queue_id?: number | null;
+                state_id?: number | null;
+                priority_id?: number | null;
+                type_id?: number | null;
+                customer_id?: string | null;
+            };
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    agent_workload_api_v1_stats_agent_workload_get: {
+        parameters: {
+            query?: {
+                date_from?: string | null;
+                date_to?: string | null;
+                queue_id?: number | null;
+                state_id?: number | null;
+                priority_id?: number | null;
+                type_id?: number | null;
+                customer_id?: string | null;
+            };
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AgentWorkloadItemOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    agent_workload_csv_api_v1_stats_agent_workload_csv_get: {
+        parameters: {
+            query?: {
+                date_from?: string | null;
+                date_to?: string | null;
+                queue_id?: number | null;
+                state_id?: number | null;
+                priority_id?: number | null;
+                type_id?: number | null;
+                customer_id?: string | null;
+            };
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    backlog_trend_api_v1_stats_backlog_get: {
+        parameters: {
+            query?: {
+                date_from?: string | null;
+                date_to?: string | null;
+                queue_id?: number | null;
+                state_id?: number | null;
+                priority_id?: number | null;
+                type_id?: number | null;
+                customer_id?: string | null;
+                granularity?: "day" | "week" | "month";
+            };
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BacklogTrendOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    backlog_trend_csv_api_v1_stats_backlog_csv_get: {
+        parameters: {
+            query?: {
+                date_from?: string | null;
+                date_to?: string | null;
+                queue_id?: number | null;
+                state_id?: number | null;
+                priority_id?: number | null;
+                type_id?: number | null;
+                customer_id?: string | null;
+                granularity?: "day" | "week" | "month";
+            };
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
                 };
             };
             /** @description Validation Error */
@@ -8641,6 +11668,113 @@ export interface operations {
             };
         };
     };
+    list_channels_api_v1_admin_channels_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChannelConfigOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_channel_api_v1_admin_channels__channel__get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                channel: string;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChannelConfigOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_channel_api_v1_admin_channels__channel__put: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                channel: string;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChannelConfigUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChannelConfigOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     canonical_session_create_znuny_compat_Session_post: {
         parameters: {
             query?: never;
@@ -8759,6 +11893,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": unknown;
+                };
+            };
+        };
+    };
+    canonical_soap_endpoint_znuny_compat_soap__webservice__post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                webservice: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

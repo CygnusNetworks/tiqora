@@ -1289,6 +1289,155 @@ async def merge_tickets(
     )
 
 
+async def forward_article(
+    session: AsyncSession,
+    *,
+    ticket_id: int,
+    subject: str,
+    body: str,
+    to_address: str,
+    cc: str | None,
+    user_id: int,
+    sysconfig: SysConfig,
+) -> int:
+    """Forward: add a customer-visible email article, history type 'Forward'.
+
+    Simplification vs Znuny's AgentTicketForward: attachments from the source
+    article are NOT carried over (no MTA integration in this vertical).
+    """
+    article = ArticleIn(
+        sender_type="agent",
+        is_visible_for_customer=True,
+        subject=subject,
+        body=body,
+        content_type="text/plain; charset=utf-8",
+        to_address=to_address,
+        cc=cc,
+        channel="email",
+        history_type_override="Forward",
+    )
+    return await add_article(
+        session, ticket_id=ticket_id, article=article, user_id=user_id, sysconfig=sysconfig
+    )
+
+
+async def bounce_article(
+    session: AsyncSession,
+    *,
+    ticket_id: int,
+    subject: str,
+    body: str,
+    content_type: str,
+    to_address: str,
+    user_id: int,
+    sysconfig: SysConfig,
+) -> int:
+    """Bounce: resend the original article body verbatim, history type 'Bounce'.
+
+    Faithful subset of Znuny's AgentTicketBounce — no RFC822 header
+    preservation / true remail (no outbound MTA in this vertical); the body is
+    resent unchanged to the new recipient.
+    """
+    article = ArticleIn(
+        sender_type="agent",
+        is_visible_for_customer=True,
+        subject=subject,
+        body=body,
+        content_type=content_type,
+        to_address=to_address,
+        channel="email",
+        history_type_override="Bounce",
+    )
+    return await add_article(
+        session, ticket_id=ticket_id, article=article, user_id=user_id, sysconfig=sysconfig
+    )
+
+
+async def _link_object_id(session: AsyncSession, name: str) -> int:
+    """Resolve link_object.id by name, inserting the row if absent (Ticket)."""
+    row = (
+        await session.execute(
+            text("SELECT id FROM link_object WHERE name = :n LIMIT 1"), {"n": name}
+        )
+    ).first()
+    if row is not None:
+        return int(row[0])
+    await session.execute(text("INSERT INTO link_object (name) VALUES (:n)"), {"n": name})
+    row = (
+        await session.execute(
+            text("SELECT id FROM link_object WHERE name = :n LIMIT 1"), {"n": name}
+        )
+    ).first()
+    if row is None:
+        raise RuntimeError("link_object insert read-back failed")
+    return int(row[0])
+
+
+async def _link_type_id(session: AsyncSession, name: str) -> int:
+    row = (
+        await session.execute(text("SELECT id FROM link_type WHERE name = :n LIMIT 1"), {"n": name})
+    ).first()
+    if row is None:
+        raise InvalidInput(f"Unknown link type: {name}")
+    return int(row[0])
+
+
+async def _link_state_id(session: AsyncSession, name: str) -> int:
+    row = (
+        await session.execute(
+            text("SELECT id FROM link_state WHERE name = :n LIMIT 1"), {"n": name}
+        )
+    ).first()
+    if row is None:
+        raise InvalidInput(f"Unknown link state: {name}")
+    return int(row[0])
+
+
+async def link_tickets(
+    session: AsyncSession,
+    *,
+    source_ticket_id: int,
+    target_ticket_id: int,
+    link_type: str,
+    user_id: int,
+) -> None:
+    """Insert a ticket↔ticket link_relation row (idempotent).
+
+    Ports the ``link_relation`` write of Kernel/System/LinkObject.pm::LinkAdd
+    (Ticket↔Ticket, state 'Valid'); resolves object/type/state ids by name.
+    """
+    obj_id = await _link_object_id(session, "Ticket")
+    type_id = await _link_type_id(session, link_type)
+    state_id = await _link_state_id(session, "Valid")
+    existing = (
+        await session.execute(
+            text(
+                "SELECT 1 FROM link_relation WHERE source_object_id = :o AND source_key = :sk"
+                " AND target_object_id = :o AND target_key = :tk AND type_id = :t LIMIT 1"
+            ),
+            {"o": obj_id, "sk": str(source_ticket_id), "tk": str(target_ticket_id), "t": type_id},
+        )
+    ).first()
+    if existing is not None:
+        return
+    await session.execute(
+        text(
+            "INSERT INTO link_relation (source_object_id, source_key, target_object_id,"
+            " target_key, type_id, state_id, create_time, create_by)"
+            " VALUES (:o, :sk, :o, :tk, :t, :s, current_timestamp, :uid)"
+        ),
+        {
+            "o": obj_id,
+            "sk": str(source_ticket_id),
+            "tk": str(target_ticket_id),
+            "t": type_id,
+            "s": state_id,
+            "uid": user_id,
+        },
+    )
+    await _emit_event(session, "LinkAdd", source_ticket_id, {"target_ticket_id": target_ticket_id})
+
+
 # ---------------------------------------------------------------------------
 # Permission-aware write service (used by REST endpoints)
 # ---------------------------------------------------------------------------
@@ -1379,6 +1528,195 @@ class TicketWriteService:
             sysconfig=self._sysconfig,
         )
 
+    async def forward_article(
+        self,
+        user_id: int,
+        ticket_id: int,
+        *,
+        subject: str,
+        body: str,
+        to_address: str,
+        cc: str | None = None,
+    ) -> int:
+        t = await _ticket_must_exist(self._session, ticket_id)
+        await self._assert_rw(user_id, int(t["queue_id"]))
+        return await forward_article(
+            self._session,
+            ticket_id=ticket_id,
+            subject=subject,
+            body=body,
+            to_address=to_address,
+            cc=cc,
+            user_id=user_id,
+            sysconfig=self._sysconfig,
+        )
+
+    async def bounce_article(
+        self,
+        user_id: int,
+        ticket_id: int,
+        article_id: int,
+        *,
+        to_address: str,
+        state_id: int | None = None,
+    ) -> int:
+        """Resend the given article's body verbatim to ``to_address``."""
+        t = await _ticket_must_exist(self._session, ticket_id)
+        await self._assert_rw(user_id, int(t["queue_id"]))
+        mime = (
+            await self._session.execute(
+                text(
+                    "SELECT a_subject, a_body, a_content_type FROM article_data_mime"
+                    " WHERE article_id = :aid LIMIT 1"
+                ),
+                {"aid": article_id},
+            )
+        ).first()
+        if mime is None:
+            raise TicketNotFound(f"article {article_id}")
+        aid = await bounce_article(
+            self._session,
+            ticket_id=ticket_id,
+            subject=str(mime[0] or ""),
+            body=str(mime[1] or ""),
+            content_type=str(mime[2] or "text/plain; charset=utf-8"),
+            to_address=to_address,
+            user_id=user_id,
+            sysconfig=self._sysconfig,
+        )
+        if state_id is not None:
+            await change_state(
+                self._session,
+                ticket_id=ticket_id,
+                new_state_id=state_id,
+                user_id=user_id,
+                sysconfig=self._sysconfig,
+            )
+        return aid
+
+    async def split_article(
+        self,
+        user_id: int,
+        ticket_id: int,
+        article_id: int,
+        *,
+        queue_id: int,
+        title: str | None = None,
+    ) -> int:
+        """Create a new ticket seeded from an existing article; link the two.
+
+        Returns the new ticket id. Requires ``rw`` on the source ticket and
+        ``create`` on the target queue.
+        """
+        src = await _ticket_must_exist(self._session, ticket_id)
+        await self._assert_rw(user_id, int(src["queue_id"]))
+        await self._assert_create(user_id, queue_id)
+        mime = (
+            await self._session.execute(
+                text(
+                    "SELECT a_subject, a_body, a_content_type, a_from, a_to"
+                    " FROM article_data_mime WHERE article_id = :aid LIMIT 1"
+                ),
+                {"aid": article_id},
+            )
+        ).first()
+        if mime is None:
+            raise TicketNotFound(f"article {article_id}")
+        seeded = ArticleIn(
+            sender_type="customer",
+            is_visible_for_customer=True,
+            subject=str(mime[0] or ""),
+            body=str(mime[1] or ""),
+            content_type=str(mime[2] or "text/plain; charset=utf-8"),
+            from_address=mime[3],
+            to_address=mime[4],
+            channel="note",
+        )
+        new_title = title or str(src.get("title") or mime[0] or "Split ticket")
+        new_ticket_id = await create_ticket(
+            self._session,
+            self._factory,
+            self._sysconfig,
+            params=TicketIn(
+                title=new_title,
+                queue_id=queue_id,
+                state_id=int(src["ticket_state_id"]),
+                priority_id=int(src["ticket_priority_id"]),
+                owner_id=user_id,
+                customer_id=src.get("customer_id"),
+                customer_user_id=src.get("customer_user_id"),
+                article=seeded,
+            ),
+            user_id=user_id,
+        )
+        await link_tickets(
+            self._session,
+            source_ticket_id=ticket_id,
+            target_ticket_id=new_ticket_id,
+            link_type="ParentChild",
+            user_id=user_id,
+        )
+        return new_ticket_id
+
+    async def link_tickets(
+        self, user_id: int, ticket_id: int, target_ticket_id: int, link_type: str = "Normal"
+    ) -> None:
+        src = await _ticket_must_exist(self._session, ticket_id)
+        tgt = await _ticket_must_exist(self._session, target_ticket_id)
+        await self._assert_rw(user_id, int(src["queue_id"]))
+        await self._assert_rw(user_id, int(tgt["queue_id"]))
+        await link_tickets(
+            self._session,
+            source_ticket_id=ticket_id,
+            target_ticket_id=target_ticket_id,
+            link_type=link_type,
+            user_id=user_id,
+        )
+
+    async def list_links(self, user_id: int, ticket_id: int) -> list[dict[str, Any]]:
+        src = await _ticket_must_exist(self._session, ticket_id)
+        await self._assert_rw(user_id, int(src["queue_id"]))
+        obj_id = await _link_object_id(self._session, "Ticket")
+        rows = (
+            (
+                await self._session.execute(
+                    text(
+                        "SELECT lr.source_key, lr.target_key, lt.name AS ltype, ls.name AS lstate"
+                        " FROM link_relation lr"
+                        " JOIN link_type lt ON lt.id = lr.type_id"
+                        " JOIN link_state ls ON ls.id = lr.state_id"
+                        " WHERE lr.source_object_id = :o AND lr.target_object_id = :o"
+                        " AND (lr.source_key = :k OR lr.target_key = :k)"
+                    ),
+                    {"o": obj_id, "k": str(ticket_id)},
+                )
+            )
+            .mappings()
+            .all()
+        )
+        out: list[dict[str, Any]] = []
+        for r in rows:
+            other = r["target_key"] if r["source_key"] == str(ticket_id) else r["source_key"]
+            other_id = int(other)
+            trow = (
+                await self._session.execute(
+                    text("SELECT tn, title FROM ticket WHERE id = :id LIMIT 1"),
+                    {"id": other_id},
+                )
+            ).first()
+            out.append(
+                {
+                    "source_key": r["source_key"],
+                    "target_key": r["target_key"],
+                    "link_type": r["ltype"],
+                    "state": r["lstate"],
+                    "other_ticket_id": other_id,
+                    "other_tn": trow[0] if trow else None,
+                    "other_title": trow[1] if trow else None,
+                }
+            )
+        return out
+
 
 __all__ = [
     "ArticleIn",
@@ -1391,10 +1729,13 @@ __all__ = [
     "archive_ticket",
     "assign_owner",
     "assign_responsible",
+    "bounce_article",
     "change_priority",
     "change_state",
     "change_title",
     "create_ticket",
+    "forward_article",
+    "link_tickets",
     "lock_ticket",
     "merge_tickets",
     "move_queue",

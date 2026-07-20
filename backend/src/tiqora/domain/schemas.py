@@ -50,6 +50,9 @@ class LoginResponse(BaseModel):
 
 class QueueCounts(BaseModel):
     open: int = 0
+    """Viewable total: state type in {new, open, pending reminder, pending auto}."""
+    new: int = 0
+    """Subset of ``open`` — tickets currently in the ``new`` state type."""
     locked: int = 0
     unlocked: int = 0
     total: int = 0
@@ -116,6 +119,8 @@ class TicketDetail(TicketListItem):
     create_by: int | None = None
     change_by: int | None = None
     dynamic_fields: list[DynamicFieldValueOut] = Field(default_factory=list)
+    is_watched: bool = False
+    can_write: bool = False
 
 
 class ArticleListItem(BaseModel):
@@ -155,12 +160,68 @@ class HistoryEntry(BaseModel):
     id: int
     ticket_id: int
     name: str
+    rendered: str
     history_type_id: int
     history_type: str | None = None
     article_id: int | None = None
     owner_id: int
     create_time: datetime
     create_by: int
+    create_by_login: str | None = None
+
+
+class ReplyDraftOut(BaseModel):
+    """Prefilled reply/reply-all draft for one article (see quoting.py)."""
+
+    to_address: str | None = None
+    cc: str | None = None
+    subject: str
+    body: str
+    is_html: bool
+    in_reply_to: str | None = None
+    references: str | None = None
+
+
+class TemplateOut(BaseModel):
+    id: int
+    name: str
+    text: str
+    content_type: str | None = None
+    template_type: str | None = None
+
+
+class TicketLinkTargetOut(BaseModel):
+    source_key: str
+    target_key: str
+    link_type: str
+    state: str
+    other_ticket_id: int
+    other_tn: str | None = None
+    other_title: str | None = None
+
+
+class TicketLinkCreateRequest(BaseModel):
+    target_ticket_id: int
+    link_type: str = "Normal"
+
+
+class ForwardRequest(BaseModel):
+    to_address: str
+    cc: str | None = None
+    subject: str | None = None
+    body: str
+    note: str | None = None
+
+
+class BounceRequest(BaseModel):
+    to_address: str
+    note: str | None = None
+    state_id: int | None = None
+
+
+class SplitRequest(BaseModel):
+    queue_id: int
+    title: str | None = None
 
 
 class CustomerUserOut(BaseModel):
