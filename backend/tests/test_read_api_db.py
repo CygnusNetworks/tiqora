@@ -368,3 +368,137 @@ async def test_queue_ticket_detail_attachment_permissions(
             await ts.get_ticket(ids["reader"], 999999)
 
     await engine.dispose()
+
+
+def _seed_dashboard(sync_url: str) -> dict[str, Any]:
+    """Seed a self-contained fixture for the dashboard-summary counts.
+
+    Uses its own id/login namespace (3xx users, group 30, queue 300, 55x
+    tickets) so it can run alongside :func:`_seed_tickets` in the shared
+    session DB without colliding.
+    """
+    engine = create_engine(sync_url)
+    ids: dict[str, Any] = {"agent": 300, "no_access": 301, "queue": 300}
+    pw = hash_password("secret")
+
+    with engine.begin() as conn:
+        TiqoraBase.metadata.create_all(conn)
+
+        for uid, login in ((300, "dash.agent"), (301, "dash.none")):
+            conn.execute(
+                text(
+                    """
+                    INSERT INTO users (id, login, pw, first_name, last_name, valid_id,
+                                      create_time, create_by, change_time, change_by)
+                    VALUES (:id, :login, :pw, 'Dash', 'Board', 1, :t, 1, :t, 1)
+                    """
+                ),
+                {"id": uid, "login": login, "pw": pw, "t": NOW},
+            )
+
+        conn.execute(
+            text(
+                """
+                INSERT INTO permission_groups
+                (id, name, valid_id, create_time, create_by, change_time, change_by)
+                VALUES (30, 'dash-grp', 1, :t, 1, :t, 1)
+                """
+            ),
+            {"t": NOW},
+        )
+        conn.execute(
+            text(
+                """
+                INSERT INTO group_user
+                (user_id, group_id, permission_key,
+                 create_time, create_by, change_time, change_by)
+                VALUES (300, 30, 'ro', :t, 1, :t, 1)
+                """
+            ),
+            {"t": NOW},
+        )
+        conn.execute(
+            text(
+                """
+                INSERT INTO queue (
+                    id, name, group_id, system_address_id, salutation_id, signature_id,
+                    follow_up_id, follow_up_lock, valid_id,
+                    create_time, create_by, change_time, change_by
+                ) VALUES (
+                    300, 'DashQueue', 30, 1, 1, 1, 1, 0, 1, :t, 1, :t, 1
+                )
+                """
+            ),
+            {"t": NOW},
+        )
+
+        # state_id 4 = open (type "open"), 1 = new (type "new"). escalation
+        # epoch 1000 is far in the past → counts as breached.
+        rows = [
+            # (id, tn, owner, state, escalation_time)
+            (550, "20240601005500", 300, 4, 0),  # my open (open state)
+            (551, "20240601005501", 300, 1, 0),  # my new (also in "open" view)
+            (552, "20240601005502", 1, 1, 0),  # unowned new (root-owned)
+            (553, "20240601005503", 1, 4, 1000),  # escalated open (other owner)
+        ]
+        for tid, tn, owner, state_id, esc in rows:
+            conn.execute(
+                text(
+                    """
+                    INSERT INTO ticket (
+                        id, tn, title, queue_id, ticket_lock_id, type_id,
+                        user_id, responsible_user_id, ticket_priority_id, ticket_state_id,
+                        customer_id, customer_user_id,
+                        timeout, until_time, escalation_time, escalation_update_time,
+                        escalation_response_time, escalation_solution_time, archive_flag,
+                        create_time, create_by, change_time, change_by
+                    ) VALUES (
+                        :id, :tn, 'Dash ticket', 300, 1, 1,
+                        :owner, 1, 3, :state,
+                        NULL, NULL,
+                        0, 0, :esc, 0, 0, 0, 0,
+                        :t, 1, :t, 1
+                    )
+                    """
+                ),
+                {"id": tid, "tn": tn, "owner": owner, "state": state_id, "esc": esc, "t": NOW},
+            )
+
+    engine.dispose()
+    return ids
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("url_fixture", ["mariadb_znuny_url", "postgres_znuny_url"])
+async def test_dashboard_summary_counts(
+    url_fixture: str,
+    request: pytest.FixtureRequest,
+) -> None:
+    sync_url: str = request.getfixturevalue(url_fixture)
+    ids = _seed_dashboard(sync_url)
+    async_url = _to_async_url(sync_url)
+    engine = create_async_engine(async_url)
+    factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+
+    async with factory() as session:
+        ts = TicketService(session)
+
+        summary = await ts.count_dashboard_summary(ids["agent"])
+        # my_open = viewable-open owned by agent (open + new states): 550 + 551.
+        assert summary["my_open"] == 2
+        # my_new = new-state owned by agent: 551.
+        assert summary["my_new"] == 1
+        # unowned_new = new-state still owned by root (owner_id=1): 552.
+        assert summary["unowned_new"] == 1
+        # escalated = viewable-open with a past escalation epoch, any owner: 553.
+        assert summary["escalated"] == 1
+
+        # No-access agent sees nothing in any tile.
+        assert await ts.count_dashboard_summary(ids["no_access"]) == {
+            "my_open": 0,
+            "my_new": 0,
+            "unowned_new": 0,
+            "escalated": 0,
+        }
+
+    await engine.dispose()

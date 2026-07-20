@@ -198,6 +198,26 @@ async def my_ticket_counts(user: CurrentUser, session: DbSession) -> MyTicketCou
     return MyTicketCounts(open=counts["open"], new=counts["new"])
 
 
+class DashboardSummary(BaseModel):
+    """KPI-tile counts for the agent dashboard."""
+
+    my_open: int
+    my_new: int
+    unowned_new: int
+    escalated: int
+
+
+@router.get("/dashboard-summary", response_model=DashboardSummary)
+async def dashboard_summary(user: CurrentUser, session: DbSession) -> DashboardSummary:
+    """Counts for the dashboard KPI tiles: owned open/new, unclaimed new, escalated.
+
+    Registered before ``/{ticket_id}`` so "dashboard-summary" is not parsed as
+    a ticket id.
+    """
+    counts = await TicketService(session).count_dashboard_summary(user.id)
+    return DashboardSummary(**counts)
+
+
 class _EchoWriter:
     """File-like shim so ``csv.writer`` yields each row as a string.
 
