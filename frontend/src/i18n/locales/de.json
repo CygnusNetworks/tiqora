@@ -383,11 +383,14 @@
       "groups": "Gruppen",
       "roles": "Rollen",
       "agentRoles": "Rollenzuordnung",
+      "agentGroups": "Gruppenzuordnung",
+      "roleGroups": "Rollengruppen",
       "queues": "Queues",
       "states": "Status",
       "priorities": "Prioritäten",
       "customerUsers": "Kundenbenutzer",
       "customerCompanies": "Kundenunternehmen",
+      "customerUserCustomers": "Unternehmenszuordnung",
       "templates": "Vorlagen",
       "salutations": "Anreden",
       "signatures": "Signaturen",
@@ -434,6 +437,36 @@
       "roles": "Rollen",
       "assigned": "Zugewiesen",
       "noRoles": "Keine gültigen Rollen vorhanden."
+    },
+    "groupAssignments": {
+      "title": "Gruppenzuordnung",
+      "subtitle": "Wähle einen Agenten und lege fest, in welchen Gruppen er arbeiten darf.",
+      "agent": "Agent",
+      "selectAgent": "Agent auswählen…",
+      "empty": "Wähle oben einen Agenten, um seine Gruppen zu bearbeiten.",
+      "groups": "Gruppen",
+      "assigned": "Vollzugriff",
+      "noGroups": "Keine gültigen Gruppen vorhanden."
+    },
+    "roleGroupAssignments": {
+      "title": "Rollengruppen",
+      "subtitle": "Wähle eine Rolle und lege fest, auf welche Gruppen sie Zugriff gewährt.",
+      "role": "Rolle",
+      "selectRole": "Rolle auswählen…",
+      "empty": "Wähle oben eine Rolle, um ihre Gruppen zu bearbeiten.",
+      "groups": "Gruppen",
+      "assigned": "Vollzugriff",
+      "noGroups": "Keine gültigen Gruppen vorhanden."
+    },
+    "customerUserCustomers": {
+      "title": "Unternehmenszuordnung",
+      "subtitle": "Wähle einen Kundenbenutzer und lege fest, für welche Unternehmen er Tickets sehen darf. Dies ist getrennt von seinem Stammunternehmen.",
+      "customerUser": "Kundenbenutzer",
+      "selectCustomerUser": "Kundenbenutzer auswählen…",
+      "empty": "Wähle oben einen Kundenbenutzer, um seine Unternehmen zu bearbeiten.",
+      "companies": "Unternehmen",
+      "assigned": "Zugewiesen",
+      "noCompanies": "Keine gültigen Unternehmen vorhanden."
     },
     "form": {
       "cancel": "Abbrechen",

@@ -9,8 +9,14 @@ from tiqora.api.deps import DbSession
 from tiqora.api.v1.admin.common import now
 from tiqora.api.v1.admin.deps import AdminUser
 from tiqora.api.v1.admin.pagination import ListParamsDep, Page, apply_valid_filter, paginate
-from tiqora.api.v1.admin.schemas import GroupRoleAssignment, RoleCreate, RoleOut, RoleUpdate
-from tiqora.db.legacy.user import GroupRole, Roles
+from tiqora.api.v1.admin.schemas import (
+    GroupOut,
+    GroupRoleAssignment,
+    RoleCreate,
+    RoleOut,
+    RoleUpdate,
+)
+from tiqora.db.legacy.user import GroupRole, PermissionGroups, Roles
 
 router = APIRouter(prefix="/roles", tags=["admin:roles"])
 
@@ -74,6 +80,22 @@ async def deactivate_role(role_id: int, admin: AdminUser, session: DbSession) ->
     role.change_time = now()
     role.change_by = admin.id
     await session.commit()
+
+
+@router.get("/{role_id}/groups", response_model=list[GroupOut])
+async def get_role_groups(
+    role_id: int, admin: AdminUser, session: DbSession
+) -> list[PermissionGroups]:
+    """Groups the role grants full (``rw``) access to — the Role↔Groups editor's
+    read side. The editor toggles the ``rw`` permission only (see
+    :func:`assign_group_role`), so the read set is filtered to that key."""
+    _ = admin
+    result = await session.execute(
+        select(PermissionGroups)
+        .join(GroupRole, GroupRole.group_id == PermissionGroups.id)
+        .where(GroupRole.role_id == role_id, GroupRole.permission_key == "rw")
+    )
+    return list(result.scalars().all())
 
 
 @router.put("/{role_id}/groups", status_code=status.HTTP_204_NO_CONTENT)

@@ -11,13 +11,14 @@ from tiqora.api.v1.admin.deps import AdminUser
 from tiqora.api.v1.admin.pagination import ListParamsDep, Page, apply_valid_filter, paginate
 from tiqora.api.v1.admin.schemas import (
     GroupAssignment,
+    GroupOut,
     RoleAssignment,
     RoleOut,
     UserCreate,
     UserOut,
     UserUpdate,
 )
-from tiqora.db.legacy.user import GroupUser, Roles, RoleUser, Users
+from tiqora.db.legacy.user import GroupUser, PermissionGroups, Roles, RoleUser, Users
 from tiqora.znuny.password import hash_password
 
 router = APIRouter(prefix="/users", tags=["admin:users"])
@@ -91,6 +92,23 @@ async def deactivate_user(user_id: int, admin: AdminUser, session: DbSession) ->
     user.change_time = now()
     user.change_by = admin.id
     await session.commit()
+
+
+@router.get("/{user_id}/groups", response_model=list[GroupOut])
+async def get_user_groups(
+    user_id: int, admin: AdminUser, session: DbSession
+) -> list[PermissionGroups]:
+    """Groups the user has full (``rw``) access to — the Agent↔Groups editor's
+    read side. The editor toggles the ``rw`` permission only (see
+    :func:`assign_group`), so the read set is filtered to that key to stay
+    consistent with what the checkboxes write."""
+    _ = admin
+    result = await session.execute(
+        select(PermissionGroups)
+        .join(GroupUser, GroupUser.group_id == PermissionGroups.id)
+        .where(GroupUser.user_id == user_id, GroupUser.permission_key == "rw")
+    )
+    return list(result.scalars().all())
 
 
 @router.put("/{user_id}/groups", status_code=status.HTTP_204_NO_CONTENT)

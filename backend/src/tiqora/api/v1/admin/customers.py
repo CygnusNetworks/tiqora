@@ -184,6 +184,28 @@ async def deactivate_customer_company(
     await session.commit()
 
 
+@router.get(
+    "/customer-users/{customer_user_login}/companies", response_model=list[CustomerCompanyOut]
+)
+async def get_customer_user_companies(
+    customer_user_login: str, admin: AdminUser, session: DbSession
+) -> list[CustomerCompany]:
+    """Companies *customer_user_login* has additional ticket visibility into —
+    the Customer-User↔Customers editor's read side.
+
+    This is the Znuny ``customer_user_customer`` M2M (extra visibility), keyed
+    by the customer-user *login*. It is distinct from the user's single primary
+    ``customer_user.customer_id`` (their home company), which is edited on the
+    Customer Users page instead."""
+    _ = admin
+    result = await session.execute(
+        select(CustomerCompany)
+        .join(CustomerUserCustomer, CustomerUserCustomer.customer_id == CustomerCompany.customer_id)
+        .where(CustomerUserCustomer.user_id == customer_user_login)
+    )
+    return list(result.scalars().all())
+
+
 @router.put(
     "/customer-users/{customer_user_login}/companies", status_code=status.HTTP_204_NO_CONTENT
 )

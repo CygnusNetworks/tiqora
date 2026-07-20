@@ -383,11 +383,14 @@
       "groups": "Groups",
       "roles": "Roles",
       "agentRoles": "Role assignment",
+      "agentGroups": "Group assignment",
+      "roleGroups": "Role groups",
       "queues": "Queues",
       "states": "States",
       "priorities": "Priorities",
       "customerUsers": "Customer users",
       "customerCompanies": "Customer companies",
+      "customerUserCustomers": "Customer assignment",
       "templates": "Templates",
       "salutations": "Salutations",
       "signatures": "Signatures",
@@ -434,6 +437,36 @@
       "roles": "Roles",
       "assigned": "Assigned",
       "noRoles": "No valid roles exist yet."
+    },
+    "groupAssignments": {
+      "title": "Group assignment",
+      "subtitle": "Pick an agent and set which groups they can work in.",
+      "agent": "Agent",
+      "selectAgent": "Select an agent…",
+      "empty": "Pick an agent above to edit their groups.",
+      "groups": "Groups",
+      "assigned": "Full access",
+      "noGroups": "No valid groups exist yet."
+    },
+    "roleGroupAssignments": {
+      "title": "Role groups",
+      "subtitle": "Pick a role and set which groups it grants access to.",
+      "role": "Role",
+      "selectRole": "Select a role…",
+      "empty": "Pick a role above to edit its groups.",
+      "groups": "Groups",
+      "assigned": "Full access",
+      "noGroups": "No valid groups exist yet."
+    },
+    "customerUserCustomers": {
+      "title": "Customer assignment",
+      "subtitle": "Pick a customer user and set which companies they can see tickets for. This is separate from their home company.",
+      "customerUser": "Customer user",
+      "selectCustomerUser": "Select a customer user…",
+      "empty": "Pick a customer user above to edit their companies.",
+      "companies": "Companies",
+      "assigned": "Assigned",
+      "noCompanies": "No valid companies exist yet."
     },
     "form": {
       "cancel": "Cancel",
