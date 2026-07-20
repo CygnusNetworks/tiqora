@@ -66,6 +66,10 @@ export type KbArticleIn = Schemas["ArticleIn"];
 export type KbArticleUpdateIn = Schemas["ArticleUpdateIn"];
 export type ArticleSummary = Schemas["ArticleSummary"];
 export type ArticleVersionOut = Schemas["ArticleVersionOut"];
+export type AssignableGroup = Schemas["AssignableGroup"];
+export type KbAttachmentOut = Schemas["AttachmentOut"];
+export type KnowledgeArticle = Schemas["KnowledgeArticle"];
+export type KnowledgeBundle = Schemas["KnowledgeBundle"];
 
 // ── Admin ─────────────────────────────────────────────────────────────────
 export type UserOut = Schemas["UserOut"];
@@ -800,11 +804,31 @@ export class ApiClient {
     return this.request<void>("DELETE", `/api/v1/kb/categories/${categoryId}`, { signal });
   }
 
+  listAssignableGroups(signal?: AbortSignal) {
+    return this.request<AssignableGroup[]>("GET", "/api/v1/kb/assignable-groups", { signal });
+  }
+
   listKbArticles(
-    params: { category_id?: number; state?: string } = {},
+    params: { category_id?: number; state?: string; tag?: string } = {},
     signal?: AbortSignal,
   ) {
     return this.request<ArticleSummary[]>("GET", "/api/v1/kb/articles", {
+      query: params,
+      signal,
+    });
+  }
+
+  /** ACL-filtered agent-knowledge bundle selected by tag(s) and/or category. */
+  getKbKnowledge(
+    params: {
+      tags?: string;
+      category_id?: number;
+      state?: string;
+      include_content?: boolean;
+    } = {},
+    signal?: AbortSignal,
+  ) {
+    return this.request<KnowledgeBundle>("GET", "/api/v1/kb/knowledge", {
       query: params,
       signal,
     });
@@ -839,6 +863,40 @@ export class ApiClient {
     return this.request<ArticleVersionOut[]>(
       "GET",
       `/api/v1/kb/articles/${articleId}/versions`,
+      { signal },
+    );
+  }
+
+  // KB article attachments (multipart field name `file`).
+  listKbAttachments(articleId: number, signal?: AbortSignal) {
+    return this.request<KbAttachmentOut[]>(
+      "GET",
+      `/api/v1/kb/articles/${articleId}/attachments`,
+      { signal },
+    );
+  }
+
+  uploadKbAttachment(articleId: number, file: File, signal?: AbortSignal) {
+    const form = new FormData();
+    form.append("file", file);
+    return this.request<KbAttachmentOut>(
+      "POST",
+      `/api/v1/kb/articles/${articleId}/attachments`,
+      { body: form, signal },
+    );
+  }
+
+  kbAttachmentDownloadUrl(articleId: number, attachmentId: number): string {
+    return joinUrl(
+      this.baseUrl,
+      `/api/v1/kb/articles/${articleId}/attachments/${attachmentId}`,
+    );
+  }
+
+  deleteKbAttachment(articleId: number, attachmentId: number, signal?: AbortSignal) {
+    return this.request<void>(
+      "DELETE",
+      `/api/v1/kb/articles/${articleId}/attachments/${attachmentId}`,
       { signal },
     );
   }
