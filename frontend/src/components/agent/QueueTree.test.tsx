@@ -11,7 +11,7 @@ const sample: QueueNode[] = [
     name: "Raw",
     group_id: 1,
     valid: true,
-    counts: { open: 3, locked: 1, unlocked: 2, total: 5 },
+    counts: { open: 3, new: 0, locked: 1, unlocked: 2, total: 5 },
     children: [
       {
         id: 2,
@@ -19,7 +19,7 @@ const sample: QueueNode[] = [
         group_id: 1,
         parent_name: "Raw",
         valid: true,
-        counts: { open: 1, locked: 0, unlocked: 1, total: 1 },
+        counts: { open: 1, new: 0, locked: 0, unlocked: 1, total: 1 },
         children: [],
       },
     ],

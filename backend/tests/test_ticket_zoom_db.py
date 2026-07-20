@@ -49,7 +49,7 @@ def _seed(sync_url: str) -> dict[str, Any]:
     pw = hash_password("secret")
     with engine.begin() as conn:
         TiqoraBase.metadata.create_all(conn)
-        for uid, login in ((300, "agent.rw"), (301, "agent.none")):
+        for uid, login in ((7301, "agent.rw"), (7302, "agent.none")):
             conn.execute(
                 text(
                     "INSERT INTO users (id, login, pw, first_name, last_name, valid_id,"
@@ -62,7 +62,7 @@ def _seed(sync_url: str) -> dict[str, Any]:
             text(
                 "INSERT INTO permission_groups (id, name, valid_id,"
                 " create_time, create_by, change_time, change_by)"
-                " VALUES (30, 'zoom-grp', 1, :t, 1, :t, 1)"
+                " VALUES (7330, 'zoom-grp', 1, :t, 1, :t, 1)"
             ),
             {"t": NOW},
         )
@@ -71,7 +71,7 @@ def _seed(sync_url: str) -> dict[str, Any]:
                 text(
                     "INSERT INTO group_user (user_id, group_id, permission_key,"
                     " create_time, create_by, change_time, change_by)"
-                    " VALUES (300, 30, :k, :t, 1, :t, 1)"
+                    " VALUES (7301, 7330, :k, :t, 1, :t, 1)"
                 ),
                 {"k": key, "t": NOW},
             )
@@ -80,7 +80,7 @@ def _seed(sync_url: str) -> dict[str, Any]:
                 "INSERT INTO queue (id, name, group_id, system_address_id, salutation_id,"
                 " signature_id, follow_up_id, follow_up_lock, valid_id,"
                 " create_time, create_by, change_time, change_by)"
-                " VALUES (300, 'ZoomQueue', 30, 1, 1, 1, 1, 0, 1, :t, 1, :t, 1)"
+                " VALUES (7300, 'ZoomQueue', 7330, 1, 1, 1, 1, 0, 1, :t, 1, :t, 1)"
             ),
             {"t": NOW},
         )
@@ -92,8 +92,8 @@ def _seed(sync_url: str) -> dict[str, Any]:
                 " customer_id, customer_user_id, timeout, until_time, escalation_time,"
                 " escalation_update_time, escalation_response_time, escalation_solution_time,"
                 " archive_flag, create_time, create_by, change_time, change_by)"
-                " VALUES (700, '20240601700001', 'Zoom ticket', 300, 1, 1,"
-                " 300, 1, 3, 4, 'CUST1', 'alice@example.com',"
+                " VALUES (7700, '20240601700001', 'Zoom ticket', 7300, 1, 1,"
+                " 7301, 1, 3, 4, 'CUST1', 'alice@example.com',"
                 " 0, 0, 0, 0, 0, 0, 0, :t, 1, :t, 1)"
             ),
             {"t": NOW},
@@ -104,7 +104,7 @@ def _seed(sync_url: str) -> dict[str, Any]:
                 "INSERT INTO article (id, ticket_id, article_sender_type_id,"
                 " communication_channel_id, is_visible_for_customer, search_index_needs_rebuild,"
                 " create_time, create_by, change_time, change_by)"
-                " VALUES (800, 700, 3, 1, 1, 0, :t, 1, :t, 1)"
+                " VALUES (7800, 7700, 3, 1, 1, 0, :t, 1, :t, 1)"
             ),
             {"t": NOW},
         )
@@ -113,7 +113,7 @@ def _seed(sync_url: str) -> dict[str, Any]:
                 "INSERT INTO article_data_mime (id, article_id, a_from, a_to, a_cc, a_subject,"
                 " a_content_type, a_body, a_message_id, incoming_time,"
                 " create_time, create_by, change_time, change_by)"
-                " VALUES (800, 800, 'alice@example.com', 'support@example.com,bob@example.com',"
+                " VALUES (7800, 7800, 'alice@example.com', 'support@example.com,bob@example.com',"
                 " 'carol@example.com', 'Re: Aw: Broken thing',"
                 " 'text/plain; charset=utf-8', 'First line\nSecond line', '<msg-1@x>', 1717243200,"
                 " :t, 1, :t, 1)"
@@ -134,25 +134,25 @@ def _seed(sync_url: str) -> dict[str, Any]:
         conn.execute(
             text(
                 "INSERT INTO dynamic_field_value (id, field_id, object_id, value_text)"
-                " VALUES (9101, 9101, 700, 'HasValue')"
+                " VALUES (9101, 9101, 7700, 'HasValue')"
             )
         )
         # empty-valued row for ZoomEmpty (value_text = '')
         conn.execute(
             text(
                 "INSERT INTO dynamic_field_value (id, field_id, object_id, value_text)"
-                " VALUES (9102, 9102, 700, '')"
+                " VALUES (9102, 9102, 7700, '')"
             )
         )
-        # OwnerUpdate history row referencing user id 300 -> should resolve to login
+        # OwnerUpdate history row referencing user id 7301 -> should resolve to login
         conn.execute(
             text(
                 "INSERT INTO ticket_history (id, name, history_type_id, ticket_id, type_id,"
                 " queue_id, owner_id, priority_id, state_id,"
                 " create_time, create_by, change_time, change_by)"
-                " VALUES (900, '%%agent.rw%%300', "
+                " VALUES (7900, '%%agent.rw%%7301', "
                 " (SELECT id FROM ticket_history_type WHERE name='OwnerUpdate'),"
-                " 700, 1, 300, 300, 3, 4, :t, 300, :t, 300)"
+                " 7700, 1, 7300, 7301, 3, 4, :t, 7301, :t, 7301)"
             ),
             {"t": NOW},
         )
@@ -161,7 +161,7 @@ def _seed(sync_url: str) -> dict[str, Any]:
             text(
                 "INSERT INTO standard_template (id, name, text, content_type, template_type,"
                 " valid_id, create_time, create_by, change_time, change_by)"
-                " VALUES (400, 'Greeting', 'Hello from support', 'text/plain', 'Answer',"
+                " VALUES (7401, 'Greeting', 'Hello from support', 'text/plain', 'Answer',"
                 " 1, :t, 1, :t, 1)"
             ),
             {"t": NOW},
@@ -171,7 +171,7 @@ def _seed(sync_url: str) -> dict[str, Any]:
             text(
                 "INSERT INTO standard_template (id, name, text, content_type, template_type,"
                 " valid_id, create_time, create_by, change_time, change_by)"
-                " VALUES (401, 'FwdTpl', 'fwd', 'text/plain', 'Forward',"
+                " VALUES (7402, 'FwdTpl', 'fwd', 'text/plain', 'Forward',"
                 " 1, :t, 1, :t, 1)"
             ),
             {"t": NOW},
@@ -180,7 +180,7 @@ def _seed(sync_url: str) -> dict[str, Any]:
             text(
                 "INSERT INTO queue_standard_template (queue_id, standard_template_id,"
                 " create_time, create_by, change_time, change_by)"
-                " VALUES (300, 400, :t, 1, :t, 1)"
+                " VALUES (7300, 7401, :t, 1, :t, 1)"
             ),
             {"t": NOW},
         )
@@ -188,12 +188,12 @@ def _seed(sync_url: str) -> dict[str, Any]:
             text(
                 "INSERT INTO queue_standard_template (queue_id, standard_template_id,"
                 " create_time, create_by, change_time, change_by)"
-                " VALUES (300, 401, :t, 1, :t, 1)"
+                " VALUES (7300, 7402, :t, 1, :t, 1)"
             ),
             {"t": NOW},
         )
     engine.dispose()
-    return {"agent": 300, "no_access": 301, "queue": 300, "ticket": 700, "article": 800}
+    return {"agent": 7301, "no_access": 7302, "queue": 7300, "ticket": 7700, "article": 7800}
 
 
 @pytest.mark.asyncio
