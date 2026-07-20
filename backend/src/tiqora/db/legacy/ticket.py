@@ -4,7 +4,6 @@ from datetime import datetime
 
 from sqlalchemy import (
     BigInteger,
-    DateTime,
     Integer,
     SmallInteger,
     String,
@@ -12,6 +11,7 @@ from sqlalchemy import (
 from sqlalchemy.orm import Mapped, mapped_column
 
 from tiqora.db.legacy.base import LegacyBase
+from tiqora.db.legacy.types import LegacyDateTime as DateTime
 
 
 class Ticket(LegacyBase):

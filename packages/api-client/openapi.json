@@ -4,9 +4,16 @@
       "AclOut": {
         "properties": {
           "change_time": {
-            "format": "date-time",
-            "title": "Change Time",
-            "type": "string"
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Change Time"
           },
           "comments": {
             "anyOf": [
@@ -42,9 +49,16 @@
             "title": "Config Match"
           },
           "create_time": {
-            "format": "date-time",
-            "title": "Create Time",
-            "type": "string"
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Create Time"
           },
           "description": {
             "anyOf": [
@@ -1578,9 +1592,16 @@
       "AutoResponseOut": {
         "properties": {
           "change_time": {
-            "format": "date-time",
-            "title": "Change Time",
-            "type": "string"
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Change Time"
           },
           "comments": {
             "anyOf": [
@@ -1605,9 +1626,16 @@
             "title": "Content Type"
           },
           "create_time": {
-            "format": "date-time",
-            "title": "Create Time",
-            "type": "string"
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Create Time"
           },
           "id": {
             "title": "Id",
@@ -2264,9 +2292,16 @@
       "CustomerCompanyOut": {
         "properties": {
           "change_time": {
-            "format": "date-time",
-            "title": "Change Time",
-            "type": "string"
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Change Time"
           },
           "city": {
             "anyOf": [
@@ -2302,9 +2337,16 @@
             "title": "Country"
           },
           "create_time": {
-            "format": "date-time",
-            "title": "Create Time",
-            "type": "string"
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Create Time"
           },
           "customer_id": {
             "title": "Customer Id",
@@ -2691,9 +2733,16 @@
       "CustomerUserAdminOut": {
         "properties": {
           "change_time": {
-            "format": "date-time",
-            "title": "Change Time",
-            "type": "string"
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Change Time"
           },
           "city": {
             "anyOf": [
@@ -2729,9 +2778,16 @@
             "title": "Country"
           },
           "create_time": {
-            "format": "date-time",
-            "title": "Create Time",
-            "type": "string"
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Create Time"
           },
           "customer_id": {
             "title": "Customer Id",
@@ -3336,9 +3392,16 @@
       "DynamicFieldOut": {
         "properties": {
           "change_time": {
-            "format": "date-time",
-            "title": "Change Time",
-            "type": "string"
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Change Time"
           },
           "config": {
             "additionalProperties": true,
@@ -3346,9 +3409,16 @@
             "type": "object"
           },
           "create_time": {
-            "format": "date-time",
-            "title": "Create Time",
-            "type": "string"
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Create Time"
           },
           "field_order": {
             "title": "Field Order",
@@ -3629,9 +3699,16 @@
       "GroupOut": {
         "properties": {
           "change_time": {
-            "format": "date-time",
-            "title": "Change Time",
-            "type": "string"
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Change Time"
           },
           "comments": {
             "anyOf": [
@@ -3645,9 +3722,16 @@
             "title": "Comments"
           },
           "create_time": {
-            "format": "date-time",
-            "title": "Create Time",
-            "type": "string"
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Create Time"
           },
           "id": {
             "title": "Id",
@@ -5227,14 +5311,28 @@
       "PriorityOut": {
         "properties": {
           "change_time": {
-            "format": "date-time",
-            "title": "Change Time",
-            "type": "string"
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Change Time"
           },
           "create_time": {
-            "format": "date-time",
-            "title": "Create Time",
-            "type": "string"
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Create Time"
           },
           "id": {
             "title": "Id",
@@ -5689,9 +5787,16 @@
             "title": "Calendar Name"
           },
           "change_time": {
-            "format": "date-time",
-            "title": "Change Time",
-            "type": "string"
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Change Time"
           },
           "comments": {
             "anyOf": [
@@ -5705,9 +5810,16 @@
             "title": "Comments"
           },
           "create_time": {
-            "format": "date-time",
-            "title": "Create Time",
-            "type": "string"
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Create Time"
           },
           "default_sign_key": {
             "anyOf": [
@@ -6235,9 +6347,16 @@
       "RoleOut": {
         "properties": {
           "change_time": {
-            "format": "date-time",
-            "title": "Change Time",
-            "type": "string"
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Change Time"
           },
           "comments": {
             "anyOf": [
@@ -6251,9 +6370,16 @@
             "title": "Comments"
           },
           "create_time": {
-            "format": "date-time",
-            "title": "Create Time",
-            "type": "string"
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Create Time"
           },
           "id": {
             "title": "Id",
@@ -6321,9 +6447,16 @@
       "SalutationOut": {
         "properties": {
           "change_time": {
-            "format": "date-time",
-            "title": "Change Time",
-            "type": "string"
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Change Time"
           },
           "comments": {
             "anyOf": [
@@ -6348,9 +6481,16 @@
             "title": "Content Type"
           },
           "create_time": {
-            "format": "date-time",
-            "title": "Create Time",
-            "type": "string"
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Create Time"
           },
           "id": {
             "title": "Id",
@@ -6662,9 +6802,16 @@
       "SignatureOut": {
         "properties": {
           "change_time": {
-            "format": "date-time",
-            "title": "Change Time",
-            "type": "string"
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Change Time"
           },
           "comments": {
             "anyOf": [
@@ -6689,9 +6836,16 @@
             "title": "Content Type"
           },
           "create_time": {
-            "format": "date-time",
-            "title": "Create Time",
-            "type": "string"
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Create Time"
           },
           "id": {
             "title": "Id",
@@ -7039,9 +7193,16 @@
         "description": "Attachment master row; ``content`` is base64-encoded binary.",
         "properties": {
           "change_time": {
-            "format": "date-time",
-            "title": "Change Time",
-            "type": "string"
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Change Time"
           },
           "comments": {
             "anyOf": [
@@ -7063,9 +7224,16 @@
             "type": "string"
           },
           "create_time": {
-            "format": "date-time",
-            "title": "Create Time",
-            "type": "string"
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Create Time"
           },
           "filename": {
             "title": "Filename",
@@ -7230,9 +7398,16 @@
       "StandardTemplateOut": {
         "properties": {
           "change_time": {
-            "format": "date-time",
-            "title": "Change Time",
-            "type": "string"
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Change Time"
           },
           "comments": {
             "anyOf": [
@@ -7257,9 +7432,16 @@
             "title": "Content Type"
           },
           "create_time": {
-            "format": "date-time",
-            "title": "Create Time",
-            "type": "string"
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Create Time"
           },
           "id": {
             "title": "Id",
@@ -7412,9 +7594,16 @@
       "StateOut": {
         "properties": {
           "change_time": {
-            "format": "date-time",
-            "title": "Change Time",
-            "type": "string"
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Change Time"
           },
           "comments": {
             "anyOf": [
@@ -7428,9 +7617,16 @@
             "title": "Comments"
           },
           "create_time": {
-            "format": "date-time",
-            "title": "Create Time",
-            "type": "string"
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Create Time"
           },
           "id": {
             "title": "Id",
@@ -8548,14 +8744,28 @@
       "UserOut": {
         "properties": {
           "change_time": {
-            "format": "date-time",
-            "title": "Change Time",
-            "type": "string"
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Change Time"
           },
           "create_time": {
-            "format": "date-time",
-            "title": "Create Time",
-            "type": "string"
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Create Time"
           },
           "first_name": {
             "title": "First Name",

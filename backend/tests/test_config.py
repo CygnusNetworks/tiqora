@@ -10,6 +10,9 @@ def test_settings_defaults() -> None:
     assert "localhost" in s.database_url
     assert s.redis_url.startswith("redis://")
     assert s.schema_ownership is False
+    # Outbound agent mail is off until an operator sets TIQORA_SMTP_ENABLED
+    # (default localhost:25 is not treated as a real relay).
+    assert s.smtp_enabled is False
 
 
 def test_cors_list() -> None:

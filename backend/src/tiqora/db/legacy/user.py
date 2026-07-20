@@ -3,7 +3,6 @@ from __future__ import annotations
 from datetime import datetime
 
 from sqlalchemy import (
-    DateTime,
     Integer,
     LargeBinary,
     SmallInteger,
@@ -12,6 +11,7 @@ from sqlalchemy import (
 from sqlalchemy.orm import Mapped, mapped_column
 
 from tiqora.db.legacy.base import LegacyBase
+from tiqora.db.legacy.types import LegacyDateTime as DateTime
 
 
 class Users(LegacyBase):
