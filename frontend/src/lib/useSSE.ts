@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { useQueryClient, type QueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
+import { addNotification } from "@/lib/notificationStore";
 
 type TicketChangedMessage = {
   type: "ticket_changed";
@@ -13,7 +14,19 @@ type PresenceChangedMessage = {
   ticket_id: number;
 };
 
-export type SSEMessage = TicketChangedMessage | PresenceChangedMessage;
+type TicketNewInQueueMessage = {
+  type: "ticket_new_in_queue";
+  ticket_id: number;
+  tn: string;
+  title: string;
+  queue_id: number;
+  queue_name: string;
+};
+
+export type SSEMessage =
+  | TicketChangedMessage
+  | PresenceChangedMessage
+  | TicketNewInQueueMessage;
 
 /** Cache key used by TicketZoomPage's presence poll — kept here so useSSE's
  * invalidation and the query that reads it never drift apart. */
@@ -47,6 +60,21 @@ export function handleSSEMessage(queryClient: QueryClient, raw: string): void {
     // presence state itself is never pushed over SSE, only this marker —
     // clients react by refetching GET .../presence instead.
     void queryClient.invalidateQueries({ queryKey: presenceQueryKey(message.ticket_id) });
+    return;
+  }
+
+  if (message.type === "ticket_new_in_queue") {
+    // Backend already filters these to the agent's readable queues, so any
+    // that reach us are worth a bell + toast. Also refresh the ticket lists
+    // and queue counts so the new item shows up without a manual reload.
+    addNotification({
+      ticketId: message.ticket_id,
+      tn: message.tn,
+      title: message.title,
+      queueName: message.queue_name,
+    });
+    void queryClient.invalidateQueries({ queryKey: ["tickets"] });
+    void queryClient.invalidateQueries({ queryKey: ["queues"] });
   }
 }
 

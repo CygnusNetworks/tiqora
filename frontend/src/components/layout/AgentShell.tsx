@@ -8,6 +8,7 @@ import { api, type QueueNode } from "@/lib/api";
 import { flattenQueues } from "@/components/agent/QueueTree";
 import { Button } from "@/components/ui/Button";
 import { ShortcutHelp } from "@/components/agent/ShortcutHelp";
+import { NotificationBell, NotificationToaster } from "@/components/agent/NotificationBell";
 import { cn } from "@/lib/cn";
 import { useSSE } from "@/lib/useSSE";
 
@@ -475,6 +476,7 @@ export function AgentShell({ children }: { children: ReactNode }) {
             <BetaPill />
           </Link>
           <div className="ml-auto flex items-center gap-1">
+            <NotificationBell />
             <Button variant="ghost" size="sm" onClick={() => setHelpOpen(true)} title="?">
               ?
             </Button>
@@ -501,6 +503,7 @@ export function AgentShell({ children }: { children: ReactNode }) {
             "hidden items-center justify-end gap-1.5 border-b border-hairline bg-surface px-4 py-1.5 md:flex",
           )}
         >
+          <NotificationBell />
           <Button variant="ghost" size="sm" onClick={() => setHelpOpen(true)} title="?">
             ?
           </Button>
@@ -526,6 +529,7 @@ export function AgentShell({ children }: { children: ReactNode }) {
         </main>
       </div>
       <ShortcutHelp open={helpOpen} onClose={() => setHelpOpen(false)} />
+      <NotificationToaster />
     </div>
   );
 }
