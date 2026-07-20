@@ -11,6 +11,20 @@ import { ShortcutHelp } from "@/components/agent/ShortcutHelp";
 import { cn } from "@/lib/cn";
 import { useSSE } from "@/lib/useSSE";
 
+/** Small "Beta" pill rendered next to the Tiqora wordmark. Replaces the old
+ * full-width "not production ready" dev ribbon. */
+function BetaPill() {
+  const { t } = useTranslation();
+  return (
+    <span
+      data-testid="beta-pill"
+      className="rounded-full border border-accent/30 bg-accent-dim px-1.5 py-0.5 text-[9.5px] font-semibold uppercase tracking-wider text-accent"
+    >
+      {t("app.beta")}
+    </span>
+  );
+}
+
 function NavItem({
   to,
   search,
@@ -63,6 +77,36 @@ function NavItem({
   );
 }
 
+/** Admin nav entry, shown only to agents who pass the same admin-capability
+ * probe as RequireAdmin. Shares the ["admin","capability-probe"] query key so
+ * the result is cached across the guard and this link (no extra request).
+ * Renders nothing while loading or when the probe 403s — no disabled state,
+ * no flicker. */
+function AdminNavItem({ onNavigate }: { onNavigate?: () => void }) {
+  const { t } = useTranslation();
+  const probe = useQuery({
+    queryKey: ["admin", "capability-probe"],
+    queryFn: () => api.adminGroups.list(),
+    retry: false,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  if (!probe.isSuccess) return null;
+
+  return (
+    <div>
+      <div className="space-y-0.5">
+        <NavItem
+          to="/admin"
+          label={t("nav.admin")}
+          testId="agent-nav-admin"
+          onNavigate={onNavigate}
+        />
+      </div>
+    </div>
+  );
+}
+
 function SidebarBody({ onNavigate }: { onNavigate?: () => void }) {
   const { t } = useTranslation();
   const { user } = useAuth();
@@ -95,6 +139,7 @@ function SidebarBody({ onNavigate }: { onNavigate?: () => void }) {
         <span className="font-display text-[15px] font-bold tracking-tight text-ink">
           {t("app.name")}
         </span>
+        <BetaPill />
       </Link>
 
       <div className="px-0.5 pb-4">
@@ -191,13 +236,15 @@ function SidebarBody({ onNavigate }: { onNavigate?: () => void }) {
             />
           </div>
         </div>
+
+        <AdminNavItem onNavigate={onNavigate} />
       </nav>
 
       <div className="mt-2 border-t border-hairline px-2 pt-3">
         <Link
-          to="/agent/security"
+          to="/agent/settings"
           onClick={onNavigate}
-          data-testid="agent-nav-security"
+          data-testid="agent-nav-settings"
           className="flex items-center gap-2.5 rounded-lg py-1 transition-colors duration-100 hover:bg-surface-subtle focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent"
         >
           <span
@@ -317,12 +364,6 @@ export function AgentShell({ children }: { children: ReactNode }) {
       )}
 
       <div className="flex min-h-screen min-w-0 flex-1 flex-col">
-        <div
-          className="border-b border-hairline bg-surface-subtle px-4 py-1 text-center font-mono text-[11px] uppercase tracking-wider text-escalation"
-          data-testid="dev-banner"
-        >
-          {t("app.devBanner")}
-        </div>
         <header className="sticky top-0 z-20 flex h-11 items-center gap-2 border-b border-hairline bg-surface px-3 md:hidden">
           <Button
             variant="ghost"
@@ -339,6 +380,7 @@ export function AgentShell({ children }: { children: ReactNode }) {
           >
             <img src="/logo.svg" alt="" width={20} height={20} className="rounded" />
             {t("app.name")}
+            <BetaPill />
           </Link>
           <div className="ml-auto flex items-center gap-1">
             <Button variant="ghost" size="sm" onClick={() => setHelpOpen(true)} title="?">

@@ -14,6 +14,7 @@ import { SearchPage, type SearchSearch } from "@/routes/agent/SearchPage";
 import { KbPage, type KbSearch } from "@/routes/agent/KbPage";
 import { KbArticlePage as AgentKbArticlePage } from "@/routes/agent/KbArticlePage";
 import { SecurityPage } from "@/routes/agent/SecurityPage";
+import { SettingsPage } from "@/routes/agent/SettingsPage";
 import { CalendarPage } from "@/routes/agent/CalendarPage";
 import {
   KbArticleNewPage,
@@ -194,6 +195,12 @@ const agentSecurityRoute = createRoute({
   getParentRoute: () => agentLayoutRoute,
   path: "/security",
   component: SecurityPage,
+});
+
+const agentSettingsRoute = createRoute({
+  getParentRoute: () => agentLayoutRoute,
+  path: "/settings",
+  component: SettingsPage,
 });
 
 const agentStatsRoute = createRoute({
@@ -455,6 +462,7 @@ const routeTree = rootRoute.addChildren([
     agentKbArticleRoute,
     agentKbArticleEditRoute,
     agentSecurityRoute,
+    agentSettingsRoute,
     agentStatsRoute,
     agentCalendarRoute,
   ]),

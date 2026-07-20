@@ -2,7 +2,19 @@
   "app": {
     "name": "Tiqora",
     "tagline": "Modernes Ticketsystem — kompatibel mit Znuny/OTRS 6.5",
-    "devBanner": "In aktiver Entwicklung — nicht produktionsreif"
+    "beta": "Beta"
+  },
+  "settings": {
+    "title": "Einstellungen",
+    "language": "Sprache",
+    "langEnglish": "English",
+    "langGerman": "Deutsch",
+    "theme": "Darstellung",
+    "themeLight": "Hell",
+    "themeDark": "Dunkel",
+    "security": "Sicherheit",
+    "securityHint": "Zwei-Faktor-Authentifizierung für Ihr Konto verwalten.",
+    "securityLink": "Sicherheitseinstellungen öffnen"
   },
   "nav": {
     "home": "Start",
