@@ -22,7 +22,13 @@ def main(argv: list[str] | None = None) -> None:
     sub = parser.add_subparsers(dest="command")
 
     # Default-friendly: `tiqora` / `tiqora api` / `tiqora worker` / `tiqora mcp`
-    sub.add_parser("api", help="Run the FastAPI HTTP server")
+    # --host/--port/--reload belong on the `api` subparser so that
+    # `tiqora api --host 0.0.0.0 --port 8000` works (argparse routes tokens
+    # after the subcommand to the subparser, not the top-level parser).
+    api_p = sub.add_parser("api", help="Run the FastAPI HTTP server")
+    api_p.add_argument("--host", default="0.0.0.0")  # noqa: S104 — container bind
+    api_p.add_argument("--port", type=int, default=8000)
+    api_p.add_argument("--reload", action="store_true")
     sub.add_parser("worker", help="Run the background worker (poller)")
     sub.add_parser("mcp", help="Run the MCP server")
     add_ownership_subparser(sub)
@@ -39,22 +45,18 @@ def main(argv: list[str] | None = None) -> None:
     )
     rebuild_p.add_argument("--batch-size", type=int, default=None)
 
-    # Also accept legacy positional: tiqora api --host ...
-    parser.add_argument("--host", default="0.0.0.0")
-    parser.add_argument("--port", type=int, default=8000)
-    parser.add_argument("--reload", action="store_true")
-
     args = parser.parse_args(argv)
     command = args.command or "api"
 
     if command == "api":
         settings = get_settings()
+        # `tiqora` with no subcommand defaults to api but has no host/port attrs.
         uvicorn.run(
             "tiqora.api.app:create_app",
             factory=True,
-            host=args.host,
-            port=args.port,
-            reload=args.reload or settings.debug,
+            host=getattr(args, "host", "0.0.0.0"),  # noqa: S104 — container bind
+            port=getattr(args, "port", 8000),
+            reload=getattr(args, "reload", False) or settings.debug,
             log_level=settings.log_level.lower(),
         )
     elif command == "worker":
