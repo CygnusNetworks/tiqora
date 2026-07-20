@@ -106,6 +106,47 @@ export type PostmasterFilterOut = Schemas["PostmasterFilterOut"];
 export type AclOut = Schemas["AclOut"];
 export type GenericAgentJobOut = Schemas["GenericAgentJobOut"];
 
+// ── Stats ────────────────────────────────────────────────────────────────
+// Hand-written (not generated from schema.d.ts): openapi.json/schema.d.ts
+// are not currently kept in sync with every backend subsystem in this
+// monorepo, so these mirror tiqora/stats/schemas.py directly rather than
+// forcing a full openapi.json regeneration (which would otherwise pull in
+// every other in-flight backend feature's routes as an unrelated diff).
+export type VolumePointOut = { bucket: string; created: number; closed: number };
+export type TicketVolumeOut = { granularity: string; points: VolumePointOut[] };
+export type DimensionCountOut = { id: number | null; label: string; count: number };
+export type OpenSnapshotOut = { dimension: string; items: DimensionCountOut[] };
+export type SlaStatsOut = {
+  total: number;
+  escalated: number;
+  first_response_breached: number;
+  update_breached: number;
+  solution_breached: number;
+  first_response_minutes: number[];
+  solution_minutes: number[];
+};
+export type AgentWorkloadItemOut = {
+  user_id: number;
+  login: string;
+  name: string;
+  owned_open: number;
+  closed_in_period: number;
+};
+export type BacklogPointOut = { bucket: string; open_count: number };
+export type BacklogTrendOut = { granularity: string; points: BacklogPointOut[] };
+export type StatsGranularity = "day" | "week" | "month";
+export type StatsDimension = "queue" | "state" | "priority" | "owner";
+
+export type StatsFilterParams = {
+  date_from?: string;
+  date_to?: string;
+  queue_id?: number;
+  state_id?: number;
+  priority_id?: number;
+  type_id?: number;
+  customer_id?: string;
+};
+
 export class ApiError extends Error {
   readonly status: number;
   readonly detail: unknown;
@@ -820,6 +861,87 @@ export class ApiClient {
       `/api/portal/kb/articles/${encodeURIComponent(slugOrId)}`,
       { signal },
     );
+  }
+
+  // ── Stats (/api/v1/stats) ────────────────────────────────────────────────
+
+  statsVolume(
+    params: StatsFilterParams & { granularity?: StatsGranularity } = {},
+    signal?: AbortSignal,
+  ) {
+    return this.request<TicketVolumeOut>("GET", "/api/v1/stats/volume", {
+      query: params,
+      signal,
+    });
+  }
+
+  statsVolumeCsvUrl(params: StatsFilterParams & { granularity?: StatsGranularity } = {}): string {
+    return this.buildStatsCsvUrl("/api/v1/stats/volume.csv", params);
+  }
+
+  statsOpenSnapshot(
+    params: StatsFilterParams & { dimension?: StatsDimension } = {},
+    signal?: AbortSignal,
+  ) {
+    return this.request<OpenSnapshotOut>("GET", "/api/v1/stats/open-snapshot", {
+      query: params,
+      signal,
+    });
+  }
+
+  statsOpenSnapshotCsvUrl(params: StatsFilterParams & { dimension?: StatsDimension } = {}): string {
+    return this.buildStatsCsvUrl("/api/v1/stats/open-snapshot.csv", params);
+  }
+
+  statsSla(params: StatsFilterParams = {}, signal?: AbortSignal) {
+    return this.request<SlaStatsOut>("GET", "/api/v1/stats/sla", {
+      query: params,
+      signal,
+    });
+  }
+
+  statsSlaCsvUrl(params: StatsFilterParams = {}): string {
+    return this.buildStatsCsvUrl("/api/v1/stats/sla.csv", params);
+  }
+
+  statsAgentWorkload(params: StatsFilterParams = {}, signal?: AbortSignal) {
+    return this.request<AgentWorkloadItemOut[]>("GET", "/api/v1/stats/agent-workload", {
+      query: params,
+      signal,
+    });
+  }
+
+  statsAgentWorkloadCsvUrl(params: StatsFilterParams = {}): string {
+    return this.buildStatsCsvUrl("/api/v1/stats/agent-workload.csv", params);
+  }
+
+  statsBacklog(
+    params: StatsFilterParams & { granularity?: StatsGranularity } = {},
+    signal?: AbortSignal,
+  ) {
+    return this.request<BacklogTrendOut>("GET", "/api/v1/stats/backlog", {
+      query: params,
+      signal,
+    });
+  }
+
+  statsBacklogCsvUrl(params: StatsFilterParams & { granularity?: StatsGranularity } = {}): string {
+    return this.buildStatsCsvUrl("/api/v1/stats/backlog.csv", params);
+  }
+
+  /**
+   * Build a CSV export URL for a stats report. Consumed via a plain
+   * navigation/anchor (cookie-authenticated download), not a fetch call —
+   * mirrors {@link ApiClient.exportTicketsCsvUrl}.
+   */
+  private buildStatsCsvUrl(path: string, params: Record<string, unknown>): string {
+    const qs = new URLSearchParams();
+    for (const [k, v] of Object.entries(params)) {
+      if (v === undefined || v === null || v === "") continue;
+      qs.set(k, String(v));
+    }
+    const suffix = qs.toString();
+    return joinUrl(this.baseUrl, `${path}${suffix ? `?${suffix}` : ""}`);
   }
 }
 
