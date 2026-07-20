@@ -79,10 +79,12 @@ function NavItem({
   );
 }
 
-/** One queue row in the single sidebar queue navigator: name + optional
- * "N neu" pill + open count, linking to that queue's ticket view. Active
- * state is decided by the caller (matched against the URL's queue_id) rather
- * than by Link's path matching, since every queue row shares the same path. */
+/** One queue row in the single sidebar queue navigator: name + open-count
+ * badge, linking to that queue's ticket view. Queues holding unread ("new")
+ * tickets are signalled by colour alone — the badge turns accent-tinted — so
+ * there is no separate "N neu" chip competing for space. Active state is
+ * decided by the caller (matched against the URL's queue_id) rather than by
+ * Link's path matching, since every queue row shares the same path. */
 function QueueNavRow({
   node,
   active,
@@ -116,15 +118,15 @@ function QueueNavRow({
       <span className="min-w-0 flex-1 truncate" title={node.name}>
         {shortName}
       </span>
-      {newCount > 0 && (
-        <span
-          className="shrink-0 rounded-full bg-accent-dim px-1.5 py-0.5 font-mono text-[10px] font-semibold tabular-nums text-accent"
-          title={t("queue.newCount", { count: newCount })}
-        >
-          {t("queue.newCount", { count: newCount })}
-        </span>
-      )}
-      <span className="shrink-0 font-mono text-[11px] tabular-nums text-muted">{open}</span>
+      <span
+        className={cn(
+          "shrink-0 rounded-full px-1.5 py-0.5 font-mono text-[11px] font-semibold tabular-nums",
+          newCount > 0 ? "bg-accent-dim text-accent" : "text-muted",
+        )}
+        title={newCount > 0 ? t("queue.newCount", { count: newCount }) : undefined}
+      >
+        {open}
+      </span>
     </Link>
   );
 }
