@@ -11,6 +11,7 @@ from fastapi import APIRouter
 
 from tiqora.api.v1.admin import (
     auto_responses,
+    channels,
     customers,
     dynamic_fields,
     groups,
@@ -37,5 +38,6 @@ admin_router.include_router(auto_responses.router)
 admin_router.include_router(dynamic_fields.router)
 admin_router.include_router(readonly.router)
 admin_router.include_router(webhooks.router)
+admin_router.include_router(channels.router)
 
 __all__ = ["admin_router"]
