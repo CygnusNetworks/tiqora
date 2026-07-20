@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { render, screen } from "@testing-library/react";
+import { I18nextProvider } from "react-i18next";
 import {
   RouterProvider,
   createRootRoute,
@@ -7,6 +8,7 @@ import {
   createRouter,
   createMemoryHistory,
 } from "@tanstack/react-router";
+import i18n from "@/i18n";
 import type { TicketListItem } from "@/lib/api";
 import { DashboardTicketRow } from "./DashboardTicketRow";
 
@@ -45,8 +47,10 @@ async function renderInRouter(ui: React.ReactElement) {
   });
   await router.load();
   return render(
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    <RouterProvider router={router as any} />,
+    <I18nextProvider i18n={i18n}>
+      {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+      <RouterProvider router={router as any} />
+    </I18nextProvider>,
   );
 }
 
@@ -58,7 +62,8 @@ describe("DashboardTicketRow", () => {
     expect(row).toHaveTextContent("Printer on fire");
     // Short queue name (last segment) rather than the full path.
     expect(row).toHaveTextContent("Level 2");
-    expect(row).toHaveTextContent("open");
+    // Localised state label (en: "Open"), not the raw Znuny name.
+    expect(row).toHaveTextContent("Open");
     // Priority shown without the numeric rank.
     const prio = screen.getByTestId("dashboard-ticket-42-priority");
     expect(prio).toHaveTextContent("very high");

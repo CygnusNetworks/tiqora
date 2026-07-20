@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useNavigate, useSearch, Link } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
 import { portalApi, type TicketListItem } from "@/lib/portalApi";
-import { stateColorVar } from "@/lib/status";
+import { stateColorVar, stateLabel } from "@/lib/status";
 import { formatDateTime } from "@/lib/format";
 import { Tabs } from "@/components/ui/Tabs";
 import { Spinner } from "@/components/ui/Spinner";
@@ -96,7 +96,9 @@ function TicketRow({ ticket, locale }: { ticket: TicketListItem; locale: string 
             className="rounded border border-hairline px-1.5 py-0.5 text-[11px] font-medium capitalize text-ink"
             style={{ borderColor: spineColor, color: spineColor }}
           >
-            {ticket.state || t("portal.tickets.unknownState")}
+            {ticket.state
+              ? stateLabel(t, ticket.state)
+              : t("portal.tickets.unknownState")}
           </span>
         </div>
         <p className="truncate text-sm font-medium text-ink">

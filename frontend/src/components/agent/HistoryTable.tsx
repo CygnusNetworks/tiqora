@@ -1,16 +1,19 @@
-import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { api } from "@/lib/api";
 import { formatDateTime } from "@/lib/format";
-import { Button } from "@/components/ui/Button";
 import { Spinner } from "@/components/ui/Spinner";
 
-export function HistoryTable({ ticketId }: { ticketId: number }) {
+export function HistoryTable({
+  ticketId,
+  order = "desc",
+}: {
+  ticketId: number;
+  /** Controlled sort order from the ticket-zoom ⋮ menu. Default newest-first. */
+  order?: "asc" | "desc";
+}) {
   const { t, i18n } = useTranslation();
   const locale = i18n.language?.startsWith("de") ? "de" : "en";
-  // Default DESCENDING (newest first), matching the backend default.
-  const [order, setOrder] = useState<"asc" | "desc">("desc");
 
   const histQ = useQuery({
     queryKey: ["tickets", ticketId, "history", order],
@@ -29,16 +32,6 @@ export function HistoryTable({ ticketId }: { ticketId: number }) {
 
   return (
     <div className="space-y-2" data-testid="history-panel">
-      <div className="flex justify-end">
-        <Button
-          variant="secondary"
-          size="sm"
-          data-testid="history-sort-toggle"
-          onClick={() => setOrder((o) => (o === "desc" ? "asc" : "desc"))}
-        >
-          {order === "desc" ? t("ticket.historySortDesc") : t("ticket.historySortAsc")}
-        </Button>
-      </div>
       <div
         className="overflow-x-auto rounded-lg border border-hairline"
         data-testid="history-table"
