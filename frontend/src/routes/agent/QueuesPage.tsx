@@ -1,18 +1,16 @@
-import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate, useSearch } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
 import { api } from "@/lib/api";
-import { QueueTree, flattenQueues } from "@/components/agent/QueueTree";
+import { flattenQueues } from "@/components/agent/QueueTree";
 import {
   TicketTable,
   type SortKey,
 } from "@/components/agent/TicketTable";
 import { Tabs } from "@/components/ui/Tabs";
-import { Spinner } from "@/components/ui/Spinner";
 import { Button } from "@/components/ui/Button";
 
-const STATE_TABS = ["open", "pending", "closed", "all"] as const;
+const STATE_TABS = ["new", "open", "pending", "closed", "all"] as const;
 type StateTab = (typeof STATE_TABS)[number];
 
 export type QueuesSearch = {
@@ -28,7 +26,6 @@ export function QueuesPage() {
   const { t } = useTranslation();
   const navigate = useNavigate({ from: "/agent/queues" });
   const search = useSearch({ from: "/agent/queues" }) as QueuesSearch;
-  const [drawerOpen, setDrawerOpen] = useState(false);
 
   const queueId = search.queue_id ?? null;
   const stateType = (search.state_type ?? "open") as StateTab;
@@ -47,6 +44,9 @@ export function QueuesPage() {
     });
   };
 
+  // Queue list is only needed for the header title now — the single queue
+  // navigator lives in the app sidebar (AgentShell), so QueuesPage no longer
+  // renders its own queue tree and the ticket table takes the full width.
   const queuesQ = useQuery({
     queryKey: ["queues"],
     queryFn: () => api.listQueues(),
@@ -77,54 +77,8 @@ export function QueuesPage() {
           return match.name.includes("::") ? (match.name.split("::").pop() ?? match.name) : match.name;
         })();
 
-  const sidebarBody = queuesQ.isLoading ? (
-    <div className="flex justify-center py-6">
-      <Spinner />
-    </div>
-  ) : (
-    <QueueTree
-      queues={queuesQ.data ?? []}
-      selectedId={queueId}
-      onSelect={(id) => {
-        setSearch({ queue_id: id ?? undefined, offset: 0 });
-        setDrawerOpen(false);
-      }}
-    />
-  );
-
   return (
     <div className="relative flex min-h-0 flex-1" data-testid="queues-page">
-      {/* Desktop / tablet sidebar */}
-      <aside className="hidden w-56 shrink-0 overflow-y-auto border-r border-hairline bg-surface p-2 md:block lg:w-64">
-        <h2 className="mb-2 px-2 text-xs font-semibold uppercase tracking-wide text-muted">
-          {t("queue.sidebar")}
-        </h2>
-        {sidebarBody}
-      </aside>
-
-      {/* Mobile drawer */}
-      {drawerOpen && (
-        <div className="fixed inset-0 z-30 md:hidden">
-          <button
-            type="button"
-            aria-label={t("common.back")}
-            className="absolute inset-0 bg-black/40"
-            onClick={() => setDrawerOpen(false)}
-          />
-          <div className="absolute inset-y-0 left-0 w-64 overflow-y-auto border-r border-hairline bg-surface p-2 shadow-xl">
-            <div className="mb-2 flex items-center justify-between px-2">
-              <h2 className="text-xs font-semibold uppercase tracking-wide text-muted">
-                {t("queue.sidebar")}
-              </h2>
-              <Button variant="ghost" size="sm" onClick={() => setDrawerOpen(false)}>
-                ✕
-              </Button>
-            </div>
-            {sidebarBody}
-          </div>
-        </div>
-      )}
-
       <div className="min-w-0 flex-1 space-y-3 p-3">
         <div>
           <div className="flex flex-wrap items-center gap-2.5">
@@ -141,15 +95,6 @@ export function QueuesPage() {
           <p className="mt-0.5 text-[12.5px] text-muted">{t("queue.metaLine")}</p>
         </div>
         <div className="flex items-center gap-2">
-          <Button
-            variant="secondary"
-            size="sm"
-            className="md:hidden"
-            onClick={() => setDrawerOpen(true)}
-            data-testid="queue-drawer-toggle"
-          >
-            {t("queue.sidebar")}
-          </Button>
           <Tabs
             value={stateType}
             onChange={(id) =>

@@ -232,6 +232,14 @@ export function TicketTable({
                   style={{ background: stateColorVar(ticket.state) }}
                 />
                 <span className="truncate">{ticket.state ?? "—"}</span>
+                {ticket.state_type === "new" && (
+                  <span
+                    className="shrink-0 rounded-full bg-accent-dim px-1.5 py-0.5 text-[9.5px] font-semibold uppercase tracking-wide text-accent"
+                    data-testid={`ticket-new-badge-${ticket.id}`}
+                  >
+                    {t("queue.state.new")}
+                  </span>
+                )}
               </span>
               <span className="hidden truncate font-mono text-[11.5px] text-muted md:inline">
                 {ticket.priority ?? "—"}

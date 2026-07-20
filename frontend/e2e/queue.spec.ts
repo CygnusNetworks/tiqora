@@ -7,11 +7,12 @@ test.describe("queue view", () => {
     await loginAsAgent(page);
   });
 
-  test("renders queue tree and ticket table", async ({ page }) => {
+  test("renders sidebar queue navigator and ticket table", async ({ page }) => {
     await page.goto("/agent/queues");
     await expect(page.getByTestId("queues-page")).toBeVisible();
-    await expect(page.getByTestId("queue-tree")).toBeVisible();
-    await expect(page.getByTestId("queue-node-1")).toBeVisible();
+    // The single queue navigator now lives in the app sidebar, not on the
+    // page itself (queue-nav consolidation).
+    await expect(page.getByTestId("sidebar-queue-list")).toBeVisible();
     await expect(page.getByTestId("ticket-table")).toBeVisible();
     await expect(page.getByTestId("ticket-row-100")).toContainText(
       "202607191000001",

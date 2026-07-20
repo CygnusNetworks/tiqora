@@ -38,7 +38,11 @@
     "toggle": "Toggle navigation",
     "reports": "Reports",
     "stats": "Statistics",
-    "calendar": "Calendar"
+    "calendar": "Calendar",
+    "showAllQueues": "Show all",
+    "showActiveQueues": "Show active",
+    "queueSearch": "Filter queues…",
+    "noQueueMatch": "No queues match."
   },
   "common": {
     "prev": "Previous",
@@ -95,7 +99,9 @@
     "openBadge": "{{count}} open",
     "metaLine": "All queues · sorted by urgency",
     "exportCsv": "Export CSV",
+    "newCount": "{{count}} new",
     "state": {
+      "new": "New",
       "open": "Open",
       "pending": "Pending",
       "closed": "Closed",

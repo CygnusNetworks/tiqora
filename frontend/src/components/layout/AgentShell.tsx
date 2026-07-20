@@ -4,7 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "@/auth/AuthContext";
 import { useTheme } from "@/themes/theme";
-import { api } from "@/lib/api";
+import { api, type QueueNode } from "@/lib/api";
 import { flattenQueues } from "@/components/agent/QueueTree";
 import { Button } from "@/components/ui/Button";
 import { ShortcutHelp } from "@/components/agent/ShortcutHelp";
@@ -77,6 +77,119 @@ function NavItem({
   );
 }
 
+/** One queue row in the single sidebar queue navigator: name + optional
+ * "N neu" pill + open count, linking to that queue's ticket view. Active
+ * state is decided by the caller (matched against the URL's queue_id) rather
+ * than by Link's path matching, since every queue row shares the same path. */
+function QueueNavRow({
+  node,
+  active,
+  onNavigate,
+}: {
+  node: QueueNode;
+  active: boolean;
+  onNavigate?: () => void;
+}) {
+  const { t } = useTranslation();
+  const open = node.counts?.open ?? 0;
+  const newCount = node.counts?.new ?? 0;
+  const shortName = node.name.includes("::")
+    ? (node.name.split("::").pop() ?? node.name)
+    : node.name;
+
+  return (
+    <Link
+      to="/agent/queues"
+      search={{ queue_id: node.id, state_type: "open" }}
+      onClick={onNavigate}
+      data-testid={`sidebar-queue-${node.id}`}
+      className={cn(
+        "flex items-center gap-2 rounded-lg px-2.5 py-[7px] text-[13.5px] transition-colors duration-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent",
+        active
+          ? "bg-accent-dim font-medium text-ink shadow-[inset_2px_0_0_var(--color-accent)]"
+          : "text-ink/80 hover:bg-surface-subtle",
+        !node.valid && "opacity-50",
+      )}
+    >
+      <span className="min-w-0 flex-1 truncate" title={node.name}>
+        {shortName}
+      </span>
+      {newCount > 0 && (
+        <span
+          className="shrink-0 rounded-full bg-accent-dim px-1.5 py-0.5 font-mono text-[10px] font-semibold tabular-nums text-accent"
+          title={t("queue.newCount", { count: newCount })}
+        >
+          {t("queue.newCount", { count: newCount })}
+        </span>
+      )}
+      <span className="shrink-0 font-mono text-[11px] tabular-nums text-muted">{open}</span>
+    </Link>
+  );
+}
+
+/** The single queue navigator in the app sidebar (QueuesPage no longer
+ * renders its own tree). Defaults to queues that have content (open or new
+ * tickets); a search box filters by name and an "all queues" toggle reveals
+ * zero-count queues. */
+function QueueNavSection({ flat, onNavigate }: { flat: QueueNode[]; onNavigate?: () => void }) {
+  const { t } = useTranslation();
+  const location = useLocation();
+  const [query, setQuery] = useState("");
+  const [showAll, setShowAll] = useState(false);
+
+  const activeQueueId = (location.search as { queue_id?: number } | undefined)?.queue_id ?? null;
+
+  const term = query.trim().toLowerCase();
+  const visible = flat.filter((q) => {
+    if (term) return q.name.toLowerCase().includes(term);
+    if (showAll) return true;
+    return (q.counts?.open ?? 0) > 0 || (q.counts?.new ?? 0) > 0;
+  });
+
+  return (
+    <div>
+      <div className="flex items-center justify-between px-2.5 pb-1.5">
+        <h2 className="text-[10.5px] font-semibold uppercase tracking-[0.12em] text-muted">
+          {t("sidebar.queues")}
+        </h2>
+        <button
+          type="button"
+          data-testid="sidebar-queues-toggle-all"
+          onClick={() => setShowAll((v) => !v)}
+          className="text-[10px] font-medium text-accent hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent"
+        >
+          {showAll ? t("sidebar.showActiveQueues") : t("sidebar.showAllQueues")}
+        </button>
+      </div>
+      <div className="px-0.5 pb-1.5">
+        <input
+          data-testid="sidebar-queue-search"
+          type="search"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder={t("sidebar.queueSearch")}
+          className="w-full rounded-md border border-hairline bg-surface-subtle px-2.5 py-1.5 text-[12px] text-ink placeholder:text-muted focus:border-accent focus:outline-none"
+        />
+      </div>
+      <div className="space-y-0.5" data-testid="sidebar-queue-list">
+        {visible.map((q) => (
+          <QueueNavRow
+            key={q.id}
+            node={q}
+            active={q.id === activeQueueId}
+            onNavigate={onNavigate}
+          />
+        ))}
+        {visible.length === 0 && (
+          <p className="px-2.5 py-2 text-[11.5px] text-muted" data-testid="sidebar-queue-empty">
+            {term ? t("sidebar.noQueueMatch") : t("queue.empty")}
+          </p>
+        )}
+      </div>
+    </div>
+  );
+}
+
 /** Admin nav entry, shown only to agents who pass the same admin-capability
  * probe as RequireAdmin. Shares the ["admin","capability-probe"] query key so
  * the result is cached across the guard and this link (no extra request).
@@ -116,10 +229,6 @@ function SidebarBody({ onNavigate }: { onNavigate?: () => void }) {
     queryFn: () => api.listQueues(),
   });
   const flat = flattenQueues(queuesQ.data ?? []);
-  const topQueues = flat
-    .slice()
-    .sort((a, b) => (b.counts?.open ?? 0) - (a.counts?.open ?? 0))
-    .slice(0, 6);
   const totalOpen = flat.reduce((sum, q) => sum + (q.counts?.open ?? 0), 0);
 
   const initials = (
@@ -176,24 +285,7 @@ function SidebarBody({ onNavigate }: { onNavigate?: () => void }) {
           </div>
         </div>
 
-        <div>
-          <h2 className="px-2.5 pb-1.5 text-[10.5px] font-semibold uppercase tracking-[0.12em] text-muted">
-            {t("sidebar.queues")}
-          </h2>
-          <div className="space-y-0.5">
-            {topQueues.map((q) => (
-              <NavItem
-                key={q.id}
-                to="/agent/queues"
-                search={{ queue_id: q.id, state_type: "open" }}
-                label={q.name.includes("::") ? (q.name.split("::").pop() ?? q.name) : q.name}
-                count={q.counts?.open ?? 0}
-                testId={`agent-nav-queue-${q.id}`}
-                onNavigate={onNavigate}
-              />
-            ))}
-          </div>
-        </div>
+        <QueueNavSection flat={flat} onNavigate={onNavigate} />
 
         <div>
           <h2 className="px-2.5 pb-1.5 text-[10.5px] font-semibold uppercase tracking-[0.12em] text-muted">
