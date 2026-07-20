@@ -37,6 +37,7 @@ export type {
   PresenceEntry,
   ArticleCreateRequest,
   ArticleCreateResponse,
+  MutationRequest,
   SearchResponse,
   SearchHit,
   CategoryOut,
@@ -127,4 +128,8 @@ export type {
   ProcessStartIn,
   ActivityDialogSubmitIn,
   ActivityDialogSubmitOut,
+  PriorityRef,
+  StateRef,
+  AgentRef,
+  CustomerRef,
 } from "@tiqora/api-client";

@@ -143,5 +143,10 @@ export {
   type ProcessStartIn,
   type ActivityDialogSubmitIn,
   type ActivityDialogSubmitOut,
+  // Reference (agent pickers)
+  type PriorityRef,
+  type StateRef,
+  type AgentRef,
+  type CustomerRef,
   type paths,
 } from "./client";

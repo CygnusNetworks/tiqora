@@ -196,6 +196,7 @@
     "toolbar": {
       "print": "Print",
       "priority": "Priority",
+      "state": "State",
       "people": "People",
       "owner": "Owner",
       "responsible": "Responsible",
