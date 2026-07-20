@@ -5,6 +5,7 @@ import { useTranslation } from "react-i18next";
 import { api } from "@/lib/api";
 import { useAuth } from "@/auth/AuthContext";
 import { TicketHeader } from "@/components/agent/TicketHeader";
+import { ActionToolbar } from "@/components/agent/ActionToolbar";
 import { ArticleTimeline } from "@/components/agent/ArticleTimeline";
 import { HistoryTable } from "@/components/agent/HistoryTable";
 import { PresenceBar } from "@/components/agent/PresenceBar";
@@ -77,6 +78,7 @@ export function TicketZoomPage() {
       <Link to="/agent/queues" className="text-xs text-accent hover:underline">
         ← {t("common.backToQueues")}
       </Link>
+      <ActionToolbar ticket={ticketQ.data} />
       <TicketHeader ticket={ticketQ.data} />
       <ProcessWidget ticketId={ticketId} />
       <PresenceBar ticketId={ticketId} selfUserId={user?.id} />
