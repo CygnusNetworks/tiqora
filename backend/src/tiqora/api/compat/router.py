@@ -232,6 +232,22 @@ def _extract_route_mapping(config: dict[str, Any]) -> dict[str, dict[str, str]]:
     return {}
 
 
+def _normalize_request_methods(raw: Any) -> list[str]:
+    """Normalize a RouteOperationMapping RequestMethod to a list of HTTP verbs.
+
+    Znuny stores it as a YAML list (``["POST"]``); tolerate a bare string too.
+    Falls back to ``["GET"]`` when empty/missing.
+    """
+    if isinstance(raw, str):
+        methods = [raw]
+    elif isinstance(raw, list):
+        methods = [str(m) for m in raw if m]
+    else:
+        methods = []
+    normalized = [m.upper() for m in methods if m]
+    return normalized or ["GET"]
+
+
 def _convert_route_pattern(znuny_route: str) -> str:
     """Convert Znuny REST route pattern to FastAPI path pattern.
 
@@ -263,10 +279,13 @@ async def _load_webservice_routes(
             if not isinstance(op_cfg, dict):
                 continue
             route = op_cfg.get("Route") or ""
-            method = (op_cfg.get("RequestMethod") or "GET").upper()
             if not route:
                 continue
-            entries.append((ws.id, ws.name, op_name, route, method))
+            # Znuny's RouteOperationMapping RequestMethod is normally a LIST
+            # (e.g. ["POST"]) but some configs use a bare string. Accept both
+            # and emit one entry per method so each is registered.
+            for method in _normalize_request_methods(op_cfg.get("RequestMethod")):
+                entries.append((ws.id, ws.name, op_name, route, method))
 
     return entries
 
