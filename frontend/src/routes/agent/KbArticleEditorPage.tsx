@@ -7,6 +7,8 @@ import { Button } from "@/components/ui/Button";
 import { Spinner } from "@/components/ui/Spinner";
 import { Dialog } from "@/components/ui/Dialog";
 import { MarkdownView } from "@/components/kb/MarkdownView";
+import { KbAttachments } from "@/components/kb/KbAttachments";
+import { slugify } from "@/lib/slug";
 import { cn } from "@/lib/cn";
 
 const STATES = ["draft", "review", "published", "archived"] as const;
@@ -47,6 +49,9 @@ function KbArticleEditor({ articleId }: { articleId?: number }) {
   const [publishOpen, setPublishOpen] = useState(false);
   const [publishing, setPublishing] = useState(false);
   const [currentState, setCurrentState] = useState<string | null>(null);
+  // On create the slug is optional (backend derives it from the title). We
+  // keep the field hidden behind a toggle and only send a slug the user chose.
+  const [editSlug, setEditSlug] = useState(false);
 
   const categoriesQ = useQuery({
     queryKey: ["kb", "categories"],
@@ -92,7 +97,8 @@ function KbArticleEditor({ articleId }: { articleId?: number }) {
   const onSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setError(null);
-    if (!form.title.trim() || !form.slug.trim() || form.categoryId == null || !form.contentMd.trim()) {
+    // Slug is optional on create (derived from the title server-side).
+    if (!form.title.trim() || form.categoryId == null || !form.contentMd.trim()) {
       setError(t("kb.validationError"));
       return;
     }
@@ -114,9 +120,12 @@ function KbArticleEditor({ articleId }: { articleId?: number }) {
       } else {
         const created = await api.createKbArticle({
           title: form.title,
-          slug: form.slug,
+          // Only send a slug if the author explicitly set one; otherwise let
+          // the backend derive it from the title.
+          ...(editSlug && form.slug.trim() ? { slug: form.slug.trim() } : {}),
           category_id: form.categoryId,
           language: form.language,
+          state: form.state,
           tags: tagsArray(),
           content_md: form.contentMd,
         });
@@ -195,17 +204,38 @@ function KbArticleEditor({ articleId }: { articleId?: number }) {
               className={inputClass}
             />
           </label>
-          <label className="block text-sm">
-            <span className="mb-1 block text-muted">{t("kb.field.slug")}</span>
-            <input
-              data-testid="kb-form-slug"
-              required
-              readOnly={isEdit}
-              value={form.slug}
-              onChange={(e) => setForm((f) => ({ ...f, slug: e.target.value }))}
-              className={cn(inputClass, isEdit && "opacity-70")}
-            />
-          </label>
+          <div className="block text-sm">
+            <div className="mb-1 flex items-center justify-between">
+              <span className="text-muted">{t("kb.field.slug")}</span>
+              {!isEdit && (
+                <button
+                  type="button"
+                  data-testid="kb-form-slug-toggle"
+                  onClick={() => setEditSlug((v) => !v)}
+                  className="text-xs text-accent hover:underline"
+                >
+                  {editSlug ? t("kb.slug.useAuto") : t("kb.slug.editSlug")}
+                </button>
+              )}
+            </div>
+            {isEdit || editSlug ? (
+              <input
+                data-testid="kb-form-slug"
+                readOnly={isEdit}
+                value={isEdit ? form.slug : form.slug || slugify(form.title)}
+                onChange={(e) => setForm((f) => ({ ...f, slug: e.target.value }))}
+                className={cn(inputClass, isEdit && "opacity-70")}
+              />
+            ) : (
+              <p
+                data-testid="kb-form-slug-preview"
+                className="truncate rounded-md border border-hairline bg-surface-subtle px-3 py-2 font-mono text-sm text-muted"
+                title={slugify(form.title)}
+              >
+                {slugify(form.title) || t("kb.slug.autoPlaceholder")}
+              </p>
+            )}
+          </div>
           <label className="block text-sm">
             <span className="mb-1 block text-muted">{t("kb.field.category")}</span>
             <select
@@ -248,7 +278,6 @@ function KbArticleEditor({ articleId }: { articleId?: number }) {
               data-testid="kb-form-state"
               value={form.state}
               onChange={(e) => setForm((f) => ({ ...f, state: e.target.value }))}
-              disabled={!isEdit}
               className={inputClass}
             >
               {STATES.map((s) => (
@@ -292,6 +321,8 @@ function KbArticleEditor({ articleId }: { articleId?: number }) {
             </div>
           </div>
         </div>
+
+        {isEdit && articleId != null && <KbAttachments articleId={articleId} />}
 
         {error && (
           <p className="text-sm text-danger" data-testid="kb-form-error" role="alert">
