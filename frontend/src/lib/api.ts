@@ -29,6 +29,7 @@ export type {
   TicketListItem,
   PaginatedTickets,
   MyTicketCounts,
+  DashboardSummary,
   TicketDetail,
   ArticleListItem,
   ArticleBody,

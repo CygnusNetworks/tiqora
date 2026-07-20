@@ -97,7 +97,20 @@
     "noMyTickets": "No open tickets assigned to you.",
     "queueShortcuts": "Queues",
     "viewAllQueues": "View all queues",
-    "openCount": "open"
+    "openCount": "open",
+    "kpiHeading": "Key figures",
+    "kpiMyOpen": "My open",
+    "kpiMyNew": "My new",
+    "kpiUnownedNew": "To pick up",
+    "kpiEscalated": "Escalated",
+    "newLabel": "new",
+    "viewAll": "View all",
+    "toPickUp": "New to pick up",
+    "toPickUpEmpty": "No new tickets to pick up.",
+    "escalatingSoon": "Escalating soon",
+    "escalatingSoonEmpty": "No upcoming escalations.",
+    "remindersDue": "Reminders due",
+    "remindersDueEmpty": "No reminders due."
   },
   "queue": {
     "sidebar": "Queues",
