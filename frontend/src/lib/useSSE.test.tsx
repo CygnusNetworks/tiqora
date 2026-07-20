@@ -3,6 +3,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { renderHook } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { handleSSEMessage, presenceQueryKey, useSSE } from "./useSSE";
+import { clearNotifications, useNotifications } from "./notificationStore";
 
 describe("handleSSEMessage", () => {
   it("invalidates the tickets cache prefix for ticket_changed", () => {
@@ -43,6 +44,32 @@ describe("handleSSEMessage", () => {
     handleSSEMessage(queryClient, JSON.stringify({ type: "something_else" }));
 
     expect(spy).not.toHaveBeenCalled();
+  });
+
+  it("stores a notification and refreshes tickets+queues for ticket_new_in_queue", () => {
+    clearNotifications();
+    const queryClient = new QueryClient();
+    const spy = vi.spyOn(queryClient, "invalidateQueries");
+
+    handleSSEMessage(
+      queryClient,
+      JSON.stringify({
+        type: "ticket_new_in_queue",
+        ticket_id: 5,
+        tn: "T5",
+        title: "New mail",
+        queue_id: 2,
+        queue_name: "Raw",
+      }),
+    );
+
+    expect(spy).toHaveBeenCalledWith({ queryKey: ["tickets"] });
+    expect(spy).toHaveBeenCalledWith({ queryKey: ["queues"] });
+
+    const { result } = renderHook(() => useNotifications());
+    expect(result.current.unreadCount).toBe(1);
+    expect(result.current.items[0]).toMatchObject({ ticketId: 5, tn: "T5", queueName: "Raw" });
+    clearNotifications();
   });
 });
 
