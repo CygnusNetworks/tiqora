@@ -250,6 +250,36 @@
     "groupTickets": "Tickets",
     "groupKb": "Wissensdatenbank"
   },
+  "account": {
+    "menu": "Kontomenü",
+    "settings": "Einstellungen",
+    "language": "Sprache",
+    "theme": "Design",
+    "themeLight": "Hell",
+    "themeDark": "Dunkel"
+  },
+  "newTicket": {
+    "new": "Neu",
+    "chooseQueue": "Queue wählen",
+    "title": "Neues Ticket",
+    "intro": "Erfasse ein Ticket im Namen eines Kunden.",
+    "queue": "Queue",
+    "noQueues": "Keine Queue verfügbar",
+    "customer": "Kunde",
+    "customerHint": "Kunden-Login (optional)",
+    "subject": "Betreff",
+    "priority": "Priorität",
+    "state": "Status",
+    "message": "Nachricht",
+    "validationError": "Bitte Queue, Betreff, Priorität, Status und Nachricht ausfüllen.",
+    "submitError": "Ticket konnte nicht erstellt werden. Bitte erneut versuchen.",
+    "submit": "Ticket erstellen",
+    "cancel": "Abbrechen"
+  },
+  "connection": {
+    "live": "Live verbunden",
+    "reconnecting": "Verbindung wird wiederhergestellt…"
+  },
   "shortcuts": {
     "title": "Tastenkürzel",
     "rowNav": "Auswahl in der Tickettabelle bewegen",
@@ -365,7 +395,21 @@
       "actions": "Aktionen",
       "edit": "Bearbeiten",
       "deactivate": "Deaktivieren",
+      "activate": "Aktivieren",
       "empty": "Noch keine Einträge."
+    },
+    "filter": {
+      "label": "Gültigkeit",
+      "valid": "Gültig",
+      "invalid": "Ungültig",
+      "all": "Alle"
+    },
+    "pagination": {
+      "prev": "Zurück",
+      "next": "Weiter",
+      "page": "Seite {{page}} von {{total}}",
+      "pageSize": "Pro Seite",
+      "showing": "{{from}}–{{to}} von {{total}}"
     },
     "form": {
       "cancel": "Abbrechen",

@@ -9,6 +9,7 @@ from sqlalchemy import select
 
 from tiqora.api.deps import DbSession
 from tiqora.api.v1.admin.deps import AdminUser
+from tiqora.api.v1.admin.pagination import ListParamsDep, Page, window
 from tiqora.api.v1.admin.schemas import WebhookCreate, WebhookOut, WebhookUpdate
 from tiqora.db.tiqora.models import TiqoraWebhook
 
@@ -31,11 +32,24 @@ def _to_out(row: TiqoraWebhook) -> WebhookOut:
     )
 
 
-@router.get("", response_model=list[WebhookOut])
-async def list_webhooks(admin: AdminUser, session: DbSession) -> list[WebhookOut]:
+@router.get("", response_model=Page[WebhookOut])
+async def list_webhooks(
+    admin: AdminUser, session: DbSession, params: ListParamsDep
+) -> Page[WebhookOut]:
     _ = admin
-    result = await session.execute(select(TiqoraWebhook).order_by(TiqoraWebhook.name))
-    return [_to_out(row) for row in result.scalars().all()]
+    stmt = select(TiqoraWebhook)
+    if params.valid == "valid":
+        stmt = stmt.where(TiqoraWebhook.valid.is_(True))
+    elif params.valid == "invalid":
+        stmt = stmt.where(TiqoraWebhook.valid.is_(False))
+    stmt = stmt.order_by(TiqoraWebhook.name)
+    rows, total = await window(session, stmt, params)
+    return Page(
+        items=[_to_out(row) for row in rows],
+        total=total,
+        page=params.page,
+        page_size=params.page_size,
+    )
 
 
 @router.get("/{webhook_id}", response_model=WebhookOut)
