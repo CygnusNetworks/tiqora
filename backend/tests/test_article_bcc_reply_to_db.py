@@ -14,6 +14,7 @@ import pytest
 from sqlalchemy import create_engine, text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
+from tiqora.channels.email.smtp import CapturingMailSender
 from tiqora.db.tiqora.base import TiqoraBase
 from tiqora.domain.ticket_write_service import ArticleIn, TicketWriteService
 from tiqora.znuny.password import hash_password
@@ -111,7 +112,8 @@ async def test_add_article_persists_bcc_and_reply_to(
     sysconfig = _make_sysconfig()
 
     async with factory() as session, session.begin():
-        svc = TicketWriteService(session, factory, sysconfig)
+        # Agent email replies go through SMTP; capture instead of real send.
+        svc = TicketWriteService(session, factory, sysconfig, mail_sender=CapturingMailSender())
         article_id = await svc.add_article(
             ids["agent"],
             ids["ticket"],

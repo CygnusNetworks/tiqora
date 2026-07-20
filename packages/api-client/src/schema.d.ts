@@ -3166,6 +3166,12 @@ export interface components {
             bcc?: string | null;
             /** Reply To */
             reply_to?: string | null;
+            /** Message Id */
+            message_id?: string | null;
+            /** In Reply To */
+            in_reply_to?: string | null;
+            /** References */
+            references?: string | null;
             /**
              * Channel
              * @default note

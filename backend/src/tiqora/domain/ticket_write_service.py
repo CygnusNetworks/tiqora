@@ -1451,10 +1451,12 @@ class TicketWriteService:
         session: AsyncSession,
         session_factory: async_sessionmaker[AsyncSession],
         sysconfig: SysConfig,
+        mail_sender: Any | None = None,
     ) -> None:
         self._session = session
         self._factory = session_factory
         self._sysconfig = sysconfig
+        self._mail_sender = mail_sender
         self._perms = PermissionEngine(session)
 
     async def _assert_rw(self, user_id: int, queue_id: int) -> None:
@@ -1464,6 +1466,15 @@ class TicketWriteService:
     async def _assert_create(self, user_id: int, queue_id: int) -> None:
         if not await self._perms.check(user_id, queue_id, "create"):
             raise TicketAccessDenied(f"user {user_id} lacks create on queue {queue_id}")
+
+    def _resolve_mail_sender(self) -> Any:
+        """Return the injectable sender, or a real SmtpMailSender from settings."""
+        if self._mail_sender is not None:
+            return self._mail_sender
+        from tiqora.channels.email.smtp import SmtpMailSender
+        from tiqora.config import get_settings
+
+        return SmtpMailSender(get_settings())
 
     async def create_ticket(self, user_id: int, params: TicketIn) -> int:
         await self._assert_create(user_id, params.queue_id)
@@ -1478,6 +1489,19 @@ class TicketWriteService:
     async def add_article(self, user_id: int, ticket_id: int, article: ArticleIn) -> int:
         t = await _ticket_must_exist(self._session, ticket_id)
         await self._assert_rw(user_id, int(t["queue_id"]))
+        # Outgoing agent email: SMTP deliver then store (see outbound_reply).
+        if article.channel.lower() == "email" and article.sender_type == "agent":
+            from tiqora.channels.email.outbound_reply import deliver_agent_email_reply
+
+            return await deliver_agent_email_reply(
+                self._session,
+                self._sysconfig,
+                self._resolve_mail_sender(),
+                ticket_id=ticket_id,
+                queue_id=int(t["queue_id"]),
+                user_id=user_id,
+                article=article,
+            )
         return await add_article(
             self._session,
             ticket_id=ticket_id,
