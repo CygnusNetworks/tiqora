@@ -46,18 +46,16 @@ function QueueItem({
             ? node.name.split("::").pop()
             : node.name}
         </span>
-        {newCount > 0 && (
-          <span
-            className="shrink-0 rounded-full bg-accent-dim px-1.5 py-0.5 font-mono text-[10px] font-semibold tabular-nums text-accent"
-            title={t("queue.newCount", { count: newCount })}
-          >
-            {t("queue.newCount", { count: newCount })}
-          </span>
-        )}
-        <span className="shrink-0 font-mono text-xs tabular-nums text-muted">
+        <span
+          className={cn(
+            "shrink-0 rounded-full px-1.5 py-0.5 font-mono text-xs font-semibold tabular-nums",
+            newCount > 0 ? "bg-accent-dim text-accent" : "text-muted",
+          )}
+          title={newCount > 0 ? t("queue.newCount", { count: newCount }) : undefined}
+        >
           {open}
           {total !== open ? (
-            <span className="text-muted/60">/{total}</span>
+            <span className={newCount > 0 ? "text-accent/60" : "text-muted/60"}>/{total}</span>
           ) : null}
         </span>
       </button>
