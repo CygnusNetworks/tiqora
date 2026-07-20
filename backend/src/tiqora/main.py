@@ -10,6 +10,7 @@ import uvicorn
 
 from tiqora import __version__
 from tiqora.cli.dev import add_dev_subparser
+from tiqora.cli.migrate import add_migrate_subparser, run_migrate
 from tiqora.cli.ownership import add_ownership_subparser
 from tiqora.config import get_settings
 
@@ -25,6 +26,7 @@ def main(argv: list[str] | None = None) -> None:
     sub.add_parser("worker", help="Run the background worker (poller)")
     sub.add_parser("mcp", help="Run the MCP server")
     add_ownership_subparser(sub)
+    add_migrate_subparser(sub)
     add_dev_subparser(sub)
 
     index_p = sub.add_parser("index", help="Search index maintenance")
@@ -84,6 +86,8 @@ def main(argv: list[str] | None = None) -> None:
             sys.exit(2)
         exit_code = asyncio.run(func(args))
         sys.exit(exit_code)
+    elif command == "migrate":
+        sys.exit(run_migrate(args))
     elif command == "dev":
         func = getattr(args, "func", None)
         if func is None:
