@@ -118,6 +118,32 @@ def _seed_tickets(sync_url: str) -> dict[str, Any]:
             {"t": NOW},
         )
 
+        # Second ticket, freshly arrived from a customer mail: state 'new'
+        # (id=1, type_id=1 "new" — see initial_insert.*.sql). Regression
+        # fixture for the "new tickets invisible under the default Offen
+        # filter" bug (Ticket::ViewableStateType must include "new").
+        conn.execute(
+            text(
+                """
+                INSERT INTO ticket (
+                    id, tn, title, queue_id, ticket_lock_id, type_id,
+                    user_id, responsible_user_id, ticket_priority_id, ticket_state_id,
+                    customer_id, customer_user_id,
+                    timeout, until_time, escalation_time, escalation_update_time,
+                    escalation_response_time, escalation_solution_time, archive_flag,
+                    create_time, create_by, change_time, change_by
+                ) VALUES (
+                    501, '20240601000002', 'Fresh mail ticket', 200, 1, 1,
+                    1, 1, 3, 1,
+                    'CUST1', 'alice@example.com',
+                    0, 0, 0, 0, 0, 0, 0,
+                    :t, 1, :t, 1
+                )
+                """
+            ),
+            {"t": NOW},
+        )
+
         # Dynamic field + value (unique name — avoid clashing with Znuny seed fields)
         conn.execute(
             text(
@@ -243,6 +269,7 @@ def _seed_tickets(sync_url: str) -> dict[str, Any]:
             "no_access": 201,
             "queue": 200,
             "ticket": 500,
+            "new_ticket": 501,
             "article": 600,
             "attachment": 700,
         }
@@ -266,9 +293,13 @@ async def test_queue_ticket_detail_attachment_permissions(
         qs = QueueService(session)
         trees = await qs.list_queues(ids["reader"])
         assert any(n.id == ids["queue"] for n in trees)
-        # open count: ticket in open state
+        # open count: ticket in open state + the "new" ticket (viewable)
         node = next(n for n in trees if n.id == ids["queue"])
-        assert node.counts.open >= 1
+        assert node.counts.open >= 2
+        # per-queue new-vs-open split (issue: queue tree showed one lumped
+        # total) — exactly the one "new" ticket seeded above.
+        assert node.counts.new == 1
+        assert node.counts.total == node.counts.open
 
         empty = await qs.list_queues(ids["no_access"])
         assert empty == []
@@ -277,6 +308,17 @@ async def test_queue_ticket_detail_attachment_permissions(
         listed = await ts.list_tickets(ids["reader"], queue_id=ids["queue"])
         assert listed.total >= 1
         assert listed.items[0].tn == "20240601000001"
+
+        # Default "Offen" view (state_type=open) must include "new" tickets —
+        # Znuny's Ticket::ViewableStateType is new+open+pending reminder+
+        # pending auto, not a literal match on the state type named "open".
+        offen = await ts.list_tickets(ids["reader"], queue_id=ids["queue"], state_type="open")
+        assert {i.tn for i in offen.items} == {"20240601000001", "20240601000002"}
+
+        # Dedicated "Neu" tab: only the new-state ticket.
+        neu = await ts.list_tickets(ids["reader"], queue_id=ids["queue"], state_type="new")
+        assert [i.tn for i in neu.items] == ["20240601000002"]
+        assert neu.items[0].state_type == "new"
 
         listed_none = await ts.list_tickets(ids["no_access"])
         assert listed_none.total == 0
