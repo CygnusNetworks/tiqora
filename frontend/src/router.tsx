@@ -50,12 +50,17 @@ import { AgentRolesPage } from "@/routes/admin/AgentRolesPage";
 import { AgentGroupsPage } from "@/routes/admin/AgentGroupsPage";
 import { RoleGroupsPage } from "@/routes/admin/RoleGroupsPage";
 import { CustomerUserCustomersPage } from "@/routes/admin/CustomerUserCustomersPage";
+import { CustomerUserGroupsPage } from "@/routes/admin/CustomerUserGroupsPage";
 import { QueuesPage as AdminQueuesPage } from "@/routes/admin/QueuesPage";
 import { StatesPage } from "@/routes/admin/StatesPage";
 import { PrioritiesPage } from "@/routes/admin/PrioritiesPage";
 import { CustomerUsersPage } from "@/routes/admin/CustomerUsersPage";
 import { CustomerCompaniesPage } from "@/routes/admin/CustomerCompaniesPage";
 import { TemplatesPage } from "@/routes/admin/TemplatesPage";
+import { TemplateAttachmentsPage } from "@/routes/admin/TemplateAttachmentsPage";
+import { AttachmentsPage } from "@/routes/admin/AttachmentsPage";
+import { QueueTemplatesPage } from "@/routes/admin/QueueTemplatesPage";
+import { QueueAutoResponsesPage } from "@/routes/admin/QueueAutoResponsesPage";
 import { SalutationsPage } from "@/routes/admin/SalutationsPage";
 import { SignaturesPage } from "@/routes/admin/SignaturesPage";
 import { AutoResponsesPage } from "@/routes/admin/AutoResponsesPage";
@@ -415,10 +420,40 @@ const adminCustomerUserCustomersRoute = createRoute({
   component: CustomerUserCustomersPage,
 });
 
+const adminCustomerUserGroupsRoute = createRoute({
+  getParentRoute: () => adminLayoutRoute,
+  path: "/customer-user-groups",
+  component: CustomerUserGroupsPage,
+});
+
 const adminTemplatesRoute = createRoute({
   getParentRoute: () => adminLayoutRoute,
   path: "/templates",
   component: TemplatesPage,
+});
+
+const adminTemplateAttachmentsRoute = createRoute({
+  getParentRoute: () => adminLayoutRoute,
+  path: "/template-attachments",
+  component: TemplateAttachmentsPage,
+});
+
+const adminAttachmentsRoute = createRoute({
+  getParentRoute: () => adminLayoutRoute,
+  path: "/attachments",
+  component: AttachmentsPage,
+});
+
+const adminQueueTemplatesRoute = createRoute({
+  getParentRoute: () => adminLayoutRoute,
+  path: "/queue-templates",
+  component: QueueTemplatesPage,
+});
+
+const adminQueueAutoResponsesRoute = createRoute({
+  getParentRoute: () => adminLayoutRoute,
+  path: "/queue-auto-responses",
+  component: QueueAutoResponsesPage,
 });
 
 const adminSalutationsRoute = createRoute({
@@ -560,7 +595,12 @@ const routeTree = rootRoute.addChildren([
     adminCustomerUsersRoute,
     adminCustomerCompaniesRoute,
     adminCustomerUserCustomersRoute,
+    adminCustomerUserGroupsRoute,
     adminTemplatesRoute,
+    adminTemplateAttachmentsRoute,
+    adminAttachmentsRoute,
+    adminQueueTemplatesRoute,
+    adminQueueAutoResponsesRoute,
     adminSalutationsRoute,
     adminSignaturesRoute,
     adminAutoResponsesRoute,

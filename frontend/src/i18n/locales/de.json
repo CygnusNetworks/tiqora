@@ -398,12 +398,14 @@
       "error": "Admin-Zugriff konnte nicht geprüft werden. Bitte erneut versuchen."
     },
     "group": {
-      "usersPermissions": "Benutzer & Berechtigungen",
+      "usersPermissions": "Benutzer & Rechte",
       "ticketConfig": "Ticket-Konfiguration",
       "customers": "Kunden",
       "communication": "Kommunikation",
       "automation": "Automatisierung",
-      "system": "System"
+      "system": "System",
+      "queuesTemplates": "Queues & Vorlagen",
+      "email": "E-Mail"
     },
     "nav": {
       "users": "Benutzer",
@@ -429,7 +431,12 @@
       "webhooks": "Webhooks",
       "processes": "Prozesse",
       "mailOutbound": "E-Mail (Ausgang)",
-      "mailLog": "Kommunikationsprotokoll"
+      "mailLog": "Kommunikationsprotokoll",
+      "customerUserGroups": "Kundenbenutzer↔Gruppen",
+      "attachments": "Anhänge",
+      "templateAttachments": "Vorlagen↔Anhänge",
+      "queueTemplates": "Vorlagen↔Queues",
+      "queueAutoResponses": "Queues↔Autoantworten"
     },
     "table": {
       "id": "ID",
@@ -716,6 +723,60 @@
       "detailField": "Detail / SMTP-Antwort",
       "empty": "Keine Einträge für die Filter.",
       "entries": "Einträge"
+    },
+    "attachments": {
+      "title_plural": "Anhänge",
+      "new": "Neuer Anhang",
+      "name": "Name",
+      "filename": "Dateiname",
+      "contentType": "Content-Type",
+      "content": "Datei / Inhalt",
+      "contentHelp": "Datei wählen — wird base64-kodiert gespeichert. Dateiname und Content-Type werden übernommen, können aber überschrieben werden.",
+      "contentReady": "Inhalt geladen ({{chars}} Zeichen Base64).",
+      "contentRequired": "Bitte eine Datei auswählen."
+    },
+    "templateAttachments": {
+      "title": "Vorlagen↔Anhänge",
+      "subtitle": "Wähle eine Vorlage und lege fest, welche Standard-Anhänge mitgesendet werden.",
+      "template": "Vorlage",
+      "selectTemplate": "Vorlage auswählen…",
+      "empty": "Wähle oben eine Vorlage, um ihre Anhänge zu bearbeiten.",
+      "attachments": "Anhänge",
+      "assigned": "Zugewiesen",
+      "noAttachments": "Keine gültigen Anhänge vorhanden.",
+      "save": "Speichern",
+      "saveError": "Speichern fehlgeschlagen."
+    },
+    "customerUserGroups": {
+      "title": "Kundenbenutzer↔Gruppen",
+      "subtitle": "Wähle einen Kundenbenutzer und lege fest, in welchen Gruppen er arbeiten darf (Vollzugriff).",
+      "customerUser": "Kundenbenutzer",
+      "selectCustomerUser": "Kundenbenutzer auswählen…",
+      "empty": "Wähle oben einen Kundenbenutzer, um seine Gruppen zu bearbeiten.",
+      "groups": "Gruppen",
+      "assigned": "Vollzugriff",
+      "noGroups": "Keine gültigen Gruppen vorhanden."
+    },
+    "queueTemplates": {
+      "title": "Vorlagen↔Queues",
+      "subtitle": "Wähle eine Queue und weise Vorlagen zu. Die Anzeige startet leer (kein GET am Backend); An- und Abwählen speichern sofort.",
+      "queue": "Queue",
+      "selectQueue": "Queue auswählen…",
+      "empty": "Wähle oben eine Queue, um ihre Vorlagen zu bearbeiten.",
+      "templates": "Vorlagen",
+      "assigned": "Zugewiesen",
+      "noTemplates": "Keine gültigen Vorlagen vorhanden."
+    },
+    "queueAutoResponses": {
+      "title": "Queues↔Autoantworten",
+      "subtitle": "Wähle eine Queue und weise Autoantworten zu. Die Anzeige startet leer (kein GET am Backend); An- und Abwählen speichern sofort.",
+      "queue": "Queue",
+      "selectQueue": "Queue auswählen…",
+      "empty": "Wähle oben eine Queue, um ihre Autoantworten zu bearbeiten.",
+      "autoResponses": "Autoantworten",
+      "assigned": "Zugewiesen",
+      "typeId": "Typ-ID",
+      "noAutoResponses": "Keine gültigen Autoantworten vorhanden."
     }
   },
   "kb": {
