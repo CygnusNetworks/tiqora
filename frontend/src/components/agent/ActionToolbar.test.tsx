@@ -6,10 +6,16 @@ import i18n from "@/i18n";
 import { ActionToolbar } from "./ActionToolbar";
 import type { TicketDetail } from "@/lib/api";
 
-const { patchTicket, listReferencePriorities, listReferenceStates } = vi.hoisted(() => ({
+const {
+  patchTicket,
+  listReferencePriorities,
+  listReferenceStates,
+  searchReferenceCustomers,
+} = vi.hoisted(() => ({
   patchTicket: vi.fn(),
   listReferencePriorities: vi.fn(),
   listReferenceStates: vi.fn(),
+  searchReferenceCustomers: vi.fn(),
 }));
 
 vi.mock("@/lib/api", async () => {
@@ -21,7 +27,7 @@ vi.mock("@/lib/api", async () => {
       listReferencePriorities,
       listReferenceStates,
       listReferenceAgents: vi.fn().mockResolvedValue([]),
-      searchReferenceCustomers: vi.fn().mockResolvedValue([]),
+      searchReferenceCustomers,
       listQueues: vi.fn().mockResolvedValue([]),
       listTicketLinks: vi.fn().mockResolvedValue([]),
     },
@@ -71,6 +77,7 @@ function makeTicket(overrides: Partial<TicketDetail> = {}): TicketDetail {
 describe("ActionToolbar", () => {
   beforeEach(() => {
     patchTicket.mockReset().mockResolvedValue(undefined);
+    searchReferenceCustomers.mockReset().mockResolvedValue([]);
     listReferencePriorities.mockReset().mockResolvedValue([
       { id: 3, name: "3 normal" },
       { id: 5, name: "5 very high" },
@@ -132,5 +139,30 @@ describe("ActionToolbar", () => {
     expect(screen.getByTestId("toolbar-move")).toBeDisabled();
     // Print stays enabled — it is a client-side action.
     expect(screen.getByTestId("toolbar-print")).not.toBeDisabled();
+  });
+
+  it("shows the customer number as a badge on each search result", async () => {
+    searchReferenceCustomers.mockResolvedValue([
+      {
+        login: "alice",
+        full_name: "Alice Example",
+        email: "alice@example.com",
+        customer_id: "C-10042",
+      },
+    ]);
+    wrap(<ActionToolbar ticket={makeTicket()} />);
+    fireEvent.click(screen.getByTestId("toolbar-customer"));
+    expect(screen.getByTestId("customer-picker-dialog")).toBeInTheDocument();
+    const input = screen.getByPlaceholderText(/select|auswählen/i);
+    fireEvent.change(input, { target: { value: "ali" } });
+    const badge = await screen.findByTestId("customer-picker-id-alice");
+    expect(badge).toHaveTextContent("C-10042");
+    // Pill/badge styling (rounded + muted tone), not plain text.
+    expect(badge.className).toMatch(/rounded/);
+    expect(badge.className).toMatch(/text-muted|border-hairline/);
+    expect(screen.getByTestId("customer-picker-result-alice")).toHaveTextContent("Alice Example");
+    expect(screen.getByTestId("customer-picker-result-alice")).toHaveTextContent(
+      "alice@example.com",
+    );
   });
 });

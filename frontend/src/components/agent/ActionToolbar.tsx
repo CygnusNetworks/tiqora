@@ -5,6 +5,7 @@ import { useTranslation } from "react-i18next";
 import { api } from "@/lib/api";
 import type { MutationRequest, TicketDetail } from "@/lib/api";
 import { useAuth } from "@/auth/AuthContext";
+import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Dialog } from "@/components/ui/Dialog";
 import { Spinner } from "@/components/ui/Spinner";
@@ -542,10 +543,23 @@ function CustomerPickerDialog({
                   patch.mutate({ customer_user_id: c.login, customer_id: c.customer_id })
                 }
                 disabled={patch.isPending}
-                className="block w-full px-3 py-1.5 text-left text-sm text-ink hover:bg-surface-subtle disabled:opacity-50"
+                data-testid={`customer-picker-result-${c.login}`}
+                className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm text-ink hover:bg-surface-subtle disabled:opacity-50"
               >
-                <span className="font-medium">{c.full_name}</span>{" "}
-                <span className="text-muted">{c.email}</span>
+                <span className="min-w-0 flex-1 truncate">
+                  <span className="font-medium">{c.full_name}</span>{" "}
+                  <span className="text-muted">{c.email}</span>
+                </span>
+                {c.customer_id ? (
+                  <Badge
+                    tone="muted"
+                    className="ml-auto shrink-0 rounded-full"
+                    data-testid={`customer-picker-id-${c.login}`}
+                    title={t("ticket.toolbar.customerNumber")}
+                  >
+                    {c.customer_id}
+                  </Badge>
+                ) : null}
               </button>
             ))
           )}

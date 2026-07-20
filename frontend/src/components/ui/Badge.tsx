@@ -16,11 +16,12 @@ export function Badge({
   children,
   tone = "default",
   className,
+  ...rest
 }: {
   children: ReactNode;
   tone?: Tone;
   className?: string;
-}) {
+} & React.HTMLAttributes<HTMLSpanElement>) {
   return (
     <span
       className={cn(
@@ -28,6 +29,7 @@ export function Badge({
         tones[tone],
         className,
       )}
+      {...rest}
     >
       {children}
     </span>

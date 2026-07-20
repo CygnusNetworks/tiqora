@@ -24,6 +24,14 @@ export type FieldDef = {
   options?: FieldOption[];
   placeholder?: string;
   helpText?: string;
+  /**
+   * When true, render the control in monospace (IDs, code snippets).
+   * Default false — prose fields (signatures, templates, comments) use the
+   * proportional UI font. Opt in only for genuinely monospaced content.
+   */
+  mono?: boolean;
+  /** Textarea row count (default 4). */
+  rows?: number;
   /** Only for type "custom": renders its own control. */
   render?: (value: unknown, onChange: (v: unknown) => void, values: FieldValues) => ReactNode;
   /** Hide this field for create (e.g. immutable identity fields shown read-only). */
@@ -123,6 +131,8 @@ export function CrudDrawer({
           const baseInputClass =
             "w-full rounded-md border bg-surface-subtle px-3 py-1.5 text-sm text-ink placeholder:text-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent";
           const borderClass = invalid ? "border-escalation" : "border-hairline focus:border-accent";
+          // Prose-safe default: proportional UI font. Opt into mono only for code/IDs.
+          const fontClass = f.mono ? "font-mono" : "font-sans";
 
           return (
             <div key={f.name}>
@@ -135,7 +145,7 @@ export function CrudDrawer({
                   value={typeof value === "string" ? value : ""}
                   placeholder={f.placeholder}
                   onChange={(e) => setField(f.name, e.target.value)}
-                  className={`${baseInputClass} ${borderClass}`}
+                  className={`${baseInputClass} ${borderClass} ${fontClass}`}
                 />
               ) : f.type === "number" ? (
                 <input
@@ -147,7 +157,7 @@ export function CrudDrawer({
                   onChange={(e) =>
                     setField(f.name, e.target.value === "" ? "" : Number(e.target.value))
                   }
-                  className={`${baseInputClass} ${borderClass}`}
+                  className={`${baseInputClass} ${borderClass} ${fontClass}`}
                 />
               ) : f.type === "textarea" ? (
                 <textarea
@@ -155,9 +165,9 @@ export function CrudDrawer({
                   data-testid={id}
                   value={typeof value === "string" ? value : ""}
                   placeholder={f.placeholder}
-                  rows={4}
+                  rows={f.rows ?? 4}
                   onChange={(e) => setField(f.name, e.target.value)}
-                  className={`${baseInputClass} ${borderClass}`}
+                  className={`${baseInputClass} ${borderClass} ${fontClass}`}
                 />
               ) : f.type === "select" ? (
                 <select
@@ -168,7 +178,7 @@ export function CrudDrawer({
                     const opt = f.options?.find((o) => String(o.value) === e.target.value);
                     setField(f.name, opt ? opt.value : e.target.value);
                   }}
-                  className={`${baseInputClass} ${borderClass}`}
+                  className={`${baseInputClass} ${borderClass} ${fontClass}`}
                 >
                   <option value="" disabled>
                     {t("admin.form.selectPlaceholder")}
