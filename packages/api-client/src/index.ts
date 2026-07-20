@@ -64,6 +64,9 @@ export {
   type KnowledgeArticle,
   type KnowledgeBundle,
   // Admin
+  type AdminPage,
+  type AdminListParams,
+  type AdminValidFilter,
   type UserOut,
   type UserCreate,
   type UserUpdate,

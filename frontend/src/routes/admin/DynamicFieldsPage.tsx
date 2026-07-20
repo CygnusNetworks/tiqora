@@ -67,7 +67,7 @@ export function DynamicFieldsPage() {
 
   const listQ = useQuery({
     queryKey: ["admin", "dynamic-fields"],
-    queryFn: ({ signal }) => api.adminDynamicFields.list(signal),
+    queryFn: ({ signal }) => api.adminDynamicFields.list({ valid: "all", pageSize: 500 }, signal),
   });
 
   const invalidate = () =>
@@ -190,7 +190,7 @@ export function DynamicFieldsPage() {
       </div>
       <DataTable
         columns={columns}
-        rows={listQ.data ?? []}
+        rows={listQ.data?.items ?? []}
         rowKey={(r) => r.id}
         isLoading={listQ.isLoading}
         isRowValid={(r) => r.valid_id === 1}
