@@ -20,9 +20,7 @@ from tiqora.domain.auth import AuthenticatedUser
 
 pytestmark = pytest.mark.db
 
-_USER = AuthenticatedUser(
-    id=1, login="agent", first_name="A", last_name="G", auth_method="session"
-)
+_USER = AuthenticatedUser(id=1, login="agent", first_name="A", last_name="G", auth_method="session")
 
 
 def _to_async_url(sync_url: str) -> str:
