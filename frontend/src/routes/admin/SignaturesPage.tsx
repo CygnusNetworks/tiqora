@@ -21,7 +21,15 @@ export function SignaturesPage() {
 
   const fields: FieldDef[] = [
     { name: "name", label: t("admin.signatures.name"), type: "text", required: true },
-    { name: "text", label: t("admin.signatures.text"), type: "textarea", required: true },
+    // Prose body — proportional UI font (not monospace).
+    {
+      name: "text",
+      label: t("admin.signatures.text"),
+      type: "textarea",
+      required: true,
+      mono: false,
+      rows: 10,
+    },
     { name: "comments", label: t("admin.table.comments"), type: "textarea" },
     {
       name: "valid_id",

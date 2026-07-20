@@ -44,7 +44,14 @@ export function TemplatesPage() {
       type: "select",
       options: TEMPLATE_TYPE_OPTIONS,
     },
-    { name: "text", label: t("admin.templates.text"), type: "textarea" },
+    // Prose body — proportional UI font (not monospace).
+    {
+      name: "text",
+      label: t("admin.templates.text"),
+      type: "textarea",
+      mono: false,
+      rows: 10,
+    },
     { name: "comments", label: t("admin.table.comments"), type: "textarea" },
     {
       name: "valid_id",

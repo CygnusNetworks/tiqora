@@ -25,6 +25,24 @@ function nearestEscalation(t: TicketListItem): number | null {
   return epochs.length ? Math.min(...epochs) : null;
 }
 
+/** Queues with work: open and/or new tickets (either count > 0). */
+export function queueHasWork(queue: {
+  counts?: { open?: number; new?: number } | null;
+}): boolean {
+  return (queue.counts?.open ?? 0) > 0 || (queue.counts?.new ?? 0) > 0;
+}
+
+/** Filter and rank queue shortcuts: only non-empty, highest open first, cap at 8. */
+export function selectQueueShortcuts<
+  T extends { counts?: { open?: number; new?: number } | null },
+>(queues: T[], limit = 8): T[] {
+  return queues
+    .filter(queueHasWork)
+    .slice()
+    .sort((a, b) => (b.counts?.open ?? 0) - (a.counts?.open ?? 0))
+    .slice(0, limit);
+}
+
 const escalationToneClass: Record<string, string> = {
   breached: "text-danger",
   approaching: "text-warn",
@@ -147,10 +165,7 @@ export function DashboardPage() {
   });
 
   const flat = flattenQueues(queuesQ.data ?? []);
-  const topQueues = flat
-    .slice()
-    .sort((a, b) => (b.counts?.open ?? 0) - (a.counts?.open ?? 0))
-    .slice(0, 8);
+  const topQueues = selectQueueShortcuts(flat);
 
   const escalating = (openForEscQ.data?.items ?? [])
     .map((ticket) => ({ ticket, epoch: nearestEscalation(ticket) }))
@@ -206,8 +221,8 @@ export function DashboardPage() {
         </div>
       </section>
 
-      {/* Work widgets */}
-      <div className="grid gap-6 lg:grid-cols-2">
+      {/* Work widgets — single full-width column (not two-across). */}
+      <div className="flex flex-col gap-6" data-testid="dashboard-work-lists">
         <WidgetCard id="widget-my-tickets" title={t("dashboard.myTickets")}>
           {lockedQ.isLoading ? (
             <Spinner />
@@ -316,14 +331,18 @@ export function DashboardPage() {
         </div>
         {queuesQ.isLoading ? (
           <Spinner />
+        ) : topQueues.length === 0 ? (
+          <p
+            className="rounded-lg border border-dashed border-hairline bg-surface px-4 py-8 text-center text-sm text-muted"
+            data-testid="dashboard-queues-empty"
+          >
+            {t("dashboard.queueShortcutsEmpty")}
+          </p>
         ) : (
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             {topQueues.map((q) => (
               <QueueShortcutCard key={q.id} queue={q} />
             ))}
-            {topQueues.length === 0 && (
-              <p className="col-span-full text-sm text-muted">{t("queue.empty")}</p>
-            )}
           </div>
         )}
       </section>
