@@ -23,9 +23,10 @@ to the native `/api/v1` (or MCP) at your own pace.
 | `TicketGet` | Fetch ticket(s) with articles |
 | `TicketSearch` | Search by criteria |
 
-SOAP is out of scope; only the REST-style GenericInterface transport is
-emulated. Full details, gotchas, and known deviations:
-[`../compatibility.md`](../compatibility.md).
+Both the REST-style (`HTTP::REST`) and SOAP (`HTTP::SOAP`) GenericInterface
+transports are emulated for these 5 operations — see
+[SOAP transport](#soap-transport) below. Full details, gotchas, and known
+deviations: [`../compatibility.md`](../compatibility.md).
 
 ## Routing model
 
@@ -79,6 +80,28 @@ SESSION_ID=$(curl -s -X POST "$TIQORA_URL/znuny-compat/Session" \
 curl -s "$TIQORA_URL/znuny-compat/TicketSearch?SessionID=$SESSION_ID&StateType=open" \
   -H 'Content-Type: application/json'
 ```
+
+## SOAP transport
+
+Point existing SOAP GenericInterface clients at:
+
+```
+POST /znuny-compat/soap/{webservice}          # canonical fallback, default NameSpace
+POST /znuny-compat/Webservice/{name}          # from gi_webservice_config, own NameSpace
+POST /znuny-compat/WebserviceID/{id}
+```
+
+The operation is dispatched from the SOAP Body wrapper element (e.g.
+`<TicketGet>...</TicketGet>`), not the URL — one endpoint per webservice
+handles all 5 operations, matching Znuny's own `HTTP::SOAP` transport.
+Auth (`UserLogin`/`Password`, `CustomerUserLogin`/`Password`, or
+`SessionID`) is passed as elements inside the operation wrapper, same as
+REST body params. See
+[`../compatibility.md#soap-transport`](../compatibility.md#soap-transport)
+for the full request/response example, namespace configuration, XXE
+mitigation (`defusedxml`), and documented deviations from Znuny's transport
+(no `SOAPAction` strict-match enforcement, no WSDL auto-serving — Znuny
+doesn't serve one either).
 
 ## Migrating a webservice from Znuny's own GenericInterface
 
