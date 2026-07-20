@@ -2,7 +2,6 @@ import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 import { Link, useLocation, useNavigate } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
-import { useAuth } from "@/auth/AuthContext";
 import { api, type QueueNode } from "@/lib/api";
 import { flattenQueues } from "@/components/agent/QueueTree";
 import { Button } from "@/components/ui/Button";
@@ -249,7 +248,6 @@ function AdminNavItem({ onNavigate }: { onNavigate?: () => void }) {
 
 function SidebarBody({ onNavigate }: { onNavigate?: () => void }) {
   const { t } = useTranslation();
-  const { user } = useAuth();
 
   const queuesQ = useQuery({
     queryKey: ["queues"],
@@ -264,11 +262,6 @@ function SidebarBody({ onNavigate }: { onNavigate?: () => void }) {
     queryKey: ["tickets", "my-counts"],
     queryFn: () => api.myTicketCounts(),
   });
-
-  const initials = (
-    (user?.first_name?.[0] ?? user?.login?.[0] ?? "?") +
-    (user?.last_name?.[0] ?? "")
-  ).toUpperCase();
 
   return (
     <div className="flex h-full flex-col">
@@ -374,28 +367,10 @@ function SidebarBody({ onNavigate }: { onNavigate?: () => void }) {
         <AdminNavItem onNavigate={onNavigate} />
       </nav>
 
-      <div className="mt-2 border-t border-hairline px-2 pt-3">
-        <Link
-          to="/agent/settings"
-          onClick={onNavigate}
-          data-testid="agent-nav-settings"
-          className="flex items-center gap-2.5 rounded-lg py-1 transition-colors duration-100 hover:bg-surface-subtle focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent"
-        >
-          <span
-            className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-accent text-[11px] font-bold text-accent-ink"
-            aria-hidden
-          >
-            {initials}
-          </span>
-          <div className="min-w-0 flex-1 leading-tight">
-            <p className="truncate text-[12.5px] font-medium text-ink" data-testid="current-user">
-              {user?.first_name || user?.login} {user?.last_name}
-            </p>
-            <p className="truncate text-[11px] text-muted">{user?.login}</p>
-          </div>
-        </Link>
+      {/* Version/git-sha footer — kept after removing the redundant bottom-left user card. */}
+      <div className="mt-2 border-t border-hairline px-2 pt-2.5 pb-0.5">
         <p
-          className="mt-1 px-1 text-[10px] leading-none text-muted opacity-70"
+          className="px-1 text-[10px] leading-none text-muted opacity-70"
           data-testid="app-version"
           title={appVersion.sha ? `commit ${appVersion.sha}` : "local dev build"}
         >
