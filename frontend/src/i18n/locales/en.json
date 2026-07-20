@@ -403,7 +403,9 @@
       "customers": "Customers",
       "communication": "Communication",
       "automation": "Automation",
-      "system": "System"
+      "system": "System",
+      "queuesTemplates": "Queues & templates",
+      "email": "Email"
     },
     "nav": {
       "users": "Users",
@@ -429,7 +431,12 @@
       "webhooks": "Webhooks",
       "processes": "Processes",
       "mailOutbound": "Email (outbound)",
-      "mailLog": "Communication log"
+      "mailLog": "Communication log",
+      "customerUserGroups": "Customer users↔Groups",
+      "attachments": "Attachments",
+      "templateAttachments": "Templates↔Attachments",
+      "queueTemplates": "Templates↔Queues",
+      "queueAutoResponses": "Queues↔Auto responses"
     },
     "table": {
       "id": "ID",
@@ -716,6 +723,60 @@
       "detailField": "Detail / SMTP response",
       "empty": "No log entries match the filters.",
       "entries": "entries"
+    },
+    "attachments": {
+      "title_plural": "Attachments",
+      "new": "New attachment",
+      "name": "Name",
+      "filename": "Filename",
+      "contentType": "Content-Type",
+      "content": "File / content",
+      "contentHelp": "Pick a file — it is stored base64-encoded. Filename and content type are filled in but can be overridden.",
+      "contentReady": "Content loaded ({{chars}} base64 characters).",
+      "contentRequired": "Please select a file."
+    },
+    "templateAttachments": {
+      "title": "Templates↔Attachments",
+      "subtitle": "Pick a template and choose which standard attachments are linked to it.",
+      "template": "Template",
+      "selectTemplate": "Select a template…",
+      "empty": "Pick a template above to edit its attachments.",
+      "attachments": "Attachments",
+      "assigned": "Assigned",
+      "noAttachments": "No valid attachments exist yet.",
+      "save": "Save",
+      "saveError": "Save failed."
+    },
+    "customerUserGroups": {
+      "title": "Customer users↔Groups",
+      "subtitle": "Pick a customer user and set which groups they can work in (full access).",
+      "customerUser": "Customer user",
+      "selectCustomerUser": "Select a customer user…",
+      "empty": "Pick a customer user above to edit their groups.",
+      "groups": "Groups",
+      "assigned": "Full access",
+      "noGroups": "No valid groups exist yet."
+    },
+    "queueTemplates": {
+      "title": "Templates↔Queues",
+      "subtitle": "Pick a queue and assign templates. The list starts empty (no GET on the backend); toggling saves immediately.",
+      "queue": "Queue",
+      "selectQueue": "Select a queue…",
+      "empty": "Pick a queue above to edit its templates.",
+      "templates": "Templates",
+      "assigned": "Assigned",
+      "noTemplates": "No valid templates exist yet."
+    },
+    "queueAutoResponses": {
+      "title": "Queues↔Auto responses",
+      "subtitle": "Pick a queue and assign auto responses. The list starts empty (no GET on the backend); toggling saves immediately.",
+      "queue": "Queue",
+      "selectQueue": "Select a queue…",
+      "empty": "Pick a queue above to edit its auto responses.",
+      "autoResponses": "Auto responses",
+      "assigned": "Assigned",
+      "typeId": "Type ID",
+      "noAutoResponses": "No valid auto responses exist yet."
     }
   },
   "kb": {
