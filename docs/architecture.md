@@ -261,6 +261,37 @@ generic_agent_jobs. Writes to queue/state/priority additionally invalidate
 every currently-affected ticket (no per-config-row cache-invalidation entity
 exists, so admin writes enumerate affected `ticket.id`s directly).
 
+### Stats / reporting
+
+`tiqora/stats/` — a modern equivalent of Znuny's `Kernel::System::Stats`
+(AgentStatistics), not a port: instead of Znuny's dynamic report-object
+framework (arbitrary user-defined X/Y-axis stat objects), `StatsService`
+provides a fixed set of purpose-built, permission-filtered (`ro` queues, same
+scoping as `TicketService`) reports with typed params (`StatsFilters`) and
+dataclass results:
+
+- ticket volume (created vs. closed per day/week/month bucket)
+- open-ticket snapshot by queue/state/priority/owner
+- SLA/escalation: escalated count + first-response/update/solution breach
+  counts (from the ticket `escalation_*` epoch columns) plus raw
+  first-response/solution time-to-event samples (minutes) for
+  percentile/histogram display client-side
+- agent workload (open tickets owned + tickets closed in the filtered period)
+- backlog trend (running open-ticket count, derived from the volume report's
+  created/closed deltas)
+
+Bucketing is done in Python after fetching bare `(id, timestamp)` rows rather
+than with dialect-specific SQL date-trunc functions, so the same code runs
+against both the MySQL and PostgreSQL backends. `/api/v1/stats/*`
+(`api/v1/stats.py`) exposes one JSON endpoint plus a `.csv` streaming-export
+sibling per report, gated on any authenticated agent (`CurrentUser`) — access
+control is enforced by the queue scoping inside `StatsService`, not by a
+separate route-level permission check. The frontend `/agent/stats` page
+(`routes/agent/StatsPage.tsx`) renders a filter bar (queue, date range,
+granularity), mono-numeral stat tiles, and hand-rolled SVG bar/line charts
+(`components/agent/stats/{BarChart,LineChart}.tsx` — no charting dependency)
+plus a CSV-downloadable agent-workload table.
+
 ### Events and workers
 
 - Writes emit events via a transactional outbox (`tiqora_event_outbox`).

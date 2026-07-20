@@ -7,6 +7,7 @@ import {
 } from "@tanstack/react-router";
 import { LoginPage } from "@/routes/LoginPage";
 import { DashboardPage } from "@/routes/agent/DashboardPage";
+import { StatsPage } from "@/routes/agent/StatsPage";
 import { QueuesPage, type QueuesSearch } from "@/routes/agent/QueuesPage";
 import { TicketZoomPage } from "@/routes/agent/TicketZoomPage";
 import { SearchPage, type SearchSearch } from "@/routes/agent/SearchPage";
@@ -190,6 +191,12 @@ const agentSecurityRoute = createRoute({
   getParentRoute: () => agentLayoutRoute,
   path: "/security",
   component: SecurityPage,
+});
+
+const agentStatsRoute = createRoute({
+  getParentRoute: () => agentLayoutRoute,
+  path: "/stats",
+  component: StatsPage,
 });
 
 // /portal/login: mounts its own CustomerAuthProvider (a separate session from
@@ -427,6 +434,7 @@ const routeTree = rootRoute.addChildren([
     agentKbArticleRoute,
     agentKbArticleEditRoute,
     agentSecurityRoute,
+    agentStatsRoute,
   ]),
   portalLoginRoute,
   portalLayoutRoute.addChildren([
