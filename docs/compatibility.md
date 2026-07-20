@@ -15,8 +15,9 @@ third-party tools can migrate gradually.
 | `TicketGet` | Fetch ticket(s) with articles |
 | `TicketSearch` | Search by criteria |
 
-SOAP is **out of scope** for V1. Transport is the REST-style GenericInterface
-endpoints Znuny documents for the HTTP::REST connector.
+Both transports Znuny documents for these operations are supported:
+the REST-style `HTTP::REST` connector, and `HTTP::SOAP` (see
+[SOAP transport](#soap-transport) below).
 
 ## Routing model
 
@@ -81,8 +82,121 @@ matching Znuny `HTTP::REST` transport behaviour.
 ### Admin reload
 
 `POST /znuny-compat/admin/reload` (requires tiqora auth) re-validates and logs
-the current webservice configuration. A full restart is required to actually
-hot-reload dynamic routes in running processes.
+the current webservice configuration (REST routes and SOAP webservices). A
+full restart is required to actually hot-reload dynamic routes in running
+processes.
+
+## SOAP transport
+
+Znuny's `HTTP::SOAP` GenericInterface transport
+(`Kernel/GenericInterface/Transport/HTTP/SOAP.pm`) is emulated by
+`api/compat/soap.py` (codec) + the same routes/dispatch table in
+`api/compat/router.py` — SOAP requests go through the *identical*
+`op_session_create` / `op_ticket_create` / `op_ticket_update` / `op_ticket_get`
+/ `op_ticket_search` handlers as REST; only the wire format differs.
+
+### Endpoints
+
+| Method | Path | NameSpace used |
+|--------|------|-----------------|
+| POST | `/znuny-compat/soap/{webservice}` | Default (`http://www.otrs.org/TicketConnector/`) — always available, `{webservice}` is a free label |
+| POST | `/znuny-compat/Webservice/{name}` | That webservice's `Provider.Transport.Config.NameSpace` (from `gi_webservice_config`) |
+| POST | `/znuny-compat/WebserviceID/{id}` | Same, addressed by numeric ID |
+
+Unlike REST, SOAP has **no per-operation route mapping** in Znuny — a single
+endpoint per webservice accepts any of the 5 supported operations. The
+operation is dispatched from the **SOAP Body wrapper element's local name**
+(namespace-prefix agnostic), matching Znuny's
+`$Operation = (sort keys %{$Body})[0]` (`SOAP.pm`). The `SOAPAction` HTTP
+header is accepted as a fallback hint only.
+
+### Example: TicketGet request/response
+
+Request (`Content-Type: text/xml; charset=utf-8`):
+
+```xml
+<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/">
+  <soapenv:Body>
+    <TicketGet>
+      <SessionID>abc123</SessionID>
+      <TicketID>42</TicketID>
+    </TicketGet>
+  </soapenv:Body>
+</soapenv:Envelope>
+```
+
+Response (HTTP 200, same `text/xml`):
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
+  <soap:Body>
+    <TicketGetResponse xmlns="http://www.otrs.org/TicketConnector/">
+      <Ticket>
+        <TicketID>42</TicketID>
+        <TicketNumber>2026072000001</TicketNumber>
+        <Title>Broken printer</Title>
+        ...
+      </Ticket>
+    </TicketGetResponse>
+  </soap:Body>
+</soap:Envelope>
+```
+
+Errors become a SOAP `<Fault>` (matching `ProviderGenerateResponse`'s
+`OperationResponse = 'Fault'` path) with the HTTP status set from the same
+`ErrorCode` → status mapping REST uses (401 AuthFail, 403 AccessDenied, 400
+Missing/InvalidParameter, 501 NotImplemented).
+
+### Namespace configuration
+
+`Provider.Transport.Config.NameSpace` in the webservice's YAML config (same
+key Znuny uses) controls the `xmlns` on the `<OperationNameResponse>`
+wrapper element. Default when unset:
+`http://www.otrs.org/TicketConnector/` (Znuny's own sample
+`GenericTicketConnectorSOAP` webservice default).
+
+### Auth in the SOAP body
+
+Same as REST: `UserLogin`/`Password`, `CustomerUserLogin`/`Password`, or
+`SessionID` as top-level elements inside the operation wrapper (not SOAP
+WS-Security headers) — this matches Znuny's own GenericInterface auth
+model, which is operation-parameter-based, not a SOAP header mechanism.
+
+### XXE mitigation
+
+Requests are parsed exclusively via `defusedxml.ElementTree`, which rejects
+external entities (XXE / SSRF via `SYSTEM`/`PUBLIC` DTD references) and
+internal entity-expansion bombs. A rejected envelope returns HTTP 400 with a
+SOAP Fault; the malicious payload is never resolved.
+
+### WSDL
+
+Znuny's GenericInterface provider does not auto-serve a WSDL for the generic
+ticket connector either — the WSDL shipped in Znuny's source
+(`scripts/test/Console/Command/Admin/WebService/GenericTicketConnectorSOAP.wsdl`)
+is a hand-maintained sample, not generated on request. Tiqora matches this:
+there is no `?wsdl` route. Point a SOAP client at the endpoint URL directly
+(most clients, e.g. Python `zeep`, accept a local/adapted WSDL file plus an
+explicit `address` override), or build envelopes by hand as the compat test
+suite does.
+
+### Differences vs Znuny's SOAP transport (documented deviations)
+
+- Znuny's `SOAPActionScheme`/`SOAPActionFreeText`/`SOAPActionSeparator`
+  config knobs (multiple ways to validate the `SOAPAction` header against an
+  expected string) are **not enforced** — the header is only used as a
+  fallback operation-name hint when the Body wrapper is unusable. Real
+  clients set `SOAPAction` correctly but Znuny's strict-match rejection path
+  is not reproduced.
+- `ResponseNameScheme`/`ResponseNameFreeText` (`Append`/`Plain`/`Replace`)
+  are not configurable — Tiqora always uses Znuny's *default*
+  (`Response` → `Append` + `Response`, i.e. `TicketGet` → `TicketGetResponse`).
+- `MaxLength` (request body size cap) is not enforced by the codec itself
+  (rely on the ASGI server / reverse proxy body-size limit instead).
+- SOAP 1.2 is accepted (mirrors the request's Content-Type/envelope
+  namespace in the response) but Znuny's SOAP transport is primarily
+  exercised with SOAP 1.1 (`SOAP::Lite` default) in practice.
 
 ## StateType / StateTypes gotcha (documented deviation)
 
@@ -100,11 +214,13 @@ Both forms are supported in Tiqora for convenience.
 
 ## What is not emulated
 
-- Full GenericInterface provider/consumer framework
+- Full GenericInterface provider/consumer framework (e.g. Requester-side
+  outbound SOAP/REST calls — only the Provider/server side is emulated)
 - Arbitrary custom operations registered only as Znuny packages
-- SOAP envelope processing
 - Package Manager remote install
 - TicketHistoryGet, TimeAccountingGet (return 501)
+- WSDL auto-serving (Znuny doesn't serve one either — see
+  [SOAP transport](#soap-transport))
 
 Integrators needing those should migrate to `/api/v1` or MCP.
 
@@ -147,6 +263,9 @@ Znuny 6.5.22 container on the same MariaDB and validated:
 - **Hot-reload**: Dynamic webservice routes require a process restart to take effect.
   The `/admin/reload` endpoint logs and validates but cannot actually re-register
   FastAPI routes in a running process without a restart.
+- **SOAP `SOAPAction` strict validation**: Znuny's `SOAPActionScheme` config
+  (validating the header against an expected `NameSpace#Operation` string) is
+  not enforced — see [SOAP transport differences](#differences-vs-znunys-soap-transport-documented-deviations).
 
 ## Phase 3a uncertainties
 
