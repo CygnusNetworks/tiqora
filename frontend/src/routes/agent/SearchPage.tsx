@@ -3,6 +3,7 @@ import { Link, useNavigate, useSearch } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
 import { api } from "@/lib/api";
 import type { KbSearchHit } from "@/lib/api";
+import { priorityName } from "@/lib/priority";
 import { Spinner } from "@/components/ui/Spinner";
 import { Badge } from "@/components/ui/Badge";
 
@@ -125,7 +126,7 @@ export function SearchPage() {
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="font-mono text-xs text-accent">{hit.tn}</span>
                       {hit.state && <Badge tone="muted">{hit.state}</Badge>}
-                      {hit.priority && <Badge>{hit.priority}</Badge>}
+                      {hit.priority && <Badge>{priorityName(hit.priority)}</Badge>}
                       {hit.queue_name && (
                         <span className="text-xs text-muted">{hit.queue_name}</span>
                       )}
