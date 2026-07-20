@@ -27,11 +27,31 @@ function BetaPill() {
   );
 }
 
+/** Count badge shared by the nav items and, in spirit, the queue rows: shows
+ * a single number (the open count) and signals "has new items" by colour
+ * alone — accent-tinted pill instead of plain muted text, no "neu" chip. */
+function NavCountBadge({ count, newCount }: { count: number; newCount?: number }) {
+  const { t } = useTranslation();
+  const hasNew = (newCount ?? 0) > 0;
+  return (
+    <span
+      className={cn(
+        "shrink-0 rounded-full px-1.5 py-0.5 font-mono text-[11px] tabular-nums",
+        hasNew ? "bg-accent-dim font-semibold text-accent" : "text-muted",
+      )}
+      title={hasNew ? t("queue.newCount", { count: newCount }) : undefined}
+    >
+      {count}
+    </span>
+  );
+}
+
 function NavItem({
   to,
   search,
   label,
   count,
+  newCount,
   testId,
   onNavigate,
   disabled,
@@ -41,6 +61,7 @@ function NavItem({
   search?: Record<string, unknown>;
   label: string;
   count?: number;
+  newCount?: number;
   testId: string;
   onNavigate?: () => void;
   disabled?: boolean;
@@ -72,9 +93,7 @@ function NavItem({
       }}
     >
       <span className="truncate">{label}</span>
-      {count != null && (
-        <span className="shrink-0 font-mono text-[11px] tabular-nums text-muted">{count}</span>
-      )}
+      {count != null && <NavCountBadge count={count} newCount={newCount} />}
     </Link>
   );
 }
@@ -235,6 +254,13 @@ function SidebarBody({ onNavigate }: { onNavigate?: () => void }) {
   const flat = flattenQueues(queuesQ.data ?? []);
   const totalOpen = flat.reduce((sum, q) => sum + (q.counts?.open ?? 0), 0);
 
+  // Owned-ticket counts for the "My tickets" badge — cheap COUNT(*) endpoint,
+  // kept fresh on the same cadence as the queue tree.
+  const myCountsQ = useQuery({
+    queryKey: ["tickets", "my-counts"],
+    queryFn: () => api.myTicketCounts(),
+  });
+
   const initials = (
     (user?.first_name?.[0] ?? user?.login?.[0] ?? "?") +
     (user?.last_name?.[0] ?? "")
@@ -276,6 +302,8 @@ function SidebarBody({ onNavigate }: { onNavigate?: () => void }) {
             <NavItem
               to="/agent"
               label={t("sidebar.myTickets")}
+              count={myCountsQ.data?.open}
+              newCount={myCountsQ.data?.new}
               testId="agent-nav-my-tickets"
               onNavigate={onNavigate}
               exact

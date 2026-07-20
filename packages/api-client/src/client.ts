@@ -20,6 +20,7 @@ export type QueueNode = Schemas["QueueNode"];
 export type QueueCounts = Schemas["QueueCounts"];
 export type TicketListItem = Schemas["TicketListItem"];
 export type PaginatedTickets = Schemas["PaginatedTickets"];
+export type MyTicketCounts = Schemas["MyTicketCounts"];
 export type TicketDetail = Schemas["TicketDetail"];
 export type ArticleListItem = Schemas["ArticleListItem"];
 export type ArticleBody = Schemas["ArticleBody"];
@@ -557,6 +558,13 @@ export class ApiClient {
   ) {
     return this.request<PaginatedTickets>("GET", "/api/v1/tickets", {
       query: params,
+      signal,
+    });
+  }
+
+  /** Open/new counts for tickets owned by the current agent (nav badges). */
+  myTicketCounts(signal?: AbortSignal) {
+    return this.request<MyTicketCounts>("GET", "/api/v1/tickets/my-counts", {
       signal,
     });
   }
