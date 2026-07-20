@@ -57,13 +57,13 @@ async def test_category_crud(factory: async_sessionmaker[AsyncSession]) -> None:
         svc = KbService(session, _settings())
         async with session.begin():
             cat = await svc.create_category(
-                1, CategoryIn(name="Networking", slug="networking-1", permission_group_id=5)
+                1, CategoryIn(name="Networking", slug="networking-1", permission_group_ids=[5])
             )
         cat_id = cat.id
 
         fetched = await svc.get_category(cat_id)
         assert fetched.name == "Networking"
-        assert fetched.permission_group_id == 5
+        assert await svc.category_group_ids(cat_id) == [5]
         assert fetched.valid is True
         await session.commit()  # close autobegin transaction from the read above
 

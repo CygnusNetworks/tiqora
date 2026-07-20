@@ -55,7 +55,9 @@ from tiqora.domain.ticket_write_service import (
     create_ticket,
     move_queue,
 )
-from tiqora.kb.service import KbNotFound, KbService
+from tiqora.kb.schemas import ArticleIn as KbArticleIn
+from tiqora.kb.schemas import ArticleUpdateIn as KbArticleUpdateIn
+from tiqora.kb.service import KbForbidden, KbNotFound, KbService
 from tiqora.permissions.engine import PermissionEngine
 from tiqora.znuny.sysconfig import SysConfig
 
@@ -872,20 +874,22 @@ async def kb_get_article(
     ctx: Context,
     article_id: int,
 ) -> dict[str, Any]:
-    """Fetch a KB article.
+    """Fetch a KB article (permission-group scoped to the caller).
 
     Args:
         article_id: The KB article ID (as returned by ``kb_search``).
     """
-    _get_user_id(ctx)  # auth check
+    user_id = _get_user_id(ctx)
     state = _get_state()
 
     async with state.session_factory() as session:
         svc = KbService(session, state.settings)
         try:
-            row = await svc.get_article(article_id)
+            row = await svc.get_article_scoped(user_id, article_id)
         except KbNotFound:
             return {"error": f"KB article {article_id} not found"}
+        except KbForbidden:
+            return {"error": f"KB article {article_id} is not readable by this agent"}
         tags = await svc.get_tags(article_id)
 
     return {
@@ -899,6 +903,170 @@ async def kb_get_article(
         "version": row.version,
         "tags": tags,
     }
+
+
+@mcp.tool(
+    description=(
+        "List knowledge base articles filtered by tag and/or category, scoped to "
+        "the agent's permission groups. Use this to gather a knowledge set (e.g. all "
+        "articles tagged 'billing') for grounding. Returns article metadata; call "
+        "kb_get_article for full content."
+    )
+)
+async def kb_list(
+    ctx: Context,
+    tag: str | None = None,
+    category_id: int | None = None,
+    state: str | None = "published",
+) -> list[dict[str, Any]]:
+    """List readable KB articles by tag/category.
+
+    Args:
+        tag: Restrict to articles carrying this tag name.
+        category_id: Restrict to this category.
+        state: Lifecycle state filter (default ``published``; pass null for any).
+    """
+    user_id = _get_user_id(ctx)
+    state_obj = _get_state()
+
+    async with state_obj.session_factory() as session:
+        svc = KbService(session, state_obj.settings)
+        rows = await svc.list_articles(
+            category_id=category_id, state=state, tag=tag, user_id=user_id
+        )
+        return [
+            {
+                "id": r.id,
+                "category_id": r.category_id,
+                "title": r.title,
+                "slug": r.slug,
+                "language": r.language,
+                "state": r.state,
+                "version": r.version,
+            }
+            for r in rows
+        ]
+
+
+@mcp.tool(
+    description=(
+        "Create or update a knowledge base article. Omit article_id to create; "
+        "provide it to update. Content is Markdown. Newly created articles start as "
+        "drafts — call kb_publish_article to index them for search."
+    )
+)
+async def kb_upsert_article(
+    ctx: Context,
+    title: str,
+    content_md: str,
+    category_id: int | None = None,
+    article_id: int | None = None,
+    language: str = "en",
+    tags: list[str] | None = None,
+    state: str | None = None,
+) -> dict[str, Any]:
+    """Create or update a KB article.
+
+    Args:
+        title: Article title.
+        content_md: Markdown body.
+        category_id: Category id (required when creating).
+        article_id: Existing article id to update; omit to create.
+        language: Language code (default ``en``).
+        tags: Tag names to set on the article.
+        state: Lifecycle state (draft/review/published/archived).
+    """
+    user_id = _get_user_id(ctx)
+    state_obj = _get_state()
+
+    async with state_obj.session_factory() as session:
+        svc = KbService(session, state_obj.settings)
+        try:
+            async with session.begin():
+                if article_id is None:
+                    if category_id is None:
+                        return {"error": "category_id is required when creating an article"}
+                    row = await svc.create_article(
+                        user_id,
+                        KbArticleIn(
+                            category_id=category_id,
+                            title=title,
+                            content_md=content_md,
+                            language=language,
+                            state=state,
+                            tags=tags or [],
+                        ),
+                    )
+                    new_id = row.id
+                else:
+                    await svc.get_article_scoped(user_id, article_id)
+                    await svc.update_article(
+                        user_id,
+                        article_id,
+                        KbArticleUpdateIn(
+                            title=title,
+                            content_md=content_md,
+                            category_id=category_id,
+                            language=language,
+                            state=state,
+                            tags=tags,
+                        ),
+                    )
+                    new_id = article_id
+            row = await svc.get_article(new_id)
+            article_tags = await svc.get_tags(new_id)
+        except KbNotFound:
+            return {"error": f"KB article {article_id} not found"}
+        except KbForbidden:
+            return {"error": f"KB article {article_id} is not editable by this agent"}
+        except ValueError as exc:
+            return {"error": str(exc)}
+
+    return {
+        "id": row.id,
+        "category_id": row.category_id,
+        "title": row.title,
+        "slug": row.slug,
+        "language": row.language,
+        "state": row.state,
+        "version": row.version,
+        "tags": article_tags,
+    }
+
+
+@mcp.tool(
+    description=(
+        "Publish a knowledge base article: mark it published and (re)index it for "
+        "search. Call after kb_upsert_article to make an article searchable."
+    )
+)
+async def kb_publish_article(
+    ctx: Context,
+    article_id: int,
+) -> dict[str, Any]:
+    """Publish + index a KB article.
+
+    Args:
+        article_id: The KB article id to publish.
+    """
+    user_id = _get_user_id(ctx)
+    state_obj = _get_state()
+
+    async with state_obj.session_factory() as session:
+        svc = KbService(session, state_obj.settings)
+        try:
+            async with session.begin():
+                await svc.get_article_scoped(user_id, article_id)
+                row = await svc.publish(user_id, article_id)
+            result = {"id": row.id, "state": row.state, "version": row.version}
+        except KbNotFound:
+            return {"error": f"KB article {article_id} not found"}
+        except KbForbidden:
+            return {"error": f"KB article {article_id} is not editable by this agent"}
+        finally:
+            await svc.close()
+
+    return result
 
 
 # ---------------------------------------------------------------------------
