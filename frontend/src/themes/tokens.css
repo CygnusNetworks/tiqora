@@ -15,6 +15,12 @@
   --color-accent-ink: #ffffff;
   --color-escalation: #d98a1f;
 
+  /* Article sender-type background tints (ticket zoom) */
+  --color-article-customer: rgba(59, 107, 232, 0.07);
+  --color-article-customer-border: rgba(59, 107, 232, 0.28);
+  --color-article-agent: var(--color-surface);
+  --color-article-system: var(--color-surface-subtle);
+
   /* Ticket state colour code */
   --color-state-new: #1fa97c;
   --color-state-open: #3b6be8;
@@ -52,6 +58,12 @@
   --color-accent-dim: rgba(91, 140, 255, 0.14);
   --color-accent-ink: #0e1015;
   --color-escalation: #f5a83c;
+
+  /* Article sender-type background tints (ticket zoom) */
+  --color-article-customer: rgba(91, 140, 255, 0.12);
+  --color-article-customer-border: rgba(91, 140, 255, 0.34);
+  --color-article-agent: var(--color-surface);
+  --color-article-system: var(--color-surface-subtle);
 
   --color-state-new: #3ecf9a;
   --color-state-open: #5b8cff;

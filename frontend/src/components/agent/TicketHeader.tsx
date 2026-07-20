@@ -10,6 +10,17 @@ import {
 } from "@/lib/status";
 import type { CSSProperties } from "react";
 
+/** Map a Znuny priority id (1=lowest … 5=highest) to a badge tone. */
+function priorityTone(
+  priorityId: number | null | undefined,
+): "default" | "muted" | "warn" | "danger" {
+  if (priorityId == null) return "default";
+  if (priorityId >= 5) return "danger";
+  if (priorityId === 4) return "warn";
+  if (priorityId <= 2) return "muted";
+  return "default";
+}
+
 export function TicketHeader({ ticket }: { ticket: TicketDetail }) {
   const { t, i18n } = useTranslation();
   const locale = i18n.language?.startsWith("de") ? "de" : "en";
@@ -74,6 +85,26 @@ export function TicketHeader({ ticket }: { ticket: TicketDetail }) {
           <h1 className="mt-1 font-display text-xl font-semibold text-ink">
             {ticket.title || t("ticket.noTitle")}
           </h1>
+          <div className="mt-2 flex flex-wrap items-center gap-1.5" data-testid="ticket-badge-row">
+            {ticket.state && (
+              <span
+                className="inline-flex items-center gap-1.5 rounded border border-hairline bg-surface-subtle px-2 py-0.5 text-xs font-medium text-ink"
+                data-testid="badge-state"
+              >
+                <span
+                  className="inline-block h-2 w-2 rounded-full"
+                  style={{ background: stateColorVar(ticket.state) }}
+                />
+                {ticket.state}
+              </span>
+            )}
+            {ticket.priority && (
+              <Badge tone={priorityTone(ticket.priority_id)}>{ticket.priority}</Badge>
+            )}
+            {ticket.queue_name && (
+              <Badge tone="default">{ticket.queue_name}</Badge>
+            )}
+          </div>
         </div>
       </div>
       <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm sm:grid-cols-3 lg:grid-cols-4">

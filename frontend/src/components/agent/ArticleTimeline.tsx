@@ -7,6 +7,12 @@ import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Spinner } from "@/components/ui/Spinner";
 import { ArticleBodyRenderer } from "./ArticleBodyRenderer";
+import { ReplyDialog } from "./ReplyDialog";
+import {
+  BounceDialog,
+  ForwardDialog,
+  SplitDialog,
+} from "./ArticleActionDialogs";
 import { cn } from "@/lib/cn";
 
 function senderTone(
@@ -17,6 +23,22 @@ function senderTone(
   if (s === "agent") return "success";
   if (s === "system") return "muted";
   return "default";
+}
+
+/** Background tint + border classes keyed on sender type (primary cue). */
+function senderTintClass(senderType: string | null | undefined): string {
+  const s = (senderType || "").toLowerCase();
+  if (s === "customer") return "bg-article-customer border-article-customer-border";
+  if (s === "system") return "bg-article-system border-hairline";
+  return "bg-article-agent border-hairline";
+}
+
+/** Sort key: incoming_time (epoch seconds) preferred, else create_time. */
+function articleSortKey(a: ArticleListItem): number {
+  if (typeof a.incoming_time === "number" && a.incoming_time > 0) {
+    return a.incoming_time * 1000;
+  }
+  return new Date(a.create_time).getTime();
 }
 
 function dayKey(iso: string, locale: string): string {
@@ -37,6 +59,8 @@ export function ArticleTimeline({
   const { t, i18n } = useTranslation();
   const locale = i18n.language?.startsWith("de") ? "de" : "en";
   const [expanded, setExpanded] = useState<Record<number, boolean>>({});
+  // Default newest-first (descending); toggle flips to oldest-first.
+  const [descending, setDescending] = useState(true);
 
   const articlesQ = useQuery({
     queryKey: ["tickets", ticketId, "articles"],
@@ -53,9 +77,15 @@ export function ArticleTimeline({
     );
   }
 
-  // Group by day
+  // Chronological sort by incoming/create time, respecting the direction.
+  const sorted = [...articles].sort((a, b) => {
+    const diff = articleSortKey(a) - articleSortKey(b);
+    return descending ? -diff : diff;
+  });
+
+  // Group by day (order follows the sorted list).
   const groups: { day: string; items: ArticleListItem[] }[] = [];
-  for (const a of articles) {
+  for (const a of sorted) {
     const day = dayKey(a.create_time, locale);
     const last = groups[groups.length - 1];
     if (last && last.day === day) last.items.push(a);
@@ -64,6 +94,18 @@ export function ArticleTimeline({
 
   return (
     <div className="space-y-6" data-testid="article-timeline">
+      {articles.length > 0 && (
+        <div className="flex justify-end">
+          <Button
+            variant="secondary"
+            size="sm"
+            data-testid="article-sort-toggle"
+            onClick={() => setDescending((d) => !d)}
+          >
+            {descending ? t("ticket.sortNewestFirst") : t("ticket.sortOldestFirst")}
+          </Button>
+        </div>
+      )}
       {articles.length === 0 ? (
         <p className="text-sm text-muted">{t("ticket.noArticles")}</p>
       ) : (
@@ -78,7 +120,11 @@ export function ArticleTimeline({
                 return (
                   <li
                     key={article.id}
-                    className="rounded-lg border border-hairline bg-surface"
+                    className={cn(
+                      "rounded-lg border",
+                      senderTintClass(article.sender_type),
+                    )}
+                    data-sender={(article.sender_type || "unknown").toLowerCase()}
                     data-testid={`article-${article.id}`}
                   >
                     <button
@@ -133,6 +179,7 @@ export function ArticleTimeline({
                           ticketId={ticketId}
                           articleId={article.id}
                         />
+                        <ArticleActions ticketId={ticketId} article={article} />
                       </div>
                     )}
                   </li>
@@ -146,6 +193,73 @@ export function ArticleTimeline({
         ticketId={ticketId}
         articles={articles}
         onComposingChange={onComposingChange}
+      />
+    </div>
+  );
+}
+
+/** Per-article action row: Reply / Reply-all / Forward / Bounce / Split. */
+function ArticleActions({
+  ticketId,
+  article,
+}: {
+  ticketId: number;
+  article: ArticleListItem;
+}) {
+  const { t } = useTranslation();
+  const [dialog, setDialog] = useState<
+    "reply" | "replyAll" | "forward" | "bounce" | "split" | null
+  >(null);
+  const hasMultipleRecipients =
+    (article.to_address ?? "").includes(",") || Boolean(article.to_address && article.from_address);
+
+  return (
+    <div
+      className="flex flex-wrap items-center gap-1.5 border-t border-hairline/60 pt-2"
+      data-testid={`article-actions-${article.id}`}
+    >
+      <Button size="sm" variant="secondary" onClick={() => setDialog("reply")}>
+        {t("ticket.reply")}
+      </Button>
+      {hasMultipleRecipients && (
+        <Button size="sm" variant="secondary" onClick={() => setDialog("replyAll")}>
+          {t("ticket.replyAll")}
+        </Button>
+      )}
+      <Button size="sm" variant="ghost" onClick={() => setDialog("forward")}>
+        {t("ticket.forward")}
+      </Button>
+      <Button size="sm" variant="ghost" onClick={() => setDialog("bounce")}>
+        {t("ticket.bounce")}
+      </Button>
+      <Button size="sm" variant="ghost" onClick={() => setDialog("split")}>
+        {t("ticket.split")}
+      </Button>
+
+      <ReplyDialog
+        ticketId={ticketId}
+        articleId={article.id}
+        replyAll={dialog === "replyAll"}
+        open={dialog === "reply" || dialog === "replyAll"}
+        onClose={() => setDialog(null)}
+      />
+      <ForwardDialog
+        ticketId={ticketId}
+        articleId={article.id}
+        open={dialog === "forward"}
+        onClose={() => setDialog(null)}
+      />
+      <BounceDialog
+        ticketId={ticketId}
+        articleId={article.id}
+        open={dialog === "bounce"}
+        onClose={() => setDialog(null)}
+      />
+      <SplitDialog
+        ticketId={ticketId}
+        articleId={article.id}
+        open={dialog === "split"}
+        onClose={() => setDialog(null)}
       />
     </div>
   );
@@ -174,7 +288,6 @@ function ArticleComposer({
   const { t } = useTranslation();
   const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
-  const [mode, setMode] = useState<"note" | "reply">("note");
   const [subject, setSubject] = useState("");
   const [body, setBody] = useState("");
   const [openedAtMaxId, setOpenedAtMaxId] = useState(0);
@@ -187,11 +300,13 @@ function ArticleComposer({
     mutationFn: () =>
       api.createArticle(ticketId, {
         sender_type: "agent",
-        subject: subject || (mode === "reply" ? t("ticket.composerReply") : t("ticket.composerNote")),
+        subject: subject || t("ticket.composerNote"),
         body,
         content_type: "text/plain; charset=utf-8",
-        channel: mode,
-        is_visible_for_customer: mode === "reply",
+        // Bottom composer is internal-note only; customer replies use the
+        // per-article reply dialog.
+        channel: "note",
+        is_visible_for_customer: false,
       }),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["tickets", ticketId, "articles"] });
@@ -214,7 +329,7 @@ function ArticleComposer({
             setOpen(true);
           }}
         >
-          {t("ticket.composerReply")}
+          {t("ticket.composerNote")}
         </Button>
       </div>
     );
@@ -232,22 +347,7 @@ function ArticleComposer({
           {t("ticket.composeWarning")}
         </p>
       )}
-      <div className="flex items-center gap-1.5">
-        <Button
-          variant={mode === "note" ? "primary" : "secondary"}
-          size="sm"
-          onClick={() => setMode("note")}
-        >
-          {t("ticket.composerNote")}
-        </Button>
-        <Button
-          variant={mode === "reply" ? "primary" : "secondary"}
-          size="sm"
-          onClick={() => setMode("reply")}
-        >
-          {t("ticket.composerReply")}
-        </Button>
-      </div>
+      <p className="text-xs font-medium text-muted">{t("ticket.composerNote")}</p>
       <input
         type="text"
         value={subject}
