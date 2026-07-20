@@ -84,6 +84,8 @@ class ArticleCreateRequest(BaseModel):
     from_address: str | None = None
     to_address: str | None = None
     cc: str | None = None
+    bcc: str | None = None
+    reply_to: str | None = None
     channel: str = "note"
 
 
@@ -176,6 +178,24 @@ async def list_tickets(
         sort=sort,
         order=order,
     )
+
+
+class MyTicketCounts(BaseModel):
+    """Owned-ticket counts for the "My tickets" sidebar badges."""
+
+    open: int
+    new: int
+
+
+@router.get("/my-counts", response_model=MyTicketCounts)
+async def my_ticket_counts(user: CurrentUser, session: DbSession) -> MyTicketCounts:
+    """Open/new counts for tickets owned by the current agent.
+
+    Registered before ``/{ticket_id}`` so "my-counts" is not parsed as a
+    ticket id.
+    """
+    counts = await TicketService(session).count_owned(user.id)
+    return MyTicketCounts(open=counts["open"], new=counts["new"])
 
 
 class _EchoWriter:
@@ -528,6 +548,8 @@ async def create_article(
                     from_address=body.from_address,
                     to_address=body.to_address,
                     cc=body.cc,
+                    bcc=body.bcc,
+                    reply_to=body.reply_to,
                     channel=body.channel,
                 ),
             )
