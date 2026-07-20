@@ -15,10 +15,29 @@ import { ActivityDialogModal } from "./ActivityDialogModal";
  * views: the current activity + its available dialogs when the ticket *is*
  * in a process, or a "start process" affordance (embedded dialog, see
  * StartProcessDialog.tsx) when it is not.
+ *
+ * When `hideInactiveStart` is set (ticket-zoom ⋮ menu owns the start action),
+ * the inactive affordance is suppressed; the dialog can still be opened via
+ * controlled `startOpen` / `onStartOpenChange`.
  */
-export function ProcessWidget({ ticketId }: { ticketId: number }) {
+export function ProcessWidget({
+  ticketId,
+  hideInactiveStart = false,
+  startOpen: startOpenProp,
+  onStartOpenChange,
+}: {
+  ticketId: number;
+  hideInactiveStart?: boolean;
+  startOpen?: boolean;
+  onStartOpenChange?: (open: boolean) => void;
+}) {
   const { t } = useTranslation();
-  const [startOpen, setStartOpen] = useState(false);
+  const [startOpenLocal, setStartOpenLocal] = useState(false);
+  const startOpen = startOpenProp ?? startOpenLocal;
+  const setStartOpen = (open: boolean) => {
+    onStartOpenChange?.(open);
+    if (startOpenProp === undefined) setStartOpenLocal(open);
+  };
   const [openDialogEntityId, setOpenDialogEntityId] = useState<string | null>(null);
 
   const stateQ = useQuery({
@@ -39,19 +58,25 @@ export function ProcessWidget({ ticketId }: { ticketId: number }) {
   const state = stateQ.data;
   const inProcess = Boolean(state.process_entity_id);
 
-  // Not in a process: a small, unobtrusive affordance — no big empty card.
+  // Not in a process: optional start affordance (or dialog-only when the
+  // ticket-zoom ⋮ menu owns the trigger).
   if (!inProcess) {
     return (
-      <div className="flex justify-end" data-testid="process-widget-inactive">
-        <button
-          type="button"
-          onClick={() => setStartOpen(true)}
-          className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-xs text-muted transition-colors hover:text-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent"
-          data-testid="process-widget-start-button"
-        >
-          <span aria-hidden>＋</span>
-          {t("process.widget.startButton")}
-        </button>
+      <div
+        className={hideInactiveStart ? undefined : "flex justify-end"}
+        data-testid="process-widget-inactive"
+      >
+        {!hideInactiveStart && (
+          <button
+            type="button"
+            onClick={() => setStartOpen(true)}
+            className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-xs text-muted transition-colors hover:text-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent"
+            data-testid="process-widget-start-button"
+          >
+            <span aria-hidden>＋</span>
+            {t("process.widget.startButton")}
+          </button>
+        )}
         <StartProcessDialog
           ticketId={ticketId}
           open={startOpen}

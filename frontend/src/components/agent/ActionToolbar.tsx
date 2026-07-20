@@ -8,6 +8,7 @@ import { useAuth } from "@/auth/AuthContext";
 import { Button } from "@/components/ui/Button";
 import { Dialog } from "@/components/ui/Dialog";
 import { Spinner } from "@/components/ui/Spinner";
+import { stateLabel } from "@/lib/status";
 
 const inputCls =
   "w-full rounded border border-hairline bg-surface px-2 py-1.5 text-sm text-ink placeholder:text-muted focus:outline-none focus:ring-1 focus:ring-accent";
@@ -254,7 +255,7 @@ export function ActionToolbar({ ticket }: { ticket: TicketDetail }) {
                 close();
               }}
             >
-              {s.name}
+              {stateLabel(t, s.name)}
             </MenuItem>
           ))
         }
@@ -288,7 +289,7 @@ export function ActionToolbar({ ticket }: { ticket: TicketDetail }) {
                   close();
                 }}
               >
-                {s.name}
+                {stateLabel(t, s.name)}
               </MenuItem>
             ))
           )
@@ -638,7 +639,7 @@ function PendingDialog({
             <option value="">{t("ticket.dialog.selectPlaceholder")}</option>
             {pendingStates.map((s) => (
               <option key={s.id} value={s.id}>
-                {s.name}
+                {stateLabel(t, s.name)}
               </option>
             ))}
           </select>

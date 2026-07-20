@@ -7,6 +7,7 @@ import { useAuth } from "@/auth/AuthContext";
 import { flattenQueues } from "@/components/agent/QueueTree";
 import { Button } from "@/components/ui/Button";
 import { Spinner } from "@/components/ui/Spinner";
+import { stateLabel } from "@/lib/status";
 
 const FIELD_CLASS =
   "w-full rounded-md border border-hairline bg-surface-subtle px-3 py-2 text-[13.5px] text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent focus:border-accent";
@@ -236,7 +237,7 @@ export function NewTicketPage() {
               >
                 {states.map((s) => (
                   <option key={s.id} value={s.id}>
-                    {s.name}
+                    {stateLabel(t, s.name)}
                   </option>
                 ))}
               </select>

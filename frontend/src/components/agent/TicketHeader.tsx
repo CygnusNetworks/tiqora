@@ -5,15 +5,25 @@ import { Badge } from "@/components/ui/Badge";
 import {
   combinedEscalationLevel,
   formatCountdown,
+  isNewTicketState,
   spineClassName,
   stateColorVar,
+  stateLabel,
 } from "@/lib/status";
 import { priorityName, priorityTextClass } from "@/lib/priority";
-import type { CSSProperties } from "react";
+import type { CSSProperties, ReactNode } from "react";
 
-export function TicketHeader({ ticket }: { ticket: TicketDetail }) {
+export function TicketHeader({
+  ticket,
+  overflowMenu,
+}: {
+  ticket: TicketDetail;
+  /** Optional ⋮ overflow menu anchored top-right of the ticket-info box. */
+  overflowMenu?: ReactNode;
+}) {
   const { t, i18n } = useTranslation();
   const locale = i18n.language?.startsWith("de") ? "de" : "en";
+  const isNew = isNewTicketState(ticket.state, ticket.state_type);
 
   const badges: { label: string; tone: "danger" | "warn" }[] = [];
   if (isEscalated(ticket.escalation_response_time)) {
@@ -55,9 +65,17 @@ export function TicketHeader({ ticket }: { ticket: TicketDetail }) {
       data-testid="ticket-header"
     >
       <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
+        <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
             <span className="font-mono text-sm text-accent">{ticket.tn}</span>
+            {isNew && (
+              <span
+                className="rounded-full bg-accent-dim px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-accent"
+                data-testid="ticket-header-new-badge"
+              >
+                {t("ticket.stateName.new")}
+              </span>
+            )}
             {countdown && (
               <span className="rounded bg-escalation/15 px-1.5 py-0.5 font-mono text-[11px] tabular-nums text-escalation">
                 {countdown}
@@ -76,14 +94,26 @@ export function TicketHeader({ ticket }: { ticket: TicketDetail }) {
             {ticket.title || t("ticket.noTitle")}
           </h1>
         </div>
+        {overflowMenu && (
+          <div className="shrink-0 print:hidden" data-testid="ticket-header-overflow">
+            {overflowMenu}
+          </div>
+        )}
       </div>
       {/* One compact metadata line — no redundant badge row, priority without
-          its numeric rank. Wraps on narrow screens. */}
+          its numeric rank. Wraps on narrow screens. For "new" tickets the
+          Neu badge above is the only state cue (no duplicate Status text). */}
       <dl
         className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm"
         data-testid="ticket-meta-line"
       >
-        <Meta label={t("ticket.state")} value={ticket.state} dot={stateColorVar(ticket.state)} />
+        {!isNew && (
+          <Meta
+            label={t("ticket.state")}
+            value={stateLabel(t, ticket.state)}
+            dot={stateColorVar(ticket.state)}
+          />
+        )}
         <Meta
           label={t("ticket.priority")}
           value={priorityName(ticket.priority)}

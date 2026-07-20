@@ -177,6 +177,28 @@
     "composeWarning": "Another agent replied since you started composing.",
     "sortNewestFirst": "Newest first",
     "sortOldestFirst": "Oldest first",
+    "stateName": {
+      "new": "New",
+      "open": "Open",
+      "pending": "Pending",
+      "pendingReminder": "Pending reminder",
+      "pendingAuto": "Pending auto",
+      "pendingAutoClosePlus": "Pending auto close+",
+      "pendingAutoCloseMinus": "Pending auto close−",
+      "closed": "Closed",
+      "closedSuccessful": "Closed successful",
+      "closedUnsuccessful": "Closed unsuccessful",
+      "merged": "Merged",
+      "removed": "Removed"
+    },
+    "overflow": {
+      "menu": "More actions",
+      "articles": "Articles",
+      "history": "History",
+      "startProcess": "Start process",
+      "internalNote": "Internal note",
+      "sort": "Sort order"
+    },
     "senderCustomer": "Customer",
     "senderAgent": "Agent",
     "senderSystem": "System",
