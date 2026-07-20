@@ -364,6 +364,20 @@ export type CustomerRef = {
   full_name: string;
 };
 
+// Hand-written to match tiqora/api/v1/tickets.py's TicketCreateRequest, which
+// the generated schema for this route does not yet reflect (agent create needs
+// queue/state/priority/owner, not the portal-style title/body). The initial
+// message is added as a separate article after creation. See the Stats/Ref
+// blocks above for why we hand-write instead of regenerating openapi.json.
+export type AgentTicketCreateInput = {
+  title: string;
+  queue_id: number;
+  state_id: number;
+  priority_id: number;
+  owner_id: number;
+  customer_user_id?: string | null;
+};
+
 export class ApiError extends Error {
   readonly status: number;
   readonly detail: unknown;
@@ -687,7 +701,7 @@ export class ApiClient {
     });
   }
 
-  createTicket(body: TicketCreateRequest, signal?: AbortSignal) {
+  createTicket(body: AgentTicketCreateInput, signal?: AbortSignal) {
     return this.request<TicketCreateResponse>("POST", "/api/v1/tickets", {
       body,
       signal,
