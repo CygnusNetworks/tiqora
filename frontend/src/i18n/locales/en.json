@@ -427,7 +427,8 @@
       "genericAgentJobs": "Generic agent jobs",
       "dynamicFields": "Dynamic fields",
       "webhooks": "Webhooks",
-      "processes": "Processes"
+      "processes": "Processes",
+      "mailOutbound": "Email (outbound)"
     },
     "table": {
       "id": "ID",
@@ -661,6 +662,36 @@
       "dialogs": "Dialogs",
       "noDialogs": "—",
       "loadError": "Could not load process."
+    },
+    "mailOutbound": {
+      "title": "Outbound email (SMTP)",
+      "description": "SMTP settings for agent replies. The password is stored encrypted and never returned by the API.",
+      "enabled": "Sending enabled",
+      "host": "SMTP host",
+      "port": "Port",
+      "security": "Security",
+      "securityNone": "None",
+      "securityStarttls": "STARTTLS",
+      "securitySsl": "SSL/TLS",
+      "authType": "Authentication",
+      "authNone": "None",
+      "authPassword": "Username/password",
+      "authUser": "Username",
+      "authPasswordField": "Password",
+      "passwordSet": "set",
+      "passwordPlaceholder": "Leave blank to keep current",
+      "fromDefault": "Default From address",
+      "timeoutSeconds": "Timeout (seconds)",
+      "save": "Save",
+      "saving": "Saving…",
+      "saved": "Settings saved.",
+      "saveError": "Failed to save settings.",
+      "test": "Test connection",
+      "testing": "Testing…",
+      "testTo": "Send test to address (optional)",
+      "testSuccess": "Test succeeded",
+      "testFailure": "Test failed",
+      "loadError": "Failed to load settings."
     }
   },
   "kb": {

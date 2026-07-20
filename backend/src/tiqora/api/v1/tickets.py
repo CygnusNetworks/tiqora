@@ -14,7 +14,6 @@ from pydantic import BaseModel, Field
 
 from tiqora.api.deps import AppSettings, CurrentUser, DbSession
 from tiqora.channels.email.outbound_reply import OutboundMailError
-from tiqora.channels.email.smtp import SmtpMailSender
 from tiqora.db.engine import get_session_factory
 from tiqora.domain.schemas import (
     ArticleBody,
@@ -158,11 +157,13 @@ def _map_exc(exc: Exception) -> HTTPException:
 
 
 def _write_service(session: Any, settings: Any) -> TicketWriteService:
+    _ = settings
     factory = get_session_factory()
     sysconfig = SysConfig(session)
-    # Injectable MailSender so tests can swap CapturingMailSender via
-    # TicketWriteService(..., mail_sender=...). Production uses Settings.smtp_*.
-    return TicketWriteService(session, factory, sysconfig, mail_sender=SmtpMailSender(settings))
+    # mail_sender=None: deliver_agent_email_reply resolves DB outbound settings
+    # first, then env TIQORA_SMTP_*. Tests inject CapturingMailSender via
+    # TicketWriteService(..., mail_sender=...).
+    return TicketWriteService(session, factory, sysconfig, mail_sender=None)
 
 
 @router.get("", response_model=PaginatedTickets)

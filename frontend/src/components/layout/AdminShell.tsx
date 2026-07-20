@@ -83,6 +83,11 @@ const NAV_GROUPS: NavGroup[] = [
         labelKey: "admin.nav.autoResponses",
         testId: "admin-nav-auto-responses",
       },
+      {
+        to: "/admin/mail-outbound",
+        labelKey: "admin.nav.mailOutbound",
+        testId: "admin-nav-mail-outbound",
+      },
     ],
   },
   {
