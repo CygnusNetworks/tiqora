@@ -80,6 +80,7 @@ from tiqora.db.legacy.ticket import (  # noqa: F401
     TicketType,
     TicketWatcher,
 )
+from tiqora.db.legacy.types import LegacyDateTime  # noqa: F401
 from tiqora.db.legacy.user import (  # noqa: F401
     GroupCustomer,
     GroupCustomerUser,
@@ -94,6 +95,7 @@ from tiqora.db.legacy.user import (  # noqa: F401
 
 __all__ = [
     "LegacyBase",
+    "LegacyDateTime",
     "legacy_metadata",
     "Ticket",
     "TicketHistory",

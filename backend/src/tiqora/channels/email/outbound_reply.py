@@ -1,19 +1,18 @@
 """Outbound agent email replies (TicketZoom compose / ArticleCreate channel=email).
 
 Wires the existing :mod:`tiqora.channels.email.smtp` primitives into the agent
-reply path. Ordering is **send-then-store** (same as auto-responses in
-:mod:`tiqora.channels.email.autoresponse`):
+reply path. Shared prepare step (signature, From, Message-ID, threading):
 
 1. Resolve From (queue system_address), signature, Message-ID, threading headers
-2. SMTP send via injectable :class:`MailSender`
-3. Persist the article with the *same* headers/body that were sent
+2. If outbound mail is enabled (``Settings.smtp_enabled``): SMTP send first via
+   injectable :class:`MailSender`, then store — on send failure store nothing
+   and raise :class:`OutboundMailError` (HTTP 502). Matches Znuny AgentTicketCompose.
+3. If outbound mail is **not** enabled (default): store the prepared article and
+   log ``agent_email_not_dispatched`` — no SMTP attempt, no 502. Production often
+   has no relay; losing the agent's typed text is worse than not sending.
 
-If SMTP fails the article is **not** stored and the caller surfaces an HTTP
-error — a silent 201 with no mail was the user-facing bug. The compose form
-still holds the draft so the agent can retry. We prefer that over store-then-
-send, which can leave a customer-visible "sent" article that never left the
-server (Znuny AgentTicketCompose also fails the action when delivery fails
-before treating the reply as done).
+The stored article content (incl. signature + threading headers) is identical
+in both paths; only the send attempt is gated.
 """
 
 from __future__ import annotations
@@ -311,12 +310,21 @@ async def deliver_agent_email_reply(
     queue_id: int,
     user_id: int,
     article: ArticleIn,
+    dispatch: bool | None = None,
 ) -> int:
-    """Prepare → SMTP send → store. Returns the new article id.
+    """Prepare → optional SMTP send → store. Returns the new article id.
 
-    Send-then-store: a failed SMTP call leaves no article row; a successful
-    send that somehow fails on INSERT is rare and logged by the caller.
+    When outbound mail is enabled (``Settings.smtp_enabled`` / ``dispatch=True``):
+    **send-then-store** — a failed SMTP call leaves no article row so the agent
+    can retry without a false "sent" customer-visible note.
+
+    When outbound mail is **not** enabled (default): store the fully prepared
+    article (signature + threading headers identical to the send path) and log
+    ``agent_email_not_dispatched`` — never attempt SMTP, never 502. Production
+    often has no relay; losing the agent's typed text is worse than not sending.
     """
+    from tiqora.config import get_settings
+
     prepared = await prepare_outgoing_agent_email(
         session,
         sysconfig,
@@ -325,7 +333,18 @@ async def deliver_agent_email_reply(
         user_id=user_id,
         article=article,
     )
-    await send_prepared_agent_email(mail_sender, prepared)
+    should_dispatch = get_settings().smtp_enabled if dispatch is None else dispatch
+    if should_dispatch:
+        await send_prepared_agent_email(mail_sender, prepared)
+    else:
+        logger.warning(
+            "agent_email_not_dispatched",
+            reason="smtp_disabled",
+            ticket_id=ticket_id,
+            to=prepared.to_address,
+            subject=prepared.subject,
+            message_id=prepared.message_id,
+        )
     article_id = await add_article(
         session,
         ticket_id=ticket_id,
@@ -333,13 +352,23 @@ async def deliver_agent_email_reply(
         user_id=user_id,
         sysconfig=sysconfig,
     )
-    logger.info(
-        "agent_email_reply_sent",
-        ticket_id=ticket_id,
-        article_id=article_id,
-        to=prepared.to_address,
-        message_id=prepared.message_id,
-    )
+    if should_dispatch:
+        logger.info(
+            "agent_email_reply_sent",
+            ticket_id=ticket_id,
+            article_id=article_id,
+            to=prepared.to_address,
+            message_id=prepared.message_id,
+        )
+    else:
+        logger.info(
+            "agent_email_reply_stored",
+            ticket_id=ticket_id,
+            article_id=article_id,
+            to=prepared.to_address,
+            message_id=prepared.message_id,
+            dispatched=False,
+        )
     return article_id
 
 

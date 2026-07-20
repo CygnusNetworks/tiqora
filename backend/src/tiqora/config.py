@@ -196,6 +196,10 @@ class Settings(BaseSettings):
     postmaster_interval_seconds: int = Field(
         default=60, validation_alias="TIQORA_POSTMASTER_INTERVAL"
     )
+    # Outbound SMTP. Disabled by default so agent email replies store the
+    # article without 502ing when no relay is configured (prod often has no
+    # TIQORA_SMTP_HOST). Set TIQORA_SMTP_ENABLED=1 once a real relay is wired.
+    smtp_enabled: bool = Field(default=False, validation_alias="TIQORA_SMTP_ENABLED")
     smtp_host: str = Field(default="localhost", validation_alias="TIQORA_SMTP_HOST")
     smtp_port: int = Field(default=25, validation_alias="TIQORA_SMTP_PORT")
     smtp_use_tls: bool = Field(default=False, validation_alias="TIQORA_SMTP_USE_TLS")

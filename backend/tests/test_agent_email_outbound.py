@@ -19,6 +19,7 @@ from tiqora.channels.email.outbound_reply import (
     generate_message_id,
 )
 from tiqora.channels.email.smtp import CapturingMailSender, FailingMailSender, build_message
+from tiqora.config import get_settings
 from tiqora.db.tiqora.base import TiqoraBase
 from tiqora.domain.ticket_write_service import ArticleIn, TicketWriteService
 from tiqora.znuny.password import hash_password
@@ -272,126 +273,206 @@ def test_build_message_agent_headers() -> None:
 @pytest.mark.asyncio
 @pytest.mark.parametrize("url_fixture", ["mariadb_znuny_url", "postgres_znuny_url"])
 async def test_agent_email_reply_sends_and_stores(
-    url_fixture: str, request: pytest.FixtureRequest
+    url_fixture: str,
+    request: pytest.FixtureRequest,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    sync_url: str = request.getfixturevalue(url_fixture)
-    ids = _seed(sync_url, ns=1)
-    engine = create_async_engine(_to_async_url(sync_url))
-    factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
-    sysconfig = _make_sysconfig()
-    sender = CapturingMailSender()
+    monkeypatch.setenv("TIQORA_SMTP_ENABLED", "1")
+    get_settings.cache_clear()
+    try:
+        sync_url: str = request.getfixturevalue(url_fixture)
+        ids = _seed(sync_url, ns=1)
+        engine = create_async_engine(_to_async_url(sync_url))
+        factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+        sysconfig = _make_sysconfig()
+        sender = CapturingMailSender()
 
-    async with factory() as session, session.begin():
-        svc = TicketWriteService(session, factory, sysconfig, mail_sender=sender)
-        article_id = await svc.add_article(
-            ids["agent"],
-            ids["ticket"],
-            ArticleIn(
-                sender_type="agent",
-                is_visible_for_customer=False,  # forced True for email agent
-                subject="Re: Outbound ticket 911",
-                body="Thanks for your report — we are looking into it.",
-                channel="email",
-                to_address=ids["customer_email"],
-                cc="cc91@example.com",
-                in_reply_to=ids["orig_mid"],
-                references=ids["orig_mid"],
-            ),
-        )
-        assert article_id > 0
-
-    assert len(sender.sent) == 1
-    msg = sender.sent[0]
-    assert msg["To"] == ids["customer_email"]
-    assert msg["Cc"] == "cc91@example.com"
-    assert msg["Subject"] == "Re: Outbound ticket 911"
-    body = msg.get_content()
-    assert "Thanks for your report" in body
-    assert "Your Ticket-Team" in body
-    assert "Ada" in body and "Lovelace" in body
-    assert msg["In-Reply-To"] == ids["orig_mid"]
-    assert msg["Message-ID"] and msg["Message-ID"].startswith("<")
-    assert "X-OTRS-Loop" not in msg
-    assert ids["support_email"] in (msg["From"] or "")
-
-    async with factory() as session:
-        row = (
-            await session.execute(
-                text(
-                    "SELECT a.is_visible_for_customer, m.a_message_id, m.a_in_reply_to,"
-                    " m.a_body, m.a_from, m.a_to, m.a_message_id_md5"
-                    " FROM article a"
-                    " JOIN article_data_mime m ON m.article_id = a.id"
-                    " WHERE a.id = :aid"
+        async with factory() as session, session.begin():
+            svc = TicketWriteService(session, factory, sysconfig, mail_sender=sender)
+            article_id = await svc.add_article(
+                ids["agent"],
+                ids["ticket"],
+                ArticleIn(
+                    sender_type="agent",
+                    is_visible_for_customer=False,  # forced True for email agent
+                    subject="Re: Outbound ticket 911",
+                    body="Thanks for your report — we are looking into it.",
+                    channel="email",
+                    to_address=ids["customer_email"],
+                    cc="cc91@example.com",
+                    in_reply_to=ids["orig_mid"],
+                    references=ids["orig_mid"],
                 ),
-                {"aid": article_id},
             )
-        ).first()
-        assert row is not None
-        assert int(row[0]) == 1, "agent email must be customer-visible"
-        assert row[1] == msg["Message-ID"], "stored Message-ID must match sent mail"
-        assert row[2] == ids["orig_mid"]
-        assert "Your Ticket-Team" in (row[3] or "")
-        assert "Ada" in (row[3] or "")
-        assert ids["support_email"] in (row[4] or "")
-        assert row[5] == ids["customer_email"]
-        assert row[6] is not None, "a_message_id_md5 required for Znuny follow-up"
+            assert article_id > 0
 
-    await engine.dispose()
+        assert len(sender.sent) == 1
+        msg = sender.sent[0]
+        assert msg["To"] == ids["customer_email"]
+        assert msg["Cc"] == "cc91@example.com"
+        assert msg["Subject"] == "Re: Outbound ticket 911"
+        body = msg.get_content()
+        assert "Thanks for your report" in body
+        assert "Your Ticket-Team" in body
+        assert "Ada" in body and "Lovelace" in body
+        assert msg["In-Reply-To"] == ids["orig_mid"]
+        assert msg["Message-ID"] and msg["Message-ID"].startswith("<")
+        assert "X-OTRS-Loop" not in msg
+        assert ids["support_email"] in (msg["From"] or "")
+
+        async with factory() as session:
+            row = (
+                await session.execute(
+                    text(
+                        "SELECT a.is_visible_for_customer, m.a_message_id, m.a_in_reply_to,"
+                        " m.a_body, m.a_from, m.a_to, m.a_message_id_md5"
+                        " FROM article a"
+                        " JOIN article_data_mime m ON m.article_id = a.id"
+                        " WHERE a.id = :aid"
+                    ),
+                    {"aid": article_id},
+                )
+            ).first()
+            assert row is not None
+            assert int(row[0]) == 1, "agent email must be customer-visible"
+            assert row[1] == msg["Message-ID"], "stored Message-ID must match sent mail"
+            assert row[2] == ids["orig_mid"]
+            assert "Your Ticket-Team" in (row[3] or "")
+            assert "Ada" in (row[3] or "")
+            assert ids["support_email"] in (row[4] or "")
+            assert row[5] == ids["customer_email"]
+            assert row[6] is not None, "a_message_id_md5 required for Znuny follow-up"
+
+        await engine.dispose()
+    finally:
+        get_settings.cache_clear()
 
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("url_fixture", ["mariadb_znuny_url", "postgres_znuny_url"])
 async def test_agent_email_smtp_failure_raises_no_silent_success(
-    url_fixture: str, request: pytest.FixtureRequest
+    url_fixture: str,
+    request: pytest.FixtureRequest,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    sync_url: str = request.getfixturevalue(url_fixture)
-    ids = _seed(sync_url, ns=2)
-    engine = create_async_engine(_to_async_url(sync_url))
-    factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
-    sysconfig = _make_sysconfig()
-    sender = FailingMailSender("connection refused by test")
+    monkeypatch.setenv("TIQORA_SMTP_ENABLED", "1")
+    get_settings.cache_clear()
+    try:
+        sync_url: str = request.getfixturevalue(url_fixture)
+        ids = _seed(sync_url, ns=2)
+        engine = create_async_engine(_to_async_url(sync_url))
+        factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+        sysconfig = _make_sysconfig()
+        sender = FailingMailSender("connection refused by test")
 
-    async with factory() as session:
-        before = int(
-            (
-                await session.execute(
-                    text("SELECT COUNT(*) FROM article WHERE ticket_id = :tid"),
-                    {"tid": ids["ticket"]},
+        async with factory() as session:
+            before = int(
+                (
+                    await session.execute(
+                        text("SELECT COUNT(*) FROM article WHERE ticket_id = :tid"),
+                        {"tid": ids["ticket"]},
+                    )
+                ).scalar_one()
+            )
+
+        with pytest.raises(OutboundMailError, match="SMTP send failed"):
+            async with factory() as session, session.begin():
+                svc = TicketWriteService(session, factory, sysconfig, mail_sender=sender)
+                await svc.add_article(
+                    ids["agent"],
+                    ids["ticket"],
+                    ArticleIn(
+                        sender_type="agent",
+                        is_visible_for_customer=True,
+                        subject="Re: will fail",
+                        body="this must not be stored",
+                        channel="email",
+                        to_address=ids["customer_email"],
+                    ),
                 )
-            ).scalar_one()
-        )
 
-    with pytest.raises(OutboundMailError, match="SMTP send failed"):
+        assert sender.attempts == 1
+
+        async with factory() as session:
+            after = int(
+                (
+                    await session.execute(
+                        text("SELECT COUNT(*) FROM article WHERE ticket_id = :tid"),
+                        {"tid": ids["ticket"]},
+                    )
+                ).scalar_one()
+            )
+            assert after == before, "send-then-store: no article after SMTP failure"
+
+        await engine.dispose()
+    finally:
+        get_settings.cache_clear()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("url_fixture", ["mariadb_znuny_url", "postgres_znuny_url"])
+async def test_agent_email_smtp_disabled_stores_without_send(
+    url_fixture: str,
+    request: pytest.FixtureRequest,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Default / TIQORA_SMTP_ENABLED=0: store the reply, do not SMTP, do not 502."""
+    monkeypatch.setenv("TIQORA_SMTP_ENABLED", "0")
+    get_settings.cache_clear()
+    try:
+        assert get_settings().smtp_enabled is False
+        sync_url: str = request.getfixturevalue(url_fixture)
+        ids = _seed(sync_url, ns=4)
+        engine = create_async_engine(_to_async_url(sync_url))
+        factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+        sysconfig = _make_sysconfig()
+        sender = CapturingMailSender()
+
         async with factory() as session, session.begin():
             svc = TicketWriteService(session, factory, sysconfig, mail_sender=sender)
-            await svc.add_article(
+            article_id = await svc.add_article(
                 ids["agent"],
                 ids["ticket"],
                 ArticleIn(
                     sender_type="agent",
                     is_visible_for_customer=True,
-                    subject="Re: will fail",
-                    body="this must not be stored",
+                    subject="Re: offline store",
+                    body="Agent typed this with no relay configured.",
                     channel="email",
                     to_address=ids["customer_email"],
+                    in_reply_to=ids["orig_mid"],
                 ),
             )
+            assert article_id > 0
 
-    assert sender.attempts == 1
+        assert sender.sent == [], "smtp disabled must not attempt delivery"
 
-    async with factory() as session:
-        after = int(
-            (
+        async with factory() as session:
+            row = (
                 await session.execute(
-                    text("SELECT COUNT(*) FROM article WHERE ticket_id = :tid"),
-                    {"tid": ids["ticket"]},
+                    text(
+                        "SELECT a.is_visible_for_customer, m.a_body, m.a_message_id,"
+                        " m.a_in_reply_to, m.a_to"
+                        " FROM article a"
+                        " JOIN article_data_mime m ON m.article_id = a.id"
+                        " WHERE a.id = :aid"
+                    ),
+                    {"aid": article_id},
                 )
-            ).scalar_one()
-        )
-        assert after == before, "send-then-store: no article after SMTP failure"
+            ).first()
+            assert row is not None
+            assert int(row[0]) == 1
+            body = row[1] or ""
+            assert "Agent typed this with no relay configured." in body
+            assert "Your Ticket-Team" in body, "signature still appended when not dispatched"
+            assert "Ada" in body
+            assert row[2] and str(row[2]).startswith("<")
+            assert row[3] == ids["orig_mid"]
+            assert row[4] == ids["customer_email"]
 
-    await engine.dispose()
+        await engine.dispose()
+    finally:
+        get_settings.cache_clear()
 
 
 @pytest.mark.asyncio

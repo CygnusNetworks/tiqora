@@ -32,6 +32,7 @@ from sqlalchemy import Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from tiqora.db.legacy.base import LegacyBase
+from tiqora.db.legacy.types import LegacyDateTime
 
 
 class PmProcess(LegacyBase):
@@ -45,9 +46,9 @@ class PmProcess(LegacyBase):
     state_entity_id: Mapped[str] = mapped_column(String(50), nullable=False)
     layout: Mapped[str] = mapped_column(Text, nullable=False)
     config: Mapped[str] = mapped_column(Text, nullable=False)
-    create_time: Mapped[datetime] = mapped_column(nullable=False)
+    create_time: Mapped[datetime] = mapped_column(LegacyDateTime, nullable=False)
     create_by: Mapped[int] = mapped_column(Integer, nullable=False)
-    change_time: Mapped[datetime] = mapped_column(nullable=False)
+    change_time: Mapped[datetime] = mapped_column(LegacyDateTime, nullable=False)
     change_by: Mapped[int] = mapped_column(Integer, nullable=False)
 
 
@@ -60,9 +61,9 @@ class PmActivity(LegacyBase):
     entity_id: Mapped[str] = mapped_column(String(50), nullable=False, unique=True)
     name: Mapped[str] = mapped_column(String(200), nullable=False)
     config: Mapped[str] = mapped_column(Text, nullable=False)
-    create_time: Mapped[datetime] = mapped_column(nullable=False)
+    create_time: Mapped[datetime] = mapped_column(LegacyDateTime, nullable=False)
     create_by: Mapped[int] = mapped_column(Integer, nullable=False)
-    change_time: Mapped[datetime] = mapped_column(nullable=False)
+    change_time: Mapped[datetime] = mapped_column(LegacyDateTime, nullable=False)
     change_by: Mapped[int] = mapped_column(Integer, nullable=False)
 
 
@@ -75,9 +76,9 @@ class PmActivityDialog(LegacyBase):
     entity_id: Mapped[str] = mapped_column(String(50), nullable=False, unique=True)
     name: Mapped[str] = mapped_column(String(200), nullable=False)
     config: Mapped[str] = mapped_column(Text, nullable=False)
-    create_time: Mapped[datetime] = mapped_column(nullable=False)
+    create_time: Mapped[datetime] = mapped_column(LegacyDateTime, nullable=False)
     create_by: Mapped[int] = mapped_column(Integer, nullable=False)
-    change_time: Mapped[datetime] = mapped_column(nullable=False)
+    change_time: Mapped[datetime] = mapped_column(LegacyDateTime, nullable=False)
     change_by: Mapped[int] = mapped_column(Integer, nullable=False)
 
 
@@ -90,9 +91,9 @@ class PmTransition(LegacyBase):
     entity_id: Mapped[str] = mapped_column(String(50), nullable=False, unique=True)
     name: Mapped[str] = mapped_column(String(200), nullable=False)
     config: Mapped[str] = mapped_column(Text, nullable=False)
-    create_time: Mapped[datetime] = mapped_column(nullable=False)
+    create_time: Mapped[datetime] = mapped_column(LegacyDateTime, nullable=False)
     create_by: Mapped[int] = mapped_column(Integer, nullable=False)
-    change_time: Mapped[datetime] = mapped_column(nullable=False)
+    change_time: Mapped[datetime] = mapped_column(LegacyDateTime, nullable=False)
     change_by: Mapped[int] = mapped_column(Integer, nullable=False)
 
 
@@ -105,9 +106,9 @@ class PmTransitionAction(LegacyBase):
     entity_id: Mapped[str] = mapped_column(String(50), nullable=False, unique=True)
     name: Mapped[str] = mapped_column(String(200), nullable=False)
     config: Mapped[str] = mapped_column(Text, nullable=False)
-    create_time: Mapped[datetime] = mapped_column(nullable=False)
+    create_time: Mapped[datetime] = mapped_column(LegacyDateTime, nullable=False)
     create_by: Mapped[int] = mapped_column(Integer, nullable=False)
-    change_time: Mapped[datetime] = mapped_column(nullable=False)
+    change_time: Mapped[datetime] = mapped_column(LegacyDateTime, nullable=False)
     change_by: Mapped[int] = mapped_column(Integer, nullable=False)
 
 
@@ -126,5 +127,5 @@ class PmEntitySync(LegacyBase):
     entity_type: Mapped[str] = mapped_column(String(30), primary_key=True, nullable=False)
     entity_id: Mapped[str] = mapped_column(String(50), primary_key=True, nullable=False)
     sync_state: Mapped[str] = mapped_column(String(30), nullable=False)
-    create_time: Mapped[datetime] = mapped_column(nullable=False)
-    change_time: Mapped[datetime] = mapped_column(nullable=False)
+    create_time: Mapped[datetime] = mapped_column(LegacyDateTime, nullable=False)
+    change_time: Mapped[datetime] = mapped_column(LegacyDateTime, nullable=False)

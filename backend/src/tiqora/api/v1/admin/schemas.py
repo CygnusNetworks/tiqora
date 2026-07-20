@@ -27,8 +27,8 @@ class UserOut(BaseModel):
     first_name: str
     last_name: str
     valid_id: int
-    create_time: datetime
-    change_time: datetime
+    create_time: datetime | None
+    change_time: datetime | None
 
 
 class UserCreate(BaseModel):
@@ -70,8 +70,8 @@ class GroupOut(BaseModel):
     name: str
     comments: str | None
     valid_id: int
-    create_time: datetime
-    change_time: datetime
+    create_time: datetime | None
+    change_time: datetime | None
 
 
 class GroupCreate(BaseModel):
@@ -98,8 +98,8 @@ class RoleOut(BaseModel):
     name: str
     comments: str | None
     valid_id: int
-    create_time: datetime
-    change_time: datetime
+    create_time: datetime | None
+    change_time: datetime | None
 
 
 class RoleCreate(BaseModel):
@@ -147,8 +147,8 @@ class QueueOut(BaseModel):
     follow_up_lock: int
     comments: str | None
     valid_id: int
-    create_time: datetime
-    change_time: datetime
+    create_time: datetime | None
+    change_time: datetime | None
 
 
 class QueueCreate(BaseModel):
@@ -206,8 +206,8 @@ class StateOut(BaseModel):
     comments: str | None
     type_id: int
     valid_id: int
-    create_time: datetime
-    change_time: datetime
+    create_time: datetime | None
+    change_time: datetime | None
 
 
 class StateTypeOut(BaseModel):
@@ -239,8 +239,8 @@ class PriorityOut(BaseModel):
     id: int
     name: str
     valid_id: int
-    create_time: datetime
-    change_time: datetime
+    create_time: datetime | None
+    change_time: datetime | None
 
 
 class PriorityCreate(BaseModel):
@@ -277,8 +277,8 @@ class CustomerUserAdminOut(BaseModel):
     country: str | None
     comments: str | None
     valid_id: int
-    create_time: datetime
-    change_time: datetime
+    create_time: datetime | None
+    change_time: datetime | None
 
 
 class CustomerUserAdminCreate(BaseModel):
@@ -331,8 +331,8 @@ class CustomerCompanyOut(BaseModel):
     url: str | None
     comments: str | None
     valid_id: int
-    create_time: datetime
-    change_time: datetime
+    create_time: datetime | None
+    change_time: datetime | None
 
 
 class CustomerCompanyCreate(BaseModel):
@@ -376,8 +376,8 @@ class SalutationOut(BaseModel):
     content_type: str | None
     comments: str | None
     valid_id: int
-    create_time: datetime
-    change_time: datetime
+    create_time: datetime | None
+    change_time: datetime | None
 
 
 class SalutationWrite(BaseModel):
@@ -418,8 +418,8 @@ class StandardTemplateOut(BaseModel):
     template_type: str
     comments: str | None
     valid_id: int
-    create_time: datetime
-    change_time: datetime
+    create_time: datetime | None
+    change_time: datetime | None
 
 
 class StandardTemplateCreate(BaseModel):
@@ -461,8 +461,8 @@ class StandardAttachmentOut(BaseModel):
     filename: str
     comments: str | None
     valid_id: int
-    create_time: datetime
-    change_time: datetime
+    create_time: datetime | None
+    change_time: datetime | None
 
     @field_validator("content", mode="before")
     @classmethod
@@ -560,8 +560,8 @@ class AutoResponseOut(BaseModel):
     content_type: str | None
     comments: str | None
     valid_id: int
-    create_time: datetime
-    change_time: datetime
+    create_time: datetime | None
+    change_time: datetime | None
 
 
 class AutoResponseCreate(BaseModel):
@@ -615,8 +615,8 @@ class DynamicFieldOut(BaseModel):
     object_type: str
     config: dict[str, Any]
     valid_id: int
-    create_time: datetime
-    change_time: datetime
+    create_time: datetime | None
+    change_time: datetime | None
 
 
 class DynamicFieldCreate(BaseModel):
@@ -668,8 +668,8 @@ class AclOut(BaseModel):
     stop_after_match: int | None
     config_match: str | None
     config_change: str | None
-    create_time: datetime
-    change_time: datetime
+    create_time: datetime | None
+    change_time: datetime | None
 
 
 class GenericAgentJobOut(BaseModel):
