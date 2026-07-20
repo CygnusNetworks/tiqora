@@ -8,6 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 
 from tiqora.api.portal.deps import AppSettings, CurrentCustomer, get_customer_auth_service
 from tiqora.domain.customer_auth import CustomerAuthService, customer_to_dict
+from tiqora.domain.customer_auth_ldap import CustomerLdapAuthService
 from tiqora.domain.schemas import CustomerLoginResponse, CustomerMe, LoginRequest
 
 router = APIRouter(prefix="/auth", tags=["portal-auth"])
@@ -21,6 +22,14 @@ async def login(
     settings: AppSettings,
 ) -> CustomerLoginResponse:
     customer = await auth.authenticate_password(body.login, body.password)
+    if customer is None and settings.customer_ldap_enabled:
+        # LDAP fallback, mirroring Kernel::System::CustomerAuth::LDAP. No
+        # auto-provisioning in v1: the resolved LDAP UID must match an
+        # existing, valid `customer_user.login` row.
+        ldap_service = CustomerLdapAuthService(settings)
+        ldap_uid = await ldap_service.authenticate(body.login, body.password)
+        if ldap_uid is not None:
+            customer = await auth.get_customer_by_login(ldap_uid)
     if customer is None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,

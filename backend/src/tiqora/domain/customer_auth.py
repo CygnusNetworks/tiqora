@@ -139,6 +139,20 @@ class CustomerAuthService:
             return None
         return _to_authenticated(user)
 
+    async def get_customer_by_login(self, login: str) -> AuthenticatedCustomer | None:
+        """Look up an existing, valid customer by login — used by LDAP auth.
+
+        No auto-provisioning: returns ``None`` if no matching valid customer
+        exists, and the caller must reject the login.
+        """
+        result = await self._session.execute(
+            select(CustomerUser).where(CustomerUser.login == login, CustomerUser.valid_id == 1)
+        )
+        user = result.scalar_one_or_none()
+        if user is None:
+            return None
+        return _to_authenticated(user)
+
 
 def customer_to_dict(customer: AuthenticatedCustomer) -> dict[str, Any]:
     return {

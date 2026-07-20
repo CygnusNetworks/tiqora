@@ -48,6 +48,22 @@
     "totpVerify": "Bestätigen",
     "totpInvalid": "Ungültiger oder abgelaufener Code."
   },
+  "security": {
+    "title": "Sicherheit",
+    "totpHeading": "Zwei-Faktor-Authentifizierung",
+    "totpEnabled": "Aktiviert",
+    "totpDisabled": "Nicht aktiviert",
+    "enrollButton": "Authenticator-App einrichten",
+    "scanHint": "Scanne diesen QR-Code mit deiner Authenticator-App und gib dann den 6-stelligen Code zur Bestätigung ein.",
+    "secretLabel": "Oder gib dieses Secret manuell ein:",
+    "confirmCode": "Bestätigungscode",
+    "confirmButton": "Bestätigen",
+    "confirmError": "Ungültiger Code — bitte erneut versuchen.",
+    "disableButton": "Zwei-Faktor-Authentifizierung deaktivieren",
+    "disableCode": "Code zum Deaktivieren eingeben",
+    "disableConfirm": "Deaktivieren",
+    "disableError": "Ungültiger Code — bitte erneut versuchen."
+  },
   "dashboard": {
     "title": "Dashboard",
     "welcome": "Willkommen, {{name}}",
