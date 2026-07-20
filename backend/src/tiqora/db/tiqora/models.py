@@ -151,6 +151,39 @@ class TiqoraUserTotp(TiqoraBase):
     )
 
 
+class TiqoraCryptoKey(TiqoraBase):
+    """Bookkeeping record for an imported PGP/S/MIME key (Phase 2c).
+
+    Not the key material itself: PGP private/public key material lives in
+    the gpg keyring at ``TIQORA_CRYPTO_GNUPG_HOME``; S/MIME cert/key material
+    lives as files under the configured cert/private directories (see
+    ``tiqora.crypto.keystore``). This table only records *who imported what,
+    when* — an audit trail for `tiqora crypto pgp-import` /
+    `tiqora crypto smime-register`.
+    """
+
+    __tablename__ = "tiqora_crypto_key"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True, nullable=False)
+    # "pgp" | "smime"
+    key_type: Mapped[str] = mapped_column(String(20), nullable=False)
+    # PGP: fingerprint. S/MIME: the email the cert/key pair is filed under.
+    identifier: Mapped[str] = mapped_column(String(255), nullable=False)
+    email: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    # "sign" | "encrypt" | "both"
+    purpose: Mapped[str] = mapped_column(String(20), nullable=False, default="both")
+    has_private_key: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default=false()
+    )
+    created: Mapped[datetime] = mapped_column(
+        DateTime,
+        nullable=False,
+        server_default=func.now(),
+    )
+
+    __table_args__ = (Index("ix_tiqora_crypto_key_type_identifier", "key_type", "identifier"),)
+
+
 class TiqoraGdprAudit(TiqoraBase):
     """Audit trail for GDPR anonymization/retention runs (Phase 2c).
 

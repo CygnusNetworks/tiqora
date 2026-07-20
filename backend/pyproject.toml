@@ -39,6 +39,9 @@ dependencies = [
 kerberos = [
     "gssapi>=1.9.0",
 ]
+crypto = [
+    "python-gnupg>=0.5.2",
+]
 dev = [
     "pytest>=8.3.0",
     "pytest-asyncio>=0.24.0",
@@ -84,7 +87,19 @@ mypy_path = "src"
 warn_unused_ignores = true
 
 [[tool.mypy.overrides]]
-module = ["authlib.*", "gssapi", "gssapi.*", "pyotp", "pyotp.*", "ldap3", "ldap3.*", "qrcode", "qrcode.*"]
+module = [
+    "authlib.*",
+    "gssapi",
+    "gssapi.*",
+    "pyotp",
+    "pyotp.*",
+    "ldap3",
+    "ldap3.*",
+    "qrcode",
+    "qrcode.*",
+    "gnupg",
+    "gnupg.*",
+]
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]

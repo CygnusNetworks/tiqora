@@ -207,6 +207,25 @@ class Settings(BaseSettings):
         default=60, validation_alias="TIQORA_GENERIC_AGENT_INTERVAL"
     )
 
+    # PGP / S/MIME (Phase 2c). Both OFF by default and require their
+    # respective external tool (gpg / openssl) — see docs/crypto.md. When
+    # enabled, inbound postmaster mail is checked for PGP/S/MIME
+    # encryption/signatures (decrypt + verify, best-effort — a failure never
+    # blocks delivery) and the compat GenericInterface's TicketCreate
+    # EmailSecurity params are honored for outbound email articles.
+    crypto_pgp_enabled: bool = Field(default=False, validation_alias="TIQORA_CRYPTO_PGP_ENABLED")
+    crypto_pgp_gnupghome: str = Field(default="", validation_alias="TIQORA_CRYPTO_PGP_GNUPGHOME")
+    crypto_smime_enabled: bool = Field(
+        default=False, validation_alias="TIQORA_CRYPTO_SMIME_ENABLED"
+    )
+    # Tiqora-owned simplification of Znuny's SMIME::CertPath/SMIME::PrivatePath
+    # (flat <email>.crt / <email>.key directories — see tiqora.crypto.keystore).
+    crypto_smime_cert_dir: str = Field(default="", validation_alias="TIQORA_CRYPTO_SMIME_CERT_DIR")
+    crypto_smime_private_dir: str = Field(
+        default="", validation_alias="TIQORA_CRYPTO_SMIME_PRIVATE_DIR"
+    )
+    crypto_openssl_bin: str = Field(default="openssl", validation_alias="TIQORA_CRYPTO_OPENSSL_BIN")
+
     @property
     def cors_origin_list(self) -> list[str]:
         return [o.strip() for o in self.cors_origins.split(",") if o.strip()]
