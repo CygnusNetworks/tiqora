@@ -177,7 +177,7 @@ async def test_sse_stream_forwards_published_message() -> None:
     from tiqora.api.v1.events import _event_stream
 
     fake_redis = _FakeRedis()
-    generator = _event_stream(cast(Any, _FakeRequest()), cast(Any, fake_redis))
+    generator = _event_stream(cast(Any, _FakeRequest()), cast(Any, fake_redis), set())
 
     async def _publish_soon() -> None:
         await asyncio.sleep(0.05)
@@ -205,7 +205,7 @@ async def test_sse_stream_emits_heartbeat_when_idle(monkeypatch: pytest.MonkeyPa
     monkeypatch.setattr(events_module, "HEARTBEAT_INTERVAL_SECONDS", 0.05)
 
     fake_redis = _FakeRedis()
-    generator = events_module._event_stream(cast(Any, _FakeRequest()), cast(Any, fake_redis))
+    generator = events_module._event_stream(cast(Any, _FakeRequest()), cast(Any, fake_redis), set())
     try:
         chunk = await asyncio.wait_for(generator.__anext__(), timeout=5)
     finally:
@@ -225,3 +225,56 @@ async def test_sse_stream_requires_auth() -> None:
     async with AsyncClient(transport=transport, base_url="http://test") as client:
         resp = await client.get("/api/v1/events/stream")
         assert resp.status_code == 401
+
+
+def test_should_forward_filters_new_ticket_by_queue() -> None:
+    from tiqora.api.v1.events import _should_forward
+
+    allowed = {1, 2}
+    in_queue = json.dumps(
+        {"type": "ticket_new_in_queue", "ticket_id": 5, "queue_id": 2, "tn": "1", "title": "x"}
+    )
+    out_queue = json.dumps(
+        {"type": "ticket_new_in_queue", "ticket_id": 6, "queue_id": 9, "tn": "2", "title": "y"}
+    )
+    # In an allowed queue → forwarded; in a disallowed queue → dropped.
+    assert _should_forward(in_queue, allowed) is True
+    assert _should_forward(out_queue, allowed) is False
+
+
+def test_should_forward_passes_other_types_and_malformed() -> None:
+    from tiqora.api.v1.events import _should_forward
+
+    # No allowed queues at all, yet non-notification types still pass.
+    empty: set[int] = set()
+    assert _should_forward(json.dumps({"type": "ticket_changed", "ticket_id": 1}), empty) is True
+    assert _should_forward(json.dumps({"type": "presence_changed", "ticket_id": 1}), empty) is True
+    # Malformed / non-dict payloads never get swallowed by the filter.
+    assert _should_forward("not json", empty) is True
+    assert _should_forward(json.dumps([1, 2, 3]), empty) is True
+
+
+@pytest.mark.asyncio
+async def test_publish_new_ticket_in_queue_payload_shape() -> None:
+    from tiqora.events.pubsub import publish_new_ticket_in_queue
+
+    fake_redis = _FakeRedis()
+    await publish_new_ticket_in_queue(
+        cast(Any, fake_redis),
+        ticket_id=12,
+        tn="20240601000002",
+        title="Printer down",
+        queue_id=3,
+        queue_name="Raw",
+    )
+    assert fake_redis.published
+    channel, raw = fake_redis.published[-1]
+    assert channel == TIQORA_EVENTS_CHANNEL
+    assert json.loads(raw) == {
+        "type": "ticket_new_in_queue",
+        "ticket_id": 12,
+        "tn": "20240601000002",
+        "title": "Printer down",
+        "queue_id": 3,
+        "queue_name": "Raw",
+    }

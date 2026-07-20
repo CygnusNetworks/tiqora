@@ -17,6 +17,20 @@ Design notes
   keeps intermediate proxies/load balancers from timing out the idle
   connection and gives the generator a natural point to check for client
   disconnect.
+* ``ticket_new_in_queue`` messages carry a ``queue_id`` and are filtered
+  per-connection to the agent's readable queues: the endpoint computes
+  ``allowed_queue_ids`` **once** at connection time (the DB session is
+  closed before the streaming generator runs) and drops notifications for
+  queues the agent can't read. ``ticket_changed`` / ``presence_changed``
+  pass through unfiltered as before.
+
+v1 limitations (documented intentionally)
+-----------------------------------------
+* No notification-persistence table: unread state is live + session-only.
+  Reconnecting drops any history the client hadn't already received.
+* Permission-set changes mid-connection are not picked up until the client
+  reconnects, since ``allowed_queue_ids`` is snapshotted once per SSE
+  connection.
 """
 
 from __future__ import annotations
@@ -32,7 +46,8 @@ from fastapi import APIRouter, Depends, Request, status
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
-from tiqora.api.deps import CurrentUser, get_redis
+from tiqora.api.deps import CurrentUser, DbSession, get_redis
+from tiqora.domain.queue_service import QueueService
 from tiqora.events.pubsub import TIQORA_EVENTS_CHANNEL, publish_presence_changed
 
 logger = structlog.get_logger(__name__)
@@ -55,7 +70,28 @@ def _presence_key(ticket_id: int, user_id: int) -> str:
 # ---------------------------------------------------------------------------
 
 
-async def _event_stream(request: Request, redis_client: redis.Redis) -> AsyncGenerator[bytes, None]:
+def _should_forward(raw: str, allowed_queue_ids: set[int]) -> bool:
+    """Whether one raw pub/sub payload should reach *this* connection.
+
+    Only ``ticket_new_in_queue`` is filtered — it is dropped when its
+    ``queue_id`` is not among the agent's readable queues. Every other
+    message type (and any payload that isn't valid JSON) passes through, so
+    a filter miss never silently swallows unrelated events. Extracted as a
+    pure function so the per-queue gate is unit-testable without a live SSE
+    connection.
+    """
+    try:
+        payload = json.loads(raw)
+    except (ValueError, TypeError):
+        return True
+    if not isinstance(payload, dict) or payload.get("type") != "ticket_new_in_queue":
+        return True
+    return payload.get("queue_id") in allowed_queue_ids
+
+
+async def _event_stream(
+    request: Request, redis_client: redis.Redis, allowed_queue_ids: set[int]
+) -> AsyncGenerator[bytes, None]:
     pubsub = redis_client.pubsub()
     await pubsub.subscribe(TIQORA_EVENTS_CHANNEL)
     try:
@@ -76,6 +112,8 @@ async def _event_stream(request: Request, redis_client: redis.Redis) -> AsyncGen
                 continue
             if isinstance(data, bytes):
                 data = data.decode("utf-8")
+            if not _should_forward(data, allowed_queue_ids):
+                continue
             yield f"data: {data}\n\n".encode()
     except asyncio.CancelledError:
         raise
@@ -92,17 +130,26 @@ async def stream_events(
     request: Request,
     user: CurrentUser,
     redis_client: RedisDep,
+    session: DbSession,
 ) -> StreamingResponse:
     """Server-sent event stream of ``tiqora:events`` pub/sub messages.
 
     Requires an authenticated agent (same session/API-key auth as the rest
     of ``/api/v1``). Each message forwarded is the raw JSON payload
-    published to Redis — see :mod:`tiqora.events.pubsub` for the two
-    message shapes (``ticket_changed`` / ``presence_changed``).
+    published to Redis — see :mod:`tiqora.events.pubsub` for the message
+    shapes (``ticket_changed`` / ``presence_changed`` /
+    ``ticket_new_in_queue``).
+
+    ``ticket_new_in_queue`` notifications are filtered to the agent's
+    readable queues. ``allowed_queue_ids`` is resolved **here**, before the
+    ``StreamingResponse`` is returned, because the DB session dependency's
+    context manager closes once this function returns — the streaming
+    generator must not touch it. This snapshots the permission set for the
+    life of the connection (see the module docstring's v1 limitations).
     """
-    del user  # auth only — the stream itself is not scoped to this agent
+    allowed_queue_ids = await QueueService(session).allowed_queue_ids(user.id, "ro")
     return StreamingResponse(
-        _event_stream(request, redis_client),
+        _event_stream(request, redis_client, allowed_queue_ids),
         media_type="text/event-stream",
         headers={
             "Cache-Control": "no-cache",
