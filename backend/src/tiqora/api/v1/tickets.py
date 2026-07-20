@@ -13,6 +13,8 @@ from fastapi.responses import Response, StreamingResponse
 from pydantic import BaseModel, Field
 
 from tiqora.api.deps import AppSettings, CurrentUser, DbSession
+from tiqora.channels.email.outbound_reply import OutboundMailError
+from tiqora.channels.email.smtp import SmtpMailSender
 from tiqora.db.engine import get_session_factory
 from tiqora.domain.schemas import (
     ArticleBody,
@@ -86,6 +88,9 @@ class ArticleCreateRequest(BaseModel):
     cc: str | None = None
     bcc: str | None = None
     reply_to: str | None = None
+    message_id: str | None = None
+    in_reply_to: str | None = None
+    references: str | None = None
     channel: str = "note"
 
 
@@ -144,13 +149,20 @@ def _map_exc(exc: Exception) -> HTTPException:
         return HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden")
     if isinstance(exc, InvalidInput):
         return HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc))
+    if isinstance(exc, OutboundMailError):
+        return HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"Outbound email delivery failed: {exc}",
+        )
     return HTTPException(status_code=500, detail="Internal error")
 
 
 def _write_service(session: Any, settings: Any) -> TicketWriteService:
     factory = get_session_factory()
     sysconfig = SysConfig(session)
-    return TicketWriteService(session, factory, sysconfig)
+    # Injectable MailSender so tests can swap CapturingMailSender via
+    # TicketWriteService(..., mail_sender=...). Production uses Settings.smtp_*.
+    return TicketWriteService(session, factory, sysconfig, mail_sender=SmtpMailSender(settings))
 
 
 @router.get("", response_model=PaginatedTickets)
@@ -552,7 +564,12 @@ async def create_article(
     session: DbSession,
     settings: AppSettings,
 ) -> ArticleCreateResponse:
-    """Add an article to a ticket. Requires ``rw`` permission."""
+    """Add an article to a ticket. Requires ``rw`` permission.
+
+    Agent email replies (``channel=email``, ``sender_type=agent``) are SMTP-
+    delivered then stored (send-then-store). Delivery failure returns HTTP 502
+    and does not leave a silent no-op 201.
+    """
     svc = _write_service(session, settings)
     try:
         async with session.begin():
@@ -570,10 +587,13 @@ async def create_article(
                     cc=body.cc,
                     bcc=body.bcc,
                     reply_to=body.reply_to,
+                    message_id=body.message_id,
+                    in_reply_to=body.in_reply_to,
+                    references=body.references,
                     channel=body.channel,
                 ),
             )
-    except (WriteAccessDenied, WriteNotFound, InvalidInput) as exc:
+    except (WriteAccessDenied, WriteNotFound, InvalidInput, OutboundMailError) as exc:
         raise _map_exc(exc) from exc
     return ArticleCreateResponse(article_id=aid)
 

@@ -10,10 +10,11 @@ articles (``Kernel::GenericInterface::Operation::Ticket::TicketCreate``,
         EncryptKeys => [ '81877F5E', '3b630c80' ],    # optional
     }
 
-Applied to the *stored* article body — Tiqora has no live outbound-SMTP
-delivery path for GenericInterface-created articles yet (see
-docs/channels.md), so this makes the persisted content reflect sign/encrypt,
-matching what an operator inspecting the ticket would see. Gated behind
+Applied to the *stored* article body. Agent UI email replies now go through
+the live SMTP path (``channels.email.outbound_reply``); GenericInterface-
+created articles still primarily store then rely on workers/notifications.
+This module makes the persisted content reflect sign/encrypt so an operator
+inspecting the ticket sees what was intended. Gated behind
 ``TIQORA_CRYPTO_PGP_ENABLED``/``TIQORA_CRYPTO_SMIME_ENABLED`` (both default
 OFF); when disabled — or on any crypto failure — ``EmailSecurity`` is
 silently ignored (logged at WARNING/ERROR), same as before this module

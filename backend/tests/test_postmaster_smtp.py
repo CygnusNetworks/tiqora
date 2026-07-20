@@ -53,3 +53,25 @@ async def test_capturing_mail_sender_records_messages() -> None:
     )
     await sender.send(msg)
     assert sender.sent == [msg]
+
+
+def test_build_message_optional_headers_and_no_loop_hint() -> None:
+    msg = build_message(
+        from_addr="a@example.com",
+        to_addrs="b@example.com",
+        cc_addrs=None,
+        subject="s",
+        body="b",
+        content_type="text/plain",
+        in_reply_to="<prev@example.com>",
+        bcc_addrs="bcc@example.com",
+        reply_to="rt@example.com",
+        references="<prev@example.com> <older@example.com>",
+        message_id="<new@example.com>",
+        loop_hint=False,
+    )
+    assert msg["Bcc"] == "bcc@example.com"
+    assert msg["Reply-To"] == "rt@example.com"
+    assert msg["Message-ID"] == "<new@example.com>"
+    assert msg["References"] == "<prev@example.com> <older@example.com>"
+    assert "X-OTRS-Loop" not in msg
