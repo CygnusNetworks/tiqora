@@ -71,9 +71,11 @@ existing schema during parallel operation.
 | Dev tooling: seed + dump anonymizer | ✅ Done | `tiqora dev seed` / `tiqora dev anonymize` — [docs/development.md](./docs/development.md) |
 | Reports/stats (volume, backlog, SLA, workload) | ✅ Done | `GET /api/v1/stats/*` (+ CSV export) — `/agent/stats` UI, permission-filtered by queue |
 | Calendar / appointments (recurrence, ICS export/feed, ticket links) | ✅ Done | `GET/POST /api/v1/calendar/*` — `/agent/calendar` UI (month/week/agenda), reuses Znuny `calendar*` tables |
-| Process management, PGP/S-MIME | ⏸ Deferred | Not in V1 |
-| SOAP, package manager | ⏸ Deferred | Not in V1 |
-| Phone/SMS, WhatsApp Business channels | 🔲 Planned (post-V1) | Plugin architecture |
+| Communication channels: SMS, WhatsApp Business, phone/CTI | ✅ Done | Channel plugin interface — [docs/channels.md](./docs/channels.md); enable-flagged, off by default |
+| LDAP/AD auth (agent + customer) | ✅ Done | Bind-search-bind, no auto-provisioning; feature-flagged |
+| GDPR tools, PGP / S-MIME | 🔧 In progress | Anonymization/retention (ownership-gated) + inbound/outbound mail crypto |
+| Process management | 🔲 Planned (next) | BPM ticket processes |
+| SOAP compat transport, package manager | 🔲 Planned | REST compat done; SOAP next |
 
 ## Architecture overview
 
@@ -285,14 +287,35 @@ Full index: **[docs/README.md](./docs/README.md)** — API reference
 Docker Compose deployment (`docs/deploy/`), architecture, parallel
 operation, cutover, and feature-area docs.
 
+**Getting started & operating**
+
 | Document | Content |
 |---|---|
+| [docs/guide/znuny-to-tiqora.md](./docs/guide/znuny-to-tiqora.md) | Operator playbook: run alongside Znuny, then migrate onto Tiqora (5 stages) |
+| [docs/deploy/docker-compose.md](./docs/deploy/docker-compose.md) | Docker Compose deployment — services, env vars, external DB, reverse proxy |
+| [docs/deployment.md](./docs/deployment.md) · [docs/parallel-operation.md](./docs/parallel-operation.md) · [docs/cutover.md](./docs/cutover.md) | Deployment notes, parallel-operation invariants, cutover runbook |
+| [docs/development.md](./docs/development.md) · [docs/testing.md](./docs/testing.md) | Local dev, seeding/anonymizing, running the test suites incl. golden-master |
+
+**API & integrations**
+
+| Document | Content |
+|---|---|
+| [docs/api/README.md](./docs/api/README.md) | API surfaces overview (v1 / portal / compat / MCP), auth, conventions |
+| [docs/api/rest-v1.md](./docs/api/rest-v1.md) | Guided `/api/v1` reference with curl examples |
+| [docs/api/openapi.json](./docs/api/openapi.json) | Generated OpenAPI spec (`tiqora openapi`) |
+| [docs/api/compat.md](./docs/api/compat.md) | GenericInterface compatibility layer for existing Znuny REST clients |
+| [docs/api/mcp.md](./docs/api/mcp.md) · [docs/ai-integration.md](./docs/ai-integration.md) | MCP tools, webhook contract, AI-agent patterns, prompt-injection guidance |
+| [docs/channels.md](./docs/channels.md) | Communication channel plugins (SMS, WhatsApp, phone/CTI) |
+| [docs/gdpr.md](./docs/gdpr.md) | GDPR anonymization & retention tooling |
+
+**Reference**
+
+| Document | Content |
+|---|---|
+| [docs/README.md](./docs/README.md) | **Full documentation index** |
 | [docs/architecture.md](./docs/architecture.md) | System components and data flow |
-| [docs/guide/znuny-to-tiqora.md](./docs/guide/znuny-to-tiqora.md) | Operator playbook: parallel operation through cutover |
-| [docs/api/README.md](./docs/api/README.md) | REST/compat/MCP API reference overview |
-| [docs/deploy/docker-compose.md](./docs/deploy/docker-compose.md) | Docker Compose deployment walkthrough |
-| [docs/ai-integration.md](./docs/ai-integration.md) | Webhook schema, MCP interface, AI agent patterns, prompt-injection guidance |
 | [docs/specs/2026-07-19-tiqora-design.md](./docs/specs/2026-07-19-tiqora-design.md) | Full design specification |
+| [NOTICE.md](./NOTICE.md) | Licensing breakdown and trademark notes |
 
 ## Compatibility statement
 
