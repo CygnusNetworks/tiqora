@@ -12,7 +12,13 @@ const { logout, navigate, setTheme } = vi.hoisted(() => ({
 
 vi.mock("@/auth/AuthContext", () => ({
   useAuth: () => ({
-    user: { id: 7, login: "jdoe", first_name: "Jane", last_name: "Doe" },
+    user: {
+      id: 7,
+      login: "jdoe",
+      first_name: "Jane",
+      last_name: "Doe",
+      email: "jane@example.com",
+    },
     logout,
   }),
 }));
@@ -44,11 +50,26 @@ describe("AccountMenu", () => {
   it("shows the signed-in identity and the core actions", () => {
     open();
     expect(screen.getByTestId("account-menu-name")).toHaveTextContent("Jane Doe");
-    expect(screen.getByTestId("account-menu-settings")).toBeInTheDocument();
+    expect(screen.getByTestId("current-user")).toHaveTextContent("Jane Doe");
+    expect(screen.queryByTestId("account-menu-settings")).not.toBeInTheDocument();
+    expect(screen.getByTestId("account-menu-security")).toBeInTheDocument();
     expect(screen.getByTestId("account-menu-lang-de")).toBeInTheDocument();
     expect(screen.getByTestId("account-menu-lang-en")).toBeInTheDocument();
     expect(screen.getByTestId("account-menu-theme-light")).toBeInTheDocument();
     expect(screen.getByTestId("logout-btn")).toBeInTheDocument();
+  });
+
+  it("does not render a general Einstellungen / settings entry", () => {
+    open();
+    expect(screen.queryByTestId("account-menu-settings")).toBeNull();
+    // German locale default — security label only, not the old settings string as a menu item.
+    expect(screen.queryByText("Einstellungen")).not.toBeInTheDocument();
+  });
+
+  it("navigates to security / 2FA settings", () => {
+    open();
+    fireEvent.click(screen.getByTestId("account-menu-security"));
+    expect(navigate).toHaveBeenCalledWith({ to: "/agent/security" });
   });
 
   it("changes language and persists the choice", () => {
@@ -72,9 +93,13 @@ describe("AccountMenu", () => {
     expect(logout).toHaveBeenCalledOnce();
   });
 
-  it("navigates to settings", () => {
+  it("renders a Gravatar image when the user has an email", () => {
     open();
-    fireEvent.click(screen.getByTestId("account-menu-settings"));
-    expect(navigate).toHaveBeenCalledWith({ to: "/agent/settings" });
+    const img = screen.getByTestId("account-menu-avatar");
+    expect(img.tagName).toBe("IMG");
+    expect(img).toHaveAttribute(
+      "src",
+      expect.stringMatching(/^https:\/\/www\.gravatar\.com\/avatar\/[0-9a-f]{32}\?/),
+    );
   });
 });
