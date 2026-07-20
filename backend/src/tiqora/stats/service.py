@@ -420,9 +420,11 @@ class StatsService:
         user_ids = set(owned_counts) | set(closed_counts)
         if not user_ids:
             return []
+        # Exclude soft-invalidated agents (valid_id != 1): a departed agent
+        # who still owns open tickets should not appear in the workload report.
         rows = await self._session.execute(
             select(Users.id, Users.login, Users.first_name, Users.last_name).where(
-                Users.id.in_(user_ids)
+                Users.id.in_(user_ids), Users.valid_id == 1
             )
         )
         out = [

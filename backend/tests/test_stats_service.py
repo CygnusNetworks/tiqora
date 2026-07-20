@@ -262,6 +262,59 @@ async def test_agent_workload(mariadb_znuny_url: str) -> None:
 
 @pytest.mark.db
 @pytest.mark.asyncio
+async def test_agent_workload_excludes_invalid_agents(mariadb_znuny_url: str) -> None:
+    """A soft-invalidated agent (valid_id != 1) who still owns an open ticket
+    in an allowed queue must not appear in the workload report."""
+    from tiqora.stats.service import StatsFilters, StatsService
+
+    ids = _seed(mariadb_znuny_url)
+    invalid_uid = ids["user_id"] + 500
+    invalid_ticket = ids["t1"] + 500
+
+    engine = create_engine(mariadb_znuny_url)
+    with engine.begin() as conn:
+        conn.execute(
+            text(
+                "INSERT INTO users (id, login, pw, first_name, last_name, valid_id,"
+                " create_time, create_by, change_time, change_by)"
+                " VALUES (:uid, :login, 'x', 'Gone', 'Agent', 2, :t, 1, :t, 1)"
+            ),
+            {"uid": invalid_uid, "login": f"stats.invalid.{invalid_uid}", "t": NOW},
+        )
+        conn.execute(
+            text(
+                "INSERT INTO ticket (id, tn, title, queue_id, ticket_lock_id, type_id,"
+                " user_id, responsible_user_id, ticket_priority_id, ticket_state_id,"
+                " customer_id, customer_user_id, timeout, until_time, escalation_time,"
+                " escalation_update_time, escalation_response_time, escalation_solution_time,"
+                " archive_flag, create_time, create_by, change_time, change_by)"
+                " VALUES (:tid, :tn, 'Owned by invalid', :qid, 1, 1, :uid, 1, 3, :st_open,"
+                "  'CUST-STATS', 'alice@example.com', 0, 0, 0, 0, 0, 0, 0, :t, 1, :t, 1)"
+            ),
+            {
+                "tid": invalid_ticket,
+                "tn": f"T{invalid_ticket}",
+                "qid": ids["queue_id"],
+                "uid": invalid_uid,
+                "st_open": ids["state_open"],
+                "t": ids["t1_create"],
+            },
+        )
+    engine.dispose()
+
+    engine2, factory = await _session_factory(mariadb_znuny_url)
+    async with factory() as session:
+        svc = StatsService(session)
+        workload = await svc.agent_workload(ids["user_id"], StatsFilters())
+    await engine2.dispose()
+
+    owners = {item.user_id for item in workload}
+    assert invalid_uid not in owners
+    assert ids["user_id"] in owners
+
+
+@pytest.mark.db
+@pytest.mark.asyncio
 async def test_backlog_trend_nonnegative_and_filtered(mariadb_znuny_url: str) -> None:
     from tiqora.stats.service import StatsFilters, StatsService
 
