@@ -47,6 +47,9 @@ import { UsersPage } from "@/routes/admin/UsersPage";
 import { GroupsPage } from "@/routes/admin/GroupsPage";
 import { RolesPage } from "@/routes/admin/RolesPage";
 import { AgentRolesPage } from "@/routes/admin/AgentRolesPage";
+import { AgentGroupsPage } from "@/routes/admin/AgentGroupsPage";
+import { RoleGroupsPage } from "@/routes/admin/RoleGroupsPage";
+import { CustomerUserCustomersPage } from "@/routes/admin/CustomerUserCustomersPage";
 import { QueuesPage as AdminQueuesPage } from "@/routes/admin/QueuesPage";
 import { StatesPage } from "@/routes/admin/StatesPage";
 import { PrioritiesPage } from "@/routes/admin/PrioritiesPage";
@@ -362,6 +365,18 @@ const adminAgentRolesRoute = createRoute({
   component: AgentRolesPage,
 });
 
+const adminAgentGroupsRoute = createRoute({
+  getParentRoute: () => adminLayoutRoute,
+  path: "/agent-groups",
+  component: AgentGroupsPage,
+});
+
+const adminRoleGroupsRoute = createRoute({
+  getParentRoute: () => adminLayoutRoute,
+  path: "/role-groups",
+  component: RoleGroupsPage,
+});
+
 const adminQueuesRoute = createRoute({
   getParentRoute: () => adminLayoutRoute,
   path: "/queues",
@@ -390,6 +405,12 @@ const adminCustomerCompaniesRoute = createRoute({
   getParentRoute: () => adminLayoutRoute,
   path: "/customer-companies",
   component: CustomerCompaniesPage,
+});
+
+const adminCustomerUserCustomersRoute = createRoute({
+  getParentRoute: () => adminLayoutRoute,
+  path: "/customer-user-customers",
+  component: CustomerUserCustomersPage,
 });
 
 const adminTemplatesRoute = createRoute({
@@ -517,11 +538,14 @@ const routeTree = rootRoute.addChildren([
     adminGroupsRoute,
     adminRolesRoute,
     adminAgentRolesRoute,
+    adminAgentGroupsRoute,
+    adminRoleGroupsRoute,
     adminQueuesRoute,
     adminStatesRoute,
     adminPrioritiesRoute,
     adminCustomerUsersRoute,
     adminCustomerCompaniesRoute,
+    adminCustomerUserCustomersRoute,
     adminTemplatesRoute,
     adminSalutationsRoute,
     adminSignaturesRoute,

@@ -23,6 +23,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 
 from tiqora.api.v1.admin import customers as admin_customers
 from tiqora.api.v1.admin import dynamic_fields as admin_dynamic_fields
+from tiqora.api.v1.admin import groups as admin_groups
 from tiqora.api.v1.admin import queues as admin_queues
 from tiqora.api.v1.admin import readonly as admin_readonly
 from tiqora.api.v1.admin import roles as admin_roles
@@ -30,8 +31,13 @@ from tiqora.api.v1.admin import users as admin_users
 from tiqora.api.v1.admin.deps import get_admin_user
 from tiqora.api.v1.admin.pagination import ListParams
 from tiqora.api.v1.admin.schemas import (
+    CustomerCompanyCreate,
     CustomerUserAdminCreate,
+    CustomerUserCustomerAssignment,
     DynamicFieldCreate,
+    GroupAssignment,
+    GroupCreate,
+    GroupRoleAssignment,
     QueueCreate,
     RoleAssignment,
     RoleCreate,
@@ -504,5 +510,165 @@ async def test_admin_user_role_assignment_roundtrip(
 
         await admin_users.revoke_role(agent.id, role.id, admin_user, s)
         assert await admin_users.get_user_roles(agent.id, admin_user, s) == []
+
+    await engine.dispose()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("url_fixture", ["mariadb_znuny_url", "postgres_znuny_url"])
+async def test_admin_user_group_assignment_roundtrip(
+    url_fixture: str, request: pytest.FixtureRequest
+) -> None:
+    """Assign/revoke an agent's group (rw) and read the current set back — the
+    Agent↔Groups assignment editor's backend."""
+    sync_url: str = request.getfixturevalue(url_fixture)
+    ids = _seed_admin_and_plain_user(sync_url)
+    session, engine = await _make_session(sync_url)
+    ns = uuid.uuid4().hex[:8]
+
+    async with session as s:
+        admin_user = AuthenticatedUser(
+            id=ids["admin_id"],
+            login="root@localhost",
+            first_name="Admin",
+            last_name="Znuny",
+            auth_method="session",
+        )
+        agent = await admin_users.create_user(
+            UserCreate(
+                login=f"groupagent.964.{ns}",
+                password="pw12345678",
+                first_name="Group",
+                last_name="Agent",
+            ),
+            admin_user,
+            s,
+        )
+        group = await admin_groups.create_group(GroupCreate(name=f"grp-964-{ns}"), admin_user, s)
+
+        assert await admin_users.get_user_groups(agent.id, admin_user, s) == []
+
+        await admin_users.assign_group(
+            agent.id, GroupAssignment(group_id=group.id, permission_key="rw"), admin_user, s
+        )
+        assigned = await admin_users.get_user_groups(agent.id, admin_user, s)
+        assert [g.id for g in assigned] == [group.id]
+
+        # Idempotent assign (no duplicate PK), then revoke the rw grant.
+        await admin_users.assign_group(
+            agent.id, GroupAssignment(group_id=group.id, permission_key="rw"), admin_user, s
+        )
+        assert len(await admin_users.get_user_groups(agent.id, admin_user, s)) == 1
+
+        await admin_users.revoke_group(agent.id, group.id, "rw", admin_user, s)
+        assert await admin_users.get_user_groups(agent.id, admin_user, s) == []
+
+    await engine.dispose()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("url_fixture", ["mariadb_znuny_url", "postgres_znuny_url"])
+async def test_admin_role_group_assignment_roundtrip(
+    url_fixture: str, request: pytest.FixtureRequest
+) -> None:
+    """Assign/revoke a role's group (rw) and read the current set back — the
+    Role↔Groups assignment editor's backend."""
+    sync_url: str = request.getfixturevalue(url_fixture)
+    ids = _seed_admin_and_plain_user(sync_url)
+    session, engine = await _make_session(sync_url)
+    ns = uuid.uuid4().hex[:8]
+
+    async with session as s:
+        admin_user = AuthenticatedUser(
+            id=ids["admin_id"],
+            login="root@localhost",
+            first_name="Admin",
+            last_name="Znuny",
+            auth_method="session",
+        )
+        role = await admin_roles.create_role(RoleCreate(name=f"role-964-{ns}"), admin_user, s)
+        group = await admin_groups.create_group(GroupCreate(name=f"rgrp-964-{ns}"), admin_user, s)
+
+        assert await admin_roles.get_role_groups(role.id, admin_user, s) == []
+
+        await admin_roles.assign_group_role(
+            role.id,
+            GroupRoleAssignment(group_id=group.id, permission_key="rw", permission_value=1),
+            admin_user,
+            s,
+        )
+        assigned = await admin_roles.get_role_groups(role.id, admin_user, s)
+        assert [g.id for g in assigned] == [group.id]
+
+        # Re-assign updates in place (no duplicate PK), then revoke.
+        await admin_roles.assign_group_role(
+            role.id,
+            GroupRoleAssignment(group_id=group.id, permission_key="rw", permission_value=1),
+            admin_user,
+            s,
+        )
+        assert len(await admin_roles.get_role_groups(role.id, admin_user, s)) == 1
+
+        await admin_roles.revoke_group_role(role.id, group.id, "rw", admin_user, s)
+        assert await admin_roles.get_role_groups(role.id, admin_user, s) == []
+
+    await engine.dispose()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("url_fixture", ["mariadb_znuny_url", "postgres_znuny_url"])
+async def test_admin_customer_user_customer_assignment_roundtrip(
+    url_fixture: str, request: pytest.FixtureRequest
+) -> None:
+    """Assign/revoke a customer user's extra company visibility and read it
+    back — the Customer-User↔Customers editor's backend (customer_user_customer,
+    keyed by login, distinct from the primary customer_id)."""
+    sync_url: str = request.getfixturevalue(url_fixture)
+    ids = _seed_admin_and_plain_user(sync_url)
+    session, engine = await _make_session(sync_url)
+    ns = uuid.uuid4().hex[:8]
+
+    async with session as s:
+        admin_user = AuthenticatedUser(
+            id=ids["admin_id"],
+            login="root@localhost",
+            first_name="Admin",
+            last_name="Znuny",
+            auth_method="session",
+        )
+        login = f"custcust.964.{ns}@example.com"
+        await admin_customers.create_customer_user(
+            CustomerUserAdminCreate(
+                login=login,
+                email=login,
+                customer_id=f"HOME-964-{ns}",
+                first_name="Cust",
+                last_name="User",
+            ),
+            admin_user,
+            s,
+        )
+        company = await admin_customers.create_customer_company(
+            CustomerCompanyCreate(customer_id=f"EXTRA-964-{ns}", name=f"Extra {ns}"),
+            admin_user,
+            s,
+        )
+
+        assert await admin_customers.get_customer_user_companies(login, admin_user, s) == []
+
+        await admin_customers.assign_customer_company(
+            login, CustomerUserCustomerAssignment(customer_id=company.customer_id), admin_user, s
+        )
+        assigned = await admin_customers.get_customer_user_companies(login, admin_user, s)
+        assert [c.customer_id for c in assigned] == [company.customer_id]
+
+        # Idempotent assign, then revoke.
+        await admin_customers.assign_customer_company(
+            login, CustomerUserCustomerAssignment(customer_id=company.customer_id), admin_user, s
+        )
+        assert len(await admin_customers.get_customer_user_companies(login, admin_user, s)) == 1
+
+        await admin_customers.revoke_customer_company(login, company.customer_id, admin_user, s)
+        assert await admin_customers.get_customer_user_companies(login, admin_user, s) == []
 
     await engine.dispose()
