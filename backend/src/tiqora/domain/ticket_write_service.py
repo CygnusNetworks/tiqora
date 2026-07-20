@@ -445,6 +445,8 @@ async def add_article(
         "phone": "Phone",
         "note": "Internal",
         "internal": "Internal",
+        "sms": "SMS",
+        "whatsapp": "WhatsApp",
     }
     ch_name = channel_name_map.get(article.channel.lower(), "Internal")
     comm_channel_id = await _channel_id(session, ch_name)
