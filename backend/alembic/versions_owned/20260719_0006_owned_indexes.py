@@ -1,8 +1,12 @@
 """Additive helper indexes on Znuny tables (Phase 5, subtask 2).
 
 Revision ID: 20260719_0006
-Revises: 20260719_0005
+Revises: 20260720_0006
 Create Date: 2026-07-19
+
+Rebased onto ``20260720_0006`` (tiqora_gdpr_audit, Phase 2c) so the combined
+chain (tiqora + owned) keeps a single head — see
+``tests/test_migration_gate.py``.
 
 **Gated**: only reachable once schema ownership is active (see
 ``tiqora.domain.ownership`` and ``alembic/env.py``'s dynamic
@@ -30,7 +34,7 @@ from collections.abc import Sequence
 from alembic import op
 
 revision: str = "20260719_0006"
-down_revision: str | None = "20260719_0005"
+down_revision: str | None = "20260720_0006"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 

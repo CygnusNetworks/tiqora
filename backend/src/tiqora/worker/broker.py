@@ -45,4 +45,16 @@ async def drain_outbox_task() -> dict[str, int]:
     return await drain_outbox()
 
 
+@broker.task(
+    schedule=[{"cron": "0 3 * * *"}],  # once daily at 03:00 — a slow, batchy sweep
+)
+async def gdpr_retention_task() -> dict[str, int]:
+    """Feature-flagged GDPR retention sweep; no-op unless both the
+    ``gdpr.retention.enabled`` flag and the schema-ownership gate are active.
+    """
+    from tiqora.worker.gdpr_retention import run_gdpr_retention_tick
+
+    return await run_gdpr_retention_tick()
+
+
 scheduler = TaskiqScheduler(broker=broker, sources=[LabelScheduleSource(broker)])

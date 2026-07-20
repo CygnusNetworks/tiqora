@@ -99,6 +99,16 @@ class ValueMapper:
             value = str(fake.user_name())
         elif kind == "company":
             value = str(fake.company())
+        elif kind == "phone":
+            value = str(fake.phone_number())
+        elif kind == "street":
+            value = str(fake.street_address())
+        elif kind == "city":
+            value = str(fake.city())
+        elif kind == "zip":
+            value = str(fake.postcode())
+        elif kind == "country":
+            value = str(fake.country())
         else:
             value = str(fake.word())
         self._cache[key] = value
