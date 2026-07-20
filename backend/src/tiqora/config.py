@@ -115,6 +115,63 @@ class Settings(BaseSettings):
     spnego_enabled: bool = Field(default=False, validation_alias="TIQORA_SPNEGO_ENABLED")
     krb5_ktname: str = Field(default="", validation_alias="KRB5_KTNAME")
 
+    # LDAP/AD agent auth (Phase 3c). Bind-search-bind against a directory,
+    # mirroring Kernel::System::Auth::LDAP. No auto-provisioning in v1: the
+    # LDAP UID must match an existing, valid `users.login` row or the login
+    # is rejected. Tried as a fallback when local password auth fails.
+    ldap_enabled: bool = Field(default=False, validation_alias="TIQORA_LDAP_ENABLED")
+    ldap_host: str = Field(default="", validation_alias="TIQORA_LDAP_HOST")
+    ldap_port: int = Field(default=389, validation_alias="TIQORA_LDAP_PORT")
+    ldap_use_ssl: bool = Field(default=False, validation_alias="TIQORA_LDAP_USE_SSL")
+    ldap_use_starttls: bool = Field(default=False, validation_alias="TIQORA_LDAP_USE_STARTTLS")
+    ldap_base_dn: str = Field(default="", validation_alias="TIQORA_LDAP_BASE_DN")
+    ldap_bind_dn: str = Field(default="", validation_alias="TIQORA_LDAP_BIND_DN")
+    ldap_bind_password: str = Field(default="", validation_alias="TIQORA_LDAP_BIND_PASSWORD")
+    ldap_uid_attr: str = Field(default="uid", validation_alias="TIQORA_LDAP_UID_ATTR")
+    ldap_always_filter: str = Field(default="", validation_alias="TIQORA_LDAP_ALWAYS_FILTER")
+    # Optional group-membership gate (Kernel::System::Auth::LDAP's
+    # GroupDN/AccessAttr/UserAttr): if ldap_group_dn is set, the user's DN
+    # (or UID, when ldap_user_attr != "DN") must appear in ldap_access_attr
+    # under ldap_group_dn or the login is rejected.
+    ldap_group_dn: str = Field(default="", validation_alias="TIQORA_LDAP_GROUP_DN")
+    ldap_access_attr: str = Field(default="memberUid", validation_alias="TIQORA_LDAP_ACCESS_ATTR")
+    ldap_user_attr: str = Field(default="DN", validation_alias="TIQORA_LDAP_USER_ATTR")
+
+    # LDAP/AD customer (portal) auth (Phase 3c), mirroring
+    # Kernel::System::CustomerAuth::LDAP. Same no-auto-provisioning rule:
+    # the LDAP UID must match an existing, valid `customer_user.login`.
+    customer_ldap_enabled: bool = Field(
+        default=False, validation_alias="TIQORA_CUSTOMER_LDAP_ENABLED"
+    )
+    customer_ldap_host: str = Field(default="", validation_alias="TIQORA_CUSTOMER_LDAP_HOST")
+    customer_ldap_port: int = Field(default=389, validation_alias="TIQORA_CUSTOMER_LDAP_PORT")
+    customer_ldap_use_ssl: bool = Field(
+        default=False, validation_alias="TIQORA_CUSTOMER_LDAP_USE_SSL"
+    )
+    customer_ldap_use_starttls: bool = Field(
+        default=False, validation_alias="TIQORA_CUSTOMER_LDAP_USE_STARTTLS"
+    )
+    customer_ldap_base_dn: str = Field(default="", validation_alias="TIQORA_CUSTOMER_LDAP_BASE_DN")
+    customer_ldap_bind_dn: str = Field(default="", validation_alias="TIQORA_CUSTOMER_LDAP_BIND_DN")
+    customer_ldap_bind_password: str = Field(
+        default="", validation_alias="TIQORA_CUSTOMER_LDAP_BIND_PASSWORD"
+    )
+    customer_ldap_uid_attr: str = Field(
+        default="uid", validation_alias="TIQORA_CUSTOMER_LDAP_UID_ATTR"
+    )
+    customer_ldap_always_filter: str = Field(
+        default="", validation_alias="TIQORA_CUSTOMER_LDAP_ALWAYS_FILTER"
+    )
+    customer_ldap_group_dn: str = Field(
+        default="", validation_alias="TIQORA_CUSTOMER_LDAP_GROUP_DN"
+    )
+    customer_ldap_access_attr: str = Field(
+        default="memberUid", validation_alias="TIQORA_CUSTOMER_LDAP_ACCESS_ATTR"
+    )
+    customer_ldap_user_attr: str = Field(
+        default="DN", validation_alias="TIQORA_CUSTOMER_LDAP_USER_ATTR"
+    )
+
     # TOTP 2FA (Phase 3c)
     totp_pending_ttl_seconds: int = Field(default=300, validation_alias="TIQORA_TOTP_PENDING_TTL")
     totp_issuer: str = Field(default="Tiqora", validation_alias="TIQORA_TOTP_ISSUER")

@@ -31,6 +31,8 @@ dependencies = [
     "pyotp>=2.9.0",
     "cryptography>=43.0.0",
     "aiosmtplib>=3.0.2",
+    "ldap3>=2.9.1",
+    "qrcode>=8.0",
 ]
 
 [project.optional-dependencies]
@@ -82,7 +84,7 @@ mypy_path = "src"
 warn_unused_ignores = true
 
 [[tool.mypy.overrides]]
-module = ["authlib.*", "gssapi", "gssapi.*", "pyotp", "pyotp.*"]
+module = ["authlib.*", "gssapi", "gssapi.*", "pyotp", "pyotp.*", "ldap3", "ldap3.*", "qrcode", "qrcode.*"]
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]

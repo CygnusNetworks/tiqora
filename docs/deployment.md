@@ -108,6 +108,53 @@ Manual verification against a real MIT Kerberos KDC:
    `KRB5_KTNAME` unset (gssapi silently fails to find credentials), and SPN
    mismatch (the keytab principal must match the hostname the browser sees).
 
+## LDAP / Active Directory configuration (Phase 3c)
+
+Optional bind-search-bind auth against an LDAP/AD directory, tried as a
+fallback when local password auth fails (mirrors Znuny's chained
+`AuthModule::LDAP`/`CustomerAuth::LDAP`). Separate on/off switches and
+settings exist for agent login (`users`) and the customer portal
+(`customer_user`) — see `tiqora.domain.auth_ldap` /
+`tiqora.domain.customer_auth_ldap` / `tiqora.domain._ldap_core`.
+
+**No auto-provisioning in v1**: the LDAP UID resolved by the search must
+match an existing, valid local `users.login` (agent) or
+`customer_user.login` (portal) row, or the login is rejected. Provision the
+account locally first, then point it at LDAP.
+
+Agent auth (`TIQORA_LDAP_*`) — customer portal uses the identical shape
+under `TIQORA_CUSTOMER_LDAP_*`:
+
+| Variable | Example | Notes |
+|---|---|---|
+| `TIQORA_LDAP_ENABLED` | `true` | Off by default |
+| `TIQORA_LDAP_HOST` | `ldap.example.com` | |
+| `TIQORA_LDAP_PORT` | `389` | `636` for implicit LDAPS |
+| `TIQORA_LDAP_USE_SSL` | `false` | Implicit TLS (LDAPS) |
+| `TIQORA_LDAP_USE_STARTTLS` | `false` | STARTTLS on a plaintext connection |
+| `TIQORA_LDAP_BASE_DN` | `ou=people,dc=example,dc=com` | Search base |
+| `TIQORA_LDAP_BIND_DN` | `cn=svc-tiqora,dc=example,dc=com` | Search account; empty = anonymous bind |
+| `TIQORA_LDAP_BIND_PASSWORD` | secret | |
+| `TIQORA_LDAP_UID_ATTR` | `uid` | `sAMAccountName` for AD |
+| `TIQORA_LDAP_ALWAYS_FILTER` | `(objectClass=inetOrgPerson)` | ANDed onto every search |
+| `TIQORA_LDAP_GROUP_DN` | `cn=helpdesk,ou=groups,dc=example,dc=com` | Optional group-membership gate |
+| `TIQORA_LDAP_ACCESS_ATTR` | `memberUid` | Attribute checked under `GROUP_DN` |
+| `TIQORA_LDAP_USER_ATTR` | `DN` | `DN` compares the user's full DN; anything else compares the login |
+
+Simplifications vs. `Kernel::System::Auth::LDAP`: no `Die` (hard-crash on
+connect failure), `UserSuffix`, `UserLowerCase`, or per-directory charset
+knobs — Tiqora is UTF-8 throughout and treats every connection error as an
+auth failure, never a process crash.
+
+## TOTP QR enrollment
+
+`POST /api/v1/auth/totp/enroll` returns the `otpauth://` secret/URI as
+before; `GET /api/v1/auth/totp/enroll/qr` renders that same pending
+enrollment as an `image/svg+xml` QR code (404 if there is no pending
+enrollment). The agent security page (`/agent/security`) uses it directly as
+an `<img src>` — the request is cookie-authenticated and same-origin (see
+`vite.config.ts`'s `/api` proxy), so no extra client wiring is needed.
+
 ## Parallel operation deployment
 
 When co-running with Znuny:
