@@ -152,5 +152,6 @@ export {
   type StateRef,
   type AgentRef,
   type CustomerRef,
+  type AgentTicketCreateInput,
   type paths,
 } from "./client";
