@@ -80,8 +80,22 @@ def add_migrate_subparser(sub: argparse._SubParsersAction) -> None:  # type: ign
     cur.set_defaults(func=_cmd_current)
 
 
-async def _cmd_upgrade(args: argparse.Namespace) -> int:
-    include_owned = await _ownership_active()
+def _resolve_ownership() -> bool:
+    """Resolve the ownership gate in its own event loop, fully completing
+    before any Alembic command runs.
+
+    CRITICAL: Alembic's ``command.*`` are synchronous but ``alembic/env.py``
+    calls ``asyncio.run()`` internally (async engine). So the ownership check
+    must NOT be awaited from a loop that is still open when ``command.upgrade``
+    runs — otherwise env.py hits "asyncio.run() cannot be called from a
+    running event loop". We therefore run the async check to completion here
+    and return a plain bool; the command call below runs with no active loop.
+    """
+    return asyncio.run(_ownership_active())
+
+
+def _cmd_upgrade(args: argparse.Namespace) -> int:
+    include_owned = _resolve_ownership()
     cfg = build_alembic_config(include_owned=include_owned)
     scope = "tiqora + owned" if include_owned else "tiqora only"
     print(f"Running migrations ({scope}) -> {args.revision}")  # noqa: T201
@@ -89,18 +103,17 @@ async def _cmd_upgrade(args: argparse.Namespace) -> int:
     return 0
 
 
-async def _cmd_downgrade(args: argparse.Namespace) -> int:
+def _cmd_downgrade(args: argparse.Namespace) -> int:
     # Downgrade must see whatever chain the target revision lives in; include
     # owned when the gate is active so an operator can roll an owned migration
     # back. Downgrading a tiqora revision never needs the owned chain.
-    include_owned = await _ownership_active()
-    cfg = build_alembic_config(include_owned=include_owned)
+    cfg = build_alembic_config(include_owned=_resolve_ownership())
     command.downgrade(cfg, args.revision)
     return 0
 
 
-async def _cmd_current(args: argparse.Namespace) -> int:
-    cfg = build_alembic_config(include_owned=await _ownership_active())
+def _cmd_current(args: argparse.Namespace) -> int:
+    cfg = build_alembic_config(include_owned=_resolve_ownership())
     command.current(cfg)
     return 0
 
@@ -109,5 +122,8 @@ def run_migrate(args: argparse.Namespace) -> int:
     if not getattr(args, "migrate_command", None):
         print("usage: tiqora migrate {upgrade|downgrade|current}")  # noqa: T201
         return 2
-    exit_code: int = asyncio.run(args.func(args))
+    # args.func is a plain sync callable: it resolves ownership (its own
+    # asyncio.run) and then calls the sync Alembic command, so there is never
+    # a running loop when env.py does its own asyncio.run().
+    exit_code: int = args.func(args)
     return exit_code
