@@ -76,7 +76,8 @@ existing schema during parallel operation.
 | GDPR tools (anonymization + retention) | ✅ Done | Ownership-gated; `tiqora gdpr *` — [docs/gdpr.md](./docs/gdpr.md) |
 | PGP / S-MIME (verify/decrypt inbound, sign/encrypt outbound) | ✅ Done | Flag-gated — [docs/crypto.md](./docs/crypto.md) |
 | Process Management (BPM ticket processes) | ✅ Done | `GET/POST /api/v1/process/*` (6 endpoints) — reuses Znuny `pm_*` tables; no visual designer — [docs/process-management.md](./docs/process-management.md) |
-| SOAP compat transport, package manager | 🔲 Planned | REST compat done; SOAP next |
+| SOAP compat transport | ✅ Done | `POST /znuny-compat/soap/{webservice}` (+ dynamic `Webservice`/`WebserviceID` routes) — same 5 ops as REST, own operation-dispatch-from-Body-element codec — [docs/compatibility.md](./docs/compatibility.md#soap-transport) |
+| Package manager (OPM remote install) | 🔲 Planned | Not started |
 
 ## Architecture overview
 

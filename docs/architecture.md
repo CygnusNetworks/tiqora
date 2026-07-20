@@ -461,10 +461,18 @@ Mounted at `/znuny-compat` in the main API process (same `tiqora-api`).
   (validated against `sessions` key-value table).
 - Error shape: `{"Error": {"ErrorCode": "Op.ErrorType", "ErrorMessage": "..."}}`.
 - Parameter merging: query string + JSON body, body wins.
+- **SOAP transport** (`api/compat/soap.py`): a second wire codec for the
+  same 5 operations/dispatch table — parses `HTTP::SOAP` envelopes (Body
+  wrapper element name → operation, via `defusedxml` to prevent XXE) and
+  serializes `<OperationNameResponse>`/`<Fault>` envelopes. Mounted at
+  `POST /znuny-compat/soap/{webservice}` (fallback) plus dynamic
+  `Webservice`/`WebserviceID` routes per `gi_webservice_config` row with
+  `Provider.Transport.Type == 'HTTP::SOAP'`. No separate operation
+  implementations — REST and SOAP both call `op_session_create` /
+  `op_ticket_*` directly. See `docs/compatibility.md#soap-transport`.
 
 ## Non-goals (V1)
 
 - calendar, stats, PGP/S-MIME
-- SOAP GenericInterface
 - Znuny package manager / OPM marketplace (except the small TiqoraSync addon)
 - Shipping any Znuny source code in this repository
