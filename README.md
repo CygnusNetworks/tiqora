@@ -73,7 +73,8 @@ existing schema during parallel operation.
 | Calendar / appointments (recurrence, ICS export/feed, ticket links) | ✅ Done | `GET/POST /api/v1/calendar/*` — `/agent/calendar` UI (month/week/agenda), reuses Znuny `calendar*` tables |
 | Communication channels: SMS, WhatsApp Business, phone/CTI | ✅ Done | Channel plugin interface — [docs/channels.md](./docs/channels.md); enable-flagged, off by default |
 | LDAP/AD auth (agent + customer) | ✅ Done | Bind-search-bind, no auto-provisioning; feature-flagged |
-| GDPR tools, PGP / S-MIME | 🔧 In progress | Anonymization/retention (ownership-gated) + inbound/outbound mail crypto |
+| GDPR tools (anonymization + retention) | ✅ Done | Ownership-gated; `tiqora gdpr *` — [docs/gdpr.md](./docs/gdpr.md) |
+| PGP / S-MIME (verify/decrypt inbound, sign/encrypt outbound) | ✅ Done | Flag-gated — [docs/crypto.md](./docs/crypto.md) |
 | Process management | 🔲 Planned (next) | BPM ticket processes |
 | SOAP compat transport, package manager | 🔲 Planned | REST compat done; SOAP next |
 
