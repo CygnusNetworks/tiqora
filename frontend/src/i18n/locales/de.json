@@ -369,6 +369,7 @@
       "users": "Benutzer",
       "groups": "Gruppen",
       "roles": "Rollen",
+      "agentRoles": "Rollenzuordnung",
       "queues": "Queues",
       "states": "Status",
       "priorities": "Prioritäten",
@@ -410,6 +411,16 @@
       "page": "Seite {{page}} von {{total}}",
       "pageSize": "Pro Seite",
       "showing": "{{from}}–{{to}} von {{total}}"
+    },
+    "roleAssignments": {
+      "title": "Rollenzuordnung",
+      "subtitle": "Wähle einen Agenten und lege fest, welche Rollen er hat.",
+      "agent": "Agent",
+      "selectAgent": "Agent auswählen…",
+      "empty": "Wähle oben einen Agenten, um seine Rollen zu bearbeiten.",
+      "roles": "Rollen",
+      "assigned": "Zugewiesen",
+      "noRoles": "Keine gültigen Rollen vorhanden."
     },
     "form": {
       "cancel": "Abbrechen",

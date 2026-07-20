@@ -15,6 +15,11 @@ const NAV_GROUPS: NavGroup[] = [
       { to: "/admin/users", labelKey: "admin.nav.users", testId: "admin-nav-users" },
       { to: "/admin/groups", labelKey: "admin.nav.groups", testId: "admin-nav-groups" },
       { to: "/admin/roles", labelKey: "admin.nav.roles", testId: "admin-nav-roles" },
+      {
+        to: "/admin/agent-roles",
+        labelKey: "admin.nav.agentRoles",
+        testId: "admin-nav-agent-roles",
+      },
     ],
   },
   {

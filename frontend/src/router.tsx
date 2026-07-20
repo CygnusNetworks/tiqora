@@ -46,6 +46,7 @@ import { AdminHomePage } from "@/routes/admin/AdminHomePage";
 import { UsersPage } from "@/routes/admin/UsersPage";
 import { GroupsPage } from "@/routes/admin/GroupsPage";
 import { RolesPage } from "@/routes/admin/RolesPage";
+import { AgentRolesPage } from "@/routes/admin/AgentRolesPage";
 import { QueuesPage as AdminQueuesPage } from "@/routes/admin/QueuesPage";
 import { StatesPage } from "@/routes/admin/StatesPage";
 import { PrioritiesPage } from "@/routes/admin/PrioritiesPage";
@@ -355,6 +356,12 @@ const adminRolesRoute = createRoute({
   component: RolesPage,
 });
 
+const adminAgentRolesRoute = createRoute({
+  getParentRoute: () => adminLayoutRoute,
+  path: "/agent-roles",
+  component: AgentRolesPage,
+});
+
 const adminQueuesRoute = createRoute({
   getParentRoute: () => adminLayoutRoute,
   path: "/queues",
@@ -509,6 +516,7 @@ const routeTree = rootRoute.addChildren([
     adminUsersRoute,
     adminGroupsRoute,
     adminRolesRoute,
+    adminAgentRolesRoute,
     adminQueuesRoute,
     adminStatesRoute,
     adminPrioritiesRoute,
