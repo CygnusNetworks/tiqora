@@ -373,18 +373,20 @@ async def test_queue_ticket_detail_attachment_permissions(
 def _seed_dashboard(sync_url: str) -> dict[str, Any]:
     """Seed a self-contained fixture for the dashboard-summary counts.
 
-    Uses its own id/login namespace (3xx users, group 30, queue 300, 55x
-    tickets) so it can run alongside :func:`_seed_tickets` in the shared
-    session DB without colliding.
+    Uses its own high id/login namespace (963xx users, group 9630, queue
+    96300, 96300x tickets) so it never collides with any other test file's
+    seed in the shared session-scoped DB. Counts are ro-permission-scoped to
+    this agent's single queue, so unrelated tickets elsewhere in that DB do
+    not affect the assertions.
     """
     engine = create_engine(sync_url)
-    ids: dict[str, Any] = {"agent": 300, "no_access": 301, "queue": 300}
+    ids: dict[str, Any] = {"agent": 96300, "no_access": 96301, "queue": 96300}
     pw = hash_password("secret")
 
     with engine.begin() as conn:
         TiqoraBase.metadata.create_all(conn)
 
-        for uid, login in ((300, "dash.agent"), (301, "dash.none")):
+        for uid, login in ((96300, "dash.agent"), (96301, "dash.none")):
             conn.execute(
                 text(
                     """
@@ -401,7 +403,7 @@ def _seed_dashboard(sync_url: str) -> dict[str, Any]:
                 """
                 INSERT INTO permission_groups
                 (id, name, valid_id, create_time, create_by, change_time, change_by)
-                VALUES (30, 'dash-grp', 1, :t, 1, :t, 1)
+                VALUES (9630, 'dash-grp', 1, :t, 1, :t, 1)
                 """
             ),
             {"t": NOW},
@@ -412,7 +414,7 @@ def _seed_dashboard(sync_url: str) -> dict[str, Any]:
                 INSERT INTO group_user
                 (user_id, group_id, permission_key,
                  create_time, create_by, change_time, change_by)
-                VALUES (300, 30, 'ro', :t, 1, :t, 1)
+                VALUES (96300, 9630, 'ro', :t, 1, :t, 1)
                 """
             ),
             {"t": NOW},
@@ -425,7 +427,7 @@ def _seed_dashboard(sync_url: str) -> dict[str, Any]:
                     follow_up_id, follow_up_lock, valid_id,
                     create_time, create_by, change_time, change_by
                 ) VALUES (
-                    300, 'DashQueue', 30, 1, 1, 1, 1, 0, 1, :t, 1, :t, 1
+                    96300, 'DashQueue', 9630, 1, 1, 1, 1, 0, 1, :t, 1, :t, 1
                 )
                 """
             ),
@@ -436,10 +438,10 @@ def _seed_dashboard(sync_url: str) -> dict[str, Any]:
         # epoch 1000 is far in the past → counts as breached.
         rows = [
             # (id, tn, owner, state, escalation_time)
-            (550, "20240601005500", 300, 4, 0),  # my open (open state)
-            (551, "20240601005501", 300, 1, 0),  # my new (also in "open" view)
-            (552, "20240601005502", 1, 1, 0),  # unowned new (root-owned)
-            (553, "20240601005503", 1, 4, 1000),  # escalated open (other owner)
+            (963001, "20240601963001", 96300, 4, 0),  # my open (open state)
+            (963002, "20240601963002", 96300, 1, 0),  # my new (also in "open" view)
+            (963003, "20240601963003", 1, 1, 0),  # unowned new (root-owned)
+            (963004, "20240601963004", 1, 4, 1000),  # escalated open (other owner)
         ]
         for tid, tn, owner, state_id, esc in rows:
             conn.execute(
@@ -453,7 +455,7 @@ def _seed_dashboard(sync_url: str) -> dict[str, Any]:
                         escalation_response_time, escalation_solution_time, archive_flag,
                         create_time, create_by, change_time, change_by
                     ) VALUES (
-                        :id, :tn, 'Dash ticket', 300, 1, 1,
+                        :id, :tn, 'Dash ticket', 96300, 1, 1,
                         :owner, 1, 3, :state,
                         NULL, NULL,
                         0, 0, :esc, 0, 0, 0, 0,
