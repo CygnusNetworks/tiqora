@@ -101,6 +101,19 @@ describe("ActionToolbar", () => {
     await waitFor(() => expect(patchTicket).toHaveBeenCalledWith(7, { priority_id: 5 }));
   });
 
+  it("shows localised state names in the state menu", async () => {
+    wrap(<ActionToolbar ticket={makeTicket()} />);
+    await waitFor(() =>
+      expect(screen.getByTestId("toolbar-state")).not.toBeDisabled(),
+    );
+    fireEvent.click(screen.getByTestId("toolbar-state"));
+    expect(await screen.findByText("Open")).toBeInTheDocument();
+    expect(screen.getByText("Closed successful")).toBeInTheDocument();
+    expect(screen.getByText("Pending reminder")).toBeInTheDocument();
+    // Raw Znuny compound name should not appear untranslated.
+    expect(screen.queryByText("closed successful")).toBeNull();
+  });
+
   it("locks an unlocked ticket", async () => {
     wrap(<ActionToolbar ticket={makeTicket({ lock: "unlock" })} />);
     fireEvent.click(screen.getByTestId("toolbar-lock"));

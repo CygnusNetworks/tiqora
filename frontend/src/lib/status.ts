@@ -1,6 +1,24 @@
-/** Ticket-state colour code and the "status spine" signature element. */
+/** Ticket-state colour code, localised labels, and the "status spine" signature. */
 
 export type EscalationLevel = "none" | "approaching" | "breached";
+
+/**
+ * Stable i18n key segment under `ticket.stateName.*` for a raw Znuny state name.
+ * Covers stock Znuny compound names (`closed successful`, `pending reminder`, …).
+ */
+export type StateNameKey =
+  | "new"
+  | "open"
+  | "pending"
+  | "pendingReminder"
+  | "pendingAuto"
+  | "pendingAutoClosePlus"
+  | "pendingAutoCloseMinus"
+  | "closed"
+  | "closedSuccessful"
+  | "closedUnsuccessful"
+  | "merged"
+  | "removed";
 
 const STATE_COLOR_VARS: Record<string, string> = {
   new: "var(--color-state-new)",
@@ -15,6 +33,38 @@ const STATE_COLOR_VARS: Record<string, string> = {
   removed: "var(--color-state-removed)",
 };
 
+/** Exact raw-name → i18n segment map (lowercase). */
+const STATE_NAME_EXACT: Record<string, StateNameKey> = {
+  new: "new",
+  open: "open",
+  pending: "pending",
+  "pending reminder": "pendingReminder",
+  "pending auto": "pendingAuto",
+  "pending auto close+": "pendingAutoClosePlus",
+  "pending auto close-": "pendingAutoCloseMinus",
+  closed: "closed",
+  "closed successful": "closedSuccessful",
+  "closed unsuccessful": "closedUnsuccessful",
+  merged: "merged",
+  removed: "removed",
+};
+
+/** Longest-prefix first so compound names win over their short stems. */
+const STATE_NAME_PREFIXES: Array<[string, StateNameKey]> = [
+  ["pending auto close+", "pendingAutoClosePlus"],
+  ["pending auto close-", "pendingAutoCloseMinus"],
+  ["pending auto", "pendingAuto"],
+  ["pending reminder", "pendingReminder"],
+  ["closed successful", "closedSuccessful"],
+  ["closed unsuccessful", "closedUnsuccessful"],
+  ["pending", "pending"],
+  ["closed", "closed"],
+  ["open", "open"],
+  ["new", "new"],
+  ["merged", "merged"],
+  ["removed", "removed"],
+];
+
 /** Resolve a CSS colour value for a ticket state name (case-insensitive, prefix match). */
 export function stateColorVar(state: string | null | undefined): string {
   if (!state) return "var(--color-hairline)";
@@ -24,6 +74,64 @@ export function stateColorVar(state: string | null | undefined): string {
     if (key.startsWith(prefix)) return value;
   }
   return "var(--color-hairline)";
+}
+
+/**
+ * Map a raw Znuny state name (or state_type) to a `ticket.stateName.*` key segment.
+ * Returns null when the name is unknown so callers can fall back to the raw string.
+ */
+export function stateNameKey(
+  state: string | null | undefined,
+): StateNameKey | null {
+  if (!state) return null;
+  const key = state.toLowerCase().trim();
+  if (!key) return null;
+  if (STATE_NAME_EXACT[key]) return STATE_NAME_EXACT[key];
+  for (const [prefix, mapped] of STATE_NAME_PREFIXES) {
+    if (key === prefix || key.startsWith(`${prefix} `) || key.startsWith(prefix)) {
+      // Prefer exact prefix match; `startsWith(prefix)` also catches "pending auto close+"
+      // when the exact map missed a spelling variant.
+      if (key.startsWith(prefix)) return mapped;
+    }
+  }
+  return null;
+}
+
+/** i18n key path for a raw state name, or null when unmapped. */
+export function stateLabelI18nKey(
+  state: string | null | undefined,
+): `ticket.stateName.${StateNameKey}` | null {
+  const key = stateNameKey(state);
+  return key ? `ticket.stateName.${key}` : null;
+}
+
+/**
+ * Localised display label for a Znuny state name. Falls back to the raw name
+ * (or `fallback`) when no mapping exists — never invents a blank label.
+ *
+ * `t` is the react-i18next `t` function (or any compatible translator).
+ */
+export function stateLabel(
+  t: (key: string, options?: { defaultValue?: string }) => string,
+  state: string | null | undefined,
+  fallback = "—",
+): string {
+  if (!state) return fallback;
+  const i18nKey = stateLabelI18nKey(state);
+  if (!i18nKey) return state;
+  return t(i18nKey, { defaultValue: state });
+}
+
+/**
+ * True when the ticket is in the "new" state — by `state_type` (preferred) or
+ * by the raw state name. Used for the badge-only rendering rule.
+ */
+export function isNewTicketState(
+  state: string | null | undefined,
+  stateType?: string | null | undefined,
+): boolean {
+  if (stateType && stateType.toLowerCase().trim() === "new") return true;
+  return stateNameKey(state) === "new";
 }
 
 /**

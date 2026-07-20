@@ -10,8 +10,10 @@ import { Spinner } from "@/components/ui/Spinner";
 import {
   combinedEscalationLevel,
   formatCountdown,
+  isNewTicketState,
   spineClassName,
   stateColorVar,
+  stateLabel,
 } from "@/lib/status";
 
 export type SortKey =
@@ -227,19 +229,22 @@ export function TicketTable({
                 </span>
               </span>
               <span className="hidden items-center gap-1.5 text-xs text-muted md:inline-flex">
-                <span
-                  aria-hidden
-                  className="h-1.5 w-1.5 shrink-0 rounded-full"
-                  style={{ background: stateColorVar(ticket.state) }}
-                />
-                <span className="truncate">{ticket.state ?? "—"}</span>
-                {ticket.state_type === "new" && (
+                {isNewTicketState(ticket.state, ticket.state_type) ? (
                   <span
                     className="shrink-0 rounded-full bg-accent-dim px-1.5 py-0.5 text-[9.5px] font-semibold uppercase tracking-wide text-accent"
                     data-testid={`ticket-new-badge-${ticket.id}`}
                   >
-                    {t("queue.state.new")}
+                    {t("ticket.stateName.new")}
                   </span>
+                ) : (
+                  <>
+                    <span
+                      aria-hidden
+                      className="h-1.5 w-1.5 shrink-0 rounded-full"
+                      style={{ background: stateColorVar(ticket.state) }}
+                    />
+                    <span className="truncate">{stateLabel(t, ticket.state)}</span>
+                  </>
                 )}
               </span>
               <span className="hidden truncate font-mono text-[11.5px] text-muted md:inline">
@@ -257,8 +262,18 @@ export function TicketTable({
 
               {/* Mobile card footer: title/customer already shown above; add state + owner chip */}
               <div className="flex items-center justify-between gap-2 text-[11.5px] text-muted md:hidden">
-                <span className="truncate">
-                  {ticket.state ?? "—"} · {priorityName(ticket.priority) ?? "—"}
+                <span className="flex min-w-0 items-center gap-1.5 truncate">
+                  {isNewTicketState(ticket.state, ticket.state_type) ? (
+                    <span
+                      className="shrink-0 rounded-full bg-accent-dim px-1.5 py-0.5 text-[9.5px] font-semibold uppercase tracking-wide text-accent"
+                      data-testid={`ticket-new-badge-mobile-${ticket.id}`}
+                    >
+                      {t("ticket.stateName.new")}
+                    </span>
+                  ) : (
+                    <span className="truncate">{stateLabel(t, ticket.state)}</span>
+                  )}
+                  <span className="truncate">· {priorityName(ticket.priority) ?? "—"}</span>
                 </span>
                 <span className="shrink-0 truncate">
                   {ticket.owner_name || ticket.owner_login || "—"}

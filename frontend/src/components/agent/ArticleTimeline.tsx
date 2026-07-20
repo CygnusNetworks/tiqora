@@ -49,18 +49,24 @@ function dayKey(iso: string, locale: string): string {
 export function ArticleTimeline({
   ticketId,
   onComposingChange,
+  descending = true,
+  noteOpen,
+  onNoteOpenChange,
 }: {
   ticketId: number;
   /** Reported whenever the reply/note composer opens or closes, so the
    * parent page can reflect it in its presence heartbeat (see
    * TicketZoomPage). */
   onComposingChange?: (composing: boolean) => void;
+  /** Newest-first when true (default). Controlled from the ticket-zoom ⋮ menu. */
+  descending?: boolean;
+  /** Controlled open state for the internal-note composer (⋮ menu). */
+  noteOpen?: boolean;
+  onNoteOpenChange?: (open: boolean) => void;
 }) {
   const { t, i18n } = useTranslation();
   const locale = i18n.language?.startsWith("de") ? "de" : "en";
   const [expanded, setExpanded] = useState<Record<number, boolean>>({});
-  // Default newest-first (descending); toggle flips to oldest-first.
-  const [descending, setDescending] = useState(true);
 
   const articlesQ = useQuery({
     queryKey: ["tickets", ticketId, "articles"],
@@ -94,18 +100,6 @@ export function ArticleTimeline({
 
   return (
     <div className="space-y-6" data-testid="article-timeline">
-      {articles.length > 0 && (
-        <div className="flex justify-end">
-          <Button
-            variant="secondary"
-            size="sm"
-            data-testid="article-sort-toggle"
-            onClick={() => setDescending((d) => !d)}
-          >
-            {descending ? t("ticket.sortNewestFirst") : t("ticket.sortOldestFirst")}
-          </Button>
-        </div>
-      )}
       {articles.length === 0 ? (
         <p className="text-sm text-muted">{t("ticket.noArticles")}</p>
       ) : (
@@ -193,6 +187,8 @@ export function ArticleTimeline({
         ticketId={ticketId}
         articles={articles}
         onComposingChange={onComposingChange}
+        open={noteOpen}
+        onOpenChange={onNoteOpenChange}
       />
     </div>
   );
@@ -280,14 +276,25 @@ function ArticleComposer({
   ticketId,
   articles,
   onComposingChange,
+  open: openProp,
+  onOpenChange,
 }: {
   ticketId: number;
   articles: ArticleListItem[];
   onComposingChange?: (composing: boolean) => void;
+  /** Controlled open (ticket-zoom ⋮ menu). Uncontrolled when omitted. */
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
 }) {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
-  const [open, setOpen] = useState(false);
+  const [openLocal, setOpenLocal] = useState(false);
+  const controlled = openProp !== undefined;
+  const open = controlled ? openProp : openLocal;
+  const setOpen = (next: boolean) => {
+    onOpenChange?.(next);
+    if (!controlled) setOpenLocal(next);
+  };
   const [subject, setSubject] = useState("");
   const [body, setBody] = useState("");
   const [openedAtMaxId, setOpenedAtMaxId] = useState(0);
@@ -295,6 +302,14 @@ function ArticleComposer({
   useEffect(() => {
     onComposingChange?.(open);
   }, [open, onComposingChange]);
+
+  // Snapshot max article id when the composer opens (controlled or not).
+  useEffect(() => {
+    if (open) setOpenedAtMaxId(maxArticleId(articles));
+    // Only re-snapshot on open transition; articles changing later is the
+    // stale-warning signal, not a re-baseline.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
 
   const sendMutation = useMutation({
     mutationFn: () =>
@@ -318,16 +333,15 @@ function ArticleComposer({
   });
 
   if (!open) {
+    // When controlled by the ticket-zoom ⋮ menu, hide the redundant open button.
+    if (controlled) return null;
     return (
       <div>
         <Button
           variant="secondary"
           size="sm"
           data-testid="composer-open"
-          onClick={() => {
-            setOpenedAtMaxId(maxArticleId(articles));
-            setOpen(true);
-          }}
+          onClick={() => setOpen(true)}
         >
           {t("ticket.composerNote")}
         </Button>

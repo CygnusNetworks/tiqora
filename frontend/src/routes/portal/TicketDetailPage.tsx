@@ -3,7 +3,7 @@ import { useParams } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { portalApi, ApiError, type ArticleListItem } from "@/lib/portalApi";
-import { stateColorVar } from "@/lib/status";
+import { stateColorVar, stateLabel } from "@/lib/status";
 import { formatDateTime } from "@/lib/format";
 import { Spinner } from "@/components/ui/Spinner";
 import { Button } from "@/components/ui/Button";
@@ -129,7 +129,9 @@ export function TicketDetailPage() {
             className="rounded border px-1.5 py-0.5 text-[11px] font-medium capitalize"
             style={{ borderColor: spineColor, color: spineColor }}
           >
-            {ticket.state || t("portal.tickets.unknownState")}
+            {ticket.state
+              ? stateLabel(t, ticket.state)
+              : t("portal.tickets.unknownState")}
           </span>
         </div>
         <h1 className="mt-1 font-display text-lg font-semibold text-ink">

@@ -10,7 +10,7 @@ import { ArticleTimeline } from "@/components/agent/ArticleTimeline";
 import { HistoryTable } from "@/components/agent/HistoryTable";
 import { PresenceBar } from "@/components/agent/PresenceBar";
 import { ProcessWidget } from "@/components/agent/process/ProcessWidget";
-import { Tabs } from "@/components/ui/Tabs";
+import { TicketZoomOverflowMenu } from "@/components/agent/TicketZoomOverflowMenu";
 import { Spinner } from "@/components/ui/Spinner";
 
 // Sliding presence renewal: comfortably inside the backend's 30s TTL (see
@@ -27,11 +27,22 @@ export function TicketZoomPage() {
   const ticketId = Number(ticketIdStr);
   const [tab, setTab] = useState<"articles" | "history">("articles");
   const [composing, setComposing] = useState(false);
+  // Sort state lives here so the ⋮ menu can toggle it for either view.
+  const [articleDescending, setArticleDescending] = useState(true);
+  const [historyOrder, setHistoryOrder] = useState<"asc" | "desc">("desc");
+  const [noteOpen, setNoteOpen] = useState(false);
+  const [processStartOpen, setProcessStartOpen] = useState(false);
   const validTicketId = Number.isFinite(ticketId) && ticketId > 0;
 
   const ticketQ = useQuery({
     queryKey: ["tickets", ticketId],
     queryFn: () => api.getTicket(ticketId),
+    enabled: validTicketId,
+  });
+
+  const processStateQ = useQuery({
+    queryKey: ["process", "ticket", ticketId, "state"],
+    queryFn: ({ signal }) => api.getTicketProcessState(ticketId, signal),
     enabled: validTicketId,
   });
 
@@ -73,27 +84,71 @@ export function TicketZoomPage() {
     );
   }
 
+  const canStartProcess =
+    !processStateQ.isLoading &&
+    !processStateQ.isError &&
+    !processStateQ.data?.process_entity_id;
+
+  const sortLabel =
+    tab === "articles"
+      ? articleDescending
+        ? t("ticket.sortNewestFirst")
+        : t("ticket.sortOldestFirst")
+      : historyOrder === "desc"
+        ? t("ticket.historySortDesc")
+        : t("ticket.historySortAsc");
+
+  const onToggleSort = () => {
+    if (tab === "articles") {
+      setArticleDescending((d) => !d);
+    } else {
+      setHistoryOrder((o) => (o === "desc" ? "asc" : "desc"));
+    }
+  };
+
+  const overflowMenu = (
+    <TicketZoomOverflowMenu
+      tab={tab}
+      onTabChange={(next) => {
+        setTab(next);
+        // Opening history while composing a note: leave the note alone.
+      }}
+      sortLabel={sortLabel}
+      onToggleSort={onToggleSort}
+      onInternalNote={() => {
+        setTab("articles");
+        setNoteOpen(true);
+      }}
+      canStartProcess={Boolean(canStartProcess)}
+      onStartProcess={() => setProcessStartOpen(true)}
+    />
+  );
+
   return (
     <div className="mx-auto w-full max-w-5xl space-y-4 px-4 py-4" data-testid="ticket-zoom">
       <Link to="/agent/queues" className="text-xs text-accent hover:underline">
         ← {t("common.backToQueues")}
       </Link>
+      {/* Ticket info first, then editable metadata controls, then content. */}
+      <TicketHeader ticket={ticketQ.data} overflowMenu={overflowMenu} />
       <ActionToolbar ticket={ticketQ.data} />
-      <TicketHeader ticket={ticketQ.data} />
-      <ProcessWidget ticketId={ticketId} />
-      <PresenceBar ticketId={ticketId} selfUserId={user?.id} />
-      <Tabs
-        value={tab}
-        onChange={(id) => setTab(id as "articles" | "history")}
-        items={[
-          { id: "articles", label: t("ticket.articles") },
-          { id: "history", label: t("ticket.history") },
-        ]}
+      <ProcessWidget
+        ticketId={ticketId}
+        hideInactiveStart
+        startOpen={processStartOpen}
+        onStartOpenChange={setProcessStartOpen}
       />
+      <PresenceBar ticketId={ticketId} selfUserId={user?.id} />
       {tab === "articles" ? (
-        <ArticleTimeline ticketId={ticketId} onComposingChange={setComposing} />
+        <ArticleTimeline
+          ticketId={ticketId}
+          onComposingChange={setComposing}
+          descending={articleDescending}
+          noteOpen={noteOpen}
+          onNoteOpenChange={setNoteOpen}
+        />
       ) : (
-        <HistoryTable ticketId={ticketId} />
+        <HistoryTable ticketId={ticketId} order={historyOrder} />
       )}
     </div>
   );

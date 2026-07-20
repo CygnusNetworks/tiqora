@@ -177,6 +177,28 @@
     "composeWarning": "Ein anderer Agent hat geantwortet, während du geschrieben hast.",
     "sortNewestFirst": "Neueste zuerst",
     "sortOldestFirst": "Älteste zuerst",
+    "stateName": {
+      "new": "Neu",
+      "open": "Offen",
+      "pending": "Wartend",
+      "pendingReminder": "Erinnerung wartend",
+      "pendingAuto": "Auto-Wartend",
+      "pendingAutoClosePlus": "Auto-Schließen+",
+      "pendingAutoCloseMinus": "Auto-Schließen−",
+      "closed": "Geschlossen",
+      "closedSuccessful": "Erfolgreich geschlossen",
+      "closedUnsuccessful": "Erfolglos geschlossen",
+      "merged": "Zusammengeführt",
+      "removed": "Entfernt"
+    },
+    "overflow": {
+      "menu": "Weitere Aktionen",
+      "articles": "Artikel",
+      "history": "Historie",
+      "startProcess": "Prozess starten",
+      "internalNote": "Interne Notiz",
+      "sort": "Sortierung"
+    },
     "senderCustomer": "Kunde",
     "senderAgent": "Agent",
     "senderSystem": "System",
