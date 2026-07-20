@@ -4,6 +4,7 @@ import { useNavigate } from "@tanstack/react-router";
 import type { TicketListItem } from "@/lib/api";
 import { formatAgeSeconds, formatDateTime, isEscalated } from "@/lib/format";
 import { cn } from "@/lib/cn";
+import { priorityName } from "@/lib/priority";
 import { Button } from "@/components/ui/Button";
 import { Spinner } from "@/components/ui/Spinner";
 import {
@@ -242,7 +243,7 @@ export function TicketTable({
                 )}
               </span>
               <span className="hidden truncate font-mono text-[11.5px] text-muted md:inline">
-                {ticket.priority ?? "—"}
+                {priorityName(ticket.priority) ?? "—"}
               </span>
               <span className="hidden truncate text-xs text-muted md:inline">
                 {ticket.owner_name || ticket.owner_login || "—"}
@@ -257,7 +258,7 @@ export function TicketTable({
               {/* Mobile card footer: title/customer already shown above; add state + owner chip */}
               <div className="flex items-center justify-between gap-2 text-[11.5px] text-muted md:hidden">
                 <span className="truncate">
-                  {ticket.state ?? "—"} · {ticket.priority ?? "—"}
+                  {ticket.state ?? "—"} · {priorityName(ticket.priority) ?? "—"}
                 </span>
                 <span className="shrink-0 truncate">
                   {ticket.owner_name || ticket.owner_login || "—"}
