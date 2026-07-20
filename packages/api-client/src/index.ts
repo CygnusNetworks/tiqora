@@ -15,6 +15,7 @@ export {
   type TicketListItem,
   type PaginatedTickets,
   type MyTicketCounts,
+  type DashboardSummary,
   type TicketDetail,
   type ArticleListItem,
   type ArticleBody,

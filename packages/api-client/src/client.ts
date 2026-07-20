@@ -21,6 +21,14 @@ export type QueueCounts = Schemas["QueueCounts"];
 export type TicketListItem = Schemas["TicketListItem"];
 export type PaginatedTickets = Schemas["PaginatedTickets"];
 export type MyTicketCounts = Schemas["MyTicketCounts"];
+// Hand-written (see the Stats block below for why we don't regenerate
+// schema.d.ts): mirrors the DashboardSummary model in tiqora/api/v1/tickets.py.
+export type DashboardSummary = {
+  my_open: number;
+  my_new: number;
+  unowned_new: number;
+  escalated: number;
+};
 export type TicketDetail = Schemas["TicketDetail"];
 export type ArticleListItem = Schemas["ArticleListItem"];
 export type ArticleBody = Schemas["ArticleBody"];
@@ -597,6 +605,13 @@ export class ApiClient {
   /** Open/new counts for tickets owned by the current agent (nav badges). */
   myTicketCounts(signal?: AbortSignal) {
     return this.request<MyTicketCounts>("GET", "/api/v1/tickets/my-counts", {
+      signal,
+    });
+  }
+
+  /** KPI-tile counts for the agent dashboard: owned open/new, unclaimed new, escalated. */
+  dashboardSummary(signal?: AbortSignal) {
+    return this.request<DashboardSummary>("GET", "/api/v1/tickets/dashboard-summary", {
       signal,
     });
   }
