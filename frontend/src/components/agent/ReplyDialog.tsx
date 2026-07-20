@@ -5,6 +5,7 @@ import { api } from "@/lib/api";
 import { Button } from "@/components/ui/Button";
 import { Dialog } from "@/components/ui/Dialog";
 import { Spinner } from "@/components/ui/Spinner";
+import { cn } from "@/lib/cn";
 import {
   RecipientsField,
   joinRecipients,
@@ -21,10 +22,11 @@ type Field = "to" | "cc" | "bcc";
 /**
  * Modal reply composer for a single article. Prefilled from the backend
  * reply-draft endpoint. Recipients are edited as Apple-Mail-style chips (To
- * always visible; Cc/Bcc/Reply-To collapsible when empty). The answer and
- * quoted original share a SINGLE editable body — the agent types above the
- * quote in one field. The outgoing article is created via the existing
- * add_article path.
+ * always visible; Cc/Bcc/Reply-To are true toggles — expand/collapse, with a
+ * count badge when collapsed and non-empty). Addresses stay in state when
+ * collapsed and are still sent. The answer and quoted original share a SINGLE
+ * editable body — the agent types above the quote in one field. The outgoing
+ * article is created via the existing add_article path.
  */
 export function ReplyDialog({
   ticketId,
@@ -160,7 +162,13 @@ export function ReplyDialog({
     "w-full max-w-full sm:max-w-2xl md:max-w-3xl lg:max-w-4xl xl:max-w-5xl";
 
   const toggleCls =
-    "rounded border border-hairline px-2 py-0.5 text-muted hover:text-ink";
+    "inline-flex items-center gap-1 rounded border border-hairline px-2 py-0.5 text-muted hover:text-ink";
+  const toggleActiveCls = "border-accent/40 text-ink";
+  // Compact count pill (QueuesPage open-badge style) — only when collapsed + non-empty.
+  const countBadgeCls =
+    "rounded-full bg-accent-dim px-1.5 py-0.5 font-mono text-[10px] tabular-nums text-accent";
+
+  const replyToCount = replyTo.trim() ? 1 : 0;
 
   return (
     <Dialog open={open} onClose={onClose} title={title} className={dialogWidth}>
@@ -216,37 +224,53 @@ export function ReplyDialog({
               />
             </label>
           )}
+          {/* Always-visible true toggles: expand/collapse; badge when collapsed + count. */}
           <div className="flex flex-wrap items-center gap-1.5 text-xs">
-            {!showCc && (
-              <button
-                type="button"
-                className={toggleCls}
-                data-testid="reply-toggle-cc"
-                onClick={() => setShowCc(true)}
-              >
-                {t("ticket.replyCc")}
-              </button>
-            )}
-            {!showBcc && (
-              <button
-                type="button"
-                className={toggleCls}
-                data-testid="reply-toggle-bcc"
-                onClick={() => setShowBcc(true)}
-              >
-                {t("ticket.replyBcc")}
-              </button>
-            )}
-            {!showReplyTo && (
-              <button
-                type="button"
-                className={toggleCls}
-                data-testid="reply-toggle-replyto"
-                onClick={() => setShowReplyTo(true)}
-              >
-                {t("ticket.replyReplyTo")}
-              </button>
-            )}
+            <button
+              type="button"
+              className={cn(toggleCls, showCc && toggleActiveCls)}
+              data-testid="reply-toggle-cc"
+              aria-expanded={showCc}
+              onClick={() => setShowCc((v) => !v)}
+            >
+              {t("ticket.replyCc")}
+              {!showCc && cc.length > 0 && (
+                <span className={countBadgeCls} data-testid="reply-toggle-cc-count">
+                  {cc.length}
+                </span>
+              )}
+            </button>
+            <button
+              type="button"
+              className={cn(toggleCls, showBcc && toggleActiveCls)}
+              data-testid="reply-toggle-bcc"
+              aria-expanded={showBcc}
+              onClick={() => setShowBcc((v) => !v)}
+            >
+              {t("ticket.replyBcc")}
+              {!showBcc && bcc.length > 0 && (
+                <span className={countBadgeCls} data-testid="reply-toggle-bcc-count">
+                  {bcc.length}
+                </span>
+              )}
+            </button>
+            <button
+              type="button"
+              className={cn(toggleCls, showReplyTo && toggleActiveCls)}
+              data-testid="reply-toggle-replyto"
+              aria-expanded={showReplyTo}
+              onClick={() => setShowReplyTo((v) => !v)}
+            >
+              {t("ticket.replyReplyTo")}
+              {!showReplyTo && replyToCount > 0 && (
+                <span
+                  className={countBadgeCls}
+                  data-testid="reply-toggle-replyto-count"
+                >
+                  {replyToCount}
+                </span>
+              )}
+            </button>
           </div>
           <label className="block text-xs text-muted">
             {t("ticket.replySubject")}
