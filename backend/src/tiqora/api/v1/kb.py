@@ -21,6 +21,7 @@ from tiqora.kb.schemas import (
     ArticleSummary,
     ArticleUpdateIn,
     ArticleVersionOut,
+    AssignableGroup,
     AttachmentOut,
     CategoryIn,
     CategoryOut,
@@ -76,6 +77,16 @@ async def list_categories(
         )
         for r in rows
     ]
+
+
+@router.get("/assignable-groups", response_model=list[AssignableGroup])
+async def list_assignable_groups(
+    user: CurrentUser, session: DbSession, settings: AppSettings
+) -> list[AssignableGroup]:
+    """Permission groups the current user may assign to a KB category."""
+    svc = KbService(session, settings)
+    pairs = await svc.assignable_groups(user.id)
+    return [AssignableGroup(id=gid, name=name) for gid, name in pairs]
 
 
 @router.post("/categories", response_model=CategoryOut, status_code=status.HTTP_201_CREATED)

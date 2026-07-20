@@ -29,6 +29,7 @@ from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from tiqora.config import Settings
+from tiqora.db.legacy.user import PermissionGroups
 from tiqora.kb.chunker import chunk_article, slugify
 from tiqora.kb.models import (
     STATE_DRAFT,
@@ -168,6 +169,31 @@ class KbService:
                 TiqoraKbCategoryGroup(category_id=category_id, permission_group_id=gid)
             )
         await self._session.flush()
+
+    async def assignable_groups(self, user_id: int) -> list[tuple[int, str]]:
+        """Permission groups ``user_id`` may assign to a category.
+
+        Admins may assign any valid permission group; other users may assign
+        only the groups they hold ``rw`` on. Returns ``(id, name)`` pairs
+        ordered by name.
+        """
+        pe = PermissionEngine(self._session)
+        if await pe.is_admin(user_id):
+            rows = await self._session.execute(
+                select(PermissionGroups.id, PermissionGroups.name)
+                .where(PermissionGroups.valid_id == 1)
+                .order_by(PermissionGroups.name)
+            )
+            return [(gid, name) for gid, name in rows.all()]
+        writable = await pe.groups_for_permission(user_id, "rw")
+        if not writable:
+            return []
+        rows = await self._session.execute(
+            select(PermissionGroups.id, PermissionGroups.name)
+            .where(PermissionGroups.id.in_(writable), PermissionGroups.valid_id == 1)
+            .order_by(PermissionGroups.name)
+        )
+        return [(gid, name) for gid, name in rows.all()]
 
     async def _assert_may_set_groups(self, user_id: int, group_ids: list[int]) -> None:
         """Authors may only restrict a category to groups they hold ``rw`` on.

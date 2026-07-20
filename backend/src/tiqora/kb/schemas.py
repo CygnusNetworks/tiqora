@@ -53,6 +53,13 @@ class CategoryOut(BaseModel):
     change_time: datetime
 
 
+class AssignableGroup(BaseModel):
+    """A permission group the current user may assign to a KB category."""
+
+    id: int
+    name: str
+
+
 class ArticleIn(BaseModel):
     category_id: int
     title: str
