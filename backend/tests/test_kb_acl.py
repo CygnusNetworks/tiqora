@@ -52,9 +52,9 @@ def _seed(sync_url: str) -> None:
             text(
                 "INSERT INTO users (id, login, pw, first_name, last_name, valid_id,"
                 "  create_time, create_by, change_time, change_by)"
-                " VALUES (:w, 'kb.writer', :pw, 'W', 'R', 1, :t, 1, :t, 1),"
-                "        (:m, 'kb.member', :pw, 'M', 'E', 1, :t, 1, :t, 1),"
-                "        (:o, 'kb.outsider', :pw, 'O', 'U', 1, :t, 1, :t, 1)"
+                " VALUES (:w, 'kbacl.writer', :pw, 'W', 'R', 1, :t, 1, :t, 1),"
+                "        (:m, 'kbacl.member', :pw, 'M', 'E', 1, :t, 1, :t, 1),"
+                "        (:o, 'kbacl.outsider', :pw, 'O', 'U', 1, :t, 1, :t, 1)"
                 " ON CONFLICT DO NOTHING"
             ),
             {"w": WRITER, "m": MEMBER, "o": OUTSIDER, "pw": pw, "t": NOW},
