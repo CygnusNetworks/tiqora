@@ -25,7 +25,8 @@
     "knowledgeBase": "Knowledge base",
     "toggle": "Toggle navigation",
     "reports": "Reports",
-    "stats": "Statistics"
+    "stats": "Statistics",
+    "calendar": "Calendar"
   },
   "common": {
     "prev": "Previous",
@@ -508,5 +509,57 @@
       "ownedOpen": "Open (owned)",
       "closedInPeriod": "Closed in period"
     }
+  },
+  "calendar": {
+    "title": "Calendar",
+    "sidebar": "Calendars",
+    "noCalendars": "No calendars available.",
+    "newAppointment": "New appointment",
+    "editAppointment": "Edit appointment",
+    "today": "Today",
+    "view": {
+      "month": "Month",
+      "week": "Week",
+      "agenda": "Agenda"
+    },
+    "weekday": {
+      "mon": "Mon",
+      "tue": "Tue",
+      "wed": "Wed",
+      "thu": "Thu",
+      "fri": "Fri",
+      "sat": "Sat",
+      "sun": "Sun"
+    },
+    "more": "+{{count}} more",
+    "empty": "No appointments in this range.",
+    "form": {
+      "titleLabel": "Title",
+      "calendar": "Calendar",
+      "start": "Start",
+      "end": "End",
+      "allDay": "All day",
+      "location": "Location",
+      "description": "Description",
+      "recurrence": "Repeat",
+      "recurrenceNone": "Does not repeat",
+      "recurrenceInterval": "Every",
+      "recurrenceCount": "Occurrences",
+      "recurrenceUntil": "Until",
+      "save": "Save",
+      "delete": "Delete",
+      "cancel": "Cancel",
+      "deleteOccurrence": "Delete this occurrence",
+      "deleteSeries": "Delete entire series"
+    },
+    "recurrence": {
+      "Daily": "Daily",
+      "Weekly": "Weekly",
+      "Monthly": "Monthly",
+      "Yearly": "Yearly"
+    },
+    "subscribe": "Subscribe (ICS)",
+    "exportIcs": "Export .ics",
+    "linkedTickets": "Linked tickets"
   }
 }

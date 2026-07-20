@@ -105,4 +105,11 @@ export type {
   StatsGranularity,
   StatsDimension,
   StatsFilterParams,
+  CalendarOut,
+  RecurrenceIn,
+  AppointmentIn,
+  AppointmentUpdateIn,
+  AppointmentOut,
+  OccurrenceOut,
+  TicketLinkOut,
 } from "@tiqora/api-client";
