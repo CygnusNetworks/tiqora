@@ -23,7 +23,9 @@
     "queues": "Queues",
     "knowledge": "Knowledge",
     "knowledgeBase": "Knowledge base",
-    "toggle": "Toggle navigation"
+    "toggle": "Toggle navigation",
+    "reports": "Reports",
+    "stats": "Statistics"
   },
   "common": {
     "prev": "Previous",
@@ -461,6 +463,50 @@
       "tagsPlaceholder": "comma, separated, tags",
       "content": "Content (Markdown)",
       "preview": "Preview"
+    }
+  },
+  "stats": {
+    "title": "Reports",
+    "subtitle": "Ticket volume, backlog, SLA and workload across your queues.",
+    "empty": "No data for the current filters.",
+    "exportCsv": "Export CSV",
+    "filters": {
+      "queue": "Queue",
+      "dateFrom": "From",
+      "dateTo": "To",
+      "granularity": "Granularity",
+      "granularityOptions": {
+        "day": "Day",
+        "week": "Week",
+        "month": "Month"
+      }
+    },
+    "tiles": {
+      "total": "Tickets",
+      "escalated": "Escalated",
+      "firstResponseBreached": "First response overdue",
+      "avgFirstResponse": "Avg. first response",
+      "avgSolution": "Avg. solution time"
+    },
+    "sections": {
+      "volume": "Ticket volume",
+      "backlog": "Backlog trend",
+      "openSnapshot": "Open tickets",
+      "agentWorkload": "Agent workload"
+    },
+    "dimension": {
+      "queue": "Queue",
+      "state": "State",
+      "priority": "Priority",
+      "owner": "Owner"
+    },
+    "table": {
+      "created": "Created",
+      "closed": "Closed",
+      "login": "Agent",
+      "name": "Name",
+      "ownedOpen": "Open (owned)",
+      "closedInPeriod": "Closed in period"
     }
   }
 }
