@@ -10,6 +10,8 @@ import shutil
 import tempfile
 
 import pytest
+
+pytest.importorskip("gnupg")  # PGP tests need the optional crypto extra
 from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 

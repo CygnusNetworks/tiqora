@@ -101,8 +101,10 @@ jobs:
           else
             echo "DATABASE_URL=mysql+aiomysql://tiqora:tiqora@localhost:3306/tiqora" >> "$GITHUB_ENV"
           fi
+      - name: Install crypto tooling (gpg for PGP tests; openssl is preinstalled)
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends gnupg
       - name: Install dependencies
-        run: uv sync --extra dev
+        run: uv sync --extra dev --extra crypto
       - name: Pytest
         run: uv run pytest -q
 

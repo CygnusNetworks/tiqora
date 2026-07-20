@@ -12,6 +12,8 @@ from pathlib import Path
 
 import pytest
 
+pytest.importorskip("gnupg")  # PGP tests need the optional crypto extra
+
 from tiqora.config import Settings
 from tiqora.crypto.outbound import apply_email_security_sync
 from tiqora.domain.ticket_write_service import ArticleIn
