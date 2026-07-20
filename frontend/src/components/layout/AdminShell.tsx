@@ -16,37 +16,20 @@ const NAV_GROUPS: NavGroup[] = [
       { to: "/admin/groups", labelKey: "admin.nav.groups", testId: "admin-nav-groups" },
       { to: "/admin/roles", labelKey: "admin.nav.roles", testId: "admin-nav-roles" },
       {
-        to: "/admin/agent-roles",
-        labelKey: "admin.nav.agentRoles",
-        testId: "admin-nav-agent-roles",
-      },
-      {
         to: "/admin/agent-groups",
         labelKey: "admin.nav.agentGroups",
         testId: "admin-nav-agent-groups",
+      },
+      {
+        to: "/admin/agent-roles",
+        labelKey: "admin.nav.agentRoles",
+        testId: "admin-nav-agent-roles",
       },
       {
         to: "/admin/role-groups",
         labelKey: "admin.nav.roleGroups",
         testId: "admin-nav-role-groups",
       },
-    ],
-  },
-  {
-    titleKey: "admin.group.ticketConfig",
-    links: [
-      { to: "/admin/queues", labelKey: "admin.nav.queues", testId: "admin-nav-queues" },
-      { to: "/admin/states", labelKey: "admin.nav.states", testId: "admin-nav-states" },
-      {
-        to: "/admin/priorities",
-        labelKey: "admin.nav.priorities",
-        testId: "admin-nav-priorities",
-      },
-    ],
-  },
-  {
-    titleKey: "admin.group.customers",
-    links: [
       {
         to: "/admin/customer-users",
         labelKey: "admin.nav.customerUsers",
@@ -62,16 +45,42 @@ const NAV_GROUPS: NavGroup[] = [
         labelKey: "admin.nav.customerUserCustomers",
         testId: "admin-nav-customer-user-customers",
       },
+      {
+        to: "/admin/customer-user-groups",
+        labelKey: "admin.nav.customerUserGroups",
+        testId: "admin-nav-customer-user-groups",
+      },
     ],
   },
   {
-    titleKey: "admin.group.communication",
+    titleKey: "admin.group.queuesTemplates",
     links: [
+      { to: "/admin/queues", labelKey: "admin.nav.queues", testId: "admin-nav-queues" },
       { to: "/admin/templates", labelKey: "admin.nav.templates", testId: "admin-nav-templates" },
       {
-        to: "/admin/salutations",
-        labelKey: "admin.nav.salutations",
-        testId: "admin-nav-salutations",
+        to: "/admin/queue-templates",
+        labelKey: "admin.nav.queueTemplates",
+        testId: "admin-nav-queue-templates",
+      },
+      {
+        to: "/admin/template-attachments",
+        labelKey: "admin.nav.templateAttachments",
+        testId: "admin-nav-template-attachments",
+      },
+      {
+        to: "/admin/attachments",
+        labelKey: "admin.nav.attachments",
+        testId: "admin-nav-attachments",
+      },
+      {
+        to: "/admin/auto-responses",
+        labelKey: "admin.nav.autoResponses",
+        testId: "admin-nav-auto-responses",
+      },
+      {
+        to: "/admin/queue-auto-responses",
+        labelKey: "admin.nav.queueAutoResponses",
+        testId: "admin-nav-queue-auto-responses",
       },
       {
         to: "/admin/signatures",
@@ -79,10 +88,21 @@ const NAV_GROUPS: NavGroup[] = [
         testId: "admin-nav-signatures",
       },
       {
-        to: "/admin/auto-responses",
-        labelKey: "admin.nav.autoResponses",
-        testId: "admin-nav-auto-responses",
+        to: "/admin/salutations",
+        labelKey: "admin.nav.salutations",
+        testId: "admin-nav-salutations",
       },
+      {
+        to: "/admin/priorities",
+        labelKey: "admin.nav.priorities",
+        testId: "admin-nav-priorities",
+      },
+      { to: "/admin/states", labelKey: "admin.nav.states", testId: "admin-nav-states" },
+    ],
+  },
+  {
+    titleKey: "admin.group.email",
+    links: [
       {
         to: "/admin/mail-outbound",
         labelKey: "admin.nav.mailOutbound",
@@ -98,31 +118,31 @@ const NAV_GROUPS: NavGroup[] = [
   {
     titleKey: "admin.group.automation",
     links: [
-      {
-        to: "/admin/postmaster-filters",
-        labelKey: "admin.nav.postmasterFilters",
-        testId: "admin-nav-postmaster-filters",
-      },
       { to: "/admin/acl", labelKey: "admin.nav.acl", testId: "admin-nav-acl" },
       {
         to: "/admin/generic-agent-jobs",
         labelKey: "admin.nav.genericAgentJobs",
         testId: "admin-nav-generic-agent-jobs",
       },
-    ],
-  },
-  {
-    titleKey: "admin.group.system",
-    links: [
       {
-        to: "/admin/dynamic-fields",
-        labelKey: "admin.nav.dynamicFields",
-        testId: "admin-nav-dynamic-fields",
+        to: "/admin/processes",
+        labelKey: "admin.nav.processes",
+        testId: "admin-nav-processes",
+      },
+      {
+        to: "/admin/postmaster-filters",
+        labelKey: "admin.nav.postmasterFilters",
+        testId: "admin-nav-postmaster-filters",
       },
       {
         to: "/admin/webhooks",
         labelKey: "admin.nav.webhooks",
         testId: "admin-nav-webhooks",
+      },
+      {
+        to: "/admin/dynamic-fields",
+        labelKey: "admin.nav.dynamicFields",
+        testId: "admin-nav-dynamic-fields",
       },
     ],
   },
