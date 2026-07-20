@@ -340,6 +340,37 @@ calendar library), week and agenda views, a calendar-switcher sidebar
 create/edit `AppointmentDialog` (title, calendar, start/end, all-day,
 location, description, recurrence). i18n: EN + DE (`calendar.*` keys).
 
+### Process management (BPM ticket processes)
+
+`tiqora/process/` (`config.py` Pydantic models for the YAML `config` blobs,
+`graph.py`'s `ProcessRepository` for read-only process loading,
+`ticket_state.py` for the two-Dynamic-Field ticket<->process link,
+`engine.py` for execution — transitions, conditions, TransitionActions,
+activity dialog submission) plus `api/v1/process.py`
+(`/api/v1/process/*`, 6 endpoints). Reuses Znuny's **existing** `pm_process`
+/ `pm_activity` / `pm_activity_dialog` / `pm_transition` /
+`pm_transition_action` tables verbatim (`db/legacy/process_management.py`)
+— same shared-schema, no-migration approach as Calendar above.
+
+Engine flow, one line: start a process at its `StartActivity` -> agent
+submits an activity dialog -> validate required fields + the dialog's
+`Permission` -> apply submitted field changes to the ticket (reusing
+`ticket_write_service`, so history stays Znuny-shaped) -> evaluate the
+current activity's outgoing transitions in declared order, first
+`Condition` match wins -> run that transition's `TransitionAction`s ->
+advance `ProcessManagementActivityID` to the target activity.
+
+Frontend: a `ProcessWidget` + `StartProcessDialog` + `ActivityDialogModal`
+on ticket zoom (`components/agent/process/`), and a read-only
+`/admin/processes` list/detail pair — there is no visual process designer;
+processes are still authored via Znuny's admin UI or direct DB/YAML.
+
+Condition types and TransitionAction modules are a documented subset of
+Znuny's (String/Regexp/Contains/NotContains/Equal/NotEqual conditions;
+ten of the most common TransitionAction modules) — see
+[docs/process-management.md](process-management.md) for the full
+supported-vs-deferred breakdown and REST endpoint list.
+
 ### Events and workers
 
 - Writes emit events via a transactional outbox (`tiqora_event_outbox`).
@@ -433,7 +464,7 @@ Mounted at `/znuny-compat` in the main API process (same `tiqora-api`).
 
 ## Non-goals (V1)
 
-- ProcessManagement, calendar, stats, PGP/S-MIME
+- calendar, stats, PGP/S-MIME
 - SOAP GenericInterface
 - Znuny package manager / OPM marketplace (except the small TiqoraSync addon)
 - Shipping any Znuny source code in this repository

@@ -75,7 +75,7 @@ existing schema during parallel operation.
 | LDAP/AD auth (agent + customer) | ✅ Done | Bind-search-bind, no auto-provisioning; feature-flagged |
 | GDPR tools (anonymization + retention) | ✅ Done | Ownership-gated; `tiqora gdpr *` — [docs/gdpr.md](./docs/gdpr.md) |
 | PGP / S-MIME (verify/decrypt inbound, sign/encrypt outbound) | ✅ Done | Flag-gated — [docs/crypto.md](./docs/crypto.md) |
-| Process management | 🔲 Planned (next) | BPM ticket processes |
+| Process Management (BPM ticket processes) | ✅ Done | `GET/POST /api/v1/process/*` (6 endpoints) — reuses Znuny `pm_*` tables; no visual designer — [docs/process-management.md](./docs/process-management.md) |
 | SOAP compat transport, package manager | 🔲 Planned | REST compat done; SOAP next |
 
 ## Architecture overview
