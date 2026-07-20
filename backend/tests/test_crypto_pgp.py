@@ -21,6 +21,8 @@ from collections.abc import Iterator
 
 import pytest
 
+pytest.importorskip("gnupg")  # PGP tests need the optional crypto extra
+
 from tiqora.crypto import CryptoError
 from tiqora.crypto.pgp import PgpEngine
 
