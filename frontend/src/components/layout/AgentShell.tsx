@@ -151,7 +151,7 @@ function QueueNavSection({ flat, onNavigate }: { flat: QueueNode[]; onNavigate?:
   return (
     <div>
       <div className="flex items-center justify-between px-2.5 pb-1.5">
-        <h2 className="text-[10.5px] font-semibold uppercase tracking-[0.12em] text-muted">
+        <h2 className="text-[10.5px] font-semibold uppercase tracking-[0.12em] text-accent/90">
           {t("sidebar.queues")}
         </h2>
         <button
@@ -259,7 +259,7 @@ function SidebarBody({ onNavigate }: { onNavigate?: () => void }) {
 
       <nav className="flex-1 space-y-4 overflow-y-auto" data-testid="agent-sidebar-nav">
         <div>
-          <h2 className="px-2.5 pb-1.5 text-[10.5px] font-semibold uppercase tracking-[0.12em] text-muted">
+          <h2 className="px-2.5 pb-1.5 text-[10.5px] font-semibold uppercase tracking-[0.12em] text-accent/90">
             {t("sidebar.workspace")}
           </h2>
           <div className="space-y-0.5">
@@ -290,7 +290,7 @@ function SidebarBody({ onNavigate }: { onNavigate?: () => void }) {
         <QueueNavSection flat={flat} onNavigate={onNavigate} />
 
         <div>
-          <h2 className="px-2.5 pb-1.5 text-[10.5px] font-semibold uppercase tracking-[0.12em] text-muted">
+          <h2 className="px-2.5 pb-1.5 text-[10.5px] font-semibold uppercase tracking-[0.12em] text-accent/90">
             {t("sidebar.knowledge")}
           </h2>
           <div className="space-y-0.5">
@@ -310,7 +310,7 @@ function SidebarBody({ onNavigate }: { onNavigate?: () => void }) {
         </div>
 
         <div>
-          <h2 className="px-2.5 pb-1.5 text-[10.5px] font-semibold uppercase tracking-[0.12em] text-muted">
+          <h2 className="px-2.5 pb-1.5 text-[10.5px] font-semibold uppercase tracking-[0.12em] text-accent/90">
             {t("sidebar.calendar")}
           </h2>
           <div className="space-y-0.5">
@@ -324,7 +324,7 @@ function SidebarBody({ onNavigate }: { onNavigate?: () => void }) {
         </div>
 
         <div>
-          <h2 className="px-2.5 pb-1.5 text-[10.5px] font-semibold uppercase tracking-[0.12em] text-muted">
+          <h2 className="px-2.5 pb-1.5 text-[10.5px] font-semibold uppercase tracking-[0.12em] text-accent/90">
             {t("sidebar.reports")}
           </h2>
           <div className="space-y-0.5">

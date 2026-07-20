@@ -105,7 +105,7 @@ function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
     <nav className="flex flex-col gap-4" data-testid="admin-sidebar-nav">
       {NAV_GROUPS.map((group) => (
         <div key={group.titleKey}>
-          <h2 className="mb-1 px-2 text-xs font-semibold uppercase tracking-wide text-muted">
+          <h2 className="mb-1 px-2 text-[10.5px] font-semibold uppercase tracking-[0.12em] text-accent/90">
             {t(group.titleKey)}
           </h2>
           <ul className="list-none space-y-0.5">
@@ -165,7 +165,8 @@ export function AdminShell({ children }: { children: ReactNode }) {
             ☰
           </Button>
           <Link
-            to="/admin"
+            to="/agent"
+            data-testid="admin-brand-link"
             className="flex shrink-0 items-center gap-2 font-display text-lg font-bold tracking-tight text-ink"
           >
             <img src="/logo.svg" alt="" width={22} height={22} className="rounded" />
