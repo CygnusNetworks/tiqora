@@ -9,6 +9,7 @@ implemented in :mod:`tiqora.channels.email.autoresponse`.
 
 from __future__ import annotations
 
+import time
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Any
@@ -20,6 +21,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from tiqora.channels.email.filters import apply_filters
 from tiqora.channels.email.parser import ParsedEmail, get_email_address, parse_email
 from tiqora.db.legacy.mail_account import MailAccount
+from tiqora.domain.mail_log import write_mail_log
 from tiqora.domain.ticket_write_service import ArticleIn, TicketIn, add_article, create_ticket
 from tiqora.znuny.followup import detect_followup
 from tiqora.znuny.sysconfig import SysConfig
@@ -238,7 +240,14 @@ async def _process_message_inner(
     ignore = (get_param.get("X-OTRS-Ignore") or "").strip().lower()
     if ignore in ("yes", "true"):
         logger.info("postmaster_ignored", account_id=account.id, message_id=parsed.message_id)
-        return PipelineResult(outcome="ignored")
+        # Carry filter reason on the result so process_message can log filtered.
+        return PipelineResult(
+            outcome="ignored",
+            error="X-OTRS-Ignore",
+            recipient=parsed.from_header,
+            orig_subject=parsed.subject,
+            orig_message_id=_msgid(parsed.message_id),
+        )
 
     followup = await detect_followup(
         session,
@@ -496,15 +505,46 @@ async def process_message(
     settings = get_settings()
     body_override, crypto_result = await process_inbound_crypto(raw, settings)
 
-    result = await _process_message_inner(
-        session,
-        session_factory,
-        sysconfig,
-        raw=raw,
-        account=account,
-        user_id=user_id,
-        body_override=body_override,
-    )
+    # Lightweight header parse for the communication log (same raw as pipeline).
+    try:
+        parsed_headers = parse_email(raw)
+        log_from = parsed_headers.from_header
+        log_to = parsed_headers.to_header
+        log_cc = parsed_headers.cc_header or None
+        log_subject = parsed_headers.subject
+        log_mid = _msgid(parsed_headers.message_id)
+    except Exception:
+        log_from, log_to, log_cc, log_subject, log_mid = "", "", None, "", None
+
+    t0 = time.perf_counter()
+    try:
+        result = await _process_message_inner(
+            session,
+            session_factory,
+            sysconfig,
+            raw=raw,
+            account=account,
+            user_id=user_id,
+            body_override=body_override,
+        )
+    except Exception as exc:
+        duration_ms = int((time.perf_counter() - t0) * 1000)
+        await write_mail_log(
+            session,
+            direction="in",
+            status="failed",
+            from_addr=log_from,
+            to_addr=log_to,
+            cc_addr=log_cc,
+            subject=log_subject,
+            message_id=log_mid,
+            detail=str(exc),
+            duration_ms=duration_ms,
+            queue=getattr(account, "login", None) or str(account.id),
+        )
+        raise
+
+    duration_ms = int((time.perf_counter() - t0) * 1000)
 
     if crypto_result is not None:
         article_id = result.article_id
@@ -518,10 +558,92 @@ async def process_message(
                     {"tid": result.ticket_id},
                 )
             ).scalar_one_or_none()
+            if article_id is not None:
+                result.article_id = int(article_id)
+        if result.article_id is not None:
+            await _write_crypto_flag(
+                session, int(result.article_id), crypto_result.article_flag_value, user_id
+            )
+    elif result.article_id is None and result.ticket_id is not None:
+        # Ensure received logs get article_id for new_ticket path even without crypto.
+        article_id = (
+            await session.execute(
+                text("SELECT id FROM article WHERE ticket_id = :tid ORDER BY id LIMIT 1"),
+                {"tid": result.ticket_id},
+            )
+        ).scalar_one_or_none()
         if article_id is not None:
-            await _write_crypto_flag(session, article_id, crypto_result.article_flag_value, user_id)
+            result.article_id = int(article_id)
+
+    await _log_inbound_result(
+        session,
+        account=account,
+        result=result,
+        duration_ms=duration_ms,
+        from_addr=log_from,
+        to_addr=log_to,
+        cc_addr=log_cc,
+        subject=log_subject,
+        message_id=log_mid,
+    )
 
     return result
+
+
+async def _log_inbound_result(
+    session: AsyncSession,
+    *,
+    account: MailAccount,
+    result: PipelineResult,
+    duration_ms: int,
+    from_addr: str = "",
+    to_addr: str = "",
+    cc_addr: str | None = None,
+    subject: str = "",
+    message_id: str | None = None,
+) -> None:
+    """Map pipeline outcome → communication-log row (best-effort)."""
+    queue_label: str | None = None
+    if result.queue_id is not None:
+        try:
+            row = (
+                await session.execute(
+                    text("SELECT name FROM queue WHERE id = :qid LIMIT 1"),
+                    {"qid": result.queue_id},
+                )
+            ).first()
+            if row is not None:
+                queue_label = str(row[0])
+        except Exception:
+            queue_label = None
+    if not queue_label:
+        queue_label = getattr(account, "login", None) or str(getattr(account, "id", ""))
+
+    if result.outcome == "ignored":
+        status = "filtered"
+        detail = result.error or "X-OTRS-Ignore"
+    elif result.outcome == "error":
+        status = "failed"
+        detail = result.error or "pipeline error"
+    else:
+        status = "received"
+        detail = result.outcome
+
+    await write_mail_log(
+        session,
+        direction="in",
+        status=status,
+        from_addr=from_addr or result.recipient or "",
+        to_addr=to_addr,
+        cc_addr=cc_addr,
+        subject=subject or result.orig_subject or "",
+        message_id=message_id or result.orig_message_id,
+        ticket_id=result.ticket_id,
+        article_id=result.article_id,
+        queue=queue_label,
+        detail=detail,
+        duration_ms=duration_ms,
+    )
 
 
 async def process_message_and_respond(

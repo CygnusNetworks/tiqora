@@ -428,7 +428,8 @@
       "dynamicFields": "Dynamic fields",
       "webhooks": "Webhooks",
       "processes": "Processes",
-      "mailOutbound": "Email (outbound)"
+      "mailOutbound": "Email (outbound)",
+      "mailLog": "Communication log"
     },
     "table": {
       "id": "ID",
@@ -692,6 +693,29 @@
       "testSuccess": "Test succeeded",
       "testFailure": "Test failed",
       "loadError": "Failed to load settings."
+    },
+    "mailLog": {
+      "title": "Email communication log",
+      "subtitle": "Inbound and outbound email attempts with status and SMTP detail.",
+      "direction": "Direction",
+      "status": "Status",
+      "search": "Search",
+      "searchPlaceholder": "From, to, or subject…",
+      "from": "From",
+      "to": "To",
+      "all": "All",
+      "dirIn": "Inbound",
+      "dirOut": "Outbound",
+      "time": "Time",
+      "fromTo": "From → To",
+      "subject": "Subject",
+      "ticket": "Ticket",
+      "queue": "Queue",
+      "duration": "Duration",
+      "detail": "Detail",
+      "detailField": "Detail / SMTP response",
+      "empty": "No log entries match the filters.",
+      "entries": "entries"
     }
   },
   "kb": {

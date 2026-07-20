@@ -428,7 +428,8 @@
       "dynamicFields": "Dynamische Felder",
       "webhooks": "Webhooks",
       "processes": "Prozesse",
-      "mailOutbound": "E-Mail (Ausgang)"
+      "mailOutbound": "E-Mail (Ausgang)",
+      "mailLog": "Kommunikationsprotokoll"
     },
     "table": {
       "id": "ID",
@@ -692,6 +693,29 @@
       "testSuccess": "Test erfolgreich",
       "testFailure": "Test fehlgeschlagen",
       "loadError": "Einstellungen konnten nicht geladen werden."
+    },
+    "mailLog": {
+      "title": "E-Mail-Kommunikationsprotokoll",
+      "subtitle": "Ein- und ausgehende E-Mail-Versuche mit Status und SMTP-Detail.",
+      "direction": "Richtung",
+      "status": "Status",
+      "search": "Suche",
+      "searchPlaceholder": "Von, an oder Betreff…",
+      "from": "Von",
+      "to": "An",
+      "all": "Alle",
+      "dirIn": "Eingehend",
+      "dirOut": "Ausgehend",
+      "time": "Zeit",
+      "fromTo": "Von → An",
+      "subject": "Betreff",
+      "ticket": "Ticket",
+      "queue": "Queue",
+      "duration": "Dauer",
+      "detail": "Detail",
+      "detailField": "Detail / SMTP-Antwort",
+      "empty": "Keine Einträge für die Filter.",
+      "entries": "Einträge"
     }
   },
   "kb": {

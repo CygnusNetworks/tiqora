@@ -55,6 +55,9 @@ class SmtpMailSender:
         self._password = password or None
         self._security: MailSecurity = security or "none"
         self._timeout = float(timeout if timeout is not None else 60.0)
+        # Populated after a successful ``send`` for communication-log detail.
+        self.last_smtp_code: int | None = None
+        self.last_smtp_detail: str | None = None
 
     @classmethod
     def from_resolved(cls, cfg: ResolvedOutboundSmtp) -> SmtpMailSender:
@@ -72,7 +75,7 @@ class SmtpMailSender:
     async def send(self, message: EmailMessage) -> None:
         use_tls = self._security == "ssl"
         start_tls = True if self._security == "starttls" else False if use_tls else None
-        await aiosmtplib.send(
+        recipients, _message_id = await aiosmtplib.send(
             message,
             hostname=self._host,
             port=self._port,
@@ -82,6 +85,18 @@ class SmtpMailSender:
             use_tls=use_tls,
             start_tls=start_tls,
         )
+        # aiosmtplib returns dict[recipient, SMTPResponse]; pick first for log.
+        self.last_smtp_code = None
+        self.last_smtp_detail = None
+        if recipients:
+            parts: list[str] = []
+            for addr, resp in recipients.items():
+                code = getattr(resp, "code", None)
+                msg = getattr(resp, "message", str(resp))
+                if self.last_smtp_code is None and isinstance(code, int):
+                    self.last_smtp_code = code
+                parts.append(f"{addr}: {code} {msg}".strip())
+            self.last_smtp_detail = "; ".join(parts) if parts else None
 
 
 class CapturingMailSender:
@@ -89,6 +104,8 @@ class CapturingMailSender:
 
     def __init__(self) -> None:
         self.sent: list[EmailMessage] = []
+        self.last_smtp_code: int | None = 250
+        self.last_smtp_detail: str | None = "250 OK (captured)"
 
     async def send(self, message: EmailMessage) -> None:
         self.sent.append(message)
@@ -100,6 +117,8 @@ class FailingMailSender:
     def __init__(self, message: str = "SMTP connection refused") -> None:
         self.message = message
         self.attempts = 0
+        self.last_smtp_code: int | None = None
+        self.last_smtp_detail: str | None = None
 
     async def send(self, message: EmailMessage) -> None:
         self.attempts += 1

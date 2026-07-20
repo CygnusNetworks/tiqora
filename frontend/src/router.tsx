@@ -62,6 +62,7 @@ import { AutoResponsesPage } from "@/routes/admin/AutoResponsesPage";
 import { DynamicFieldsPage } from "@/routes/admin/DynamicFieldsPage";
 import { WebhooksPage } from "@/routes/admin/WebhooksPage";
 import { MailOutboundPage } from "@/routes/admin/MailOutboundPage";
+import { MailLogPage } from "@/routes/admin/MailLogPage";
 import { PostmasterFiltersPage } from "@/routes/admin/PostmasterFiltersPage";
 import { PostmasterFilterDetailPage } from "@/routes/admin/PostmasterFilterDetailPage";
 import { AclPage } from "@/routes/admin/AclPage";
@@ -456,6 +457,12 @@ const adminMailOutboundRoute = createRoute({
   component: MailOutboundPage,
 });
 
+const adminMailLogRoute = createRoute({
+  getParentRoute: () => adminLayoutRoute,
+  path: "/mail-log",
+  component: MailLogPage,
+});
+
 const adminPostmasterFiltersRoute = createRoute({
   getParentRoute: () => adminLayoutRoute,
   path: "/postmaster-filters",
@@ -560,6 +567,7 @@ const routeTree = rootRoute.addChildren([
     adminDynamicFieldsRoute,
     adminWebhooksRoute,
     adminMailOutboundRoute,
+    adminMailLogRoute,
     adminPostmasterFiltersRoute,
     adminPostmasterFilterDetailRoute,
     adminAclRoute,
