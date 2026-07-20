@@ -20,6 +20,7 @@ from sqlalchemy import BigInteger, Integer, SmallInteger, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from tiqora.db.legacy.base import LegacyBase
+from tiqora.db.legacy.types import LegacyDateTime
 
 
 class Calendar(LegacyBase):
@@ -36,9 +37,9 @@ class Calendar(LegacyBase):
     color: Mapped[str] = mapped_column(String(7), nullable=False)
     ticket_appointments: Mapped[bytes | None] = mapped_column(nullable=True)
     valid_id: Mapped[int] = mapped_column(SmallInteger, nullable=False)
-    create_time: Mapped[datetime] = mapped_column(nullable=False)
+    create_time: Mapped[datetime] = mapped_column(LegacyDateTime, nullable=False)
     create_by: Mapped[int] = mapped_column(Integer, nullable=False)
-    change_time: Mapped[datetime] = mapped_column(nullable=False)
+    change_time: Mapped[datetime] = mapped_column(LegacyDateTime, nullable=False)
     change_by: Mapped[int] = mapped_column(Integer, nullable=False)
 
 
@@ -65,16 +66,16 @@ class CalendarAppointment(LegacyBase):
     title: Mapped[str] = mapped_column(String(255), nullable=False)
     description: Mapped[str | None] = mapped_column(String(3800), nullable=True)
     location: Mapped[str | None] = mapped_column(String(255), nullable=True)
-    start_time: Mapped[datetime] = mapped_column(nullable=False)
-    end_time: Mapped[datetime] = mapped_column(nullable=False)
+    start_time: Mapped[datetime] = mapped_column(LegacyDateTime, nullable=False)
+    end_time: Mapped[datetime] = mapped_column(LegacyDateTime, nullable=False)
     all_day: Mapped[int | None] = mapped_column(SmallInteger, nullable=True)
-    notify_time: Mapped[datetime | None] = mapped_column(nullable=True)
+    notify_time: Mapped[datetime | None] = mapped_column(LegacyDateTime, nullable=True)
     notify_template: Mapped[str | None] = mapped_column(String(255), nullable=True)
     notify_custom: Mapped[str | None] = mapped_column(String(255), nullable=True)
     notify_custom_unit_count: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
     notify_custom_unit: Mapped[str | None] = mapped_column(String(255), nullable=True)
     notify_custom_unit_point: Mapped[str | None] = mapped_column(String(255), nullable=True)
-    notify_custom_date: Mapped[datetime | None] = mapped_column(nullable=True)
+    notify_custom_date: Mapped[datetime | None] = mapped_column(LegacyDateTime, nullable=True)
     team_id: Mapped[str | None] = mapped_column(String(3800), nullable=True)
     resource_id: Mapped[str | None] = mapped_column(String(3800), nullable=True)
     recurring: Mapped[int | None] = mapped_column(SmallInteger, nullable=True)
@@ -82,13 +83,13 @@ class CalendarAppointment(LegacyBase):
     recur_freq: Mapped[str | None] = mapped_column(String(255), nullable=True)
     recur_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
     recur_interval: Mapped[int | None] = mapped_column(Integer, nullable=True)
-    recur_until: Mapped[datetime | None] = mapped_column(nullable=True)
-    recur_id: Mapped[datetime | None] = mapped_column(nullable=True)
+    recur_until: Mapped[datetime | None] = mapped_column(LegacyDateTime, nullable=True)
+    recur_id: Mapped[datetime | None] = mapped_column(LegacyDateTime, nullable=True)
     recur_exclude: Mapped[str | None] = mapped_column(String(3800), nullable=True)
     ticket_appointment_rule_id: Mapped[str | None] = mapped_column(String(32), nullable=True)
-    create_time: Mapped[datetime | None] = mapped_column(nullable=True)
+    create_time: Mapped[datetime | None] = mapped_column(LegacyDateTime, nullable=True)
     create_by: Mapped[int | None] = mapped_column(Integer, nullable=True)
-    change_time: Mapped[datetime | None] = mapped_column(nullable=True)
+    change_time: Mapped[datetime | None] = mapped_column(LegacyDateTime, nullable=True)
     change_by: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
 
