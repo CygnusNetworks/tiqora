@@ -8,6 +8,7 @@ import {
   type NotificationItem,
 } from "@/lib/notificationStore";
 import { cn } from "@/lib/cn";
+import { BellIcon } from "@/components/ui/icons";
 
 /**
  * Topbar bell showing the live SSE `ticket_new_in_queue` notifications:
@@ -42,11 +43,9 @@ export function NotificationBell() {
             return next;
           });
         }}
-        className="relative flex h-8 w-8 items-center justify-center rounded-lg text-ink/70 transition-colors duration-100 hover:bg-surface-subtle focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent"
+        className="relative flex h-8 w-8 items-center justify-center rounded-lg text-ink/70 transition-colors duration-100 hover:bg-surface-subtle hover:text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent"
       >
-        <span aria-hidden className="text-[15px]">
-          🔔
-        </span>
+        <BellIcon className="text-[17px]" />
         {unreadCount > 0 && (
           <span
             data-testid="notification-unread-count"
@@ -164,9 +163,7 @@ export function NotificationToaster() {
           className="pointer-events-auto w-72 max-w-[90vw] rounded-lg border border-hairline bg-surface p-3 text-left shadow-xl animate-route-in"
         >
           <div className="flex items-center gap-2">
-            <span aria-hidden className="text-[13px]">
-              🔔
-            </span>
+            <BellIcon className="text-[14px] text-accent" />
             <span className="text-[11px] font-semibold uppercase tracking-wide text-accent">
               {t("notifications.newTicket")}
             </span>

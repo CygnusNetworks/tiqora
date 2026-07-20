@@ -8,6 +8,7 @@ from sqlalchemy import select
 from tiqora.api.deps import DbSession
 from tiqora.api.v1.admin.common import now
 from tiqora.api.v1.admin.deps import AdminUser
+from tiqora.api.v1.admin.pagination import ListParamsDep, Page, apply_valid_filter, paginate
 from tiqora.api.v1.admin.schemas import (
     GroupAssignment,
     RoleAssignment,
@@ -21,11 +22,11 @@ from tiqora.znuny.password import hash_password
 router = APIRouter(prefix="/users", tags=["admin:users"])
 
 
-@router.get("", response_model=list[UserOut])
-async def list_users(admin: AdminUser, session: DbSession) -> list[Users]:
+@router.get("", response_model=Page[UserOut])
+async def list_users(admin: AdminUser, session: DbSession, params: ListParamsDep) -> Page[UserOut]:
     _ = admin
-    result = await session.execute(select(Users).order_by(Users.login))
-    return list(result.scalars().all())
+    stmt = apply_valid_filter(select(Users), Users.valid_id, params.valid).order_by(Users.login)
+    return await paginate(session, UserOut, stmt, params)
 
 
 @router.get("/{user_id}", response_model=UserOut)

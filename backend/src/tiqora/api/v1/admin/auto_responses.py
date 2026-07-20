@@ -8,6 +8,7 @@ from sqlalchemy import select
 from tiqora.api.deps import DbSession
 from tiqora.api.v1.admin.common import now
 from tiqora.api.v1.admin.deps import AdminUser
+from tiqora.api.v1.admin.pagination import ListParamsDep, Page, apply_valid_filter, paginate
 from tiqora.api.v1.admin.schemas import (
     AutoResponseCreate,
     AutoResponseOut,
@@ -19,11 +20,15 @@ from tiqora.db.legacy.queue import AutoResponse, QueueAutoResponse
 router = APIRouter(tags=["admin:auto-responses"])
 
 
-@router.get("/auto-responses", response_model=list[AutoResponseOut])
-async def list_auto_responses(admin: AdminUser, session: DbSession) -> list[AutoResponse]:
+@router.get("/auto-responses", response_model=Page[AutoResponseOut])
+async def list_auto_responses(
+    admin: AdminUser, session: DbSession, params: ListParamsDep
+) -> Page[AutoResponseOut]:
     _ = admin
-    result = await session.execute(select(AutoResponse).order_by(AutoResponse.name))
-    return list(result.scalars().all())
+    stmt = apply_valid_filter(select(AutoResponse), AutoResponse.valid_id, params.valid).order_by(
+        AutoResponse.name
+    )
+    return await paginate(session, AutoResponseOut, stmt, params)
 
 
 @router.get("/auto-responses/{auto_response_id}", response_model=AutoResponseOut)

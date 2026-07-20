@@ -20,6 +20,7 @@ from sqlalchemy import select
 from tiqora.api.deps import DbSession
 from tiqora.api.v1.admin.common import now
 from tiqora.api.v1.admin.deps import AdminUser
+from tiqora.api.v1.admin.pagination import ListParamsDep, Page, apply_valid_filter, window
 from tiqora.api.v1.admin.schemas import (
     DYNAMIC_FIELD_TYPES,
     DynamicFieldCreate,
@@ -115,11 +116,21 @@ def _to_out(row: DynamicField) -> DynamicFieldOut:
     )
 
 
-@router.get("", response_model=list[DynamicFieldOut])
-async def list_dynamic_fields(admin: AdminUser, session: DbSession) -> list[DynamicFieldOut]:
+@router.get("", response_model=Page[DynamicFieldOut])
+async def list_dynamic_fields(
+    admin: AdminUser, session: DbSession, params: ListParamsDep
+) -> Page[DynamicFieldOut]:
     _ = admin
-    result = await session.execute(select(DynamicField).order_by(DynamicField.field_order))
-    return [_to_out(r) for r in result.scalars().all()]
+    stmt = apply_valid_filter(select(DynamicField), DynamicField.valid_id, params.valid).order_by(
+        DynamicField.field_order
+    )
+    rows, total = await window(session, stmt, params)
+    return Page(
+        items=[_to_out(r) for r in rows],
+        total=total,
+        page=params.page,
+        page_size=params.page_size,
+    )
 
 
 @router.get("/{field_id}", response_model=DynamicFieldOut)

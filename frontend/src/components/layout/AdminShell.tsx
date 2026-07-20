@@ -1,9 +1,8 @@
 import { useState, type FormEvent, type ReactNode } from "react";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
-import { useAuth } from "@/auth/AuthContext";
-import { useTheme } from "@/themes/theme";
 import { Button } from "@/components/ui/Button";
+import { AccountMenu } from "@/components/agent/AccountMenu";
 import { cn } from "@/lib/cn";
 
 type NavLink = { to: string; labelKey: string; testId: string };
@@ -130,9 +129,7 @@ function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
 }
 
 export function AdminShell({ children }: { children: ReactNode }) {
-  const { t, i18n } = useTranslation();
-  const { user, logout } = useAuth();
-  const { theme, toggleTheme } = useTheme();
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const [q, setQ] = useState("");
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -142,12 +139,6 @@ export function AdminShell({ children }: { children: ReactNode }) {
     const term = q.trim();
     if (!term) return;
     void navigate({ to: "/agent/search", search: { q: term } });
-  };
-
-  const switchLang = () => {
-    const next = i18n.language?.startsWith("de") ? "en" : "de";
-    void i18n.changeLanguage(next);
-    localStorage.setItem("tiqora-lang", next);
   };
 
   return (
@@ -186,32 +177,8 @@ export function AdminShell({ children }: { children: ReactNode }) {
               className="w-full rounded-md border border-hairline bg-surface-subtle px-3 py-1.5 text-sm text-ink placeholder:text-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent focus:border-accent"
             />
           </form>
-          <div className="flex shrink-0 items-center gap-1.5 text-sm">
-            <Button variant="ghost" size="sm" onClick={toggleTheme}>
-              {theme === "dark" ? "☀" : "☾"}
-            </Button>
-            <Button variant="ghost" size="sm" onClick={switchLang}>
-              {i18n.language?.startsWith("de") ? "DE" : "EN"}
-            </Button>
-            {user && (
-              <span
-                className="hidden max-w-[10rem] truncate text-xs text-muted md:inline"
-                data-testid="current-user"
-                title={user.login}
-              >
-                {user.first_name || user.login} {user.last_name}
-              </span>
-            )}
-            <Button
-              variant="ghost"
-              size="sm"
-              data-testid="logout-btn"
-              onClick={() => {
-                void logout().then(() => navigate({ to: "/login" }));
-              }}
-            >
-              {t("auth.logout")}
-            </Button>
+          <div className="flex shrink-0 items-center">
+            <AccountMenu logoutTestId="logout-btn" />
           </div>
         </div>
       </header>
