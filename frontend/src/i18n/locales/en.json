@@ -369,6 +369,7 @@
       "users": "Users",
       "groups": "Groups",
       "roles": "Roles",
+      "agentRoles": "Role assignment",
       "queues": "Queues",
       "states": "States",
       "priorities": "Priorities",
@@ -410,6 +411,16 @@
       "page": "Page {{page}} of {{total}}",
       "pageSize": "Per page",
       "showing": "{{from}}–{{to}} of {{total}}"
+    },
+    "roleAssignments": {
+      "title": "Role assignment",
+      "subtitle": "Pick an agent and set which roles they hold.",
+      "agent": "Agent",
+      "selectAgent": "Select an agent…",
+      "empty": "Pick an agent above to edit their roles.",
+      "roles": "Roles",
+      "assigned": "Assigned",
+      "noRoles": "No valid roles exist yet."
     },
     "form": {
       "cancel": "Cancel",

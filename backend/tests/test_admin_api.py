@@ -25,6 +25,7 @@ from tiqora.api.v1.admin import customers as admin_customers
 from tiqora.api.v1.admin import dynamic_fields as admin_dynamic_fields
 from tiqora.api.v1.admin import queues as admin_queues
 from tiqora.api.v1.admin import readonly as admin_readonly
+from tiqora.api.v1.admin import roles as admin_roles
 from tiqora.api.v1.admin import users as admin_users
 from tiqora.api.v1.admin.deps import get_admin_user
 from tiqora.api.v1.admin.pagination import ListParams
@@ -32,6 +33,8 @@ from tiqora.api.v1.admin.schemas import (
     CustomerUserAdminCreate,
     DynamicFieldCreate,
     QueueCreate,
+    RoleAssignment,
+    RoleCreate,
     UserCreate,
 )
 from tiqora.domain.auth import AuthenticatedUser, AuthService, SessionStore
@@ -456,5 +459,50 @@ async def test_admin_state_types_reference(
         names = {t.name for t in types}
         # Znuny's initial_insert seeds these ticket_state_type rows.
         assert {"new", "open", "closed"} <= names
+
+    await engine.dispose()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("url_fixture", ["mariadb_znuny_url", "postgres_znuny_url"])
+async def test_admin_user_role_assignment_roundtrip(
+    url_fixture: str, request: pytest.FixtureRequest
+) -> None:
+    """Assign/revoke an agent's role and read the current set back — the
+    Agent↔Roles assignment editor's backend."""
+    sync_url: str = request.getfixturevalue(url_fixture)
+    ids = _seed_admin_and_plain_user(sync_url)
+    session, engine = await _make_session(sync_url)
+    ns = uuid.uuid4().hex[:8]
+
+    async with session as s:
+        admin_user = AuthenticatedUser(
+            id=ids["admin_id"],
+            login="root@localhost",
+            first_name="Admin",
+            last_name="Znuny",
+            auth_method="session",
+        )
+        agent = await admin_users.create_user(
+            UserCreate(
+                login=f"roleagent.{ns}", password="pw12345678", first_name="Role", last_name="Agent"
+            ),
+            admin_user,
+            s,
+        )
+        role = await admin_roles.create_role(RoleCreate(name=f"role-{ns}"), admin_user, s)
+
+        assert await admin_users.get_user_roles(agent.id, admin_user, s) == []
+
+        await admin_users.assign_role(agent.id, RoleAssignment(role_id=role.id), admin_user, s)
+        assigned = await admin_users.get_user_roles(agent.id, admin_user, s)
+        assert [r.id for r in assigned] == [role.id]
+
+        # Idempotent assign (no duplicate PK), then revoke.
+        await admin_users.assign_role(agent.id, RoleAssignment(role_id=role.id), admin_user, s)
+        assert len(await admin_users.get_user_roles(agent.id, admin_user, s)) == 1
+
+        await admin_users.revoke_role(agent.id, role.id, admin_user, s)
+        assert await admin_users.get_user_roles(agent.id, admin_user, s) == []
 
     await engine.dispose()
