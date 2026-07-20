@@ -227,6 +227,36 @@ export type MailOutboundTestOut = {
   message: string;
   detail?: string | null;
 };
+export type MailLogDirection = "in" | "out";
+export type MailLogStatus = "queued" | "sent" | "failed" | "received" | "filtered";
+export type MailLogOut = {
+  id: number;
+  created_at: string;
+  direction: string;
+  status: string;
+  from_addr: string;
+  to_addr: string;
+  cc_addr?: string | null;
+  subject: string;
+  message_id?: string | null;
+  ticket_id?: number | null;
+  article_id?: number | null;
+  queue?: string | null;
+  smtp_code?: number | null;
+  detail?: string | null;
+  duration_ms?: number | null;
+};
+export type MailLogListParams = {
+  page?: number;
+  pageSize?: number;
+  direction?: MailLogDirection | null;
+  status?: MailLogStatus | null;
+  q?: string | null;
+  /** ISO datetime lower bound (query param ``from``). */
+  from?: string | null;
+  /** ISO datetime upper bound (query param ``to``). */
+  to?: string | null;
+};
 export type PostmasterFilterOut = Schemas["PostmasterFilterOut"];
 export type AclOut = Schemas["AclOut"];
 export type GenericAgentJobOut = Schemas["GenericAgentJobOut"];
@@ -1335,6 +1365,25 @@ export class ApiClient {
       body,
       signal,
     });
+  }
+
+  listMailLog(params?: MailLogListParams, signal?: AbortSignal) {
+    return this.request<AdminPage<MailLogOut>>("GET", "/api/v1/admin/mail/log", {
+      query: {
+        page: params?.page,
+        page_size: params?.pageSize,
+        direction: params?.direction ?? undefined,
+        status: params?.status ?? undefined,
+        q: params?.q ?? undefined,
+        from: params?.from ?? undefined,
+        to: params?.to ?? undefined,
+      },
+      signal,
+    });
+  }
+
+  getMailLog(id: number, signal?: AbortSignal) {
+    return this.request<MailLogOut>("GET", `/api/v1/admin/mail/log/${id}`, { signal });
   }
 
   // Read-only automation config.

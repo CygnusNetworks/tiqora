@@ -22,6 +22,7 @@ from __future__ import annotations
 import re
 import secrets
 import socket
+import time
 from dataclasses import replace
 
 import structlog
@@ -30,6 +31,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from tiqora.channels.email.placeholder import expand_placeholders
 from tiqora.channels.email.smtp import MailSender, build_message
+from tiqora.domain.mail_log import write_mail_log
 from tiqora.domain.ticket_write_service import ArticleIn, InvalidInput, add_article
 from tiqora.znuny.sysconfig import SysConfig
 
@@ -339,6 +341,12 @@ async def deliver_agent_email_reply(
     )
     resolved = await resolve_outbound_smtp(session)
     should_dispatch = resolved.enabled if dispatch is None else dispatch
+    queue_name: str | None = None
+    try:
+        _from, queue_name, _sig, _sig_ct = await _queue_outbound_meta(session, queue_id)
+    except Exception:
+        queue_name = None
+
     if should_dispatch:
         sender: MailSender
         if mail_sender is not None:
@@ -350,25 +358,56 @@ async def deliver_agent_email_reply(
             from tiqora.config import get_settings
 
             sender = SmtpMailSender(get_settings())
-        await send_prepared_agent_email(sender, prepared)
-    else:
-        logger.warning(
-            "agent_email_not_dispatched",
-            reason="smtp_disabled",
-            source=resolved.source,
+        t0 = time.perf_counter()
+        try:
+            await send_prepared_agent_email(sender, prepared)
+        except OutboundMailError as exc:
+            duration_ms = int((time.perf_counter() - t0) * 1000)
+            # Log BEFORE re-raising so the failure is captured even when the
+            # outer request transaction rolls back (independent session commit).
+            await write_mail_log(
+                session,
+                direction="out",
+                status="failed",
+                from_addr=prepared.from_address or "",
+                to_addr=prepared.to_address or "",
+                cc_addr=prepared.cc,
+                subject=prepared.subject or "",
+                message_id=prepared.message_id,
+                ticket_id=ticket_id,
+                article_id=None,
+                queue=queue_name,
+                smtp_code=None,
+                detail=str(exc),
+                duration_ms=duration_ms,
+            )
+            raise
+        duration_ms = int((time.perf_counter() - t0) * 1000)
+        smtp_code = getattr(sender, "last_smtp_code", None)
+        smtp_detail = getattr(sender, "last_smtp_detail", None)
+        article_id = await add_article(
+            session,
             ticket_id=ticket_id,
-            to=prepared.to_address,
-            subject=prepared.subject,
-            message_id=prepared.message_id,
+            article=prepared,
+            user_id=user_id,
+            sysconfig=sysconfig,
         )
-    article_id = await add_article(
-        session,
-        ticket_id=ticket_id,
-        article=prepared,
-        user_id=user_id,
-        sysconfig=sysconfig,
-    )
-    if should_dispatch:
+        await write_mail_log(
+            session,
+            direction="out",
+            status="sent",
+            from_addr=prepared.from_address or "",
+            to_addr=prepared.to_address or "",
+            cc_addr=prepared.cc,
+            subject=prepared.subject or "",
+            message_id=prepared.message_id,
+            ticket_id=ticket_id,
+            article_id=article_id,
+            queue=queue_name,
+            smtp_code=smtp_code if isinstance(smtp_code, int) else None,
+            detail=str(smtp_detail) if smtp_detail else None,
+            duration_ms=duration_ms,
+        )
         logger.info(
             "agent_email_reply_sent",
             ticket_id=ticket_id,
@@ -377,15 +416,49 @@ async def deliver_agent_email_reply(
             message_id=prepared.message_id,
             source=resolved.source,
         )
-    else:
-        logger.info(
-            "agent_email_reply_stored",
-            ticket_id=ticket_id,
-            article_id=article_id,
-            to=prepared.to_address,
-            message_id=prepared.message_id,
-            dispatched=False,
-        )
+        return article_id
+
+    logger.warning(
+        "agent_email_not_dispatched",
+        reason="smtp_disabled",
+        source=resolved.source,
+        ticket_id=ticket_id,
+        to=prepared.to_address,
+        subject=prepared.subject,
+        message_id=prepared.message_id,
+    )
+    article_id = await add_article(
+        session,
+        ticket_id=ticket_id,
+        article=prepared,
+        user_id=user_id,
+        sysconfig=sysconfig,
+    )
+    # SMTP disabled: still record a queued row so the admin log shows the
+    # prepared outbound message (no SMTP attempt, no 502).
+    await write_mail_log(
+        session,
+        direction="out",
+        status="queued",
+        from_addr=prepared.from_address or "",
+        to_addr=prepared.to_address or "",
+        cc_addr=prepared.cc,
+        subject=prepared.subject or "",
+        message_id=prepared.message_id,
+        ticket_id=ticket_id,
+        article_id=article_id,
+        queue=queue_name,
+        detail="smtp_disabled",
+        duration_ms=None,
+    )
+    logger.info(
+        "agent_email_reply_stored",
+        ticket_id=ticket_id,
+        article_id=article_id,
+        to=prepared.to_address,
+        message_id=prepared.message_id,
+        dispatched=False,
+    )
     return article_id
 
 

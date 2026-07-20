@@ -278,3 +278,44 @@ class TiqoraMailOutbound(TiqoraBase):
         server_default=func.now(),
     )
     change_by: Mapped[int | None] = mapped_column(Integer, nullable=True)
+
+
+class TiqoraMailLog(TiqoraBase):
+    """Inbound/outbound email communication log (Znuny Communication Log).
+
+    One row per outbound agent-reply send attempt and per inbound
+    fetch/process outcome. Logging is best-effort — write failures must
+    never block mail processing or sending.
+    """
+
+    __tablename__ = "tiqora_mail_log"
+
+    id: Mapped[int] = mapped_column(
+        BigInteger, primary_key=True, autoincrement=True, nullable=False
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime,
+        nullable=False,
+        server_default=func.now(),
+    )
+    # "in" | "out"
+    direction: Mapped[str] = mapped_column(String(10), nullable=False)
+    # out: "queued" | "sent" | "failed"
+    # in:  "received" | "filtered" | "failed"
+    status: Mapped[str] = mapped_column(String(20), nullable=False)
+    from_addr: Mapped[str] = mapped_column(String(500), nullable=False, default="")
+    to_addr: Mapped[str] = mapped_column(String(1000), nullable=False, default="")
+    cc_addr: Mapped[str | None] = mapped_column(String(1000), nullable=True)
+    subject: Mapped[str] = mapped_column(String(500), nullable=False, default="")
+    message_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    ticket_id: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    article_id: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    queue: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    smtp_code: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    detail: Mapped[str | None] = mapped_column(Text, nullable=True)
+    duration_ms: Mapped[int | None] = mapped_column(Integer, nullable=True)
+
+    __table_args__ = (
+        Index("ix_tiqora_mail_log_created_at", "created_at"),
+        Index("ix_tiqora_mail_log_direction_status", "direction", "status"),
+    )
