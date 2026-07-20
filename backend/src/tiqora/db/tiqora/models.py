@@ -151,6 +151,40 @@ class TiqoraUserTotp(TiqoraBase):
     )
 
 
+class TiqoraGdprAudit(TiqoraBase):
+    """Audit trail for GDPR anonymization/retention runs (Phase 2c).
+
+    One row per run of ``tiqora gdpr anonymize-customer`` /
+    ``tiqora gdpr retention-run`` (and the retention taskiq worker task).
+    Never stores the anonymized values themselves — only who/what/when and
+    row counts, so the audit log itself carries no PII.
+    """
+
+    __tablename__ = "tiqora_gdpr_audit"
+
+    id: Mapped[int] = mapped_column(
+        BigInteger, primary_key=True, autoincrement=True, nullable=False
+    )
+    # "anonymize_customer" | "retention_run" | "retention_dry_run"
+    action: Mapped[str] = mapped_column(String(50), nullable=False)
+    # Login/customer_id for anonymize_customer; rule description for retention.
+    target: Mapped[str] = mapped_column(String(255), nullable=False)
+    # "cli" | "worker" | an operator identifier passed through by the caller.
+    actor: Mapped[str] = mapped_column(String(200), nullable=False)
+    # JSON-encoded counters, e.g. {"customer_user": 1, "article_data_mime": 4}
+    counts: Mapped[str] = mapped_column(Text, nullable=False, default="{}")
+    force_parallel: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default=false()
+    )
+    created: Mapped[datetime] = mapped_column(
+        DateTime,
+        nullable=False,
+        server_default=func.now(),
+    )
+
+    __table_args__ = (Index("ix_tiqora_gdpr_audit_action_created", "action", "created"),)
+
+
 class TiqoraWebhook(TiqoraBase):
     """Admin-configured outbound webhook subscription (Phase 3c).
 
