@@ -10,6 +10,7 @@ implemented in :mod:`tiqora.channels.email.autoresponse`.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from datetime import UTC, datetime
 from typing import Any
 
 import structlog
@@ -210,7 +211,7 @@ async def _apply_x_otrs_ticket_fields(
     return fields
 
 
-async def process_message(
+async def _process_message_inner(
     session: AsyncSession,
     session_factory: async_sessionmaker[AsyncSession],
     sysconfig: SysConfig,
@@ -218,9 +219,18 @@ async def process_message(
     raw: bytes,
     account: MailAccount,
     user_id: int,
+    body_override: str | None = None,
 ) -> PipelineResult:
-    """Process one raw email against *account* within the caller's transaction."""
+    """Process one raw email against *account* within the caller's transaction.
+
+    ``body_override`` (set by :func:`process_message` when inbound crypto
+    successfully decrypted a PGP block) replaces the parsed plaintext body
+    before article creation — everything else (subject, from/to headers,
+    routing) still comes from the original, undecrypted ``raw``.
+    """
     parsed = parse_email(raw)
+    if body_override is not None:
+        parsed.body = body_override
     get_param = _build_get_param(parsed, trusted=bool(account.trusted))
 
     await apply_filters(session, get_param)
@@ -443,6 +453,75 @@ async def process_message(
         orig_message_id=_msgid(parsed.message_id),
         orig_x_otrs_loop=get_param.get("X-OTRS-Loop"),
     )
+
+
+async def _write_crypto_flag(
+    session: AsyncSession, article_id: int, flag_value: str, user_id: int
+) -> None:
+    """Record inbound PGP/S/MIME status as an ``article_flag`` row."""
+    from tiqora.db.legacy.article import ArticleFlag
+
+    session.add(
+        ArticleFlag(
+            article_id=article_id,
+            article_key="TiqoraCryptoVerify",
+            article_value=flag_value[:50],
+            create_time=datetime.now(UTC).replace(tzinfo=None),
+            create_by=user_id,
+        )
+    )
+
+
+async def process_message(
+    session: AsyncSession,
+    session_factory: async_sessionmaker[AsyncSession],
+    sysconfig: SysConfig,
+    *,
+    raw: bytes,
+    account: MailAccount,
+    user_id: int,
+) -> PipelineResult:
+    """Process one raw email: best-effort inbound PGP/S/MIME crypto, then dispatch.
+
+    Crypto (:mod:`tiqora.crypto.inbound`) is a no-op unless
+    ``TIQORA_CRYPTO_PGP_ENABLED``/``TIQORA_CRYPTO_SMIME_ENABLED`` are set —
+    the common case, so this adds no overhead by default. A decrypt/verify
+    failure never blocks delivery: the article is still created, and the
+    outcome (``pgp:decrypted_verified``, ``smime:verify_failed``, etc.) is
+    recorded as an ``article_flag`` row once the article id is known.
+    """
+    from tiqora.config import get_settings
+    from tiqora.crypto.inbound import process_inbound_crypto
+
+    settings = get_settings()
+    body_override, crypto_result = await process_inbound_crypto(raw, settings)
+
+    result = await _process_message_inner(
+        session,
+        session_factory,
+        sysconfig,
+        raw=raw,
+        account=account,
+        user_id=user_id,
+        body_override=body_override,
+    )
+
+    if crypto_result is not None:
+        article_id = result.article_id
+        if article_id is None and result.ticket_id is not None:
+            # New-ticket path: create_ticket() only returns the ticket id, not
+            # the first article's id, so look it up (one article exists at
+            # this point — the one just created for this message).
+            article_id = (
+                await session.execute(
+                    text("SELECT id FROM article WHERE ticket_id = :tid ORDER BY id LIMIT 1"),
+                    {"tid": result.ticket_id},
+                )
+            ).scalar_one_or_none()
+        if article_id is not None:
+            await _write_crypto_flag(session, article_id, crypto_result.article_flag_value, user_id)
+
+    return result
 
 
 async def process_message_and_respond(
