@@ -7,10 +7,11 @@ to the admin surface only.
 
 from __future__ import annotations
 
+import base64
 from datetime import datetime
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 # ---------------------------------------------------------------------------
 # Users
@@ -441,6 +442,105 @@ class StandardTemplateUpdate(BaseModel):
 
 class QueueTemplateAssignment(BaseModel):
     standard_template_id: int
+
+
+# ---------------------------------------------------------------------------
+# Standard attachments (+ template assignment)
+# ---------------------------------------------------------------------------
+
+
+class StandardAttachmentOut(BaseModel):
+    """Attachment master row; ``content`` is base64-encoded binary."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    name: str
+    content_type: str
+    content: str
+    filename: str
+    comments: str | None
+    valid_id: int
+    create_time: datetime
+    change_time: datetime
+
+    @field_validator("content", mode="before")
+    @classmethod
+    def _encode_content_b64(cls, value: object) -> str:
+        """Normalise ORM blob → base64 for the wire format.
+
+        Drivers differ: MariaDB/aiomysql returns ``bytes``; asyncpg sometimes
+        surfaces BYTEA as a PostgreSQL hex literal (``\\xdeadbeef``) string
+        after refresh. Accept both, plus already-encoded base64 for
+        round-trips through the same schema.
+        """
+        if isinstance(value, memoryview):
+            value = value.tobytes()
+        if isinstance(value, bytearray):
+            value = bytes(value)
+        if isinstance(value, bytes):
+            return base64.b64encode(value).decode("ascii")
+        if isinstance(value, str):
+            if value.startswith("\\x"):
+                return base64.b64encode(bytes.fromhex(value[2:])).decode("ascii")
+            return value
+        raise TypeError("content must be bytes or a base64 string")
+
+
+class StandardAttachmentCreate(BaseModel):
+    name: str
+    content_type: str
+    content: str = Field(description="Base64-encoded attachment body")
+    filename: str
+    comments: str | None = None
+    valid_id: int = 1
+
+    def content_bytes(self) -> bytes:
+        return base64.b64decode(self.content, validate=True)
+
+
+class StandardAttachmentUpdate(BaseModel):
+    name: str | None = None
+    content_type: str | None = None
+    content: str | None = Field(default=None, description="Base64-encoded attachment body")
+    filename: str | None = None
+    comments: str | None = None
+    valid_id: int | None = None
+
+    def content_bytes(self) -> bytes | None:
+        if self.content is None:
+            return None
+        return base64.b64decode(self.content, validate=True)
+
+
+class AttachmentRefOut(BaseModel):
+    """Slim attachment row for assignment editors (no blob)."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    name: str
+    filename: str
+    content_type: str
+
+
+class TemplateAttachmentsReplace(BaseModel):
+    """Full replacement set of attachments for a standard template."""
+
+    attachment_ids: list[int]
+
+
+class CustomerUserGroupAssignment(BaseModel):
+    """Assign a customer-user (by login) to a group with ro/rw permission.
+
+    Znuny ``group_customer_user`` stores one row per (login, group, key) with
+    ``permission_value`` (unlike agent ``group_user``, which has no value
+    column). Customer-user group grants are only ``ro`` / ``rw``.
+    """
+
+    group_id: int
+    permission_key: Literal["ro", "rw"]
+    permission_value: int = 1
 
 
 # ---------------------------------------------------------------------------

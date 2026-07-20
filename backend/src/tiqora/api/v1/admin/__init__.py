@@ -10,6 +10,7 @@ from __future__ import annotations
 from fastapi import APIRouter
 
 from tiqora.api.v1.admin import (
+    attachments,
     auto_responses,
     channels,
     customers,
@@ -34,6 +35,7 @@ admin_router.include_router(states.router)
 admin_router.include_router(priorities.router)
 admin_router.include_router(customers.router)
 admin_router.include_router(templates.router)
+admin_router.include_router(attachments.router)
 admin_router.include_router(auto_responses.router)
 admin_router.include_router(dynamic_fields.router)
 admin_router.include_router(readonly.router)

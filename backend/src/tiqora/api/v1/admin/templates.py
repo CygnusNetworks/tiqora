@@ -13,6 +13,7 @@ from tiqora.api.v1.admin.common import now
 from tiqora.api.v1.admin.deps import AdminUser
 from tiqora.api.v1.admin.pagination import ListParamsDep, Page, apply_valid_filter, paginate
 from tiqora.api.v1.admin.schemas import (
+    AttachmentRefOut,
     QueueTemplateAssignment,
     SalutationOut,
     SalutationUpdate,
@@ -23,12 +24,15 @@ from tiqora.api.v1.admin.schemas import (
     StandardTemplateCreate,
     StandardTemplateOut,
     StandardTemplateUpdate,
+    TemplateAttachmentsReplace,
 )
 from tiqora.db.legacy.queue import (
     QueueStandardTemplate,
     Salutation,
     Signature,
+    StandardAttachment,
     StandardTemplate,
+    StandardTemplateAttachment,
 )
 
 router = APIRouter(tags=["admin:templates"])
@@ -255,3 +259,86 @@ async def revoke_queue_template(
     if existing is not None:
         await session.delete(existing)
         await session.commit()
+
+
+# --- Template ↔ Attachment assignment (standard_template_attachment) ---------
+
+
+@router.get("/templates/{template_id}/attachments", response_model=list[AttachmentRefOut])
+async def get_template_attachments(
+    template_id: int, admin: AdminUser, session: DbSession
+) -> list[StandardAttachment]:
+    """Attachments currently linked to *template_id* (ids/names for the editor)."""
+    _ = admin
+    tmpl = await session.get(StandardTemplate, template_id)
+    if tmpl is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Template not found")
+    result = await session.execute(
+        select(StandardAttachment)
+        .join(
+            StandardTemplateAttachment,
+            StandardTemplateAttachment.standard_attachment_id == StandardAttachment.id,
+        )
+        .where(StandardTemplateAttachment.standard_template_id == template_id)
+        .order_by(StandardAttachment.name)
+    )
+    return list(result.scalars().all())
+
+
+@router.put("/templates/{template_id}/attachments", status_code=status.HTTP_204_NO_CONTENT)
+async def replace_template_attachments(
+    template_id: int,
+    body: TemplateAttachmentsReplace,
+    admin: AdminUser,
+    session: DbSession,
+) -> None:
+    """Replace the full set of attachments linked to *template_id*.
+
+    Deletes every ``standard_template_attachment`` row for the template, then
+    inserts one row per id in ``attachment_ids`` (deduplicated, order-
+    preserving). Mirrors the multi-select replace semantics the template
+    attachment editor needs — single-add PUT alone cannot clear unchecked
+    rows the way a replace body can.
+    """
+    tmpl = await session.get(StandardTemplate, template_id)
+    if tmpl is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Template not found")
+
+    # Validate every attachment id exists before mutating the link table.
+    wanted: list[int] = []
+    seen: set[int] = set()
+    for attachment_id in body.attachment_ids:
+        if attachment_id in seen:
+            continue
+        seen.add(attachment_id)
+        att = await session.get(StandardAttachment, attachment_id)
+        if att is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Attachment {attachment_id} not found",
+            )
+        wanted.append(attachment_id)
+
+    existing = await session.execute(
+        select(StandardTemplateAttachment).where(
+            StandardTemplateAttachment.standard_template_id == template_id
+        )
+    )
+    for row in existing.scalars().all():
+        await session.delete(row)
+    # Flush deletes before inserts so unique/FK constraints stay happy.
+    await session.flush()
+
+    ts = now()
+    for attachment_id in wanted:
+        session.add(
+            StandardTemplateAttachment(
+                standard_attachment_id=attachment_id,
+                standard_template_id=template_id,
+                create_time=ts,
+                create_by=admin.id,
+                change_time=ts,
+                change_by=admin.id,
+            )
+        )
+    await session.commit()

@@ -22,8 +22,11 @@ from tiqora.api.v1.admin.schemas import (
     CustomerUserAdminOut,
     CustomerUserAdminUpdate,
     CustomerUserCustomerAssignment,
+    CustomerUserGroupAssignment,
+    GroupOut,
 )
 from tiqora.db.legacy.customer import CustomerCompany, CustomerUser, CustomerUserCustomer
+from tiqora.db.legacy.user import GroupCustomerUser, PermissionGroups
 from tiqora.znuny.password import hash_password
 
 router = APIRouter(tags=["admin:customers"])
@@ -243,6 +246,94 @@ async def revoke_customer_company(
 ) -> None:
     _ = admin
     existing = await session.get(CustomerUserCustomer, (customer_user_login, customer_id))
+    if existing is not None:
+        await session.delete(existing)
+        await session.commit()
+
+
+# --- Customer-user ↔ Groups (group_customer_user, keyed by login) ------------
+
+
+@router.get("/customer-users/{login}/groups", response_model=list[GroupOut])
+async def get_customer_user_groups(
+    login: str, admin: AdminUser, session: DbSession
+) -> list[PermissionGroups]:
+    """Groups the customer user has full (``rw``) access to — the
+    Customer-User↔Groups editor's read side.
+
+    Znuny stores the customer-user identity as the *login string* in
+    ``group_customer_user.user_id`` (not the numeric ``customer_user.id``).
+    The editor toggles ``rw`` (see :func:`assign_customer_user_group`), so the
+    read set is filtered to that key — same pattern as agent↔group.
+    """
+    _ = admin
+    result = await session.execute(
+        select(PermissionGroups)
+        .join(GroupCustomerUser, GroupCustomerUser.group_id == PermissionGroups.id)
+        .where(
+            GroupCustomerUser.user_id == login,
+            GroupCustomerUser.permission_key == "rw",
+            GroupCustomerUser.permission_value == 1,
+        )
+        .order_by(PermissionGroups.name)
+    )
+    return list(result.scalars().all())
+
+
+@router.put("/customer-users/{login}/groups", status_code=status.HTTP_204_NO_CONTENT)
+async def assign_customer_user_group(
+    login: str,
+    body: CustomerUserGroupAssignment,
+    admin: AdminUser,
+    session: DbSession,
+) -> None:
+    """Grant *login* the given permission on *group_id*.
+
+    Upserts into Znuny ``group_customer_user`` (composite identity:
+    login + group_id + permission_key). ``permission_value`` is required by
+    the table (unlike agent ``group_user``).
+    """
+    # Ensure the customer user exists (lookup by login, not numeric id).
+    result = await session.execute(select(CustomerUser).where(CustomerUser.login == login))
+    cu = result.scalar_one_or_none()
+    if cu is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Customer user not found")
+
+    existing = await session.get(GroupCustomerUser, (login, body.group_id, body.permission_key))
+    ts = now()
+    if existing is None:
+        session.add(
+            GroupCustomerUser(
+                user_id=login,
+                group_id=body.group_id,
+                permission_key=body.permission_key,
+                permission_value=body.permission_value,
+                create_time=ts,
+                create_by=admin.id,
+                change_time=ts,
+                change_by=admin.id,
+            )
+        )
+    else:
+        existing.permission_value = body.permission_value
+        existing.change_time = ts
+        existing.change_by = admin.id
+    await session.commit()
+
+
+@router.delete(
+    "/customer-users/{login}/groups/{group_id}/{permission_key}",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+async def revoke_customer_user_group(
+    login: str,
+    group_id: int,
+    permission_key: str,
+    admin: AdminUser,
+    session: DbSession,
+) -> None:
+    _ = admin
+    existing = await session.get(GroupCustomerUser, (login, group_id, permission_key))
     if existing is not None:
         await session.delete(existing)
         await session.commit()

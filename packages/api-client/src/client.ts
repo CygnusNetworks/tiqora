@@ -135,6 +135,53 @@ export type SignatureUpdate = Schemas["SignatureUpdate"];
 export type StandardTemplateOut = Schemas["StandardTemplateOut"];
 export type StandardTemplateCreate = Schemas["StandardTemplateCreate"];
 export type StandardTemplateUpdate = Schemas["StandardTemplateUpdate"];
+// Hand-written (do not regenerate schema.d.ts): standard_attachment master +
+// template/attachment + customer-user/group assignment editors.
+export type StandardAttachmentOut = {
+  id: number;
+  name: string;
+  content_type: string;
+  /** Base64-encoded blob body. */
+  content: string;
+  filename: string;
+  comments: string | null;
+  valid_id: number;
+  create_time: string;
+  change_time: string;
+};
+export type StandardAttachmentCreate = {
+  name: string;
+  content_type: string;
+  /** Base64-encoded blob body. */
+  content: string;
+  filename: string;
+  comments?: string | null;
+  valid_id?: number;
+};
+export type StandardAttachmentUpdate = {
+  name?: string | null;
+  content_type?: string | null;
+  content?: string | null;
+  filename?: string | null;
+  comments?: string | null;
+  valid_id?: number | null;
+};
+/** Slim attachment row for the template↔attachments editor (no blob). */
+export type AttachmentRefOut = {
+  id: number;
+  name: string;
+  filename: string;
+  content_type: string;
+};
+export type TemplateAttachmentsReplace = {
+  attachment_ids: number[];
+};
+/** Customer-user ↔ group grant (group_customer_user; login string identity). */
+export type CustomerUserGroupAssignment = {
+  group_id: number;
+  permission_key: "ro" | "rw";
+  permission_value?: number;
+};
 export type AutoResponseOut = Schemas["AutoResponseOut"];
 export type AutoResponseCreate = Schemas["AutoResponseCreate"];
 export type AutoResponseUpdate = Schemas["AutoResponseUpdate"];
@@ -1143,6 +1190,67 @@ export class ApiClient {
     return this.request<void>(
       "DELETE",
       `/api/v1/admin/queues/${queueId}/templates/${standardTemplateId}`,
+      { signal },
+    );
+  }
+
+  get adminAttachments() {
+    return this.adminCrud<
+      StandardAttachmentOut,
+      StandardAttachmentCreate,
+      StandardAttachmentUpdate
+    >("/api/v1/admin/attachments");
+  }
+
+  listTemplateAttachments(templateId: number, signal?: AbortSignal) {
+    return this.request<AttachmentRefOut[]>(
+      "GET",
+      `/api/v1/admin/templates/${templateId}/attachments`,
+      { signal },
+    );
+  }
+
+  /** Replace the full set of attachments linked to a standard template. */
+  replaceTemplateAttachments(
+    templateId: number,
+    body: TemplateAttachmentsReplace,
+    signal?: AbortSignal,
+  ) {
+    return this.request<void>("PUT", `/api/v1/admin/templates/${templateId}/attachments`, {
+      body,
+      signal,
+    });
+  }
+
+  listCustomerUserGroups(login: string, signal?: AbortSignal) {
+    return this.request<GroupOut[]>(
+      "GET",
+      `/api/v1/admin/customer-users/${encodeURIComponent(login)}/groups`,
+      { signal },
+    );
+  }
+
+  assignCustomerUserGroup(
+    login: string,
+    body: CustomerUserGroupAssignment,
+    signal?: AbortSignal,
+  ) {
+    return this.request<void>(
+      "PUT",
+      `/api/v1/admin/customer-users/${encodeURIComponent(login)}/groups`,
+      { body, signal },
+    );
+  }
+
+  revokeCustomerUserGroup(
+    login: string,
+    groupId: number,
+    permissionKey: string,
+    signal?: AbortSignal,
+  ) {
+    return this.request<void>(
+      "DELETE",
+      `/api/v1/admin/customer-users/${encodeURIComponent(login)}/groups/${groupId}/${permissionKey}`,
       { signal },
     );
   }
