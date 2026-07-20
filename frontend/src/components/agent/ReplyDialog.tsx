@@ -8,6 +8,7 @@ import { Spinner } from "@/components/ui/Spinner";
 import {
   RecipientsField,
   joinRecipients,
+  moveRecipientBetween,
   parseRecipientList,
   type Recipient,
 } from "./RecipientsField";
@@ -19,10 +20,11 @@ type Field = "to" | "cc" | "bcc";
 
 /**
  * Modal reply composer for a single article. Prefilled from the backend
- * reply-draft endpoint. Recipients are edited as Apple-Mail-style chips (To/Cc,
- * with optional Bcc + Reply-To), and the answer and quoted original share a
- * SINGLE editable body — the agent types above the quote in one field. The
- * outgoing article is created via the existing add_article path.
+ * reply-draft endpoint. Recipients are edited as Apple-Mail-style chips (To
+ * always visible; Cc/Bcc/Reply-To collapsible when empty). The answer and
+ * quoted original share a SINGLE editable body — the agent types above the
+ * quote in one field. The outgoing article is created via the existing
+ * add_article path.
  */
 export function ReplyDialog({
   ticketId,
@@ -44,6 +46,8 @@ export function ReplyDialog({
   const [cc, setCc] = useState<Recipient[]>([]);
   const [bcc, setBcc] = useState<Recipient[]>([]);
   const [replyTo, setReplyTo] = useState("");
+  // Cc/Bcc/Reply-To start collapsed when empty; draft seed may open Cc.
+  const [showCc, setShowCc] = useState(false);
   const [showBcc, setShowBcc] = useState(false);
   const [showReplyTo, setShowReplyTo] = useState(false);
   const [subject, setSubject] = useState("");
@@ -59,13 +63,21 @@ export function ReplyDialog({
   };
   const values: Record<Field, Recipient[]> = { to, cc, bcc };
 
-  // Move one recipient between the To/Cc/Bcc fields (drag-drop or the explicit
-  // "→ Cc" action both route through here).
+  // Move one recipient between To/Cc/Bcc (drag-drop). Removes from source and
+  // appends to target (deduped by email) — never copies.
   const moveRecipient = (from: string, dest: string, r: Recipient) => {
+    if (from === dest) return;
     const fromKey = from as Field;
     const destKey = dest as Field;
-    setters[fromKey](values[fromKey].filter((x) => x !== r));
-    setters[destKey]([...values[destKey], r]);
+    if (!(fromKey in values) || !(destKey in values)) return;
+    const { source, target } = moveRecipientBetween(
+      values[fromKey],
+      values[destKey],
+      r,
+    );
+    setters[fromKey](source);
+    setters[destKey](target);
+    if (destKey === "cc") setShowCc(true);
     if (destKey === "bcc") setShowBcc(true);
   };
 
@@ -85,10 +97,14 @@ export function ReplyDialog({
   useEffect(() => {
     const d = draftQ.data;
     if (!d) return;
-    setTo(parseRecipientList(d.to_address));
-    setCc(parseRecipientList(d.cc));
+    const nextTo = parseRecipientList(d.to_address);
+    const nextCc = parseRecipientList(d.cc);
+    setTo(nextTo);
+    setCc(nextCc);
     setBcc([]);
     setReplyTo("");
+    // Show Cc when the draft already has addresses; keep Bcc/Reply-To collapsed.
+    setShowCc(nextCc.length > 0);
     setShowBcc(false);
     setShowReplyTo(false);
     setSubject(d.subject);
@@ -136,8 +152,18 @@ export function ReplyDialog({
     [replyAll, t],
   );
 
+  const canSend = body.trim().length > 0 && to.length > 0 && !sendMutation.isPending;
+
+  // Wide on large viewports (~80+ mono chars in the body); full-width on mobile.
+  // Dialog base is max-w-md; this className overrides via cn().
+  const dialogWidth =
+    "w-full max-w-full sm:max-w-2xl md:max-w-3xl lg:max-w-4xl xl:max-w-5xl";
+
+  const toggleCls =
+    "rounded border border-hairline px-2 py-0.5 text-muted hover:text-ink";
+
   return (
-    <Dialog open={open} onClose={onClose} title={title} className="max-w-2xl">
+    <Dialog open={open} onClose={onClose} title={title} className={dialogWidth}>
       {draftQ.isLoading ? (
         <div className="flex justify-center py-8">
           <Spinner />
@@ -152,20 +178,21 @@ export function ReplyDialog({
             recipients={to}
             onChange={setTo}
             onMove={moveRecipient}
-            moveTargets={[{ key: "cc", label: t("ticket.replyCc") }]}
+            required
             placeholder={t("ticket.recipientAddHint")}
             testid="reply-to"
           />
-          <RecipientsField
-            label={t("ticket.replyCc")}
-            fieldKey="cc"
-            recipients={cc}
-            onChange={setCc}
-            onMove={moveRecipient}
-            moveTargets={[{ key: "to", label: t("ticket.replyTo") }]}
-            placeholder={t("ticket.recipientAddHint")}
-            testid="reply-cc"
-          />
+          {showCc && (
+            <RecipientsField
+              label={t("ticket.replyCc")}
+              fieldKey="cc"
+              recipients={cc}
+              onChange={setCc}
+              onMove={moveRecipient}
+              placeholder={t("ticket.recipientAddHint")}
+              testid="reply-cc"
+            />
+          )}
           {showBcc && (
             <RecipientsField
               label={t("ticket.replyBcc")}
@@ -173,10 +200,6 @@ export function ReplyDialog({
               recipients={bcc}
               onChange={setBcc}
               onMove={moveRecipient}
-              moveTargets={[
-                { key: "to", label: t("ticket.replyTo") },
-                { key: "cc", label: t("ticket.replyCc") },
-              ]}
               placeholder={t("ticket.recipientAddHint")}
               testid="reply-bcc"
             />
@@ -194,10 +217,20 @@ export function ReplyDialog({
             </label>
           )}
           <div className="flex flex-wrap items-center gap-1.5 text-xs">
+            {!showCc && (
+              <button
+                type="button"
+                className={toggleCls}
+                data-testid="reply-toggle-cc"
+                onClick={() => setShowCc(true)}
+              >
+                {t("ticket.replyCc")}
+              </button>
+            )}
             {!showBcc && (
               <button
                 type="button"
-                className="rounded border border-hairline px-2 py-0.5 text-muted hover:text-ink"
+                className={toggleCls}
                 data-testid="reply-toggle-bcc"
                 onClick={() => setShowBcc(true)}
               >
@@ -207,7 +240,7 @@ export function ReplyDialog({
             {!showReplyTo && (
               <button
                 type="button"
-                className="rounded border border-hairline px-2 py-0.5 text-muted hover:text-ink"
+                className={toggleCls}
                 data-testid="reply-toggle-replyto"
                 onClick={() => setShowReplyTo(true)}
               >
@@ -262,7 +295,7 @@ export function ReplyDialog({
               variant="primary"
               size="sm"
               data-testid="reply-send"
-              disabled={!body.trim() || to.length === 0 || sendMutation.isPending}
+              disabled={!canSend}
               onClick={() => sendMutation.mutate()}
             >
               {sendMutation.isPending ? t("ticket.replySending") : t("ticket.composerSend")}
