@@ -79,13 +79,13 @@ def _seed(sync_url: str) -> dict[str, Any]:
         # module must not fail on duplicate seed rows.
         existing = conn.execute(text("SELECT id FROM users WHERE login = 'soap.agent'")).first()
         if existing is not None:
-            return {"queue_id": 51, "state_id": 1, "priority_id": 3}
+            return {"queue_id": 953, "state_id": 1, "priority_id": 3}
 
         conn.execute(
             text(
                 "INSERT INTO users (id, login, pw, first_name, last_name, valid_id,"
                 " create_time, create_by, change_time, change_by)"
-                " VALUES (400, 'soap.agent', :pw, 'Soap', 'Agent', 1, :t, 1, :t, 1)"
+                " VALUES (951, 'soap.agent', :pw, 'Soap', 'Agent', 1, :t, 1, :t, 1)"
             ),
             {"pw": PW_HASH, "t": NOW},
         )
@@ -93,7 +93,7 @@ def _seed(sync_url: str) -> dict[str, Any]:
             text(
                 "INSERT INTO permission_groups"
                 " (id, name, valid_id, create_time, create_by, change_time, change_by)"
-                " VALUES (51, 'soap-compat-group', 1, :t, 1, :t, 1)"
+                " VALUES (952, 'soap-compat-group', 1, :t, 1, :t, 1)"
             ),
             {"t": NOW},
         )
@@ -103,7 +103,7 @@ def _seed(sync_url: str) -> dict[str, Any]:
                     "INSERT INTO group_user"
                     " (user_id, group_id, permission_key,"
                     "  create_time, create_by, change_time, change_by)"
-                    " VALUES (400, 51, :perm, :t, 1, :t, 1)"
+                    " VALUES (951, 952, :perm, :t, 1, :t, 1)"
                 ),
                 {"perm": perm, "t": NOW},
             )
@@ -113,11 +113,11 @@ def _seed(sync_url: str) -> dict[str, Any]:
                 " (id, name, group_id, system_address_id, salutation_id, signature_id,"
                 "  follow_up_id, follow_up_lock, valid_id,"
                 "  create_time, create_by, change_time, change_by)"
-                " VALUES (51, 'SoapCompatQueue', 51, 1, 1, 1, 1, 0, 1, :t, 1, :t, 1)"
+                " VALUES (953, 'SoapCompatQueue', 952, 1, 1, 1, 1, 0, 1, :t, 1, :t, 1)"
             ),
             {"t": NOW},
         )
-        ids["queue_id"] = 51
+        ids["queue_id"] = 953
         ids["state_id"] = 1
         ids["priority_id"] = 3
 
