@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
+import time
 from collections.abc import AsyncGenerator
 from typing import Any
 
 import yaml
-from sqlalchemy import Select, func, select
+from sqlalchemy import Select, and_, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from tiqora.db.legacy.article import (
@@ -321,6 +322,68 @@ class TicketService:
             count_stmt = select(func.count()).select_from(stmt.subquery())
             counts[view] = int((await self._session.execute(count_stmt)).scalar_one())
         return counts
+
+    async def count_dashboard_summary(self, user_id: int) -> dict[str, int]:
+        """KPI-tile counts for the agent dashboard.
+
+        Reuses the same ``ro`` permission scoping and ``state_type`` view
+        resolution as the ticket list (:meth:`_filtered_ticket_stmt`) so each
+        tile agrees with the filtered list it links to. Four cheap
+        ``COUNT(*)`` queries — no rows or lookup maps are materialised.
+
+        - ``my_open`` / ``my_new``: viewable-open / new tickets owned by the
+          agent (same numbers as the "My tickets" sidebar badges).
+        - ``unowned_new``: new tickets still owned by root (``owner_id=1``) in
+          queues the agent can see — the unclaimed queue to pick up from.
+        - ``escalated``: viewable-open tickets whose nearest escalation
+          deadline has already passed (any ``escalation_*`` epoch in
+          ``(0, now)``).
+        """
+        summary = {"my_open": 0, "my_new": 0, "unowned_new": 0, "escalated": 0}
+
+        async def _count(stmt: Select[tuple[Ticket]] | None) -> int:
+            if stmt is None:
+                return 0
+            count_stmt = select(func.count()).select_from(stmt.subquery())
+            return int((await self._session.execute(count_stmt)).scalar_one())
+
+        summary["my_open"] = await _count(
+            await self._filtered_ticket_stmt(
+                user_id, queue_id=None, state_id=None, state_type="open", owner_id=user_id
+            )
+        )
+        summary["my_new"] = await _count(
+            await self._filtered_ticket_stmt(
+                user_id, queue_id=None, state_id=None, state_type="new", owner_id=user_id
+            )
+        )
+        # "unowned" = still assigned to root (owner_id=1); this is how Znuny
+        # leaves freshly-arrived tickets until an agent takes ownership.
+        summary["unowned_new"] = await _count(
+            await self._filtered_ticket_stmt(
+                user_id, queue_id=None, state_id=None, state_type="new", owner_id=1
+            )
+        )
+
+        esc_stmt = await self._filtered_ticket_stmt(
+            user_id, queue_id=None, state_id=None, state_type="open", owner_id=None
+        )
+        if esc_stmt is not None:
+            now = int(time.time())
+            esc_stmt = esc_stmt.where(
+                or_(
+                    and_(Ticket.escalation_time > 0, Ticket.escalation_time < now),
+                    and_(
+                        Ticket.escalation_response_time > 0, Ticket.escalation_response_time < now
+                    ),
+                    and_(Ticket.escalation_update_time > 0, Ticket.escalation_update_time < now),
+                    and_(
+                        Ticket.escalation_solution_time > 0, Ticket.escalation_solution_time < now
+                    ),
+                )
+            )
+            summary["escalated"] = await _count(esc_stmt)
+        return summary
 
     async def get_ticket(self, user_id: int, ticket_id: int) -> TicketDetail:
         ticket = await self._assert_ticket_ro(user_id, ticket_id)
