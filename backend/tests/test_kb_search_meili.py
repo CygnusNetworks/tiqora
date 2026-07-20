@@ -131,7 +131,7 @@ async def test_publish_indexes_chunks_with_scoping(
                     CategoryIn(
                         name="Internal Runbooks",
                         slug="internal-runbooks-kb1",
-                        permission_group_id=ids["group"],
+                        permission_group_ids=[ids["group"]],
                         customer_visible=False,
                     ),
                 )
@@ -155,7 +155,7 @@ async def test_publish_indexes_chunks_with_scoping(
                     CategoryIn(
                         name="Public FAQ",
                         slug="public-faq-kb1",
-                        permission_group_id=None,
+                        permission_group_ids=[],
                         customer_visible=True,
                     ),
                 )
