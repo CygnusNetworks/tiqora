@@ -23,7 +23,9 @@
     "queues": "Queues",
     "knowledge": "Wissen",
     "knowledgeBase": "Knowledge Base",
-    "toggle": "Navigation umschalten"
+    "toggle": "Navigation umschalten",
+    "reports": "Berichte",
+    "stats": "Statistiken"
   },
   "common": {
     "prev": "Zurück",
@@ -461,6 +463,50 @@
       "tagsPlaceholder": "kommagetrennte, Schlagworte",
       "content": "Inhalt (Markdown)",
       "preview": "Vorschau"
+    }
+  },
+  "stats": {
+    "title": "Berichte",
+    "subtitle": "Ticketvolumen, Rückstand, SLA und Auslastung über Ihre Queues.",
+    "empty": "Keine Daten für die aktuellen Filter.",
+    "exportCsv": "CSV exportieren",
+    "filters": {
+      "queue": "Queue",
+      "dateFrom": "Von",
+      "dateTo": "Bis",
+      "granularity": "Granularität",
+      "granularityOptions": {
+        "day": "Tag",
+        "week": "Woche",
+        "month": "Monat"
+      }
+    },
+    "tiles": {
+      "total": "Tickets",
+      "escalated": "Eskaliert",
+      "firstResponseBreached": "Erstreaktion überfällig",
+      "avgFirstResponse": "Ø Erstreaktionszeit",
+      "avgSolution": "Ø Lösungszeit"
+    },
+    "sections": {
+      "volume": "Ticketvolumen",
+      "backlog": "Rückstandsverlauf",
+      "openSnapshot": "Offene Tickets",
+      "agentWorkload": "Agentenauslastung"
+    },
+    "dimension": {
+      "queue": "Queue",
+      "state": "Status",
+      "priority": "Priorität",
+      "owner": "Bearbeiter"
+    },
+    "table": {
+      "created": "Erstellt",
+      "closed": "Geschlossen",
+      "login": "Agent",
+      "name": "Name",
+      "ownedOpen": "Offen (eigene)",
+      "closedInPeriod": "Geschlossen im Zeitraum"
     }
   }
 }

@@ -466,6 +466,56 @@ export async function mockApi(page: Page) {
       return;
     }
 
+    // Stats / reports
+    if (path.endsWith("/api/v1/stats/volume") && method === "GET") {
+      await json(route, 200, {
+        granularity: "day",
+        points: [
+          { bucket: "2026-07-18", created: 3, closed: 1 },
+          { bucket: "2026-07-19", created: 2, closed: 2 },
+        ],
+      });
+      return;
+    }
+    if (path.endsWith("/api/v1/stats/backlog") && method === "GET") {
+      await json(route, 200, {
+        granularity: "day",
+        points: [
+          { bucket: "2026-07-18", open_count: 2 },
+          { bucket: "2026-07-19", open_count: 2 },
+        ],
+      });
+      return;
+    }
+    if (path.endsWith("/api/v1/stats/open-snapshot") && method === "GET") {
+      await json(route, 200, {
+        dimension: url.searchParams.get("dimension") || "queue",
+        items: [
+          { id: 1, label: "Raw", count: 2 },
+          { id: 2, label: "Raw::Misc", count: 1 },
+        ],
+      });
+      return;
+    }
+    if (path.endsWith("/api/v1/stats/sla") && method === "GET") {
+      await json(route, 200, {
+        total: 5,
+        escalated: 1,
+        first_response_breached: 1,
+        update_breached: 0,
+        solution_breached: 0,
+        first_response_minutes: [30, 45],
+        solution_minutes: [120],
+      });
+      return;
+    }
+    if (path.endsWith("/api/v1/stats/agent-workload") && method === "GET") {
+      await json(route, 200, [
+        { user_id: 1, login: "agent", name: "Ada Agent", owned_open: 2, closed_in_period: 1 },
+      ]);
+      return;
+    }
+
     await json(route, 404, { detail: `No mock for ${method} ${path}` });
   });
 }

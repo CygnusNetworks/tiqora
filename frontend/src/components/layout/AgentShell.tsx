@@ -163,6 +163,20 @@ function SidebarBody({ onNavigate }: { onNavigate?: () => void }) {
             />
           </div>
         </div>
+
+        <div>
+          <h2 className="px-2.5 pb-1.5 text-[10.5px] font-semibold uppercase tracking-[0.12em] text-muted">
+            {t("sidebar.reports")}
+          </h2>
+          <div className="space-y-0.5">
+            <NavItem
+              to="/agent/stats"
+              label={t("sidebar.stats")}
+              testId="agent-nav-stats"
+              onNavigate={onNavigate}
+            />
+          </div>
+        </div>
       </nav>
 
       <div className="mt-2 border-t border-hairline px-2 pt-3">
