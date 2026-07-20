@@ -279,14 +279,17 @@ Detailed design: [docs/specs/2026-07-19-tiqora-design.md](./docs/specs/2026-07-1
 
 ## Documentation
 
+Full index: **[docs/README.md](./docs/README.md)** — API reference
+(`docs/api/`), the Znuny-to-Tiqora migration playbook (`docs/guide/`),
+Docker Compose deployment (`docs/deploy/`), architecture, parallel
+operation, cutover, and feature-area docs.
+
 | Document | Content |
 |---|---|
 | [docs/architecture.md](./docs/architecture.md) | System components and data flow |
-| [docs/parallel-operation.md](./docs/parallel-operation.md) | Znuny invariants and coexistence rules |
-| [docs/compatibility.md](./docs/compatibility.md) | GenericInterface compatibility layer |
-| [docs/deployment.md](./docs/deployment.md) | Production-oriented deployment notes |
-| [docs/development.md](./docs/development.md) | Local development workflow |
-| [docs/cutover.md](./docs/cutover.md) | Step-by-step cutover runbook with rollback per stage |
+| [docs/guide/znuny-to-tiqora.md](./docs/guide/znuny-to-tiqora.md) | Operator playbook: parallel operation through cutover |
+| [docs/api/README.md](./docs/api/README.md) | REST/compat/MCP API reference overview |
+| [docs/deploy/docker-compose.md](./docs/deploy/docker-compose.md) | Docker Compose deployment walkthrough |
 | [docs/ai-integration.md](./docs/ai-integration.md) | Webhook schema, MCP interface, AI agent patterns, prompt-injection guidance |
 | [docs/specs/2026-07-19-tiqora-design.md](./docs/specs/2026-07-19-tiqora-design.md) | Full design specification |
 
