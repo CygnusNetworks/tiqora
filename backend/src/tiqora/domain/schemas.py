@@ -20,6 +20,10 @@ class UserMe(BaseModel):
     email: str | None = None
     # Best-effort OIDC/Google ``picture`` claim captured at SSO login.
     avatar_url: str | None = None
+    # True when the agent has ``rw`` on the group named ``admin``
+    # (see ``PermissionEngine.is_admin``). Used by the agent UI to show
+    # admin navigation without probing an admin endpoint.
+    is_admin: bool = False
 
 
 class LoginRequest(BaseModel):
