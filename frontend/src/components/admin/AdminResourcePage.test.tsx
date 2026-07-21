@@ -3,22 +3,48 @@ import { render, screen, waitFor, fireEvent, within } from "@testing-library/rea
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { I18nextProvider } from "react-i18next";
 import i18n from "@/i18n";
-import { AdminResourcePage, type AdminResourcePageProps } from "./AdminResourcePage";
+import {
+  AdminResourcePage,
+  type AdminResourcePageProps,
+} from "./AdminResourcePage";
+import type { AdminListParams, AdminPage } from "@/lib/api";
 
 type Row = { id: number; name: string; valid_id: number };
 type Create = { name: string };
 type Update = { name?: string };
 
-function renderPage(props: Partial<AdminResourcePageProps<Row, Create, Update>> = {}) {
-  const list = vi.fn().mockResolvedValue({
-    items: [
-      { id: 1, name: "Alpha", valid_id: 1 },
-      { id: 2, name: "Beta", valid_id: 1 },
-    ],
-    total: 2,
-    page: 1,
-    page_size: 25,
-  });
+/** Build a paginated list mock that slices a synthetic table of `total` rows. */
+function makeChunkedListMock(total: number) {
+  return vi.fn().mockImplementation(
+    async (params?: AdminListParams): Promise<AdminPage<Row>> => {
+      const page = params?.page ?? 1;
+      const pageSize = params?.pageSize ?? 25;
+      const start = (page - 1) * pageSize;
+      const end = Math.min(start + pageSize, total);
+      const items: Row[] = [];
+      for (let i = start; i < end; i++) {
+        items.push({ id: i + 1, name: `Row ${i + 1}`, valid_id: 1 });
+      }
+      return { items, total, page, page_size: pageSize };
+    },
+  );
+}
+
+function renderPage(
+  props: Partial<AdminResourcePageProps<Row, Create, Update>> = {},
+  listImpl?: ReturnType<typeof vi.fn>,
+) {
+  const list =
+    listImpl ??
+    vi.fn().mockResolvedValue({
+      items: [
+        { id: 1, name: "Alpha", valid_id: 1 },
+        { id: 2, name: "Beta", valid_id: 1 },
+      ],
+      total: 2,
+      page: 1,
+      page_size: 25,
+    });
   const create = vi.fn();
   const update = vi.fn();
   const deactivate = vi.fn();
@@ -194,5 +220,132 @@ describe("AdminResourcePage", () => {
     const lastParams = list.mock.calls[list.mock.calls.length - 1][0] as Record<string, unknown>;
     expect(lastParams.sort).toBeUndefined();
     expect(lastParams.order).toBeUndefined();
+  });
+
+  describe("Alle (all rows) chunked fetch", () => {
+    it("fetches a large table in 500-row chunks and shows all rows", async () => {
+      const list = makeChunkedListMock(1200);
+      renderPage({ allowAllPageSize: true }, list);
+
+      await waitFor(() => expect(list).toHaveBeenCalled());
+      list.mockClear();
+
+      const select = screen.getByTestId("admin-test-resource-page-size");
+      fireEvent.change(select, { target: { value: "100000" } });
+
+      await waitFor(() => {
+        expect(screen.getByTestId("admin-row-1")).toBeInTheDocument();
+        expect(screen.getByTestId("admin-row-1200")).toBeInTheDocument();
+      });
+
+      // Exactly 3 chunked requests at page_size 500 — never a 100k mega-request.
+      expect(list).toHaveBeenCalledTimes(3);
+      for (const call of list.mock.calls) {
+        expect(call[0]).toEqual(
+          expect.objectContaining({ pageSize: 500 }),
+        );
+        expect(call[0].pageSize).not.toBe(100_000);
+      }
+      expect(list).toHaveBeenNthCalledWith(
+        1,
+        expect.objectContaining({ page: 1, pageSize: 500 }),
+        expect.anything(),
+      );
+      expect(list).toHaveBeenNthCalledWith(
+        2,
+        expect.objectContaining({ page: 2, pageSize: 500 }),
+        expect.anything(),
+      );
+      expect(list).toHaveBeenNthCalledWith(
+        3,
+        expect.objectContaining({ page: 3, pageSize: 500 }),
+        expect.anything(),
+      );
+
+      // All 1200 rows present in the table.
+      expect(screen.getAllByTestId(/^admin-row-\d+$/)).toHaveLength(1200);
+    });
+
+    it("issues a single chunk request for a small table under Alle", async () => {
+      const list = makeChunkedListMock(30);
+      renderPage({ allowAllPageSize: true }, list);
+
+      await waitFor(() => expect(list).toHaveBeenCalled());
+      list.mockClear();
+
+      fireEvent.change(screen.getByTestId("admin-test-resource-page-size"), {
+        target: { value: "100000" },
+      });
+
+      await waitFor(() => {
+        expect(screen.getByTestId("admin-row-1")).toBeInTheDocument();
+        expect(screen.getByTestId("admin-row-30")).toBeInTheDocument();
+      });
+
+      expect(list).toHaveBeenCalledTimes(1);
+      expect(list).toHaveBeenCalledWith(
+        expect.objectContaining({ page: 1, pageSize: 500 }),
+        expect.anything(),
+      );
+      expect(screen.getAllByTestId(/^admin-row-\d+$/)).toHaveLength(30);
+    });
+
+    it("keeps numeric page sizes as a single request at that exact size", async () => {
+      const list = makeChunkedListMock(100);
+      renderPage({ allowAllPageSize: true }, list);
+
+      await waitFor(() => expect(list).toHaveBeenCalled());
+      list.mockClear();
+
+      fireEvent.change(screen.getByTestId("admin-test-resource-page-size"), {
+        target: { value: "50" },
+      });
+
+      await waitFor(() => {
+        expect(list).toHaveBeenCalledWith(
+          expect.objectContaining({ page: 1, pageSize: 50 }),
+          expect.anything(),
+        );
+      });
+      expect(list).toHaveBeenCalledTimes(1);
+      expect(list.mock.calls[0][0].pageSize).toBe(50);
+
+      list.mockClear();
+      fireEvent.change(screen.getByTestId("admin-test-resource-page-size"), {
+        target: { value: "500" },
+      });
+
+      await waitFor(() => {
+        expect(list).toHaveBeenCalledWith(
+          expect.objectContaining({ page: 1, pageSize: 500 }),
+          expect.anything(),
+        );
+      });
+      expect(list).toHaveBeenCalledTimes(1);
+    });
+
+    it("renders empty state under Alle with no infinite loop", async () => {
+      const list = makeChunkedListMock(0);
+      renderPage({ allowAllPageSize: true }, list);
+
+      await waitFor(() => expect(list).toHaveBeenCalled());
+      list.mockClear();
+
+      fireEvent.change(screen.getByTestId("admin-test-resource-page-size"), {
+        target: { value: "100000" },
+      });
+
+      await waitFor(() => {
+        expect(screen.getByText(/No records yet|Noch keine Einträge/)).toBeInTheDocument();
+      });
+
+      // One request only — never loops on empty.
+      expect(list).toHaveBeenCalledTimes(1);
+      expect(list).toHaveBeenCalledWith(
+        expect.objectContaining({ page: 1, pageSize: 500 }),
+        expect.anything(),
+      );
+      expect(screen.queryByTestId(/^admin-row-\d+$/)).not.toBeInTheDocument();
+    });
   });
 });
