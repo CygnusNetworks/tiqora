@@ -34,7 +34,8 @@ from tiqora.db.legacy.customer import (
     CustomerUser,
     CustomerUserCustomer,
 )
-from tiqora.db.legacy.ticket import Ticket, TicketState, TicketStateType
+from tiqora.db.legacy.dynamic_field import DynamicField, DynamicFieldValue
+from tiqora.db.legacy.ticket import Ticket, TicketHistory, TicketState, TicketStateType
 from tiqora.db.legacy.user import GroupCustomerUser
 from tiqora.db.tiqora.models import TiqoraGdprBackup, TiqoraGdprJob
 from tiqora.domain.dev_anonymize import ValueMapper
@@ -68,6 +69,9 @@ KEY_GDPR_ERASURE_PURGE_ENABLED = "gdpr.erasure.purge_enabled"
 
 BACKUP_RETENTION_DAYS = 30
 INVALID_VALID_ID = 2
+# Placeholder written into free-text columns (ticket.title, ticket_history.name,
+# dynamic_field_value.value_text) when anonymizing — rollback-able via backup.
+_ANON_PLACEHOLDER = "[anonymisiert]"
 
 # Guard admin-supplied selector regexes against ReDoS (L-1). Patterns longer
 # than this are rejected before compile; nested quantifiers that commonly
@@ -733,7 +737,9 @@ async def build_erasure_preview_for_ids(
     columns_changed: dict[str, list[str]] = {
         "customer_user": sorted(set(pii_cols) | {"valid_id"}),
         "customer_company": sorted(_CUSTOMER_COMPANY_PII),
-        "ticket": ["customer_user_id", "customer_id"],
+        "ticket": ["customer_user_id", "customer_id", "title"],
+        "ticket_history": ["name"],
+        "dynamic_field_value": ["value_text"],
         "article_data_mime": list(_MIME_PII_COLS),
         "article_data_mime_plain": ["body"],
         "article_data_mime_attachment": ["filename", "content"],
@@ -805,6 +811,8 @@ async def run_erasure(
         "customer_user_customer": 0,
         "group_customer_user": 0,
         "customer_company_deleted": 0,
+        "ticket_history": 0,
+        "dynamic_field_value": 0,
     }
 
     async with session_factory() as session, session.begin():
@@ -848,7 +856,7 @@ async def run_erasure(
         # ---- Preload tickets / articles for these logins ----
         ticket_rows = (
             await session.execute(
-                select(Ticket.id, Ticket.customer_user_id, Ticket.customer_id).where(
+                select(Ticket.id, Ticket.customer_user_id, Ticket.customer_id, Ticket.title).where(
                     Ticket.customer_user_id.in_(logins)
                 )
             )
@@ -1072,6 +1080,11 @@ async def run_erasure(
                 if old_cu != new_cu:
                     changed_t["customer_user_id"] = old_cu
                     updates_t["customer_user_id"] = new_cu
+                # ticket.title routinely carries the mail subject / customer name.
+                old_title = trow.title
+                if old_title:
+                    changed_t["title"] = old_title
+                    updates_t["title"] = _ANON_PLACEHOLDER
             else:
                 if old_cu:
                     new_cu = login_to_new.get(str(old_cu)) or mapper.map_value(str(old_cu), "login")
@@ -1096,6 +1109,76 @@ async def run_erasure(
                 )
                 await _update_row(session, "ticket", {"id": tid}, updates_t)
                 counts["tickets"] += 1
+
+        # ---- ticket_history + dynamic_field_value: scrub free-text PII ----
+        # Only on anonymize (delete removes these rows outright, batch B). The
+        # customer's whole ticket is being anonymized, so scrub the history text
+        # (subject/name snippets) and any custom-field values wholesale.
+        if mode == "anonymize" and ticket_ids:
+            hist_rows = (
+                await session.execute(
+                    select(TicketHistory.id, TicketHistory.name).where(
+                        TicketHistory.ticket_id.in_(ticket_ids)
+                    )
+                )
+            ).all()
+            for hid, hname in hist_rows:
+                if not hname:
+                    continue
+                await _add_backup(
+                    session,
+                    job_id=job_id,
+                    table_name="ticket_history",
+                    row_pk={"id": int(hid)},
+                    original_row={"name": hname},
+                    created=now,
+                )
+                await _update_row(
+                    session, "ticket_history", {"id": int(hid)}, {"name": _ANON_PLACEHOLDER}
+                )
+                counts["ticket_history"] += 1
+
+            # Dynamic-field values: scrub value_text for Ticket-object fields on
+            # these tickets and Article-object fields on these articles.
+            field_types: dict[int, str] = {
+                int(fid): str(ot)
+                for fid, ot in (
+                    await session.execute(select(DynamicField.id, DynamicField.object_type))
+                ).all()
+            }
+            for obj_ids, wanted in (
+                (ticket_ids, "Ticket"),
+                (article_ids, "Article"),
+            ):
+                field_ids = [fid for fid, ot in field_types.items() if ot == wanted]
+                if not obj_ids or not field_ids:
+                    continue
+                dfv_rows = (
+                    await session.execute(
+                        select(DynamicFieldValue.id, DynamicFieldValue.value_text).where(
+                            DynamicFieldValue.object_id.in_(obj_ids),
+                            DynamicFieldValue.field_id.in_(field_ids),
+                        )
+                    )
+                ).all()
+                for did, val in dfv_rows:
+                    if not val:
+                        continue
+                    await _add_backup(
+                        session,
+                        job_id=job_id,
+                        table_name="dynamic_field_value",
+                        row_pk={"id": int(did)},
+                        original_row={"value_text": val},
+                        created=now,
+                    )
+                    await _update_row(
+                        session,
+                        "dynamic_field_value",
+                        {"id": int(did)},
+                        {"value_text": _ANON_PLACEHOLDER},
+                    )
+                    counts["dynamic_field_value"] += 1
 
         # ---- articles: scrub mime / plain / attachment / search_index ----
         if article_ids:
