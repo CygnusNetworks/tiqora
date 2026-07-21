@@ -4,8 +4,12 @@ Bearer auth: tiqora_api_key hash lookup → principal agent user.
 Every tool builds the same permission context as the REST API.
 
 Tools:
+Ticket read:
 - ticket_search: Meilisearch + permission filter (falls back to DB search)
 - ticket_get: markdown-rendered ticket incl. plaintext articles
+- ticket_get_by_number: resolve Znuny ticket number (TN) → same payload as ticket_get
+
+Ticket write:
 - ticket_create: create a new ticket
 - ticket_reply: add customer-visible reply article
 - ticket_note: add internal note (is_visible_for_customer=False by default)
@@ -13,8 +17,25 @@ Tools:
 - ticket_update_queue: move ticket to a new queue
 - ticket_update_priority: change ticket priority
 - ticket_update_owner: assign ticket owner
+- ticket_set_title: change ticket title
+- ticket_set_customer: set customer_id / customer_user_id
+- ticket_set_dynamic_field: set a dynamic field value
+- ticket_lock / ticket_unlock: lock or unlock a ticket
+
+Reference / discovery:
+- list_queues: queues the agent may act in (permission-scoped)
+- list_states: valid ticket states
+- list_priorities: valid priorities
+- list_agents: valid agent users for owner/responsible assignment
+
+Knowledge base:
 - kb_search: search published knowledge base articles (permission-group scoped)
 - kb_get_article: fetch a knowledge base article's full Markdown content
+- kb_list: list articles by tag/category
+- kb_upsert_article: create or update a KB article
+- kb_publish_article: publish + index a KB article
+
+Customer:
 - customer_lookup: look up customer user details
 
 All fully async — NO sync DB calls, requests, or time.sleep anywhere.
@@ -25,6 +46,7 @@ from __future__ import annotations
 import hashlib
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from datetime import datetime
 from typing import Any
 
 import structlog
@@ -39,7 +61,7 @@ from starlette.responses import JSONResponse
 from tiqora.config import Settings, get_settings
 from tiqora.db.legacy.customer import CustomerUser
 from tiqora.db.legacy.queue import Queue
-from tiqora.db.legacy.ticket import TicketState, TicketStateType
+from tiqora.db.legacy.ticket import TicketPriority, TicketState, TicketStateType
 from tiqora.db.legacy.user import Users
 from tiqora.db.tiqora.models import TiqoraApiKey
 from tiqora.domain.ticket_write_service import (
@@ -52,8 +74,13 @@ from tiqora.domain.ticket_write_service import (
     assign_owner,
     change_priority,
     change_state,
+    change_title,
     create_ticket,
+    lock_ticket,
     move_queue,
+    set_customer,
+    unlock_ticket,
+    update_dynamic_field,
 )
 from tiqora.kb.schemas import ArticleIn as KbArticleIn
 from tiqora.kb.schemas import ArticleUpdateIn as KbArticleUpdateIn
@@ -62,6 +89,14 @@ from tiqora.permissions.engine import PermissionEngine
 from tiqora.znuny.sysconfig import SysConfig
 
 logger = structlog.get_logger(__name__)
+
+# Znuny's "valid" list id — 1 == valid (same as api/v1/reference.py).
+_VALID = 1
+
+
+def _utcnow() -> datetime:
+    """Naive UTC now — matches DateTime columns (server stores naive)."""
+    return datetime.utcnow()  # noqa: DTZ003 — intentional naive UTC for DB columns
 
 
 # ---------------------------------------------------------------------------
@@ -123,7 +158,11 @@ class TiqoraBearerAuth(BaseHTTPMiddleware):
 
 
 async def _resolve_api_key(factory: async_sessionmaker[AsyncSession], raw_key: str) -> int | None:
-    """Resolve tiqora_api_key to user_id via SHA-256 hash lookup."""
+    """Resolve tiqora_api_key to user_id via SHA-256 hash lookup.
+
+    Parity with ``domain.auth.AuthService.resolve_api_key``: reject expired keys
+    and stamp ``last_used_at`` (non-fatal if the metadata write fails).
+    """
     key_hash = hashlib.sha256(raw_key.encode("utf-8")).hexdigest()
     async with factory() as session:
         row = (
@@ -136,10 +175,21 @@ async def _resolve_api_key(factory: async_sessionmaker[AsyncSession], raw_key: s
         ).scalar_one_or_none()
         if row is None:
             return None
+        now = _utcnow()
+        if row.expires_at is not None and row.expires_at <= now:
+            return None
         user = (
             await session.execute(select(Users).where(Users.id == row.user_id, Users.valid_id == 1))
         ).scalar_one_or_none()
-        return user.id if user else None
+        if user is None:
+            return None
+        # Stamp last_used_at; auth must not fail if the metadata write fails.
+        try:
+            row.last_used_at = now
+            await session.commit()
+        except Exception:  # noqa: BLE001 — non-fatal metadata stamp
+            await session.rollback()
+        return user.id
 
 
 # ---------------------------------------------------------------------------
@@ -362,6 +412,124 @@ async def _db_search(
 
 
 # ---------------------------------------------------------------------------
+# Shared ticket markdown renderer (ticket_get / ticket_get_by_number)
+# ---------------------------------------------------------------------------
+
+
+async def _render_ticket(
+    session: AsyncSession,
+    *,
+    ticket_id: int,
+    user_id: int,
+    include_internal_notes: bool = True,
+) -> str:
+    """Markdown ticket payload, or a not-found / access-denied message string."""
+    pe = PermissionEngine(session)
+    allowed_groups = await pe.groups_for_permission(user_id, "ro")
+
+    t_row = (
+        (
+            await session.execute(
+                text(
+                    "SELECT t.id, t.tn, t.title, q.name as queue,"
+                    " ts.name as state_name, tst.name as state_type,"
+                    " tp.name as priority, t.customer_id, t.customer_user_id,"
+                    " t.create_time, t.change_time, q.group_id"
+                    " FROM ticket t"
+                    " JOIN queue q ON q.id = t.queue_id"
+                    " JOIN ticket_state ts ON ts.id = t.ticket_state_id"
+                    " JOIN ticket_state_type tst ON tst.id = ts.type_id"
+                    " JOIN ticket_priority tp ON tp.id = t.ticket_priority_id"
+                    " WHERE t.id = :tid LIMIT 1"
+                ),
+                {"tid": ticket_id},
+            )
+        )
+        .mappings()
+        .first()
+    )
+
+    if t_row is None:
+        return f"Ticket #{ticket_id} not found."
+
+    if int(t_row["group_id"]) not in allowed_groups:
+        return f"Access denied to ticket #{ticket_id}."
+
+    lines: list[str] = [
+        f"# Ticket #{ticket_id} — {t_row['tn']}",
+        "",
+        f"**Title:** {t_row['title']}",
+        f"**Queue:** {t_row['queue']}",
+        f"**State:** {t_row['state_name']} ({t_row['state_type']})",
+        f"**Priority:** {t_row['priority']}",
+        f"**Customer:** {t_row['customer_user_id'] or t_row['customer_id'] or 'N/A'}",
+        f"**Created:** {t_row['create_time']}",
+        f"**Changed:** {t_row['change_time']}",
+        "",
+        "## Articles",
+        "",
+    ]
+
+    art_rows = (
+        await session.execute(
+            text(
+                "SELECT a.id, a.is_visible_for_customer, adm.a_from, adm.a_subject,"
+                " adm.a_body, adm.a_content_type, a.create_time, ast.name as sender_type"
+                " FROM article a"
+                " LEFT JOIN article_data_mime adm ON adm.article_id = a.id"
+                " LEFT JOIN article_sender_type ast ON ast.id = a.article_sender_type_id"
+                " WHERE a.ticket_id = :tid"
+                " ORDER BY a.id"
+            ),
+            {"tid": ticket_id},
+        )
+    ).fetchall()
+
+    for art in art_rows:
+        is_visible = bool(art[1])
+        if not is_visible and not include_internal_notes:
+            continue
+        visibility = "customer-visible" if is_visible else "internal"
+        lines.append(f"### Article #{art[0]} [{art[7] or 'unknown'}] [{visibility}]")
+        lines.append(f"**From:** {art[2] or 'N/A'}")
+        lines.append(f"**Subject:** {art[3] or '(no subject)'}")
+        lines.append(f"**Date:** {art[6]}")
+        lines.append("")
+        body = art[4] or ""
+        content_type = art[5] or ""
+        if "html" in content_type.lower():
+            import re
+
+            body = re.sub(r"<[^>]+>", "", body)
+            body = body.replace("&lt;", "<").replace("&gt;", ">").replace("&amp;", "&")
+        lines.append(body[:2000])
+        lines.append("")
+
+    df_rows = (
+        await session.execute(
+            text(
+                "SELECT df.name, df.label, dfv.value_text"
+                " FROM dynamic_field df"
+                " JOIN dynamic_field_value dfv ON dfv.field_id = df.id"
+                " WHERE dfv.object_id = :tid AND df.object_type = 'Ticket'"
+                "  AND df.valid_id = 1"
+                " ORDER BY df.field_order"
+            ),
+            {"tid": ticket_id},
+        )
+    ).fetchall()
+
+    if df_rows:
+        lines.append("## Dynamic Fields")
+        lines.append("")
+        for df in df_rows:
+            label = df[1] or df[0]
+            lines.append(f"- **{label}:** {df[2]}")
+
+    return "\n".join(lines)
+
+
+# ---------------------------------------------------------------------------
 # Tool: ticket_get
 # ---------------------------------------------------------------------------
 
@@ -387,113 +555,59 @@ async def ticket_get(
     state = _get_state()
 
     async with state.session_factory() as session:
-        pe = PermissionEngine(session)
-        allowed_groups = await pe.groups_for_permission(user_id, "ro")
-
-        t_row = (
-            (
-                await session.execute(
-                    text(
-                        "SELECT t.id, t.tn, t.title, q.name as queue,"
-                        " ts.name as state_name, tst.name as state_type,"
-                        " tp.name as priority, t.customer_id, t.customer_user_id,"
-                        " t.create_time, t.change_time, q.group_id"
-                        " FROM ticket t"
-                        " JOIN queue q ON q.id = t.queue_id"
-                        " JOIN ticket_state ts ON ts.id = t.ticket_state_id"
-                        " JOIN ticket_state_type tst ON tst.id = ts.type_id"
-                        " JOIN ticket_priority tp ON tp.id = t.ticket_priority_id"
-                        " WHERE t.id = :tid LIMIT 1"
-                    ),
-                    {"tid": ticket_id},
-                )
-            )
-            .mappings()
-            .first()
+        return await _render_ticket(
+            session,
+            ticket_id=ticket_id,
+            user_id=user_id,
+            include_internal_notes=include_internal_notes,
         )
 
-        if t_row is None:
-            return f"Ticket #{ticket_id} not found."
 
-        if int(t_row["group_id"]) not in allowed_groups:
-            return f"Access denied to ticket #{ticket_id}."
+# ---------------------------------------------------------------------------
+# Tool: ticket_get_by_number
+# ---------------------------------------------------------------------------
 
-        # Build markdown
-        lines: list[str] = [
-            f"# Ticket #{ticket_id} — {t_row['tn']}",
-            "",
-            f"**Title:** {t_row['title']}",
-            f"**Queue:** {t_row['queue']}",
-            f"**State:** {t_row['state_name']} ({t_row['state_type']})",
-            f"**Priority:** {t_row['priority']}",
-            f"**Customer:** {t_row['customer_user_id'] or t_row['customer_id'] or 'N/A'}",
-            f"**Created:** {t_row['create_time']}",
-            f"**Changed:** {t_row['change_time']}",
-            "",
-            "## Articles",
-            "",
-        ]
 
-        # Load articles
-        art_rows = (
+@mcp.tool(
+    description=(
+        "Get a ticket by Znuny ticket number (TN). Returns the same markdown "
+        "payload as ticket_get. Use this when a human refers to a ticket by its "
+        "visible number rather than the internal ticket_id."
+    )
+)
+async def ticket_get_by_number(
+    ctx: Context,
+    tn: str,
+    include_internal_notes: bool = True,
+) -> str | dict[str, Any]:
+    """Resolve a ticket number to the markdown ticket view.
+
+    Args:
+        tn: The Znuny ticket number (e.g. ``202406011200001``).
+        include_internal_notes: Include internal (not customer-visible) notes.
+    """
+    user_id = _get_user_id(ctx)
+    state = _get_state()
+
+    async with state.session_factory() as session:
+        ticket_id = (
             await session.execute(
-                text(
-                    "SELECT a.id, a.is_visible_for_customer, adm.a_from, adm.a_subject,"
-                    " adm.a_body, adm.a_content_type, a.create_time, ast.name as sender_type"
-                    " FROM article a"
-                    " LEFT JOIN article_data_mime adm ON adm.article_id = a.id"
-                    " LEFT JOIN article_sender_type ast ON ast.id = a.article_sender_type_id"
-                    " WHERE a.ticket_id = :tid"
-                    " ORDER BY a.id"
-                ),
-                {"tid": ticket_id},
+                text("SELECT id FROM ticket WHERE tn = :tn LIMIT 1"),
+                {"tn": tn},
             )
-        ).fetchall()
+        ).scalar_one_or_none()
+        if ticket_id is None:
+            return {"error": f"Ticket number {tn!r} not found"}
 
-        for art in art_rows:
-            is_visible = bool(art[1])
-            if not is_visible and not include_internal_notes:
-                continue
-            visibility = "customer-visible" if is_visible else "internal"
-            lines.append(f"### Article #{art[0]} [{art[7] or 'unknown'}] [{visibility}]")
-            lines.append(f"**From:** {art[2] or 'N/A'}")
-            lines.append(f"**Subject:** {art[3] or '(no subject)'}")
-            lines.append(f"**Date:** {art[6]}")
-            lines.append("")
-            body = art[4] or ""
-            content_type = art[5] or ""
-            if "html" in content_type.lower():
-                # Strip HTML tags for plaintext output
-                import re
-
-                body = re.sub(r"<[^>]+>", "", body)
-                body = body.replace("&lt;", "<").replace("&gt;", ">").replace("&amp;", "&")
-            lines.append(body[:2000])
-            lines.append("")
-
-        # Dynamic fields
-        df_rows = (
-            await session.execute(
-                text(
-                    "SELECT df.name, df.label, dfv.value_text"
-                    " FROM dynamic_field df"
-                    " JOIN dynamic_field_value dfv ON dfv.field_id = df.id"
-                    " WHERE dfv.object_id = :tid AND df.object_type = 'Ticket'"
-                    "  AND df.valid_id = 1"
-                    " ORDER BY df.field_order"
-                ),
-                {"tid": ticket_id},
-            )
-        ).fetchall()
-
-        if df_rows:
-            lines.append("## Dynamic Fields")
-            lines.append("")
-            for df in df_rows:
-                label = df[1] or df[0]
-                lines.append(f"- **{label}:** {df[2]}")
-
-    return "\n".join(lines)
+        rendered = await _render_ticket(
+            session,
+            ticket_id=int(ticket_id),
+            user_id=user_id,
+            include_internal_notes=include_internal_notes,
+        )
+        if rendered.startswith("Access denied") or rendered.endswith("not found."):
+            return {"error": rendered}
+        return rendered
 
 
 # ---------------------------------------------------------------------------
@@ -819,6 +933,295 @@ async def ticket_update_owner(
             return {"ok": True, "ticket_id": ticket_id, "owner_id": owner_id}
         except (TicketNotFound, TicketAccessDenied, InvalidInput) as e:
             return {"error": str(e)}
+
+
+# ---------------------------------------------------------------------------
+# Tool: ticket_set_title / ticket_set_customer / ticket_set_dynamic_field
+# ---------------------------------------------------------------------------
+
+
+@mcp.tool(description="Change a ticket's title.")
+async def ticket_set_title(
+    ctx: Context,
+    ticket_id: int,
+    title: str,
+) -> dict[str, Any]:
+    """Change ticket title.
+
+    Args:
+        ticket_id: Target ticket ID.
+        title: New title (truncated to 255 characters).
+    """
+    user_id = _get_user_id(ctx)
+    state = _get_state()
+
+    async with state.session_factory() as session:
+        try:
+            async with session.begin():
+                await change_title(session, ticket_id=ticket_id, new_title=title, user_id=user_id)
+            return {"ok": True, "ticket_id": ticket_id, "title": title[:255]}
+        except (TicketNotFound, TicketAccessDenied, InvalidInput) as e:
+            return {"error": str(e)}
+
+
+@mcp.tool(description="Set a ticket's customer (customer_user_id and optional customer_id).")
+async def ticket_set_customer(
+    ctx: Context,
+    ticket_id: int,
+    customer_user_id: str,
+    customer_id: str | None = None,
+) -> dict[str, Any]:
+    """Set ticket customer fields.
+
+    Args:
+        ticket_id: Target ticket ID.
+        customer_user_id: Customer user login.
+        customer_id: Optional customer company ID.
+    """
+    user_id = _get_user_id(ctx)
+    state = _get_state()
+
+    async with state.session_factory() as session:
+        try:
+            async with session.begin():
+                await set_customer(
+                    session,
+                    ticket_id=ticket_id,
+                    customer_id=customer_id,
+                    customer_user_id=customer_user_id,
+                    user_id=user_id,
+                )
+            return {
+                "ok": True,
+                "ticket_id": ticket_id,
+                "customer_user_id": customer_user_id,
+                "customer_id": customer_id,
+            }
+        except (TicketNotFound, TicketAccessDenied, InvalidInput) as e:
+            return {"error": str(e)}
+
+
+@mcp.tool(
+    description=(
+        "Set a ticket dynamic field value by field name. Returns an error if the "
+        "field does not exist. Pass null value to clear the field."
+    )
+)
+async def ticket_set_dynamic_field(
+    ctx: Context,
+    ticket_id: int,
+    field_name: str,
+    value: str | None = None,
+) -> dict[str, Any]:
+    """Set a dynamic field on a ticket.
+
+    Args:
+        ticket_id: Target ticket ID.
+        field_name: Dynamic field name (not label).
+        value: New value as a string, or null to clear.
+    """
+    user_id = _get_user_id(ctx)
+    state = _get_state()
+    values: list[str] = [] if value is None else [value]
+
+    async with state.session_factory() as session:
+        try:
+            async with session.begin():
+                field_id = (
+                    await session.execute(
+                        text(
+                            "SELECT id FROM dynamic_field WHERE name = :n"
+                            " AND object_type = 'Ticket' AND valid_id = 1 LIMIT 1"
+                        ),
+                        {"n": field_name},
+                    )
+                ).scalar_one_or_none()
+                if field_id is None:
+                    raise InvalidInput(f"Dynamic field {field_name!r} not found")
+                await update_dynamic_field(
+                    session,
+                    ticket_id=ticket_id,
+                    field_name=field_name,
+                    values=values,
+                    user_id=user_id,
+                )
+            return {
+                "ok": True,
+                "ticket_id": ticket_id,
+                "field_name": field_name,
+                "value": value,
+            }
+        except (TicketNotFound, TicketAccessDenied, InvalidInput) as e:
+            return {"error": str(e)}
+
+
+# ---------------------------------------------------------------------------
+# Tool: ticket_lock / ticket_unlock
+# ---------------------------------------------------------------------------
+
+
+@mcp.tool(description="Lock a ticket (ticket_lock_id = lock).")
+async def ticket_lock(
+    ctx: Context,
+    ticket_id: int,
+) -> dict[str, Any]:
+    """Lock a ticket.
+
+    Args:
+        ticket_id: Target ticket ID.
+    """
+    user_id = _get_user_id(ctx)
+    state = _get_state()
+
+    async with state.session_factory() as session:
+        sysconfig = state.sysconfig()
+        try:
+            async with session.begin():
+                await lock_ticket(
+                    session, ticket_id=ticket_id, user_id=user_id, sysconfig=sysconfig
+                )
+            return {"ok": True, "ticket_id": ticket_id, "lock": "lock"}
+        except (TicketNotFound, TicketAccessDenied, InvalidInput) as e:
+            return {"error": str(e)}
+
+
+@mcp.tool(description="Unlock a ticket (ticket_lock_id = unlock).")
+async def ticket_unlock(
+    ctx: Context,
+    ticket_id: int,
+) -> dict[str, Any]:
+    """Unlock a ticket.
+
+    Args:
+        ticket_id: Target ticket ID.
+    """
+    user_id = _get_user_id(ctx)
+    state = _get_state()
+
+    async with state.session_factory() as session:
+        sysconfig = state.sysconfig()
+        try:
+            async with session.begin():
+                await unlock_ticket(
+                    session, ticket_id=ticket_id, user_id=user_id, sysconfig=sysconfig
+                )
+            return {"ok": True, "ticket_id": ticket_id, "lock": "unlock"}
+        except (TicketNotFound, TicketAccessDenied, InvalidInput) as e:
+            return {"error": str(e)}
+
+
+# ---------------------------------------------------------------------------
+# Reference / discovery tools (parity with api/v1/reference.py)
+# ---------------------------------------------------------------------------
+
+
+@mcp.tool(
+    description=(
+        "List valid queues the agent may access. Use movable=true for queues "
+        "the agent can move tickets into (rw). Default is queues with at least ro. "
+        "Returns id, name, group_id."
+    )
+)
+async def list_queues(
+    ctx: Context,
+    movable: bool = False,
+) -> list[dict[str, Any]]:
+    """Valid queues the current agent may access, filtered by permission.
+
+    Args:
+        movable: If true, only queues with ``rw``; otherwise queues with ``ro``.
+    """
+    user_id = _get_user_id(ctx)
+    state = _get_state()
+    perm = "rw" if movable else "ro"
+
+    async with state.session_factory() as session:
+        pe = PermissionEngine(session)
+        group_ids = await pe.groups_for_permission(user_id, perm)
+        if not group_ids:
+            return []
+        rows = (
+            await session.execute(
+                select(Queue)
+                .where(Queue.group_id.in_(group_ids), Queue.valid_id == _VALID)
+                .order_by(Queue.name)
+            )
+        ).scalars()
+        return [{"id": q.id, "name": q.name, "group_id": q.group_id} for q in rows]
+
+
+@mcp.tool(description="List valid ticket states (id, name, type_name). Global reference data.")
+async def list_states(ctx: Context) -> list[dict[str, Any]]:
+    """Valid ticket states for update pickers.
+
+    Args:
+        (none — auth required)
+    """
+    _get_user_id(ctx)
+    state = _get_state()
+
+    async with state.session_factory() as session:
+        rows = (
+            await session.execute(
+                select(TicketState.id, TicketState.name, TicketStateType.name)
+                .join(TicketStateType, TicketState.type_id == TicketStateType.id)
+                .where(TicketState.valid_id == _VALID)
+                .order_by(TicketState.id)
+            )
+        ).all()
+        return [{"id": r[0], "name": r[1], "type_name": r[2]} for r in rows]
+
+
+@mcp.tool(description="List valid ticket priorities (id, name). Global reference data.")
+async def list_priorities(ctx: Context) -> list[dict[str, Any]]:
+    """Valid priorities for update pickers.
+
+    Args:
+        (none — auth required)
+    """
+    _get_user_id(ctx)
+    state = _get_state()
+
+    async with state.session_factory() as session:
+        rows = (
+            await session.execute(
+                select(TicketPriority)
+                .where(TicketPriority.valid_id == _VALID)
+                .order_by(TicketPriority.id)
+            )
+        ).scalars()
+        return [{"id": p.id, "name": p.name} for p in rows]
+
+
+@mcp.tool(
+    description=(
+        "List valid agent users for owner/responsible assignment "
+        "(id, login, full_name). Global list of valid users."
+    )
+)
+async def list_agents(ctx: Context) -> list[dict[str, Any]]:
+    """Valid agents for owner/responsible pickers.
+
+    Args:
+        (none — auth required)
+    """
+    _get_user_id(ctx)
+    state = _get_state()
+
+    async with state.session_factory() as session:
+        rows = (
+            await session.execute(
+                select(Users).where(Users.valid_id == _VALID).order_by(Users.login)
+            )
+        ).scalars()
+        return [
+            {
+                "id": u.id,
+                "login": u.login,
+                "full_name": f"{u.first_name} {u.last_name}".strip(),
+            }
+            for u in rows
+        ]
 
 
 # ---------------------------------------------------------------------------

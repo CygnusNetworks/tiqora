@@ -72,13 +72,21 @@ appearing over time.
 ## 2. MCP as the primary AI interface
 
 `tiqora.mcp_server.server` runs a FastMCP streamable-HTTP server (default
-port `8001`, `tiqora mcp` / `tiqora-mcp` entry points) exposing the
-following tools:
+port `8001`, `tiqora mcp` / `tiqora-mcp` entry points) exposing **25 tools**.
+MCP deliberately does **not** mirror admin/portal/calendar/BPM/stats/GDPR.
+
+#### Ticket read
 
 | Tool | Purpose |
 |---|---|
 | `ticket_search` | Search tickets (Meilisearch-backed with DB fallback) by free text / filters. |
-| `ticket_get` | Full ticket detail: fields, articles, dynamic field values. |
+| `ticket_get` | Full ticket detail: fields, articles, dynamic field values (Markdown). |
+| `ticket_get_by_number` | Same payload as `ticket_get`, resolved by Znuny ticket number (`tn`). |
+
+#### Ticket write
+
+| Tool | Purpose |
+|---|---|
 | `ticket_create` | Create a new ticket. Returns `TicketID` and `TicketNumber`. |
 | `ticket_reply` | Post a customer-visible reply article. |
 | `ticket_note` | Post an internal (agent-only) note article. |
@@ -86,9 +94,32 @@ following tools:
 | `ticket_update_queue` | Move ticket to a different queue by queue ID. |
 | `ticket_update_priority` | Change ticket priority by priority ID. |
 | `ticket_update_owner` | Reassign ticket owner by user ID. |
+| `ticket_set_title` | Change ticket title. |
+| `ticket_set_customer` | Set customer user / company on a ticket. |
+| `ticket_set_dynamic_field` | Set a dynamic field by name. |
+| `ticket_lock` / `ticket_unlock` | Lock or unlock a ticket. |
+
+#### Reference / discovery
+
+| Tool | Purpose |
+|---|---|
+| `list_queues` | Queues the agent may act in (permission-scoped). |
+| `list_states` | Valid ticket states. |
+| `list_priorities` | Valid priorities. |
+| `list_agents` | Valid agents for owner/responsible assignment. |
+
+#### Knowledge base + customer
+
+| Tool | Purpose |
+|---|---|
 | `kb_search` | Search the knowledge base. |
 | `kb_get_article` | Fetch a KB article's full Markdown content. |
+| `kb_list` | List KB articles by tag/category. |
+| `kb_upsert_article` | Create or update a KB article. |
+| `kb_publish_article` | Publish + index a KB article. |
 | `customer_lookup` | Look up a customer user by login. |
+
+Full parameter tables: [`api/mcp.md`](api/mcp.md).
 
 ### Auth
 

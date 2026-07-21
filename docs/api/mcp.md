@@ -63,12 +63,24 @@ missing trailing slash in a way that breaks concurrent MCP session setup;
 see the reverse-proxy notes in
 [`../deploy/docker-compose.md`](../deploy/docker-compose.md).)
 
-## Tools
+## Tools (25)
+
+MCP deliberately does **not** mirror admin/portal/calendar/BPM/stats/GDPR —
+those stay on REST. Source of truth: `@mcp.tool` handlers in
+`tiqora.mcp_server.server`.
+
+### Ticket read
 
 | Tool | Purpose |
 |---|---|
 | `ticket_search` | Search tickets (Meilisearch-backed, DB fallback) by free text and/or filters: `queue_ids`, `state_type`, `customer_user_id`, `limit` (max 100). Returns permission-filtered ticket summaries. |
 | `ticket_get` | Full ticket detail as Markdown: fields, articles (plaintext), dynamic field values. `ticket_id` (required), `include_internal_notes` (default `true`). |
+| `ticket_get_by_number` | Same Markdown payload as `ticket_get`, resolved by Znuny ticket number (`tn`). |
+
+### Ticket write
+
+| Tool | Purpose |
+|---|---|
 | `ticket_create` | Create a new ticket. Returns `TicketID` and `TicketNumber`. |
 | `ticket_reply` | Post a customer-visible reply article. |
 | `ticket_note` | Post an internal (agent-only, not customer-visible) note article. |
@@ -76,14 +88,40 @@ see the reverse-proxy notes in
 | `ticket_update_queue` | Move ticket to a different queue by queue ID. |
 | `ticket_update_priority` | Change ticket priority by priority ID. |
 | `ticket_update_owner` | Reassign ticket owner by user ID. |
+| `ticket_set_title` | Change ticket title. |
+| `ticket_set_customer` | Set `customer_user_id` / optional `customer_id`. |
+| `ticket_set_dynamic_field` | Set a dynamic field by name (error if field does not exist). |
+| `ticket_lock` / `ticket_unlock` | Lock or unlock a ticket. |
+
+### Reference / discovery
+
+| Tool | Purpose |
+|---|---|
+| `list_queues` | Queues the agent may act in (`ro` by default; `movable=true` requires `rw`). Returns `id`, `name`, `group_id`. |
+| `list_states` | Valid ticket states (`id`, `name`, `type_name`). |
+| `list_priorities` | Valid priorities (`id`, `name`). |
+| `list_agents` | Valid agent users for owner/responsible assignment (`id`, `login`, `full_name`). |
+
+### Knowledge base
+
+| Tool | Purpose |
+|---|---|
 | `kb_search` | Search the knowledge base (permission-group scoped). |
 | `kb_get_article` | Fetch a knowledge base article's full Markdown content. |
+| `kb_list` | List articles by tag/category (permission-group scoped). |
+| `kb_upsert_article` | Create or update a KB article (Markdown). |
+| `kb_publish_article` | Publish + (re)index a KB article for search. |
+
+### Customer
+
+| Tool | Purpose |
+|---|---|
 | `customer_lookup` | Look up a customer user by login. |
 
 Every tool's exact parameter list and docstring lives in the source of
 truth, `tiqora.mcp_server.server` (each `@mcp.tool`-decorated function) — the
-table above is a summary. State/queue/priority/owner IDs are the same
-numeric IDs used by the `/api/v1/admin/*` reference-data endpoints (see
+tables above are a summary. State/queue/priority/owner IDs match
+`/api/v1/reference/*` and admin reference data (see
 [`rest-v1.md`](rest-v1.md#admin-crud-overview)).
 
 ### Example: `ticket_search`
