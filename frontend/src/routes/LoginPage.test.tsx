@@ -8,7 +8,9 @@ import { LoginPage } from "./LoginPage";
 const navigate = vi.fn();
 const login = vi.fn();
 const verifyTotp = vi.fn();
+const verifyPasskey = vi.fn();
 const completeEnroll2fa = vi.fn();
+const completeEnrollPasskey = vi.fn();
 const authMethods = vi.fn();
 const totpEnroll = vi.fn();
 const spnegoLoginUrl = vi.fn(() => "/api/v1/auth/spnego");
@@ -29,7 +31,9 @@ vi.mock("@/auth/AuthContext", () => ({
   useAuth: () => ({
     login,
     verifyTotp,
+    verifyPasskey,
     completeEnroll2fa,
+    completeEnrollPasskey,
     pending2fa,
     mustEnroll2fa,
     isAuthenticated,
@@ -56,6 +60,11 @@ vi.mock("@/lib/api", () => ({
   },
 }));
 
+vi.mock("@simplewebauthn/browser", () => ({
+  startRegistration: vi.fn(),
+  startAuthentication: vi.fn(),
+}));
+
 function renderPage() {
   const qc = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
@@ -74,7 +83,9 @@ describe("LoginPage", () => {
     navigate.mockReset();
     login.mockReset();
     verifyTotp.mockReset();
+    verifyPasskey.mockReset();
     completeEnroll2fa.mockReset();
+    completeEnrollPasskey.mockReset();
     authMethods.mockReset();
     totpEnroll.mockReset();
     pending2fa = false;
@@ -82,11 +93,17 @@ describe("LoginPage", () => {
     isAuthenticated = false;
     isLoading = false;
     searchParams = {};
+    // jsdom has no WebAuthn by default — enable for passkey UI tests.
+    Object.defineProperty(window, "PublicKeyCredential", {
+      configurable: true,
+      value: class PublicKeyCredential {},
+    });
     authMethods.mockResolvedValue({
       password: true,
       oidc: false,
       spnego: false,
       ldap: false,
+      webauthn: false,
     });
   });
 
@@ -96,6 +113,7 @@ describe("LoginPage", () => {
       oidc: false,
       spnego: true,
       ldap: false,
+      webauthn: false,
     });
     renderPage();
     await waitFor(() => {
@@ -145,6 +163,70 @@ describe("LoginPage", () => {
     await waitFor(() => {
       expect(navigate).toHaveBeenCalledWith({ to: "/agent" });
     });
+  });
+
+  it("offers passkey enrollment as alternative during forced enrollment when webauthn is on", async () => {
+    mustEnroll2fa = true;
+    authMethods.mockResolvedValue({
+      password: true,
+      oidc: false,
+      spnego: false,
+      ldap: false,
+      webauthn: true,
+    });
+    totpEnroll.mockResolvedValue({ secret: "JBSWY3DPEHPK3PXP", provisioning_uri: "otpauth://x" });
+    completeEnrollPasskey.mockResolvedValue(undefined);
+
+    renderPage();
+
+    await waitFor(() => {
+      expect(screen.getByTestId("must-enroll-passkey")).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByTestId("must-enroll-passkey"));
+
+    await waitFor(() => {
+      expect(completeEnrollPasskey).toHaveBeenCalled();
+    });
+    await waitFor(() => {
+      expect(navigate).toHaveBeenCalledWith({ to: "/agent" });
+    });
+  });
+
+  it("shows passkey button on 2FA step when methods.webauthn is true", async () => {
+    pending2fa = true;
+    authMethods.mockResolvedValue({
+      password: true,
+      oidc: false,
+      spnego: false,
+      ldap: false,
+      webauthn: true,
+    });
+    verifyPasskey.mockResolvedValue(undefined);
+
+    renderPage();
+
+    await waitFor(() => {
+      expect(screen.getByTestId("passkey-login")).toBeInTheDocument();
+    });
+    expect(screen.getByTestId("totp-form")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId("passkey-login"));
+    await waitFor(() => {
+      expect(verifyPasskey).toHaveBeenCalled();
+    });
+    await waitFor(() => {
+      expect(navigate).toHaveBeenCalledWith({ to: "/agent" });
+    });
+  });
+
+  it("hides passkey button on 2FA step when webauthn is false", async () => {
+    pending2fa = true;
+    renderPage();
+    await waitFor(() => {
+      expect(screen.getByTestId("totp-form")).toBeInTheDocument();
+    });
+    expect(screen.queryByTestId("passkey-login")).not.toBeInTheDocument();
   });
 
   it("submits password login", async () => {

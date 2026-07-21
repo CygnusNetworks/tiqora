@@ -6,12 +6,18 @@ import { api, ApiError } from "@/lib/api";
 import { Button } from "@/components/ui/Button";
 import { Spinner } from "@/components/ui/Spinner";
 
+function browserSupportsWebAuthn(): boolean {
+  return typeof window !== "undefined" && typeof window.PublicKeyCredential !== "undefined";
+}
+
 export function LoginPage() {
   const { t } = useTranslation();
   const {
     login,
     verifyTotp,
+    verifyPasskey,
     completeEnroll2fa,
+    completeEnrollPasskey,
     pending2fa,
     mustEnroll2fa,
     isAuthenticated,
@@ -29,6 +35,7 @@ export function LoginPage() {
   const [submitting, setSubmitting] = useState(false);
   const [oidcEnabled, setOidcEnabled] = useState(false);
   const [spnegoEnabled, setSpnegoEnabled] = useState(false);
+  const [webauthnEnabled, setWebauthnEnabled] = useState(false);
 
   // Forced enrollment step (must_enroll_2fa)
   const [enrollSecret, setEnrollSecret] = useState<string | null>(null);
@@ -36,6 +43,7 @@ export function LoginPage() {
   const [enrollCode, setEnrollCode] = useState("");
   const [enrollError, setEnrollError] = useState<string | null>(null);
   const [enrollStarting, setEnrollStarting] = useState(false);
+  const [passkeyEnrolling, setPasskeyEnrolling] = useState(false);
 
   useEffect(() => {
     api
@@ -43,10 +51,12 @@ export function LoginPage() {
       .then((methods) => {
         setOidcEnabled(Boolean(methods.oidc));
         setSpnegoEnabled(Boolean(methods.spnego));
+        setWebauthnEnabled(Boolean(methods.webauthn));
       })
       .catch(() => {
         setOidcEnabled(false);
         setSpnegoEnabled(false);
+        setWebauthnEnabled(false);
       });
   }, []);
 
@@ -58,9 +68,10 @@ export function LoginPage() {
     }
   }, [isLoading, isAuthenticated, mustEnroll2fa, pending2fa, search.next, navigate]);
 
-  // Auto-start enrollment when forced into must-enroll mode.
+  // Auto-start TOTP enrollment when forced into must-enroll mode (unless the
+  // agent is mid passkey registration as the alternative path).
   useEffect(() => {
-    if (!mustEnroll2fa || enrollSecret || enrollStarting) return;
+    if (!mustEnroll2fa || enrollSecret || enrollStarting || passkeyEnrolling) return;
     setEnrollStarting(true);
     setEnrollError(null);
     api
@@ -73,7 +84,13 @@ export function LoginPage() {
         setEnrollError(t("auth.mustEnroll.startError"));
       })
       .finally(() => setEnrollStarting(false));
-  }, [mustEnroll2fa, enrollSecret, enrollStarting, t]);
+  }, [mustEnroll2fa, enrollSecret, enrollStarting, passkeyEnrolling, t]);
+
+  const goNext = async () => {
+    const next =
+      search.next && search.next.startsWith("/") ? search.next : "/agent";
+    await navigate({ to: next });
+  };
 
   const onSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -100,14 +117,29 @@ export function LoginPage() {
     setSubmitting(true);
     try {
       await verifyTotp(totpCode);
-      const next =
-        search.next && search.next.startsWith("/") ? search.next : "/agent";
-      await navigate({ to: next });
+      await goNext();
     } catch (err) {
       if (err instanceof ApiError && err.status === 401) {
         setError(t("auth.totpInvalid"));
       } else {
         setError(t("auth.loginFailed"));
+      }
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const onVerifyPasskey = async () => {
+    setError(null);
+    setSubmitting(true);
+    try {
+      await verifyPasskey();
+      await goNext();
+    } catch (err) {
+      if (err instanceof ApiError && (err.status === 401 || err.status === 400)) {
+        setError(t("auth.passkeyInvalid"));
+      } else {
+        setError(t("auth.passkeyFailed"));
       }
     } finally {
       setSubmitting(false);
@@ -120,15 +152,33 @@ export function LoginPage() {
     setSubmitting(true);
     try {
       await completeEnroll2fa(enrollCode);
-      const next =
-        search.next && search.next.startsWith("/") ? search.next : "/agent";
-      await navigate({ to: next });
+      await goNext();
     } catch {
       setEnrollError(t("auth.mustEnroll.confirmError"));
     } finally {
       setSubmitting(false);
     }
   };
+
+  const onEnrollPasskey = async () => {
+    setEnrollError(null);
+    setPasskeyEnrolling(true);
+    setSubmitting(true);
+    try {
+      await completeEnrollPasskey(null);
+      await goNext();
+    } catch {
+      setEnrollError(t("auth.passkeyEnrollFailed"));
+    } finally {
+      setSubmitting(false);
+      setPasskeyEnrolling(false);
+    }
+  };
+
+  const showPasskeyLogin =
+    webauthnEnabled && browserSupportsWebAuthn();
+  const showPasskeyEnroll =
+    webauthnEnabled && browserSupportsWebAuthn();
 
   if (mustEnroll2fa) {
     return (
@@ -198,9 +248,33 @@ export function LoginPage() {
                   disabled={submitting}
                   data-testid="must-enroll-submit"
                 >
-                  {submitting ? <Spinner /> : t("security.confirmButton")}
+                  {submitting && !passkeyEnrolling ? <Spinner /> : t("security.confirmButton")}
                 </Button>
               </form>
+
+              {showPasskeyEnroll && (
+                <>
+                  <div className="flex items-center gap-3 text-xs text-muted">
+                    <span className="h-px flex-1 bg-hairline" />
+                    {t("auth.or")}
+                    <span className="h-px flex-1 bg-hairline" />
+                  </div>
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    className="w-full"
+                    disabled={submitting}
+                    data-testid="must-enroll-passkey"
+                    onClick={() => void onEnrollPasskey()}
+                  >
+                    {submitting && passkeyEnrolling ? (
+                      <Spinner />
+                    ) : (
+                      t("auth.passkeyEnroll")
+                    )}
+                  </Button>
+                </>
+              )}
             </div>
           )}
 
@@ -255,6 +329,26 @@ export function LoginPage() {
               {submitting ? <Spinner /> : t("auth.totpVerify")}
             </Button>
           </form>
+
+          {showPasskeyLogin && (
+            <>
+              <div className="my-4 flex items-center gap-3 text-xs text-muted">
+                <span className="h-px flex-1 bg-hairline" />
+                {t("auth.or")}
+                <span className="h-px flex-1 bg-hairline" />
+              </div>
+              <Button
+                type="button"
+                variant="secondary"
+                className="w-full"
+                disabled={submitting}
+                data-testid="passkey-login"
+                onClick={() => void onVerifyPasskey()}
+              >
+                {submitting ? <Spinner /> : t("auth.passkeyLogin")}
+              </Button>
+            </>
+          )}
         </div>
       </div>
     );
