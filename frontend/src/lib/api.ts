@@ -131,6 +131,8 @@ export type {
   MailLogOut,
   MailLogListParams,
   PostmasterFilterOut,
+  PostmasterFilterRuleOut,
+  PostmasterFilterWrite,
   AclOut,
   GenericAgentJobOut,
   SystemAddressOut,

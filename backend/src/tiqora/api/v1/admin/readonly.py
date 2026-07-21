@@ -1,8 +1,11 @@
-"""Read-only admin endpoints: postmaster filters, ACLs, generic agent jobs.
+"""Read-only admin endpoints: ACLs, generic agent jobs, reference lists.
 
 ACL editing is explicitly deferred (config_match/config_change YAML shape is
 complex and Znuny's ACL cache invalidation semantics need dedicated design
 work) — only list/detail are implemented here.
+
+PostMaster filters live in :mod:`tiqora.api.v1.admin.postmaster_filters`
+(full CRUD).
 """
 
 from __future__ import annotations
@@ -18,12 +21,10 @@ from tiqora.api.v1.admin.schemas import (
     AclOut,
     FollowUpPossibleOut,
     GenericAgentJobOut,
-    PostmasterFilterOut,
-    PostmasterFilterRuleOut,
     StateTypeOut,
     SystemAddressOut,
 )
-from tiqora.db.legacy.config import Acl, GenericAgentJobs, PostmasterFilter
+from tiqora.db.legacy.config import Acl, GenericAgentJobs
 from tiqora.db.legacy.queue import FollowUpPossible, SystemAddress
 from tiqora.db.legacy.ticket import TicketStateType
 
@@ -63,52 +64,6 @@ async def list_follow_up_possible(admin: AdminUser, session: DbSession) -> list[
         .order_by(FollowUpPossible.id)
     )
     return list(result.scalars().all())
-
-
-@router.get("/postmaster-filters", response_model=list[PostmasterFilterOut])
-async def list_postmaster_filters(
-    admin: AdminUser, session: DbSession
-) -> list[PostmasterFilterOut]:
-    _ = admin
-    result = await session.execute(select(PostmasterFilter).order_by(PostmasterFilter.f_name))
-    grouped: dict[str, list[PostmasterFilterRuleOut]] = defaultdict(list)
-    for row in result.scalars().all():
-        grouped[row.f_name].append(
-            PostmasterFilterRuleOut(
-                f_name=row.f_name,
-                f_stop=row.f_stop,
-                f_type=row.f_type,
-                f_key=row.f_key,
-                f_value=row.f_value,
-                f_not=row.f_not,
-            )
-        )
-    return [PostmasterFilterOut(name=name, rules=rules) for name, rules in grouped.items()]
-
-
-@router.get("/postmaster-filters/{filter_name}", response_model=PostmasterFilterOut)
-async def get_postmaster_filter(
-    filter_name: str, admin: AdminUser, session: DbSession
-) -> PostmasterFilterOut:
-    _ = admin
-    result = await session.execute(
-        select(PostmasterFilter).where(PostmasterFilter.f_name == filter_name)
-    )
-    rows = list(result.scalars().all())
-    if not rows:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Filter not found")
-    rules = [
-        PostmasterFilterRuleOut(
-            f_name=r.f_name,
-            f_stop=r.f_stop,
-            f_type=r.f_type,
-            f_key=r.f_key,
-            f_value=r.f_value,
-            f_not=r.f_not,
-        )
-        for r in rows
-    ]
-    return PostmasterFilterOut(name=filter_name, rules=rules)
 
 
 @router.get("/acl", response_model=list[AclOut])

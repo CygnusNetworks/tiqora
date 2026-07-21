@@ -20,6 +20,7 @@ from tiqora.api.v1.admin import (
     mail_log,
     mail_outbound,
     placeholder_variables,
+    postmaster_filters,
     priorities,
     queues,
     readonly,
@@ -43,6 +44,7 @@ admin_router.include_router(templates.router)
 admin_router.include_router(attachments.router)
 admin_router.include_router(auto_responses.router)
 admin_router.include_router(dynamic_fields.router)
+admin_router.include_router(postmaster_filters.router)
 admin_router.include_router(readonly.router)
 admin_router.include_router(webhooks.router)
 admin_router.include_router(api_keys.router)

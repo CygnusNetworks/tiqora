@@ -304,6 +304,10 @@ export type MailLogListParams = {
   to?: string | null;
 };
 export type PostmasterFilterOut = Schemas["PostmasterFilterOut"];
+export type PostmasterFilterRuleOut = Schemas["PostmasterFilterRuleOut"];
+export type PostmasterFilterWrite = Schemas["PostmasterFilterWrite"];
+export type PostmasterMatchRuleIn = Schemas["PostmasterMatchRuleIn"];
+export type PostmasterSetRuleIn = Schemas["PostmasterSetRuleIn"];
 export type AclOut = Schemas["AclOut"];
 export type GenericAgentJobOut = Schemas["GenericAgentJobOut"];
 export type SystemAddressOut = Schemas["SystemAddressOut"];
@@ -1734,7 +1738,7 @@ export class ApiClient {
     });
   }
 
-  // Read-only automation config.
+  // PostMaster filters (named filter = Match rows + Set rows + f_stop).
   listPostmasterFilters(signal?: AbortSignal) {
     return this.request<PostmasterFilterOut[]>("GET", "/api/v1/admin/postmaster-filters", {
       signal,
@@ -1744,6 +1748,33 @@ export class ApiClient {
   getPostmasterFilter(filterName: string, signal?: AbortSignal) {
     return this.request<PostmasterFilterOut>(
       "GET",
+      `/api/v1/admin/postmaster-filters/${encodeURIComponent(filterName)}`,
+      { signal },
+    );
+  }
+
+  createPostmasterFilter(body: PostmasterFilterWrite, signal?: AbortSignal) {
+    return this.request<PostmasterFilterOut>("POST", "/api/v1/admin/postmaster-filters", {
+      body,
+      signal,
+    });
+  }
+
+  updatePostmasterFilter(
+    filterName: string,
+    body: PostmasterFilterWrite,
+    signal?: AbortSignal,
+  ) {
+    return this.request<PostmasterFilterOut>(
+      "PUT",
+      `/api/v1/admin/postmaster-filters/${encodeURIComponent(filterName)}`,
+      { body, signal },
+    );
+  }
+
+  deletePostmasterFilter(filterName: string, signal?: AbortSignal) {
+    return this.request<void>(
+      "DELETE",
       `/api/v1/admin/postmaster-filters/${encodeURIComponent(filterName)}`,
       { signal },
     );
