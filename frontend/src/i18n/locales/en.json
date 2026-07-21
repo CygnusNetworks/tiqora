@@ -948,7 +948,8 @@
       "noAnchors": "No items available.",
       "noMatches": "No matches.",
       "assignedCount": "{{count}} assigned",
-      "counterpartFor": "{{counterpart}} for {{anchor}}"
+      "counterpartFor": "{{counterpart}} for {{anchor}}",
+      "invalid": "invalid"
     },
     "queueVariables": {
       "title_plural": "Queue variables",
