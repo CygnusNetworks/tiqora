@@ -563,19 +563,25 @@ async def build_erasure_preview(
     session: AsyncSession,
     selector: ErasureSelector,
     mode: ErasureMode = "anonymize",
+    *,
+    delete_tickets: bool = False,
 ) -> ErasurePreview:
     """Resolve selector and return exact customers + counts/samples of impact."""
     if mode not in ("anonymize", "delete"):
         raise ErasureError(f"mode must be 'anonymize' or 'delete', got {mode!r}")
+    if delete_tickets and mode != "delete":
+        raise ErasureError("delete_tickets requires mode='delete'")
 
     ids = await resolve_selector(session, selector)
-    return await build_erasure_preview_for_ids(session, ids, mode)
+    return await build_erasure_preview_for_ids(session, ids, mode, delete_tickets=delete_tickets)
 
 
 async def build_erasure_preview_for_ids(
     session: AsyncSession,
     customer_user_ids: list[int],
     mode: ErasureMode = "anonymize",
+    *,
+    delete_tickets: bool = False,
 ) -> ErasurePreview:
     pii_cols = await resolve_customer_user_pii_columns(session)
     customers: list[ResolvedCustomer] = []
@@ -779,6 +785,11 @@ async def build_erasure_preview_for_ids(
             "group_customer_user",
             "customer_company",  # only when no remaining users
         ]
+        if delete_tickets:
+            # The tickets + all FK children are hard-deleted too.
+            tables_deleted.extend(
+                ["ticket", *(t for t, _, _ in _TICKET_DELETE_ORDER), "dynamic_field_value"]
+            )
 
     return ErasurePreview(
         mode=mode,

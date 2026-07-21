@@ -41,6 +41,7 @@ type SelectorForm = {
   inactiveSince: string;
   validId: "" | "1" | "2" | "3";
   mode: ErasureMode;
+  deleteTickets: boolean;
 };
 
 const emptyForm = (): SelectorForm => ({
@@ -54,6 +55,7 @@ const emptyForm = (): SelectorForm => ({
   inactiveSince: "",
   validId: "",
   mode: "anonymize",
+  deleteTickets: false,
 });
 
 function useDebouncedValue<T>(value: T, delayMs: number): T {
@@ -233,7 +235,11 @@ export function GdprPage() {
   const previewM = useMutation({
     mutationFn: () => {
       const selector = buildSelector(form);
-      return api.adminGdpr.preview({ selector, mode: form.mode });
+      return api.adminGdpr.preview({
+        selector,
+        mode: form.mode,
+        delete_tickets: form.mode === "delete" && form.deleteTickets,
+      });
     },
     onSuccess: (data) => {
       setPreview(data);
@@ -256,6 +262,7 @@ export function GdprPage() {
         customer_user_ids: preview.customers.map((c) => c.id),
         selector: buildSelector(form),
         mode: form.mode,
+        delete_tickets: form.mode === "delete" && form.deleteTickets,
         confirm: true,
       });
     },
@@ -547,6 +554,23 @@ export function GdprPage() {
                   ? t("admin.gdpr.modeDeleteHint")
                   : t("admin.gdpr.modeAnonymizeHint")}
               </p>
+              {form.mode === "delete" && (
+                <label
+                  className="flex w-full items-start gap-2 rounded-lg border border-danger/40 bg-danger/5 p-2.5 text-xs text-ink"
+                  data-testid="gdpr-delete-tickets"
+                >
+                  <input
+                    type="checkbox"
+                    className="mt-0.5"
+                    checked={form.deleteTickets}
+                    onChange={(e) => {
+                      setForm((f) => ({ ...f, deleteTickets: e.target.checked }));
+                      setPreview(null);
+                    }}
+                  />
+                  <span>{t("admin.gdpr.deleteTicketsHint")}</span>
+                </label>
+              )}
             </div>
 
             <div className="grid gap-4 sm:grid-cols-2">
