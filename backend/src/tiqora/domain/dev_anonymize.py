@@ -62,6 +62,11 @@ def _chunks[T](items: Sequence[T], size: int) -> Iterator[Sequence[T]]:
         yield items[i : i + size]
 
 
+# Kinds whose replacements land in a column with a UNIQUE constraint (or that is
+# effectively unique). The mapper guarantees no duplicate replacement per kind.
+_UNIQUE_KINDS = frozenset({"company", "login", "email"})
+
+
 class ValueMapper:
     """Deterministic ``(kind, original) -> replacement`` mapping, cached per run.
 
@@ -73,6 +78,11 @@ class ValueMapper:
     def __init__(self, seed: int | None = None) -> None:
         self._seed = seed if seed is not None else 0
         self._cache: dict[tuple[str, str], str] = {}
+        # Per-kind registry of already-issued replacements so that kinds backing
+        # UNIQUE columns (customer_company.name, customer_user.login) never emit a
+        # duplicate — Faker's pools are finite and two distinct originals can
+        # otherwise draw the same value, violating the constraint at UPDATE time.
+        self._used: dict[str, set[str]] = {}
 
     def _faker_for(self, kind: str, original: str) -> Any:
         Faker = _require_faker()
@@ -81,6 +91,30 @@ class ValueMapper:
         fake.seed_instance(int(digest[:16], 16))
         return fake
 
+    @staticmethod
+    def _draw(fake: Any, kind: str) -> str:
+        if kind == "first_name":
+            return str(fake.first_name())
+        if kind == "last_name":
+            return str(fake.last_name())
+        if kind == "email":
+            return str(fake.email())
+        if kind == "login":
+            return str(fake.user_name())
+        if kind == "company":
+            return str(fake.company())
+        if kind == "phone":
+            return str(fake.phone_number())
+        if kind == "street":
+            return str(fake.street_address())
+        if kind == "city":
+            return str(fake.city())
+        if kind == "zip":
+            return str(fake.postcode())
+        if kind == "country":
+            return str(fake.country())
+        return str(fake.word())
+
     def map_value(self, original: str | None, kind: str) -> str | None:
         if not original:
             return original
@@ -88,29 +122,18 @@ class ValueMapper:
         cached = self._cache.get(key)
         if cached is not None:
             return cached
-        fake = self._faker_for(kind, original)
-        if kind == "first_name":
-            value = str(fake.first_name())
-        elif kind == "last_name":
-            value = str(fake.last_name())
-        elif kind == "email":
-            value = str(fake.email())
-        elif kind == "login":
-            value = str(fake.user_name())
-        elif kind == "company":
-            value = str(fake.company())
-        elif kind == "phone":
-            value = str(fake.phone_number())
-        elif kind == "street":
-            value = str(fake.street_address())
-        elif kind == "city":
-            value = str(fake.city())
-        elif kind == "zip":
-            value = str(fake.postcode())
-        elif kind == "country":
-            value = str(fake.country())
-        else:
-            value = str(fake.word())
+        # Re-draw with an attempt-salt on collision so unique-column kinds get a
+        # distinct-but-still-deterministic replacement. Non-unique kinds always
+        # take the first draw (attempt 0), preserving previous behaviour.
+        attempt = 0
+        while True:
+            salt = original if attempt == 0 else f"{original}#{attempt}"
+            value = self._draw(self._faker_for(kind, salt), kind)
+            if kind not in _UNIQUE_KINDS or value not in self._used.setdefault(kind, set()):
+                break
+            attempt += 1
+        if kind in _UNIQUE_KINDS:
+            self._used[kind].add(value)
         self._cache[key] = value
         return value
 
@@ -171,7 +194,7 @@ async def _anonymize_customer_users(
                     CustomerUser.last_name,
                     CustomerUser.email,
                     CustomerUser.login,
-                )
+                ).order_by(CustomerUser.id)
             )
         ).all()
     total = 0
@@ -209,7 +232,11 @@ async def _anonymize_customer_companies(
 ) -> int:
     async with session_factory() as session:
         rows = (
-            await session.execute(select(CustomerCompany.customer_id, CustomerCompany.name))
+            await session.execute(
+                select(CustomerCompany.customer_id, CustomerCompany.name).order_by(
+                    CustomerCompany.customer_id
+                )
+            )
         ).all()
     total = 0
     for chunk in _chunks(rows, batch_size):

@@ -66,6 +66,32 @@ def test_map_value_none_and_empty_passthrough() -> None:
     assert mapper.map_value("", "email") == ""
 
 
+def test_unique_kinds_never_emit_duplicates() -> None:
+    """company/login/email back UNIQUE columns — no two distinct originals may
+    map to the same replacement, or the anonymizer UPDATE violates the key.
+
+    Faker's company pool is small enough that ~300 distinct originals collide
+    without the uniqueness guard; the guard must re-draw to keep them distinct.
+    """
+    mapper = ValueMapper(seed=7)
+    for kind in ("company", "login", "email"):
+        originals = [f"orig-{kind}-{i}" for i in range(300)]
+        mapped = [mapper.map_value(o, kind) for o in originals]
+        assert len(set(mapped)) == len(mapped), f"{kind} produced a duplicate replacement"
+
+
+def test_unique_kind_disambiguation_is_deterministic() -> None:
+    """Same seed + same originals in the same order → identical output, including
+    the collision re-draws."""
+    originals = [f"co-{i}" for i in range(300)]
+    m1 = ValueMapper(seed=11)
+    a = [m1.map_value(o, "company") for o in originals]
+    # A second mapper fed the same sequence must reproduce it exactly.
+    m2 = ValueMapper(seed=11)
+    b = [m2.map_value(o, "company") for o in originals]
+    assert a == b
+
+
 def test_anonymize_address_field_maps_embedded_emails_consistently() -> None:
     mapper = ValueMapper(seed=9)
     replaced_from = mapper.anonymize_address_field('"Alice Example" <alice@example.com>')
