@@ -3,6 +3,9 @@ import react from "@vitejs/plugin-react";
 import path from "node:path";
 
 export default defineConfig({
+  // Demo builds are served under a GitHub Pages project sub-path; set it via
+  // VITE_BASE (e.g. "/tiqora/"). Normal builds stay at root "/".
+  base: process.env.VITE_BASE || "/",
   plugins: [react()],
   resolve: {
     alias: {
