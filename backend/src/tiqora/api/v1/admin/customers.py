@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from fastapi import APIRouter, HTTPException, status
-from sqlalchemy import select
+from sqlalchemy import func, or_, select
 
 from tiqora.api.deps import DbSession
 from tiqora.api.v1.admin.common import (
@@ -40,12 +40,26 @@ router = APIRouter(tags=["admin:customers"])
 
 @router.get("/customer-users", response_model=Page[CustomerUserAdminOut])
 async def list_customer_users(
-    admin: AdminUser, session: DbSession, params: ListParamsDep
+    admin: AdminUser,
+    session: DbSession,
+    params: ListParamsDep,
+    search: str | None = None,
 ) -> Page[CustomerUserAdminOut]:
     _ = admin
     stmt = apply_valid_filter(select(CustomerUser), CustomerUser.valid_id, params.valid).order_by(
         CustomerUser.login
     )
+    # Dialect-portable case-insensitive match (Postgres LIKE is case-sensitive).
+    if search and (term := search.strip().lower()):
+        pattern = f"%{term}%"
+        stmt = stmt.where(
+            or_(
+                func.lower(CustomerUser.login).like(pattern),
+                func.lower(CustomerUser.email).like(pattern),
+                func.lower(CustomerUser.first_name).like(pattern),
+                func.lower(CustomerUser.last_name).like(pattern),
+            )
+        )
     return await paginate(session, CustomerUserAdminOut, stmt, params)
 
 
@@ -124,12 +138,24 @@ async def deactivate_customer_user(
 
 @router.get("/customer-companies", response_model=Page[CustomerCompanyOut])
 async def list_customer_companies(
-    admin: AdminUser, session: DbSession, params: ListParamsDep
+    admin: AdminUser,
+    session: DbSession,
+    params: ListParamsDep,
+    search: str | None = None,
 ) -> Page[CustomerCompanyOut]:
     _ = admin
     stmt = apply_valid_filter(
         select(CustomerCompany), CustomerCompany.valid_id, params.valid
     ).order_by(CustomerCompany.name)
+    # Dialect-portable case-insensitive match (Postgres LIKE is case-sensitive).
+    if search and (term := search.strip().lower()):
+        pattern = f"%{term}%"
+        stmt = stmt.where(
+            or_(
+                func.lower(CustomerCompany.customer_id).like(pattern),
+                func.lower(CustomerCompany.name).like(pattern),
+            )
+        )
     return await paginate(session, CustomerCompanyOut, stmt, params)
 
 
