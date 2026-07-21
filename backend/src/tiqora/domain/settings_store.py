@@ -48,6 +48,14 @@ KEY_GENERIC_AGENT_ENABLED = "daemon.generic_agent.enabled"
 # (tiqora.gdpr.gate.require_write_gate).
 KEY_GDPR_RETENTION_ENABLED = "gdpr.retention.enabled"
 
+# GDPR erasure backup purge worker — deletes tiqora_gdpr_backup rows past the
+# job's 30-day window and flips job status to purged. Default ON.
+KEY_GDPR_ERASURE_PURGE_ENABLED = "gdpr.erasure.purge_enabled"
+
+# Optional JSON list of extra customer_user column names treated as PII by the
+# erasure engine (on top of information_schema discovery).
+KEY_GDPR_CUSTOMER_EXTRA_PII = "gdpr.customer_extra_pii_columns"
+
 # Global TOTP/2FA enforcement: when true, every agent without an enabled
 # tiqora_user_totp row is forced through must-enroll after password login.
 # Default OFF; per-agent ``tiqora_user_auth_config.enforce_2fa`` can also

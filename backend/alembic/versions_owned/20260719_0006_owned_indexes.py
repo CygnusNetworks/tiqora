@@ -4,7 +4,7 @@ Revision ID: 20260719_0006
 Revises: 20260720_0007
 Create Date: 2026-07-19
 
-Rebased onto ``20260721_0014`` (user auth config) so the
+Rebased onto ``20260721_0015`` (GDPR erasure job/backup) so the
 combined chain (tiqora + owned) keeps a single head — see
 ``tests/test_migration_gate.py``.
 
@@ -34,7 +34,7 @@ from collections.abc import Sequence
 from alembic import op
 
 revision: str = "20260719_0006"
-down_revision: str | None = "20260721_0014"
+down_revision: str | None = "20260721_0015"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
