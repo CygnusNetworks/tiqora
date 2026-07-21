@@ -9507,6 +9507,9 @@
             ],
             "title": "Owner Name"
           },
+          "permissions": {
+            "$ref": "#/components/schemas/TicketPermissions"
+          },
           "priority": {
             "anyOf": [
               {
@@ -9944,6 +9947,48 @@
           "change_time"
         ],
         "title": "TicketListItem",
+        "type": "object"
+      },
+      "TicketPermissions": {
+        "description": "Effective Znuny permission keys for the ticket's queue group.\n\nEach flag is true when the agent holds that key **or** ``rw`` (which\nimplies every key). Used by the agent UI to disable per-action controls.",
+        "properties": {
+          "create": {
+            "default": false,
+            "title": "Create",
+            "type": "boolean"
+          },
+          "move_into": {
+            "default": false,
+            "title": "Move Into",
+            "type": "boolean"
+          },
+          "note": {
+            "default": false,
+            "title": "Note",
+            "type": "boolean"
+          },
+          "owner": {
+            "default": false,
+            "title": "Owner",
+            "type": "boolean"
+          },
+          "priority": {
+            "default": false,
+            "title": "Priority",
+            "type": "boolean"
+          },
+          "ro": {
+            "default": false,
+            "title": "Ro",
+            "type": "boolean"
+          },
+          "rw": {
+            "default": false,
+            "title": "Rw",
+            "type": "boolean"
+          }
+        },
+        "title": "TicketPermissions",
         "type": "object"
       },
       "TicketProcessStateOut": {
@@ -30109,7 +30154,7 @@
         ]
       },
       "patch": {
-        "description": "Apply one or more field mutations to a ticket.",
+        "description": "Apply one or more field mutations to a ticket.\n\nEvery mutating field is routed through :class:`TicketWriteService` methods\nso per-action Znuny permission keys are enforced (``priority``, ``owner``,\n``move_into``, ``rw``, \u2026). Personal watch/unwatch stays ungated.",
         "operationId": "patch_ticket_api_v1_tickets__ticket_id__patch",
         "parameters": [
           {

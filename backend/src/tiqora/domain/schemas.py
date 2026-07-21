@@ -114,6 +114,22 @@ class DynamicFieldValueOut(BaseModel):
     values: list[Any] = Field(default_factory=list)
 
 
+class TicketPermissions(BaseModel):
+    """Effective Znuny permission keys for the ticket's queue group.
+
+    Each flag is true when the agent holds that key **or** ``rw`` (which
+    implies every key). Used by the agent UI to disable per-action controls.
+    """
+
+    ro: bool = False
+    move_into: bool = False
+    create: bool = False
+    note: bool = False
+    owner: bool = False
+    priority: bool = False
+    rw: bool = False
+
+
 class TicketDetail(TicketListItem):
     type_id: int | None = None
     service_id: int | None = None
@@ -125,6 +141,7 @@ class TicketDetail(TicketListItem):
     dynamic_fields: list[DynamicFieldValueOut] = Field(default_factory=list)
     is_watched: bool = False
     can_write: bool = False
+    permissions: TicketPermissions = Field(default_factory=TicketPermissions)
 
 
 class ArticleListItem(BaseModel):

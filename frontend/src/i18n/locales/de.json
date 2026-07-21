@@ -265,7 +265,9 @@
       "link": "Verknüpfen",
       "merge": "Zusammenfassen",
       "appointment": "Neuer Termin",
-      "move": "Verschieben"
+      "move": "Verschieben",
+      "queue": "Queue",
+      "noPermission": "Keine Berechtigung"
     },
     "dialog": {
       "save": "Speichern",
@@ -277,7 +279,8 @@
       "apptTitle": "Titel",
       "apptStart": "Beginn",
       "apptEnd": "Ende",
-      "genericError": "Aktion fehlgeschlagen. Bitte erneut versuchen."
+      "genericError": "Aktion fehlgeschlagen. Bitte erneut versuchen.",
+      "currentCustomer": "Aktuell"
     }
   },
   "search": {

@@ -3093,6 +3093,10 @@ export interface paths {
         /**
          * Patch Ticket
          * @description Apply one or more field mutations to a ticket.
+         *
+         *     Every mutating field is routed through :class:`TicketWriteService` methods
+         *     so per-action Znuny permission keys are enforced (``priority``, ``owner``,
+         *     ``move_into``, ``rw``, …). Personal watch/unwatch stays ungated.
          */
         patch: operations["patch_ticket_api_v1_tickets__ticket_id__patch"];
         trace?: never;
@@ -6671,6 +6675,7 @@ export interface components {
             owner_login?: string | null;
             /** Owner Name */
             owner_name?: string | null;
+            permissions?: components["schemas"]["TicketPermissions"];
             /** Priority */
             priority?: string | null;
             /** Priority Id */
@@ -6814,6 +6819,50 @@ export interface components {
              * @default 0
              */
             until_time: number;
+        };
+        /**
+         * TicketPermissions
+         * @description Effective Znuny permission keys for the ticket's queue group.
+         *
+         *     Each flag is true when the agent holds that key **or** ``rw`` (which
+         *     implies every key). Used by the agent UI to disable per-action controls.
+         */
+        TicketPermissions: {
+            /**
+             * Create
+             * @default false
+             */
+            create: boolean;
+            /**
+             * Move Into
+             * @default false
+             */
+            move_into: boolean;
+            /**
+             * Note
+             * @default false
+             */
+            note: boolean;
+            /**
+             * Owner
+             * @default false
+             */
+            owner: boolean;
+            /**
+             * Priority
+             * @default false
+             */
+            priority: boolean;
+            /**
+             * Ro
+             * @default false
+             */
+            ro: boolean;
+            /**
+             * Rw
+             * @default false
+             */
+            rw: boolean;
         };
         /**
          * TicketProcessStateOut

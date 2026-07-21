@@ -636,7 +636,12 @@ async def patch_ticket(
     session: DbSession,
     settings: AppSettings,
 ) -> None:
-    """Apply one or more field mutations to a ticket."""
+    """Apply one or more field mutations to a ticket.
+
+    Every mutating field is routed through :class:`TicketWriteService` methods
+    so per-action Znuny permission keys are enforced (``priority``, ``owner``,
+    ``move_into``, ``rw``, …). Personal watch/unwatch stays ungated.
+    """
     svc = _write_service(session, settings)
     try:
         async with session.begin():
@@ -647,84 +652,35 @@ async def patch_ticket(
                     user.id, ticket_id, body.state_id, pending_time=body.pending_time
                 )
             if body.priority_id is not None:
-                from tiqora.domain.ticket_write_service import change_priority
-
-                await svc._assert_rw.__self__._assert_rw(user.id, ticket_id)  # type: ignore[attr-defined]
-                await change_priority(
-                    session,
-                    ticket_id=ticket_id,
-                    new_priority_id=body.priority_id,
-                    user_id=user.id,
-                    sysconfig=svc._sysconfig,
-                )
+                await svc.change_priority(user.id, ticket_id, body.priority_id)
             if body.title is not None:
-                from tiqora.domain.ticket_write_service import change_title
-
-                await change_title(
-                    session, ticket_id=ticket_id, new_title=body.title, user_id=user.id
-                )
+                await svc.change_title(user.id, ticket_id, body.title)
             if body.customer_id is not None or body.customer_user_id is not None:
-                from tiqora.domain.ticket_write_service import set_customer
-
-                await set_customer(
-                    session,
-                    ticket_id=ticket_id,
+                await svc.set_customer(
+                    user.id,
+                    ticket_id,
                     customer_id=body.customer_id,
                     customer_user_id=body.customer_user_id,
-                    user_id=user.id,
                 )
             if body.owner_id is not None:
-                from tiqora.domain.ticket_write_service import assign_owner
-
-                await assign_owner(
-                    session,
-                    ticket_id=ticket_id,
-                    new_owner_id=body.owner_id,
-                    user_id=user.id,
-                    sysconfig=svc._sysconfig,
-                )
+                await svc.assign_owner(user.id, ticket_id, body.owner_id)
             if body.responsible_id is not None:
-                from tiqora.domain.ticket_write_service import assign_responsible
-
-                await assign_responsible(
-                    session,
-                    ticket_id=ticket_id,
-                    new_responsible_id=body.responsible_id,
-                    user_id=user.id,
-                )
+                await svc.assign_responsible(user.id, ticket_id, body.responsible_id)
             if body.lock is not None:
                 if body.lock == "lock":
-                    from tiqora.domain.ticket_write_service import lock_ticket
-
-                    await lock_ticket(
-                        session, ticket_id=ticket_id, user_id=user.id, sysconfig=svc._sysconfig
-                    )
+                    await svc.lock_ticket(user.id, ticket_id)
                 elif body.lock == "unlock":
-                    from tiqora.domain.ticket_write_service import unlock_ticket
-
-                    await unlock_ticket(
-                        session, ticket_id=ticket_id, user_id=user.id, sysconfig=svc._sysconfig
-                    )
+                    await svc.unlock_ticket(user.id, ticket_id)
             if body.archive is not None:
-                from tiqora.domain.ticket_write_service import archive_ticket
-
-                await archive_ticket(
-                    session,
-                    ticket_id=ticket_id,
-                    archive=body.archive,
-                    user_id=user.id,
-                    sysconfig=svc._sysconfig,
-                )
+                await svc.archive_ticket(user.id, ticket_id, body.archive)
             if body.field_name is not None and body.field_values is not None:
-                from tiqora.domain.ticket_write_service import update_dynamic_field
-
-                await update_dynamic_field(
-                    session,
-                    ticket_id=ticket_id,
+                await svc.update_dynamic_field(
+                    user.id,
+                    ticket_id,
                     field_name=body.field_name,
                     values=body.field_values,
-                    user_id=user.id,
                 )
+            # Watch/unwatch are personal preferences — no permission gate.
             if body.watcher_user_id is not None:
                 from tiqora.domain.ticket_write_service import watch_ticket
 

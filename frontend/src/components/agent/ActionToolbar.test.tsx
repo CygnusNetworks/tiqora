@@ -18,6 +18,13 @@ const {
   searchReferenceCustomers: vi.fn(),
 }));
 
+const listReferenceAgents = vi.hoisted(() =>
+  vi.fn().mockResolvedValue([
+    { id: 2, login: "ada", full_name: "Ada Lovelace" },
+    { id: 9, login: "bob", full_name: "Bob Agent" },
+  ]),
+);
+
 vi.mock("@/lib/api", async () => {
   const actual = await vi.importActual<typeof import("@/lib/api")>("@/lib/api");
   return {
@@ -26,7 +33,7 @@ vi.mock("@/lib/api", async () => {
       patchTicket,
       listReferencePriorities,
       listReferenceStates,
-      listReferenceAgents: vi.fn().mockResolvedValue([]),
+      listReferenceAgents,
       searchReferenceCustomers,
       listQueues: vi.fn().mockResolvedValue([]),
       listTicketLinks: vi.fn().mockResolvedValue([]),
@@ -53,6 +60,16 @@ function wrap(ui: React.ReactElement) {
   );
 }
 
+const ALL_PERMS = {
+  ro: true,
+  move_into: true,
+  create: true,
+  note: true,
+  owner: true,
+  priority: true,
+  rw: true,
+};
+
 function makeTicket(overrides: Partial<TicketDetail> = {}): TicketDetail {
   return {
     id: 7,
@@ -70,6 +87,7 @@ function makeTicket(overrides: Partial<TicketDetail> = {}): TicketDetail {
     change_time: "2024-06-01T12:00:00Z",
     is_watched: false,
     can_write: true,
+    permissions: ALL_PERMS,
     ...overrides,
   } as TicketDetail;
 }
@@ -134,11 +152,82 @@ describe("ActionToolbar", () => {
   });
 
   it("disables mutating actions when the agent cannot write", () => {
-    wrap(<ActionToolbar ticket={makeTicket({ can_write: false })} />);
+    wrap(
+      <ActionToolbar
+        ticket={makeTicket({
+          can_write: false,
+          permissions: {
+            ro: true,
+            move_into: false,
+            create: false,
+            note: false,
+            owner: false,
+            priority: false,
+            rw: false,
+          },
+        })}
+      />,
+    );
     expect(screen.getByTestId("toolbar-priority")).toBeDisabled();
     expect(screen.getByTestId("toolbar-move")).toBeDisabled();
     // Print stays enabled — it is a client-side action.
     expect(screen.getByTestId("toolbar-print")).not.toBeDisabled();
+  });
+
+  it("gates each control by its own permission key", async () => {
+    wrap(
+      <ActionToolbar
+        ticket={makeTicket({
+          can_write: false,
+          permissions: {
+            ro: true,
+            move_into: true,
+            create: false,
+            note: false,
+            owner: false,
+            priority: true,
+            rw: false,
+          },
+        })}
+      />,
+    );
+    // Priority menu also waits for the reference list to load.
+    await waitFor(() =>
+      expect(screen.getByTestId("toolbar-priority")).not.toBeDisabled(),
+    );
+    expect(screen.getByTestId("toolbar-move")).not.toBeDisabled();
+    expect(screen.getByTestId("toolbar-owner")).toBeDisabled();
+    expect(screen.getByTestId("toolbar-state")).toBeDisabled();
+    expect(screen.getByTestId("toolbar-lock")).toBeDisabled();
+  });
+
+  it("relabels the move control as Queue", () => {
+    wrap(<ActionToolbar ticket={makeTicket()} />);
+    expect(screen.getByTestId("toolbar-move")).toHaveTextContent(/queue|Queue/i);
+  });
+
+  it("prefills the owner picker with the current owner_id", async () => {
+    wrap(<ActionToolbar ticket={makeTicket({ owner_id: 2 })} />);
+    fireEvent.click(screen.getByTestId("toolbar-owner"));
+    const select = await screen.findByTestId("agent-picker-select");
+    expect(select).toHaveValue("2");
+  });
+
+  it("shows the current customer and prefills search", async () => {
+    searchReferenceCustomers.mockResolvedValue([]);
+    wrap(
+      <ActionToolbar
+        ticket={makeTicket({
+          customer_id: "C-9",
+          customer_user_id: "bob",
+        })}
+      />,
+    );
+    fireEvent.click(screen.getByTestId("toolbar-customer"));
+    expect(screen.getByTestId("customer-picker-current")).toHaveTextContent("bob");
+    expect(screen.getByTestId("customer-picker-current")).toHaveTextContent("C-9");
+    const input = screen.getByPlaceholderText(/select|auswählen/i);
+    expect(input).toHaveValue("bob");
   });
 
   it("shows the customer number as a badge on each search result", async () => {

@@ -30,6 +30,7 @@ export type DashboardSummary = {
   escalated: number;
 };
 export type TicketDetail = Schemas["TicketDetail"];
+export type TicketPermissions = Schemas["TicketPermissions"];
 export type ArticleListItem = Schemas["ArticleListItem"];
 export type ArticleBody = Schemas["ArticleBody"];
 export type AttachmentMetaOut = Schemas["AttachmentMetaOut"];

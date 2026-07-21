@@ -47,9 +47,10 @@ from tiqora.domain.schemas import (
     TemplateOut,
     TicketDetail,
     TicketListItem,
+    TicketPermissions,
 )
 from tiqora.domain.subject_hook import load_subject_config
-from tiqora.permissions.engine import PermissionEngine
+from tiqora.permissions.engine import PERMISSION_KEYS, PermissionEngine
 from tiqora.storage.backend import AttachmentContent, DbMimeStorage
 
 #: Named ``state_type`` query-param views resolved to one-or-more
@@ -467,7 +468,9 @@ class TicketService:
                 )
             )
         ).first() is not None
-        can_write = await self._perms.check(user_id, ticket.queue_id, "rw")
+        # One queue_permissions() call + group lookup; rw implies every key.
+        permissions = await self._ticket_permissions(user_id, ticket.queue_id)
+        can_write = permissions.rw
         return TicketDetail(
             **base.model_dump(),
             type_id=ticket.type_id,
@@ -480,6 +483,25 @@ class TicketService:
             dynamic_fields=dfs,
             is_watched=is_watched,
             can_write=can_write,
+            permissions=permissions,
+        )
+
+    async def _ticket_permissions(self, user_id: int, queue_id: int) -> TicketPermissions:
+        """Effective per-key flags for *user_id* on the group owning *queue_id*."""
+        group_id = (
+            await self._session.execute(select(Queue.group_id).where(Queue.id == queue_id))
+        ).scalar_one_or_none()
+        if group_id is None:
+            return TicketPermissions()
+        by_group = await self._perms.queue_permissions(user_id)
+        keys = by_group.get(group_id, set())
+        has_rw = "rw" in keys
+
+        def _has(key: str) -> bool:
+            return has_rw or key in keys
+
+        return TicketPermissions(
+            **{key: _has(key) for key in sorted(PERMISSION_KEYS)},
         )
 
     async def _load_dynamic_fields(self, ticket_id: int) -> list[DynamicFieldValueOut]:

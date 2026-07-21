@@ -53,8 +53,9 @@ describe("AccountMenu", () => {
     expect(screen.getByTestId("current-user")).toHaveTextContent("Jane Doe");
     expect(screen.queryByTestId("account-menu-settings")).not.toBeInTheDocument();
     expect(screen.getByTestId("account-menu-security")).toBeInTheDocument();
-    expect(screen.getByTestId("account-menu-lang-de")).toBeInTheDocument();
-    expect(screen.getByTestId("account-menu-lang-en")).toBeInTheDocument();
+    // Languages live in a nested submenu — trigger is visible, items open on click.
+    expect(screen.getByTestId("account-menu-lang")).toBeInTheDocument();
+    expect(screen.queryByTestId("account-menu-lang-de")).not.toBeInTheDocument();
     expect(screen.getByTestId("account-menu-theme-light")).toBeInTheDocument();
     expect(screen.getByTestId("logout-btn")).toBeInTheDocument();
   });
@@ -72,13 +73,23 @@ describe("AccountMenu", () => {
     expect(navigate).toHaveBeenCalledWith({ to: "/agent/security" });
   });
 
-  it("changes language and persists the choice", () => {
+  it("changes language via the submenu and persists the choice", () => {
     const changeLanguage = vi.spyOn(i18n, "changeLanguage");
     open();
+    fireEvent.click(screen.getByTestId("account-menu-lang"));
+    expect(screen.getByTestId("account-menu-lang-submenu")).toBeInTheDocument();
     fireEvent.click(screen.getByTestId("account-menu-lang-en"));
     expect(changeLanguage).toHaveBeenCalledWith("en");
     expect(localStorage.getItem("tiqora-lang")).toBe("en");
     changeLanguage.mockRestore();
+  });
+
+  it("opens the language submenu with ArrowRight", () => {
+    open();
+    fireEvent.keyDown(screen.getByTestId("account-menu-lang"), { key: "ArrowRight" });
+    expect(screen.getByTestId("account-menu-lang-submenu")).toBeInTheDocument();
+    expect(screen.getByTestId("account-menu-lang-de")).toBeInTheDocument();
+    expect(screen.getByTestId("account-menu-lang-en")).toBeInTheDocument();
   });
 
   it("toggles theme via setTheme", () => {
