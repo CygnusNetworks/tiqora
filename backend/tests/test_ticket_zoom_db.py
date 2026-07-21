@@ -229,6 +229,10 @@ async def test_ticket_zoom(url_fixture: str, request: pytest.FixtureRequest) -> 
         assert "ZoomFilled" in names
         assert "ZoomEmpty" not in names
         assert detail.can_write is True
+        assert detail.permissions.rw is True
+        assert detail.permissions.priority is True
+        assert detail.permissions.owner is True
+        assert detail.permissions.note is True
         assert detail.is_watched is False
 
         # History rendered + owner-id resolved to login, default desc order.

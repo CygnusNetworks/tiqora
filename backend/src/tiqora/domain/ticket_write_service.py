@@ -1469,13 +1469,19 @@ class TicketWriteService:
         self._mail_sender = mail_sender
         self._perms = PermissionEngine(session)
 
+    async def _assert(self, user_id: int, queue_id: int, key: str) -> None:
+        """Raise TicketAccessDenied unless *user_id* holds *key* on *queue_id*.
+
+        ``rw`` on the queue's group satisfies any key (PermissionEngine).
+        """
+        if not await self._perms.check(user_id, queue_id, key):
+            raise TicketAccessDenied(f"user {user_id} lacks {key} on queue {queue_id}")
+
     async def _assert_rw(self, user_id: int, queue_id: int) -> None:
-        if not await self._perms.check(user_id, queue_id, "rw"):
-            raise TicketAccessDenied(f"user {user_id} lacks rw on queue {queue_id}")
+        await self._assert(user_id, queue_id, "rw")
 
     async def _assert_create(self, user_id: int, queue_id: int) -> None:
-        if not await self._perms.check(user_id, queue_id, "create"):
-            raise TicketAccessDenied(f"user {user_id} lacks create on queue {queue_id}")
+        await self._assert(user_id, queue_id, "create")
 
     def _resolve_mail_sender(self) -> Any:
         """Return the test/injectable sender override, or ``None``.
@@ -1498,7 +1504,8 @@ class TicketWriteService:
 
     async def add_article(self, user_id: int, ticket_id: int, article: ArticleIn) -> int:
         t = await _ticket_must_exist(self._session, ticket_id)
-        await self._assert_rw(user_id, int(t["queue_id"]))
+        # Znuny: reply / note require the ``note`` permission key (rw implies).
+        await self._assert(user_id, int(t["queue_id"]), "note")
         # Outgoing agent email: SMTP deliver then store (see outbound_reply).
         if article.channel.lower() == "email" and article.sender_type == "agent":
             from tiqora.channels.email.outbound_reply import deliver_agent_email_reply
@@ -1522,7 +1529,8 @@ class TicketWriteService:
 
     async def move_queue(self, user_id: int, ticket_id: int, new_queue_id: int) -> None:
         t = await _ticket_must_exist(self._session, ticket_id)
-        await self._assert_rw(user_id, int(t["queue_id"]))
+        # Znuny: move requires ``move_into`` on the SOURCE queue.
+        await self._assert(user_id, int(t["queue_id"]), "move_into")
         await move_queue(
             self._session,
             ticket_id=ticket_id,
@@ -1547,6 +1555,117 @@ class TicketWriteService:
             user_id=user_id,
             sysconfig=self._sysconfig,
             pending_time=pending_time,
+        )
+
+    async def change_priority(self, user_id: int, ticket_id: int, new_priority_id: int) -> None:
+        t = await _ticket_must_exist(self._session, ticket_id)
+        await self._assert(user_id, int(t["queue_id"]), "priority")
+        await change_priority(
+            self._session,
+            ticket_id=ticket_id,
+            new_priority_id=new_priority_id,
+            user_id=user_id,
+            sysconfig=self._sysconfig,
+        )
+
+    async def change_title(self, user_id: int, ticket_id: int, new_title: str) -> None:
+        t = await _ticket_must_exist(self._session, ticket_id)
+        await self._assert_rw(user_id, int(t["queue_id"]))
+        await change_title(
+            self._session,
+            ticket_id=ticket_id,
+            new_title=new_title,
+            user_id=user_id,
+        )
+
+    async def set_customer(
+        self,
+        user_id: int,
+        ticket_id: int,
+        *,
+        customer_id: str | None,
+        customer_user_id: str | None,
+    ) -> None:
+        t = await _ticket_must_exist(self._session, ticket_id)
+        await self._assert_rw(user_id, int(t["queue_id"]))
+        await set_customer(
+            self._session,
+            ticket_id=ticket_id,
+            customer_id=customer_id,
+            customer_user_id=customer_user_id,
+            user_id=user_id,
+        )
+
+    async def assign_owner(self, user_id: int, ticket_id: int, new_owner_id: int) -> None:
+        t = await _ticket_must_exist(self._session, ticket_id)
+        await self._assert(user_id, int(t["queue_id"]), "owner")
+        await assign_owner(
+            self._session,
+            ticket_id=ticket_id,
+            new_owner_id=new_owner_id,
+            user_id=user_id,
+            sysconfig=self._sysconfig,
+        )
+
+    async def assign_responsible(
+        self, user_id: int, ticket_id: int, new_responsible_id: int
+    ) -> None:
+        t = await _ticket_must_exist(self._session, ticket_id)
+        await self._assert(user_id, int(t["queue_id"]), "owner")
+        await assign_responsible(
+            self._session,
+            ticket_id=ticket_id,
+            new_responsible_id=new_responsible_id,
+            user_id=user_id,
+        )
+
+    async def lock_ticket(self, user_id: int, ticket_id: int) -> None:
+        t = await _ticket_must_exist(self._session, ticket_id)
+        await self._assert_rw(user_id, int(t["queue_id"]))
+        await lock_ticket(
+            self._session,
+            ticket_id=ticket_id,
+            user_id=user_id,
+            sysconfig=self._sysconfig,
+        )
+
+    async def unlock_ticket(self, user_id: int, ticket_id: int) -> None:
+        t = await _ticket_must_exist(self._session, ticket_id)
+        await self._assert_rw(user_id, int(t["queue_id"]))
+        await unlock_ticket(
+            self._session,
+            ticket_id=ticket_id,
+            user_id=user_id,
+            sysconfig=self._sysconfig,
+        )
+
+    async def archive_ticket(self, user_id: int, ticket_id: int, archive: bool) -> None:
+        t = await _ticket_must_exist(self._session, ticket_id)
+        await self._assert_rw(user_id, int(t["queue_id"]))
+        await archive_ticket(
+            self._session,
+            ticket_id=ticket_id,
+            archive=archive,
+            user_id=user_id,
+            sysconfig=self._sysconfig,
+        )
+
+    async def update_dynamic_field(
+        self,
+        user_id: int,
+        ticket_id: int,
+        *,
+        field_name: str,
+        values: list[str],
+    ) -> None:
+        t = await _ticket_must_exist(self._session, ticket_id)
+        await self._assert_rw(user_id, int(t["queue_id"]))
+        await update_dynamic_field(
+            self._session,
+            ticket_id=ticket_id,
+            field_name=field_name,
+            values=values,
+            user_id=user_id,
         )
 
     async def merge_tickets(self, user_id: int, main_ticket_id: int, merge_ticket_id: int) -> None:
