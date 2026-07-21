@@ -97,10 +97,40 @@ are the code defaults, not necessarily sane production values.
 
 ### Kerberos / SPNEGO
 
+The production image ships the `kerberos` optional extra (`gssapi`) and MIT
+Kerberos runtime libraries (`libkrb5-3`, `libgssapi-krb5-2`). SPNEGO stays
+**inert** until you enable the flag and mount a keytab. Without the flag,
+`/api/v1/auth/spnego` is not advertised in `GET /api/v1/auth/methods`.
+
 | Variable | Default | Notes |
 |---|---|---|
-| `TIQORA_SPNEGO_ENABLED` | `false` | Requires the optional `kerberos` extra (`gssapi`). |
-| `KRB5_KTNAME` | *(empty)* | Path to a keytab reachable by the container, e.g. `/etc/krb5.keytab`. |
+| `TIQORA_SPNEGO_ENABLED` | `false` | Set `true` only after a keytab is mounted. |
+| `KRB5_KTNAME` | *(empty)* | Path inside the container, e.g. `/etc/tiqora/tiqora.keytab`. |
+
+Recommended compose wiring for `tiqora-api` (and `tiqora-mcp` only if it
+accepts SPNEGO — typically not needed for MCP):
+
+```yaml
+environment:
+  TIQORA_SPNEGO_ENABLED: "true"
+  KRB5_KTNAME: /etc/tiqora/tiqora.keytab
+volumes:
+  - ./secrets/tiqora.keytab:/etc/tiqora/tiqora.keytab:ro
+  # Optional: pure acceptors usually need no krb5.conf (ticket decrypted with
+  # the keytab; no KDC round-trip). `default_realm = CYGNUSNETWORKS.DE` can help.
+  # - ./secrets/krb5.conf:/etc/krb5.conf:ro
+```
+
+Production SPN for Cygnus: `HTTP/tiqora.cygnusnetworks.de@CYGNUSNETWORKS.DE`.
+
+**Operational notes:**
+
+- The reverse proxy must **forward** the `Authorization: Negotiate` header
+  unmodified (do not strip it).
+- The browser must reach the host that matches the keytab SPN
+  (`tiqora.cygnusnetworks.de` in production).
+- SPNEGO only elevates agents flagged `sso_eligible`; the principal's primary
+  part must still match an existing, valid `users.login`.
 
 ### LDAP/AD — agent auth
 

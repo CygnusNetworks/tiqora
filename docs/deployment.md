@@ -74,39 +74,61 @@ agents in Znuny/Tiqora admin first, then point them at SSO.
 
 ## Kerberos / SPNEGO configuration (Phase 3c)
 
-Optional; requires the `kerberos` extra (`uv sync --extra kerberos`, installs
-`gssapi`) — without it, `/api/v1/auth/spnego` returns `501`.
+Optional. The **production Docker image** already includes the `kerberos`
+extra (`gssapi`) and MIT Kerberos runtime libraries; SPNEGO stays inert until
+`TIQORA_SPNEGO_ENABLED=true` and a keytab are set. For a local/dev install
+without the image, install the extra yourself (`uv sync --extra kerberos`) —
+without `gssapi`, `/api/v1/auth/spnego` returns `501`.
 
 | Variable | Example | Notes |
 |---|---|---|
 | `TIQORA_SPNEGO_ENABLED` | `true` | Off by default |
 | `KRB5_KTNAME` | `/etc/tiqora/tiqora.keytab` | Service keytab, read-only to the API process user |
 
+Production SPN (Cygnus): `HTTP/tiqora.cygnusnetworks.de@CYGNUSNETWORKS.DE`.
+
+Docker Compose keytab mount (see `docker-compose.example.yml` and
+`docs/deploy/docker-compose.md`):
+
+```yaml
+environment:
+  TIQORA_SPNEGO_ENABLED: "true"
+  KRB5_KTNAME: /etc/tiqora/tiqora.keytab
+volumes:
+  - ./secrets/tiqora.keytab:/etc/tiqora/tiqora.keytab:ro
+  # Optional: pure acceptors usually need no krb5.conf; default_realm can help.
+  # - ./secrets/krb5.conf:/etc/krb5.conf:ro
+```
+
 Manual verification against a real MIT Kerberos KDC:
 
 1. On the KDC, create a service principal for the Tiqora API host and export
    a keytab:
    ```
-   kadmin.local -q "addprinc -randkey HTTP/helpdesk.example.com@EXAMPLE.COM"
-   kadmin.local -q "ktadd -k /etc/tiqora/tiqora.keytab HTTP/helpdesk.example.com@EXAMPLE.COM"
+   kadmin.local -q "addprinc -randkey HTTP/tiqora.cygnusnetworks.de@CYGNUSNETWORKS.DE"
+   kadmin.local -q "ktadd -k /etc/tiqora/tiqora.keytab HTTP/tiqora.cygnusnetworks.de@CYGNUSNETWORKS.DE"
    ```
-2. Deploy the keytab to the Tiqora API host, owned/readable only by the
-   process user, and set `KRB5_KTNAME=/etc/tiqora/tiqora.keytab` +
-   `TIQORA_SPNEGO_ENABLED=true`.
-3. Reverse proxy must pass the `Authorization` header through unmodified to
-   `/api/v1/auth/spnego`.
-4. Configure the browser to allow SPNEGO for the site:
-   - Firefox: `network.negotiate-auth.trusted-uris` = `helpdesk.example.com`
-   - Chrome/Edge (Linux): `--auth-server-allowlist=helpdesk.example.com` or
+   (Substitute your own host/realm for non-Cygnus deployments.)
+2. Deploy the keytab to the Tiqora API host (or mount it into the container
+   read-only), owned/readable only by the process user, and set
+   `KRB5_KTNAME=/etc/tiqora/tiqora.keytab` + `TIQORA_SPNEGO_ENABLED=true`.
+3. Reverse proxy must forward the `Authorization: Negotiate` header
+   unmodified to `/api/v1/auth/spnego` (do not strip it).
+4. The browser must reach the host that matches the keytab SPN
+   (`tiqora.cygnusnetworks.de` in production). Configure the browser to allow
+   SPNEGO for that site:
+   - Firefox: `network.negotiate-auth.trusted-uris` = `tiqora.cygnusnetworks.de`
+   - Chrome/Edge (Linux): `--auth-server-allowlist=tiqora.cygnusnetworks.de` or
      the `AuthServerAllowlist` policy.
 5. On a domain-joined / `kinit`'d client, `curl --negotiate -u : -c -
-   https://helpdesk.example.com/api/v1/auth/spnego` should return a session
+   https://tiqora.cygnusnetworks.de/api/v1/auth/spnego` should return a session
    cookie for a user whose Kerberos principal's primary part matches an
-   existing `users.login`.
+   existing `users.login` with `sso_eligible` set.
 6. Common failure modes: clock skew > 5 min (Kerberos requires tight time
    sync — run NTP/chrony), keytab not readable by the API process user,
-   `KRB5_KTNAME` unset (gssapi silently fails to find credentials), and SPN
-   mismatch (the keytab principal must match the hostname the browser sees).
+   `KRB5_KTNAME` unset (gssapi silently fails to find credentials), SPN
+   mismatch (the keytab principal must match the hostname the browser sees),
+   and agents not flagged `sso_eligible`.
 
 ## LDAP / Active Directory configuration (Phase 3c)
 
