@@ -173,44 +173,44 @@ function QueueNavSection({ flat, onNavigate }: { flat: QueueNode[]; onNavigate?:
   });
 
   return (
-    <div>
-      <div className="flex items-center justify-between px-2.5 pb-1.5">
-        <h2 className="text-[10.5px] font-semibold uppercase tracking-[0.12em] text-accent/90">
-          {t("sidebar.queues")}
-        </h2>
+    <div className="nav-section-card">
+      <div className="nav-section-titleband">
+        <h2>{t("sidebar.queues")}</h2>
         <button
           type="button"
           data-testid="sidebar-queues-toggle-all"
           onClick={() => setShowAll((v) => !v)}
-          className="text-[10px] font-medium text-accent hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent"
+          className="shrink-0 text-[10px] font-medium normal-case tracking-normal text-accent hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent"
         >
           {showAll ? t("sidebar.showActiveQueues") : t("sidebar.showAllQueues")}
         </button>
       </div>
-      <div className="px-0.5 pb-1.5">
-        <input
-          data-testid="sidebar-queue-search"
-          type="search"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder={t("sidebar.queueSearch")}
-          className="w-full rounded-md border border-hairline bg-surface-subtle px-2.5 py-1.5 text-[12px] text-ink placeholder:text-muted focus:border-accent focus:outline-none"
-        />
-      </div>
-      <div className="space-y-0.5" data-testid="sidebar-queue-list">
-        {visible.map((q) => (
-          <QueueNavRow
-            key={q.id}
-            node={q}
-            active={q.id === activeQueueId}
-            onNavigate={onNavigate}
+      <div className="nav-section-body">
+        <div className="pb-1.5">
+          <input
+            data-testid="sidebar-queue-search"
+            type="search"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder={t("sidebar.queueSearch")}
+            className="w-full rounded-md border border-hairline bg-surface-subtle px-2.5 py-1.5 text-[12px] text-ink placeholder:text-muted focus:border-accent focus:outline-none"
           />
-        ))}
-        {visible.length === 0 && (
-          <p className="px-2.5 py-2 text-[11.5px] text-muted" data-testid="sidebar-queue-empty">
-            {term ? t("sidebar.noQueueMatch") : t("queue.empty")}
-          </p>
-        )}
+        </div>
+        <div className="space-y-0.5" data-testid="sidebar-queue-list">
+          {visible.map((q) => (
+            <QueueNavRow
+              key={q.id}
+              node={q}
+              active={q.id === activeQueueId}
+              onNavigate={onNavigate}
+            />
+          ))}
+          {visible.length === 0 && (
+            <p className="px-2.5 py-2 text-[11.5px] text-muted" data-testid="sidebar-queue-empty">
+              {term ? t("sidebar.noQueueMatch") : t("queue.empty")}
+            </p>
+          )}
+        </div>
       </div>
     </div>
   );
@@ -282,12 +282,12 @@ function SidebarBody({ onNavigate }: { onNavigate?: () => void }) {
         <SidebarSearch />
       </div>
 
-      <nav className="flex-1 space-y-4 overflow-y-auto" data-testid="agent-sidebar-nav">
-        <div>
-          <h2 className="px-2.5 pb-1.5 text-[10.5px] font-semibold uppercase tracking-[0.12em] text-accent/90">
-            {t("sidebar.workspace")}
-          </h2>
-          <div className="space-y-0.5">
+      <nav className="flex-1 space-y-3 overflow-y-auto" data-testid="agent-sidebar-nav">
+        <div className="nav-section-card">
+          <div className="nav-section-titleband">
+            <h2>{t("sidebar.workspace")}</h2>
+          </div>
+          <div className="nav-section-body space-y-0.5">
             <NavItem
               to="/agent/queues"
               search={{ state_type: "open" }}
@@ -316,11 +316,11 @@ function SidebarBody({ onNavigate }: { onNavigate?: () => void }) {
 
         <QueueNavSection flat={flat} onNavigate={onNavigate} />
 
-        <div>
-          <h2 className="px-2.5 pb-1.5 text-[10.5px] font-semibold uppercase tracking-[0.12em] text-accent/90">
-            {t("sidebar.knowledge")}
-          </h2>
-          <div className="space-y-0.5">
+        <div className="nav-section-card">
+          <div className="nav-section-titleband">
+            <h2>{t("sidebar.knowledge")}</h2>
+          </div>
+          <div className="nav-section-body space-y-0.5">
             <NavItem
               to="/agent/kb"
               label={t("sidebar.knowledgeBase")}
@@ -336,11 +336,11 @@ function SidebarBody({ onNavigate }: { onNavigate?: () => void }) {
           </div>
         </div>
 
-        <div>
-          <h2 className="px-2.5 pb-1.5 text-[10.5px] font-semibold uppercase tracking-[0.12em] text-accent/90">
-            {t("sidebar.calendar")}
-          </h2>
-          <div className="space-y-0.5">
+        <div className="nav-section-card">
+          <div className="nav-section-titleband">
+            <h2>{t("sidebar.calendar")}</h2>
+          </div>
+          <div className="nav-section-body space-y-0.5">
             <NavItem
               to="/agent/calendar"
               label={t("sidebar.calendar")}
@@ -350,11 +350,11 @@ function SidebarBody({ onNavigate }: { onNavigate?: () => void }) {
           </div>
         </div>
 
-        <div>
-          <h2 className="px-2.5 pb-1.5 text-[10.5px] font-semibold uppercase tracking-[0.12em] text-accent/90">
-            {t("sidebar.reports")}
-          </h2>
-          <div className="space-y-0.5">
+        <div className="nav-section-card">
+          <div className="nav-section-titleband">
+            <h2>{t("sidebar.reports")}</h2>
+          </div>
+          <div className="nav-section-body space-y-0.5">
             <NavItem
               to="/agent/stats"
               label={t("sidebar.stats")}

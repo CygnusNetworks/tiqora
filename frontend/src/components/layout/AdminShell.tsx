@@ -151,21 +151,24 @@ const NAV_GROUPS: NavGroup[] = [
 function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
   const { t } = useTranslation();
   return (
-    <nav className="flex flex-col gap-4" data-testid="admin-sidebar-nav">
+    <nav className="flex flex-col gap-3" data-testid="admin-sidebar-nav">
       {NAV_GROUPS.map((group) => (
-        <div key={group.titleKey}>
-          <h2 className="mb-1 px-2 text-[10.5px] font-semibold uppercase tracking-[0.12em] text-accent/90">
-            {t(group.titleKey)}
-          </h2>
-          <ul className="list-none space-y-0.5">
+        <div key={group.titleKey} className="nav-section-card">
+          <div className="nav-section-titleband">
+            <h2>{t(group.titleKey)}</h2>
+          </div>
+          <ul className="nav-section-body list-none space-y-0.5">
             {group.links.map((link) => (
               <li key={link.to}>
                 <Link
                   to={link.to}
                   data-testid={link.testId}
                   onClick={onNavigate}
-                  className="block rounded px-2 py-1.5 text-sm text-ink transition-colors duration-100 hover:bg-surface-subtle focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent"
-                  activeProps={{ className: "bg-surface-subtle font-medium text-accent" }}
+                  className="block rounded-lg px-2.5 py-[7px] text-[13.5px] text-ink transition-colors duration-100 hover:bg-surface-subtle focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent"
+                  activeProps={{
+                    className:
+                      "block rounded-lg px-2.5 py-[7px] text-[13.5px] font-medium text-accent bg-accent-dim shadow-[inset_2px_0_0_var(--color-accent)]",
+                  }}
                 >
                   {t(link.labelKey)}
                 </Link>
