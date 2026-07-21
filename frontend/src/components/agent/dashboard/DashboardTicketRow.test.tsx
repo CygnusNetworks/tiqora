@@ -55,23 +55,26 @@ async function renderInRouter(ui: React.ReactElement) {
 }
 
 describe("DashboardTicketRow", () => {
-  it("renders number, title, queue, state chip and priority", async () => {
+  it("renders number, title, queue, state chip and priority chip", async () => {
     await renderInRouter(<DashboardTicketRow ticket={ticket} />);
     const row = await screen.findByTestId("dashboard-ticket-42");
     expect(row).toHaveTextContent("20240601000042");
     expect(row).toHaveTextContent("Printer on fire");
     // Short queue name (last segment) rather than the full path.
     expect(row).toHaveTextContent("Level 2");
-    // Localised state label (en: "Open"), not the raw Znuny name.
-    expect(row).toHaveTextContent("Open");
-    // Priority shown without the numeric rank.
+    // Localised state as soft-chip.
+    const stateChip = screen.getByTestId("dashboard-ticket-42-state-chip");
+    expect(stateChip).toHaveTextContent("Open");
+    expect(stateChip).toHaveAttribute("data-kind", "state");
+    expect(stateChip).toHaveStyle({ color: "var(--color-state-open)" });
+    // Priority soft-chip without the numeric rank.
     const prio = screen.getByTestId("dashboard-ticket-42-priority");
     expect(prio).toHaveTextContent("very high");
     expect(prio).not.toHaveTextContent("5 very");
-    // Highest priority is tinted danger.
-    expect(prio.className).toContain("text-danger");
-    // Colour dot present.
-    expect(screen.getByTestId("dashboard-ticket-42-state-dot")).toBeInTheDocument();
+    expect(prio).toHaveAttribute("data-kind", "priority");
+    expect(prio).toHaveStyle({ color: "var(--color-prio-5)" });
+    // Old colour-dot / danger-text markup is gone.
+    expect(screen.queryByTestId("dashboard-ticket-42-state-dot")).toBeNull();
   });
 
   it("renders the trailing slot", async () => {

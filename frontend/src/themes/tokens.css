@@ -28,6 +28,13 @@
   --color-state-closed: #8891a3;
   --color-state-removed: #9aa0ae;
 
+  /* Ticket priority ramp (1=lowest … 5=highest) */
+  --color-prio-1: #6b7fb5;
+  --color-prio-2: #1fa97c;
+  --color-prio-3: #66708a;
+  --color-prio-4: #d98a1f;
+  --color-prio-5: #d4554f;
+
   --color-green: #1fa97c;
   --color-amber: #d98a1f;
   --color-red: #d4554f;
@@ -70,6 +77,13 @@
   --color-state-pending: #a78bfa;
   --color-state-closed: #7b8296;
   --color-state-removed: #6a7182;
+
+  /* Ticket priority ramp (1=lowest … 5=highest) */
+  --color-prio-1: #8ea3d6;
+  --color-prio-2: #3ecf9a;
+  --color-prio-3: #8891a3;
+  --color-prio-4: #f5a83c;
+  --color-prio-5: #f26d6d;
 
   --color-green: #3ecf9a;
   --color-amber: #f5a83c;
