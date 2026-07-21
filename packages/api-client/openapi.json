@@ -1802,6 +1802,99 @@
         "title": "AttachmentRefOut",
         "type": "object"
       },
+      "AuthConfigAgentOut": {
+        "description": "One agent row for the admin auth-config list.",
+        "properties": {
+          "enforce_2fa": {
+            "title": "Enforce 2Fa",
+            "type": "boolean"
+          },
+          "full_name": {
+            "title": "Full Name",
+            "type": "string"
+          },
+          "login": {
+            "title": "Login",
+            "type": "string"
+          },
+          "sso_eligible": {
+            "title": "Sso Eligible",
+            "type": "boolean"
+          },
+          "totp_enabled": {
+            "title": "Totp Enabled",
+            "type": "boolean"
+          },
+          "user_id": {
+            "title": "User Id",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "user_id",
+          "login",
+          "full_name",
+          "totp_enabled",
+          "sso_eligible",
+          "enforce_2fa"
+        ],
+        "title": "AuthConfigAgentOut",
+        "type": "object"
+      },
+      "AuthConfigGlobalOut": {
+        "properties": {
+          "enforce_all": {
+            "title": "Enforce All",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "enforce_all"
+        ],
+        "title": "AuthConfigGlobalOut",
+        "type": "object"
+      },
+      "AuthConfigGlobalUpdate": {
+        "properties": {
+          "enforce_all": {
+            "title": "Enforce All",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "enforce_all"
+        ],
+        "title": "AuthConfigGlobalUpdate",
+        "type": "object"
+      },
+      "AuthConfigUpdate": {
+        "properties": {
+          "enforce_2fa": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Enforce 2Fa"
+          },
+          "sso_eligible": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sso Eligible"
+          }
+        },
+        "title": "AuthConfigUpdate",
+        "type": "object"
+      },
       "AuthMethodsOut": {
         "properties": {
           "ldap": {
@@ -4542,6 +4635,11 @@
       },
       "LoginResponse": {
         "properties": {
+          "must_enroll_2fa": {
+            "default": false,
+            "title": "Must Enroll 2Fa",
+            "type": "boolean"
+          },
           "pending_2fa": {
             "default": false,
             "title": "Pending 2Fa",
@@ -5305,6 +5403,37 @@
           "page_size"
         ],
         "title": "Page[ApiKeyOut]",
+        "type": "object"
+      },
+      "Page_AuthConfigAgentOut_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/AuthConfigAgentOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "page": {
+            "title": "Page",
+            "type": "integer"
+          },
+          "page_size": {
+            "title": "Page Size",
+            "type": "integer"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "items",
+          "total",
+          "page",
+          "page_size"
+        ],
+        "title": "Page[AuthConfigAgentOut]",
         "type": "object"
       },
       "Page_AutoResponseOut_": {
@@ -12921,6 +13050,430 @@
         "summary": "Get Attachment Templates",
         "tags": [
           "admin:attachments"
+        ]
+      }
+    },
+    "/api/v1/admin/auth-config": {
+      "get": {
+        "description": "Paginated agents with TOTP + SSO/enforce flags (valid users only by default).",
+        "operationId": "list_auth_config_api_v1_admin_auth_config_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "page",
+            "required": false,
+            "schema": {
+              "default": 1,
+              "minimum": 1,
+              "title": "Page",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "page_size",
+            "required": false,
+            "schema": {
+              "default": 25,
+              "maximum": 500,
+              "minimum": 1,
+              "title": "Page Size",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "valid",
+            "required": false,
+            "schema": {
+              "default": "valid",
+              "enum": [
+                "valid",
+                "invalid",
+                "all"
+              ],
+              "title": "Valid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "sort",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Sort"
+            }
+          },
+          {
+            "in": "query",
+            "name": "order",
+            "required": false,
+            "schema": {
+              "default": "asc",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "title": "Order",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_AuthConfigAgentOut_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Auth Config",
+        "tags": [
+          "admin:auth-config"
+        ]
+      }
+    },
+    "/api/v1/admin/auth-config/global": {
+      "get": {
+        "operationId": "get_global_auth_config_api_v1_admin_auth_config_global_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthConfigGlobalOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Global Auth Config",
+        "tags": [
+          "admin:auth-config"
+        ]
+      },
+      "put": {
+        "operationId": "put_global_auth_config_api_v1_admin_auth_config_global_put",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AuthConfigGlobalUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthConfigGlobalOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Put Global Auth Config",
+        "tags": [
+          "admin:auth-config"
+        ]
+      }
+    },
+    "/api/v1/admin/auth-config/{user_id}": {
+      "put": {
+        "operationId": "update_auth_config_api_v1_admin_auth_config__user_id__put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "user_id",
+            "required": true,
+            "schema": {
+              "title": "User Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AuthConfigUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthConfigAgentOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Auth Config",
+        "tags": [
+          "admin:auth-config"
+        ]
+      }
+    },
+    "/api/v1/admin/auth-config/{user_id}/reset-2fa": {
+      "post": {
+        "description": "Admin force-disable: delete ``tiqora_user_totp`` without a TOTP code.",
+        "operationId": "reset_2fa_api_v1_admin_auth_config__user_id__reset_2fa_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "user_id",
+            "required": true,
+            "schema": {
+              "title": "User Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Reset 2Fa",
+        "tags": [
+          "admin:auth-config"
         ]
       }
     },
@@ -24806,6 +25359,7 @@
     },
     "/api/v1/auth/spnego": {
       "get": {
+        "description": "Kerberos/SPNEGO handshake. On success, 302 to SPA root with a full session.\n\nPer-agent ``sso_eligible`` must be true. SSO is the strong factor \u2014 2FA\nis skipped even when the agent has TOTP enrolled.",
         "operationId": "spnego_api_v1_auth_spnego_get",
         "parameters": [
           {
@@ -24829,9 +25383,7 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/LoginResponse"
-                }
+                "schema": {}
               }
             },
             "description": "Successful Response"
@@ -24930,6 +25482,7 @@
     },
     "/api/v1/auth/totp/confirm": {
       "post": {
+        "description": "Confirm TOTP enrollment. Promotes an ENROLL session to a full session.",
         "operationId": "totp_confirm_api_v1_auth_totp_confirm_post",
         "parameters": [
           {
@@ -25070,7 +25623,7 @@
     },
     "/api/v1/auth/totp/enroll/qr": {
       "get": {
-        "description": "SVG QR code for the pending enrollment's ``otpauth://`` URI.\n\n404 if the caller has no pending enrollment (never called\n``POST /totp/enroll``, or already confirmed one \u2014 re-enroll first).",
+        "description": "SVG QR code for the pending enrollment's ``otpauth://`` URI.\n\n404 if the caller has no pending enrollment (never called\n``POST /totp/enroll``, or already confirmed one \u2014 re-enroll first).\nAccepts a full session or a restricted must-enroll (ENROLL) session.",
         "operationId": "totp_enroll_qr_api_v1_auth_totp_enroll_qr_get",
         "parameters": [
           {

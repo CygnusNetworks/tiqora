@@ -48,6 +48,12 @@ KEY_GENERIC_AGENT_ENABLED = "daemon.generic_agent.enabled"
 # (tiqora.gdpr.gate.require_write_gate).
 KEY_GDPR_RETENTION_ENABLED = "gdpr.retention.enabled"
 
+# Global TOTP/2FA enforcement: when true, every agent without an enabled
+# tiqora_user_totp row is forced through must-enroll after password login.
+# Default OFF; per-agent ``tiqora_user_auth_config.enforce_2fa`` can also
+# force enrollment without flipping this global switch.
+KEY_TOTP_ENFORCE_ALL = "auth.totp.enforce_all"
+
 
 async def get_setting_bool(session: AsyncSession, key: str, default: bool = False) -> bool:
     raw = await get_setting(session, key)

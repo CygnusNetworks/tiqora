@@ -116,3 +116,16 @@ class TOTPService:
         await self._session.delete(row)
         await self._session.commit()
         return True
+
+    async def force_disable(self, user_id: int) -> bool:
+        """Admin force-reset: delete the TOTP row without requiring a code.
+
+        Idempotent — returns ``True`` when a row was removed, ``False`` when
+        none existed. Distinct from :meth:`disable` (self-service, code-gated).
+        """
+        row = await self._get_row(user_id)
+        if row is None:
+            return False
+        await self._session.delete(row)
+        await self._session.commit()
+        return True
