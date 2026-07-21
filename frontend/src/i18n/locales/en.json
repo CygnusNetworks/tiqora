@@ -77,7 +77,15 @@
     "totpHint": "Enter the 6-digit code from your authenticator app.",
     "totpCode": "Authentication code",
     "totpVerify": "Verify",
-    "totpInvalid": "Invalid or expired code."
+    "totpInvalid": "Invalid or expired code.",
+    "kerberosButton": "Sign in with Kerberos",
+    "ssoFailed": "SSO failed — please sign in with your password.",
+    "mustEnroll": {
+      "title": "Set up two-factor authentication",
+      "hint": "2FA is required for this account — please set it up now.",
+      "startError": "Could not start 2FA setup. Please try again or contact an admin.",
+      "confirmError": "Invalid code — please try again."
+    }
   },
   "security": {
     "title": "Security",
@@ -451,7 +459,8 @@
       "queueTemplates": "Templates↔Queues",
       "queueAutoResponses": "Queues↔Auto responses",
       "queueVariables": "Queue variables",
-      "customerFields": "Customer fields"
+      "customerFields": "Customer fields",
+      "authConfig": "Authentication / 2FA"
     },
     "table": {
       "id": "ID",
@@ -976,6 +985,29 @@
       "tagNameHelp": "Placeholder: <OTRS_CUSTOMER_DATA_{Tag}>",
       "label": "Label",
       "enabled": "Enabled"
+    },
+    "authConfig": {
+      "title": "Authentication / 2FA",
+      "description": "Manage Kerberos SSO eligibility and two-factor authentication enforcement per agent.",
+      "globalHeading": "Global 2FA policy",
+      "enforceAll": "Require 2FA for all agents",
+      "enforceGroups": "Require 2FA for members of these groups",
+      "noGroups": "No valid groups found.",
+      "saveGlobal": "Save global policy",
+      "globalSaved": "Global policy saved.",
+      "globalSaveError": "Could not save global policy.",
+      "agentsHeading": "Agents",
+      "login": "Login",
+      "name": "Name",
+      "totpStatus": "2FA status",
+      "totpActive": "active",
+      "totpInactive": "—",
+      "ssoEligible": "SSO eligible",
+      "enforce2fa": "Enforce 2FA",
+      "reset2fa": "Reset 2FA",
+      "resetConfirmTitle": "Reset two-factor authentication?",
+      "resetConfirmBody": "This disables 2FA for {{login}}. They will need to enroll again if enforcement still applies.",
+      "empty": "No agents found."
     }
   },
   "kb": {
