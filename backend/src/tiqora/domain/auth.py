@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import secrets
 from dataclasses import dataclass
+from datetime import datetime
 from typing import Any
 
 import redis.asyncio as redis
@@ -18,6 +19,11 @@ from tiqora.znuny.password import verify_password
 
 SESSION_KEY_PREFIX = "tiqora:session:"
 SESSION_AVATAR_KEY_PREFIX = "tiqora:session:avatar:"
+
+
+def _utcnow() -> datetime:
+    """Naive UTC now — matches DateTime columns (server stores naive)."""
+    return datetime.utcnow()  # noqa: DTZ003 — intentional naive UTC for DB columns
 
 
 @dataclass(frozen=True, slots=True)
@@ -283,12 +289,21 @@ class AuthService:
         row = result.scalar_one_or_none()
         if row is None:
             return None
+        now = _utcnow()
+        if row.expires_at is not None and row.expires_at <= now:
+            return None
         user_result = await self._session.execute(
             select(Users).where(Users.id == row.user_id, Users.valid_id == 1)
         )
         user = user_result.scalar_one_or_none()
         if user is None:
             return None
+        # Stamp last_used_at; auth must not fail if the metadata write fails.
+        try:
+            row.last_used_at = now
+            await self._session.commit()
+        except Exception:  # noqa: BLE001 — non-fatal metadata stamp
+            await self._session.rollback()
         return await self._user_from_row(user, auth_method="api_key")
 
     async def get_user_by_id(self, user_id: int) -> AuthenticatedUser | None:
