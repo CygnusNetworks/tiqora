@@ -37,6 +37,9 @@ class TiqoraApiKey(TiqoraBase):
         nullable=False,
         server_default=func.now(),
     )
+    expires_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    last_used_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    created_by: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
 
 class TiqoraSettings(TiqoraBase):

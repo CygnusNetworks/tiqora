@@ -56,7 +56,8 @@
     "next": "Weiter",
     "back": "Zurück",
     "backToQueues": "Zurück zu Queues",
-    "loading": "Laden…"
+    "loading": "Laden…",
+    "close": "Schließen"
   },
   "auth": {
     "login": "Anmelden",
@@ -431,6 +432,7 @@
       "genericAgentJobs": "GenericAgent-Jobs",
       "dynamicFields": "Dynamische Felder",
       "webhooks": "Webhooks",
+      "apiKeys": "API-Schlüssel",
       "processes": "Prozesse",
       "mailOutbound": "E-Mail (Ausgang)",
       "mailLog": "Kommunikationsprotokoll",
@@ -713,6 +715,28 @@
       "events": "Ereignisse",
       "eventsPlaceholder": "TicketCreate, ArticleCreate",
       "eventsHelp": "Kommagetrennte Ereignistypen (entspricht tiqora_event_outbox.event_type). Leer lassen, um alle Ereignisse zu abonnieren."
+    },
+    "apiKeys": {
+      "title_plural": "API-Schlüssel",
+      "new": "Neuer API-Schlüssel",
+      "name": "Name",
+      "user": "Benutzer",
+      "userRequired": "Bitte einen gültigen Benutzer wählen.",
+      "created": "Erstellt",
+      "lastUsed": "Zuletzt verwendet",
+      "expires": "Gültig bis",
+      "expiresHelp": "Optional, ISO-8601. Leer lassen = unbefristet.",
+      "expiresInvalid": "Ungültiges Ablaufdatum (ISO-8601 erwartet).",
+      "empty": "Keine API-Schlüssel vorhanden.",
+      "hint": "Schlüssel werden nur einmal im Klartext angezeigt. Widerruf setzt „gültig“ auf nein; Löschen entfernt den Eintrag dauerhaft.",
+      "delete": "Löschen",
+      "deleteConfirm": "API-Schlüssel „{{name}}“ dauerhaft löschen?",
+      "revokeConfirm": "API-Schlüssel „{{name}}“ widerrufen?",
+      "createdTitle": "API-Schlüssel erstellt",
+      "onceWarning": "Wird nur einmal angezeigt — jetzt kopieren und sicher speichern.",
+      "onceHint": "Der Klartext-Schlüssel kann später nicht erneut abgerufen werden.",
+      "copy": "Kopieren",
+      "copied": "Kopiert"
     },
     "processes": {
       "title_plural": "Prozesse",
