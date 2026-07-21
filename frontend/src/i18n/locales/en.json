@@ -789,7 +789,7 @@
     },
     "queueTemplates": {
       "title": "Templates↔Queues",
-      "subtitle": "Pick a queue and assign templates. The list starts empty (no GET on the backend); toggling saves immediately.",
+      "subtitle": "Assign templates to queues — either direction. Toggling saves immediately.",
       "queue": "Queue",
       "selectQueue": "Select a queue…",
       "empty": "Pick a queue above to edit its templates.",
@@ -799,7 +799,7 @@
     },
     "queueAutoResponses": {
       "title": "Queues↔Auto responses",
-      "subtitle": "Pick a queue and assign auto responses. The list starts empty (no GET on the backend); toggling saves immediately.",
+      "subtitle": "Assign auto responses to queues — either direction. Toggling saves immediately.",
       "queue": "Queue",
       "selectQueue": "Select a queue…",
       "empty": "Pick a queue above to edit its auto responses.",
@@ -807,6 +807,20 @@
       "assigned": "Assigned",
       "typeId": "Type ID",
       "noAutoResponses": "No valid auto responses exist yet."
+    },
+    "assignmentEditor": {
+      "directionBy": "By {{side}}",
+      "searchAnchor": "Search…",
+      "searchCounterpart": "Search…",
+      "all": "All",
+      "none": "None",
+      "saved": "Saved",
+      "selectAnchor": "Select {{side}} …",
+      "noCounterparts": "No items available.",
+      "noAnchors": "No items available.",
+      "noMatches": "No matches.",
+      "assignedCount": "{{count}} assigned",
+      "counterpartFor": "{{counterpart}} for {{anchor}}"
     }
   },
   "kb": {

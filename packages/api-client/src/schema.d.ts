@@ -330,6 +330,26 @@ export interface paths {
         patch: operations["update_attachment_api_v1_admin_attachments__attachment_id__patch"];
         trace?: never;
     };
+    "/api/v1/admin/attachments/{attachment_id}/templates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Attachment Templates
+         * @description Templates currently using *attachment_id* — reverse of template↔attachments.
+         */
+        get: operations["get_attachment_templates_api_v1_admin_attachments__attachment_id__templates_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/auto-responses": {
         parameters: {
             query?: never;
@@ -365,6 +385,26 @@ export interface paths {
         head?: never;
         /** Update Auto Response */
         patch: operations["update_auto_response_api_v1_admin_auto_responses__auto_response_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/admin/auto-responses/{auto_response_id}/queues": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Auto Response Queues
+         * @description Queues this auto-response is assigned to (reverse read side).
+         */
+        get: operations["get_auto_response_queues_api_v1_admin_auto_responses__auto_response_id__queues_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/api/v1/admin/channels": {
@@ -437,6 +477,30 @@ export interface paths {
         head?: never;
         /** Update Customer Company */
         patch: operations["update_customer_company_api_v1_admin_customer_companies__customer_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/admin/customer-companies/{customer_id}/customer-users": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Customer Company Users
+         * @description Customer users with extra visibility into *customer_id* — reverse of
+         *     customer-user↔companies (Znuny ``customer_user_customer``).
+         *
+         *     Distinct from users whose *primary* ``customer_user.customer_id`` is this
+         *     company; those are not listed here.
+         */
+        get: operations["get_customer_company_users_api_v1_admin_customer_companies__customer_id__customer_users_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/api/v1/admin/customer-users": {
@@ -690,6 +754,70 @@ export interface paths {
         patch: operations["update_group_api_v1_admin_groups__group_id__patch"];
         trace?: never;
     };
+    "/api/v1/admin/groups/{group_id}/customer-users": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Group Customer Users
+         * @description Customer users with full (``rw``) access to *group_id* — reverse of
+         *     customer-user↔groups.
+         *
+         *     Znuny stores the customer-user identity as the *login string* in
+         *     ``group_customer_user.user_id`` (not the numeric ``customer_user.id``).
+         */
+        get: operations["get_group_customer_users_api_v1_admin_groups__group_id__customer_users_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/groups/{group_id}/roles": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Group Roles
+         * @description Roles that grant full (``rw``) access to *group_id* — reverse of role↔groups.
+         */
+        get: operations["get_group_roles_api_v1_admin_groups__group_id__roles_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/groups/{group_id}/users": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Group Users
+         * @description Agents with full (``rw``) access to *group_id* — reverse of user↔groups.
+         */
+        get: operations["get_group_users_api_v1_admin_groups__group_id__users_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/mail/log": {
         parameters: {
             query?: never;
@@ -880,7 +1008,11 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /**
+         * Get Queue Auto Responses
+         * @description Auto-responses currently assigned to *queue_id* (read side for the editor).
+         */
+        get: operations["get_queue_auto_responses_api_v1_admin_queues__queue_id__auto_responses_get"];
         /** Assign Queue Auto Response */
         put: operations["assign_queue_auto_response_api_v1_admin_queues__queue_id__auto_responses_put"];
         post?: never;
@@ -914,7 +1046,11 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /**
+         * Get Queue Templates
+         * @description Templates currently assigned to *queue_id* (read side for the editor).
+         */
+        get: operations["get_queue_templates_api_v1_admin_queues__queue_id__templates_get"];
         /** Assign Queue Template */
         put: operations["assign_queue_template_api_v1_admin_queues__queue_id__templates_put"];
         post?: never;
@@ -1013,6 +1149,26 @@ export interface paths {
         post?: never;
         /** Revoke Group Role */
         delete: operations["revoke_group_role_api_v1_admin_roles__role_id__groups__group_id___permission_key__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/roles/{role_id}/users": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Role Users
+         * @description Agents currently granted *role_id* — reverse of user↔roles.
+         */
+        get: operations["get_role_users_api_v1_admin_roles__role_id__users_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -1209,6 +1365,26 @@ export interface paths {
          *     rows the way a replace body can.
          */
         put: operations["replace_template_attachments_api_v1_admin_templates__template_id__attachments_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/templates/{template_id}/queues": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Template Queues
+         * @description Queues this template is assigned to (reverse read side).
+         */
+        get: operations["get_template_queues_api_v1_admin_templates__template_id__queues_get"];
+        put?: never;
         post?: never;
         delete?: never;
         options?: never;
@@ -1871,6 +2047,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/customers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Create Customer
+         * @description Create a valid customer_user as any authenticated agent.
+         *
+         *     Mirrors Znuny's AgentTicketCustomer "add customer" — not admin-gated.
+         */
+        post: operations["create_customer_api_v1_customers_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/customers/{login}": {
         parameters: {
             query?: never;
@@ -2319,6 +2517,29 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/reference/queues": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Reference Queues
+         * @description Valid queues the current agent may access, filtered by permission.
+         *
+         *     ``movable=true`` requires ``rw`` (move into the queue). Default is ``ro``.
+         *     Always restricted to ``valid_id = 1``.
+         */
+        get: operations["list_reference_queues_api_v1_reference_queues_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/reference/states": {
         parameters: {
             query?: never;
@@ -2608,6 +2829,31 @@ export interface paths {
          *     ticket id.
          */
         get: operations["my_ticket_counts_api_v1_tickets_my_counts_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tickets/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Search Tickets
+         * @description Search tickets the current agent may access (``ro`` on the queue).
+         *
+         *     Matches case-insensitively against ``tn`` and ``title``. Merged/removed
+         *     tickets are excluded. Registered before ``/{ticket_id}`` so "search" is
+         *     not parsed as a ticket id. Powers "Ticket verknüpfen" / "Ticket
+         *     zusammenfassen" pickers.
+         */
+        get: operations["search_tickets_api_v1_tickets_search_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -3259,6 +3505,42 @@ export interface components {
             entity_id: string;
             /** Name */
             name: string;
+        };
+        /**
+         * AgentCustomerCreateOut
+         * @description Created customer-user ref for the ticket Kunde dialog.
+         */
+        AgentCustomerCreateOut: {
+            /** Customer Id */
+            customer_id: string;
+            /** Email */
+            email: string;
+            /** First Name */
+            first_name: string;
+            /** Last Name */
+            last_name: string;
+            /** Login */
+            login: string;
+        };
+        /**
+         * AgentCustomerCreateRequest
+         * @description Body for agent-side customer-user creation (Znuny AgentTicketCustomer).
+         *
+         *     No password — agents create the contact record; portal auth is separate.
+         */
+        AgentCustomerCreateRequest: {
+            /** Customer Id */
+            customer_id: string;
+            /** Email */
+            email: string;
+            /** First Name */
+            first_name: string;
+            /** Last Name */
+            last_name: string;
+            /** Login */
+            login: string;
+            /** Phone */
+            phone?: string | null;
         };
         /** AgentRefOut */
         AgentRefOut: {
@@ -5221,6 +5503,13 @@ export interface components {
             /** Valid Id */
             valid_id: number;
         };
+        /** QueueRefOut */
+        QueueRefOut: {
+            /** Id */
+            id: number;
+            /** Name */
+            name: string;
+        };
         /** QueueTemplateAssignment */
         QueueTemplateAssignment: {
             /** Standard Template Id */
@@ -6043,6 +6332,24 @@ export interface components {
             process_entity_id?: string | null;
             /** Process Name */
             process_name?: string | null;
+        };
+        /**
+         * TicketSearchHitOut
+         * @description Compact ticket hit for agent link/merge pickers.
+         */
+        TicketSearchHitOut: {
+            /** Queue */
+            queue?: string | null;
+            /** State */
+            state?: string | null;
+            /** State Type */
+            state_type?: string | null;
+            /** Ticket Id */
+            ticket_id: number;
+            /** Title */
+            title: string;
+            /** Tn */
+            tn: string;
         };
         /** TicketVolumeOut */
         TicketVolumeOut: {
@@ -6966,6 +7273,41 @@ export interface operations {
             };
         };
     };
+    get_attachment_templates_api_v1_admin_attachments__attachment_id__templates_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                attachment_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StandardTemplateOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_auto_responses_api_v1_admin_auto_responses_get: {
         parameters: {
             query?: {
@@ -7134,6 +7476,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AutoResponseOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_auto_response_queues_api_v1_admin_auto_responses__auto_response_id__queues_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                auto_response_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QueueOut"][];
                 };
             };
             /** @description Validation Error */
@@ -7422,6 +7799,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CustomerCompanyOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_customer_company_users_api_v1_admin_customer_companies__customer_id__customer_users_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                customer_id: string;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustomerUserAdminOut"][];
                 };
             };
             /** @description Validation Error */
@@ -8259,6 +8671,111 @@ export interface operations {
             };
         };
     };
+    get_group_customer_users_api_v1_admin_groups__group_id__customer_users_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                group_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustomerUserAdminOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_group_roles_api_v1_admin_groups__group_id__roles_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                group_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RoleOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_group_users_api_v1_admin_groups__group_id__users_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                group_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_mail_log_api_v1_admin_mail_log_get: {
         parameters: {
             query?: {
@@ -8872,6 +9389,41 @@ export interface operations {
             };
         };
     };
+    get_queue_auto_responses_api_v1_admin_queues__queue_id__auto_responses_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                queue_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AutoResponseOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     assign_queue_auto_response_api_v1_admin_queues__queue_id__auto_responses_put: {
         parameters: {
             query?: never;
@@ -8931,6 +9483,41 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_queue_templates_api_v1_admin_queues__queue_id__templates_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                queue_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StandardTemplateOut"][];
+                };
             };
             /** @description Validation Error */
             422: {
@@ -9290,6 +9877,41 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_role_users_api_v1_admin_roles__role_id__users_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                role_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserOut"][];
+                };
             };
             /** @description Validation Error */
             422: {
@@ -10119,6 +10741,41 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_template_queues_api_v1_admin_templates__template_id__queues_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                template_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QueueOut"][];
+                };
             };
             /** @description Validation Error */
             422: {
@@ -11771,6 +12428,43 @@ export interface operations {
             };
         };
     };
+    create_customer_api_v1_customers_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AgentCustomerCreateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AgentCustomerCreateOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     get_customer_api_v1_customers__login__get: {
         parameters: {
             query?: never;
@@ -12872,6 +13566,42 @@ export interface operations {
             };
         };
     };
+    list_reference_queues_api_v1_reference_queues_get: {
+        parameters: {
+            query?: {
+                /** @description If true, only queues the agent has ``rw`` on (for the Verschieben / move picker). Otherwise queues with at least ``ro``. */
+                movable?: boolean;
+            };
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QueueRefOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_states_api_v1_reference_states_get: {
         parameters: {
             query?: never;
@@ -13530,6 +14260,43 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MyTicketCounts"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    search_tickets_api_v1_tickets_search_get: {
+        parameters: {
+            query?: {
+                /** @description Substring matched against ticket number or title */
+                q?: string;
+                limit?: number;
+            };
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TicketSearchHitOut"][];
                 };
             };
             /** @description Validation Error */
