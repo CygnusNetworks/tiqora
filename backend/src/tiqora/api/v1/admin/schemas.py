@@ -219,6 +219,36 @@ class StateTypeOut(BaseModel):
     name: str
 
 
+class SystemAddressOut(BaseModel):
+    """Reference row for resolving ``queue.system_address_id`` to a label.
+
+    Znuny ``system_address``: ``value0`` is the email, ``value1`` the real name.
+    UI display is typically ``"{value1} <{value0}>"``.
+    """
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    value0: str
+    value1: str
+    comments: str | None = None
+    valid_id: int
+
+
+class FollowUpPossibleOut(BaseModel):
+    """Reference row for resolving ``queue.follow_up_id`` to a name.
+
+    Stock Znuny names: ``possible``, ``reject``, ``new ticket``.
+    """
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    name: str
+    comments: str | None = None
+    valid_id: int
+
+
 class StateCreate(BaseModel):
     name: str
     type_id: int

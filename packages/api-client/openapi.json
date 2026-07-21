@@ -3925,6 +3925,41 @@
         "title": "DynamicFieldValueOut",
         "type": "object"
       },
+      "FollowUpPossibleOut": {
+        "description": "Reference row for resolving ``queue.follow_up_id`` to a name.\n\nStock Znuny names: ``possible``, ``reject``, ``new ticket``.",
+        "properties": {
+          "comments": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Comments"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "valid_id": {
+            "title": "Valid Id",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "valid_id"
+        ],
+        "title": "FollowUpPossibleOut",
+        "type": "object"
+      },
       "ForwardRequest": {
         "properties": {
           "body": {
@@ -9113,6 +9148,46 @@
           "subject_format"
         ],
         "title": "SubjectHookZnunyOut",
+        "type": "object"
+      },
+      "SystemAddressOut": {
+        "description": "Reference row for resolving ``queue.system_address_id`` to a label.\n\nZnuny ``system_address``: ``value0`` is the email, ``value1`` the real name.\nUI display is typically ``\"{value1} <{value0}>\"``.",
+        "properties": {
+          "comments": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Comments"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "valid_id": {
+            "title": "Valid Id",
+            "type": "integer"
+          },
+          "value0": {
+            "title": "Value0",
+            "type": "string"
+          },
+          "value1": {
+            "title": "Value1",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "value0",
+          "value1",
+          "valid_id"
+        ],
+        "title": "SystemAddressOut",
         "type": "object"
       },
       "TOTPCodeIn": {
@@ -15595,6 +15670,76 @@
         ]
       }
     },
+    "/api/v1/admin/follow-up-possible": {
+      "get": {
+        "description": "Valid follow-up options for the queue editor (possible / reject / new ticket).",
+        "operationId": "list_follow_up_possible_api_v1_admin_follow_up_possible_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/FollowUpPossibleOut"
+                  },
+                  "title": "Response List Follow Up Possible Api V1 Admin Follow Up Possible Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Follow Up Possible",
+        "tags": [
+          "admin:readonly"
+        ]
+      }
+    },
     "/api/v1/admin/generic-agent-jobs": {
       "get": {
         "operationId": "list_generic_agent_jobs_api_v1_admin_generic_agent_jobs_get",
@@ -20856,6 +21001,76 @@
         "summary": "Put Subject Config",
         "tags": [
           "admin:subject-config"
+        ]
+      }
+    },
+    "/api/v1/admin/system-addresses": {
+      "get": {
+        "description": "Valid system addresses for queue / auto-response From pickers.",
+        "operationId": "list_system_addresses_api_v1_admin_system_addresses_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/SystemAddressOut"
+                  },
+                  "title": "Response List System Addresses Api V1 Admin System Addresses Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List System Addresses",
+        "tags": [
+          "admin:readonly"
         ]
       }
     },

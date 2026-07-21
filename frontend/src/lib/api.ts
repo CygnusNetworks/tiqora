@@ -133,6 +133,8 @@ export type {
   PostmasterFilterOut,
   AclOut,
   GenericAgentJobOut,
+  SystemAddressOut,
+  FollowUpPossibleOut,
   TicketVolumeOut,
   VolumePointOut,
   OpenSnapshotOut,
