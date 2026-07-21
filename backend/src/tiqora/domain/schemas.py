@@ -180,6 +180,10 @@ class ReplyDraftOut(BaseModel):
     is_html: bool
     in_reply_to: str | None = None
     references: str | None = None
+    # Queue signature expanded for read-only composer preview (not part of body;
+    # the send pipeline appends it via prepare_outgoing_agent_email).
+    signature: str = ""
+    signature_is_html: bool = False
 
 
 class TemplateOut(BaseModel):

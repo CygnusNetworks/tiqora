@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
-import { api } from "@/lib/api";
+import { api, ApiError } from "@/lib/api";
 import { Button } from "@/components/ui/Button";
 import { Dialog } from "@/components/ui/Dialog";
 import { Spinner } from "@/components/ui/Spinner";
 import { cn } from "@/lib/cn";
+import { ArticleBodyRenderer } from "./ArticleBodyRenderer";
 import {
   RecipientsField,
   joinRecipients,
@@ -308,8 +309,40 @@ export function ReplyDialog({
               onChange={(e) => setBody(e.target.value)}
             />
           </label>
+          {/* Read-only signature preview — backend appends on send; do not
+              put this into the editable body (would double on send). */}
+          {Boolean(draftQ.data?.signature?.trim()) && (
+            <div
+              className="rounded border border-hairline bg-surface-subtle/60 p-2"
+              data-testid="reply-signature-preview"
+            >
+              <p className="mb-1 text-[11px] font-medium uppercase tracking-wide text-muted">
+                {t("ticket.signaturePreview")}
+              </p>
+              {draftQ.data?.signature_is_html ? (
+                <ArticleBodyRenderer
+                  body={draftQ.data.signature}
+                  isHtml
+                  className="text-xs"
+                />
+              ) : (
+                <pre
+                  className="max-h-40 overflow-auto whitespace-pre-wrap break-words font-mono text-xs text-ink"
+                  data-testid="reply-signature-plain"
+                >
+                  {draftQ.data?.signature}
+                </pre>
+              )}
+            </div>
+          )}
           {sendMutation.isError && (
-            <p className="text-xs text-danger">{t("ticket.replyError")}</p>
+            <p className="text-xs text-danger" data-testid="reply-send-error">
+              {sendMutation.error instanceof ApiError &&
+              sendMutation.error.message &&
+              !sendMutation.error.message.startsWith("HTTP ")
+                ? sendMutation.error.message
+                : t("ticket.replyError")}
+            </p>
           )}
           <div className="flex items-center justify-end gap-1.5 pt-1">
             <Button variant="ghost" size="sm" onClick={onClose}>

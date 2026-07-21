@@ -754,8 +754,16 @@ class TicketService:
         quoting): the answer area is empty and placed ABOVE the quoted
         original. Quoting is plaintext-only (HTML bodies are down-converted);
         see ``tiqora.domain.quoting``.
+
+        Also loads the queue signature (expanded placeholders) for a read-only
+        composer preview. The signature is **not** part of ``body`` — the send
+        pipeline appends it via ``prepare_outgoing_agent_email``.
         """
-        await self._assert_ticket_ro(user_id, ticket_id)
+        from tiqora.channels.email.outbound_reply import _queue_outbound_meta
+        from tiqora.channels.email.placeholder import expand_placeholders
+        from tiqora.znuny.sysconfig import SysConfig
+
+        ticket = await self._assert_ticket_ro(user_id, ticket_id)
         art = (
             await self._session.execute(
                 select(Article).where(Article.id == article_id, Article.ticket_id == ticket_id)
@@ -794,6 +802,28 @@ class TicketService:
         quoted = quote_plaintext_body(plain, from_address=from_addr, sent_at=art.create_time)
         # Empty answer area above the quote (two newlines), then the quote.
         body = f"\n\n{quoted}\n"
+
+        signature = ""
+        signature_is_html = False
+        queue_id = int(ticket.queue_id) if ticket.queue_id else 0
+        if queue_id:
+            _from, queue_name, sig_text, sig_ct = await _queue_outbound_meta(
+                self._session, queue_id
+            )
+            if sig_text and str(sig_text).strip():
+                expanded = await expand_placeholders(
+                    self._session,
+                    SysConfig(self._session),
+                    str(sig_text),
+                    ticket_id=ticket_id,
+                    user_id=user_id,
+                    queue_name=queue_name or "",
+                    customer_subject=subject or "",
+                    customer_email_lines=[],
+                )
+                signature = expanded
+                signature_is_html = "html" in (sig_ct or "").lower()
+
         return ReplyDraftOut(
             to_address=to_addr,
             cc=cc,
@@ -802,6 +832,8 @@ class TicketService:
             is_html=False,
             in_reply_to=(mime.a_message_id if mime else None),
             references=(mime.a_message_id if mime else None),
+            signature=signature,
+            signature_is_html=signature_is_html,
         )
 
     async def list_templates(self, user_id: int, ticket_id: int) -> list[TemplateOut]:

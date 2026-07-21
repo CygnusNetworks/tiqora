@@ -19,6 +19,7 @@ in both paths; only the send attempt is gated.
 
 from __future__ import annotations
 
+import re
 import secrets
 import socket
 import time
@@ -42,6 +43,9 @@ _SIGNATURE_MARKERS = (
     "\n<hr",
     '\n<div class="signature"',
 )
+
+# Leading RFC-3676 sig delimiter: "--" or "-- " plus optional trailing whitespace.
+_LEADING_SIG_DELIMITER_RE = re.compile(r"^-- ?\s*$")
 
 
 class OutboundMailError(Exception):
@@ -72,25 +76,42 @@ def _signature_already_present(body: str, signature: str) -> bool:
     return any(m.strip() in tail for m in _SIGNATURE_MARKERS if m.strip())
 
 
+def _strip_leading_signature_delimiter(signature: str) -> str:
+    """Drop a leading ``--`` / ``-- `` delimiter line so only the canonical one remains.
+
+    Stored Znuny signatures often begin with their own RFC-3676 delimiter; we
+    always prepend ``\\n\\n-- \\n`` ourselves, so a second leading line would
+    produce a double separator in the sent mail.
+    """
+    text = (signature or "").strip()
+    if not text:
+        return ""
+    lines = text.splitlines()
+    if lines and _LEADING_SIG_DELIMITER_RE.match(lines[0]):
+        return "\n".join(lines[1:]).strip()
+    return text
+
+
 def append_signature(body: str, signature: str, *, content_type: str) -> str:
     """Append *signature* to *body* for the article content type (text vs html)."""
-    if not (signature or "").strip():
+    sig = _strip_leading_signature_delimiter(signature)
+    if not sig:
         return body
-    if _signature_already_present(body, signature):
+    if _signature_already_present(body, sig):
         return body
     if _is_html(content_type):
         # Preserve plaintext signatures inside a preformatted block when the
         # reply body is HTML (queue signatures are often text/plain).
-        if "<" not in signature:
+        if "<" not in sig:
             sig_html = (
                 '<br />\n-- <br />\n<pre style="font-family: inherit; white-space: pre-wrap">'
-                + _html_escape(signature.strip())
+                + _html_escape(sig)
                 + "</pre>"
             )
         else:
-            sig_html = "<br />\n-- <br />\n" + signature.strip()
+            sig_html = "<br />\n-- <br />\n" + sig
         return (body or "").rstrip() + "\n" + sig_html
-    return (body or "").rstrip() + "\n\n-- \n" + signature.strip()
+    return (body or "").rstrip() + "\n\n-- \n" + sig
 
 
 def _html_escape(value: str) -> str:

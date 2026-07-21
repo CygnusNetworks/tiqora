@@ -417,3 +417,172 @@ async def test_expand_unknown_and_error_best_effort(
         assert recovered == original
 
     await engine.dispose()
+
+
+def _ensure_queue_domain_column(sync_url: str) -> bool:
+    """Add synthetic queue.domain when missing (site-specific Znuny patch).
+
+    Returns True if the column is usable after this call.
+    """
+    engine = create_engine(sync_url)
+    try:
+        with engine.begin() as conn:
+            dialect = conn.dialect.name
+            if dialect.startswith("postgres"):
+                has_col = conn.execute(
+                    text(
+                        "SELECT 1 FROM information_schema.columns"
+                        " WHERE table_schema = current_schema()"
+                        " AND table_name = 'queue' AND column_name = 'domain'"
+                        " LIMIT 1"
+                    )
+                ).first()
+                if not has_col:
+                    conn.execute(
+                        text("ALTER TABLE queue ADD COLUMN IF NOT EXISTS domain VARCHAR(128)")
+                    )
+            else:
+                has_col = conn.execute(
+                    text(
+                        "SELECT 1 FROM information_schema.columns"
+                        " WHERE table_schema = DATABASE()"
+                        " AND table_name = 'queue' AND column_name = 'domain'"
+                        " LIMIT 1"
+                    )
+                ).first()
+                if not has_col:
+                    conn.execute(text("ALTER TABLE queue ADD COLUMN domain VARCHAR(128) NULL"))
+        return True
+    except Exception:
+        return False
+    finally:
+        engine.dispose()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("url_fixture", ["mariadb_znuny_url", "postgres_znuny_url"])
+async def test_queue_custom_column_domain_placeholder(
+    url_fixture: str, request: pytest.FixtureRequest
+) -> None:
+    """SELECT q.* exposes site-specific queue columns as <OTRS_QUEUE_...>.
+
+    Missing columns stay empty (no error); when ``queue.domain`` exists and is
+    set, ``<OTRS_QUEUE_Domain>`` resolves to its value.
+    """
+    sync_url: str = request.getfixturevalue(url_fixture)
+    ids = _seed(sync_url, ns=4)
+    sysconfig = _make_sysconfig()
+    engine = create_async_engine(_to_async_url(sync_url))
+    factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+
+    # Without the column (or with NULL): empty, no error.
+    async with factory() as session:
+        expanded = await expand_placeholders(
+            session,
+            sysconfig,
+            "d=<OTRS_QUEUE_Domain> n=<OTRS_QUEUE_Name>",
+            ticket_id=ids["ticket"],
+            user_id=ids["agent"],
+        )
+        assert expanded.startswith("d=")
+        assert f"n={ids['queue_name']}" in expanded
+        assert "<OTRS_" not in expanded
+
+    await engine.dispose()
+
+    assert _ensure_queue_domain_column(sync_url)
+    domain_val = f"custom-domain-92{ids['ns']}.example"
+    sync_engine = create_engine(sync_url)
+    with sync_engine.begin() as conn:
+        conn.execute(
+            text("UPDATE queue SET domain = :d WHERE id = :id"),
+            {"d": domain_val, "id": ids["queue"]},
+        )
+    sync_engine.dispose()
+
+    # Fresh engine after DDL — asyncpg caches prepared plans per connection and
+    # would otherwise raise InvalidCachedStatementError on SELECT q.*.
+    engine = create_async_engine(_to_async_url(sync_url))
+    factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+
+    async with factory() as session:
+        expanded = await expand_placeholders(
+            session,
+            sysconfig,
+            "https://startup.<OTRS_QUEUE_Domain>/x",
+            ticket_id=ids["ticket"],
+            user_id=ids["agent"],
+        )
+        assert expanded == f"https://startup.{domain_val}/x"
+        assert "<OTRS_" not in expanded
+
+        # Still-missing field name must stay empty, not raise.
+        missing = await expand_placeholders(
+            session,
+            sysconfig,
+            "p=<OTRS_QUEUE_Phonenumber>",
+            ticket_id=ids["ticket"],
+            user_id=ids["agent"],
+        )
+        assert missing == "p="
+
+    await engine.dispose()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("url_fixture", ["mariadb_znuny_url", "postgres_znuny_url"])
+async def test_reply_draft_includes_expanded_signature(
+    url_fixture: str, request: pytest.FixtureRequest
+) -> None:
+    """get_reply_draft returns expanded queue signature for composer preview."""
+    sync_url: str = request.getfixturevalue(url_fixture)
+    ids = _seed(sync_url, ns=5)
+    article_id = 9280 + ids["ns"]
+    sync_engine = create_engine(sync_url)
+    with sync_engine.begin() as conn:
+        conn.execute(
+            text(
+                "INSERT INTO article (id, ticket_id, article_sender_type_id,"
+                " communication_channel_id, is_visible_for_customer, search_index_needs_rebuild,"
+                " create_time, create_by, change_time, change_by)"
+                " VALUES (:id, :tid, 3, 1, 1, 0, :t, 1, :t, 1)"
+            ),
+            {"id": article_id, "tid": ids["ticket"], "t": NOW},
+        )
+        conn.execute(
+            text(
+                "INSERT INTO article_data_mime (id, article_id, a_from, a_to, a_subject,"
+                " a_content_type, a_body, a_message_id, incoming_time,"
+                " create_time, create_by, change_time, change_by)"
+                " VALUES (:id, :aid, :frm, 'support@example.com', 'Hello',"
+                " 'text/plain; charset=utf-8', 'Customer body', :mid, 1717243200,"
+                " :t, 1, :t, 1)"
+            ),
+            {
+                "id": article_id,
+                "aid": article_id,
+                "frm": ids["cust_login"],
+                "mid": f"<ph-draft-92{ids['ns']}@example.com>",
+                "t": NOW,
+            },
+        )
+    sync_engine.dispose()
+
+    engine = create_async_engine(_to_async_url(sync_url))
+    factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+
+    async with factory() as session:
+        draft = await TicketService(session).get_reply_draft(
+            ids["agent"], ids["ticket"], article_id
+        )
+        assert draft.signature
+        assert draft.signature_is_html is False
+        # Expanded agent + ticket placeholders from the seeded signature.
+        assert "Ada" in draft.signature and "Lovelace" in draft.signature
+        assert ids["tn"] in draft.signature
+        assert "<OTRS_" not in draft.signature
+        # Signature must not be folded into the editable body.
+        assert "Ada Lovelace" not in draft.body
+        assert draft.body.startswith("\n\n")
+
+    await engine.dispose()

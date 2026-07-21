@@ -3,6 +3,7 @@ import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { I18nextProvider } from "react-i18next";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import i18n from "@/i18n";
+import { ApiError } from "@/lib/api";
 import { ReplyDialog } from "./ReplyDialog";
 
 const { getReplyDraft, listTemplates, createArticle } = vi.hoisted(() => ({
@@ -41,6 +42,8 @@ const baseDraft = {
   body: "> quoted",
   in_reply_to: null as string | null,
   references: null as string | null,
+  signature: "",
+  signature_is_html: false,
 };
 
 describe("ReplyDialog recipient toggles", () => {
@@ -195,5 +198,77 @@ describe("ReplyDialog recipient toggles", () => {
     expect(screen.queryByTestId("reply-toggle-cc-count")).toBeNull();
     expect(screen.queryByTestId("reply-toggle-bcc-count")).toBeNull();
     expect(screen.queryByTestId("reply-toggle-replyto-count")).toBeNull();
+  });
+
+  it("shows a read-only signature preview and does not send it in the body", async () => {
+    getReplyDraft.mockResolvedValue({
+      ...baseDraft,
+      to_address: "to@x.com",
+      signature: "Alice Example\nSupport Team",
+      signature_is_html: false,
+    });
+
+    wrap(
+      <ReplyDialog
+        ticketId={3}
+        articleId={4}
+        replyAll={false}
+        open
+        onClose={vi.fn()}
+      />,
+    );
+
+    await waitFor(() => expect(screen.getByTestId("reply-signature-preview")).toBeTruthy());
+    expect(screen.getByTestId("reply-signature-plain").textContent).toContain(
+      "Alice Example",
+    );
+
+    const body = screen.getByTestId("reply-body") as HTMLTextAreaElement;
+    // Seeded body is blank answer + quote only — signature stays out of the textarea.
+    expect(body.value).not.toContain("Alice Example");
+    expect(body.value).not.toContain("Support Team");
+
+    fireEvent.change(body, { target: { value: "Thanks\n\n> quoted" } });
+    fireEvent.click(screen.getByTestId("reply-send"));
+
+    await waitFor(() => expect(createArticle).toHaveBeenCalled());
+    const payload = createArticle.mock.calls[0][1] as { body: string };
+    expect(payload.body).toBe("Thanks\n\n> quoted");
+    expect(payload.body).not.toContain("Alice Example");
+    expect(payload.body).not.toContain("Support Team");
+  });
+
+  it("surfaces the server error detail when send fails", async () => {
+    getReplyDraft.mockResolvedValue({
+      ...baseDraft,
+      to_address: "to@x.com",
+    });
+    createArticle.mockRejectedValue(
+      new ApiError(
+        502,
+        "Outbound email delivery failed: SMTP refused",
+        "/api/v1/tickets/1/articles",
+      ),
+    );
+
+    wrap(
+      <ReplyDialog
+        ticketId={1}
+        articleId={2}
+        replyAll={false}
+        open
+        onClose={vi.fn()}
+      />,
+    );
+
+    await waitFor(() => expect(screen.getByTestId("reply-dialog")).toBeTruthy());
+    const body = screen.getByTestId("reply-body") as HTMLTextAreaElement;
+    fireEvent.change(body, { target: { value: "Thanks\n\n> quoted" } });
+    fireEvent.click(screen.getByTestId("reply-send"));
+
+    await waitFor(() => expect(screen.getByTestId("reply-send-error")).toBeTruthy());
+    expect(screen.getByTestId("reply-send-error").textContent).toContain(
+      "Outbound email delivery failed: SMTP refused",
+    );
   });
 });

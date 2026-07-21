@@ -230,6 +230,7 @@
     "replySending": "Wird gesendet…",
     "replyError": "Antwort konnte nicht gesendet werden. Bitte erneut versuchen.",
     "replyDraftError": "Antwortentwurf konnte nicht geladen werden.",
+    "signaturePreview": "Signatur (wird automatisch angehängt)",
     "forwardDialogTitle": "Artikel weiterleiten",
     "forwardNote": "Notiz (optional)",
     "bounceDialogTitle": "Artikel umleiten",
