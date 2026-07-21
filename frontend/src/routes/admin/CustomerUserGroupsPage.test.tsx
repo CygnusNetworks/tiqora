@@ -8,6 +8,7 @@ import { CustomerUserGroupsPage } from "./CustomerUserGroupsPage";
 const listCustomerUsers = vi.fn();
 const listGroups = vi.fn();
 const listCustomerUserGroups = vi.fn();
+const listGroupCustomerUsers = vi.fn();
 const assignCustomerUserGroup = vi.fn();
 const revokeCustomerUserGroup = vi.fn();
 
@@ -20,6 +21,7 @@ vi.mock("@/lib/api", () => ({
       list: (...args: unknown[]) => listGroups(...args),
     },
     listCustomerUserGroups: (...args: unknown[]) => listCustomerUserGroups(...args),
+    listGroupCustomerUsers: (...args: unknown[]) => listGroupCustomerUsers(...args),
     assignCustomerUserGroup: (...args: unknown[]) => assignCustomerUserGroup(...args),
     revokeCustomerUserGroup: (...args: unknown[]) => revokeCustomerUserGroup(...args),
   },
@@ -43,6 +45,7 @@ describe("CustomerUserGroupsPage", () => {
     listCustomerUsers.mockReset();
     listGroups.mockReset();
     listCustomerUserGroups.mockReset();
+    listGroupCustomerUsers.mockReset();
     assignCustomerUserGroup.mockReset();
     revokeCustomerUserGroup.mockReset();
 
@@ -74,26 +77,27 @@ describe("CustomerUserGroupsPage", () => {
     listCustomerUserGroups.mockResolvedValue([
       { id: 5, name: "users", valid_id: 1, comments: null },
     ]);
+    listGroupCustomerUsers.mockResolvedValue([]);
     assignCustomerUserGroup.mockResolvedValue(undefined);
     revokeCustomerUserGroup.mockResolvedValue(undefined);
   });
 
-  it("renders assigned groups and submits PUT assign on toggle", async () => {
+  it("renders assigned groups checked and submits PUT assign on toggle", async () => {
     renderPage();
 
-    await screen.findByRole("option", { name: /alice/i });
-    fireEvent.change(screen.getByTestId("admin-customer-user-groups-select"), {
-      target: { value: "alice" },
-    });
+    await screen.findByTestId("admin-customer-user-groups-page-anchor-alice");
+    fireEvent.click(screen.getByTestId("admin-customer-user-groups-page-anchor-alice"));
 
     await waitFor(() => {
-      expect(listCustomerUserGroups).toHaveBeenCalledWith("alice");
+      expect(listCustomerUserGroups).toHaveBeenCalledWith("alice", expect.anything());
     });
     await waitFor(() => {
-      expect(screen.getByTestId("admin-customer-user-group-toggle-5")).toBeChecked();
+      expect(
+        screen.getByTestId("admin-customer-user-groups-page-counterpart-5"),
+      ).toBeChecked();
     });
 
-    fireEvent.click(screen.getByTestId("admin-customer-user-group-toggle-6"));
+    fireEvent.click(screen.getByTestId("admin-customer-user-groups-page-counterpart-6"));
 
     await waitFor(() => {
       expect(assignCustomerUserGroup).toHaveBeenCalledWith("alice", {

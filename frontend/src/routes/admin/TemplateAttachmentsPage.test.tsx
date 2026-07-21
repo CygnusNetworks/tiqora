@@ -8,6 +8,7 @@ import { TemplateAttachmentsPage } from "./TemplateAttachmentsPage";
 const listTemplates = vi.fn();
 const listAttachments = vi.fn();
 const listTemplateAttachments = vi.fn();
+const listAttachmentTemplates = vi.fn();
 const replaceTemplateAttachments = vi.fn();
 
 vi.mock("@/lib/api", () => ({
@@ -19,6 +20,7 @@ vi.mock("@/lib/api", () => ({
       list: (...args: unknown[]) => listAttachments(...args),
     },
     listTemplateAttachments: (...args: unknown[]) => listTemplateAttachments(...args),
+    listAttachmentTemplates: (...args: unknown[]) => listAttachmentTemplates(...args),
     replaceTemplateAttachments: (...args: unknown[]) => replaceTemplateAttachments(...args),
   },
 }));
@@ -41,6 +43,7 @@ describe("TemplateAttachmentsPage", () => {
     listTemplates.mockReset();
     listAttachments.mockReset();
     listTemplateAttachments.mockReset();
+    listAttachmentTemplates.mockReset();
     replaceTemplateAttachments.mockReset();
 
     listTemplates.mockResolvedValue({
@@ -81,31 +84,30 @@ describe("TemplateAttachmentsPage", () => {
     listTemplateAttachments.mockResolvedValue([
       { id: 1, name: "Logo", filename: "logo.png", content_type: "image/png" },
     ]);
+    listAttachmentTemplates.mockResolvedValue([]);
     replaceTemplateAttachments.mockResolvedValue(undefined);
   });
 
-  it("renders, loads assigned attachments, and submits the PUT replace body", async () => {
+  it("preselects assigned attachments and assigns via replace on toggle", async () => {
     renderPage();
 
-    await screen.findByRole("option", { name: "Answer default" });
-    fireEvent.change(screen.getByTestId("admin-template-attachments-select"), {
-      target: { value: "10" },
+    await screen.findByTestId("admin-template-attachments-page-anchor-10");
+    fireEvent.click(screen.getByTestId("admin-template-attachments-page-anchor-10"));
+
+    await waitFor(() => {
+      expect(listTemplateAttachments).toHaveBeenCalledWith(10, expect.anything());
     });
 
     await waitFor(() => {
-      expect(listTemplateAttachments).toHaveBeenCalledWith(10);
+      expect(
+        screen.getByTestId("admin-template-attachments-page-counterpart-1"),
+      ).toBeChecked();
     });
+    expect(
+      screen.getByTestId("admin-template-attachments-page-counterpart-2"),
+    ).not.toBeChecked();
 
-    await waitFor(() => {
-      expect(screen.getByTestId("admin-template-attachment-toggle-1")).toBeChecked();
-    });
-    expect(screen.getByTestId("admin-template-attachment-toggle-2")).not.toBeChecked();
-
-    fireEvent.click(screen.getByTestId("admin-template-attachment-toggle-2"));
-    await waitFor(() => {
-      expect(screen.getByTestId("admin-template-attachments-save")).not.toBeDisabled();
-    });
-    fireEvent.click(screen.getByTestId("admin-template-attachments-save"));
+    fireEvent.click(screen.getByTestId("admin-template-attachments-page-counterpart-2"));
 
     await waitFor(() => {
       expect(replaceTemplateAttachments).toHaveBeenCalled();

@@ -789,7 +789,7 @@
     },
     "queueTemplates": {
       "title": "Vorlagen↔Queues",
-      "subtitle": "Wähle eine Queue und weise Vorlagen zu. Die Anzeige startet leer (kein GET am Backend); An- und Abwählen speichern sofort.",
+      "subtitle": "Weise Vorlagen Queues zu — in beide Richtungen. An- und Abwählen speichern sofort.",
       "queue": "Queue",
       "selectQueue": "Queue auswählen…",
       "empty": "Wähle oben eine Queue, um ihre Vorlagen zu bearbeiten.",
@@ -799,7 +799,7 @@
     },
     "queueAutoResponses": {
       "title": "Queues↔Autoantworten",
-      "subtitle": "Wähle eine Queue und weise Autoantworten zu. Die Anzeige startet leer (kein GET am Backend); An- und Abwählen speichern sofort.",
+      "subtitle": "Weise Autoantworten Queues zu — in beide Richtungen. An- und Abwählen speichern sofort.",
       "queue": "Queue",
       "selectQueue": "Queue auswählen…",
       "empty": "Wähle oben eine Queue, um ihre Autoantworten zu bearbeiten.",
@@ -807,6 +807,20 @@
       "assigned": "Zugewiesen",
       "typeId": "Typ-ID",
       "noAutoResponses": "Keine gültigen Autoantworten vorhanden."
+    },
+    "assignmentEditor": {
+      "directionBy": "Nach {{side}}",
+      "searchAnchor": "Suchen…",
+      "searchCounterpart": "Suchen…",
+      "all": "Alle",
+      "none": "Keine",
+      "saved": "Gespeichert",
+      "selectAnchor": "Wähle {{side}} …",
+      "noCounterparts": "Keine Einträge vorhanden.",
+      "noAnchors": "Keine Einträge vorhanden.",
+      "noMatches": "Keine Treffer.",
+      "assignedCount": "{{count}} zugewiesen",
+      "counterpartFor": "{{counterpart}} für {{anchor}}"
     }
   },
   "kb": {

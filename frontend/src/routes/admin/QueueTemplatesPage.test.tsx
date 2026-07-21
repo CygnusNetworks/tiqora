@@ -7,6 +7,8 @@ import { QueueTemplatesPage } from "./QueueTemplatesPage";
 
 const listQueues = vi.fn();
 const listTemplates = vi.fn();
+const listQueueTemplates = vi.fn();
+const listTemplateQueues = vi.fn();
 const assignQueueTemplate = vi.fn();
 const revokeQueueTemplate = vi.fn();
 
@@ -18,6 +20,8 @@ vi.mock("@/lib/api", () => ({
     adminTemplates: {
       list: (...args: unknown[]) => listTemplates(...args),
     },
+    listQueueTemplates: (...args: unknown[]) => listQueueTemplates(...args),
+    listTemplateQueues: (...args: unknown[]) => listTemplateQueues(...args),
     assignQueueTemplate: (...args: unknown[]) => assignQueueTemplate(...args),
     revokeQueueTemplate: (...args: unknown[]) => revokeQueueTemplate(...args),
   },
@@ -40,6 +44,8 @@ describe("QueueTemplatesPage", () => {
   beforeEach(() => {
     listQueues.mockReset();
     listTemplates.mockReset();
+    listQueueTemplates.mockReset();
+    listTemplateQueues.mockReset();
     assignQueueTemplate.mockReset();
     revokeQueueTemplate.mockReset();
 
@@ -66,24 +72,42 @@ describe("QueueTemplatesPage", () => {
       page: 1,
       page_size: 500,
     });
+    listQueueTemplates.mockResolvedValue([
+      {
+        id: 20,
+        name: "Welcome",
+        template_type: "Create",
+        text: null,
+        comments: null,
+        valid_id: 1,
+        create_time: "2026-01-01T00:00:00Z",
+        change_time: "2026-01-01T00:00:00Z",
+      },
+    ]);
+    listTemplateQueues.mockResolvedValue([]);
     assignQueueTemplate.mockResolvedValue(undefined);
     revokeQueueTemplate.mockResolvedValue(undefined);
   });
 
-  it("renders and submits PUT assign when a template is toggled on", async () => {
+  it("preselects assigned templates and submits assign/revoke on toggle", async () => {
     renderPage();
 
-    // Wait until the async queue option is present before changing.
-    await screen.findByRole("option", { name: "Support" });
-    fireEvent.change(screen.getByTestId("admin-queue-templates-select"), {
-      target: { value: "3" },
-    });
-
-    await screen.findByTestId("admin-queue-template-toggle-20");
-    fireEvent.click(screen.getByTestId("admin-queue-template-toggle-20"));
+    await screen.findByTestId("admin-queue-templates-page-anchor-3");
+    fireEvent.click(screen.getByTestId("admin-queue-templates-page-anchor-3"));
 
     await waitFor(() => {
-      expect(assignQueueTemplate).toHaveBeenCalledWith(3, 20);
+      expect(listQueueTemplates).toHaveBeenCalledWith(3, expect.anything());
+    });
+    await waitFor(() => {
+      expect(
+        screen.getByTestId("admin-queue-templates-page-counterpart-20"),
+      ).toBeChecked();
+    });
+
+    // Uncheck → revoke
+    fireEvent.click(screen.getByTestId("admin-queue-templates-page-counterpart-20"));
+    await waitFor(() => {
+      expect(revokeQueueTemplate).toHaveBeenCalledWith(3, 20);
     });
   });
 });
