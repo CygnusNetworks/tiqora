@@ -5595,6 +5595,25 @@
         "title": "PhoneNoteResponse",
         "type": "object"
       },
+      "PhysicalQueueVariableOut": {
+        "description": "A non-standard column on the Znuny ``queue`` table (site-specific patch).\n\nSurfaced read-only so admins can see physical values that resolve as\n``<OTRS_QUEUE_{name}>`` even when no ``tiqora_queue_variable`` row exists.",
+        "properties": {
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "value": {
+            "title": "Value",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "value"
+        ],
+        "title": "PhysicalQueueVariableOut",
+        "type": "object"
+      },
       "PlaceholderFieldCreate": {
         "properties": {
           "column_name": {
@@ -9648,6 +9667,28 @@
           "auth_method": {
             "title": "Auth Method",
             "type": "string"
+          },
+          "avatar_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Avatar Url"
+          },
+          "email": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Email"
           },
           "first_name": {
             "title": "First Name",
@@ -17403,6 +17444,85 @@
         "summary": "Revoke Queue Auto Response",
         "tags": [
           "admin:auto-responses"
+        ]
+      }
+    },
+    "/api/v1/admin/queues/{queue_id}/physical-variables": {
+      "get": {
+        "description": "Non-standard columns on the ``queue`` table for this queue (read-only).\n\nStock Znuny installs with no custom columns return ``[]``. Missing queue \u2192 404.",
+        "operationId": "list_queue_physical_variables_api_v1_admin_queues__queue_id__physical_variables_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "queue_id",
+            "required": true,
+            "schema": {
+              "title": "Queue Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/PhysicalQueueVariableOut"
+                  },
+                  "title": "Response List Queue Physical Variables Api V1 Admin Queues  Queue Id  Physical Variables Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Queue Physical Variables",
+        "tags": [
+          "admin:queues"
         ]
       }
     },

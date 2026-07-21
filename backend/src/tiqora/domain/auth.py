@@ -12,11 +12,12 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from tiqora.config import Settings
-from tiqora.db.legacy.user import Users
+from tiqora.db.legacy.user import UserPreferences, Users
 from tiqora.db.tiqora.models import TiqoraApiKey
 from tiqora.znuny.password import verify_password
 
 SESSION_KEY_PREFIX = "tiqora:session:"
+SESSION_AVATAR_KEY_PREFIX = "tiqora:session:avatar:"
 
 
 @dataclass(frozen=True, slots=True)
@@ -27,7 +28,9 @@ class AuthenticatedUser:
     login: str
     first_name: str
     last_name: str
-    auth_method: str  # "session" | "api_key"
+    auth_method: str  # "session" | "api_key" | "sso" | "ldap" | "spnego"
+    email: str | None = None
+    avatar_url: str | None = None
 
 
 class SessionStore:
@@ -37,14 +40,20 @@ class SessionStore:
         self._client = client
         self._ttl = settings.session_ttl_seconds
         self._prefix = SESSION_KEY_PREFIX
+        self._avatar_prefix = SESSION_AVATAR_KEY_PREFIX
 
     def _key(self, token: str) -> str:
         return f"{self._prefix}{token}"
 
-    async def create(self, user_id: int, login: str) -> str:
+    def _avatar_key(self, token: str) -> str:
+        return f"{self._avatar_prefix}{token}"
+
+    async def create(self, user_id: int, login: str, *, avatar_url: str | None = None) -> str:
         token = secrets.token_urlsafe(32)
         payload = f"{user_id}:{login}"
         await self._client.set(self._key(token), payload, ex=self._ttl)
+        if avatar_url:
+            await self._client.set(self._avatar_key(token), avatar_url, ex=self._ttl)
         return token
 
     async def get(self, token: str) -> tuple[int, str] | None:
@@ -59,12 +68,22 @@ class SessionStore:
         except (ValueError, TypeError):
             return None
 
+    async def get_avatar_url(self, token: str) -> str | None:
+        raw = await self._client.get(self._avatar_key(token))
+        if raw is None:
+            return None
+        if isinstance(raw, bytes):
+            raw = raw.decode("utf-8")
+        value = str(raw).strip()
+        return value or None
+
     async def touch(self, token: str) -> None:
         """Sliding renewal: reset TTL if the session still exists."""
         await self._client.expire(self._key(token), self._ttl)
+        await self._client.expire(self._avatar_key(token), self._ttl)
 
     async def delete(self, token: str) -> None:
-        await self._client.delete(self._key(token))
+        await self._client.delete(self._key(token), self._avatar_key(token))
 
     async def create_pending(self, user_id: int, login: str, ttl_seconds: int) -> str:
         """Create a short-lived 'pending 2FA' session (not resolvable by :meth:`get`).
@@ -93,14 +112,14 @@ class SessionStore:
         except (ValueError, TypeError):
             return None
 
-    async def promote_pending(self, token: str) -> str | None:
+    async def promote_pending(self, token: str, *, avatar_url: str | None = None) -> str | None:
         """Verify+consume a pending session and issue a full session token."""
         data = await self.get_pending(token)
         if data is None:
             return None
         user_id, login = data
         await self.delete(token)
-        return await self.create(user_id, login)
+        return await self.create(user_id, login, avatar_url=avatar_url)
 
 
 def hash_api_key(raw_key: str) -> str:
@@ -126,6 +145,41 @@ class AuthService:
         self._sessions = sessions
         self._settings = settings
 
+    async def _load_user_email(self, user_id: int) -> str | None:
+        """Znuny stores the agent mailbox in ``user_preferences.UserEmail``."""
+        result = await self._session.execute(
+            select(UserPreferences.preferences_value).where(
+                UserPreferences.user_id == user_id,
+                UserPreferences.preferences_key == "UserEmail",
+            )
+        )
+        raw = result.scalar_one_or_none()
+        if raw is None:
+            return None
+        if isinstance(raw, bytes | bytearray | memoryview):
+            value = bytes(raw).decode("utf-8", errors="replace").strip()
+        else:
+            value = str(raw).strip()
+        return value or None
+
+    async def _user_from_row(
+        self,
+        user: Users,
+        *,
+        auth_method: str,
+        avatar_url: str | None = None,
+    ) -> AuthenticatedUser:
+        email = await self._load_user_email(user.id)
+        return AuthenticatedUser(
+            id=user.id,
+            login=user.login,
+            first_name=user.first_name,
+            last_name=user.last_name,
+            auth_method=auth_method,
+            email=email,
+            avatar_url=avatar_url,
+        )
+
     async def authenticate_password(self, login: str, password: str) -> AuthenticatedUser | None:
         """Verify agent credentials against ``users.pw`` (valid_id must be 1)."""
         result = await self._session.execute(
@@ -136,16 +190,15 @@ class AuthService:
             return None
         if not verify_password(password, user.pw):
             return None
-        return AuthenticatedUser(
-            id=user.id,
-            login=user.login,
-            first_name=user.first_name,
-            last_name=user.last_name,
-            auth_method="session",
-        )
+        return await self._user_from_row(user, auth_method="session")
 
-    async def create_session(self, user: AuthenticatedUser) -> str:
-        return await self._sessions.create(user.id, user.login)
+    async def create_session(
+        self, user: AuthenticatedUser, *, avatar_url: str | None = None
+    ) -> str:
+        # Prefer an explicit avatar_url (OIDC picture); fall back to whatever
+        # was already attached to the AuthenticatedUser (usually None).
+        resolved = avatar_url if avatar_url is not None else user.avatar_url
+        return await self._sessions.create(user.id, user.login, avatar_url=resolved)
 
     async def resolve_session(self, token: str) -> AuthenticatedUser | None:
         data = await self._sessions.get(token)
@@ -159,13 +212,8 @@ class AuthService:
         if user is None or user.login != login:
             return None
         await self._sessions.touch(token)
-        return AuthenticatedUser(
-            id=user.id,
-            login=user.login,
-            first_name=user.first_name,
-            last_name=user.last_name,
-            auth_method="session",
-        )
+        avatar_url = await self._sessions.get_avatar_url(token)
+        return await self._user_from_row(user, auth_method="session", avatar_url=avatar_url)
 
     async def logout(self, token: str) -> None:
         await self._sessions.delete(token)
@@ -184,24 +232,28 @@ class AuthService:
         user = result.scalar_one_or_none()
         if user is None:
             return None
-        return AuthenticatedUser(
-            id=user.id,
-            login=user.login,
-            first_name=user.first_name,
-            last_name=user.last_name,
-            auth_method=auth_method,
-        )
+        return await self._user_from_row(user, auth_method=auth_method)
 
     async def get_pending_session(self, token: str) -> tuple[int, str] | None:
         return await self._sessions.get_pending(token)
 
-    async def create_pending_session(self, user: AuthenticatedUser) -> str:
-        """Create a short-lived pending-2FA session (password/SSO/SPNEGO step 1)."""
+    async def create_pending_session(
+        self, user: AuthenticatedUser, *, avatar_url: str | None = None
+    ) -> str:
+        """Create a short-lived pending-2FA session (password/SSO/SPNEGO step 1).
+
+        ``avatar_url`` is accepted for API symmetry with :meth:`create_session`
+        but is not stored on the pending token (pending sessions never reach
+        ``/me``). Callers with 2FA + OIDC re-capture picture after promote.
+        """
+        _ = avatar_url
         return await self._sessions.create_pending(
             user.id, user.login, self._settings.totp_pending_ttl_seconds
         )
 
-    async def promote_pending_session(self, token: str) -> tuple[str, AuthenticatedUser] | None:
+    async def promote_pending_session(
+        self, token: str, *, avatar_url: str | None = None
+    ) -> tuple[str, AuthenticatedUser] | None:
         """Verify a pending session still exists and issue a full session token."""
         pending = await self._sessions.get_pending(token)
         if pending is None:
@@ -213,15 +265,11 @@ class AuthService:
         user = result.scalar_one_or_none()
         if user is None:
             return None
-        new_token = await self._sessions.promote_pending(token)
+        new_token = await self._sessions.promote_pending(token, avatar_url=avatar_url)
         if new_token is None:
             return None
-        return new_token, AuthenticatedUser(
-            id=user.id,
-            login=user.login,
-            first_name=user.first_name,
-            last_name=user.last_name,
-            auth_method="session",
+        return new_token, await self._user_from_row(
+            user, auth_method="session", avatar_url=avatar_url
         )
 
     async def resolve_api_key(self, raw_key: str) -> AuthenticatedUser | None:
@@ -241,13 +289,7 @@ class AuthService:
         user = user_result.scalar_one_or_none()
         if user is None:
             return None
-        return AuthenticatedUser(
-            id=user.id,
-            login=user.login,
-            first_name=user.first_name,
-            last_name=user.last_name,
-            auth_method="api_key",
-        )
+        return await self._user_from_row(user, auth_method="api_key")
 
     async def get_user_by_id(self, user_id: int) -> AuthenticatedUser | None:
         result = await self._session.execute(
@@ -256,13 +298,7 @@ class AuthService:
         user = result.scalar_one_or_none()
         if user is None:
             return None
-        return AuthenticatedUser(
-            id=user.id,
-            login=user.login,
-            first_name=user.first_name,
-            last_name=user.last_name,
-            auth_method="session",
-        )
+        return await self._user_from_row(user, auth_method="session")
 
 
 def user_to_dict(user: AuthenticatedUser) -> dict[str, Any]:
@@ -272,4 +308,6 @@ def user_to_dict(user: AuthenticatedUser) -> dict[str, Any]:
         "first_name": user.first_name,
         "last_name": user.last_name,
         "auth_method": user.auth_method,
+        "email": user.email,
+        "avatar_url": user.avatar_url,
     }

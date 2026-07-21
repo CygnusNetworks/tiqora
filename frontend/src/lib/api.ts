@@ -107,6 +107,7 @@ export type {
   QueueVariableOut,
   QueueVariableCreate,
   QueueVariableUpdate,
+  PhysicalQueueVariableOut,
   PlaceholderFieldOut,
   PlaceholderFieldCreate,
   PlaceholderFieldUpdate,

@@ -93,7 +93,7 @@ describe("AccountMenu", () => {
     expect(logout).toHaveBeenCalledOnce();
   });
 
-  it("renders a Gravatar image when the user has an email", () => {
+  it("renders an avatar for the signed-in user (Gravatar when email is set)", () => {
     open();
     const img = screen.getByTestId("account-menu-avatar");
     expect(img.tagName).toBe("IMG");

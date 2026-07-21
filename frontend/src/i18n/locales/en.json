@@ -838,7 +838,10 @@
       "empty": "No variables for this queue.",
       "nameHelp": "Resolved as <OTRS_QUEUE_{Name}> and <TIQORA_QUEUE_{Name}>.",
       "globalHint": "Global variables apply to every queue unless the queue defines its own value for the same name.",
-      "queueHint": "Queue-specific variables override globals with the same name."
+      "queueHint": "Queue-specific variables override globals with the same name.",
+      "physicalTitle": "From the queue table (read-only)",
+      "physicalHint": "Physical columns on this queue (e.g. domain, phonenumber). A configured variable with the same name overrides the physical value.",
+      "physicalEmpty": "No custom queue columns (stock Znuny)."
     },
     "customerFields": {
       "title_plural": "Customer fields",
