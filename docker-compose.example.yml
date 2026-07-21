@@ -95,6 +95,17 @@ services:
       TIQORA_CORS_ORIGINS: ${TIQORA_CORS_ORIGINS:-https://helpdesk.example.com}
       # Keep false until post-cutover schema ownership (Phase 5)
       TIQORA_SCHEMA_OWNERSHIP: "false"
+      # Kerberos / SPNEGO (optional). Image ships gssapi + libkrb5; stays inert
+      # until enabled. Prod SPN: HTTP/tiqora.cygnusnetworks.de@CYGNUSNETWORKS.DE
+      # TIQORA_SPNEGO_ENABLED: "true"
+      # KRB5_KTNAME: /etc/tiqora/tiqora.keytab
+    # volumes:
+    #   # Service keytab (read-only). Export from KDC for the SPN above.
+    #   - ./secrets/tiqora.keytab:/etc/tiqora/tiqora.keytab:ro
+    #   # Optional: for a pure acceptor, krb5.conf is usually not required
+    #   # (ticket is decrypted with the keytab; no KDC round-trip). A
+    #   # `default_realm = CYGNUSNETWORKS.DE` can still help.
+    #   - ./secrets/krb5.conf:/etc/krb5.conf:ro
     ports:
       - "8000:8000"
     depends_on:

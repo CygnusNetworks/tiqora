@@ -26,16 +26,27 @@ COPY frontend/ ./frontend/
 RUN pnpm --filter tiqora-frontend build
 
 # ---------- Python deps ----------
+# Base: python:*-slim-bookworm (Debian 12). gssapi (kerberos extra) needs
+# libkrb5 headers + a C compiler to build the extension against MIT Kerberos.
 FROM python:${PYTHON_VERSION}-slim-bookworm AS python-deps
 WORKDIR /app/backend
 ENV UV_COMPILE_BYTECODE=1 \
     UV_LINK_MODE=copy \
     PIP_DISABLE_PIP_VERSION_CHECK=1
 
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+        gcc \
+        libkrb5-dev \
+        krb5-config \
+    && rm -rf /var/lib/apt/lists/*
+
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
 COPY backend/pyproject.toml backend/README.md ./
 COPY backend/src ./src
-RUN uv sync --no-dev --no-editable
+# Include the optional kerberos extra (gssapi) so SPNEGO can be enabled at
+# runtime via TIQORA_SPNEGO_ENABLED + KRB5_KTNAME. Stays inert until then.
+RUN uv sync --no-dev --no-editable --extra kerberos
 
 # ---------- Runtime ----------
 FROM python:${PYTHON_VERSION}-slim-bookworm AS runtime
@@ -43,7 +54,11 @@ WORKDIR /app
 
 RUN useradd --create-home --uid 10001 tiqora \
     && apt-get update \
-    && apt-get install -y --no-install-recommends ca-certificates curl \
+    && apt-get install -y --no-install-recommends \
+        ca-certificates \
+        curl \
+        libgssapi-krb5-2 \
+        libkrb5-3 \
     && rm -rf /var/lib/apt/lists/*
 
 COPY --from=python-deps /app/backend/.venv /app/.venv
