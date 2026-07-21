@@ -185,6 +185,13 @@ class Settings(BaseSettings):
     totp_pending_ttl_seconds: int = Field(default=300, validation_alias="TIQORA_TOTP_PENDING_TTL")
     totp_issuer: str = Field(default="Tiqora", validation_alias="TIQORA_TOTP_ISSUER")
 
+    # WebAuthn passkeys as an alternative 2nd factor (Phase 3c). Disabled unless
+    # both rp_id and origin are set — endpoints 404 and AuthMethodsOut.webauthn
+    # is false when unset (ships flag-off).
+    webauthn_rp_id: str = Field(default="", validation_alias="TIQORA_WEBAUTHN_RP_ID")
+    webauthn_rp_name: str = Field(default="Tiqora", validation_alias="TIQORA_WEBAUTHN_RP_NAME")
+    webauthn_origin: str = Field(default="", validation_alias="TIQORA_WEBAUTHN_ORIGIN")
+
     # Webhooks (Phase 3c)
     webhook_timeout_seconds: float = Field(default=10.0, validation_alias="TIQORA_WEBHOOK_TIMEOUT")
     webhook_max_attempts: int = Field(default=3, validation_alias="TIQORA_WEBHOOK_MAX_ATTEMPTS")

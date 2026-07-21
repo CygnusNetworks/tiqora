@@ -971,6 +971,7 @@ class AuthConfigAgentOut(BaseModel):
     login: str
     full_name: str
     totp_enabled: bool
+    passkey_enabled: bool = False
     sso_eligible: bool
     enforce_2fa: bool
 
