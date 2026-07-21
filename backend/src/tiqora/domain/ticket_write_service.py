@@ -1008,6 +1008,7 @@ async def watch_ticket(
     fullname = f"{name_row[0]} {name_row[1]}".strip() if name_row else str(watcher_user_id)
     await add_subscribe(session, ticket_id=ticket_id, user_fullname=fullname, user_id=user_id)
     await _emit_event(session, "TicketSubscribe", ticket_id, {"watcher_user_id": watcher_user_id})
+    await invalidate_ticket_cache(session, ticket_id)
 
 
 async def unwatch_ticket(
@@ -1032,6 +1033,7 @@ async def unwatch_ticket(
     fullname = f"{name_row[0]} {name_row[1]}".strip() if name_row else str(watcher_user_id)
     await add_unsubscribe(session, ticket_id=ticket_id, user_fullname=fullname, user_id=user_id)
     await _emit_event(session, "TicketUnsubscribe", ticket_id, {"watcher_user_id": watcher_user_id})
+    await invalidate_ticket_cache(session, ticket_id)
 
 
 async def archive_ticket(
@@ -1441,6 +1443,9 @@ async def link_tickets(
         },
     )
     await _emit_event(session, "LinkAdd", source_ticket_id, {"target_ticket_id": target_ticket_id})
+    # Both linked tickets must refresh in Znuny (link list on each side).
+    await invalidate_ticket_cache(session, source_ticket_id)
+    await invalidate_ticket_cache(session, target_ticket_id)
 
 
 # ---------------------------------------------------------------------------
