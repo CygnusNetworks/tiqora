@@ -16,8 +16,13 @@ from sqlalchemy import create_engine, text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from tiqora.channels.email.outbound_reply import prepare_outgoing_agent_email
-from tiqora.channels.email.placeholder import expand_placeholders
+from tiqora.channels.email.placeholder import (
+    KEY_CUSTOMER_ALLOWLIST,
+    expand_placeholders,
+)
 from tiqora.db.tiqora.base import TiqoraBase
+from tiqora.db.tiqora.models import TiqoraPlaceholderField
+from tiqora.domain.settings_store import set_setting
 from tiqora.domain.ticket_service import TicketService
 from tiqora.domain.ticket_write_service import ArticleIn
 from tiqora.znuny.password import hash_password
@@ -584,5 +589,173 @@ async def test_reply_draft_includes_expanded_signature(
         # Signature must not be folded into the editable body.
         assert "Ada Lovelace" not in draft.body
         assert draft.body.startswith("\n\n")
+
+    await engine.dispose()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("url_fixture", ["mariadb_znuny_url", "postgres_znuny_url"])
+async def test_configured_queue_variable_otrs_and_tiqora_prefix(
+    url_fixture: str, request: pytest.FixtureRequest
+) -> None:
+    """Configured tiqora_queue_variable resolves via OTRS_ and TIQORA_ prefixes.
+
+    Precedence: configured var → physical column → empty. Queue-specific
+    overrides global (queue_id IS NULL).
+    """
+    sync_url: str = request.getfixturevalue(url_fixture)
+    ids = _seed(sync_url, ns=6)
+    sysconfig = _make_sysconfig()
+    domain_global = f"global-92{ids['ns']}.example"
+    domain_queue = f"queue-92{ids['ns']}.example"
+    only_global = f"only-global-92{ids['ns']}"
+
+    engine_sync = create_engine(sync_url)
+    with engine_sync.begin() as conn:
+        TiqoraBase.metadata.create_all(conn)
+        # Global defaults
+        conn.execute(
+            text(
+                "INSERT INTO tiqora_queue_variable (queue_id, name, value)"
+                " VALUES (NULL, 'Domain', :v), (NULL, 'OnlyGlobal', :og)"
+            ),
+            {"v": domain_global, "og": only_global},
+        )
+        # Queue-specific Domain overrides global
+        conn.execute(
+            text(
+                "INSERT INTO tiqora_queue_variable (queue_id, name, value)"
+                " VALUES (:qid, 'Domain', :v)"
+            ),
+            {"qid": ids["queue"], "v": domain_queue},
+        )
+    engine_sync.dispose()
+
+    engine = create_async_engine(_to_async_url(sync_url))
+    factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+
+    async with factory() as session:
+        both = await expand_placeholders(
+            session,
+            sysconfig,
+            "o=<OTRS_QUEUE_Domain> t=<TIQORA_QUEUE_Domain>"
+            " g=<OTRS_QUEUE_OnlyGlobal> u=<OTRS_QUEUE_UnknownVar>",
+            ticket_id=ids["ticket"],
+            user_id=ids["agent"],
+        )
+        assert both == (f"o={domain_queue} t={domain_queue} g={only_global} u=")
+        assert "<OTRS_" not in both and "<TIQORA_" not in both
+
+        # Unknown configured name + no physical column → empty (not raw tag).
+        unknown = await expand_placeholders(
+            session,
+            sysconfig,
+            "x=<TIQORA_QUEUE_NoSuchField>",
+            ticket_id=ids["ticket"],
+            user_id=ids["agent"],
+        )
+        assert unknown == "x="
+
+    await engine.dispose()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("url_fixture", ["mariadb_znuny_url", "postgres_znuny_url"])
+async def test_configured_queue_variable_beats_physical_column(
+    url_fixture: str, request: pytest.FixtureRequest
+) -> None:
+    """Configured variable wins over a real queue column of the same name."""
+    sync_url: str = request.getfixturevalue(url_fixture)
+    ids = _seed(sync_url, ns=7)
+    sysconfig = _make_sysconfig()
+    assert _ensure_queue_domain_column(sync_url)
+    physical = f"physical-92{ids['ns']}.example"
+    configured = f"configured-92{ids['ns']}.example"
+
+    engine_sync = create_engine(sync_url)
+    with engine_sync.begin() as conn:
+        TiqoraBase.metadata.create_all(conn)
+        conn.execute(
+            text("UPDATE queue SET domain = :d WHERE id = :id"),
+            {"d": physical, "id": ids["queue"]},
+        )
+        conn.execute(
+            text(
+                "INSERT INTO tiqora_queue_variable (queue_id, name, value)"
+                " VALUES (:qid, 'Domain', :v)"
+            ),
+            {"qid": ids["queue"], "v": configured},
+        )
+    engine_sync.dispose()
+
+    engine = create_async_engine(_to_async_url(sync_url))
+    factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+
+    async with factory() as session:
+        expanded = await expand_placeholders(
+            session,
+            sysconfig,
+            "d=<OTRS_QUEUE_Domain>",
+            ticket_id=ids["ticket"],
+            user_id=ids["agent"],
+        )
+        assert expanded == f"d={configured}"
+
+    await engine.dispose()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("url_fixture", ["mariadb_znuny_url", "postgres_znuny_url"])
+async def test_customer_allowlist_gate_default_off(
+    url_fixture: str, request: pytest.FixtureRequest
+) -> None:
+    """Allow-list gate defaults OFF — all customer columns still resolve."""
+    sync_url: str = request.getfixturevalue(url_fixture)
+    ids = _seed(sync_url, ns=8)
+    if not ids["has_wpnum"]:
+        pytest.skip("wpnum column not available")
+    sysconfig = _make_sysconfig()
+
+    engine_sync = create_engine(sync_url)
+    with engine_sync.begin() as conn:
+        TiqoraBase.metadata.create_all(conn)
+    engine_sync.dispose()
+
+    engine = create_async_engine(_to_async_url(sync_url))
+    factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+
+    async with factory() as session:
+        # No allow-list rows, flag unset → wpnum still resolves.
+        expanded = await expand_placeholders(
+            session,
+            sysconfig,
+            "w=<OTRS_CUSTOMER_DATA_wpnum> f=<OTRS_CUSTOMER_DATA_UserFirstname>",
+            ticket_id=ids["ticket"],
+            user_id=ids["agent"],
+        )
+        assert ids["wpnum"] in expanded
+        assert "Alice" in expanded
+
+        # Enable gate with only UserFirstname registered → wpnum blocked.
+        await set_setting(session, KEY_CUSTOMER_ALLOWLIST, "true")
+        session.add(
+            TiqoraPlaceholderField(
+                source_table="customer_user",
+                column_name="first_name",
+                tag_name="UserFirstname",
+                label="First name",
+                enabled=True,
+            )
+        )
+        await session.commit()
+
+        gated = await expand_placeholders(
+            session,
+            sysconfig,
+            "w=<OTRS_CUSTOMER_DATA_wpnum> f=<OTRS_CUSTOMER_DATA_UserFirstname>",
+            ticket_id=ids["ticket"],
+            user_id=ids["agent"],
+        )
+        assert gated == "w= f=Alice"
 
     await engine.dispose()

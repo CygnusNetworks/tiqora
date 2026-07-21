@@ -503,6 +503,66 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/customer-fields": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Customer Fields */
+        get: operations["list_customer_fields_api_v1_admin_customer_fields_get"];
+        put?: never;
+        /** Create Customer Field */
+        post: operations["create_customer_field_api_v1_admin_customer_fields_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/customer-fields/available-columns": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Available Customer Columns
+         * @description Column names for ``customer_user`` / ``customer_company`` via information_schema.
+         */
+        get: operations["list_available_customer_columns_api_v1_admin_customer_fields_available_columns_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/customer-fields/{field_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Customer Field */
+        get: operations["get_customer_field_api_v1_admin_customer_fields__field_id__get"];
+        put?: never;
+        post?: never;
+        /**
+         * Delete Customer Field
+         * @description Hard-delete a registry row (no soft-valid flag on this table).
+         */
+        delete: operations["delete_customer_field_api_v1_admin_customer_fields__field_id__delete"];
+        options?: never;
+        head?: never;
+        /** Update Customer Field */
+        patch: operations["update_customer_field_api_v1_admin_customer_fields__field_id__patch"];
+        trace?: never;
+    };
     "/api/v1/admin/customer-users": {
         parameters: {
             query?: never;
@@ -959,6 +1019,53 @@ export interface paths {
         head?: never;
         /** Update Priority */
         patch: operations["update_priority_api_v1_admin_priorities__priority_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/admin/queue-variables": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Queue Variables
+         * @description List queue variables.
+         *
+         *     * ``queue_id`` set → only that queue's rows (not globals).
+         *     * ``global_only=true`` → only ``queue_id IS NULL`` rows.
+         *     * both omitted → all rows.
+         */
+        get: operations["list_queue_variables_api_v1_admin_queue_variables_get"];
+        put?: never;
+        /** Create Queue Variable */
+        post: operations["create_queue_variable_api_v1_admin_queue_variables_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/queue-variables/{variable_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Queue Variable */
+        get: operations["get_queue_variable_api_v1_admin_queue_variables__variable_id__get"];
+        put?: never;
+        post?: never;
+        /**
+         * Delete Queue Variable
+         * @description Hard-delete a queue variable (no soft-valid flag on this table).
+         */
+        delete: operations["delete_queue_variable_api_v1_admin_queue_variables__variable_id__delete"];
+        options?: never;
+        head?: never;
+        /** Update Queue Variable */
+        patch: operations["update_queue_variable_api_v1_admin_queue_variables__variable_id__patch"];
         trace?: never;
     };
     "/api/v1/admin/queues": {
@@ -5025,6 +5132,17 @@ export interface components {
             /** Total */
             total: number;
         };
+        /** Page[PlaceholderFieldOut] */
+        Page_PlaceholderFieldOut_: {
+            /** Items */
+            items: components["schemas"]["PlaceholderFieldOut"][];
+            /** Page */
+            page: number;
+            /** Page Size */
+            page_size: number;
+            /** Total */
+            total: number;
+        };
         /** Page[PriorityOut] */
         Page_PriorityOut_: {
             /** Items */
@@ -5040,6 +5158,17 @@ export interface components {
         Page_QueueOut_: {
             /** Items */
             items: components["schemas"]["QueueOut"][];
+            /** Page */
+            page: number;
+            /** Page Size */
+            page_size: number;
+            /** Total */
+            total: number;
+        };
+        /** Page[QueueVariableOut] */
+        Page_QueueVariableOut_: {
+            /** Items */
+            items: components["schemas"]["QueueVariableOut"][];
             /** Page */
             page: number;
             /** Page Size */
@@ -5169,6 +5298,60 @@ export interface components {
             created: boolean;
             /** Ticket Id */
             ticket_id: number;
+        };
+        /** PlaceholderFieldCreate */
+        PlaceholderFieldCreate: {
+            /** Column Name */
+            column_name: string;
+            /**
+             * Enabled
+             * @default true
+             */
+            enabled: boolean;
+            /** Label */
+            label?: string | null;
+            /** Source Table */
+            source_table: string;
+            /** Tag Name */
+            tag_name: string;
+        };
+        /** PlaceholderFieldOut */
+        PlaceholderFieldOut: {
+            /**
+             * Changed
+             * Format: date-time
+             */
+            changed: string;
+            /** Column Name */
+            column_name: string;
+            /**
+             * Created
+             * Format: date-time
+             */
+            created: string;
+            /** Enabled */
+            enabled: boolean;
+            /** Id */
+            id: number;
+            /** Label */
+            label: string | null;
+            /** Source Table */
+            source_table: string;
+            /** Tag Name */
+            tag_name: string;
+        };
+        /** PlaceholderFieldUpdate */
+        PlaceholderFieldUpdate: {
+            /** Column Name */
+            column_name?: string | null;
+            /** Enabled */
+            enabled?: boolean | null;
+            /** Label */
+            label?: string | null;
+            /** Source Table */
+            source_table?: string | null;
+            /** Tag Name */
+            tag_name?: string | null;
         };
         /** PortalArticleOut */
         PortalArticleOut: {
@@ -5553,6 +5736,45 @@ export interface components {
             update_time?: number | null;
             /** Valid Id */
             valid_id?: number | null;
+        };
+        /** QueueVariableCreate */
+        QueueVariableCreate: {
+            /** Name */
+            name: string;
+            /** Queue Id */
+            queue_id?: number | null;
+            /** Value */
+            value?: string | null;
+        };
+        /** QueueVariableOut */
+        QueueVariableOut: {
+            /**
+             * Changed
+             * Format: date-time
+             */
+            changed: string;
+            /**
+             * Created
+             * Format: date-time
+             */
+            created: string;
+            /** Id */
+            id: number;
+            /** Name */
+            name: string;
+            /** Queue Id */
+            queue_id: number | null;
+            /** Value */
+            value: string | null;
+        };
+        /** QueueVariableUpdate */
+        QueueVariableUpdate: {
+            /** Name */
+            name?: string | null;
+            /** Queue Id */
+            queue_id?: number | null;
+            /** Value */
+            value?: string | null;
         };
         /**
          * RecurrenceIn
@@ -7858,6 +8080,222 @@ export interface operations {
             };
         };
     };
+    list_customer_fields_api_v1_admin_customer_fields_get: {
+        parameters: {
+            query?: {
+                page?: number;
+                page_size?: number;
+                valid?: "valid" | "invalid" | "all";
+            };
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Page_PlaceholderFieldOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_customer_field_api_v1_admin_customer_fields_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PlaceholderFieldCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlaceholderFieldOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_available_customer_columns_api_v1_admin_customer_fields_available_columns_get: {
+        parameters: {
+            query: {
+                source: string;
+            };
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": string[];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_customer_field_api_v1_admin_customer_fields__field_id__get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                field_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlaceholderFieldOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_customer_field_api_v1_admin_customer_fields__field_id__delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                field_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_customer_field_api_v1_admin_customer_fields__field_id__patch: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                field_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PlaceholderFieldUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlaceholderFieldOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_customer_users_api_v1_admin_customer_users_get: {
         parameters: {
             query?: {
@@ -9207,6 +9645,189 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PriorityOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_queue_variables_api_v1_admin_queue_variables_get: {
+        parameters: {
+            query?: {
+                queue_id?: number | null;
+                global_only?: boolean;
+                page?: number;
+                page_size?: number;
+                valid?: "valid" | "invalid" | "all";
+            };
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Page_QueueVariableOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_queue_variable_api_v1_admin_queue_variables_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["QueueVariableCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QueueVariableOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_queue_variable_api_v1_admin_queue_variables__variable_id__get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                variable_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QueueVariableOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_queue_variable_api_v1_admin_queue_variables__variable_id__delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                variable_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_queue_variable_api_v1_admin_queue_variables__variable_id__patch: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                variable_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["QueueVariableUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QueueVariableOut"];
                 };
             };
             /** @description Validation Error */

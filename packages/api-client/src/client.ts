@@ -193,6 +193,13 @@ export type DynamicFieldUpdate = Schemas["DynamicFieldUpdate"];
 export type WebhookOut = Schemas["WebhookOut"];
 export type WebhookCreate = Schemas["WebhookCreate"];
 export type WebhookUpdate = Schemas["WebhookUpdate"];
+// Placeholder variables (regenerated into schema.d.ts from openapi.json).
+export type QueueVariableOut = Schemas["QueueVariableOut"];
+export type QueueVariableCreate = Schemas["QueueVariableCreate"];
+export type QueueVariableUpdate = Schemas["QueueVariableUpdate"];
+export type PlaceholderFieldOut = Schemas["PlaceholderFieldOut"];
+export type PlaceholderFieldCreate = Schemas["PlaceholderFieldCreate"];
+export type PlaceholderFieldUpdate = Schemas["PlaceholderFieldUpdate"];
 // Hand-written until openapi.json is regenerated (schemas also appear there).
 export type MailSecurity = "none" | "starttls" | "ssl";
 export type MailAuthType = "none" | "password";
@@ -1487,6 +1494,25 @@ export class ApiClient {
 
   get adminWebhooks() {
     return this.adminCrud<WebhookOut, WebhookCreate, WebhookUpdate>("/api/v1/admin/webhooks");
+  }
+
+  get adminQueueVariables() {
+    return this.adminCrud<QueueVariableOut, QueueVariableCreate, QueueVariableUpdate>(
+      "/api/v1/admin/queue-variables",
+    );
+  }
+
+  get adminCustomerFields() {
+    return this.adminCrud<PlaceholderFieldOut, PlaceholderFieldCreate, PlaceholderFieldUpdate>(
+      "/api/v1/admin/customer-fields",
+    );
+  }
+
+  listAvailableCustomerColumns(source: "customer_user" | "customer_company", signal?: AbortSignal) {
+    return this.request<string[]>("GET", "/api/v1/admin/customer-fields/available-columns", {
+      query: { source },
+      signal,
+    });
   }
 
   getMailOutbound(signal?: AbortSignal) {

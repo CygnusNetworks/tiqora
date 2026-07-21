@@ -21,12 +21,18 @@ import structlog
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from tiqora.domain.settings_store import get_setting_bool
 from tiqora.znuny.sysconfig import SysConfig
 
 logger = structlog.get_logger(__name__)
 
+# tiqora_settings flag: when true, only registered+enabled
+# tiqora_placeholder_field tags resolve for CUSTOMER_DATA_*. Default OFF.
+KEY_CUSTOMER_ALLOWLIST = "placeholder.customer_allowlist.enabled"
+
 # Znuny matches <OTRS_Name> and <OTRS_Name[n]>; field names are alphanumeric + _.
-_TAG_RE = re.compile(r"<OTRS_([A-Za-z0-9_]+?)(?:\[(\d+)\])?>", re.IGNORECASE)
+# <TIQORA_...> is a full alias of <OTRS_...> (configurable vars + stock tags).
+_TAG_RE = re.compile(r"<(?:OTRS|TIQORA)_([A-Za-z0-9_]+?)(?:\[(\d+)\])?>", re.IGNORECASE)
 
 # Standard CustomerUser Map (Config Defaults.pm) → DB column.
 _CUSTOMER_USER_COL_TO_TAG: dict[str, str] = {
@@ -82,6 +88,12 @@ class PlaceholderContext:
     responsible: dict[str, str] = field(default_factory=dict)
     current_user: dict[str, str] = field(default_factory=dict)
     customer: dict[str, str] = field(default_factory=dict)
+    # Configured tiqora_queue_variable rows (name.lower → value); queue-specific
+    # overrides global (queue_id IS NULL).
+    queue_vars: dict[str, str] = field(default_factory=dict)
+    # When set (allow-list gate ON), only these tag names resolve for
+    # CUSTOMER_DATA_*. None means gate off (all columns resolve as before).
+    customer_allowlist: set[str] | None = None
     queue_name: str = ""
     customer_subject: str = ""
     customer_email_lines: list[str] = field(default_factory=list)
@@ -265,6 +277,65 @@ async def _fetch_queue_maps(session: AsyncSession, queue_id: int | None) -> dict
     return data
 
 
+async def _fetch_queue_variables(session: AsyncSession, queue_id: int | None) -> dict[str, str]:
+    """Load configured queue variables; queue-specific rows override globals.
+
+    Defensive: any error (missing table on a partial deploy, etc.) yields ``{}``
+    so placeholder expansion never fails because of this optional feature.
+    """
+    try:
+        if queue_id is not None:
+            result = await session.execute(
+                text(
+                    "SELECT name, value, queue_id FROM tiqora_queue_variable"
+                    " WHERE queue_id = :qid OR queue_id IS NULL"
+                ),
+                {"qid": int(queue_id)},
+            )
+        else:
+            result = await session.execute(
+                text(
+                    "SELECT name, value, queue_id FROM tiqora_queue_variable WHERE queue_id IS NULL"
+                ),
+            )
+        globals_map: dict[str, str] = {}
+        specific: dict[str, str] = {}
+        for row in result.mappings().all():
+            name = str(row["name"]).lower()
+            val = _as_str(row["value"])
+            if row["queue_id"] is None:
+                globals_map[name] = val
+            else:
+                specific[name] = val
+        return {**globals_map, **specific}
+    except Exception:
+        logger.debug("placeholder_queue_vars_load_failed", exc_info=True)
+        return {}
+
+
+async def _fetch_customer_allowlist(session: AsyncSession) -> set[str] | None:
+    """Return enabled tag names when the allow-list gate is ON; else None.
+
+    None means the gate is off (default) — all customer columns resolve as
+    before. An empty set means the gate is on with no registered tags.
+    """
+    try:
+        enabled = await get_setting_bool(session, KEY_CUSTOMER_ALLOWLIST, False)
+        if not enabled:
+            return None
+        result = await session.execute(
+            text(
+                "SELECT tag_name FROM tiqora_placeholder_field"
+                " WHERE enabled"
+                " AND source_table IN ('customer_user', 'customer_company')"
+            ),
+        )
+        return {str(row[0]).lower() for row in result.all()}
+    except Exception:
+        logger.debug("placeholder_customer_allowlist_load_failed", exc_info=True)
+        return None
+
+
 async def load_placeholder_context(
     session: AsyncSession,
     *,
@@ -334,11 +405,13 @@ async def load_placeholder_context(
     ctx.responsible = _agent_maps_from_row(resp_row)
     ctx.current_user = _agent_maps_from_row(current_row)
     ctx.queue = await _fetch_queue_maps(session, int(queue_id) if queue_id else None)
+    ctx.queue_vars = await _fetch_queue_variables(session, int(queue_id) if queue_id else None)
     ctx.customer = await _fetch_customer_maps(
         session,
         customer_user_id=str(cuid) if cuid else None,
         customer_id=str(cid) if cid else None,
     )
+    ctx.customer_allowlist = await _fetch_customer_allowlist(session)
 
     qname = _as_str(row.get("queue_name")) or ctx.queue.get("name") or queue_name or ""
     ctx.queue_name = qname
@@ -428,6 +501,9 @@ async def _resolve_tag(
 
     if tag_u.startswith("CUSTOMER_DATA_"):
         field = tag[len("CUSTOMER_DATA_") :]
+        # Optional allow-list: when set, only registered+enabled tags resolve.
+        if ctx.customer_allowlist is not None and field.lower() not in ctx.customer_allowlist:
+            return ""
         found = _lookup(ctx.customer, field)
         return "" if found is None else found
 
@@ -487,6 +563,10 @@ async def _resolve_tag(
 
     if tag_u.startswith("QUEUE_"):
         field = tag[len("QUEUE_") :]
+        # Configured variable → physical queue column → empty.
+        configured = ctx.queue_vars.get(field.lower())
+        if configured is not None:
+            return configured
         found = _lookup(ctx.queue, field)
         if found is None:
             # Unknown queue field (e.g. Domain) — Znuny would yield empty/'-'; log it.
@@ -539,7 +619,8 @@ async def expand_placeholders(
     """
     if not text:
         return text
-    if "<OTRS_" not in text and "<otrs_" not in text.lower():
+    lowered = text.lower()
+    if "<otrs_" not in lowered and "<tiqora_" not in lowered:
         return text
 
     try:

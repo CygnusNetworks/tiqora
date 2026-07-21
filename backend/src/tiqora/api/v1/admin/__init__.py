@@ -18,6 +18,7 @@ from tiqora.api.v1.admin import (
     groups,
     mail_log,
     mail_outbound,
+    placeholder_variables,
     priorities,
     queues,
     readonly,
@@ -45,5 +46,7 @@ admin_router.include_router(webhooks.router)
 admin_router.include_router(channels.router)
 admin_router.include_router(mail_outbound.router)
 admin_router.include_router(mail_log.router)
+admin_router.include_router(placeholder_variables.queue_variables_router)
+admin_router.include_router(placeholder_variables.customer_fields_router)
 
 __all__ = ["admin_router"]
