@@ -21,19 +21,22 @@ our @ObjectDependencies = (
 
 =head1 NAME
 
-Kernel::System::TiqoraSync - Ticket cache invalidation for Tiqora parallel operation
+Kernel::System::TiqoraSync - Ticket and master-data cache invalidation for Tiqora parallel operation
 
 =head1 DESCRIPTION
 
 Tiqora is a Python/FastAPI reimplementation of Znuny that runs alongside this
 Znuny instance on the same MySQL/MariaDB database ("parallel operation").
-Tiqora writes tickets directly via SQL, bypassing Znuny's Perl object layer,
-which means Znuny's in-process object cache (L<Kernel::System::Cache>) can go
-stale for tickets that Tiqora touched.
+Tiqora writes tickets and master data directly via SQL, bypassing Znuny's Perl
+object layer, which means Znuny's in-process object cache
+(L<Kernel::System::Cache>) can go stale for tickets and config that Tiqora
+touched.
 
 Whenever Tiqora writes a ticket, it records the affected C<TicketID> in the
-hand-off table C<tiqora_cache_invalidation>. This module is invoked by a
-daemon cron task (see C<Kernel::Config::Files::XML::TiqoraSync>) and:
+hand-off table C<tiqora_cache_invalidation>. Master-data admin edits (queues,
+states, users, templates, …) insert a row with C<cache_type> set (and
+C<ticket_id> NULL) naming a Znuny CacheType string. This module is invoked by
+a daemon cron task (see C<Kernel::Config::Files::XML::TiqoraSync>) and:
 
 =over 4
 
@@ -43,6 +46,9 @@ C<tiqorasync.watermark>, defaulting to C<0> if unset)
 =item * selects up to 500 new rows from C<tiqora_cache_invalidation>
 
 =item * clears the Znuny ticket cache for every distinct C<TicketID> found
+
+=item * runs C<Cache-E<gt>CleanUp( Type =E<gt> $CacheType )> once per distinct
+non-null C<cache_type> found
 
 =item * advances the watermark to the highest id processed
 
@@ -90,7 +96,8 @@ sub new {
 
 Called by the daemon cron task (C<Daemon::SchedulerCronTaskManager::Task###TiqoraSync>).
 Reads new rows from C<tiqora_cache_invalidation>, invalidates the Znuny
-ticket cache for every affected ticket, and advances the watermark.
+ticket cache for every affected ticket, cleans up any requested master-data
+CacheTypes, and advances the watermark.
 
     my $Success = $TiqoraSyncObject->Run();
 
@@ -120,7 +127,7 @@ sub Run {
 
     my $SelectSuccess = eval {
         $DBObject->Prepare(
-            SQL => 'SELECT ticket_id, id FROM tiqora_cache_invalidation '
+            SQL => 'SELECT ticket_id, cache_type, id FROM tiqora_cache_invalidation '
                 . 'WHERE id > ? ORDER BY id ASC LIMIT ' . BATCH_LIMIT,
             Bind => [ \$Watermark ],
         );
@@ -135,11 +142,20 @@ sub Run {
     }
 
     my %TicketIDs;
+    my %CacheTypes;
     my $MaxID = $Watermark;
 
     while ( my @Row = $DBObject->FetchrowArray() ) {
-        my ( $TicketID, $ID ) = @Row;
-        $TicketIDs{$TicketID} = 1;
+        my ( $TicketID, $CacheType, $ID ) = @Row;
+        if ( defined $TicketID && $TicketID ne '' && $TicketID + 0 > 0 ) {
+            $TicketIDs{ $TicketID + 0 } = 1;
+        }
+        if ( defined $CacheType ) {
+            # Strip whitespace; skip empty / all-whitespace types so a bad
+            # row never becomes CleanUp( Type => '' ).
+            $CacheType =~ s/^\s+|\s+$//g;
+            $CacheTypes{$CacheType} = 1 if length $CacheType;
+        }
         $MaxID = $ID if $ID > $MaxID;
     }
 
@@ -147,14 +163,45 @@ sub Run {
     return 1 if $MaxID == $Watermark;
 
     for my $TicketID ( sort keys %TicketIDs ) {
-        $Self->_TicketCacheInvalidate( TicketID => $TicketID );
+        eval {
+            $Self->_TicketCacheInvalidate( TicketID => $TicketID );
+        };
+        if ($@) {
+            $Kernel::OM->Get('Kernel::System::Log')->Log(
+                Priority => 'notice',
+                Message  => "TiqoraSync: ticket cache invalidate failed for TicketID=$TicketID ($@).",
+            );
+        }
     }
 
-    # Coarse fallback, done once per run: also drop the entire Ticket cache
-    # type so any list- or count-level cache entries derived from these
-    # tickets (which we can not enumerate exhaustively per-ticket) can not
-    # remain stale.
-    $Kernel::OM->Get('Kernel::System::Cache')->CleanUp( Type => 'Ticket' );
+    # Coarse fallback, done once per run when any ticket signal was present:
+    # also drop the entire Ticket cache type so any list- or count-level
+    # cache entries derived from these tickets (which we can not enumerate
+    # exhaustively per-ticket) can not remain stale.
+    if (%TicketIDs) {
+        eval {
+            $Kernel::OM->Get('Kernel::System::Cache')->CleanUp( Type => 'Ticket' );
+        };
+        if ($@) {
+            $Kernel::OM->Get('Kernel::System::Log')->Log(
+                Priority => 'notice',
+                Message  => "TiqoraSync: Ticket CleanUp failed ($@).",
+            );
+        }
+    }
+
+    # Master-data CacheType signals: one CleanUp per distinct type per run.
+    for my $CacheType ( sort keys %CacheTypes ) {
+        eval {
+            $Kernel::OM->Get('Kernel::System::Cache')->CleanUp( Type => $CacheType );
+        };
+        if ($@) {
+            $Kernel::OM->Get('Kernel::System::Log')->Log(
+                Priority => 'notice',
+                Message  => "TiqoraSync: CleanUp Type=$CacheType failed ($@).",
+            );
+        }
+    }
 
     $Self->_WatermarkSet( Watermark => $MaxID );
 

@@ -49,9 +49,12 @@ async def _create_tiqora_tables(session: AsyncSession) -> None:
     ddls = [
         """CREATE TABLE IF NOT EXISTS tiqora_cache_invalidation (
             id BIGINT AUTO_INCREMENT PRIMARY KEY,
-            ticket_id BIGINT NOT NULL,
+            ticket_id BIGINT NULL,
+            cache_type VARCHAR(100) NULL,
             created DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
         )""",
+        "ALTER TABLE tiqora_cache_invalidation MODIFY ticket_id BIGINT NULL",
+        "ALTER TABLE tiqora_cache_invalidation ADD COLUMN cache_type VARCHAR(100) NULL",
         """CREATE TABLE IF NOT EXISTS tiqora_event_outbox (
             id BIGINT AUTO_INCREMENT PRIMARY KEY,
             event_type VARCHAR(100) NOT NULL,

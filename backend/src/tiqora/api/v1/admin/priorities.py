@@ -6,7 +6,12 @@ from fastapi import APIRouter, HTTPException, status
 from sqlalchemy import select
 
 from tiqora.api.deps import DbSession
-from tiqora.api.v1.admin.common import invalidate_cache_for_priority, now
+from tiqora.api.v1.admin.common import (
+    PRIORITY_CACHE_TYPES,
+    invalidate_cache_for_priority,
+    invalidate_znuny_cache_types,
+    now,
+)
 from tiqora.api.v1.admin.deps import AdminUser
 from tiqora.api.v1.admin.pagination import ListParamsDep, Page, apply_valid_filter, paginate
 from tiqora.api.v1.admin.schemas import PriorityCreate, PriorityOut, PriorityUpdate
@@ -48,6 +53,7 @@ async def create_priority(
         change_by=admin.id,
     )
     session.add(priority)
+    await invalidate_znuny_cache_types(session, PRIORITY_CACHE_TYPES)
     await session.commit()
     await session.refresh(priority)
     return priority

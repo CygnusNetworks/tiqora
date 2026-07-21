@@ -9,7 +9,14 @@ from fastapi import APIRouter, HTTPException, status
 from sqlalchemy import select
 
 from tiqora.api.deps import DbSession
-from tiqora.api.v1.admin.common import now
+from tiqora.api.v1.admin.common import (
+    ATTACHMENT_CACHE_TYPES,
+    SALUTATION_CACHE_TYPES,
+    SIGNATURE_CACHE_TYPES,
+    TEMPLATE_CACHE_TYPES,
+    invalidate_znuny_cache_types,
+    now,
+)
 from tiqora.api.v1.admin.deps import AdminUser
 from tiqora.api.v1.admin.pagination import ListParamsDep, Page, apply_valid_filter, paginate
 from tiqora.api.v1.admin.schemas import (
@@ -70,6 +77,7 @@ async def create_salutation(
         **body.model_dump(), create_time=ts, create_by=admin.id, change_time=ts, change_by=admin.id
     )
     session.add(row)
+    await invalidate_znuny_cache_types(session, SALUTATION_CACHE_TYPES)
     await session.commit()
     await session.refresh(row)
     return row
@@ -86,6 +94,7 @@ async def update_salutation(
         setattr(row, field, value)
     row.change_time = now()
     row.change_by = admin.id
+    await invalidate_znuny_cache_types(session, SALUTATION_CACHE_TYPES)
     await session.commit()
     await session.refresh(row)
     return row
@@ -99,6 +108,7 @@ async def deactivate_salutation(salutation_id: int, admin: AdminUser, session: D
     row.valid_id = 2
     row.change_time = now()
     row.change_by = admin.id
+    await invalidate_znuny_cache_types(session, SALUTATION_CACHE_TYPES)
     await session.commit()
 
 
@@ -132,6 +142,7 @@ async def create_signature(body: SignatureWrite, admin: AdminUser, session: DbSe
         **body.model_dump(), create_time=ts, create_by=admin.id, change_time=ts, change_by=admin.id
     )
     session.add(row)
+    await invalidate_znuny_cache_types(session, SIGNATURE_CACHE_TYPES)
     await session.commit()
     await session.refresh(row)
     return row
@@ -148,6 +159,7 @@ async def update_signature(
         setattr(row, field, value)
     row.change_time = now()
     row.change_by = admin.id
+    await invalidate_znuny_cache_types(session, SIGNATURE_CACHE_TYPES)
     await session.commit()
     await session.refresh(row)
     return row
@@ -161,6 +173,7 @@ async def deactivate_signature(signature_id: int, admin: AdminUser, session: DbS
     row.valid_id = 2
     row.change_time = now()
     row.change_by = admin.id
+    await invalidate_znuny_cache_types(session, SIGNATURE_CACHE_TYPES)
     await session.commit()
 
 
@@ -196,6 +209,7 @@ async def create_template(
         **body.model_dump(), create_time=ts, create_by=admin.id, change_time=ts, change_by=admin.id
     )
     session.add(row)
+    await invalidate_znuny_cache_types(session, TEMPLATE_CACHE_TYPES)
     await session.commit()
     await session.refresh(row)
     return row
@@ -212,6 +226,7 @@ async def update_template(
         setattr(row, field, value)
     row.change_time = now()
     row.change_by = admin.id
+    await invalidate_znuny_cache_types(session, TEMPLATE_CACHE_TYPES)
     await session.commit()
     await session.refresh(row)
     return row
@@ -225,6 +240,7 @@ async def deactivate_template(template_id: int, admin: AdminUser, session: DbSes
     row.valid_id = 2
     row.change_time = now()
     row.change_by = admin.id
+    await invalidate_znuny_cache_types(session, TEMPLATE_CACHE_TYPES)
     await session.commit()
 
 
@@ -245,6 +261,7 @@ async def assign_queue_template(
                 change_by=admin.id,
             )
         )
+        await invalidate_znuny_cache_types(session, TEMPLATE_CACHE_TYPES)
         await session.commit()
 
 
@@ -258,6 +275,7 @@ async def revoke_queue_template(
     existing = await session.get(QueueStandardTemplate, (queue_id, standard_template_id))
     if existing is not None:
         await session.delete(existing)
+        await invalidate_znuny_cache_types(session, TEMPLATE_CACHE_TYPES)
         await session.commit()
 
 
@@ -341,4 +359,7 @@ async def replace_template_attachments(
                 change_by=admin.id,
             )
         )
+    # Template↔attachment links are read via StdAttachment list caches and
+    # Queue template membership (StandardTemplate clears Queue on change).
+    await invalidate_znuny_cache_types(session, (*TEMPLATE_CACHE_TYPES, *ATTACHMENT_CACHE_TYPES))
     await session.commit()
