@@ -143,7 +143,17 @@ async def resolve_ticket_for_inbound(
     *body_text* contains a ``Ticket::Hook`` tag (:func:`detect_followup`, same
     check the email pipeline uses) or when the customer already has a
     non-closed ticket; otherwise create a new one."""
-    followup = await detect_followup(session, sysconfig, subject=body_text, references=[])
+    from tiqora.domain.subject_hook import load_subject_config
+
+    subject_cfg = await load_subject_config(session, sysconfig)
+    followup = await detect_followup(
+        session,
+        sysconfig,
+        subject=body_text,
+        references=[],
+        hook=subject_cfg.hook,
+        hook_divider=subject_cfg.divider,
+    )
     if followup is not None:
         _tn, ticket_id = followup
         return ticket_id, False

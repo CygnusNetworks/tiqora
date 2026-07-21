@@ -25,6 +25,7 @@ from tiqora.api.v1.admin import (
     readonly,
     roles,
     states,
+    subject_config,
     templates,
     users,
     webhooks,
@@ -48,6 +49,7 @@ admin_router.include_router(api_keys.router)
 admin_router.include_router(channels.router)
 admin_router.include_router(mail_outbound.router)
 admin_router.include_router(mail_log.router)
+admin_router.include_router(subject_config.router)
 admin_router.include_router(placeholder_variables.queue_variables_router)
 admin_router.include_router(placeholder_variables.customer_fields_router)
 

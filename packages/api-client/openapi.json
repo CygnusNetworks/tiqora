@@ -8952,6 +8952,169 @@
         "title": "StateUpdate",
         "type": "object"
       },
+      "SubjectConfigOut": {
+        "description": "Effective subject-hook config plus Znuny baseline and raw overrides.",
+        "properties": {
+          "divider": {
+            "title": "Divider",
+            "type": "string"
+          },
+          "enabled": {
+            "title": "Enabled",
+            "type": "boolean"
+          },
+          "hook": {
+            "title": "Hook",
+            "type": "string"
+          },
+          "overrides": {
+            "$ref": "#/components/schemas/SubjectHookOverridesOut"
+          },
+          "subject_format": {
+            "title": "Subject Format",
+            "type": "string"
+          },
+          "znuny": {
+            "$ref": "#/components/schemas/SubjectHookZnunyOut"
+          }
+        },
+        "required": [
+          "enabled",
+          "hook",
+          "divider",
+          "subject_format",
+          "overrides",
+          "znuny"
+        ],
+        "title": "SubjectConfigOut",
+        "type": "object"
+      },
+      "SubjectConfigUpdate": {
+        "description": "Upsert Tiqora overrides. Empty string / null clears an override.\n\n``enabled`` null clears the override (reverts to default True).\n``subject_format`` must be Left, Right, or None when set.",
+        "properties": {
+          "divider": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Divider"
+          },
+          "enabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Enabled"
+          },
+          "hook": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hook"
+          },
+          "subject_format": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Subject Format"
+          }
+        },
+        "title": "SubjectConfigUpdate",
+        "type": "object"
+      },
+      "SubjectHookOverridesOut": {
+        "description": "Raw Tiqora overrides; ``None`` means the field is not overridden.",
+        "properties": {
+          "divider": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Divider"
+          },
+          "enabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Enabled"
+          },
+          "hook": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hook"
+          },
+          "subject_format": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Subject Format"
+          }
+        },
+        "title": "SubjectHookOverridesOut",
+        "type": "object"
+      },
+      "SubjectHookZnunyOut": {
+        "description": "Underlying Znuny SysConfig values (never written by Tiqora).",
+        "properties": {
+          "divider": {
+            "title": "Divider",
+            "type": "string"
+          },
+          "hook": {
+            "title": "Hook",
+            "type": "string"
+          },
+          "subject_format": {
+            "title": "Subject Format",
+            "type": "string"
+          }
+        },
+        "required": [
+          "hook",
+          "divider",
+          "subject_format"
+        ],
+        "title": "SubjectHookZnunyOut",
+        "type": "object"
+      },
       "TOTPCodeIn": {
         "properties": {
           "code": {
@@ -20509,6 +20672,145 @@
         "summary": "Update State",
         "tags": [
           "admin:states"
+        ]
+      }
+    },
+    "/api/v1/admin/subject-config": {
+      "get": {
+        "operationId": "get_subject_config_api_v1_admin_subject_config_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SubjectConfigOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Subject Config",
+        "tags": [
+          "admin:subject-config"
+        ]
+      },
+      "put": {
+        "description": "Upsert the four Tiqora override keys. Empty string / null clears.",
+        "operationId": "put_subject_config_api_v1_admin_subject_config_put",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SubjectConfigUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SubjectConfigOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Put Subject Config",
+        "tags": [
+          "admin:subject-config"
         ]
       }
     },

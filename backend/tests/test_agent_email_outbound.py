@@ -220,6 +220,7 @@ def _seed(sync_url: str, *, ns: int) -> dict[str, Any]:
         "agent": agent_id,
         "queue": queue_id,
         "ticket": ticket_id,
+        "tn": tn,
         "customer_email": f"alice91{ns}@example.com",
         "support_email": f"support{ns}@outbound.example",
         "orig_mid": f"<cust-orig-91{ns}@example.com>",
@@ -351,7 +352,10 @@ async def test_agent_email_reply_sends_and_stores(
         msg = sender.sent[0]
         assert msg["To"] == ids["customer_email"]
         assert msg["Cc"] == "cc91@example.com"
-        assert msg["Subject"] == "Re: Outbound ticket 911"
+        # Default Ticket::Hook=Ticket#, SubjectFormat=Left → tag left of subject.
+        expected_subject = f"[Ticket#{ids['tn']}] Re: Outbound ticket 911"
+        assert msg["Subject"] == expected_subject
+        assert f"[Ticket#{ids['tn']}]" in (msg["Subject"] or "")
         body = msg.get_content()
         assert "Thanks for your report" in body
         assert "Your Ticket-Team" in body

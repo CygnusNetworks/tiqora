@@ -767,6 +767,52 @@ class ApiKeyCreated(ApiKeyOut):
 
 
 # ---------------------------------------------------------------------------
+# Subject-hook config — tiqora_settings overrides over live Znuny SysConfig
+# ---------------------------------------------------------------------------
+
+
+class SubjectHookZnunyOut(BaseModel):
+    """Underlying Znuny SysConfig values (never written by Tiqora)."""
+
+    hook: str
+    divider: str
+    subject_format: str
+
+
+class SubjectHookOverridesOut(BaseModel):
+    """Raw Tiqora overrides; ``None`` means the field is not overridden."""
+
+    enabled: bool | None = None
+    hook: str | None = None
+    divider: str | None = None
+    subject_format: str | None = None
+
+
+class SubjectConfigOut(BaseModel):
+    """Effective subject-hook config plus Znuny baseline and raw overrides."""
+
+    enabled: bool
+    hook: str
+    divider: str
+    subject_format: str
+    overrides: SubjectHookOverridesOut
+    znuny: SubjectHookZnunyOut
+
+
+class SubjectConfigUpdate(BaseModel):
+    """Upsert Tiqora overrides. Empty string / null clears an override.
+
+    ``enabled`` null clears the override (reverts to default True).
+    ``subject_format`` must be Left, Right, or None when set.
+    """
+
+    enabled: bool | None = None
+    hook: str | None = None
+    divider: str | None = None
+    subject_format: str | None = None
+
+
+# ---------------------------------------------------------------------------
 # Placeholder variables — tiqora_queue_variable / tiqora_placeholder_field
 # ---------------------------------------------------------------------------
 
