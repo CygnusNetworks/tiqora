@@ -49,6 +49,21 @@ def _seed(sync_url: str) -> dict[str, Any]:
     pw = hash_password("secret")
     with engine.begin() as conn:
         TiqoraBase.metadata.create_all(conn)
+        # Idempotent cleanup of our block (shared session-scoped DB).
+        conn.execute(text("DELETE FROM queue_standard_template WHERE queue_id = 7300"))
+        conn.execute(text("DELETE FROM standard_template WHERE id IN (7401, 7402)"))
+        conn.execute(text("DELETE FROM ticket_history WHERE id = 7900"))
+        conn.execute(text("DELETE FROM dynamic_field_value WHERE id IN (9101, 9102)"))
+        conn.execute(text("DELETE FROM dynamic_field WHERE id IN (9101, 9102)"))
+        conn.execute(text("DELETE FROM article_data_mime WHERE id = 7800"))
+        conn.execute(text("DELETE FROM article WHERE id = 7800"))
+        conn.execute(text("DELETE FROM ticket WHERE id = 7700"))
+        conn.execute(text("DELETE FROM queue WHERE id = 7300"))
+        conn.execute(
+            text("DELETE FROM group_user WHERE user_id IN (7301, 7302) OR group_id = 7330"),
+        )
+        conn.execute(text("DELETE FROM permission_groups WHERE id = 7330"))
+        conn.execute(text("DELETE FROM users WHERE id IN (7301, 7302)"))
         for uid, login in ((7301, "agent.rw"), (7302, "agent.none")):
             conn.execute(
                 text(

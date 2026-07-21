@@ -98,6 +98,14 @@ def _seed_mcp_data(sync_url: str) -> dict[str, Any]:
     with engine.begin() as conn:
         TiqoraBase.metadata.create_all(conn)
 
+        # Idempotent cleanup of our block (shared session-scoped DB).
+        conn.execute(text("DELETE FROM queue WHERE id = 60"))
+        conn.execute(
+            text("DELETE FROM group_user WHERE user_id IN (400, 401) OR group_id = 60"),
+        )
+        conn.execute(text("DELETE FROM permission_groups WHERE id = 60"))
+        conn.execute(text("DELETE FROM users WHERE id IN (400, 401)"))
+
         # Agent with full permissions (id=400)
         conn.execute(
             text(

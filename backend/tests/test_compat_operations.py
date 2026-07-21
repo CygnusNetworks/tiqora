@@ -141,6 +141,17 @@ def _seed_compat_data(sync_url: str) -> dict[str, Any]:
     with engine.begin() as conn:
         TiqoraBase.metadata.create_all(conn)
 
+        # Idempotent cleanup of our block (shared session-scoped DB).
+        conn.execute(text("DELETE FROM sessions WHERE session_id = 'TESTSESSIONID123'"))
+        conn.execute(text("DELETE FROM dynamic_field WHERE id = 99"))
+        conn.execute(text("DELETE FROM customer_user WHERE login = 'cust.user1'"))
+        conn.execute(text("DELETE FROM queue WHERE id = 50"))
+        conn.execute(
+            text("DELETE FROM group_user WHERE user_id IN (300, 301) OR group_id = 50"),
+        )
+        conn.execute(text("DELETE FROM permission_groups WHERE id = 50"))
+        conn.execute(text("DELETE FROM users WHERE id IN (300, 301)"))
+
         # Agent user (id=300) with full permissions
         conn.execute(
             text(
