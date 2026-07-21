@@ -14,6 +14,14 @@ export type DataTableColumn<T> = {
   className?: string;
 };
 
+export type DataTableSelection = {
+  selected: Set<string | number>;
+  onToggle: (id: string | number) => void;
+  onToggleAll: () => void;
+  allSelected: boolean;
+  someSelected: boolean;
+};
+
 export type DataTableProps<T> = {
   columns: DataTableColumn<T>[];
   rows: T[];
@@ -26,6 +34,8 @@ export type DataTableProps<T> = {
   onActivate?: (row: T) => void;
   /** True for a row whose valid_id !== 1 (or equivalent) — renders the invalid Badge. */
   isRowValid?: (row: T) => boolean;
+  /** Opt-in leading checkbox column for bulk selection. */
+  selection?: DataTableSelection;
   testId?: string;
 };
 
@@ -80,11 +90,14 @@ export function DataTable<T>({
   onDeactivate,
   onActivate,
   isRowValid,
+  selection,
   testId = "admin-data-table",
 }: DataTableProps<T>) {
   const { t } = useTranslation();
   const hasActions = Boolean(onEdit || onDeactivate || onActivate);
-  const colCount = columns.length + (hasActions ? 1 : 0) + (isRowValid ? 1 : 0);
+  const hasSelection = Boolean(selection);
+  const colCount =
+    columns.length + (hasActions ? 1 : 0) + (isRowValid ? 1 : 0) + (hasSelection ? 1 : 0);
 
   return (
     <div
@@ -94,6 +107,21 @@ export function DataTable<T>({
       <table className="w-full min-w-[640px] border-collapse text-left text-sm">
         <thead>
           <tr className="border-b border-hairline bg-surface-subtle text-xs uppercase tracking-wide text-muted">
+            {hasSelection && selection && (
+              <th className="w-10 py-1.5 pl-3 pr-1 font-medium">
+                <input
+                  type="checkbox"
+                  checked={selection.allSelected}
+                  ref={(el) => {
+                    if (el) el.indeterminate = selection.someSelected;
+                  }}
+                  onChange={selection.onToggleAll}
+                  data-testid="admin-select-all"
+                  aria-label={t("admin.bulk.selectAll")}
+                  className="rounded border-hairline text-accent focus:ring-accent"
+                />
+              </th>
+            )}
             {columns.map((col) => (
               <th key={col.key} className={cn("py-1.5 pl-4 pr-2 font-medium", col.className)}>
                 {col.header}
@@ -122,12 +150,25 @@ export function DataTable<T>({
           )}
           {rows.map((row) => {
             const valid = isRowValid?.(row) ?? true;
+            const id = rowKey(row);
             return (
               <tr
-                key={rowKey(row)}
-                data-testid={`admin-row-${rowKey(row)}`}
+                key={id}
+                data-testid={`admin-row-${id}`}
                 className="h-10 border-b border-hairline transition-colors duration-100 hover:bg-surface-subtle last:border-b-0"
               >
+                {hasSelection && selection && (
+                  <td className="py-1 pl-3 pr-1">
+                    <input
+                      type="checkbox"
+                      checked={selection.selected.has(id)}
+                      onChange={() => selection.onToggle(id)}
+                      data-testid={`admin-row-select-${id}`}
+                      aria-label={t("admin.bulk.selectRow")}
+                      className="rounded border-hairline text-accent focus:ring-accent"
+                    />
+                  </td>
+                )}
                 {columns.map((col) => (
                   <td
                     key={col.key}
@@ -154,7 +195,7 @@ export function DataTable<T>({
                         <Button
                           size="sm"
                           variant="secondary"
-                          data-testid={`admin-row-edit-${rowKey(row)}`}
+                          data-testid={`admin-row-edit-${id}`}
                           onClick={() => onEdit(row)}
                         >
                           <span className="inline-flex items-center gap-1">
@@ -167,7 +208,7 @@ export function DataTable<T>({
                         <Button
                           size="sm"
                           variant="danger"
-                          data-testid={`admin-row-deactivate-${rowKey(row)}`}
+                          data-testid={`admin-row-deactivate-${id}`}
                           onClick={() => onDeactivate(row)}
                         >
                           <span className="inline-flex items-center gap-1">
@@ -180,7 +221,7 @@ export function DataTable<T>({
                         <Button
                           size="sm"
                           variant="secondary"
-                          data-testid={`admin-row-activate-${rowKey(row)}`}
+                          data-testid={`admin-row-activate-${id}`}
                           onClick={() => onActivate(row)}
                         >
                           <span className="inline-flex items-center gap-1">

@@ -461,6 +461,13 @@
       "invalid": "Invalid",
       "all": "All"
     },
+    "search": "Search",
+    "searchPlaceholder": "Search…",
+    "bulk": {
+      "selected": "{{count}} selected",
+      "selectAll": "Select all on page",
+      "selectRow": "Select row"
+    },
     "pagination": {
       "prev": "Previous",
       "next": "Next",
@@ -573,7 +580,19 @@
       "phone": "Phone",
       "street": "Street",
       "city": "City",
-      "country": "Country"
+      "country": "Country",
+      "bulk": {
+        "valid": "Set valid",
+        "invalid": "Set invalid",
+        "temp": "Temporarily invalid",
+        "company": "Assign company…",
+        "companyTitle": "Assign company",
+        "companyHint": "Assign a customer company to {{count}} selected users.",
+        "companySearch": "Search company ID or name…",
+        "companyPicked": "Selected: {{id}}",
+        "companyApply": "Assign",
+        "companyRequired": "Please pick or enter a customer ID."
+      }
     },
     "customerCompanies": {
       "title_plural": "Customer companies",

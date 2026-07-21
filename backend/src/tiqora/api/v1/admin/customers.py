@@ -27,6 +27,8 @@ from tiqora.api.v1.admin.schemas import (
     CustomerUserAdminCreate,
     CustomerUserAdminOut,
     CustomerUserAdminUpdate,
+    CustomerUserBulkUpdate,
+    CustomerUserBulkUpdateResult,
     CustomerUserCustomerAssignment,
     CustomerUserGroupAssignment,
     GroupOut,
@@ -61,6 +63,56 @@ async def list_customer_users(
             )
         )
     return await paginate(session, CustomerUserAdminOut, stmt, params)
+
+
+@router.patch("/customer-users/bulk", response_model=CustomerUserBulkUpdateResult)
+async def bulk_update_customer_users(
+    body: CustomerUserBulkUpdate,
+    admin: AdminUser,
+    session: DbSession,
+) -> CustomerUserBulkUpdateResult:
+    """Apply ``valid_id`` and/or ``customer_id`` to many customer_user rows.
+
+    Bound a single call via the schema (1 ≤ len(ids) ≤ 1000). Stamps
+    change_time/change_by and invalidates the same Znuny cache types as the
+    single-row update path.
+    """
+    # Defensive guards (schema already enforces min/max length for FastAPI).
+    if not body.ids:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="ids must not be empty",
+        )
+    if len(body.ids) > 1000:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="ids length must be <= 1000",
+        )
+
+    # Nothing to change besides audit stamps — treat as no-op.
+    if body.valid_id is None and body.customer_id is None:
+        return CustomerUserBulkUpdateResult(updated=0)
+
+    rows = (
+        (await session.execute(select(CustomerUser).where(CustomerUser.id.in_(body.ids))))
+        .scalars()
+        .all()
+    )
+    if not rows:
+        return CustomerUserBulkUpdateResult(updated=0)
+
+    ts = now()
+    for cu in rows:
+        if body.valid_id is not None:
+            cu.valid_id = body.valid_id
+        if body.customer_id is not None:
+            cu.customer_id = body.customer_id
+        cu.change_time = ts
+        cu.change_by = admin.id
+
+    await invalidate_znuny_cache_types(session, CUSTOMER_USER_CACHE_TYPES)
+    await session.commit()
+    return CustomerUserBulkUpdateResult(updated=len(rows))
 
 
 @router.get("/customer-users/{customer_user_id}", response_model=CustomerUserAdminOut)
