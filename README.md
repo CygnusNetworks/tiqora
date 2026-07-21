@@ -42,6 +42,25 @@ Tiqora targets organisations that run (or want to leave) Znuny/OTRS 6.5 and need
 Tiqora only adds new tables under the `tiqora_*` prefix. Znuny keeps owning its
 existing schema during parallel operation.
 
+## Screenshots
+
+The agent workspace, ticket zoom (with a permission-aware action bar), reporting,
+the admin console, and the customer portal — German UI, light theme:
+
+| Agent dashboard | Ticket zoom |
+|---|---|
+| ![Agent dashboard](./docs/images/agent-dashboard.png) | ![Ticket zoom](./docs/images/agent-ticket-zoom.png) |
+
+| Queue view | Reporting |
+|---|---|
+| ![Queue view](./docs/images/agent-queues.png) | ![Statistics](./docs/images/agent-stats.png) |
+
+| Admin — queues | Customer portal |
+|---|---|
+| ![Admin queues](./docs/images/admin-queues.png) | ![Customer portal](./docs/images/portal.png) |
+
+<sub>Rendered from representative fixture data via `SCREENSHOTS=1 pnpm exec playwright test screenshots` — no backend required.</sub>
+
 ## Key features
 
 | Area | Status | Notes |
