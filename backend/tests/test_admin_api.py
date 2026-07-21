@@ -463,6 +463,162 @@ async def test_admin_customer_user_list_pagination_and_valid_filter(
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("url_fixture", ["mariadb_znuny_url", "postgres_znuny_url"])
+async def test_admin_customer_user_list_search(
+    url_fixture: str, request: pytest.FixtureRequest
+) -> None:
+    """Server-side search filters by login/email/first/last case-insensitively."""
+    sync_url: str = request.getfixturevalue(url_fixture)
+    ids = _seed_admin_and_plain_user(sync_url)
+    session, engine = await _make_session(sync_url)
+    ns = uuid.uuid4().hex[:8]
+
+    async with session as s:
+        admin_user = AuthenticatedUser(
+            id=ids["admin_id"],
+            login="root@localhost",
+            first_name="Admin",
+            last_name="Znuny",
+            auth_method="session",
+        )
+        cust = f"SRCH-{ns}"
+        await admin_customers.create_customer_user(
+            CustomerUserAdminCreate(
+                login=f"alice.srch.{ns}@example.com",
+                email=f"alice.mail.{ns}@example.com",
+                customer_id=cust,
+                first_name="Alice",
+                last_name=f"Wonder{ns}",
+            ),
+            admin_user,
+            s,
+        )
+        await admin_customers.create_customer_user(
+            CustomerUserAdminCreate(
+                login=f"bob.srch.{ns}@example.com",
+                email=f"bob.mail.{ns}@example.com",
+                customer_id=cust,
+                first_name="Bob",
+                last_name=f"Builder{ns}",
+            ),
+            admin_user,
+            s,
+        )
+        await admin_customers.create_customer_user(
+            CustomerUserAdminCreate(
+                login=f"carol.srch.{ns}@example.com",
+                email=f"carol.mail.{ns}@example.com",
+                customer_id=cust,
+                first_name="Carol",
+                last_name=f"Singer{ns}",
+            ),
+            admin_user,
+            s,
+        )
+
+        params = ListParams(page=1, page_size=50, valid="valid")
+
+        # Empty / whitespace search = unfiltered (still paginated).
+        empty = await admin_customers.list_customer_users(admin_user, s, params, search=None)
+        empty_ws = await admin_customers.list_customer_users(admin_user, s, params, search="   ")
+        assert empty.total == empty_ws.total
+        assert {i.login for i in empty.items if i.customer_id == cust} == {
+            f"alice.srch.{ns}@example.com",
+            f"bob.srch.{ns}@example.com",
+            f"carol.srch.{ns}@example.com",
+        }
+
+        # Case-insensitive login substring.
+        by_login = await admin_customers.list_customer_users(
+            admin_user, s, params, search=f"ALICE.SRCH.{ns}"
+        )
+        assert {i.login for i in by_login.items} == {f"alice.srch.{ns}@example.com"}
+        assert by_login.total == 1
+
+        # Email match.
+        by_email = await admin_customers.list_customer_users(
+            admin_user, s, params, search=f"bob.mail.{ns}"
+        )
+        assert {i.login for i in by_email.items} == {f"bob.srch.{ns}@example.com"}
+
+        # last_name match.
+        by_name = await admin_customers.list_customer_users(
+            admin_user, s, params, search=f"singer{ns}"
+        )
+        assert {i.login for i in by_name.items} == {f"carol.srch.{ns}@example.com"}
+
+        # No match.
+        none = await admin_customers.list_customer_users(
+            admin_user, s, params, search=f"zzz-no-hit-{ns}"
+        )
+        assert none.total == 0
+        assert none.items == []
+
+    await engine.dispose()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("url_fixture", ["mariadb_znuny_url", "postgres_znuny_url"])
+async def test_admin_customer_company_list_search(
+    url_fixture: str, request: pytest.FixtureRequest
+) -> None:
+    """Server-side search filters companies by customer_id and name (ci)."""
+    sync_url: str = request.getfixturevalue(url_fixture)
+    ids = _seed_admin_and_plain_user(sync_url)
+    session, engine = await _make_session(sync_url)
+    ns = uuid.uuid4().hex[:8]
+
+    async with session as s:
+        admin_user = AuthenticatedUser(
+            id=ids["admin_id"],
+            login="root@localhost",
+            first_name="Admin",
+            last_name="Znuny",
+            auth_method="session",
+        )
+        await admin_customers.create_customer_company(
+            CustomerCompanyCreate(
+                customer_id=f"ACME-{ns}",
+                name=f"Acme Corp {ns}",
+            ),
+            admin_user,
+            s,
+        )
+        await admin_customers.create_customer_company(
+            CustomerCompanyCreate(
+                customer_id=f"BETA-{ns}",
+                name=f"Beta Industries {ns}",
+            ),
+            admin_user,
+            s,
+        )
+
+        params = ListParams(page=1, page_size=50, valid="valid")
+
+        empty = await admin_customers.list_customer_companies(admin_user, s, params, search=None)
+        assert f"ACME-{ns}" in {i.customer_id for i in empty.items}
+        assert f"BETA-{ns}" in {i.customer_id for i in empty.items}
+
+        by_id = await admin_customers.list_customer_companies(
+            admin_user, s, params, search=f"acme-{ns}"
+        )
+        assert {i.customer_id for i in by_id.items} == {f"ACME-{ns}"}
+        assert by_id.total == 1
+
+        by_name = await admin_customers.list_customer_companies(
+            admin_user, s, params, search=f"beta industries {ns}"
+        )
+        assert {i.customer_id for i in by_name.items} == {f"BETA-{ns}"}
+
+        none = await admin_customers.list_customer_companies(
+            admin_user, s, params, search=f"zzz-no-hit-{ns}"
+        )
+        assert none.total == 0
+
+    await engine.dispose()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("url_fixture", ["mariadb_znuny_url", "postgres_znuny_url"])
 async def test_admin_state_types_reference(
     url_fixture: str, request: pytest.FixtureRequest
 ) -> None:

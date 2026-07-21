@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { Spinner } from "@/components/ui/Spinner";
@@ -15,6 +15,12 @@ export interface AssignmentSide<Item> {
   getId: (item: Item) => Id;
   getLabel: (item: Item) => string;
   getSubLabel?: (item: Item) => string | undefined;
+  /**
+   * When present, this side uses server-side search instead of loading a
+   * fixed page and filtering client-side. Required for large tables
+   * (e.g. 100k+ customer users).
+   */
+  searchItems?: (query: string, signal?: AbortSignal) => Promise<Item[]>;
 }
 
 export interface AssignmentConfig<A, B> {
@@ -41,6 +47,15 @@ function idKey(id: Id): string {
   return String(id);
 }
 
+function useDebouncedValue<T>(value: T, delayMs: number): T {
+  const [debounced, setDebounced] = useState(value);
+  useEffect(() => {
+    const handle = window.setTimeout(() => setDebounced(value), delayMs);
+    return () => window.clearTimeout(handle);
+  }, [value, delayMs]);
+  return debounced;
+}
+
 /**
  * Reusable master-detail relation editor with a direction toggle
  * (design #5 — "Master-Detail mit Richtungs-Umschalter").
@@ -49,6 +64,9 @@ function idKey(id: Id): string {
  * direction flips which side is the master list vs. the checklist. Count badges
  * on master rows only appear when that anchor's assignment set is already in the
  * react-query cache (no N+1 up-front).
+ *
+ * Sides with `searchItems` use debounced server-side search instead of a fixed
+ * client-side page (needed for large customer_user / company tables).
  */
 export function AssignmentEditor<A, B>({ config }: { config: AssignmentConfig<A, B> }) {
   const { t } = useTranslation();
@@ -59,6 +77,9 @@ export function AssignmentEditor<A, B>({ config }: { config: AssignmentConfig<A,
   const [counterpartFilter, setCounterpartFilter] = useState("");
   const [savedFlash, setSavedFlash] = useState(false);
 
+  const debouncedAnchorFilter = useDebouncedValue(anchorFilter, 300);
+  const debouncedCounterpartFilter = useDebouncedValue(counterpartFilter, 300);
+
   // Runtime side adapters — both sides are treated as opaque items; getId/getLabel
   // close over the correct Side<A|B> via the direction branch.
   const anchorSide = (
@@ -67,6 +88,9 @@ export function AssignmentEditor<A, B>({ config }: { config: AssignmentConfig<A,
   const counterpartSide = (
     direction === "a" ? config.sideB : config.sideA
   ) as AssignmentSide<unknown>;
+
+  const anchorServerSearch = Boolean(anchorSide.searchItems);
+  const counterpartServerSearch = Boolean(counterpartSide.searchItems);
 
   const itemsKey = useCallback(
     (sideKey: string) => ["admin", "assignment", config.testId, "items", sideKey] as const,
@@ -79,16 +103,51 @@ export function AssignmentEditor<A, B>({ config }: { config: AssignmentConfig<A,
     [config.testId],
   );
 
-  const anchorsQ = useQuery<unknown[]>({
+  // Client-mode list (fixed page + local filter) when no searchItems.
+  const anchorsClientQ = useQuery<unknown[]>({
     queryKey: itemsKey(anchorSide.key),
     queryFn: ({ signal }) => anchorSide.loadItems(signal),
+    enabled: !anchorServerSearch,
     staleTime: 5 * 60 * 1000,
   });
 
-  const counterpartsQ = useQuery<unknown[]>({
+  // Server-search mode for the master (anchor) list.
+  const anchorsSearchQ = useQuery<unknown[]>({
+    queryKey: [
+      ...itemsKey(anchorSide.key),
+      "search",
+      debouncedAnchorFilter,
+    ] as const,
+    queryFn: ({ signal }) => {
+      if (!anchorSide.searchItems) return Promise.resolve([]);
+      return anchorSide.searchItems(debouncedAnchorFilter, signal);
+    },
+    enabled: anchorServerSearch,
+    staleTime: 30 * 1000,
+  });
+
+  const counterpartsClientQ = useQuery<unknown[]>({
     queryKey: itemsKey(counterpartSide.key),
     queryFn: ({ signal }) => counterpartSide.loadItems(signal),
+    enabled: !counterpartServerSearch,
     staleTime: 5 * 60 * 1000,
+  });
+
+  // Server-search candidates for the counterpart checklist (excludes assigned
+  // which are always shown separately).
+  const counterpartsSearchQ = useQuery<unknown[]>({
+    queryKey: [
+      ...itemsKey(counterpartSide.key),
+      "search",
+      debouncedCounterpartFilter,
+      selectedId !== null ? idKey(selectedId) : "none",
+    ] as const,
+    queryFn: ({ signal }) => {
+      if (!counterpartSide.searchItems) return Promise.resolve([]);
+      return counterpartSide.searchItems(debouncedCounterpartFilter, signal);
+    },
+    enabled: counterpartServerSearch && selectedId !== null,
+    staleTime: 30 * 1000,
   });
 
   const assignedQ = useQuery<unknown[]>({
@@ -114,11 +173,20 @@ export function AssignmentEditor<A, B>({ config }: { config: AssignmentConfig<A,
 
   const selectedAnchorLabel = useMemo(() => {
     if (selectedId === null) return "";
-    const found = (anchorsQ.data ?? []).find(
+    const pool = anchorServerSearch
+      ? (anchorsSearchQ.data ?? [])
+      : (anchorsClientQ.data ?? []);
+    const found = pool.find(
       (item) => idKey(anchorSide.getId(item)) === idKey(selectedId),
     );
     return found !== undefined ? anchorSide.getLabel(found) : idKey(selectedId);
-  }, [selectedId, anchorsQ.data, anchorSide]);
+  }, [
+    selectedId,
+    anchorServerSearch,
+    anchorsSearchQ.data,
+    anchorsClientQ.data,
+    anchorSide,
+  ]);
 
   const flashSaved = useCallback(() => {
     setSavedFlash(true);
@@ -139,6 +207,20 @@ export function AssignmentEditor<A, B>({ config }: { config: AssignmentConfig<A,
     [config, direction, selectedId],
   );
 
+  /** Locate a counterpart item for optimistic cache updates. */
+  const findCounterpartItem = useCallback(
+    (counterpartId: Id): unknown | undefined => {
+      const match = (item: unknown) =>
+        idKey(counterpartSide.getId(item)) === idKey(counterpartId);
+      return (
+        (assignedQ.data ?? []).find(match) ??
+        (counterpartsSearchQ.data ?? []).find(match) ??
+        (counterpartsClientQ.data ?? []).find(match)
+      );
+    },
+    [assignedQ.data, counterpartsSearchQ.data, counterpartsClientQ.data, counterpartSide],
+  );
+
   const toggleM = useMutation({
     mutationFn: async ({
       counterpartId,
@@ -154,16 +236,13 @@ export function AssignmentEditor<A, B>({ config }: { config: AssignmentConfig<A,
       const key = assignedKey(direction, selectedId);
       await queryClient.cancelQueries({ queryKey: key });
       const previous = queryClient.getQueryData(key);
-      const counterparts = counterpartsQ.data ?? [];
       queryClient.setQueryData(key, (old: unknown[] | undefined) => {
         const list = Array.isArray(old) ? [...old] : [];
         const match = (item: unknown) =>
           idKey(counterpartSide.getId(item)) === idKey(counterpartId);
         if (next) {
           if (list.some(match)) return list;
-          const item = counterparts.find(
-            (c) => idKey(counterpartSide.getId(c)) === idKey(counterpartId),
-          );
+          const item = findCounterpartItem(counterpartId);
           return item !== undefined ? [...list, item] : list;
         }
         return list.filter((item) => !match(item));
@@ -200,13 +279,30 @@ export function AssignmentEditor<A, B>({ config }: { config: AssignmentConfig<A,
         targetIds.map((cId) => writePair(cId, mode === "all")),
       );
     },
-    onMutate: async ({ mode }) => {
+    onMutate: async ({ mode, targetIds }) => {
       if (selectedId === null) return { previous: undefined as unknown };
       const key = assignedKey(direction, selectedId);
       await queryClient.cancelQueries({ queryKey: key });
       const previous = queryClient.getQueryData(key);
       if (mode === "all") {
-        queryClient.setQueryData(key, counterpartsQ.data ?? []);
+        if (counterpartServerSearch) {
+          // Only optimistic-add the bulk targets we know about (search hits).
+          queryClient.setQueryData(key, (old: unknown[] | undefined) => {
+            const list = Array.isArray(old) ? [...old] : [];
+            const have = new Set(list.map((item) => idKey(counterpartSide.getId(item))));
+            for (const cId of targetIds) {
+              if (have.has(idKey(cId))) continue;
+              const item = findCounterpartItem(cId);
+              if (item !== undefined) {
+                list.push(item);
+                have.add(idKey(cId));
+              }
+            }
+            return list;
+          });
+        } else {
+          queryClient.setQueryData(key, counterpartsClientQ.data ?? []);
+        }
       } else {
         queryClient.setQueryData(key, []);
       }
@@ -230,7 +326,10 @@ export function AssignmentEditor<A, B>({ config }: { config: AssignmentConfig<A,
 
   const runBulkAll = () => {
     if (selectedId === null) return;
-    const targetIds = (counterpartsQ.data ?? [])
+    const pool = counterpartServerSearch
+      ? (counterpartsSearchQ.data ?? [])
+      : (counterpartsClientQ.data ?? []);
+    const targetIds = pool
       .map((item) => counterpartSide.getId(item))
       .filter((cId) => !assignedIdSet.has(idKey(cId)));
     if (targetIds.length === 0) return;
@@ -239,7 +338,7 @@ export function AssignmentEditor<A, B>({ config }: { config: AssignmentConfig<A,
 
   const runBulkNone = () => {
     if (selectedId === null) return;
-    const targetIds = (counterpartsQ.data ?? [])
+    const targetIds = (assignedQ.data ?? [])
       .map((item) => counterpartSide.getId(item))
       .filter((cId) => assignedIdSet.has(idKey(cId)));
     if (targetIds.length === 0) return;
@@ -255,8 +354,12 @@ export function AssignmentEditor<A, B>({ config }: { config: AssignmentConfig<A,
     setSavedFlash(false);
   };
 
+  // Master list rows.
   const filteredAnchors = useMemo(() => {
-    const anchors = anchorsQ.data ?? [];
+    if (anchorServerSearch) {
+      return anchorsSearchQ.data ?? [];
+    }
+    const anchors = anchorsClientQ.data ?? [];
     const q = anchorFilter.trim().toLowerCase();
     if (!q) return anchors;
     return anchors.filter((item) => {
@@ -264,10 +367,17 @@ export function AssignmentEditor<A, B>({ config }: { config: AssignmentConfig<A,
       const sub = anchorSide.getSubLabel?.(item)?.toLowerCase() ?? "";
       return label.includes(q) || sub.includes(q);
     });
-  }, [anchorsQ.data, anchorFilter, anchorSide]);
+  }, [
+    anchorServerSearch,
+    anchorsSearchQ.data,
+    anchorsClientQ.data,
+    anchorFilter,
+    anchorSide,
+  ]);
 
-  const filteredCounterparts = useMemo(() => {
-    const list = counterpartsQ.data ?? [];
+  // Counterpart checklist rows (client-filter mode).
+  const filteredCounterpartsClient = useMemo(() => {
+    const list = counterpartsClientQ.data ?? [];
     const q = counterpartFilter.trim().toLowerCase();
     if (!q) return list;
     return list.filter((item) => {
@@ -275,9 +385,29 @@ export function AssignmentEditor<A, B>({ config }: { config: AssignmentConfig<A,
       const sub = counterpartSide.getSubLabel?.(item)?.toLowerCase() ?? "";
       return label.includes(q) || sub.includes(q);
     });
-  }, [counterpartsQ.data, counterpartFilter, counterpartSide]);
+  }, [counterpartsClientQ.data, counterpartFilter, counterpartSide]);
 
-  const counterparts = counterpartsQ.data ?? [];
+  // Counterpart checklist: assigned always + search hits (deduped).
+  const counterpartServerRows = useMemo(() => {
+    if (!counterpartServerSearch) return [] as unknown[];
+    const assigned = assignedQ.data ?? [];
+    const assignedKeys = new Set(
+      assigned.map((item) => idKey(counterpartSide.getId(item))),
+    );
+    const searchHits = (counterpartsSearchQ.data ?? []).filter(
+      (item) => !assignedKeys.has(idKey(counterpartSide.getId(item))),
+    );
+    return [...assigned, ...searchHits];
+  }, [
+    counterpartServerSearch,
+    assignedQ.data,
+    counterpartsSearchQ.data,
+    counterpartSide,
+  ]);
+
+  const counterpartsForBulkCount = counterpartServerSearch
+    ? (counterpartsSearchQ.data ?? []).length
+    : (counterpartsClientQ.data ?? []).length;
 
   /** Count only when that anchor's assignment set is already cached (no N+1). */
   const cachedCount = (anchorId: Id): number | null => {
@@ -289,8 +419,65 @@ export function AssignmentEditor<A, B>({ config }: { config: AssignmentConfig<A,
     return null;
   };
 
+  // isLoading only (no cached data) — avoid list flash on every debounced keystroke.
+  const anchorsLoading = anchorServerSearch
+    ? anchorsSearchQ.isLoading
+    : anchorsClientQ.isLoading;
+  const anchorsSearching =
+    anchorServerSearch && anchorsSearchQ.isFetching && !anchorsSearchQ.isLoading;
+  const counterpartsLoading = counterpartServerSearch
+    ? (counterpartsSearchQ.isLoading && !assignedQ.data) ||
+      (assignedQ.isLoading && !assignedQ.data)
+    : counterpartsClientQ.isLoading || (assignedQ.isLoading && !assignedQ.data);
+  const counterpartsSearching =
+    counterpartServerSearch &&
+    counterpartsSearchQ.isFetching &&
+    !counterpartsSearchQ.isLoading;
+
   const pending = toggleM.isPending || bulkM.isPending;
-  const busy = pending || assignedQ.isFetching || anchorsQ.isLoading || counterpartsQ.isLoading;
+  const busy =
+    pending ||
+    assignedQ.isFetching ||
+    anchorsLoading ||
+    anchorsSearching ||
+    (selectedId !== null && (counterpartsLoading || counterpartsSearching));
+
+  const renderCounterpartRow = (item: unknown) => {
+    const cId = counterpartSide.getId(item);
+    const checked = assignedIdSet.has(idKey(cId));
+    const sub = counterpartSide.getSubLabel?.(item);
+    return (
+      <li
+        key={idKey(cId)}
+        className="flex items-center px-3 py-2.5"
+        data-testid={`${config.testId}-counterpart-row-${idKey(cId)}`}
+      >
+        <label className="flex min-w-0 flex-1 cursor-pointer items-center gap-3">
+          <input
+            type="checkbox"
+            className="size-4 accent-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent"
+            checked={checked}
+            disabled={pending}
+            data-testid={`${config.testId}-counterpart-${idKey(cId)}`}
+            onChange={(e) =>
+              toggleM.mutate({
+                counterpartId: cId,
+                next: e.target.checked,
+              })
+            }
+          />
+          <span className="min-w-0">
+            <span className="block truncate text-sm text-ink">
+              {counterpartSide.getLabel(item)}
+            </span>
+            {sub ? (
+              <span className="block truncate text-xs text-muted">{sub}</span>
+            ) : null}
+          </span>
+        </label>
+      </li>
+    );
+  };
 
   return (
     <div className="space-y-4 p-4" data-testid={config.testId}>
@@ -359,69 +546,81 @@ export function AssignmentEditor<A, B>({ config }: { config: AssignmentConfig<A,
             </label>
           </div>
           <ul className="min-h-0 flex-1 overflow-y-auto divide-y divide-hairline">
-            {anchorsQ.isLoading && (
-              <li className="flex justify-center px-3 py-8">
+            {anchorsLoading && (
+              <li
+                className="flex justify-center px-3 py-8"
+                data-testid={`${config.testId}-anchor-loading`}
+              >
                 <Spinner className="size-5" />
               </li>
             )}
-            {!anchorsQ.isLoading && filteredAnchors.length === 0 && (
+            {!anchorsLoading && anchorsSearching && (
+              <li
+                className="flex justify-center border-b border-hairline px-3 py-2"
+                data-testid={`${config.testId}-anchor-searching`}
+              >
+                <Spinner className="size-4" />
+              </li>
+            )}
+            {!anchorsLoading && filteredAnchors.length === 0 && (
               <li className="px-3 py-8 text-center text-sm text-muted">
                 {t("admin.assignmentEditor.noAnchors")}
               </li>
             )}
-            {filteredAnchors.map((item) => {
-              const id = anchorSide.getId(item);
-              const selected = selectedId !== null && idKey(selectedId) === idKey(id);
-              const count = cachedCount(id);
-              const sub = anchorSide.getSubLabel?.(item);
-              return (
-                <li key={idKey(id)}>
-                  <button
-                    type="button"
-                    data-testid={`${config.testId}-anchor-${idKey(id)}`}
-                    onClick={() => setSelectedId(id)}
-                    className={cn(
-                      "flex w-full items-center gap-2 px-3 py-2.5 text-left transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-accent",
-                      selected
-                        ? "bg-accent-dim text-accent"
-                        : "text-ink hover:bg-surface-subtle",
-                    )}
-                  >
-                    <span className="min-w-0 flex-1">
-                      <span className="block truncate text-sm font-medium">
-                        {anchorSide.getLabel(item)}
-                      </span>
-                      {sub ? (
-                        <span
-                          className={cn(
-                            "block truncate text-xs",
-                            selected ? "text-accent/80" : "text-muted",
-                          )}
-                        >
-                          {sub}
-                        </span>
-                      ) : null}
-                    </span>
-                    <span
+            {!anchorsLoading &&
+              filteredAnchors.map((item) => {
+                const id = anchorSide.getId(item);
+                const selected = selectedId !== null && idKey(selectedId) === idKey(id);
+                const count = cachedCount(id);
+                const sub = anchorSide.getSubLabel?.(item);
+                return (
+                  <li key={idKey(id)}>
+                    <button
+                      type="button"
+                      data-testid={`${config.testId}-anchor-${idKey(id)}`}
+                      onClick={() => setSelectedId(id)}
                       className={cn(
-                        "shrink-0 rounded-full px-1.5 py-0.5 font-mono text-[11px] tabular-nums",
+                        "flex w-full items-center gap-2 px-3 py-2.5 text-left transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-accent",
                         selected
-                          ? "bg-accent/20 text-accent"
-                          : "bg-surface-subtle text-muted",
+                          ? "bg-accent-dim text-accent"
+                          : "text-ink hover:bg-surface-subtle",
                       )}
-                      data-testid={`${config.testId}-anchor-count-${idKey(id)}`}
-                      title={
-                        count !== null
-                          ? t("admin.assignmentEditor.assignedCount", { count })
-                          : undefined
-                      }
                     >
-                      {count !== null ? count : "–"}
-                    </span>
-                  </button>
-                </li>
-              );
-            })}
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-sm font-medium">
+                          {anchorSide.getLabel(item)}
+                        </span>
+                        {sub ? (
+                          <span
+                            className={cn(
+                              "block truncate text-xs",
+                              selected ? "text-accent/80" : "text-muted",
+                            )}
+                          >
+                            {sub}
+                          </span>
+                        ) : null}
+                      </span>
+                      <span
+                        className={cn(
+                          "shrink-0 rounded-full px-1.5 py-0.5 font-mono text-[11px] tabular-nums",
+                          selected
+                            ? "bg-accent/20 text-accent"
+                            : "bg-surface-subtle text-muted",
+                        )}
+                        data-testid={`${config.testId}-anchor-count-${idKey(id)}`}
+                        title={
+                          count !== null
+                            ? t("admin.assignmentEditor.assignedCount", { count })
+                            : undefined
+                        }
+                      >
+                        {count !== null ? count : "–"}
+                      </span>
+                    </button>
+                  </li>
+                );
+              })}
           </ul>
         </section>
 
@@ -460,7 +659,7 @@ export function AssignmentEditor<A, B>({ config }: { config: AssignmentConfig<A,
                   <button
                     type="button"
                     data-testid={`${config.testId}-bulk-all`}
-                    disabled={pending || counterparts.length === 0}
+                    disabled={pending || counterpartsForBulkCount === 0}
                     onClick={runBulkAll}
                     className="rounded-md border border-hairline px-2 py-0.5 text-xs font-medium text-ink hover:border-accent/50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent disabled:opacity-50"
                   >
@@ -491,55 +690,36 @@ export function AssignmentEditor<A, B>({ config }: { config: AssignmentConfig<A,
                 </label>
               </div>
               <ul className="min-h-0 flex-1 overflow-y-auto divide-y divide-hairline">
-                {counterpartsQ.isLoading || (assignedQ.isLoading && !assignedQ.data) ? (
+                {counterpartServerSearch ? (
+                  counterpartsLoading && counterpartServerRows.length === 0 ? (
+                    <li
+                      className="flex justify-center px-3 py-8"
+                      data-testid={`${config.testId}-counterpart-loading`}
+                    >
+                      <Spinner className="size-5" />
+                    </li>
+                  ) : counterpartServerRows.length === 0 ? (
+                    <li className="px-3 py-8 text-center text-sm text-muted">
+                      {t("admin.assignmentEditor.noMatches")}
+                    </li>
+                  ) : (
+                    counterpartServerRows.map(renderCounterpartRow)
+                  )
+                ) : counterpartsClientQ.isLoading ||
+                  (assignedQ.isLoading && !assignedQ.data) ? (
                   <li className="flex justify-center px-3 py-8">
                     <Spinner className="size-5" />
                   </li>
-                ) : counterparts.length === 0 ? (
+                ) : (counterpartsClientQ.data ?? []).length === 0 ? (
                   <li className="px-3 py-8 text-center text-sm text-muted">
                     {t("admin.assignmentEditor.noCounterparts")}
                   </li>
-                ) : filteredCounterparts.length === 0 ? (
+                ) : filteredCounterpartsClient.length === 0 ? (
                   <li className="px-3 py-8 text-center text-sm text-muted">
                     {t("admin.assignmentEditor.noMatches")}
                   </li>
                 ) : (
-                  filteredCounterparts.map((item) => {
-                    const cId = counterpartSide.getId(item);
-                    const checked = assignedIdSet.has(idKey(cId));
-                    const sub = counterpartSide.getSubLabel?.(item);
-                    return (
-                      <li
-                        key={idKey(cId)}
-                        className="flex items-center px-3 py-2.5"
-                        data-testid={`${config.testId}-counterpart-row-${idKey(cId)}`}
-                      >
-                        <label className="flex min-w-0 flex-1 cursor-pointer items-center gap-3">
-                          <input
-                            type="checkbox"
-                            className="size-4 accent-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent"
-                            checked={checked}
-                            disabled={pending}
-                            data-testid={`${config.testId}-counterpart-${idKey(cId)}`}
-                            onChange={(e) =>
-                              toggleM.mutate({
-                                counterpartId: cId,
-                                next: e.target.checked,
-                              })
-                            }
-                          />
-                          <span className="min-w-0">
-                            <span className="block truncate text-sm text-ink">
-                              {counterpartSide.getLabel(item)}
-                            </span>
-                            {sub ? (
-                              <span className="block truncate text-xs text-muted">{sub}</span>
-                            ) : null}
-                          </span>
-                        </label>
-                      </li>
-                    );
-                  })
+                  filteredCounterpartsClient.map(renderCounterpartRow)
                 )}
               </ul>
             </>

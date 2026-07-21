@@ -220,4 +220,128 @@ describe("AssignmentEditor", () => {
       expect(assignCuGroup).toHaveBeenCalledWith("alice", 6);
     });
   });
+
+  it("server-search side debounces searchItems and renders results", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    const searchUsers = vi.fn();
+    searchUsers.mockResolvedValue([
+      { login: "bob", first_name: "Bob", last_name: "B" },
+    ]);
+
+    const config: AssignmentConfig<CustomerUser, Group> = {
+      ...customerGroupConfig,
+      sideA: {
+        ...customerGroupConfig.sideA,
+        loadItems: () => listCustomerUsers(),
+        searchItems: (q) => searchUsers(q),
+      },
+    };
+
+    renderEditor(config);
+
+    // Empty query fires searchItems("") for the first page.
+    await waitFor(() => {
+      expect(searchUsers).toHaveBeenCalledWith("");
+    });
+    await screen.findByTestId("ae-cug-anchor-bob");
+
+    searchUsers.mockClear();
+    searchUsers.mockResolvedValue([
+      { login: "carol", first_name: "Carol", last_name: "C" },
+    ]);
+
+    fireEvent.change(screen.getByTestId("ae-cug-search-anchor"), {
+      target: { value: "car" },
+    });
+
+    // Not called immediately (debounce 300ms).
+    expect(searchUsers).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(350);
+
+    await waitFor(() => {
+      expect(searchUsers).toHaveBeenCalledWith("car");
+    });
+    await screen.findByTestId("ae-cug-anchor-carol");
+    expect(screen.queryByTestId("ae-cug-anchor-bob")).not.toBeInTheDocument();
+
+    vi.useRealTimers();
+  });
+
+  it("counterpart server-search shows assigned + search hits and assigns on toggle", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    const searchUsers = vi.fn();
+    // Initial empty search for counterpart candidates.
+    searchUsers.mockResolvedValue([
+      { login: "dave", first_name: "Dave", last_name: "D" },
+    ]);
+    listGroupCus.mockResolvedValue([
+      { login: "alice", first_name: "Alice", last_name: "A" },
+    ]);
+
+    // Groups as master (client); customer-users as counterpart with server search.
+    const serverCounterpartConfig: AssignmentConfig<Group, CustomerUser> = {
+      testId: "ae-gcu",
+      titleKey: "admin.customerUserGroups.title",
+      subtitleKey: "admin.customerUserGroups.subtitle",
+      sideA: {
+        key: "groups",
+        labelKey: "admin.customerUserGroups.groups",
+        loadItems: () => listGroups(),
+        getId: (g) => g.id,
+        getLabel: (g) => g.name,
+      },
+      sideB: {
+        key: "customer-users",
+        labelKey: "admin.customerUserGroups.customerUser",
+        loadItems: () => listCustomerUsers(),
+        searchItems: (q) => searchUsers(q),
+        getId: (u) => u.login,
+        getLabel: (u) => u.login,
+        getSubLabel: (u) => `${u.first_name} ${u.last_name}`,
+      },
+      loadAssignedB: (gId) => listGroupCus(gId),
+      loadAssignedA: (login) => listCuGroups(login),
+      assign: (gId, login) => assignCuGroup(login, gId),
+      revoke: (gId, login) => revokeCuGroup(login, gId),
+    };
+
+    renderEditor(serverCounterpartConfig);
+
+    await screen.findByTestId("ae-gcu-anchor-5");
+    fireEvent.click(screen.getByTestId("ae-gcu-anchor-5"));
+
+    await waitFor(() => {
+      expect(listGroupCus).toHaveBeenCalledWith(5);
+    });
+    // Assigned alice is checked; search hit dave is not.
+    await waitFor(() => {
+      expect(screen.getByTestId("ae-gcu-counterpart-alice")).toBeChecked();
+    });
+    await waitFor(() => {
+      expect(screen.getByTestId("ae-gcu-counterpart-dave")).not.toBeChecked();
+    });
+
+    // Search for another user and assign them.
+    searchUsers.mockResolvedValue([
+      { login: "erin", first_name: "Erin", last_name: "E" },
+    ]);
+    fireEvent.change(screen.getByTestId("ae-gcu-search-counterpart"), {
+      target: { value: "erin" },
+    });
+    await vi.advanceTimersByTimeAsync(350);
+
+    await waitFor(() => {
+      expect(searchUsers).toHaveBeenCalledWith("erin");
+    });
+    await screen.findByTestId("ae-gcu-counterpart-erin");
+    // Assigned alice still present (not deduped away).
+    expect(screen.getByTestId("ae-gcu-counterpart-alice")).toBeChecked();
+
+    fireEvent.click(screen.getByTestId("ae-gcu-counterpart-erin"));
+    await waitFor(() => {
+      expect(assignCuGroup).toHaveBeenCalledWith("erin", 5);
+    });
+
+    vi.useRealTimers();
+  });
 });
