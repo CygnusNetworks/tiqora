@@ -89,6 +89,8 @@ export type AdminListParams = {
   page?: number;
   pageSize?: number;
   valid?: AdminValidFilter;
+  /** Optional server-side substring search (customer users / companies). */
+  search?: string;
 };
 
 /** Paginated envelope returned by every admin resource list endpoint. */
@@ -1193,6 +1195,7 @@ export class ApiClient {
             page: params?.page,
             page_size: params?.pageSize,
             valid: params?.valid,
+            search: params?.search,
           },
           signal,
         }),

@@ -10,7 +10,8 @@ import {
 
 /**
  * Customer-User↔Companies assignment editor (bidirectional master-detail).
- * Both sides use string ids (login / customer_id).
+ * Both sides use string ids (login / customer_id) and server-side search
+ * (customer_user is 100k+ rows; companies can also be large).
  */
 export function CustomerUserCustomersPage() {
   const config: AssignmentConfig<CustomerUserAdminOut, CustomerCompanyOut> = {
@@ -22,21 +23,39 @@ export function CustomerUserCustomersPage() {
       labelKey: "admin.customerUserCustomers.customerUser",
       loadItems: async (signal) => {
         const page = await api.adminCustomerUsers.list(
-          { valid: "valid", pageSize: 500 },
+          { valid: "valid", pageSize: 50, search: "" },
+          signal,
+        );
+        return page.items;
+      },
+      searchItems: async (q, signal) => {
+        const page = await api.adminCustomerUsers.list(
+          { valid: "valid", pageSize: 50, search: q },
           signal,
         );
         return page.items;
       },
       getId: (u) => u.login,
       getLabel: (u) => u.login,
-      getSubLabel: (u) => `${u.first_name} ${u.last_name}`.trim() || undefined,
+      getSubLabel: (u) => {
+        const name = `${u.first_name} ${u.last_name}`.trim();
+        if (name && u.email) return `${name} · ${u.email}`;
+        return name || u.email || undefined;
+      },
     },
     sideB: {
       key: "companies",
       labelKey: "admin.customerUserCustomers.companies",
       loadItems: async (signal) => {
         const page = await api.adminCustomerCompanies.list(
-          { valid: "valid", pageSize: 500 },
+          { valid: "valid", pageSize: 50, search: "" },
+          signal,
+        );
+        return page.items;
+      },
+      searchItems: async (q, signal) => {
+        const page = await api.adminCustomerCompanies.list(
+          { valid: "valid", pageSize: 50, search: q },
           signal,
         );
         return page.items;

@@ -7634,6 +7634,7 @@ export interface operations {
     list_customer_companies_api_v1_admin_customer_companies_get: {
         parameters: {
             query?: {
+                search?: string | null;
                 page?: number;
                 page_size?: number;
                 valid?: "valid" | "invalid" | "all";
@@ -7850,6 +7851,7 @@ export interface operations {
     list_customer_users_api_v1_admin_customer_users_get: {
         parameters: {
             query?: {
+                search?: string | null;
                 page?: number;
                 page_size?: number;
                 valid?: "valid" | "invalid" | "all";
