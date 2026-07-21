@@ -8,6 +8,12 @@ import {
   type ReactNode,
 } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  startAuthentication,
+  startRegistration,
+  type PublicKeyCredentialCreationOptionsJSON,
+  type PublicKeyCredentialRequestOptionsJSON,
+} from "@simplewebauthn/browser";
 import { api, ApiError, type UserMe } from "@/lib/api";
 
 type AuthContextValue = {
@@ -24,10 +30,20 @@ type AuthContextValue = {
   login: (login: string, password: string) => Promise<void>;
   verifyTotp: (code: string) => Promise<void>;
   /**
+   * Finish pending-2FA via passkey assertion (begin → browser ceremony → finish).
+   * Mirrors verifyTotp: clears pending2fa and loads /me on success.
+   */
+  verifyPasskey: () => Promise<void>;
+  /**
    * Finish forced enrollment: confirm TOTP (backend promotes ENROLL → full
    * session cookie) then load /me.
    */
   completeEnroll2fa: (code: string) => Promise<void>;
+  /**
+   * Finish forced enrollment via passkey registration (alternative to TOTP).
+   * Backend promotes the ENROLL session to a full session on success.
+   */
+  completeEnrollPasskey: (name?: string | null) => Promise<void>;
   logout: () => Promise<void>;
   refresh: () => Promise<void>;
 };
@@ -92,10 +108,43 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [queryClient],
   );
 
+  const verifyPasskey = useCallback(async () => {
+    const options = await api.passkeyAuthenticateBegin();
+    const credential = await startAuthentication({
+      optionsJSON: options as unknown as PublicKeyCredentialRequestOptionsJSON,
+    });
+    const res = await api.passkeyAuthenticateFinish({
+      credential: credential as unknown as Record<string, unknown>,
+    });
+    setPending2fa(false);
+    setMustEnroll2fa(false);
+    queryClient.setQueryData(["auth", "me"], res.user);
+    await queryClient.invalidateQueries({ queryKey: ["auth", "me"] });
+  }, [queryClient]);
+
   const completeEnroll2fa = useCallback(
     async (code: string) => {
       await api.totpConfirm({ code });
       // Backend promotes the ENROLL cookie to a full session on success.
+      const me = await api.me();
+      setMustEnroll2fa(false);
+      setPending2fa(false);
+      queryClient.setQueryData(["auth", "me"], me);
+      await queryClient.invalidateQueries({ queryKey: ["auth", "me"] });
+    },
+    [queryClient],
+  );
+
+  const completeEnrollPasskey = useCallback(
+    async (name?: string | null) => {
+      const options = await api.passkeyRegisterBegin();
+      const credential = await startRegistration({
+        optionsJSON: options as unknown as PublicKeyCredentialCreationOptionsJSON,
+      });
+      await api.passkeyRegisterFinish({
+        credential: credential as unknown as Record<string, unknown>,
+        name: name?.trim() || null,
+      });
       const me = await api.me();
       setMustEnroll2fa(false);
       setPending2fa(false);
@@ -130,7 +179,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       mustEnroll2fa,
       login,
       verifyTotp,
+      verifyPasskey,
       completeEnroll2fa,
+      completeEnrollPasskey,
       logout,
       refresh,
     }),
@@ -142,7 +193,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       mustEnroll2fa,
       login,
       verifyTotp,
+      verifyPasskey,
       completeEnroll2fa,
+      completeEnrollPasskey,
       logout,
       refresh,
     ],

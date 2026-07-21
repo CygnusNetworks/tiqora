@@ -16,6 +16,12 @@ export type AuthMethodsOut = Schemas["AuthMethodsOut"];
 export type TOTPCodeIn = Schemas["TOTPCodeIn"];
 export type TOTPEnrollOut = Schemas["TOTPEnrollOut"];
 export type TOTPStatusOut = Schemas["TOTPStatusOut"];
+export type PasskeyOut = Schemas["PasskeyOut"];
+export type PasskeyStatusOut = Schemas["PasskeyStatusOut"];
+export type PasskeyRegisterFinishIn = Schemas["PasskeyRegisterFinishIn"];
+export type PasskeyAuthenticateFinishIn = Schemas["PasskeyAuthenticateFinishIn"];
+/** WebAuthn PublicKeyCredential*Options JSON (py_webauthn / simplewebauthn). */
+export type PasskeyOptionsJSON = Record<string, unknown>;
 export type QueueNode = Schemas["QueueNode"];
 export type QueueCounts = Schemas["QueueCounts"];
 export type TicketListItem = Schemas["TicketListItem"];
@@ -726,6 +732,12 @@ export class ApiClient {
     this.skipAuthRedirectPaths = options.skipAuthRedirectPaths ?? [
       "/api/v1/auth/login",
       "/api/v1/auth/me",
+      // Pending-2FA / forced-enroll ceremonies must not bounce to /login on 401.
+      "/api/v1/auth/passkey/authenticate",
+      "/api/v1/auth/passkey/register",
+      "/api/v1/auth/totp/verify",
+      "/api/v1/auth/totp/enroll",
+      "/api/v1/auth/totp/confirm",
       "/api/portal/auth/login",
       "/api/portal/auth/me",
     ];
@@ -845,6 +857,44 @@ export class ApiClient {
 
   totpStatus(signal?: AbortSignal) {
     return this.request<TOTPStatusOut>("GET", "/api/v1/auth/totp/status", { signal });
+  }
+
+  // ── Passkeys (WebAuthn) ─────────────────────────────────────────────
+
+  passkeyRegisterBegin(signal?: AbortSignal) {
+    return this.request<PasskeyOptionsJSON>("POST", "/api/v1/auth/passkey/register/begin", {
+      signal,
+    });
+  }
+
+  passkeyRegisterFinish(body: PasskeyRegisterFinishIn, signal?: AbortSignal) {
+    return this.request<PasskeyStatusOut>("POST", "/api/v1/auth/passkey/register/finish", {
+      body,
+      signal,
+    });
+  }
+
+  passkeyAuthenticateBegin(signal?: AbortSignal) {
+    return this.request<PasskeyOptionsJSON>(
+      "POST",
+      "/api/v1/auth/passkey/authenticate/begin",
+      { signal },
+    );
+  }
+
+  passkeyAuthenticateFinish(body: PasskeyAuthenticateFinishIn, signal?: AbortSignal) {
+    return this.request<LoginResponse>("POST", "/api/v1/auth/passkey/authenticate/finish", {
+      body,
+      signal,
+    });
+  }
+
+  passkeyList(signal?: AbortSignal) {
+    return this.request<PasskeyOut[]>("GET", "/api/v1/auth/passkey", { signal });
+  }
+
+  passkeyDelete(passkeyId: number, signal?: AbortSignal) {
+    return this.request<void>("DELETE", `/api/v1/auth/passkey/${passkeyId}`, { signal });
   }
 
   /** Browser-navigates to the OIDC provider; not a fetch (redirect flow). */
