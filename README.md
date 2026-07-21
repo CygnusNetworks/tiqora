@@ -45,21 +45,26 @@ existing schema during parallel operation.
 ## Screenshots
 
 The agent workspace, ticket zoom (with a permission-aware action bar), reporting,
-the admin console, and the customer portal — German UI, light theme:
+the admin console, privacy/GDPR tooling, and the customer portal:
 
 | Agent dashboard | Ticket zoom |
 |---|---|
 | ![Agent dashboard](./docs/images/agent-dashboard.png) | ![Ticket zoom](./docs/images/agent-ticket-zoom.png) |
 
-| Queue view | Reporting |
+| Reporting & SLA | Queue view |
 |---|---|
-| ![Queue view](./docs/images/agent-queues.png) | ![Statistics](./docs/images/agent-stats.png) |
+| ![Reporting](./docs/images/agent-stats.png) | ![Queue view](./docs/images/agent-queues.png) |
 
-| Admin — queues | Customer portal |
+| Admin — queues | Authentication / 2FA |
 |---|---|
-| ![Admin queues](./docs/images/admin-queues.png) | ![Customer portal](./docs/images/portal.png) |
+| ![Admin queues](./docs/images/admin-queues.png) | ![2FA administration](./docs/images/admin-2fa.png) |
 
-<sub>Rendered from representative fixture data via `SCREENSHOTS=1 pnpm exec playwright test screenshots` — no backend required.</sub>
+| Privacy / GDPR erasure | Customer portal |
+|---|---|
+| ![GDPR](./docs/images/admin-gdpr.png) | ![Customer portal](./docs/images/portal.png) |
+
+<sub>Rendered from representative data via `SCREENSHOTS=1 pnpm exec playwright test screenshots`
+(`e2e/fixtures/rich-mock.ts`) — no backend required. Use `THEME=dark` / `LANG_UI=de` for variants.</sub>
 
 ## Key features
 
