@@ -21,14 +21,14 @@ export function CustomerUserGroupsPage() {
       labelKey: "admin.customerUserGroups.customerUser",
       loadItems: async (signal) => {
         const page = await api.adminCustomerUsers.list(
-          { valid: "valid", pageSize: 50, search: "" },
+          { valid: "all", pageSize: 50, search: "" },
           signal,
         );
         return page.items;
       },
       searchItems: async (q, signal) => {
         const page = await api.adminCustomerUsers.list(
-          { valid: "valid", pageSize: 50, search: q },
+          { valid: "all", pageSize: 50, search: q },
           signal,
         );
         return page.items;
@@ -40,16 +40,18 @@ export function CustomerUserGroupsPage() {
         if (name && u.email) return `${name} · ${u.email}`;
         return name || u.email || undefined;
       },
+      isValid: (u) => u.valid_id === 1,
     },
     sideB: {
       key: "groups",
       labelKey: "admin.customerUserGroups.groups",
       loadItems: async (signal) => {
-        const page = await api.adminGroups.list({ valid: "valid", pageSize: 500 }, signal);
+        const page = await api.adminGroups.list({ valid: "all", pageSize: 500 }, signal);
         return page.items;
       },
       getId: (g) => g.id,
       getLabel: (g) => g.name,
+      isValid: (g) => g.valid_id === 1,
     },
     loadAssignedB: (login, signal) => api.listCustomerUserGroups(login as string, signal),
     loadAssignedA: (groupId, signal) => api.listGroupCustomerUsers(groupId as number, signal),

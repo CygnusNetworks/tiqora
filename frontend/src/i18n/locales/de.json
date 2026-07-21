@@ -948,7 +948,8 @@
       "noAnchors": "Keine Einträge vorhanden.",
       "noMatches": "Keine Treffer.",
       "assignedCount": "{{count}} zugewiesen",
-      "counterpartFor": "{{counterpart}} für {{anchor}}"
+      "counterpartFor": "{{counterpart}} für {{anchor}}",
+      "invalid": "ungültig"
     },
     "queueVariables": {
       "title_plural": "Queue-Variablen",

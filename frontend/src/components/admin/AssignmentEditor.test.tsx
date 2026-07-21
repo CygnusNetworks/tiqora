@@ -8,10 +8,10 @@ import {
   type AssignmentConfig,
 } from "./AssignmentEditor";
 
-type Queue = { id: number; name: string };
-type Template = { id: number; name: string; template_type: string };
-type CustomerUser = { login: string; first_name: string; last_name: string };
-type Group = { id: number; name: string };
+type Queue = { id: number; name: string; valid_id?: number };
+type Template = { id: number; name: string; template_type: string; valid_id?: number };
+type CustomerUser = { login: string; first_name: string; last_name: string; valid_id?: number };
+type Group = { id: number; name: string; valid_id?: number };
 
 const listQueues = vi.fn();
 const listTemplates = vi.fn();
@@ -363,5 +363,61 @@ describe("AssignmentEditor", () => {
     });
 
     vi.useRealTimers();
+  });
+
+  it("grays invalid items with an (ungültig) marker; valid items stay unmarked", async () => {
+    listQueues.mockResolvedValue([
+      { id: 3, name: "Support", valid_id: 1 },
+      { id: 9, name: "Legacy", valid_id: 2 },
+    ]);
+    listTemplates.mockResolvedValue([
+      { id: 20, name: "Welcome", template_type: "Create", valid_id: 1 },
+      { id: 22, name: "Retired", template_type: "Close", valid_id: 2 },
+    ]);
+    listAssignedB.mockResolvedValue([
+      { id: 22, name: "Retired", template_type: "Close", valid_id: 2 },
+    ]);
+
+    const config: AssignmentConfig<Queue, Template> = {
+      ...queueTemplateConfig,
+      sideA: {
+        ...queueTemplateConfig.sideA,
+        isValid: (q) => q.valid_id === 1,
+      },
+      sideB: {
+        ...queueTemplateConfig.sideB,
+        isValid: (t) => t.valid_id === 1,
+      },
+    };
+    renderEditor(config);
+
+    const invalidAnchor = await screen.findByTestId("ae-qt-anchor-9");
+    expect(invalidAnchor).toHaveAttribute("data-invalid", "true");
+    expect(invalidAnchor).toHaveTextContent(/ungültig|invalid/i);
+    expect(invalidAnchor.className).toMatch(/opacity-50/);
+
+    const validAnchor = screen.getByTestId("ae-qt-anchor-3");
+    expect(validAnchor).not.toHaveAttribute("data-invalid");
+    expect(validAnchor).not.toHaveTextContent(/ungültig|invalid/i);
+
+    fireEvent.click(validAnchor);
+    await waitFor(() => {
+      expect(screen.getByTestId("ae-qt-counterpart-22")).toBeChecked();
+    });
+
+    const invalidRow = screen.getByTestId("ae-qt-counterpart-row-22");
+    expect(invalidRow).toHaveAttribute("data-invalid", "true");
+    expect(invalidRow).toHaveTextContent(/ungültig|invalid/i);
+    expect(invalidRow.className).toMatch(/opacity-50/);
+
+    const validRow = screen.getByTestId("ae-qt-counterpart-row-20");
+    expect(validRow).not.toHaveAttribute("data-invalid");
+    expect(validRow).not.toHaveTextContent(/ungültig|invalid/i);
+
+    // Checkbox on invalid item remains usable (unassign).
+    fireEvent.click(screen.getByTestId("ae-qt-counterpart-22"));
+    await waitFor(() => {
+      expect(revoke).toHaveBeenCalledWith(3, 22);
+    });
   });
 });

@@ -17,22 +17,24 @@ export function AgentGroupsPage() {
       key: "users",
       labelKey: "admin.groupAssignments.agent",
       loadItems: async (signal) => {
-        const page = await api.adminUsers.list({ valid: "valid", pageSize: 500 }, signal);
+        const page = await api.adminUsers.list({ valid: "all", pageSize: 500 }, signal);
         return page.items;
       },
       getId: (u) => u.id,
       getLabel: (u) => u.login,
       getSubLabel: (u) => `${u.first_name} ${u.last_name}`.trim() || undefined,
+      isValid: (u) => u.valid_id === 1,
     },
     sideB: {
       key: "groups",
       labelKey: "admin.groupAssignments.groups",
       loadItems: async (signal) => {
-        const page = await api.adminGroups.list({ valid: "valid", pageSize: 500 }, signal);
+        const page = await api.adminGroups.list({ valid: "all", pageSize: 500 }, signal);
         return page.items;
       },
       getId: (g) => g.id,
       getLabel: (g) => g.name,
+      isValid: (g) => g.valid_id === 1,
     },
     loadAssignedB: (uId, signal) =>
       api.request<GroupOut[]>("GET", `/api/v1/admin/users/${uId}/groups`, { signal }),

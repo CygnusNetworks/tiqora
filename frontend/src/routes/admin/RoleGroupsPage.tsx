@@ -17,21 +17,23 @@ export function RoleGroupsPage() {
       key: "roles",
       labelKey: "admin.roleGroupAssignments.role",
       loadItems: async (signal) => {
-        const page = await api.adminRoles.list({ valid: "valid", pageSize: 500 }, signal);
+        const page = await api.adminRoles.list({ valid: "all", pageSize: 500 }, signal);
         return page.items;
       },
       getId: (r) => r.id,
       getLabel: (r) => r.name,
+      isValid: (r) => r.valid_id === 1,
     },
     sideB: {
       key: "groups",
       labelKey: "admin.roleGroupAssignments.groups",
       loadItems: async (signal) => {
-        const page = await api.adminGroups.list({ valid: "valid", pageSize: 500 }, signal);
+        const page = await api.adminGroups.list({ valid: "all", pageSize: 500 }, signal);
         return page.items;
       },
       getId: (g) => g.id,
       getLabel: (g) => g.name,
+      isValid: (g) => g.valid_id === 1,
     },
     loadAssignedB: (roleId, signal) =>
       api.request<GroupOut[]>("GET", `/api/v1/admin/roles/${roleId}/groups`, { signal }),

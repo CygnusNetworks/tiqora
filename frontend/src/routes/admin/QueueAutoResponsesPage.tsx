@@ -16,18 +16,19 @@ export function QueueAutoResponsesPage() {
       key: "queues",
       labelKey: "admin.queueAutoResponses.queue",
       loadItems: async (signal) => {
-        const page = await api.adminQueues.list({ valid: "valid", pageSize: 500 }, signal);
+        const page = await api.adminQueues.list({ valid: "all", pageSize: 500 }, signal);
         return page.items;
       },
       getId: (q) => q.id,
       getLabel: (q) => q.name,
+      isValid: (q) => q.valid_id === 1,
     },
     sideB: {
       key: "auto-responses",
       labelKey: "admin.queueAutoResponses.autoResponses",
       loadItems: async (signal) => {
         const page = await api.adminAutoResponses.list(
-          { valid: "valid", pageSize: 500 },
+          { valid: "all", pageSize: 500 },
           signal,
         );
         return page.items;
@@ -35,6 +36,7 @@ export function QueueAutoResponsesPage() {
       getId: (ar) => ar.id,
       getLabel: (ar) => ar.name,
       getSubLabel: (ar) => String(ar.type_id),
+      isValid: (ar) => ar.valid_id === 1,
     },
     loadAssignedB: (qId, signal) => api.listQueueAutoResponses(qId as number, signal),
     loadAssignedA: (arId, signal) => api.listAutoResponseQueues(arId as number, signal),

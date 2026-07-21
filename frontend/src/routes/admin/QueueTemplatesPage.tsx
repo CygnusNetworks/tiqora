@@ -16,22 +16,24 @@ export function QueueTemplatesPage() {
       key: "queues",
       labelKey: "admin.queueTemplates.queue",
       loadItems: async (signal) => {
-        const page = await api.adminQueues.list({ valid: "valid", pageSize: 500 }, signal);
+        const page = await api.adminQueues.list({ valid: "all", pageSize: 500 }, signal);
         return page.items;
       },
       getId: (q) => q.id,
       getLabel: (q) => q.name,
+      isValid: (q) => q.valid_id === 1,
     },
     sideB: {
       key: "templates",
       labelKey: "admin.queueTemplates.templates",
       loadItems: async (signal) => {
-        const page = await api.adminTemplates.list({ valid: "valid", pageSize: 500 }, signal);
+        const page = await api.adminTemplates.list({ valid: "all", pageSize: 500 }, signal);
         return page.items;
       },
       getId: (t) => t.id,
       getLabel: (t) => t.name,
       getSubLabel: (t) => t.template_type ?? undefined,
+      isValid: (t) => t.valid_id === 1,
     },
     loadAssignedB: (qId, signal) => api.listQueueTemplates(qId as number, signal),
     loadAssignedA: (tId, signal) => api.listTemplateQueues(tId as number, signal),

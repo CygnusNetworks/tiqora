@@ -35,19 +35,20 @@ export function TemplateAttachmentsPage() {
       key: "templates",
       labelKey: "admin.templateAttachments.template",
       loadItems: async (signal) => {
-        const page = await api.adminTemplates.list({ valid: "valid", pageSize: 500 }, signal);
+        const page = await api.adminTemplates.list({ valid: "all", pageSize: 500 }, signal);
         return page.items;
       },
       getId: (t) => t.id,
       getLabel: (t) => t.name,
       getSubLabel: (t) => t.template_type ?? undefined,
+      isValid: (t) => t.valid_id === 1,
     },
     sideB: {
       key: "attachments",
       labelKey: "admin.templateAttachments.attachments",
       loadItems: async (signal) => {
         const page = await api.adminAttachments.list(
-          { valid: "valid", pageSize: 500 },
+          { valid: "all", pageSize: 500 },
           signal,
         );
         return page.items;
@@ -55,6 +56,7 @@ export function TemplateAttachmentsPage() {
       getId: (a) => a.id,
       getLabel: (a) => a.name,
       getSubLabel: (a) => a.filename,
+      isValid: (a) => a.valid_id === 1,
     },
     loadAssignedB: async (templateId, signal) => {
       const refs = await api.listTemplateAttachments(templateId as number, signal);

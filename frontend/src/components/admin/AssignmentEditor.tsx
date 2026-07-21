@@ -23,6 +23,12 @@ export interface AssignmentSide<Item> {
    * (e.g. 100k+ customer users).
    */
   searchItems?: (query: string, signal?: AbortSignal) => Promise<Item[]>;
+  /**
+   * Validity check (typically ``valid_id === 1``). When false, the row is
+   * grayed with an "(ungültig)" marker but remains selectable/toggleable so
+   * admins can unassign now-invalid items.
+   */
+  isValid?: (item: Item) => boolean;
 }
 
 export interface AssignmentConfig<A, B> {
@@ -198,15 +204,12 @@ export function AssignmentEditor<A, B>({ config }: { config: AssignmentConfig<A,
     return set;
   }, [assignedQ.data, counterpartSide]);
 
-  const selectedAnchorLabel = useMemo(() => {
-    if (selectedId === null) return "";
+  const selectedAnchor = useMemo(() => {
+    if (selectedId === null) return undefined;
     const pool = anchorServerSearch
       ? (anchorsSearchQ.data ?? [])
       : (anchorsClientQ.data ?? []);
-    const found = pool.find(
-      (item) => idKey(anchorSide.getId(item)) === idKey(selectedId),
-    );
-    return found !== undefined ? anchorSide.getLabel(found) : idKey(selectedId);
+    return pool.find((item) => idKey(anchorSide.getId(item)) === idKey(selectedId));
   }, [
     selectedId,
     anchorServerSearch,
@@ -214,6 +217,18 @@ export function AssignmentEditor<A, B>({ config }: { config: AssignmentConfig<A,
     anchorsClientQ.data,
     anchorSide,
   ]);
+
+  const selectedAnchorLabel = useMemo(() => {
+    if (selectedId === null) return "";
+    if (selectedAnchor !== undefined) {
+      const label = anchorSide.getLabel(selectedAnchor);
+      if (anchorSide.isValid !== undefined && anchorSide.isValid(selectedAnchor) === false) {
+        return `${label} (${t("admin.assignmentEditor.invalid")})`;
+      }
+      return label;
+    }
+    return idKey(selectedId);
+  }, [selectedId, selectedAnchor, anchorSide, t]);
 
   const flashSaved = useCallback(() => {
     setSavedFlash(true);
@@ -387,38 +402,58 @@ export function AssignmentEditor<A, B>({ config }: { config: AssignmentConfig<A,
     setSavedFlash(false);
   };
 
+  /** Stable valid-first sort when the side provides ``isValid``. */
+  const sortValidFirst = useCallback(
+    (side: AssignmentSide<unknown>, items: unknown[]): unknown[] => {
+      if (!side.isValid) return items;
+      return [...items].sort((a, b) => {
+        const aOk = side.isValid!(a) !== false ? 0 : 1;
+        const bOk = side.isValid!(b) !== false ? 0 : 1;
+        return aOk - bOk;
+      });
+    },
+    [],
+  );
+
   // Master list rows.
   const filteredAnchors = useMemo(() => {
+    let anchors: unknown[];
     if (anchorServerSearch) {
-      return anchorsSearchQ.data ?? [];
+      anchors = anchorsSearchQ.data ?? [];
+    } else {
+      anchors = anchorsClientQ.data ?? [];
+      const q = anchorFilter.trim().toLowerCase();
+      if (q) {
+        anchors = anchors.filter((item) => {
+          const label = anchorSide.getLabel(item).toLowerCase();
+          const sub = anchorSide.getSubLabel?.(item)?.toLowerCase() ?? "";
+          return label.includes(q) || sub.includes(q);
+        });
+      }
     }
-    const anchors = anchorsClientQ.data ?? [];
-    const q = anchorFilter.trim().toLowerCase();
-    if (!q) return anchors;
-    return anchors.filter((item) => {
-      const label = anchorSide.getLabel(item).toLowerCase();
-      const sub = anchorSide.getSubLabel?.(item)?.toLowerCase() ?? "";
-      return label.includes(q) || sub.includes(q);
-    });
+    return sortValidFirst(anchorSide, anchors);
   }, [
     anchorServerSearch,
     anchorsSearchQ.data,
     anchorsClientQ.data,
     anchorFilter,
     anchorSide,
+    sortValidFirst,
   ]);
 
   // Counterpart checklist rows (client-filter mode).
   const filteredCounterpartsClient = useMemo(() => {
-    const list = counterpartsClientQ.data ?? [];
+    let list = counterpartsClientQ.data ?? [];
     const q = counterpartFilter.trim().toLowerCase();
-    if (!q) return list;
-    return list.filter((item) => {
-      const label = counterpartSide.getLabel(item).toLowerCase();
-      const sub = counterpartSide.getSubLabel?.(item)?.toLowerCase() ?? "";
-      return label.includes(q) || sub.includes(q);
-    });
-  }, [counterpartsClientQ.data, counterpartFilter, counterpartSide]);
+    if (q) {
+      list = list.filter((item) => {
+        const label = counterpartSide.getLabel(item).toLowerCase();
+        const sub = counterpartSide.getSubLabel?.(item)?.toLowerCase() ?? "";
+        return label.includes(q) || sub.includes(q);
+      });
+    }
+    return sortValidFirst(counterpartSide, list);
+  }, [counterpartsClientQ.data, counterpartFilter, counterpartSide, sortValidFirst]);
 
   // Counterpart checklist: assigned always + search hits (deduped).
   const counterpartServerRows = useMemo(() => {
@@ -430,12 +465,17 @@ export function AssignmentEditor<A, B>({ config }: { config: AssignmentConfig<A,
     const searchHits = (counterpartsSearchQ.data ?? []).filter(
       (item) => !assignedKeys.has(idKey(counterpartSide.getId(item))),
     );
-    return [...assigned, ...searchHits];
+    // Keep assigned block first; valid-first within each block.
+    return [
+      ...sortValidFirst(counterpartSide, assigned),
+      ...sortValidFirst(counterpartSide, searchHits),
+    ];
   }, [
     counterpartServerSearch,
     assignedQ.data,
     counterpartsSearchQ.data,
     counterpartSide,
+    sortValidFirst,
   ]);
 
   const counterpartsForBulkCount = counterpartServerSearch
@@ -483,15 +523,27 @@ export function AssignmentEditor<A, B>({ config }: { config: AssignmentConfig<A,
     anchorsSearching ||
     (selectedId !== null && (counterpartsLoading || counterpartsSearching));
 
+  const itemIsInvalid = (side: AssignmentSide<unknown>, item: unknown): boolean =>
+    side.isValid !== undefined && side.isValid(item) === false;
+
+  const invalidMarker = (invalid: boolean) =>
+    invalid ? (
+      <span className="ml-1 shrink-0 text-xs font-normal text-muted">
+        ({t("admin.assignmentEditor.invalid")})
+      </span>
+    ) : null;
+
   const renderCounterpartRow = (item: unknown) => {
     const cId = counterpartSide.getId(item);
     const checked = assignedIdSet.has(idKey(cId));
     const sub = counterpartSide.getSubLabel?.(item);
+    const invalid = itemIsInvalid(counterpartSide, item);
     return (
       <li
         key={idKey(cId)}
-        className="flex items-center px-3 py-2.5"
+        className={cn("flex items-center px-3 py-2.5", invalid && "opacity-50")}
         data-testid={`${config.testId}-counterpart-row-${idKey(cId)}`}
+        data-invalid={invalid ? "true" : undefined}
       >
         <label className="flex min-w-0 flex-1 cursor-pointer items-center gap-3">
           <input
@@ -508,8 +560,14 @@ export function AssignmentEditor<A, B>({ config }: { config: AssignmentConfig<A,
             }
           />
           <span className="min-w-0">
-            <span className="block truncate text-sm text-ink">
-              {counterpartSide.getLabel(item)}
+            <span
+              className={cn(
+                "flex min-w-0 items-baseline truncate text-sm",
+                invalid ? "text-muted" : "text-ink",
+              )}
+            >
+              <span className="truncate">{counterpartSide.getLabel(item)}</span>
+              {invalidMarker(invalid)}
             </span>
             {sub ? (
               <span className="block truncate text-xs text-muted">{sub}</span>
@@ -614,22 +672,31 @@ export function AssignmentEditor<A, B>({ config }: { config: AssignmentConfig<A,
                 const selected = selectedId !== null && idKey(selectedId) === idKey(id);
                 const count = anchorCount(id);
                 const sub = anchorSide.getSubLabel?.(item);
+                const invalid = itemIsInvalid(anchorSide, item);
                 return (
                   <li key={idKey(id)}>
                     <button
                       type="button"
                       data-testid={`${config.testId}-anchor-${idKey(id)}`}
+                      data-invalid={invalid ? "true" : undefined}
                       onClick={() => setSelectedId(id)}
                       className={cn(
                         "flex w-full items-center gap-2 px-3 py-2.5 text-left transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-accent",
                         selected
                           ? "bg-accent-dim text-accent"
                           : "text-ink hover:bg-surface-subtle",
+                        invalid && "opacity-50",
                       )}
                     >
                       <span className="min-w-0 flex-1">
-                        <span className="block truncate text-sm font-medium">
-                          {anchorSide.getLabel(item)}
+                        <span
+                          className={cn(
+                            "flex min-w-0 items-baseline truncate text-sm font-medium",
+                            invalid && !selected && "text-muted",
+                          )}
+                        >
+                          <span className="truncate">{anchorSide.getLabel(item)}</span>
+                          {invalidMarker(invalid)}
                         </span>
                         {sub ? (
                           <span
