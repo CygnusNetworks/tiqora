@@ -406,7 +406,8 @@
       "automation": "Automatisierung",
       "system": "System",
       "queuesTemplates": "Queues & Vorlagen",
-      "email": "E-Mail"
+      "email": "E-Mail",
+      "placeholderVariables": "Platzhalter-Variablen"
     },
     "nav": {
       "users": "Benutzer",
@@ -437,7 +438,9 @@
       "attachments": "Anhänge",
       "templateAttachments": "Vorlagen↔Anhänge",
       "queueTemplates": "Vorlagen↔Queues",
-      "queueAutoResponses": "Queues↔Autoantworten"
+      "queueAutoResponses": "Queues↔Autoantworten",
+      "queueVariables": "Queue-Variablen",
+      "customerFields": "Customer-Felder"
     },
     "table": {
       "id": "ID",
@@ -609,11 +612,13 @@
         "currentLastname": "Nachname des angemeldeten Bearbeiters",
         "ownerFirstname": "Vorname des Ticket-Besitzers",
         "ownerLastname": "Nachname des Ticket-Besitzers",
-        "queueName": "Name der Queue"
+        "queueName": "Name der Queue",
+        "configuredQueueVar": "Konfigurierte Queue-Variable ({name})"
       },
       "notes": {
         "customerAnyColumn": "Beliebige customer_user-Spalte: <OTRS_CUSTOMER_DATA_{Spalte}>",
-        "queueCustomFields": "Nicht-Standard-Felder (z. B. <OTRS_QUEUE_Domain>) werden nur ersetzt, wenn eine Datenquelle existiert."
+        "queueCustomFields": "Konfigurierte Variablen erscheinen als <OTRS_QUEUE_Name>. <TIQORA_QUEUE_Name> ist ein gleichwertiger Alias. Nicht-Standard-Felder werden nur ersetzt, wenn eine Datenquelle existiert.",
+        "tiqoraQueueAlias": "<TIQORA_QUEUE_Name> ist ein gleichwertiger Alias von <OTRS_QUEUE_Name>."
       }
     },
     "salutations": {
@@ -822,6 +827,29 @@
       "noMatches": "Keine Treffer.",
       "assignedCount": "{{count}} zugewiesen",
       "counterpartFor": "{{counterpart}} für {{anchor}}"
+    },
+    "queueVariables": {
+      "title_plural": "Queue-Variablen",
+      "new": "Neue Variable",
+      "queue": "Queue",
+      "global": "Global (alle Queues)",
+      "name": "Name",
+      "value": "Wert",
+      "empty": "Keine Variablen für diese Queue.",
+      "nameHelp": "Wird als <OTRS_QUEUE_{Name}> und <TIQORA_QUEUE_{Name}> aufgelöst.",
+      "globalHint": "Globale Variablen gelten für alle Queues, sofern die Queue keine eigene Variable gleichen Namens setzt.",
+      "queueHint": "Queue-spezifische Variablen überschreiben gleichnamige globale Werte."
+    },
+    "customerFields": {
+      "title_plural": "Customer-Felder",
+      "new": "Neues Feld",
+      "sourceTable": "Quelltabelle",
+      "columnName": "Spaltenname",
+      "columnNameHelp": "Spalte aus customer_user / customer_company (Vorschläge aus der DB).",
+      "tagName": "Tag-Name",
+      "tagNameHelp": "Platzhalter: <OTRS_CUSTOMER_DATA_{Tag}>",
+      "label": "Bezeichnung",
+      "enabled": "Aktiv"
     }
   },
   "kb": {
