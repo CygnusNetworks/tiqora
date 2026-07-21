@@ -19,6 +19,13 @@ class SpnegoUnavailable(Exception):
     """Raised when gssapi is not installed, or negotiation cannot complete."""
 
 
+class SpnegoAuthFailed(Exception):
+    """Raised when a client's Negotiate token cannot be validated against the
+    keytab (malformed token, wrong/expired ticket, keytab/principal mismatch,
+    clock skew). Distinct from :class:`SpnegoUnavailable` so the API can map it
+    to 401 (authentication failed) rather than a 500/501."""
+
+
 def _import_gssapi() -> Any:
     try:
         import gssapi
@@ -40,9 +47,14 @@ class SpnegoService:
         gssapi = _import_gssapi()
         if self._settings.krb5_ktname:
             os.environ["KRB5_KTNAME"] = self._settings.krb5_ktname
-        server_creds = gssapi.Credentials(usage="accept")
-        ctx = gssapi.SecurityContext(creds=server_creds, usage="accept")
-        ctx.step(token)
+        try:
+            server_creds = gssapi.Credentials(usage="accept")
+            ctx = gssapi.SecurityContext(creds=server_creds, usage="accept")
+            ctx.step(token)
+        except Exception as exc:  # noqa: BLE001 — gssapi.exceptions.GSSError (dynamic import)
+            # Malformed/expired/wrong ticket, or the keytab can't be read /
+            # doesn't hold the service principal → authentication failure, 401.
+            raise SpnegoAuthFailed(f"SPNEGO negotiation failed: {exc}") from exc
         if not ctx.complete:
             raise SpnegoUnavailable("multi-leg SPNEGO negotiation is not supported")
         return str(ctx.initiator_name)

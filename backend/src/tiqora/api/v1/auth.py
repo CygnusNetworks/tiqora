@@ -39,7 +39,12 @@ from tiqora.domain.schemas import (
     TOTPStatusOut,
     UserMe,
 )
-from tiqora.domain.spnego import SpnegoService, SpnegoUnavailable, principal_to_login
+from tiqora.domain.spnego import (
+    SpnegoAuthFailed,
+    SpnegoService,
+    SpnegoUnavailable,
+    principal_to_login,
+)
 from tiqora.domain.totp_qr import totp_qr_svg
 from tiqora.permissions.engine import PermissionEngine
 from tiqora.security.ratelimit import AuthRateLimiter, client_ip
@@ -584,6 +589,13 @@ async def spnego(
     service = SpnegoService(settings)
     try:
         principal = await service.accept(token_bytes)
+    except SpnegoAuthFailed as exc:
+        # Bad/expired token or keytab mismatch → authentication failed, re-challenge.
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=str(exc),
+            headers={"WWW-Authenticate": "Negotiate"},
+        ) from exc
     except SpnegoUnavailable as exc:
         raise HTTPException(status_code=status.HTTP_501_NOT_IMPLEMENTED, detail=str(exc)) from exc
 
