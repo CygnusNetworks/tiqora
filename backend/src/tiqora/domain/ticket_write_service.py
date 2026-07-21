@@ -632,6 +632,11 @@ async def add_article(
         session, "ArticleCreate", ticket_id, {"article_id": article_id, "channel": article.channel}
     )
 
+    # Invalidate Znuny's on-disk ticket/article cache so the new article shows
+    # up in the Znuny GUI (the TiqoraSync daemon polls tiqora_cache_invalidation).
+    # Without this, field changes propagate but externally-added articles do not.
+    await invalidate_ticket_cache(session, ticket_id)
+
     return article_id
 
 
