@@ -11178,6 +11178,85 @@
         ]
       }
     },
+    "/api/v1/admin/attachments/{attachment_id}/templates": {
+      "get": {
+        "description": "Templates currently using *attachment_id* \u2014 reverse of template\u2194attachments.",
+        "operationId": "get_attachment_templates_api_v1_admin_attachments__attachment_id__templates_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "attachment_id",
+            "required": true,
+            "schema": {
+              "title": "Attachment Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/StandardTemplateOut"
+                  },
+                  "title": "Response Get Attachment Templates Api V1 Admin Attachments  Attachment Id  Templates Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Attachment Templates",
+        "tags": [
+          "admin:attachments"
+        ]
+      }
+    },
     "/api/v1/admin/auto-responses": {
       "get": {
         "operationId": "list_auto_responses_api_v1_admin_auto_responses_get",
@@ -12271,6 +12350,85 @@
           }
         },
         "summary": "Update Customer Company",
+        "tags": [
+          "admin:customers"
+        ]
+      }
+    },
+    "/api/v1/admin/customer-companies/{customer_id}/customer-users": {
+      "get": {
+        "description": "Customer users with extra visibility into *customer_id* \u2014 reverse of\ncustomer-user\u2194companies (Znuny ``customer_user_customer``).\n\nDistinct from users whose *primary* ``customer_user.customer_id`` is this\ncompany; those are not listed here.",
+        "operationId": "get_customer_company_users_api_v1_admin_customer_companies__customer_id__customer_users_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "customer_id",
+            "required": true,
+            "schema": {
+              "title": "Customer Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/CustomerUserAdminOut"
+                  },
+                  "title": "Response Get Customer Company Users Api V1 Admin Customer Companies  Customer Id  Customer Users Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Customer Company Users",
         "tags": [
           "admin:customers"
         ]
@@ -14078,6 +14236,243 @@
           }
         },
         "summary": "Update Group",
+        "tags": [
+          "admin:groups"
+        ]
+      }
+    },
+    "/api/v1/admin/groups/{group_id}/customer-users": {
+      "get": {
+        "description": "Customer users with full (``rw``) access to *group_id* \u2014 reverse of\ncustomer-user\u2194groups.\n\nZnuny stores the customer-user identity as the *login string* in\n``group_customer_user.user_id`` (not the numeric ``customer_user.id``).",
+        "operationId": "get_group_customer_users_api_v1_admin_groups__group_id__customer_users_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "group_id",
+            "required": true,
+            "schema": {
+              "title": "Group Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/CustomerUserAdminOut"
+                  },
+                  "title": "Response Get Group Customer Users Api V1 Admin Groups  Group Id  Customer Users Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Group Customer Users",
+        "tags": [
+          "admin:groups"
+        ]
+      }
+    },
+    "/api/v1/admin/groups/{group_id}/roles": {
+      "get": {
+        "description": "Roles that grant full (``rw``) access to *group_id* \u2014 reverse of role\u2194groups.",
+        "operationId": "get_group_roles_api_v1_admin_groups__group_id__roles_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "group_id",
+            "required": true,
+            "schema": {
+              "title": "Group Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/RoleOut"
+                  },
+                  "title": "Response Get Group Roles Api V1 Admin Groups  Group Id  Roles Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Group Roles",
+        "tags": [
+          "admin:groups"
+        ]
+      }
+    },
+    "/api/v1/admin/groups/{group_id}/users": {
+      "get": {
+        "description": "Agents with full (``rw``) access to *group_id* \u2014 reverse of user\u2194groups.",
+        "operationId": "get_group_users_api_v1_admin_groups__group_id__users_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "group_id",
+            "required": true,
+            "schema": {
+              "title": "Group Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/UserOut"
+                  },
+                  "title": "Response Get Group Users Api V1 Admin Groups  Group Id  Users Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Group Users",
         "tags": [
           "admin:groups"
         ]
@@ -16581,6 +16976,85 @@
           }
         },
         "summary": "Revoke Group Role",
+        "tags": [
+          "admin:roles"
+        ]
+      }
+    },
+    "/api/v1/admin/roles/{role_id}/users": {
+      "get": {
+        "description": "Agents currently granted *role_id* \u2014 reverse of user\u2194roles.",
+        "operationId": "get_role_users_api_v1_admin_roles__role_id__users_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "role_id",
+            "required": true,
+            "schema": {
+              "title": "Role Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/UserOut"
+                  },
+                  "title": "Response Get Role Users Api V1 Admin Roles  Role Id  Users Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Role Users",
         "tags": [
           "admin:roles"
         ]

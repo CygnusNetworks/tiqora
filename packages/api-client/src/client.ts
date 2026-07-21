@@ -1237,8 +1237,28 @@ export class ApiClient {
     return this.adminCrud<GroupOut, GroupCreate, GroupUpdate>("/api/v1/admin/groups");
   }
 
+  listGroupUsers(groupId: number, signal?: AbortSignal) {
+    return this.request<UserOut[]>("GET", `/api/v1/admin/groups/${groupId}/users`, { signal });
+  }
+
+  listGroupRoles(groupId: number, signal?: AbortSignal) {
+    return this.request<RoleOut[]>("GET", `/api/v1/admin/groups/${groupId}/roles`, { signal });
+  }
+
+  listGroupCustomerUsers(groupId: number, signal?: AbortSignal) {
+    return this.request<CustomerUserAdminOut[]>(
+      "GET",
+      `/api/v1/admin/groups/${groupId}/customer-users`,
+      { signal },
+    );
+  }
+
   get adminRoles() {
     return this.adminCrud<RoleOut, RoleCreate, RoleUpdate>("/api/v1/admin/roles");
+  }
+
+  listRoleUsers(roleId: number, signal?: AbortSignal) {
+    return this.request<UserOut[]>("GET", `/api/v1/admin/roles/${roleId}/users`, { signal });
   }
 
   assignRoleGroup(roleId: number, body: GroupRoleAssignment, signal?: AbortSignal) {
@@ -1276,6 +1296,14 @@ export class ApiClient {
   get adminCustomerCompanies() {
     return this.adminCrud<CustomerCompanyOut, CustomerCompanyCreate, CustomerCompanyUpdate>(
       "/api/v1/admin/customer-companies",
+    );
+  }
+
+  listCustomerCompanyUsers(customerId: string, signal?: AbortSignal) {
+    return this.request<CustomerUserAdminOut[]>(
+      "GET",
+      `/api/v1/admin/customer-companies/${encodeURIComponent(customerId)}/customer-users`,
+      { signal },
     );
   }
 
@@ -1354,6 +1382,14 @@ export class ApiClient {
     return this.request<AttachmentRefOut[]>(
       "GET",
       `/api/v1/admin/templates/${templateId}/attachments`,
+      { signal },
+    );
+  }
+
+  listAttachmentTemplates(attachmentId: number, signal?: AbortSignal) {
+    return this.request<StandardTemplateOut[]>(
+      "GET",
+      `/api/v1/admin/attachments/${attachmentId}/templates`,
       { signal },
     );
   }

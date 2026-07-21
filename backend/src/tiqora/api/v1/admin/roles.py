@@ -20,8 +20,9 @@ from tiqora.api.v1.admin.schemas import (
     RoleCreate,
     RoleOut,
     RoleUpdate,
+    UserOut,
 )
-from tiqora.db.legacy.user import GroupRole, PermissionGroups, Roles
+from tiqora.db.legacy.user import GroupRole, PermissionGroups, Roles, RoleUser, Users
 
 router = APIRouter(prefix="/roles", tags=["admin:roles"])
 
@@ -102,6 +103,22 @@ async def get_role_groups(
         select(PermissionGroups)
         .join(GroupRole, GroupRole.group_id == PermissionGroups.id)
         .where(GroupRole.role_id == role_id, GroupRole.permission_key == "rw")
+    )
+    return list(result.scalars().all())
+
+
+@router.get("/{role_id}/users", response_model=list[UserOut])
+async def get_role_users(role_id: int, admin: AdminUser, session: DbSession) -> list[Users]:
+    """Agents currently granted *role_id* — reverse of user↔roles."""
+    _ = admin
+    role = await session.get(Roles, role_id)
+    if role is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Role not found")
+    result = await session.execute(
+        select(Users)
+        .join(RoleUser, RoleUser.user_id == Users.id)
+        .where(RoleUser.role_id == role_id)
+        .order_by(Users.login)
     )
     return list(result.scalars().all())
 
