@@ -185,10 +185,23 @@ stateless — no application-data volume is needed for them.
 
 ## Connecting to an existing Znuny database
 
-For a fresh, standalone Tiqora deployment, use the bundled `postgres` (or
-`mariadb`) service as-is. For a **parallel-operation deployment against an
-existing Znuny 6.5 database** (see
-[`../guide/znuny-to-tiqora.md`](../guide/znuny-to-tiqora.md)):
+For a **fresh, standalone Tiqora deployment**, use the bundled `postgres` (or
+`mariadb`) service as-is — that database starts **empty**. After `docker
+compose up`, run:
+
+```bash
+docker compose run --rm tiqora-api \
+  tiqora bootstrap --admin-password '…' --seed
+```
+
+`tiqora bootstrap` loads the Znuny 6.5 base schema (installer order), applies
+the tiqora Alembic chain (`tiqora_*` only), and sets the admin password. The
+API entrypoint’s automatic `tiqora migrate upgrade` alone is **not** enough
+for greenfield: it never creates Znuny tables or the seeded `root@localhost`
+user. Full runbook: [`../guide/fresh-install.md`](../guide/fresh-install.md).
+
+For a **parallel-operation deployment against an existing Znuny 6.5 database**
+(see [`../guide/znuny-to-tiqora.md`](../guide/znuny-to-tiqora.md)):
 
 1. Remove (or never enable) the bundled `postgres`/`mariadb` service in your
    compose file — you don't want Tiqora managing a second, empty database

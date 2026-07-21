@@ -192,6 +192,14 @@ Tiqora and Znuny can share **one** PostgreSQL or MariaDB/MySQL database:
 
 See [docs/parallel-operation.md](./docs/parallel-operation.md) for the full invariant list.
 
+## Getting started — three ways to run
+
+| Path | When | Doc |
+|---|---|---|
+| **Fresh standalone** | Empty database, no Znuny — greenfield install via `tiqora bootstrap` | [docs/guide/fresh-install.md](./docs/guide/fresh-install.md) |
+| **Parallel to Znuny** | Co-run with an existing Znuny 6.5 database (same schema, additive `tiqora_*` only) | [docs/parallel-operation.md](./docs/parallel-operation.md), [docs/guide/znuny-to-tiqora.md](./docs/guide/znuny-to-tiqora.md) |
+| **Migrate away** | After parallel operation: schema ownership, cutover checklist | [docs/cutover.md](./docs/cutover.md) |
+
 ## Quick start (development)
 
 ### Prerequisites

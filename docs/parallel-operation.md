@@ -16,6 +16,34 @@ systems remain coherent.
 5. After cutover, an explicit **schema-ownership** mode unlocks
    `alembic/versions_owned/` for additive FKs, indexes, and orphan reports.
 
+## `tiqora_*` tables
+
+All Tiqora-owned state lives in these additive tables (models in
+`backend/src/tiqora/db/tiqora/models.py`). Znuny never reads or writes them
+except optionally via the TiqoraSync OPM for cache invalidation.
+
+| Table | Purpose |
+|---|---|
+| `tiqora_api_key` | Bearer API keys (`Authorization: Bearer`) mapped to agent users |
+| `tiqora_settings` | Key/value store: indexer watermarks, daemon feature flags, ownership marker |
+| `tiqora_cache_invalidation` | Queue of ticket/cache-type signals for the Znuny TiqoraSync addon |
+| `tiqora_event_outbox` | Transactional outbox for Meilisearch re-index and webhooks |
+| `tiqora_form_draft` | Agent form drafts (JSON; not Znuny’s Perl-Storable `form_draft`) |
+| `tiqora_user_totp` | Per-agent TOTP 2FA enrollment (secret Fernet-encrypted) |
+| `tiqora_user_passkey` | Per-agent WebAuthn passkey credentials |
+| `tiqora_user_auth_config` | Per-agent SSO eligibility and 2FA enforcement flags |
+| `tiqora_crypto_key` | Audit/bookkeeping for imported PGP/S-MIME keys (material elsewhere) |
+| `tiqora_gdpr_audit` | Audit trail for GDPR anonymize/retention runs (counts only, no PII) |
+| `tiqora_webhook` | Outbound webhook subscriptions (HMAC-signed deliveries) |
+| `tiqora_mail_outbound` | Singleton outbound SMTP settings for agent reply path |
+| `tiqora_mail_log` | Inbound/outbound mail communication log |
+| `tiqora_queue_variable` | Per-queue (or global) placeholder variables for templates |
+| `tiqora_placeholder_field` | Registry of customer_user/company columns for the placeholder picker |
+| `tiqora_gdpr_job` | Applied GDPR erasure jobs with backup window and status |
+| `tiqora_gdpr_backup` | Per-row snapshots taken before GDPR anonymize/delete |
+
+Plus the Alembic version table `tiqora_alembic_version` (not application state).
+
 ## Ticket number counter
 
 Source reference (Znuny): `Kernel/System/Ticket/NumberBase.pm`.

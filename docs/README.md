@@ -1,9 +1,18 @@
 # Tiqora documentation index
 
+## Getting started — three ways to run
+
+| Path | When | Doc |
+|---|---|---|
+| **Fresh standalone** | Empty database, no Znuny — greenfield install via `tiqora bootstrap` | [guide/fresh-install.md](guide/fresh-install.md) |
+| **Parallel to Znuny** | Co-run with an existing Znuny 6.5 database (same schema, additive `tiqora_*` only) | [parallel-operation.md](parallel-operation.md), [guide/znuny-to-tiqora.md](guide/znuny-to-tiqora.md) |
+| **Migrate away** | After parallel operation: schema ownership, cutover checklist | [cutover.md](cutover.md) |
+
 ## Getting started
 
 | Document | Content |
 |---|---|
+| [guide/fresh-install.md](guide/fresh-install.md) | Greenfield install: empty DB → `tiqora bootstrap` → login |
 | [architecture.md](architecture.md) | System components and data flow |
 | [development.md](development.md) | Local development workflow |
 | [testing.md](testing.md) | Test suite layout, golden-master tests, testcontainers |

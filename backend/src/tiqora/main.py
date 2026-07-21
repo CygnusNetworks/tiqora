@@ -10,6 +10,7 @@ import uvicorn
 
 from tiqora import __version__
 from tiqora.cli.api_key import add_api_key_subparser
+from tiqora.cli.bootstrap import add_bootstrap_subparser
 from tiqora.cli.crypto import add_crypto_subparser
 from tiqora.cli.dev import add_dev_subparser
 from tiqora.cli.gdpr import add_gdpr_subparser
@@ -37,6 +38,7 @@ def main(argv: list[str] | None = None) -> None:
     sub.add_parser("mcp", help="Run the MCP server")
     add_ownership_subparser(sub)
     add_migrate_subparser(sub)
+    add_bootstrap_subparser(sub)
     add_dev_subparser(sub)
     add_gdpr_subparser(sub)
     add_crypto_subparser(sub)
@@ -98,6 +100,8 @@ def main(argv: list[str] | None = None) -> None:
         sys.exit(exit_code)
     elif command == "migrate":
         sys.exit(run_migrate(args))
+    elif command == "bootstrap":
+        sys.exit(args.func(args))
     elif command == "dev":
         func = getattr(args, "func", None)
         if func is None:
