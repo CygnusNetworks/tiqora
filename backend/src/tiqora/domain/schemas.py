@@ -36,6 +36,8 @@ class AuthMethodsOut(BaseModel):
     oidc: bool = False
     spnego: bool = False
     ldap: bool = False
+    # True only when TIQORA_WEBAUTHN_RP_ID and TIQORA_WEBAUTHN_ORIGIN are set.
+    webauthn: bool = False
 
 
 class TOTPEnrollOut(BaseModel):
@@ -49,6 +51,34 @@ class TOTPCodeIn(BaseModel):
 
 class TOTPStatusOut(BaseModel):
     enabled: bool
+
+
+class PasskeyRegisterFinishIn(BaseModel):
+    """Browser ``PublicKeyCredential`` JSON from ``navigator.credentials.create``."""
+
+    credential: dict[str, Any]
+    name: str | None = None
+
+
+class PasskeyAuthenticateFinishIn(BaseModel):
+    """Browser ``PublicKeyCredential`` JSON from ``navigator.credentials.get``."""
+
+    credential: dict[str, Any]
+
+
+class PasskeyOut(BaseModel):
+    id: int
+    name: str
+    created: datetime
+    last_used_at: datetime | None = None
+
+
+class PasskeyStatusOut(BaseModel):
+    """Returned after register/finish (and optionally after delete)."""
+
+    id: int
+    name: str
+    enabled: bool = True
 
 
 class LoginResponse(BaseModel):

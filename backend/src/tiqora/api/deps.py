@@ -12,6 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from tiqora.config import Settings, get_settings
 from tiqora.db.engine import get_session_factory
 from tiqora.domain.auth import AuthenticatedUser, AuthService, SessionStore
+from tiqora.domain.passkey import WebAuthnService
 from tiqora.domain.totp import TOTPService
 
 _redis_client: redis.Redis | None = None
@@ -131,6 +132,15 @@ async def get_totp_service(
     return TOTPService(session, settings)
 
 
+async def get_webauthn_service(
+    request: Request,
+    session: Annotated[AsyncSession, Depends(get_db)],
+    settings: Annotated[Settings, Depends(get_app_settings)],
+) -> WebAuthnService:
+    redis_client = await get_redis(request)
+    return WebAuthnService(session, redis_client, settings)
+
+
 async def get_current_user_or_enroll(
     request: Request,
     auth: Annotated[AuthService, Depends(get_auth_service)],
@@ -141,10 +151,11 @@ async def get_current_user_or_enroll(
 ) -> AuthenticatedUser:
     """Resolve a full session **or** a must-enroll-2FA session.
 
-    Used only by ``/auth/totp/enroll``, ``/auth/totp/enroll/qr`` and
-    ``/auth/totp/confirm`` so a restricted ENROLL cookie can complete forced
-    enrollment. Marks ``request.state.enroll_token`` when the cookie is an
-    enroll session so confirm can promote it.
+    Used by ``/auth/totp/enroll``, ``/auth/totp/enroll/qr``,
+    ``/auth/totp/confirm`` and the passkey register begin/finish routes so a
+    restricted ENROLL cookie can complete forced enrollment. Marks
+    ``request.state.enroll_token`` when the cookie is an enroll session so
+    confirm/finish can promote it.
     """
     cookie_token = tiqora_session
     if cookie_token is None:
@@ -188,3 +199,4 @@ EnrollableUser = Annotated[AuthenticatedUser, Depends(get_current_user_or_enroll
 DbSession = Annotated[AsyncSession, Depends(get_db)]
 AppSettings = Annotated[Settings, Depends(get_app_settings)]
 TOTPServiceDep = Annotated[TOTPService, Depends(get_totp_service)]
+WebAuthnServiceDep = Annotated[WebAuthnService, Depends(get_webauthn_service)]

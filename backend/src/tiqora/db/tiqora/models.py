@@ -10,6 +10,7 @@ from sqlalchemy import (
     DateTime,
     Index,
     Integer,
+    LargeBinary,
     String,
     Text,
     UniqueConstraint,
@@ -160,6 +161,33 @@ class TiqoraUserTotp(TiqoraBase):
         nullable=False,
         server_default=func.now(),
     )
+
+
+class TiqoraUserPasskey(TiqoraBase):
+    """Per-agent WebAuthn passkey credential (alternative 2nd factor).
+
+    One-to-many: an agent may register several authenticators. ``credential_id``
+    is the base64url-encoded credential id (unique globally).
+    """
+
+    __tablename__ = "tiqora_user_passkey"
+
+    id: Mapped[int] = mapped_column(
+        BigInteger, primary_key=True, autoincrement=True, nullable=False
+    )
+    user_id: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
+    credential_id: Mapped[str] = mapped_column(String(255), nullable=False, unique=True)
+    public_key: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
+    sign_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    transports: Mapped[str | None] = mapped_column(Text, nullable=True)
+    aaguid: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    name: Mapped[str] = mapped_column(String(120), nullable=False, default="Passkey")
+    created: Mapped[datetime] = mapped_column(
+        DateTime,
+        nullable=False,
+        server_default=func.now(),
+    )
+    last_used_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
 
 class TiqoraUserAuthConfig(TiqoraBase):

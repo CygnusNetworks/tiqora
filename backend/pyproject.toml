@@ -34,6 +34,7 @@ dependencies = [
     "ldap3>=2.9.1",
     "qrcode>=8.0",
     "defusedxml>=0.7.1",
+    "webauthn>=2",
 ]
 
 [project.optional-dependencies]
@@ -101,6 +102,8 @@ module = [
     "qrcode.*",
     "gnupg",
     "gnupg.*",
+    "webauthn",
+    "webauthn.*",
 ]
 ignore_missing_imports = true
 
