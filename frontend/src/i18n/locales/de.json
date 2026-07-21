@@ -77,7 +77,15 @@
     "totpHint": "Gib den 6-stelligen Code aus deiner Authenticator-App ein.",
     "totpCode": "Authentifizierungscode",
     "totpVerify": "Bestätigen",
-    "totpInvalid": "Ungültiger oder abgelaufener Code."
+    "totpInvalid": "Ungültiger oder abgelaufener Code.",
+    "kerberosButton": "Mit Kerberos anmelden",
+    "ssoFailed": "SSO fehlgeschlagen — bitte per Passwort anmelden.",
+    "mustEnroll": {
+      "title": "Zwei-Faktor-Authentifizierung einrichten",
+      "hint": "2FA ist für dieses Konto erforderlich — bitte jetzt einrichten.",
+      "startError": "2FA-Einrichtung konnte nicht gestartet werden. Bitte erneut versuchen oder einen Admin kontaktieren.",
+      "confirmError": "Ungültiger Code — bitte erneut versuchen."
+    }
   },
   "security": {
     "title": "Sicherheit",
@@ -451,7 +459,8 @@
       "queueTemplates": "Vorlagen↔Queues",
       "queueAutoResponses": "Queues↔Autoantworten",
       "queueVariables": "Queue-Variablen",
-      "customerFields": "Customer-Felder"
+      "customerFields": "Customer-Felder",
+      "authConfig": "Authentifizierung / 2FA"
     },
     "table": {
       "id": "ID",
@@ -976,6 +985,29 @@
       "tagNameHelp": "Platzhalter: <OTRS_CUSTOMER_DATA_{Tag}>",
       "label": "Bezeichnung",
       "enabled": "Aktiv"
+    },
+    "authConfig": {
+      "title": "Authentifizierung / 2FA",
+      "description": "Kerberos-SSO-Berechtigung und 2FA-Erzwingung pro Agent verwalten.",
+      "globalHeading": "Globale 2FA-Richtlinie",
+      "enforceAll": "2FA für alle Agenten erzwingen",
+      "enforceGroups": "2FA für Gruppen erzwingen",
+      "noGroups": "Keine gültigen Gruppen gefunden.",
+      "saveGlobal": "Globale Richtlinie speichern",
+      "globalSaved": "Globale Richtlinie gespeichert.",
+      "globalSaveError": "Globale Richtlinie konnte nicht gespeichert werden.",
+      "agentsHeading": "Agenten",
+      "login": "Login",
+      "name": "Name",
+      "totpStatus": "2FA-Status",
+      "totpActive": "aktiv",
+      "totpInactive": "—",
+      "ssoEligible": "SSO berechtigt",
+      "enforce2fa": "2FA erzwingen",
+      "reset2fa": "2FA zurücksetzen",
+      "resetConfirmTitle": "Zwei-Faktor-Authentifizierung zurücksetzen?",
+      "resetConfirmBody": "Dies deaktiviert 2FA für {{login}}. Bei weiterhin geltender Erzwingung muss erneut eingerichtet werden.",
+      "empty": "Keine Agenten gefunden."
     }
   },
   "kb": {
