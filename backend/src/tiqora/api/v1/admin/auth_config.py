@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from fastapi import APIRouter, HTTPException, status
-from sqlalchemy import func, select
+from sqlalchemy import delete, exists, func, select
 
 from tiqora.api.deps import AppSettings, DbSession
 from tiqora.api.v1.admin.deps import AdminUser
@@ -15,7 +15,7 @@ from tiqora.api.v1.admin.schemas import (
     AuthConfigUpdate,
 )
 from tiqora.db.legacy.user import PermissionGroups, Users
-from tiqora.db.tiqora.models import TiqoraUserAuthConfig, TiqoraUserTotp
+from tiqora.db.tiqora.models import TiqoraUserAuthConfig, TiqoraUserPasskey, TiqoraUserTotp
 from tiqora.domain.auth_config import (
     AuthConfigService,
     get_enforce_group_ids,
@@ -74,8 +74,9 @@ async def put_global_auth_config(
 async def list_auth_config(
     admin: AdminUser, session: DbSession, params: ListParamsDep
 ) -> Page[AuthConfigAgentOut]:
-    """Paginated agents with TOTP + SSO/enforce flags (valid users only by default)."""
+    """Paginated agents with TOTP/passkey + SSO/enforce flags (valid users by default)."""
     _ = admin
+    has_passkey = exists(select(TiqoraUserPasskey.id).where(TiqoraUserPasskey.user_id == Users.id))
     stmt = (
         select(
             Users.id,
@@ -83,6 +84,7 @@ async def list_auth_config(
             Users.first_name,
             Users.last_name,
             TiqoraUserTotp.enabled,
+            has_passkey.label("passkey_enabled"),
             TiqoraUserAuthConfig.sso_eligible,
             TiqoraUserAuthConfig.enforce_2fa,
         )
@@ -101,7 +103,16 @@ async def list_auth_config(
     rows = (await session.execute(windowed)).all()
 
     items: list[AuthConfigAgentOut] = []
-    for user_id, login, first_name, last_name, totp_enabled, sso_eligible, enforce_2fa in rows:
+    for (
+        user_id,
+        login,
+        first_name,
+        last_name,
+        totp_enabled,
+        passkey_enabled,
+        sso_eligible,
+        enforce_2fa,
+    ) in rows:
         full_name = f"{first_name or ''} {last_name or ''}".strip() or login
         items.append(
             AuthConfigAgentOut(
@@ -109,6 +120,7 @@ async def list_auth_config(
                 login=login,
                 full_name=full_name,
                 totp_enabled=bool(totp_enabled),
+                passkey_enabled=bool(passkey_enabled),
                 sso_eligible=bool(sso_eligible),
                 enforce_2fa=bool(enforce_2fa),
             )
@@ -138,12 +150,20 @@ async def update_auth_config(
     totp_row = (
         await session.execute(select(TiqoraUserTotp).where(TiqoraUserTotp.user_id == user_id))
     ).scalar_one_or_none()
+    passkey_count = (
+        await session.execute(
+            select(func.count())
+            .select_from(TiqoraUserPasskey)
+            .where(TiqoraUserPasskey.user_id == user_id)
+        )
+    ).scalar_one()
     full_name = f"{user.first_name or ''} {user.last_name or ''}".strip() or user.login
     return AuthConfigAgentOut(
         user_id=user.id,
         login=user.login,
         full_name=full_name,
         totp_enabled=bool(totp_row is not None and totp_row.enabled),
+        passkey_enabled=bool(passkey_count),
         sso_eligible=cfg.sso_eligible,
         enforce_2fa=cfg.enforce_2fa,
     )
@@ -156,10 +176,12 @@ async def reset_2fa(
     session: DbSession,
     settings: AppSettings,
 ) -> None:
-    """Admin force-disable: delete ``tiqora_user_totp`` without a TOTP code."""
+    """Admin force-disable: delete TOTP enrollment and all passkeys for the agent."""
     _ = admin
     user = await session.get(Users, user_id)
     if user is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
     totp = TOTPService(session, settings)
     await totp.force_disable(user_id)
+    await session.execute(delete(TiqoraUserPasskey).where(TiqoraUserPasskey.user_id == user_id))
+    await session.commit()

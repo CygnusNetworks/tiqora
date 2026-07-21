@@ -1,4 +1,4 @@
-"""Auth endpoints: login, me, logout, method discovery, OIDC/SSO, SPNEGO, TOTP 2FA."""
+"""Auth endpoints: login, me, logout, method discovery, OIDC/SSO, SPNEGO, TOTP/passkey 2FA."""
 
 from __future__ import annotations
 
@@ -17,6 +17,7 @@ from tiqora.api.deps import (
     DbSession,
     EnrollableUser,
     TOTPServiceDep,
+    WebAuthnServiceDep,
     get_auth_service,
     get_redis,
 )
@@ -24,10 +25,15 @@ from tiqora.domain.auth import AuthenticatedUser, AuthService, user_to_dict
 from tiqora.domain.auth_config import AuthConfigService
 from tiqora.domain.auth_ldap import LdapAuthService
 from tiqora.domain.oidc import OIDCError, OIDCService
+from tiqora.domain.passkey import two_factor_enabled, webauthn_enabled
 from tiqora.domain.schemas import (
     AuthMethodsOut,
     LoginRequest,
     LoginResponse,
+    PasskeyAuthenticateFinishIn,
+    PasskeyOut,
+    PasskeyRegisterFinishIn,
+    PasskeyStatusOut,
     TOTPCodeIn,
     TOTPEnrollOut,
     TOTPStatusOut,
@@ -80,6 +86,7 @@ async def auth_methods(settings: AppSettings) -> AuthMethodsOut:
         oidc=settings.oidc_enabled,
         spnego=settings.spnego_enabled,
         ldap=settings.ldap_enabled,
+        webauthn=webauthn_enabled(settings),
     )
 
 
@@ -89,6 +96,7 @@ async def login(
     response: Response,
     auth: Annotated[AuthService, Depends(get_auth_service)],
     totp: TOTPServiceDep,
+    webauthn: WebAuthnServiceDep,
     settings: AppSettings,
     session: DbSession,
 ) -> LoginResponse:
@@ -107,14 +115,14 @@ async def login(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid credentials",
         )
-    if await totp.is_enabled(user.id):
+    if await two_factor_enabled(totp, webauthn, user.id):
         pending_token = await auth.create_pending_session(user)
         _set_session_cookie(response, settings, pending_token)
         return LoginResponse(user=None, pending_2fa=True)
     auth_config = AuthConfigService(session)
     if await auth_config.effective_enforce(user.id):
         # Forced enrollment: restricted ENROLL session only reaches enroll/
-        # confirm endpoints until the agent finishes TOTP setup.
+        # confirm (or passkey register) until the agent finishes 2FA setup.
         enroll_token = await auth.create_enroll_session(user)
         _set_session_cookie(response, settings, enroll_token)
         return LoginResponse(user=None, must_enroll_2fa=True)
@@ -238,6 +246,189 @@ async def totp_disable(body: TOTPCodeIn, user: CurrentUser, totp: TOTPServiceDep
 @router.get("/totp/status", response_model=TOTPStatusOut)
 async def totp_status(user: CurrentUser, totp: TOTPServiceDep) -> TOTPStatusOut:
     return TOTPStatusOut(enabled=await totp.is_enabled(user.id))
+
+
+# ---------------------------------------------------------------------------
+# WebAuthn passkeys (alternative 2nd factor)
+# ---------------------------------------------------------------------------
+
+
+def _require_webauthn(settings: AppSettings) -> None:
+    if not webauthn_enabled(settings):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="WebAuthn is not enabled",
+        )
+
+
+def _session_token_from_request(request: Request, settings: AppSettings) -> str | None:
+    token = getattr(request.state, "session_token", None) or getattr(
+        request.state, "enroll_token", None
+    )
+    if token:
+        return str(token)
+    return request.cookies.get(settings.session_cookie_name)
+
+
+@router.post("/passkey/register/begin")
+async def passkey_register_begin(
+    request: Request,
+    user: EnrollableUser,
+    webauthn: WebAuthnServiceDep,
+    settings: AppSettings,
+) -> dict[str, Any]:
+    """Start passkey registration (full session or restricted ENROLL session)."""
+    _require_webauthn(settings)
+    token = _session_token_from_request(request, settings)
+    if not token:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="No session")
+    return await webauthn.begin_registration(user_id=user.id, login=user.login, session_token=token)
+
+
+@router.post("/passkey/register/finish", response_model=PasskeyStatusOut)
+async def passkey_register_finish(
+    body: PasskeyRegisterFinishIn,
+    request: Request,
+    response: Response,
+    user: EnrollableUser,
+    auth: Annotated[AuthService, Depends(get_auth_service)],
+    webauthn: WebAuthnServiceDep,
+    settings: AppSettings,
+) -> PasskeyStatusOut:
+    """Finish passkey registration. Promotes an ENROLL session to a full session."""
+    _require_webauthn(settings)
+    token = _session_token_from_request(request, settings)
+    if not token:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="No session")
+    row = await webauthn.finish_registration(
+        user_id=user.id,
+        session_token=token,
+        credential=body.credential,
+        name=body.name,
+    )
+    if row is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid or expired passkey registration",
+        )
+    enroll_token = getattr(request.state, "enroll_token", None)
+    if enroll_token:
+        promoted = await auth.promote_enroll_session(enroll_token)
+        if promoted is None:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Session expired")
+        new_token, _promoted_user = promoted
+        _set_session_cookie(response, settings, new_token)
+    return PasskeyStatusOut(id=int(row.id), name=row.name, enabled=True)
+
+
+@router.get("/passkey", response_model=list[PasskeyOut])
+async def passkey_list(
+    user: CurrentUser, webauthn: WebAuthnServiceDep, settings: AppSettings
+) -> list[PasskeyOut]:
+    _require_webauthn(settings)
+    rows = await webauthn.list(user.id)
+    return [
+        PasskeyOut(
+            id=int(row.id),
+            name=row.name,
+            created=row.created,
+            last_used_at=row.last_used_at,
+        )
+        for row in rows
+    ]
+
+
+@router.delete("/passkey/{passkey_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def passkey_delete(
+    passkey_id: int,
+    user: CurrentUser,
+    webauthn: WebAuthnServiceDep,
+    totp: TOTPServiceDep,
+    settings: AppSettings,
+    session: DbSession,
+) -> Response:
+    """Delete a passkey. Blocked when it is the last remaining 2FA factor under enforce."""
+    _require_webauthn(settings)
+    row = await webauthn.get_by_id(user.id, passkey_id)
+    if row is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Passkey not found")
+
+    remaining_after = await webauthn.count(user.id) - 1
+    totp_on = await totp.is_enabled(user.id)
+    if remaining_after <= 0 and not totp_on:
+        auth_config = AuthConfigService(session)
+        if await auth_config.effective_enforce(user.id):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Cannot remove the last 2FA factor while 2FA is enforced",
+            )
+
+    ok = await webauthn.delete(user.id, passkey_id)
+    if not ok:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Passkey not found")
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.post("/passkey/authenticate/begin")
+async def passkey_authenticate_begin(
+    request: Request,
+    auth: Annotated[AuthService, Depends(get_auth_service)],
+    webauthn: WebAuthnServiceDep,
+    settings: AppSettings,
+) -> dict[str, Any]:
+    """Start passkey assertion for a pending-2FA session."""
+    _require_webauthn(settings)
+    token = request.cookies.get(settings.session_cookie_name)
+    if not token:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="No pending session")
+    pending = await auth.get_pending_session(token)
+    if pending is None:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="No pending session")
+    user_id, _login = pending
+    options = await webauthn.begin_authentication(user_id=user_id, session_token=token)
+    if options is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No passkeys registered for this account",
+        )
+    return options
+
+
+@router.post("/passkey/authenticate/finish", response_model=LoginResponse)
+async def passkey_authenticate_finish(
+    body: PasskeyAuthenticateFinishIn,
+    request: Request,
+    response: Response,
+    auth: Annotated[AuthService, Depends(get_auth_service)],
+    webauthn: WebAuthnServiceDep,
+    settings: AppSettings,
+    session: DbSession,
+) -> LoginResponse:
+    """Verify passkey assertion and promote a pending-2FA session to a full session."""
+    _require_webauthn(settings)
+    token = request.cookies.get(settings.session_cookie_name)
+    if not token:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="No pending session")
+    pending = await auth.get_pending_session(token)
+    if pending is None:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="No pending session")
+    user_id, _login = pending
+    row = await webauthn.finish_authentication(
+        user_id=user_id,
+        session_token=token,
+        credential=body.credential,
+    )
+    if row is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or expired passkey assertion",
+        )
+    promoted = await auth.promote_pending_session(token)
+    if promoted is None:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Session expired")
+    new_token, user = promoted
+    _set_session_cookie(response, settings, new_token)
+    return LoginResponse(user=await _user_me(session, user))
 
 
 # ---------------------------------------------------------------------------
