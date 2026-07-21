@@ -183,3 +183,106 @@ async def test_promote_pending_session_issues_full_session(
         assert await auth.promote_pending_session(pending_token) is None
 
     await engine.dispose()
+
+
+# ---------------------------------------------------------------------------
+# Must-enroll (ENROLL) session + enforce_2fa
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("url_fixture", ["mariadb_znuny_url", "postgres_znuny_url"])
+async def test_enroll_session_invisible_to_resolve_and_promotes_on_confirm(
+    url_fixture: str, request: pytest.FixtureRequest
+) -> None:
+    """ENROLL session: not resolve_session; enroll+confirm promotes to full."""
+    from tiqora.domain.auth_config import AuthConfigService
+
+    sync_url: str = request.getfixturevalue(url_fixture)
+    user_id, login = _seed_user(sync_url)
+    engine = create_async_engine(_to_async_url(sync_url))
+    factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+    settings = Settings(secret_key="unit-test-secret-key", totp_pending_ttl_seconds=300)
+    sessions = SessionStore(_FakeRedis(), settings)  # type: ignore[arg-type]
+
+    async with factory() as session:
+        auth_cfg = AuthConfigService(session)
+        await auth_cfg.set(user_id, enforce_2fa=True)
+        assert await auth_cfg.effective_enforce(user_id) is True
+
+        auth = AuthService(session, sessions, settings)
+        user = await auth.authenticate_password(login, "secret123")
+        assert user is not None
+        assert await TOTPService(session, settings).is_enabled(user.id) is False
+
+        enroll_token = await auth.create_enroll_session(user)
+
+        # (a) does NOT resolve via normal session path
+        assert await auth.resolve_session(enroll_token) is None
+        assert await sessions.get(enroll_token) is None
+        assert await sessions.get_enroll(enroll_token) == (user_id, login)
+
+        # (b) enroll + confirm work against the user identity
+        totp = TOTPService(session, settings)
+        secret, _uri = await totp.enroll(user_id, login)
+        code = pyotp.TOTP(secret).now()
+        assert await totp.confirm(user_id, code) is True
+
+        # (c) promote ENROLL → full session
+        result = await auth.promote_enroll_session(enroll_token)
+        assert result is not None
+        full_token, promoted = result
+        assert promoted.login == login
+        resolved = await auth.resolve_session(full_token)
+        assert resolved is not None
+        assert resolved.login == login
+        assert await auth.promote_enroll_session(enroll_token) is None
+
+    await engine.dispose()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("url_fixture", ["mariadb_znuny_url", "postgres_znuny_url"])
+async def test_effective_enforce_global_setting(
+    url_fixture: str, request: pytest.FixtureRequest
+) -> None:
+    from tiqora.domain.auth_config import AuthConfigService
+    from tiqora.domain.settings_store import KEY_TOTP_ENFORCE_ALL, set_setting
+
+    sync_url: str = request.getfixturevalue(url_fixture)
+    user_id, _login = _seed_user(sync_url)
+    engine = create_async_engine(_to_async_url(sync_url))
+    factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+
+    async with factory() as session:
+        svc = AuthConfigService(session)
+        assert await svc.effective_enforce(user_id) is False
+        await set_setting(session, KEY_TOTP_ENFORCE_ALL, "1")
+        assert await svc.effective_enforce(user_id) is True
+        await set_setting(session, KEY_TOTP_ENFORCE_ALL, "0")
+        assert await svc.effective_enforce(user_id) is False
+        await svc.set(user_id, enforce_2fa=True)
+        assert await svc.effective_enforce(user_id) is True
+
+    await engine.dispose()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("url_fixture", ["mariadb_znuny_url", "postgres_znuny_url"])
+async def test_force_disable_without_code(url_fixture: str, request: pytest.FixtureRequest) -> None:
+    sync_url: str = request.getfixturevalue(url_fixture)
+    user_id, login = _seed_user(sync_url)
+    engine = create_async_engine(_to_async_url(sync_url))
+    factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+    settings = Settings(secret_key="unit-test-secret-key")
+
+    async with factory() as session:
+        totp = TOTPService(session, settings)
+        secret, _ = await totp.enroll(user_id, login)
+        assert await totp.confirm(user_id, pyotp.TOTP(secret).now()) is True
+        assert await totp.is_enabled(user_id) is True
+        assert await totp.force_disable(user_id) is True
+        assert await totp.is_enabled(user_id) is False
+        assert await totp.force_disable(user_id) is False
+
+    await engine.dispose()

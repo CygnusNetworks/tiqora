@@ -162,6 +162,34 @@ class TiqoraUserTotp(TiqoraBase):
     )
 
 
+class TiqoraUserAuthConfig(TiqoraBase):
+    """Per-agent auth policy: Kerberos SSO eligibility + 2FA enforcement.
+
+    Soft-joins ``users.id`` (no FK) so parallel-operation stays additive
+    ``tiqora_*`` only. Missing row means both flags default to false.
+    """
+
+    __tablename__ = "tiqora_user_auth_config"
+
+    user_id: Mapped[int] = mapped_column(Integer, primary_key=True, nullable=False)
+    sso_eligible: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default=false()
+    )
+    enforce_2fa: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default=false()
+    )
+    created: Mapped[datetime] = mapped_column(
+        DateTime,
+        nullable=False,
+        server_default=func.now(),
+    )
+    changed: Mapped[datetime] = mapped_column(
+        DateTime,
+        nullable=False,
+        server_default=func.now(),
+    )
+
+
 class TiqoraCryptoKey(TiqoraBase):
     """Bookkeeping record for an imported PGP/S/MIME key (Phase 2c).
 

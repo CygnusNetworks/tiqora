@@ -957,3 +957,32 @@ class PlaceholderFieldUpdate(BaseModel):
     tag_name: str | None = None
     label: str | None = None
     enabled: bool | None = None
+
+
+# ---------------------------------------------------------------------------
+# Auth config — per-agent SSO eligibility + 2FA enforcement
+# ---------------------------------------------------------------------------
+
+
+class AuthConfigAgentOut(BaseModel):
+    """One agent row for the admin auth-config list."""
+
+    user_id: int
+    login: str
+    full_name: str
+    totp_enabled: bool
+    sso_eligible: bool
+    enforce_2fa: bool
+
+
+class AuthConfigUpdate(BaseModel):
+    sso_eligible: bool | None = None
+    enforce_2fa: bool | None = None
+
+
+class AuthConfigGlobalOut(BaseModel):
+    enforce_all: bool
+
+
+class AuthConfigGlobalUpdate(BaseModel):
+    enforce_all: bool

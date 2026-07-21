@@ -15,11 +15,13 @@ from tiqora.api.deps import (
     AppSettings,
     CurrentUser,
     DbSession,
+    EnrollableUser,
     TOTPServiceDep,
     get_auth_service,
     get_redis,
 )
 from tiqora.domain.auth import AuthenticatedUser, AuthService, user_to_dict
+from tiqora.domain.auth_config import AuthConfigService
 from tiqora.domain.auth_ldap import LdapAuthService
 from tiqora.domain.oidc import OIDCError, OIDCService
 from tiqora.domain.schemas import (
@@ -109,6 +111,13 @@ async def login(
         pending_token = await auth.create_pending_session(user)
         _set_session_cookie(response, settings, pending_token)
         return LoginResponse(user=None, pending_2fa=True)
+    auth_config = AuthConfigService(session)
+    if await auth_config.effective_enforce(user.id):
+        # Forced enrollment: restricted ENROLL session only reaches enroll/
+        # confirm endpoints until the agent finishes TOTP setup.
+        enroll_token = await auth.create_enroll_session(user)
+        _set_session_cookie(response, settings, enroll_token)
+        return LoginResponse(user=None, must_enroll_2fa=True)
     token = await auth.create_session(user)
     _set_session_cookie(response, settings, token)
     return LoginResponse(user=await _user_me(session, user))
@@ -173,17 +182,18 @@ async def totp_verify(
 
 
 @router.post("/totp/enroll", response_model=TOTPEnrollOut)
-async def totp_enroll(user: CurrentUser, totp: TOTPServiceDep) -> TOTPEnrollOut:
+async def totp_enroll(user: EnrollableUser, totp: TOTPServiceDep) -> TOTPEnrollOut:
     secret, uri = await totp.enroll(user.id, user.login)
     return TOTPEnrollOut(secret=secret, otpauth_uri=uri)
 
 
 @router.get("/totp/enroll/qr")
-async def totp_enroll_qr(user: CurrentUser, totp: TOTPServiceDep) -> Response:
+async def totp_enroll_qr(user: EnrollableUser, totp: TOTPServiceDep) -> Response:
     """SVG QR code for the pending enrollment's ``otpauth://`` URI.
 
     404 if the caller has no pending enrollment (never called
     ``POST /totp/enroll``, or already confirmed one — re-enroll first).
+    Accepts a full session or a restricted must-enroll (ENROLL) session.
     """
     uri = await totp.get_pending_provisioning_uri(user.id, user.login)
     if uri is None:
@@ -194,10 +204,26 @@ async def totp_enroll_qr(user: CurrentUser, totp: TOTPServiceDep) -> Response:
 
 
 @router.post("/totp/confirm", response_model=TOTPStatusOut)
-async def totp_confirm(body: TOTPCodeIn, user: CurrentUser, totp: TOTPServiceDep) -> TOTPStatusOut:
+async def totp_confirm(
+    body: TOTPCodeIn,
+    request: Request,
+    response: Response,
+    user: EnrollableUser,
+    auth: Annotated[AuthService, Depends(get_auth_service)],
+    totp: TOTPServiceDep,
+    settings: AppSettings,
+) -> TOTPStatusOut:
+    """Confirm TOTP enrollment. Promotes an ENROLL session to a full session."""
     ok = await totp.confirm(user.id, body.code)
     if not ok:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid TOTP code")
+    enroll_token = getattr(request.state, "enroll_token", None)
+    if enroll_token:
+        promoted = await auth.promote_enroll_session(enroll_token)
+        if promoted is None:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Session expired")
+        new_token, _promoted_user = promoted
+        _set_session_cookie(response, settings, new_token)
     return TOTPStatusOut(enabled=True)
 
 
@@ -290,11 +316,8 @@ async def oidc_callback(
         if picture.startswith(("http://", "https://")):
             avatar_url = picture
 
-    if await totp.is_enabled(user.id):
-        pending_token = await auth.create_pending_session(user, avatar_url=avatar_url)
-        _set_session_cookie(response, settings, pending_token)
-        return LoginResponse(user=None, pending_2fa=True)
-
+    # SSO is the strong factor — skip the TOTP pending branch entirely.
+    _ = totp
     token = await auth.create_session(user, avatar_url=avatar_url)
     _set_session_cookie(response, settings, token)
     return LoginResponse(user=await _user_me(session, user, extra={"avatar_url": avatar_url}))
@@ -305,15 +328,19 @@ async def oidc_callback(
 # ---------------------------------------------------------------------------
 
 
-@router.get("/spnego", response_model=LoginResponse)
+@router.get("/spnego")
 async def spnego(
     response: Response,
     auth: Annotated[AuthService, Depends(get_auth_service)],
-    totp: TOTPServiceDep,
     settings: AppSettings,
     session: DbSession,
     authorization: Annotated[str | None, Header()] = None,
-) -> LoginResponse:
+) -> RedirectResponse:
+    """Kerberos/SPNEGO handshake. On success, 302 to SPA root with a full session.
+
+    Per-agent ``sso_eligible`` must be true. SSO is the strong factor — 2FA
+    is skipped even when the agent has TOTP enrolled.
+    """
     if not settings.spnego_enabled:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="SPNEGO is not enabled")
 
@@ -346,11 +373,16 @@ async def spnego(
             detail=f"No local user matches Kerberos principal '{principal}'",
         )
 
-    if await totp.is_enabled(user.id):
-        pending_token = await auth.create_pending_session(user)
-        _set_session_cookie(response, settings, pending_token)
-        return LoginResponse(user=None, pending_2fa=True)
+    auth_config = AuthConfigService(session)
+    cfg = await auth_config.get(user.id)
+    if not cfg.sso_eligible:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="SSO not enabled for this account",
+        )
 
+    # SSO is the strong factor — skip TOTP/pending entirely; issue a full session.
     token = await auth.create_session(user)
-    _set_session_cookie(response, settings, token)
-    return LoginResponse(user=await _user_me(session, user))
+    redirect = RedirectResponse(url="/", status_code=status.HTTP_302_FOUND)
+    _set_session_cookie(redirect, settings, token)
+    return redirect

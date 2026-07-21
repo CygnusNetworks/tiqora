@@ -209,6 +209,10 @@ export type ApiKeyCreate = Schemas["ApiKeyCreate"];
 export type ApiKeyUpdate = Schemas["ApiKeyUpdate"];
 /** Create response includes the plaintext `key` exactly once. */
 export type ApiKeyCreated = Schemas["ApiKeyCreated"];
+export type AuthConfigAgentOut = Schemas["AuthConfigAgentOut"];
+export type AuthConfigUpdate = Schemas["AuthConfigUpdate"];
+export type AuthConfigGlobalOut = Schemas["AuthConfigGlobalOut"];
+export type AuthConfigGlobalUpdate = Schemas["AuthConfigGlobalUpdate"];
 // Placeholder variables (regenerated into schema.d.ts from openapi.json).
 export type QueueVariableOut = Schemas["QueueVariableOut"];
 export type QueueVariableCreate = Schemas["QueueVariableCreate"];
@@ -1719,6 +1723,35 @@ export class ApiClient {
       body,
       signal,
     });
+  }
+
+  /** Per-agent SSO eligibility + 2FA enforcement (admin). */
+  get adminAuthConfig() {
+    const base = "/api/v1/admin/auth-config";
+    return {
+      list: (params?: AdminListParams, signal?: AbortSignal) =>
+        this.request<AdminPage<AuthConfigAgentOut>>("GET", base, {
+          query: {
+            page: params?.page,
+            page_size: params?.pageSize,
+            valid: params?.valid,
+          },
+          signal,
+        }),
+      update: (userId: number, body: AuthConfigUpdate, signal?: AbortSignal) =>
+        this.request<AuthConfigAgentOut>("PUT", `${base}/${userId}`, { body, signal }),
+      reset2fa: (userId: number, signal?: AbortSignal) =>
+        this.request<void>("POST", `${base}/${userId}/reset-2fa`, { signal }),
+      getGlobal: (signal?: AbortSignal) =>
+        this.request<AuthConfigGlobalOut>("GET", `${base}/global`, { signal }),
+      putGlobal: (body: AuthConfigGlobalUpdate, signal?: AbortSignal) =>
+        this.request<AuthConfigGlobalOut>("PUT", `${base}/global`, { body, signal }),
+    };
+  }
+
+  /** Browser-navigates for Kerberos/SPNEGO; not a fetch (redirect flow). */
+  spnegoLoginUrl(): string {
+    return "/api/v1/auth/spnego";
   }
 
   testMailOutbound(body: MailOutboundTestIn = {}, signal?: AbortSignal) {

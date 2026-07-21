@@ -12,6 +12,7 @@ from fastapi import APIRouter
 from tiqora.api.v1.admin import (
     api_keys,
     attachments,
+    auth_config,
     auto_responses,
     channels,
     customers,
@@ -34,6 +35,7 @@ from tiqora.api.v1.admin import (
 
 admin_router = APIRouter(prefix="/admin")
 admin_router.include_router(users.router)
+admin_router.include_router(auth_config.router)
 admin_router.include_router(groups.router)
 admin_router.include_router(roles.router)
 admin_router.include_router(queues.router)

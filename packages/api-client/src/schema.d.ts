@@ -410,6 +410,81 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/auth-config": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Auth Config
+         * @description Paginated agents with TOTP + SSO/enforce flags (valid users only by default).
+         */
+        get: operations["list_auth_config_api_v1_admin_auth_config_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/auth-config/global": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Global Auth Config */
+        get: operations["get_global_auth_config_api_v1_admin_auth_config_global_get"];
+        /** Put Global Auth Config */
+        put: operations["put_global_auth_config_api_v1_admin_auth_config_global_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/auth-config/{user_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Update Auth Config */
+        put: operations["update_auth_config_api_v1_admin_auth_config__user_id__put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/auth-config/{user_id}/reset-2fa": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Reset 2Fa
+         * @description Admin force-disable: delete ``tiqora_user_totp`` without a TOTP code.
+         */
+        post: operations["reset_2fa_api_v1_admin_auth_config__user_id__reset_2fa_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/auto-responses": {
         parameters: {
             query?: never;
@@ -2118,7 +2193,13 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Spnego */
+        /**
+         * Spnego
+         * @description Kerberos/SPNEGO handshake. On success, 302 to SPA root with a full session.
+         *
+         *     Per-agent ``sso_eligible`` must be true. SSO is the strong factor — 2FA
+         *     is skipped even when the agent has TOTP enrolled.
+         */
         get: operations["spnego_api_v1_auth_spnego_get"];
         put?: never;
         post?: never;
@@ -2154,7 +2235,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Totp Confirm */
+        /**
+         * Totp Confirm
+         * @description Confirm TOTP enrollment. Promotes an ENROLL session to a full session.
+         */
         post: operations["totp_confirm_api_v1_auth_totp_confirm_post"];
         delete?: never;
         options?: never;
@@ -2192,6 +2276,7 @@ export interface paths {
          *
          *     404 if the caller has no pending enrollment (never called
          *     ``POST /totp/enroll``, or already confirmed one — re-enroll first).
+         *     Accepts a full session or a restricted must-enroll (ENROLL) session.
          */
         get: operations["totp_enroll_qr_api_v1_auth_totp_enroll_qr_get"];
         put?: never;
@@ -4458,6 +4543,41 @@ export interface components {
             /** Name */
             name: string;
         };
+        /**
+         * AuthConfigAgentOut
+         * @description One agent row for the admin auth-config list.
+         */
+        AuthConfigAgentOut: {
+            /** Enforce 2Fa */
+            enforce_2fa: boolean;
+            /** Full Name */
+            full_name: string;
+            /** Login */
+            login: string;
+            /** Sso Eligible */
+            sso_eligible: boolean;
+            /** Totp Enabled */
+            totp_enabled: boolean;
+            /** User Id */
+            user_id: number;
+        };
+        /** AuthConfigGlobalOut */
+        AuthConfigGlobalOut: {
+            /** Enforce All */
+            enforce_all: boolean;
+        };
+        /** AuthConfigGlobalUpdate */
+        AuthConfigGlobalUpdate: {
+            /** Enforce All */
+            enforce_all: boolean;
+        };
+        /** AuthConfigUpdate */
+        AuthConfigUpdate: {
+            /** Enforce 2Fa */
+            enforce_2fa?: boolean | null;
+            /** Sso Eligible */
+            sso_eligible?: boolean | null;
+        };
         /** AuthMethodsOut */
         AuthMethodsOut: {
             /**
@@ -5329,6 +5449,11 @@ export interface components {
         /** LoginResponse */
         LoginResponse: {
             /**
+             * Must Enroll 2Fa
+             * @default false
+             */
+            must_enroll_2fa: boolean;
+            /**
              * Pending 2Fa
              * @default false
              */
@@ -5543,6 +5668,17 @@ export interface components {
         Page_ApiKeyOut_: {
             /** Items */
             items: components["schemas"]["ApiKeyOut"][];
+            /** Page */
+            page: number;
+            /** Page Size */
+            page_size: number;
+            /** Total */
+            total: number;
+        };
+        /** Page[AuthConfigAgentOut] */
+        Page_AuthConfigAgentOut_: {
+            /** Items */
+            items: components["schemas"]["AuthConfigAgentOut"][];
             /** Page */
             page: number;
             /** Page Size */
@@ -8434,6 +8570,187 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["StandardTemplateOut"][];
                 };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_auth_config_api_v1_admin_auth_config_get: {
+        parameters: {
+            query?: {
+                page?: number;
+                page_size?: number;
+                valid?: "valid" | "invalid" | "all";
+                sort?: string | null;
+                order?: "asc" | "desc";
+            };
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Page_AuthConfigAgentOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_global_auth_config_api_v1_admin_auth_config_global_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuthConfigGlobalOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    put_global_auth_config_api_v1_admin_auth_config_global_put: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AuthConfigGlobalUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuthConfigGlobalOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_auth_config_api_v1_admin_auth_config__user_id__put: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                user_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AuthConfigUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuthConfigAgentOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    reset_2fa_api_v1_admin_auth_config__user_id__reset_2fa_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                user_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {
@@ -13710,7 +14027,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["LoginResponse"];
+                    "application/json": unknown;
                 };
             };
             /** @description Validation Error */

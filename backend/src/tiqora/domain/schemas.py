@@ -54,6 +54,9 @@ class TOTPStatusOut(BaseModel):
 class LoginResponse(BaseModel):
     user: UserMe | None = None
     pending_2fa: bool = False
+    # Password login only: agent must complete TOTP enrollment before a full
+    # session is issued (per-agent enforce_2fa or global auth.totp.enforce_all).
+    must_enroll_2fa: bool = False
 
 
 class QueueCounts(BaseModel):
