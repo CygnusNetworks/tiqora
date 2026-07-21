@@ -10,6 +10,13 @@ import { LineChart } from "@/components/agent/stats/LineChart";
 import { Tabs } from "@/components/ui/Tabs";
 import { Button } from "@/components/ui/Button";
 import { Spinner } from "@/components/ui/Spinner";
+import { cn } from "@/lib/cn";
+import {
+  DATE_RANGE_PRESETS,
+  dateRangeForPreset,
+  isPresetActive,
+  type DateRangePreset,
+} from "@/lib/dateRanges";
 
 const GRANULARITIES: StatsGranularity[] = ["day", "week", "month"];
 const DIMENSIONS: StatsDimension[] = ["queue", "state", "priority", "owner"];
@@ -74,6 +81,17 @@ export function StatsPage() {
   const avgFirstResponse = average(slaQ.data?.first_response_minutes ?? []);
   const avgSolution = average(slaQ.data?.solution_minutes ?? []);
 
+  function applyPreset(preset: DateRangePreset) {
+    const range = dateRangeForPreset(preset);
+    setDateFrom(range.from);
+    setDateTo(range.to);
+  }
+
+  // Match Cc/Bcc toggle styling in ReplyDialog (muted outline / accent fill when active).
+  const presetChipCls =
+    "inline-flex items-center rounded border border-hairline px-2 py-0.5 text-xs text-muted transition-colors duration-100 hover:text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent";
+  const presetChipActiveCls = "border-accent/50 bg-accent-dim text-accent hover:text-accent";
+
   return (
     <div className="mx-auto w-full max-w-6xl space-y-6 px-4 py-6" data-testid="stats-page">
       <div>
@@ -82,58 +100,82 @@ export function StatsPage() {
       </div>
 
       {/* Filter bar */}
-      <div className="flex flex-wrap items-end gap-3 rounded-lg border border-hairline bg-surface p-3">
-        <label className="flex flex-col gap-1 text-xs text-muted">
-          {t("stats.filters.queue")}
-          <select
-            className="rounded-md border border-hairline bg-bg px-2 py-1.5 text-sm text-ink"
-            value={queueId ?? ""}
-            onChange={(e) => setQueueId(e.target.value ? Number(e.target.value) : undefined)}
-            data-testid="stats-filter-queue"
-          >
-            <option value="">{t("queue.allQueues")}</option>
-            {flatQueues.map((q) => (
-              <option key={q.id} value={q.id}>
-                {q.name}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="flex flex-col gap-1 text-xs text-muted">
-          {t("stats.filters.dateFrom")}
-          <input
-            type="date"
-            className="rounded-md border border-hairline bg-bg px-2 py-1.5 text-sm text-ink"
-            value={dateFrom}
-            onChange={(e) => setDateFrom(e.target.value)}
-            data-testid="stats-filter-date-from"
-          />
-        </label>
-        <label className="flex flex-col gap-1 text-xs text-muted">
-          {t("stats.filters.dateTo")}
-          <input
-            type="date"
-            className="rounded-md border border-hairline bg-bg px-2 py-1.5 text-sm text-ink"
-            value={dateTo}
-            onChange={(e) => setDateTo(e.target.value)}
-            data-testid="stats-filter-date-to"
-          />
-        </label>
-        <label className="flex flex-col gap-1 text-xs text-muted">
-          {t("stats.filters.granularity")}
-          <select
-            className="rounded-md border border-hairline bg-bg px-2 py-1.5 text-sm text-ink"
-            value={granularity}
-            onChange={(e) => setGranularity(e.target.value as StatsGranularity)}
-            data-testid="stats-filter-granularity"
-          >
-            {GRANULARITIES.map((g) => (
-              <option key={g} value={g}>
-                {t(`stats.filters.granularityOptions.${g}`)}
-              </option>
-            ))}
-          </select>
-        </label>
+      <div className="space-y-2 rounded-lg border border-hairline bg-surface p-3">
+        <div
+          className="flex flex-wrap items-center gap-1.5"
+          data-testid="stats-date-presets"
+          role="group"
+          aria-label={t("stats.filters.dateFrom")}
+        >
+          {DATE_RANGE_PRESETS.map((key) => {
+            const active = isPresetActive(key, dateFrom, dateTo);
+            return (
+              <button
+                key={key}
+                type="button"
+                className={cn(presetChipCls, active && presetChipActiveCls)}
+                aria-pressed={active}
+                onClick={() => applyPreset(key)}
+                data-testid={`stats-preset-${key}`}
+              >
+                {t(`stats.presets.${key}`)}
+              </button>
+            );
+          })}
+        </div>
+        <div className="flex flex-wrap items-end gap-3">
+          <label className="flex flex-col gap-1 text-xs text-muted">
+            {t("stats.filters.queue")}
+            <select
+              className="rounded-md border border-hairline bg-bg px-2 py-1.5 text-sm text-ink"
+              value={queueId ?? ""}
+              onChange={(e) => setQueueId(e.target.value ? Number(e.target.value) : undefined)}
+              data-testid="stats-filter-queue"
+            >
+              <option value="">{t("queue.allQueues")}</option>
+              {flatQueues.map((q) => (
+                <option key={q.id} value={q.id}>
+                  {q.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="flex flex-col gap-1 text-xs text-muted">
+            {t("stats.filters.dateFrom")}
+            <input
+              type="date"
+              className="rounded-md border border-hairline bg-bg px-2 py-1.5 text-sm text-ink"
+              value={dateFrom}
+              onChange={(e) => setDateFrom(e.target.value)}
+              data-testid="stats-filter-date-from"
+            />
+          </label>
+          <label className="flex flex-col gap-1 text-xs text-muted">
+            {t("stats.filters.dateTo")}
+            <input
+              type="date"
+              className="rounded-md border border-hairline bg-bg px-2 py-1.5 text-sm text-ink"
+              value={dateTo}
+              onChange={(e) => setDateTo(e.target.value)}
+              data-testid="stats-filter-date-to"
+            />
+          </label>
+          <label className="flex flex-col gap-1 text-xs text-muted">
+            {t("stats.filters.granularity")}
+            <select
+              className="rounded-md border border-hairline bg-bg px-2 py-1.5 text-sm text-ink"
+              value={granularity}
+              onChange={(e) => setGranularity(e.target.value as StatsGranularity)}
+              data-testid="stats-filter-granularity"
+            >
+              {GRANULARITIES.map((g) => (
+                <option key={g} value={g}>
+                  {t(`stats.filters.granularityOptions.${g}`)}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
       </div>
 
       {/* Stat tiles */}

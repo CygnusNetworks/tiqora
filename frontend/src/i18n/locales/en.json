@@ -947,6 +947,20 @@
         "month": "Month"
       }
     },
+    "presets": {
+      "today": "Today",
+      "yesterday": "Yesterday",
+      "thisWeek": "This week",
+      "last7Days": "Last 7 days",
+      "thisMonth": "This month",
+      "lastMonth": "Last month",
+      "thisQuarter": "This quarter",
+      "lastQuarter": "Last quarter",
+      "thisYear": "This year",
+      "lastYear": "Last year",
+      "last30Days": "Last 30 days",
+      "reset": "Reset"
+    },
     "tiles": {
       "total": "Tickets",
       "escalated": "Escalated",
