@@ -176,6 +176,16 @@ const NAV_GROUPS: NavGroup[] = [
       },
     ],
   },
+  {
+    titleKey: "admin.group.compliance",
+    links: [
+      {
+        to: "/admin/gdpr",
+        labelKey: "admin.nav.gdpr",
+        testId: "admin-nav-gdpr",
+      },
+    ],
+  },
 ];
 
 function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {

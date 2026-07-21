@@ -81,6 +81,7 @@ import { QueueVariablesPage } from "@/routes/admin/QueueVariablesPage";
 import { CustomerFieldsPage } from "@/routes/admin/CustomerFieldsPage";
 import { ApiKeysPage } from "@/routes/admin/ApiKeysPage";
 import { AuthConfigPage } from "@/routes/admin/AuthConfigPage";
+import { GdprPage, type GdprSearch } from "@/routes/admin/GdprPage";
 
 const rootRoute = createRootRoute({
   component: () => <Outlet />,
@@ -578,6 +579,16 @@ const adminCustomerFieldsRoute = createRoute({
   component: CustomerFieldsPage,
 });
 
+const adminGdprRoute = createRoute({
+  getParentRoute: () => adminLayoutRoute,
+  path: "/gdpr",
+  validateSearch: (s: Record<string, unknown>): GdprSearch => ({
+    logins: typeof s.logins === "string" ? s.logins : undefined,
+    tab: s.tab === "jobs" || s.tab === "run" ? s.tab : undefined,
+  }),
+  component: GdprPage,
+});
+
 const adminProcessDetailRoute = createRoute({
   getParentRoute: () => adminLayoutRoute,
   path: "/processes/$processEntityId",
@@ -659,6 +670,7 @@ const routeTree = rootRoute.addChildren([
     adminProcessDetailRoute,
     adminQueueVariablesRoute,
     adminCustomerFieldsRoute,
+    adminGdprRoute,
   ]),
   catchAllRoute,
 ]);

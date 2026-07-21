@@ -11,6 +11,11 @@ const update = vi.fn();
 const deactivate = vi.fn();
 const bulkUpdateCustomerUsers = vi.fn();
 const companyList = vi.fn();
+const navigate = vi.fn();
+
+vi.mock("@tanstack/react-router", () => ({
+  useNavigate: () => navigate,
+}));
 
 vi.mock("@/lib/api", () => ({
   ApiError: class ApiError extends Error {
@@ -75,6 +80,7 @@ describe("CustomerUsersPage", () => {
     deactivate.mockReset();
     bulkUpdateCustomerUsers.mockReset();
     companyList.mockReset();
+    navigate.mockReset();
 
     list.mockResolvedValue({
       items: [sampleRow, { ...sampleRow, id: 43, login: "bob@example.com" }],
@@ -149,6 +155,29 @@ describe("CustomerUsersPage", () => {
         expect.anything(),
       );
     });
+  });
+
+  it("bulk GDPR action navigates to /admin/gdpr with selected logins", async () => {
+    renderPage();
+    await waitFor(() => expect(screen.getByTestId("admin-row-select-42")).toBeInTheDocument());
+
+    fireEvent.click(screen.getByTestId("admin-row-select-42"));
+    fireEvent.click(screen.getByTestId("admin-row-select-43"));
+    await screen.findByTestId("admin-bulk-bar");
+    fireEvent.click(screen.getByTestId("admin-bulk-action-gdpr"));
+
+    await waitFor(() => {
+      expect(navigate).toHaveBeenCalledWith({
+        to: "/admin/gdpr",
+        search: {
+          logins: expect.stringMatching(/alice@example\.com/),
+        },
+      });
+    });
+    const call = navigate.mock.calls[0][0] as { search: { logins: string } };
+    const logins = call.search.logins.split(",");
+    expect(logins).toEqual(expect.arrayContaining(["alice@example.com", "bob@example.com"]));
+    expect(logins).toHaveLength(2);
   });
 
   it("sorts by login header and toggles the indicator", async () => {

@@ -1855,56 +1855,71 @@ export class ApiClient {
 
   // ── GDPR erasure (admin) ──────────────────────────────────────────────
 
+  get adminGdpr() {
+    const base = "/api/v1/admin/gdpr";
+    return {
+      preview: (body: GdprErasurePreviewRequest, signal?: AbortSignal) =>
+        this.request<GdprErasurePreviewOut>("POST", `${base}/preview`, { body, signal }),
+      createJob: (body: GdprErasureJobCreate, signal?: AbortSignal) =>
+        this.request<GdprErasureJobDetailOut>("POST", `${base}/jobs`, { body, signal }),
+      listJobs: (params?: GdprJobListParams, signal?: AbortSignal) =>
+        this.request<AdminPage<GdprErasureJobOut>>("GET", `${base}/jobs`, {
+          query: {
+            page: params?.page,
+            page_size: params?.pageSize,
+            status: params?.status ?? undefined,
+            mode: params?.mode ?? undefined,
+            q: params?.q ?? undefined,
+            from: params?.from ?? undefined,
+            to: params?.to ?? undefined,
+          },
+          signal,
+        }),
+      getJob: (id: number, signal?: AbortSignal) =>
+        this.request<GdprErasureJobDetailOut>("GET", `${base}/jobs/${id}`, { signal }),
+      rollback: (id: number, signal?: AbortSignal) =>
+        this.request<GdprRollbackOut>("POST", `${base}/jobs/${id}/rollback`, { signal }),
+      purgeBackup: (id: number, signal?: AbortSignal) =>
+        this.request<GdprPurgeOut>("POST", `${base}/jobs/${id}/purge-backup`, { signal }),
+      /** Absolute URL for downloading a job's JSON backup export. */
+      backupDownloadUrl: (id: number): string =>
+        joinUrl(this.baseUrl, `${base}/jobs/${id}/backup/download`),
+    };
+  }
+
+  /** @deprecated Prefer `adminGdpr.preview`. */
   previewGdprErasure(body: GdprErasurePreviewRequest, signal?: AbortSignal) {
-    return this.request<GdprErasurePreviewOut>("POST", "/api/v1/admin/gdpr/preview", {
-      body,
-      signal,
-    });
+    return this.adminGdpr.preview(body, signal);
   }
 
+  /** @deprecated Prefer `adminGdpr.createJob`. */
   createGdprErasureJob(body: GdprErasureJobCreate, signal?: AbortSignal) {
-    return this.request<GdprErasureJobDetailOut>("POST", "/api/v1/admin/gdpr/jobs", {
-      body,
-      signal,
-    });
+    return this.adminGdpr.createJob(body, signal);
   }
 
+  /** @deprecated Prefer `adminGdpr.listJobs`. */
   listGdprErasureJobs(params?: GdprJobListParams, signal?: AbortSignal) {
-    return this.request<AdminPage<GdprErasureJobOut>>("GET", "/api/v1/admin/gdpr/jobs", {
-      query: {
-        page: params?.page,
-        page_size: params?.pageSize,
-        status: params?.status ?? undefined,
-        mode: params?.mode ?? undefined,
-        q: params?.q ?? undefined,
-        from: params?.from ?? undefined,
-        to: params?.to ?? undefined,
-      },
-      signal,
-    });
+    return this.adminGdpr.listJobs(params, signal);
   }
 
+  /** @deprecated Prefer `adminGdpr.getJob`. */
   getGdprErasureJob(id: number, signal?: AbortSignal) {
-    return this.request<GdprErasureJobDetailOut>("GET", `/api/v1/admin/gdpr/jobs/${id}`, {
-      signal,
-    });
+    return this.adminGdpr.getJob(id, signal);
   }
 
+  /** @deprecated Prefer `adminGdpr.rollback`. */
   rollbackGdprErasureJob(id: number, signal?: AbortSignal) {
-    return this.request<GdprRollbackOut>("POST", `/api/v1/admin/gdpr/jobs/${id}/rollback`, {
-      signal,
-    });
+    return this.adminGdpr.rollback(id, signal);
   }
 
+  /** @deprecated Prefer `adminGdpr.purgeBackup`. */
   purgeGdprErasureBackup(id: number, signal?: AbortSignal) {
-    return this.request<GdprPurgeOut>("POST", `/api/v1/admin/gdpr/jobs/${id}/purge-backup`, {
-      signal,
-    });
+    return this.adminGdpr.purgeBackup(id, signal);
   }
 
-  /** Absolute URL for downloading a job's JSON backup export. */
+  /** @deprecated Prefer `adminGdpr.backupDownloadUrl`. */
   gdprErasureBackupDownloadUrl(id: number): string {
-    return joinUrl(this.baseUrl, `/api/v1/admin/gdpr/jobs/${id}/backup/download`);
+    return this.adminGdpr.backupDownloadUrl(id);
   }
 
   // Read-only reference lists for admin pickers (queue editor FKs, etc.).
