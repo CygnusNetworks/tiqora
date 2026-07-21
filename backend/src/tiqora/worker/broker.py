@@ -57,4 +57,16 @@ async def gdpr_retention_task() -> dict[str, int]:
     return await run_gdpr_retention_tick()
 
 
+@broker.task(
+    schedule=[{"cron": "30 3 * * *"}],  # daily after retention — purge expired backups
+)
+async def gdpr_erasure_purge_task() -> dict[str, int]:
+    """Purge GDPR erasure backups past the 30-day window. Default ON
+    (``gdpr.erasure.purge_enabled``); no ownership gate — only touches tiqora_*.
+    """
+    from tiqora.worker.gdpr_erasure_purge import run_gdpr_erasure_purge_tick
+
+    return await run_gdpr_erasure_purge_tick()
+
+
 scheduler = TaskiqScheduler(broker=broker, sources=[LabelScheduleSource(broker)])

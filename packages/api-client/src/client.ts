@@ -313,6 +313,79 @@ export type MailLogListParams = {
   /** ISO datetime upper bound (query param ``to``). */
   to?: string | null;
 };
+// GDPR erasure (admin) — types mirror admin/schemas.py; also regenerated into schema.d.ts.
+export type ErasureMode = "anonymize" | "delete";
+export type ErasureSelectorIn = {
+  logins?: string[];
+  customer_ids?: string[];
+  login_regex?: string | null;
+  customer_id_regex?: string | null;
+  changed_before?: string | null;
+  changed_after?: string | null;
+  activity?: string | null;
+  valid_id?: number | null;
+};
+export type GdprErasurePreviewRequest = {
+  selector: ErasureSelectorIn;
+  mode?: ErasureMode;
+};
+export type GdprResolvedCustomerOut = {
+  id: number;
+  login: string;
+  email: string;
+  customer_id: string;
+};
+export type GdprSampleRowOut = {
+  table: string;
+  id: unknown;
+  summary: string;
+};
+export type GdprErasurePreviewOut = {
+  mode: string;
+  customers: GdprResolvedCustomerOut[];
+  counts: Record<string, number>;
+  sample: GdprSampleRowOut[];
+  columns_changed: Record<string, string[]>;
+  tables_deleted: string[];
+};
+export type GdprErasureJobCreate = {
+  customer_user_ids: number[];
+  selector?: ErasureSelectorIn | null;
+  mode?: ErasureMode;
+  seed?: number | null;
+  confirm: true;
+};
+export type GdprErasureJobOut = {
+  id: number;
+  mode: string;
+  selector: string;
+  resolved_logins: string;
+  status: string;
+  counts: string;
+  seed?: number | null;
+  actor: string;
+  force_parallel: boolean;
+  created: string;
+  applied_at: string;
+  rolled_back_at?: string | null;
+  backup_expires_at: string;
+};
+export type GdprErasureJobDetailOut = GdprErasureJobOut & {
+  counts_parsed: Record<string, number>;
+  resolved_logins_parsed: string[];
+  selector_parsed: Record<string, unknown>;
+};
+export type GdprJobListParams = {
+  page?: number;
+  pageSize?: number;
+  status?: "applied" | "rolled_back" | "purged" | null;
+  mode?: ErasureMode | null;
+  q?: string | null;
+  from?: string | null;
+  to?: string | null;
+};
+export type GdprRollbackOut = { restored_rows: number };
+export type GdprPurgeOut = { deleted_backups: number };
 export type PostmasterFilterOut = Schemas["PostmasterFilterOut"];
 export type PostmasterFilterRuleOut = Schemas["PostmasterFilterRuleOut"];
 export type PostmasterFilterWrite = Schemas["PostmasterFilterWrite"];
@@ -1778,6 +1851,60 @@ export class ApiClient {
 
   getMailLog(id: number, signal?: AbortSignal) {
     return this.request<MailLogOut>("GET", `/api/v1/admin/mail/log/${id}`, { signal });
+  }
+
+  // ── GDPR erasure (admin) ──────────────────────────────────────────────
+
+  previewGdprErasure(body: GdprErasurePreviewRequest, signal?: AbortSignal) {
+    return this.request<GdprErasurePreviewOut>("POST", "/api/v1/admin/gdpr/preview", {
+      body,
+      signal,
+    });
+  }
+
+  createGdprErasureJob(body: GdprErasureJobCreate, signal?: AbortSignal) {
+    return this.request<GdprErasureJobDetailOut>("POST", "/api/v1/admin/gdpr/jobs", {
+      body,
+      signal,
+    });
+  }
+
+  listGdprErasureJobs(params?: GdprJobListParams, signal?: AbortSignal) {
+    return this.request<AdminPage<GdprErasureJobOut>>("GET", "/api/v1/admin/gdpr/jobs", {
+      query: {
+        page: params?.page,
+        page_size: params?.pageSize,
+        status: params?.status ?? undefined,
+        mode: params?.mode ?? undefined,
+        q: params?.q ?? undefined,
+        from: params?.from ?? undefined,
+        to: params?.to ?? undefined,
+      },
+      signal,
+    });
+  }
+
+  getGdprErasureJob(id: number, signal?: AbortSignal) {
+    return this.request<GdprErasureJobDetailOut>("GET", `/api/v1/admin/gdpr/jobs/${id}`, {
+      signal,
+    });
+  }
+
+  rollbackGdprErasureJob(id: number, signal?: AbortSignal) {
+    return this.request<GdprRollbackOut>("POST", `/api/v1/admin/gdpr/jobs/${id}/rollback`, {
+      signal,
+    });
+  }
+
+  purgeGdprErasureBackup(id: number, signal?: AbortSignal) {
+    return this.request<GdprPurgeOut>("POST", `/api/v1/admin/gdpr/jobs/${id}/purge-backup`, {
+      signal,
+    });
+  }
+
+  /** Absolute URL for downloading a job's JSON backup export. */
+  gdprErasureBackupDownloadUrl(id: number): string {
+    return joinUrl(this.baseUrl, `/api/v1/admin/gdpr/jobs/${id}/backup/download`);
   }
 
   // Read-only reference lists for admin pickers (queue editor FKs, etc.).

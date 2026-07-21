@@ -17,6 +17,7 @@ from tiqora.api.v1.admin import (
     channels,
     customers,
     dynamic_fields,
+    gdpr,
     groups,
     mail_log,
     mail_outbound,
@@ -53,6 +54,7 @@ admin_router.include_router(api_keys.router)
 admin_router.include_router(channels.router)
 admin_router.include_router(mail_outbound.router)
 admin_router.include_router(mail_log.router)
+admin_router.include_router(gdpr.router)
 admin_router.include_router(subject_config.router)
 admin_router.include_router(placeholder_variables.queue_variables_router)
 admin_router.include_router(placeholder_variables.customer_fields_router)

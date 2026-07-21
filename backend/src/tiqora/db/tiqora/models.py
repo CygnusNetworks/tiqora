@@ -427,3 +427,79 @@ class TiqoraPlaceholderField(TiqoraBase):
     __table_args__ = (
         UniqueConstraint("source_table", "tag_name", name="uq_tiqora_placeholder_field_source_tag"),
     )
+
+
+class TiqoraGdprJob(TiqoraBase):
+    """One applied GDPR erasure job (anonymize or hard-delete) with backup window.
+
+    ``selector`` / ``resolved_logins`` / ``counts`` are JSON text. Status is
+    ``applied`` | ``rolled_back`` | ``purged``. Backups expire after 30 days
+    (``backup_expires_at``); the daily purge worker deletes backup rows and
+    flips status to ``purged``.
+    """
+
+    __tablename__ = "tiqora_gdpr_job"
+
+    id: Mapped[int] = mapped_column(
+        BigInteger, primary_key=True, autoincrement=True, nullable=False
+    )
+    # "anonymize" | "delete"
+    mode: Mapped[str] = mapped_column(String(20), nullable=False)
+    # JSON of the ErasureSelector used for audit (may be empty if ids were explicit).
+    selector: Mapped[str] = mapped_column(Text, nullable=False)
+    # JSON list of resolved customer_user.login values at apply time.
+    resolved_logins: Mapped[str] = mapped_column(Text, nullable=False)
+    # "applied" | "rolled_back" | "purged"
+    status: Mapped[str] = mapped_column(String(20), nullable=False)
+    # JSON counters, e.g. {"customer_user": 1, "article_data_mime": 4}
+    counts: Mapped[str] = mapped_column(Text, nullable=False, default="{}")
+    seed: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    actor: Mapped[str] = mapped_column(String(200), nullable=False)
+    force_parallel: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default=false()
+    )
+    created: Mapped[datetime] = mapped_column(
+        DateTime,
+        nullable=False,
+        server_default=func.now(),
+    )
+    applied_at: Mapped[datetime] = mapped_column(
+        DateTime,
+        nullable=False,
+        server_default=func.now(),
+    )
+    rolled_back_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    backup_expires_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+
+    __table_args__ = (Index("ix_tiqora_gdpr_job_status_expires", "status", "backup_expires_at"),)
+
+
+class TiqoraGdprBackup(TiqoraBase):
+    """Per-row snapshot taken before a GDPR erasure mutation.
+
+    For ``mode=anonymize`` ``original_row`` holds only changed columns; for
+    ``mode=delete`` it holds the full row so a hard-deleted master can be
+    re-INSERTed on rollback. Binary values are base64-wrapped JSON objects.
+    """
+
+    __tablename__ = "tiqora_gdpr_backup"
+
+    id: Mapped[int] = mapped_column(
+        BigInteger, primary_key=True, autoincrement=True, nullable=False
+    )
+    job_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    table_name: Mapped[str] = mapped_column(String(100), nullable=False)
+    # JSON object of primary-key column -> value.
+    row_pk: Mapped[str] = mapped_column(Text, nullable=False)
+    # JSON object of column -> original value (changed cols or full row).
+    original_row: Mapped[str] = mapped_column(Text, nullable=False)
+    created: Mapped[datetime] = mapped_column(
+        DateTime,
+        nullable=False,
+        server_default=func.now(),
+    )
+
+    __table_args__ = (
+        Index("ix_tiqora_gdpr_backup_job_id", "job_id"),
+        Index("ix_tiqora_gdpr_backup_created", "created"),
+    )

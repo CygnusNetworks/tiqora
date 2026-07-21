@@ -989,3 +989,91 @@ class AuthConfigGlobalUpdate(BaseModel):
     enforce_all: bool
     # When omitted (None), the stored enforce_group_ids list is left unchanged.
     enforce_group_ids: list[int] | None = None
+
+
+# ---------------------------------------------------------------------------
+# GDPR erasure (anonymize / hard-delete with backup + rollback)
+# ---------------------------------------------------------------------------
+
+
+class ErasureSelectorIn(BaseModel):
+    """Combinable AND filter for customer_user resolution."""
+
+    logins: list[str] = Field(default_factory=list)
+    customer_ids: list[str] = Field(default_factory=list)
+    login_regex: str | None = None
+    customer_id_regex: str | None = None
+    changed_before: datetime | None = None
+    changed_after: datetime | None = None
+    # "no_tickets" | "no_open_tickets" | "inactive_since:YYYY-MM-DD"
+    activity: str | None = None
+    valid_id: int | None = None
+
+
+class GdprErasurePreviewRequest(BaseModel):
+    selector: ErasureSelectorIn
+    mode: Literal["anonymize", "delete"] = "anonymize"
+
+
+class GdprResolvedCustomerOut(BaseModel):
+    id: int
+    login: str
+    email: str
+    customer_id: str
+
+
+class GdprSampleRowOut(BaseModel):
+    table: str
+    id: Any
+    summary: str
+
+
+class GdprErasurePreviewOut(BaseModel):
+    mode: str
+    customers: list[GdprResolvedCustomerOut]
+    counts: dict[str, int]
+    sample: list[GdprSampleRowOut]
+    columns_changed: dict[str, list[str]]
+    tables_deleted: list[str]
+
+
+class GdprErasureJobCreate(BaseModel):
+    """Only destructive entry point — requires confirm=true."""
+
+    customer_user_ids: list[int] = Field(min_length=1)
+    selector: ErasureSelectorIn | None = None
+    mode: Literal["anonymize", "delete"] = "anonymize"
+    seed: int | None = None
+    confirm: Literal[True]
+
+
+class GdprErasureJobOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    mode: str
+    selector: str
+    resolved_logins: str
+    status: str
+    counts: str
+    seed: int | None
+    actor: str
+    force_parallel: bool
+    created: datetime
+    applied_at: datetime
+    rolled_back_at: datetime | None
+    backup_expires_at: datetime
+
+
+class GdprErasureJobDetailOut(GdprErasureJobOut):
+    counts_parsed: dict[str, int] = Field(default_factory=dict)
+    resolved_logins_parsed: list[str] = Field(default_factory=list)
+    selector_parsed: dict[str, Any] = Field(default_factory=dict)
+
+
+class GdprRollbackOut(BaseModel):
+    restored_rows: int
+
+
+class GdprPurgeOut(BaseModel):
+    deleted_backups: int
