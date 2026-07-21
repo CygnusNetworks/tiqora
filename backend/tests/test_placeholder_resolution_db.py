@@ -105,6 +105,39 @@ def _seed(sync_url: str, *, ns: int) -> dict[str, Any]:
     with engine.begin() as conn:
         TiqoraBase.metadata.create_all(conn)
 
+        # Idempotent cleanup of our ns block (shared session-scoped DB).
+        # Children before parents so FKs do not block.
+        conn.execute(text("DELETE FROM ticket WHERE id = :id"), {"id": ticket_id})
+        conn.execute(
+            text(
+                "DELETE FROM queue_standard_template WHERE queue_id = :qid"
+                " OR standard_template_id = :tid"
+            ),
+            {"qid": queue_id, "tid": tpl_id},
+        )
+        conn.execute(text("DELETE FROM queue WHERE id = :id"), {"id": queue_id})
+        conn.execute(text("DELETE FROM standard_template WHERE id = :id"), {"id": tpl_id})
+        conn.execute(
+            text("DELETE FROM group_user WHERE user_id IN (:u1, :u2) OR group_id = :g"),
+            {"u1": agent_id, "u2": owner_id, "g": group_id},
+        )
+        conn.execute(text("DELETE FROM permission_groups WHERE id = :id"), {"id": group_id})
+        conn.execute(
+            text("DELETE FROM customer_user WHERE login = :login"),
+            {"login": cust_login},
+        )
+        conn.execute(
+            text("DELETE FROM customer_company WHERE customer_id = :cid"),
+            {"cid": cust_company},
+        )
+        # Queue may reference signature / system_address — already deleted above.
+        conn.execute(text("DELETE FROM signature WHERE id = :id"), {"id": sig_id})
+        conn.execute(text("DELETE FROM system_address WHERE id = :id"), {"id": sa_id})
+        conn.execute(
+            text("DELETE FROM users WHERE id IN (:u1, :u2)"),
+            {"u1": agent_id, "u2": owner_id},
+        )
+
         for uid, ulogin, first, last in (
             (agent_id, login, "Ada", "Lovelace"),
             (owner_id, owner_login, "Grace", "Hopper"),

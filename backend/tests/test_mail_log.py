@@ -85,6 +85,17 @@ def _seed_outbound(sync_url: str, *, ns: int) -> dict[str, Any]:
         TiqoraBase.metadata.create_all(conn)
         conn.execute(text("DELETE FROM tiqora_mail_log"))
         conn.execute(text("DELETE FROM tiqora_mail_outbound"))
+        # Idempotent cleanup of our ns block (shared session-scoped DB).
+        conn.execute(text("DELETE FROM ticket WHERE id = :id"), {"id": ticket_id})
+        conn.execute(text("DELETE FROM queue WHERE id = :id"), {"id": queue_id})
+        conn.execute(
+            text("DELETE FROM group_user WHERE user_id = :uid OR group_id = :gid"),
+            {"uid": agent_id, "gid": group_id},
+        )
+        conn.execute(text("DELETE FROM permission_groups WHERE id = :id"), {"id": group_id})
+        conn.execute(text("DELETE FROM signature WHERE id = :id"), {"id": sig_id})
+        conn.execute(text("DELETE FROM system_address WHERE id = :id"), {"id": sa_id})
+        conn.execute(text("DELETE FROM users WHERE id = :id"), {"id": agent_id})
         conn.execute(
             text(
                 "INSERT INTO users (id, login, pw, first_name, last_name, valid_id,"

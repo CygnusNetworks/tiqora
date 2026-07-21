@@ -45,6 +45,26 @@ def _seed_tickets(sync_url: str) -> dict[str, Any]:
         # tiqora tables for this test DB
         TiqoraBase.metadata.create_all(conn)
 
+        # Idempotent cleanup of our block (shared session-scoped DB).
+        # Children before parents so FKs do not block.
+        conn.execute(text("DELETE FROM article_data_mime_attachment WHERE id = 700"))
+        conn.execute(text("DELETE FROM article_data_mime WHERE id = 600"))
+        conn.execute(text("DELETE FROM article WHERE id = 600"))
+        conn.execute(text("DELETE FROM ticket_history WHERE id = 800"))
+        conn.execute(text("DELETE FROM dynamic_field_value WHERE id IN (9001)"))
+        conn.execute(text("DELETE FROM dynamic_field WHERE id = 9001"))
+        conn.execute(text("DELETE FROM ticket WHERE id IN (500, 501)"))
+        conn.execute(text("DELETE FROM queue WHERE id = 200"))
+        conn.execute(
+            text("DELETE FROM group_user WHERE user_id IN (200, 201) OR group_id = 20"),
+        )
+        conn.execute(text("DELETE FROM permission_groups WHERE id = 20"))
+        conn.execute(text("DELETE FROM customer_user WHERE id = 50"))
+        conn.execute(
+            text("DELETE FROM customer_company WHERE customer_id = 'CUST1'"),
+        )
+        conn.execute(text("DELETE FROM users WHERE id IN (200, 201)"))
+
         for uid, login in ((200, "reader.alpha"), (201, "reader.none")):
             conn.execute(
                 text(
@@ -385,6 +405,17 @@ def _seed_dashboard(sync_url: str) -> dict[str, Any]:
 
     with engine.begin() as conn:
         TiqoraBase.metadata.create_all(conn)
+
+        # Idempotent cleanup of our block (shared session-scoped DB).
+        conn.execute(
+            text("DELETE FROM ticket WHERE id IN (963001, 963002, 963003, 963004)"),
+        )
+        conn.execute(text("DELETE FROM queue WHERE id = 96300"))
+        conn.execute(
+            text("DELETE FROM group_user WHERE user_id IN (96300, 96301) OR group_id = 9630"),
+        )
+        conn.execute(text("DELETE FROM permission_groups WHERE id = 9630"))
+        conn.execute(text("DELETE FROM users WHERE id IN (96300, 96301)"))
 
         for uid, login in ((96300, "dash.agent"), (96301, "dash.none")):
             conn.execute(
