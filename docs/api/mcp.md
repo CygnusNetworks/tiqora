@@ -30,8 +30,10 @@ transport that any MCP-compatible client can point at directly.
 Every request requires `Authorization: Bearer <tiqora_api_key>`.
 
 - The raw key is SHA-256 hashed and looked up against
-  `tiqora_api_key.key_hash` (keys are issued/revoked via the admin API,
-  `/api/v1/admin/*`, same mechanism used for `/api/v1` bearer-token access).
+  `tiqora_api_key.key_hash`. Keys are issued/revoked via
+  `POST/GET/PATCH/DELETE /api/v1/admin/api-keys` or
+  `tiqora api-key create|list|revoke|delete` (same mechanism used for
+  `/api/v1` bearer-token access).
 - The resolved `user_id` becomes the acting principal for **every**
   subsequent tool call in that connection — MCP actions run with that
   agent's own ticket permissions (queue/group ACLs enforced identically to a

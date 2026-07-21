@@ -164,7 +164,8 @@ function itemAt(panel: HTMLElement | null, index: number): HTMLElement | undefin
 }
 
 /** A single actionable menu row. Closes the menu after firing `onSelect`
- * (unless `keepOpen`). Renders as a button; pass `selected` to show a check. */
+ * (unless `keepOpen`). Renders as a button; pass `selected` to show a check.
+ * `highlight` marks an attention entry (e.g. Admin area) with accent fill. */
 export function MenuItem({
   onSelect,
   children,
@@ -172,6 +173,7 @@ export function MenuItem({
   selected,
   keepOpen,
   danger,
+  highlight,
   testId,
 }: {
   onSelect?: () => void;
@@ -180,6 +182,7 @@ export function MenuItem({
   selected?: boolean;
   keepOpen?: boolean;
   danger?: boolean;
+  highlight?: boolean;
   testId?: string;
 }) {
   const ctx = useContext(MenuContext);
@@ -194,14 +197,22 @@ export function MenuItem({
         if (!keepOpen) ctx?.close();
       }}
       className={cn(
-        "flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-[13px] transition-colors duration-100 focus:outline-none focus-visible:bg-surface-subtle",
-        danger
-          ? "text-danger hover:bg-danger/10 focus-visible:bg-danger/10"
-          : "text-ink/90 hover:bg-surface-subtle",
+        "flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-[13px] transition-colors duration-100 focus:outline-none",
+        highlight
+          ? "bg-accent/15 font-semibold text-accent hover:bg-accent/25 focus-visible:bg-accent/25"
+          : danger
+            ? "text-danger hover:bg-danger/10 focus-visible:bg-danger/10"
+            : "text-ink/90 hover:bg-surface-subtle focus-visible:bg-surface-subtle",
       )}
     >
       {icon != null && (
-        <span className="flex w-4 shrink-0 justify-center text-[15px] text-muted" aria-hidden>
+        <span
+          className={cn(
+            "flex w-4 shrink-0 justify-center text-[15px]",
+            highlight ? "text-accent" : "text-muted",
+          )}
+          aria-hidden
+        >
           {icon}
         </span>
       )}
