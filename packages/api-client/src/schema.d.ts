@@ -581,6 +581,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/customer-users/bulk": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Bulk Update Customer Users
+         * @description Apply ``valid_id`` and/or ``customer_id`` to many customer_user rows.
+         *
+         *     Bound a single call via the schema (1 ≤ len(ids) ≤ 1000). Stamps
+         *     change_time/change_by and invalidates the same Znuny cache types as the
+         *     single-row update path.
+         */
+        patch: operations["bulk_update_customer_users_api_v1_admin_customer_users_bulk_patch"];
+        trace?: never;
+    };
     "/api/v1/admin/customer-users/{customer_user_id}": {
         parameters: {
             query?: never;
@@ -4501,6 +4525,23 @@ export interface components {
             /** Zip */
             zip?: string | null;
         };
+        /**
+         * CustomerUserBulkUpdate
+         * @description Bulk-patch a set of customer_user rows (validity and/or company).
+         */
+        CustomerUserBulkUpdate: {
+            /** Customer Id */
+            customer_id?: string | null;
+            /** Ids */
+            ids: number[];
+            /** Valid Id */
+            valid_id?: number | null;
+        };
+        /** CustomerUserBulkUpdateResult */
+        CustomerUserBulkUpdateResult: {
+            /** Updated */
+            updated: number;
+        };
         /** CustomerUserCustomerAssignment */
         CustomerUserCustomerAssignment: {
             /** Customer Id */
@@ -8397,6 +8438,43 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CustomerUserAdminOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    bulk_update_customer_users_api_v1_admin_customer_users_bulk_patch: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CustomerUserBulkUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustomerUserBulkUpdateResult"];
                 };
             };
             /** @description Validation Error */

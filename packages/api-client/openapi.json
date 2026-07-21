@@ -3179,6 +3179,60 @@
         "title": "CustomerUserAdminUpdate",
         "type": "object"
       },
+      "CustomerUserBulkUpdate": {
+        "description": "Bulk-patch a set of customer_user rows (validity and/or company).",
+        "properties": {
+          "customer_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Customer Id"
+          },
+          "ids": {
+            "items": {
+              "type": "integer"
+            },
+            "maxItems": 1000,
+            "minItems": 1,
+            "title": "Ids",
+            "type": "array"
+          },
+          "valid_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Valid Id"
+          }
+        },
+        "required": [
+          "ids"
+        ],
+        "title": "CustomerUserBulkUpdate",
+        "type": "object"
+      },
+      "CustomerUserBulkUpdateResult": {
+        "properties": {
+          "updated": {
+            "title": "Updated",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "updated"
+        ],
+        "title": "CustomerUserBulkUpdateResult",
+        "type": "object"
+      },
       "CustomerUserCustomerAssignment": {
         "properties": {
           "customer_id": {
@@ -13512,6 +13566,82 @@
           }
         },
         "summary": "Create Customer User",
+        "tags": [
+          "admin:customers"
+        ]
+      }
+    },
+    "/api/v1/admin/customer-users/bulk": {
+      "patch": {
+        "description": "Apply ``valid_id`` and/or ``customer_id`` to many customer_user rows.\n\nBound a single call via the schema (1 \u2264 len(ids) \u2264 1000). Stamps\nchange_time/change_by and invalidates the same Znuny cache types as the\nsingle-row update path.",
+        "operationId": "bulk_update_customer_users_api_v1_admin_customer_users_bulk_patch",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CustomerUserBulkUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CustomerUserBulkUpdateResult"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Bulk Update Customer Users",
         "tags": [
           "admin:customers"
         ]

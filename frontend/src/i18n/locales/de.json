@@ -461,6 +461,13 @@
       "invalid": "Ungültig",
       "all": "Alle"
     },
+    "search": "Suche",
+    "searchPlaceholder": "Suchen…",
+    "bulk": {
+      "selected": "{{count}} ausgewählt",
+      "selectAll": "Alle auf der Seite auswählen",
+      "selectRow": "Zeile auswählen"
+    },
     "pagination": {
       "prev": "Zurück",
       "next": "Weiter",
@@ -573,7 +580,19 @@
       "phone": "Telefon",
       "street": "Straße",
       "city": "Stadt",
-      "country": "Land"
+      "country": "Land",
+      "bulk": {
+        "valid": "Gültig setzen",
+        "invalid": "Ungültig setzen",
+        "temp": "Vorübergehend ungültig",
+        "company": "Unternehmen zuweisen…",
+        "companyTitle": "Unternehmen zuweisen",
+        "companyHint": "{{count}} ausgewählte Benutzer einem Kundenunternehmen zuweisen.",
+        "companySearch": "Unternehmens-ID oder Name suchen…",
+        "companyPicked": "Ausgewählt: {{id}}",
+        "companyApply": "Zuweisen",
+        "companyRequired": "Bitte eine Kunden-ID wählen oder eingeben."
+      }
     },
     "customerCompanies": {
       "title_plural": "Kundenunternehmen",

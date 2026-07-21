@@ -92,6 +92,8 @@ export {
   type CustomerUserAdminOut,
   type CustomerUserAdminCreate,
   type CustomerUserAdminUpdate,
+  type CustomerUserBulkUpdate,
+  type CustomerUserBulkUpdateResult,
   type CustomerCompanyOut,
   type CustomerCompanyCreate,
   type CustomerCompanyUpdate,
