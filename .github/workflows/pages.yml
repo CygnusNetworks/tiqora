@@ -1,0 +1,57 @@
+name: Demo (GitHub Pages)
+
+# Builds the MSW-backed, backend-free demo of the Tiqora frontend and deploys it
+# to GitHub Pages. The app runs entirely in the browser against mock data.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "frontend/**"
+      - "packages/api-client/**"
+      - ".github/workflows/pages.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Allow one concurrent deployment; don't cancel an in-progress run.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build demo bundle
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+      - name: Install
+        run: pnpm install --frozen-lockfile
+      - name: Build api-client
+        run: pnpm --filter @tiqora/api-client build
+      - name: Build demo (base = /tiqora/)
+        run: VITE_BASE=/tiqora/ pnpm --filter tiqora-frontend build:demo
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: frontend/dist
+
+  deploy:
+    name: Deploy to Pages
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
