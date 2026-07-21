@@ -10,6 +10,10 @@
     "newTicket": "Neu in Ihrer Queue",
     "noSubject": "(kein Betreff)"
   },
+  "onlineAgents": {
+    "title": "Agenten online",
+    "empty": "Derzeit ist niemand online."
+  },
   "settings": {
     "title": "Einstellungen",
     "language": "Sprache",

@@ -28,6 +28,7 @@ export {
   type DynamicFieldValueOut,
   type PresenceIn,
   type PresenceEntry,
+  type OnlineAgentOut,
   type ArticleCreateRequest,
   type ArticleCreateResponse,
   type ReplyDraftOut,

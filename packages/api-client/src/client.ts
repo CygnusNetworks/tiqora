@@ -41,6 +41,8 @@ export type SearchResponse = Schemas["SearchResponse"];
 export type DynamicFieldValueOut = Schemas["DynamicFieldValueOut"];
 export type PresenceIn = Schemas["PresenceIn"];
 export type PresenceEntry = Schemas["PresenceEntry"];
+/** Global online-agent presence (``GET /agents/online``). */
+export type OnlineAgentOut = Schemas["OnlineAgentOut"];
 export type ArticleCreateRequest = Schemas["ArticleCreateRequest"];
 export type ArticleCreateResponse = Schemas["ArticleCreateResponse"];
 export type ReplyDraftOut = Schemas["ReplyDraftOut"];
@@ -1002,6 +1004,20 @@ export class ApiClient {
       `/api/v1/tickets/${ticketId}/presence`,
       { signal },
     );
+  }
+
+  /** Currently-online agents (Redis TTL presence). */
+  getOnlineAgents(signal?: AbortSignal) {
+    return this.request<OnlineAgentOut[]>("GET", "/api/v1/agents/online", {
+      signal,
+    });
+  }
+
+  /** Lightweight global presence heartbeat (idle-but-open sessions). */
+  pingOnlinePresence(signal?: AbortSignal) {
+    return this.request<void>("POST", "/api/v1/agents/presence/ping", {
+      signal,
+    });
   }
 
   /**

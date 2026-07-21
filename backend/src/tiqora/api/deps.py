@@ -64,6 +64,7 @@ async def get_current_user(
     auth: Annotated[AuthService, Depends(get_auth_service)],
     settings: Annotated[Settings, Depends(get_app_settings)],
     session: Annotated[AsyncSession, Depends(get_db)],
+    redis_client: Annotated[redis.Redis, Depends(get_redis)],
     authorization: Annotated[str | None, Header()] = None,
     tiqora_session: Annotated[str | None, Cookie(alias="tiqora_session")] = None,
 ) -> AuthenticatedUser:
@@ -74,6 +75,9 @@ async def get_current_user(
     open their own ``async with session.begin()`` without hitting
     "A transaction is already begun on this Session" (the lookups are
     read-only, so nothing is lost).
+
+    On a successful resolve we also refresh the global online-presence key
+    (``tiqora:online:<user_id>``) — best-effort and non-fatal if Redis is down.
     """
     # Cookie name may be customised via settings
     cookie_token = tiqora_session
@@ -111,6 +115,12 @@ async def get_current_user(
 
     if token_for_state is not None:
         request.state.session_token = token_for_state
+
+    # Sliding global presence: any authenticated request counts as activity.
+    # Import lazily to avoid a circular import with the agents router module.
+    from tiqora.api.v1.agents import touch_online_presence
+
+    await touch_online_presence(redis_client, resolved)
     return resolved
 
 
