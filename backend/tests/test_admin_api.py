@@ -51,6 +51,7 @@ from tiqora.api.v1.admin.schemas import (
     TemplateAttachmentsReplace,
     UserCreate,
 )
+from tiqora.db.tiqora.base import TiqoraBase
 from tiqora.domain.auth import AuthenticatedUser, AuthService, SessionStore
 from tiqora.domain.queue_service import QueueService
 from tiqora.permissions.engine import PermissionEngine
@@ -119,6 +120,11 @@ def _seed_admin_and_plain_user(sync_url: str) -> dict[str, int]:
 async def _make_session(sync_url: str) -> tuple[AsyncSession, object]:
     async_url = _to_async_url(sync_url)
     engine = create_async_engine(async_url)
+    # Admin writes now enqueue Znuny cache-invalidation signals into the
+    # additive tiqora_* tables (tiqora_cache_invalidation); create them here so
+    # master-data CRUD works against the Znuny-only DDL loaded by the fixtures.
+    async with engine.begin() as conn:
+        await conn.run_sync(lambda c: TiqoraBase.metadata.create_all(c, checkfirst=True))
     factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
     return factory(), engine
 
