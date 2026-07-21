@@ -89,9 +89,12 @@ async def _seed_tiqora_tables(session: AsyncSession) -> None:
         )""",
         """CREATE TABLE IF NOT EXISTS tiqora_cache_invalidation (
             id BIGINT AUTO_INCREMENT PRIMARY KEY,
-            ticket_id BIGINT NOT NULL,
+            ticket_id BIGINT NULL,
+            cache_type VARCHAR(100) NULL,
             created DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
         )""",
+        "ALTER TABLE tiqora_cache_invalidation MODIFY ticket_id BIGINT NULL",
+        "ALTER TABLE tiqora_cache_invalidation ADD COLUMN cache_type VARCHAR(100) NULL",
     ]
     for ddl in ddls:
         with contextlib.suppress(Exception):

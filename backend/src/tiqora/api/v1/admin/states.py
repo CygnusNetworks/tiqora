@@ -6,7 +6,12 @@ from fastapi import APIRouter, HTTPException, status
 from sqlalchemy import select
 
 from tiqora.api.deps import DbSession
-from tiqora.api.v1.admin.common import invalidate_cache_for_state, now
+from tiqora.api.v1.admin.common import (
+    STATE_CACHE_TYPES,
+    invalidate_cache_for_state,
+    invalidate_znuny_cache_types,
+    now,
+)
 from tiqora.api.v1.admin.deps import AdminUser
 from tiqora.api.v1.admin.pagination import ListParamsDep, Page, apply_valid_filter, paginate
 from tiqora.api.v1.admin.schemas import StateCreate, StateOut, StateUpdate
@@ -46,6 +51,7 @@ async def create_state(body: StateCreate, admin: AdminUser, session: DbSession) 
         change_by=admin.id,
     )
     session.add(state)
+    await invalidate_znuny_cache_types(session, STATE_CACHE_TYPES)
     await session.commit()
     await session.refresh(state)
     return state

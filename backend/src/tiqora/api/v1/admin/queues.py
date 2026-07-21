@@ -6,7 +6,12 @@ from fastapi import APIRouter, HTTPException, status
 from sqlalchemy import select
 
 from tiqora.api.deps import DbSession
-from tiqora.api.v1.admin.common import invalidate_cache_for_queue, now
+from tiqora.api.v1.admin.common import (
+    QUEUE_CACHE_TYPES,
+    invalidate_cache_for_queue,
+    invalidate_znuny_cache_types,
+    now,
+)
 from tiqora.api.v1.admin.deps import AdminUser
 from tiqora.api.v1.admin.pagination import ListParamsDep, Page, apply_valid_filter, paginate
 from tiqora.api.v1.admin.schemas import QueueCreate, QueueOut, QueueUpdate
@@ -44,6 +49,7 @@ async def create_queue(body: QueueCreate, admin: AdminUser, session: DbSession) 
         change_by=admin.id,
     )
     session.add(queue)
+    await invalidate_znuny_cache_types(session, QUEUE_CACHE_TYPES)
     await session.commit()
     await session.refresh(queue)
     return queue
@@ -61,7 +67,8 @@ async def update_queue(
     queue.change_time = now()
     queue.change_by = admin.id
     # Queue config (escalation timers, salutation/signature, validity, ...)
-    # is ticket-relevant for every ticket currently in the queue.
+    # is ticket-relevant for every ticket currently in the queue. Also clears
+    # Znuny CacheType 'Queue' for the master-data list itself.
     await invalidate_cache_for_queue(session, queue_id)
     await session.commit()
     await session.refresh(queue)

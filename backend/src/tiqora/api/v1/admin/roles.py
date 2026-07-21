@@ -6,7 +6,12 @@ from fastapi import APIRouter, HTTPException, status
 from sqlalchemy import select
 
 from tiqora.api.deps import DbSession
-from tiqora.api.v1.admin.common import now
+from tiqora.api.v1.admin.common import (
+    GROUP_ROLE_CACHE_TYPES,
+    ROLE_CACHE_TYPES,
+    invalidate_znuny_cache_types,
+    now,
+)
 from tiqora.api.v1.admin.deps import AdminUser
 from tiqora.api.v1.admin.pagination import ListParamsDep, Page, apply_valid_filter, paginate
 from tiqora.api.v1.admin.schemas import (
@@ -50,6 +55,7 @@ async def create_role(body: RoleCreate, admin: AdminUser, session: DbSession) ->
         change_by=admin.id,
     )
     session.add(role)
+    await invalidate_znuny_cache_types(session, ROLE_CACHE_TYPES)
     await session.commit()
     await session.refresh(role)
     return role
@@ -66,6 +72,7 @@ async def update_role(
         setattr(role, field, value)
     role.change_time = now()
     role.change_by = admin.id
+    await invalidate_znuny_cache_types(session, ROLE_CACHE_TYPES)
     await session.commit()
     await session.refresh(role)
     return role
@@ -79,6 +86,7 @@ async def deactivate_role(role_id: int, admin: AdminUser, session: DbSession) ->
     role.valid_id = 2
     role.change_time = now()
     role.change_by = admin.id
+    await invalidate_znuny_cache_types(session, ROLE_CACHE_TYPES)
     await session.commit()
 
 
@@ -124,6 +132,7 @@ async def assign_group_role(
         existing.permission_value = body.permission_value
         existing.change_time = ts
         existing.change_by = admin.id
+    await invalidate_znuny_cache_types(session, GROUP_ROLE_CACHE_TYPES)
     await session.commit()
 
 
@@ -141,4 +150,5 @@ async def revoke_group_role(
     existing = await session.get(GroupRole, (role_id, group_id, permission_key))
     if existing is not None:
         await session.delete(existing)
+        await invalidate_znuny_cache_types(session, GROUP_ROLE_CACHE_TYPES)
         await session.commit()

@@ -6,7 +6,7 @@ from fastapi import APIRouter, HTTPException, status
 from sqlalchemy import select
 
 from tiqora.api.deps import DbSession
-from tiqora.api.v1.admin.common import now
+from tiqora.api.v1.admin.common import ATTACHMENT_CACHE_TYPES, invalidate_znuny_cache_types, now
 from tiqora.api.v1.admin.deps import AdminUser
 from tiqora.api.v1.admin.pagination import ListParamsDep, Page, apply_valid_filter, paginate
 from tiqora.api.v1.admin.schemas import (
@@ -66,6 +66,7 @@ async def create_attachment(
         change_by=admin.id,
     )
     session.add(row)
+    await invalidate_znuny_cache_types(session, ATTACHMENT_CACHE_TYPES)
     await session.commit()
     await session.refresh(row)
     return row
@@ -97,6 +98,7 @@ async def update_attachment(
         setattr(row, field, value)
     row.change_time = now()
     row.change_by = admin.id
+    await invalidate_znuny_cache_types(session, ATTACHMENT_CACHE_TYPES)
     await session.commit()
     await session.refresh(row)
     return row
@@ -111,4 +113,5 @@ async def deactivate_attachment(attachment_id: int, admin: AdminUser, session: D
     row.valid_id = 2
     row.change_time = now()
     row.change_by = admin.id
+    await invalidate_znuny_cache_types(session, ATTACHMENT_CACHE_TYPES)
     await session.commit()

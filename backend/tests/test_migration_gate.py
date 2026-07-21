@@ -17,7 +17,7 @@ from tiqora.cli.migrate import ALEMBIC_INI, build_alembic_config
 # The current head of the tiqora-only chain and of the owned chain. Update
 # these when adding migrations; the assertions below encode the invariant,
 # not the exact ids.
-TIQORA_HEAD = "20260720_0010"
+TIQORA_HEAD = "20260720_0011"
 OWNED_HEAD = "20260719_0006"
 
 

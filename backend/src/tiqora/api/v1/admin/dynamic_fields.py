@@ -18,7 +18,11 @@ from fastapi import APIRouter, HTTPException, status
 from sqlalchemy import select
 
 from tiqora.api.deps import DbSession
-from tiqora.api.v1.admin.common import now
+from tiqora.api.v1.admin.common import (
+    DYNAMIC_FIELD_CACHE_TYPES,
+    invalidate_znuny_cache_types,
+    now,
+)
 from tiqora.api.v1.admin.deps import AdminUser
 from tiqora.api.v1.admin.pagination import ListParamsDep, Page, apply_valid_filter, window
 from tiqora.api.v1.admin.schemas import (
@@ -169,6 +173,7 @@ async def create_dynamic_field(
         change_by=admin.id,
     )
     session.add(row)
+    await invalidate_znuny_cache_types(session, DYNAMIC_FIELD_CACHE_TYPES)
     await session.commit()
     await session.refresh(row)
     return _to_out(row)
@@ -195,6 +200,7 @@ async def update_dynamic_field(
         setattr(row, field, value)
     row.change_time = now()
     row.change_by = admin.id
+    await invalidate_znuny_cache_types(session, DYNAMIC_FIELD_CACHE_TYPES)
     await session.commit()
     await session.refresh(row)
     return _to_out(row)
@@ -209,6 +215,7 @@ async def deactivate_dynamic_field(field_id: int, admin: AdminUser, session: DbS
     row.valid_id = 2
     row.change_time = now()
     row.change_by = admin.id
+    await invalidate_znuny_cache_types(session, DYNAMIC_FIELD_CACHE_TYPES)
     await session.commit()
 
 

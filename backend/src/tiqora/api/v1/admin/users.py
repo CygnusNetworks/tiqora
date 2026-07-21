@@ -6,7 +6,13 @@ from fastapi import APIRouter, HTTPException, status
 from sqlalchemy import select
 
 from tiqora.api.deps import DbSession
-from tiqora.api.v1.admin.common import now
+from tiqora.api.v1.admin.common import (
+    USER_CACHE_TYPES,
+    USER_GROUP_CACHE_TYPES,
+    USER_ROLE_CACHE_TYPES,
+    invalidate_znuny_cache_types,
+    now,
+)
 from tiqora.api.v1.admin.deps import AdminUser
 from tiqora.api.v1.admin.pagination import ListParamsDep, Page, apply_valid_filter, paginate
 from tiqora.api.v1.admin.schemas import (
@@ -56,6 +62,7 @@ async def create_user(body: UserCreate, admin: AdminUser, session: DbSession) ->
         change_by=admin.id,
     )
     session.add(user)
+    await invalidate_znuny_cache_types(session, USER_CACHE_TYPES)
     await session.commit()
     await session.refresh(user)
     return user
@@ -77,6 +84,7 @@ async def update_user(
         setattr(user, field, value)
     user.change_time = now()
     user.change_by = admin.id
+    await invalidate_znuny_cache_types(session, USER_CACHE_TYPES)
     await session.commit()
     await session.refresh(user)
     return user
@@ -91,6 +99,7 @@ async def deactivate_user(user_id: int, admin: AdminUser, session: DbSession) ->
     user.valid_id = 2
     user.change_time = now()
     user.change_by = admin.id
+    await invalidate_znuny_cache_types(session, USER_CACHE_TYPES)
     await session.commit()
 
 
@@ -132,6 +141,7 @@ async def assign_group(
                 change_by=admin.id,
             )
         )
+    await invalidate_znuny_cache_types(session, USER_GROUP_CACHE_TYPES)
     await session.commit()
 
 
@@ -149,6 +159,7 @@ async def revoke_group(
     existing = await session.get(GroupUser, (user_id, group_id, permission_key))
     if existing is not None:
         await session.delete(existing)
+        await invalidate_znuny_cache_types(session, USER_GROUP_CACHE_TYPES)
         await session.commit()
 
 
@@ -184,6 +195,7 @@ async def assign_role(
                 change_by=admin.id,
             )
         )
+    await invalidate_znuny_cache_types(session, USER_ROLE_CACHE_TYPES)
     await session.commit()
 
 
@@ -193,4 +205,5 @@ async def revoke_role(user_id: int, role_id: int, admin: AdminUser, session: DbS
     existing = await session.get(RoleUser, (user_id, role_id))
     if existing is not None:
         await session.delete(existing)
+        await invalidate_znuny_cache_types(session, USER_ROLE_CACHE_TYPES)
         await session.commit()

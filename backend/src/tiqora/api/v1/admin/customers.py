@@ -6,7 +6,13 @@ from fastapi import APIRouter, HTTPException, status
 from sqlalchemy import select
 
 from tiqora.api.deps import DbSession
-from tiqora.api.v1.admin.common import now
+from tiqora.api.v1.admin.common import (
+    CUSTOMER_COMPANY_CACHE_TYPES,
+    CUSTOMER_USER_CACHE_TYPES,
+    CUSTOMER_USER_GROUP_CACHE_TYPES,
+    invalidate_znuny_cache_types,
+    now,
+)
 from tiqora.api.v1.admin.deps import AdminUser
 from tiqora.api.v1.admin.pagination import (
     ListParamsDep,
@@ -71,6 +77,7 @@ async def create_customer_user(
         change_by=admin.id,
     )
     session.add(cu)
+    await invalidate_znuny_cache_types(session, CUSTOMER_USER_CACHE_TYPES)
     await session.commit()
     await session.refresh(cu)
     return cu
@@ -95,6 +102,7 @@ async def update_customer_user(
         setattr(cu, field, value)
     cu.change_time = now()
     cu.change_by = admin.id
+    await invalidate_znuny_cache_types(session, CUSTOMER_USER_CACHE_TYPES)
     await session.commit()
     await session.refresh(cu)
     return cu
@@ -110,6 +118,7 @@ async def deactivate_customer_user(
     cu.valid_id = 2
     cu.change_time = now()
     cu.change_by = admin.id
+    await invalidate_znuny_cache_types(session, CUSTOMER_USER_CACHE_TYPES)
     await session.commit()
 
 
@@ -150,6 +159,7 @@ async def create_customer_company(
         change_by=admin.id,
     )
     session.add(co)
+    await invalidate_znuny_cache_types(session, CUSTOMER_COMPANY_CACHE_TYPES)
     await session.commit()
     await session.refresh(co)
     return co
@@ -169,6 +179,7 @@ async def update_customer_company(
         setattr(co, field, value)
     co.change_time = now()
     co.change_by = admin.id
+    await invalidate_znuny_cache_types(session, CUSTOMER_COMPANY_CACHE_TYPES)
     await session.commit()
     await session.refresh(co)
     return co
@@ -184,6 +195,7 @@ async def deactivate_customer_company(
     co.valid_id = 2
     co.change_time = now()
     co.change_by = admin.id
+    await invalidate_znuny_cache_types(session, CUSTOMER_COMPANY_CACHE_TYPES)
     await session.commit()
 
 
@@ -234,6 +246,7 @@ async def assign_customer_company(
                 change_by=admin.id,
             )
         )
+        await invalidate_znuny_cache_types(session, CUSTOMER_USER_CACHE_TYPES)
         await session.commit()
 
 
@@ -248,6 +261,7 @@ async def revoke_customer_company(
     existing = await session.get(CustomerUserCustomer, (customer_user_login, customer_id))
     if existing is not None:
         await session.delete(existing)
+        await invalidate_znuny_cache_types(session, CUSTOMER_USER_CACHE_TYPES)
         await session.commit()
 
 
@@ -318,6 +332,7 @@ async def assign_customer_user_group(
         existing.permission_value = body.permission_value
         existing.change_time = ts
         existing.change_by = admin.id
+    await invalidate_znuny_cache_types(session, CUSTOMER_USER_GROUP_CACHE_TYPES)
     await session.commit()
 
 
@@ -336,4 +351,5 @@ async def revoke_customer_user_group(
     existing = await session.get(GroupCustomerUser, (login, group_id, permission_key))
     if existing is not None:
         await session.delete(existing)
+        await invalidate_znuny_cache_types(session, CUSTOMER_USER_GROUP_CACHE_TYPES)
         await session.commit()

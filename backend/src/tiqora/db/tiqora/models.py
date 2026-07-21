@@ -47,14 +47,20 @@ class TiqoraSettings(TiqoraBase):
 
 
 class TiqoraCacheInvalidation(TiqoraBase):
-    """Ticket cache invalidation queue consumed by the Znuny TiqoraSync addon."""
+    """Cache invalidation queue consumed by the Znuny TiqoraSync addon.
+
+    A row is either a ticket signal (``ticket_id`` set, ``cache_type`` NULL)
+    or a Znuny CacheType cleanup signal (``cache_type`` set, ``ticket_id``
+    NULL). The addon polls both.
+    """
 
     __tablename__ = "tiqora_cache_invalidation"
 
     id: Mapped[int] = mapped_column(
         BigInteger, primary_key=True, autoincrement=True, nullable=False
     )
-    ticket_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    ticket_id: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    cache_type: Mapped[str | None] = mapped_column(String(100), nullable=True)
     created: Mapped[datetime] = mapped_column(
         DateTime,
         nullable=False,
