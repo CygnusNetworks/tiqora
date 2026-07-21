@@ -41,6 +41,7 @@ export function AccountMenu({ logoutTestId = "logout-btn" }: { logoutTestId?: st
   ).toUpperCase();
   const fullName = [user?.first_name || user?.login, user?.last_name].filter(Boolean).join(" ");
   const email = userEmailForAvatar(user);
+  const avatarUrl = user?.avatar_url ?? null;
 
   const changeLang = (code: string) => {
     void i18n.changeLanguage(code);
@@ -66,7 +67,13 @@ export function AccountMenu({ logoutTestId = "logout-btn" }: { logoutTestId?: st
           <span className="sr-only" data-testid="current-user">
             {fullName || user?.login}
           </span>
-          <Avatar email={email} initials={initials} size={24} testId="account-menu-avatar" />
+          <Avatar
+            avatarUrl={avatarUrl}
+            email={email}
+            initials={initials}
+            size={24}
+            testId="account-menu-avatar"
+          />
           <ChevronDownIcon
             className={cn(
               "text-[15px] text-muted transition-transform duration-150",

@@ -838,7 +838,10 @@
       "empty": "Keine Variablen für diese Queue.",
       "nameHelp": "Wird als <OTRS_QUEUE_{Name}> und <TIQORA_QUEUE_{Name}> aufgelöst.",
       "globalHint": "Globale Variablen gelten für alle Queues, sofern die Queue keine eigene Variable gleichen Namens setzt.",
-      "queueHint": "Queue-spezifische Variablen überschreiben gleichnamige globale Werte."
+      "queueHint": "Queue-spezifische Variablen überschreiben gleichnamige globale Werte.",
+      "physicalTitle": "Aus der Queue-Tabelle (nicht editierbar)",
+      "physicalHint": "Physische Spalten dieser Queue (z. B. domain, phonenumber). Eine konfigurierte Variable gleichen Namens überschreibt den physischen Wert.",
+      "physicalEmpty": "Keine benutzerdefinierten Queue-Spalten vorhanden (Standard-Znuny)."
     },
     "customerFields": {
       "title_plural": "Customer-Felder",

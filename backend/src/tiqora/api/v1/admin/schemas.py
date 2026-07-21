@@ -740,6 +740,17 @@ class QueueVariableUpdate(BaseModel):
     value: str | None = None
 
 
+class PhysicalQueueVariableOut(BaseModel):
+    """A non-standard column on the Znuny ``queue`` table (site-specific patch).
+
+    Surfaced read-only so admins can see physical values that resolve as
+    ``<OTRS_QUEUE_{name}>`` even when no ``tiqora_queue_variable`` row exists.
+    """
+
+    name: str
+    value: str
+
+
 class PlaceholderFieldOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

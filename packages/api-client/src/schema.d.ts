@@ -1146,6 +1146,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/queues/{queue_id}/physical-variables": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Queue Physical Variables
+         * @description Non-standard columns on the ``queue`` table for this queue (read-only).
+         *
+         *     Stock Znuny installs with no custom columns return ``[]``. Missing queue → 404.
+         */
+        get: operations["list_queue_physical_variables_api_v1_admin_queues__queue_id__physical_variables_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/queues/{queue_id}/templates": {
         parameters: {
             query?: never;
@@ -5299,6 +5321,19 @@ export interface components {
             /** Ticket Id */
             ticket_id: number;
         };
+        /**
+         * PhysicalQueueVariableOut
+         * @description A non-standard column on the Znuny ``queue`` table (site-specific patch).
+         *
+         *     Surfaced read-only so admins can see physical values that resolve as
+         *     ``<OTRS_QUEUE_{name}>`` even when no ``tiqora_queue_variable`` row exists.
+         */
+        PhysicalQueueVariableOut: {
+            /** Name */
+            name: string;
+            /** Value */
+            value: string;
+        };
         /** PlaceholderFieldCreate */
         PlaceholderFieldCreate: {
             /** Column Name */
@@ -6612,6 +6647,10 @@ export interface components {
         UserMe: {
             /** Auth Method */
             auth_method: string;
+            /** Avatar Url */
+            avatar_url?: string | null;
+            /** Email */
+            email?: string | null;
             /** First Name */
             first_name: string;
             /** Id */
@@ -10116,6 +10155,41 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_queue_physical_variables_api_v1_admin_queues__queue_id__physical_variables_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                queue_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PhysicalQueueVariableOut"][];
+                };
             };
             /** @description Validation Error */
             422: {

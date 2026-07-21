@@ -7,6 +7,7 @@ import { QueueVariablesPage } from "./QueueVariablesPage";
 
 const request = vi.fn();
 const listQueues = vi.fn();
+const listQueuePhysicalVariables = vi.fn();
 const create = vi.fn();
 const update = vi.fn();
 const deactivate = vi.fn();
@@ -23,6 +24,7 @@ vi.mock("@/lib/api", () => ({
     adminQueues: {
       list: (...args: unknown[]) => listQueues(...args),
     },
+    listQueuePhysicalVariables: (...args: unknown[]) => listQueuePhysicalVariables(...args),
     adminQueueVariables: {
       create: (...args: unknown[]) => create(...args),
       update: (...args: unknown[]) => update(...args),
@@ -66,6 +68,7 @@ describe("QueueVariablesPage", () => {
   beforeEach(() => {
     request.mockReset();
     listQueues.mockReset();
+    listQueuePhysicalVariables.mockReset();
     create.mockReset();
     update.mockReset();
     deactivate.mockReset();
@@ -76,6 +79,10 @@ describe("QueueVariablesPage", () => {
       page: 1,
       page_size: 500,
     });
+    listQueuePhysicalVariables.mockResolvedValue([
+      { name: "domain", value: "support.example" },
+      { name: "phonenumber", value: "+49 30 123" },
+    ]);
     request.mockImplementation(async (...args: unknown[]) => {
       const method = args[0] as string;
       const path = args[1] as string;
@@ -124,6 +131,9 @@ describe("QueueVariablesPage", () => {
       expect(screen.getByRole("option", { name: "Support" })).toBeInTheDocument();
     });
 
+    // Global scope: physical section hidden.
+    expect(screen.queryByTestId("admin-queue-variables-physical")).not.toBeInTheDocument();
+
     const select = screen.getByTestId("admin-queue-variables-queue-select");
     fireEvent.change(select, { target: { value: "3" } });
 
@@ -141,6 +151,17 @@ describe("QueueVariablesPage", () => {
       expect(screen.getByText("Phone")).toBeInTheDocument();
     });
     expect(screen.getByText("+49 123")).toBeInTheDocument();
+
+    // Physical columns section for a specific queue.
+    await waitFor(() => {
+      expect(listQueuePhysicalVariables).toHaveBeenCalledWith(3, expect.anything());
+    });
+    await waitFor(() => {
+      expect(screen.getByTestId("admin-queue-variables-physical")).toBeInTheDocument();
+    });
+    expect(screen.getByText("<OTRS_QUEUE_domain>")).toBeInTheDocument();
+    expect(screen.getByText("support.example")).toBeInTheDocument();
+    expect(screen.getByText("<OTRS_QUEUE_phonenumber>")).toBeInTheDocument();
   });
 
   it("creates a new global variable", async () => {

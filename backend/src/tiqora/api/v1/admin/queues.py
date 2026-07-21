@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import re
+
 from fastapi import APIRouter, HTTPException, status
-from sqlalchemy import select
+from sqlalchemy import select, text
 
 from tiqora.api.deps import DbSession
 from tiqora.api.v1.admin.common import (
@@ -14,10 +16,47 @@ from tiqora.api.v1.admin.common import (
 )
 from tiqora.api.v1.admin.deps import AdminUser
 from tiqora.api.v1.admin.pagination import ListParamsDep, Page, apply_valid_filter, paginate
-from tiqora.api.v1.admin.schemas import QueueCreate, QueueOut, QueueUpdate
+from tiqora.api.v1.admin.schemas import (
+    PhysicalQueueVariableOut,
+    QueueCreate,
+    QueueOut,
+    QueueUpdate,
+)
 from tiqora.db.legacy.queue import Queue
 
 router = APIRouter(prefix="/queues", tags=["admin:queues"])
+
+# Stock Znuny ``queue`` columns — everything else is a site-specific custom
+# column (e.g. domain / phonenumber from a Znuny patch) available as
+# ``<OTRS_QUEUE_...>`` via SELECT q.* in placeholder expansion.
+_STANDARD_QUEUE_COLUMNS: frozenset[str] = frozenset(
+    {
+        "id",
+        "name",
+        "group_id",
+        "unlock_timeout",
+        "first_response_time",
+        "first_response_notify",
+        "update_time",
+        "update_notify",
+        "solution_time",
+        "solution_notify",
+        "system_address_id",
+        "calendar_name",
+        "default_sign_key",
+        "salutation_id",
+        "signature_id",
+        "follow_up_id",
+        "follow_up_lock",
+        "comments",
+        "valid_id",
+        "create_time",
+        "create_by",
+        "change_time",
+        "change_by",
+    }
+)
+_SAFE_IDENT = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 
 
 @router.get("", response_model=Page[QueueOut])
@@ -36,6 +75,55 @@ async def get_queue(queue_id: int, admin: AdminUser, session: DbSession) -> Queu
     if queue is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Queue not found")
     return queue
+
+
+@router.get("/{queue_id}/physical-variables", response_model=list[PhysicalQueueVariableOut])
+async def list_queue_physical_variables(
+    queue_id: int, admin: AdminUser, session: DbSession
+) -> list[PhysicalQueueVariableOut]:
+    """Non-standard columns on the ``queue`` table for this queue (read-only).
+
+    Stock Znuny installs with no custom columns return ``[]``. Missing queue → 404.
+    """
+    _ = admin
+    queue = await session.get(Queue, queue_id)
+    if queue is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Queue not found")
+
+    col_result = await session.execute(
+        text(
+            "SELECT column_name FROM information_schema.columns"
+            " WHERE table_name = 'queue'"
+            " ORDER BY ordinal_position"
+        ),
+    )
+    all_cols = [str(row[0]) for row in col_result.all()]
+    custom = [
+        c for c in all_cols if c.lower() not in _STANDARD_QUEUE_COLUMNS and _SAFE_IDENT.match(c)
+    ]
+    if not custom:
+        return []
+
+    # Identifiers already validated as [A-Za-z_][A-Za-z0-9_]* (from
+    # information_schema only) — safe to interpolate as SQL column lists.
+    col_list = ", ".join(custom)
+    row_result = await session.execute(
+        text(f"SELECT {col_list} FROM queue WHERE id = :qid LIMIT 1"),  # noqa: S608
+        {"qid": queue_id},
+    )
+    mapping = row_result.mappings().first()
+    if mapping is None:
+        return []
+
+    out: list[PhysicalQueueVariableOut] = []
+    for col in custom:
+        raw = mapping.get(col)
+        if raw is None:
+            # Drivers may return lowercased keys.
+            raw = mapping.get(col.lower())
+        value = "" if raw is None else str(raw)
+        out.append(PhysicalQueueVariableOut(name=col, value=value))
+    return out
 
 
 @router.post("", response_model=QueueOut, status_code=status.HTTP_201_CREATED)

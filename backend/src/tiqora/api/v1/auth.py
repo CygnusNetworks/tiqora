@@ -255,14 +255,24 @@ async def oidc_callback(
             detail=f"No local user matches SSO identity '{login_value}'",
         )
 
+    # Best-effort Google/OIDC profile picture (userinfo ``picture`` claim).
+    picture_raw = claims.get("picture")
+    avatar_url: str | None = None
+    if isinstance(picture_raw, str):
+        picture = picture_raw.strip()
+        if picture.startswith(("http://", "https://")):
+            avatar_url = picture
+
     if await totp.is_enabled(user.id):
-        pending_token = await auth.create_pending_session(user)
+        pending_token = await auth.create_pending_session(user, avatar_url=avatar_url)
         _set_session_cookie(response, settings, pending_token)
         return LoginResponse(user=None, pending_2fa=True)
 
-    token = await auth.create_session(user)
+    token = await auth.create_session(user, avatar_url=avatar_url)
     _set_session_cookie(response, settings, token)
-    return LoginResponse(user=UserMe(**user_to_dict(user)))
+    me_dict = user_to_dict(user)
+    me_dict["avatar_url"] = avatar_url
+    return LoginResponse(user=UserMe(**me_dict))
 
 
 # ---------------------------------------------------------------------------
