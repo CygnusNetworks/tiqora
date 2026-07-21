@@ -12,8 +12,10 @@ from sqlalchemy import (
     Integer,
     String,
     Text,
+    UniqueConstraint,
     false,
     func,
+    true,
 )
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -324,4 +326,73 @@ class TiqoraMailLog(TiqoraBase):
     __table_args__ = (
         Index("ix_tiqora_mail_log_created_at", "created_at"),
         Index("ix_tiqora_mail_log_direction_status", "direction", "status"),
+    )
+
+
+class TiqoraQueueVariable(TiqoraBase):
+    """Configurable per-queue (or global) placeholder variable.
+
+    Resolved as ``<OTRS_QUEUE_{name}>`` / ``<TIQORA_QUEUE_{name}>``.
+    ``queue_id IS NULL`` is a global default; a queue-specific row overrides
+    the global for the same ``name``. Additive ``tiqora_*`` only — never
+    alters Znuny ``queue`` columns.
+    """
+
+    __tablename__ = "tiqora_queue_variable"
+
+    id: Mapped[int] = mapped_column(
+        BigInteger, primary_key=True, autoincrement=True, nullable=False
+    )
+    queue_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    name: Mapped[str] = mapped_column(String(120), nullable=False)
+    value: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created: Mapped[datetime] = mapped_column(
+        DateTime,
+        nullable=False,
+        server_default=func.now(),
+    )
+    changed: Mapped[datetime] = mapped_column(
+        DateTime,
+        nullable=False,
+        server_default=func.now(),
+    )
+
+    __table_args__ = (
+        UniqueConstraint("queue_id", "name", name="uq_tiqora_queue_variable_queue_name"),
+        Index("ix_tiqora_queue_variable_queue_id", "queue_id"),
+    )
+
+
+class TiqoraPlaceholderField(TiqoraBase):
+    """Registry of customer_user / customer_company columns for the picker.
+
+    Also drives the optional customer-field allow-list gate
+    (``placeholder.customer_allowlist.enabled``). Additive ``tiqora_*`` only.
+    """
+
+    __tablename__ = "tiqora_placeholder_field"
+
+    id: Mapped[int] = mapped_column(
+        BigInteger, primary_key=True, autoincrement=True, nullable=False
+    )
+    source_table: Mapped[str] = mapped_column(String(64), nullable=False)
+    column_name: Mapped[str] = mapped_column(String(120), nullable=False)
+    tag_name: Mapped[str] = mapped_column(String(120), nullable=False)
+    label: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    enabled: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=True, server_default=true()
+    )
+    created: Mapped[datetime] = mapped_column(
+        DateTime,
+        nullable=False,
+        server_default=func.now(),
+    )
+    changed: Mapped[datetime] = mapped_column(
+        DateTime,
+        nullable=False,
+        server_default=func.now(),
+    )
+
+    __table_args__ = (
+        UniqueConstraint("source_table", "tag_name", name="uq_tiqora_placeholder_field_source_tag"),
     )

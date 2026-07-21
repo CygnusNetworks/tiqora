@@ -710,3 +710,60 @@ class WebhookUpdate(BaseModel):
     secret: str | None = None
     events: list[str] | None = None
     valid: bool | None = None
+
+
+# ---------------------------------------------------------------------------
+# Placeholder variables — tiqora_queue_variable / tiqora_placeholder_field
+# ---------------------------------------------------------------------------
+
+
+class QueueVariableOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    queue_id: int | None
+    name: str
+    value: str | None
+    created: datetime
+    changed: datetime
+
+
+class QueueVariableCreate(BaseModel):
+    queue_id: int | None = None
+    name: str
+    value: str | None = None
+
+
+class QueueVariableUpdate(BaseModel):
+    queue_id: int | None = None
+    name: str | None = None
+    value: str | None = None
+
+
+class PlaceholderFieldOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    source_table: str
+    column_name: str
+    tag_name: str
+    label: str | None
+    enabled: bool
+    created: datetime
+    changed: datetime
+
+
+class PlaceholderFieldCreate(BaseModel):
+    source_table: str
+    column_name: str
+    tag_name: str
+    label: str | None = None
+    enabled: bool = True
+
+
+class PlaceholderFieldUpdate(BaseModel):
+    source_table: str | None = None
+    column_name: str | None = None
+    tag_name: str | None = None
+    label: str | None = None
+    enabled: bool | None = None
