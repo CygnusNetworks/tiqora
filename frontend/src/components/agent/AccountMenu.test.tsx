@@ -57,9 +57,9 @@ describe("AccountMenu", () => {
     expect(screen.queryByTestId("account-menu-settings")).not.toBeInTheDocument();
     expect(screen.queryByTestId("account-menu-admin")).not.toBeInTheDocument();
     expect(screen.getByTestId("account-menu-security")).toBeInTheDocument();
-    // Languages live in a nested submenu — trigger is visible, items open on click.
-    expect(screen.getByTestId("account-menu-lang")).toBeInTheDocument();
-    expect(screen.queryByTestId("account-menu-lang-de")).not.toBeInTheDocument();
+    // Languages are inline items (no nested flyout that would clip inside the menu).
+    expect(screen.getByTestId("account-menu-lang-de")).toBeInTheDocument();
+    expect(screen.getByTestId("account-menu-lang-en")).toBeInTheDocument();
     expect(screen.getByTestId("account-menu-theme-light")).toBeInTheDocument();
     expect(screen.getByTestId("logout-btn")).toBeInTheDocument();
   });
@@ -89,23 +89,14 @@ describe("AccountMenu", () => {
     expect(navigate).toHaveBeenCalledWith({ to: "/agent/security" });
   });
 
-  it("changes language via the submenu and persists the choice", () => {
+  it("changes language inline and persists the choice", () => {
     const changeLanguage = vi.spyOn(i18n, "changeLanguage");
     open();
-    fireEvent.click(screen.getByTestId("account-menu-lang"));
-    expect(screen.getByTestId("account-menu-lang-submenu")).toBeInTheDocument();
+    // Inline item — clickable directly, not hidden behind a flyout.
     fireEvent.click(screen.getByTestId("account-menu-lang-en"));
     expect(changeLanguage).toHaveBeenCalledWith("en");
     expect(localStorage.getItem("tiqora-lang")).toBe("en");
     changeLanguage.mockRestore();
-  });
-
-  it("opens the language submenu with ArrowLeft (it flies out to the left)", () => {
-    open();
-    fireEvent.keyDown(screen.getByTestId("account-menu-lang"), { key: "ArrowLeft" });
-    expect(screen.getByTestId("account-menu-lang-submenu")).toBeInTheDocument();
-    expect(screen.getByTestId("account-menu-lang-de")).toBeInTheDocument();
-    expect(screen.getByTestId("account-menu-lang-en")).toBeInTheDocument();
   });
 
   it("toggles theme via setTheme", () => {

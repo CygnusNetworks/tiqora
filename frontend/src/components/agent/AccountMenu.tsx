@@ -1,4 +1,3 @@
-import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "@/auth/AuthContext";
@@ -25,7 +24,7 @@ const LANGUAGES = [
 /**
  * Avatar dropdown for account actions, shared by the agent and admin shells.
  * Opens a Menu with the signed-in identity, a link to security / 2FA settings
- * (general preferences live in the sidebar), a nested language flyout
+ * (general preferences live in the sidebar), inline language choices
  * (Deutsch / English), a light/dark theme toggle, and finally sign-out.
  * Admins additionally get a highlighted "Admin-Bereich" entry.
  *
@@ -118,11 +117,18 @@ export function AccountMenu({ logoutTestId = "logout-btn" }: { logoutTestId?: st
       </div>
 
       <MenuLabel>{t("account.language")}</MenuLabel>
-      <LanguageSubmenu
-        currentLang={currentLang}
-        onChange={changeLang}
-        label={t("account.language")}
-      />
+      {LANGUAGES.map((lang) => (
+        <MenuItem
+          key={lang.code}
+          icon={<GlobeIcon />}
+          keepOpen
+          selected={currentLang === lang.code}
+          testId={`account-menu-lang-${lang.code}`}
+          onSelect={() => changeLang(lang.code)}
+        >
+          {lang.label}
+        </MenuItem>
+      ))}
 
       <MenuLabel>{t("account.theme")}</MenuLabel>
       <MenuItem
@@ -156,108 +162,5 @@ export function AccountMenu({ logoutTestId = "logout-btn" }: { logoutTestId?: st
         {t("auth.logout")}
       </MenuItem>
     </Menu>
-  );
-}
-
-/**
- * Nested language flyout ("Sprache ▸") so many languages don't bloat the
- * account menu. Keyboard: Enter/Space/ArrowRight open; Escape/ArrowLeft close.
- */
-function LanguageSubmenu({
-  currentLang,
-  onChange,
-  label,
-}: {
-  currentLang: string;
-  onChange: (code: string) => void;
-  label: string;
-}) {
-  const [open, setOpen] = useState(false);
-  const wrapRef = useRef<HTMLDivElement>(null);
-  const currentLabel =
-    LANGUAGES.find((l) => l.code === currentLang)?.label ?? currentLang;
-
-  useEffect(() => {
-    if (!open) return undefined;
-    const onPointer = (e: PointerEvent) => {
-      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) {
-        setOpen(false);
-      }
-    };
-    document.addEventListener("pointerdown", onPointer);
-    return () => document.removeEventListener("pointerdown", onPointer);
-  }, [open]);
-
-  return (
-    <div className="relative" ref={wrapRef}>
-      <button
-        type="button"
-        role="menuitem"
-        tabIndex={-1}
-        data-testid="account-menu-lang"
-        aria-haspopup="menu"
-        aria-expanded={open}
-        onClick={() => setOpen((v) => !v)}
-        onKeyDown={(e) => {
-          // Submenu opens to the LEFT (the account menu sits at the screen's
-          // right edge), so ArrowLeft opens and ArrowRight closes.
-          if (e.key === "ArrowLeft" || e.key === "Enter" || e.key === " ") {
-            e.preventDefault();
-            setOpen(true);
-          } else if (e.key === "ArrowRight" || e.key === "Escape") {
-            e.preventDefault();
-            setOpen(false);
-          }
-        }}
-        className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-[13px] text-ink/90 transition-colors duration-100 hover:bg-surface-subtle focus:outline-none focus-visible:bg-surface-subtle"
-      >
-        <span className="text-muted" aria-hidden>
-          ◂
-        </span>
-        <span className="flex w-4 shrink-0 justify-center text-[15px] text-muted" aria-hidden>
-          <GlobeIcon />
-        </span>
-        <span className="min-w-0 flex-1 truncate">
-          {label}
-          <span className="ml-1 text-muted">({currentLabel})</span>
-        </span>
-      </button>
-      {open && (
-        <div
-          role="menu"
-          data-testid="account-menu-lang-submenu"
-          className="absolute right-full top-0 z-50 mr-1 min-w-[10rem] overflow-hidden rounded-xl border border-hairline bg-surface p-1 shadow-xl"
-        >
-          {LANGUAGES.map((lang) => (
-            <button
-              key={lang.code}
-              type="button"
-              role="menuitem"
-              tabIndex={-1}
-              data-testid={`account-menu-lang-${lang.code}`}
-              aria-checked={currentLang === lang.code}
-              onClick={() => {
-                onChange(lang.code);
-                setOpen(false);
-              }}
-              onKeyDown={(e) => {
-                if (e.key === "ArrowRight" || e.key === "Escape") {
-                  e.preventDefault();
-                  setOpen(false);
-                }
-              }}
-              className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-[13px] text-ink/90 transition-colors duration-100 hover:bg-surface-subtle focus:outline-none focus-visible:bg-surface-subtle"
-            >
-              <span className="min-w-0 flex-1 truncate">{lang.label}</span>
-              {currentLang === lang.code && (
-                <span className="text-accent" aria-hidden>
-                  ✓
-                </span>
-              )}
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
   );
 }
