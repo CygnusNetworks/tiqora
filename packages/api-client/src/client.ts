@@ -197,6 +197,7 @@ export type WebhookUpdate = Schemas["WebhookUpdate"];
 export type QueueVariableOut = Schemas["QueueVariableOut"];
 export type QueueVariableCreate = Schemas["QueueVariableCreate"];
 export type QueueVariableUpdate = Schemas["QueueVariableUpdate"];
+export type PhysicalQueueVariableOut = Schemas["PhysicalQueueVariableOut"];
 export type PlaceholderFieldOut = Schemas["PlaceholderFieldOut"];
 export type PlaceholderFieldCreate = Schemas["PlaceholderFieldCreate"];
 export type PlaceholderFieldUpdate = Schemas["PlaceholderFieldUpdate"];
@@ -1499,6 +1500,15 @@ export class ApiClient {
   get adminQueueVariables() {
     return this.adminCrud<QueueVariableOut, QueueVariableCreate, QueueVariableUpdate>(
       "/api/v1/admin/queue-variables",
+    );
+  }
+
+  /** Site-specific physical columns on the Znuny ``queue`` table (read-only). */
+  listQueuePhysicalVariables(queueId: number, signal?: AbortSignal) {
+    return this.request<PhysicalQueueVariableOut[]>(
+      "GET",
+      `/api/v1/admin/queues/${queueId}/physical-variables`,
+      { signal },
     );
   }
 

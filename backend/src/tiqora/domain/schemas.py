@@ -16,6 +16,10 @@ class UserMe(BaseModel):
     first_name: str
     last_name: str
     auth_method: str
+    # Znuny user_preferences.UserEmail when set; used for Gravatar.
+    email: str | None = None
+    # Best-effort OIDC/Google ``picture`` claim captured at SSO login.
+    avatar_url: str | None = None
 
 
 class LoginRequest(BaseModel):

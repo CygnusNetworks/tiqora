@@ -56,6 +56,12 @@ export function QueueVariablesPage() {
     queryFn: ({ signal }) => listScopedVariables(scope, signal),
   });
 
+  const physicalQ = useQuery({
+    queryKey: ["admin", "queue-physical-variables", scope],
+    queryFn: ({ signal }) => api.listQueuePhysicalVariables(scope as number, signal),
+    enabled: scope !== GLOBAL_SENTINEL,
+  });
+
   const invalidate = () =>
     queryClient.invalidateQueries({ queryKey: ["admin", "queue-variables"] });
 
@@ -152,6 +158,8 @@ export function QueueVariablesPage() {
 
   const rows = varsQ.data?.items ?? [];
   const queues = queuesQ.data?.items ?? [];
+  const physical = physicalQ.data ?? [];
+  const showPhysical = scope !== GLOBAL_SENTINEL;
 
   return (
     <div className="space-y-3 p-4" data-testid="admin-queue-variables-page">
@@ -196,6 +204,43 @@ export function QueueVariablesPage() {
           ? t("admin.queueVariables.globalHint")
           : t("admin.queueVariables.queueHint")}
       </p>
+
+      {showPhysical && (
+        <section
+          className="rounded-lg border border-hairline bg-surface-subtle/40 p-3"
+          data-testid="admin-queue-variables-physical"
+        >
+          <h2 className="text-sm font-semibold text-ink">
+            {t("admin.queueVariables.physicalTitle")}
+          </h2>
+          <p className="mt-1 text-xs text-muted">{t("admin.queueVariables.physicalHint")}</p>
+          {physicalQ.isLoading ? (
+            <p className="mt-2 text-xs text-muted">{t("common.loading")}</p>
+          ) : physical.length === 0 ? (
+            <p
+              className="mt-2 text-xs text-muted"
+              data-testid="admin-queue-variables-physical-empty"
+            >
+              {t("admin.queueVariables.physicalEmpty")}
+            </p>
+          ) : (
+            <ul className="mt-2 divide-y divide-hairline" data-testid="admin-queue-variables-physical-list">
+              {physical.map((item) => (
+                <li
+                  key={item.name}
+                  className="flex flex-wrap items-baseline justify-between gap-2 py-1.5 text-sm"
+                  data-testid={`admin-queue-variables-physical-${item.name}`}
+                >
+                  <code className="font-mono text-[12.5px] text-ink">
+                    {`<OTRS_QUEUE_${item.name}>`}
+                  </code>
+                  <span className="text-ink">{item.value || "—"}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+      )}
 
       <DataTable
         columns={columns}
