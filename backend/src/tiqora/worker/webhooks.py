@@ -9,6 +9,9 @@ timestamp}`` and an ``X-Tiqora-Signature: sha256=<hex hmac>`` header.
 shape. Delivery retries up to ``settings.webhook_max_attempts`` times with
 exponential backoff; a row that exhausts retries is logged and counted,
 never raised (must not block the outbox drain).
+
+Target URLs are validated and IP-pinned via
+:mod:`tiqora.security.outbound` (SSRF guard; no redirect following).
 """
 
 from __future__ import annotations
@@ -29,6 +32,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from tiqora.config import Settings, get_settings
 from tiqora.db.engine import get_session_factory
 from tiqora.db.tiqora.models import TiqoraWebhook
+from tiqora.security.outbound import OutboundURLError, pin_outbound_url
 
 logger = structlog.get_logger(__name__)
 
@@ -62,14 +66,36 @@ async def _deliver_one(
     client: httpx.AsyncClient,
     webhook: TiqoraWebhook,
     body: bytes,
-    headers: dict[str, str],
+    base_headers: dict[str, str],
     *,
     max_attempts: int,
     timeout: float,  # noqa: ASYNC109 — httpx per-request timeout, not asyncio.timeout
 ) -> bool:
+    try:
+        pinned = pin_outbound_url(webhook.url)
+    except OutboundURLError as exc:
+        WEBHOOK_DELIVERIES.labels(status="failure").inc()
+        logger.error(
+            "webhook_delivery_url_blocked",
+            url=webhook.url,
+            name=webhook.name,
+            error=str(exc),
+        )
+        return False
+
+    headers = pinned.request_headers(base_headers)
+    extensions = pinned.request_extensions()
+    request_url = pinned.request_url
+
     for attempt in range(1, max_attempts + 1):
         try:
-            resp = await client.post(webhook.url, content=body, headers=headers, timeout=timeout)
+            resp = await client.post(
+                request_url,
+                content=body,
+                headers=headers,
+                timeout=timeout,
+                extensions=extensions,
+            )
             if resp.status_code < 300:
                 WEBHOOK_DELIVERIES.labels(status="success").inc()
                 return True
@@ -113,7 +139,8 @@ async def dispatch_webhooks(
 
     delivered = 0
     failed = 0
-    async with httpx.AsyncClient(transport=transport) as client:
+    # Never follow redirects: a public host must not 302 into RFC1918/metadata.
+    async with httpx.AsyncClient(transport=transport, follow_redirects=False) as client:
         for event_type, ticket_id, payload in rows:
             for webhook in webhooks:
                 if not webhook_matches_event(webhook.events, event_type):
@@ -126,7 +153,7 @@ async def dispatch_webhooks(
                     "timestamp": time.time(),
                 }
                 body = json.dumps(body_obj).encode("utf-8")
-                headers = {
+                base_headers = {
                     "Content-Type": "application/json",
                     "X-Tiqora-Signature": sign_payload(webhook.secret, body),
                 }
@@ -134,7 +161,7 @@ async def dispatch_webhooks(
                     client,
                     webhook,
                     body,
-                    headers,
+                    base_headers,
                     max_attempts=cfg.webhook_max_attempts,
                     timeout=cfg.webhook_timeout_seconds,
                 )
