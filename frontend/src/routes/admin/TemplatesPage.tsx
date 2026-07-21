@@ -8,6 +8,8 @@ import {
 import { AdminResourcePage } from "@/components/admin/AdminResourcePage";
 import type { FieldDef, FieldValues } from "@/components/admin/CrudDrawer";
 import type { DataTableColumn } from "@/components/admin/DataTable";
+import { insertTagAtCursor } from "@/components/admin/otrsPlaceholders";
+import { VariableReference } from "@/components/admin/VariableReference";
 import { formatDateTime } from "@/lib/format";
 
 const TEMPLATE_TYPE_OPTIONS = [
@@ -51,6 +53,15 @@ export function TemplatesPage() {
       type: "textarea",
       mono: false,
       rows: 10,
+      afterControl: ({ value, onChange, controlId }) => (
+        <VariableReference
+          onInsert={(tag) => {
+            const el = document.getElementById(controlId) as HTMLTextAreaElement | null;
+            const text = typeof value === "string" ? value : "";
+            insertTagAtCursor(el, text, tag, (next) => onChange(next));
+          }}
+        />
+      ),
     },
     { name: "comments", label: t("admin.table.comments"), type: "textarea" },
     {

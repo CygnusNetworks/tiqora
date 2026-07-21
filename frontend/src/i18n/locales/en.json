@@ -585,6 +585,36 @@
       "type": "Type",
       "text": "Text"
     },
+    "variables": {
+      "title": "Available variables",
+      "insertHint": "Click to insert at the cursor position",
+      "groups": {
+        "ticket": "Ticket",
+        "customer": "Customer",
+        "agent": "Agent",
+        "queue": "Queue"
+      },
+      "items": {
+        "ticketNumber": "Ticket number",
+        "ticketTitle": "Title",
+        "ticketState": "State",
+        "ticketQueue": "Ticket queue",
+        "ticketPriority": "Priority",
+        "customerFirstname": "Customer first name",
+        "customerLastname": "Customer last name",
+        "customerEmail": "Customer email",
+        "customerWpnum": "Customer number (wpnum)",
+        "currentFirstname": "Logged-in agent first name",
+        "currentLastname": "Logged-in agent last name",
+        "ownerFirstname": "Ticket owner first name",
+        "ownerLastname": "Ticket owner last name",
+        "queueName": "Queue name"
+      },
+      "notes": {
+        "customerAnyColumn": "Any customer_user column: <OTRS_CUSTOMER_DATA_{Column}>",
+        "queueCustomFields": "Non-standard fields (e.g. <OTRS_QUEUE_Domain>) are only replaced when a data source exists."
+      }
+    },
     "salutations": {
       "title_plural": "Salutations",
       "new": "New salutation",
