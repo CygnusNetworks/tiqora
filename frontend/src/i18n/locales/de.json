@@ -1045,6 +1045,7 @@
       "modeDelete": "Löschen",
       "modeAnonymizeHint": "PII wird deterministisch ersetzt; Datensätze bleiben erhalten und können aus dem Backup zurückgerollt werden.",
       "modeDeleteHint": "Kundenbenutzer und zugehörige Verknüpfungen werden hard-gelöscht (mit Backup). Ticket-Inhalte werden anonymisiert, nicht gelöscht.",
+      "deleteTicketsHint": "Auch die Tickets dieses Kunden und alle verknüpften Daten (Artikel, Verlauf, Anhänge, dynamische Felder) HART löschen — mit Backup + Rollback. Aufbewahrungsrelevante Tickets werden nur gewarnt, nicht blockiert.",
       "field": {
         "customerSearch": "Kundenbenutzer suchen",
         "customerSearchPh": "Login, E-Mail oder Name…",

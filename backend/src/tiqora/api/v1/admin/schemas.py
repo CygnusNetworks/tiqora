@@ -1014,6 +1014,8 @@ class ErasureSelectorIn(BaseModel):
 class GdprErasurePreviewRequest(BaseModel):
     selector: ErasureSelectorIn
     mode: Literal["anonymize", "delete"] = "anonymize"
+    # delete mode only: also HARD-DELETE the customer's tickets + FK children.
+    delete_tickets: bool = False
 
 
 class GdprResolvedCustomerOut(BaseModel):
@@ -1041,10 +1043,12 @@ class GdprErasurePreviewOut(BaseModel):
 class GdprErasureJobCreate(BaseModel):
     """Only destructive entry point — requires confirm=true."""
 
-    customer_user_ids: list[int] = Field(min_length=1)
+    customer_user_ids: list[int] = Field(min_length=1, max_length=50_000)
     selector: ErasureSelectorIn | None = None
     mode: Literal["anonymize", "delete"] = "anonymize"
     seed: int | None = None
+    # delete mode only: also HARD-DELETE the customer's tickets + FK children.
+    delete_tickets: bool = False
     confirm: Literal[True]
 
 
