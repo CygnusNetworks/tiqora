@@ -94,6 +94,10 @@ export type AdminListParams = {
   valid?: AdminValidFilter;
   /** Optional server-side substring search (customer users / companies). */
   search?: string;
+  /** Optional allowlisted sort column key (customer users). */
+  sort?: string;
+  /** Sort direction; only sent when `sort` is set. */
+  order?: "asc" | "desc";
 };
 
 /** Paginated envelope returned by every admin resource list endpoint. */
@@ -1262,6 +1266,8 @@ export class ApiClient {
             page_size: params?.pageSize,
             valid: params?.valid,
             search: params?.search,
+            sort: params?.sort,
+            order: params?.order,
           },
           signal,
         }),

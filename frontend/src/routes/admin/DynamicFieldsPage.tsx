@@ -11,6 +11,7 @@ import {
 import { DataTable, type DataTableColumn } from "@/components/admin/DataTable";
 import { Dialog } from "@/components/ui/Dialog";
 import { Button } from "@/components/ui/Button";
+import { PlusIcon } from "@/components/ui/icons";
 import {
   DynamicFieldConfigEditor,
   type DynamicFieldConfig,
@@ -184,8 +185,16 @@ export function DynamicFieldsPage() {
         <h1 className="font-display text-xl font-semibold text-ink">
           {t("admin.dynamicFields.title_plural")}
         </h1>
-        <Button variant="primary" size="sm" data-testid="admin-new-button" onClick={openCreate}>
-          {t("admin.dynamicFields.new")}
+        <Button
+          variant="primary"
+          size="sm"
+          data-testid="admin-new-button"
+          onClick={openCreate}
+          aria-label={t("admin.dynamicFields.new")}
+          title={t("admin.dynamicFields.new")}
+          className="!px-2"
+        >
+          <PlusIcon className="text-[16px]" />
         </Button>
       </div>
       <DataTable

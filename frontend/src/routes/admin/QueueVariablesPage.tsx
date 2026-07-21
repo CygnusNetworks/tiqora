@@ -12,6 +12,7 @@ import {
 import { DataTable, type DataTableColumn } from "@/components/admin/DataTable";
 import { CrudDrawer, type FieldDef, type FieldValues } from "@/components/admin/CrudDrawer";
 import { Button } from "@/components/ui/Button";
+import { PlusIcon } from "@/components/ui/icons";
 
 /** Sentinel for the "Global (all queues)" option → queue_id = null / global_only. */
 const GLOBAL_SENTINEL = "global";
@@ -172,8 +173,11 @@ export function QueueVariablesPage() {
           size="sm"
           data-testid="admin-queue-variables-new"
           onClick={openCreate}
+          aria-label={t("admin.queueVariables.new")}
+          title={t("admin.queueVariables.new")}
+          className="!px-2"
         >
-          {t("admin.queueVariables.new")}
+          <PlusIcon className="text-[16px]" />
         </Button>
       </div>
 

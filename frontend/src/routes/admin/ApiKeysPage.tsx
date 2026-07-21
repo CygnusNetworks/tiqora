@@ -13,6 +13,7 @@ import {
 import { DataTable, type DataTableColumn } from "@/components/admin/DataTable";
 import { CrudDrawer, type FieldDef, type FieldValues } from "@/components/admin/CrudDrawer";
 import { Button } from "@/components/ui/Button";
+import { PlusIcon } from "@/components/ui/icons";
 import { Dialog } from "@/components/ui/Dialog";
 import { formatDateTime } from "@/lib/format";
 
@@ -264,8 +265,11 @@ export function ApiKeysPage() {
           size="sm"
           data-testid="admin-api-keys-new"
           onClick={openCreate}
+          aria-label={t("admin.apiKeys.new")}
+          title={t("admin.apiKeys.new")}
+          className="!px-2"
         >
-          {t("admin.apiKeys.new")}
+          <PlusIcon className="text-[16px]" />
         </Button>
       </div>
 

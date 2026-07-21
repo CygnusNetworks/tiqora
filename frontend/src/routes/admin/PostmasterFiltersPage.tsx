@@ -12,6 +12,7 @@ import { DataTable, type DataTableColumn } from "@/components/admin/DataTable";
 import { CrudDrawer, type FieldDef, type FieldValues } from "@/components/admin/CrudDrawer";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
+import { PlusIcon } from "@/components/ui/icons";
 
 type MatchRow = { key: string; value: string; negate: boolean };
 type SetRow = { key: string; value: string };
@@ -410,8 +411,11 @@ export function PostmasterFiltersPage() {
           size="sm"
           data-testid="admin-postmaster-filters-new"
           onClick={openCreate}
+          aria-label={t("admin.postmasterFilters.new")}
+          title={t("admin.postmasterFilters.new")}
+          className="!px-2"
         >
-          {t("admin.postmasterFilters.new")}
+          <PlusIcon className="text-[16px]" />
         </Button>
       </div>
 

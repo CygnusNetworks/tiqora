@@ -18,6 +18,7 @@ from tiqora.api.v1.admin.pagination import (
     CustomerUserListParamsDep,
     ListParamsDep,
     Page,
+    apply_sort,
     apply_valid_filter,
     paginate,
 )
@@ -40,6 +41,18 @@ from tiqora.znuny.password import hash_password
 
 router = APIRouter(tags=["admin:customers"])
 
+# Allowlisted sort keys for GET /customer-users (prevents arbitrary column order).
+CUSTOMER_USER_SORT_COLUMNS = {
+    "login": CustomerUser.login,
+    "email": CustomerUser.email,
+    "first_name": CustomerUser.first_name,
+    "last_name": CustomerUser.last_name,
+    "customer_id": CustomerUser.customer_id,
+    "valid_id": CustomerUser.valid_id,
+    "create_time": CustomerUser.create_time,
+    "change_time": CustomerUser.change_time,
+}
+
 
 @router.get("/customer-users", response_model=Page[CustomerUserAdminOut])
 async def list_customer_users(
@@ -50,9 +63,7 @@ async def list_customer_users(
 ) -> Page[CustomerUserAdminOut]:
     """List customer users. ``page_size`` may be up to 100_000 (``Alle`` UI option)."""
     _ = admin
-    stmt = apply_valid_filter(select(CustomerUser), CustomerUser.valid_id, params.valid).order_by(
-        CustomerUser.login
-    )
+    stmt = apply_valid_filter(select(CustomerUser), CustomerUser.valid_id, params.valid)
     # Dialect-portable case-insensitive match (Postgres LIKE is case-sensitive).
     if search and (term := search.strip().lower()):
         pattern = f"%{term}%"
@@ -64,6 +75,13 @@ async def list_customer_users(
                 func.lower(CustomerUser.last_name).like(pattern),
             )
         )
+    stmt = apply_sort(
+        stmt,
+        CUSTOMER_USER_SORT_COLUMNS,
+        params,
+        default=CustomerUser.login,
+        tiebreaker=CustomerUser.login,
+    )
     return await paginate(session, CustomerUserAdminOut, stmt, params)
 
 

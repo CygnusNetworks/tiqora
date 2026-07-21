@@ -150,4 +150,43 @@ describe("CustomerUsersPage", () => {
       );
     });
   });
+
+  it("sorts by login header and toggles the indicator", async () => {
+    renderPage();
+    await waitFor(() => {
+      expect(screen.getByTestId("admin-sort-login")).toBeInTheDocument();
+    });
+
+    list.mockClear();
+    const header = screen.getByTestId("admin-sort-login");
+    fireEvent.click(header);
+
+    await waitFor(() => {
+      expect(list).toHaveBeenCalledWith(
+        expect.objectContaining({ sort: "login", order: "asc" }),
+        expect.anything(),
+      );
+    });
+    expect(header.textContent).toMatch(/▲/);
+
+    list.mockClear();
+    fireEvent.click(header);
+    await waitFor(() => {
+      expect(list).toHaveBeenCalledWith(
+        expect.objectContaining({ sort: "login", order: "desc" }),
+        expect.anything(),
+      );
+    });
+    expect(header.textContent).toMatch(/▼/);
+
+    // Name column maps to first_name sort key.
+    list.mockClear();
+    fireEvent.click(screen.getByTestId("admin-sort-first_name"));
+    await waitFor(() => {
+      expect(list).toHaveBeenCalledWith(
+        expect.objectContaining({ sort: "first_name", order: "asc" }),
+        expect.anything(),
+      );
+    });
+  });
 });
