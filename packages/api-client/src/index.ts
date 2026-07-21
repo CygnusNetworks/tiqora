@@ -169,6 +169,10 @@ export {
   type StateRef,
   type AgentRef,
   type CustomerRef,
+  type QueueRef,
+  type TicketSearchHit,
+  type AgentCustomerCreateInput,
+  type AgentCustomerCreateOut,
   type AgentTicketCreateInput,
   type paths,
 } from "./client";

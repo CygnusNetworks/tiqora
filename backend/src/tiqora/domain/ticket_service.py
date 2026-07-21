@@ -298,6 +298,73 @@ class TicketService:
         async for ticket in result.scalars():
             yield self._to_list_item(ticket, maps)
 
+    #: State types hidden from the lightweight agent ticket picker (link/merge).
+    _SEARCH_EXCLUDED_STATE_TYPES: frozenset[str] = frozenset({"merged", "removed"})
+
+    async def search_tickets(
+        self,
+        user_id: int,
+        *,
+        q: str,
+        limit: int = 20,
+    ) -> list[dict[str, Any]]:
+        """Permission-scoped ticket picker search by number (``tn``) or title.
+
+        Only tickets in queues where the agent has at least ``ro`` are returned.
+        Merged/removed tickets are excluded. Limit is capped at 50 (default 20).
+        Empty ``q`` yields an empty list (no full dump).
+        """
+        term = (q or "").strip()
+        if not term:
+            return []
+        limit = max(1, min(int(limit), 50))
+
+        allowed_groups = await self._perms.groups_for_permission(user_id, "ro")
+        if not allowed_groups:
+            return []
+
+        q_ids_result = await self._session.execute(
+            select(Queue.id).where(Queue.group_id.in_(allowed_groups), Queue.valid_id == 1)
+        )
+        allowed_queues = set(q_ids_result.scalars().all())
+        if not allowed_queues:
+            return []
+
+        like = f"%{term}%"
+        stmt = (
+            select(
+                Ticket.id,
+                Ticket.tn,
+                Ticket.title,
+                Queue.name,
+                TicketState.name,
+                TicketStateType.name,
+            )
+            .join(Queue, Queue.id == Ticket.queue_id)
+            .join(TicketState, TicketState.id == Ticket.ticket_state_id)
+            .join(TicketStateType, TicketStateType.id == TicketState.type_id)
+            .where(
+                Ticket.queue_id.in_(allowed_queues),
+                Ticket.archive_flag == 0,
+                TicketStateType.name.notin_(self._SEARCH_EXCLUDED_STATE_TYPES),
+                or_(Ticket.tn.ilike(like), Ticket.title.ilike(like)),
+            )
+            .order_by(Ticket.change_time.desc())
+            .limit(limit)
+        )
+        rows = (await self._session.execute(stmt)).all()
+        return [
+            {
+                "ticket_id": int(r[0]),
+                "tn": r[1] or "",
+                "title": r[2] or "",
+                "queue": r[3],
+                "state": r[4],
+                "state_type": r[5],
+            }
+            for r in rows
+        ]
+
     async def count_owned(self, user_id: int) -> dict[str, int]:
         """Open/new ticket counts for tickets owned by ``user_id``.
 

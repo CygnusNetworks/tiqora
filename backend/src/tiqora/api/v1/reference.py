@@ -1,9 +1,9 @@
 """Agent-accessible reference data for ticket-zoom action pickers.
 
-These are read-only lookups (priorities, states, agents, customers) that the
-agent UI needs to populate the ticket action toolbar's dropdowns and dialogs.
-Unlike the admin CRUD under ``/admin/*`` (which is AdminUser-gated), these are
-guarded only by ``CurrentUser`` — any logged-in agent may read them.
+These are read-only lookups (priorities, states, agents, customers, queues)
+that the agent UI needs to populate the ticket action toolbar's dropdowns and
+dialogs. Unlike the admin CRUD under ``/admin/*`` (which is AdminUser-gated),
+these are guarded only by ``CurrentUser`` — any logged-in agent may read them.
 """
 
 from __future__ import annotations
@@ -14,8 +14,10 @@ from sqlalchemy import select
 
 from tiqora.api.deps import CurrentUser, DbSession
 from tiqora.db.legacy.customer import CustomerUser
+from tiqora.db.legacy.queue import Queue
 from tiqora.db.legacy.ticket import TicketPriority, TicketState, TicketStateType
 from tiqora.db.legacy.user import Users
+from tiqora.permissions.engine import PermissionEngine
 
 router = APIRouter(prefix="/reference", tags=["reference"])
 
@@ -45,6 +47,11 @@ class CustomerRefOut(BaseModel):
     email: str
     customer_id: str
     full_name: str
+
+
+class QueueRefOut(BaseModel):
+    id: int
+    name: str
 
 
 @router.get("/priorities", response_model=list[PriorityRefOut])
@@ -125,3 +132,35 @@ async def search_customers(
         )
         for c in rows
     ]
+
+
+@router.get("/queues", response_model=list[QueueRefOut])
+async def list_reference_queues(
+    user: CurrentUser,
+    session: DbSession,
+    movable: bool = Query(
+        False,
+        description=(
+            "If true, only queues the agent has ``rw`` on (for the "
+            "Verschieben / move picker). Otherwise queues with at least ``ro``."
+        ),
+    ),
+) -> list[QueueRefOut]:
+    """Valid queues the current agent may access, filtered by permission.
+
+    ``movable=true`` requires ``rw`` (move into the queue). Default is ``ro``.
+    Always restricted to ``valid_id = 1``.
+    """
+    perm = "rw" if movable else "ro"
+    pe = PermissionEngine(session)
+    group_ids = await pe.groups_for_permission(user.id, perm)
+    if not group_ids:
+        return []
+    rows = (
+        await session.execute(
+            select(Queue)
+            .where(Queue.group_id.in_(group_ids), Queue.valid_id == _VALID)
+            .order_by(Queue.name)
+        )
+    ).scalars()
+    return [QueueRefOut(id=q.id, name=q.name) for q in rows]

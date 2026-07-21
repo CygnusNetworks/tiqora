@@ -310,6 +310,96 @@
         "title": "ActivityDialogSummaryOut",
         "type": "object"
       },
+      "AgentCustomerCreateOut": {
+        "description": "Created customer-user ref for the ticket Kunde dialog.",
+        "properties": {
+          "customer_id": {
+            "title": "Customer Id",
+            "type": "string"
+          },
+          "email": {
+            "title": "Email",
+            "type": "string"
+          },
+          "first_name": {
+            "title": "First Name",
+            "type": "string"
+          },
+          "last_name": {
+            "title": "Last Name",
+            "type": "string"
+          },
+          "login": {
+            "title": "Login",
+            "type": "string"
+          }
+        },
+        "required": [
+          "login",
+          "email",
+          "customer_id",
+          "first_name",
+          "last_name"
+        ],
+        "title": "AgentCustomerCreateOut",
+        "type": "object"
+      },
+      "AgentCustomerCreateRequest": {
+        "description": "Body for agent-side customer-user creation (Znuny AgentTicketCustomer).\n\nNo password \u2014 agents create the contact record; portal auth is separate.",
+        "properties": {
+          "customer_id": {
+            "maxLength": 150,
+            "minLength": 1,
+            "title": "Customer Id",
+            "type": "string"
+          },
+          "email": {
+            "maxLength": 150,
+            "minLength": 1,
+            "title": "Email",
+            "type": "string"
+          },
+          "first_name": {
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "First Name",
+            "type": "string"
+          },
+          "last_name": {
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Last Name",
+            "type": "string"
+          },
+          "login": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Login",
+            "type": "string"
+          },
+          "phone": {
+            "anyOf": [
+              {
+                "maxLength": 150,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Phone"
+          }
+        },
+        "required": [
+          "login",
+          "email",
+          "first_name",
+          "last_name",
+          "customer_id"
+        ],
+        "title": "AgentCustomerCreateRequest",
+        "type": "object"
+      },
       "AgentRefOut": {
         "properties": {
           "full_name": {
@@ -6385,6 +6475,24 @@
         "title": "QueueOut",
         "type": "object"
       },
+      "QueueRefOut": {
+        "properties": {
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name"
+        ],
+        "title": "QueueRefOut",
+        "type": "object"
+      },
       "QueueTemplateAssignment": {
         "properties": {
           "standard_template_id": {
@@ -9054,6 +9162,63 @@
           }
         },
         "title": "TicketProcessStateOut",
+        "type": "object"
+      },
+      "TicketSearchHitOut": {
+        "description": "Compact ticket hit for agent link/merge pickers.",
+        "properties": {
+          "queue": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Queue"
+          },
+          "state": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "State"
+          },
+          "state_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "State Type"
+          },
+          "ticket_id": {
+            "title": "Ticket Id",
+            "type": "integer"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "tn": {
+            "title": "Tn",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ticket_id",
+          "tn",
+          "title"
+        ],
+        "title": "TicketSearchHitOut",
         "type": "object"
       },
       "TicketVolumeOut": {
@@ -21333,6 +21498,82 @@
         ]
       }
     },
+    "/api/v1/customers": {
+      "post": {
+        "description": "Create a valid customer_user as any authenticated agent.\n\nMirrors Znuny's AgentTicketCustomer \"add customer\" \u2014 not admin-gated.",
+        "operationId": "create_customer_api_v1_customers_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AgentCustomerCreateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentCustomerCreateOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Customer",
+        "tags": [
+          "customers"
+        ]
+      }
+    },
     "/api/v1/customers/{login}": {
       "get": {
         "operationId": "get_customer_api_v1_customers__login__get",
@@ -23765,6 +24006,88 @@
           }
         },
         "summary": "List Priorities",
+        "tags": [
+          "reference"
+        ]
+      }
+    },
+    "/api/v1/reference/queues": {
+      "get": {
+        "description": "Valid queues the current agent may access, filtered by permission.\n\n``movable=true`` requires ``rw`` (move into the queue). Default is ``ro``.\nAlways restricted to ``valid_id = 1``.",
+        "operationId": "list_reference_queues_api_v1_reference_queues_get",
+        "parameters": [
+          {
+            "description": "If true, only queues the agent has ``rw`` on (for the Verschieben / move picker). Otherwise queues with at least ``ro``.",
+            "in": "query",
+            "name": "movable",
+            "required": false,
+            "schema": {
+              "default": false,
+              "description": "If true, only queues the agent has ``rw`` on (for the Verschieben / move picker). Otherwise queues with at least ``ro``.",
+              "title": "Movable",
+              "type": "boolean"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/QueueRefOut"
+                  },
+                  "title": "Response List Reference Queues Api V1 Reference Queues Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Reference Queues",
         "tags": [
           "reference"
         ]
@@ -26334,6 +26657,100 @@
           }
         },
         "summary": "My Ticket Counts",
+        "tags": [
+          "tickets"
+        ]
+      }
+    },
+    "/api/v1/tickets/search": {
+      "get": {
+        "description": "Search tickets the current agent may access (``ro`` on the queue).\n\nMatches case-insensitively against ``tn`` and ``title``. Merged/removed\ntickets are excluded. Registered before ``/{ticket_id}`` so \"search\" is\nnot parsed as a ticket id. Powers \"Ticket verkn\u00fcpfen\" / \"Ticket\nzusammenfassen\" pickers.",
+        "operationId": "search_tickets_api_v1_tickets_search_get",
+        "parameters": [
+          {
+            "description": "Substring matched against ticket number or title",
+            "in": "query",
+            "name": "q",
+            "required": false,
+            "schema": {
+              "default": "",
+              "description": "Substring matched against ticket number or title",
+              "title": "Q",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 20,
+              "maximum": 50,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/TicketSearchHitOut"
+                  },
+                  "title": "Response Search Tickets Api V1 Tickets Search Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Search Tickets",
         "tags": [
           "tickets"
         ]

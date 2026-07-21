@@ -231,6 +231,35 @@ async def dashboard_summary(user: CurrentUser, session: DbSession) -> DashboardS
     return DashboardSummary(**counts)
 
 
+class TicketSearchHitOut(BaseModel):
+    """Compact ticket hit for agent link/merge pickers."""
+
+    ticket_id: int
+    tn: str
+    title: str
+    queue: str | None = None
+    state: str | None = None
+    state_type: str | None = None
+
+
+@router.get("/search", response_model=list[TicketSearchHitOut])
+async def search_tickets(
+    user: CurrentUser,
+    session: DbSession,
+    q: str = Query("", description="Substring matched against ticket number or title"),
+    limit: int = Query(20, ge=1, le=50),
+) -> list[TicketSearchHitOut]:
+    """Search tickets the current agent may access (``ro`` on the queue).
+
+    Matches case-insensitively against ``tn`` and ``title``. Merged/removed
+    tickets are excluded. Registered before ``/{ticket_id}`` so "search" is
+    not parsed as a ticket id. Powers "Ticket verknüpfen" / "Ticket
+    zusammenfassen" pickers.
+    """
+    hits = await TicketService(session).search_tickets(user.id, q=q, limit=limit)
+    return [TicketSearchHitOut(**h) for h in hits]
+
+
 class _EchoWriter:
     """File-like shim so ``csv.writer`` yields each row as a string.
 
