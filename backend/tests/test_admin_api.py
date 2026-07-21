@@ -103,10 +103,21 @@ def _seed_admin_and_plain_user(sync_url: str) -> dict[str, int]:
     """
     ns = uuid.uuid4().int % 1_000_000
     plain_id = 300_000 + ns
+    login = f"plain.agent.{ns}"
     pw = hash_password("secret")
 
     engine = create_engine(sync_url)
     with engine.begin() as conn:
+        # Idempotent self-cleanup: the *_znuny_url fixtures share a session-scoped
+        # DB, and `ns` is random — a prior test drawing the same ns must not cause
+        # a duplicate-PK on the users row. Clear dependents (no DB-level FKs in the
+        # Znuny schema, but keep it tidy) then the user itself, by id AND login.
+        conn.execute(text("DELETE FROM group_user WHERE user_id = :id"), {"id": plain_id})
+        conn.execute(text("DELETE FROM role_user WHERE user_id = :id"), {"id": plain_id})
+        conn.execute(
+            text("DELETE FROM users WHERE id = :id OR login = :login"),
+            {"id": plain_id, "login": login},
+        )
         conn.execute(
             text(
                 """
@@ -115,7 +126,7 @@ def _seed_admin_and_plain_user(sync_url: str) -> dict[str, int]:
                 VALUES (:id, :login, :pw, 'Plain', 'Agent', 1, :t, 1, :t, 1)
                 """
             ),
-            {"id": plain_id, "login": f"plain.agent.{ns}", "pw": pw, "t": NOW},
+            {"id": plain_id, "login": login, "pw": pw, "t": NOW},
         )
     engine.dispose()
     return {"admin_id": 1, "plain_id": plain_id}
