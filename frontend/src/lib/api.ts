@@ -175,4 +175,8 @@ export type {
   AdminPage,
   AdminListParams,
   AdminValidFilter,
+  AuthConfigAgentOut,
+  AuthConfigUpdate,
+  AuthConfigGlobalOut,
+  AuthConfigGlobalUpdate,
 } from "@tiqora/api-client";

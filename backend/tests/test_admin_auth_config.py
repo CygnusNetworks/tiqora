@@ -112,10 +112,12 @@ async def test_list_put_reset_global(url_fixture: str, request: pytest.FixtureRe
         # Global toggle
         g0 = await admin_auth_config.get_global_auth_config(admin, session)
         assert g0.enforce_all is False
+        assert g0.enforce_group_ids == []
         g1 = await admin_auth_config.put_global_auth_config(
             AuthConfigGlobalUpdate(enforce_all=True), admin, session
         )
         assert g1.enforce_all is True
+        assert g1.enforce_group_ids == []
         assert await get_setting_bool(session, KEY_TOTP_ENFORCE_ALL, default=False) is True
         # effective_enforce true via global even without per-agent flag on a fresh user
         assert await AuthConfigService(session).effective_enforce(user_id) is True
@@ -146,5 +148,101 @@ async def test_update_unknown_user_404(url_fixture: str, request: pytest.Fixture
                 session,
             )
         assert ei.value.status_code == 404
+
+    await engine.dispose()
+
+
+def _seed_group_and_membership(sync_url: str, user_id: int) -> int:
+    """Create a permission group and put *user_id* in it with ``ro``."""
+    ns = uuid.uuid4().hex[:8]
+    group_id = int(ns, 16) % 1_000_000 + 800_000
+    engine = create_engine(sync_url)
+    with engine.begin() as conn:
+        conn.execute(
+            text(
+                "INSERT INTO permission_groups"
+                " (id, name, valid_id, create_time, create_by, change_time, change_by)"
+                " VALUES (:id, :name, 1, :t, 1, :t, 1)"
+            ),
+            {"id": group_id, "name": f"enforce-grp-{ns}", "t": NOW},
+        )
+        conn.execute(
+            text(
+                "INSERT INTO group_user"
+                " (user_id, group_id, permission_key,"
+                "  create_time, create_by, change_time, change_by)"
+                " VALUES (:uid, :gid, 'ro', :t, 1, :t, 1)"
+            ),
+            {"uid": user_id, "gid": group_id, "t": NOW},
+        )
+    engine.dispose()
+    return group_id
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("url_fixture", ["mariadb_znuny_url", "postgres_znuny_url"])
+async def test_global_enforce_group_ids(url_fixture: str, request: pytest.FixtureRequest) -> None:
+    from fastapi import HTTPException
+
+    sync_url: str = request.getfixturevalue(url_fixture)
+    user_id, _login = _seed_agent(sync_url)
+    group_id = _seed_group_and_membership(sync_url, user_id)
+    outsider_id, _ = _seed_agent(sync_url)
+    engine = create_async_engine(_to_async_url(sync_url))
+    factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+    admin = _admin()
+
+    async with factory() as session:
+        # Unknown group id → 422
+        with pytest.raises(HTTPException) as ei:
+            await admin_auth_config.put_global_auth_config(
+                AuthConfigGlobalUpdate(enforce_all=False, enforce_group_ids=[9_999_999]),
+                admin,
+                session,
+            )
+        assert ei.value.status_code == 422
+
+        g = await admin_auth_config.put_global_auth_config(
+            AuthConfigGlobalUpdate(enforce_all=False, enforce_group_ids=[group_id]),
+            admin,
+            session,
+        )
+        assert g.enforce_all is False
+        assert g.enforce_group_ids == [group_id]
+
+        svc = AuthConfigService(session)
+        # Member of enforced group → enforced (no per-agent flag)
+        assert await svc.effective_enforce(user_id) is True
+        # Non-member, no flags → not enforced
+        assert await svc.effective_enforce(outsider_id) is False
+
+        # Clear groups
+        g2 = await admin_auth_config.put_global_auth_config(
+            AuthConfigGlobalUpdate(enforce_all=False, enforce_group_ids=[]),
+            admin,
+            session,
+        )
+        assert g2.enforce_group_ids == []
+        assert await svc.effective_enforce(user_id) is False
+
+        # Omitting enforce_group_ids leaves the stored list alone
+        await admin_auth_config.put_global_auth_config(
+            AuthConfigGlobalUpdate(enforce_all=False, enforce_group_ids=[group_id]),
+            admin,
+            session,
+        )
+        g3 = await admin_auth_config.put_global_auth_config(
+            AuthConfigGlobalUpdate(enforce_all=True),
+            admin,
+            session,
+        )
+        assert g3.enforce_all is True
+        assert g3.enforce_group_ids == [group_id]
+
+        await admin_auth_config.put_global_auth_config(
+            AuthConfigGlobalUpdate(enforce_all=False, enforce_group_ids=[]),
+            admin,
+            session,
+        )
 
     await engine.dispose()

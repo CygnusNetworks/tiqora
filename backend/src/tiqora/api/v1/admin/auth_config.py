@@ -14,20 +14,47 @@ from tiqora.api.v1.admin.schemas import (
     AuthConfigGlobalUpdate,
     AuthConfigUpdate,
 )
-from tiqora.db.legacy.user import Users
+from tiqora.db.legacy.user import PermissionGroups, Users
 from tiqora.db.tiqora.models import TiqoraUserAuthConfig, TiqoraUserTotp
-from tiqora.domain.auth_config import AuthConfigService
+from tiqora.domain.auth_config import (
+    AuthConfigService,
+    get_enforce_group_ids,
+    set_enforce_group_ids,
+)
 from tiqora.domain.settings_store import KEY_TOTP_ENFORCE_ALL, get_setting_bool, set_setting
 from tiqora.domain.totp import TOTPService
 
 router = APIRouter(prefix="/auth-config", tags=["admin:auth-config"])
 
 
+async def _global_out(session: DbSession) -> AuthConfigGlobalOut:
+    enforce_all = await get_setting_bool(session, KEY_TOTP_ENFORCE_ALL, default=False)
+    group_ids = await get_enforce_group_ids(session)
+    return AuthConfigGlobalOut(enforce_all=enforce_all, enforce_group_ids=group_ids)
+
+
+async def _validate_group_ids(session: DbSession, group_ids: list[int]) -> None:
+    """Raise 422 when any id is missing from ``permission_groups``."""
+    if not group_ids:
+        return
+    unique = list(dict.fromkeys(group_ids))
+    found = set(
+        (await session.execute(select(PermissionGroups.id).where(PermissionGroups.id.in_(unique))))
+        .scalars()
+        .all()
+    )
+    missing = [gid for gid in unique if gid not in found]
+    if missing:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"unknown group id(s): {missing}",
+        )
+
+
 @router.get("/global", response_model=AuthConfigGlobalOut)
 async def get_global_auth_config(admin: AdminUser, session: DbSession) -> AuthConfigGlobalOut:
     _ = admin
-    enforce_all = await get_setting_bool(session, KEY_TOTP_ENFORCE_ALL, default=False)
-    return AuthConfigGlobalOut(enforce_all=enforce_all)
+    return await _global_out(session)
 
 
 @router.put("/global", response_model=AuthConfigGlobalOut)
@@ -35,8 +62,12 @@ async def put_global_auth_config(
     body: AuthConfigGlobalUpdate, admin: AdminUser, session: DbSession
 ) -> AuthConfigGlobalOut:
     _ = admin
+    if body.enforce_group_ids is not None:
+        await _validate_group_ids(session, body.enforce_group_ids)
     await set_setting(session, KEY_TOTP_ENFORCE_ALL, "1" if body.enforce_all else "0")
-    return AuthConfigGlobalOut(enforce_all=body.enforce_all)
+    if body.enforce_group_ids is not None:
+        await set_enforce_group_ids(session, body.enforce_group_ids)
+    return await _global_out(session)
 
 
 @router.get("", response_model=Page[AuthConfigAgentOut])

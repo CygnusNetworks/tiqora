@@ -426,7 +426,12 @@ export async function mockApi(page: Page) {
 
     // Auth
     if (path.endsWith("/api/v1/auth/methods") && method === "GET") {
-      await json(route, 200, { password: true, oidc: false, spnego: false });
+      await json(route, 200, {
+        password: true,
+        oidc: false,
+        spnego: false,
+        ldap: false,
+      });
       return;
     }
     if (path.endsWith("/api/v1/auth/login") && method === "POST") {

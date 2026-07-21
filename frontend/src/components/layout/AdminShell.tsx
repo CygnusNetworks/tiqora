@@ -13,6 +13,11 @@ const NAV_GROUPS: NavGroup[] = [
     titleKey: "admin.group.usersPermissions",
     links: [
       { to: "/admin/users", labelKey: "admin.nav.users", testId: "admin-nav-users" },
+      {
+        to: "/admin/auth-config",
+        labelKey: "admin.nav.authConfig",
+        testId: "admin-nav-auth-config",
+      },
       { to: "/admin/groups", labelKey: "admin.nav.groups", testId: "admin-nav-groups" },
       { to: "/admin/roles", labelKey: "admin.nav.roles", testId: "admin-nav-roles" },
       {

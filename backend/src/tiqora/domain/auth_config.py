@@ -1,11 +1,13 @@
 """Per-agent auth policy: SSO eligibility + 2FA enforcement.
 
-Backed by ``tiqora_user_auth_config`` (missing row ⇒ both flags false) and
-the global ``auth.totp.enforce_all`` setting in ``tiqora_settings``.
+Backed by ``tiqora_user_auth_config`` (missing row ⇒ both flags false),
+the global ``auth.totp.enforce_all`` setting, and the group-based
+``auth.totp.enforce_group_ids`` list in ``tiqora_settings``.
 """
 
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass
 from datetime import datetime
 
@@ -13,7 +15,14 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from tiqora.db.tiqora.models import TiqoraUserAuthConfig
-from tiqora.domain.settings_store import KEY_TOTP_ENFORCE_ALL, get_setting_bool
+from tiqora.domain.settings_store import (
+    KEY_TOTP_ENFORCE_ALL,
+    KEY_TOTP_ENFORCE_GROUP_IDS,
+    get_setting,
+    get_setting_bool,
+    set_setting,
+)
+from tiqora.permissions.engine import PermissionEngine
 
 
 def _utcnow() -> datetime:
@@ -27,6 +36,49 @@ class AuthConfig:
 
     sso_eligible: bool = False
     enforce_2fa: bool = False
+
+
+async def get_enforce_group_ids(session: AsyncSession) -> list[int]:
+    """Parse ``auth.totp.enforce_group_ids`` (JSON int list). Empty on missing/invalid."""
+    raw = await get_setting(session, KEY_TOTP_ENFORCE_GROUP_IDS)
+    if raw is None or raw.strip() == "":
+        return []
+    try:
+        data = json.loads(raw)
+    except json.JSONDecodeError:
+        return []
+    if not isinstance(data, list):
+        return []
+    out: list[int] = []
+    for item in data:
+        if isinstance(item, bool):
+            continue
+        if isinstance(item, int):
+            out.append(item)
+        elif isinstance(item, str) and item.strip().lstrip("-").isdigit():
+            out.append(int(item))
+    # Stable unique order (first-seen) for admin UI round-trips.
+    seen: set[int] = set()
+    unique: list[int] = []
+    for gid in out:
+        if gid not in seen:
+            seen.add(gid)
+            unique.append(gid)
+    return unique
+
+
+async def set_enforce_group_ids(session: AsyncSession, group_ids: list[int]) -> None:
+    """Persist the enforced group-id list as a JSON array string."""
+    # Dedupe while preserving order.
+    seen: set[int] = set()
+    clean: list[int] = []
+    for gid in group_ids:
+        if not isinstance(gid, int) or isinstance(gid, bool):
+            continue
+        if gid not in seen:
+            seen.add(gid)
+            clean.append(gid)
+    await set_setting(session, KEY_TOTP_ENFORCE_GROUP_IDS, json.dumps(clean))
 
 
 class AuthConfigService:
@@ -75,8 +127,14 @@ class AuthConfigService:
         return AuthConfig(sso_eligible=bool(row.sso_eligible), enforce_2fa=bool(row.enforce_2fa))
 
     async def effective_enforce(self, user_id: int) -> bool:
-        """True when per-agent ``enforce_2fa`` OR global ``auth.totp.enforce_all``."""
+        """True when per-agent, global, or group-based 2FA enforcement applies."""
         cfg = await self.get(user_id)
         if cfg.enforce_2fa:
             return True
-        return await get_setting_bool(self._session, KEY_TOTP_ENFORCE_ALL, default=False)
+        if await get_setting_bool(self._session, KEY_TOTP_ENFORCE_ALL, default=False):
+            return True
+        enforced = await get_enforce_group_ids(self._session)
+        if not enforced:
+            return False
+        perms = await PermissionEngine(self._session).queue_permissions(user_id)
+        return bool(set(perms.keys()) & set(enforced))

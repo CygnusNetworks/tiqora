@@ -269,6 +269,71 @@ async def test_effective_enforce_global_setting(
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("url_fixture", ["mariadb_znuny_url", "postgres_znuny_url"])
+async def test_effective_enforce_via_group_membership(
+    url_fixture: str, request: pytest.FixtureRequest
+) -> None:
+    """Member of an enforced group is forced to enroll; non-member is not."""
+    import uuid
+    from datetime import datetime
+
+    from sqlalchemy import create_engine, text
+
+    from tiqora.domain.auth_config import AuthConfigService, set_enforce_group_ids
+
+    sync_url: str = request.getfixturevalue(url_fixture)
+    user_id, _login = _seed_user(sync_url)
+    outsider_id, _ = _seed_user(sync_url)
+    ns = uuid.uuid4().hex[:8]
+    group_id = int(ns, 16) % 1_000_000 + 810_000
+    engine_sync = create_engine(sync_url)
+    with engine_sync.begin() as conn:
+        conn.execute(
+            text(
+                "INSERT INTO permission_groups"
+                " (id, name, valid_id, create_time, create_by, change_time, change_by)"
+                " VALUES (:id, :name, 1, :t, 1, :t, 1)"
+            ),
+            {
+                "id": group_id,
+                "name": f"totp-enforce-{ns}",
+                "t": datetime(2024, 6, 1, 12, 0, 0),
+            },
+        )
+        conn.execute(
+            text(
+                "INSERT INTO group_user"
+                " (user_id, group_id, permission_key,"
+                "  create_time, create_by, change_time, change_by)"
+                " VALUES (:uid, :gid, 'ro', :t, 1, :t, 1)"
+            ),
+            {
+                "uid": user_id,
+                "gid": group_id,
+                "t": datetime(2024, 6, 1, 12, 0, 0),
+            },
+        )
+    engine_sync.dispose()
+
+    engine = create_async_engine(_to_async_url(sync_url))
+    factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+
+    async with factory() as session:
+        svc = AuthConfigService(session)
+        assert await svc.effective_enforce(user_id) is False
+        assert await svc.effective_enforce(outsider_id) is False
+
+        await set_enforce_group_ids(session, [group_id])
+        assert await svc.effective_enforce(user_id) is True
+        assert await svc.effective_enforce(outsider_id) is False
+
+        await set_enforce_group_ids(session, [])
+        assert await svc.effective_enforce(user_id) is False
+
+    await engine.dispose()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("url_fixture", ["mariadb_znuny_url", "postgres_znuny_url"])
 async def test_force_disable_without_code(url_fixture: str, request: pytest.FixtureRequest) -> None:
     sync_url: str = request.getfixturevalue(url_fixture)
     user_id, login = _seed_user(sync_url)

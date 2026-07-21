@@ -8,30 +8,72 @@ import { Spinner } from "@/components/ui/Spinner";
 
 export function LoginPage() {
   const { t } = useTranslation();
-  const { login, verifyTotp, pending2fa, isAuthenticated, isLoading } = useAuth();
+  const {
+    login,
+    verifyTotp,
+    completeEnroll2fa,
+    pending2fa,
+    mustEnroll2fa,
+    isAuthenticated,
+    isLoading,
+  } = useAuth();
   const navigate = useNavigate();
-  const search = useSearch({ from: "/login" }) as { next?: string };
+  const search = useSearch({ from: "/login" }) as {
+    next?: string;
+    sso_error?: string;
+  };
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [totpCode, setTotpCode] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
-  const [ssoEnabled, setSsoEnabled] = useState(false);
+  const [oidcEnabled, setOidcEnabled] = useState(false);
+  const [spnegoEnabled, setSpnegoEnabled] = useState(false);
+
+  // Forced enrollment step (must_enroll_2fa)
+  const [enrollSecret, setEnrollSecret] = useState<string | null>(null);
+  const [enrollQrNonce, setEnrollQrNonce] = useState(0);
+  const [enrollCode, setEnrollCode] = useState("");
+  const [enrollError, setEnrollError] = useState<string | null>(null);
+  const [enrollStarting, setEnrollStarting] = useState(false);
 
   useEffect(() => {
     api
       .authMethods()
-      .then((methods) => setSsoEnabled(methods.oidc))
-      .catch(() => setSsoEnabled(false));
+      .then((methods) => {
+        setOidcEnabled(Boolean(methods.oidc));
+        setSpnegoEnabled(Boolean(methods.spnego));
+      })
+      .catch(() => {
+        setOidcEnabled(false);
+        setSpnegoEnabled(false);
+      });
   }, []);
 
   useEffect(() => {
-    if (!isLoading && isAuthenticated) {
+    if (!isLoading && isAuthenticated && !mustEnroll2fa && !pending2fa) {
       const next =
         search.next && search.next.startsWith("/") ? search.next : "/agent";
       void navigate({ to: next });
     }
-  }, [isLoading, isAuthenticated, search.next, navigate]);
+  }, [isLoading, isAuthenticated, mustEnroll2fa, pending2fa, search.next, navigate]);
+
+  // Auto-start enrollment when forced into must-enroll mode.
+  useEffect(() => {
+    if (!mustEnroll2fa || enrollSecret || enrollStarting) return;
+    setEnrollStarting(true);
+    setEnrollError(null);
+    api
+      .totpEnroll()
+      .then((res) => {
+        setEnrollSecret(res.secret);
+        setEnrollQrNonce((n) => n + 1);
+      })
+      .catch(() => {
+        setEnrollError(t("auth.mustEnroll.startError"));
+      })
+      .finally(() => setEnrollStarting(false));
+  }, [mustEnroll2fa, enrollSecret, enrollStarting, t]);
 
   const onSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -39,11 +81,8 @@ export function LoginPage() {
     setSubmitting(true);
     try {
       await login(username, password);
-      if (!pending2fa) {
-        const next =
-          search.next && search.next.startsWith("/") ? search.next : "/agent";
-        await navigate({ to: next });
-      }
+      // pending2fa / mustEnroll2fa are set inside login(); navigation is
+      // handled by the post-auth effect once a full session exists.
     } catch (err) {
       if (err instanceof ApiError && err.status === 401) {
         setError(t("auth.invalidCredentials"));
@@ -74,6 +113,106 @@ export function LoginPage() {
       setSubmitting(false);
     }
   };
+
+  const onConfirmEnroll = async (e: FormEvent) => {
+    e.preventDefault();
+    setEnrollError(null);
+    setSubmitting(true);
+    try {
+      await completeEnroll2fa(enrollCode);
+      const next =
+        search.next && search.next.startsWith("/") ? search.next : "/agent";
+      await navigate({ to: next });
+    } catch {
+      setEnrollError(t("auth.mustEnroll.confirmError"));
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  if (mustEnroll2fa) {
+    return (
+      <div className="flex min-h-screen flex-col items-center justify-center bg-bg px-4">
+        <div className="w-full max-w-sm rounded-xl border border-hairline bg-surface p-8">
+          <h1 className="text-center font-display text-2xl font-bold tracking-tight text-ink">
+            {t("auth.mustEnroll.title")}
+          </h1>
+          <p className="mt-1.5 text-center text-sm text-muted" data-testid="must-enroll-hint">
+            {t("auth.mustEnroll.hint")}
+          </p>
+
+          {enrollStarting && !enrollSecret && (
+            <div className="mt-7 flex justify-center">
+              <Spinner />
+            </div>
+          )}
+
+          {enrollSecret && (
+            <div className="mt-6 space-y-4" data-testid="must-enroll-step">
+              <p className="text-sm text-muted">{t("security.scanHint")}</p>
+              <img
+                key={enrollQrNonce}
+                src="/api/v1/auth/totp/enroll/qr"
+                alt="TOTP QR code"
+                width={200}
+                height={200}
+                data-testid="must-enroll-qr"
+                className="mx-auto rounded-lg border border-hairline bg-white p-2"
+              />
+              <p className="text-xs text-muted">
+                {t("security.secretLabel")}{" "}
+                <code data-testid="must-enroll-secret" className="font-mono text-ink">
+                  {enrollSecret}
+                </code>
+              </p>
+              <form
+                onSubmit={(e) => void onConfirmEnroll(e)}
+                className="space-y-3"
+                data-testid="must-enroll-form"
+              >
+                <label className="block text-sm">
+                  <span className="mb-1 block text-muted">{t("security.confirmCode")}</span>
+                  <input
+                    data-testid="must-enroll-code"
+                    inputMode="numeric"
+                    autoComplete="one-time-code"
+                    required
+                    value={enrollCode}
+                    onChange={(e) => setEnrollCode(e.target.value)}
+                    className="w-full rounded-md border border-hairline bg-surface-subtle px-3 py-2 text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent focus:border-accent"
+                  />
+                </label>
+                {enrollError && (
+                  <p
+                    className="text-sm text-danger"
+                    role="alert"
+                    data-testid="must-enroll-error"
+                  >
+                    {enrollError}
+                  </p>
+                )}
+                <Button
+                  type="submit"
+                  variant="primary"
+                  className="w-full"
+                  disabled={submitting}
+                  data-testid="must-enroll-submit"
+                >
+                  {submitting ? <Spinner /> : t("security.confirmButton")}
+                </Button>
+              </form>
+            </div>
+          )}
+
+          {enrollError && !enrollSecret && (
+            <p className="mt-4 text-sm text-danger" role="alert" data-testid="must-enroll-error">
+              {enrollError}
+            </p>
+          )}
+        </div>
+      </div>
+    );
+  }
 
   if (pending2fa) {
     return (
@@ -121,6 +260,9 @@ export function LoginPage() {
     );
   }
 
+  const showSsoDivider = oidcEnabled || spnegoEnabled;
+  const ssoError = search.sso_error === "1" || search.sso_error === "true";
+
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-bg px-4">
       <div className="w-full max-w-sm rounded-xl border border-hairline bg-surface p-8">
@@ -129,6 +271,15 @@ export function LoginPage() {
           {t("app.name")}
         </h1>
         <p className="mt-1.5 text-center text-sm text-muted">{t("auth.signIn")}</p>
+        {ssoError && (
+          <p
+            className="mt-3 rounded-md border border-danger/30 bg-danger/10 px-3 py-2 text-sm text-danger"
+            role="alert"
+            data-testid="sso-error"
+          >
+            {t("auth.ssoFailed")}
+          </p>
+        )}
         <form
           onSubmit={(e) => void onSubmit(e)}
           className="mt-7 space-y-4"
@@ -174,24 +325,41 @@ export function LoginPage() {
             {submitting ? <Spinner /> : t("auth.login")}
           </Button>
         </form>
-        {ssoEnabled && (
+        {showSsoDivider && (
           <>
             <div className="my-4 flex items-center gap-3 text-xs text-muted">
               <span className="h-px flex-1 bg-hairline" />
               {t("auth.or")}
               <span className="h-px flex-1 bg-hairline" />
             </div>
-            <Button
-              type="button"
-              variant="secondary"
-              className="w-full"
-              data-testid="sso-login"
-              onClick={() => {
-                window.location.assign(api.oidcLoginUrl());
-              }}
-            >
-              {t("auth.ssoButton")}
-            </Button>
+            <div className="space-y-2">
+              {spnegoEnabled && (
+                <Button
+                  type="button"
+                  variant="secondary"
+                  className="w-full"
+                  data-testid="kerberos-login"
+                  onClick={() => {
+                    window.location.assign(api.spnegoLoginUrl());
+                  }}
+                >
+                  {t("auth.kerberosButton")}
+                </Button>
+              )}
+              {oidcEnabled && (
+                <Button
+                  type="button"
+                  variant="secondary"
+                  className="w-full"
+                  data-testid="sso-login"
+                  onClick={() => {
+                    window.location.assign(api.oidcLoginUrl());
+                  }}
+                >
+                  {t("auth.ssoButton")}
+                </Button>
+              )}
+            </div>
           </>
         )}
       </div>

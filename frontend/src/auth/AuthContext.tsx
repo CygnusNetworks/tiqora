@@ -16,8 +16,18 @@ type AuthContextValue = {
   isAuthenticated: boolean;
   /** True right after login()/verifyTotp() when a TOTP code is still required. */
   pending2fa: boolean;
+  /**
+   * True when login() returned must_enroll_2fa — the agent has a restricted
+   * ENROLL session and must finish TOTP setup before a full session is issued.
+   */
+  mustEnroll2fa: boolean;
   login: (login: string, password: string) => Promise<void>;
   verifyTotp: (code: string) => Promise<void>;
+  /**
+   * Finish forced enrollment: confirm TOTP (backend promotes ENROLL → full
+   * session cookie) then load /me.
+   */
+  completeEnroll2fa: (code: string) => Promise<void>;
   logout: () => Promise<void>;
   refresh: () => Promise<void>;
 };
@@ -28,6 +38,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const queryClient = useQueryClient();
   const [bootstrapped, setBootstrapped] = useState(false);
   const [pending2fa, setPending2fa] = useState(false);
+  const [mustEnroll2fa, setMustEnroll2fa] = useState(false);
 
   const meQuery = useQuery({
     queryKey: ["auth", "me"],
@@ -54,9 +65,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const res = await api.login({ login: loginName, password });
       if (res.pending_2fa) {
         setPending2fa(true);
+        setMustEnroll2fa(false);
+        return;
+      }
+      if (res.must_enroll_2fa) {
+        setMustEnroll2fa(true);
+        setPending2fa(false);
         return;
       }
       setPending2fa(false);
+      setMustEnroll2fa(false);
       queryClient.setQueryData(["auth", "me"], res.user);
       await queryClient.invalidateQueries({ queryKey: ["auth", "me"] });
     },
@@ -67,7 +85,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     async (code: string) => {
       const res = await api.totpVerify({ code });
       setPending2fa(false);
+      setMustEnroll2fa(false);
       queryClient.setQueryData(["auth", "me"], res.user);
+      await queryClient.invalidateQueries({ queryKey: ["auth", "me"] });
+    },
+    [queryClient],
+  );
+
+  const completeEnroll2fa = useCallback(
+    async (code: string) => {
+      await api.totpConfirm({ code });
+      // Backend promotes the ENROLL cookie to a full session on success.
+      const me = await api.me();
+      setMustEnroll2fa(false);
+      setPending2fa(false);
+      queryClient.setQueryData(["auth", "me"], me);
       await queryClient.invalidateQueries({ queryKey: ["auth", "me"] });
     },
     [queryClient],
@@ -80,6 +112,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       /* ignore network errors on logout */
     }
     setPending2fa(false);
+    setMustEnroll2fa(false);
     queryClient.setQueryData(["auth", "me"], null);
     queryClient.clear();
   }, [queryClient]);
@@ -94,12 +127,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       isLoading: !bootstrapped || meQuery.isLoading,
       isAuthenticated: Boolean(meQuery.data),
       pending2fa,
+      mustEnroll2fa,
       login,
       verifyTotp,
+      completeEnroll2fa,
       logout,
       refresh,
     }),
-    [meQuery.data, meQuery.isLoading, bootstrapped, pending2fa, login, verifyTotp, logout, refresh],
+    [
+      meQuery.data,
+      meQuery.isLoading,
+      bootstrapped,
+      pending2fa,
+      mustEnroll2fa,
+      login,
+      verifyTotp,
+      completeEnroll2fa,
+      logout,
+      refresh,
+    ],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

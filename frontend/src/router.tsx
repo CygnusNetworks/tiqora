@@ -80,6 +80,7 @@ import { ProcessDetailPage } from "@/routes/admin/ProcessDetailPage";
 import { QueueVariablesPage } from "@/routes/admin/QueueVariablesPage";
 import { CustomerFieldsPage } from "@/routes/admin/CustomerFieldsPage";
 import { ApiKeysPage } from "@/routes/admin/ApiKeysPage";
+import { AuthConfigPage } from "@/routes/admin/AuthConfigPage";
 
 const rootRoute = createRootRoute({
   component: () => <Outlet />,
@@ -94,8 +95,11 @@ const indexRoute = createRoute({
 const loginRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/login",
-  validateSearch: (s: Record<string, unknown>): { next?: string } => ({
+  validateSearch: (
+    s: Record<string, unknown>,
+  ): { next?: string; sso_error?: string } => ({
     next: typeof s.next === "string" ? s.next : undefined,
+    sso_error: typeof s.sso_error === "string" ? s.sso_error : undefined,
   }),
   component: LoginPage,
 });
@@ -358,6 +362,12 @@ const adminUsersRoute = createRoute({
   component: UsersPage,
 });
 
+const adminAuthConfigRoute = createRoute({
+  getParentRoute: () => adminLayoutRoute,
+  path: "/auth-config",
+  component: AuthConfigPage,
+});
+
 const adminGroupsRoute = createRoute({
   getParentRoute: () => adminLayoutRoute,
   path: "/groups",
@@ -612,6 +622,7 @@ const routeTree = rootRoute.addChildren([
   adminLayoutRoute.addChildren([
     adminIndexRoute,
     adminUsersRoute,
+    adminAuthConfigRoute,
     adminGroupsRoute,
     adminRolesRoute,
     adminAgentRolesRoute,

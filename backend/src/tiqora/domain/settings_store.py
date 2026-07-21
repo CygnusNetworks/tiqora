@@ -54,6 +54,11 @@ KEY_GDPR_RETENTION_ENABLED = "gdpr.retention.enabled"
 # force enrollment without flipping this global switch.
 KEY_TOTP_ENFORCE_ALL = "auth.totp.enforce_all"
 
+# JSON list of permission_groups.id values. Members of any listed group are
+# forced through must-enroll (same effect as per-agent enforce_2fa). Default
+# empty list (stored as missing / "[]").
+KEY_TOTP_ENFORCE_GROUP_IDS = "auth.totp.enforce_group_ids"
+
 
 async def get_setting_bool(session: AsyncSession, key: str, default: bool = False) -> bool:
     raw = await get_setting(session, key)

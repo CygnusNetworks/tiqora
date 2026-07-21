@@ -982,7 +982,10 @@ class AuthConfigUpdate(BaseModel):
 
 class AuthConfigGlobalOut(BaseModel):
     enforce_all: bool
+    enforce_group_ids: list[int] = []
 
 
 class AuthConfigGlobalUpdate(BaseModel):
     enforce_all: bool
+    # When omitted (None), the stored enforce_group_ids list is left unchanged.
+    enforce_group_ids: list[int] | None = None
