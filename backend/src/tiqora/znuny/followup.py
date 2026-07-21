@@ -133,10 +133,23 @@ async def detect_followup(
     *,
     subject: str,
     references: list[str],
+    hook: str | None = None,
+    hook_divider: str | None = None,
 ) -> tuple[str, int] | None:
-    """Return ``(tn, ticket_id)`` for the first matching follow-up check, or None."""
-    hook = await sysconfig.ticket_hook()
-    hook_divider = await sysconfig.ticket_hook_divider()
+    """Return ``(tn, ticket_id)`` for the first matching follow-up check, or None.
+
+    When *hook* / *hook_divider* are omitted, the effective Tiqora-override-aware
+    values from :func:`tiqora.domain.subject_hook.load_subject_config` are used so
+    inbound matching stays consistent with outbound subject building.
+    """
+    if hook is None or hook_divider is None:
+        from tiqora.domain.subject_hook import load_subject_config
+
+        cfg = await load_subject_config(session, sysconfig)
+        if hook is None:
+            hook = cfg.hook
+        if hook_divider is None:
+            hook_divider = cfg.divider
     generator = await sysconfig.ticket_number_generator()
     system_id = await sysconfig.system_id()
     check_system_id = bool(await sysconfig.get("Ticket::NumberGenerator::CheckSystemID", False))

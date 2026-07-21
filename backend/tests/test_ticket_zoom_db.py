@@ -242,9 +242,9 @@ async def test_ticket_zoom(url_fixture: str, request: pytest.FixtureRequest) -> 
         hist_asc = await ts.list_history(ids["agent"], ids["ticket"], order="asc")
         assert [h.id for h in hist_asc] == sorted(h.id for h in hist_asc)
 
-        # Reply draft: Re: dedup + quote + attribution.
+        # Reply draft: Re: dedup + ticket hook + quote + attribution.
         draft = await ts.get_reply_draft(ids["agent"], ids["ticket"], ids["article"])
-        assert draft.subject == "Re: Broken thing"
+        assert draft.subject == "[Ticket#20240601700001] Re: Broken thing"
         assert draft.to_address == "alice@example.com"
         assert "> First line" in draft.body
         assert "wrote:" in draft.body

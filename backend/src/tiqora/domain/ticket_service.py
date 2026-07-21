@@ -33,6 +33,7 @@ from tiqora.domain.history_render import render_history_entry
 from tiqora.domain.queue_service import OPEN_STATE_TYPES, age_seconds
 from tiqora.domain.quoting import (
     build_reply_subject,
+    build_ticket_subject,
     html_to_plaintext,
     quote_plaintext_body,
 )
@@ -47,6 +48,7 @@ from tiqora.domain.schemas import (
     TicketDetail,
     TicketListItem,
 )
+from tiqora.domain.subject_hook import load_subject_config
 from tiqora.permissions.engine import PermissionEngine
 from tiqora.storage.backend import AttachmentContent, DbMimeStorage
 
@@ -778,6 +780,21 @@ class TicketService:
         ).scalar_one_or_none()
 
         subject = build_reply_subject(mime.a_subject if mime else None)
+        # Show the same hooked subject the send path will produce so the
+        # composer preview matches the outbound mail (idempotent strip-then-add
+        # in prepare_outgoing_agent_email still protects against mismatch).
+        sysconfig = SysConfig(self._session)
+        hook_cfg = await load_subject_config(self._session, sysconfig)
+        if hook_cfg.enabled and ticket.tn:
+            subject = build_ticket_subject(
+                subject,
+                hook=hook_cfg.hook,
+                divider=hook_cfg.divider,
+                tn=str(ticket.tn),
+                subject_format=hook_cfg.subject_format,
+                add_re=False,
+                add_fwd=False,
+            )
         from_addr = (mime.a_from if mime else None) or None
         to_addr = from_addr
         cc: str | None = None
@@ -813,7 +830,7 @@ class TicketService:
             if sig_text and str(sig_text).strip():
                 expanded = await expand_placeholders(
                     self._session,
-                    SysConfig(self._session),
+                    sysconfig,
                     str(sig_text),
                     ticket_id=ticket_id,
                     user_id=user_id,

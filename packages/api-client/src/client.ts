@@ -224,6 +224,32 @@ export type MailOutboundOut = {
   change_time?: string | null;
   change_by?: number | null;
 };
+export type SubjectFormat = "Left" | "Right" | "None";
+export type SubjectHookZnunyOut = {
+  hook: string;
+  divider: string;
+  subject_format: string;
+};
+export type SubjectHookOverridesOut = {
+  enabled?: boolean | null;
+  hook?: string | null;
+  divider?: string | null;
+  subject_format?: string | null;
+};
+export type SubjectConfigOut = {
+  enabled: boolean;
+  hook: string;
+  divider: string;
+  subject_format: string;
+  overrides: SubjectHookOverridesOut;
+  znuny: SubjectHookZnunyOut;
+};
+export type SubjectConfigUpdate = {
+  enabled?: boolean | null;
+  hook?: string | null;
+  divider?: string | null;
+  subject_format?: string | null;
+};
 export type MailOutboundUpdate = {
   enabled?: boolean | null;
   host?: string | null;
@@ -1573,6 +1599,17 @@ export class ApiClient {
 
   putMailOutbound(body: MailOutboundUpdate, signal?: AbortSignal) {
     return this.request<MailOutboundOut>("PUT", "/api/v1/admin/mail/outbound", { body, signal });
+  }
+
+  getSubjectConfig(signal?: AbortSignal) {
+    return this.request<SubjectConfigOut>("GET", "/api/v1/admin/subject-config", { signal });
+  }
+
+  putSubjectConfig(body: SubjectConfigUpdate, signal?: AbortSignal) {
+    return this.request<SubjectConfigOut>("PUT", "/api/v1/admin/subject-config", {
+      body,
+      signal,
+    });
   }
 
   testMailOutbound(body: MailOutboundTestIn = {}, signal?: AbortSignal) {

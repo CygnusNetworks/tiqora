@@ -30,6 +30,8 @@ from tiqora.channels.email import loop_protection
 from tiqora.channels.email.parser import get_email_address, split_address_line
 from tiqora.channels.email.placeholder import expand_placeholders
 from tiqora.channels.email.smtp import MailSender, build_message
+from tiqora.domain.quoting import build_ticket_subject
+from tiqora.domain.subject_hook import load_subject_config
 from tiqora.domain.ticket_write_service import ArticleIn, add_article
 from tiqora.znuny.history import history_add
 from tiqora.znuny.sysconfig import SysConfig
@@ -166,6 +168,17 @@ async def send_auto_response(
         customer_subject=orig_subject,
         customer_email_lines=orig_body.splitlines(),
     )
+    hook_cfg = await load_subject_config(session, sysconfig)
+    if hook_cfg.enabled and tn:
+        subject = build_ticket_subject(
+            subject,
+            hook=hook_cfg.hook,
+            divider=hook_cfg.divider,
+            tn=str(tn),
+            subject_format=hook_cfg.subject_format,
+            add_re=False,
+            add_fwd=False,
+        )
     body = await expand_placeholders(
         session,
         sysconfig,
