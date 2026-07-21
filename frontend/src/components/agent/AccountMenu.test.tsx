@@ -100,9 +100,9 @@ describe("AccountMenu", () => {
     changeLanguage.mockRestore();
   });
 
-  it("opens the language submenu with ArrowRight", () => {
+  it("opens the language submenu with ArrowLeft (it flies out to the left)", () => {
     open();
-    fireEvent.keyDown(screen.getByTestId("account-menu-lang"), { key: "ArrowRight" });
+    fireEvent.keyDown(screen.getByTestId("account-menu-lang"), { key: "ArrowLeft" });
     expect(screen.getByTestId("account-menu-lang-submenu")).toBeInTheDocument();
     expect(screen.getByTestId("account-menu-lang-de")).toBeInTheDocument();
     expect(screen.getByTestId("account-menu-lang-en")).toBeInTheDocument();
