@@ -5589,6 +5589,16 @@ export interface components {
             is_html: boolean;
             /** References */
             references?: string | null;
+            /**
+             * Signature
+             * @default
+             */
+            signature: string;
+            /**
+             * Signature Is Html
+             * @default false
+             */
+            signature_is_html: boolean;
             /** Subject */
             subject: string;
             /** To Address */

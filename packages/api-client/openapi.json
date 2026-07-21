@@ -6799,6 +6799,16 @@
             ],
             "title": "References"
           },
+          "signature": {
+            "default": "",
+            "title": "Signature",
+            "type": "string"
+          },
+          "signature_is_html": {
+            "default": false,
+            "title": "Signature Is Html",
+            "type": "boolean"
+          },
           "subject": {
             "title": "Subject",
             "type": "string"

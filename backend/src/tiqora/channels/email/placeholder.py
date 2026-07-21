@@ -213,14 +213,12 @@ async def _fetch_customer_maps(
 async def _fetch_queue_maps(session: AsyncSession, queue_id: int | None) -> dict[str, str]:
     if not queue_id:
         return {}
+    # SELECT q.* so site-specific queue columns (e.g. domain, phonenumber from a
+    # Znuny patch) are available as <OTRS_QUEUE_...>. Safe on a default Znuny DB:
+    # only existing columns are returned. system_address fields stay aliased.
     result = await session.execute(
         text(
-            "SELECT q.id, q.name, q.group_id, q.unlock_timeout,"
-            " q.first_response_time, q.first_response_notify,"
-            " q.update_time, q.update_notify, q.solution_time, q.solution_notify,"
-            " q.system_address_id, q.calendar_name, q.default_sign_key,"
-            " q.salutation_id, q.signature_id, q.follow_up_id, q.follow_up_lock,"
-            " q.comments, q.valid_id,"
+            "SELECT q.*,"
             " sa.value0 AS email, sa.value1 AS real_name"
             " FROM queue q"
             " LEFT JOIN system_address sa ON sa.id = q.system_address_id"
@@ -261,7 +259,8 @@ async def _fetch_queue_maps(session: AsyncSession, queue_id: int | None) -> dict
         col_s = str(col)
         sval = _as_str(value)
         data[col_s.lower()] = sval
-        for alias in aliases.get(col_s, ()):
+        # Match aliases case-insensitively (drivers may return mixed case).
+        for alias in aliases.get(col_s, ()) or aliases.get(col_s.lower(), ()):
             data[alias.lower()] = sval
     return data
 

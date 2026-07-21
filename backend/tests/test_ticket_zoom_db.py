@@ -234,6 +234,12 @@ async def test_ticket_zoom(url_fixture: str, request: pytest.FixtureRequest) -> 
         assert "> First line" in draft.body
         assert "wrote:" in draft.body
         assert draft.body.startswith("\n\n")  # empty answer area above quote
+        # Signature preview fields are always present (stock sig id=1 or empty).
+        assert isinstance(draft.signature, str)
+        assert isinstance(draft.signature_is_html, bool)
+        # Expanded signature must not be embedded in the editable body.
+        if draft.signature.strip():
+            assert draft.signature.strip() not in draft.body
 
         # Reply-all: Cc includes other recipients, not the sender.
         draft_all = await ts.get_reply_draft(
