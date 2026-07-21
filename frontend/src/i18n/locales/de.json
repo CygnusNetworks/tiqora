@@ -424,7 +424,8 @@
       "system": "System",
       "queuesTemplates": "Queues & Vorlagen",
       "email": "E-Mail",
-      "placeholderVariables": "Platzhalter-Variablen"
+      "placeholderVariables": "Platzhalter-Variablen",
+      "compliance": "Compliance"
     },
     "nav": {
       "users": "Benutzer",
@@ -460,7 +461,8 @@
       "queueAutoResponses": "Queues↔Autoantworten",
       "queueVariables": "Queue-Variablen",
       "customerFields": "Customer-Felder",
-      "authConfig": "Authentifizierung / 2FA"
+      "authConfig": "Authentifizierung / 2FA",
+      "gdpr": "Datenschutz / DSGVO"
     },
     "table": {
       "id": "ID",
@@ -630,7 +632,8 @@
         "companySearch": "Unternehmens-ID oder Name suchen…",
         "companyPicked": "Ausgewählt: {{id}}",
         "companyApply": "Zuweisen",
-        "companyRequired": "Bitte eine Kunden-ID wählen oder eingeben."
+        "companyRequired": "Bitte eine Kunden-ID wählen oder eingeben.",
+        "gdpr": "DSGVO: anonymisieren/löschen"
       }
     },
     "customerCompanies": {
@@ -1008,6 +1011,94 @@
       "resetConfirmTitle": "Zwei-Faktor-Authentifizierung zurücksetzen?",
       "resetConfirmBody": "Dies deaktiviert 2FA für {{login}}. Bei weiterhin geltender Erzwingung muss erneut eingerichtet werden.",
       "empty": "Keine Agenten gefunden."
+    },
+    "gdpr": {
+      "title": "Datenschutz / DSGVO",
+      "subtitle": "Kundenbenutzer anhand von Selektoren auflösen, Auswirkungen prüfen und Anonymisierung oder Löschung mit Backup ausführen.",
+      "tab": {
+        "run": "Selektion & Ausführung",
+        "jobs": "Aufträge"
+      },
+      "mode": "Modus",
+      "modeAnonymize": "Anonymisieren",
+      "modeDelete": "Löschen",
+      "modeAnonymizeHint": "PII wird deterministisch ersetzt; Datensätze bleiben erhalten und können aus dem Backup zurückgerollt werden.",
+      "modeDeleteHint": "Kundenbenutzer und zugehörige Verknüpfungen werden hard-gelöscht (mit Backup). Ticket-Inhalte werden anonymisiert, nicht gelöscht.",
+      "field": {
+        "customerSearch": "Kundenbenutzer suchen",
+        "customerSearchPh": "Login, E-Mail oder Name…",
+        "loginManualPh": "Login manuell hinzufügen",
+        "companyId": "Kundenunternehmen (customer_id)",
+        "companyIdPh": "z. B. ACME",
+        "loginRegex": "Login-Regex",
+        "customerIdRegex": "customer_id-Regex",
+        "changedAfter": "Geändert ab",
+        "changedBefore": "Geändert bis",
+        "activity": "Aktivität",
+        "inactiveSinceDate": "Inaktiv seit (Datum)",
+        "validity": "Gültigkeit"
+      },
+      "activity": {
+        "all": "Alle",
+        "noTickets": "Keine Tickets",
+        "noOpenTickets": "Nur geschlossene (keine offenen Tickets)",
+        "inactiveSince": "Inaktiv seit…"
+      },
+      "validity": {
+        "all": "Alle",
+        "temp": "Temporär"
+      },
+      "add": "Hinzufügen",
+      "preview": "Vorschau",
+      "reset": "Zurücksetzen",
+      "run": "Ausführen",
+      "previewError": "Vorschau fehlgeschlagen.",
+      "runError": "Ausführung fehlgeschlagen.",
+      "noCustomers": "Keine Kundenbenutzer in der Vorschau.",
+      "previewTitle": "Vorschau",
+      "previewSummary": "{{count}} Kundenbenutzer · Modus: {{mode}}",
+      "previewEmpty": "Keine Kundenbenutzer entsprechen diesem Selektor.",
+      "affectedCounts": "Betroffene Datensätze",
+      "impact": {
+        "anonymizeTitle": "Was wird anonymisiert (Spalten):",
+        "deleteTitle": "Was wird gelöscht:",
+        "deleteBody": "Tabellen: {{tables}}. Ticket-/Artikel-Inhalte werden anonymisiert, nicht entfernt."
+      },
+      "confirmTitle": "DSGVO-Auftrag bestätigen",
+      "confirmAnonymizeBody": "Möchten Sie {{count}} Kundenbenutzer anonymisieren? Es wird ein Backup angelegt.",
+      "confirmDeleteBody": "ACHTUNG: {{count}} Kundenbenutzer werden unwiderruflich gelöscht (Backup bis Ablaufdatum). Tippen Sie zur Bestätigung das Wort LÖSCHEN.",
+      "confirmTypePrompt": "Zur Bestätigung „{{word}}“ eingeben:",
+      "confirmSubmit": "Jetzt ausführen",
+      "runSuccess": "Auftrag erfolgreich gestartet.",
+      "runSuccessDetail": "Auftrag #{{id}} · Status: {{status}} · {{count}} Login(s).",
+      "viewJobs": "Aufträge anzeigen",
+      "jobsEmpty": "Noch keine DSGVO-Aufträge.",
+      "jobDetail": "Auftrag #{{id}} — Selektor",
+      "col": {
+        "login": "Login",
+        "email": "E-Mail",
+        "customerId": "customer_id",
+        "mode": "Modus",
+        "status": "Status",
+        "resolved": "Anzahl",
+        "created": "Erstellt",
+        "backupExpires": "Backup bis",
+        "actions": "Aktionen"
+      },
+      "status": {
+        "applied": "Angewendet",
+        "rolled_back": "Zurückgerollt",
+        "purged": "Backup gelöscht"
+      },
+      "action": {
+        "rollback": "Rollback",
+        "purge": "Backup löschen",
+        "download": "Backup"
+      },
+      "rollbackTitle": "Rollback bestätigen",
+      "rollbackBody": "Backup von Auftrag #{{id}} wiederherstellen? Der aktuelle Zustand wird überschrieben.",
+      "purgeTitle": "Backup unwiderruflich löschen",
+      "purgeBody": "Backup von Auftrag #{{id}} endgültig löschen? Rollback ist danach nicht mehr möglich."
     }
   },
   "kb": {
