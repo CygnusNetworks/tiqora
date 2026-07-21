@@ -6,7 +6,7 @@ from fastapi import APIRouter, HTTPException, status
 from sqlalchemy import select
 
 from tiqora.api.deps import DbSession
-from tiqora.api.v1.admin.common import now
+from tiqora.api.v1.admin.common import AUTO_RESPONSE_CACHE_TYPES, invalidate_znuny_cache_types, now
 from tiqora.api.v1.admin.deps import AdminUser
 from tiqora.api.v1.admin.pagination import ListParamsDep, Page, apply_valid_filter, paginate
 from tiqora.api.v1.admin.schemas import (
@@ -51,6 +51,7 @@ async def create_auto_response(
         **body.model_dump(), create_time=ts, create_by=admin.id, change_time=ts, change_by=admin.id
     )
     session.add(row)
+    await invalidate_znuny_cache_types(session, AUTO_RESPONSE_CACHE_TYPES)
     await session.commit()
     await session.refresh(row)
     return row
@@ -67,6 +68,7 @@ async def update_auto_response(
         setattr(row, field, value)
     row.change_time = now()
     row.change_by = admin.id
+    await invalidate_znuny_cache_types(session, AUTO_RESPONSE_CACHE_TYPES)
     await session.commit()
     await session.refresh(row)
     return row
@@ -82,6 +84,7 @@ async def deactivate_auto_response(
     row.valid_id = 2
     row.change_time = now()
     row.change_by = admin.id
+    await invalidate_znuny_cache_types(session, AUTO_RESPONSE_CACHE_TYPES)
     await session.commit()
 
 
@@ -100,6 +103,7 @@ async def assign_queue_auto_response(
             change_by=admin.id,
         )
     )
+    await invalidate_znuny_cache_types(session, AUTO_RESPONSE_CACHE_TYPES)
     await session.commit()
 
 
@@ -118,4 +122,5 @@ async def revoke_queue_auto_response(
     )
     for row in result.scalars().all():
         await session.delete(row)
+    await invalidate_znuny_cache_types(session, AUTO_RESPONSE_CACHE_TYPES)
     await session.commit()

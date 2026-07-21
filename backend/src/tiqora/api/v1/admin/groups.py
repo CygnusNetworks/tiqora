@@ -6,7 +6,7 @@ from fastapi import APIRouter, HTTPException, status
 from sqlalchemy import select
 
 from tiqora.api.deps import DbSession
-from tiqora.api.v1.admin.common import now
+from tiqora.api.v1.admin.common import GROUP_CACHE_TYPES, invalidate_znuny_cache_types, now
 from tiqora.api.v1.admin.deps import AdminUser
 from tiqora.api.v1.admin.pagination import ListParamsDep, Page, apply_valid_filter, paginate
 from tiqora.api.v1.admin.schemas import GroupCreate, GroupOut, GroupUpdate
@@ -48,6 +48,7 @@ async def create_group(body: GroupCreate, admin: AdminUser, session: DbSession) 
         change_by=admin.id,
     )
     session.add(group)
+    await invalidate_znuny_cache_types(session, GROUP_CACHE_TYPES)
     await session.commit()
     await session.refresh(group)
     return group
@@ -64,6 +65,7 @@ async def update_group(
         setattr(group, field, value)
     group.change_time = now()
     group.change_by = admin.id
+    await invalidate_znuny_cache_types(session, GROUP_CACHE_TYPES)
     await session.commit()
     await session.refresh(group)
     return group
@@ -78,4 +80,5 @@ async def deactivate_group(group_id: int, admin: AdminUser, session: DbSession) 
     group.valid_id = 2
     group.change_time = now()
     group.change_by = admin.id
+    await invalidate_znuny_cache_types(session, GROUP_CACHE_TYPES)
     await session.commit()
