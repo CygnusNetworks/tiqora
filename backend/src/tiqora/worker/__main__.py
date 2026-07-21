@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import asyncio
+import os
 import signal
+import time
 
 import structlog
 
@@ -16,6 +18,37 @@ from tiqora.worker.poller import poll_once
 from tiqora.worker.postmaster import run_postmaster_tick
 
 logger = structlog.get_logger(__name__)
+
+#: Heartbeat file the worker touches every cycle. The container has no HTTP
+#: port, so the Docker healthcheck reads this file's freshness to tell the
+#: asyncio event loop is still alive (see docker-compose healthcheck).
+_HEARTBEAT_FILE = os.environ.get("TIQORA_WORKER_HEARTBEAT_FILE", "/tmp/tiqora-worker.heartbeat")
+_HEARTBEAT_INTERVAL_SECONDS = 15
+
+
+def _write_heartbeat() -> None:
+    with open(_HEARTBEAT_FILE, "w") as fh:
+        fh.write(str(int(time.time())))
+
+
+async def _heartbeat_loop(stop: asyncio.Event) -> None:
+    """Touch the heartbeat file on a fixed cadence so the container healthcheck
+    can distinguish a live event loop from a hung/deadlocked one."""
+    logger.info(
+        "heartbeat_loop_started",
+        path=_HEARTBEAT_FILE,
+        interval_seconds=_HEARTBEAT_INTERVAL_SECONDS,
+    )
+    while not stop.is_set():
+        try:
+            await asyncio.to_thread(_write_heartbeat)
+        except OSError:
+            logger.exception("heartbeat_write_error", path=_HEARTBEAT_FILE)
+        try:
+            await asyncio.wait_for(stop.wait(), timeout=_HEARTBEAT_INTERVAL_SECONDS)
+        except TimeoutError:
+            continue
+    logger.info("heartbeat_loop_stopped")
 
 
 async def _poller_loop(stop: asyncio.Event) -> None:
@@ -113,6 +146,7 @@ async def _generic_agent_loop(stop: asyncio.Event) -> None:
 
 async def _run_all_loops(stop: asyncio.Event) -> None:
     await asyncio.gather(
+        _heartbeat_loop(stop),
         _poller_loop(stop),
         _postmaster_loop(stop),
         _escalation_loop(stop),
