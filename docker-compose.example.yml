@@ -67,6 +67,11 @@ services:
       MEILI_NO_ANALYTICS: "true"
     volumes:
       - tiqora_meili:/meili_data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:7700/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
 
   tiqora-api:
     # Serves the REST/portal/compat API AND the web UI (SPA) at "/", so a single
@@ -120,6 +125,14 @@ services:
     depends_on:
       - tiqora-api
       - redis
+    healthcheck:
+      # No HTTP port — the worker touches a heartbeat file each cycle; this
+      # checks it is fresh (i.e. the asyncio event loop is alive).
+      test: ["CMD-SHELL", "python -c \"import os,sys,time; f=os.environ.get('TIQORA_WORKER_HEARTBEAT_FILE','/tmp/tiqora-worker.heartbeat'); sys.exit(0 if os.path.exists(f) and time.time()-os.path.getmtime(f) < 90 else 1)\""]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
 
   tiqora-mcp:
     image: ghcr.io/cygnusnetworks/tiqora:latest
@@ -137,6 +150,13 @@ services:
       - "8001:8001"
     depends_on:
       - tiqora-api
+    healthcheck:
+      # FastMCP streamable-HTTP returns 404 on "/" — any HTTP response proves
+      # the server is listening (a bare liveness check, not MCP-protocol auth).
+      test: ["CMD-SHELL", "curl -s -o /dev/null http://127.0.0.1:8001/ || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
 
   # Optional: catch SMTP in non-production
   # mailpit:
