@@ -32,6 +32,31 @@ def _seed_permissions(sync_url: str) -> dict[str, Any]:
     engine = create_engine(sync_url)
     ids: dict[str, Any] = {}
     with engine.begin() as conn:
+        # Idempotent cleanup of our block (shared session-scoped DB).
+        # Children before parents so FKs do not block.
+        conn.execute(
+            text("DELETE FROM queue WHERE id IN (100, 101)"),
+        )
+        conn.execute(
+            text(
+                "DELETE FROM group_user WHERE user_id IN (100, 101, 102)"
+                " OR group_id IN (10, 11, 12)"
+            ),
+        )
+        conn.execute(
+            text("DELETE FROM group_role WHERE role_id = 50 OR group_id IN (10, 11, 12)"),
+        )
+        conn.execute(
+            text("DELETE FROM role_user WHERE user_id IN (100, 101, 102) OR role_id = 50"),
+        )
+        conn.execute(text("DELETE FROM roles WHERE id = 50"))
+        conn.execute(
+            text("DELETE FROM permission_groups WHERE id IN (10, 11, 12)"),
+        )
+        conn.execute(
+            text("DELETE FROM users WHERE id IN (100, 101, 102)"),
+        )
+
         # Agent with direct perms, agent with role perms, invalid agent
         for uid, login, valid in (
             (100, "agent.direct", 1),

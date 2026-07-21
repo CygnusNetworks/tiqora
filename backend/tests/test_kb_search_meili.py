@@ -74,6 +74,12 @@ def _seed_users(sync_url: str) -> dict[str, int]:
     pw = hash_password("secret")
     with engine.begin() as conn:
         TiqoraBase.metadata.create_all(conn)
+        # Idempotent cleanup of our block (shared session-scoped DB).
+        conn.execute(
+            text("DELETE FROM group_user WHERE user_id IN (500, 501) OR group_id = 50"),
+        )
+        conn.execute(text("DELETE FROM permission_groups WHERE id = 50"))
+        conn.execute(text("DELETE FROM users WHERE id IN (500, 501)"))
         conn.execute(
             text(
                 "INSERT INTO users (id, login, pw, first_name, last_name, valid_id,"
