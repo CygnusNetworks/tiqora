@@ -484,6 +484,35 @@ export type CustomerRef = {
   customer_id: string;
   full_name: string;
 };
+export type QueueRef = { id: number; name: string };
+
+/** Compact ticket hit for agent link/merge pickers (GET /api/v1/tickets/search). */
+export type TicketSearchHit = {
+  ticket_id: number;
+  tn: string;
+  title: string;
+  queue?: string | null;
+  state?: string | null;
+  state_type?: string | null;
+};
+
+/** Agent-side customer-user create body (POST /api/v1/customers). */
+export type AgentCustomerCreateInput = {
+  login: string;
+  email: string;
+  first_name: string;
+  last_name: string;
+  customer_id: string;
+  phone?: string | null;
+};
+
+export type AgentCustomerCreateOut = {
+  login: string;
+  email: string;
+  customer_id: string;
+  first_name: string;
+  last_name: string;
+};
 
 // Hand-written to match tiqora/api/v1/tickets.py's TicketCreateRequest, which
 // the generated schema for this route does not yet reflect (agent create needs
@@ -729,6 +758,20 @@ export class ApiClient {
     });
   }
 
+  /**
+   * Permission-scoped ticket search for link/merge pickers.
+   * Matches tn + title; only queues the agent has at least `ro` on.
+   */
+  searchTickets(
+    params: { q: string; limit?: number },
+    signal?: AbortSignal,
+  ) {
+    return this.request<TicketSearchHit[]>("GET", "/api/v1/tickets/search", {
+      query: params,
+      signal,
+    });
+  }
+
   getTicket(ticketId: number, signal?: AbortSignal) {
     return this.request<TicketDetail>(
       "GET",
@@ -954,6 +997,17 @@ export class ApiClient {
     );
   }
 
+  /**
+   * Create a customer_user as any authenticated agent (ticket "Kunde anlegen").
+   * No password — contact record only; portal auth is separate.
+   */
+  createCustomer(body: AgentCustomerCreateInput, signal?: AbortSignal) {
+    return this.request<AgentCustomerCreateOut>("POST", "/api/v1/customers", {
+      body,
+      signal,
+    });
+  }
+
   // ── Reference (agent pickers, /api/v1/reference) ─────────────────────────
 
   listReferencePriorities(signal?: AbortSignal) {
@@ -973,6 +1027,20 @@ export class ApiClient {
     signal?: AbortSignal,
   ) {
     return this.request<CustomerRef[]>("GET", "/api/v1/reference/customers", {
+      query: params,
+      signal,
+    });
+  }
+
+  /**
+   * Queues for agent pickers. Pass `movable: true` for the Verschieben
+   * (move) picker — only valid queues the agent has `rw` on.
+   */
+  listReferenceQueues(
+    params: { movable?: boolean } = {},
+    signal?: AbortSignal,
+  ) {
+    return this.request<QueueRef[]>("GET", "/api/v1/reference/queues", {
       query: params,
       signal,
     });
