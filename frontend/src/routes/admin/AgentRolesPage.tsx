@@ -16,22 +16,24 @@ export function AgentRolesPage() {
       key: "users",
       labelKey: "admin.roleAssignments.agent",
       loadItems: async (signal) => {
-        const page = await api.adminUsers.list({ valid: "valid", pageSize: 500 }, signal);
+        const page = await api.adminUsers.list({ valid: "all", pageSize: 500 }, signal);
         return page.items;
       },
       getId: (u) => u.id,
       getLabel: (u) => u.login,
       getSubLabel: (u) => `${u.first_name} ${u.last_name}`.trim() || undefined,
+      isValid: (u) => u.valid_id === 1,
     },
     sideB: {
       key: "roles",
       labelKey: "admin.roleAssignments.roles",
       loadItems: async (signal) => {
-        const page = await api.adminRoles.list({ valid: "valid", pageSize: 500 }, signal);
+        const page = await api.adminRoles.list({ valid: "all", pageSize: 500 }, signal);
         return page.items;
       },
       getId: (r) => r.id,
       getLabel: (r) => r.name,
+      isValid: (r) => r.valid_id === 1,
     },
     loadAssignedB: (uId, signal) =>
       api.request<RoleOut[]>("GET", `/api/v1/admin/users/${uId}/roles`, { signal }),

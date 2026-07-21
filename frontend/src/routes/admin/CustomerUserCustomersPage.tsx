@@ -23,14 +23,14 @@ export function CustomerUserCustomersPage() {
       labelKey: "admin.customerUserCustomers.customerUser",
       loadItems: async (signal) => {
         const page = await api.adminCustomerUsers.list(
-          { valid: "valid", pageSize: 50, search: "" },
+          { valid: "all", pageSize: 50, search: "" },
           signal,
         );
         return page.items;
       },
       searchItems: async (q, signal) => {
         const page = await api.adminCustomerUsers.list(
-          { valid: "valid", pageSize: 50, search: q },
+          { valid: "all", pageSize: 50, search: q },
           signal,
         );
         return page.items;
@@ -42,20 +42,21 @@ export function CustomerUserCustomersPage() {
         if (name && u.email) return `${name} · ${u.email}`;
         return name || u.email || undefined;
       },
+      isValid: (u) => u.valid_id === 1,
     },
     sideB: {
       key: "companies",
       labelKey: "admin.customerUserCustomers.companies",
       loadItems: async (signal) => {
         const page = await api.adminCustomerCompanies.list(
-          { valid: "valid", pageSize: 50, search: "" },
+          { valid: "all", pageSize: 50, search: "" },
           signal,
         );
         return page.items;
       },
       searchItems: async (q, signal) => {
         const page = await api.adminCustomerCompanies.list(
-          { valid: "valid", pageSize: 50, search: q },
+          { valid: "all", pageSize: 50, search: q },
           signal,
         );
         return page.items;
@@ -63,6 +64,7 @@ export function CustomerUserCustomersPage() {
       getId: (c) => c.customer_id,
       getLabel: (c) => c.name,
       getSubLabel: (c) => c.customer_id,
+      isValid: (c) => c.valid_id === 1,
     },
     loadAssignedB: (login, signal) =>
       api.request<CustomerCompanyOut[]>(
