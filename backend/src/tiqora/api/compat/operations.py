@@ -24,12 +24,20 @@ from tiqora.db.legacy.customer import CustomerUser
 from tiqora.db.legacy.dynamic_field import DynamicField, DynamicFieldValue
 from tiqora.db.legacy.queue import Queue
 from tiqora.db.legacy.ticket import (
+    Ticket,
     TicketPriority,
     TicketState,
     TicketStateType,
 )
 from tiqora.db.legacy.user import Users
+from tiqora.db.tiqora.models import TiqoraUserPasskey
 from tiqora.domain.auth import AuthenticatedUser, SessionStore
+from tiqora.domain.auth_config import AuthConfigService
+from tiqora.domain.portal_ticket_service import (
+    PORTAL_SYSTEM_USER_ID,
+    customer_can_access_ticket,
+    customer_ticket_scope_filter,
+)
 from tiqora.domain.ticket_write_service import (
     ArticleIn,
     InvalidInput,
@@ -47,6 +55,7 @@ from tiqora.domain.ticket_write_service import (
     set_customer,
     update_dynamic_field,
 )
+from tiqora.domain.totp import TOTPService
 from tiqora.permissions.engine import PermissionEngine
 from tiqora.znuny.password import verify_password
 from tiqora.znuny.sysconfig import SysConfig
@@ -69,6 +78,42 @@ def _err(code: str, message: str) -> dict[str, Any]:
 
 _CUSTOMER_USER_TYPE = "Customer"
 _AGENT_USER_TYPE = "User"
+# Sentinel agent id for customer principals — never use root/agent id 1.
+_CUSTOMER_SENTINEL_USER_ID = 0
+
+_2FA_API_KEY_MSG = (
+    "Agent has 2FA enabled or enforced; use a tiqora_* API key instead of password/SessionCreate"
+)
+
+
+async def _agent_password_blocked_by_2fa(session: AsyncSession, user_id: int) -> bool:
+    """True when password/SessionCreate must be rejected (2FA enrolled or enforced)."""
+    from tiqora.config import get_settings
+
+    settings = get_settings()
+    totp = TOTPService(session, settings)
+    if await totp.is_enabled(user_id):
+        return True
+    has_passkey = (
+        await session.execute(
+            select(TiqoraUserPasskey.id).where(TiqoraUserPasskey.user_id == user_id).limit(1)
+        )
+    ).first()
+    if has_passkey is not None:
+        return True
+    return await AuthConfigService(session).effective_enforce(user_id)
+
+
+async def _load_customer_company_id(session: AsyncSession, login: str) -> str:
+    row = (
+        await session.execute(
+            select(CustomerUser.customer_id).where(
+                CustomerUser.login == login,
+                CustomerUser.valid_id == 1,
+            )
+        )
+    ).scalar_one_or_none()
+    return str(row) if row is not None else ""
 
 
 async def _auth_from_params(
@@ -80,8 +125,11 @@ async def _auth_from_params(
 
     Returns an error dict on failure.  Accepts:
     - SessionID: validated against the Znuny `sessions` key-value table
-    - UserLogin + Password: agent login
-    - CustomerUserLogin + Password: customer login (limited perms)
+    - UserLogin + Password: agent login (rejected when 2FA enabled/enforced)
+    - CustomerUserLogin + Password: customer login (ownership-scoped; never agent id)
+
+    Customer principals always return ``user_id=0`` and ``user_type=Customer``.
+    They must never be elevated to the root agent (id 1).
     """
     op_prefix = "Auth"
 
@@ -95,13 +143,12 @@ async def _auth_from_params(
         # compat SessionCreate op must round-trip for subsequent compat calls
         # (golden-master finding — Znuny's SessionCreate token is always
         # usable for follow-up requests). Customer sessions are stored with
-        # user_id=0 and map to the system user (id 1) per the documented
-        # Phase 2c convention.
+        # user_id=0; keep that sentinel — never rewrite 0→1 (C-1).
         stored = await session_store.get(session_id)
         if stored is not None:
             stored_user_id, stored_login = stored
-            if stored_user_id == 0:
-                return (1, stored_login, _CUSTOMER_USER_TYPE)
+            if stored_user_id == _CUSTOMER_SENTINEL_USER_ID:
+                return (_CUSTOMER_SENTINEL_USER_ID, stored_login, _CUSTOMER_USER_TYPE)
             return (stored_user_id, stored_login, _AGENT_USER_TYPE)
         return _err(f"{op_prefix}.AuthFail", "Session invalid or expired")
 
@@ -117,6 +164,8 @@ async def _auth_from_params(
         ).scalar_one_or_none()
         if row is None or not verify_password(password, row.pw or ""):
             return _err(f"{op_prefix}.AuthFail", "UserLogin or Password is invalid!")
+        if await _agent_password_blocked_by_2fa(session, row.id):
+            return _err(f"{op_prefix}.AuthFail", _2FA_API_KEY_MSG)
         return (row.id, row.login, _AGENT_USER_TYPE)
 
     if customer_login:
@@ -130,8 +179,8 @@ async def _auth_from_params(
         ).scalar_one_or_none()
         if row2 is None or not verify_password(password, row2.pw or ""):
             return _err(f"{op_prefix}.AuthFail", "CustomerUserLogin or Password is invalid!")
-        # Map customer to system user_id=1 (root) — customers have no direct agent user_id
-        return (1, customer_login, _CUSTOMER_USER_TYPE)
+        # Never map customers onto an agent id (was root user_id=1 — C-1).
+        return (_CUSTOMER_SENTINEL_USER_ID, customer_login, _CUSTOMER_USER_TYPE)
 
     return _err(f"{op_prefix}.AuthFail", "No UserLogin, CustomerUserLogin, or SessionID provided!")
 
@@ -158,10 +207,15 @@ async def _lookup_session(session: AsyncSession, session_id: str) -> tuple[int, 
     user_id_s = data.get("UserID")
     user_login = data.get("UserLogin")
     user_type = data.get("UserType", _AGENT_USER_TYPE)
-    if not user_id_s or not user_login:
+    if not user_login:
+        return None
+    # Customer sessions: never treat UserID as an agent principal for ACL.
+    if user_type == _CUSTOMER_USER_TYPE:
+        return (_CUSTOMER_SENTINEL_USER_ID, user_login, _CUSTOMER_USER_TYPE)
+    if not user_id_s:
         return None
     try:
-        return (int(user_id_s), user_login, user_type)
+        return (int(user_id_s), user_login, user_type or _AGENT_USER_TYPE)
     except ValueError:
         return None
 
@@ -319,7 +373,12 @@ async def op_session_create(
     session: AsyncSession,
     session_store: SessionStore,
 ) -> dict[str, Any]:
-    """SessionCreate operation — returns a SessionID."""
+    """SessionCreate operation — returns a SessionID.
+
+    Agent password auth is rejected when 2FA is enabled or enforced; non-interactive
+    callers must use a ``tiqora_*`` API key (H-1). Customer sessions use sentinel
+    ``user_id=0`` and must never be rewritten to the root agent (C-1).
+    """
     user_login = (data.get("UserLogin") or "").strip()
     customer_login = (data.get("CustomerUserLogin") or "").strip()
     password = (data.get("Password") or "").strip()
@@ -340,6 +399,8 @@ async def op_session_create(
         ).scalar_one_or_none()
         if row is None or not verify_password(password, row.pw or ""):
             return _err("SessionCreate.AuthFail", "SessionCreate: Authorization failing!")
+        if await _agent_password_blocked_by_2fa(session, row.id):
+            return _err("SessionCreate.AuthFail", _2FA_API_KEY_MSG)
         user = AuthenticatedUser(
             id=row.id,
             login=row.login,
@@ -348,7 +409,7 @@ async def op_session_create(
             auth_method="session",
         )
     else:
-        # Customer user session
+        # Customer user session — sentinel id 0, not root/agent 1.
         row2 = (
             await session.execute(
                 select(CustomerUser).where(
@@ -360,7 +421,7 @@ async def op_session_create(
         if row2 is None or not verify_password(password, row2.pw or ""):
             return _err("SessionCreate.AuthFail", "SessionCreate: Authorization failing!")
         user = AuthenticatedUser(
-            id=0,  # customer has no agent id
+            id=_CUSTOMER_SENTINEL_USER_ID,
             login=customer_login,
             first_name=row2.first_name,
             last_name=row2.last_name,
@@ -391,7 +452,8 @@ async def op_ticket_create(
         # Re-prefix error code with TicketCreate
         err = auth["Error"]
         return _err(f"{op}.AuthFail", err["ErrorMessage"])
-    user_id, _login, user_type = auth
+    user_id, login, user_type = auth
+    is_customer = user_type == _CUSTOMER_USER_TYPE
 
     ticket = data.get("Ticket") or {}
     if not ticket:
@@ -417,16 +479,25 @@ async def op_ticket_create(
 
     owner_id = await _resolve_user_id(session, ticket.get("Owner"), ticket.get("OwnerID"))
     if owner_id is None:
-        owner_id = 1  # default owner = root/system
+        owner_id = PORTAL_SYSTEM_USER_ID if is_customer else 1
 
     responsible_id = await _resolve_user_id(
         session, ticket.get("Responsible"), ticket.get("ResponsibleID")
     )
 
-    # Permission check
-    pe = PermissionEngine(session)
-    if not await pe.check(user_id, queue_id, "create"):
-        return _err(f"{op}.AccessDenied", f"{op}: No permission to create tickets in Queue!")
+    if is_customer:
+        # Ownership-scoped create: force customer identity; never agent queue-group ACL.
+        customer_company = await _load_customer_company_id(session, login)
+        customer_id_val: str | None = customer_company or ticket.get("CustomerID")
+        customer_user_val: str | None = login
+        write_user_id = PORTAL_SYSTEM_USER_ID
+    else:
+        pe = PermissionEngine(session)
+        if not await pe.check(user_id, queue_id, "create"):
+            return _err(f"{op}.AccessDenied", f"{op}: No permission to create tickets in Queue!")
+        customer_id_val = ticket.get("CustomerID")
+        customer_user_val = ticket.get("CustomerUser")
+        write_user_id = user_id
 
     # Dynamic fields
     dynamic_fields: dict[str, list[str]] = {}
@@ -456,8 +527,8 @@ async def op_ticket_create(
         priority_id=priority_id,
         owner_id=owner_id,
         responsible_id=responsible_id,
-        customer_id=ticket.get("CustomerID"),
-        customer_user_id=ticket.get("CustomerUser"),
+        customer_id=customer_id_val,
+        customer_user_id=customer_user_val,
         type_id=ticket.get("TypeID") or ticket.get("Type"),
         service_id=ticket.get("ServiceID"),
         sla_id=ticket.get("SLAID"),
@@ -479,7 +550,7 @@ async def op_ticket_create(
     try:
         async with session.begin_nested():
             ticket_id = await create_ticket(
-                session, session_factory, sysconfig, params=ticket_in, user_id=user_id
+                session, session_factory, sysconfig, params=ticket_in, user_id=write_user_id
             )
         await session.commit()
     except TicketAccessDenied:
@@ -520,7 +591,8 @@ async def op_ticket_update(
     if isinstance(auth, dict):
         err = auth["Error"]
         return _err(f"{op}.AuthFail", err["ErrorMessage"])
-    user_id, _login, user_type = auth
+    user_id, login, user_type = auth
+    is_customer = user_type == _CUSTOMER_USER_TYPE
 
     ticket_id_raw = data.get("TicketID")
     ticket_number = data.get("TicketNumber")
@@ -558,11 +630,55 @@ async def op_ticket_update(
         return _err(f"{op}.InvalidParameter", f"{op}: Ticket {ticket_id} not found!")
     queue_id = int(t_row["queue_id"])
 
+    ticket = data.get("Ticket") or {}
+    art_data = data.get("Article")
+
+    if is_customer:
+        # Portal customers may only add a follow-up article on owned tickets —
+        # never agent queue-group rw, never field mutations (C-1).
+        company_id = await _load_customer_company_id(session, login)
+        if not await customer_can_access_ticket(
+            session, login=login, customer_id=company_id, ticket_id=ticket_id
+        ):
+            return _err(f"{op}.AccessDenied", f"{op}: No permission to update ticket!")
+        if ticket:
+            return _err(
+                f"{op}.AccessDenied",
+                f"{op}: Customers may only add follow-up articles, not change ticket fields!",
+            )
+        if not art_data or not isinstance(art_data, dict):
+            return _err(
+                f"{op}.MissingParameter",
+                f"{op}: Article is required for customer follow-up!",
+            )
+        try:
+            async with session.begin_nested():
+                article_in = _build_article_in(
+                    {**art_data, "IsVisibleForCustomer": art_data.get("IsVisibleForCustomer", 1)},
+                    user_type,
+                )
+                await add_article(
+                    session,
+                    ticket_id=ticket_id,
+                    article=article_in,
+                    user_id=PORTAL_SYSTEM_USER_ID,
+                    sysconfig=sysconfig,
+                )
+            await session.commit()
+        except TicketNotFound:
+            await session.rollback()
+            return _err(f"{op}.InvalidParameter", f"{op}: Ticket {ticket_id} not found!")
+        except TicketAccessDenied:
+            await session.rollback()
+            return _err(f"{op}.AccessDenied", f"{op}: No permission!")
+        except InvalidInput as e:
+            await session.rollback()
+            return _err(f"{op}.InvalidParameter", str(e))
+        return {"TicketID": ticket_id, "TicketNumber": await _get_tn(session, ticket_id)}
+
     pe = PermissionEngine(session)
     if not await pe.check(user_id, queue_id, "rw"):
         return _err(f"{op}.AccessDenied", f"{op}: No permission to update ticket!")
-
-    ticket = data.get("Ticket") or {}
 
     try:
         async with session.begin_nested():
@@ -724,7 +840,8 @@ async def op_ticket_get(
     if isinstance(auth, dict):
         err = auth["Error"]
         return _err(f"{op}.AuthFail", err["ErrorMessage"])
-    user_id, _login, _user_type = auth
+    user_id, login, user_type = auth
+    is_customer = user_type == _CUSTOMER_USER_TYPE
 
     ticket_ids_raw = data.get("TicketID")
     if ticket_ids_raw is None:
@@ -740,8 +857,13 @@ async def op_ticket_get(
     with_attachments = bool(int(data.get("Attachments") or 0))
     with_dynamic_fields = bool(int(data.get("DynamicFields") or 0))
 
-    pe = PermissionEngine(session)
-    allowed_groups = await pe.groups_for_permission(user_id, "ro")
+    customer_company = ""
+    allowed_groups: set[int] = set()
+    if is_customer:
+        customer_company = await _load_customer_company_id(session, login)
+    else:
+        pe = PermissionEngine(session)
+        allowed_groups = set(await pe.groups_for_permission(user_id, "ro"))
 
     tickets_out: list[dict[str, Any]] = []
     for tid in ticket_ids:
@@ -767,12 +889,18 @@ async def op_ticket_get(
         if t is None:
             continue
 
-        # Permission check via queue→group
-        q_group = (
-            await session.execute(select(Queue.group_id).where(Queue.id == int(t["queue_id"])))
-        ).scalar_one_or_none()
-        if q_group not in allowed_groups:
-            continue
+        if is_customer:
+            if not await customer_can_access_ticket(
+                session, login=login, customer_id=customer_company, ticket_id=tid
+            ):
+                continue
+        else:
+            # Permission check via queue→group
+            q_group = (
+                await session.execute(select(Queue.group_id).where(Queue.id == int(t["queue_id"])))
+            ).scalar_one_or_none()
+            if q_group not in allowed_groups:
+                continue
 
         ticket_dict: dict[str, Any] = {
             "TicketID": t["id"],
@@ -971,56 +1099,90 @@ async def op_ticket_search(
     if isinstance(auth, dict):
         err = auth["Error"]
         return _err(f"{op}.AuthFail", err["ErrorMessage"])
-    user_id, _login, _user_type = auth
-
-    pe = PermissionEngine(session)
-    allowed_groups = await pe.groups_for_permission(user_id, "ro")
-    if not allowed_groups:
-        return {"TicketID": []}
-
-    # Get allowed queue IDs
-    allowed_queue_rows = (
-        (
-            await session.execute(
-                select(Queue.id).where(
-                    Queue.group_id.in_(allowed_groups),
-                    Queue.valid_id == 1,
-                )
-            )
-        )
-        .scalars()
-        .all()
-    )
-    allowed_queues: set[int] = set(allowed_queue_rows)
+    user_id, login, user_type = auth
+    is_customer = user_type == _CUSTOMER_USER_TYPE
 
     # Build filter conditions as a list of SQL clauses
     conditions: list[str] = []
     params: dict[str, Any] = {}
 
-    # Queue filter
-    queue_filter: set[int] = set(allowed_queues)
-    req_queues: set[int] = set()
-    if data.get("QueueIDs"):
-        for qid in _to_list(data["QueueIDs"]):
-            req_queues.add(int(qid))
-    if data.get("Queues"):
-        for qname in _to_list(data["Queues"]):
-            row = (
-                await session.execute(select(Queue.id).where(Queue.name == qname))
-            ).scalar_one_or_none()
-            if row:
-                req_queues.add(int(row))
-    if req_queues:
-        queue_filter = queue_filter & req_queues
+    if is_customer:
+        # Ownership-scoped: never agent queue-group RO (C-1).
+        company_id = await _load_customer_company_id(session, login)
+        scope = await customer_ticket_scope_filter(session, login=login, customer_id=company_id)
+        # Materialise matching ticket ids via ORM so we share portal ownership
+        # logic, then constrain the raw-SQL search builder.
+        owned_ids = set((await session.execute(select(Ticket.id).where(scope))).scalars().all())
+        if not owned_ids:
+            return {"TicketID": []}
+        o_list = list(owned_ids)
+        o_ph = ",".join(f":own{i}" for i in range(len(o_list)))
+        conditions.append(f"t.id IN ({o_ph})")
+        for i, oid in enumerate(o_list):
+            params[f"own{i}"] = oid
+        # Optional queue narrowing (still within owned tickets).
+        req_queues: set[int] = set()
+        if data.get("QueueIDs"):
+            for qid in _to_list(data["QueueIDs"]):
+                req_queues.add(int(qid))
+        if data.get("Queues"):
+            for qname in _to_list(data["Queues"]):
+                row = (
+                    await session.execute(select(Queue.id).where(Queue.name == qname))
+                ).scalar_one_or_none()
+                if row:
+                    req_queues.add(int(row))
+        if req_queues:
+            q_list = list(req_queues)
+            placeholders = ",".join(f":q{i}" for i in range(len(q_list)))
+            conditions.append(f"t.queue_id IN ({placeholders})")
+            for i, qid in enumerate(q_list):
+                params[f"q{i}"] = qid
+    else:
+        pe = PermissionEngine(session)
+        allowed_groups = await pe.groups_for_permission(user_id, "ro")
+        if not allowed_groups:
+            return {"TicketID": []}
 
-    if not queue_filter:
-        return {"TicketID": []}
+        # Get allowed queue IDs
+        allowed_queue_rows = (
+            (
+                await session.execute(
+                    select(Queue.id).where(
+                        Queue.group_id.in_(allowed_groups),
+                        Queue.valid_id == 1,
+                    )
+                )
+            )
+            .scalars()
+            .all()
+        )
+        allowed_queues: set[int] = set(allowed_queue_rows)
 
-    q_list = list(queue_filter)
-    placeholders = ",".join(f":q{i}" for i in range(len(q_list)))
-    conditions.append(f"t.queue_id IN ({placeholders})")
-    for i, qid in enumerate(q_list):
-        params[f"q{i}"] = qid
+        # Queue filter
+        queue_filter: set[int] = set(allowed_queues)
+        req_queues = set()
+        if data.get("QueueIDs"):
+            for qid in _to_list(data["QueueIDs"]):
+                req_queues.add(int(qid))
+        if data.get("Queues"):
+            for qname in _to_list(data["Queues"]):
+                row = (
+                    await session.execute(select(Queue.id).where(Queue.name == qname))
+                ).scalar_one_or_none()
+                if row:
+                    req_queues.add(int(row))
+        if req_queues:
+            queue_filter = queue_filter & req_queues
+
+        if not queue_filter:
+            return {"TicketID": []}
+
+        q_list = list(queue_filter)
+        placeholders = ",".join(f":q{i}" for i in range(len(q_list)))
+        conditions.append(f"t.queue_id IN ({placeholders})")
+        for i, qid in enumerate(q_list):
+            params[f"q{i}"] = qid
 
     # TicketNumber
     if tn := data.get("TicketNumber"):

@@ -95,13 +95,11 @@ async def get_current_user(
 
     if resolved is None and authorization and authorization.lower().startswith("bearer "):
         raw = authorization[7:].strip()
-        if raw:
+        # Only opaque API keys (tiqora_*). Session tokens must use the session
+        # cookie — accepting them as Bearer let password-only compat tokens
+        # authenticate the full /api/v1 surface (SECURITY_REVIEW_FABLE H-1).
+        if raw.startswith("tiqora_"):
             resolved = await auth.resolve_api_key(raw)
-            if resolved is None:
-                # Also accept session token as bearer (MCP / CLI convenience)
-                resolved = await auth.resolve_session(raw)
-                if resolved is not None:
-                    token_for_state = raw
 
     # Discard the read-only transaction the auth lookups opened on the shared
     # request session so downstream endpoints start with a clean session.

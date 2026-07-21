@@ -886,3 +886,359 @@ async def test_ticket_search_no_permission_returns_empty(compat_mariadb: dict[st
     assert "Error" not in result
     assert result["TicketID"] == []
     await engine.dispose()
+
+
+# ---------------------------------------------------------------------------
+# Security: C-1 customer ownership + H-1 2FA (no agent elevation / no 2FA bypass)
+# ---------------------------------------------------------------------------
+
+
+def _seed_second_customer(sync_url: str) -> None:
+    """Ensure a second customer exists for ownership isolation tests."""
+    engine = create_engine(sync_url)
+    with engine.begin() as conn:
+        conn.execute(text("DELETE FROM customer_user WHERE login = 'cust.user2'"))
+        conn.execute(
+            text(
+                "INSERT INTO customer_user"
+                " (login, email, customer_id, pw, first_name, last_name, valid_id,"
+                "  create_time, create_by, change_time, change_by)"
+                " VALUES ('cust.user2', 'c2@example.com', 'CUST2', :pw,"
+                "         'Cust', 'Two', 1, :t, 1, :t, 1)"
+            ),
+            {"pw": PW_HASH, "t": NOW},
+        )
+
+
+@pytest.mark.db
+async def test_customer_cannot_elevate_to_root_or_read_others(
+    compat_mariadb: dict[str, Any],
+) -> None:
+    """C-1: customer SessionCreate/auth never becomes agent id 1; ownership scoped."""
+    from tiqora.api.compat.operations import _auth_from_params
+
+    _seed_second_customer(compat_mariadb["url"])
+    engine = create_async_engine(compat_mariadb["async_url"])
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    store = _make_session_store()
+    sysconfig = _make_sysconfig()
+
+    async with factory() as session:
+        await _create_tiqora_tables(session)
+        # Agent creates one ticket per customer
+        mine = await op_ticket_create(
+            {
+                "UserLogin": "compat.agent",
+                "Password": "testpass",
+                "Ticket": {
+                    "Title": "Cust1 Owned Ticket",
+                    "QueueID": compat_mariadb["queue_id"],
+                    "StateID": compat_mariadb["state_id"],
+                    "PriorityID": compat_mariadb["priority_id"],
+                    "CustomerUser": "cust.user1",
+                    "CustomerID": "CUST1",
+                },
+            },
+            session,
+            factory,
+            store,
+            sysconfig,
+        )
+        other = await op_ticket_create(
+            {
+                "UserLogin": "compat.agent",
+                "Password": "testpass",
+                "Ticket": {
+                    "Title": "Cust2 Owned Ticket",
+                    "QueueID": compat_mariadb["queue_id"],
+                    "StateID": compat_mariadb["state_id"],
+                    "PriorityID": compat_mariadb["priority_id"],
+                    "CustomerUser": "cust.user2",
+                    "CustomerID": "CUST2",
+                },
+            },
+            session,
+            factory,
+            store,
+            sysconfig,
+        )
+
+    assert "TicketID" in mine, mine
+    assert "TicketID" in other, other
+    mine_id = int(mine["TicketID"])
+    other_id = int(other["TicketID"])
+
+    # SessionCreate stores sentinel 0; auth must not rewrite to root agent 1.
+    async with factory() as session:
+        sess = await op_session_create(
+            {"CustomerUserLogin": "cust.user1", "Password": "testpass"},
+            session,
+            store,
+        )
+        assert "SessionID" in sess, sess
+        auth = await _auth_from_params({"SessionID": sess["SessionID"]}, session, store)
+        assert not isinstance(auth, dict), auth
+        user_id, login, user_type = auth
+        assert user_id == 0
+        assert user_id != 1
+        assert login == "cust.user1"
+        assert user_type == "Customer"
+
+        # Direct password path also returns sentinel 0, never 1.
+        auth2 = await _auth_from_params(
+            {"CustomerUserLogin": "cust.user1", "Password": "testpass"},
+            session,
+            store,
+        )
+        assert not isinstance(auth2, dict), auth2
+        assert auth2[0] == 0
+        assert auth2[2] == "Customer"
+
+        # Can get own ticket only.
+        got_mine = await op_ticket_get(
+            {
+                "CustomerUserLogin": "cust.user1",
+                "Password": "testpass",
+                "TicketID": mine_id,
+            },
+            session,
+            store,
+        )
+        assert "Error" not in got_mine, got_mine
+        assert got_mine["Ticket"][0]["TicketID"] == mine_id
+
+        got_other = await op_ticket_get(
+            {
+                "CustomerUserLogin": "cust.user1",
+                "Password": "testpass",
+                "TicketID": other_id,
+            },
+            session,
+            store,
+        )
+        assert "Error" in got_other
+        assert "AccessDenied" in got_other["Error"]["ErrorCode"]
+
+        # Search must not list across queues / other customers.
+        search = await op_ticket_search(
+            {
+                "CustomerUserLogin": "cust.user1",
+                "Password": "testpass",
+            },
+            session,
+            store,
+        )
+        assert "Error" not in search, search
+        ids = set(search["TicketID"])
+        assert mine_id in ids
+        assert other_id not in ids
+
+        # Agent-style field update must be rejected for customers.
+        upd = await op_ticket_update(
+            {
+                "CustomerUserLogin": "cust.user1",
+                "Password": "testpass",
+                "TicketID": mine_id,
+                "Ticket": {"StateID": compat_mariadb["state_id"], "Title": "Hacked"},
+            },
+            session,
+            factory,
+            store,
+            sysconfig,
+        )
+        assert "Error" in upd
+        assert "AccessDenied" in upd["Error"]["ErrorCode"]
+
+        # Article follow-up on own ticket is allowed.
+        reply = await op_ticket_update(
+            {
+                "CustomerUserLogin": "cust.user1",
+                "Password": "testpass",
+                "TicketID": mine_id,
+                "Article": {
+                    "Subject": "Customer follow-up",
+                    "Body": "Still waiting",
+                    "ContentType": "text/plain; charset=utf-8",
+                },
+            },
+            session,
+            factory,
+            store,
+            sysconfig,
+        )
+        assert "Error" not in reply, reply
+
+        # Update other customer's ticket is denied.
+        upd_other = await op_ticket_update(
+            {
+                "CustomerUserLogin": "cust.user1",
+                "Password": "testpass",
+                "TicketID": other_id,
+                "Article": {"Subject": "nope", "Body": "nope"},
+            },
+            session,
+            factory,
+            store,
+            sysconfig,
+        )
+        assert "Error" in upd_other
+        assert "AccessDenied" in upd_other["Error"]["ErrorCode"]
+
+    await engine.dispose()
+
+
+@pytest.mark.db
+async def test_customer_ticket_create_forces_own_identity(
+    compat_mariadb: dict[str, Any],
+) -> None:
+    """Customer TicketCreate must stamp their login, not impersonate another customer."""
+    engine = create_async_engine(compat_mariadb["async_url"])
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    store = _make_session_store()
+    sysconfig = _make_sysconfig()
+
+    async with factory() as session:
+        await _create_tiqora_tables(session)
+        created = await op_ticket_create(
+            {
+                "CustomerUserLogin": "cust.user1",
+                "Password": "testpass",
+                "Ticket": {
+                    "Title": "Customer self-create",
+                    "QueueID": compat_mariadb["queue_id"],
+                    "StateID": compat_mariadb["state_id"],
+                    "PriorityID": compat_mariadb["priority_id"],
+                    # Attempt to spoof another customer — must be ignored.
+                    "CustomerUser": "cust.user2",
+                    "CustomerID": "CUST2",
+                },
+                "Article": {
+                    "Subject": "hi",
+                    "Body": "from customer",
+                    "ContentType": "text/plain; charset=utf-8",
+                },
+            },
+            session,
+            factory,
+            store,
+            sysconfig,
+        )
+        assert "TicketID" in created, created
+        tid = int(created["TicketID"])
+        row = (
+            await session.execute(
+                text("SELECT customer_user_id, customer_id FROM ticket WHERE id = :tid"),
+                {"tid": tid},
+            )
+        ).first()
+        assert row is not None
+        assert row[0] == "cust.user1"
+        assert row[1] == "CUST1"
+
+    await engine.dispose()
+
+
+@pytest.mark.db
+async def test_compat_password_rejects_2fa_agent_non_2fa_still_works(
+    compat_mariadb: dict[str, Any],
+) -> None:
+    """H-1: 2FA-enabled agent cannot SessionCreate/password; non-2FA agent still can."""
+    import pyotp
+
+    from tiqora.config import Settings
+    from tiqora.domain.auth_config import AuthConfigService
+    from tiqora.domain.totp import TOTPService
+
+    # Dedicated agent so TOTP state never pollutes shared compat.agent (id 300).
+    twofa_id = 302
+    twofa_login = "compat.twofa"
+    eng = create_engine(compat_mariadb["url"])
+    with eng.begin() as conn:
+        conn.execute(text("DELETE FROM group_user WHERE user_id = :id"), {"id": twofa_id})
+        conn.execute(
+            text("DELETE FROM users WHERE id = :id OR login = :login"),
+            {"id": twofa_id, "login": twofa_login},
+        )
+        conn.execute(
+            text(
+                "INSERT INTO users (id, login, pw, first_name, last_name, valid_id,"
+                " create_time, create_by, change_time, change_by)"
+                " VALUES (:id, :login, :pw, 'Two', 'Fa', 1, :t, 1, :t, 1)"
+            ),
+            {"id": twofa_id, "login": twofa_login, "pw": PW_HASH, "t": NOW},
+        )
+
+    engine = create_async_engine(compat_mariadb["async_url"])
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    store = _make_session_store()
+    settings = Settings(secret_key="compat-2fa-test-secret", totp_pending_ttl_seconds=300)
+
+    # Non-2FA agents still authenticate via SessionCreate (regression).
+    async with factory() as session:
+        await _create_tiqora_tables(session)
+        ok = await op_session_create(
+            {"UserLogin": "compat.agent", "Password": "testpass"},
+            session,
+            store,
+        )
+        assert "SessionID" in ok, ok
+
+        ok_before = await op_session_create(
+            {"UserLogin": twofa_login, "Password": "testpass"},
+            session,
+            store,
+        )
+        assert "SessionID" in ok_before, ok_before
+
+    async with factory() as session:
+        totp = TOTPService(session, settings)
+        secret, _uri = await totp.enroll(twofa_id, twofa_login)
+        assert await totp.confirm(twofa_id, pyotp.TOTP(secret).now()) is True
+        assert await totp.is_enabled(twofa_id) is True
+
+        blocked = await op_session_create(
+            {"UserLogin": twofa_login, "Password": "testpass"},
+            session,
+            store,
+        )
+        assert "Error" in blocked
+        assert blocked["Error"]["ErrorCode"] == "SessionCreate.AuthFail"
+        assert "API key" in blocked["Error"]["ErrorMessage"]
+
+        blocked_inline = await op_ticket_search(
+            {
+                "UserLogin": twofa_login,
+                "Password": "testpass",
+                "QueueIDs": [compat_mariadb["queue_id"]],
+            },
+            session,
+            store,
+        )
+        assert "Error" in blocked_inline
+        assert "AuthFail" in blocked_inline["Error"]["ErrorCode"]
+        assert "API key" in blocked_inline["Error"]["ErrorMessage"]
+
+        # Disable TOTP; enable enforce_2fa — still blocked.
+        assert await totp.disable(twofa_id, pyotp.TOTP(secret).now()) is True
+        await AuthConfigService(session).set(twofa_id, enforce_2fa=True)
+
+        blocked_enforce = await op_session_create(
+            {"UserLogin": twofa_login, "Password": "testpass"},
+            session,
+            store,
+        )
+        assert "Error" in blocked_enforce
+        assert "API key" in blocked_enforce["Error"]["ErrorMessage"]
+
+        await AuthConfigService(session).set(twofa_id, enforce_2fa=False)
+
+    # Shared non-2FA agent still works after the 2FA exercise.
+    async with factory() as session:
+        ok2 = await op_session_create(
+            {"UserLogin": "compat.agent", "Password": "testpass"},
+            session,
+            store,
+        )
+        assert "SessionID" in ok2, ok2
+
+    await engine.dispose()
