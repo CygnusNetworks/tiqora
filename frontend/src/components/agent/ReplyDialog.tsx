@@ -162,14 +162,20 @@ export function ReplyDialog({
   const dialogWidth =
     "w-full max-w-full sm:max-w-2xl md:max-w-3xl lg:max-w-4xl xl:max-w-5xl";
 
+  // OFF: muted outline. ON: filled accent (expanded and/or has content).
   const toggleCls =
-    "inline-flex items-center gap-1 rounded border border-hairline px-2 py-0.5 text-muted hover:text-ink";
-  const toggleActiveCls = "border-accent/40 text-ink";
+    "inline-flex items-center gap-1 rounded border border-hairline px-2 py-0.5 text-muted transition-colors duration-100 hover:text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent";
+  const toggleActiveCls =
+    "border-accent/50 bg-accent-dim text-accent hover:text-accent";
   // Compact count pill (QueuesPage open-badge style) — only when collapsed + non-empty.
   const countBadgeCls =
     "rounded-full bg-accent-dim px-1.5 py-0.5 font-mono text-[10px] tabular-nums text-accent";
 
   const replyToCount = replyTo.trim() ? 1 : 0;
+  // "On" when the section is expanded OR still holds content while collapsed.
+  const ccOn = showCc || cc.length > 0;
+  const bccOn = showBcc || bcc.length > 0;
+  const replyToOn = showReplyTo || replyToCount > 0;
 
   return (
     <Dialog open={open} onClose={onClose} title={title} className={dialogWidth}>
@@ -229,8 +235,9 @@ export function ReplyDialog({
           <div className="flex flex-wrap items-center gap-1.5 text-xs">
             <button
               type="button"
-              className={cn(toggleCls, showCc && toggleActiveCls)}
+              className={cn(toggleCls, ccOn && toggleActiveCls)}
               data-testid="reply-toggle-cc"
+              data-active={ccOn ? "true" : "false"}
               aria-expanded={showCc}
               onClick={() => setShowCc((v) => !v)}
             >
@@ -243,8 +250,9 @@ export function ReplyDialog({
             </button>
             <button
               type="button"
-              className={cn(toggleCls, showBcc && toggleActiveCls)}
+              className={cn(toggleCls, bccOn && toggleActiveCls)}
               data-testid="reply-toggle-bcc"
+              data-active={bccOn ? "true" : "false"}
               aria-expanded={showBcc}
               onClick={() => setShowBcc((v) => !v)}
             >
@@ -257,8 +265,9 @@ export function ReplyDialog({
             </button>
             <button
               type="button"
-              className={cn(toggleCls, showReplyTo && toggleActiveCls)}
+              className={cn(toggleCls, replyToOn && toggleActiveCls)}
               data-testid="reply-toggle-replyto"
+              data-active={replyToOn ? "true" : "false"}
               aria-expanded={showReplyTo}
               onClick={() => setShowReplyTo((v) => !v)}
             >
