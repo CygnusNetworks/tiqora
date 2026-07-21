@@ -685,7 +685,7 @@ class DynamicFieldUpdate(BaseModel):
 
 
 # ---------------------------------------------------------------------------
-# Read-only: postmaster filter / ACL / generic agent jobs
+# Postmaster filters (editable) + read-only ACL / generic agent jobs
 # ---------------------------------------------------------------------------
 
 
@@ -703,6 +703,49 @@ class PostmasterFilterOut(BaseModel):
 
     name: str
     rules: list[PostmasterFilterRuleOut]
+
+
+class PostmasterMatchRuleIn(BaseModel):
+    """One Match condition (email header + regex/value, optional negate)."""
+
+    key: str = Field(min_length=1, max_length=200)
+    value: str = Field(min_length=1, max_length=200)
+    negate: bool = False
+
+
+class PostmasterSetRuleIn(BaseModel):
+    """One Set action (typically an X-OTRS-* header + value)."""
+
+    key: str = Field(min_length=1, max_length=200)
+    value: str = Field(min_length=1, max_length=200)
+
+
+class PostmasterFilterWrite(BaseModel):
+    """Create/replace body for a named PostMaster filter.
+
+    Znuny stores one ``postmaster_filter`` row per Match/Set entry under the
+    same ``f_name``; ``stop`` maps to ``f_stop`` on every row for that name.
+    """
+
+    name: str = Field(min_length=1, max_length=200)
+    stop: bool = False
+    match: list[PostmasterMatchRuleIn] = Field(min_length=1)
+    set: list[PostmasterSetRuleIn] = Field(default_factory=list)
+
+    @field_validator("name")
+    @classmethod
+    def _strip_name(cls, v: str) -> str:
+        name = v.strip()
+        if not name:
+            raise ValueError("name must not be empty")
+        return name
+
+    @field_validator("match")
+    @classmethod
+    def _require_match(cls, v: list[PostmasterMatchRuleIn]) -> list[PostmasterMatchRuleIn]:
+        if not v:
+            raise ValueError("at least one Match rule is required")
+        return v
 
 
 class AclOut(BaseModel):
