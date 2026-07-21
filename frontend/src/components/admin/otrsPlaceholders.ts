@@ -102,6 +102,12 @@ export const VARIABLE_GROUP_NOTES: Partial<Record<VariableGroup, string>> = {
 };
 
 /**
+ * Note for the TIQORA_ alias of OTRS_ queue tags (shown with configured vars).
+ * Kept as a dedicated key so i18n can stay in sync without overloading the base note.
+ */
+export const QUEUE_TIQORA_ALIAS_NOTE = "admin.variables.notes.tiqoraQueueAlias";
+
+/**
  * Insert `tag` at the textarea cursor (or selection), restoring focus/caret.
  * Falls back to append when the control is missing or not a textarea.
  */

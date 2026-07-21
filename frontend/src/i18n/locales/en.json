@@ -406,7 +406,8 @@
       "automation": "Automation",
       "system": "System",
       "queuesTemplates": "Queues & templates",
-      "email": "Email"
+      "email": "Email",
+      "placeholderVariables": "Placeholder variables"
     },
     "nav": {
       "users": "Users",
@@ -437,7 +438,9 @@
       "attachments": "Attachments",
       "templateAttachments": "Templates↔Attachments",
       "queueTemplates": "Templates↔Queues",
-      "queueAutoResponses": "Queues↔Auto responses"
+      "queueAutoResponses": "Queues↔Auto responses",
+      "queueVariables": "Queue variables",
+      "customerFields": "Customer fields"
     },
     "table": {
       "id": "ID",
@@ -609,11 +612,13 @@
         "currentLastname": "Logged-in agent last name",
         "ownerFirstname": "Ticket owner first name",
         "ownerLastname": "Ticket owner last name",
-        "queueName": "Queue name"
+        "queueName": "Queue name",
+        "configuredQueueVar": "Configured queue variable ({name})"
       },
       "notes": {
         "customerAnyColumn": "Any customer_user column: <OTRS_CUSTOMER_DATA_{Column}>",
-        "queueCustomFields": "Non-standard fields (e.g. <OTRS_QUEUE_Domain>) are only replaced when a data source exists."
+        "queueCustomFields": "Configured variables appear as <OTRS_QUEUE_Name>. <TIQORA_QUEUE_Name> is an equivalent alias. Non-standard fields are only substituted when a data source exists.",
+        "tiqoraQueueAlias": "<TIQORA_QUEUE_Name> is an equivalent alias of <OTRS_QUEUE_Name>."
       }
     },
     "salutations": {
@@ -822,6 +827,29 @@
       "noMatches": "No matches.",
       "assignedCount": "{{count}} assigned",
       "counterpartFor": "{{counterpart}} for {{anchor}}"
+    },
+    "queueVariables": {
+      "title_plural": "Queue variables",
+      "new": "New variable",
+      "queue": "Queue",
+      "global": "Global (all queues)",
+      "name": "Name",
+      "value": "Value",
+      "empty": "No variables for this queue.",
+      "nameHelp": "Resolved as <OTRS_QUEUE_{Name}> and <TIQORA_QUEUE_{Name}>.",
+      "globalHint": "Global variables apply to every queue unless the queue defines its own value for the same name.",
+      "queueHint": "Queue-specific variables override globals with the same name."
+    },
+    "customerFields": {
+      "title_plural": "Customer fields",
+      "new": "New field",
+      "sourceTable": "Source table",
+      "columnName": "Column name",
+      "columnNameHelp": "Column from customer_user / customer_company (suggestions from the DB).",
+      "tagName": "Tag name",
+      "tagNameHelp": "Placeholder: <OTRS_CUSTOMER_DATA_{Tag}>",
+      "label": "Label",
+      "enabled": "Enabled"
     }
   },
   "kb": {
