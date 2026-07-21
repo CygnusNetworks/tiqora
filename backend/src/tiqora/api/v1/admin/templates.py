@@ -21,6 +21,7 @@ from tiqora.api.v1.admin.deps import AdminUser
 from tiqora.api.v1.admin.pagination import ListParamsDep, Page, apply_valid_filter, paginate
 from tiqora.api.v1.admin.schemas import (
     AttachmentRefOut,
+    QueueOut,
     QueueTemplateAssignment,
     SalutationOut,
     SalutationUpdate,
@@ -34,6 +35,7 @@ from tiqora.api.v1.admin.schemas import (
     TemplateAttachmentsReplace,
 )
 from tiqora.db.legacy.queue import (
+    Queue,
     QueueStandardTemplate,
     Salutation,
     Signature,
@@ -242,6 +244,45 @@ async def deactivate_template(template_id: int, admin: AdminUser, session: DbSes
     row.change_by = admin.id
     await invalidate_znuny_cache_types(session, TEMPLATE_CACHE_TYPES)
     await session.commit()
+
+
+@router.get("/queues/{queue_id}/templates", response_model=list[StandardTemplateOut])
+async def get_queue_templates(
+    queue_id: int, admin: AdminUser, session: DbSession
+) -> list[StandardTemplate]:
+    """Templates currently assigned to *queue_id* (read side for the editor)."""
+    _ = admin
+    queue = await session.get(Queue, queue_id)
+    if queue is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Queue not found")
+    result = await session.execute(
+        select(StandardTemplate)
+        .join(
+            QueueStandardTemplate,
+            QueueStandardTemplate.standard_template_id == StandardTemplate.id,
+        )
+        .where(QueueStandardTemplate.queue_id == queue_id)
+        .order_by(StandardTemplate.name)
+    )
+    return list(result.scalars().all())
+
+
+@router.get("/templates/{template_id}/queues", response_model=list[QueueOut])
+async def get_template_queues(
+    template_id: int, admin: AdminUser, session: DbSession
+) -> list[Queue]:
+    """Queues this template is assigned to (reverse read side)."""
+    _ = admin
+    tmpl = await session.get(StandardTemplate, template_id)
+    if tmpl is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Template not found")
+    result = await session.execute(
+        select(Queue)
+        .join(QueueStandardTemplate, QueueStandardTemplate.queue_id == Queue.id)
+        .where(QueueStandardTemplate.standard_template_id == template_id)
+        .order_by(Queue.name)
+    )
+    return list(result.scalars().all())
 
 
 @router.put("/queues/{queue_id}/templates", status_code=status.HTTP_204_NO_CONTENT)
