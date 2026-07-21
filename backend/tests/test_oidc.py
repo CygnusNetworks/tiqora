@@ -14,7 +14,9 @@ import pytest
 from tiqora.config import Settings
 from tiqora.domain.oidc import OIDCError, OIDCService
 
-ISSUER = "https://idp.example.com"
+# Public hostname so outbound IP-pinning can resolve in tests (no network I/O:
+# MockTransport answers the HTTP calls; only DNS is real).
+ISSUER = "https://example.com"
 
 
 def _settings(**overrides: object) -> Settings:

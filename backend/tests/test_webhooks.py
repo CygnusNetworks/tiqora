@@ -120,7 +120,7 @@ async def test_dispatch_delivers_signed_payload_and_filters_events(
         session.add(
             TiqoraWebhook(
                 name=f"hook-{uuid.uuid4().hex[:8]}",
-                url="https://hooks.example.com/tiqora",
+                url="https://example.com/tiqora",
                 secret=secret,
                 events=json.dumps(["TicketCreate"]),
                 valid=True,
@@ -178,7 +178,7 @@ async def test_dispatch_retries_and_counts_final_failure(
         session.add(
             TiqoraWebhook(
                 name=f"hook-{uuid.uuid4().hex[:8]}",
-                url="https://hooks.example.com/always-down",
+                url="https://example.com/always-down",
                 secret="s3cret",
                 events=json.dumps([]),  # subscribes to everything
                 valid=True,
@@ -209,5 +209,49 @@ async def test_dispatch_retries_and_counts_final_failure(
 
     assert attempts == 3
     assert result == {"delivered": 0, "failed": 1}
+
+    await engine.dispose()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("url_fixture", ["mariadb_znuny_url", "postgres_znuny_url"])
+async def test_dispatch_blocks_private_url_ssrf(
+    url_fixture: str, request: pytest.FixtureRequest
+) -> None:
+    """H-4 / H-03: webhook delivery must not POST to loopback/private targets."""
+    sync_url: str = request.getfixturevalue(url_fixture)
+    _seed_tables(sync_url)
+    engine = create_async_engine(_to_async_url(sync_url))
+    factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+    await _clear_webhooks(factory)
+
+    async with factory() as session:
+        session.add(
+            TiqoraWebhook(
+                name=f"ssrf-{uuid.uuid4().hex[:8]}",
+                url="http://127.0.0.1:9/steal",
+                secret="s3cret",
+                events=json.dumps([]),
+                valid=True,
+            )
+        )
+        await session.commit()
+
+    received: list[httpx.Request] = []
+
+    def handler(request_: httpx.Request) -> httpx.Response:
+        received.append(request_)
+        return httpx.Response(200)
+
+    settings = Settings(webhook_max_attempts=2, webhook_timeout_seconds=5.0)
+    result = await dispatch_webhooks(
+        [("TicketCreate", 1, None)],
+        settings=settings,
+        session_factory=factory,
+        transport=httpx.MockTransport(handler),
+    )
+
+    assert result == {"delivered": 0, "failed": 1}
+    assert received == []  # never connected
 
     await engine.dispose()

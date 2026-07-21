@@ -295,6 +295,46 @@ async def ticket_search(
         return await _db_search(session, allowed_queues, query, state_type, customer_user_id, limit)
 
 
+# Znuny default ticket_state_type names — used as an allowlist so a crafted
+# state_type cannot break out of the Meili filter expression.
+_MEILI_STATE_TYPES: frozenset[str] = frozenset(
+    {
+        "new",
+        "open",
+        "closed",
+        "pending reminder",
+        "pending auto",
+        "removed",
+        "merged",
+    }
+)
+
+
+def _meili_escape_string(value: str) -> str:
+    """Escape a string value for embedding in a Meilisearch filter expression.
+
+    Meili string literals use single quotes; backslash escapes ``\\`` and ``'``.
+    Without this, a crafted ``customer_user_id`` can break out of the mandatory
+    ``queue_id IN [...]`` clause (Meili binds AND tighter than OR).
+    """
+    return value.replace("\\", "\\\\").replace("'", "\\'")
+
+
+def _build_meili_ticket_filters(
+    allowed_queues: set[int],
+    state_type: str | None,
+    customer_user_id: str | None,
+) -> str:
+    """Build a safe Meili filter that always keeps the queue-permission clause."""
+    filters: list[str] = [f"queue_id IN [{','.join(str(q) for q in sorted(allowed_queues))}]"]
+    if state_type is not None and state_type in _MEILI_STATE_TYPES:
+        # Allowlisted tokens only — no quoting needed, but keep the same form.
+        filters.append(f"state_type = '{state_type}'")
+    if customer_user_id:
+        filters.append(f"customer_user_id = '{_meili_escape_string(customer_user_id)}'")
+    return " AND ".join(filters)
+
+
 async def _meili_search(
     settings: Settings,
     query: str,
@@ -308,15 +348,11 @@ async def _meili_search(
 
     async with AsyncClient(settings.meili_url, settings.meili_master_key) as client:
         index = client.index(settings.meili_tickets_index)
-        filters: list[str] = [f"queue_id IN [{','.join(str(q) for q in allowed_queues)}]"]
-        if state_type:
-            filters.append(f"state_type = '{state_type}'")
-        if customer_user_id:
-            filters.append(f"customer_user_id = '{customer_user_id}'")
+        filter_expr = _build_meili_ticket_filters(allowed_queues, state_type, customer_user_id)
 
         resp = await index.search(
             query,
-            filter=" AND ".join(filters),
+            filter=filter_expr,
             limit=limit,
         )
         return [
