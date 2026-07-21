@@ -11575,6 +11575,85 @@
         ]
       }
     },
+    "/api/v1/admin/auto-responses/{auto_response_id}/queues": {
+      "get": {
+        "description": "Queues this auto-response is assigned to (reverse read side).",
+        "operationId": "get_auto_response_queues_api_v1_admin_auto_responses__auto_response_id__queues_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "auto_response_id",
+            "required": true,
+            "schema": {
+              "title": "Auto Response Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/QueueOut"
+                  },
+                  "title": "Response Get Auto Response Queues Api V1 Admin Auto Responses  Auto Response Id  Queues Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Auto Response Queues",
+        "tags": [
+          "admin:auto-responses"
+        ]
+      }
+    },
     "/api/v1/admin/channels": {
       "get": {
         "operationId": "list_channels_api_v1_admin_channels_get",
@@ -15412,6 +15491,83 @@
       }
     },
     "/api/v1/admin/queues/{queue_id}/auto-responses": {
+      "get": {
+        "description": "Auto-responses currently assigned to *queue_id* (read side for the editor).",
+        "operationId": "get_queue_auto_responses_api_v1_admin_queues__queue_id__auto_responses_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "queue_id",
+            "required": true,
+            "schema": {
+              "title": "Queue Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/AutoResponseOut"
+                  },
+                  "title": "Response Get Queue Auto Responses Api V1 Admin Queues  Queue Id  Auto Responses Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Queue Auto Responses",
+        "tags": [
+          "admin:auto-responses"
+        ]
+      },
       "put": {
         "operationId": "assign_queue_auto_response_api_v1_admin_queues__queue_id__auto_responses_put",
         "parameters": [
@@ -15565,6 +15721,83 @@
       }
     },
     "/api/v1/admin/queues/{queue_id}/templates": {
+      "get": {
+        "description": "Templates currently assigned to *queue_id* (read side for the editor).",
+        "operationId": "get_queue_templates_api_v1_admin_queues__queue_id__templates_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "queue_id",
+            "required": true,
+            "schema": {
+              "title": "Queue Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/StandardTemplateOut"
+                  },
+                  "title": "Response Get Queue Templates Api V1 Admin Queues  Queue Id  Templates Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Queue Templates",
+        "tags": [
+          "admin:templates"
+        ]
+      },
       "put": {
         "operationId": "assign_queue_template_api_v1_admin_queues__queue_id__templates_put",
         "parameters": [
@@ -18161,6 +18394,85 @@
           }
         },
         "summary": "Replace Template Attachments",
+        "tags": [
+          "admin:templates"
+        ]
+      }
+    },
+    "/api/v1/admin/templates/{template_id}/queues": {
+      "get": {
+        "description": "Queues this template is assigned to (reverse read side).",
+        "operationId": "get_template_queues_api_v1_admin_templates__template_id__queues_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "template_id",
+            "required": true,
+            "schema": {
+              "title": "Template Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/QueueOut"
+                  },
+                  "title": "Response Get Template Queues Api V1 Admin Templates  Template Id  Queues Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Template Queues",
         "tags": [
           "admin:templates"
         ]

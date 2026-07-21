@@ -22,6 +22,7 @@ from sqlalchemy import create_engine, text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from tiqora.api.v1.admin import attachments as admin_attachments
+from tiqora.api.v1.admin import auto_responses as admin_auto_responses
 from tiqora.api.v1.admin import customers as admin_customers
 from tiqora.api.v1.admin import dynamic_fields as admin_dynamic_fields
 from tiqora.api.v1.admin import groups as admin_groups
@@ -33,6 +34,7 @@ from tiqora.api.v1.admin import users as admin_users
 from tiqora.api.v1.admin.deps import get_admin_user
 from tiqora.api.v1.admin.pagination import ListParams
 from tiqora.api.v1.admin.schemas import (
+    AutoResponseCreate,
     CustomerCompanyCreate,
     CustomerUserAdminCreate,
     CustomerUserCustomerAssignment,
@@ -41,7 +43,9 @@ from tiqora.api.v1.admin.schemas import (
     GroupAssignment,
     GroupCreate,
     GroupRoleAssignment,
+    QueueAutoResponseAssignment,
     QueueCreate,
+    QueueTemplateAssignment,
     RoleAssignment,
     RoleCreate,
     StandardAttachmentCreate,
@@ -992,5 +996,148 @@ async def test_admin_customer_user_group_assignment_roundtrip(
             )
         ).scalar_one()
         assert remaining == 0
+
+    await engine.dispose()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("url_fixture", ["mariadb_znuny_url", "postgres_znuny_url"])
+async def test_admin_queue_template_assignment_get_roundtrip(
+    url_fixture: str, request: pytest.FixtureRequest
+) -> None:
+    """Queue↔template read side: assign, GET both directions, revoke, empty; 404 anchors."""
+    sync_url: str = request.getfixturevalue(url_fixture)
+    ids = _seed_admin_and_plain_user(sync_url)
+    session, engine = await _make_session(sync_url)
+    ns = uuid.uuid4().hex[:8]
+
+    async with session as s:
+        admin_user = AuthenticatedUser(
+            id=ids["admin_id"],
+            login="root@localhost",
+            first_name="Admin",
+            last_name="Znuny",
+            auth_method="session",
+        )
+        queue = await admin_queues.create_queue(
+            QueueCreate(
+                name=f"qt-q-{ns}",
+                group_id=1,
+                system_address_id=1,
+                salutation_id=1,
+                signature_id=1,
+                follow_up_id=1,
+                follow_up_lock=0,
+            ),
+            admin_user,
+            s,
+        )
+        tmpl = await admin_templates.create_template(
+            StandardTemplateCreate(
+                name=f"qt-t-{ns}",
+                text="body",
+                template_type="Answer",
+            ),
+            admin_user,
+            s,
+        )
+
+        assert await admin_templates.get_queue_templates(queue.id, admin_user, s) == []
+        assert await admin_templates.get_template_queues(tmpl.id, admin_user, s) == []
+
+        await admin_templates.assign_queue_template(
+            queue.id,
+            QueueTemplateAssignment(standard_template_id=tmpl.id),
+            admin_user,
+            s,
+        )
+        linked_tmpls = await admin_templates.get_queue_templates(queue.id, admin_user, s)
+        assert [t.id for t in linked_tmpls] == [tmpl.id]
+        linked_queues = await admin_templates.get_template_queues(tmpl.id, admin_user, s)
+        assert [q.id for q in linked_queues] == [queue.id]
+
+        await admin_templates.revoke_queue_template(queue.id, tmpl.id, admin_user, s)
+        assert await admin_templates.get_queue_templates(queue.id, admin_user, s) == []
+        assert await admin_templates.get_template_queues(tmpl.id, admin_user, s) == []
+
+        with pytest.raises(HTTPException) as missing_queue:
+            await admin_templates.get_queue_templates(9_999_999, admin_user, s)
+        assert missing_queue.value.status_code == 404
+
+        with pytest.raises(HTTPException) as missing_tmpl:
+            await admin_templates.get_template_queues(9_999_999, admin_user, s)
+        assert missing_tmpl.value.status_code == 404
+
+    await engine.dispose()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("url_fixture", ["mariadb_znuny_url", "postgres_znuny_url"])
+async def test_admin_queue_auto_response_assignment_get_roundtrip(
+    url_fixture: str, request: pytest.FixtureRequest
+) -> None:
+    """Queue↔auto-response read side: assign, GET both directions, revoke, empty; 404 anchors."""
+    sync_url: str = request.getfixturevalue(url_fixture)
+    ids = _seed_admin_and_plain_user(sync_url)
+    session, engine = await _make_session(sync_url)
+    ns = uuid.uuid4().hex[:8]
+
+    async with session as s:
+        admin_user = AuthenticatedUser(
+            id=ids["admin_id"],
+            login="root@localhost",
+            first_name="Admin",
+            last_name="Znuny",
+            auth_method="session",
+        )
+        queue = await admin_queues.create_queue(
+            QueueCreate(
+                name=f"qar-q-{ns}",
+                group_id=1,
+                system_address_id=1,
+                salutation_id=1,
+                signature_id=1,
+                follow_up_id=1,
+                follow_up_lock=0,
+            ),
+            admin_user,
+            s,
+        )
+        ar = await admin_auto_responses.create_auto_response(
+            AutoResponseCreate(
+                name=f"qar-ar-{ns}",
+                type_id=1,
+                system_address_id=1,
+                text0="hello",
+            ),
+            admin_user,
+            s,
+        )
+
+        assert await admin_auto_responses.get_queue_auto_responses(queue.id, admin_user, s) == []
+        assert await admin_auto_responses.get_auto_response_queues(ar.id, admin_user, s) == []
+
+        await admin_auto_responses.assign_queue_auto_response(
+            queue.id,
+            QueueAutoResponseAssignment(auto_response_id=ar.id),
+            admin_user,
+            s,
+        )
+        linked_ars = await admin_auto_responses.get_queue_auto_responses(queue.id, admin_user, s)
+        assert [a.id for a in linked_ars] == [ar.id]
+        linked_queues = await admin_auto_responses.get_auto_response_queues(ar.id, admin_user, s)
+        assert [q.id for q in linked_queues] == [queue.id]
+
+        await admin_auto_responses.revoke_queue_auto_response(queue.id, ar.id, admin_user, s)
+        assert await admin_auto_responses.get_queue_auto_responses(queue.id, admin_user, s) == []
+        assert await admin_auto_responses.get_auto_response_queues(ar.id, admin_user, s) == []
+
+        with pytest.raises(HTTPException) as missing_queue:
+            await admin_auto_responses.get_queue_auto_responses(9_999_999, admin_user, s)
+        assert missing_queue.value.status_code == 404
+
+        with pytest.raises(HTTPException) as missing_ar:
+            await admin_auto_responses.get_auto_response_queues(9_999_999, admin_user, s)
+        assert missing_ar.value.status_code == 404
 
     await engine.dispose()

@@ -1313,6 +1313,20 @@ export class ApiClient {
     );
   }
 
+  listQueueTemplates(queueId: number, signal?: AbortSignal) {
+    return this.request<StandardTemplateOut[]>(
+      "GET",
+      `/api/v1/admin/queues/${queueId}/templates`,
+      { signal },
+    );
+  }
+
+  listTemplateQueues(templateId: number, signal?: AbortSignal) {
+    return this.request<QueueOut[]>("GET", `/api/v1/admin/templates/${templateId}/queues`, {
+      signal,
+    });
+  }
+
   assignQueueTemplate(queueId: number, standardTemplateId: number, signal?: AbortSignal) {
     return this.request<void>("PUT", `/api/v1/admin/queues/${queueId}/templates`, {
       body: { standard_template_id: standardTemplateId },
@@ -1392,6 +1406,22 @@ export class ApiClient {
   get adminAutoResponses() {
     return this.adminCrud<AutoResponseOut, AutoResponseCreate, AutoResponseUpdate>(
       "/api/v1/admin/auto-responses",
+    );
+  }
+
+  listQueueAutoResponses(queueId: number, signal?: AbortSignal) {
+    return this.request<AutoResponseOut[]>(
+      "GET",
+      `/api/v1/admin/queues/${queueId}/auto-responses`,
+      { signal },
+    );
+  }
+
+  listAutoResponseQueues(autoResponseId: number, signal?: AbortSignal) {
+    return this.request<QueueOut[]>(
+      "GET",
+      `/api/v1/admin/auto-responses/${autoResponseId}/queues`,
+      { signal },
     );
   }
 
