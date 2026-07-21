@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import contextlib
 import json
-from datetime import datetime
+from datetime import UTC, datetime
 
 import pytest
 from sqlalchemy import text
@@ -401,6 +401,102 @@ async def test_resolve_selector_criteria(url_fixture: str, request: pytest.Fixtu
 
         # empty selector → empty
         assert await resolve_selector(session, ErasureSelector()) == []
+
+    await engine.dispose()
+
+
+@pytest.mark.db
+@pytest.mark.asyncio
+@pytest.mark.parametrize("url_fixture", ["mariadb_znuny_url", "postgres_znuny_url"])
+async def test_resolve_selector_python_regex_semantics(
+    url_fixture: str, request: pytest.FixtureRequest
+) -> None:
+    """Python re semantics: \\d, (?i), invalid pattern, tz-aware time window.
+
+    Native SQL REGEXP/~ does not understand these patterns; resolve_selector
+    must apply re.search on in-memory candidates so admin preview is non-empty.
+    """
+    url = request.getfixturevalue(url_fixture)
+    engine, factory = await _factory(url)
+    mysql = _is_mysql(url)
+    prefix = "rx_mysql" if mysql else "rx_pg"
+
+    async with factory() as session:
+        await _seed_tiqora_tables(session, mysql=mysql)
+        id_legacy = await _insert_customer(
+            session,
+            login=f"{prefix}-legacy-0007",
+            customer_id=f"{prefix}-LEGACY-42",
+            change_time=datetime(2025, 8, 15, 10, 0, 0),
+        )
+        id_legacy_upper = await _insert_customer(
+            session,
+            login=f"{prefix}-LEGACY-42",
+            customer_id=f"{prefix}-OTHER",
+            change_time=datetime(2025, 9, 1, 10, 0, 0),
+        )
+        id_alt = await _insert_customer(
+            session,
+            login=f"{prefix}-alt_kunde",
+            customer_id=f"{prefix}-ALT",
+            change_time=datetime(2025, 7, 1, 10, 0, 0),
+        )
+        id_neu = await _insert_customer(
+            session,
+            login=f"{prefix}-neu.kunde",
+            customer_id=f"{prefix}-NEU",
+            change_time=datetime(2024, 1, 1, 10, 0, 0),
+        )
+
+        # login_regex with \\d — failed under native SQL REGEXP before the fix
+        ids = await resolve_selector(
+            session,
+            ErasureSelector(login_regex=rf"^{prefix}-legacy-\d+$"),
+        )
+        assert ids == [id_legacy]
+        assert id_legacy_upper not in ids
+        assert id_neu not in ids
+
+        # customer_id_regex anchored prefix
+        ids = await resolve_selector(
+            session,
+            ErasureSelector(customer_id_regex=rf"^{prefix}-LEGACY-"),
+        )
+        assert ids == [id_legacy]
+
+        # inline case-insensitive flag (?i)
+        ids = await resolve_selector(
+            session,
+            ErasureSelector(login_regex=rf"(?i)^{prefix}-ALT_"),
+        )
+        assert ids == [id_alt]
+
+        # invalid pattern → ErasureError (4xx path), not a 500
+        with pytest.raises(ErasureError, match="invalid login_regex"):
+            await resolve_selector(session, ErasureSelector(login_regex="[unclosed"))
+
+        with pytest.raises(ErasureError, match="invalid customer_id_regex"):
+            await resolve_selector(session, ErasureSelector(customer_id_regex="[unclosed"))
+
+        # tz-aware changed_after combined with regex — no crash, no spurious empty
+        ids = await resolve_selector(
+            session,
+            ErasureSelector(
+                login_regex=rf"^{prefix}-legacy-\d+$",
+                changed_after=datetime(2025, 1, 1, 0, 0, 0, tzinfo=UTC),
+            ),
+        )
+        assert ids == [id_legacy]
+
+        # window after the row's change_time → empty (still no tz crash)
+        ids = await resolve_selector(
+            session,
+            ErasureSelector(
+                login_regex=rf"^{prefix}-legacy-\d+$",
+                changed_after=datetime(2025, 12, 1, tzinfo=UTC),
+            ),
+        )
+        assert ids == []
 
     await engine.dispose()
 
