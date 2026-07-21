@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useNavigate } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
 import {
   api,
+  type AdminPage,
   type CustomerUserAdminOut,
   type CustomerUserAdminCreate,
   type CustomerUserAdminUpdate,
@@ -27,6 +29,7 @@ export function CustomerUsersPage() {
   const { t, i18n } = useTranslation();
   const locale = i18n.language?.startsWith("de") ? "de" : "en";
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
 
   const [companyDialog, setCompanyDialog] = useState<{
     ids: Array<number | string>;
@@ -165,8 +168,32 @@ export function CustomerUsersPage() {
           setCompanyDialog({ ids });
         },
       },
+      {
+        key: "gdpr",
+        label: t("admin.customerUsers.bulk.gdpr"),
+        run: async (ids) => {
+          // Resolve logins from the currently cached customer-users list pages.
+          const loginById = new Map<number, string>();
+          const cached = queryClient.getQueriesData<AdminPage<CustomerUserAdminOut>>({
+            queryKey: ["admin", "customer-users"],
+          });
+          for (const [, data] of cached) {
+            for (const row of data?.items ?? []) {
+              loginById.set(row.id, row.login);
+            }
+          }
+          const logins = ids
+            .map(Number)
+            .map((id) => loginById.get(id))
+            .filter((login): login is string => Boolean(login));
+          await navigate({
+            to: "/admin/gdpr",
+            search: { logins: logins.join(",") },
+          });
+        },
+      },
     ],
-    [t],
+    [t, queryClient, navigate],
   );
 
   const applyCompany = async () => {

@@ -424,7 +424,8 @@
       "system": "System",
       "queuesTemplates": "Queues & templates",
       "email": "Email",
-      "placeholderVariables": "Placeholder variables"
+      "placeholderVariables": "Placeholder variables",
+      "compliance": "Compliance"
     },
     "nav": {
       "users": "Users",
@@ -460,7 +461,8 @@
       "queueAutoResponses": "Queues↔Auto responses",
       "queueVariables": "Queue variables",
       "customerFields": "Customer fields",
-      "authConfig": "Authentication / 2FA"
+      "authConfig": "Authentication / 2FA",
+      "gdpr": "Privacy / GDPR"
     },
     "table": {
       "id": "ID",
@@ -630,7 +632,8 @@
         "companySearch": "Search company ID or name…",
         "companyPicked": "Selected: {{id}}",
         "companyApply": "Assign",
-        "companyRequired": "Please pick or enter a customer ID."
+        "companyRequired": "Please pick or enter a customer ID.",
+        "gdpr": "GDPR: anonymize/delete"
       }
     },
     "customerCompanies": {
@@ -1008,6 +1011,94 @@
       "resetConfirmTitle": "Reset two-factor authentication?",
       "resetConfirmBody": "This disables 2FA for {{login}}. They will need to enroll again if enforcement still applies.",
       "empty": "No agents found."
+    },
+    "gdpr": {
+      "title": "Privacy / GDPR",
+      "subtitle": "Resolve customer users via selectors, preview impact, then anonymize or delete with backup.",
+      "tab": {
+        "run": "Selection & run",
+        "jobs": "Jobs"
+      },
+      "mode": "Mode",
+      "modeAnonymize": "Anonymize",
+      "modeDelete": "Delete",
+      "modeAnonymizeHint": "PII is replaced deterministically; rows remain and can be rolled back from backup.",
+      "modeDeleteHint": "Customer users and related links are hard-deleted (with backup). Ticket content is anonymized, not deleted.",
+      "field": {
+        "customerSearch": "Search customer user",
+        "customerSearchPh": "Login, email, or name…",
+        "loginManualPh": "Add login manually",
+        "companyId": "Company (customer_id)",
+        "companyIdPh": "e.g. ACME",
+        "loginRegex": "Login regex",
+        "customerIdRegex": "customer_id regex",
+        "changedAfter": "Changed after",
+        "changedBefore": "Changed before",
+        "activity": "Activity",
+        "inactiveSinceDate": "Inactive since (date)",
+        "validity": "Validity"
+      },
+      "activity": {
+        "all": "All",
+        "noTickets": "No tickets",
+        "noOpenTickets": "Closed only (no open tickets)",
+        "inactiveSince": "Inactive since…"
+      },
+      "validity": {
+        "all": "All",
+        "temp": "Temporary"
+      },
+      "add": "Add",
+      "preview": "Preview",
+      "reset": "Reset",
+      "run": "Run",
+      "previewError": "Preview failed.",
+      "runError": "Run failed.",
+      "noCustomers": "No customer users in preview.",
+      "previewTitle": "Preview",
+      "previewSummary": "{{count}} customer users · mode: {{mode}}",
+      "previewEmpty": "No customer users match this selector.",
+      "affectedCounts": "Affected records",
+      "impact": {
+        "anonymizeTitle": "Columns that will be anonymized:",
+        "deleteTitle": "What will be deleted:",
+        "deleteBody": "Tables: {{tables}}. Ticket/article content is anonymized, not removed."
+      },
+      "confirmTitle": "Confirm GDPR job",
+      "confirmAnonymizeBody": "Anonymize {{count}} customer users? A backup will be created.",
+      "confirmDeleteBody": "WARNING: {{count}} customer users will be permanently deleted (backup until expiry). Type LÖSCHEN to confirm.",
+      "confirmTypePrompt": "Type “{{word}}” to confirm:",
+      "confirmSubmit": "Run now",
+      "runSuccess": "Job started successfully.",
+      "runSuccessDetail": "Job #{{id}} · status: {{status}} · {{count}} login(s).",
+      "viewJobs": "View jobs",
+      "jobsEmpty": "No GDPR jobs yet.",
+      "jobDetail": "Job #{{id}} — selector",
+      "col": {
+        "login": "Login",
+        "email": "Email",
+        "customerId": "customer_id",
+        "mode": "Mode",
+        "status": "Status",
+        "resolved": "Count",
+        "created": "Created",
+        "backupExpires": "Backup until",
+        "actions": "Actions"
+      },
+      "status": {
+        "applied": "Applied",
+        "rolled_back": "Rolled back",
+        "purged": "Backup purged"
+      },
+      "action": {
+        "rollback": "Rollback",
+        "purge": "Purge backup",
+        "download": "Backup"
+      },
+      "rollbackTitle": "Confirm rollback",
+      "rollbackBody": "Restore backup for job #{{id}}? The current state will be overwritten.",
+      "purgeTitle": "Permanently purge backup",
+      "purgeBody": "Permanently delete backup for job #{{id}}? Rollback will no longer be possible."
     }
   },
   "kb": {
