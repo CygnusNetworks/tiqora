@@ -10,6 +10,16 @@ function browserSupportsWebAuthn(): boolean {
   return typeof window !== "undefined" && typeof window.PublicKeyCredential !== "undefined";
 }
 
+/** Same-site absolute path only — reject protocol-relative (`//evil`) and `/\evil`. */
+function isSafeNextPath(next: string | undefined): next is string {
+  return (
+    typeof next === "string" &&
+    next.startsWith("/") &&
+    !next.startsWith("//") &&
+    !next.startsWith("/\\")
+  );
+}
+
 export function LoginPage() {
   const { t } = useTranslation();
   const {
@@ -62,8 +72,7 @@ export function LoginPage() {
 
   useEffect(() => {
     if (!isLoading && isAuthenticated && !mustEnroll2fa && !pending2fa) {
-      const next =
-        search.next && search.next.startsWith("/") ? search.next : "/agent";
+      const next = isSafeNextPath(search.next) ? search.next : "/agent";
       void navigate({ to: next });
     }
   }, [isLoading, isAuthenticated, mustEnroll2fa, pending2fa, search.next, navigate]);
@@ -87,8 +96,7 @@ export function LoginPage() {
   }, [mustEnroll2fa, enrollSecret, enrollStarting, passkeyEnrolling, t]);
 
   const goNext = async () => {
-    const next =
-      search.next && search.next.startsWith("/") ? search.next : "/agent";
+    const next = isSafeNextPath(search.next) ? search.next : "/agent";
     await navigate({ to: next });
   };
 

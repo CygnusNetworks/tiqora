@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link, useNavigate, useSearch } from "@tanstack/react-router";
+import DOMPurify from "dompurify";
 import { useTranslation } from "react-i18next";
 import { api } from "@/lib/api";
 import type { KbSearchHit } from "@/lib/api";
@@ -8,13 +9,20 @@ import { PriorityChip, StateChip } from "@/components/ui/StatusChip";
 
 export type SearchSearch = { q?: string; offset?: number };
 
+/** Escape first, highlight query terms, then allow only em/mark through to the DOM. */
 function highlight(text: string | null | undefined, q: string): string {
   if (!text) return "";
-  // Meilisearch may return <em> already; also do a simple client highlight
-  if (/<em>/i.test(text)) return text;
-  if (!q.trim()) return escapeHtml(text);
-  const re = new RegExp(`(${escapeRegExp(q.trim())})`, "gi");
-  return escapeHtml(text).replace(re, "<mark>$1</mark>");
+  // Never pass through raw HTML (attacker-controlled title/body can contain <em>).
+  const escaped = escapeHtml(text);
+  let withMarks = escaped;
+  if (q.trim()) {
+    const re = new RegExp(`(${escapeRegExp(q.trim())})`, "gi");
+    withMarks = escaped.replace(re, "<mark>$1</mark>");
+  }
+  return DOMPurify.sanitize(withMarks, {
+    ALLOWED_TAGS: ["em", "mark"],
+    ALLOWED_ATTR: [],
+  });
 }
 
 function escapeHtml(s: string): string {

@@ -238,4 +238,36 @@ describe("LoginPage", () => {
     fireEvent.submit(screen.getByTestId("login-form"));
     await waitFor(() => expect(login).toHaveBeenCalledWith("agent", "secret"));
   });
+
+  it("rejects protocol-relative next=//evil.com and falls back to /agent", async () => {
+    isAuthenticated = true;
+    isLoading = false;
+    searchParams = { next: "//evil.com" };
+    renderPage();
+    await waitFor(() => {
+      expect(navigate).toHaveBeenCalledWith({ to: "/agent" });
+    });
+    expect(navigate).not.toHaveBeenCalledWith({ to: "//evil.com" });
+  });
+
+  it("rejects next=/\\evil.com and falls back to /agent", async () => {
+    isAuthenticated = true;
+    isLoading = false;
+    searchParams = { next: "/\\evil.com" };
+    renderPage();
+    await waitFor(() => {
+      expect(navigate).toHaveBeenCalledWith({ to: "/agent" });
+    });
+    expect(navigate).not.toHaveBeenCalledWith({ to: "/\\evil.com" });
+  });
+
+  it("honors same-site next=/agent/tickets after auth", async () => {
+    isAuthenticated = true;
+    isLoading = false;
+    searchParams = { next: "/agent/tickets" };
+    renderPage();
+    await waitFor(() => {
+      expect(navigate).toHaveBeenCalledWith({ to: "/agent/tickets" });
+    });
+  });
 });
