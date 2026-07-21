@@ -2,13 +2,21 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, HTTPException, status
+from typing import Literal
+
+from fastapi import APIRouter, HTTPException, Query, status
 from sqlalchemy import select
 
 from tiqora.api.deps import DbSession
 from tiqora.api.v1.admin.common import AUTO_RESPONSE_CACHE_TYPES, invalidate_znuny_cache_types, now
 from tiqora.api.v1.admin.deps import AdminUser
-from tiqora.api.v1.admin.pagination import ListParamsDep, Page, apply_valid_filter, paginate
+from tiqora.api.v1.admin.pagination import (
+    ListParamsDep,
+    Page,
+    apply_valid_filter,
+    bulk_grouped_counts,
+    window,
+)
 from tiqora.api.v1.admin.schemas import (
     AutoResponseCreate,
     AutoResponseOut,
@@ -29,7 +37,32 @@ async def list_auto_responses(
     stmt = apply_valid_filter(select(AutoResponse), AutoResponse.valid_id, params.valid).order_by(
         AutoResponse.name
     )
-    return await paginate(session, AutoResponseOut, stmt, params)
+    rows, total = await window(session, stmt, params)
+    ids = [r.id for r in rows]
+    counts = await bulk_grouped_counts(
+        session,
+        QueueAutoResponse.auto_response_id,
+        restrict_ids=ids,
+    )
+    items = [
+        AutoResponseOut.model_validate(r).model_copy(
+            update={"assigned_queue_count": counts.get(r.id, 0)}
+        )
+        for r in rows
+    ]
+    return Page(items=items, total=total, page=params.page, page_size=params.page_size)
+
+
+@router.get("/auto-responses/assignment-counts", response_model=dict[int, int])
+async def auto_response_assignment_counts(
+    admin: AdminUser,
+    session: DbSession,
+    side: Literal["queues"] = Query(...),
+) -> dict[int, int]:
+    """Bulk assignment counts keyed by auto-response id (queue links)."""
+    _ = admin
+    _ = side
+    return await bulk_grouped_counts(session, QueueAutoResponse.auto_response_id)
 
 
 @router.get("/auto-responses/{auto_response_id}", response_model=AutoResponseOut)

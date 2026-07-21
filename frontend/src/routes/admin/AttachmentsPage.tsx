@@ -8,6 +8,7 @@ import {
 import { AdminResourcePage } from "@/components/admin/AdminResourcePage";
 import type { FieldDef, FieldValues } from "@/components/admin/CrudDrawer";
 import type { DataTableColumn } from "@/components/admin/DataTable";
+import { Badge } from "@/components/ui/Badge";
 import { formatDateTime } from "@/lib/format";
 
 /** Read a File as a raw base64 string (no data-URL prefix). */
@@ -60,6 +61,21 @@ export function AttachmentsPage() {
       key: "content_type",
       header: t("admin.attachments.contentType"),
       render: (r) => r.content_type,
+    },
+    {
+      key: "assigned_template_count",
+      header: t("admin.attachments.usage"),
+      render: (r) => {
+        const n = r.assigned_template_count ?? 0;
+        return (
+          <Badge
+            tone={n > 0 ? "default" : "muted"}
+            data-testid={`admin-attachment-usage-${r.id}`}
+          >
+            {n > 0 ? t("admin.attachments.inTemplates", { count: n }) : "0"}
+          </Badge>
+        );
+      },
     },
     {
       key: "changed",
