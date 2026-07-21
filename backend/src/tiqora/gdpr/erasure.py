@@ -347,11 +347,6 @@ def _kind_for(column: str) -> str:
 # ---------------------------------------------------------------------------
 
 
-async def _dialect_name(session: AsyncSession) -> str:
-    conn = await session.connection()
-    return conn.dialect.name
-
-
 def _has_any_selector(selector: ErasureSelector) -> bool:
     return bool(
         selector.logins
@@ -365,6 +360,17 @@ def _has_any_selector(selector: ErasureSelector) -> bool:
     )
 
 
+def _naive_change_time(dt: datetime) -> datetime:
+    """Normalize a pydantic/API datetime to naive wall-clock for Znuny change_time.
+
+    ``customer_user.change_time`` is a naive ``LegacyDateTime`` column. API-bound
+    values may be tz-aware; convert to local wall-clock then drop tzinfo.
+    """
+    if dt.tzinfo is not None:
+        return dt.astimezone().replace(tzinfo=None)
+    return dt
+
+
 async def resolve_selector(session: AsyncSession, selector: ErasureSelector) -> list[int]:
     """Resolve *selector* to ``customer_user.id`` list (AND of all criteria).
 
@@ -374,15 +380,18 @@ async def resolve_selector(session: AsyncSession, selector: ErasureSelector) -> 
         return []
 
     # Candidate set: start broad, narrow with SQL where possible.
+    # Regex-only selectors load the whole customer_user (id, login, customer_id)
+    # into memory — tens of thousands of small tuples is fine for admin preview.
     stmt = select(CustomerUser.id, CustomerUser.login, CustomerUser.customer_id)
     if selector.logins:
         stmt = stmt.where(CustomerUser.login.in_(list(selector.logins)))
     if selector.customer_ids:
         stmt = stmt.where(CustomerUser.customer_id.in_(list(selector.customer_ids)))
     if selector.changed_before is not None:
-        stmt = stmt.where(CustomerUser.change_time < selector.changed_before)
+        # Normalize tz-aware bounds so they compare cleanly with naive change_time.
+        stmt = stmt.where(CustomerUser.change_time < _naive_change_time(selector.changed_before))
     if selector.changed_after is not None:
-        stmt = stmt.where(CustomerUser.change_time > selector.changed_after)
+        stmt = stmt.where(CustomerUser.change_time > _naive_change_time(selector.changed_after))
     if selector.valid_id is not None:
         stmt = stmt.where(CustomerUser.valid_id == selector.valid_id)
 
@@ -393,80 +402,26 @@ async def resolve_selector(session: AsyncSession, selector: ErasureSelector) -> 
     if not candidates:
         return []
 
-    dialect = await _dialect_name(session)
-
-    # Regex: prefer SQL (MariaDB REGEXP / Postgres ~), fallback to Python re.
+    # Apply regex in Python (candidates already loaded). Native SQL REGEXP/~ does
+    # not understand Python patterns like \\d, \\w, (?i) and would return empty.
     if selector.login_regex:
         try:
-            re.compile(selector.login_regex)
+            cre = re.compile(selector.login_regex)
         except re.error as exc:
             raise ErasureError(f"invalid login_regex: {exc}") from exc
-        sql_ids = await _sql_regex_ids(
-            session,
-            dialect,
-            column="login",
-            pattern=selector.login_regex,
-            ids=[c[0] for c in candidates],
-        )
-        if sql_ids is not None:
-            allowed = set(sql_ids)
-            candidates = [c for c in candidates if c[0] in allowed]
-        else:
-            cre = re.compile(selector.login_regex)
-            candidates = [c for c in candidates if cre.search(c[1])]
+        candidates = [c for c in candidates if cre.search(c[1])]
 
     if selector.customer_id_regex:
         try:
-            re.compile(selector.customer_id_regex)
+            cre = re.compile(selector.customer_id_regex)
         except re.error as exc:
             raise ErasureError(f"invalid customer_id_regex: {exc}") from exc
-        sql_ids = await _sql_regex_ids(
-            session,
-            dialect,
-            column="customer_id",
-            pattern=selector.customer_id_regex,
-            ids=[c[0] for c in candidates],
-        )
-        if sql_ids is not None:
-            allowed = set(sql_ids)
-            candidates = [c for c in candidates if c[0] in allowed]
-        else:
-            cre = re.compile(selector.customer_id_regex)
-            candidates = [c for c in candidates if cre.search(c[2])]
+        candidates = [c for c in candidates if cre.search(c[2])]
 
     if selector.activity:
         candidates = await _filter_activity(session, candidates, selector.activity)
 
     return [c[0] for c in candidates]
-
-
-async def _sql_regex_ids(
-    session: AsyncSession,
-    dialect: str,
-    *,
-    column: str,
-    pattern: str,
-    ids: list[int],
-) -> list[int] | None:
-    """Return matching customer_user ids via SQL regex, or None to fall back."""
-    if not ids:
-        return []
-    if column not in ("login", "customer_id"):
-        return None
-    # Bound id list for the candidate set only.
-    id_list = ",".join(str(int(i)) for i in ids)
-    try:
-        if dialect in ("mysql", "mariadb"):
-            sql = f"SELECT id FROM customer_user WHERE id IN ({id_list}) AND `{column}` REGEXP :pat"
-            rows = (await session.execute(text(sql), {"pat": pattern})).scalars().all()
-            return [int(r) for r in rows]
-        if dialect == "postgresql":
-            sql = f"SELECT id FROM customer_user WHERE id IN ({id_list}) AND {column} ~ :pat"
-            rows = (await session.execute(text(sql), {"pat": pattern})).scalars().all()
-            return [int(r) for r in rows]
-    except Exception:  # noqa: BLE001 — dialect/regex mismatch → Python fallback
-        return None
-    return None
 
 
 async def _filter_activity(
