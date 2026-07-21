@@ -230,6 +230,7 @@
     "replySending": "Sending…",
     "replyError": "Could not send the reply. Please try again.",
     "replyDraftError": "Could not load the reply draft.",
+    "signaturePreview": "Signature (appended automatically)",
     "forwardDialogTitle": "Forward article",
     "forwardNote": "Note (optional)",
     "bounceDialogTitle": "Bounce article",

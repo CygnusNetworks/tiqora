@@ -232,6 +232,33 @@ def test_append_signature_plaintext_once() -> None:
     assert out2 == out
 
 
+def test_append_signature_strips_leading_delimiter() -> None:
+    """Stored signatures often start with -- / -- ; only one RFC-3676 delim remains."""
+    out = append_signature(
+        "Hello customer,",
+        "--\nAlice Example\nSupport",
+        content_type="text/plain; charset=utf-8",
+    )
+    assert out == "Hello customer,\n\n-- \nAlice Example\nSupport"
+    assert out.count("--") == 1
+
+    out_sp = append_signature(
+        "Hi",
+        "-- \nBob\nTeam",
+        content_type="text/plain",
+    )
+    assert out_sp == "Hi\n\n-- \nBob\nTeam"
+    assert out_sp.count("--") == 1
+
+    out_html = append_signature(
+        "<p>Hi</p>",
+        "--\nTeam Support",
+        content_type="text/html",
+    )
+    assert out_html.count("--") == 1
+    assert "Team Support" in out_html
+
+
 def test_append_signature_html() -> None:
     out = append_signature("<p>Hi</p>", "Team Support", content_type="text/html")
     assert "<p>Hi</p>" in out
