@@ -37,6 +37,7 @@ export type {
   HistoryEntry,
   PresenceIn,
   PresenceEntry,
+  OnlineAgentOut,
   ArticleCreateRequest,
   ArticleCreateResponse,
   MutationRequest,

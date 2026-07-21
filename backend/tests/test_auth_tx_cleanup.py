@@ -46,6 +46,13 @@ def _request() -> SimpleNamespace:
     return SimpleNamespace(state=SimpleNamespace(), cookies={})
 
 
+class _NoopRedis:
+    """Minimal Redis stand-in so auth cleanup tests ignore online presence."""
+
+    async def set(self, key: str, value: str, ex: int | None = None) -> None:
+        del key, value, ex
+
+
 @pytest.fixture
 async def session(postgres_znuny_url: str) -> AsyncSession:
     engine = create_async_engine(_to_async_url(postgres_znuny_url))
@@ -66,6 +73,7 @@ async def test_get_current_user_rolls_back_autobegun_tx(session: AsyncSession) -
         auth=_StubAuth(_USER),  # type: ignore[arg-type]
         settings=Settings(environment="test"),
         session=session,
+        redis_client=_NoopRedis(),  # type: ignore[arg-type]
         authorization=None,
         tiqora_session="tok",
     )
@@ -88,6 +96,7 @@ async def test_get_current_user_unauthenticated_still_clean(session: AsyncSessio
             auth=_StubAuth(None),  # type: ignore[arg-type]
             settings=Settings(environment="test"),
             session=session,
+            redis_client=_NoopRedis(),  # type: ignore[arg-type]
             authorization=None,
             tiqora_session="tok",
         )

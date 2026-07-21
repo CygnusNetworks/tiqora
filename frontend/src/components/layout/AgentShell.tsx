@@ -12,6 +12,7 @@ import { CommandSearch } from "@/components/agent/CommandSearch";
 import { NewTicketButton } from "@/components/agent/NewTicketButton";
 import { ConnectionStatus } from "@/components/agent/ConnectionStatus";
 import { AccountMenu } from "@/components/agent/AccountMenu";
+import { OnlineAgentsPopover } from "@/components/agent/OnlineAgentsPopover";
 import { HelpIcon } from "@/components/ui/icons";
 import { cn } from "@/lib/cn";
 import { appVersion } from "@/lib/appVersion";
@@ -438,7 +439,7 @@ function HeaderIconButton({
 }
 
 /** The cohesive top-right control cluster shared by the desktop and mobile
- * agent headers: search · new · connection · bell · help │ account. */
+ * agent headers: search · new · connection · online · bell · help │ account. */
 function HeaderControls({ onHelp, logoutTestId }: { onHelp: () => void; logoutTestId: string }) {
   const { t } = useTranslation();
   return (
@@ -447,6 +448,7 @@ function HeaderControls({ onHelp, logoutTestId }: { onHelp: () => void; logoutTe
       <NewTicketButton />
       <div className="mx-0.5 flex items-center gap-0.5">
         <ConnectionStatus />
+        <OnlineAgentsPopover />
         <NotificationBell />
         <HeaderIconButton onClick={onHelp} label={t("shortcuts.title")} testId="header-help">
           <HelpIcon className="text-[18px]" />
