@@ -146,6 +146,21 @@ const NAV_GROUPS: NavGroup[] = [
       },
     ],
   },
+  {
+    titleKey: "admin.group.placeholderVariables",
+    links: [
+      {
+        to: "/admin/queue-variables",
+        labelKey: "admin.nav.queueVariables",
+        testId: "admin-nav-queue-variables",
+      },
+      {
+        to: "/admin/customer-fields",
+        labelKey: "admin.nav.customerFields",
+        testId: "admin-nav-customer-fields",
+      },
+    ],
+  },
 ];
 
 function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {

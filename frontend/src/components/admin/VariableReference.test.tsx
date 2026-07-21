@@ -1,16 +1,45 @@
-import { describe, it, expect, vi } from "vitest";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { describe, it, expect, vi, beforeEach } from "vitest";
+import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { I18nextProvider } from "react-i18next";
 import i18n from "@/i18n";
 import { insertTagAtCursor, OTRS_PLACEHOLDERS } from "./otrsPlaceholders";
 import { VariableReference } from "./VariableReference";
 
+const listQueueVariables = vi.fn();
+const listCustomerFields = vi.fn();
+
+vi.mock("@/lib/api", () => ({
+  api: {
+    adminQueueVariables: {
+      list: (...args: unknown[]) => listQueueVariables(...args),
+    },
+    adminCustomerFields: {
+      list: (...args: unknown[]) => listCustomerFields(...args),
+    },
+  },
+}));
+
 function wrap(ui: React.ReactElement) {
-  return render(<I18nextProvider i18n={i18n}>{ui}</I18nextProvider>);
+  const qc = new QueryClient({
+    defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+  });
+  return render(
+    <QueryClientProvider client={qc}>
+      <I18nextProvider i18n={i18n}>{ui}</I18nextProvider>
+    </QueryClientProvider>,
+  );
 }
 
 describe("VariableReference", () => {
-  it("renders categorised groups when expanded", () => {
+  beforeEach(() => {
+    listQueueVariables.mockReset();
+    listCustomerFields.mockReset();
+    listQueueVariables.mockResolvedValue({ items: [], total: 0, page: 1, page_size: 500 });
+    listCustomerFields.mockResolvedValue({ items: [], total: 0, page: 1, page_size: 500 });
+  });
+
+  it("renders categorised groups when expanded", async () => {
     wrap(<VariableReference onInsert={vi.fn()} defaultOpen />);
 
     expect(screen.getByTestId("variable-reference-group-ticket")).toBeInTheDocument();
@@ -51,6 +80,86 @@ describe("VariableReference", () => {
     expect(OTRS_PLACEHOLDERS.every((p) => p.tag.startsWith("<OTRS_") && p.descriptionKey)).toBe(
       true,
     );
+  });
+
+  it("shows a configured queue variable from the admin list API", async () => {
+    listQueueVariables.mockResolvedValue({
+      items: [
+        {
+          id: 1,
+          queue_id: 3,
+          name: "Domain",
+          value: "stw-bonn.de",
+          created: "2026-07-20T00:00:00Z",
+          changed: "2026-07-20T00:00:00Z",
+        },
+        {
+          id: 2,
+          queue_id: null,
+          name: "Domain",
+          value: "global.example",
+          created: "2026-07-20T00:00:00Z",
+          changed: "2026-07-20T00:00:00Z",
+        },
+      ],
+      total: 2,
+      page: 1,
+      page_size: 500,
+    });
+    listCustomerFields.mockResolvedValue({
+      items: [
+        {
+          id: 5,
+          source_table: "customer_user",
+          column_name: "custom_col",
+          tag_name: "CustomCol",
+          label: "Custom column",
+          enabled: true,
+          created: "2026-07-20T00:00:00Z",
+          changed: "2026-07-20T00:00:00Z",
+        },
+        {
+          id: 6,
+          source_table: "customer_user",
+          column_name: "disabled_col",
+          tag_name: "Disabled",
+          label: "Off",
+          enabled: false,
+          created: "2026-07-20T00:00:00Z",
+          changed: "2026-07-20T00:00:00Z",
+        },
+      ],
+      total: 2,
+      page: 1,
+      page_size: 500,
+    });
+
+    wrap(<VariableReference onInsert={vi.fn()} defaultOpen />);
+
+    await waitFor(() => {
+      expect(screen.getByText("<OTRS_QUEUE_Domain>")).toBeInTheDocument();
+    });
+    // Distinct name only once
+    expect(screen.getAllByText("<OTRS_QUEUE_Domain>")).toHaveLength(1);
+
+    await waitFor(() => {
+      expect(screen.getByText("<OTRS_CUSTOMER_DATA_CustomCol>")).toBeInTheDocument();
+    });
+    expect(screen.getByText("Custom column")).toBeInTheDocument();
+    expect(screen.queryByText("<OTRS_CUSTOMER_DATA_Disabled>")).not.toBeInTheDocument();
+  });
+
+  it("falls back to the static list when admin queries fail", async () => {
+    listQueueVariables.mockRejectedValue(new Error("boom"));
+    listCustomerFields.mockRejectedValue(new Error("boom"));
+
+    wrap(<VariableReference onInsert={vi.fn()} defaultOpen />);
+
+    await waitFor(() => {
+      expect(screen.getByText("<OTRS_QUEUE_Name>")).toBeInTheDocument();
+    });
+    // No error UI
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
 });
 

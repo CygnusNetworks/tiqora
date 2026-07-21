@@ -76,6 +76,8 @@ import { GenericAgentJobsPage } from "@/routes/admin/GenericAgentJobsPage";
 import { GenericAgentJobDetailPage } from "@/routes/admin/GenericAgentJobDetailPage";
 import { ProcessesPage } from "@/routes/admin/ProcessesPage";
 import { ProcessDetailPage } from "@/routes/admin/ProcessDetailPage";
+import { QueueVariablesPage } from "@/routes/admin/QueueVariablesPage";
+import { CustomerFieldsPage } from "@/routes/admin/CustomerFieldsPage";
 
 const rootRoute = createRootRoute({
   component: () => <Outlet />,
@@ -540,6 +542,18 @@ const adminProcessesRoute = createRoute({
   component: ProcessesPage,
 });
 
+const adminQueueVariablesRoute = createRoute({
+  getParentRoute: () => adminLayoutRoute,
+  path: "/queue-variables",
+  component: QueueVariablesPage,
+});
+
+const adminCustomerFieldsRoute = createRoute({
+  getParentRoute: () => adminLayoutRoute,
+  path: "/customer-fields",
+  component: CustomerFieldsPage,
+});
+
 const adminProcessDetailRoute = createRoute({
   getParentRoute: () => adminLayoutRoute,
   path: "/processes/$processEntityId",
@@ -616,6 +630,8 @@ const routeTree = rootRoute.addChildren([
     adminGenericAgentJobDetailRoute,
     adminProcessesRoute,
     adminProcessDetailRoute,
+    adminQueueVariablesRoute,
+    adminCustomerFieldsRoute,
   ]),
   catchAllRoute,
 ]);

@@ -1,10 +1,14 @@
-import { useId, useState } from "react";
+import { useId, useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
+import { api } from "@/lib/api";
 import { cn } from "@/lib/cn";
 import {
   OTRS_PLACEHOLDERS,
   VARIABLE_GROUP_NOTES,
   VARIABLE_GROUP_ORDER,
+  type VariableGroup,
+  type VariablePlaceholder,
 } from "./otrsPlaceholders";
 
 export type VariableReferenceProps = {
@@ -15,8 +19,16 @@ export type VariableReferenceProps = {
   className?: string;
 };
 
+type DisplayItem = {
+  tag: string;
+  group: VariableGroup;
+  /** Already-resolved description text (i18n or plain label). */
+  description: string;
+};
+
 /**
  * Compact collapsible reference of supported OTRS placeholders.
+ * Static catalogue plus configured queue variables / customer fields (admin APIs).
  * Click a tag to insert it into the associated body/text field (via onInsert).
  */
 export function VariableReference({
@@ -28,10 +40,67 @@ export function VariableReference({
   const [open, setOpen] = useState(defaultOpen);
   const panelId = useId();
 
-  const byGroup = VARIABLE_GROUP_ORDER.map((group) => ({
-    group,
-    items: OTRS_PLACEHOLDERS.filter((p) => p.group === group),
-  })).filter((g) => g.items.length > 0);
+  const queueVarsQ = useQuery({
+    queryKey: ["admin", "queue-variables", "picker"],
+    queryFn: ({ signal }) => api.adminQueueVariables.list({ pageSize: 500 }, signal),
+    staleTime: 5 * 60 * 1000,
+    retry: false,
+    enabled: open,
+  });
+
+  const customerFieldsQ = useQuery({
+    queryKey: ["admin", "customer-fields", "picker"],
+    queryFn: ({ signal }) => api.adminCustomerFields.list({ pageSize: 500 }, signal),
+    staleTime: 5 * 60 * 1000,
+    retry: false,
+    enabled: open,
+  });
+
+  const byGroup = useMemo(() => {
+    const staticItems: DisplayItem[] = OTRS_PLACEHOLDERS.map((p: VariablePlaceholder) => ({
+      tag: p.tag,
+      group: p.group,
+      description: t(p.descriptionKey),
+    }));
+
+    const seen = new Set(staticItems.map((i) => i.tag));
+    const extras: DisplayItem[] = [];
+
+    // Distinct configured queue variable names → <OTRS_QUEUE_${name}>
+    const names = new Set<string>();
+    for (const row of queueVarsQ.data?.items ?? []) {
+      if (row.name?.trim()) names.add(row.name.trim());
+    }
+    for (const name of [...names].sort((a, b) => a.localeCompare(b))) {
+      const tag = `<OTRS_QUEUE_${name}>`;
+      if (seen.has(tag)) continue;
+      seen.add(tag);
+      extras.push({
+        tag,
+        group: "queue",
+        description: t("admin.variables.items.configuredQueueVar", { name }),
+      });
+    }
+
+    // Enabled customer-field registry rows → <OTRS_CUSTOMER_DATA_${tag_name}>
+    for (const row of customerFieldsQ.data?.items ?? []) {
+      if (!row.enabled || !row.tag_name?.trim()) continue;
+      const tag = `<OTRS_CUSTOMER_DATA_${row.tag_name.trim()}>`;
+      if (seen.has(tag)) continue;
+      seen.add(tag);
+      extras.push({
+        tag,
+        group: "customer",
+        description: row.label?.trim() || row.column_name || row.tag_name,
+      });
+    }
+
+    const all = [...staticItems, ...extras];
+    return VARIABLE_GROUP_ORDER.map((group) => ({
+      group,
+      items: all.filter((p) => p.group === group),
+    })).filter((g) => g.items.length > 0);
+  }, [t, queueVarsQ.data, customerFieldsQ.data]);
 
   return (
     <div
@@ -80,7 +149,7 @@ export function VariableReference({
                           {item.tag}
                         </code>
                         <span className="pt-0.5 text-[11px] leading-snug text-muted">
-                          {t(item.descriptionKey)}
+                          {item.description}
                         </span>
                       </button>
                     </li>
