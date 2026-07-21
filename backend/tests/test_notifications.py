@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import contextlib
-
 import pytest
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
@@ -18,23 +16,16 @@ def _mysql_async(url: str) -> str:
 
 
 async def _seed_tiqora_tables(session: AsyncSession) -> None:
-    ddl = [
-        """CREATE TABLE IF NOT EXISTS tiqora_event_outbox (
-            id BIGINT AUTO_INCREMENT PRIMARY KEY,
-            event_type VARCHAR(100) NOT NULL,
-            ticket_id BIGINT NOT NULL,
-            payload TEXT,
-            created DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-            processed TINYINT(1) NOT NULL DEFAULT 0
-        )""",
-        """CREATE TABLE IF NOT EXISTS tiqora_settings (
-            `key` VARCHAR(200) PRIMARY KEY,
-            value TEXT
-        )""",
-    ]
-    for stmt in ddl:
-        with contextlib.suppress(Exception):
-            await session.execute(text(stmt))
+    """Create additive Tiqora tables (outbox, settings, cache_invalidation, …).
+
+    Customer notifications write a ticket article, which enqueues
+    ``tiqora_cache_invalidation`` — so we need the full Tiqora metadata, not
+    just the outbox/settings subset. Dialect-agnostic via SQLAlchemy.
+    """
+    from tiqora.db.tiqora.base import TiqoraBase
+
+    conn = await session.connection()
+    await conn.run_sync(lambda c: TiqoraBase.metadata.create_all(c, checkfirst=True))
     await session.commit()
 
 
@@ -201,12 +192,14 @@ async def _skip_backlog(session: AsyncSession) -> None:
 async def _insert_outbox_event(
     session: AsyncSession, event_type: str, ticket_id: int, payload: str = "{}"
 ) -> int:
+    # ``processed`` is TINYINT on MySQL and BOOLEAN on Postgres — bind a
+    # boolean so both dialects accept the literal without a cast.
     await session.execute(
         text(
             "INSERT INTO tiqora_event_outbox (event_type, ticket_id, payload, created, processed)"
-            " VALUES (:et, :tid, :pl, current_timestamp, 0)"
+            " VALUES (:et, :tid, :pl, current_timestamp, :processed)"
         ),
-        {"et": event_type, "tid": ticket_id, "pl": payload},
+        {"et": event_type, "tid": ticket_id, "pl": payload, "processed": False},
     )
     row = (await session.execute(text("SELECT MAX(id) FROM tiqora_event_outbox"))).first()
     assert row is not None
@@ -391,5 +384,133 @@ async def test_run_notifications_tick_disabled_by_default(mariadb_znuny_url: str
             await set_setting(session, KEY_NOTIFICATIONS_ENABLED, "0")
         result = await run_notifications_tick(session_factory=factory)
         assert result == {"enabled": 0}
+    finally:
+        await engine.dispose()
+
+
+async def _insert_agent(
+    session: AsyncSession,
+    *,
+    user_id: int,
+    login: str,
+    valid_id: int = 1,
+) -> None:
+    """Idempotent agent seed (shared session-scoped container)."""
+    await session.execute(
+        text("DELETE FROM user_preferences WHERE user_id = :uid"), {"uid": user_id}
+    )
+    await session.execute(
+        text("DELETE FROM users WHERE id = :uid OR login = :login"),
+        {
+            "uid": user_id,
+            "login": login,
+        },
+    )
+    await session.execute(
+        text(
+            "INSERT INTO users (id, login, pw, first_name, last_name, valid_id,"
+            " create_time, create_by, change_time, change_by)"
+            " VALUES (:uid, :login, 'x', 'Watch', 'Agent', :vid,"
+            " current_timestamp, 1, current_timestamp, 1)"
+        ),
+        {"uid": user_id, "login": login, "vid": valid_id},
+    )
+
+
+async def _insert_watcher(session: AsyncSession, ticket_id: int, user_id: int) -> None:
+    await session.execute(
+        text("DELETE FROM ticket_watcher WHERE ticket_id = :tid AND user_id = :uid"),
+        {"tid": ticket_id, "uid": user_id},
+    )
+    await session.execute(
+        text(
+            "INSERT INTO ticket_watcher (ticket_id, user_id, create_time, create_by,"
+            " change_time, change_by)"
+            " VALUES (:tid, :uid, current_timestamp, 1, current_timestamp, 1)"
+        ),
+        {"tid": ticket_id, "uid": user_id},
+    )
+
+
+@pytest.mark.db
+@pytest.mark.parametrize("url_fixture", ["mariadb_znuny_url", "postgres_znuny_url"])
+async def test_agent_watcher_recipient_resolves_watchers(
+    url_fixture: str, request: pytest.FixtureRequest
+) -> None:
+    """AgentWatcher notifies ticket_watcher agents; skips invalid/no-email and non-watchers."""
+    sync_url: str = request.getfixturevalue(url_fixture)
+    if sync_url.startswith("mysql"):
+        async_url = _mysql_async(sync_url)
+    elif sync_url.startswith("postgresql+psycopg2://"):
+        async_url = sync_url.replace("postgresql+psycopg2://", "postgresql+asyncpg://", 1)
+    elif sync_url.startswith("postgresql://"):
+        async_url = sync_url.replace("postgresql://", "postgresql+asyncpg://", 1)
+    else:
+        async_url = sync_url
+
+    engine = create_async_engine(async_url)
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    sender = CapturingMailSender()
+
+    # Stable ids in a high range so they never collide with Znuny seed data.
+    watcher_id = 910_001
+    non_watcher_id = 910_002
+    invalid_watcher_id = 910_003
+    no_email_watcher_id = 910_004
+
+    try:
+        async with factory() as session:
+            await _seed_tiqora_tables(session)
+            await _skip_backlog(session)
+
+            queue_id = await _insert_queue(session, "notify-q-watcher")
+            ticket_id = await _insert_ticket(
+                session, "NOTIFY_WATCHER", owner_id=1, queue_id=queue_id
+            )
+
+            await _insert_agent(session, user_id=watcher_id, login="watcher.valid")
+            await _insert_agent(session, user_id=non_watcher_id, login="watcher.non")
+            await _insert_agent(
+                session, user_id=invalid_watcher_id, login="watcher.invalid", valid_id=2
+            )
+            await _insert_agent(session, user_id=no_email_watcher_id, login="watcher.noemail")
+
+            await _set_user_prefs(session, watcher_id, "watcher@example.com")
+            await _set_user_prefs(session, non_watcher_id, "nonwatcher@example.com")
+            await _set_user_prefs(session, invalid_watcher_id, "invalid@example.com")
+            # no_email_watcher deliberately has no UserEmail preference
+
+            await _insert_watcher(session, ticket_id, watcher_id)
+            await _insert_watcher(session, ticket_id, invalid_watcher_id)
+            await _insert_watcher(session, ticket_id, no_email_watcher_id)
+            # non_watcher is intentionally NOT on the ticket
+
+            await _insert_notification_event(
+                session,
+                "watcher-notify",
+                items={
+                    "Events": ["TicketCreate"],
+                    "QueueID": [str(queue_id)],
+                    "Recipients": ["AgentWatcher"],
+                    "Transports": ["Email"],
+                },
+                subject="Watched ticket <OTRS_TICKET_TicketNumber>",
+                body="Title: <OTRS_TICKET_Title>",
+            )
+            await _insert_outbox_event(session, "TicketCreate", ticket_id)
+            await session.commit()
+            await set_setting(session, KEY_NOTIFICATIONS_ENABLED, "1")
+
+        result = await run_notifications_tick(session_factory=factory, mail_sender=sender)
+        assert result["events"] == 1
+        assert result["sent"] == 1
+
+        recipients = [str(m["To"]) for m in sender.sent]
+        assert recipients == ["watcher@example.com"]
+        assert "nonwatcher@example.com" not in recipients
+        assert "invalid@example.com" not in recipients
+
+        async with factory() as session:
+            assert await _history_count(session, ticket_id, "SendAgentNotification") == 1
     finally:
         await engine.dispose()

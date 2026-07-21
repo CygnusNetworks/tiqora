@@ -36,11 +36,17 @@ one event, recipients are deduplicated by resolved email address.
 
 Documented simplifications (see docs/parallel-operation.md → Uncertainties):
 ``RecipientGroups``/``RecipientRoles`` resolve group *members* only (no
-role→group expansion); ``AgentMyQueues``/``AgentWatcher`` are not
-implemented (require queue-subscription / ticket-watcher tables not yet
-modelled here); only the ``Email`` transport is supported; user notification
-preferences (``Notification-<id>-Email``) are not consulted — every matched
-recipient with the ``Email`` transport is notified.
+role→group expansion); ``AgentWatcher`` is resolved from the modelled
+``ticket_watcher`` table (valid agents with a ``UserEmail`` preference);
+``AgentMyQueues`` is not implemented (needs per-agent queue subscriptions
+via personal-queues preferences, not yet consumed here); only the ``Email``
+transport is supported; user notification preferences
+(``Notification-<id>-Email``) are not consulted — every matched recipient
+with the ``Email`` transport is notified.
+
+Parallel-operation safety: this engine only drains ``tiqora_event_outbox``
+(Tiqora-originated events). Znuny's daemon never sees those rows, so enabling
+``AgentWatcher`` here cannot double-send with Znuny.
 """
 
 from __future__ import annotations
@@ -253,6 +259,15 @@ async def _resolve_recipients(
     seen: set[tuple[str, str]] = set()
 
     async def _add_agent(user_id: int) -> None:
+        # Only valid agents (mirrors Znuny: invalid users never receive mail).
+        valid_row = (
+            await session.execute(
+                text("SELECT 1 FROM users WHERE id = :uid AND valid_id = 1"),
+                {"uid": user_id},
+            )
+        ).first()
+        if valid_row is None:
+            return
         row = (
             await session.execute(
                 text(
@@ -284,6 +299,16 @@ async def _resolve_recipients(
         await _add_agent(_as_int(ticket["user_id"]))
     if "AgentResponsible" in recipient_kinds and ticket.get("responsible_user_id"):
         await _add_agent(_as_int(ticket["responsible_user_id"]))
+
+    if "AgentWatcher" in recipient_kinds:
+        watcher_rows = (
+            await session.execute(
+                text("SELECT user_id FROM ticket_watcher WHERE ticket_id = :tid"),
+                {"tid": ticket["id"]},
+            )
+        ).fetchall()
+        for (uid,) in watcher_rows:
+            await _add_agent(int(uid))
 
     for raw_id in notification.items.get("RecipientAgents", []):
         try:

@@ -6,6 +6,10 @@ const user = {
   first_name: "Ada",
   last_name: "Agent",
   auth_method: "password",
+  // Default agent is treated as admin so /admin e2e fixtures work without an
+  // extra capability probe. Override via route when testing the access denied
+  // path (see e2e/admin-access.spec.ts).
+  is_admin: true,
 };
 
 const queues = [

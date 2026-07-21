@@ -4,14 +4,22 @@ from __future__ import annotations
 
 import base64
 import secrets
-from typing import Annotated
+from typing import Annotated, Any
 
 import structlog
 from fastapi import APIRouter, Depends, Header, HTTPException, Request, Response, status
 from fastapi.responses import RedirectResponse
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from tiqora.api.deps import AppSettings, CurrentUser, TOTPServiceDep, get_auth_service, get_redis
-from tiqora.domain.auth import AuthService, user_to_dict
+from tiqora.api.deps import (
+    AppSettings,
+    CurrentUser,
+    DbSession,
+    TOTPServiceDep,
+    get_auth_service,
+    get_redis,
+)
+from tiqora.domain.auth import AuthenticatedUser, AuthService, user_to_dict
 from tiqora.domain.auth_ldap import LdapAuthService
 from tiqora.domain.oidc import OIDCError, OIDCService
 from tiqora.domain.schemas import (
@@ -25,6 +33,7 @@ from tiqora.domain.schemas import (
 )
 from tiqora.domain.spnego import SpnegoService, SpnegoUnavailable, principal_to_login
 from tiqora.domain.totp_qr import totp_qr_svg
+from tiqora.permissions.engine import PermissionEngine
 
 logger = structlog.get_logger(__name__)
 
@@ -32,6 +41,21 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 
 _OIDC_STATE_PREFIX = "tiqora:oidc:state:"
 _OIDC_STATE_TTL = 300
+
+
+async def _user_me(
+    session: AsyncSession,
+    user: AuthenticatedUser,
+    *,
+    extra: dict[str, Any] | None = None,
+) -> UserMe:
+    """Build ``UserMe`` including ``is_admin`` from ``PermissionEngine``."""
+    pe = PermissionEngine(session)
+    data = user_to_dict(user)
+    if extra:
+        data.update(extra)
+    data["is_admin"] = await pe.is_admin(user.id)
+    return UserMe(**data)
 
 
 def _set_session_cookie(response: Response, settings: AppSettings, token: str) -> None:
@@ -64,6 +88,7 @@ async def login(
     auth: Annotated[AuthService, Depends(get_auth_service)],
     totp: TOTPServiceDep,
     settings: AppSettings,
+    session: DbSession,
 ) -> LoginResponse:
     user = await auth.authenticate_password(body.login, body.password)
     if user is None and settings.ldap_enabled:
@@ -86,12 +111,12 @@ async def login(
         return LoginResponse(user=None, pending_2fa=True)
     token = await auth.create_session(user)
     _set_session_cookie(response, settings, token)
-    return LoginResponse(user=UserMe(**user_to_dict(user)))
+    return LoginResponse(user=await _user_me(session, user))
 
 
 @router.get("/me", response_model=UserMe)
-async def me(user: CurrentUser) -> UserMe:
-    return UserMe(**user_to_dict(user))
+async def me(user: CurrentUser, session: DbSession) -> UserMe:
+    return await _user_me(session, user)
 
 
 @router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
@@ -127,6 +152,7 @@ async def totp_verify(
     auth: Annotated[AuthService, Depends(get_auth_service)],
     totp: TOTPServiceDep,
     settings: AppSettings,
+    session: DbSession,
 ) -> LoginResponse:
     """Promote a pending-2FA session to a full session after a valid TOTP code."""
     token = request.cookies.get(settings.session_cookie_name)
@@ -143,7 +169,7 @@ async def totp_verify(
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Session expired")
     new_token, user = promoted
     _set_session_cookie(response, settings, new_token)
-    return LoginResponse(user=UserMe(**user_to_dict(user)))
+    return LoginResponse(user=await _user_me(session, user))
 
 
 @router.post("/totp/enroll", response_model=TOTPEnrollOut)
@@ -218,6 +244,7 @@ async def oidc_callback(
     auth: Annotated[AuthService, Depends(get_auth_service)],
     totp: TOTPServiceDep,
     settings: AppSettings,
+    session: DbSession,
     code: str | None = None,
     state: str | None = None,
 ) -> LoginResponse:
@@ -270,9 +297,7 @@ async def oidc_callback(
 
     token = await auth.create_session(user, avatar_url=avatar_url)
     _set_session_cookie(response, settings, token)
-    me_dict = user_to_dict(user)
-    me_dict["avatar_url"] = avatar_url
-    return LoginResponse(user=UserMe(**me_dict))
+    return LoginResponse(user=await _user_me(session, user, extra={"avatar_url": avatar_url}))
 
 
 # ---------------------------------------------------------------------------
@@ -286,6 +311,7 @@ async def spnego(
     auth: Annotated[AuthService, Depends(get_auth_service)],
     totp: TOTPServiceDep,
     settings: AppSettings,
+    session: DbSession,
     authorization: Annotated[str | None, Header()] = None,
 ) -> LoginResponse:
     if not settings.spnego_enabled:
@@ -327,4 +353,4 @@ async def spnego(
 
     token = await auth.create_session(user)
     _set_session_cookie(response, settings, token)
-    return LoginResponse(user=UserMe(**user_to_dict(user)))
+    return LoginResponse(user=await _user_me(session, user))

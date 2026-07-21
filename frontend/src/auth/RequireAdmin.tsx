@@ -1,27 +1,20 @@
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
-import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { RequireAuth } from "./RequireAuth";
-import { api, ApiError } from "@/lib/api";
+import { useAuth } from "./AuthContext";
 import { Spinner } from "@/components/ui/Spinner";
 
 /**
- * Admin-capability guard. UserMe carries no explicit "is_admin"/capabilities
- * field, so we probe a lightweight admin endpoint on mount: a 403 renders an
- * "access denied" page, while a 401 is already handled globally by the
- * ApiClient's onUnauthorized redirect (see lib/api.ts) before this component
- * would even see it reject.
+ * Admin-capability guard. Uses ``UserMe.is_admin`` from ``GET /api/v1/auth/me``
+ * (``PermissionEngine.is_admin`` — rw on the group named ``admin``). No extra
+ * probe request; session/auth loading is owned by RequireAuth + AuthContext.
  */
 function AdminCapabilityCheck({ children }: { children: ReactNode }) {
   const { t } = useTranslation();
-  const probe = useQuery({
-    queryKey: ["admin", "capability-probe"],
-    queryFn: () => api.adminGroups.list(),
-    retry: false,
-  });
+  const { user, isLoading } = useAuth();
 
-  if (probe.isLoading) {
+  if (isLoading) {
     return (
       <div className="flex min-h-[40vh] items-center justify-center gap-2 text-muted">
         <Spinner />
@@ -29,8 +22,7 @@ function AdminCapabilityCheck({ children }: { children: ReactNode }) {
     );
   }
 
-  if (probe.isError) {
-    const forbidden = probe.error instanceof ApiError && probe.error.isForbidden;
+  if (!user?.is_admin) {
     return (
       <div
         className="mx-auto max-w-lg space-y-3 px-4 py-16 text-center"
@@ -39,9 +31,7 @@ function AdminCapabilityCheck({ children }: { children: ReactNode }) {
         <h1 className="font-display text-2xl font-semibold text-ink">
           {t("admin.accessDenied.title")}
         </h1>
-        <p className="text-muted">
-          {forbidden ? t("admin.accessDenied.body") : t("admin.accessDenied.error")}
-        </p>
+        <p className="text-muted">{t("admin.accessDenied.body")}</p>
         <Link to="/agent" className="text-sm text-accent hover:underline">
           {t("nav.dashboard")}
         </Link>
@@ -52,7 +42,7 @@ function AdminCapabilityCheck({ children }: { children: ReactNode }) {
   return children;
 }
 
-/** Composes RequireAuth (agent session) with the admin-capability probe. */
+/** Composes RequireAuth (agent session) with the is_admin flag from /me. */
 export function RequireAdmin({ children }: { children: ReactNode }) {
   return (
     <RequireAuth>

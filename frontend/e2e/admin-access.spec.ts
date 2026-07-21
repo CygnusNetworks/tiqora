@@ -2,20 +2,47 @@ import { test, expect } from "@playwright/test";
 import { mockAdminApi, loginAsAgent } from "./fixtures/mock-admin-api";
 
 test.describe("admin access guard", () => {
-  test("renders access denied for a 403 on the capability probe", async ({ page }) => {
+  test("renders access denied when /me reports is_admin=false", async ({ page }) => {
     await mockAdminApi(page);
-    await loginAsAgent(page);
 
-    // Override the capability-probe endpoint (adminGroups.list) to 403 —
-    // registered after mockAdminApi's handler so it takes precedence.
-    await page.route("**/api/v1/admin/groups", async (route) => {
+    // Override /me (and login) so the agent is a non-admin. RequireAdmin now
+    // uses UserMe.is_admin instead of probing adminGroups.list.
+    await page.route("**/api/v1/auth/me", async (route) => {
       await route.fulfill({
-        status: 403,
+        status: 200,
         contentType: "application/json",
-        body: JSON.stringify({ detail: "Admin privileges required" }),
+        body: JSON.stringify({
+          id: 1,
+          login: "agent",
+          first_name: "Ada",
+          last_name: "Agent",
+          auth_method: "password",
+          is_admin: false,
+        }),
+      });
+    });
+    await page.route("**/api/v1/auth/login", async (route) => {
+      if (route.request().method() !== "POST") {
+        await route.fallback();
+        return;
+      }
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          user: {
+            id: 1,
+            login: "agent",
+            first_name: "Ada",
+            last_name: "Agent",
+            auth_method: "password",
+            is_admin: false,
+          },
+        }),
       });
     });
 
+    await loginAsAgent(page);
     await page.goto("/admin/users");
     await expect(page.getByTestId("admin-access-denied")).toBeVisible();
   });

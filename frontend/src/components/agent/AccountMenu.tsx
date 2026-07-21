@@ -10,6 +10,7 @@ import {
   GlobeIcon,
   LogOutIcon,
   MoonIcon,
+  SettingsIcon,
   ShieldIcon,
   SunIcon,
 } from "@/components/ui/icons";
@@ -26,6 +27,7 @@ const LANGUAGES = [
  * Opens a Menu with the signed-in identity, a link to security / 2FA settings
  * (general preferences live in the sidebar), a nested language flyout
  * (Deutsch / English), a light/dark theme toggle, and finally sign-out.
+ * Admins additionally get a highlighted "Admin-Bereich" entry.
  *
  * `logoutTestId` keeps the existing `logout-btn` (mobile) / `logout-btn-desktop`
  * (desktop) hooks on the sign-out item so the shell tests keep passing.
@@ -43,6 +45,7 @@ export function AccountMenu({ logoutTestId = "logout-btn" }: { logoutTestId?: st
   const fullName = [user?.first_name || user?.login, user?.last_name].filter(Boolean).join(" ");
   const email = userEmailForAvatar(user);
   const avatarUrl = user?.avatar_url ?? null;
+  const isAdmin = user?.is_admin === true;
 
   const changeLang = (code: string) => {
     void i18n.changeLanguage(code);
@@ -91,7 +94,20 @@ export function AccountMenu({ logoutTestId = "logout-btn" }: { logoutTestId?: st
         <p className="truncate text-[11.5px] text-muted">{user?.login}</p>
       </MenuHeader>
 
-      <div className="pt-1">
+      {isAdmin && (
+        <div className="pt-1">
+          <MenuItem
+            highlight
+            icon={<SettingsIcon />}
+            testId="account-menu-admin"
+            onSelect={() => void navigate({ to: "/admin" })}
+          >
+            {t("account.adminArea")}
+          </MenuItem>
+        </div>
+      )}
+
+      <div className={isAdmin ? "pt-0.5" : "pt-1"}>
         <MenuItem
           icon={<ShieldIcon />}
           testId="account-menu-security"

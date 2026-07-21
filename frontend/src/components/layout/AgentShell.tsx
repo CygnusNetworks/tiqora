@@ -2,6 +2,7 @@ import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 import { Link, useLocation, useNavigate } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
+import { useAuth } from "@/auth/AuthContext";
 import { api, type QueueNode } from "@/lib/api";
 import { flattenQueues } from "@/components/agent/QueueTree";
 import { Button } from "@/components/ui/Button";
@@ -216,21 +217,14 @@ function QueueNavSection({ flat, onNavigate }: { flat: QueueNode[]; onNavigate?:
   );
 }
 
-/** Admin nav entry, shown only to agents who pass the same admin-capability
- * probe as RequireAdmin. Shares the ["admin","capability-probe"] query key so
- * the result is cached across the guard and this link (no extra request).
- * Renders nothing while loading or when the probe 403s — no disabled state,
- * no flicker. */
+/** Admin nav entry, shown only when ``UserMe.is_admin`` is true (same source
+ * as RequireAdmin / AccountMenu — no extra probe request). Renders nothing
+ * for non-admins; no disabled state, no flicker. */
 function AdminNavItem({ onNavigate }: { onNavigate?: () => void }) {
   const { t } = useTranslation();
-  const probe = useQuery({
-    queryKey: ["admin", "capability-probe"],
-    queryFn: () => api.adminGroups.list(),
-    retry: false,
-    staleTime: 5 * 60 * 1000,
-  });
+  const { user } = useAuth();
 
-  if (!probe.isSuccess) return null;
+  if (!user?.is_admin) return null;
 
   return (
     <div>

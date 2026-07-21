@@ -332,7 +332,7 @@ const portalKbArticleRoute = createRoute({
   component: KbArticlePage,
 });
 
-// /admin: agent session (RequireAuth) + admin-capability probe (RequireAdmin)
+// /admin: agent session (RequireAuth) + is_admin from /me (RequireAdmin)
 // gated shell with a grouped left sidebar nav (see AdminShell).
 const adminLayoutRoute = createRoute({
   getParentRoute: () => rootRoute,

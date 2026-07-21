@@ -49,9 +49,14 @@ surface is documented by hand in [`mcp.md`](mcp.md) from the tool registry in
   httpOnly cookie (name configurable via `TIQORA_SESSION_COOKIE`, default
   `tiqora_session`). Subsequent requests just need the cookie.
 - **API key** (`/api/v1`, `/znuny-compat`, MCP): `Authorization: Bearer
-  <key>`. Issued/revoked via the admin API
-  (`/api/v1/admin/*` — API key management) or an existing session token can
-  also be passed as a bearer token for CLI/automation convenience.
+  <key>`. Lifecycle:
+  - REST admin API (requires admin session): `GET/POST /api/v1/admin/api-keys`,
+    `GET/PATCH/DELETE /api/v1/admin/api-keys/{key_id}` (`POST` returns the
+    raw key once; `PATCH` can soft-revoke via `valid: false`).
+  - CLI: `tiqora api-key create|list|revoke|delete` (create prints the raw
+    key once; revoke soft-disables; delete hard-removes the row).
+  An existing session token can also be passed as a bearer token for
+  CLI/automation convenience.
 - **Portal session cookie** (`/api/portal`): separate cookie
   (`TIQORA_CUSTOMER_SESSION_COOKIE`, default `tiqora_customer_session`) from
   `POST /api/portal/auth/login`, scoped to a `customer_user`, not a `users`

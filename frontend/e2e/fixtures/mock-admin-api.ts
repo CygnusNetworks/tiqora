@@ -99,8 +99,8 @@ function resetAdminState() {
 
 /**
  * Extends mockApi with `/api/v1/admin/**` fixtures: users, groups, queues,
- * dynamic fields (in-memory CRUD), used by the RequireAdmin capability probe
- * (adminGroups.list) and the admin resource pages.
+ * dynamic fields (in-memory CRUD) for the admin resource pages. Admin access
+ * itself is gated by ``UserMe.is_admin`` on the default mock user (true).
  */
 export async function mockAdminApi(page: Page) {
   resetAdminState();
@@ -148,7 +148,7 @@ export async function mockAdminApi(page: Page) {
       return;
     }
 
-    // Groups (also used by RequireAdmin's capability probe)
+    // Groups
     if (path.endsWith("/api/v1/admin/groups") && method === "GET") {
       await json(route, 200, groups);
       return;

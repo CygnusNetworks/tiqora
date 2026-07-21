@@ -4,21 +4,23 @@ import { I18nextProvider } from "react-i18next";
 import i18n from "@/i18n";
 import { AccountMenu } from "./AccountMenu";
 
-const { logout, navigate, setTheme } = vi.hoisted(() => ({
+const { logout, navigate, setTheme, authUser } = vi.hoisted(() => ({
   logout: vi.fn().mockResolvedValue(undefined),
   navigate: vi.fn(),
   setTheme: vi.fn(),
+  authUser: {
+    id: 7,
+    login: "jdoe",
+    first_name: "Jane",
+    last_name: "Doe",
+    email: "jane@example.com",
+    is_admin: false as boolean,
+  },
 }));
 
 vi.mock("@/auth/AuthContext", () => ({
   useAuth: () => ({
-    user: {
-      id: 7,
-      login: "jdoe",
-      first_name: "Jane",
-      last_name: "Doe",
-      email: "jane@example.com",
-    },
+    user: authUser,
     logout,
   }),
 }));
@@ -45,6 +47,7 @@ describe("AccountMenu", () => {
     logout.mockClear();
     navigate.mockClear();
     setTheme.mockClear();
+    authUser.is_admin = false;
   });
 
   it("shows the signed-in identity and the core actions", () => {
@@ -52,12 +55,25 @@ describe("AccountMenu", () => {
     expect(screen.getByTestId("account-menu-name")).toHaveTextContent("Jane Doe");
     expect(screen.getByTestId("current-user")).toHaveTextContent("Jane Doe");
     expect(screen.queryByTestId("account-menu-settings")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("account-menu-admin")).not.toBeInTheDocument();
     expect(screen.getByTestId("account-menu-security")).toBeInTheDocument();
     // Languages live in a nested submenu — trigger is visible, items open on click.
     expect(screen.getByTestId("account-menu-lang")).toBeInTheDocument();
     expect(screen.queryByTestId("account-menu-lang-de")).not.toBeInTheDocument();
     expect(screen.getByTestId("account-menu-theme-light")).toBeInTheDocument();
     expect(screen.getByTestId("logout-btn")).toBeInTheDocument();
+  });
+
+  it("shows a highlighted Admin-Bereich entry only for is_admin users", () => {
+    authUser.is_admin = true;
+    open();
+    const adminBtn = screen.getByTestId("account-menu-admin");
+    expect(adminBtn).toBeInTheDocument();
+    expect(adminBtn).toHaveTextContent(/Admin/i);
+    // Highlighted via accent fill (MenuItem highlight prop).
+    expect(adminBtn.className).toMatch(/bg-accent/);
+    fireEvent.click(adminBtn);
+    expect(navigate).toHaveBeenCalledWith({ to: "/admin" });
   });
 
   it("does not render a general Einstellungen / settings entry", () => {

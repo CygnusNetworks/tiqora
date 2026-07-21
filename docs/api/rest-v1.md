@@ -24,9 +24,29 @@ curl -c cookies.txt -X POST "$TIQORA_URL/api/v1/auth/login" \
 curl -b cookies.txt "$TIQORA_URL/api/v1/auth/me"
 ```
 
-**API key** (bearer token, used by scripts/automation — issue one via the
-admin API, or reuse the CLI/session token as a bearer token for quick
-testing):
+**API key** (bearer token, used by scripts/automation). Issue and manage keys
+via the admin API or the CLI:
+
+```sh
+# Admin API (session cookie from an admin agent)
+curl -b cookies.txt -X POST "$TIQORA_URL/api/v1/admin/api-keys" \
+  -H 'Content-Type: application/json' \
+  -d '{"name": "ci-bot", "user_id": 1}'
+# → 201 with {"id": …, "key": "tiq_…", …}  (raw key shown only once)
+
+curl -b cookies.txt "$TIQORA_URL/api/v1/admin/api-keys"
+curl -b cookies.txt -X PATCH "$TIQORA_URL/api/v1/admin/api-keys/42" \
+  -H 'Content-Type: application/json' -d '{"valid": false}'
+curl -b cookies.txt -X DELETE "$TIQORA_URL/api/v1/admin/api-keys/42"
+
+# CLI (same lifecycle against the configured database)
+tiqora api-key create --user 1 --name ci-bot
+tiqora api-key list
+tiqora api-key revoke 42
+tiqora api-key delete 42
+```
+
+Use the key (or, for quick testing, a session token) as a bearer token:
 
 ```sh
 curl "$TIQORA_URL/api/v1/tickets" \
