@@ -10,8 +10,17 @@ if (!root) {
   throw new Error("Root element #root not found");
 }
 
-createRoot(root).render(
-  <StrictMode>
-    <App />
-  </StrictMode>,
-);
+async function bootstrap() {
+  // Public demo build: start the MSW mock backend before mounting.
+  if (import.meta.env.VITE_DEMO === "1") {
+    const { startDemo } = await import("./demo/start");
+    await startDemo(import.meta.env.BASE_URL);
+  }
+  createRoot(root!).render(
+    <StrictMode>
+      <App />
+    </StrictMode>,
+  );
+}
+
+void bootstrap();

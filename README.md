@@ -42,6 +42,14 @@ Tiqora targets organisations that run (or want to leave) Znuny/OTRS 6.5 and need
 Tiqora only adds new tables under the `tiqora_*` prefix. Znuny keeps owning its
 existing schema during parallel operation.
 
+## Live demo
+
+**[▶ Try the interactive demo](https://cygnusnetworks.github.io/tiqora/)** — the full
+agent, admin, and portal UI running entirely in your browser against mock data (no
+backend, nothing is saved). Deployed to GitHub Pages from `frontend/` via
+[Mock Service Worker](https://mswjs.io/); build it locally with
+`VITE_BASE=/tiqora/ pnpm --filter tiqora-frontend build:demo`.
+
 ## Screenshots
 
 The agent workspace, ticket zoom (with a permission-aware action bar), reporting,
