@@ -5,6 +5,13 @@ import { Button } from "@/components/ui/Button";
 import { Spinner } from "@/components/ui/Spinner";
 import { cn } from "@/lib/cn";
 
+export type DataTableSortOrder = "asc" | "desc";
+
+export type DataTableSortState = {
+  sort: string | null;
+  order: DataTableSortOrder;
+};
+
 export type DataTableColumn<T> = {
   key: string;
   header: string;
@@ -12,6 +19,16 @@ export type DataTableColumn<T> = {
   mono?: boolean;
   render: (row: T) => ReactNode;
   className?: string;
+  /**
+   * Opt-in: make this header clickable for server-side sort.
+   * Only active when the table also receives `sort` + `onSortChange`.
+   */
+  sortable?: boolean;
+  /**
+   * API sort key when it differs from `key` (e.g. column key "changed" →
+   * sortKey "change_time"). Defaults to `key`.
+   */
+  sortKey?: string;
 };
 
 export type DataTableSelection = {
@@ -36,6 +53,18 @@ export type DataTableProps<T> = {
   isRowValid?: (row: T) => boolean;
   /** Opt-in leading checkbox column for bulk selection. */
   selection?: DataTableSelection;
+  /**
+   * Opt-in sort state. When omitted (with `onSortChange`), headers render
+   * exactly as static text — other admin pages stay unchanged.
+   */
+  sort?: DataTableSortState | null;
+  /** Called with the next sort state (null sort = clear back to server default). */
+  onSortChange?: (next: DataTableSortState) => void;
+  /**
+   * When true and sort props are present, the status column header is sortable
+   * with API key `valid_id`.
+   */
+  statusSortable?: boolean;
   testId?: string;
 };
 
@@ -75,6 +104,59 @@ function ActivateIcon() {
   );
 }
 
+function cycleSort(
+  current: DataTableSortState | null | undefined,
+  sortKey: string,
+): DataTableSortState {
+  if (!current || current.sort !== sortKey) {
+    return { sort: sortKey, order: "asc" };
+  }
+  if (current.order === "asc") {
+    return { sort: sortKey, order: "desc" };
+  }
+  // desc → clear (server default)
+  return { sort: null, order: "asc" };
+}
+
+function SortableHeader({
+  label,
+  sortKey,
+  sort,
+  onSortChange,
+  className,
+  testId,
+}: {
+  label: string;
+  sortKey: string;
+  sort: DataTableSortState | null | undefined;
+  onSortChange: (next: DataTableSortState) => void;
+  className?: string;
+  testId?: string;
+}) {
+  const active = sort?.sort === sortKey;
+  const ariaSort = !active ? "none" : sort?.order === "asc" ? "ascending" : "descending";
+  const indicator = !active ? "" : sort?.order === "asc" ? " ▲" : " ▼";
+
+  return (
+    <th
+      className={cn("py-1.5 pl-4 pr-2 font-medium", className)}
+      aria-sort={ariaSort}
+    >
+      <button
+        type="button"
+        className="inline-flex items-center gap-0.5 rounded-sm uppercase tracking-wide text-muted hover:text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent"
+        onClick={() => onSortChange(cycleSort(sort, sortKey))}
+        data-testid={testId ?? `admin-sort-${sortKey}`}
+      >
+        <span>{label}</span>
+        <span className="inline-block w-3 text-[10px] tabular-nums" aria-hidden="true">
+          {indicator.trim()}
+        </span>
+      </button>
+    </th>
+  );
+}
+
 /**
  * Generic dense admin data table: mono id-style rendering per column,
  * valid/invalid Badge, horizontal scroll contained to the table wrapper
@@ -91,11 +173,15 @@ export function DataTable<T>({
   onActivate,
   isRowValid,
   selection,
+  sort,
+  onSortChange,
+  statusSortable = false,
   testId = "admin-data-table",
 }: DataTableProps<T>) {
   const { t } = useTranslation();
   const hasActions = Boolean(onEdit || onDeactivate || onActivate);
   const hasSelection = Boolean(selection);
+  const sortEnabled = Boolean(onSortChange);
   const colCount =
     columns.length + (hasActions ? 1 : 0) + (isRowValid ? 1 : 0) + (hasSelection ? 1 : 0);
 
@@ -122,12 +208,39 @@ export function DataTable<T>({
                 />
               </th>
             )}
-            {columns.map((col) => (
-              <th key={col.key} className={cn("py-1.5 pl-4 pr-2 font-medium", col.className)}>
-                {col.header}
-              </th>
-            ))}
-            {isRowValid && <th className="py-1.5 pr-2 font-medium">{t("admin.table.status")}</th>}
+            {columns.map((col) => {
+              const colSortKey = col.sortKey ?? col.key;
+              if (sortEnabled && col.sortable && onSortChange) {
+                return (
+                  <SortableHeader
+                    key={col.key}
+                    label={col.header}
+                    sortKey={colSortKey}
+                    sort={sort}
+                    onSortChange={onSortChange}
+                    className={col.className}
+                  />
+                );
+              }
+              return (
+                <th key={col.key} className={cn("py-1.5 pl-4 pr-2 font-medium", col.className)}>
+                  {col.header}
+                </th>
+              );
+            })}
+            {isRowValid &&
+              (sortEnabled && statusSortable && onSortChange ? (
+                <SortableHeader
+                  label={t("admin.table.status")}
+                  sortKey="valid_id"
+                  sort={sort}
+                  onSortChange={onSortChange}
+                  className="pr-2 pl-0"
+                  testId="admin-sort-valid_id"
+                />
+              ) : (
+                <th className="py-1.5 pr-2 font-medium">{t("admin.table.status")}</th>
+              ))}
             {hasActions && (
               <th className="py-1.5 pr-4 text-right font-medium">{t("admin.table.actions")}</th>
             )}

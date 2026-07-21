@@ -132,4 +132,67 @@ describe("AdminResourcePage", () => {
       expect(screen.queryByTestId("admin-bulk-bar")).not.toBeInTheDocument();
     });
   });
+
+  it("create button is a compact + with accessible name from newLabel", async () => {
+    renderPage();
+    await waitFor(() => {
+      expect(screen.getByTestId("admin-new-button")).toBeInTheDocument();
+    });
+    const btn = screen.getByTestId("admin-new-button");
+    expect(btn).toHaveAttribute("aria-label", "New item");
+    expect(btn).toHaveAttribute("title", "New item");
+    // Visible label text is gone; accessible name remains.
+    expect(btn.textContent?.trim()).not.toBe("New item");
+    expect(screen.getByRole("button", { name: "New item" })).toBe(btn);
+  });
+
+  it("does not render sort headers when sortable is off", async () => {
+    renderPage({
+      columns: [{ key: "name", header: "Name", sortable: true, render: (r) => r.name }],
+    });
+    await waitFor(() => {
+      expect(screen.getByTestId("admin-test-resource-page")).toBeInTheDocument();
+    });
+    expect(screen.queryByTestId("admin-sort-name")).not.toBeInTheDocument();
+  });
+
+  it("cycles sort asc → desc → clear and forwards to list", async () => {
+    const { list } = renderPage({
+      sortable: true,
+      columns: [{ key: "name", header: "Name", sortable: true, render: (r) => r.name }],
+    });
+
+    await waitFor(() => expect(list).toHaveBeenCalled());
+    list.mockClear();
+
+    const header = await screen.findByTestId("admin-sort-name");
+    fireEvent.click(header);
+
+    await waitFor(() => {
+      expect(list).toHaveBeenCalledWith(
+        expect.objectContaining({ sort: "name", order: "asc", page: 1 }),
+        expect.anything(),
+      );
+    });
+    expect(header.textContent).toMatch(/▲/);
+
+    list.mockClear();
+    fireEvent.click(header);
+    await waitFor(() => {
+      expect(list).toHaveBeenCalledWith(
+        expect.objectContaining({ sort: "name", order: "desc", page: 1 }),
+        expect.anything(),
+      );
+    });
+    expect(header.textContent).toMatch(/▼/);
+
+    list.mockClear();
+    fireEvent.click(header);
+    await waitFor(() => {
+      expect(list).toHaveBeenCalled();
+    });
+    const lastParams = list.mock.calls[list.mock.calls.length - 1][0] as Record<string, unknown>;
+    expect(lastParams.sort).toBeUndefined();
+    expect(lastParams.order).toBeUndefined();
+  });
 });

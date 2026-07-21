@@ -11,7 +11,7 @@ generically.
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from typing import Annotated, Any, Literal
 
 from fastapi import Depends, Query
@@ -21,6 +21,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import InstrumentedAttribute
 
 ValidFilter = Literal["valid", "invalid", "all"]
+SortOrder = Literal["asc", "desc"]
 
 # Customer-users "Alle" page-size option may request up to this many rows.
 CUSTOMER_USER_PAGE_SIZE_MAX = 100_000
@@ -39,29 +40,65 @@ class ListParams(BaseModel):
     page: int = 1
     page_size: int = 25
     valid: ValidFilter = "valid"
+    """Optional column key from the caller's allowlist; unknown values are ignored."""
+    sort: str | None = None
+    order: SortOrder = "asc"
 
 
 def list_params(
     page: Annotated[int, Query(ge=1)] = 1,
     page_size: Annotated[int, Query(ge=1, le=500)] = 25,
     valid: Annotated[ValidFilter, Query()] = "valid",
+    sort: Annotated[str | None, Query()] = None,
+    order: Annotated[SortOrder, Query()] = "asc",
 ) -> ListParams:
-    return ListParams(page=page, page_size=page_size, valid=valid)
+    return ListParams(page=page, page_size=page_size, valid=valid, sort=sort, order=order)
 
 
 def customer_user_list_params(
     page: Annotated[int, Query(ge=1)] = 1,
     page_size: Annotated[int, Query(ge=1, le=CUSTOMER_USER_PAGE_SIZE_MAX)] = 25,
     valid: Annotated[ValidFilter, Query()] = "valid",
+    sort: Annotated[str | None, Query()] = None,
+    order: Annotated[SortOrder, Query()] = "asc",
 ) -> ListParams:
     """List params for customer-users — allows ``page_size`` up to 100_000
     so the admin UI can request an "Alle" (all rows) page without a separate
     unbounded endpoint."""
-    return ListParams(page=page, page_size=page_size, valid=valid)
+    return ListParams(page=page, page_size=page_size, valid=valid, sort=sort, order=order)
 
 
 ListParamsDep = Annotated[ListParams, Depends(list_params)]
 CustomerUserListParamsDep = Annotated[ListParams, Depends(customer_user_list_params)]
+
+
+def apply_sort(
+    stmt: Select[Any],
+    allowed: Mapping[str, InstrumentedAttribute[Any]],
+    params: ListParams,
+    *,
+    default: InstrumentedAttribute[Any],
+    tiebreaker: InstrumentedAttribute[Any] | None = None,
+) -> Select[Any]:
+    """Apply ``ORDER BY`` from *params* against an allowlisted column map.
+
+    Unknown or absent ``sort`` falls back to *default* ascending (caller may
+    still pass ``order`` only when a valid sort is selected). A *tiebreaker*
+    column is appended when distinct from the primary sort column so pagination
+    order stays stable.
+    """
+    col = allowed.get(params.sort) if params.sort else None
+    if col is None:
+        col = default
+        direction = "asc"
+    else:
+        direction = params.order
+
+    primary = col.asc() if direction == "asc" else col.desc()
+    if tiebreaker is not None and tiebreaker is not col:
+        secondary = tiebreaker.asc() if direction == "asc" else tiebreaker.desc()
+        return stmt.order_by(primary, secondary)
+    return stmt.order_by(primary)
 
 
 async def bulk_grouped_counts(

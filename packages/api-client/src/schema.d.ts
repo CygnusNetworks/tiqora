@@ -8014,6 +8014,8 @@ export interface operations {
                 page?: number;
                 page_size?: number;
                 valid?: "valid" | "invalid" | "all";
+                sort?: string | null;
+                order?: "asc" | "desc";
             };
             header?: {
                 authorization?: string | null;
@@ -8195,6 +8197,8 @@ export interface operations {
                 page?: number;
                 page_size?: number;
                 valid?: "valid" | "invalid" | "all";
+                sort?: string | null;
+                order?: "asc" | "desc";
             };
             header?: {
                 authorization?: string | null;
@@ -8448,6 +8452,8 @@ export interface operations {
                 page?: number;
                 page_size?: number;
                 valid?: "valid" | "invalid" | "all";
+                sort?: string | null;
+                order?: "asc" | "desc";
             };
             header?: {
                 authorization?: string | null;
@@ -8809,6 +8815,8 @@ export interface operations {
                 page?: number;
                 page_size?: number;
                 valid?: "valid" | "invalid" | "all";
+                sort?: string | null;
+                order?: "asc" | "desc";
             };
             header?: {
                 authorization?: string | null;
@@ -9025,6 +9033,8 @@ export interface operations {
                 page?: number;
                 page_size?: number;
                 valid?: "valid" | "invalid" | "all";
+                sort?: string | null;
+                order?: "asc" | "desc";
             };
             header?: {
                 authorization?: string | null;
@@ -9242,6 +9252,8 @@ export interface operations {
                 page?: number;
                 page_size?: number;
                 valid?: "valid" | "invalid" | "all";
+                sort?: string | null;
+                order?: "asc" | "desc";
             };
             header?: {
                 authorization?: string | null;
@@ -9673,6 +9685,8 @@ export interface operations {
                 page?: number;
                 page_size?: number;
                 valid?: "valid" | "invalid" | "all";
+                sort?: string | null;
+                order?: "asc" | "desc";
             };
             header?: {
                 authorization?: string | null;
@@ -9955,6 +9969,8 @@ export interface operations {
                 page?: number;
                 page_size?: number;
                 valid?: "valid" | "invalid" | "all";
+                sort?: string | null;
+                order?: "asc" | "desc";
             };
             header?: {
                 authorization?: string | null;
@@ -10638,6 +10654,8 @@ export interface operations {
                 page?: number;
                 page_size?: number;
                 valid?: "valid" | "invalid" | "all";
+                sort?: string | null;
+                order?: "asc" | "desc";
             };
             header?: {
                 authorization?: string | null;
@@ -10821,6 +10839,8 @@ export interface operations {
                 page?: number;
                 page_size?: number;
                 valid?: "valid" | "invalid" | "all";
+                sort?: string | null;
+                order?: "asc" | "desc";
             };
             header?: {
                 authorization?: string | null;
@@ -11002,6 +11022,8 @@ export interface operations {
                 page?: number;
                 page_size?: number;
                 valid?: "valid" | "invalid" | "all";
+                sort?: string | null;
+                order?: "asc" | "desc";
             };
             header?: {
                 authorization?: string | null;
@@ -11467,6 +11489,8 @@ export interface operations {
                 page?: number;
                 page_size?: number;
                 valid?: "valid" | "invalid" | "all";
+                sort?: string | null;
+                order?: "asc" | "desc";
             };
             header?: {
                 authorization?: string | null;
@@ -11827,6 +11851,8 @@ export interface operations {
                 page?: number;
                 page_size?: number;
                 valid?: "valid" | "invalid" | "all";
+                sort?: string | null;
+                order?: "asc" | "desc";
             };
             header?: {
                 authorization?: string | null;
@@ -12008,6 +12034,8 @@ export interface operations {
                 page?: number;
                 page_size?: number;
                 valid?: "valid" | "invalid" | "all";
+                sort?: string | null;
+                order?: "asc" | "desc";
             };
             header?: {
                 authorization?: string | null;
@@ -12222,6 +12250,8 @@ export interface operations {
                 page?: number;
                 page_size?: number;
                 valid?: "valid" | "invalid" | "all";
+                sort?: string | null;
+                order?: "asc" | "desc";
             };
             header?: {
                 authorization?: string | null;
@@ -12506,6 +12536,8 @@ export interface operations {
                 page?: number;
                 page_size?: number;
                 valid?: "valid" | "invalid" | "all";
+                sort?: string | null;
+                order?: "asc" | "desc";
             };
             header?: {
                 authorization?: string | null;
@@ -12831,6 +12863,8 @@ export interface operations {
                 page?: number;
                 page_size?: number;
                 valid?: "valid" | "invalid" | "all";
+                sort?: string | null;
+                order?: "asc" | "desc";
             };
             header?: {
                 authorization?: string | null;
@@ -13262,6 +13296,8 @@ export interface operations {
                 page?: number;
                 page_size?: number;
                 valid?: "valid" | "invalid" | "all";
+                sort?: string | null;
+                order?: "asc" | "desc";
             };
             header?: {
                 authorization?: string | null;

@@ -13,7 +13,7 @@ identically either way.
 from __future__ import annotations
 
 import uuid
-from datetime import datetime
+from datetime import datetime, timedelta
 
 import pytest
 import yaml
@@ -57,6 +57,7 @@ from tiqora.api.v1.admin.schemas import (
     TemplateAttachmentsReplace,
     UserCreate,
 )
+from tiqora.db.legacy.customer import CustomerUser
 from tiqora.db.tiqora.base import TiqoraBase
 from tiqora.domain.auth import AuthenticatedUser, AuthService, SessionStore
 from tiqora.domain.queue_service import QueueService
@@ -2048,5 +2049,158 @@ async def test_admin_customer_user_list_large_page_size(
         assert page.page_size == 100_000
         assert page.total >= 3
         assert len(page.items) >= 3
+
+    await engine.dispose()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("url_fixture", ["mariadb_znuny_url", "postgres_znuny_url"])
+async def test_admin_customer_user_list_sort(
+    url_fixture: str, request: pytest.FixtureRequest
+) -> None:
+    """Server-side sort by allowlisted columns; invalid sort falls back to login."""
+    sync_url: str = request.getfixturevalue(url_fixture)
+    ids = _seed_admin_and_plain_user(sync_url)
+    session, engine = await _make_session(sync_url)
+    ns = uuid.uuid4().hex[:8]
+
+    async with session as s:
+        admin_user = AuthenticatedUser(
+            id=ids["admin_id"],
+            login="root@localhost",
+            first_name="Admin",
+            last_name="Znuny",
+            auth_method="session",
+        )
+        cust = f"SORT-{ns}"
+        # Distinct login/email/change_time so asc/desc order is unambiguous.
+        # Create in mid/low/high order so default insertion order ≠ sort order.
+        for login_prefix, email_prefix, first in (
+            ("m", "z", "Mid"),
+            ("a", "m", "Low"),
+            ("z", "a", "High"),
+        ):
+            await admin_customers.create_customer_user(
+                CustomerUserAdminCreate(
+                    login=f"{login_prefix}.sort.{ns}@example.com",
+                    email=f"{email_prefix}.sort.{ns}@example.com",
+                    customer_id=cust,
+                    first_name=first,
+                    last_name=f"Sort{ns}",
+                ),
+                admin_user,
+                s,
+            )
+
+        # Stagger change_time so order is independent of login (m < a < z by time).
+        login_asc_seed = await admin_customers.list_customer_users(
+            admin_user,
+            s,
+            ListParams(page=1, page_size=50, valid="valid", sort="login", order="asc"),
+            search=ns,
+        )
+        assert len(login_asc_seed.items) == 3
+        # Map login prefix → offset so change_time order is m, a, z (not login order).
+        time_offsets = {
+            f"a.sort.{ns}@example.com": 2,
+            f"m.sort.{ns}@example.com": 1,
+            f"z.sort.{ns}@example.com": 3,
+        }
+        base_ts = datetime(2024, 6, 1, 12, 0, 0)
+        for row in login_asc_seed.items:
+            cu = await s.get(CustomerUser, row.id)
+            assert cu is not None
+            cu.change_time = base_ts + timedelta(minutes=time_offsets[row.login])
+        await s.commit()
+
+        base = ListParams(page=1, page_size=50, valid="valid")
+
+        login_asc = await admin_customers.list_customer_users(
+            admin_user,
+            s,
+            ListParams(page=1, page_size=50, valid="valid", sort="login", order="asc"),
+            search=ns,
+        )
+        assert [i.login for i in login_asc.items] == [
+            f"a.sort.{ns}@example.com",
+            f"m.sort.{ns}@example.com",
+            f"z.sort.{ns}@example.com",
+        ]
+
+        login_desc = await admin_customers.list_customer_users(
+            admin_user,
+            s,
+            ListParams(page=1, page_size=50, valid="valid", sort="login", order="desc"),
+            search=ns,
+        )
+        assert [i.login for i in login_desc.items] == [
+            f"z.sort.{ns}@example.com",
+            f"m.sort.{ns}@example.com",
+            f"a.sort.{ns}@example.com",
+        ]
+
+        email_asc = await admin_customers.list_customer_users(
+            admin_user,
+            s,
+            ListParams(page=1, page_size=50, valid="valid", sort="email", order="asc"),
+            search=ns,
+        )
+        assert [i.email for i in email_asc.items] == [
+            f"a.sort.{ns}@example.com",
+            f"m.sort.{ns}@example.com",
+            f"z.sort.{ns}@example.com",
+        ]
+
+        email_desc = await admin_customers.list_customer_users(
+            admin_user,
+            s,
+            ListParams(page=1, page_size=50, valid="valid", sort="email", order="desc"),
+            search=ns,
+        )
+        assert [i.email for i in email_desc.items] == [
+            f"z.sort.{ns}@example.com",
+            f"m.sort.{ns}@example.com",
+            f"a.sort.{ns}@example.com",
+        ]
+
+        change_asc = await admin_customers.list_customer_users(
+            admin_user,
+            s,
+            ListParams(page=1, page_size=50, valid="valid", sort="change_time", order="asc"),
+            search=ns,
+        )
+        change_desc = await admin_customers.list_customer_users(
+            admin_user,
+            s,
+            ListParams(page=1, page_size=50, valid="valid", sort="change_time", order="desc"),
+            search=ns,
+        )
+        assert [i.login for i in change_asc.items] == [
+            f"m.sort.{ns}@example.com",
+            f"a.sort.{ns}@example.com",
+            f"z.sort.{ns}@example.com",
+        ]
+        assert [i.login for i in change_desc.items] == list(
+            reversed([i.login for i in change_asc.items])
+        )
+
+        # Invalid / unknown sort key → safe default (login asc), not an error.
+        bad = await admin_customers.list_customer_users(
+            admin_user,
+            s,
+            ListParams(
+                page=1, page_size=50, valid="valid", sort="password; drop table", order="desc"
+            ),
+            search=ns,
+        )
+        assert [i.login for i in bad.items] == [
+            f"a.sort.{ns}@example.com",
+            f"m.sort.{ns}@example.com",
+            f"z.sort.{ns}@example.com",
+        ]
+
+        # Absent sort → login default.
+        default = await admin_customers.list_customer_users(admin_user, s, base, search=ns)
+        assert [i.login for i in default.items] == [i.login for i in login_asc.items]
 
     await engine.dispose()

@@ -54,22 +54,37 @@ export function CustomerUsersPage() {
 
   const columns: DataTableColumn<CustomerUserAdminOut>[] = [
     { key: "id", header: t("admin.table.id"), mono: true, render: (r) => r.id },
-    { key: "login", header: t("admin.customerUsers.login"), render: (r) => r.login },
-    { key: "email", header: t("admin.customerUsers.email"), render: (r) => r.email },
+    {
+      key: "login",
+      header: t("admin.customerUsers.login"),
+      sortable: true,
+      render: (r) => r.login,
+    },
+    {
+      key: "email",
+      header: t("admin.customerUsers.email"),
+      sortable: true,
+      render: (r) => r.email,
+    },
     {
       key: "customer_id",
       header: t("admin.customerUsers.customerId"),
       mono: true,
+      sortable: true,
       render: (r) => r.customer_id,
     },
     {
       key: "name",
       header: t("admin.customerUsers.name"),
+      sortable: true,
+      sortKey: "first_name",
       render: (r) => `${r.first_name} ${r.last_name}`,
     },
     {
       key: "changed",
       header: t("admin.table.changed"),
+      sortable: true,
+      sortKey: "change_time",
       render: (r) => formatDateTime(r.change_time, locale),
     },
   ];
@@ -188,6 +203,8 @@ export function CustomerUsersPage() {
         columns={columns}
         fields={fields}
         searchable
+        sortable
+        statusSortable
         pageSize={100}
         allowAllPageSize
         bulkActions={bulkActions}
