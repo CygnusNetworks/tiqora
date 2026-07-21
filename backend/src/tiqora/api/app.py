@@ -126,6 +126,19 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     )
 
     @app.middleware("http")
+    async def csrf_origin_check_middleware(
+        request: Request, call_next: CallNext
+    ) -> StarletteResponse:
+        """M-02: Origin/Referer check for cookie-authenticated unsafe API requests.
+
+        API-key Authorization, safe methods, and requests without a session
+        cookie are exempt — SPA same-origin and non-browser clients keep working.
+        """
+        from tiqora.security.csrf import csrf_origin_middleware
+
+        return await csrf_origin_middleware(request, call_next)
+
+    @app.middleware("http")
     async def security_headers_middleware(
         request: Request, call_next: CallNext
     ) -> StarletteResponse:

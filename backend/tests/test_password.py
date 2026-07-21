@@ -7,7 +7,14 @@ import hashlib
 import pytest
 from passlib.hash import apr_md5_crypt, des_crypt, md5_crypt
 
-from tiqora.znuny.password import detect_scheme, hash_password, verify_password
+from tiqora.znuny.password import (
+    detect_scheme,
+    hash_password,
+    is_strong_scheme,
+    is_weak_scheme,
+    needs_rehash,
+    verify_password,
+)
 
 PASSWORD = "S3cret!pass"
 
@@ -88,6 +95,20 @@ def test_empty_password_never_succeeds() -> None:
     assert not verify_password("", stored)
     assert not verify_password("", "anything", crypt_type_plain=True)
     assert not verify_password(PASSWORD, "")
+
+
+def test_weak_strong_rehash_classification() -> None:
+    bcrypt_hash = hash_password(PASSWORD, cost=10)
+    assert is_strong_scheme(bcrypt_hash)
+    assert not is_weak_scheme(bcrypt_hash)
+    assert not needs_rehash(bcrypt_hash)
+
+    sha = hashlib.sha256(PASSWORD.encode("utf-8")).hexdigest()
+    assert is_weak_scheme(sha)
+    assert not is_strong_scheme(sha)
+    assert needs_rehash(sha)
+    assert needs_rehash("")
+    assert needs_rehash("not-a-hash")
 
 
 @pytest.mark.parametrize(

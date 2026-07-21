@@ -195,3 +195,33 @@ def detect_scheme(stored: str) -> str:
     if len(stored) == 13:
         return "crypt"
     return "unknown"
+
+
+# Schemes Znuny still verifies but that are weak for online/offline attack.
+# BCRYPT: is the only modern write format we produce (Znuny-compatible).
+_STRONG_SCHEMES: Final[frozenset[str]] = frozenset({"bcrypt"})
+
+
+def is_strong_scheme(stored: str) -> bool:
+    """Return True when *stored* is already a modern Znuny ``BCRYPT:`` hash."""
+    return detect_scheme(stored) in _STRONG_SCHEMES
+
+
+def is_weak_scheme(stored: str) -> bool:
+    """Return True when *stored* is a legacy/weak scheme (or unknown/empty).
+
+    Used for rehash-on-login and the optional reject-weak policy. Empty and
+    unknown are treated as weak so they never count as "modern".
+    """
+    scheme = detect_scheme(stored)
+    return scheme not in _STRONG_SCHEMES
+
+
+def needs_rehash(stored: str) -> bool:
+    """True when a successful verify should upgrade *stored* to ``BCRYPT:``."""
+    return not is_strong_scheme(stored)
+
+
+def rehash_password(password: str, *, cost: int = DEFAULT_BCRYPT_COST) -> str:
+    """Hash *password* with Znuny ``BCRYPT:`` (alias of :func:`hash_password`)."""
+    return hash_password(password, cost=cost)

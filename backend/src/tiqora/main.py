@@ -68,6 +68,10 @@ def main(argv: list[str] | None = None) -> None:
             port=getattr(args, "port", 8000),
             reload=getattr(args, "reload", False) or settings.debug,
             log_level=settings.log_level.lower(),
+            # Honour X-Forwarded-For/X-Real-IP from the trusted proxy so
+            # request.client.host is the real client IP (rate limiting keys on it).
+            proxy_headers=True,
+            forwarded_allow_ips=settings.forwarded_allow_ips,
         )
     elif command == "worker":
         from tiqora.worker.__main__ import run_worker

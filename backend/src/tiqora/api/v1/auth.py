@@ -42,6 +42,7 @@ from tiqora.domain.schemas import (
 from tiqora.domain.spnego import SpnegoService, SpnegoUnavailable, principal_to_login
 from tiqora.domain.totp_qr import totp_qr_svg
 from tiqora.permissions.engine import PermissionEngine
+from tiqora.security.ratelimit import AuthRateLimiter, client_ip
 
 logger = structlog.get_logger(__name__)
 
@@ -78,6 +79,27 @@ def _set_session_cookie(response: Response, settings: AppSettings, token: str) -
     )
 
 
+def _clear_session_cookie(response: Response, settings: AppSettings) -> None:
+    """Delete the session cookie with the same flags used when setting it (M-10)."""
+    response.delete_cookie(
+        key=settings.session_cookie_name,
+        path="/",
+        secure=settings.session_cookie_secure,
+        httponly=True,
+        samesite=settings.session_cookie_samesite,  # type: ignore[arg-type]
+    )
+
+
+def _rate_limit_http_exception(decision: object) -> HTTPException:
+    retry_after = int(getattr(decision, "retry_after", 0) or 0)
+    headers = {"Retry-After": str(max(1, retry_after))} if retry_after else None
+    return HTTPException(
+        status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+        detail="Too many failed login attempts; try again later",
+        headers=headers,
+    )
+
+
 @router.get("/methods", response_model=AuthMethodsOut)
 async def auth_methods(settings: AppSettings) -> AuthMethodsOut:
     """Discovery endpoint the login page uses to decide which buttons to show."""
@@ -93,6 +115,7 @@ async def auth_methods(settings: AppSettings) -> AuthMethodsOut:
 @router.post("/login", response_model=LoginResponse)
 async def login(
     body: LoginRequest,
+    request: Request,
     response: Response,
     auth: Annotated[AuthService, Depends(get_auth_service)],
     totp: TOTPServiceDep,
@@ -100,6 +123,13 @@ async def login(
     settings: AppSettings,
     session: DbSession,
 ) -> LoginResponse:
+    redis_client = await get_redis(request)
+    limiter = AuthRateLimiter(redis_client, settings)
+    ip = client_ip(request)
+    pre = await limiter.check(login=body.login, ip=ip)
+    if not pre.allowed:
+        raise _rate_limit_http_exception(pre)
+
     user = await auth.authenticate_password(body.login, body.password)
     if user is None and settings.ldap_enabled:
         # LDAP is tried as a fallback when local password auth fails,
@@ -111,10 +141,14 @@ async def login(
         if ldap_uid is not None:
             user = await auth.get_user_by_login(ldap_uid, auth_method="ldap")
     if user is None:
+        locked = await limiter.record_failure(login=body.login, ip=ip)
+        if locked is not None:
+            raise _rate_limit_http_exception(locked)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid credentials",
         )
+    await limiter.reset(login=body.login, ip=ip)
     if await two_factor_enabled(totp, webauthn, user.id):
         pending_token = await auth.create_pending_session(user)
         _set_session_cookie(response, settings, pending_token)
@@ -148,10 +182,7 @@ async def logout(
     )
     if token:
         await auth.logout(token)
-    response.delete_cookie(
-        key=settings.session_cookie_name,
-        path="/",
-    )
+    _clear_session_cookie(response, settings)
     response.status_code = status.HTTP_204_NO_CONTENT
     return response
 

@@ -18,7 +18,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from tiqora.config import Settings
 from tiqora.db.legacy.customer import CustomerUser
-from tiqora.znuny.password import verify_password
+from tiqora.znuny.password import hash_password, is_weak_scheme, needs_rehash, verify_password
 
 CUSTOMER_SESSION_KEY_PREFIX = "tiqora:csession:"
 
@@ -99,15 +99,29 @@ class CustomerAuthService:
     async def authenticate_password(
         self, login: str, password: str
     ) -> AuthenticatedCustomer | None:
-        """Verify customer credentials against ``customer_user.pw`` (valid_id must be 1)."""
+        """Verify customer credentials against ``customer_user.pw`` (valid_id must be 1).
+
+        Mirrors agent rehash-on-login for weak/legacy schemes (H-06).
+        """
         result = await self._session.execute(
             select(CustomerUser).where(CustomerUser.login == login, CustomerUser.valid_id == 1)
         )
         user = result.scalar_one_or_none()
         if user is None or not user.pw:
             return None
-        if not verify_password(password, user.pw):
+        stored = user.pw
+        reject_weak = bool(getattr(self._settings, "password_reject_weak_hashes", False))
+        rehash_on = bool(getattr(self._settings, "password_rehash_on_login", True))
+        if reject_weak and is_weak_scheme(stored):
             return None
+        if not verify_password(password, stored):
+            return None
+        if rehash_on and needs_rehash(stored):
+            user.pw = hash_password(password)
+            try:
+                await self._session.commit()
+            except Exception:  # noqa: BLE001 — login must not fail on rehash write
+                await self._session.rollback()
         return _to_authenticated(user)
 
     async def create_session(self, customer: AuthenticatedCustomer) -> str:

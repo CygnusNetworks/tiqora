@@ -215,6 +215,49 @@ class Settings(BaseSettings):
     totp_pending_ttl_seconds: int = Field(default=300, validation_alias="TIQORA_TOTP_PENDING_TTL")
     totp_issuer: str = Field(default="Tiqora", validation_alias="TIQORA_TOTP_ISSUER")
 
+    # Password-auth rate limit / lockout (M-7 / H-01). Disable for unit tests
+    # that hammer login (TIQORA_AUTH_RATE_LIMIT_ENABLED=0).
+    auth_rate_limit_enabled: bool = Field(
+        default=True, validation_alias="TIQORA_AUTH_RATE_LIMIT_ENABLED"
+    )
+    auth_rate_limit_login_max: int = Field(
+        default=10, validation_alias="TIQORA_AUTH_RATE_LIMIT_LOGIN_MAX"
+    )
+    auth_rate_limit_ip_max: int = Field(
+        default=20, validation_alias="TIQORA_AUTH_RATE_LIMIT_IP_MAX"
+    )
+    auth_rate_limit_window_seconds: int = Field(
+        default=60, validation_alias="TIQORA_AUTH_RATE_LIMIT_WINDOW"
+    )
+    auth_rate_limit_lockout_seconds: int = Field(
+        default=300, validation_alias="TIQORA_AUTH_RATE_LIMIT_LOCKOUT"
+    )
+
+    # Trusted reverse-proxy IPs whose X-Forwarded-For/X-Real-IP uvicorn honours so
+    # request.client.host reflects the real client (not the proxy). REQUIRED behind
+    # nginx, else the per-IP rate limit keys every request on the proxy IP and locks
+    # out all users. Default "127.0.0.1"; set to the proxy/docker-gateway IP or "*"
+    # when the app port is only reachable through the trusted proxy.
+    forwarded_allow_ips: str = Field(
+        default="127.0.0.1", validation_alias="TIQORA_FORWARDED_ALLOW_IPS"
+    )
+
+    # After successful password verify, rehash weak/legacy Znuny schemes to
+    # BCRYPT: (H-06). Always on for upgrades; rejecting weak schemes entirely
+    # is optional so parallel-op with Znuny keeps working until migrated.
+    password_rehash_on_login: bool = Field(
+        default=True, validation_alias="TIQORA_PASSWORD_REHASH_ON_LOGIN"
+    )
+    password_reject_weak_hashes: bool = Field(
+        default=False, validation_alias="TIQORA_PASSWORD_REJECT_WEAK_HASHES"
+    )
+
+    # Cookie-session CSRF defense via Origin/Referer (M-02). Same-origin SPA
+    # requests match automatically; API-key Authorization is exempt.
+    csrf_origin_check_enabled: bool = Field(
+        default=True, validation_alias="TIQORA_CSRF_ORIGIN_CHECK_ENABLED"
+    )
+
     # WebAuthn passkeys as an alternative 2nd factor (Phase 3c). Disabled unless
     # both rp_id and origin are set — endpoints 404 and AuthMethodsOut.webauthn
     # is false when unset (ships flag-off).
