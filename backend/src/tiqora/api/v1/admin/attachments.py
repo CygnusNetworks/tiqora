@@ -13,8 +13,9 @@ from tiqora.api.v1.admin.schemas import (
     StandardAttachmentCreate,
     StandardAttachmentOut,
     StandardAttachmentUpdate,
+    StandardTemplateOut,
 )
-from tiqora.db.legacy.queue import StandardAttachment
+from tiqora.db.legacy.queue import StandardAttachment, StandardTemplate, StandardTemplateAttachment
 
 router = APIRouter(prefix="/attachments", tags=["admin:attachments"])
 
@@ -115,3 +116,24 @@ async def deactivate_attachment(attachment_id: int, admin: AdminUser, session: D
     row.change_by = admin.id
     await invalidate_znuny_cache_types(session, ATTACHMENT_CACHE_TYPES)
     await session.commit()
+
+
+@router.get("/{attachment_id}/templates", response_model=list[StandardTemplateOut])
+async def get_attachment_templates(
+    attachment_id: int, admin: AdminUser, session: DbSession
+) -> list[StandardTemplate]:
+    """Templates currently using *attachment_id* — reverse of template↔attachments."""
+    _ = admin
+    att = await session.get(StandardAttachment, attachment_id)
+    if att is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Attachment not found")
+    result = await session.execute(
+        select(StandardTemplate)
+        .join(
+            StandardTemplateAttachment,
+            StandardTemplateAttachment.standard_template_id == StandardTemplate.id,
+        )
+        .where(StandardTemplateAttachment.standard_attachment_id == attachment_id)
+        .order_by(StandardTemplate.name)
+    )
+    return list(result.scalars().all())

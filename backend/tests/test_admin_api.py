@@ -1141,3 +1141,323 @@ async def test_admin_queue_auto_response_assignment_get_roundtrip(
         assert missing_ar.value.status_code == 404
 
     await engine.dispose()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("url_fixture", ["mariadb_znuny_url", "postgres_znuny_url"])
+async def test_admin_group_users_reverse_get_roundtrip(
+    url_fixture: str, request: pytest.FixtureRequest
+) -> None:
+    """Group↔users reverse read: assign, GET reverse, revoke empty; 404 anchor."""
+    sync_url: str = request.getfixturevalue(url_fixture)
+    ids = _seed_admin_and_plain_user(sync_url)
+    session, engine = await _make_session(sync_url)
+    ns = uuid.uuid4().hex[:8]
+
+    async with session as s:
+        admin_user = AuthenticatedUser(
+            id=ids["admin_id"],
+            login="root@localhost",
+            first_name="Admin",
+            last_name="Znuny",
+            auth_method="session",
+        )
+        agent = await admin_users.create_user(
+            UserCreate(
+                login=f"rev.gu.{ns}@example.com",
+                password="pw12345678",
+                first_name="Rev",
+                last_name="GroupUser",
+            ),
+            admin_user,
+            s,
+        )
+        group = await admin_groups.create_group(GroupCreate(name=f"rev-gu-{ns}"), admin_user, s)
+
+        assert await admin_groups.get_group_users(group.id, admin_user, s) == []
+
+        await admin_users.assign_group(
+            agent.id, GroupAssignment(group_id=group.id, permission_key="rw"), admin_user, s
+        )
+        linked = await admin_groups.get_group_users(group.id, admin_user, s)
+        assert [u.id for u in linked] == [agent.id]
+
+        await admin_users.revoke_group(agent.id, group.id, "rw", admin_user, s)
+        assert await admin_groups.get_group_users(group.id, admin_user, s) == []
+
+        with pytest.raises(HTTPException) as missing:
+            await admin_groups.get_group_users(9_999_999, admin_user, s)
+        assert missing.value.status_code == 404
+
+    await engine.dispose()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("url_fixture", ["mariadb_znuny_url", "postgres_znuny_url"])
+async def test_admin_role_users_reverse_get_roundtrip(
+    url_fixture: str, request: pytest.FixtureRequest
+) -> None:
+    """Role↔users reverse read: assign, GET reverse, revoke empty; 404 anchor."""
+    sync_url: str = request.getfixturevalue(url_fixture)
+    ids = _seed_admin_and_plain_user(sync_url)
+    session, engine = await _make_session(sync_url)
+    ns = uuid.uuid4().hex[:8]
+
+    async with session as s:
+        admin_user = AuthenticatedUser(
+            id=ids["admin_id"],
+            login="root@localhost",
+            first_name="Admin",
+            last_name="Znuny",
+            auth_method="session",
+        )
+        agent = await admin_users.create_user(
+            UserCreate(
+                login=f"rev.ru.{ns}@example.com",
+                password="pw12345678",
+                first_name="Rev",
+                last_name="RoleUser",
+            ),
+            admin_user,
+            s,
+        )
+        role = await admin_roles.create_role(RoleCreate(name=f"rev-ru-{ns}"), admin_user, s)
+
+        assert await admin_roles.get_role_users(role.id, admin_user, s) == []
+
+        await admin_users.assign_role(agent.id, RoleAssignment(role_id=role.id), admin_user, s)
+        linked = await admin_roles.get_role_users(role.id, admin_user, s)
+        assert [u.id for u in linked] == [agent.id]
+
+        await admin_users.revoke_role(agent.id, role.id, admin_user, s)
+        assert await admin_roles.get_role_users(role.id, admin_user, s) == []
+
+        with pytest.raises(HTTPException) as missing:
+            await admin_roles.get_role_users(9_999_999, admin_user, s)
+        assert missing.value.status_code == 404
+
+    await engine.dispose()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("url_fixture", ["mariadb_znuny_url", "postgres_znuny_url"])
+async def test_admin_group_roles_reverse_get_roundtrip(
+    url_fixture: str, request: pytest.FixtureRequest
+) -> None:
+    """Group↔roles reverse read: assign, GET reverse, revoke empty; 404 anchor."""
+    sync_url: str = request.getfixturevalue(url_fixture)
+    ids = _seed_admin_and_plain_user(sync_url)
+    session, engine = await _make_session(sync_url)
+    ns = uuid.uuid4().hex[:8]
+
+    async with session as s:
+        admin_user = AuthenticatedUser(
+            id=ids["admin_id"],
+            login="root@localhost",
+            first_name="Admin",
+            last_name="Znuny",
+            auth_method="session",
+        )
+        role = await admin_roles.create_role(RoleCreate(name=f"rev-gr-{ns}"), admin_user, s)
+        group = await admin_groups.create_group(GroupCreate(name=f"rev-gr-g-{ns}"), admin_user, s)
+
+        assert await admin_groups.get_group_roles(group.id, admin_user, s) == []
+
+        await admin_roles.assign_group_role(
+            role.id,
+            GroupRoleAssignment(group_id=group.id, permission_key="rw", permission_value=1),
+            admin_user,
+            s,
+        )
+        linked = await admin_groups.get_group_roles(group.id, admin_user, s)
+        assert [r.id for r in linked] == [role.id]
+
+        await admin_roles.revoke_group_role(role.id, group.id, "rw", admin_user, s)
+        assert await admin_groups.get_group_roles(group.id, admin_user, s) == []
+
+        with pytest.raises(HTTPException) as missing:
+            await admin_groups.get_group_roles(9_999_999, admin_user, s)
+        assert missing.value.status_code == 404
+
+    await engine.dispose()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("url_fixture", ["mariadb_znuny_url", "postgres_znuny_url"])
+async def test_admin_group_customer_users_reverse_get_roundtrip(
+    url_fixture: str, request: pytest.FixtureRequest
+) -> None:
+    """Group↔customer-users reverse read: assign, GET reverse, revoke empty; 404."""
+    sync_url: str = request.getfixturevalue(url_fixture)
+    ids = _seed_admin_and_plain_user(sync_url)
+    session, engine = await _make_session(sync_url)
+    ns = uuid.uuid4().hex[:8]
+
+    async with session as s:
+        admin_user = AuthenticatedUser(
+            id=ids["admin_id"],
+            login="root@localhost",
+            first_name="Admin",
+            last_name="Znuny",
+            auth_method="session",
+        )
+        login = f"rev.gcu.{ns}@example.com"
+        await admin_customers.create_customer_user(
+            CustomerUserAdminCreate(
+                login=login,
+                email=login,
+                customer_id=f"REV-GCU-HOME-{ns}",
+                first_name="Rev",
+                last_name="Gcu",
+            ),
+            admin_user,
+            s,
+        )
+        group = await admin_groups.create_group(GroupCreate(name=f"rev-gcu-{ns}"), admin_user, s)
+
+        assert await admin_groups.get_group_customer_users(group.id, admin_user, s) == []
+
+        await admin_customers.assign_customer_user_group(
+            login,
+            CustomerUserGroupAssignment(group_id=group.id, permission_key="rw", permission_value=1),
+            admin_user,
+            s,
+        )
+        linked = await admin_groups.get_group_customer_users(group.id, admin_user, s)
+        assert [cu.login for cu in linked] == [login]
+
+        await admin_customers.revoke_customer_user_group(login, group.id, "rw", admin_user, s)
+        assert await admin_groups.get_group_customer_users(group.id, admin_user, s) == []
+
+        with pytest.raises(HTTPException) as missing:
+            await admin_groups.get_group_customer_users(9_999_999, admin_user, s)
+        assert missing.value.status_code == 404
+
+    await engine.dispose()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("url_fixture", ["mariadb_znuny_url", "postgres_znuny_url"])
+async def test_admin_customer_company_users_reverse_get_roundtrip(
+    url_fixture: str, request: pytest.FixtureRequest
+) -> None:
+    """Company↔customer-users reverse read (customer_user_customer); 404 anchor."""
+    sync_url: str = request.getfixturevalue(url_fixture)
+    ids = _seed_admin_and_plain_user(sync_url)
+    session, engine = await _make_session(sync_url)
+    ns = uuid.uuid4().hex[:8]
+
+    async with session as s:
+        admin_user = AuthenticatedUser(
+            id=ids["admin_id"],
+            login="root@localhost",
+            first_name="Admin",
+            last_name="Znuny",
+            auth_method="session",
+        )
+        login = f"rev.ccu.{ns}@example.com"
+        await admin_customers.create_customer_user(
+            CustomerUserAdminCreate(
+                login=login,
+                email=login,
+                customer_id=f"REV-CCU-HOME-{ns}",
+                first_name="Rev",
+                last_name="Ccu",
+            ),
+            admin_user,
+            s,
+        )
+        company = await admin_customers.create_customer_company(
+            CustomerCompanyCreate(customer_id=f"REV-CCU-EXTRA-{ns}", name=f"Rev CCU {ns}"),
+            admin_user,
+            s,
+        )
+
+        assert (
+            await admin_customers.get_customer_company_users(company.customer_id, admin_user, s)
+            == []
+        )
+
+        await admin_customers.assign_customer_company(
+            login, CustomerUserCustomerAssignment(customer_id=company.customer_id), admin_user, s
+        )
+        linked = await admin_customers.get_customer_company_users(
+            company.customer_id, admin_user, s
+        )
+        assert [cu.login for cu in linked] == [login]
+
+        await admin_customers.revoke_customer_company(login, company.customer_id, admin_user, s)
+        assert (
+            await admin_customers.get_customer_company_users(company.customer_id, admin_user, s)
+            == []
+        )
+
+        with pytest.raises(HTTPException) as missing:
+            await admin_customers.get_customer_company_users("missing-company-rev", admin_user, s)
+        assert missing.value.status_code == 404
+
+    await engine.dispose()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("url_fixture", ["mariadb_znuny_url", "postgres_znuny_url"])
+async def test_admin_attachment_templates_reverse_get_roundtrip(
+    url_fixture: str, request: pytest.FixtureRequest
+) -> None:
+    """Attachment↔templates reverse read: link, GET reverse, clear empty; 404."""
+    import base64
+
+    sync_url: str = request.getfixturevalue(url_fixture)
+    ids = _seed_admin_and_plain_user(sync_url)
+    session, engine = await _make_session(sync_url)
+    ns = uuid.uuid4().hex[:8]
+
+    async with session as s:
+        admin_user = AuthenticatedUser(
+            id=ids["admin_id"],
+            login="root@localhost",
+            first_name="Admin",
+            last_name="Znuny",
+            auth_method="session",
+        )
+        tmpl = await admin_templates.create_template(
+            StandardTemplateCreate(
+                name=f"rev-at-t-{ns}",
+                text="body",
+                template_type="Answer",
+            ),
+            admin_user,
+            s,
+        )
+        att = await admin_attachments.create_attachment(
+            StandardAttachmentCreate(
+                name=f"rev-at-a-{ns}",
+                content_type="text/plain",
+                content=base64.b64encode(b"rev").decode("ascii"),
+                filename=f"rev-at-{ns}.txt",
+            ),
+            admin_user,
+            s,
+        )
+
+        assert await admin_attachments.get_attachment_templates(att.id, admin_user, s) == []
+
+        await admin_templates.replace_template_attachments(
+            tmpl.id,
+            TemplateAttachmentsReplace(attachment_ids=[att.id]),
+            admin_user,
+            s,
+        )
+        linked = await admin_attachments.get_attachment_templates(att.id, admin_user, s)
+        assert [t.id for t in linked] == [tmpl.id]
+
+        await admin_templates.replace_template_attachments(
+            tmpl.id, TemplateAttachmentsReplace(attachment_ids=[]), admin_user, s
+        )
+        assert await admin_attachments.get_attachment_templates(att.id, admin_user, s) == []
+
+        with pytest.raises(HTTPException) as missing:
+            await admin_attachments.get_attachment_templates(9_999_999, admin_user, s)
+        assert missing.value.status_code == 404
+
+    await engine.dispose()

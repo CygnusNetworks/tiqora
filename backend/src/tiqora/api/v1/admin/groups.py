@@ -9,8 +9,23 @@ from tiqora.api.deps import DbSession
 from tiqora.api.v1.admin.common import GROUP_CACHE_TYPES, invalidate_znuny_cache_types, now
 from tiqora.api.v1.admin.deps import AdminUser
 from tiqora.api.v1.admin.pagination import ListParamsDep, Page, apply_valid_filter, paginate
-from tiqora.api.v1.admin.schemas import GroupCreate, GroupOut, GroupUpdate
-from tiqora.db.legacy.user import PermissionGroups
+from tiqora.api.v1.admin.schemas import (
+    CustomerUserAdminOut,
+    GroupCreate,
+    GroupOut,
+    GroupUpdate,
+    RoleOut,
+    UserOut,
+)
+from tiqora.db.legacy.customer import CustomerUser
+from tiqora.db.legacy.user import (
+    GroupCustomerUser,
+    GroupRole,
+    GroupUser,
+    PermissionGroups,
+    Roles,
+    Users,
+)
 
 router = APIRouter(prefix="/groups", tags=["admin:groups"])
 
@@ -82,3 +97,69 @@ async def deactivate_group(group_id: int, admin: AdminUser, session: DbSession) 
     group.change_by = admin.id
     await invalidate_znuny_cache_types(session, GROUP_CACHE_TYPES)
     await session.commit()
+
+
+# --- Reverse relation reads (group as anchor) --------------------------------
+
+
+@router.get("/{group_id}/users", response_model=list[UserOut])
+async def get_group_users(group_id: int, admin: AdminUser, session: DbSession) -> list[Users]:
+    """Agents with full (``rw``) access to *group_id* — reverse of user↔groups."""
+    _ = admin
+    group = await session.get(PermissionGroups, group_id)
+    if group is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Group not found")
+    result = await session.execute(
+        select(Users)
+        .join(GroupUser, GroupUser.user_id == Users.id)
+        .where(GroupUser.group_id == group_id, GroupUser.permission_key == "rw")
+        .order_by(Users.login)
+    )
+    return list(result.scalars().all())
+
+
+@router.get("/{group_id}/roles", response_model=list[RoleOut])
+async def get_group_roles(group_id: int, admin: AdminUser, session: DbSession) -> list[Roles]:
+    """Roles that grant full (``rw``) access to *group_id* — reverse of role↔groups."""
+    _ = admin
+    group = await session.get(PermissionGroups, group_id)
+    if group is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Group not found")
+    result = await session.execute(
+        select(Roles)
+        .join(GroupRole, GroupRole.role_id == Roles.id)
+        .where(
+            GroupRole.group_id == group_id,
+            GroupRole.permission_key == "rw",
+            GroupRole.permission_value == 1,
+        )
+        .order_by(Roles.name)
+    )
+    return list(result.scalars().all())
+
+
+@router.get("/{group_id}/customer-users", response_model=list[CustomerUserAdminOut])
+async def get_group_customer_users(
+    group_id: int, admin: AdminUser, session: DbSession
+) -> list[CustomerUser]:
+    """Customer users with full (``rw``) access to *group_id* — reverse of
+    customer-user↔groups.
+
+    Znuny stores the customer-user identity as the *login string* in
+    ``group_customer_user.user_id`` (not the numeric ``customer_user.id``).
+    """
+    _ = admin
+    group = await session.get(PermissionGroups, group_id)
+    if group is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Group not found")
+    result = await session.execute(
+        select(CustomerUser)
+        .join(GroupCustomerUser, GroupCustomerUser.user_id == CustomerUser.login)
+        .where(
+            GroupCustomerUser.group_id == group_id,
+            GroupCustomerUser.permission_key == "rw",
+            GroupCustomerUser.permission_value == 1,
+        )
+        .order_by(CustomerUser.login)
+    )
+    return list(result.scalars().all())
