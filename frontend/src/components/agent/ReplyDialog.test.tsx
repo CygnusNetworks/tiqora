@@ -200,6 +200,71 @@ describe("ReplyDialog recipient toggles", () => {
     expect(screen.queryByTestId("reply-toggle-replyto-count")).toBeNull();
   });
 
+  it("signals Cc toggle on/off with active classes when enabled", async () => {
+    getReplyDraft.mockResolvedValue(baseDraft);
+
+    wrap(
+      <ReplyDialog
+        ticketId={1}
+        articleId={2}
+        replyAll={false}
+        open
+        onClose={vi.fn()}
+      />,
+    );
+
+    await waitFor(() => expect(screen.getByTestId("reply-dialog")).toBeTruthy());
+
+    const ccToggle = screen.getByTestId("reply-toggle-cc");
+    // Collapsed and empty → inactive (muted outline, not accent fill).
+    expect(ccToggle.getAttribute("data-active")).toBe("false");
+    expect(ccToggle.className).not.toMatch(/bg-accent-dim/);
+    expect(ccToggle.className).toMatch(/border-hairline/);
+    expect(ccToggle.className).toMatch(/text-muted/);
+
+    // Expand → active (filled accent style).
+    fireEvent.click(ccToggle);
+    expect(ccToggle.getAttribute("data-active")).toBe("true");
+    expect(ccToggle.className).toMatch(/bg-accent-dim/);
+    expect(ccToggle.className).toMatch(/text-accent/);
+    expect(ccToggle.className).toMatch(/border-accent\/50/);
+
+    // Collapse again with no addresses → inactive.
+    fireEvent.click(ccToggle);
+    expect(ccToggle.getAttribute("data-active")).toBe("false");
+    expect(ccToggle.className).not.toMatch(/bg-accent-dim/);
+  });
+
+  it("keeps Cc toggle active when collapsed but non-empty", async () => {
+    getReplyDraft.mockResolvedValue({
+      ...baseDraft,
+      cc: "a@x.com, b@x.com",
+    });
+
+    wrap(
+      <ReplyDialog
+        ticketId={1}
+        articleId={2}
+        replyAll
+        open
+        onClose={vi.fn()}
+      />,
+    );
+
+    await waitFor(() => expect(screen.getByTestId("reply-cc")).toBeTruthy());
+
+    const ccToggle = screen.getByTestId("reply-toggle-cc");
+    expect(ccToggle.getAttribute("data-active")).toBe("true");
+    expect(ccToggle.className).toMatch(/bg-accent-dim/);
+
+    // Collapse while addresses remain → still "on".
+    fireEvent.click(ccToggle);
+    expect(screen.queryByTestId("reply-cc")).toBeNull();
+    expect(ccToggle.getAttribute("data-active")).toBe("true");
+    expect(ccToggle.className).toMatch(/bg-accent-dim/);
+    expect(screen.getByTestId("reply-toggle-cc-count").textContent).toBe("2");
+  });
+
   it("shows a read-only signature preview and does not send it in the body", async () => {
     getReplyDraft.mockResolvedValue({
       ...baseDraft,
