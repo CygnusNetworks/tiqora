@@ -1,16 +1,13 @@
 import type { ReactNode } from "react";
 import { Link } from "@tanstack/react-router";
-import { useTranslation } from "react-i18next";
 import type { TicketListItem } from "@/lib/api";
-import { priorityName, priorityTextClass } from "@/lib/priority";
-import { isNewTicketState, stateColorVar, stateLabel } from "@/lib/status";
-import { cn } from "@/lib/cn";
+import { PriorityChip, StateChip } from "@/components/ui/StatusChip";
 
 /**
  * A single ticket row for the dashboard work lists: number + title, then a
- * compact meta cluster (queue, state chip with a colour dot, priority tinted
- * by severity). The right-hand `trailing` slot carries whatever each list
- * needs there — a changed date, an escalation countdown, or a due time.
+ * compact meta cluster (queue, state soft-chip, priority soft-chip). The
+ * right-hand `trailing` slot carries whatever each list needs there — a
+ * changed date, an escalation countdown, or a due time.
  */
 export function DashboardTicketRow({
   ticket,
@@ -19,10 +16,6 @@ export function DashboardTicketRow({
   ticket: TicketListItem;
   trailing?: ReactNode;
 }) {
-  const { t } = useTranslation();
-  const prio = priorityName(ticket.priority);
-  const isNew = isNewTicketState(ticket.state, ticket.state_type);
-
   return (
     <li>
       <Link
@@ -45,34 +38,15 @@ export function DashboardTicketRow({
                 : ticket.queue_name}
             </span>
           )}
-          {isNew ? (
-            <span
-              className="rounded-full bg-accent-dim px-1.5 py-0.5 text-[9.5px] font-semibold uppercase tracking-wide text-accent"
-              data-testid={`dashboard-ticket-${ticket.id}-new-badge`}
-            >
-              {t("ticket.stateName.new")}
-            </span>
-          ) : (
-            ticket.state && (
-              <span className="inline-flex items-center gap-1.5 text-xs text-muted">
-                <span
-                  className="h-2 w-2 shrink-0 rounded-full"
-                  style={{ backgroundColor: stateColorVar(ticket.state) }}
-                  data-testid={`dashboard-ticket-${ticket.id}-state-dot`}
-                  aria-hidden
-                />
-                {stateLabel(t, ticket.state)}
-              </span>
-            )
-          )}
-          {prio && (
-            <span
-              className={cn("text-xs font-medium", priorityTextClass(ticket.priority_id))}
-              data-testid={`dashboard-ticket-${ticket.id}-priority`}
-            >
-              {prio}
-            </span>
-          )}
+          <StateChip
+            state={ticket.state}
+            data-testid={`dashboard-ticket-${ticket.id}-state-chip`}
+          />
+          <PriorityChip
+            priority={ticket.priority}
+            priorityId={ticket.priority_id}
+            data-testid={`dashboard-ticket-${ticket.id}-priority`}
+          />
         </span>
 
         {trailing && (

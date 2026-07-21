@@ -2,15 +2,13 @@ import { useTranslation } from "react-i18next";
 import type { TicketDetail } from "@/lib/api";
 import { formatDateTime, isEscalated } from "@/lib/format";
 import { Badge } from "@/components/ui/Badge";
+import { PriorityChip, StateChip } from "@/components/ui/StatusChip";
 import {
   combinedEscalationLevel,
   formatCountdown,
-  isNewTicketState,
   spineClassName,
   stateColorVar,
-  stateLabel,
 } from "@/lib/status";
-import { priorityName, priorityTextClass } from "@/lib/priority";
 import type { CSSProperties, ReactNode } from "react";
 
 export function TicketHeader({
@@ -23,7 +21,6 @@ export function TicketHeader({
 }) {
   const { t, i18n } = useTranslation();
   const locale = i18n.language?.startsWith("de") ? "de" : "en";
-  const isNew = isNewTicketState(ticket.state, ticket.state_type);
 
   const badges: { label: string; tone: "danger" | "warn" }[] = [];
   if (isEscalated(ticket.escalation_response_time)) {
@@ -68,14 +65,6 @@ export function TicketHeader({
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
             <span className="font-mono text-sm text-accent">{ticket.tn}</span>
-            {isNew && (
-              <span
-                className="rounded-full bg-accent-dim px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-accent"
-                data-testid="ticket-header-new-badge"
-              >
-                {t("ticket.stateName.new")}
-              </span>
-            )}
             {countdown && (
               <span className="rounded bg-escalation/15 px-1.5 py-0.5 font-mono text-[11px] tabular-nums text-escalation">
                 {countdown}
@@ -100,25 +89,21 @@ export function TicketHeader({
           </div>
         )}
       </div>
-      {/* One compact metadata line — no redundant badge row, priority without
-          its numeric rank. Wraps on narrow screens. For "new" tickets the
-          Neu badge above is the only state cue (no duplicate Status text). */}
+      {/* Compact metadata line — status and priority as uniform soft-chips. */}
       <dl
         className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm"
         data-testid="ticket-meta-line"
       >
-        {!isNew && (
-          <Meta
-            label={t("ticket.state")}
-            value={stateLabel(t, ticket.state)}
-            dot={stateColorVar(ticket.state)}
+        <Meta label={t("ticket.state")}>
+          <StateChip state={ticket.state} data-testid="ticket-header-state-chip" />
+        </Meta>
+        <Meta label={t("ticket.priority")}>
+          <PriorityChip
+            priority={ticket.priority}
+            priorityId={ticket.priority_id}
+            data-testid="ticket-header-priority-chip"
           />
-        )}
-        <Meta
-          label={t("ticket.priority")}
-          value={priorityName(ticket.priority)}
-          valueClass={priorityTextClass(ticket.priority_id)}
-        />
+        </Meta>
         <Meta label={t("ticket.queue")} value={ticket.queue_name} />
         <Meta label={t("ticket.owner")} value={ticket.owner_name || ticket.owner_login} />
         <Meta label={t("ticket.customer")} value={ticket.customer_user_id || ticket.customer_id} />
@@ -149,22 +134,25 @@ export function TicketHeader({
 function Meta({
   label,
   value,
-  dot,
-  valueClass,
+  children,
 }: {
   label: string;
-  value: string | null | undefined;
-  dot?: string;
-  valueClass?: string;
+  value?: string | null | undefined;
+  children?: ReactNode;
 }) {
+  if (children) {
+    return (
+      <div className="inline-flex items-center gap-1.5">
+        <dt className="text-[11px] uppercase tracking-wide text-muted">{label}</dt>
+        <dd>{children}</dd>
+      </div>
+    );
+  }
   if (!value) return null;
   return (
     <div className="inline-flex items-center gap-1.5">
-      {dot && (
-        <span className="inline-block h-2 w-2 rounded-full" style={{ background: dot }} />
-      )}
       <dt className="text-[11px] uppercase tracking-wide text-muted">{label}</dt>
-      <dd className={`font-medium ${valueClass ?? "text-ink"}`}>{value}</dd>
+      <dd className="font-medium text-ink">{value}</dd>
     </div>
   );
 }

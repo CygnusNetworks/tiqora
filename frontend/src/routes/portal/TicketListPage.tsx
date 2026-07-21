@@ -3,11 +3,12 @@ import { useQuery } from "@tanstack/react-query";
 import { useNavigate, useSearch, Link } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
 import { portalApi, type TicketListItem } from "@/lib/portalApi";
-import { stateColorVar, stateLabel } from "@/lib/status";
+import { stateColorVar } from "@/lib/status";
 import { formatDateTime } from "@/lib/format";
 import { Tabs } from "@/components/ui/Tabs";
 import { Spinner } from "@/components/ui/Spinner";
 import { Button } from "@/components/ui/Button";
+import { StateChip } from "@/components/ui/StatusChip";
 
 const STATE_TABS = ["all", "open", "pending", "closed"] as const;
 type StateTab = (typeof STATE_TABS)[number];
@@ -92,14 +93,13 @@ function TicketRow({ ticket, locale }: { ticket: TicketListItem; locale: string 
       >
         <div className="flex flex-wrap items-center gap-2">
           <span className="font-mono text-xs tabular-nums text-muted">{ticket.tn}</span>
-          <span
-            className="rounded border border-hairline px-1.5 py-0.5 text-[11px] font-medium capitalize text-ink"
-            style={{ borderColor: spineColor, color: spineColor }}
-          >
-            {ticket.state
-              ? stateLabel(t, ticket.state)
-              : t("portal.tickets.unknownState")}
-          </span>
+          <StateChip
+            state={ticket.state}
+            empty={
+              <span className="text-[11px] text-muted">{t("portal.tickets.unknownState")}</span>
+            }
+            data-testid={`portal-ticket-state-chip-${ticket.id}`}
+          />
         </div>
         <p className="truncate text-sm font-medium text-ink">
           {ticket.title || t("ticket.noTitle")}

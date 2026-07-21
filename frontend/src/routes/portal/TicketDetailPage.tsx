@@ -3,10 +3,11 @@ import { useParams } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { portalApi, ApiError, type ArticleListItem } from "@/lib/portalApi";
-import { stateColorVar, stateLabel } from "@/lib/status";
+import { stateColorVar } from "@/lib/status";
 import { formatDateTime } from "@/lib/format";
 import { Spinner } from "@/components/ui/Spinner";
 import { Button } from "@/components/ui/Button";
+import { StateChip } from "@/components/ui/StatusChip";
 import { cn } from "@/lib/cn";
 
 /**
@@ -125,14 +126,13 @@ export function TicketDetailPage() {
       >
         <div className="flex flex-wrap items-center gap-2">
           <span className="font-mono text-xs tabular-nums text-muted">{ticket.tn}</span>
-          <span
-            className="rounded border px-1.5 py-0.5 text-[11px] font-medium capitalize"
-            style={{ borderColor: spineColor, color: spineColor }}
-          >
-            {ticket.state
-              ? stateLabel(t, ticket.state)
-              : t("portal.tickets.unknownState")}
-          </span>
+          <StateChip
+            state={ticket.state}
+            empty={
+              <span className="text-[11px] text-muted">{t("portal.tickets.unknownState")}</span>
+            }
+            data-testid="portal-ticket-detail-state-chip"
+          />
         </div>
         <h1 className="mt-1 font-display text-lg font-semibold text-ink">
           {ticket.title || t("ticket.noTitle")}

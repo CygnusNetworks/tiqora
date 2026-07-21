@@ -71,18 +71,17 @@ async function renderTable(items: TicketListItem[]) {
 }
 
 describe("TicketTable state display", () => {
-  it("shows only the New badge for new tickets (no raw 'new' text)", async () => {
+  it("shows a soft-chip for new tickets with the localised label", async () => {
     await renderTable([makeItem()]);
-    const badge = await screen.findByTestId("ticket-new-badge-11");
-    expect(badge).toHaveTextContent("New");
-    const row = screen.getByTestId("ticket-row-11");
-    // Badge is present; raw English state name must not also appear as plain text.
-    // The badge itself says "New", so check the desktop state cell structure:
-    // only the badge, not a sibling state string.
-    expect(row.querySelectorAll('[data-testid="ticket-new-badge-11"]')).toHaveLength(1);
+    const chip = await screen.findByTestId("ticket-state-chip-11");
+    expect(chip).toHaveTextContent("New");
+    expect(chip).toHaveAttribute("data-kind", "state");
+    expect(chip).toHaveStyle({ color: "var(--color-state-new)" });
+    // Old special-case NEU badge is gone.
+    expect(screen.queryByTestId("ticket-new-badge-11")).toBeNull();
   });
 
-  it("shows the localised label for non-new states without a New badge", async () => {
+  it("shows a soft-chip for non-new states with the same chip markup", async () => {
     await renderTable([
       makeItem({
         id: 12,
@@ -91,8 +90,18 @@ describe("TicketTable state display", () => {
         state_type: "closed",
       }),
     ]);
-    const row = await screen.findByTestId("ticket-row-12");
-    expect(row).toHaveTextContent("Closed successful");
-    expect(screen.queryByTestId("ticket-new-badge-12")).toBeNull();
+    const chip = await screen.findByTestId("ticket-state-chip-12");
+    expect(chip).toHaveTextContent("Closed successful");
+    expect(chip).toHaveAttribute("data-kind", "state");
+    expect(chip).toHaveStyle({ color: "var(--color-state-closed)" });
+  });
+
+  it("shows a soft-chip for priority without the numeric rank", async () => {
+    await renderTable([makeItem({ priority: "5 very high", priority_id: 5 })]);
+    const chip = await screen.findByTestId("ticket-priority-chip-11");
+    expect(chip).toHaveTextContent("very high");
+    expect(chip).not.toHaveTextContent("5 very");
+    expect(chip).toHaveAttribute("data-kind", "priority");
+    expect(chip).toHaveStyle({ color: "var(--color-prio-5)" });
   });
 });

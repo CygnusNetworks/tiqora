@@ -4,16 +4,14 @@ import { useNavigate } from "@tanstack/react-router";
 import type { TicketListItem } from "@/lib/api";
 import { formatAgeSeconds, formatDateTime, isEscalated } from "@/lib/format";
 import { cn } from "@/lib/cn";
-import { priorityName } from "@/lib/priority";
 import { Button } from "@/components/ui/Button";
 import { Spinner } from "@/components/ui/Spinner";
+import { PriorityChip, StateChip } from "@/components/ui/StatusChip";
 import {
   combinedEscalationLevel,
   formatCountdown,
-  isNewTicketState,
   spineClassName,
   stateColorVar,
-  stateLabel,
 } from "@/lib/status";
 
 export type SortKey =
@@ -203,15 +201,10 @@ export function TicketTable({
               }
               onMouseEnter={() => setFocusIdx(idx)}
             >
-              {/* Mobile card header: TN + state chip + age */}
+              {/* Mobile card header: TN + age */}
               <div className="flex items-center justify-between gap-2 md:hidden">
                 <span className="font-mono text-xs tabular-nums text-accent">{ticket.tn}</span>
-                <span className="flex items-center gap-1 font-mono text-[11px] tabular-nums text-muted">
-                  <span
-                    aria-hidden
-                    className="h-1.5 w-1.5 rounded-full"
-                    style={{ background: stateColorVar(ticket.state) }}
-                  />
+                <span className="font-mono text-[11px] tabular-nums text-muted">
                   {formatAgeSeconds(ticket.age_seconds, locale)}
                 </span>
               </div>
@@ -228,27 +221,22 @@ export function TicketTable({
                   {ticket.customer_user_id || ticket.customer_id || "—"}
                 </span>
               </span>
-              <span className="hidden items-center gap-1.5 text-xs text-muted md:inline-flex">
-                {isNewTicketState(ticket.state, ticket.state_type) ? (
-                  <span
-                    className="shrink-0 rounded-full bg-accent-dim px-1.5 py-0.5 text-[9.5px] font-semibold uppercase tracking-wide text-accent"
-                    data-testid={`ticket-new-badge-${ticket.id}`}
-                  >
-                    {t("ticket.stateName.new")}
-                  </span>
-                ) : (
-                  <>
-                    <span
-                      aria-hidden
-                      className="h-1.5 w-1.5 shrink-0 rounded-full"
-                      style={{ background: stateColorVar(ticket.state) }}
-                    />
-                    <span className="truncate">{stateLabel(t, ticket.state)}</span>
-                  </>
-                )}
+              <span className="hidden min-w-0 items-center md:inline-flex">
+                <StateChip
+                  state={ticket.state}
+                  empty="—"
+                  className="max-w-full truncate"
+                  data-testid={`ticket-state-chip-${ticket.id}`}
+                />
               </span>
-              <span className="hidden truncate font-mono text-[11.5px] text-muted md:inline">
-                {priorityName(ticket.priority) ?? "—"}
+              <span className="hidden min-w-0 items-center md:inline-flex">
+                <PriorityChip
+                  priority={ticket.priority}
+                  priorityId={ticket.priority_id}
+                  empty="—"
+                  className="max-w-full truncate"
+                  data-testid={`ticket-priority-chip-${ticket.id}`}
+                />
               </span>
               <span className="hidden truncate text-xs text-muted md:inline">
                 {ticket.owner_name || ticket.owner_login || "—"}
@@ -260,20 +248,18 @@ export function TicketTable({
                 {formatAgeSeconds(ticket.age_seconds, locale)}
               </span>
 
-              {/* Mobile card footer: title/customer already shown above; add state + owner chip */}
+              {/* Mobile card footer: state + priority chips + owner */}
               <div className="flex items-center justify-between gap-2 text-[11.5px] text-muted md:hidden">
                 <span className="flex min-w-0 items-center gap-1.5 truncate">
-                  {isNewTicketState(ticket.state, ticket.state_type) ? (
-                    <span
-                      className="shrink-0 rounded-full bg-accent-dim px-1.5 py-0.5 text-[9.5px] font-semibold uppercase tracking-wide text-accent"
-                      data-testid={`ticket-new-badge-mobile-${ticket.id}`}
-                    >
-                      {t("ticket.stateName.new")}
-                    </span>
-                  ) : (
-                    <span className="truncate">{stateLabel(t, ticket.state)}</span>
-                  )}
-                  <span className="truncate">· {priorityName(ticket.priority) ?? "—"}</span>
+                  <StateChip
+                    state={ticket.state}
+                    data-testid={`ticket-state-chip-mobile-${ticket.id}`}
+                  />
+                  <PriorityChip
+                    priority={ticket.priority}
+                    priorityId={ticket.priority_id}
+                    data-testid={`ticket-priority-chip-mobile-${ticket.id}`}
+                  />
                 </span>
                 <span className="shrink-0 truncate">
                   {ticket.owner_name || ticket.owner_login || "—"}

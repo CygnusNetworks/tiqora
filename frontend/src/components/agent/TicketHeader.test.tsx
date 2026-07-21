@@ -38,19 +38,28 @@ function wrap(ticket: TicketDetail, overflowMenu?: React.ReactNode) {
 }
 
 describe("TicketHeader", () => {
-  it("shows the localised state label for non-new tickets", () => {
+  it("shows status and priority as soft-chips in the meta line", () => {
     wrap(makeTicket({ state: "pending reminder", state_type: "pending reminder" }));
-    expect(screen.getByTestId("ticket-meta-line")).toHaveTextContent("Pending reminder");
+    const stateChip = screen.getByTestId("ticket-header-state-chip");
+    expect(stateChip).toHaveTextContent("Pending reminder");
+    expect(stateChip).toHaveAttribute("data-kind", "state");
+    expect(stateChip).toHaveStyle({ color: "var(--color-state-pending)" });
+
+    const prioChip = screen.getByTestId("ticket-header-priority-chip");
+    expect(prioChip).toHaveTextContent("normal");
+    expect(prioChip).toHaveAttribute("data-kind", "priority");
+    expect(prioChip).toHaveStyle({ color: "var(--color-prio-3)" });
+
+    // Old NEU-only badge special-case is gone.
     expect(screen.queryByTestId("ticket-header-new-badge")).toBeNull();
   });
 
-  it("shows only the Neu/New badge for new tickets (no duplicate state text)", () => {
+  it("shows the same soft-chip for new tickets (no separate Neu badge)", () => {
     wrap(makeTicket({ state: "new", state_type: "new" }));
-    expect(screen.getByTestId("ticket-header-new-badge")).toHaveTextContent("New");
-    // Meta line must not repeat the raw English state name.
-    const meta = screen.getByTestId("ticket-meta-line");
-    expect(meta).not.toHaveTextContent(/^.*\bnew\b/i);
-    expect(meta.textContent?.toLowerCase()).not.toContain("new");
+    const stateChip = screen.getByTestId("ticket-header-state-chip");
+    expect(stateChip).toHaveTextContent("New");
+    expect(stateChip).toHaveStyle({ color: "var(--color-state-new)" });
+    expect(screen.queryByTestId("ticket-header-new-badge")).toBeNull();
   });
 
   it("anchors the overflow menu top-right", () => {
