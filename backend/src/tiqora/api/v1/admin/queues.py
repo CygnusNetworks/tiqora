@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 import re
+from typing import Literal
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, HTTPException, Query, status
 from sqlalchemy import select, text
 
 from tiqora.api.deps import DbSession
@@ -15,14 +16,20 @@ from tiqora.api.v1.admin.common import (
     now,
 )
 from tiqora.api.v1.admin.deps import AdminUser
-from tiqora.api.v1.admin.pagination import ListParamsDep, Page, apply_valid_filter, paginate
+from tiqora.api.v1.admin.pagination import (
+    ListParamsDep,
+    Page,
+    apply_valid_filter,
+    bulk_grouped_counts,
+    paginate,
+)
 from tiqora.api.v1.admin.schemas import (
     PhysicalQueueVariableOut,
     QueueCreate,
     QueueOut,
     QueueUpdate,
 )
-from tiqora.db.legacy.queue import Queue
+from tiqora.db.legacy.queue import Queue, QueueAutoResponse, QueueStandardTemplate
 
 router = APIRouter(prefix="/queues", tags=["admin:queues"])
 
@@ -66,6 +73,19 @@ async def list_queues(
     _ = admin
     stmt = apply_valid_filter(select(Queue), Queue.valid_id, params.valid).order_by(Queue.name)
     return await paginate(session, QueueOut, stmt, params)
+
+
+@router.get("/assignment-counts", response_model=dict[int, int])
+async def queue_assignment_counts(
+    admin: AdminUser,
+    session: DbSession,
+    side: Literal["templates", "auto-responses"] = Query(...),
+) -> dict[int, int]:
+    """Bulk assignment counts keyed by queue id (for AssignmentEditor badges)."""
+    _ = admin
+    if side == "templates":
+        return await bulk_grouped_counts(session, QueueStandardTemplate.queue_id)
+    return await bulk_grouped_counts(session, QueueAutoResponse.queue_id)
 
 
 @router.get("/{queue_id}", response_model=QueueOut)

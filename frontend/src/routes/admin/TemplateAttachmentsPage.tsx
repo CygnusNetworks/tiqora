@@ -63,6 +63,10 @@ export function TemplateAttachmentsPage() {
     },
     loadAssignedA: (attachmentId, signal) =>
       api.listAttachmentTemplates(attachmentId as number, signal),
+    loadCounts: (dir, signal) =>
+      dir === "a"
+        ? api.listTemplateAssignmentCounts("attachments", signal)
+        : api.listAttachmentAssignmentCounts("templates", signal),
     assign: (templateId, attachmentId) =>
       assignTemplateAttachment(templateId as number, attachmentId as number),
     revoke: (templateId, attachmentId) =>

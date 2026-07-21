@@ -1779,3 +1779,274 @@ async def test_admin_attachment_templates_reverse_get_roundtrip(
         assert missing.value.status_code == 404
 
     await engine.dispose()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("url_fixture", ["mariadb_znuny_url", "postgres_znuny_url"])
+async def test_admin_usage_counts_on_list_and_bulk_assignment_counts(
+    url_fixture: str, request: pytest.FixtureRequest
+) -> None:
+    """List Out schemas expose assignment counts; bulk count endpoints match.
+
+    Seeds a known assignment graph and checks:
+    * list ``assigned_*_count`` fields (including zero for unassigned rows)
+    * ``/assignment-counts`` bulk maps for groups/roles/users and the
+      template/attachment/auto-response/queue relations
+    """
+    import base64
+
+    sync_url: str = request.getfixturevalue(url_fixture)
+    ids = _seed_admin_and_plain_user(sync_url)
+    session, engine = await _make_session(sync_url)
+    ns = uuid.uuid4().hex[:8]
+
+    async with session as s:
+        admin_user = AuthenticatedUser(
+            id=ids["admin_id"],
+            login="root@localhost",
+            first_name="Admin",
+            last_name="Znuny",
+            auth_method="session",
+        )
+
+        # --- templates ↔ queues ---
+        q1 = await admin_queues.create_queue(
+            QueueCreate(
+                name=f"cnt-q1-{ns}",
+                group_id=1,
+                system_address_id=1,
+                salutation_id=1,
+                signature_id=1,
+                follow_up_id=1,
+                follow_up_lock=0,
+            ),
+            admin_user,
+            s,
+        )
+        q2 = await admin_queues.create_queue(
+            QueueCreate(
+                name=f"cnt-q2-{ns}",
+                group_id=1,
+                system_address_id=1,
+                salutation_id=1,
+                signature_id=1,
+                follow_up_id=1,
+                follow_up_lock=0,
+            ),
+            admin_user,
+            s,
+        )
+        tmpl_used = await admin_templates.create_template(
+            StandardTemplateCreate(name=f"cnt-t-used-{ns}", text="x", template_type="Answer"),
+            admin_user,
+            s,
+        )
+        tmpl_free = await admin_templates.create_template(
+            StandardTemplateCreate(name=f"cnt-t-free-{ns}", text="y", template_type="Answer"),
+            admin_user,
+            s,
+        )
+        await admin_templates.assign_queue_template(
+            q1.id, QueueTemplateAssignment(standard_template_id=tmpl_used.id), admin_user, s
+        )
+        await admin_templates.assign_queue_template(
+            q2.id, QueueTemplateAssignment(standard_template_id=tmpl_used.id), admin_user, s
+        )
+
+        tmpl_page = await admin_templates.list_templates(
+            admin_user, s, ListParams(page=1, page_size=500, valid="valid")
+        )
+        by_id = {t.id: t for t in tmpl_page.items}
+        assert by_id[tmpl_used.id].assigned_queue_count == 2
+        assert by_id[tmpl_free.id].assigned_queue_count == 0
+
+        tmpl_counts = await admin_templates.template_assignment_counts(admin_user, s, side="queues")
+        assert tmpl_counts.get(tmpl_used.id) == 2
+        assert tmpl_free.id not in tmpl_counts  # zero omitted
+
+        queue_tmpl_counts = await admin_queues.queue_assignment_counts(
+            admin_user, s, side="templates"
+        )
+        assert queue_tmpl_counts.get(q1.id) == 1
+        assert queue_tmpl_counts.get(q2.id) == 1
+
+        # --- attachments ↔ templates ---
+        att_used = await admin_attachments.create_attachment(
+            StandardAttachmentCreate(
+                name=f"cnt-a-used-{ns}",
+                content_type="text/plain",
+                content=base64.b64encode(b"a").decode("ascii"),
+                filename=f"cnt-a-used-{ns}.txt",
+            ),
+            admin_user,
+            s,
+        )
+        att_free = await admin_attachments.create_attachment(
+            StandardAttachmentCreate(
+                name=f"cnt-a-free-{ns}",
+                content_type="text/plain",
+                content=base64.b64encode(b"b").decode("ascii"),
+                filename=f"cnt-a-free-{ns}.txt",
+            ),
+            admin_user,
+            s,
+        )
+        await admin_templates.replace_template_attachments(
+            tmpl_used.id,
+            TemplateAttachmentsReplace(attachment_ids=[att_used.id]),
+            admin_user,
+            s,
+        )
+        att_page = await admin_attachments.list_attachments(
+            admin_user, s, ListParams(page=1, page_size=500, valid="valid")
+        )
+        att_by = {a.id: a for a in att_page.items}
+        assert att_by[att_used.id].assigned_template_count == 1
+        assert att_by[att_free.id].assigned_template_count == 0
+
+        att_counts = await admin_attachments.attachment_assignment_counts(
+            admin_user, s, side="templates"
+        )
+        assert att_counts.get(att_used.id) == 1
+        assert att_free.id not in att_counts
+
+        tmpl_att_counts = await admin_templates.template_assignment_counts(
+            admin_user, s, side="attachments"
+        )
+        assert tmpl_att_counts.get(tmpl_used.id) == 1
+
+        # --- auto-responses ↔ queues ---
+        ar_used = await admin_auto_responses.create_auto_response(
+            AutoResponseCreate(
+                name=f"cnt-ar-used-{ns}",
+                type_id=1,
+                system_address_id=1,
+                text0="s",
+                text1="b",
+            ),
+            admin_user,
+            s,
+        )
+        ar_free = await admin_auto_responses.create_auto_response(
+            AutoResponseCreate(
+                name=f"cnt-ar-free-{ns}",
+                type_id=1,
+                system_address_id=1,
+            ),
+            admin_user,
+            s,
+        )
+        await admin_auto_responses.assign_queue_auto_response(
+            q1.id,
+            QueueAutoResponseAssignment(auto_response_id=ar_used.id),
+            admin_user,
+            s,
+        )
+        ar_page = await admin_auto_responses.list_auto_responses(
+            admin_user, s, ListParams(page=1, page_size=500, valid="valid")
+        )
+        ar_by = {a.id: a for a in ar_page.items}
+        assert ar_by[ar_used.id].assigned_queue_count == 1
+        assert ar_by[ar_free.id].assigned_queue_count == 0
+
+        ar_counts = await admin_auto_responses.auto_response_assignment_counts(
+            admin_user, s, side="queues"
+        )
+        assert ar_counts.get(ar_used.id) == 1
+        assert ar_free.id not in ar_counts
+
+        # --- group/role/user assignment counts ---
+        agent = await admin_users.create_user(
+            UserCreate(
+                login=f"cnt.agent.{ns}@example.com",
+                password="pw12345678",
+                first_name="Cnt",
+                last_name="Agent",
+            ),
+            admin_user,
+            s,
+        )
+        group = await admin_groups.create_group(GroupCreate(name=f"cnt-g-{ns}"), admin_user, s)
+        role = await admin_roles.create_role(RoleCreate(name=f"cnt-r-{ns}"), admin_user, s)
+
+        # Zero-assignment case: empty dict is fine, no error.
+        empty_group_users = await admin_groups.group_assignment_counts(admin_user, s, side="users")
+        assert empty_group_users.get(group.id) is None
+
+        await admin_users.assign_group(
+            agent.id, GroupAssignment(group_id=group.id, permission_key="rw"), admin_user, s
+        )
+        await admin_users.assign_role(agent.id, RoleAssignment(role_id=role.id), admin_user, s)
+        await admin_roles.assign_group_role(
+            role.id,
+            GroupRoleAssignment(group_id=group.id, permission_key="rw", permission_value=1),
+            admin_user,
+            s,
+        )
+
+        assert (await admin_groups.group_assignment_counts(admin_user, s, side="users")).get(
+            group.id
+        ) == 1
+        assert (await admin_groups.group_assignment_counts(admin_user, s, side="roles")).get(
+            group.id
+        ) == 1
+        assert (await admin_users.user_assignment_counts(admin_user, s, side="groups")).get(
+            agent.id
+        ) == 1
+        assert (await admin_users.user_assignment_counts(admin_user, s, side="roles")).get(
+            agent.id
+        ) == 1
+        assert (await admin_roles.role_assignment_counts(admin_user, s, side="users")).get(
+            role.id
+        ) == 1
+        assert (await admin_roles.role_assignment_counts(admin_user, s, side="groups")).get(
+            role.id
+        ) == 1
+
+    await engine.dispose()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("url_fixture", ["mariadb_znuny_url", "postgres_znuny_url"])
+async def test_admin_customer_user_list_large_page_size(
+    url_fixture: str, request: pytest.FixtureRequest
+) -> None:
+    """Customer-users list accepts page_size above the generic 500 cap (Alle)."""
+    sync_url: str = request.getfixturevalue(url_fixture)
+    ids = _seed_admin_and_plain_user(sync_url)
+    session, engine = await _make_session(sync_url)
+    ns = uuid.uuid4().hex[:8]
+
+    async with session as s:
+        admin_user = AuthenticatedUser(
+            id=ids["admin_id"],
+            login="root@localhost",
+            first_name="Admin",
+            last_name="Znuny",
+            auth_method="session",
+        )
+        # Seed a modest batch; the important assertion is the high page_size
+        # is accepted (not 422) and returns every row for the company.
+        for i in range(3):
+            await admin_customers.create_customer_user(
+                CustomerUserAdminCreate(
+                    login=f"alle.{i}.{ns}@example.com",
+                    email=f"alle.{i}.{ns}@example.com",
+                    customer_id=f"ALLE-{ns}",
+                    first_name="Alle",
+                    last_name=f"User{i}",
+                ),
+                admin_user,
+                s,
+            )
+        page = await admin_customers.list_customer_users(
+            admin_user,
+            s,
+            ListParams(page=1, page_size=100_000, valid="valid"),
+            search=ns,
+        )
+        assert page.page_size == 100_000
+        assert page.total >= 3
+        assert len(page.items) >= 3
+
+    await engine.dispose()

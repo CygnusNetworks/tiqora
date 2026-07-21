@@ -36,6 +36,10 @@ export function AgentRolesPage() {
     loadAssignedB: (uId, signal) =>
       api.request<RoleOut[]>("GET", `/api/v1/admin/users/${uId}/roles`, { signal }),
     loadAssignedA: (roleId, signal) => api.listRoleUsers(roleId as number, signal),
+    loadCounts: (dir, signal) =>
+      dir === "a"
+        ? api.listUserAssignmentCounts("roles", signal)
+        : api.listRoleAssignmentCounts("users", signal),
     assign: (uId, roleId) =>
       api.assignUserRole(uId as number, { role_id: roleId as number }),
     revoke: (uId, roleId) => api.revokeUserRole(uId as number, roleId as number),

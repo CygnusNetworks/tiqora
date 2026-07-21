@@ -479,7 +479,8 @@
       "next": "Next",
       "page": "Page {{page}} of {{total}}",
       "pageSize": "Per page",
-      "showing": "{{from}}–{{to}} of {{total}}"
+      "showing": "{{from}}–{{to}} of {{total}}",
+      "all": "All"
     },
     "roleAssignments": {
       "title": "Role assignment",
@@ -630,7 +631,11 @@
       "new": "New template",
       "name": "Name",
       "type": "Type",
-      "text": "Text"
+      "text": "Text",
+      "usage": "Usage",
+      "inQueues": "in {{count}} queues",
+      "inQueues_one": "in {{count}} queue",
+      "inQueues_other": "in {{count}} queues"
     },
     "variables": {
       "title": "Available variables",
@@ -682,7 +687,11 @@
       "name": "Name",
       "typeId": "Type ID",
       "subject": "Subject",
-      "body": "Body"
+      "body": "Body",
+      "usage": "Usage",
+      "inQueues": "in {{count}} queues",
+      "inQueues_one": "in {{count}} queue",
+      "inQueues_other": "in {{count}} queues"
     },
     "dynamicFields": {
       "title_plural": "Dynamic fields",
@@ -854,7 +863,11 @@
       "content": "File / content",
       "contentHelp": "Pick a file — it is stored base64-encoded. Filename and content type are filled in but can be overridden.",
       "contentReady": "Content loaded ({{chars}} base64 characters).",
-      "contentRequired": "Please select a file."
+      "contentRequired": "Please select a file.",
+      "usage": "Usage",
+      "inTemplates": "in {{count}} templates",
+      "inTemplates_one": "in {{count}} template",
+      "inTemplates_other": "in {{count}} templates"
     },
     "templateAttachments": {
       "title": "Templates↔Attachments",

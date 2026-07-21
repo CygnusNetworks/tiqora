@@ -6,6 +6,8 @@ import { cn } from "@/lib/cn";
 
 export type Id = number | string;
 
+export type Direction = "a" | "b";
+
 export interface AssignmentSide<Item> {
   /** Discriminator for query keys + i18n side noun. */
   key: string;
@@ -39,9 +41,17 @@ export interface AssignmentConfig<A, B> {
    */
   assign: (aId: Id, bId: Id) => Promise<void>;
   revoke: (aId: Id, bId: Id) => Promise<void>;
+  /**
+   * Optional bulk counts for anchor badges. Called with the current direction
+   * (`"a"` = sideA anchors, `"b"` = sideB anchors) and should return
+   * `{ [idKey]: count }`. When omitted, badges fall back to the prior
+   * cache-only behaviour (count only after selecting an anchor).
+   */
+  loadCounts?: (
+    dir: Direction,
+    signal?: AbortSignal,
+  ) => Promise<Record<string, number>>;
 }
-
-type Direction = "a" | "b";
 
 function idKey(id: Id): string {
   return String(id);
@@ -62,8 +72,9 @@ function useDebouncedValue<T>(value: T, delayMs: number): T {
  *
  * Selecting an anchor loads its assigned counterparts (preselection). Switching
  * direction flips which side is the master list vs. the checklist. Count badges
- * on master rows only appear when that anchor's assignment set is already in the
- * react-query cache (no N+1 up-front).
+ * on master rows use optional `loadCounts` (one bulk query per direction) so
+ * every anchor shows a count immediately; without `loadCounts` they fall back
+ * to cache-only counts (visible only after selecting an anchor).
  *
  * Sides with `searchItems` use debounced server-side search instead of a fixed
  * client-side page (needed for large customer_user / company tables).
@@ -161,6 +172,22 @@ export function AssignmentEditor<A, B>({ config }: { config: AssignmentConfig<A,
       return config.loadAssignedA(selectedId, signal);
     },
     enabled: selectedId !== null,
+  });
+
+  const countsKey = useCallback(
+    (dir: Direction) =>
+      ["admin", "assignment", config.testId, "counts", dir] as const,
+    [config.testId],
+  );
+
+  const countsQ = useQuery<Record<string, number>>({
+    queryKey: countsKey(direction),
+    queryFn: ({ signal }) => {
+      if (!config.loadCounts) return Promise.resolve({});
+      return config.loadCounts(direction, signal);
+    },
+    enabled: Boolean(config.loadCounts),
+    staleTime: 30 * 1000,
   });
 
   const assignedIdSet = useMemo(() => {
@@ -262,6 +289,9 @@ export function AssignmentEditor<A, B>({ config }: { config: AssignmentConfig<A,
       void queryClient.invalidateQueries({
         queryKey: assignedKey(direction, selectedId),
       });
+      void queryClient.invalidateQueries({
+        queryKey: ["admin", "assignment", config.testId, "counts"],
+      });
     },
   });
 
@@ -320,6 +350,9 @@ export function AssignmentEditor<A, B>({ config }: { config: AssignmentConfig<A,
       if (selectedId === null) return;
       void queryClient.invalidateQueries({
         queryKey: assignedKey(direction, selectedId),
+      });
+      void queryClient.invalidateQueries({
+        queryKey: ["admin", "assignment", config.testId, "counts"],
       });
     },
   });
@@ -409,13 +442,21 @@ export function AssignmentEditor<A, B>({ config }: { config: AssignmentConfig<A,
     ? (counterpartsSearchQ.data ?? []).length
     : (counterpartsClientQ.data ?? []).length;
 
-  /** Count only when that anchor's assignment set is already cached (no N+1). */
-  const cachedCount = (anchorId: Id): number | null => {
-    const data = queryClient.getQueryData(assignedKey(direction, anchorId));
-    if (Array.isArray(data)) return data.length;
-    if (selectedId !== null && idKey(selectedId) === idKey(anchorId) && assignedQ.data) {
+  /** Prefer bulk loadCounts; fall back to per-anchor cache after selection. */
+  const anchorCount = (anchorId: Id): number | null => {
+    if (config.loadCounts && countsQ.data) {
+      return countsQ.data[idKey(anchorId)] ?? 0;
+    }
+    // Live override for the selected anchor once its assignment set is loaded.
+    if (
+      selectedId !== null &&
+      idKey(selectedId) === idKey(anchorId) &&
+      assignedQ.data
+    ) {
       return assignedQ.data.length;
     }
+    const data = queryClient.getQueryData(assignedKey(direction, anchorId));
+    if (Array.isArray(data)) return data.length;
     return null;
   };
 
@@ -571,7 +612,7 @@ export function AssignmentEditor<A, B>({ config }: { config: AssignmentConfig<A,
               filteredAnchors.map((item) => {
                 const id = anchorSide.getId(item);
                 const selected = selectedId !== null && idKey(selectedId) === idKey(id);
-                const count = cachedCount(id);
+                const count = anchorCount(id);
                 const sub = anchorSide.getSubLabel?.(item);
                 return (
                   <li key={idKey(id)}>

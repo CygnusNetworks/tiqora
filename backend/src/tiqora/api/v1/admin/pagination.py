@@ -22,6 +22,9 @@ from sqlalchemy.orm import InstrumentedAttribute
 
 ValidFilter = Literal["valid", "invalid", "all"]
 
+# Customer-users "Alle" page-size option may request up to this many rows.
+CUSTOMER_USER_PAGE_SIZE_MAX = 100_000
+
 
 class Page[T](BaseModel):
     """Envelope for a paginated admin list response."""
@@ -46,7 +49,42 @@ def list_params(
     return ListParams(page=page, page_size=page_size, valid=valid)
 
 
+def customer_user_list_params(
+    page: Annotated[int, Query(ge=1)] = 1,
+    page_size: Annotated[int, Query(ge=1, le=CUSTOMER_USER_PAGE_SIZE_MAX)] = 25,
+    valid: Annotated[ValidFilter, Query()] = "valid",
+) -> ListParams:
+    """List params for customer-users — allows ``page_size`` up to 100_000
+    so the admin UI can request an "Alle" (all rows) page without a separate
+    unbounded endpoint."""
+    return ListParams(page=page, page_size=page_size, valid=valid)
+
+
 ListParamsDep = Annotated[ListParams, Depends(list_params)]
+CustomerUserListParamsDep = Annotated[ListParams, Depends(customer_user_list_params)]
+
+
+async def bulk_grouped_counts(
+    session: AsyncSession,
+    group_col: Any,
+    *where_clauses: Any,
+    restrict_ids: Sequence[int] | None = None,
+) -> dict[int, int]:
+    """One ``GROUP BY`` count query: ``{group_id: count}``.
+
+    Optional *restrict_ids* limits the result to a page of anchors (avoids
+    scanning the whole join table when only a page of list rows needs counts).
+    Rows with zero assignments are omitted — callers map missing → 0.
+    """
+    stmt = select(group_col, func.count()).group_by(group_col)
+    for clause in where_clauses:
+        stmt = stmt.where(clause)
+    if restrict_ids is not None:
+        if not restrict_ids:
+            return {}
+        stmt = stmt.where(group_col.in_(list(restrict_ids)))
+    result = await session.execute(stmt)
+    return {int(row[0]): int(row[1]) for row in result.all()}
 
 
 def apply_valid_filter(

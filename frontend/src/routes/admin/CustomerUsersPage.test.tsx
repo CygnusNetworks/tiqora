@@ -127,4 +127,27 @@ describe("CustomerUsersPage", () => {
       });
     });
   });
+
+  it("offers an Alle page-size option that requests a large page", async () => {
+    renderPage();
+    await waitFor(() => {
+      expect(screen.getByTestId("admin-customer-users-page-size")).toBeInTheDocument();
+    });
+    const select = screen.getByTestId("admin-customer-users-page-size");
+    expect(select.querySelector('[data-testid="admin-customer-users-page-size-all"]')).not.toBeNull();
+    // Option label is i18n "All" / "Alle"
+    const allOption = Array.from(select.querySelectorAll("option")).find(
+      (o) => o.getAttribute("value") === "100000",
+    );
+    expect(allOption).toBeTruthy();
+
+    list.mockClear();
+    fireEvent.change(select, { target: { value: "100000" } });
+    await waitFor(() => {
+      expect(list).toHaveBeenCalledWith(
+        expect.objectContaining({ pageSize: 100_000, page: 1 }),
+        expect.anything(),
+      );
+    });
+  });
 });

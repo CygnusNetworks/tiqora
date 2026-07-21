@@ -35,6 +35,10 @@ export function QueueTemplatesPage() {
     },
     loadAssignedB: (qId, signal) => api.listQueueTemplates(qId as number, signal),
     loadAssignedA: (tId, signal) => api.listTemplateQueues(tId as number, signal),
+    loadCounts: (dir, signal) =>
+      dir === "a"
+        ? api.listQueueAssignmentCounts("templates", signal)
+        : api.listTemplateAssignmentCounts("queues", signal),
     assign: (qId, tId) => api.assignQueueTemplate(qId as number, tId as number),
     revoke: (qId, tId) => api.revokeQueueTemplate(qId as number, tId as number),
   };

@@ -37,6 +37,10 @@ export function AgentGroupsPage() {
     loadAssignedB: (uId, signal) =>
       api.request<GroupOut[]>("GET", `/api/v1/admin/users/${uId}/groups`, { signal }),
     loadAssignedA: (groupId, signal) => api.listGroupUsers(groupId as number, signal),
+    loadCounts: (dir, signal) =>
+      dir === "a"
+        ? api.listUserAssignmentCounts("groups", signal)
+        : api.listGroupAssignmentCounts("users", signal),
     assign: (uId, groupId) =>
       api.assignUserGroup(uId as number, {
         group_id: groupId as number,

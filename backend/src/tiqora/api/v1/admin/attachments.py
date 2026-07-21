@@ -2,13 +2,21 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, HTTPException, status
+from typing import Literal
+
+from fastapi import APIRouter, HTTPException, Query, status
 from sqlalchemy import select
 
 from tiqora.api.deps import DbSession
 from tiqora.api.v1.admin.common import ATTACHMENT_CACHE_TYPES, invalidate_znuny_cache_types, now
 from tiqora.api.v1.admin.deps import AdminUser
-from tiqora.api.v1.admin.pagination import ListParamsDep, Page, apply_valid_filter, paginate
+from tiqora.api.v1.admin.pagination import (
+    ListParamsDep,
+    Page,
+    apply_valid_filter,
+    bulk_grouped_counts,
+    window,
+)
 from tiqora.api.v1.admin.schemas import (
     StandardAttachmentCreate,
     StandardAttachmentOut,
@@ -28,7 +36,32 @@ async def list_attachments(
     stmt = apply_valid_filter(
         select(StandardAttachment), StandardAttachment.valid_id, params.valid
     ).order_by(StandardAttachment.name)
-    return await paginate(session, StandardAttachmentOut, stmt, params)
+    rows, total = await window(session, stmt, params)
+    ids = [r.id for r in rows]
+    counts = await bulk_grouped_counts(
+        session,
+        StandardTemplateAttachment.standard_attachment_id,
+        restrict_ids=ids,
+    )
+    items = [
+        StandardAttachmentOut.model_validate(r).model_copy(
+            update={"assigned_template_count": counts.get(r.id, 0)}
+        )
+        for r in rows
+    ]
+    return Page(items=items, total=total, page=params.page, page_size=params.page_size)
+
+
+@router.get("/assignment-counts", response_model=dict[int, int])
+async def attachment_assignment_counts(
+    admin: AdminUser,
+    session: DbSession,
+    side: Literal["templates"] = Query(...),
+) -> dict[int, int]:
+    """Bulk assignment counts keyed by attachment id (template links)."""
+    _ = admin
+    _ = side  # only one side today; kept for symmetry with other count endpoints
+    return await bulk_grouped_counts(session, StandardTemplateAttachment.standard_attachment_id)
 
 
 @router.get("/{attachment_id}", response_model=StandardAttachmentOut)

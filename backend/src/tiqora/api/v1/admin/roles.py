@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, HTTPException, status
+from typing import Literal
+
+from fastapi import APIRouter, HTTPException, Query, status
 from sqlalchemy import select
 
 from tiqora.api.deps import DbSession
@@ -13,7 +15,13 @@ from tiqora.api.v1.admin.common import (
     now,
 )
 from tiqora.api.v1.admin.deps import AdminUser
-from tiqora.api.v1.admin.pagination import ListParamsDep, Page, apply_valid_filter, paginate
+from tiqora.api.v1.admin.pagination import (
+    ListParamsDep,
+    Page,
+    apply_valid_filter,
+    bulk_grouped_counts,
+    paginate,
+)
 from tiqora.api.v1.admin.schemas import (
     GroupOut,
     GroupRoleAssignment,
@@ -32,6 +40,28 @@ async def list_roles(admin: AdminUser, session: DbSession, params: ListParamsDep
     _ = admin
     stmt = apply_valid_filter(select(Roles), Roles.valid_id, params.valid).order_by(Roles.name)
     return await paginate(session, RoleOut, stmt, params)
+
+
+@router.get("/assignment-counts", response_model=dict[int, int])
+async def role_assignment_counts(
+    admin: AdminUser,
+    session: DbSession,
+    side: Literal["users", "groups"] = Query(...),
+) -> dict[int, int]:
+    """Bulk assignment counts keyed by role id (for AssignmentEditor badges).
+
+    Group counts use the same ``rw`` / ``permission_value=1`` filter as the
+    Role↔Groups editor read side.
+    """
+    _ = admin
+    if side == "users":
+        return await bulk_grouped_counts(session, RoleUser.role_id)
+    return await bulk_grouped_counts(
+        session,
+        GroupRole.role_id,
+        GroupRole.permission_key == "rw",
+        GroupRole.permission_value == 1,
+    )
 
 
 @router.get("/{role_id}", response_model=RoleOut)

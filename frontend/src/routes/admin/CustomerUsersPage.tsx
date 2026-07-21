@@ -189,6 +189,7 @@ export function CustomerUsersPage() {
         fields={fields}
         searchable
         pageSize={100}
+        allowAllPageSize
         bulkActions={bulkActions}
         toFormValues={(row) =>
           row

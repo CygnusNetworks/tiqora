@@ -49,6 +49,13 @@ export type AdminResourcePageProps<Out, Create, Update> = {
    * checkbox column and a bottom pill bar. Default off.
    */
   bulkActions?: AdminBulkAction[];
+  /**
+   * Opt-in "Alle" (all rows) page-size option. Requests `allPageSize` rows
+   * (backend must allow that page size — customer-users does). Default off.
+   */
+  allowAllPageSize?: boolean;
+  /** Page size used when "Alle" is selected (default 100_000). */
+  allPageSize?: number;
 };
 
 const defaultIsRowValid = (row: unknown): boolean =>
@@ -58,6 +65,7 @@ const defaultIsRowValid = (row: unknown): boolean =>
 const VALID_FILTERS: AdminValidFilter[] = ["valid", "invalid", "all"];
 
 const PAGE_SIZE_OPTIONS = [25, 50, 100, 200, 500] as const;
+const DEFAULT_ALL_PAGE_SIZE = 100_000;
 
 function useDebouncedValue<T>(value: T, delayMs: number): T {
   const [debounced, setDebounced] = useState(value);
@@ -79,6 +87,7 @@ function useDebouncedValue<T>(value: T, delayMs: number): T {
  * - `searchable` — debounced server-side search input
  * - `bulkActions` — row checkboxes + floating bulk action bar
  * - page-size select includes 500 (backend ListParams max)
+ * - `allowAllPageSize` — "Alle" option that requests a very large page
  */
 export function AdminResourcePage<Out, Create, Update>({
   resourceKey,
@@ -95,6 +104,8 @@ export function AdminResourcePage<Out, Create, Update>({
   pageSize: initialPageSize = 25,
   searchable = false,
   bulkActions,
+  allowAllPageSize = false,
+  allPageSize = DEFAULT_ALL_PAGE_SIZE,
 }: AdminResourcePageProps<Out, Create, Update>) {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
@@ -246,12 +257,18 @@ export function AdminResourcePage<Out, Create, Update>({
   };
 
   // Ensure the current pageSize is always a selectable option (e.g. custom default).
+  // "Alle" is a separate labelled option (value = allPageSize), not a bare number.
   const pageSizeOptions = useMemo(() => {
-    if (PAGE_SIZE_OPTIONS.includes(pageSize as (typeof PAGE_SIZE_OPTIONS)[number])) {
-      return [...PAGE_SIZE_OPTIONS];
+    const base: number[] = [...PAGE_SIZE_OPTIONS];
+    if (
+      !base.includes(pageSize) &&
+      !(allowAllPageSize && pageSize === allPageSize)
+    ) {
+      base.push(pageSize);
+      base.sort((a, b) => a - b);
     }
-    return [...PAGE_SIZE_OPTIONS, pageSize].sort((a, b) => a - b);
-  }, [pageSize]);
+    return base;
+  }, [pageSize, allowAllPageSize, allPageSize]);
 
   return (
     <div className="space-y-3 p-4" data-testid={`admin-${resourceKey}-page`}>
@@ -315,6 +332,11 @@ export function AdminResourcePage<Out, Create, Update>({
                 {n}
               </option>
             ))}
+            {allowAllPageSize && (
+              <option value={allPageSize} data-testid={`admin-${resourceKey}-page-size-all`}>
+                {t("admin.pagination.all")}
+              </option>
+            )}
           </select>
         </label>
       </div>
