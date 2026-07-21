@@ -200,6 +200,32 @@ async def deactivate_customer_company(
 
 
 @router.get(
+    "/customer-companies/{customer_id}/customer-users",
+    response_model=list[CustomerUserAdminOut],
+)
+async def get_customer_company_users(
+    customer_id: str, admin: AdminUser, session: DbSession
+) -> list[CustomerUser]:
+    """Customer users with extra visibility into *customer_id* — reverse of
+    customer-user↔companies (Znuny ``customer_user_customer``).
+
+    Distinct from users whose *primary* ``customer_user.customer_id`` is this
+    company; those are not listed here.
+    """
+    _ = admin
+    co = await session.get(CustomerCompany, customer_id)
+    if co is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Company not found")
+    result = await session.execute(
+        select(CustomerUser)
+        .join(CustomerUserCustomer, CustomerUserCustomer.user_id == CustomerUser.login)
+        .where(CustomerUserCustomer.customer_id == customer_id)
+        .order_by(CustomerUser.login)
+    )
+    return list(result.scalars().all())
+
+
+@router.get(
     "/customer-users/{customer_user_login}/companies", response_model=list[CustomerCompanyOut]
 )
 async def get_customer_user_companies(
