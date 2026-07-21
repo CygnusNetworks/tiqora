@@ -9,6 +9,7 @@ import sys
 import uvicorn
 
 from tiqora import __version__
+from tiqora.cli.api_key import add_api_key_subparser
 from tiqora.cli.crypto import add_crypto_subparser
 from tiqora.cli.dev import add_dev_subparser
 from tiqora.cli.gdpr import add_gdpr_subparser
@@ -39,6 +40,7 @@ def main(argv: list[str] | None = None) -> None:
     add_dev_subparser(sub)
     add_gdpr_subparser(sub)
     add_crypto_subparser(sub)
+    add_api_key_subparser(sub)
     add_openapi_subparser(sub)
 
     index_p = sub.add_parser("index", help="Search index maintenance")
@@ -114,6 +116,13 @@ def main(argv: list[str] | None = None) -> None:
         func = getattr(args, "func", None)
         if func is None:
             sub.choices["crypto"].print_help()
+            sys.exit(2)
+        exit_code = asyncio.run(func(args))
+        sys.exit(exit_code)
+    elif command == "api-key":
+        func = getattr(args, "func", None)
+        if func is None:
+            sub.choices["api-key"].print_help()
             sys.exit(2)
         exit_code = asyncio.run(func(args))
         sys.exit(exit_code)

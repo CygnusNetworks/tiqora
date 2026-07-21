@@ -78,6 +78,7 @@ import { ProcessesPage } from "@/routes/admin/ProcessesPage";
 import { ProcessDetailPage } from "@/routes/admin/ProcessDetailPage";
 import { QueueVariablesPage } from "@/routes/admin/QueueVariablesPage";
 import { CustomerFieldsPage } from "@/routes/admin/CustomerFieldsPage";
+import { ApiKeysPage } from "@/routes/admin/ApiKeysPage";
 
 const rootRoute = createRootRoute({
   component: () => <Outlet />,
@@ -488,6 +489,12 @@ const adminWebhooksRoute = createRoute({
   component: WebhooksPage,
 });
 
+const adminApiKeysRoute = createRoute({
+  getParentRoute: () => adminLayoutRoute,
+  path: "/api-keys",
+  component: ApiKeysPage,
+});
+
 const adminMailOutboundRoute = createRoute({
   getParentRoute: () => adminLayoutRoute,
   path: "/mail-outbound",
@@ -620,6 +627,7 @@ const routeTree = rootRoute.addChildren([
     adminAutoResponsesRoute,
     adminDynamicFieldsRoute,
     adminWebhooksRoute,
+    adminApiKeysRoute,
     adminMailOutboundRoute,
     adminMailLogRoute,
     adminPostmasterFiltersRoute,

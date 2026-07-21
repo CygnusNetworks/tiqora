@@ -195,6 +195,11 @@ export type DynamicFieldUpdate = Schemas["DynamicFieldUpdate"];
 export type WebhookOut = Schemas["WebhookOut"];
 export type WebhookCreate = Schemas["WebhookCreate"];
 export type WebhookUpdate = Schemas["WebhookUpdate"];
+export type ApiKeyOut = Schemas["ApiKeyOut"];
+export type ApiKeyCreate = Schemas["ApiKeyCreate"];
+export type ApiKeyUpdate = Schemas["ApiKeyUpdate"];
+/** Create response includes the plaintext `key` exactly once. */
+export type ApiKeyCreated = Schemas["ApiKeyCreated"];
 // Placeholder variables (regenerated into schema.d.ts from openapi.json).
 export type QueueVariableOut = Schemas["QueueVariableOut"];
 export type QueueVariableCreate = Schemas["QueueVariableCreate"];
@@ -1505,6 +1510,33 @@ export class ApiClient {
 
   get adminWebhooks() {
     return this.adminCrud<WebhookOut, WebhookCreate, WebhookUpdate>("/api/v1/admin/webhooks");
+  }
+
+  /**
+   * API-key lifecycle. ``create`` returns the plaintext key once
+   * (``ApiKeyCreated``); list/get/update never include it.
+   */
+  get adminApiKeys() {
+    const base = "/api/v1/admin/api-keys";
+    return {
+      list: (params?: AdminListParams, signal?: AbortSignal) =>
+        this.request<AdminPage<ApiKeyOut>>("GET", base, {
+          query: {
+            page: params?.page,
+            page_size: params?.pageSize,
+            valid: params?.valid,
+          },
+          signal,
+        }),
+      get: (id: number | string, signal?: AbortSignal) =>
+        this.request<ApiKeyOut>("GET", `${base}/${id}`, { signal }),
+      create: (body: ApiKeyCreate, signal?: AbortSignal) =>
+        this.request<ApiKeyCreated>("POST", base, { body, signal }),
+      update: (id: number | string, body: ApiKeyUpdate, signal?: AbortSignal) =>
+        this.request<ApiKeyOut>("PATCH", `${base}/${id}`, { body, signal }),
+      remove: (id: number | string, signal?: AbortSignal) =>
+        this.request<void>("DELETE", `${base}/${id}`, { signal }),
+    };
   }
 
   get adminQueueVariables() {

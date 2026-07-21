@@ -725,6 +725,48 @@ class WebhookUpdate(BaseModel):
 
 
 # ---------------------------------------------------------------------------
+# API keys — tiqora_api_key (Bearer auth)
+# ---------------------------------------------------------------------------
+
+
+class ApiKeyOut(BaseModel):
+    """Public API-key metadata. Never includes key_hash or plaintext."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    name: str
+    user_id: int
+    valid: bool
+    created: datetime
+    expires_at: datetime | None
+    last_used_at: datetime | None
+    created_by: int | None
+
+
+class ApiKeyCreate(BaseModel):
+    name: str
+    user_id: int
+    expires_at: datetime | None = None
+
+
+class ApiKeyUpdate(BaseModel):
+    name: str | None = None
+    valid: bool | None = None
+    expires_at: datetime | None = None
+
+
+class ApiKeyCreated(ApiKeyOut):
+    """Create response: includes the plaintext ``key`` exactly once.
+
+    The plaintext is never stored and cannot be retrieved again — copy it
+    immediately after creation.
+    """
+
+    key: str
+
+
+# ---------------------------------------------------------------------------
 # Placeholder variables — tiqora_queue_variable / tiqora_placeholder_field
 # ---------------------------------------------------------------------------
 

@@ -290,6 +290,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/api-keys": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Api Keys */
+        get: operations["list_api_keys_api_v1_admin_api_keys_get"];
+        put?: never;
+        /** Create Api Key */
+        post: operations["create_api_key_api_v1_admin_api_keys_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/api-keys/{key_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Api Key */
+        get: operations["get_api_key_api_v1_admin_api_keys__key_id__get"];
+        put?: never;
+        post?: never;
+        /**
+         * Delete Api Key
+         * @description Hard-delete the API-key row. Use PATCH valid=false to revoke instead.
+         */
+        delete: operations["delete_api_key_api_v1_admin_api_keys__key_id__delete"];
+        options?: never;
+        head?: never;
+        /** Update Api Key */
+        patch: operations["update_api_key_api_v1_admin_api_keys__key_id__patch"];
+        trace?: never;
+    };
     "/api/v1/admin/attachments": {
         parameters: {
             query?: never;
@@ -3717,6 +3757,79 @@ export interface components {
             /** User Id */
             user_id: number;
         };
+        /** ApiKeyCreate */
+        ApiKeyCreate: {
+            /** Expires At */
+            expires_at?: string | null;
+            /** Name */
+            name: string;
+            /** User Id */
+            user_id: number;
+        };
+        /**
+         * ApiKeyCreated
+         * @description Create response: includes the plaintext ``key`` exactly once.
+         *
+         *     The plaintext is never stored and cannot be retrieved again — copy it
+         *     immediately after creation.
+         */
+        ApiKeyCreated: {
+            /**
+             * Created
+             * Format: date-time
+             */
+            created: string;
+            /** Created By */
+            created_by: number | null;
+            /** Expires At */
+            expires_at: string | null;
+            /** Id */
+            id: number;
+            /** Key */
+            key: string;
+            /** Last Used At */
+            last_used_at: string | null;
+            /** Name */
+            name: string;
+            /** User Id */
+            user_id: number;
+            /** Valid */
+            valid: boolean;
+        };
+        /**
+         * ApiKeyOut
+         * @description Public API-key metadata. Never includes key_hash or plaintext.
+         */
+        ApiKeyOut: {
+            /**
+             * Created
+             * Format: date-time
+             */
+            created: string;
+            /** Created By */
+            created_by: number | null;
+            /** Expires At */
+            expires_at: string | null;
+            /** Id */
+            id: number;
+            /** Last Used At */
+            last_used_at: string | null;
+            /** Name */
+            name: string;
+            /** User Id */
+            user_id: number;
+            /** Valid */
+            valid: boolean;
+        };
+        /** ApiKeyUpdate */
+        ApiKeyUpdate: {
+            /** Expires At */
+            expires_at?: string | null;
+            /** Name */
+            name?: string | null;
+            /** Valid */
+            valid?: boolean | null;
+        };
         /** AppointmentIn */
         AppointmentIn: {
             /**
@@ -5128,6 +5241,17 @@ export interface components {
             dimension: string;
             /** Items */
             items: components["schemas"]["DimensionCountOut"][];
+        };
+        /** Page[ApiKeyOut] */
+        Page_ApiKeyOut_: {
+            /** Items */
+            items: components["schemas"]["ApiKeyOut"][];
+            /** Page */
+            page: number;
+            /** Page Size */
+            page_size: number;
+            /** Total */
+            total: number;
         };
         /** Page[AutoResponseOut] */
         Page_AutoResponseOut_: {
@@ -7391,6 +7515,187 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AclOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_api_keys_api_v1_admin_api_keys_get: {
+        parameters: {
+            query?: {
+                page?: number;
+                page_size?: number;
+                valid?: "valid" | "invalid" | "all";
+            };
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Page_ApiKeyOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_api_key_api_v1_admin_api_keys_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ApiKeyCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiKeyCreated"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_api_key_api_v1_admin_api_keys__key_id__get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                key_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiKeyOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_api_key_api_v1_admin_api_keys__key_id__delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                key_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_api_key_api_v1_admin_api_keys__key_id__patch: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                key_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ApiKeyUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiKeyOut"];
                 };
             };
             /** @description Validation Error */
