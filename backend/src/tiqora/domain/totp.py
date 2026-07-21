@@ -3,12 +3,18 @@
 Secrets are stored Fernet-encrypted (key derived from ``settings.secret_key``
 via SHA-256) — never in plaintext. Verification uses a ±1 step window (30s
 step => ~90s total tolerance), matching common authenticator app behaviour.
+
+After a successful :meth:`verify` the accepted timestep is recorded in Redis
+so the same (or earlier) code cannot be replayed within the window (M-04).
 """
 
 from __future__ import annotations
 
 import base64
 import hashlib
+import time
+from datetime import UTC, datetime
+from typing import Any
 
 import pyotp
 from cryptography.fernet import Fernet, InvalidToken
@@ -19,6 +25,10 @@ from tiqora.config import Settings
 from tiqora.db.tiqora.models import TiqoraUserTotp
 
 _TOTP_VALID_WINDOW = 1
+_TOTP_STEP_SECONDS = 30
+# Keep used-timestep keys a bit longer than the ±1 window (~90s).
+_TOTP_REPLAY_TTL_SECONDS = 90
+_TOTP_USED_KEY_PREFIX = "tiqora:totp:used:"
 
 
 def _fernet_key(secret_key: str) -> bytes:
@@ -27,9 +37,15 @@ def _fernet_key(secret_key: str) -> bytes:
 
 
 class TOTPService:
-    def __init__(self, session: AsyncSession, settings: Settings) -> None:
+    def __init__(
+        self,
+        session: AsyncSession,
+        settings: Settings,
+        redis_client: Any | None = None,
+    ) -> None:
         self._session = session
         self._settings = settings
+        self._redis = redis_client
         self._fernet = Fernet(_fernet_key(settings.secret_key))
 
     def _encrypt(self, secret: str) -> str:
@@ -84,12 +100,56 @@ class TOTPService:
             name=login, issuer_name=self._settings.totp_issuer
         )
 
-    async def _verify_code(self, row: TiqoraUserTotp, code: str) -> bool:
+    def _match_timestep(self, secret: str, code: str) -> int | None:
+        """Return the matching TOTP timestep for *code*, or None if invalid."""
+        totp = pyotp.TOTP(secret, interval=_TOTP_STEP_SECONDS)
+        # Explicit per-offset check so we know *which* step matched (for replay).
+        now = int(time.time())
+        base = now // _TOTP_STEP_SECONDS
+        for delta in range(-_TOTP_VALID_WINDOW, _TOTP_VALID_WINDOW + 1):
+            step = base + delta
+            for_time = datetime.fromtimestamp(step * _TOTP_STEP_SECONDS, tz=UTC)
+            if totp.verify(code, for_time=for_time, valid_window=0):
+                return step
+        return None
+
+    async def _verify_code(
+        self,
+        row: TiqoraUserTotp,
+        code: str,
+        *,
+        consume_replay: bool = False,
+        user_id: int | None = None,
+    ) -> bool:
         secret = self._decrypt(row.secret)
         if secret is None:
             return False
-        totp = pyotp.TOTP(secret)
-        return bool(totp.verify(code, valid_window=_TOTP_VALID_WINDOW))
+        step = self._match_timestep(secret, code)
+        if step is None:
+            return False
+        if not consume_replay or user_id is None:
+            return True
+        return await self._accept_timestep(user_id, step)
+
+    async def _accept_timestep(self, user_id: int, step: int) -> bool:
+        """Record *step* as used; reject if same or earlier timestep already used.
+
+        Uses Redis when available. Without Redis (unit tests that omit it),
+        replay protection is a no-op so existing fixtures keep working.
+        """
+        if self._redis is None:
+            return True
+        key = f"{_TOTP_USED_KEY_PREFIX}{user_id}"
+        raw = await self._redis.get(key)
+        if raw is not None:
+            try:
+                last = int(raw if not isinstance(raw, bytes) else raw.decode("utf-8"))
+            except (TypeError, ValueError):
+                last = None
+            if last is not None and step <= last:
+                return False
+        await self._redis.set(key, str(step), ex=_TOTP_REPLAY_TTL_SECONDS)
+        return True
 
     async def confirm(self, user_id: int, code: str) -> bool:
         row = await self._get_row(user_id)
@@ -102,10 +162,11 @@ class TOTPService:
         return True
 
     async def verify(self, user_id: int, code: str) -> bool:
+        """Verify a login TOTP code with replay protection for used timesteps."""
         row = await self._get_row(user_id)
         if row is None or not row.enabled:
             return False
-        return await self._verify_code(row, code)
+        return await self._verify_code(row, code, consume_replay=True, user_id=user_id)
 
     async def disable(self, user_id: int, code: str) -> bool:
         row = await self._get_row(user_id)

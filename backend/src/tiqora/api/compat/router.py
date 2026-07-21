@@ -103,9 +103,12 @@ async def _dispatch_operation(
 ) -> dict[str, Any]:
     """Route an operation name to the right handler."""
     sysconfig = SysConfig(session)
+    settings = getattr(request.app.state, "settings", None)
 
     if operation == "SessionCreate":
-        return await op_session_create(data, session, session_store)
+        return await op_session_create(
+            data, session, session_store, request=request, settings=settings
+        )
 
     if operation == "TicketCreate":
         factory = getattr(request.app.state, "session_factory", None)
@@ -113,7 +116,15 @@ async def _dispatch_operation(
             from tiqora.db.engine import get_session_factory
 
             factory = get_session_factory()
-        return await op_ticket_create(data, session, factory, session_store, sysconfig)
+        return await op_ticket_create(
+            data,
+            session,
+            factory,
+            session_store,
+            sysconfig,
+            request=request,
+            settings=settings,
+        )
 
     if operation == "TicketUpdate":
         factory = getattr(request.app.state, "session_factory", None)
@@ -121,13 +132,23 @@ async def _dispatch_operation(
             from tiqora.db.engine import get_session_factory
 
             factory = get_session_factory()
-        return await op_ticket_update(data, session, factory, session_store, sysconfig)
+        return await op_ticket_update(
+            data,
+            session,
+            factory,
+            session_store,
+            sysconfig,
+            request=request,
+            settings=settings,
+        )
 
     if operation == "TicketGet":
-        return await op_ticket_get(data, session, session_store)
+        return await op_ticket_get(data, session, session_store, request=request, settings=settings)
 
     if operation == "TicketSearch":
-        return await op_ticket_search(data, session, session_store)
+        return await op_ticket_search(
+            data, session, session_store, request=request, settings=settings
+        )
 
     return {
         "Error": {
@@ -147,6 +168,8 @@ def _error_status_code(result: dict[str, Any]) -> int:
         ec: str = result["Error"].get("ErrorCode", "")
         if "NotImplemented" in ec:
             return status.HTTP_501_NOT_IMPLEMENTED
+        if "RateLimited" in ec:
+            return status.HTTP_429_TOO_MANY_REQUESTS
         if "AuthFail" in ec:
             return status.HTTP_401_UNAUTHORIZED
         if "AccessDenied" in ec:
@@ -157,8 +180,14 @@ def _error_status_code(result: dict[str, Any]) -> int:
 
 
 def _json_or_501(result: dict[str, Any]) -> JSONResponse:
-    """Return 501 if the result contains an unsupported error, else 200."""
-    return JSONResponse(content=result, status_code=_error_status_code(result))
+    """Return error-aware status; attach Retry-After for rate-limited auth."""
+    code = _error_status_code(result)
+    headers: dict[str, str] | None = None
+    if code == status.HTTP_429_TOO_MANY_REQUESTS and "Error" in result:
+        retry = result["Error"].get("RetryAfter")
+        if retry is not None:
+            headers = {"Retry-After": str(retry)}
+    return JSONResponse(content=result, status_code=code, headers=headers)
 
 
 # ---------------------------------------------------------------------------

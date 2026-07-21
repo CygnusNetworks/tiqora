@@ -18,6 +18,7 @@ import structlog
 from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from tiqora.config import Settings, get_settings
 from tiqora.db.legacy.article import Article, ArticleDataMimeAttachment
 from tiqora.db.legacy.article import ArticleDataMime as ArticleDataMimeModel
 from tiqora.db.legacy.customer import CustomerUser
@@ -57,7 +58,13 @@ from tiqora.domain.ticket_write_service import (
 )
 from tiqora.domain.totp import TOTPService
 from tiqora.permissions.engine import PermissionEngine
-from tiqora.znuny.password import verify_password
+from tiqora.security.ratelimit import AuthRateLimiter, client_ip
+from tiqora.znuny.password import (
+    hash_password,
+    is_weak_scheme,
+    needs_rehash,
+    verify_password,
+)
 from tiqora.znuny.sysconfig import SysConfig
 
 logger = structlog.get_logger(__name__)
@@ -116,10 +123,61 @@ async def _load_customer_company_id(session: AsyncSession, login: str) -> str:
     return str(row) if row is not None else ""
 
 
+def _compat_rate_limited_err(op_prefix: str, retry_after: int) -> dict[str, Any]:
+    err = _err(
+        f"{op_prefix}.AuthFail",
+        "Too many failed login attempts; try again later",
+    )
+    # Surface Retry-After for the HTTP layer (router maps AuthFail → 401; we
+    # use a dedicated code so the router can emit 429 when present).
+    err["Error"]["ErrorCode"] = f"{op_prefix}.RateLimited"
+    err["Error"]["RetryAfter"] = max(1, int(retry_after))
+    return err
+
+
+async def _maybe_rehash_agent_pw(
+    session: AsyncSession,
+    row: Users,
+    password: str,
+    settings: Settings,
+) -> None:
+    if not settings.password_rehash_on_login:
+        return
+    stored = row.pw or ""
+    if not needs_rehash(stored):
+        return
+    row.pw = hash_password(password)
+    try:
+        await session.commit()
+    except Exception:  # noqa: BLE001
+        await session.rollback()
+
+
+async def _maybe_rehash_customer_pw(
+    session: AsyncSession,
+    row: CustomerUser,
+    password: str,
+    settings: Settings,
+) -> None:
+    if not settings.password_rehash_on_login:
+        return
+    stored = row.pw or ""
+    if not needs_rehash(stored):
+        return
+    row.pw = hash_password(password)
+    try:
+        await session.commit()
+    except Exception:  # noqa: BLE001
+        await session.rollback()
+
+
 async def _auth_from_params(
     data: dict[str, Any],
     session: AsyncSession,
     session_store: SessionStore,
+    *,
+    request: Any | None = None,
+    settings: Settings | None = None,
 ) -> tuple[int, str, str] | dict[str, Any]:
     """Resolve (user_id, login, user_type) from GenericInterface auth params.
 
@@ -132,6 +190,7 @@ async def _auth_from_params(
     They must never be elevated to the root agent (id 1).
     """
     op_prefix = "Auth"
+    cfg = settings or get_settings()
 
     session_id = (data.get("SessionID") or "").strip()
     if session_id:
@@ -144,9 +203,9 @@ async def _auth_from_params(
         # (golden-master finding — Znuny's SessionCreate token is always
         # usable for follow-up requests). Customer sessions are stored with
         # user_id=0; keep that sentinel — never rewrite 0→1 (C-1).
-        stored = await session_store.get(session_id)
-        if stored is not None:
-            stored_user_id, stored_login = stored
+        session_payload = await session_store.get(session_id)
+        if session_payload is not None:
+            stored_user_id, stored_login = session_payload
             if stored_user_id == _CUSTOMER_SENTINEL_USER_ID:
                 return (_CUSTOMER_SENTINEL_USER_ID, stored_login, _CUSTOMER_USER_TYPE)
             return (stored_user_id, stored_login, _AGENT_USER_TYPE)
@@ -156,16 +215,39 @@ async def _auth_from_params(
     customer_login = (data.get("CustomerUserLogin") or "").strip()
     password = (data.get("Password") or "").strip()
 
+    limiter: AuthRateLimiter | None = None
+    ip = "unknown"
+    rate_login = user_login or customer_login
+    if request is not None and rate_login:
+        redis_client = getattr(getattr(request, "app", None), "state", None)
+        redis_client = getattr(redis_client, "redis", None) if redis_client else None
+        if redis_client is not None:
+            limiter = AuthRateLimiter(redis_client, cfg)
+            ip = client_ip(request)
+            pre = await limiter.check(login=rate_login, ip=ip)
+            if not pre.allowed:
+                return _compat_rate_limited_err(op_prefix, pre.retry_after)
+
     if user_login:
         row = (
             await session.execute(
                 select(Users).where(Users.login == user_login, Users.valid_id == 1)
             )
         ).scalar_one_or_none()
-        if row is None or not verify_password(password, row.pw or ""):
+        pw_hash = (row.pw or "") if row is not None else ""
+        if row is not None and cfg.password_reject_weak_hashes and is_weak_scheme(pw_hash):
+            row = None
+        if row is None or not verify_password(password, pw_hash):
+            if limiter is not None:
+                locked = await limiter.record_failure(login=user_login, ip=ip)
+                if locked is not None:
+                    return _compat_rate_limited_err(op_prefix, locked.retry_after)
             return _err(f"{op_prefix}.AuthFail", "UserLogin or Password is invalid!")
         if await _agent_password_blocked_by_2fa(session, row.id):
             return _err(f"{op_prefix}.AuthFail", _2FA_API_KEY_MSG)
+        if limiter is not None:
+            await limiter.reset(login=user_login, ip=ip)
+        await _maybe_rehash_agent_pw(session, row, password, cfg)
         return (row.id, row.login, _AGENT_USER_TYPE)
 
     if customer_login:
@@ -177,8 +259,18 @@ async def _auth_from_params(
                 )
             )
         ).scalar_one_or_none()
-        if row2 is None or not verify_password(password, row2.pw or ""):
+        pw_hash2 = (row2.pw or "") if row2 is not None else ""
+        if row2 is not None and cfg.password_reject_weak_hashes and is_weak_scheme(pw_hash2):
+            row2 = None
+        if row2 is None or not verify_password(password, pw_hash2):
+            if limiter is not None:
+                locked = await limiter.record_failure(login=customer_login, ip=ip)
+                if locked is not None:
+                    return _compat_rate_limited_err(op_prefix, locked.retry_after)
             return _err(f"{op_prefix}.AuthFail", "CustomerUserLogin or Password is invalid!")
+        if limiter is not None:
+            await limiter.reset(login=customer_login, ip=ip)
+        await _maybe_rehash_customer_pw(session, row2, password, cfg)
         # Never map customers onto an agent id (was root user_id=1 — C-1).
         return (_CUSTOMER_SENTINEL_USER_ID, customer_login, _CUSTOMER_USER_TYPE)
 
@@ -372,13 +464,18 @@ async def op_session_create(
     data: dict[str, Any],
     session: AsyncSession,
     session_store: SessionStore,
+    *,
+    request: Any | None = None,
+    settings: Settings | None = None,
 ) -> dict[str, Any]:
     """SessionCreate operation — returns a SessionID.
 
     Agent password auth is rejected when 2FA is enabled or enforced; non-interactive
     callers must use a ``tiqora_*`` API key (H-1). Customer sessions use sentinel
     ``user_id=0`` and must never be rewritten to the root agent (C-1).
+    Password attempts are rate-limited per login/IP (M-7 / H-01).
     """
+    cfg = settings or get_settings()
     user_login = (data.get("UserLogin") or "").strip()
     customer_login = (data.get("CustomerUserLogin") or "").strip()
     password = (data.get("Password") or "").strip()
@@ -391,16 +488,39 @@ async def op_session_create(
     if not password:
         return _err("SessionCreate.MissingParameter", "SessionCreate: Password is required!")
 
+    limiter: AuthRateLimiter | None = None
+    ip = "unknown"
+    rate_login = user_login or customer_login
+    if request is not None:
+        redis_client = getattr(getattr(request, "app", None), "state", None)
+        redis_client = getattr(redis_client, "redis", None) if redis_client else None
+        if redis_client is not None:
+            limiter = AuthRateLimiter(redis_client, cfg)
+            ip = client_ip(request)
+            pre = await limiter.check(login=rate_login, ip=ip)
+            if not pre.allowed:
+                return _compat_rate_limited_err("SessionCreate", pre.retry_after)
+
     if user_login:
         row = (
             await session.execute(
                 select(Users).where(Users.login == user_login, Users.valid_id == 1)
             )
         ).scalar_one_or_none()
-        if row is None or not verify_password(password, row.pw or ""):
+        stored = (row.pw or "") if row is not None else ""
+        if row is not None and cfg.password_reject_weak_hashes and is_weak_scheme(stored):
+            row = None
+        if row is None or not verify_password(password, stored):
+            if limiter is not None:
+                locked = await limiter.record_failure(login=user_login, ip=ip)
+                if locked is not None:
+                    return _compat_rate_limited_err("SessionCreate", locked.retry_after)
             return _err("SessionCreate.AuthFail", "SessionCreate: Authorization failing!")
         if await _agent_password_blocked_by_2fa(session, row.id):
             return _err("SessionCreate.AuthFail", _2FA_API_KEY_MSG)
+        if limiter is not None:
+            await limiter.reset(login=user_login, ip=ip)
+        await _maybe_rehash_agent_pw(session, row, password, cfg)
         user = AuthenticatedUser(
             id=row.id,
             login=row.login,
@@ -418,8 +538,18 @@ async def op_session_create(
                 )
             )
         ).scalar_one_or_none()
-        if row2 is None or not verify_password(password, row2.pw or ""):
+        stored2 = (row2.pw or "") if row2 is not None else ""
+        if row2 is not None and cfg.password_reject_weak_hashes and is_weak_scheme(stored2):
+            row2 = None
+        if row2 is None or not verify_password(password, stored2):
+            if limiter is not None:
+                locked = await limiter.record_failure(login=customer_login, ip=ip)
+                if locked is not None:
+                    return _compat_rate_limited_err("SessionCreate", locked.retry_after)
             return _err("SessionCreate.AuthFail", "SessionCreate: Authorization failing!")
+        if limiter is not None:
+            await limiter.reset(login=customer_login, ip=ip)
+        await _maybe_rehash_customer_pw(session, row2, password, cfg)
         user = AuthenticatedUser(
             id=_CUSTOMER_SENTINEL_USER_ID,
             login=customer_login,
@@ -430,6 +560,19 @@ async def op_session_create(
 
     token = await session_store.create(user.id, user.login)
     return {"SessionID": token}
+
+
+def _reprefix_auth_error(op: str, auth_err: dict[str, Any]) -> dict[str, Any]:
+    """Re-prefix an Auth.* error for a Ticket* operation, preserving rate-limit."""
+    err = auth_err.get("Error") or {}
+    code = str(err.get("ErrorCode") or "")
+    message = str(err.get("ErrorMessage") or "Authorization failing!")
+    if "RateLimited" in code:
+        out = _err(f"{op}.RateLimited", message)
+        if "RetryAfter" in err:
+            out["Error"]["RetryAfter"] = err["RetryAfter"]
+        return out
+    return _err(f"{op}.AuthFail", message)
 
 
 # ---------------------------------------------------------------------------
@@ -443,15 +586,16 @@ async def op_ticket_create(
     session_factory: async_sessionmaker[AsyncSession],
     session_store: SessionStore,
     sysconfig: SysConfig,
+    *,
+    request: Any | None = None,
+    settings: Settings | None = None,
 ) -> dict[str, Any]:
     """TicketCreate operation."""
     op = "TicketCreate"
 
-    auth = await _auth_from_params(data, session, session_store)
+    auth = await _auth_from_params(data, session, session_store, request=request, settings=settings)
     if isinstance(auth, dict):
-        # Re-prefix error code with TicketCreate
-        err = auth["Error"]
-        return _err(f"{op}.AuthFail", err["ErrorMessage"])
+        return _reprefix_auth_error(op, auth)
     user_id, login, user_type = auth
     is_customer = user_type == _CUSTOMER_USER_TYPE
 
@@ -583,14 +727,16 @@ async def op_ticket_update(
     session_factory: async_sessionmaker[AsyncSession],
     session_store: SessionStore,
     sysconfig: SysConfig,
+    *,
+    request: Any | None = None,
+    settings: Settings | None = None,
 ) -> dict[str, Any]:
     """TicketUpdate operation."""
     op = "TicketUpdate"
 
-    auth = await _auth_from_params(data, session, session_store)
+    auth = await _auth_from_params(data, session, session_store, request=request, settings=settings)
     if isinstance(auth, dict):
-        err = auth["Error"]
-        return _err(f"{op}.AuthFail", err["ErrorMessage"])
+        return _reprefix_auth_error(op, auth)
     user_id, login, user_type = auth
     is_customer = user_type == _CUSTOMER_USER_TYPE
 
@@ -829,6 +975,9 @@ async def op_ticket_get(
     data: dict[str, Any],
     session: AsyncSession,
     session_store: SessionStore,
+    *,
+    request: Any | None = None,
+    settings: Settings | None = None,
 ) -> dict[str, Any]:
     """TicketGet operation.
 
@@ -836,10 +985,9 @@ async def op_ticket_get(
     """
     op = "TicketGet"
 
-    auth = await _auth_from_params(data, session, session_store)
+    auth = await _auth_from_params(data, session, session_store, request=request, settings=settings)
     if isinstance(auth, dict):
-        err = auth["Error"]
-        return _err(f"{op}.AuthFail", err["ErrorMessage"])
+        return _reprefix_auth_error(op, auth)
     user_id, login, user_type = auth
     is_customer = user_type == _CUSTOMER_USER_TYPE
 
@@ -1083,6 +1231,9 @@ async def op_ticket_search(
     data: dict[str, Any],
     session: AsyncSession,
     session_store: SessionStore,
+    *,
+    request: Any | None = None,
+    settings: Settings | None = None,
 ) -> dict[str, Any]:
     """TicketSearch operation.
 
@@ -1095,10 +1246,9 @@ async def op_ticket_search(
     """
     op = "TicketSearch"
 
-    auth = await _auth_from_params(data, session, session_store)
+    auth = await _auth_from_params(data, session, session_store, request=request, settings=settings)
     if isinstance(auth, dict):
-        err = auth["Error"]
-        return _err(f"{op}.AuthFail", err["ErrorMessage"])
+        return _reprefix_auth_error(op, auth)
     user_id, login, user_type = auth
     is_customer = user_type == _CUSTOMER_USER_TYPE
 

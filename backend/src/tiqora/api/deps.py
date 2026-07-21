@@ -124,10 +124,12 @@ async def get_current_user(
 
 
 async def get_totp_service(
+    request: Request,
     session: Annotated[AsyncSession, Depends(get_db)],
     settings: Annotated[Settings, Depends(get_app_settings)],
 ) -> TOTPService:
-    return TOTPService(session, settings)
+    redis_client = await get_redis(request)
+    return TOTPService(session, settings, redis_client)
 
 
 async def get_webauthn_service(
