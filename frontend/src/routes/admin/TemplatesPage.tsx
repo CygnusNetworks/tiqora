@@ -10,6 +10,7 @@ import type { FieldDef, FieldValues } from "@/components/admin/CrudDrawer";
 import type { DataTableColumn } from "@/components/admin/DataTable";
 import { insertTagAtCursor } from "@/components/admin/otrsPlaceholders";
 import { VariableReference } from "@/components/admin/VariableReference";
+import { Badge } from "@/components/ui/Badge";
 import { formatDateTime } from "@/lib/format";
 
 const TEMPLATE_TYPE_OPTIONS = [
@@ -30,6 +31,21 @@ export function TemplatesPage() {
       key: "template_type",
       header: t("admin.templates.type"),
       render: (r) => r.template_type,
+    },
+    {
+      key: "assigned_queue_count",
+      header: t("admin.templates.usage"),
+      render: (r) => {
+        const n = r.assigned_queue_count ?? 0;
+        return (
+          <Badge
+            tone={n > 0 ? "default" : "muted"}
+            data-testid={`admin-template-usage-${r.id}`}
+          >
+            {n > 0 ? t("admin.templates.inQueues", { count: n }) : "0"}
+          </Badge>
+        );
+      },
     },
     {
       key: "changed",

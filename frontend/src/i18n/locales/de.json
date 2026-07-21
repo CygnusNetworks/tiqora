@@ -479,7 +479,8 @@
       "next": "Weiter",
       "page": "Seite {{page}} von {{total}}",
       "pageSize": "Pro Seite",
-      "showing": "{{from}}–{{to}} von {{total}}"
+      "showing": "{{from}}–{{to}} von {{total}}",
+      "all": "Alle"
     },
     "roleAssignments": {
       "title": "Rollenzuordnung",
@@ -630,7 +631,11 @@
       "new": "Neue Vorlage",
       "name": "Name",
       "type": "Typ",
-      "text": "Text"
+      "text": "Text",
+      "usage": "Verwendung",
+      "inQueues": "in {{count}} Queues",
+      "inQueues_one": "in {{count}} Queue",
+      "inQueues_other": "in {{count}} Queues"
     },
     "variables": {
       "title": "Verfügbare Variablen",
@@ -682,7 +687,11 @@
       "name": "Name",
       "typeId": "Typ-ID",
       "subject": "Betreff",
-      "body": "Text"
+      "body": "Text",
+      "usage": "Verwendung",
+      "inQueues": "in {{count}} Queues",
+      "inQueues_one": "in {{count}} Queue",
+      "inQueues_other": "in {{count}} Queues"
     },
     "dynamicFields": {
       "title_plural": "Dynamische Felder",
@@ -854,7 +863,11 @@
       "content": "Datei / Inhalt",
       "contentHelp": "Datei wählen — wird base64-kodiert gespeichert. Dateiname und Content-Type werden übernommen, können aber überschrieben werden.",
       "contentReady": "Inhalt geladen ({{chars}} Zeichen Base64).",
-      "contentRequired": "Bitte eine Datei auswählen."
+      "contentRequired": "Bitte eine Datei auswählen.",
+      "usage": "Verwendung",
+      "inTemplates": "in {{count}} Vorlagen",
+      "inTemplates_one": "in {{count}} Vorlage",
+      "inTemplates_other": "in {{count}} Vorlagen"
     },
     "templateAttachments": {
       "title": "Vorlagen↔Anhänge",

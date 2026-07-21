@@ -15,6 +15,7 @@ from tiqora.api.v1.admin.common import (
 )
 from tiqora.api.v1.admin.deps import AdminUser
 from tiqora.api.v1.admin.pagination import (
+    CustomerUserListParamsDep,
     ListParamsDep,
     Page,
     apply_valid_filter,
@@ -44,9 +45,10 @@ router = APIRouter(tags=["admin:customers"])
 async def list_customer_users(
     admin: AdminUser,
     session: DbSession,
-    params: ListParamsDep,
+    params: CustomerUserListParamsDep,
     search: str | None = None,
 ) -> Page[CustomerUserAdminOut]:
+    """List customer users. ``page_size`` may be up to 100_000 (``Alle`` UI option)."""
     _ = admin
     stmt = apply_valid_filter(select(CustomerUser), CustomerUser.valid_id, params.valid).order_by(
         CustomerUser.login

@@ -36,6 +36,10 @@ export function RoleGroupsPage() {
     loadAssignedB: (roleId, signal) =>
       api.request<GroupOut[]>("GET", `/api/v1/admin/roles/${roleId}/groups`, { signal }),
     loadAssignedA: (groupId, signal) => api.listGroupRoles(groupId as number, signal),
+    loadCounts: (dir, signal) =>
+      dir === "a"
+        ? api.listRoleAssignmentCounts("groups", signal)
+        : api.listGroupAssignmentCounts("roles", signal),
     assign: (roleId, groupId) =>
       api.assignRoleGroup(roleId as number, {
         group_id: groupId as number,

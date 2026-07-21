@@ -8,6 +8,7 @@ import {
 import { AdminResourcePage } from "@/components/admin/AdminResourcePage";
 import type { FieldDef, FieldValues } from "@/components/admin/CrudDrawer";
 import type { DataTableColumn } from "@/components/admin/DataTable";
+import { Badge } from "@/components/ui/Badge";
 import { formatDateTime } from "@/lib/format";
 
 export function AutoResponsesPage() {
@@ -17,6 +18,21 @@ export function AutoResponsesPage() {
   const columns: DataTableColumn<AutoResponseOut>[] = [
     { key: "id", header: t("admin.table.id"), mono: true, render: (r) => r.id },
     { key: "name", header: t("admin.autoResponses.name"), render: (r) => r.name },
+    {
+      key: "assigned_queue_count",
+      header: t("admin.autoResponses.usage"),
+      render: (r) => {
+        const n = r.assigned_queue_count ?? 0;
+        return (
+          <Badge
+            tone={n > 0 ? "default" : "muted"}
+            data-testid={`admin-auto-response-usage-${r.id}`}
+          >
+            {n > 0 ? t("admin.autoResponses.inQueues", { count: n }) : "0"}
+          </Badge>
+        );
+      },
+    },
     {
       key: "changed",
       header: t("admin.table.changed"),

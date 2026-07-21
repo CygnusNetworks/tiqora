@@ -462,6 +462,8 @@ class StandardTemplateOut(BaseModel):
     valid_id: int
     create_time: datetime | None
     change_time: datetime | None
+    #: How many queues this template is assigned to (list responses only).
+    assigned_queue_count: int = 0
 
 
 class StandardTemplateCreate(BaseModel):
@@ -505,6 +507,8 @@ class StandardAttachmentOut(BaseModel):
     valid_id: int
     create_time: datetime | None
     change_time: datetime | None
+    #: How many templates link this attachment (list responses only).
+    assigned_template_count: int = 0
 
     @field_validator("content", mode="before")
     @classmethod
@@ -604,6 +608,8 @@ class AutoResponseOut(BaseModel):
     valid_id: int
     create_time: datetime | None
     change_time: datetime | None
+    #: How many queues this auto-response is assigned to (list responses only).
+    assigned_queue_count: int = 0
 
 
 class AutoResponseCreate(BaseModel):

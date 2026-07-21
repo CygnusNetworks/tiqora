@@ -5,7 +5,9 @@ Auto-response templates live in :mod:`tiqora.api.v1.admin.auto_responses`.
 
 from __future__ import annotations
 
-from fastapi import APIRouter, HTTPException, status
+from typing import Literal
+
+from fastapi import APIRouter, HTTPException, Query, status
 from sqlalchemy import select
 
 from tiqora.api.deps import DbSession
@@ -18,7 +20,14 @@ from tiqora.api.v1.admin.common import (
     now,
 )
 from tiqora.api.v1.admin.deps import AdminUser
-from tiqora.api.v1.admin.pagination import ListParamsDep, Page, apply_valid_filter, paginate
+from tiqora.api.v1.admin.pagination import (
+    ListParamsDep,
+    Page,
+    apply_valid_filter,
+    bulk_grouped_counts,
+    paginate,
+    window,
+)
 from tiqora.api.v1.admin.schemas import (
     AttachmentRefOut,
     QueueOut,
@@ -190,7 +199,37 @@ async def list_templates(
     stmt = apply_valid_filter(
         select(StandardTemplate), StandardTemplate.valid_id, params.valid
     ).order_by(StandardTemplate.name)
-    return await paginate(session, StandardTemplateOut, stmt, params)
+    rows, total = await window(session, stmt, params)
+    ids = [r.id for r in rows]
+    counts = await bulk_grouped_counts(
+        session,
+        QueueStandardTemplate.standard_template_id,
+        restrict_ids=ids,
+    )
+    items = [
+        StandardTemplateOut.model_validate(r).model_copy(
+            update={"assigned_queue_count": counts.get(r.id, 0)}
+        )
+        for r in rows
+    ]
+    return Page(items=items, total=total, page=params.page, page_size=params.page_size)
+
+
+@router.get("/templates/assignment-counts", response_model=dict[int, int])
+async def template_assignment_counts(
+    admin: AdminUser,
+    session: DbSession,
+    side: Literal["queues", "attachments"] = Query(...),
+) -> dict[int, int]:
+    """Bulk assignment counts keyed by template id (for AssignmentEditor badges).
+
+    * ``side=queues`` — rows in ``queue_standard_template``
+    * ``side=attachments`` — rows in ``standard_template_attachment``
+    """
+    _ = admin
+    if side == "queues":
+        return await bulk_grouped_counts(session, QueueStandardTemplate.standard_template_id)
+    return await bulk_grouped_counts(session, StandardTemplateAttachment.standard_template_id)
 
 
 @router.get("/templates/{template_id}", response_model=StandardTemplateOut)

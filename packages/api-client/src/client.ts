@@ -153,6 +153,8 @@ export type StandardAttachmentOut = {
   valid_id: number;
   create_time: string;
   change_time: string;
+  /** How many templates link this attachment (list responses). */
+  assigned_template_count?: number;
 };
 export type StandardAttachmentCreate = {
   name: string;
@@ -1300,12 +1302,48 @@ export class ApiClient {
     );
   }
 
+  /** Bulk assignment counts keyed by group id (`side=users|roles`). */
+  listGroupAssignmentCounts(
+    side: "users" | "roles",
+    signal?: AbortSignal,
+  ) {
+    return this.request<Record<string, number>>(
+      "GET",
+      "/api/v1/admin/groups/assignment-counts",
+      { query: { side }, signal },
+    );
+  }
+
   get adminRoles() {
     return this.adminCrud<RoleOut, RoleCreate, RoleUpdate>("/api/v1/admin/roles");
   }
 
   listRoleUsers(roleId: number, signal?: AbortSignal) {
     return this.request<UserOut[]>("GET", `/api/v1/admin/roles/${roleId}/users`, { signal });
+  }
+
+  /** Bulk assignment counts keyed by role id (`side=users|groups`). */
+  listRoleAssignmentCounts(
+    side: "users" | "groups",
+    signal?: AbortSignal,
+  ) {
+    return this.request<Record<string, number>>(
+      "GET",
+      "/api/v1/admin/roles/assignment-counts",
+      { query: { side }, signal },
+    );
+  }
+
+  /** Bulk assignment counts keyed by user id (`side=groups|roles`). */
+  listUserAssignmentCounts(
+    side: "groups" | "roles",
+    signal?: AbortSignal,
+  ) {
+    return this.request<Record<string, number>>(
+      "GET",
+      "/api/v1/admin/users/assignment-counts",
+      { query: { side }, signal },
+    );
   }
 
   assignRoleGroup(roleId: number, body: GroupRoleAssignment, signal?: AbortSignal) {
@@ -1410,6 +1448,30 @@ export class ApiClient {
     });
   }
 
+  /** Bulk assignment counts keyed by template id (`side=queues|attachments`). */
+  listTemplateAssignmentCounts(
+    side: "queues" | "attachments",
+    signal?: AbortSignal,
+  ) {
+    return this.request<Record<string, number>>(
+      "GET",
+      "/api/v1/admin/templates/assignment-counts",
+      { query: { side }, signal },
+    );
+  }
+
+  /** Bulk assignment counts keyed by queue id (`side=templates|auto-responses`). */
+  listQueueAssignmentCounts(
+    side: "templates" | "auto-responses",
+    signal?: AbortSignal,
+  ) {
+    return this.request<Record<string, number>>(
+      "GET",
+      "/api/v1/admin/queues/assignment-counts",
+      { query: { side }, signal },
+    );
+  }
+
   assignQueueTemplate(queueId: number, standardTemplateId: number, signal?: AbortSignal) {
     return this.request<void>("PUT", `/api/v1/admin/queues/${queueId}/templates`, {
       body: { standard_template_id: standardTemplateId },
@@ -1446,6 +1508,15 @@ export class ApiClient {
       "GET",
       `/api/v1/admin/attachments/${attachmentId}/templates`,
       { signal },
+    );
+  }
+
+  /** Bulk assignment counts keyed by attachment id (`side=templates`). */
+  listAttachmentAssignmentCounts(side: "templates" = "templates", signal?: AbortSignal) {
+    return this.request<Record<string, number>>(
+      "GET",
+      "/api/v1/admin/attachments/assignment-counts",
+      { query: { side }, signal },
     );
   }
 
@@ -1513,6 +1584,15 @@ export class ApiClient {
       "GET",
       `/api/v1/admin/auto-responses/${autoResponseId}/queues`,
       { signal },
+    );
+  }
+
+  /** Bulk assignment counts keyed by auto-response id (`side=queues`). */
+  listAutoResponseAssignmentCounts(side: "queues" = "queues", signal?: AbortSignal) {
+    return this.request<Record<string, number>>(
+      "GET",
+      "/api/v1/admin/auto-responses/assignment-counts",
+      { query: { side }, signal },
     );
   }
 

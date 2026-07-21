@@ -146,6 +146,26 @@ describe("AssignmentEditor", () => {
     expect(screen.getByTestId("ae-qt-counterpart-21")).not.toBeChecked();
   });
 
+  it("shows bulk loadCounts badges on anchors without selecting them", async () => {
+    const loadCounts = vi.fn();
+    loadCounts.mockResolvedValue({ "3": 2, "4": 0 });
+    const config: AssignmentConfig<Queue, Template> = {
+      ...queueTemplateConfig,
+      loadCounts: (dir) => loadCounts(dir),
+    };
+    renderEditor(config);
+
+    await waitFor(() => {
+      expect(loadCounts).toHaveBeenCalledWith("a");
+    });
+    await waitFor(() => {
+      expect(screen.getByTestId("ae-qt-anchor-count-3")).toHaveTextContent("2");
+      expect(screen.getByTestId("ae-qt-anchor-count-4")).toHaveTextContent("0");
+    });
+    // Must not have required selecting an anchor to load assigned sets for the badge.
+    expect(listAssignedB).not.toHaveBeenCalled();
+  });
+
   it("direction toggle swaps master/detail and loads reverse assigned set", async () => {
     renderEditor(queueTemplateConfig);
 
