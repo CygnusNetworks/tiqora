@@ -585,6 +585,36 @@
       "type": "Typ",
       "text": "Text"
     },
+    "variables": {
+      "title": "Verfügbare Variablen",
+      "insertHint": "Klicken zum Einfügen an der Cursorposition",
+      "groups": {
+        "ticket": "Ticket",
+        "customer": "Kunde",
+        "agent": "Bearbeiter",
+        "queue": "Queue"
+      },
+      "items": {
+        "ticketNumber": "Ticketnummer",
+        "ticketTitle": "Titel",
+        "ticketState": "Status",
+        "ticketQueue": "Queue des Tickets",
+        "ticketPriority": "Priorität",
+        "customerFirstname": "Vorname des Kunden",
+        "customerLastname": "Nachname des Kunden",
+        "customerEmail": "E-Mail des Kunden",
+        "customerWpnum": "Kundennummer (wpnum)",
+        "currentFirstname": "Vorname des angemeldeten Bearbeiters",
+        "currentLastname": "Nachname des angemeldeten Bearbeiters",
+        "ownerFirstname": "Vorname des Ticket-Besitzers",
+        "ownerLastname": "Nachname des Ticket-Besitzers",
+        "queueName": "Name der Queue"
+      },
+      "notes": {
+        "customerAnyColumn": "Beliebige customer_user-Spalte: <OTRS_CUSTOMER_DATA_{Spalte}>",
+        "queueCustomFields": "Nicht-Standard-Felder (z. B. <OTRS_QUEUE_Domain>) werden nur ersetzt, wenn eine Datenquelle existiert."
+      }
+    },
     "salutations": {
       "title_plural": "Anreden",
       "new": "Neue Anrede",
