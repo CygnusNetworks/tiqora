@@ -1176,3 +1176,124 @@ async def test_extra_pii_setting_and_introspection(mariadb_znuny_url: str) -> No
         # wpnum present after ALTER in seed
         assert "wpnum" in cols
     await engine.dispose()
+
+
+async def _count(session: AsyncSession, sql: str, params: dict) -> int:
+    return int((await session.execute(text(sql), params)).scalar_one())
+
+
+@pytest.mark.db
+@pytest.mark.asyncio
+@pytest.mark.parametrize("url_fixture", ["mariadb_znuny_url", "postgres_znuny_url"])
+async def test_delete_tickets_hard_delete_and_rollback_restores(
+    url_fixture: str, request: pytest.FixtureRequest
+) -> None:
+    """delete_tickets hard-deletes the ticket + all FK children (FK-safe) and
+    rollback_job re-inserts everything."""
+    url = request.getfixturevalue(url_fixture)
+    engine, factory = await _factory(url)
+    mysql = _is_mysql(url)
+    login = f"erase.del.{'my' if mysql else 'pg'}@example.com"
+    company = f"ERASE-DEL-{'MY' if mysql else 'PG'}"
+
+    async with factory() as session:
+        await _seed_tiqora_tables(session, mysql=mysql)
+        # Idempotent on the shared DB: FK-safe cleanup of any leftover from a
+        # prior run (rollback restores rows, so they persist otherwise).
+        tick = "(SELECT id FROM ticket WHERE customer_user_id = :l)"
+        art = f"(SELECT id FROM article WHERE ticket_id IN {tick})"
+        async with session.begin():
+            for stmt in (
+                f"DELETE FROM article_search_index WHERE ticket_id IN {tick}",
+                f"DELETE FROM article_data_mime_attachment WHERE article_id IN {art}",
+                f"DELETE FROM article_data_mime_plain WHERE article_id IN {art}",
+                f"DELETE FROM article_data_mime WHERE article_id IN {art}",
+                f"DELETE FROM article WHERE ticket_id IN {tick}",
+                "DELETE FROM ticket WHERE customer_user_id = :l",
+                "DELETE FROM customer_user WHERE login = :l",
+                "DELETE FROM customer_company WHERE customer_id = :c",
+            ):
+                await session.execute(text(stmt), {"l": login, "c": company})
+        await _insert_company(session, customer_id=company, name="Acme Delete")
+        cuid = await _insert_customer(session, login=login, customer_id=company, wpnum="WP-1")
+        tid = await _insert_ticket(
+            session, customer_user_id=login, customer_id=company, tn=f"2026DEL{cuid}"
+        )
+        aid = await _insert_article_bundle(
+            session, ticket_id=tid, from_addr=login, body=f"Body for {login}"
+        )
+
+    child_counts_sql = {
+        "ticket": ("SELECT COUNT(*) FROM ticket WHERE id = :t", {"t": tid}),
+        "article": ("SELECT COUNT(*) FROM article WHERE ticket_id = :t", {"t": tid}),
+        "article_data_mime": (
+            "SELECT COUNT(*) FROM article_data_mime WHERE article_id = :a",
+            {"a": aid},
+        ),
+        "article_data_mime_plain": (
+            "SELECT COUNT(*) FROM article_data_mime_plain WHERE article_id = :a",
+            {"a": aid},
+        ),
+        "article_data_mime_attachment": (
+            "SELECT COUNT(*) FROM article_data_mime_attachment WHERE article_id = :a",
+            {"a": aid},
+        ),
+        "article_search_index": (
+            "SELECT COUNT(*) FROM article_search_index WHERE ticket_id = :t",
+            {"t": tid},
+        ),
+    }
+
+    # Baseline: every child row is present.
+    async with factory() as session:
+        for name, (sql, params) in child_counts_sql.items():
+            assert await _count(session, sql, params) >= 1, f"{name} should exist pre-delete"
+        orig_title = (
+            await session.execute(text("SELECT title FROM ticket WHERE id = :t"), {"t": tid})
+        ).scalar_one()
+
+    # Hard delete.
+    result = await run_erasure(
+        factory,
+        Settings(),
+        customer_user_ids=[cuid],
+        mode="delete",
+        force_parallel=True,
+        actor="test",
+        selector=ErasureSelector(logins=[login]),
+        delete_tickets=True,
+    )
+    assert result.job_id > 0
+
+    # Everything gone (ticket + children + customer master).
+    async with factory() as session:
+        for name, (sql, params) in child_counts_sql.items():
+            assert await _count(session, sql, params) == 0, f"{name} should be deleted"
+        assert (
+            await _count(session, "SELECT COUNT(*) FROM customer_user WHERE id = :id", {"id": cuid})
+            == 0
+        )
+
+    # Rollback restores all rows.
+    rb = await rollback_job(factory, Settings(), result.job_id, force_parallel=True, actor="test")
+    assert rb["restored_rows"] >= 7  # ticket + 5 child tables + customer_user (+more)
+
+    async with factory() as session:
+        for name, (sql, params) in child_counts_sql.items():
+            assert await _count(session, sql, params) >= 1, f"{name} should be restored"
+        restored_title = (
+            await session.execute(text("SELECT title FROM ticket WHERE id = :t"), {"t": tid})
+        ).scalar_one()
+        assert restored_title == orig_title
+        restored_cu = (
+            await session.execute(
+                text("SELECT customer_user_id FROM ticket WHERE id = :t"), {"t": tid}
+            )
+        ).scalar_one()
+        assert restored_cu == login
+        assert (
+            await _count(session, "SELECT COUNT(*) FROM customer_user WHERE id = :id", {"id": cuid})
+            == 1
+        )
+
+    await engine.dispose()

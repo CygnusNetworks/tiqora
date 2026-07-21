@@ -73,6 +73,31 @@ INVALID_VALID_ID = 2
 # dynamic_field_value.value_text) when anonymizing — rollback-able via backup.
 _ANON_PLACEHOLDER = "[anonymisiert]"
 
+# Optional ticket HARD-DELETE (delete_tickets): every table with a FK to
+# ticket/article, in FK-safe DELETE order (children → parents). Each entry is
+# (table, fk_column, scope) where scope selects ticket_ids vs article_ids. Rows
+# are backed up (full) before deletion; rollback re-inserts in id-DESC order,
+# which is parents-first (FK-safe). Missing tables are skipped per install.
+# dynamic_field_value + the ticket rows themselves are handled separately.
+_TICKET_DELETE_ORDER: tuple[tuple[str, str, str], ...] = (
+    ("article_flag", "article_id", "article"),
+    ("article_data_mime_plain", "article_id", "article"),
+    ("article_data_mime_attachment", "article_id", "article"),
+    ("article_data_mime_send_error", "article_id", "article"),
+    ("article_data_otrs_chat", "article_id", "article"),
+    ("article_data_mime", "article_id", "article"),
+    ("mail_queue", "article_id", "article"),
+    ("article_search_index", "ticket_id", "ticket"),  # FK to article + ticket
+    ("time_accounting", "ticket_id", "ticket"),  # FK to article + ticket
+    ("ticket_history", "ticket_id", "ticket"),  # FK to article + ticket
+    ("article", "ticket_id", "ticket"),
+    ("ticket_flag", "ticket_id", "ticket"),
+    ("ticket_watcher", "ticket_id", "ticket"),
+    ("ticket_index", "ticket_id", "ticket"),
+    ("ticket_lock_index", "ticket_id", "ticket"),
+    ("calendar_appointment_ticket", "ticket_id", "ticket"),
+)
+
 # Guard admin-supplied selector regexes against ReDoS (L-1). Patterns longer
 # than this are rejected before compile; nested quantifiers that commonly
 # cause catastrophic backtracking are also refused. Matching still runs in
@@ -780,10 +805,18 @@ async def run_erasure(
     actor: str = "admin",
     force_parallel: bool = True,
     selector: ErasureSelector | None = None,
+    delete_tickets: bool = False,
 ) -> ErasureResult:
-    """Snapshot + apply erasure on an explicit confirmed id list (not a re-resolve)."""
+    """Snapshot + apply erasure on an explicit confirmed id list (not a re-resolve).
+
+    ``delete_tickets`` (delete mode only) additionally HARD-DELETEs the customer's
+    tickets and all FK-linked child rows (FK-safe order, full-row backup for
+    rollback) instead of tokenizing the ticket references.
+    """
     if mode not in ("anonymize", "delete"):
         raise ErasureError(f"mode must be 'anonymize' or 'delete', got {mode!r}")
+    if delete_tickets and mode != "delete":
+        raise ErasureError("delete_tickets requires mode='delete'")
     if not customer_user_ids:
         raise ErasureError("customer_user_ids must not be empty")
 
@@ -870,6 +903,73 @@ async def run_erasure(
                 .scalars()
                 .all()
             )
+
+        do_ticket_delete = mode == "delete" and delete_tickets
+        if do_ticket_delete and ticket_ids:
+            # FK-safe hard delete: child tables first, then dynamic fields, then
+            # the tickets themselves. Every deleted row is backed up (full) so
+            # rollback_job re-inserts them (id DESC = parents first).
+            for table, fk_col, scope in _TICKET_DELETE_ORDER:
+                target_ids = article_ids if scope == "article" else ticket_ids
+                n = await _backup_and_delete_by(
+                    session, job_id=job_id, table=table, fk_col=fk_col, ids=target_ids, now=now
+                )
+                counts[table] = counts.get(table, 0) + n
+            # dynamic_field_value: Ticket-object fields on these tickets, and
+            # Article-object fields on their articles (no FK — delete by object).
+            dfv_field_types: dict[int, str] = {
+                int(fid): str(ot)
+                for fid, ot in (
+                    await session.execute(select(DynamicField.id, DynamicField.object_type))
+                ).all()
+            }
+            for obj_ids, wanted in ((ticket_ids, "Ticket"), (article_ids, "Article")):
+                del_fids = [fid for fid, ot in dfv_field_types.items() if ot == wanted]
+                if not obj_ids or not del_fids:
+                    continue
+                oid_list = ",".join(str(int(i)) for i in obj_ids)
+                fid_list = ",".join(str(int(i)) for i in del_fids)
+                where = f"object_id IN ({oid_list}) AND field_id IN ({fid_list})"
+                dfv_del_rows = (
+                    (
+                        await session.execute(
+                            text(f"SELECT * FROM dynamic_field_value WHERE {where}")
+                        )
+                    )
+                    .mappings()
+                    .all()
+                )
+                for dfv_row in dfv_del_rows:
+                    dfv_full = dict(dfv_row)
+                    await _add_backup(
+                        session,
+                        job_id=job_id,
+                        table_name="dynamic_field_value",
+                        row_pk={"id": dfv_full["id"]},
+                        original_row=dfv_full,
+                        created=now,
+                    )
+                if dfv_del_rows:
+                    await session.execute(text(f"DELETE FROM dynamic_field_value WHERE {where}"))
+                    counts["dynamic_field_value"] = counts.get("dynamic_field_value", 0) + len(
+                        dfv_del_rows
+                    )
+            # tickets last (parent) — backup full row first.
+            for trow in ticket_rows:
+                full_t = await _fetch_full_row(session, "ticket", {"id": int(trow.id)})
+                if full_t is None:
+                    continue
+                await _add_backup(
+                    session,
+                    job_id=job_id,
+                    table_name="ticket",
+                    row_pk={"id": int(trow.id)},
+                    original_row=full_t,
+                    created=now,
+                )
+            tid_list = ",".join(str(int(t)) for t in ticket_ids)
+            await session.execute(text(f"DELETE FROM ticket WHERE id IN ({tid_list})"))
+            counts["tickets_deleted"] = counts.get("tickets_deleted", 0) + len(ticket_ids)
 
         # ---- customer_user: snapshot + anonymize or prepare delete ----
         for cust in ordered:
@@ -1085,7 +1185,7 @@ async def run_erasure(
                 if old_title:
                     changed_t["title"] = old_title
                     updates_t["title"] = _ANON_PLACEHOLDER
-            else:
+            elif not do_ticket_delete:
                 if old_cu:
                     new_cu = login_to_new.get(str(old_cu)) or mapper.map_value(str(old_cu), "login")
                     if old_cu != new_cu:
@@ -1181,7 +1281,8 @@ async def run_erasure(
                     counts["dynamic_field_value"] += 1
 
         # ---- articles: scrub mime / plain / attachment / search_index ----
-        if article_ids:
+        # (skipped when hard-deleting tickets — those rows are already gone).
+        if article_ids and not do_ticket_delete:
             mime_rows = (
                 (
                     await session.execute(
@@ -1551,6 +1652,13 @@ async def rollback_job(
 
         restored = 0
         ticket_ids: list[int] = []
+        # A ticket hard-delete job (delete_tickets) backs up EVERY affected row
+        # as a full row (tickets + all FK children + masters). Detect it via a
+        # full-row "ticket" backup, then simply re-INSERT everything in id-DESC
+        # order — that is parents-before-children, so FKs hold.
+        is_ticket_delete = job.mode == "delete" and any(
+            b.table_name == "ticket" and len(_json_load_row(b.original_row)) > 5 for b in backups
+        )
         # Reverse order so deletes (which were applied last) re-INSERT first
         # for masters, and ticket/article UPDATEs restore afterward.
         # We stored backups in apply order; reverse restores dependent first.
@@ -1558,6 +1666,13 @@ async def rollback_job(
             pk = _json_load_row(bak.row_pk)
             original = _json_load_row(bak.original_row)
             table = bak.table_name
+
+            if is_ticket_delete:
+                await _insert_row(session, table, original)
+                if table == "ticket" and "id" in pk:
+                    ticket_ids.append(int(pk["id"]))
+                restored += 1
+                continue
 
             if table == "customer_user" and job.mode == "delete":
                 await _insert_row(session, table, original)
@@ -1895,3 +2010,54 @@ def _qi(name: str) -> str:
     if not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", name):
         raise ErasureError(f"unsafe SQL identifier: {name!r}")
     return name
+
+
+async def _table_exists(session: AsyncSession, table: str) -> bool:
+    """Whether *table* exists (portable across MySQL/Postgres for the connection)."""
+    _qi(table)
+    row = (
+        await session.execute(
+            text("SELECT 1 FROM information_schema.tables WHERE table_name = :t LIMIT 1"),
+            {"t": table},
+        )
+    ).first()
+    return row is not None
+
+
+async def _backup_and_delete_by(
+    session: AsyncSession,
+    *,
+    job_id: int,
+    table: str,
+    fk_col: str,
+    ids: list[int],
+    now: datetime,
+) -> int:
+    """Snapshot (full row) then DELETE every row of *table* where ``fk_col ∈ ids``.
+
+    Returns the number of rows deleted. Missing tables (per Znuny install) are
+    skipped. Each row is backed up so :func:`rollback_job` can re-insert it.
+    ``ids`` are bounded, trusted ints (inlined — matches the master-delete path).
+    """
+    if not ids or not await _table_exists(session, table):
+        return 0
+    id_list = ",".join(str(int(i)) for i in ids)
+    rows = (
+        (
+            await session.execute(
+                text(f"SELECT * FROM {_qi(table)} WHERE {_qi(fk_col)} IN ({id_list})")
+            )
+        )
+        .mappings()
+        .all()
+    )
+    if not rows:
+        return 0
+    for row in rows:
+        full = dict(row)
+        pk = {"id": full["id"]} if "id" in full else {fk_col: full[fk_col]}
+        await _add_backup(
+            session, job_id=job_id, table_name=table, row_pk=pk, original_row=full, created=now
+        )
+    await session.execute(text(f"DELETE FROM {_qi(table)} WHERE {_qi(fk_col)} IN ({id_list})"))
+    return len(rows)
