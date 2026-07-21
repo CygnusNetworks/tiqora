@@ -34,6 +34,16 @@ export type FieldDef = {
   rows?: number;
   /** Only for type "custom": renders its own control. */
   render?: (value: unknown, onChange: (v: unknown) => void, values: FieldValues) => ReactNode;
+  /**
+   * Optional secondary UI below the control (e.g. variable picker for body
+   * fields). Only resources that set this are affected; other forms unchanged.
+   */
+  afterControl?: (ctx: {
+    value: unknown;
+    onChange: (v: unknown) => void;
+    values: FieldValues;
+    controlId: string;
+  }) => ReactNode;
   /** Hide this field for create (e.g. immutable identity fields shown read-only). */
   hideOnCreate?: boolean;
 };
@@ -204,6 +214,12 @@ export function CrudDrawer({
               ) : f.type === "custom" && f.render ? (
                 f.render(value, (v) => setField(f.name, v), values)
               ) : null}
+              {f.afterControl?.({
+                value,
+                onChange: (v) => setField(f.name, v),
+                values,
+                controlId: id,
+              })}
               {f.helpText && <p className="mt-1 text-xs text-muted">{f.helpText}</p>}
               {invalid && (
                 <p className="mt-1 text-xs text-escalation">{t("admin.form.required")}</p>
