@@ -199,16 +199,21 @@ function LanguageSubmenu({
         aria-expanded={open}
         onClick={() => setOpen((v) => !v)}
         onKeyDown={(e) => {
-          if (e.key === "ArrowRight" || e.key === "Enter" || e.key === " ") {
+          // Submenu opens to the LEFT (the account menu sits at the screen's
+          // right edge), so ArrowLeft opens and ArrowRight closes.
+          if (e.key === "ArrowLeft" || e.key === "Enter" || e.key === " ") {
             e.preventDefault();
             setOpen(true);
-          } else if (e.key === "ArrowLeft" || e.key === "Escape") {
+          } else if (e.key === "ArrowRight" || e.key === "Escape") {
             e.preventDefault();
             setOpen(false);
           }
         }}
         className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-[13px] text-ink/90 transition-colors duration-100 hover:bg-surface-subtle focus:outline-none focus-visible:bg-surface-subtle"
       >
+        <span className="text-muted" aria-hidden>
+          ◂
+        </span>
         <span className="flex w-4 shrink-0 justify-center text-[15px] text-muted" aria-hidden>
           <GlobeIcon />
         </span>
@@ -216,15 +221,12 @@ function LanguageSubmenu({
           {label}
           <span className="ml-1 text-muted">({currentLabel})</span>
         </span>
-        <span className="text-muted" aria-hidden>
-          ▸
-        </span>
       </button>
       {open && (
         <div
           role="menu"
           data-testid="account-menu-lang-submenu"
-          className="absolute left-full top-0 z-50 ml-1 min-w-[10rem] overflow-hidden rounded-xl border border-hairline bg-surface p-1 shadow-xl"
+          className="absolute right-full top-0 z-50 mr-1 min-w-[10rem] overflow-hidden rounded-xl border border-hairline bg-surface p-1 shadow-xl"
         >
           {LANGUAGES.map((lang) => (
             <button
@@ -239,7 +241,7 @@ function LanguageSubmenu({
                 setOpen(false);
               }}
               onKeyDown={(e) => {
-                if (e.key === "ArrowLeft" || e.key === "Escape") {
+                if (e.key === "ArrowRight" || e.key === "Escape") {
                   e.preventDefault();
                   setOpen(false);
                 }
