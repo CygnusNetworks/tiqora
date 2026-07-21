@@ -261,6 +261,40 @@ async def test_mcp_ticket_search_no_access(mcp_mariadb: dict[str, Any]) -> None:
         srv._mcp_state = None
 
 
+def test_meili_filter_escapes_customer_user_id_injection() -> None:
+    """M-1: crafted customer_user_id must not break out of queue_id IN [...]."""
+    from tiqora.mcp_server.server import _build_meili_ticket_filters, _meili_escape_string
+
+    injection = "x' OR queue_id > 0 OR customer_user_id = 'x"
+    escaped = _meili_escape_string(injection)
+    assert "\\'" in escaped or "\\\\" in escaped or "'" not in escaped or escaped.count("'") == 0
+    # After escape, a bare quote breakout sequence is gone.
+    assert " OR queue_id > 0 OR " not in f"customer_user_id = '{escaped}'".replace(
+        f"'{escaped}'", "SAFE"
+    )
+
+    expr = _build_meili_ticket_filters({5, 7}, None, injection)
+    # Permission clause is always present and uses only integer queue ids.
+    assert "queue_id IN [5,7]" in expr
+    # Injection is inside a single quoted string — the OR breakout is escaped.
+    assert "customer_user_id = '" in expr
+    # Unescaped form of the payload must not appear as free filter syntax.
+    assert "customer_user_id = 'x' OR queue_id > 0" not in expr
+    assert "\\'" in expr  # single quotes escaped with backslash
+
+
+def test_meili_filter_state_type_allowlist() -> None:
+    """M-1: unknown state_type values are dropped (not interpolated)."""
+    from tiqora.mcp_server.server import _build_meili_ticket_filters
+
+    ok = _build_meili_ticket_filters({1}, "open", None)
+    assert "state_type = 'open'" in ok
+
+    bad = _build_meili_ticket_filters({1}, "open' OR queue_id > 0 OR state_type = 'x", None)
+    assert "state_type" not in bad
+    assert bad == "queue_id IN [1]"
+
+
 @pytest.mark.db
 async def test_mcp_ticket_create_and_get(mcp_mariadb: dict[str, Any]) -> None:
     """ticket_create creates a ticket; ticket_get retrieves it."""

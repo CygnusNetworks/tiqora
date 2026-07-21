@@ -6,6 +6,9 @@ provider-specific driver later (Twilio, Vonage, ...) without touching
 :class:`GenericHttpSmsGateway`, which POSTs a JSON webhook to a configurable
 URL — the lowest common denominator most SMS aggregators/on-prem modems
 support, optionally HMAC-signed with a shared secret.
+
+The webhook URL is validated and IP-pinned via :mod:`tiqora.security.outbound`
+(SSRF guard; no redirect following).
 """
 
 from __future__ import annotations
@@ -17,6 +20,8 @@ from typing import Protocol
 
 import httpx
 import structlog
+
+from tiqora.security.outbound import pin_outbound_url
 
 logger = structlog.get_logger(__name__)
 
@@ -51,18 +56,31 @@ class GenericHttpSmsGateway:
     async def send(self, *, to: str, body: str) -> None:
         payload = {"to": to, "body": body}
         raw = json.dumps(payload).encode("utf-8")
-        headers = {"Content-Type": "application/json"}
+        base_headers = {"Content-Type": "application/json"}
         if self._secret:
-            headers["X-Tiqora-Signature"] = sign_payload(self._secret, raw)
+            base_headers["X-Tiqora-Signature"] = sign_payload(self._secret, raw)
+
+        pinned = pin_outbound_url(self._url)
+        headers = pinned.request_headers(base_headers)
+        extensions = pinned.request_extensions()
+        request_url = pinned.request_url
 
         if self._client is not None:
             resp = await self._client.post(
-                self._url, content=raw, headers=headers, timeout=self._timeout
+                request_url,
+                content=raw,
+                headers=headers,
+                timeout=self._timeout,
+                extensions=extensions,
             )
         else:
-            async with httpx.AsyncClient() as client:
+            async with httpx.AsyncClient(follow_redirects=False) as client:
                 resp = await client.post(
-                    self._url, content=raw, headers=headers, timeout=self._timeout
+                    request_url,
+                    content=raw,
+                    headers=headers,
+                    timeout=self._timeout,
+                    extensions=extensions,
                 )
         resp.raise_for_status()
         logger.info("sms_outbound_sent", to=to, status=resp.status_code)

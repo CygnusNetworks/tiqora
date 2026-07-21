@@ -304,6 +304,37 @@ async def _factory(url: str) -> tuple:
 
 
 # ---------------------------------------------------------------------------
+# ---------------------------------------------------------------------------
+# ReDoS guards on admin-supplied selector regexes (L-1)
+# ---------------------------------------------------------------------------
+
+
+def test_compile_selector_regex_rejects_overlong_pattern() -> None:
+    from tiqora.gdpr.erasure import _MAX_SELECTOR_REGEX_LEN, _compile_selector_regex
+
+    overlong = "a" * (_MAX_SELECTOR_REGEX_LEN + 1)
+    with pytest.raises(ErasureError, match="maximum length"):
+        _compile_selector_regex(overlong, field="login_regex")
+
+
+def test_compile_selector_regex_rejects_catastrophic_pattern() -> None:
+    from tiqora.gdpr.erasure import _compile_selector_regex
+
+    with pytest.raises(ErasureError, match="ReDoS|nested|quantifier"):
+        _compile_selector_regex(r"(a+)+$", field="login_regex")
+
+    with pytest.raises(ErasureError, match="ReDoS|nested|quantifier"):
+        _compile_selector_regex(r"(a*)*b", field="customer_id_regex")
+
+
+def test_compile_selector_regex_allows_normal_patterns() -> None:
+    from tiqora.gdpr.erasure import _compile_selector_regex
+
+    cre = _compile_selector_regex(r"^user-\d+$", field="login_regex")
+    assert cre.search("user-42")
+    assert cre.search("nope") is None
+
+
 # resolve_selector
 # ---------------------------------------------------------------------------
 

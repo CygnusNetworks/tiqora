@@ -12,8 +12,20 @@ from tiqora.api.v1.admin.deps import AdminUser
 from tiqora.api.v1.admin.pagination import ListParamsDep, Page, window
 from tiqora.api.v1.admin.schemas import WebhookCreate, WebhookOut, WebhookUpdate
 from tiqora.db.tiqora.models import TiqoraWebhook
+from tiqora.security.outbound import OutboundURLError, validate_outbound_url
 
 router = APIRouter(prefix="/webhooks", tags=["admin:webhooks"])
+
+
+def _validate_webhook_url(url: str) -> None:
+    """Reject SSRF-prone targets at create/update so they are never stored."""
+    try:
+        validate_outbound_url(url)
+    except OutboundURLError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"Invalid webhook URL: {exc}",
+        ) from exc
 
 
 def _to_out(row: TiqoraWebhook) -> WebhookOut:
@@ -64,6 +76,7 @@ async def get_webhook(webhook_id: int, admin: AdminUser, session: DbSession) -> 
 @router.post("", response_model=WebhookOut, status_code=status.HTTP_201_CREATED)
 async def create_webhook(body: WebhookCreate, admin: AdminUser, session: DbSession) -> WebhookOut:
     _ = admin
+    _validate_webhook_url(body.url)
     row = TiqoraWebhook(
         name=body.name,
         url=body.url,
@@ -86,6 +99,8 @@ async def update_webhook(
     if row is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Webhook not found")
     updates = body.model_dump(exclude_unset=True)
+    if "url" in updates and updates["url"] is not None:
+        _validate_webhook_url(updates["url"])
     if "events" in updates:
         updates["events"] = json.dumps(updates["events"])
     for field, value in updates.items():

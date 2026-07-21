@@ -69,6 +69,17 @@ KEY_GDPR_ERASURE_PURGE_ENABLED = "gdpr.erasure.purge_enabled"
 BACKUP_RETENTION_DAYS = 30
 INVALID_VALID_ID = 2
 
+# Guard admin-supplied selector regexes against ReDoS (L-1). Patterns longer
+# than this are rejected before compile; nested quantifiers that commonly
+# cause catastrophic backtracking are also refused. Matching still runs in
+# process (candidates are already bounded by SQL filters).
+_MAX_SELECTOR_REGEX_LEN = 200
+# Nested/adjacent quantifiers on the same atom — e.g. (a+)+, (a*)*, (a+){2,}.
+_CATASTROPHIC_REGEX = re.compile(
+    r"\((?:[^()\\]|\\.)*[+*{](?:[^()\\]|\\.)*\)[+*{]"
+    r"|(?:[*+?])[+*?{]"  # a++ / a+* / a+{ — possessive-ish stacking
+)
+
 ErasureMode = Literal["anonymize", "delete"]
 JobStatus = Literal["applied", "rolled_back", "purged"]
 
@@ -371,6 +382,27 @@ def _naive_change_time(dt: datetime) -> datetime:
     return dt
 
 
+def _compile_selector_regex(pattern: str, *, field: str) -> re.Pattern[str]:
+    """Compile an admin-supplied selector regex with ReDoS guards.
+
+    Rejects over-long patterns and common catastrophic-backtracking shapes
+    with a clean :class:`ErasureError` (API 4xx path) instead of hanging the
+    worker on ``re.search``.
+    """
+    if len(pattern) > _MAX_SELECTOR_REGEX_LEN:
+        raise ErasureError(
+            f"{field} exceeds maximum length of {_MAX_SELECTOR_REGEX_LEN} characters"
+        )
+    if _CATASTROPHIC_REGEX.search(pattern):
+        raise ErasureError(
+            f"{field} rejected: nested or stacked quantifiers are not allowed (ReDoS guard)"
+        )
+    try:
+        return re.compile(pattern)
+    except re.error as exc:
+        raise ErasureError(f"invalid {field}: {exc}") from exc
+
+
 async def resolve_selector(session: AsyncSession, selector: ErasureSelector) -> list[int]:
     """Resolve *selector* to ``customer_user.id`` list (AND of all criteria).
 
@@ -378,6 +410,19 @@ async def resolve_selector(session: AsyncSession, selector: ErasureSelector) -> 
     """
     if not _has_any_selector(selector):
         return []
+
+    # Compile regexes first so invalid/catastrophic patterns fail fast with
+    # ErasureError before we load candidate rows.
+    login_cre = (
+        _compile_selector_regex(selector.login_regex, field="login_regex")
+        if selector.login_regex
+        else None
+    )
+    customer_id_cre = (
+        _compile_selector_regex(selector.customer_id_regex, field="customer_id_regex")
+        if selector.customer_id_regex
+        else None
+    )
 
     # Candidate set: start broad, narrow with SQL where possible.
     # Regex-only selectors load the whole customer_user (id, login, customer_id)
@@ -404,19 +449,11 @@ async def resolve_selector(session: AsyncSession, selector: ErasureSelector) -> 
 
     # Apply regex in Python (candidates already loaded). Native SQL REGEXP/~ does
     # not understand Python patterns like \\d, \\w, (?i) and would return empty.
-    if selector.login_regex:
-        try:
-            cre = re.compile(selector.login_regex)
-        except re.error as exc:
-            raise ErasureError(f"invalid login_regex: {exc}") from exc
-        candidates = [c for c in candidates if cre.search(c[1])]
+    if login_cre is not None:
+        candidates = [c for c in candidates if login_cre.search(c[1])]
 
-    if selector.customer_id_regex:
-        try:
-            cre = re.compile(selector.customer_id_regex)
-        except re.error as exc:
-            raise ErasureError(f"invalid customer_id_regex: {exc}") from exc
-        candidates = [c for c in candidates if cre.search(c[2])]
+    if customer_id_cre is not None:
+        candidates = [c for c in candidates if customer_id_cre.search(c[2])]
 
     if selector.activity:
         candidates = await _filter_activity(session, candidates, selector.activity)

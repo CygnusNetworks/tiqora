@@ -62,15 +62,19 @@ async def test_generic_http_gateway_sends_signed_post() -> None:
         return httpx.Response(200, json={"ok": True})
 
     client = httpx.AsyncClient(transport=httpx.MockTransport(handler))
+    # example.com resolves publicly; IP pinning rewrites the request host.
     gateway = GenericHttpSmsGateway(
-        "https://gw.example.com/send", shared_secret="topsecret", client=client
+        "https://example.com/send", shared_secret="topsecret", client=client
     )
     await gateway.send(to="+491701234567", body="hello")
     await client.aclose()
 
-    assert captured["url"] == "https://gw.example.com/send"
+    assert str(captured["url"]).endswith("/send")
+    headers = captured["headers"]
+    assert isinstance(headers, dict)
+    assert headers.get("host") == "example.com"
     assert captured["body"] == {"to": "+491701234567", "body": "hello"}
-    assert "x-tiqora-signature" in captured["headers"]  # type: ignore[operator]
+    assert "x-tiqora-signature" in headers
 
 
 async def test_generic_http_gateway_raises_on_error_status() -> None:
@@ -78,8 +82,18 @@ async def test_generic_http_gateway_raises_on_error_status() -> None:
         return httpx.Response(500)
 
     client = httpx.AsyncClient(transport=httpx.MockTransport(handler))
-    gateway = GenericHttpSmsGateway("https://gw.example.com/send", client=client)
+    gateway = GenericHttpSmsGateway("https://example.com/send", client=client)
     with pytest.raises(httpx.HTTPStatusError):
+        await gateway.send(to="+491701234567", body="hello")
+    await client.aclose()
+
+
+async def test_generic_http_gateway_rejects_private_url() -> None:
+    from tiqora.security.outbound import OutboundURLError
+
+    client = httpx.AsyncClient(transport=httpx.MockTransport(lambda r: httpx.Response(200)))
+    gateway = GenericHttpSmsGateway("http://127.0.0.1:9/send", client=client)
+    with pytest.raises(OutboundURLError):
         await gateway.send(to="+491701234567", body="hello")
     await client.aclose()
 
