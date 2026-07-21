@@ -93,6 +93,44 @@ class PortalInvalidInput(Exception):
     """Caller passed an invalid combination of parameters (e.g. bad queue)."""
 
 
+async def company_tickets_enabled(session: AsyncSession) -> bool:
+    """True when portal company-wide ticket visibility is enabled."""
+    val = await get_setting(session, SETTING_COMPANY_TICKETS)
+    return val == "1"
+
+
+async def customer_ticket_scope_filter(
+    session: AsyncSession, *, login: str, customer_id: str
+) -> ColumnElement[bool]:
+    """SQLAlchemy filter for tickets a customer may see (portal + compat).
+
+    Always includes ``ticket.customer_user_id == login``. When company tickets
+    are enabled, also includes tickets whose ``customer_id`` matches the
+    customer's own company or any ``customer_user_customer`` mapping.
+    """
+    conditions: list[ColumnElement[bool]] = [Ticket.customer_user_id == login]
+    if await company_tickets_enabled(session):
+        cids: set[str] = {customer_id}
+        rows = await session.execute(
+            select(CustomerUserCustomer.customer_id).where(CustomerUserCustomer.user_id == login)
+        )
+        cids.update(cid for cid in rows.scalars().all() if cid)
+        if cids:
+            conditions.append(Ticket.customer_id.in_(cids))
+    return or_(*conditions)
+
+
+async def customer_can_access_ticket(
+    session: AsyncSession, *, login: str, customer_id: str, ticket_id: int
+) -> bool:
+    """True when ``ticket_id`` is inside the customer's ownership scope."""
+    scope = await customer_ticket_scope_filter(session, login=login, customer_id=customer_id)
+    owned = (
+        await session.execute(select(Ticket.id).where(Ticket.id == ticket_id, scope))
+    ).scalar_one_or_none()
+    return owned is not None
+
+
 class PortalTicketService:
     def __init__(
         self,
@@ -108,23 +146,12 @@ class PortalTicketService:
     # -- scope -------------------------------------------------------
 
     async def _company_tickets_enabled(self) -> bool:
-        val = await get_setting(self._session, SETTING_COMPANY_TICKETS)
-        return val == "1"
+        return await company_tickets_enabled(self._session)
 
     async def _scope_filter(self, customer: AuthenticatedCustomer) -> ColumnElement[bool]:
-        conditions: list[ColumnElement[bool]] = [Ticket.customer_user_id == customer.login]
-        if await self._company_tickets_enabled():
-            cids: set[str] = {customer.customer_id}
-            rows = await self._session.execute(
-                select(CustomerUserCustomer.customer_id).where(
-                    CustomerUserCustomer.user_id == customer.login
-                )
-            )
-            cids.update(rows.scalars().all())
-            cids.discard(None)
-            if cids:
-                conditions.append(Ticket.customer_id.in_(cids))
-        return or_(*conditions)
+        return await customer_ticket_scope_filter(
+            self._session, login=customer.login, customer_id=customer.customer_id
+        )
 
     async def _get_owned_ticket(self, customer: AuthenticatedCustomer, ticket_id: int) -> Ticket:
         t = (
