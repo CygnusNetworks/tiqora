@@ -56,11 +56,15 @@ export type AdminResourcePageProps<Out, Create, Update> = {
    */
   bulkActions?: AdminBulkAction[];
   /**
-   * Opt-in "Alle" (all rows) page-size option. Requests `allPageSize` rows
-   * (backend must allow that page size — customer-users does). Default off.
+   * Opt-in "Alle" (all rows) page-size option. Uses `allPageSize` as a UI
+   * sentinel only; the client fetches the table in 500-row chunks instead of
+   * one mega-request. Default off.
    */
   allowAllPageSize?: boolean;
-  /** Page size used when "Alle" is selected (default 100_000). */
+  /**
+   * Sentinel value for the "Alle" select option (default 100_000). Not sent to
+   * the backend as a real page_size — see `fetchAllChunked`.
+   */
   allPageSize?: number;
   /**
    * Opt-in server-side column sorting. When true, sortable column headers
@@ -82,7 +86,16 @@ const defaultIsRowValid = (row: unknown): boolean =>
 const VALID_FILTERS: AdminValidFilter[] = ["valid", "invalid", "all"];
 
 const PAGE_SIZE_OPTIONS = [25, 50, 100, 200, 500] as const;
+/**
+ * Sentinel for the "Alle" UI option — not a real backend page_size. When
+ * selected, the client loads the table via `fetchAllChunked` (500-row pages)
+ * so a reverse proxy cannot kill one 100k-row response.
+ */
 const DEFAULT_ALL_PAGE_SIZE = 100_000;
+/** Chunk size for "Alle" client-side concatenation. */
+const ALL_CHUNK_SIZE = 500;
+/** Hard cap on chunk requests (~200k rows) to prevent infinite loops. */
+const ALL_CHUNK_HARD_MAX = 400;
 
 function useDebouncedValue<T>(value: T, delayMs: number): T {
   const [debounced, setDebounced] = useState(value);
@@ -91,6 +104,42 @@ function useDebouncedValue<T>(value: T, delayMs: number): T {
     return () => window.clearTimeout(handle);
   }, [value, delayMs]);
   return debounced;
+}
+
+/**
+ * Fetch every row of an admin list by walking bounded `chunk`-sized pages and
+ * concatenating. Used when the "Alle" page-size option is active so we never
+ * issue a single proxy-killing mega-request.
+ *
+ * Returns a synthetic `AdminPage` with `page: 1` and `page_size: items.length`
+ * so the existing pagination UI (totalPages collapses to 1) keeps working.
+ */
+async function fetchAllChunked<Out>(
+  list: (params?: AdminListParams, signal?: AbortSignal) => Promise<AdminPage<Out>>,
+  baseParams: Omit<AdminListParams, "page" | "pageSize">,
+  signal?: AbortSignal,
+  chunk: number = ALL_CHUNK_SIZE,
+): Promise<AdminPage<Out>> {
+  const first = await list({ ...baseParams, page: 1, pageSize: chunk }, signal);
+  const total = first.total;
+  const items: Out[] = [...first.items];
+
+  if (items.length === 0 || items.length >= total) {
+    return { items, total, page: 1, page_size: items.length };
+  }
+
+  const maxPages = Math.min(Math.ceil(total / chunk), ALL_CHUNK_HARD_MAX);
+  for (let page = 2; page <= maxPages; page++) {
+    if (signal?.aborted) {
+      throw new DOMException("The operation was aborted.", "AbortError");
+    }
+    const next = await list({ ...baseParams, page, pageSize: chunk }, signal);
+    if (next.items.length === 0) break;
+    items.push(...next.items);
+    if (items.length >= total) break;
+  }
+
+  return { items, total, page: 1, page_size: items.length };
 }
 
 /**
@@ -104,7 +153,7 @@ function useDebouncedValue<T>(value: T, delayMs: number): T {
  * - `searchable` — debounced server-side search input
  * - `bulkActions` — row checkboxes + floating bulk action bar
  * - page-size select includes 500 (backend ListParams max)
- * - `allowAllPageSize` — "Alle" option that requests a very large page
+ * - `allowAllPageSize` — "Alle" option that chunk-fetches all rows (500 each)
  * - `sortable` — server-side column header sorting (`sort`/`order`)
  */
 export function AdminResourcePage<Out, Create, Update>({
@@ -171,17 +220,25 @@ export function AdminResourcePage<Out, Create, Update>({
         order: order || undefined,
       },
     ],
-    queryFn: ({ signal }) =>
-      api.list(
+    queryFn: ({ signal }) => {
+      const base = {
+        valid,
+        ...(search ? { search } : {}),
+        ...(sort ? { sort, order } : {}),
+      };
+      // "Alle" is a UI sentinel only — never send allPageSize to the backend.
+      if (allowAllPageSize && pageSize === allPageSize) {
+        return fetchAllChunked(api.list, base, signal);
+      }
+      return api.list(
         {
           page,
           pageSize,
-          valid,
-          ...(search ? { search } : {}),
-          ...(sort ? { sort, order } : {}),
+          ...base,
         },
         signal,
-      ),
+      );
+    },
     placeholderData: keepPreviousData,
   });
 

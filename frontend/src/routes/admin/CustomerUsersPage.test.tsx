@@ -134,14 +134,14 @@ describe("CustomerUsersPage", () => {
     });
   });
 
-  it("offers an Alle page-size option that requests a large page", async () => {
+  it("offers an Alle page-size option that chunk-fetches at pageSize 500", async () => {
     renderPage();
     await waitFor(() => {
       expect(screen.getByTestId("admin-customer-users-page-size")).toBeInTheDocument();
     });
     const select = screen.getByTestId("admin-customer-users-page-size");
     expect(select.querySelector('[data-testid="admin-customer-users-page-size-all"]')).not.toBeNull();
-    // Option label is i18n "All" / "Alle"
+    // Option value stays the 100_000 sentinel; the client never sends that size.
     const allOption = Array.from(select.querySelectorAll("option")).find(
       (o) => o.getAttribute("value") === "100000",
     );
@@ -151,10 +151,15 @@ describe("CustomerUsersPage", () => {
     fireEvent.change(select, { target: { value: "100000" } });
     await waitFor(() => {
       expect(list).toHaveBeenCalledWith(
-        expect.objectContaining({ pageSize: 100_000, page: 1 }),
+        expect.objectContaining({ pageSize: 500, page: 1 }),
         expect.anything(),
       );
     });
+    // Small table (total 2) → single chunk, never a 100k mega-request.
+    expect(list).toHaveBeenCalledTimes(1);
+    expect(list.mock.calls[0][0]).not.toEqual(
+      expect.objectContaining({ pageSize: 100_000 }),
+    );
   });
 
   it("bulk GDPR action navigates to /admin/gdpr with selected logins", async () => {
