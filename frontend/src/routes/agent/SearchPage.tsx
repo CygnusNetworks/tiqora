@@ -3,10 +3,8 @@ import { Link, useNavigate, useSearch } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
 import { api } from "@/lib/api";
 import type { KbSearchHit } from "@/lib/api";
-import { priorityName } from "@/lib/priority";
-import { stateLabel } from "@/lib/status";
 import { Spinner } from "@/components/ui/Spinner";
-import { Badge } from "@/components/ui/Badge";
+import { PriorityChip, StateChip } from "@/components/ui/StatusChip";
 
 export type SearchSearch = { q?: string; offset?: number };
 
@@ -126,8 +124,8 @@ export function SearchPage() {
                   >
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="font-mono text-xs text-accent">{hit.tn}</span>
-                      {hit.state && <Badge tone="muted">{stateLabel(t, hit.state)}</Badge>}
-                      {hit.priority && <Badge>{priorityName(hit.priority)}</Badge>}
+                      <StateChip state={hit.state} />
+                      <PriorityChip priority={hit.priority} />
                       {hit.queue_name && (
                         <span className="text-xs text-muted">{hit.queue_name}</span>
                       )}

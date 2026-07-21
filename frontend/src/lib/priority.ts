@@ -11,7 +11,28 @@ export function priorityName(priority: string | null | undefined): string | null
   return priority.replace(/^\s*\d+\s+/, "");
 }
 
-/** Priority text tone by Znuny priority id (1=lowest … 5=highest). */
+/** Extract the leading numeric rank from a Znuny priority name ("5 very high" → 5). */
+export function priorityIdFromName(priority: string | null | undefined): number | null {
+  if (!priority) return null;
+  const m = priority.match(/^\s*(\d+)\s+/);
+  if (!m) return null;
+  const n = Number(m[1]);
+  return Number.isFinite(n) ? n : null;
+}
+
+/**
+ * CSS colour variable for a Znuny priority id (1=lowest … 5=highest).
+ * Clamps out-of-range ids into 1..5; null/unknown → neutral mid-ramp (3).
+ */
+export function priorityColorVar(priorityId: number | null | undefined): string {
+  if (priorityId == null || !Number.isFinite(priorityId)) {
+    return "var(--color-prio-3)";
+  }
+  const n = Math.min(5, Math.max(1, Math.round(priorityId)));
+  return `var(--color-prio-${n})`;
+}
+
+/** @deprecated Prefer soft-chip colour via `priorityColorVar`. Kept for any residual callers. */
 export function priorityTextClass(priorityId: number | null | undefined): string {
   if (priorityId == null) return "text-ink";
   if (priorityId >= 5) return "text-danger";
