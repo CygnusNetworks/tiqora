@@ -32,6 +32,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from tiqora.channels.email.placeholder import expand_placeholders
 from tiqora.channels.email.smtp import MailSender, build_message
 from tiqora.domain.mail_log import write_mail_log
+from tiqora.domain.quoting import build_ticket_subject
+from tiqora.domain.subject_hook import load_subject_config
 from tiqora.domain.ticket_write_service import ArticleIn, InvalidInput, add_article
 from tiqora.znuny.sysconfig import SysConfig
 
@@ -225,9 +227,32 @@ async def prepare_outgoing_agent_email(
     if not (article.to_address or "").strip():
         raise InvalidInput("Agent email reply requires to_address")
 
+    # Ensure exactly one correct ticket-number hook tag (Znuny TicketSubjectBuild).
+    # Agent's subject already has Re:; strip-then-add keeps this idempotent.
+    subject = article.subject
+    hook_cfg = await load_subject_config(session, sysconfig)
+    if hook_cfg.enabled:
+        tn_row = (
+            await session.execute(
+                text("SELECT tn FROM ticket WHERE id = :tid"),
+                {"tid": ticket_id},
+            )
+        ).first()
+        if tn_row is not None and tn_row[0]:
+            subject = build_ticket_subject(
+                article.subject,
+                hook=hook_cfg.hook,
+                divider=hook_cfg.divider,
+                tn=str(tn_row[0]),
+                subject_format=hook_cfg.subject_format,
+                add_re=False,
+                add_fwd=False,
+            )
+
     return replace(
         article,
         body=body,
+        subject=subject,
         from_address=from_address,
         message_id=message_id,
         in_reply_to=in_reply_to,

@@ -7,7 +7,9 @@ dialog:
   + ``TicketSubjectBuild`` (``znuny-6.5.22/Kernel/System/Ticket.pm``): strip
   any existing ``Re:``/``Aw:``/``Antw:``/``Fwd:``/``Wg:`` prefixes (repeated,
   case-insensitive — Znuny's default ``Ticket::SubjectRe``/``SubjectFwd``
-  plus common German MUA variants) before prepending exactly one.
+  plus common German MUA variants) before prepending exactly one. Also strip
+  a configured ``[<hook><divider><tn>]`` bracket tag so re-building never
+  accumulates tags.
 - Quoted body mirrors the attribution + ``> ``-quoting Znuny's
   ``Kernel::Output::HTML::Layout::_Quote`` / ``TemplateGenerator`` produce
   for plaintext bodies (``On <date>, <from> wrote:`` + each line prefixed).
@@ -24,9 +26,37 @@ from datetime import datetime
 _REPLY_PREFIX_RE = re.compile(r"^\s*(re|aw|antw|fwd|wg)\s*:\s*", re.IGNORECASE)
 
 
-def clean_subject(subject: str | None) -> str:
-    """Strip repeated Re:/Aw:/Antw:/Fwd:/Wg: prefixes from a subject."""
+def strip_ticket_hook(subject: str | None, *, hook: str, divider: str) -> str:
+    """Remove every ``[<hook><divider><digits>]`` tag (case-insensitive).
+
+    Mirrors Znuny's ``TicketSubjectClean`` tag strip so re-building never
+    doubles the ticket number hook. Digits are any run of 1+ digits (tn
+    format is generator-specific; stripping is deliberately permissive).
+    """
+    s = subject or ""
+    if not hook:
+        return s.strip()
+    # Tag may appear leading, trailing, or embedded; strip all occurrences.
+    tag_re = re.compile(
+        r"\s*\[\s*" + re.escape(hook) + re.escape(divider) + r"\d+\s*\]\s*",
+        re.IGNORECASE,
+    )
+    cleaned = tag_re.sub(" ", s)
+    # Collapse whitespace left by mid-string removals.
+    cleaned = re.sub(r"[ \t]{2,}", " ", cleaned)
+    return cleaned.strip()
+
+
+def clean_subject(
+    subject: str | None,
+    *,
+    hook: str | None = None,
+    divider: str | None = None,
+) -> str:
+    """Strip repeated Re:/Aw:/Antw:/Fwd:/Wg: prefixes (and optional hook tag)."""
     s = (subject or "").strip()
+    if hook is not None:
+        s = strip_ticket_hook(s, hook=hook, divider=divider or "")
     while True:
         stripped = _REPLY_PREFIX_RE.sub("", s)
         if stripped == s:
@@ -42,6 +72,51 @@ def build_reply_subject(subject: str | None) -> str:
 def build_forward_subject(subject: str | None) -> str:
     """``Fwd: `` + cleaned subject (never double-prefixed)."""
     return f"Fwd: {clean_subject(subject)}"
+
+
+def build_ticket_subject(
+    subject: str | None,
+    *,
+    hook: str,
+    divider: str,
+    tn: str,
+    subject_format: str = "Left",
+    add_re: bool = False,
+    add_fwd: bool = False,
+) -> str:
+    """Idempotent subject with optional Re:/Fwd: and ticket-number hook tag.
+
+    1. Strip any existing ``[<hook><divider><tn>]`` tag for *hook*.
+    2. Optionally apply exactly one ``Re:`` / ``Fwd:`` via the existing helpers
+       (which also strip repeated reply/forward prefixes).
+    3. Place the tag per *subject_format*:
+       - ``Left`` → ``[<hook><divider><tn>] <subject>``
+       - ``Right`` → ``<subject> [<hook><divider><tn>]``
+       - ``None`` → no tag
+
+    Never double-tags or double-Re-prefixes. When *add_re*/*add_fwd* are both
+    false the subject text is left as-is after the hook strip (agent composers
+    already supply ``Re:``).
+    """
+    base = strip_ticket_hook(subject, hook=hook, divider=divider)
+    if add_re and add_fwd:
+        # Prefer Re: when both requested (should not happen in practice).
+        base = build_reply_subject(base)
+    elif add_re:
+        base = build_reply_subject(base)
+    elif add_fwd:
+        base = build_forward_subject(base)
+    else:
+        base = (base or "").strip()
+
+    fmt = (subject_format or "Left").strip()
+    if fmt.lower() == "none" or not tn:
+        return base
+    tag = f"[{hook}{divider}{tn}]"
+    if fmt.lower() == "right":
+        return f"{base} {tag}".strip() if base else tag
+    # Default / Left
+    return f"{tag} {base}".strip() if base else tag
 
 
 def quote_plaintext_body(

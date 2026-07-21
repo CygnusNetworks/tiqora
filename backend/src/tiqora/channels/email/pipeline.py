@@ -249,11 +249,16 @@ async def _process_message_inner(
             orig_message_id=_msgid(parsed.message_id),
         )
 
+    from tiqora.domain.subject_hook import load_subject_config
+
+    subject_cfg = await load_subject_config(session, sysconfig)
     followup = await detect_followup(
         session,
         sysconfig,
         subject=get_param.get("Subject", ""),
         references=parsed.references,
+        hook=subject_cfg.hook,
+        hook_divider=subject_cfg.divider,
     )
 
     is_visible = True

@@ -24,6 +24,8 @@ ZNUNY_SETTING_DEFAULTS: Final[dict[str, Any]] = {
     "Ticket::NumberGenerator": "Kernel::System::Ticket::Number::DateChecksum",
     "Ticket::Hook": "Ticket#",
     "Ticket::HookDivider": "",
+    # Ticket::SubjectFormat — Left | Right | None (Ticket.xml default Left).
+    "Ticket::SubjectFormat": "Left",
     "Ticket::IndexModule": "Kernel::System::Ticket::IndexAccelerator::RuntimeDB",
     "OTRSTimeZone": "UTC",
     "DefaultLanguage": "en",
@@ -152,6 +154,10 @@ class SysConfig:
 
     async def ticket_hook_divider(self) -> str:
         return await self.get_str("Ticket::HookDivider")
+
+    async def ticket_subject_format(self) -> str:
+        """Return ``Ticket::SubjectFormat`` (``Left`` / ``Right`` / ``None``)."""
+        return await self.get_str("Ticket::SubjectFormat")
 
     async def ticket_index_module(self) -> str:
         return await self.get_str("Ticket::IndexModule")

@@ -1498,6 +1498,27 @@ export interface paths {
         patch: operations["update_state_api_v1_admin_states__state_id__patch"];
         trace?: never;
     };
+    "/api/v1/admin/subject-config": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Subject Config */
+        get: operations["get_subject_config_api_v1_admin_subject_config_get"];
+        /**
+         * Put Subject Config
+         * @description Upsert the four Tiqora override keys. Empty string / null clears.
+         */
+        put: operations["put_subject_config_api_v1_admin_subject_config_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/templates": {
         parameters: {
             query?: never;
@@ -6437,6 +6458,65 @@ export interface components {
             type_id?: number | null;
             /** Valid Id */
             valid_id?: number | null;
+        };
+        /**
+         * SubjectConfigOut
+         * @description Effective subject-hook config plus Znuny baseline and raw overrides.
+         */
+        SubjectConfigOut: {
+            /** Divider */
+            divider: string;
+            /** Enabled */
+            enabled: boolean;
+            /** Hook */
+            hook: string;
+            overrides: components["schemas"]["SubjectHookOverridesOut"];
+            /** Subject Format */
+            subject_format: string;
+            znuny: components["schemas"]["SubjectHookZnunyOut"];
+        };
+        /**
+         * SubjectConfigUpdate
+         * @description Upsert Tiqora overrides. Empty string / null clears an override.
+         *
+         *     ``enabled`` null clears the override (reverts to default True).
+         *     ``subject_format`` must be Left, Right, or None when set.
+         */
+        SubjectConfigUpdate: {
+            /** Divider */
+            divider?: string | null;
+            /** Enabled */
+            enabled?: boolean | null;
+            /** Hook */
+            hook?: string | null;
+            /** Subject Format */
+            subject_format?: string | null;
+        };
+        /**
+         * SubjectHookOverridesOut
+         * @description Raw Tiqora overrides; ``None`` means the field is not overridden.
+         */
+        SubjectHookOverridesOut: {
+            /** Divider */
+            divider?: string | null;
+            /** Enabled */
+            enabled?: boolean | null;
+            /** Hook */
+            hook?: string | null;
+            /** Subject Format */
+            subject_format?: string | null;
+        };
+        /**
+         * SubjectHookZnunyOut
+         * @description Underlying Znuny SysConfig values (never written by Tiqora).
+         */
+        SubjectHookZnunyOut: {
+            /** Divider */
+            divider: string;
+            /** Hook */
+            hook: string;
+            /** Subject Format */
+            subject_format: string;
         };
         /** TOTPCodeIn */
         TOTPCodeIn: {
@@ -11577,6 +11657,76 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["StateOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_subject_config_api_v1_admin_subject_config_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SubjectConfigOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    put_subject_config_api_v1_admin_subject_config_put: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SubjectConfigUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SubjectConfigOut"];
                 };
             };
             /** @description Validation Error */

@@ -113,6 +113,11 @@ const NAV_GROUPS: NavGroup[] = [
         labelKey: "admin.nav.mailLog",
         testId: "admin-nav-mail-log",
       },
+      {
+        to: "/admin/subject-config",
+        labelKey: "admin.nav.subjectConfig",
+        testId: "admin-nav-subject-config",
+      },
     ],
   },
   {
