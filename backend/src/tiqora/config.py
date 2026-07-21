@@ -1,9 +1,27 @@
 """Application settings loaded from environment variables."""
 
-from functools import lru_cache
+from __future__ import annotations
 
-from pydantic import Field
+from functools import lru_cache
+from typing import Self
+
+from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+# Public constant so tests and startup guards share one source of truth.
+DEFAULT_SECRET_KEY = "change-me-in-production-use-openssl-rand"
+#: Known-insecure Meilisearch master keys (dev compose + example fallbacks).
+INSECURE_MEILI_MASTER_KEYS: frozenset[str] = frozenset(
+    {
+        "tiqora-dev-master-key",
+        "change-me-meili-master-key",
+    }
+)
+MIN_PRODUCTION_SECRET_KEY_LEN = 32
+
+
+class ProductionConfigError(RuntimeError):
+    """Raised when production settings are unsafe and the process must not start."""
 
 
 class Settings(BaseSettings):
@@ -22,7 +40,7 @@ class Settings(BaseSettings):
     debug: bool = Field(default=False, validation_alias="TIQORA_DEBUG")
     log_level: str = Field(default="INFO", validation_alias="TIQORA_LOG_LEVEL")
     secret_key: str = Field(
-        default="change-me-in-production-use-openssl-rand",
+        default=DEFAULT_SECRET_KEY,
         validation_alias="TIQORA_SECRET_KEY",
     )
 
@@ -77,6 +95,8 @@ class Settings(BaseSettings):
         default=86400,
         validation_alias="TIQORA_SESSION_TTL",
     )
+    # Default False for local/dev HTTP; flipped to True in production when
+    # TIQORA_SESSION_COOKIE_SECURE is unset (see _default_session_cookie_secure).
     session_cookie_secure: bool = Field(
         default=False,
         validation_alias="TIQORA_SESSION_COOKIE_SECURE",
@@ -85,6 +105,16 @@ class Settings(BaseSettings):
         default="lax",
         validation_alias="TIQORA_SESSION_COOKIE_SAMESITE",
     )
+
+    # Prometheus /metrics on the public app port. Keep True so existing internal
+    # scrapes and tests keep working; set TIQORA_METRICS_ENABLED=0 when the app
+    # port is internet-facing and metrics are scraped only via a private path.
+    metrics_enabled: bool = Field(default=True, validation_alias="TIQORA_METRICS_ENABLED")
+
+    # App-level Content-Security-Policy for the SPA. Report-only by default so a
+    # too-strict policy cannot break the React UI; set TIQORA_CSP_ENFORCE=1 only
+    # after verifying CSP reports are clean in your deployment.
+    csp_enforce: bool = Field(default=False, validation_alias="TIQORA_CSP_ENFORCE")
 
     # Customer portal sessions (Redis, separate opaque token/cookie from agent
     # sessions — same store/TTL/secure/samesite knobs are reused for simplicity).
@@ -257,6 +287,75 @@ class Settings(BaseSettings):
     @property
     def is_mysql(self) -> bool:
         return self.database_url.startswith("mysql")
+
+    @property
+    def is_production(self) -> bool:
+        return self.environment == "production"
+
+    @model_validator(mode="after")
+    def _default_session_cookie_secure(self) -> Self:
+        """Default Secure cookies in production when the env var is unset.
+
+        Explicit ``TIQORA_SESSION_COOKIE_SECURE`` (or constructor kwarg) always
+        wins — operators can still force false for edge cases (e.g. TLS only at
+        an outer proxy with plain HTTP to the container is *not* recommended).
+        """
+        if "session_cookie_secure" not in self.model_fields_set:
+            object.__setattr__(self, "session_cookie_secure", self.is_production)
+        return self
+
+    def validate_production(self) -> None:
+        """Hard-fail on unsafe production settings; no-op outside production.
+
+        Intended to run once at process start (app factory). Never raises when
+        ``environment != "production"`` so dev/tests keep working with defaults.
+        """
+        if not self.is_production:
+            return
+
+        errors: list[str] = []
+
+        if self.secret_key == DEFAULT_SECRET_KEY:
+            errors.append(
+                "TIQORA_SECRET_KEY is still the insecure default "
+                f"({DEFAULT_SECRET_KEY!r}). Generate a strong secret, e.g. "
+                "`openssl rand -hex 32`, and set TIQORA_SECRET_KEY."
+            )
+        elif len(self.secret_key) < MIN_PRODUCTION_SECRET_KEY_LEN:
+            errors.append(
+                f"TIQORA_SECRET_KEY is too short ({len(self.secret_key)} chars; "
+                f"need at least {MIN_PRODUCTION_SECRET_KEY_LEN}). "
+                "Generate with e.g. `openssl rand -hex 32`."
+            )
+
+        if self.debug:
+            errors.append(
+                "TIQORA_DEBUG=true is not allowed in production "
+                "(set TIQORA_DEBUG=false or unset it)."
+            )
+
+        if "*" in self.cors_origin_list:
+            errors.append(
+                "TIQORA_CORS_ORIGINS must not contain '*' in production "
+                "(credentialed CORS with a wildcard origin is unsafe). "
+                "List explicit origins, e.g. https://helpdesk.example.com."
+            )
+
+        # Meili is the search backend for every standard deployment; reject
+        # known placeholder master keys so a copy-paste compose cannot ship
+        # with a public index key.
+        if self.meili_master_key in INSECURE_MEILI_MASTER_KEYS:
+            errors.append(
+                "MEILI_MASTER_KEY is a known development/default value. "
+                "Set a unique production master key shared only with Meilisearch "
+                "and Tiqora (e.g. `openssl rand -hex 32`)."
+            )
+
+        if errors:
+            joined = "\n  - ".join(errors)
+            raise ProductionConfigError(
+                f"Refusing to start with unsafe production configuration:\n  - {joined}"
+            )
 
 
 @lru_cache

@@ -39,18 +39,18 @@ are the code defaults, not necessarily sane production values.
 | Variable | Default | Notes |
 |---|---|---|
 | `TIQORA_ENV` | `development` | Set to `production` in deployment. |
-| `TIQORA_DEBUG` | `false` | Never `true` in production (verbose errors). |
+| `TIQORA_DEBUG` | `false` | Never `true` in production (verbose errors). **Startup hard-fails** if true when `TIQORA_ENV=production`. |
 | `TIQORA_LOG_LEVEL` | `INFO` | Standard Python logging levels. |
-| `TIQORA_SECRET_KEY` | *(insecure placeholder)* | **Must** be overridden — generate with `openssl rand -hex 32`. Used for session/token signing. |
+| `TIQORA_SECRET_KEY` | *(insecure placeholder)* | **Must** be overridden — generate with `openssl rand -hex 32`. Used for Fernet at-rest encryption (SMTP passwords, TOTP seeds, channel credentials). **Startup hard-fails** in production if still the default or shorter than 32 characters. |
 
 ### Data stores
 
 | Variable | Default | Notes |
 |---|---|---|
 | `DATABASE_URL` | `postgresql+asyncpg://tiqora:tiqora@localhost:5432/tiqora` | Async SQLAlchemy URL. PostgreSQL: `postgresql+asyncpg://...`. MariaDB/MySQL: `mysql+aiomysql://...`. Enable only one DB service. |
-| `REDIS_URL` | `redis://localhost:6379/0` | |
+| `REDIS_URL` | `redis://localhost:6379/0` | Compose example requires `REDIS_PASSWORD` and uses `redis://:${REDIS_PASSWORD}@redis:6379/0`. |
 | `MEILI_URL` | `http://localhost:7700` | |
-| `MEILI_MASTER_KEY` | `tiqora-dev-master-key` | **Must** be overridden in production; shared between `meilisearch` and every Tiqora process that talks to it. |
+| `MEILI_MASTER_KEY` | `tiqora-dev-master-key` | **Must** be overridden in production; shared between `meilisearch` and every Tiqora process that talks to it. **Startup hard-fails** if still a known dev/default value when `TIQORA_ENV=production`. |
 | `MEILI_TICKETS_INDEX` | `tickets` | |
 | `MEILI_KB_INDEX` | `kb` | |
 
@@ -58,7 +58,9 @@ are the code defaults, not necessarily sane production values.
 
 | Variable | Default | Notes |
 |---|---|---|
-| `TIQORA_CORS_ORIGINS` | `http://localhost:5173,http://localhost:8000` | Comma-separated origin list for the frontend. Set to your real UI origin(s), e.g. `https://tickets.example.com`. |
+| `TIQORA_CORS_ORIGINS` | `http://localhost:5173,http://localhost:8000` | Comma-separated origin list for the frontend. Set to your real UI origin(s), e.g. `https://tickets.example.com`. **Startup hard-fails** if the list contains `*` when `TIQORA_ENV=production` (credentialed wildcard CORS). |
+| `TIQORA_METRICS_ENABLED` | `true` | Expose Prometheus `GET /metrics` on the app port. Keep `true` for internal scrapes; set `false` if the app port is internet-facing and metrics must not be public (nginx deny is still recommended). |
+| `TIQORA_CSP_ENFORCE` | `false` | When `false` (default), the SPA CSP is sent as `Content-Security-Policy-Report-Only` so a too-strict policy cannot brick the UI. Set `true` only after verifying CSP reports are clean. |
 
 ### Sessions
 
@@ -66,7 +68,7 @@ are the code defaults, not necessarily sane production values.
 |---|---|---|
 | `TIQORA_SESSION_COOKIE` | `tiqora_session` | Agent session cookie name. |
 | `TIQORA_SESSION_TTL` | `86400` (seconds) | |
-| `TIQORA_SESSION_COOKIE_SECURE` | `false` | **Set to `true`** once served over HTTPS (always, in production). |
+| `TIQORA_SESSION_COOKIE_SECURE` | `false` in non-production; **`true` when `TIQORA_ENV=production` and the var is unset** | Override explicitly if needed. Always use Secure cookies behind HTTPS. |
 | `TIQORA_SESSION_COOKIE_SAMESITE` | `lax` | |
 | `TIQORA_CUSTOMER_SESSION_COOKIE` | `tiqora_customer_session` | Separate cookie for the customer portal; reuses the TTL/secure/samesite settings above. |
 

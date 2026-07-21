@@ -1,9 +1,25 @@
 # Tiqora deployment example (NOT production-hardened)
 #
-# Copy to docker-compose.yml, set secrets, and review network/TLS at your reverse proxy.
+# Copy to docker-compose.yml, set secrets in a sibling .env, and review
+# network/TLS at your reverse proxy before production traffic.
+#
+# Required .env variables (compose refuses to start if any are missing):
+#   POSTGRES_PASSWORD
+#   REDIS_PASSWORD
+#   MEILI_MASTER_KEY
+#   TIQORA_SECRET_KEY
+# Optional:
+#   TIQORA_CORS_ORIGINS   (default: https://helpdesk.example.com)
+#   MYSQL_PASSWORD / MYSQL_ROOT_PASSWORD  (only if using the mariadb service)
+#
 # Images: ghcr.io/cygnusnetworks/tiqora  (or docker.io/cygnusnetworks/tiqora)
 #
-# Database choice: enable EITHER postgres OR mariadb (not both), and set DATABASE_URL accordingly.
+# Database choice: enable EITHER postgres OR mariadb (not both), and set
+# DATABASE_URL accordingly.
+#
+# Ports 8000/8001 are bound to 127.0.0.1 so only a local reverse proxy (or
+# host-local scrape) can reach them. Change the bind if you intentionally
+# expose the app without a proxy (not recommended).
 
 services:
   # --- Option A: PostgreSQL ---
@@ -13,13 +29,12 @@ services:
     environment:
       POSTGRES_DB: tiqora
       POSTGRES_USER: tiqora
-      # CHANGE ME
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change-me}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
     volumes:
       - tiqora_pg:/var/lib/postgresql/data
     # Do not publish DB ports publicly in production.
     # ports:
-    #   - "5432:5432"
+    #   - "127.0.0.1:5432:5432"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U tiqora -d tiqora"]
       interval: 10s
@@ -33,8 +48,8 @@ services:
   #   environment:
   #     MYSQL_DATABASE: tiqora
   #     MYSQL_USER: tiqora
-  #     MYSQL_PASSWORD: ${MYSQL_PASSWORD:-change-me}
-  #     MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-change-me-root}
+  #     MYSQL_PASSWORD: ${MYSQL_PASSWORD:?set MYSQL_PASSWORD in .env}
+  #     MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?set MYSQL_ROOT_PASSWORD in .env}
   #   volumes:
   #     - tiqora_mysql:/var/lib/mysql
   #   command:
@@ -49,10 +64,14 @@ services:
   redis:
     image: redis:7-alpine
     restart: unless-stopped
+    command:
+      - redis-server
+      - --requirepass
+      - ${REDIS_PASSWORD:?set REDIS_PASSWORD in .env}
     volumes:
       - tiqora_redis:/data
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:?set REDIS_PASSWORD in .env}", "ping"]
       interval: 10s
       timeout: 3s
       retries: 10
@@ -62,8 +81,7 @@ services:
     restart: unless-stopped
     environment:
       MEILI_ENV: production
-      # CHANGE ME — required in production
-      MEILI_MASTER_KEY: ${MEILI_MASTER_KEY:-change-me-meili-master-key}
+      MEILI_MASTER_KEY: ${MEILI_MASTER_KEY:?set MEILI_MASTER_KEY in .env}
       MEILI_NO_ANALYTICS: "true"
     volumes:
       - tiqora_meili:/meili_data
@@ -83,18 +101,24 @@ services:
     command: ["api"]
     environment:
       # PostgreSQL:
-      DATABASE_URL: postgresql+asyncpg://tiqora:${POSTGRES_PASSWORD:-change-me}@postgres:5432/tiqora
+      DATABASE_URL: postgresql+asyncpg://tiqora:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}@postgres:5432/tiqora
       # MariaDB alternative:
-      # DATABASE_URL: mysql+aiomysql://tiqora:${MYSQL_PASSWORD:-change-me}@mariadb:3306/tiqora
-      REDIS_URL: redis://redis:6379/0
+      # DATABASE_URL: mysql+aiomysql://tiqora:${MYSQL_PASSWORD:?set MYSQL_PASSWORD in .env}@mariadb:3306/tiqora
+      REDIS_URL: redis://:${REDIS_PASSWORD:?set REDIS_PASSWORD in .env}@redis:6379/0
       MEILI_URL: http://meilisearch:7700
-      MEILI_MASTER_KEY: ${MEILI_MASTER_KEY:-change-me-meili-master-key}
-      TIQORA_SECRET_KEY: ${TIQORA_SECRET_KEY:-change-me-use-openssl-rand-hex-32}
+      MEILI_MASTER_KEY: ${MEILI_MASTER_KEY:?set MEILI_MASTER_KEY in .env}
+      TIQORA_SECRET_KEY: ${TIQORA_SECRET_KEY:?set TIQORA_SECRET_KEY in .env}
       TIQORA_ENV: production
       TIQORA_LOG_LEVEL: INFO
+      # Secure session cookies (HTTPS). Override only if you know why.
+      TIQORA_SESSION_COOKIE_SECURE: "true"
       TIQORA_CORS_ORIGINS: ${TIQORA_CORS_ORIGINS:-https://helpdesk.example.com}
       # Keep false until post-cutover schema ownership (Phase 5)
       TIQORA_SCHEMA_OWNERSHIP: "false"
+      # Optional: disable public /metrics if scrape is only via private network
+      # TIQORA_METRICS_ENABLED: "false"
+      # Optional: enforce CSP (default is report-only — safer for SPA)
+      # TIQORA_CSP_ENFORCE: "true"
       # Kerberos / SPNEGO (optional). Image ships gssapi + libkrb5; stays inert
       # until enabled. Prod SPN: HTTP/tiqora.cygnusnetworks.de@CYGNUSNETWORKS.DE
       # TIQORA_SPNEGO_ENABLED: "true"
@@ -107,7 +131,7 @@ services:
     #   # `default_realm = CYGNUSNETWORKS.DE` can still help.
     #   - ./secrets/krb5.conf:/etc/krb5.conf:ro
     ports:
-      - "8000:8000"
+      - "127.0.0.1:8000:8000"
     depends_on:
       postgres:
         condition: service_healthy
@@ -126,11 +150,11 @@ services:
     restart: unless-stopped
     command: ["worker"]
     environment:
-      DATABASE_URL: postgresql+asyncpg://tiqora:${POSTGRES_PASSWORD:-change-me}@postgres:5432/tiqora
-      REDIS_URL: redis://redis:6379/0
+      DATABASE_URL: postgresql+asyncpg://tiqora:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}@postgres:5432/tiqora
+      REDIS_URL: redis://:${REDIS_PASSWORD:?set REDIS_PASSWORD in .env}@redis:6379/0
       MEILI_URL: http://meilisearch:7700
-      MEILI_MASTER_KEY: ${MEILI_MASTER_KEY:-change-me-meili-master-key}
-      TIQORA_SECRET_KEY: ${TIQORA_SECRET_KEY:-change-me-use-openssl-rand-hex-32}
+      MEILI_MASTER_KEY: ${MEILI_MASTER_KEY:?set MEILI_MASTER_KEY in .env}
+      TIQORA_SECRET_KEY: ${TIQORA_SECRET_KEY:?set TIQORA_SECRET_KEY in .env}
       TIQORA_ENV: production
       TIQORA_LOG_LEVEL: INFO
     depends_on:
@@ -150,15 +174,15 @@ services:
     restart: unless-stopped
     command: ["mcp"]
     environment:
-      DATABASE_URL: postgresql+asyncpg://tiqora:${POSTGRES_PASSWORD:-change-me}@postgres:5432/tiqora
-      REDIS_URL: redis://redis:6379/0
+      DATABASE_URL: postgresql+asyncpg://tiqora:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}@postgres:5432/tiqora
+      REDIS_URL: redis://:${REDIS_PASSWORD:?set REDIS_PASSWORD in .env}@redis:6379/0
       MEILI_URL: http://meilisearch:7700
-      MEILI_MASTER_KEY: ${MEILI_MASTER_KEY:-change-me-meili-master-key}
-      TIQORA_SECRET_KEY: ${TIQORA_SECRET_KEY:-change-me-use-openssl-rand-hex-32}
+      MEILI_MASTER_KEY: ${MEILI_MASTER_KEY:?set MEILI_MASTER_KEY in .env}
+      TIQORA_SECRET_KEY: ${TIQORA_SECRET_KEY:?set TIQORA_SECRET_KEY in .env}
       TIQORA_ENV: production
       TIQORA_LOG_LEVEL: INFO
     ports:
-      - "8001:8001"
+      - "127.0.0.1:8001:8001"
     depends_on:
       - tiqora-api
     healthcheck:
@@ -173,8 +197,8 @@ services:
   # mailpit:
   #   image: axllent/mailpit:latest
   #   ports:
-  #     - "8025:8025"
-  #     - "1025:1025"
+  #     - "127.0.0.1:8025:8025"
+  #     - "127.0.0.1:1025:1025"
 
 volumes:
   tiqora_pg:

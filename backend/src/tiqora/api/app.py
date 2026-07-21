@@ -5,7 +5,7 @@ from contextlib import asynccontextmanager
 
 import redis.asyncio as redis
 import structlog
-from fastapi import FastAPI, Response
+from fastapi import FastAPI, HTTPException, Response
 from fastapi.middleware.cors import CORSMiddleware
 from prometheus_client import CONTENT_TYPE_LATEST, Counter, Gauge, Histogram, generate_latest
 from starlette.requests import Request
@@ -52,6 +52,25 @@ INDEX_DOCS = Counter(
 
 CallNext = Callable[[Request], Awaitable[StarletteResponse]]
 
+# Conservative SPA CSP. Inline styles are required (many React style= props);
+# scripts stay 'self' only (vite production build has no inline scripts).
+# Article HTML is rendered in a sandboxed iframe with its own CSP meta tag —
+# that nested document is not governed by this parent policy for its own
+# content, but frame-src must still allow the iframe itself.
+_SPA_CSP = (
+    "default-src 'self'; "
+    "base-uri 'self'; "
+    "form-action 'self'; "
+    "frame-ancestors 'self'; "
+    "object-src 'none'; "
+    "script-src 'self'; "
+    "style-src 'self' 'unsafe-inline'; "
+    "img-src 'self' data: blob:; "
+    "font-src 'self' data:; "
+    "connect-src 'self'; "
+    "frame-src 'self' blob:;"
+)
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
@@ -81,12 +100,20 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 def create_app(settings: Settings | None = None) -> FastAPI:
     """Build and return the FastAPI application."""
     cfg = settings or get_settings()
+    # Production-only hard fail on weak secrets / debug / wildcard CORS / etc.
+    # No-op in development and test so defaults remain usable.
+    cfg.validate_production()
 
+    is_prod = cfg.is_production
     app = FastAPI(
         title=cfg.app_name,
         version=__version__,
         description="Tiqora ticket system API.",
         lifespan=lifespan,
+        # H-05: do not expose OpenAPI/Swagger on production deployments.
+        docs_url=None if is_prod else "/docs",
+        redoc_url=None if is_prod else "/redoc",
+        openapi_url=None if is_prod else "/openapi.json",
     )
     app.state.settings = cfg
 
@@ -97,6 +124,26 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
+
+    @app.middleware("http")
+    async def security_headers_middleware(
+        request: Request, call_next: CallNext
+    ) -> StarletteResponse:
+        """M-03: defense-in-depth security headers (proxy may also set some)."""
+        response = await call_next(request)
+        response.headers.setdefault("X-Content-Type-Options", "nosniff")
+        response.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
+        response.headers.setdefault(
+            "Permissions-Policy",
+            "geolocation=(), camera=(), microphone=()",
+        )
+        # CSP: report-only by default so a policy drift cannot brick the SPA;
+        # set TIQORA_CSP_ENFORCE=1 after verifying reports are clean.
+        csp_header = (
+            "Content-Security-Policy" if cfg.csp_enforce else "Content-Security-Policy-Report-Only"
+        )
+        response.headers.setdefault(csp_header, _SPA_CSP)
+        return response
 
     @app.middleware("http")
     async def metrics_middleware(request: Request, call_next: CallNext) -> StarletteResponse:
@@ -151,10 +198,21 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             "version": __version__,
         }
 
-    @app.get("/metrics", tags=["ops"])
-    async def metrics() -> Response:
-        """Prometheus metrics exposition."""
-        return Response(content=generate_latest(), media_type=CONTENT_TYPE_LATEST)
+    # H-04: keep /metrics registered when enabled (default) so internal scrapes
+    # and tests keep working; operators can disable with TIQORA_METRICS_ENABLED=0
+    # when the public app port must not expose metrics (nginx deny is still the
+    # primary control in prod).
+    if cfg.metrics_enabled:
+
+        @app.get("/metrics", tags=["ops"])
+        async def metrics() -> Response:
+            """Prometheus metrics exposition."""
+            return Response(content=generate_latest(), media_type=CONTENT_TYPE_LATEST)
+    else:
+
+        @app.get("/metrics", tags=["ops"], include_in_schema=False)
+        async def metrics_disabled() -> Response:
+            raise HTTPException(status_code=404, detail="Not found")
 
     # When the api serves the built SPA, "/" must return index.html — so only
     # register the JSON root when the SPA is not mounted (dev/tests, or
