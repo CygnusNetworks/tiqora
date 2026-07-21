@@ -131,7 +131,60 @@ async def get_totp_service(
     return TOTPService(session, settings)
 
 
+async def get_current_user_or_enroll(
+    request: Request,
+    auth: Annotated[AuthService, Depends(get_auth_service)],
+    settings: Annotated[Settings, Depends(get_app_settings)],
+    session: Annotated[AsyncSession, Depends(get_db)],
+    authorization: Annotated[str | None, Header()] = None,
+    tiqora_session: Annotated[str | None, Cookie(alias="tiqora_session")] = None,
+) -> AuthenticatedUser:
+    """Resolve a full session **or** a must-enroll-2FA session.
+
+    Used only by ``/auth/totp/enroll``, ``/auth/totp/enroll/qr`` and
+    ``/auth/totp/confirm`` so a restricted ENROLL cookie can complete forced
+    enrollment. Marks ``request.state.enroll_token`` when the cookie is an
+    enroll session so confirm can promote it.
+    """
+    cookie_token = tiqora_session
+    if cookie_token is None:
+        cookie_token = request.cookies.get(settings.session_cookie_name)
+
+    resolved: AuthenticatedUser | None = None
+    if cookie_token:
+        resolved = await auth.resolve_session(cookie_token)
+        if resolved is not None:
+            request.state.session_token = cookie_token
+        else:
+            enroll = await auth.get_enroll_session(cookie_token)
+            if enroll is not None:
+                user_id, login = enroll
+                user = await auth.get_user_by_id(user_id)
+                if user is not None and user.login == login:
+                    resolved = user
+                    request.state.enroll_token = cookie_token
+                    request.state.session_token = cookie_token
+
+    if resolved is None and authorization and authorization.lower().startswith("bearer "):
+        raw = authorization[7:].strip()
+        if raw:
+            resolved = await auth.resolve_api_key(raw)
+            if resolved is None:
+                resolved = await auth.resolve_session(raw)
+
+    await session.rollback()
+
+    if resolved is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Not authenticated",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    return resolved
+
+
 CurrentUser = Annotated[AuthenticatedUser, Depends(get_current_user)]
+EnrollableUser = Annotated[AuthenticatedUser, Depends(get_current_user_or_enroll)]
 DbSession = Annotated[AsyncSession, Depends(get_db)]
 AppSettings = Annotated[Settings, Depends(get_app_settings)]
 TOTPServiceDep = Annotated[TOTPService, Depends(get_totp_service)]

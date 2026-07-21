@@ -11,7 +11,7 @@ import pytest
 from httpx import ASGITransport, AsyncClient
 
 from tiqora.api.app import create_app
-from tiqora.api.deps import get_current_user, get_totp_service
+from tiqora.api.deps import get_current_user_or_enroll, get_totp_service
 from tiqora.config import Settings
 from tiqora.domain.auth import AuthenticatedUser
 from tiqora.domain.totp_qr import totp_qr_svg
@@ -45,7 +45,7 @@ async def test_totp_enroll_qr_returns_svg_for_pending_enrollment() -> None:
     app = create_app(settings)
     pending_uri = "otpauth://totp/Tiqora:alice?secret=JBSWY3DPEHPK3PXP&issuer=Tiqora"
 
-    app.dependency_overrides[get_current_user] = _fake_user
+    app.dependency_overrides[get_current_user_or_enroll] = _fake_user
     app.dependency_overrides[get_totp_service] = lambda: _FakeTOTPService(pending_uri)
     try:
         transport = ASGITransport(app=app)
@@ -63,7 +63,7 @@ async def test_totp_enroll_qr_404_without_pending_enrollment() -> None:
     settings = Settings(secret_key="unit-test-secret-key")
     app = create_app(settings)
 
-    app.dependency_overrides[get_current_user] = _fake_user
+    app.dependency_overrides[get_current_user_or_enroll] = _fake_user
     app.dependency_overrides[get_totp_service] = lambda: _FakeTOTPService(None)
     try:
         transport = ASGITransport(app=app)

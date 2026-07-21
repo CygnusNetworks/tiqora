@@ -127,6 +127,42 @@ class SessionStore:
         await self.delete(token)
         return await self.create(user_id, login, avatar_url=avatar_url)
 
+    async def create_enroll(self, user_id: int, login: str, ttl_seconds: int) -> str:
+        """Create a short-lived 'must-enroll-2FA' session (not resolvable by :meth:`get`).
+
+        Mirrored after :meth:`create_pending`: the ``ENROLL:`` prefix makes the
+        payload invisible to normal ``resolve_session`` / ``get_current_user``
+        and only readable via :meth:`get_enroll`. Callers use this after
+        password login when 2FA is enforced but the agent has not enrolled yet.
+        """
+        token = secrets.token_urlsafe(32)
+        payload = f"ENROLL:{user_id}:{login}"
+        await self._client.set(self._key(token), payload, ex=ttl_seconds)
+        return token
+
+    async def get_enroll(self, token: str) -> tuple[int, str] | None:
+        raw = await self._client.get(self._key(token))
+        if raw is None:
+            return None
+        if isinstance(raw, bytes):
+            raw = raw.decode("utf-8")
+        if not raw.startswith("ENROLL:"):
+            return None
+        try:
+            _, user_id_s, login = raw.split(":", 2)
+            return int(user_id_s), login
+        except (ValueError, TypeError):
+            return None
+
+    async def promote_enroll(self, token: str, *, avatar_url: str | None = None) -> str | None:
+        """Verify+consume an enroll session and issue a full session token."""
+        data = await self.get_enroll(token)
+        if data is None:
+            return None
+        user_id, login = data
+        await self.delete(token)
+        return await self.create(user_id, login, avatar_url=avatar_url)
+
 
 def hash_api_key(raw_key: str) -> str:
     """SHA-256 hex digest of the opaque API key (never store plaintext)."""
@@ -272,6 +308,36 @@ class AuthService:
         if user is None:
             return None
         new_token = await self._sessions.promote_pending(token, avatar_url=avatar_url)
+        if new_token is None:
+            return None
+        return new_token, await self._user_from_row(
+            user, auth_method="session", avatar_url=avatar_url
+        )
+
+    async def get_enroll_session(self, token: str) -> tuple[int, str] | None:
+        return await self._sessions.get_enroll(token)
+
+    async def create_enroll_session(self, user: AuthenticatedUser) -> str:
+        """Create a short-lived must-enroll-2FA session (password login step)."""
+        return await self._sessions.create_enroll(
+            user.id, user.login, self._settings.totp_pending_ttl_seconds
+        )
+
+    async def promote_enroll_session(
+        self, token: str, *, avatar_url: str | None = None
+    ) -> tuple[str, AuthenticatedUser] | None:
+        """Verify an enroll session still exists and issue a full session token."""
+        enroll = await self._sessions.get_enroll(token)
+        if enroll is None:
+            return None
+        user_id, login = enroll
+        result = await self._session.execute(
+            select(Users).where(Users.id == user_id, Users.login == login, Users.valid_id == 1)
+        )
+        user = result.scalar_one_or_none()
+        if user is None:
+            return None
+        new_token = await self._sessions.promote_enroll(token, avatar_url=avatar_url)
         if new_token is None:
             return None
         return new_token, await self._user_from_row(
