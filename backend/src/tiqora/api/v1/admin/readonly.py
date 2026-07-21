@@ -16,15 +16,21 @@ from tiqora.api.deps import DbSession
 from tiqora.api.v1.admin.deps import AdminUser
 from tiqora.api.v1.admin.schemas import (
     AclOut,
+    FollowUpPossibleOut,
     GenericAgentJobOut,
     PostmasterFilterOut,
     PostmasterFilterRuleOut,
     StateTypeOut,
+    SystemAddressOut,
 )
 from tiqora.db.legacy.config import Acl, GenericAgentJobs, PostmasterFilter
+from tiqora.db.legacy.queue import FollowUpPossible, SystemAddress
 from tiqora.db.legacy.ticket import TicketStateType
 
 router = APIRouter(tags=["admin:readonly"])
+
+# Znuny ``valid`` list id — 1 == valid (matches agent reference endpoints).
+_VALID = 1
 
 
 @router.get("/state-types", response_model=list[StateTypeOut])
@@ -32,6 +38,30 @@ async def list_state_types(admin: AdminUser, session: DbSession) -> list[TicketS
     """Reference list for resolving a state's ``type_id`` to a name."""
     _ = admin
     result = await session.execute(select(TicketStateType).order_by(TicketStateType.id))
+    return list(result.scalars().all())
+
+
+@router.get("/system-addresses", response_model=list[SystemAddressOut])
+async def list_system_addresses(admin: AdminUser, session: DbSession) -> list[SystemAddress]:
+    """Valid system addresses for queue / auto-response From pickers."""
+    _ = admin
+    result = await session.execute(
+        select(SystemAddress)
+        .where(SystemAddress.valid_id == _VALID)
+        .order_by(SystemAddress.value1, SystemAddress.value0)
+    )
+    return list(result.scalars().all())
+
+
+@router.get("/follow-up-possible", response_model=list[FollowUpPossibleOut])
+async def list_follow_up_possible(admin: AdminUser, session: DbSession) -> list[FollowUpPossible]:
+    """Valid follow-up options for the queue editor (possible / reject / new ticket)."""
+    _ = admin
+    result = await session.execute(
+        select(FollowUpPossible)
+        .where(FollowUpPossible.valid_id == _VALID)
+        .order_by(FollowUpPossible.id)
+    )
     return list(result.scalars().all())
 
 

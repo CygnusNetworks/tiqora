@@ -151,6 +151,8 @@ export {
   type PostmasterFilterOut,
   type AclOut,
   type GenericAgentJobOut,
+  type SystemAddressOut,
+  type FollowUpPossibleOut,
   // Stats
   type TicketVolumeOut,
   type VolumePointOut,

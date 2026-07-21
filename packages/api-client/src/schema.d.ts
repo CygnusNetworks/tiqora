@@ -804,6 +804,26 @@ export interface paths {
         patch: operations["update_dynamic_field_api_v1_admin_dynamic_fields__field_id__patch"];
         trace?: never;
     };
+    "/api/v1/admin/follow-up-possible": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Follow Up Possible
+         * @description Valid follow-up options for the queue editor (possible / reject / new ticket).
+         */
+        get: operations["list_follow_up_possible_api_v1_admin_follow_up_possible_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/generic-agent-jobs": {
         parameters: {
             query?: never;
@@ -1512,6 +1532,26 @@ export interface paths {
          * @description Upsert the four Tiqora override keys. Empty string / null clears.
          */
         put: operations["put_subject_config_api_v1_admin_subject_config_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/system-addresses": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List System Addresses
+         * @description Valid system addresses for queue / auto-response From pickers.
+         */
+        get: operations["list_system_addresses_api_v1_admin_system_addresses_get"];
+        put?: never;
         post?: never;
         delete?: never;
         options?: never;
@@ -4863,6 +4903,22 @@ export interface components {
             /** Values */
             values?: unknown[];
         };
+        /**
+         * FollowUpPossibleOut
+         * @description Reference row for resolving ``queue.follow_up_id`` to a name.
+         *
+         *     Stock Znuny names: ``possible``, ``reject``, ``new ticket``.
+         */
+        FollowUpPossibleOut: {
+            /** Comments */
+            comments?: string | null;
+            /** Id */
+            id: number;
+            /** Name */
+            name: string;
+            /** Valid Id */
+            valid_id: number;
+        };
         /** ForwardRequest */
         ForwardRequest: {
             /** Body */
@@ -6521,6 +6577,25 @@ export interface components {
             hook: string;
             /** Subject Format */
             subject_format: string;
+        };
+        /**
+         * SystemAddressOut
+         * @description Reference row for resolving ``queue.system_address_id`` to a label.
+         *
+         *     Znuny ``system_address``: ``value0`` is the email, ``value1`` the real name.
+         *     UI display is typically ``"{value1} <{value0}>"``.
+         */
+        SystemAddressOut: {
+            /** Comments */
+            comments?: string | null;
+            /** Id */
+            id: number;
+            /** Valid Id */
+            valid_id: number;
+            /** Value0 */
+            value0: string;
+            /** Value1 */
+            value1: string;
         };
         /** TOTPCodeIn */
         TOTPCodeIn: {
@@ -9423,6 +9498,39 @@ export interface operations {
             };
         };
     };
+    list_follow_up_possible_api_v1_admin_follow_up_possible_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FollowUpPossibleOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_generic_agent_jobs_api_v1_admin_generic_agent_jobs_get: {
         parameters: {
             query?: never;
@@ -11776,6 +11884,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SubjectConfigOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_system_addresses_api_v1_admin_system_addresses_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SystemAddressOut"][];
                 };
             };
             /** @description Validation Error */

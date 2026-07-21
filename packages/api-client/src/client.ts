@@ -304,6 +304,8 @@ export type MailLogListParams = {
 export type PostmasterFilterOut = Schemas["PostmasterFilterOut"];
 export type AclOut = Schemas["AclOut"];
 export type GenericAgentJobOut = Schemas["GenericAgentJobOut"];
+export type SystemAddressOut = Schemas["SystemAddressOut"];
+export type FollowUpPossibleOut = Schemas["FollowUpPossibleOut"];
 
 // ── Stats ────────────────────────────────────────────────────────────────
 // Hand-written (not generated from schema.d.ts): openapi.json/schema.d.ts
@@ -1637,6 +1639,19 @@ export class ApiClient {
 
   getMailLog(id: number, signal?: AbortSignal) {
     return this.request<MailLogOut>("GET", `/api/v1/admin/mail/log/${id}`, { signal });
+  }
+
+  // Read-only reference lists for admin pickers (queue editor FKs, etc.).
+  listSystemAddresses(signal?: AbortSignal) {
+    return this.request<SystemAddressOut[]>("GET", "/api/v1/admin/system-addresses", {
+      signal,
+    });
+  }
+
+  listFollowUpPossible(signal?: AbortSignal) {
+    return this.request<FollowUpPossibleOut[]>("GET", "/api/v1/admin/follow-up-possible", {
+      signal,
+    });
   }
 
   // Read-only automation config.
