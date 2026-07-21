@@ -334,6 +334,8 @@ export type ErasureSelectorIn = {
 export type GdprErasurePreviewRequest = {
   selector: ErasureSelectorIn;
   mode?: ErasureMode;
+  /** delete mode only: also hard-delete the customer's tickets + FK children. */
+  delete_tickets?: boolean;
 };
 export type GdprResolvedCustomerOut = {
   id: number;
@@ -359,6 +361,8 @@ export type GdprErasureJobCreate = {
   selector?: ErasureSelectorIn | null;
   mode?: ErasureMode;
   seed?: number | null;
+  /** delete mode only: also hard-delete the customer's tickets + FK children. */
+  delete_tickets?: boolean;
   confirm: true;
 };
 export type GdprErasureJobOut = {

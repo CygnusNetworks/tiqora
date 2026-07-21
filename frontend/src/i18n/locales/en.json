@@ -1045,6 +1045,7 @@
       "modeDelete": "Delete",
       "modeAnonymizeHint": "PII is replaced deterministically; rows remain and can be rolled back from backup.",
       "modeDeleteHint": "Customer users and related links are hard-deleted (with backup). Ticket content is anonymized, not deleted.",
+      "deleteTicketsHint": "Also HARD-DELETE this customer's tickets and all linked data (articles, history, attachments, dynamic fields) — with backup + rollback. Retention-relevant tickets are only warned about, not blocked.",
       "field": {
         "customerSearch": "Search customer user",
         "customerSearchPh": "Login, email, or name…",
