@@ -8,8 +8,14 @@ import {
 import { useTranslation } from "react-i18next";
 import { ApiError, type AdminListParams, type AdminPage, type AdminValidFilter } from "@/lib/api";
 import { Button } from "@/components/ui/Button";
+import { PlusIcon } from "@/components/ui/icons";
 import { cn } from "@/lib/cn";
-import { DataTable, type DataTableColumn } from "./DataTable";
+import {
+  DataTable,
+  type DataTableColumn,
+  type DataTableSortOrder,
+  type DataTableSortState,
+} from "./DataTable";
 import { CrudDrawer, type FieldDef, type FieldValues } from "./CrudDrawer";
 
 export type AdminCrudApi<Out, Create, Update> = {
@@ -56,6 +62,17 @@ export type AdminResourcePageProps<Out, Create, Update> = {
   allowAllPageSize?: boolean;
   /** Page size used when "Alle" is selected (default 100_000). */
   allPageSize?: number;
+  /**
+   * Opt-in server-side column sorting. When true, sortable column headers
+   * forward `sort`/`order` to `api.list`. Columns still need `sortable: true`.
+   * Default off — other admin pages unchanged.
+   */
+  sortable?: boolean;
+  /**
+   * When `sortable` is on, also make the status column header sort by
+   * `valid_id`. Default off.
+   */
+  statusSortable?: boolean;
 };
 
 const defaultIsRowValid = (row: unknown): boolean =>
@@ -88,6 +105,7 @@ function useDebouncedValue<T>(value: T, delayMs: number): T {
  * - `bulkActions` — row checkboxes + floating bulk action bar
  * - page-size select includes 500 (backend ListParams max)
  * - `allowAllPageSize` — "Alle" option that requests a very large page
+ * - `sortable` — server-side column header sorting (`sort`/`order`)
  */
 export function AdminResourcePage<Out, Create, Update>({
   resourceKey,
@@ -106,6 +124,8 @@ export function AdminResourcePage<Out, Create, Update>({
   bulkActions,
   allowAllPageSize = false,
   allPageSize = DEFAULT_ALL_PAGE_SIZE,
+  sortable = false,
+  statusSortable = false,
 }: AdminResourcePageProps<Out, Create, Update>) {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
@@ -119,6 +139,10 @@ export function AdminResourcePage<Out, Create, Update>({
   const [searchInput, setSearchInput] = useState("");
   const debouncedSearch = useDebouncedValue(searchInput, 300);
   const search = searchable ? debouncedSearch.trim() : "";
+  const [sortState, setSortState] = useState<DataTableSortState>({ sort: null, order: "asc" });
+  const sort = sortable ? sortState.sort : undefined;
+  const order: DataTableSortOrder | undefined =
+    sortable && sortState.sort ? sortState.order : undefined;
 
   const [selected, setSelected] = useState<Set<string | number>>(() => new Set());
   const bulkEnabled = Boolean(bulkActions && bulkActions.length > 0);
@@ -129,13 +153,24 @@ export function AdminResourcePage<Out, Create, Update>({
     setPage(1);
   }, [search, searchable]);
 
-  // Drop selection when the list context changes (filter / search / page size).
+  // Drop selection when the list context changes (filter / search / page size / sort).
   useEffect(() => {
     setSelected(new Set());
-  }, [valid, search, pageSize]);
+  }, [valid, search, pageSize, sort, order]);
 
   const listQ = useQuery({
-    queryKey: ["admin", resourceKey, { page, pageSize, valid, search: search || undefined }],
+    queryKey: [
+      "admin",
+      resourceKey,
+      {
+        page,
+        pageSize,
+        valid,
+        search: search || undefined,
+        sort: sort || undefined,
+        order: order || undefined,
+      },
+    ],
     queryFn: ({ signal }) =>
       api.list(
         {
@@ -143,6 +178,7 @@ export function AdminResourcePage<Out, Create, Update>({
           pageSize,
           valid,
           ...(search ? { search } : {}),
+          ...(sort ? { sort, order } : {}),
         },
         signal,
       ),
@@ -213,6 +249,11 @@ export function AdminResourcePage<Out, Create, Update>({
     setPage(1);
   };
 
+  const changeSort = (next: DataTableSortState) => {
+    setSortState(next);
+    setPage(1);
+  };
+
   const toggleRow = (id: string | number) => {
     setSelected((prev) => {
       const next = new Set(prev);
@@ -274,8 +315,16 @@ export function AdminResourcePage<Out, Create, Update>({
     <div className="space-y-3 p-4" data-testid={`admin-${resourceKey}-page`}>
       <div className="flex items-center justify-between gap-3">
         <h1 className="font-display text-xl font-semibold text-ink">{title}</h1>
-        <Button variant="primary" size="sm" data-testid="admin-new-button" onClick={openCreate}>
-          {newLabel}
+        <Button
+          variant="primary"
+          size="sm"
+          data-testid="admin-new-button"
+          onClick={openCreate}
+          aria-label={newLabel}
+          title={newLabel}
+          className="!px-2"
+        >
+          <PlusIcon className="text-[16px]" />
         </Button>
       </div>
 
@@ -361,6 +410,9 @@ export function AdminResourcePage<Out, Create, Update>({
               }
             : undefined
         }
+        sort={sortable ? sortState : undefined}
+        onSortChange={sortable ? changeSort : undefined}
+        statusSortable={sortable && statusSortable}
         testId={`admin-${resourceKey}-table`}
       />
 
