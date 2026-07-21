@@ -14,7 +14,7 @@ services:
       MYSQL_USER: tiqora
       MYSQL_PASSWORD: tiqora
     ports:
-      - "3306:3306"
+      - "127.0.0.1:3306:3306"
     volumes:
       - tiqora_mariadb_data:/var/lib/mysql
     command:
@@ -34,7 +34,7 @@ services:
       POSTGRES_USER: tiqora
       POSTGRES_PASSWORD: tiqora
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"
     volumes:
       - tiqora_postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -47,7 +47,7 @@ services:
     image: redis:7-alpine
     container_name: tiqora-dev-redis
     ports:
-      - "6379:6379"
+      - "127.0.0.1:6379:6379"
     volumes:
       - tiqora_redis_data:/data
     healthcheck:
@@ -64,7 +64,7 @@ services:
       MEILI_MASTER_KEY: tiqora-dev-master-key
       MEILI_NO_ANALYTICS: "true"
     ports:
-      - "7700:7700"
+      - "127.0.0.1:7700:7700"
     volumes:
       - tiqora_meili_data:/meili_data
     healthcheck:
