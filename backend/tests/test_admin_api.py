@@ -750,6 +750,63 @@ async def test_admin_state_types_reference(
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("url_fixture", ["mariadb_znuny_url", "postgres_znuny_url"])
+async def test_admin_system_addresses_reference(
+    url_fixture: str, request: pytest.FixtureRequest
+) -> None:
+    """system-addresses reference list returns seed rows (queue From picker)."""
+    sync_url: str = request.getfixturevalue(url_fixture)
+    ids = _seed_admin_and_plain_user(sync_url)
+    session, engine = await _make_session(sync_url)
+
+    async with session as s:
+        admin_user = AuthenticatedUser(
+            id=ids["admin_id"],
+            login="root@localhost",
+            first_name="Admin",
+            last_name="Znuny",
+            auth_method="session",
+        )
+        rows = await admin_readonly.list_system_addresses(admin_user, s)
+        assert len(rows) >= 1
+        # Stock Znuny initial_insert: id 1, znuny@localhost / Znuny System.
+        by_id = {r.id: r for r in rows}
+        assert 1 in by_id
+        assert by_id[1].value0  # email
+        assert by_id[1].value1  # real name
+        assert all(r.valid_id == 1 for r in rows)
+
+    await engine.dispose()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("url_fixture", ["mariadb_znuny_url", "postgres_znuny_url"])
+async def test_admin_follow_up_possible_reference(
+    url_fixture: str, request: pytest.FixtureRequest
+) -> None:
+    """follow-up-possible reference resolves queue.follow_up_id to a name."""
+    sync_url: str = request.getfixturevalue(url_fixture)
+    ids = _seed_admin_and_plain_user(sync_url)
+    session, engine = await _make_session(sync_url)
+
+    async with session as s:
+        admin_user = AuthenticatedUser(
+            id=ids["admin_id"],
+            login="root@localhost",
+            first_name="Admin",
+            last_name="Znuny",
+            auth_method="session",
+        )
+        rows = await admin_readonly.list_follow_up_possible(admin_user, s)
+        names = {r.name for r in rows}
+        # Stock Znuny: possible / reject / new ticket.
+        assert {"possible", "reject", "new ticket"} <= names
+        assert all(r.valid_id == 1 for r in rows)
+
+    await engine.dispose()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("url_fixture", ["mariadb_znuny_url", "postgres_znuny_url"])
 async def test_admin_user_role_assignment_roundtrip(
     url_fixture: str, request: pytest.FixtureRequest
 ) -> None:
