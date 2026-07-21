@@ -8,6 +8,8 @@ export type TicketZoomOverflowMenuProps = {
   sortLabel: string;
   onToggleSort: () => void;
   onInternalNote: () => void;
+  /** Whether the agent holds the ``note`` permission (internal note). */
+  canNote?: boolean;
   /** Whether "Start process" is available (ticket not already in a process). */
   canStartProcess: boolean;
   onStartProcess: () => void;
@@ -23,6 +25,7 @@ export function TicketZoomOverflowMenu({
   sortLabel,
   onToggleSort,
   onInternalNote,
+  canNote = true,
   canStartProcess,
   onStartProcess,
 }: TicketZoomOverflowMenuProps) {
@@ -68,9 +71,21 @@ export function TicketZoomOverflowMenu({
         {t("ticket.overflow.sort")}: {sortLabel}
       </MenuItem>
       <MenuSeparator />
-      <MenuItem testId="overflow-internal-note" onSelect={onInternalNote}>
-        {t("ticket.overflow.internalNote")}
-      </MenuItem>
+      {canNote ? (
+        <MenuItem testId="overflow-internal-note" onSelect={onInternalNote}>
+          {t("ticket.overflow.internalNote")}
+        </MenuItem>
+      ) : (
+        <div
+          role="menuitem"
+          aria-disabled="true"
+          data-testid="overflow-internal-note"
+          title={t("ticket.toolbar.noPermission")}
+          className="flex w-full cursor-not-allowed items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-[13px] text-muted opacity-40"
+        >
+          {t("ticket.overflow.internalNote")}
+        </div>
+      )}
       {canStartProcess && (
         <MenuItem testId="overflow-start-process" onSelect={onStartProcess}>
           {t("ticket.overflow.startProcess")}

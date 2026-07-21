@@ -52,6 +52,7 @@ export function ArticleTimeline({
   descending = true,
   noteOpen,
   onNoteOpenChange,
+  canNote = true,
 }: {
   ticketId: number;
   /** Reported whenever the reply/note composer opens or closes, so the
@@ -63,6 +64,8 @@ export function ArticleTimeline({
   /** Controlled open state for the internal-note composer (⋮ menu). */
   noteOpen?: boolean;
   onNoteOpenChange?: (open: boolean) => void;
+  /** Whether the agent may reply / add notes (``note`` permission). */
+  canNote?: boolean;
 }) {
   const { t, i18n } = useTranslation();
   const locale = i18n.language?.startsWith("de") ? "de" : "en";
@@ -173,7 +176,11 @@ export function ArticleTimeline({
                           ticketId={ticketId}
                           articleId={article.id}
                         />
-                        <ArticleActions ticketId={ticketId} article={article} />
+                        <ArticleActions
+                          ticketId={ticketId}
+                          article={article}
+                          canNote={canNote}
+                        />
                       </div>
                     )}
                   </li>
@@ -183,13 +190,15 @@ export function ArticleTimeline({
           </section>
         ))
       )}
-      <ArticleComposer
-        ticketId={ticketId}
-        articles={articles}
-        onComposingChange={onComposingChange}
-        open={noteOpen}
-        onOpenChange={onNoteOpenChange}
-      />
+      {canNote && (
+        <ArticleComposer
+          ticketId={ticketId}
+          articles={articles}
+          onComposingChange={onComposingChange}
+          open={noteOpen}
+          onOpenChange={onNoteOpenChange}
+        />
+      )}
     </div>
   );
 }
@@ -198,9 +207,11 @@ export function ArticleTimeline({
 function ArticleActions({
   ticketId,
   article,
+  canNote = true,
 }: {
   ticketId: number;
   article: ArticleListItem;
+  canNote?: boolean;
 }) {
   const { t } = useTranslation();
   const [dialog, setDialog] = useState<
@@ -208,19 +219,34 @@ function ArticleActions({
   >(null);
   const hasMultipleRecipients =
     (article.to_address ?? "").includes(",") || Boolean(article.to_address && article.from_address);
+  const noPerm = t("ticket.toolbar.noPermission");
 
   return (
     <div
       className="flex flex-wrap items-center gap-1.5 border-t border-hairline/60 pt-2"
       data-testid={`article-actions-${article.id}`}
     >
-      <Button size="sm" variant="secondary" onClick={() => setDialog("reply")}>
-        {t("ticket.reply")}
-      </Button>
-      {hasMultipleRecipients && (
-        <Button size="sm" variant="secondary" onClick={() => setDialog("replyAll")}>
-          {t("ticket.replyAll")}
+      <span title={!canNote ? noPerm : undefined} className="inline-flex">
+        <Button
+          size="sm"
+          variant="secondary"
+          disabled={!canNote}
+          onClick={() => setDialog("reply")}
+        >
+          {t("ticket.reply")}
         </Button>
+      </span>
+      {hasMultipleRecipients && (
+        <span title={!canNote ? noPerm : undefined} className="inline-flex">
+          <Button
+            size="sm"
+            variant="secondary"
+            disabled={!canNote}
+            onClick={() => setDialog("replyAll")}
+          >
+            {t("ticket.replyAll")}
+          </Button>
+        </span>
       )}
       <Button size="sm" variant="ghost" onClick={() => setDialog("forward")}>
         {t("ticket.forward")}
@@ -232,13 +258,15 @@ function ArticleActions({
         {t("ticket.split")}
       </Button>
 
-      <ReplyDialog
-        ticketId={ticketId}
-        articleId={article.id}
-        replyAll={dialog === "replyAll"}
-        open={dialog === "reply" || dialog === "replyAll"}
-        onClose={() => setDialog(null)}
-      />
+      {canNote && (
+        <ReplyDialog
+          ticketId={ticketId}
+          articleId={article.id}
+          replyAll={dialog === "replyAll"}
+          open={dialog === "reply" || dialog === "replyAll"}
+          onClose={() => setDialog(null)}
+        />
+      )}
       <ForwardDialog
         ticketId={ticketId}
         articleId={article.id}

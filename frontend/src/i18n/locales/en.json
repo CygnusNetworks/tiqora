@@ -265,7 +265,9 @@
       "link": "Link",
       "merge": "Merge",
       "appointment": "New appointment",
-      "move": "Move"
+      "move": "Move",
+      "queue": "Queue",
+      "noPermission": "No permission"
     },
     "dialog": {
       "save": "Save",
@@ -277,7 +279,8 @@
       "apptTitle": "Title",
       "apptStart": "Start",
       "apptEnd": "End",
-      "genericError": "Action failed. Please try again."
+      "genericError": "Action failed. Please try again.",
+      "currentCustomer": "Current"
     }
   },
   "search": {

@@ -17,6 +17,7 @@ export {
   type MyTicketCounts,
   type DashboardSummary,
   type TicketDetail,
+  type TicketPermissions,
   type ArticleListItem,
   type ArticleBody,
   type AttachmentMetaOut,

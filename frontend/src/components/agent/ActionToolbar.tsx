@@ -114,6 +114,7 @@ function ToolbarButton({
   disabled,
   active,
   testId,
+  title,
 }: {
   label: string;
   icon: ReactNode;
@@ -121,13 +122,16 @@ function ToolbarButton({
   disabled?: boolean;
   active?: boolean;
   testId?: string;
+  /** Tooltip; shown even when disabled (via span wrapper). */
+  title?: string;
 }) {
-  return (
+  const btn = (
     <button
       type="button"
       onClick={onClick}
       disabled={disabled}
       data-testid={testId}
+      title={disabled ? undefined : title}
       className={`inline-flex items-center gap-1.5 rounded-md border px-2 py-1 text-xs font-medium transition-colors duration-100 disabled:pointer-events-none disabled:opacity-40 ${
         active
           ? "border-accent bg-accent/10 text-accent"
@@ -138,6 +142,50 @@ function ToolbarButton({
       {label}
     </button>
   );
+  // Disabled buttons don't fire pointer events — wrap so the title tooltip still shows.
+  if (disabled && title) {
+    return (
+      <span className="inline-flex" title={title}>
+        {btn}
+      </span>
+    );
+  }
+  return btn;
+}
+
+/** Resolve per-action flags; fall back to blanket ``can_write`` when the
+ * backend has not yet shipped the ``permissions`` object. */
+function ticketPerms(ticket: TicketDetail): {
+  ro: boolean;
+  move_into: boolean;
+  create: boolean;
+  note: boolean;
+  owner: boolean;
+  priority: boolean;
+  rw: boolean;
+} {
+  const p = ticket.permissions;
+  if (p) {
+    return {
+      ro: Boolean(p.ro),
+      move_into: Boolean(p.move_into),
+      create: Boolean(p.create),
+      note: Boolean(p.note),
+      owner: Boolean(p.owner),
+      priority: Boolean(p.priority),
+      rw: Boolean(p.rw),
+    };
+  }
+  const all = Boolean(ticket.can_write);
+  return {
+    ro: all,
+    move_into: all,
+    create: all,
+    note: all,
+    owner: all,
+    priority: all,
+    rw: all,
+  };
 }
 
 // ── Minimal inline icons (single-path, 14px) ───────────────────────────────
@@ -181,7 +229,8 @@ export function ActionToolbar({ ticket }: { ticket: TicketDetail }) {
   const { user } = useAuth();
   const navigate = useNavigate();
   const ticketId = ticket.id;
-  const canWrite = ticket.can_write;
+  const perms = ticketPerms(ticket);
+  const noPerm = t("ticket.toolbar.noPermission");
   const patch = usePatchTicket(ticketId);
 
   const prioritiesQ = useQuery({
@@ -216,11 +265,11 @@ export function ActionToolbar({ ticket }: { ticket: TicketDetail }) {
       className="flex flex-wrap items-center gap-1.5 rounded-lg border border-hairline bg-surface p-2 print:hidden"
       data-testid="action-toolbar"
     >
-      {/* Priority */}
+      {/* Priority → permission key ``priority`` */}
       <ToolbarMenu
         label={t("ticket.toolbar.priority")}
         icon={icons.priority}
-        disabled={!canWrite || prioritiesQ.isLoading}
+        disabled={!perms.priority || prioritiesQ.isLoading}
         testId="toolbar-priority"
       >
         {(close) =>
@@ -239,11 +288,11 @@ export function ActionToolbar({ ticket }: { ticket: TicketDetail }) {
         }
       </ToolbarMenu>
 
-      {/* State */}
+      {/* State / Pending / Close → ``rw`` */}
       <ToolbarMenu
         label={t("ticket.toolbar.state")}
         icon={icons.state}
-        disabled={!canWrite || statesQ.isLoading}
+        disabled={!perms.rw || statesQ.isLoading}
         testId="toolbar-state"
       >
         {(close) =>
@@ -262,20 +311,19 @@ export function ActionToolbar({ ticket }: { ticket: TicketDetail }) {
         }
       </ToolbarMenu>
 
-      {/* Pending (state + time) */}
       <ToolbarButton
         label={t("ticket.toolbar.pending")}
         icon={icons.pending}
-        disabled={!canWrite}
+        disabled={!perms.rw}
+        title={!perms.rw ? noPerm : undefined}
         onClick={() => setDialog("pending")}
         testId="toolbar-pending"
       />
 
-      {/* Close (closed states) */}
       <ToolbarMenu
         label={t("ticket.toolbar.close")}
         icon={icons.close}
-        disabled={!canWrite || statesQ.isLoading}
+        disabled={!perms.rw || statesQ.isLoading}
         testId="toolbar-close"
       >
         {(close) =>
@@ -299,45 +347,51 @@ export function ActionToolbar({ ticket }: { ticket: TicketDetail }) {
 
       <span className="mx-0.5 h-5 w-px bg-hairline" aria-hidden="true" />
 
-      {/* Move */}
+      {/* Queue (was Move) → ``move_into`` */}
       <ToolbarButton
-        label={t("ticket.toolbar.move")}
+        label={t("ticket.toolbar.queue")}
         icon={icons.move}
-        disabled={!canWrite}
+        disabled={!perms.move_into}
+        title={!perms.move_into ? noPerm : undefined}
         onClick={() => setDialog("move")}
         testId="toolbar-move"
       />
-      {/* People */}
+      {/* Owner + Responsible → ``owner`` */}
       <ToolbarButton
         label={t("ticket.toolbar.owner")}
         icon={icons.owner}
-        disabled={!canWrite}
+        disabled={!perms.owner}
+        title={!perms.owner ? noPerm : undefined}
         onClick={() => setDialog("owner")}
         testId="toolbar-owner"
       />
       <ToolbarButton
         label={t("ticket.toolbar.responsible")}
         icon={icons.owner}
-        disabled={!canWrite}
+        disabled={!perms.owner}
+        title={!perms.owner ? noPerm : undefined}
         onClick={() => setDialog("responsible")}
         testId="toolbar-responsible"
       />
+      {/* Customer → ``rw`` */}
       <ToolbarButton
         label={t("ticket.toolbar.customer")}
         icon={icons.customer}
-        disabled={!canWrite}
+        disabled={!perms.rw}
+        title={!perms.rw ? noPerm : undefined}
         onClick={() => setDialog("customer")}
         testId="toolbar-customer"
       />
 
       <span className="mx-0.5 h-5 w-px bg-hairline" aria-hidden="true" />
 
-      {/* Lock / Unlock */}
+      {/* Lock / Unlock → ``rw`` */}
       <ToolbarButton
         label={isLocked ? t("ticket.toolbar.unlock") : t("ticket.toolbar.lock")}
         icon={isLocked ? icons.unlock : icons.lock}
         active={isLocked}
-        disabled={!canWrite}
+        disabled={!perms.rw}
+        title={!perms.rw ? noPerm : undefined}
         onClick={() => patch.mutate({ lock: isLocked ? "unlock" : "lock" })}
         testId="toolbar-lock"
       />
@@ -353,18 +407,20 @@ export function ActionToolbar({ ticket }: { ticket: TicketDetail }) {
 
       <span className="mx-0.5 h-5 w-px bg-hairline" aria-hidden="true" />
 
-      {/* Link / Merge */}
+      {/* Link / Merge → ``rw`` */}
       <ToolbarButton
         label={t("ticket.toolbar.link")}
         icon={icons.link}
-        disabled={!canWrite}
+        disabled={!perms.rw}
+        title={!perms.rw ? noPerm : undefined}
         onClick={() => setDialog("link")}
         testId="toolbar-link"
       />
       <ToolbarButton
         label={t("ticket.toolbar.merge")}
         icon={icons.merge}
-        disabled={!canWrite}
+        disabled={!perms.rw}
+        title={!perms.rw ? noPerm : undefined}
         onClick={() => setDialog("merge")}
         testId="toolbar-merge"
       />
@@ -392,6 +448,7 @@ export function ActionToolbar({ ticket }: { ticket: TicketDetail }) {
           title={t("ticket.toolbar.owner")}
           ticketId={ticketId}
           field="owner_id"
+          currentId={ticket.owner_id}
           onClose={() => setDialog(null)}
         />
       )}
@@ -400,14 +457,24 @@ export function ActionToolbar({ ticket }: { ticket: TicketDetail }) {
           title={t("ticket.toolbar.responsible")}
           ticketId={ticketId}
           field="responsible_id"
+          currentId={ticket.responsible_user_id ?? null}
           onClose={() => setDialog(null)}
         />
       )}
       {dialog === "customer" && (
-        <CustomerPickerDialog ticketId={ticketId} onClose={() => setDialog(null)} />
+        <CustomerPickerDialog
+          ticketId={ticketId}
+          currentCustomerId={ticket.customer_id}
+          currentCustomerUserId={ticket.customer_user_id}
+          onClose={() => setDialog(null)}
+        />
       )}
       {dialog === "move" && (
-        <MovePickerDialog ticketId={ticketId} onClose={() => setDialog(null)} />
+        <MovePickerDialog
+          ticketId={ticketId}
+          currentQueueId={ticket.queue_id}
+          onClose={() => setDialog(null)}
+        />
       )}
       {dialog === "pending" && (
         <PendingDialog
@@ -454,15 +521,17 @@ function AgentPickerDialog({
   title,
   ticketId,
   field,
+  currentId,
   onClose,
 }: {
   title: string;
   ticketId: number;
   field: "owner_id" | "responsible_id";
+  currentId?: number | null;
   onClose: () => void;
 }) {
   const { t } = useTranslation();
-  const [agentId, setAgentId] = useState("");
+  const [agentId, setAgentId] = useState(String(currentId ?? ""));
   const agentsQ = useQuery({
     queryKey: ["reference", "agents"],
     queryFn: () => api.listReferenceAgents(),
@@ -481,6 +550,7 @@ function AgentPickerDialog({
             className={inputCls}
             value={agentId}
             onChange={(e) => setAgentId(e.target.value)}
+            data-testid="agent-picker-select"
           >
             <option value="">{t("ticket.dialog.selectPlaceholder")}</option>
             {(agentsQ.data ?? []).map((a) => (
@@ -503,23 +573,44 @@ function AgentPickerDialog({
 
 function CustomerPickerDialog({
   ticketId,
+  currentCustomerId,
+  currentCustomerUserId,
   onClose,
 }: {
   ticketId: number;
+  currentCustomerId?: string | null;
+  currentCustomerUserId?: string | null;
   onClose: () => void;
 }) {
   const { t } = useTranslation();
-  const [q, setQ] = useState("");
+  const [q, setQ] = useState(currentCustomerUserId ?? "");
   const customersQ = useQuery({
     queryKey: ["reference", "customers", q],
     queryFn: () => api.searchReferenceCustomers({ q }),
     enabled: q.trim().length >= 2,
   });
   const patch = usePatchTicket(ticketId, onClose);
+  const hasCurrent = Boolean(currentCustomerUserId || currentCustomerId);
 
   return (
     <Dialog open onClose={onClose} title={t("ticket.toolbar.customer")}>
       <div className="space-y-2" data-testid="customer-picker-dialog">
+        {hasCurrent && (
+          <div
+            className="flex items-center gap-2 rounded border border-hairline bg-surface-subtle px-3 py-1.5 text-sm"
+            data-testid="customer-picker-current"
+          >
+            <span className="text-muted">{t("ticket.dialog.currentCustomer")}:</span>
+            <span className="font-medium text-ink">
+              {currentCustomerUserId || "—"}
+            </span>
+            {currentCustomerId ? (
+              <Badge tone="muted" className="ml-auto shrink-0 rounded-full">
+                {currentCustomerId}
+              </Badge>
+            ) : null}
+          </div>
+        )}
         <input
           className={inputCls}
           value={q}
@@ -587,24 +678,27 @@ function flattenQueues(
 
 function MovePickerDialog({
   ticketId,
+  currentQueueId,
   onClose,
 }: {
   ticketId: number;
+  currentQueueId?: number | null;
   onClose: () => void;
 }) {
   const { t } = useTranslation();
-  const [queueId, setQueueId] = useState("");
+  const [queueId, setQueueId] = useState(String(currentQueueId ?? ""));
   const queuesQ = useQuery({ queryKey: ["queues"], queryFn: () => api.listQueues() });
   const queues = flattenQueues(queuesQ.data ?? []);
   const patch = usePatchTicket(ticketId, onClose);
 
   return (
-    <Dialog open onClose={onClose} title={t("ticket.toolbar.move")}>
+    <Dialog open onClose={onClose} title={t("ticket.toolbar.queue")}>
       <div className="space-y-2" data-testid="move-picker-dialog">
         <select
           className={inputCls}
           value={queueId}
           onChange={(e) => setQueueId(e.target.value)}
+          data-testid="queue-picker-select"
         >
           <option value="">{t("ticket.dialog.selectPlaceholder")}</option>
           {queues.map((qu) => (

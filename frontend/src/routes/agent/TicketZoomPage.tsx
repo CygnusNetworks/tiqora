@@ -106,6 +106,13 @@ export function TicketZoomPage() {
     }
   };
 
+  // note permission: prefer explicit permissions.note; fall back to can_write.
+  const canNote = ticketQ.data
+    ? ticketQ.data.permissions
+      ? Boolean(ticketQ.data.permissions.note || ticketQ.data.permissions.rw)
+      : Boolean(ticketQ.data.can_write)
+    : false;
+
   const overflowMenu = (
     <TicketZoomOverflowMenu
       tab={tab}
@@ -119,6 +126,7 @@ export function TicketZoomPage() {
         setTab("articles");
         setNoteOpen(true);
       }}
+      canNote={canNote}
       canStartProcess={Boolean(canStartProcess)}
       onStartProcess={() => setProcessStartOpen(true)}
     />
@@ -146,6 +154,7 @@ export function TicketZoomPage() {
           descending={articleDescending}
           noteOpen={noteOpen}
           onNoteOpenChange={setNoteOpen}
+          canNote={canNote}
         />
       ) : (
         <HistoryTable ticketId={ticketId} order={historyOrder} />
