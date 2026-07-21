@@ -11,17 +11,20 @@ The in-process FastMCP Client bypasses HTTP transport entirely.
 from __future__ import annotations
 
 import contextlib
-from datetime import datetime
+import hashlib
+import json
+from datetime import datetime, timedelta
 from typing import Any
 from unittest.mock import MagicMock, patch
 
 import pytest
 from fastmcp import Client
-from sqlalchemy import create_engine, text
+from sqlalchemy import create_engine, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from tiqora.db.tiqora.base import TiqoraBase
-from tiqora.mcp_server.server import McpState, mcp
+from tiqora.db.tiqora.models import TiqoraApiKey
+from tiqora.mcp_server.server import McpState, _resolve_api_key, mcp
 from tiqora.znuny.password import hash_password
 
 pytestmark = pytest.mark.db
@@ -31,6 +34,17 @@ PW_HASH = hash_password("testpass")
 
 AGENT_FULL_ID = 400
 AGENT_NONE_ID = 401
+
+
+def _tool_data(result: Any) -> Any:
+    """Normalize FastMCP tool result payloads to Python objects."""
+    data = result.data
+    if isinstance(data, str):
+        try:
+            return json.loads(data)
+        except json.JSONDecodeError:
+            return data
+    return data
 
 
 # ---------------------------------------------------------------------------
@@ -394,6 +408,7 @@ async def test_mcp_tools_list(mcp_mariadb: dict[str, Any]) -> None:
     expected = {
         "ticket_search",
         "ticket_get",
+        "ticket_get_by_number",
         "ticket_create",
         "ticket_reply",
         "ticket_note",
@@ -401,12 +416,25 @@ async def test_mcp_tools_list(mcp_mariadb: dict[str, Any]) -> None:
         "ticket_update_queue",
         "ticket_update_priority",
         "ticket_update_owner",
+        "ticket_set_title",
+        "ticket_set_customer",
+        "ticket_set_dynamic_field",
+        "ticket_lock",
+        "ticket_unlock",
+        "list_queues",
+        "list_states",
+        "list_priorities",
+        "list_agents",
         "kb_search",
         "kb_get_article",
+        "kb_list",
+        "kb_upsert_article",
+        "kb_publish_article",
         "customer_lookup",
     }
     missing = expected - tool_names
     assert not missing, f"Missing MCP tools: {missing}"
+    assert len(tool_names) == 25, f"Expected 25 tools, got {len(tool_names)}: {sorted(tool_names)}"
 
 
 @pytest.mark.db
@@ -462,10 +490,318 @@ async def test_mcp_kb_get_article(mcp_mariadb: dict[str, Any]) -> None:
             async with Client(mcp) as client:
                 missing_result = await client.call_tool("kb_get_article", {"article_id": 99999999})
         assert not missing_result.is_error
-        missing_data = missing_result.data
-        if isinstance(missing_data, str):
-            missing_data = json.loads(missing_data)
+        missing_data = _tool_data(missing_result)
         assert "error" in missing_data
     finally:
         await state.aclose()
         srv._mcp_state = None
+
+
+# ---------------------------------------------------------------------------
+# P1: reference tools, write-field tools, TN lookup, api-key expiry
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.db
+async def test_mcp_reference_tools(mcp_mariadb: dict[str, Any]) -> None:
+    """Reference tools return expected rows for a permitted agent."""
+    state = _make_mock_state(mcp_mariadb["async_url"])
+    async with state.session_factory() as session:
+        await _create_tiqora_tables(session)
+
+    import tiqora.mcp_server.server as srv
+
+    srv._mcp_state = state
+    try:
+        with _patch_user_id(AGENT_FULL_ID):
+            async with Client(mcp) as client:
+                queues = _tool_data(await client.call_tool("list_queues", {}))
+                states = _tool_data(await client.call_tool("list_states", {}))
+                priorities = _tool_data(await client.call_tool("list_priorities", {}))
+                agents = _tool_data(await client.call_tool("list_agents", {}))
+
+        assert isinstance(queues, list)
+        assert any(q["id"] == mcp_mariadb["queue_id"] and q["name"] == "McpQueue" for q in queues)
+        assert all({"id", "name", "group_id"} <= set(q.keys()) for q in queues)
+
+        assert isinstance(states, list) and len(states) >= 1
+        assert all({"id", "name", "type_name"} <= set(s.keys()) for s in states)
+
+        assert isinstance(priorities, list) and len(priorities) >= 1
+        assert any(p["id"] == mcp_mariadb["priority_id"] for p in priorities)
+
+        assert isinstance(agents, list)
+        assert any(a["id"] == AGENT_FULL_ID and a["login"] == "mcp.agent" for a in agents)
+
+        # No-permission agent: queues empty; global refs still visible (match REST).
+        with _patch_user_id(AGENT_NONE_ID):
+            async with Client(mcp) as client:
+                empty_queues = _tool_data(await client.call_tool("list_queues", {}))
+                still_states = _tool_data(await client.call_tool("list_states", {}))
+        assert empty_queues == []
+        assert isinstance(still_states, list) and len(still_states) >= 1
+    finally:
+        await state.aclose()
+        srv._mcp_state = None
+
+
+@pytest.mark.db
+async def test_mcp_write_field_tools(mcp_mariadb: dict[str, Any]) -> None:
+    """title/customer/DF/lock/unlock succeed; missing ticket returns error dict."""
+    state = _make_mock_state(mcp_mariadb["async_url"])
+    async with state.session_factory() as session:
+        await _create_tiqora_tables(session)
+
+    # Seed a dynamic field for the DF tool.
+    engine = create_engine(mcp_mariadb["url"])
+    with engine.begin() as conn:
+        conn.execute(text("DELETE FROM dynamic_field_value WHERE field_id = 9060"))
+        conn.execute(text("DELETE FROM dynamic_field WHERE id = 9060"))
+        conn.execute(
+            text(
+                "INSERT INTO dynamic_field ("
+                " id, internal_field, name, label, field_order, field_type, object_type,"
+                " valid_id, create_time, create_by, change_time, change_by"
+                ") VALUES ("
+                " 9060, 0, 'McpTestField', 'MCP Test Field', 100, 'Text', 'Ticket',"
+                " 1, :t, 1, :t, 1)"
+            ),
+            {"t": NOW},
+        )
+
+    import tiqora.mcp_server.server as srv
+
+    srv._mcp_state = state
+    try:
+        with _patch_user_id(AGENT_FULL_ID):
+            async with Client(mcp) as client:
+                created = _tool_data(
+                    await client.call_tool(
+                        "ticket_create",
+                        {
+                            "title": "Write Fields Ticket",
+                            "queue_id": mcp_mariadb["queue_id"],
+                            "state_id": mcp_mariadb["state_id"],
+                            "priority_id": mcp_mariadb["priority_id"],
+                        },
+                    )
+                )
+                assert isinstance(created, dict)
+                assert "ticket_id" in created, f"create failed: {created}"
+                ticket_id = created["ticket_id"]
+
+                title_ok = _tool_data(
+                    await client.call_tool(
+                        "ticket_set_title",
+                        {"ticket_id": ticket_id, "title": "Renamed by MCP"},
+                    )
+                )
+                assert title_ok.get("ok") is True
+
+                customer_ok = _tool_data(
+                    await client.call_tool(
+                        "ticket_set_customer",
+                        {
+                            "ticket_id": ticket_id,
+                            "customer_user_id": "mcp.customer",
+                            "customer_id": "MCP-CO",
+                        },
+                    )
+                )
+                assert customer_ok.get("ok") is True
+
+                df_ok = _tool_data(
+                    await client.call_tool(
+                        "ticket_set_dynamic_field",
+                        {
+                            "ticket_id": ticket_id,
+                            "field_name": "McpTestField",
+                            "value": "triaged",
+                        },
+                    )
+                )
+                assert df_ok.get("ok") is True
+
+                lock_ok = _tool_data(
+                    await client.call_tool("ticket_lock", {"ticket_id": ticket_id})
+                )
+                assert lock_ok.get("ok") is True
+                unlock_ok = _tool_data(
+                    await client.call_tool("ticket_unlock", {"ticket_id": ticket_id})
+                )
+                assert unlock_ok.get("ok") is True
+
+                # Missing ticket → error dict, not raised.
+                missing = _tool_data(
+                    await client.call_tool(
+                        "ticket_set_title",
+                        {"ticket_id": 9_999_999, "title": "nope"},
+                    )
+                )
+                assert "error" in missing
+
+                missing_lock = _tool_data(
+                    await client.call_tool("ticket_lock", {"ticket_id": 9_999_999})
+                )
+                assert "error" in missing_lock
+
+                # Unknown dynamic field → error dict.
+                bad_df = _tool_data(
+                    await client.call_tool(
+                        "ticket_set_dynamic_field",
+                        {
+                            "ticket_id": ticket_id,
+                            "field_name": "DoesNotExistEver",
+                            "value": "x",
+                        },
+                    )
+                )
+                assert "error" in bad_df
+
+        # Verify DB side effects for the permitted agent.
+        async with state.session_factory() as session:
+            row = (
+                await session.execute(
+                    text(
+                        "SELECT title, customer_user_id, customer_id, ticket_lock_id"
+                        " FROM ticket WHERE id = :tid"
+                    ),
+                    {"tid": ticket_id},
+                )
+            ).first()
+            assert row is not None
+            assert row[0] == "Renamed by MCP"
+            assert row[1] == "mcp.customer"
+            assert row[2] == "MCP-CO"
+            # unlocked after lock+unlock
+            assert int(row[3]) == 1
+
+            df_val = (
+                await session.execute(
+                    text(
+                        "SELECT dfv.value_text FROM dynamic_field_value dfv"
+                        " JOIN dynamic_field df ON df.id = dfv.field_id"
+                        " WHERE dfv.object_id = :tid AND df.name = 'McpTestField'"
+                    ),
+                    {"tid": ticket_id},
+                )
+            ).scalar_one_or_none()
+            assert df_val == "triaged"
+    finally:
+        await state.aclose()
+        srv._mcp_state = None
+
+
+@pytest.mark.db
+async def test_mcp_ticket_get_by_number(mcp_mariadb: dict[str, Any]) -> None:
+    """ticket_get_by_number returns the same ticket as ticket_get; unknown TN errors."""
+    state = _make_mock_state(mcp_mariadb["async_url"])
+    async with state.session_factory() as session:
+        await _create_tiqora_tables(session)
+
+    import tiqora.mcp_server.server as srv
+
+    srv._mcp_state = state
+    try:
+        with _patch_user_id(AGENT_FULL_ID):
+            async with Client(mcp) as client:
+                created = _tool_data(
+                    await client.call_tool(
+                        "ticket_create",
+                        {
+                            "title": "TN Lookup Ticket",
+                            "queue_id": mcp_mariadb["queue_id"],
+                            "state_id": mcp_mariadb["state_id"],
+                            "priority_id": mcp_mariadb["priority_id"],
+                            "body": "body for tn lookup",
+                        },
+                    )
+                )
+                assert isinstance(created, dict)
+                ticket_id = created["ticket_id"]
+                tn = created.get("ticket_number")
+                assert tn, f"create missing ticket_number: {created}"
+
+                by_id = await client.call_tool("ticket_get", {"ticket_id": ticket_id})
+                by_tn = await client.call_tool("ticket_get_by_number", {"tn": str(tn)})
+                assert not by_id.is_error and not by_tn.is_error
+                text_id = str(by_id.data)
+                text_tn = str(by_tn.data)
+                assert "TN Lookup Ticket" in text_id
+                assert "TN Lookup Ticket" in text_tn
+                assert str(tn) in text_tn
+                # Same ticket header shape
+                assert f"# Ticket #{ticket_id}" in text_id
+                assert f"# Ticket #{ticket_id}" in text_tn
+
+                missing = _tool_data(
+                    await client.call_tool(
+                        "ticket_get_by_number",
+                        {"tn": "000000000000000-never"},
+                    )
+                )
+                assert isinstance(missing, dict)
+                assert "error" in missing
+    finally:
+        await state.aclose()
+        srv._mcp_state = None
+
+
+@pytest.mark.db
+async def test_mcp_resolve_api_key_rejects_expired(mcp_mariadb: dict[str, Any]) -> None:
+    """MCP ``_resolve_api_key`` rejects expired keys and stamps last_used_at."""
+    state = _make_mock_state(mcp_mariadb["async_url"])
+    async with state.session_factory() as session:
+        await _create_tiqora_tables(session)
+        # Ensure expiry columns exist even on the simplified DDL path.
+        for ddl in (
+            "ALTER TABLE tiqora_api_key ADD COLUMN expires_at DATETIME NULL",
+            "ALTER TABLE tiqora_api_key ADD COLUMN last_used_at DATETIME NULL",
+            "ALTER TABLE tiqora_api_key ADD COLUMN name VARCHAR(200) NULL",
+            "ALTER TABLE tiqora_api_key ADD COLUMN created_by INT NULL",
+        ):
+            with contextlib.suppress(Exception):
+                await session.execute(text(ddl))
+        await session.commit()
+
+    raw_ok = "tiqora_mcp_test_key_ok_abcdef0123456789"
+    raw_expired = "tiqora_mcp_test_key_expired_abcdef012345"
+    hash_ok = hashlib.sha256(raw_ok.encode()).hexdigest()
+    hash_expired = hashlib.sha256(raw_expired.encode()).hexdigest()
+
+    async with state.session_factory() as session, session.begin():
+        await session.execute(text("DELETE FROM tiqora_api_key WHERE user_id = 400"))
+        session.add(
+            TiqoraApiKey(
+                name="mcp-ok",
+                key_hash=hash_ok,
+                user_id=AGENT_FULL_ID,
+                valid=True,
+                expires_at=None,
+            )
+        )
+        session.add(
+            TiqoraApiKey(
+                name="mcp-expired",
+                key_hash=hash_expired,
+                user_id=AGENT_FULL_ID,
+                valid=True,
+                expires_at=datetime.utcnow() - timedelta(hours=1),  # noqa: DTZ003
+            )
+        )
+
+    try:
+        uid = await _resolve_api_key(state.session_factory, raw_ok)
+        assert uid == AGENT_FULL_ID
+
+        expired_uid = await _resolve_api_key(state.session_factory, raw_expired)
+        assert expired_uid is None
+
+        async with state.session_factory() as session:
+            row = (
+                await session.execute(select(TiqoraApiKey).where(TiqoraApiKey.key_hash == hash_ok))
+            ).scalar_one_or_none()
+            assert row is not None
+            assert row.last_used_at is not None
+    finally:
+        await state.aclose()

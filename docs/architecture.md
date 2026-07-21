@@ -431,20 +431,15 @@ Uses `fastmcp.http_app(transport="streamable-http")`.
 `Authorization: Bearer` header validated on every request via `TiqoraBearerAuth`
 middleware. The `user_id` is injected into `request.state.user_id` for tools.
 
-**Tools (10):**
+**Tools (25):** ticket read (`ticket_search`, `ticket_get`, `ticket_get_by_number`),
+ticket write (`ticket_create`, `ticket_reply`, `ticket_note`,
+`ticket_update_state`/`queue`/`priority`/`owner`, `ticket_set_title`/`customer`/
+`dynamic_field`, `ticket_lock`/`unlock`), reference/discovery (`list_queues`,
+`list_states`, `list_priorities`, `list_agents`), knowledge base (`kb_search`,
+`kb_get_article`, `kb_list`, `kb_upsert_article`, `kb_publish_article`), and
+`customer_lookup`. Full catalogue: [`api/mcp.md`](api/mcp.md).
 
-| Tool | Description |
-|------|-------------|
-| `ticket_search` | Meilisearch + DB fallback, permission-filtered |
-| `ticket_get` | Markdown-rendered ticket with articles (visibility-aware) |
-| `ticket_create` | Create ticket with optional first article |
-| `ticket_reply` | Add customer-visible reply (default `is_visible_for_customer=True`) |
-| `ticket_note` | Add internal note (default `is_visible_for_customer=False`) |
-| `ticket_update_state` | Change state by state_id |
-| `ticket_update_queue` | Move ticket to queue_id |
-| `ticket_update_priority` | Change priority by priority_id |
-| `ticket_update_owner` | Assign owner by user_id |
-| `customer_lookup` | Look up customer user details |
+MCP deliberately does **not** mirror admin/portal/calendar/BPM/stats/GDPR.
 
 **Constraints:** All tool handlers are `async`. No sync SQLAlchemy, no `requests`,
 no `time.sleep` anywhere in `mcp_server/`. Unavoidable sync operations (none currently)

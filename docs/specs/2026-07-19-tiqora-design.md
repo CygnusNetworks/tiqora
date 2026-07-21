@@ -89,7 +89,7 @@ backend/src/tiqora/
   znuny/            # invariants: ticket_number, history, escalation, followup,
                     # sysconfig reader, password, ticket_index, search_flag, cache_invalidation
   domain/           # services (TicketService etc.) — sole write paths
-  permissions/      # one engine: group/role + ACL for UI/REST/MCP
+  permissions/      # one engine: group/role (+ ACL documented ambition) for UI/REST/MCP
   events/           # async bus + transactional outbox (tiqora_event_outbox)
   channels/         # channel plugin protocol; email/, web/
   storage/          # StorageBackend; v1 DB MIME
@@ -119,6 +119,12 @@ docker-compose.dev.yml
   `tiqora_kb_chunk` → Meilisearch; citable for RAG/MCP from day one.
 - **MCP tools V1:** ticket_search/get/create/reply/note/update, customer_lookup,
   kb_search/get; all async; CI ban on sync blocking in MCP tools (SSE starvation).
+- **PermissionEngine runtime (current state, deliberate):** evaluates **group/role
+  only** (`group_user` / `role_user` → `group_role`, with `rw` implying other keys).
+  Znuny `acl` table rows (`config_match` / `config_change`) are **not** evaluated
+  at runtime. Admin exposes ACL as read-only (`GET /api/v1/admin/acl`); full ACL
+  editor + runtime evaluation remain deferred. Frame as a known limitation of the
+  current cut, not as a bug in MCP/REST scoping.
 
 ## Phases
 
