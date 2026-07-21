@@ -18,6 +18,7 @@ from datetime import datetime
 import pytest
 import yaml
 from fastapi import HTTPException
+from pydantic import ValidationError
 from sqlalchemy import create_engine, text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
@@ -37,6 +38,7 @@ from tiqora.api.v1.admin.schemas import (
     AutoResponseCreate,
     CustomerCompanyCreate,
     CustomerUserAdminCreate,
+    CustomerUserBulkUpdate,
     CustomerUserCustomerAssignment,
     CustomerUserGroupAssignment,
     DynamicFieldCreate,
@@ -563,6 +565,98 @@ async def test_admin_customer_user_list_search(
         )
         assert none.total == 0
         assert none.items == []
+
+    await engine.dispose()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("url_fixture", ["mariadb_znuny_url", "postgres_znuny_url"])
+async def test_admin_customer_user_bulk_update(
+    url_fixture: str, request: pytest.FixtureRequest
+) -> None:
+    """Bulk PATCH applies validity / customer_id only to the given ids."""
+    sync_url: str = request.getfixturevalue(url_fixture)
+    ids = _seed_admin_and_plain_user(sync_url)
+    session, engine = await _make_session(sync_url)
+    ns = uuid.uuid4().hex[:8]
+
+    async with session as s:
+        admin_user = AuthenticatedUser(
+            id=ids["admin_id"],
+            login="root@localhost",
+            first_name="Admin",
+            last_name="Znuny",
+            auth_method="session",
+        )
+        cust_a = f"BULK-A-{ns}"
+        cust_b = f"BULK-B-{ns}"
+        created: list[int] = []
+        for i in range(4):
+            cu = await admin_customers.create_customer_user(
+                CustomerUserAdminCreate(
+                    login=f"bulk.{i}.{ns}@example.com",
+                    email=f"bulk.{i}.{ns}@example.com",
+                    customer_id=cust_a,
+                    first_name="Bulk",
+                    last_name=f"User{i}",
+                ),
+                admin_user,
+                s,
+            )
+            created.append(cu.id)
+
+        target = created[:3]
+        leave = created[3]
+
+        # Validity bulk-set (valid_id=2) on three of four.
+        result = await admin_customers.bulk_update_customer_users(
+            CustomerUserBulkUpdate(ids=target, valid_id=2),
+            admin_user,
+            s,
+        )
+        assert result.updated == 3
+
+        for cid in target:
+            row = await admin_customers.get_customer_user(cid, admin_user, s)
+            assert row.valid_id == 2
+        untouched = await admin_customers.get_customer_user(leave, admin_user, s)
+        assert untouched.valid_id == 1
+
+        # Company reassignment only on a subset.
+        result2 = await admin_customers.bulk_update_customer_users(
+            CustomerUserBulkUpdate(ids=target[:2], customer_id=cust_b),
+            admin_user,
+            s,
+        )
+        assert result2.updated == 2
+        for cid in target[:2]:
+            row = await admin_customers.get_customer_user(cid, admin_user, s)
+            assert row.customer_id == cust_b
+        still_a = await admin_customers.get_customer_user(target[2], admin_user, s)
+        assert still_a.customer_id == cust_a
+
+        # Schema rejects empty ids and over-cap lists (FastAPI → 422).
+        with pytest.raises(ValidationError):
+            CustomerUserBulkUpdate(ids=[])
+        with pytest.raises(ValidationError):
+            CustomerUserBulkUpdate(ids=list(range(1001)))
+
+        # Endpoint-level guards still fire when validation is bypassed.
+        with pytest.raises(HTTPException) as empty_exc:
+            await admin_customers.bulk_update_customer_users(
+                CustomerUserBulkUpdate.model_construct(ids=[]),
+                admin_user,
+                s,
+            )
+        assert empty_exc.value.status_code == 422
+
+        with pytest.raises(HTTPException) as cap_exc:
+            await admin_customers.bulk_update_customer_users(
+                CustomerUserBulkUpdate.model_construct(ids=list(range(1001))),
+                admin_user,
+                s,
+            )
+        assert cap_exc.value.status_code == 422
 
     await engine.dispose()
 

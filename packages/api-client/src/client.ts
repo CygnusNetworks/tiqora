@@ -125,6 +125,8 @@ export type PriorityUpdate = Schemas["PriorityUpdate"];
 export type CustomerUserAdminOut = Schemas["CustomerUserAdminOut"];
 export type CustomerUserAdminCreate = Schemas["CustomerUserAdminCreate"];
 export type CustomerUserAdminUpdate = Schemas["CustomerUserAdminUpdate"];
+export type CustomerUserBulkUpdate = Schemas["CustomerUserBulkUpdate"];
+export type CustomerUserBulkUpdateResult = Schemas["CustomerUserBulkUpdateResult"];
 export type CustomerCompanyOut = Schemas["CustomerCompanyOut"];
 export type CustomerCompanyCreate = Schemas["CustomerCompanyCreate"];
 export type CustomerCompanyUpdate = Schemas["CustomerCompanyUpdate"];
@@ -1301,6 +1303,14 @@ export class ApiClient {
   get adminCustomerUsers() {
     return this.adminCrud<CustomerUserAdminOut, CustomerUserAdminCreate, CustomerUserAdminUpdate>(
       "/api/v1/admin/customer-users",
+    );
+  }
+
+  bulkUpdateCustomerUsers(body: CustomerUserBulkUpdate, signal?: AbortSignal) {
+    return this.request<CustomerUserBulkUpdateResult>(
+      "PATCH",
+      "/api/v1/admin/customer-users/bulk",
+      { body, signal },
     );
   }
 

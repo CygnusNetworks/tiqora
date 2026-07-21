@@ -319,6 +319,18 @@ class CustomerUserAdminUpdate(BaseModel):
     valid_id: int | None = None
 
 
+class CustomerUserBulkUpdate(BaseModel):
+    """Bulk-patch a set of customer_user rows (validity and/or company)."""
+
+    ids: list[int] = Field(..., min_length=1, max_length=1000)
+    valid_id: int | None = None
+    customer_id: str | None = None
+
+
+class CustomerUserBulkUpdateResult(BaseModel):
+    updated: int
+
+
 class CustomerCompanyOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
