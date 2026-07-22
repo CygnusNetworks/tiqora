@@ -152,11 +152,68 @@ describe("AdminResourcePage", () => {
     const ids = run.mock.calls[0][0] as Array<number | string>;
     expect(ids).toEqual(expect.arrayContaining([1, 2]));
     expect(ids).toHaveLength(2);
+    // run also receives a ctx object with an onProgress callback.
+    const ctx = run.mock.calls[0][1] as { onProgress?: (done: number, total: number) => void };
+    expect(typeof ctx.onProgress).toBe("function");
 
-    // Selection cleared after action.
+    // Selection cleared after action; count/action buttons gone but the
+    // success status stays visible in the bar.
     await waitFor(() => {
-      expect(screen.queryByTestId("admin-bulk-bar")).not.toBeInTheDocument();
+      expect(screen.queryByTestId("admin-bulk-count")).not.toBeInTheDocument();
     });
+    expect(screen.getByTestId("admin-bulk-status").textContent).toMatch(/2/);
+  });
+
+  it("shows busy state (disabled buttons + spinner) while a bulk action runs", async () => {
+    let resolveRun!: (value: void) => void;
+    const run = vi.fn().mockImplementation(
+      () =>
+        new Promise<void>((resolve) => {
+          resolveRun = resolve;
+        }),
+    );
+    renderPage({
+      bulkActions: [{ key: "valid", label: "Set valid", run }],
+    });
+
+    await waitFor(() => {
+      expect(screen.getByTestId("admin-row-select-1")).toBeInTheDocument();
+    });
+    fireEvent.click(screen.getByTestId("admin-row-select-1"));
+    await screen.findByTestId("admin-bulk-bar");
+
+    const button = screen.getByTestId("admin-bulk-action-valid");
+    fireEvent.click(button);
+
+    await waitFor(() => {
+      expect(button).toBeDisabled();
+    });
+
+    resolveRun();
+    await waitFor(() => {
+      expect(screen.getByTestId("admin-bulk-status")).toBeInTheDocument();
+    });
+  });
+
+  it("shows a red error status and keeps the selection when the action fails", async () => {
+    const run = vi.fn().mockRejectedValue(new Error("boom"));
+    renderPage({
+      bulkActions: [{ key: "valid", label: "Set valid", run }],
+    });
+
+    await waitFor(() => {
+      expect(screen.getByTestId("admin-row-select-1")).toBeInTheDocument();
+    });
+    fireEvent.click(screen.getByTestId("admin-row-select-1"));
+    await screen.findByTestId("admin-bulk-bar");
+    fireEvent.click(screen.getByTestId("admin-bulk-action-valid"));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("admin-bulk-status")).toBeInTheDocument();
+    });
+    // Selection is retained so the user can correct and retry.
+    expect(screen.getByTestId("admin-bulk-count")).toBeInTheDocument();
+    expect(screen.getByTestId("admin-bulk-count").textContent).toMatch(/1/);
   });
 
   it("create button is a compact + with accessible name from newLabel", async () => {

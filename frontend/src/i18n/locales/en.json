@@ -547,7 +547,11 @@
     "bulk": {
       "selected": "{{count}} selected",
       "selectAll": "Select all on page",
-      "selectRow": "Select row"
+      "selectRow": "Select row",
+      "done": "{{count}} updated",
+      "progress": "{{done}}/{{total}} processed…",
+      "error": "Action failed: {{message}}",
+      "errorGeneric": "Action failed."
     },
     "pagination": {
       "prev": "Previous",

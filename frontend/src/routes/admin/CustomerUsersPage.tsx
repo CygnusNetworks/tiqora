@@ -14,6 +14,7 @@ import type { FieldDef, FieldValues } from "@/components/admin/CrudDrawer";
 import type { DataTableColumn } from "@/components/admin/DataTable";
 import { Button } from "@/components/ui/Button";
 import { Dialog } from "@/components/ui/Dialog";
+import { bulkInChunks } from "@/lib/bulk";
 import { formatDateTime } from "@/lib/format";
 
 function useDebouncedValue<T>(value: T, delayMs: number): T {
@@ -128,32 +129,32 @@ export function CustomerUsersPage() {
       {
         key: "valid",
         label: t("admin.customerUsers.bulk.valid"),
-        run: async (ids) => {
-          await api.bulkUpdateCustomerUsers({
-            ids: ids.map(Number),
-            valid_id: 1,
-          });
-        },
+        run: (ids, { onProgress }) =>
+          bulkInChunks(
+            ids,
+            (chunk) => api.bulkUpdateCustomerUsers({ ids: chunk.map(Number), valid_id: 1 }),
+            onProgress,
+          ),
       },
       {
         key: "invalid",
         label: t("admin.customerUsers.bulk.invalid"),
-        run: async (ids) => {
-          await api.bulkUpdateCustomerUsers({
-            ids: ids.map(Number),
-            valid_id: 2,
-          });
-        },
+        run: (ids, { onProgress }) =>
+          bulkInChunks(
+            ids,
+            (chunk) => api.bulkUpdateCustomerUsers({ ids: chunk.map(Number), valid_id: 2 }),
+            onProgress,
+          ),
       },
       {
         key: "temp",
         label: t("admin.customerUsers.bulk.temp"),
-        run: async (ids) => {
-          await api.bulkUpdateCustomerUsers({
-            ids: ids.map(Number),
-            valid_id: 3,
-          });
-        },
+        run: (ids, { onProgress }) =>
+          bulkInChunks(
+            ids,
+            (chunk) => api.bulkUpdateCustomerUsers({ ids: chunk.map(Number), valid_id: 3 }),
+            onProgress,
+          ),
       },
       {
         key: "company",
@@ -206,10 +207,9 @@ export function CustomerUsersPage() {
     setCompanyBusy(true);
     setCompanyError(null);
     try {
-      await api.bulkUpdateCustomerUsers({
-        ids: companyDialog.ids.map(Number),
-        customer_id: customerId,
-      });
+      await bulkInChunks(companyDialog.ids, (chunk) =>
+        api.bulkUpdateCustomerUsers({ ids: chunk.map(Number), customer_id: customerId }),
+      );
       setCompanyDialog(null);
       await queryClient.invalidateQueries({ queryKey: ["admin", "customer-users"] });
     } catch (err) {

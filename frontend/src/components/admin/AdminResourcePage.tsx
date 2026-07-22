@@ -8,6 +8,7 @@ import {
 import { useTranslation } from "react-i18next";
 import { ApiError, type AdminListParams, type AdminPage, type AdminValidFilter } from "@/lib/api";
 import { Button } from "@/components/ui/Button";
+import { Spinner } from "@/components/ui/Spinner";
 import { PlusIcon } from "@/components/ui/icons";
 import { cn } from "@/lib/cn";
 import {
@@ -25,10 +26,19 @@ export type AdminCrudApi<Out, Create, Update> = {
   deactivate: (id: number | string, signal?: AbortSignal) => Promise<void>;
 };
 
+export type AdminBulkActionContext = {
+  /** Chunked actions call this after each chunk so the bar can show progress. */
+  onProgress?: (done: number, total: number) => void;
+};
+
 export type AdminBulkAction = {
   key: string;
   label: string;
-  run: (ids: Array<number | string>) => Promise<void>;
+  /** May return `{ updated }` so the bar can report an exact count. */
+  run: (
+    ids: Array<number | string>,
+    ctx: AdminBulkActionContext,
+  ) => Promise<void | { updated: number }>;
 };
 
 export type AdminResourcePageProps<Out, Create, Update> = {
@@ -195,6 +205,19 @@ export function AdminResourcePage<Out, Create, Update>({
 
   const [selected, setSelected] = useState<Set<string | number>>(() => new Set());
   const bulkEnabled = Boolean(bulkActions && bulkActions.length > 0);
+  // Key of the currently-running bulk action, or null when idle.
+  const [bulkBusy, setBulkBusy] = useState<string | null>(null);
+  const [bulkProgress, setBulkProgress] = useState<{ done: number; total: number } | null>(null);
+  const [bulkStatus, setBulkStatus] = useState<{ tone: "success" | "error"; text: string } | null>(
+    null,
+  );
+
+  // Success feedback auto-dismisses; errors stay until the next action.
+  useEffect(() => {
+    if (bulkStatus?.tone !== "success") return;
+    const handle = window.setTimeout(() => setBulkStatus(null), 6000);
+    return () => window.clearTimeout(handle);
+  }, [bulkStatus]);
 
   // Reset to page 1 when the debounced search term changes.
   useEffect(() => {
@@ -335,9 +358,28 @@ export function AdminResourcePage<Out, Create, Update>({
   const runBulkAction = async (action: AdminBulkAction) => {
     const ids = Array.from(selected);
     if (ids.length === 0) return;
-    await action.run(ids);
-    setSelected(new Set());
-    await invalidate();
+    setBulkBusy(action.key);
+    setBulkStatus(null);
+    setBulkProgress(null);
+    try {
+      const result = await action.run(ids, {
+        onProgress: (done, total) => setBulkProgress({ done, total }),
+      });
+      const count = result && typeof result === "object" ? result.updated : ids.length;
+      setBulkStatus({ tone: "success", text: t("admin.bulk.done", { count }) });
+      setSelected(new Set());
+      await invalidate();
+    } catch (err) {
+      const message =
+        err instanceof ApiError && err.message && !err.message.startsWith("HTTP ")
+          ? err.message
+          : t("admin.bulk.errorGeneric");
+      // Selection is intentionally kept so the user can retry.
+      setBulkStatus({ tone: "error", text: t("admin.bulk.error", { message }) });
+    } finally {
+      setBulkBusy(null);
+      setBulkProgress(null);
+    }
   };
 
   const handleSubmit = async (values: FieldValues) => {
@@ -502,31 +544,55 @@ export function AdminResourcePage<Out, Create, Update>({
         </div>
       </div>
 
-      {bulkEnabled && selected.size > 0 && bulkActions && (
+      {bulkEnabled && (selected.size > 0 || bulkStatus !== null) && bulkActions && (
         <div
-          className="fixed bottom-6 left-1/2 z-40 flex -translate-x-1/2 items-center gap-2 rounded-full border border-accent/50 bg-accent-dim px-3 py-2 shadow-lg"
+          className="fixed bottom-6 left-1/2 z-40 flex -translate-x-1/2 flex-wrap items-center gap-2 rounded-full border border-accent/50 bg-accent-dim px-3 py-2 shadow-lg"
           data-testid="admin-bulk-bar"
           role="toolbar"
           aria-label={t("admin.bulk.selected", { count: selected.size })}
         >
-          <span
-            className="rounded-full bg-accent px-2 py-0.5 font-mono text-[11px] tabular-nums text-white"
-            data-testid="admin-bulk-count"
-          >
-            {t("admin.bulk.selected", { count: selected.size })}
-          </span>
-          {bulkActions.map((action) => (
-            <Button
-              key={action.key}
-              size="sm"
-              variant="secondary"
-              data-testid={`admin-bulk-action-${action.key}`}
-              onClick={() => void runBulkAction(action)}
-              className="border-accent/40 bg-surface text-accent hover:bg-surface-subtle"
+          {selected.size > 0 && (
+            <span
+              className="rounded-full bg-accent px-2 py-0.5 font-mono text-[11px] tabular-nums text-white"
+              data-testid="admin-bulk-count"
             >
-              {action.label}
-            </Button>
-          ))}
+              {t("admin.bulk.selected", { count: selected.size })}
+            </span>
+          )}
+          {selected.size > 0 &&
+            bulkActions.map((action) => (
+              <Button
+                key={action.key}
+                size="sm"
+                variant="secondary"
+                disabled={bulkBusy !== null}
+                data-testid={`admin-bulk-action-${action.key}`}
+                onClick={() => void runBulkAction(action)}
+                className="border-accent/40 bg-surface text-accent hover:bg-surface-subtle"
+              >
+                {bulkBusy === action.key && <Spinner className="mr-1 h-3 w-3" />}
+                {action.label}
+              </Button>
+            ))}
+          {bulkBusy && bulkProgress && (
+            <span
+              className="font-mono text-[11px] tabular-nums text-accent"
+              data-testid="admin-bulk-progress"
+            >
+              {t("admin.bulk.progress", { done: bulkProgress.done, total: bulkProgress.total })}
+            </span>
+          )}
+          {bulkStatus && (
+            <span
+              className={cn(
+                "text-xs font-medium",
+                bulkStatus.tone === "success" ? "text-green" : "text-danger",
+              )}
+              data-testid="admin-bulk-status"
+            >
+              {bulkStatus.text}
+            </span>
+          )}
         </div>
       )}
 

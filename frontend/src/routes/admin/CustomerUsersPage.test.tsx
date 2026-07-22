@@ -3,6 +3,7 @@ import { render, screen, waitFor, fireEvent } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { I18nextProvider } from "react-i18next";
 import i18n from "@/i18n";
+import { ApiError } from "@/lib/api";
 import { CustomerUsersPage } from "./CustomerUsersPage";
 
 const list = vi.fn();
@@ -18,10 +19,16 @@ vi.mock("@tanstack/react-router", () => ({
 }));
 
 vi.mock("@/lib/api", () => ({
+  // Mirrors the real ApiError(status, detail, path) shape (packages/api-client)
+  // so lib/bulk.ts's `new ApiError(err.status, message, err.path)` re-wrap works.
   ApiError: class ApiError extends Error {
-    constructor(message: string) {
-      super(message);
+    status: number;
+    path: string;
+    constructor(status: number, detail: unknown, path: string) {
+      super(typeof detail === "string" ? detail : `HTTP ${status}`);
       this.name = "ApiError";
+      this.status = status;
+      this.path = path;
     }
   },
   api: {
@@ -183,6 +190,95 @@ describe("CustomerUsersPage", () => {
     const logins = call.search.logins.split(",");
     expect(logins).toEqual(expect.arrayContaining(["alice@example.com", "bob@example.com"]));
     expect(logins).toHaveLength(2);
+  });
+
+  describe("bulk chunking over the 1000-id backend cap", () => {
+    /** Synthetic customer_user row matching CustomerUserAdminOut. */
+    function makeRow(id: number) {
+      return {
+        ...sampleRow,
+        id,
+        login: `edu.${id}@example.com`,
+        email: `edu.${id}@example.com`,
+      };
+    }
+
+    /** Chunked "Alle" list mock serving `total` rows in 500-row pages. */
+    function makeAllListMock(total: number) {
+      return vi.fn().mockImplementation(async (params?: { page?: number; pageSize?: number }) => {
+        const page = params?.page ?? 1;
+        const pageSize = params?.pageSize ?? 100;
+        const start = (page - 1) * pageSize;
+        const end = Math.min(start + pageSize, total);
+        const items = [];
+        for (let i = start; i < end; i++) items.push(makeRow(i + 1));
+        return { items, total, page, page_size: pageSize };
+      });
+    }
+
+    async function selectAllViaAllePageSize(total: number) {
+      list.mockImplementation(makeAllListMock(total));
+      renderPage();
+      await waitFor(() => {
+        expect(screen.getByTestId("admin-customer-users-page-size")).toBeInTheDocument();
+      });
+      fireEvent.change(screen.getByTestId("admin-customer-users-page-size"), {
+        target: { value: "100000" },
+      });
+      await waitFor(() => {
+        expect(screen.getByTestId(`admin-row-${total}`)).toBeInTheDocument();
+      });
+      fireEvent.click(screen.getByTestId("admin-select-all"));
+      await screen.findByTestId("admin-bulk-bar");
+    }
+
+    it("splits a 2988-id selection into 3 chunked PATCH calls (1000/1000/988)", async () => {
+      bulkUpdateCustomerUsers.mockImplementation(async (body: { ids: number[] }) => ({
+        updated: body.ids.length,
+      }));
+      await selectAllViaAllePageSize(2988);
+
+      bulkUpdateCustomerUsers.mockClear();
+      fireEvent.click(screen.getByTestId("admin-bulk-action-invalid"));
+
+      await waitFor(() => {
+        expect(screen.getByTestId("admin-bulk-status")).toBeInTheDocument();
+      });
+      expect(bulkUpdateCustomerUsers).toHaveBeenCalledTimes(3);
+      const sizes = bulkUpdateCustomerUsers.mock.calls.map(
+        (c) => (c[0] as { ids: number[] }).ids.length,
+      );
+      expect(sizes).toEqual([1000, 1000, 988]);
+      // Every id present exactly once across the three chunks.
+      const allIds = bulkUpdateCustomerUsers.mock.calls.flatMap(
+        (c) => (c[0] as { ids: number[] }).ids,
+      );
+      expect(new Set(allIds).size).toBe(2988);
+      // Success feedback reports the summed count.
+      expect(screen.getByTestId("admin-bulk-status").textContent).toMatch(/2988/);
+    }, 20000);
+
+    it("stops after a failing chunk and reports progress in the error message", async () => {
+      await selectAllViaAllePageSize(2988);
+
+      bulkUpdateCustomerUsers
+        .mockImplementationOnce(async () => ({ updated: 1000 }))
+        .mockImplementationOnce(async () => {
+          throw new ApiError(422, "boom", "/admin/customer-users/bulk");
+        });
+      fireEvent.click(screen.getByTestId("admin-bulk-action-invalid"));
+
+      await waitFor(() => {
+        expect(screen.getByTestId("admin-bulk-status")).toBeInTheDocument();
+      });
+      // Aborted after the 2nd chunk — never reached the 3rd.
+      expect(bulkUpdateCustomerUsers).toHaveBeenCalledTimes(2);
+      const status = screen.getByTestId("admin-bulk-status").textContent ?? "";
+      expect(status).toMatch(/1000/);
+      expect(status).toMatch(/2988/);
+      // Selection is retained so the user can retry.
+      expect(screen.getByTestId("admin-bulk-count")).toBeInTheDocument();
+    }, 20000);
   });
 
   it("sorts by login header and toggles the indicator", async () => {
