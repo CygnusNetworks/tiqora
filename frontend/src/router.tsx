@@ -683,9 +683,15 @@ const routeTree = rootRoute.addChildren([
   catchAllRoute,
 ]);
 
+// Vite serves the demo under a project sub-path (e.g. "/tiqora/demo/").
+// TanStack Router needs the same prefix or every <Navigate to="/agent" /> and
+// Link would jump to the host root (https://…github.io/agent) and 404.
+const routerBasepath = (import.meta.env.BASE_URL || "/").replace(/\/+$/, "") || "/";
+
 export const router = createRouter({
   routeTree,
   defaultPreload: "intent",
+  basepath: routerBasepath,
 });
 
 declare module "@tanstack/react-router" {
