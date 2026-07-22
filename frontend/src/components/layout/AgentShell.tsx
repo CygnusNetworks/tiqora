@@ -2,7 +2,6 @@ import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 import { Link, useLocation, useNavigate } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
-import { useAuth } from "@/auth/AuthContext";
 import { api, type QueueNode } from "@/lib/api";
 import { flattenQueues } from "@/components/agent/QueueTree";
 import { Button } from "@/components/ui/Button";
@@ -218,29 +217,6 @@ function QueueNavSection({ flat, onNavigate }: { flat: QueueNode[]; onNavigate?:
   );
 }
 
-/** Admin nav entry, shown only when ``UserMe.is_admin`` is true (same source
- * as RequireAdmin / AccountMenu — no extra probe request). Renders nothing
- * for non-admins; no disabled state, no flicker. */
-function AdminNavItem({ onNavigate }: { onNavigate?: () => void }) {
-  const { t } = useTranslation();
-  const { user } = useAuth();
-
-  if (!user?.is_admin) return null;
-
-  return (
-    <div>
-      <div className="space-y-0.5">
-        <NavItem
-          to="/admin"
-          label={t("nav.admin")}
-          testId="agent-nav-admin"
-          onNavigate={onNavigate}
-        />
-      </div>
-    </div>
-  );
-}
-
 function SidebarBody({ onNavigate }: { onNavigate?: () => void }) {
   const { t } = useTranslation();
 
@@ -358,8 +334,6 @@ function SidebarBody({ onNavigate }: { onNavigate?: () => void }) {
             />
           </div>
         </div>
-
-        <AdminNavItem onNavigate={onNavigate} />
       </nav>
 
       {/* Version/git-sha footer — kept after removing the redundant bottom-left user card. */}
