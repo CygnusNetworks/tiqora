@@ -148,6 +148,19 @@ h3 {
   padding: 5px 6px;
 }
 
+@keyframes admin-list-progress-slide {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(350%);
+  }
+}
+
+.admin-list-progress-bar {
+  animation: admin-list-progress-slide 1.1s ease-in-out infinite;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

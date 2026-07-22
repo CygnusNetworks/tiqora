@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   keepPreviousData,
   useMutation,
@@ -9,7 +9,7 @@ import { useTranslation } from "react-i18next";
 import { ApiError, type AdminListParams, type AdminPage, type AdminValidFilter } from "@/lib/api";
 import { Button } from "@/components/ui/Button";
 import { Spinner } from "@/components/ui/Spinner";
-import { PlusIcon } from "@/components/ui/icons";
+import { CheckIcon, PlusIcon } from "@/components/ui/icons";
 import { cn } from "@/lib/cn";
 import {
   DataTable,
@@ -106,6 +106,10 @@ const DEFAULT_ALL_PAGE_SIZE = 100_000;
 const ALL_CHUNK_SIZE = 500;
 /** Hard cap on chunk requests (~200k rows) to prevent infinite loops. */
 const ALL_CHUNK_HARD_MAX = 400;
+/** Delay before showing the "refreshing" busy treatment, to avoid flicker on fast refetches. */
+const REFRESH_BUSY_DELAY_MS = 200;
+/** How long the post-refetch success tone stays on the count chip. */
+const REFRESH_SUCCESS_DURATION_MS = 3000;
 
 function useDebouncedValue<T>(value: T, delayMs: number): T {
   const [debounced, setDebounced] = useState(value);
@@ -272,6 +276,46 @@ export function AdminResourcePage<Out, Create, Update>({
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
   const firstRow = total === 0 ? 0 : (page - 1) * pageSize + 1;
   const lastRow = Math.min(page * pageSize, total);
+
+  // Background refetch, as opposed to the initial load (which keeps the
+  // existing full-table loading state in DataTable).
+  const isRefetching = listQ.isFetching && !listQ.isLoading;
+
+  // Delay-guarded so a refetch that resolves within ~200ms never flickers.
+  const [refreshBusy, setRefreshBusy] = useState(false);
+  useEffect(() => {
+    if (!isRefetching) {
+      setRefreshBusy(false);
+      return;
+    }
+    const handle = window.setTimeout(() => setRefreshBusy(true), REFRESH_BUSY_DELAY_MS);
+    return () => window.clearTimeout(handle);
+  }, [isRefetching]);
+
+  // Green "success" tone on the count chip for a few seconds after a refetch
+  // completes, then back to neutral.
+  const [refreshSuccess, setRefreshSuccess] = useState(false);
+  const wasRefetchingRef = useRef(false);
+  useEffect(() => {
+    if (isRefetching) {
+      wasRefetchingRef.current = true;
+      setRefreshSuccess(false);
+      return;
+    }
+    if (!wasRefetchingRef.current) return;
+    wasRefetchingRef.current = false;
+    setRefreshSuccess(true);
+    const handle = window.setTimeout(() => setRefreshSuccess(false), REFRESH_SUCCESS_DURATION_MS);
+    return () => window.clearTimeout(handle);
+  }, [isRefetching]);
+
+  const allLoaded = allowAllPageSize && pageSize === allPageSize;
+  const countText =
+    total === 0
+      ? t("admin.list.countNone")
+      : allLoaded
+        ? t("admin.list.countShownAll", { total })
+        : t("admin.list.countShown", { total, from: firstRow, to: lastRow });
 
   const pageIds = useMemo(() => rows.map((r) => idOf(r)), [rows, idOf]);
   const allPageSelected =
@@ -467,27 +511,54 @@ export function AdminResourcePage<Out, Create, Update>({
             </label>
           )}
         </div>
-        <label className="inline-flex items-center gap-1.5 text-xs text-muted">
-          {t("admin.pagination.pageSize")}
-          <select
-            className="rounded-md border border-hairline bg-surface px-1.5 py-1 text-xs text-ink"
-            value={pageSize}
-            data-testid={`admin-${resourceKey}-page-size`}
-            onChange={(e) => changePageSize(Number(e.target.value))}
-          >
-            {pageSizeOptions.map((n) => (
-              <option key={n} value={n}>
-                {n}
-              </option>
-            ))}
-            {allowAllPageSize && (
-              <option value={allPageSize} data-testid={`admin-${resourceKey}-page-size-all`}>
-                {t("admin.pagination.all")}
-              </option>
+        <div className="flex items-center gap-2">
+          <span
+            data-testid="admin-list-count"
+            data-state={refreshBusy ? "busy" : refreshSuccess ? "success" : "neutral"}
+            className={cn(
+              "inline-flex items-center gap-1 rounded-full px-2 py-1 font-mono text-xs tabular-nums transition-colors",
+              refreshBusy && "bg-accent-dim text-accent",
+              !refreshBusy && refreshSuccess && "bg-green/15 text-green",
+              !refreshBusy && !refreshSuccess && "text-muted",
             )}
-          </select>
-        </label>
+          >
+            {refreshBusy && <Spinner className="h-3 w-3" />}
+            {!refreshBusy && refreshSuccess && <CheckIcon className="text-[13px]" />}
+            {refreshBusy ? t("admin.list.refreshing") : countText}
+          </span>
+          <label className="inline-flex items-center gap-1.5 text-xs text-muted">
+            {t("admin.pagination.pageSize")}
+            <select
+              className="rounded-md border border-hairline bg-surface px-1.5 py-1 text-xs text-ink"
+              value={pageSize}
+              data-testid={`admin-${resourceKey}-page-size`}
+              onChange={(e) => changePageSize(Number(e.target.value))}
+            >
+              {pageSizeOptions.map((n) => (
+                <option key={n} value={n}>
+                  {n}
+                </option>
+              ))}
+              {allowAllPageSize && (
+                <option value={allPageSize} data-testid={`admin-${resourceKey}-page-size-all`}>
+                  {t("admin.pagination.all")}
+                </option>
+              )}
+            </select>
+          </label>
+        </div>
       </div>
+
+      {refreshBusy && (
+        <div
+          className="h-[3px] w-full overflow-hidden rounded-full bg-accent-dim"
+          data-testid="admin-list-progress"
+          role="progressbar"
+          aria-label={t("admin.list.refreshing")}
+        >
+          <div className="admin-list-progress-bar h-full w-1/3 rounded-full bg-accent" />
+        </div>
+      )}
 
       <DataTable
         columns={columns}
@@ -512,13 +583,11 @@ export function AdminResourcePage<Out, Create, Update>({
         sort={sortable ? sortState : undefined}
         onSortChange={sortable ? changeSort : undefined}
         statusSortable={sortable && statusSortable}
+        busy={refreshBusy}
         testId={`admin-${resourceKey}-table`}
       />
 
-      <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted">
-        <span data-testid={`admin-${resourceKey}-count`}>
-          {t("admin.pagination.showing", { from: firstRow, to: lastRow, total })}
-        </span>
+      <div className="flex flex-wrap items-center justify-end gap-2 text-xs text-muted">
         <div className="inline-flex items-center gap-2">
           <Button
             size="sm"

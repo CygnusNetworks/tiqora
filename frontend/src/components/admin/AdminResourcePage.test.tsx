@@ -381,6 +381,21 @@ describe("AdminResourcePage", () => {
       expect(list).toHaveBeenCalledTimes(1);
     });
 
+    it('shows "alle N angezeigt" when the Alle page size has loaded every row', async () => {
+      const list = makeChunkedListMock(30);
+      renderPage({ allowAllPageSize: true }, list);
+
+      await waitFor(() => expect(list).toHaveBeenCalled());
+      fireEvent.change(screen.getByTestId("admin-test-resource-page-size"), {
+        target: { value: "100000" },
+      });
+
+      await waitFor(() => {
+        expect(screen.getByTestId("admin-row-30")).toBeInTheDocument();
+      });
+      expect(screen.getByTestId("admin-list-count").textContent).toMatch(/all 30|alle 30/i);
+    });
+
     it("renders empty state under Alle with no infinite loop", async () => {
       const list = makeChunkedListMock(0);
       renderPage({ allowAllPageSize: true }, list);
@@ -403,6 +418,88 @@ describe("AdminResourcePage", () => {
         expect.anything(),
       );
       expect(screen.queryByTestId(/^admin-row-\d+$/)).not.toBeInTheDocument();
+    });
+  });
+
+  describe("list count chip + refetch feedback", () => {
+    it("shows the count from the envelope total, not items.length", async () => {
+      const list = vi.fn().mockResolvedValue({
+        items: [{ id: 1, name: "Alpha", valid_id: 1 }],
+        total: 42,
+        page: 1,
+        page_size: 25,
+      });
+      renderPage({}, list);
+
+      const chip = await screen.findByTestId("admin-list-count");
+      await waitFor(() => expect(chip.textContent).toMatch(/42/));
+      expect(chip.textContent?.trim().startsWith("1")).toBe(false);
+    });
+
+    it("shows the empty-results label when total is 0", async () => {
+      const list = vi.fn().mockResolvedValue({ items: [], total: 0, page: 1, page_size: 25 });
+      renderPage({}, list);
+
+      await waitFor(() => {
+        expect(screen.getByTestId("admin-list-count").textContent).toMatch(/No results|Keine Treffer/);
+      });
+    });
+
+    it("delays the busy state, dims the table, then flashes success before returning to neutral", async () => {
+      vi.useFakeTimers({ shouldAdvanceTime: true });
+      let resolveRefetch!: (value: unknown) => void;
+      const list = vi
+        .fn()
+        .mockResolvedValueOnce({
+          items: [{ id: 1, name: "Alpha", valid_id: 1 }],
+          total: 1,
+          page: 1,
+          page_size: 25,
+        })
+        .mockImplementationOnce(
+          () =>
+            new Promise((resolve) => {
+              resolveRefetch = resolve;
+            }),
+        );
+      renderPage({}, list);
+      await screen.findByTestId("admin-row-1");
+
+      fireEvent.click(screen.getByTestId("admin-valid-invalid"));
+      await waitFor(() => expect(list).toHaveBeenCalledTimes(2));
+
+      // Under the flicker-guard delay: still neutral, no progress bar, table not dimmed.
+      await vi.advanceTimersByTimeAsync(100);
+      expect(screen.getByTestId("admin-list-count")).toHaveAttribute("data-state", "neutral");
+      expect(screen.queryByTestId("admin-list-progress")).not.toBeInTheDocument();
+
+      // Past the delay: busy chip, progress bar, dimmed table body.
+      await vi.advanceTimersByTimeAsync(150);
+      expect(screen.getByTestId("admin-list-count")).toHaveAttribute("data-state", "busy");
+      expect(screen.getByTestId("admin-list-progress")).toBeInTheDocument();
+      const tbody = screen.getByTestId("admin-test-resource-table").querySelector("tbody");
+      expect(tbody).toHaveAttribute("data-state", "busy");
+
+      resolveRefetch({
+        items: [{ id: 2, name: "Beta", valid_id: 0 }],
+        total: 1,
+        page: 1,
+        page_size: 25,
+      });
+
+      await waitFor(() => {
+        expect(screen.getByTestId("admin-list-count")).toHaveAttribute("data-state", "success");
+      });
+      expect(screen.queryByTestId("admin-list-progress")).not.toBeInTheDocument();
+
+      await waitFor(
+        () => {
+          expect(screen.getByTestId("admin-list-count")).toHaveAttribute("data-state", "neutral");
+        },
+        { timeout: 6000 },
+      );
+
+      vi.useRealTimers();
     });
   });
 });

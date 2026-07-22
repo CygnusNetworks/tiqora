@@ -584,6 +584,12 @@
       "showing": "{{from}}–{{to}} of {{total}}",
       "all": "All"
     },
+    "list": {
+      "countShown": "{{total}} results · showing {{from}}–{{to}}",
+      "countShownAll": "showing all {{total}}",
+      "countNone": "No results",
+      "refreshing": "Refreshing…"
+    },
     "roleAssignments": {
       "title": "Role assignment",
       "subtitle": "Pick an agent and set which roles they hold.",
