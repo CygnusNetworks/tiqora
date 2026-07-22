@@ -1209,6 +1209,41 @@
         "all": "All",
         "temp": "Temporary"
       },
+      "filters": {
+        "title": "More filters",
+        "addButton": "Filter",
+        "addPlaceholder": "Choose a filter…",
+        "commit": "Apply",
+        "remove": "Remove filter: {{label}}",
+        "noneActive": "No additional filters active."
+      },
+      "summary": {
+        "title": "Active selection",
+        "logins": "{{count}} login(s) selected directly",
+        "companies": "Companies: {{list}}",
+        "empty": "No selection criteria chosen yet."
+      },
+      "liveCount": {
+        "label": "Live match count",
+        "loading": "Counting…",
+        "error": "Count failed.",
+        "zero": "No matches for this selection.",
+        "high": "Very large selection (> 1000) — please review."
+      },
+      "recordPreview": {
+        "action": "Preview",
+        "close": "Close",
+        "loading": "Loading record preview…",
+        "error": "Record preview failed.",
+        "field": "Field",
+        "before": "Before",
+        "after": "After",
+        "unchanged": "unchanged",
+        "deleteTable": "Table",
+        "deleteCount": "Count",
+        "deleteEmpty": "No records would be deleted.",
+        "anonymizeEmpty": "No anonymizable fields found."
+      },
       "add": "Add",
       "preview": "Preview",
       "reset": "Reset",

@@ -22,15 +22,21 @@ from tiqora.api.v1.admin.deps import AdminUser
 from tiqora.api.v1.admin.pagination import ListParams, Page, window
 from tiqora.api.v1.admin.schemas import (
     ErasureSelectorIn,
+    GdprCustomerRecordPreviewOut,
+    GdprCustomerRecordPreviewRequest,
+    GdprDeleteSummaryRowOut,
     GdprErasureJobCreate,
     GdprErasureJobDetailOut,
     GdprErasureJobOut,
     GdprErasurePreviewOut,
     GdprErasurePreviewRequest,
+    GdprFieldPreviewOut,
     GdprPurgeOut,
     GdprResolvedCustomerOut,
     GdprRollbackOut,
     GdprSampleRowOut,
+    GdprSelectorCountOut,
+    GdprSelectorCountRequest,
 )
 from tiqora.config import Settings, get_settings
 from tiqora.db.engine import get_session_factory
@@ -39,9 +45,11 @@ from tiqora.gdpr.erasure import (
     ErasureError,
     ErasureNotFoundError,
     ErasureSelector,
+    build_customer_record_preview,
     build_erasure_preview,
     load_job_backups_export,
     purge_job_backup,
+    resolve_selector,
     rollback_job,
     run_erasure,
 )
@@ -165,6 +173,59 @@ async def preview_erasure(
         sample=[GdprSampleRowOut(**s.__dict__) for s in preview.sample],
         columns_changed=preview.columns_changed,
         tables_deleted=preview.tables_deleted,
+    )
+
+
+@router.post("/selector-count", response_model=GdprSelectorCountOut)
+async def selector_count(
+    body: GdprSelectorCountRequest,
+    admin: AdminUser,
+    session: DbSession,
+) -> GdprSelectorCountOut:
+    """Fast match count for the live selector counter (same selector shape as
+    ``/preview``, but resolves ids only — no customer/sample/count breakdown)."""
+    _ = admin
+    selector = _selector_from_in(body.selector)
+    try:
+        ids = await resolve_selector(session, selector)
+    except ErasureError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
+        ) from exc
+    return GdprSelectorCountOut(count=len(ids))
+
+
+@router.post("/record-preview", response_model=GdprCustomerRecordPreviewOut)
+async def customer_record_preview(
+    body: GdprCustomerRecordPreviewRequest,
+    admin: AdminUser,
+    session: DbSession,
+) -> GdprCustomerRecordPreviewOut:
+    """Per-customer before/after preview. Read-only: no commit is ever issued,
+    and the session is rolled back explicitly in case the engine's read helpers
+    ever pick up a pending flush."""
+    _ = admin
+    try:
+        preview = await build_customer_record_preview(
+            session,
+            body.login,
+            body.mode,
+            seed=body.seed,
+            delete_tickets=body.delete_tickets,
+        )
+    except ErasureNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except ErasureError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
+        ) from exc
+    finally:
+        await session.rollback()
+    return GdprCustomerRecordPreviewOut(
+        login=preview.login,
+        mode=preview.mode,
+        fields=[GdprFieldPreviewOut(**f.__dict__) for f in preview.fields],
+        delete_summary=[GdprDeleteSummaryRowOut(**d.__dict__) for d in preview.delete_summary],
     )
 
 

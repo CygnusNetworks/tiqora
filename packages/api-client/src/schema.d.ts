@@ -1079,6 +1079,49 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/gdpr/record-preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Customer Record Preview
+         * @description Per-customer before/after preview. Read-only: no commit is ever issued,
+         *     and the session is rolled back explicitly in case the engine's read helpers
+         *     ever pick up a pending flush.
+         */
+        post: operations["customer_record_preview_api_v1_admin_gdpr_record_preview_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/gdpr/selector-count": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Selector Count
+         * @description Fast match count for the live selector counter (same selector shape as
+         *     ``/preview``, but resolves ids only — no customer/sample/count breakdown).
+         */
+        post: operations["selector_count_api_v1_admin_gdpr_selector_count_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/generic-agent-jobs": {
         parameters: {
             query?: never;
@@ -5651,6 +5694,52 @@ export interface components {
             /** To Address */
             to_address: string;
         };
+        /** GdprCustomerRecordPreviewOut */
+        GdprCustomerRecordPreviewOut: {
+            /** Delete Summary */
+            delete_summary?: components["schemas"]["GdprDeleteSummaryRowOut"][];
+            /** Fields */
+            fields?: components["schemas"]["GdprFieldPreviewOut"][];
+            /** Login */
+            login: string;
+            /**
+             * Mode
+             * @enum {string}
+             */
+            mode: "anonymize" | "delete";
+        };
+        /**
+         * GdprCustomerRecordPreviewRequest
+         * @description Per-customer before/after preview request. Login is body-only because
+         *     logins may contain characters (e.g. ``#``) that are unsafe as a path segment.
+         */
+        GdprCustomerRecordPreviewRequest: {
+            /**
+             * Delete Tickets
+             * @default false
+             */
+            delete_tickets: boolean;
+            /** Login */
+            login: string;
+            /**
+             * Mode
+             * @default anonymize
+             * @enum {string}
+             */
+            mode: "anonymize" | "delete";
+            /** Seed */
+            seed?: number | null;
+        };
+        /**
+         * GdprDeleteSummaryRowOut
+         * @description One row/object count that would be removed by a delete-mode erasure.
+         */
+        GdprDeleteSummaryRowOut: {
+            /** Count */
+            count: number;
+            /** Table */
+            table: string;
+        };
         /**
          * GdprErasureJobCreate
          * @description Only destructive entry point — requires confirm=true.
@@ -5798,6 +5887,22 @@ export interface components {
             mode: "anonymize" | "delete";
             selector: components["schemas"]["ErasureSelectorIn"];
         };
+        /**
+         * GdprFieldPreviewOut
+         * @description One before/after row in the per-customer record preview (anonymize mode).
+         */
+        GdprFieldPreviewOut: {
+            /** After */
+            after?: unknown;
+            /** Before */
+            before?: unknown;
+            /** Changed */
+            changed: boolean;
+            /** Field */
+            field: string;
+            /** Occurrences */
+            occurrences?: number | null;
+        };
         /** GdprPurgeOut */
         GdprPurgeOut: {
             /** Deleted Backups */
@@ -5827,6 +5932,21 @@ export interface components {
             summary: string;
             /** Table */
             table: string;
+        };
+        /**
+         * GdprSelectorCountOut
+         * @description Fast match count for the selector live-counter (no joins/samples).
+         */
+        GdprSelectorCountOut: {
+            /** Count */
+            count: number;
+        };
+        /**
+         * GdprSelectorCountRequest
+         * @description Live match-count request — shares the selector shape with preview/apply.
+         */
+        GdprSelectorCountRequest: {
+            selector: components["schemas"]["ErasureSelectorIn"];
         };
         /**
          * GenericAgentJobOut
@@ -11159,6 +11279,80 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["GdprErasurePreviewOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    customer_record_preview_api_v1_admin_gdpr_record_preview_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GdprCustomerRecordPreviewRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GdprCustomerRecordPreviewOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    selector_count_api_v1_admin_gdpr_selector_count_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GdprSelectorCountRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GdprSelectorCountOut"];
                 };
             };
             /** @description Validation Error */
