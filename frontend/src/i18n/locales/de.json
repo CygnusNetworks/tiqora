@@ -321,6 +321,37 @@
     "splitDialogTitle": "In neues Ticket teilen",
     "splitQueue": "Ziel-Queue",
     "splitNewTitle": "Titel des neuen Tickets (optional)",
+    "ai": {
+      "title": "KI-Unterstützung",
+      "summaryLabel": "Zusammenfassung",
+      "summarizeButton": "Zusammenfassen",
+      "summaryEmpty": "Noch keine Zusammenfassung.",
+      "summaryAsOf": "Stand: Artikel #{{articleId}}",
+      "summaryUpToDate": "Bereits aktuell — keine neuen Artikel seit der letzten Zusammenfassung.",
+      "draftsLabel": "Entwürfe",
+      "createDraftButton": "KI-Entwurf erstellen",
+      "createDraftHint": "Dies kann bis zu einer Minute dauern…",
+      "draftsEmpty": "Noch keine KI-Entwürfe.",
+      "draftKind": {
+        "reply": "Antwort",
+        "clarify": "Rückfrage"
+      },
+      "draftSource": {
+        "auto": "Automatisch",
+        "manual": "Manuell"
+      },
+      "basedOnArticle": "Basiert auf Artikel #{{articleId}}",
+      "expand": "Aufklappen",
+      "collapse": "Zuklappen",
+      "useDraft": "Als Antwort übernehmen",
+      "discardDraft": "Verwerfen",
+      "discardConfirm": "Diesen KI-Entwurf wirklich verwerfen? Dies kann nicht rückgängig gemacht werden.",
+      "errorLocked": "Für dieses Ticket läuft bereits ein KI-Lauf. Bitte gleich erneut versuchen.",
+      "errorForbidden": "Sie haben keine Berechtigung für diese KI-Funktion.",
+      "errorRateLimited": "Limit erreicht — bitte später erneut versuchen.",
+      "errorDisabled": "Diese KI-Funktion ist derzeit deaktiviert.",
+      "errorGeneric": "Etwas ist schiefgelaufen. Bitte erneut versuchen."
+    },
     "toolbar": {
       "print": "Drucken",
       "priority": "Priorität",

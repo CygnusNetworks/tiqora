@@ -35,12 +35,18 @@ export function ReplyDialog({
   replyAll,
   open,
   onClose,
+  initialDraft,
 }: {
   ticketId: number;
   articleId: number;
   replyAll: boolean;
   open: boolean;
   onClose: () => void;
+  /** Seeds the body from an AI draft (plan §3.4 "Als Antwort übernehmen").
+   * The draft stays `open` on the backend until `ai_draft_id` round-trips
+   * through the actual send below — closing without sending leaves it
+   * untouched. */
+  initialDraft?: { id: number; subject: string | null; body: string } | null;
 }) {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
@@ -110,10 +116,11 @@ export function ReplyDialog({
     setShowCc(nextCc.length > 0);
     setShowBcc(false);
     setShowReplyTo(false);
-    setSubject(d.subject);
-    // Empty answer on top, blank line, then the quoted original.
-    setBody(`\n\n${d.body}`);
-  }, [draftQ.data]);
+    setSubject(initialDraft?.subject ?? d.subject);
+    // Answer on top (blank, or the AI draft's text), blank line, then the
+    // quoted original.
+    setBody(initialDraft ? `${initialDraft.body}\n\n${d.body}` : `\n\n${d.body}`);
+  }, [draftQ.data, initialDraft]);
 
   const templates = templatesQ.data ?? [];
 
@@ -134,12 +141,18 @@ export function ReplyDialog({
         // Message-ID chain matches Znuny follow-up detection.
         in_reply_to: draftQ.data?.in_reply_to ?? null,
         references: draftQ.data?.references ?? null,
+        ai_draft_id: initialDraft?.id ?? null,
       }),
     onSuccess: () => {
       void queryClient.invalidateQueries({
         queryKey: ["tickets", ticketId, "articles"],
       });
       void queryClient.invalidateQueries({ queryKey: ["tickets", ticketId] });
+      if (initialDraft) {
+        // Sending with ai_draft_id accepts the draft server-side — it drops
+        // out of the AI panel's open-drafts list.
+        void queryClient.invalidateQueries({ queryKey: ["tickets", ticketId, "ai"] });
+      }
       onClose();
     },
   });
