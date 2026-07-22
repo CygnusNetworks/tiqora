@@ -301,6 +301,38 @@ export const ADMIN_PAGES: AdminPageEntry[] = [
     descriptionKey: "admin.pageDescriptions.apiKeys",
     keywords: ["api", "token", "schlüssel", "zugriffsschlüssel", "integration"],
   },
+  {
+    slug: "ai",
+    route: "/admin/ai",
+    group: "automation",
+    nameKey: "admin.nav.ai",
+    descriptionKey: "admin.pageDescriptions.ai",
+    keywords: ["ki", "ai", "llm", "assistent", "autoreply", "einstellungen"],
+  },
+  {
+    slug: "ai-providers",
+    route: "/admin/ai/providers",
+    group: "automation",
+    nameKey: "admin.nav.aiProviders",
+    descriptionKey: "admin.pageDescriptions.aiProviders",
+    keywords: ["ki", "llm", "provider", "openai", "anthropic", "modell"],
+  },
+  {
+    slug: "ai-mcp",
+    route: "/admin/ai/mcp",
+    group: "automation",
+    nameKey: "admin.nav.aiMcp",
+    descriptionKey: "admin.pageDescriptions.aiMcp",
+    keywords: ["mcp", "tools", "werkzeuge", "model context protocol"],
+  },
+  {
+    slug: "ai-queues",
+    route: "/admin/ai/queues",
+    group: "automation",
+    nameKey: "admin.nav.aiQueues",
+    descriptionKey: "admin.pageDescriptions.aiQueues",
+    keywords: ["ki", "queue", "autonomie", "eskalation", "policy"],
+  },
 
   // ── System & Betrieb ─────────────────────────────────────────────────
   {
