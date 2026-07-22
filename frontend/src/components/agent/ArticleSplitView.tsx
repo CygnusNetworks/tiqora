@@ -3,7 +3,15 @@ import { useTranslation } from "react-i18next";
 import { api, type ArticleListItem } from "@/lib/api";
 import { formatDateTime } from "@/lib/format";
 import { decodeEntities, stripHtml } from "@/lib/html";
-import { avatarTone, channelIcon, emailFromAddress, initialsFor } from "@/lib/articleChannel";
+import {
+  avatarTone,
+  channelIcon,
+  emailFromAddress,
+  formatFromAddress,
+  formatToAddresses,
+  initialsFor,
+  senderDisplayName,
+} from "@/lib/articleChannel";
 import { cn } from "@/lib/cn";
 import { Avatar } from "@/components/ui/Avatar";
 import { Badge } from "@/components/ui/Badge";
@@ -81,7 +89,7 @@ function ArticleListRow({
   onSelect: () => void;
 }) {
   const { t } = useTranslation();
-  const senderName = article.from_address || t("ticket.unknownSender");
+  const senderName = senderDisplayName(article.from_address) || t("ticket.unknownSender");
   return (
     <div
       role="option"
@@ -163,8 +171,8 @@ function ArticleReader({
               {article.subject || t("ticket.noSubject")}
             </p>
             <p className="truncate text-xs text-muted">
-              {article.from_address}
-              {article.to_address ? ` → ${article.to_address}` : ""}
+              {formatFromAddress(article.from_address)}
+              {article.to_address ? ` → ${formatToAddresses(article.to_address)}` : ""}
             </p>
           </div>
           <span className="shrink-0 font-mono text-xs tabular-nums text-muted" title={t("ticket.readerDetails")}>
