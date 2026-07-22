@@ -1,228 +1,36 @@
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useNavigate } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
-import { api, ApiError, type QueueRef } from "@/lib/api";
-import {
-  aiApi,
-  type AclFeature,
-  type AiQueuePolicyCreate,
-  type AiQueuePolicyOut,
-  type AiQueuePolicyUpdate,
-  type AiUsageOut,
-  type Autonomy,
-  type IdentityMode,
-} from "@/lib/aiApi";
+import { api } from "@/lib/api";
+import { aiApi, type AclFeature, type AiQueuePolicyOut, type AiUsageOut } from "@/lib/aiApi";
 import { DataTable, type DataTableColumn } from "@/components/admin/DataTable";
-import { Dialog } from "@/components/ui/Dialog";
+import { PickerField } from "@/components/admin/PickerField";
+import { Tabs } from "@/components/ui/Tabs";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
-import { SelectMenu, type SelectMenuItem } from "@/components/ui/SelectMenu";
-import { ChevronDownIcon, PlusIcon } from "@/components/ui/icons";
+import { PlusIcon } from "@/components/ui/icons";
 import { formatDateTime } from "@/lib/format";
-import { cn } from "@/lib/cn";
-
-/** Sentinel for "no selection" in optional numeric pickers (0 is never a valid id). */
-const NONE = 0;
-
-/**
- * Entity/enum picker built on the shared {@link SelectMenu} — mirrors the
- * trigger button markup used by ApiKeysPage/GdprPage so every dropdown in the
- * admin area looks and behaves the same (portal panel, search-if-many,
- * keyboard nav), instead of a native `<select>`.
- */
-function PickerField<T extends string | number>({
-  testId,
-  value,
-  items,
-  onSelect,
-  placeholder,
-  loading,
-}: {
-  testId: string;
-  value: T | undefined;
-  items: SelectMenuItem<T>[];
-  onSelect: (value: T) => void;
-  placeholder: string;
-  loading?: boolean;
-}) {
-  return (
-    <SelectMenu
-      items={items}
-      value={value}
-      onSelect={onSelect}
-      loading={loading}
-      placeholder={placeholder}
-      panelTestId={`${testId}-panel`}
-      trigger={({ open, ref, toggleProps }) => (
-        <button
-          ref={ref}
-          type="button"
-          data-testid={testId}
-          {...toggleProps}
-          className="flex w-full items-center justify-between gap-2 rounded-md border border-hairline bg-surface-subtle px-3 py-1.5 text-left text-sm text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent"
-        >
-          <span className="min-w-0 flex-1 truncate">
-            {items.find((i) => i.value === value)?.label ?? placeholder}
-          </span>
-          <ChevronDownIcon
-            className={cn(
-              "shrink-0 text-muted transition-transform duration-150",
-              open && "rotate-180",
-            )}
-          />
-        </button>
-      )}
-    />
-  );
-}
 
 const POLICIES_KEY = ["admin", "ai", "queue-policies"] as const;
 const QUEUES_KEY = ["admin", "ai", "reference-queues"] as const;
 const PROVIDERS_KEY = ["admin", "ai", "providers"] as const;
-const MCP_KEY = ["admin", "ai", "mcp-clients"] as const;
-const AGENTS_KEY = ["admin", "ai", "reference-agents"] as const;
 const USAGE_KEY = ["admin", "ai", "usage"] as const;
 
-const AUTONOMY_VALUES: Autonomy[] = ["off", "clarify_only", "full"];
-const IDENTITY_MODES: IdentityMode[] = ["ticket_customer_id", "clarify_schema", "off"];
+const NONE = 0;
 const FEATURES: AclFeature[] = ["summary", "auto_reply", "manual_assist"];
 
-type FormState = {
-  enabled_auto_reply: boolean;
-  enabled_summary: boolean;
-  enabled_manual_assist: boolean;
-  autonomy: Autonomy;
-  system_prompt: string;
-  llm_provider_id: number;
-  model_override: string;
-  service_user_id: number;
-  kb_tags: string;
-  kb_category_ids: string;
-  mcp_client_ids: Set<number>;
-  summary_article_threshold: string;
-  summary_char_threshold: string;
-  summary_incremental_min_articles: string;
-  summary_incremental_min_chars: string;
-  max_clarifications: string;
-  max_auto_replies: string;
-  max_replies_per_hour: string;
-  budget_tokens_day: string;
-  escalation_rules: string;
-  ai_disclosure_enabled: boolean;
-  ai_disclosure_text: string;
-  pii_masking: boolean;
-  identity_mode: IdentityMode;
-  clarify_schema_json: string;
-};
-
-/**
- * Defaults for a brand-new policy (create only) — chosen so a queue can go
- * live without the operator having to hand-tune every cap. `openEdit` never
- * calls this; existing policies always load their real stored values via
- * `toForm`.
- */
-function emptyForm(): FormState {
-  return {
-    enabled_auto_reply: false,
-    enabled_summary: false,
-    enabled_manual_assist: false,
-    autonomy: "off",
-    system_prompt: "",
-    llm_provider_id: NONE,
-    model_override: "",
-    service_user_id: NONE,
-    kb_tags: "",
-    kb_category_ids: "",
-    mcp_client_ids: new Set(),
-    summary_article_threshold: "10",
-    summary_char_threshold: "20000",
-    summary_incremental_min_articles: "2",
-    summary_incremental_min_chars: "2000",
-    max_clarifications: "2",
-    max_auto_replies: "5",
-    max_replies_per_hour: "20",
-    budget_tokens_day: "500000",
-    escalation_rules: "",
-    ai_disclosure_enabled: false,
-    ai_disclosure_text: "",
-    pii_masking: true,
-    identity_mode: "ticket_customer_id",
-    clarify_schema_json: "",
-  };
-}
-
-function toForm(row: AiQueuePolicyOut): FormState {
-  return {
-    enabled_auto_reply: row.enabled_auto_reply,
-    enabled_summary: row.enabled_summary,
-    enabled_manual_assist: row.enabled_manual_assist,
-    autonomy: row.autonomy,
-    system_prompt: row.system_prompt,
-    llm_provider_id: row.llm_provider_id ?? NONE,
-    model_override: row.model_override ?? "",
-    service_user_id: row.service_user_id ?? NONE,
-    kb_tags: row.kb_tags ?? "",
-    kb_category_ids: row.kb_category_ids ?? "",
-    mcp_client_ids: new Set(
-      (row.mcp_client_ids ?? "")
-        .split(",")
-        .map((s) => Number(s.trim()))
-        .filter((n) => Number.isFinite(n)),
-    ),
-    summary_article_threshold: row.summary_article_threshold != null ? String(row.summary_article_threshold) : "",
-    summary_char_threshold: row.summary_char_threshold != null ? String(row.summary_char_threshold) : "",
-    summary_incremental_min_articles:
-      row.summary_incremental_min_articles != null ? String(row.summary_incremental_min_articles) : "",
-    summary_incremental_min_chars:
-      row.summary_incremental_min_chars != null ? String(row.summary_incremental_min_chars) : "",
-    max_clarifications: String(row.max_clarifications),
-    max_auto_replies: String(row.max_auto_replies),
-    max_replies_per_hour: row.max_replies_per_hour != null ? String(row.max_replies_per_hour) : "",
-    budget_tokens_day: row.budget_tokens_day != null ? String(row.budget_tokens_day) : "",
-    escalation_rules: row.escalation_rules ?? "",
-    ai_disclosure_enabled: row.ai_disclosure_enabled,
-    ai_disclosure_text: row.ai_disclosure_text ?? "",
-    pii_masking: row.pii_masking,
-    identity_mode: row.identity_mode,
-    clarify_schema_json: row.clarify_schema_json ?? "",
-  };
-}
-
-function numOrNull(v: string): number | null {
-  const trimmed = v.trim();
-  if (!trimmed) return null;
-  const n = Number(trimmed);
-  return Number.isFinite(n) ? n : null;
-}
-
-function validateJson(
-  label: string,
-  value: string,
-  t: (k: string, o?: Record<string, unknown>) => string,
-): string | null {
-  if (!value.trim()) return null;
-  try {
-    JSON.parse(value);
-    return null;
-  } catch {
-    return t("admin.ai.queues.invalidJson", { field: label });
-  }
-}
+type ListTab = "policies" | "usage";
 
 export function AiQueuePoliciesPage() {
   const { t, i18n } = useTranslation();
   const locale = i18n.language?.startsWith("de") ? "de" : "en";
   const qc = useQueryClient();
+  const navigate = useNavigate();
   const { confirm, dialog: confirmDialog } = useConfirm();
 
-  const [dialogOpen, setDialogOpen] = useState(false);
-  const [editing, setEditing] = useState<AiQueuePolicyOut | null>(null);
-  const [newQueueId, setNewQueueId] = useState<number>(NONE);
-  const [form, setForm] = useState<FormState>(emptyForm());
-  const [formError, setFormError] = useState<string | null>(null);
-  const [jsonErrors, setJsonErrors] = useState<{ escalation?: string; clarify?: string }>({});
-
+  const [listTab, setListTab] = useState<ListTab>("policies");
   const [usageQueueFilter, setUsageQueueFilter] = useState<number>(NONE);
   const [usageFeatureFilter, setUsageFeatureFilter] = useState<AclFeature | "">("");
   const [usagePage, setUsagePage] = useState(1);
@@ -239,14 +47,6 @@ export function AiQueuePoliciesPage() {
     queryKey: PROVIDERS_KEY,
     queryFn: ({ signal }) => aiApi.listProviders(signal),
   });
-  const mcpQ = useQuery({
-    queryKey: MCP_KEY,
-    queryFn: ({ signal }) => aiApi.listMcpClients(signal),
-  });
-  const agentsQ = useQuery({
-    queryKey: AGENTS_KEY,
-    queryFn: ({ signal }) => api.listReferenceAgents(signal),
-  });
 
   const usageQ = useQuery({
     queryKey: [...USAGE_KEY, usageQueueFilter, usageFeatureFilter, usagePage],
@@ -260,6 +60,7 @@ export function AiQueuePoliciesPage() {
         },
         signal,
       ),
+    enabled: listTab === "usage",
   });
 
   const queueNameById = useMemo(() => {
@@ -268,124 +69,23 @@ export function AiQueuePoliciesPage() {
     return map;
   }, [queuesQ.data]);
 
-  const availableQueues: QueueRef[] = useMemo(() => {
+  const availableQueues = useMemo(() => {
     const used = new Set((policiesQ.data?.items ?? []).map((p) => p.queue_id));
     return (queuesQ.data ?? []).filter((q) => !used.has(q.id));
   }, [queuesQ.data, policiesQ.data]);
 
-  const invalidate = () => qc.invalidateQueries({ queryKey: POLICIES_KEY });
-
-  const createM = useMutation({
-    mutationFn: (body: AiQueuePolicyCreate) => aiApi.createQueuePolicy(body),
-    onSuccess: async () => {
-      setDialogOpen(false);
-      await invalidate();
-    },
-  });
-  const updateM = useMutation({
-    mutationFn: ({ id, body }: { id: number; body: AiQueuePolicyUpdate }) =>
-      aiApi.updateQueuePolicy(id, body),
-    onSuccess: async () => {
-      setDialogOpen(false);
-      await invalidate();
-    },
-  });
   const deleteM = useMutation({
     mutationFn: (id: number) => aiApi.deleteQueuePolicy(id),
-    onSuccess: () => invalidate(),
+    onSuccess: () => qc.invalidateQueries({ queryKey: POLICIES_KEY }),
   });
-
-  const openCreate = () => {
-    setEditing(null);
-    setNewQueueId(availableQueues[0]?.id ?? NONE);
-    const providers = providersQ.data?.items ?? [];
-    setForm({
-      ...emptyForm(),
-      // Only auto-pick when unambiguous — with 2+ providers the operator must choose.
-      llm_provider_id: providers.length === 1 ? providers[0].id : NONE,
-    });
-    setFormError(null);
-    setJsonErrors({});
-    setDialogOpen(true);
-  };
-  const openEdit = (row: AiQueuePolicyOut) => {
-    setEditing(row);
-    setForm(toForm(row));
-    setFormError(null);
-    setJsonErrors({});
-    setDialogOpen(true);
-  };
-
-  const setField = <K extends keyof FormState>(key: K, value: FormState[K]) =>
-    setForm((f) => ({ ...f, [key]: value }));
-
-  const toggleMcpClient = (id: number) => {
-    setForm((f) => {
-      const next = new Set(f.mcp_client_ids);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return { ...f, mcp_client_ids: next };
-    });
-  };
-
-  const buildBody = (): AiQueuePolicyCreate | AiQueuePolicyUpdate => ({
-    enabled_auto_reply: form.enabled_auto_reply,
-    enabled_summary: form.enabled_summary,
-    enabled_manual_assist: form.enabled_manual_assist,
-    autonomy: form.autonomy,
-    system_prompt: form.system_prompt,
-    llm_provider_id: form.llm_provider_id !== NONE ? form.llm_provider_id : null,
-    model_override: form.model_override.trim() || null,
-    service_user_id: form.service_user_id !== NONE ? form.service_user_id : null,
-    kb_tags: form.kb_tags.trim() || null,
-    kb_category_ids: form.kb_category_ids.trim() || null,
-    mcp_client_ids: form.mcp_client_ids.size > 0 ? Array.from(form.mcp_client_ids).join(",") : null,
-    summary_article_threshold: numOrNull(form.summary_article_threshold),
-    summary_char_threshold: numOrNull(form.summary_char_threshold),
-    summary_incremental_min_articles: numOrNull(form.summary_incremental_min_articles),
-    summary_incremental_min_chars: numOrNull(form.summary_incremental_min_chars),
-    max_clarifications: numOrNull(form.max_clarifications) ?? 2,
-    max_auto_replies: numOrNull(form.max_auto_replies) ?? 5,
-    max_replies_per_hour: numOrNull(form.max_replies_per_hour),
-    budget_tokens_day: numOrNull(form.budget_tokens_day),
-    escalation_rules: form.escalation_rules.trim() || null,
-    ai_disclosure_enabled: form.ai_disclosure_enabled,
-    ai_disclosure_text: form.ai_disclosure_text.trim() || null,
-    pii_masking: form.pii_masking,
-    identity_mode: form.identity_mode,
-    clarify_schema_json: form.clarify_schema_json.trim() || null,
-  });
-
-  const handleSubmit = async () => {
-    setFormError(null);
-    const escalationErr = validateJson("escalation_rules", form.escalation_rules, t);
-    const clarifyErr = validateJson("clarify_schema_json", form.clarify_schema_json, t);
-    setJsonErrors({ escalation: escalationErr ?? undefined, clarify: clarifyErr ?? undefined });
-    if (escalationErr || clarifyErr) return;
-
-    try {
-      if (editing) {
-        await updateM.mutateAsync({ id: editing.id, body: buildBody() });
-      } else {
-        if (newQueueId === NONE) {
-          setFormError(t("admin.ai.queues.queueRequired"));
-          return;
-        }
-        await createM.mutateAsync({ queue_id: newQueueId, ...buildBody() });
-      }
-    } catch (err) {
-      if (err instanceof ApiError && err.status === 409) {
-        setFormError(t("admin.ai.queues.gateError"));
-      } else {
-        setFormError(err instanceof ApiError ? err.message : t("admin.form.genericError"));
-      }
-    }
-  };
 
   const providerName = (id: number | null) => {
     if (id == null) return "—";
     return providersQ.data?.items.find((p) => p.id === id)?.name ?? `#${id}`;
   };
+
+  const goToEditor = (row: AiQueuePolicyOut) =>
+    void navigate({ to: "/admin/ai/queues/$policyId", params: { policyId: String(row.id) } });
 
   const columns: DataTableColumn<AiQueuePolicyOut>[] = [
     {
@@ -419,14 +119,14 @@ export function AiQueuePoliciesPage() {
     },
   ];
 
-  const usageQueueItems: SelectMenuItem<number>[] = useMemo(
+  const usageQueueItems = useMemo(
     () => [
       { value: NONE, label: t("admin.ai.usage.allQueues") },
       ...(queuesQ.data ?? []).map((q) => ({ value: q.id, label: q.name })),
     ],
     [queuesQ.data, t],
   );
-  const usageFeatureItems: SelectMenuItem<AclFeature | "">[] = useMemo(
+  const usageFeatureItems = useMemo(
     () => [
       { value: "" as const, label: t("admin.ai.usage.allFeatures") },
       ...[...FEATURES, "mcp" as AclFeature].map((f) => ({ value: f, label: t(`admin.ai.feature.${f}`) })),
@@ -461,490 +161,101 @@ export function AiQueuePoliciesPage() {
   ];
 
   return (
-    <div className="space-y-6 p-4" data-testid="admin-ai-queues-page">
-      <div>
-        <div className="flex items-center justify-between gap-3">
+    <div className="space-y-4 p-4" data-testid="admin-ai-queues-page">
+      <div className="flex items-center justify-between gap-3">
+        <div>
           <h1 className="font-display text-xl font-semibold text-ink">{t("admin.ai.queues.title")}</h1>
+          <p className="mt-1 text-xs text-muted">{t("admin.ai.queues.description")}</p>
+        </div>
+        {listTab === "policies" && (
           <Button
             variant="primary"
             size="sm"
             data-testid="admin-ai-queues-new"
             disabled={availableQueues.length === 0}
-            onClick={openCreate}
+            onClick={() => void navigate({ to: "/admin/ai/queues/new" })}
             aria-label={t("admin.ai.queues.new")}
             title={t("admin.ai.queues.new")}
             className="!px-2"
           >
             <PlusIcon className="text-[16px]" />
           </Button>
-        </div>
-        <p className="mt-1 text-xs text-muted">{t("admin.ai.queues.description")}</p>
+        )}
       </div>
 
-      <DataTable
-        columns={columns}
-        rows={policiesQ.data?.items ?? []}
-        rowKey={(r) => r.id}
-        isLoading={policiesQ.isLoading}
-        isRowValid={(r) => r.valid_id === 1}
-        onEdit={openEdit}
-        onDelete={async (row) => {
-          const ok = await confirm({
-            title: t("admin.ai.queues.title"),
-            message: t("admin.ai.queues.deleteConfirm"),
-            variant: "danger",
-          });
-          if (ok) deleteM.mutate(row.id);
-        }}
-        testId="admin-ai-queues-table"
+      <Tabs
+        items={[
+          { id: "policies", label: t("admin.ai.queues.list.tabPolicies") },
+          { id: "usage", label: t("admin.ai.queues.list.tabUsage") },
+        ]}
+        value={listTab}
+        onChange={(id) => setListTab(id as ListTab)}
       />
 
-      <div className="space-y-3 rounded-lg border border-hairline bg-surface p-4">
-        <h2 className="font-display text-sm font-semibold text-ink">{t("admin.ai.usage.title")}</h2>
-        <div className="flex flex-wrap items-center gap-2">
-          <div className="w-44">
-            <PickerField
-              testId="admin-ai-usage-queue-filter"
-              value={usageQueueFilter}
-              items={usageQueueItems}
-              placeholder={t("admin.ai.usage.allQueues")}
-              onSelect={(v) => {
-                setUsageQueueFilter(v);
-                setUsagePage(1);
-              }}
-            />
-          </div>
-          <div className="w-44">
-            <PickerField
-              testId="admin-ai-usage-feature-filter"
-              value={usageFeatureFilter}
-              items={usageFeatureItems}
-              placeholder={t("admin.ai.usage.allFeatures")}
-              onSelect={(v) => {
-                setUsageFeatureFilter(v);
-                setUsagePage(1);
-              }}
-            />
-          </div>
-          {usageQ.data && (
-            <span className="text-xs text-muted" data-testid="admin-ai-usage-totals">
-              {t("admin.ai.usage.totals", {
-                prompt: usageQ.data.total_prompt_tokens,
-                completion: usageQ.data.total_completion_tokens,
-              })}
-            </span>
-          )}
-        </div>
+      {listTab === "policies" ? (
         <DataTable
-          columns={usageColumns}
-          rows={usageQ.data?.items ?? []}
-          rowKey={(u) => u.id}
-          isLoading={usageQ.isLoading}
-          emptyLabel={t("admin.table.empty")}
-          testId="admin-ai-usage-table"
+          columns={columns}
+          rows={policiesQ.data?.items ?? []}
+          rowKey={(r) => r.id}
+          isLoading={policiesQ.isLoading}
+          isRowValid={(r) => r.valid_id === 1}
+          onEdit={goToEditor}
+          onDelete={async (row) => {
+            const ok = await confirm({
+              title: t("admin.ai.queues.title"),
+              message: t("admin.ai.queues.deleteConfirm"),
+              variant: "danger",
+            });
+            if (ok) deleteM.mutate(row.id);
+          }}
+          testId="admin-ai-queues-table"
         />
-      </div>
-
-      <Dialog
-        open={dialogOpen}
-        onClose={() => setDialogOpen(false)}
-        title={
-          editing
-            ? t("admin.form.editTitle", {
-                title: queueNameById.get(editing.queue_id) ?? `#${editing.queue_id}`,
-              })
-            : t("admin.ai.queues.new")
-        }
-        className="max-w-3xl"
-      >
-        <div
-          className="flex max-h-[75vh] flex-col gap-4 overflow-y-auto"
-          data-testid="admin-ai-queue-form"
-        >
-          {!editing && (
-            <label className="block text-sm">
-              <span className="mb-1 block text-muted">{t("admin.ai.queues.queue")}</span>
+      ) : (
+        <div className="space-y-3 rounded-lg border border-hairline bg-surface p-4">
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="w-44">
               <PickerField
-                testId="admin-ai-queue-form-queue_id"
-                value={newQueueId}
-                items={availableQueues.map((q) => ({ value: q.id, label: q.name }))}
-                placeholder={t("admin.form.selectPlaceholder")}
-                onSelect={setNewQueueId}
+                testId="admin-ai-usage-queue-filter"
+                value={usageQueueFilter}
+                items={usageQueueItems}
+                placeholder={t("admin.ai.usage.allQueues")}
+                onSelect={(v) => {
+                  setUsageQueueFilter(v);
+                  setUsagePage(1);
+                }}
               />
-            </label>
-          )}
-
-          <section className="space-y-2">
-            <h3 className="text-xs font-semibold uppercase tracking-wide text-muted">
-              {t("admin.ai.queues.section.features")}
-            </h3>
-            <label className="flex items-center gap-2 text-sm text-ink">
-              <input
-                type="checkbox"
-                data-testid="admin-ai-queue-form-enabled_manual_assist"
-                checked={form.enabled_manual_assist}
-                onChange={(e) => setField("enabled_manual_assist", e.target.checked)}
-                className="rounded border-hairline"
-              />
-              {t("admin.ai.feature.manual_assist")}
-            </label>
-            <label className="flex items-center gap-2 text-sm text-ink">
-              <input
-                type="checkbox"
-                data-testid="admin-ai-queue-form-enabled_summary"
-                checked={form.enabled_summary}
-                onChange={(e) => setField("enabled_summary", e.target.checked)}
-                className="rounded border-hairline"
-              />
-              {t("admin.ai.feature.summary")}
-            </label>
-            <label className="flex items-center gap-2 text-sm text-ink">
-              <input
-                type="checkbox"
-                data-testid="admin-ai-queue-form-enabled_auto_reply"
-                checked={form.enabled_auto_reply}
-                onChange={(e) => setField("enabled_auto_reply", e.target.checked)}
-                className="rounded border-hairline"
-              />
-              {t("admin.ai.feature.auto_reply")}
-            </label>
-          </section>
-
-          <section className="space-y-2">
-            <h3 className="text-xs font-semibold uppercase tracking-wide text-muted">
-              {t("admin.ai.queues.section.autonomy")}
-            </h3>
-            <PickerField
-              testId="admin-ai-queue-form-autonomy"
-              value={form.autonomy}
-              items={AUTONOMY_VALUES.map((a) => ({ value: a, label: t(`admin.ai.queues.autonomy.${a}`) }))}
-              placeholder={t("admin.form.selectPlaceholder")}
-              onSelect={(v) => setField("autonomy", v)}
-            />
-            <p className="text-xs text-muted">{t(`admin.ai.queues.autonomy.${form.autonomy}Hint`)}</p>
-          </section>
-
-          <section className="space-y-2">
-            <h3 className="text-xs font-semibold uppercase tracking-wide text-muted">
-              {t("admin.ai.queues.section.prompt")}
-            </h3>
-            <textarea
-              data-testid="admin-ai-queue-form-system_prompt"
-              value={form.system_prompt}
-              onChange={(e) => setField("system_prompt", e.target.value)}
-              rows={4}
-              className="w-full rounded-md border border-hairline bg-surface-subtle px-3 py-1.5 text-sm text-ink"
-            />
-          </section>
-
-          <section className="grid gap-3 sm:grid-cols-2">
-            <label className="block text-sm">
-              <span className="mb-1 block text-muted">{t("admin.ai.providers.title")}</span>
-              <PickerField
-                testId="admin-ai-queue-form-llm_provider_id"
-                value={form.llm_provider_id}
-                items={[
-                  { value: NONE, label: t("admin.form.selectPlaceholder") },
-                  ...(providersQ.data?.items ?? []).map((p) => ({ value: p.id, label: p.name })),
-                ]}
-                placeholder={t("admin.form.selectPlaceholder")}
-                loading={providersQ.isLoading}
-                onSelect={(v) => setField("llm_provider_id", v)}
-              />
-            </label>
-            <label className="block text-sm">
-              <span className="mb-1 block text-muted">{t("admin.ai.queues.modelOverride")}</span>
-              <input
-                data-testid="admin-ai-queue-form-model_override"
-                value={form.model_override}
-                onChange={(e) => setField("model_override", e.target.value)}
-                className="w-full rounded-md border border-hairline bg-surface-subtle px-3 py-1.5 text-sm text-ink"
-              />
-            </label>
-            <label className="block text-sm sm:col-span-2">
-              <span className="mb-1 block text-muted">{t("admin.ai.queues.serviceUser")}</span>
-              <PickerField
-                testId="admin-ai-queue-form-service_user_id"
-                value={form.service_user_id}
-                items={[
-                  { value: NONE, label: t("admin.form.selectPlaceholder") },
-                  ...(agentsQ.data ?? []).map((a) => ({
-                    value: a.id,
-                    label: a.full_name,
-                    hint: a.login,
-                  })),
-                ]}
-                placeholder={t("admin.form.selectPlaceholder")}
-                loading={agentsQ.isLoading}
-                onSelect={(v) => setField("service_user_id", v)}
-              />
-            </label>
-          </section>
-
-          <section className="grid gap-3 sm:grid-cols-2">
-            <label className="block text-sm">
-              <span className="mb-1 block text-muted">{t("admin.ai.queues.kbTags")}</span>
-              <input
-                data-testid="admin-ai-queue-form-kb_tags"
-                value={form.kb_tags}
-                onChange={(e) => setField("kb_tags", e.target.value)}
-                placeholder={t("admin.ai.queues.kbTagsPlaceholder")}
-                className="w-full rounded-md border border-hairline bg-surface-subtle px-3 py-1.5 text-sm text-ink"
-              />
-            </label>
-            <label className="block text-sm">
-              <span className="mb-1 block text-muted">{t("admin.ai.queues.kbCategoryIds")}</span>
-              <input
-                data-testid="admin-ai-queue-form-kb_category_ids"
-                value={form.kb_category_ids}
-                onChange={(e) => setField("kb_category_ids", e.target.value)}
-                placeholder="1,2,3"
-                className="w-full rounded-md border border-hairline bg-surface-subtle px-3 py-1.5 text-sm text-ink"
-              />
-            </label>
-          </section>
-
-          <section className="space-y-2">
-            <h3 className="text-xs font-semibold uppercase tracking-wide text-muted">
-              {t("admin.ai.queues.mcpClients")}
-            </h3>
-            <div className="flex flex-wrap gap-2">
-              {(mcpQ.data?.items ?? []).map((c) => (
-                <label
-                  key={c.id}
-                  className="flex items-center gap-1.5 rounded-md border border-hairline bg-surface-subtle px-2 py-1 text-xs text-ink"
-                >
-                  <input
-                    type="checkbox"
-                    data-testid={`admin-ai-queue-form-mcp-${c.id}`}
-                    checked={form.mcp_client_ids.has(c.id)}
-                    onChange={() => toggleMcpClient(c.id)}
-                    className="rounded border-hairline"
-                  />
-                  {c.name}
-                </label>
-              ))}
-              {(mcpQ.data?.items.length ?? 0) === 0 && (
-                <span className="text-xs text-muted">{t("admin.ai.mcp.empty")}</span>
-              )}
             </div>
-          </section>
-
-          <section className="grid gap-3 sm:grid-cols-2">
-            <h3 className="text-xs font-semibold uppercase tracking-wide text-muted sm:col-span-2">
-              {t("admin.ai.queues.section.summary")}
-            </h3>
-            <label className="block text-sm">
-              <span className="mb-1 block text-muted">{t("admin.ai.queues.summaryArticleThreshold")}</span>
-              <input
-                type="number"
-                data-testid="admin-ai-queue-form-summary_article_threshold"
-                value={form.summary_article_threshold}
-                onChange={(e) => setField("summary_article_threshold", e.target.value)}
-                placeholder={t("admin.ai.queues.emptyUnlimited")}
-                className="w-full rounded-md border border-hairline bg-surface-subtle px-3 py-1.5 text-sm text-ink"
+            <div className="w-44">
+              <PickerField
+                testId="admin-ai-usage-feature-filter"
+                value={usageFeatureFilter}
+                items={usageFeatureItems}
+                placeholder={t("admin.ai.usage.allFeatures")}
+                onSelect={(v) => {
+                  setUsageFeatureFilter(v);
+                  setUsagePage(1);
+                }}
               />
-              <p className="mt-1 text-xs text-muted">{t("admin.ai.queues.emptyUnlimited")}</p>
-            </label>
-            <label className="block text-sm">
-              <span className="mb-1 block text-muted">{t("admin.ai.queues.summaryCharThreshold")}</span>
-              <input
-                type="number"
-                data-testid="admin-ai-queue-form-summary_char_threshold"
-                value={form.summary_char_threshold}
-                onChange={(e) => setField("summary_char_threshold", e.target.value)}
-                placeholder={t("admin.ai.queues.emptyUnlimited")}
-                className="w-full rounded-md border border-hairline bg-surface-subtle px-3 py-1.5 text-sm text-ink"
-              />
-              <p className="mt-1 text-xs text-muted">{t("admin.ai.queues.emptyUnlimited")}</p>
-            </label>
-            <label className="block text-sm">
-              <span className="mb-1 block text-muted">
-                {t("admin.ai.queues.summaryIncrementalMinArticles")}
+            </div>
+            {usageQ.data && (
+              <span className="text-xs text-muted" data-testid="admin-ai-usage-totals">
+                {t("admin.ai.usage.totals", {
+                  prompt: usageQ.data.total_prompt_tokens,
+                  completion: usageQ.data.total_completion_tokens,
+                })}
               </span>
-              <input
-                type="number"
-                data-testid="admin-ai-queue-form-summary_incremental_min_articles"
-                value={form.summary_incremental_min_articles}
-                onChange={(e) => setField("summary_incremental_min_articles", e.target.value)}
-                placeholder={t("admin.ai.queues.emptyUnlimited")}
-                className="w-full rounded-md border border-hairline bg-surface-subtle px-3 py-1.5 text-sm text-ink"
-              />
-              <p className="mt-1 text-xs text-muted">{t("admin.ai.queues.emptyUnlimited")}</p>
-            </label>
-            <label className="block text-sm">
-              <span className="mb-1 block text-muted">
-                {t("admin.ai.queues.summaryIncrementalMinChars")}
-              </span>
-              <input
-                type="number"
-                data-testid="admin-ai-queue-form-summary_incremental_min_chars"
-                value={form.summary_incremental_min_chars}
-                onChange={(e) => setField("summary_incremental_min_chars", e.target.value)}
-                placeholder={t("admin.ai.queues.emptyUnlimited")}
-                className="w-full rounded-md border border-hairline bg-surface-subtle px-3 py-1.5 text-sm text-ink"
-              />
-              <p className="mt-1 text-xs text-muted">{t("admin.ai.queues.emptyUnlimited")}</p>
-            </label>
-          </section>
-
-          <section className="grid gap-3 sm:grid-cols-2">
-            <h3 className="text-xs font-semibold uppercase tracking-wide text-muted sm:col-span-2">
-              {t("admin.ai.queues.section.caps")}
-            </h3>
-            <label className="block text-sm">
-              <span className="mb-1 block text-muted">{t("admin.ai.queues.maxClarifications")}</span>
-              <input
-                type="number"
-                data-testid="admin-ai-queue-form-max_clarifications"
-                value={form.max_clarifications}
-                onChange={(e) => setField("max_clarifications", e.target.value)}
-                className="w-full rounded-md border border-hairline bg-surface-subtle px-3 py-1.5 text-sm text-ink"
-              />
-            </label>
-            <label className="block text-sm">
-              <span className="mb-1 block text-muted">{t("admin.ai.queues.maxAutoReplies")}</span>
-              <input
-                type="number"
-                data-testid="admin-ai-queue-form-max_auto_replies"
-                value={form.max_auto_replies}
-                onChange={(e) => setField("max_auto_replies", e.target.value)}
-                className="w-full rounded-md border border-hairline bg-surface-subtle px-3 py-1.5 text-sm text-ink"
-              />
-            </label>
-            <label className="block text-sm">
-              <span className="mb-1 block text-muted">{t("admin.ai.queues.maxRepliesPerHour")}</span>
-              <input
-                type="number"
-                data-testid="admin-ai-queue-form-max_replies_per_hour"
-                value={form.max_replies_per_hour}
-                onChange={(e) => setField("max_replies_per_hour", e.target.value)}
-                placeholder={t("admin.ai.queues.emptyUnlimited")}
-                className="w-full rounded-md border border-hairline bg-surface-subtle px-3 py-1.5 text-sm text-ink"
-              />
-              <p className="mt-1 text-xs text-muted">{t("admin.ai.queues.emptyUnlimited")}</p>
-            </label>
-            <label className="block text-sm">
-              <span className="mb-1 block text-muted">{t("admin.ai.queues.budgetTokensDay")}</span>
-              <input
-                type="number"
-                data-testid="admin-ai-queue-form-budget_tokens_day"
-                value={form.budget_tokens_day}
-                onChange={(e) => setField("budget_tokens_day", e.target.value)}
-                placeholder={t("admin.ai.queues.emptyUnlimited")}
-                className="w-full rounded-md border border-hairline bg-surface-subtle px-3 py-1.5 text-sm text-ink"
-              />
-              <p className="mt-1 text-xs text-muted">{t("admin.ai.queues.emptyUnlimited")}</p>
-            </label>
-          </section>
-
-          <section className="space-y-1">
-            <h3 className="text-xs font-semibold uppercase tracking-wide text-muted">
-              {t("admin.ai.queues.escalationRules")}
-            </h3>
-            <p className="text-xs text-muted">{t("admin.ai.queues.escalationRulesHint")}</p>
-            <textarea
-              data-testid="admin-ai-queue-form-escalation_rules"
-              value={form.escalation_rules}
-              onChange={(e) => setField("escalation_rules", e.target.value)}
-              placeholder={t("admin.ai.queues.escalationRulesPlaceholder")}
-              rows={4}
-              spellCheck={false}
-              className="w-full rounded-md border border-hairline bg-surface-subtle px-3 py-1.5 font-mono text-xs text-ink"
-            />
-            {jsonErrors.escalation && (
-              <p className="text-xs text-escalation" data-testid="admin-ai-queue-form-escalation_rules-error">
-                {jsonErrors.escalation}
-              </p>
             )}
-          </section>
-
-          <section className="space-y-2">
-            <h3 className="text-xs font-semibold uppercase tracking-wide text-muted">
-              {t("admin.ai.queues.section.disclosure")}
-            </h3>
-            <label className="flex items-center gap-2 text-sm text-ink">
-              <input
-                type="checkbox"
-                data-testid="admin-ai-queue-form-ai_disclosure_enabled"
-                checked={form.ai_disclosure_enabled}
-                onChange={(e) => setField("ai_disclosure_enabled", e.target.checked)}
-                className="rounded border-hairline"
-              />
-              {t("admin.ai.queues.disclosureEnabled")}
-            </label>
-            <textarea
-              data-testid="admin-ai-queue-form-ai_disclosure_text"
-              value={form.ai_disclosure_text}
-              onChange={(e) => setField("ai_disclosure_text", e.target.value)}
-              placeholder={t("admin.ai.queues.disclosureTextPlaceholder")}
-              rows={2}
-              className="w-full rounded-md border border-hairline bg-surface-subtle px-3 py-1.5 text-sm text-ink"
-            />
-            <label className="flex items-center gap-2 text-sm text-ink">
-              <input
-                type="checkbox"
-                data-testid="admin-ai-queue-form-pii_masking"
-                checked={form.pii_masking}
-                onChange={(e) => setField("pii_masking", e.target.checked)}
-                className="rounded border-hairline"
-              />
-              {t("admin.ai.queues.piiMasking")}
-            </label>
-          </section>
-
-          <section className="space-y-2">
-            <h3 className="text-xs font-semibold uppercase tracking-wide text-muted">
-              {t("admin.ai.queues.section.identity")}
-            </h3>
-            <PickerField
-              testId="admin-ai-queue-form-identity_mode"
-              value={form.identity_mode}
-              items={IDENTITY_MODES.map((m) => ({ value: m, label: t(`admin.ai.queues.identityMode.${m}`) }))}
-              placeholder={t("admin.form.selectPlaceholder")}
-              onSelect={(v) => setField("identity_mode", v)}
-            />
-            {form.identity_mode === "clarify_schema" && (
-              <>
-                <textarea
-                  data-testid="admin-ai-queue-form-clarify_schema_json"
-                  value={form.clarify_schema_json}
-                  onChange={(e) => setField("clarify_schema_json", e.target.value)}
-                  rows={3}
-                  spellCheck={false}
-                  className="w-full rounded-md border border-hairline bg-surface-subtle px-3 py-1.5 font-mono text-xs text-ink"
-                />
-                {jsonErrors.clarify && (
-                  <p className="text-xs text-escalation" data-testid="admin-ai-queue-form-clarify_schema_json-error">
-                    {jsonErrors.clarify}
-                  </p>
-                )}
-              </>
-            )}
-          </section>
-
-          {formError && (
-            <p className="text-sm text-escalation" data-testid="admin-ai-queue-form-error">
-              {formError}
-            </p>
-          )}
-
-          <div className="flex justify-end gap-2 border-t border-hairline pt-3">
-            <Button type="button" variant="ghost" onClick={() => setDialogOpen(false)}>
-              {t("admin.form.cancel")}
-            </Button>
-            <Button
-              type="button"
-              variant="primary"
-              data-testid="admin-ai-queue-form-submit"
-              disabled={createM.isPending || updateM.isPending}
-              onClick={() => void handleSubmit()}
-            >
-              {createM.isPending || updateM.isPending ? t("admin.form.saving") : t("admin.form.save")}
-            </Button>
           </div>
+          <DataTable
+            columns={usageColumns}
+            rows={usageQ.data?.items ?? []}
+            rowKey={(u) => u.id}
+            isLoading={usageQ.isLoading}
+            emptyLabel={t("admin.table.empty")}
+            testId="admin-ai-usage-table"
+          />
         </div>
-      </Dialog>
+      )}
 
       {confirmDialog}
     </div>

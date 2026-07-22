@@ -63,7 +63,8 @@
     "loading": "Laden…",
     "close": "Schließen",
     "confirm": "Bestätigen",
-    "cancel": "Abbrechen"
+    "cancel": "Abbrechen",
+    "help": "Hilfe"
   },
   "auth": {
     "login": "Anmelden",
@@ -681,6 +682,14 @@
         "kbTagsPlaceholder": "tag1, tag2, …",
         "kbCategoryIds": "KB-Kategorie-IDs",
         "mcpClients": "MCP-Clients",
+        "mcpClientsSelected": "{{count}} ausgewählt",
+        "promptLoadFile": "Aus Datei laden…",
+        "promptCharCount": "{{formatted}} Zeichen",
+        "promptCharCountWarning": "Sehr großer Prompt — Kontext-/Kostenrisiko.",
+        "promptFileTooLarge": "Datei zu groß (max. 2 MB).",
+        "promptFileBinary": "Datei scheint binär zu sein — nur Text-/Markdown-Dateien werden unterstützt.",
+        "promptReplaceConfirmTitle": "Inhalt ersetzen?",
+        "promptReplaceConfirmMessage": "Der aktuelle System-Prompt wird durch den Dateiinhalt ersetzt. Fortfahren?",
         "summaryArticleThreshold": "Artikel-Schwellenwert",
         "summaryCharThreshold": "Zeichen-Schwellenwert",
         "summaryIncrementalMinArticles": "Min. Artikel (inkrementell)",
@@ -700,7 +709,24 @@
           "ticket_customer_id": "Ticket-Kunde",
           "clarify_schema": "Rückfrage-Schema",
           "off": "Aus"
-        }
+        },
+        "list": {
+          "tabPolicies": "Richtlinien",
+          "tabUsage": "Nutzung"
+        },
+        "tab": {
+          "basics": "Basis",
+          "drafts": "Entwürfe",
+          "summaries": "Zusammenfassungen",
+          "auto": "Auto-Antworten",
+          "safety": "Schutz"
+        },
+        "editor": {
+          "newTitle": "Neue Queue-Policy",
+          "loadError": "Policy konnte nicht geladen werden.",
+          "queueLocked": "Die Queue kann nach dem Anlegen nicht mehr geändert werden."
+        },
+        "autoGateWarning": "Auto-Antworten erfordern den Betriebsmodus „Nur Tiqora“ (tiqora_primary). Aktuell: Parallelbetrieb — der Schalter bleibt gesperrt."
       },
       "usage": {
         "title": "Nutzung",
@@ -715,6 +741,36 @@
         "success": "Status",
         "ok": "OK",
         "failed": "Fehler"
+      }
+    },
+    "help": {
+      "aiQueue": {
+        "queue": "Die Queue, für die diese Policy gilt. Jede Queue kann höchstens eine Policy haben; Policies werden nicht auf Subqueues vererbt.",
+        "systemPrompt": "Zusätzlicher Prompt-Text, der vor jeder Modellanfrage vorangestellt wird (z. B. Ton, Fachkontext der Queue) — kombiniert mit dem Autonomie-Template und optionalen Identitätsregeln.",
+        "llmProvider": "Sprachmodell-Provider für diese Queue. Muss Tool-Aufrufe unterstützen, sobald MCP-Tools oder Autonomie genutzt werden.",
+        "modelOverride": "Überschreibt nur für diese Queue das Standardmodell des gewählten Providers.",
+        "enabledManualAssist": "Blendet den „KI-Entwurf“-Button im Ticket Zoom ein. Entwürfe sind eigene Datensätze, kein Artikel — ein Agent muss jeden Entwurf explizit übernehmen und senden. Nicht vom Betriebsmodus-Gate betroffen.",
+        "kbTags": "Kommagetrennte Tags, deren Wissensdatenbank-Artikel dem Modell als Kontext mitgegeben werden.",
+        "kbCategoryIds": "Kommagetrennte Kategorie-IDs der Wissensdatenbank, zusätzlich zu den Tags eingebunden.",
+        "mcpClients": "MCP-Clients, deren freigegebene Tools dem Modell für diese Queue zur Verfügung stehen. Mutierende Tools sind nur bei Autonomie „Voll autonom“ erlaubt.",
+        "enabledSummary": "Blendet den „Zusammenfassen“-Button im Ticket Zoom ein und erlaubt automatische Zusammenfassungen ab den Schwellenwerten unten. Ergebnis wird ausschließlich im Ticket-Status gespeichert, nie als interne Notiz.",
+        "summaryArticleThreshold": "Automatische Neu-Zusammenfassung, sobald mindestens so viele Artikel seit der letzten Zusammenfassung hinzugekommen sind.",
+        "summaryCharThreshold": "Automatische Neu-Zusammenfassung, sobald der neue Inhalt seit der letzten Zusammenfassung diese Zeichenzahl überschreitet.",
+        "summaryIncrementalMinArticles": "Mindestanzahl neuer Artikel, bevor eine inkrementelle statt einer vollständigen Neuberechnung ausgelöst wird.",
+        "summaryIncrementalMinChars": "Mindestanzahl neuer Zeichen, bevor eine inkrementelle Neuberechnung ausgelöst wird.",
+        "enabledAutoReply": "Aktiviert den autonomen Auto-Reply-Worker für diese Queue — sendet Kundenantworten ohne menschliche Freigabe gemäß der Autonomie-Matrix. Erfordert den Betriebsmodus „Nur Tiqora“ (tiqora_primary).",
+        "autonomy": "Steuert, was die KI ohne menschliche Freigabe darf: „Aus“ = nur Entwürfe, „Nur Rückfragen“ = Rückfragen dürfen direkt raus (fachliche Antworten bleiben Entwurf), „Voll autonom“ = beides darf automatisch gesendet werden, inkl. mutierender MCP-Tools.",
+        "serviceUser": "Agenten-Konto, unter dem automatische Antworten/Rückfragen dieser Queue erzeugt werden (Audit- und Berechtigungs-Identität). Pflicht, sobald Auto-Antworten aktiv sind.",
+        "maxClarifications": "Maximale Anzahl automatischer Rückfragen pro Ticket, bevor eskaliert wird.",
+        "maxAutoReplies": "Maximale Anzahl automatischer Antworten pro Ticket.",
+        "maxRepliesPerHour": "Maximale Anzahl automatischer Antworten dieser Queue pro Stunde — Kostenbremse.",
+        "budgetTokensDay": "Tägliches Token-Budget für den Auto-Antwort-Pfad dieser Queue. Bei Überschreitung pausiert der Auto-Worker bis zum nächsten Tag.",
+        "disclosureEnabled": "Hängt bei autonom gesendeten Kundenantworten einen KI-Kennzeichnungs-Footer an. Von einem Agenten übernommene und gesendete Entwürfe gelten als menschliche Antwort und erhalten keinen Footer.",
+        "disclosureText": "Queue-spezifischer Kennzeichnungstext. Leer = globaler Standardtext aus den KI-Einstellungen wird verwendet.",
+        "escalationRules": "JSON-Regeln, die MCP-Tool-Ergebnisse vor dem PII-Masking prüfen; jeder Treffer stoppt das automatische Senden hart und eskaliert an einen Menschen (reine ODER-Verknüpfung, keine Priorität zwischen Regeln).",
+        "piiMasking": "Maskiert erkannte Kunden-Identifikatoren (E-Mail, Telefon, MAC, IP) im Ticket-Text und in MCP-Tool-Ergebnissen, bevor sie an das Modell gehen, und löst sie vor dem eigentlichen Tool-Aufruf bzw. vor dem Senden wieder auf. Ergänzt, ersetzt aber nicht die Provider-Wahl (EU-Hosting/AVV) als primäre Datenschutzmaßnahme.",
+        "identityMode": "Wie die Kundenidentität für Tool-Aufrufe aufgelöst wird: „Ticket-Kunde“ nutzt die am Ticket hinterlegte Kunden-ID, „Rückfrage-Schema“ lässt die KI fehlende Angaben aktiv erfragen, „Aus“ deaktiviert die Identitätsauflösung.",
+        "clarifySchemaJson": "JSON-Beschreibung der Felder, die die KI beim Rückfrage-Schema aktiv erheben darf (Feldname + optionales MCP-Match-Tool)."
       }
     },
     "nav": {
