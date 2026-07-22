@@ -108,6 +108,7 @@ describe("AiQueuePoliciesPage", () => {
     listReferenceQueues.mockResolvedValue([
       { id: 10, name: "Support" },
       { id: 11, name: "Sales" },
+      { id: 12, name: "Billing" },
     ]);
     listReferenceAgents.mockResolvedValue([{ id: 1, login: "agent1", full_name: "Agent One" }]);
     listQueuePolicies.mockResolvedValue({ items: [samplePolicy], total: 1, page: 1, page_size: 1 });
@@ -131,6 +132,19 @@ describe("AiQueuePoliciesPage", () => {
     });
   });
 
+  it("deletes a policy only after confirming in the ConfirmDialog", async () => {
+    deleteQueuePolicy.mockResolvedValue(undefined);
+    renderPage();
+    await waitFor(() => expect(screen.getByTestId("admin-row-delete-1")).toBeInTheDocument());
+
+    fireEvent.click(screen.getByTestId("admin-row-delete-1"));
+    await screen.findByTestId("confirm-dialog");
+    expect(deleteQueuePolicy).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByTestId("confirm-dialog-confirm"));
+    await waitFor(() => expect(deleteQueuePolicy).toHaveBeenCalledWith(1));
+  });
+
   it("shows a friendly gate message on a 409 from the backend", async () => {
     updateQueuePolicy.mockRejectedValue(new ApiError(409, "gate closed", "/admin/ai/queue-policies/1"));
     renderPage();
@@ -143,6 +157,38 @@ describe("AiQueuePoliciesPage", () => {
     await waitFor(() => {
       expect(screen.getByTestId("admin-ai-queue-form-error").textContent).toMatch(
         /tiqora_primary/,
+      );
+    });
+  });
+
+  it("changes autonomy and provider via the SelectMenu pickers and PUTs the new values", async () => {
+    listProviders.mockResolvedValue({
+      items: [{ id: 5, name: "Nebius" }],
+      total: 1,
+      page: 1,
+      page_size: 1,
+    });
+    updateQueuePolicy.mockResolvedValue({ ...samplePolicy, autonomy: "full", llm_provider_id: 5 });
+    renderPage();
+    await waitFor(() => expect(screen.getByTestId("admin-row-edit-1")).toBeInTheDocument());
+    fireEvent.click(screen.getByTestId("admin-row-edit-1"));
+
+    await waitFor(() => expect(screen.getByTestId("admin-ai-queue-form-autonomy")).toBeInTheDocument());
+    fireEvent.click(screen.getByTestId("admin-ai-queue-form-autonomy"));
+    fireEvent.click(screen.getByTestId("admin-ai-queue-form-autonomy-panel-option-full"));
+
+    fireEvent.click(screen.getByTestId("admin-ai-queue-form-llm_provider_id"));
+    await waitFor(() =>
+      expect(screen.getByTestId("admin-ai-queue-form-llm_provider_id-panel-option-5")).toBeInTheDocument(),
+    );
+    fireEvent.click(screen.getByTestId("admin-ai-queue-form-llm_provider_id-panel-option-5"));
+
+    fireEvent.click(screen.getByTestId("admin-ai-queue-form-submit"));
+
+    await waitFor(() => {
+      expect(updateQueuePolicy).toHaveBeenCalledWith(
+        1,
+        expect.objectContaining({ autonomy: "full", llm_provider_id: 5 }),
       );
     });
   });
@@ -166,8 +212,68 @@ describe("AiQueuePoliciesPage", () => {
     expect(updateQueuePolicy).not.toHaveBeenCalled();
   });
 
-  it("creates a policy for a queue without one", async () => {
-    createQueuePolicy.mockResolvedValue({ ...samplePolicy, id: 2, queue_id: 11 });
+  it("opens the create dialog pre-filled with sensible defaults, incl. the sole provider", async () => {
+    listProviders.mockResolvedValue({
+      items: [{ id: 7, name: "Nebius" }],
+      total: 1,
+      page: 1,
+      page_size: 1,
+    });
+    renderPage();
+    await waitFor(() => expect(screen.getByTestId("admin-ai-queues-new")).not.toBeDisabled());
+    fireEvent.click(screen.getByTestId("admin-ai-queues-new"));
+
+    await waitFor(() =>
+      expect(screen.getByTestId("admin-ai-queue-form-autonomy")).toHaveTextContent("Off"),
+    );
+    expect(screen.getByTestId("admin-ai-queue-form-identity_mode")).toHaveTextContent(
+      "Ticket customer",
+    );
+    expect(screen.getByTestId("admin-ai-queue-form-pii_masking")).toBeChecked();
+    expect(screen.getByTestId("admin-ai-queue-form-enabled_auto_reply")).not.toBeChecked();
+    expect(screen.getByTestId("admin-ai-queue-form-enabled_summary")).not.toBeChecked();
+    expect(screen.getByTestId("admin-ai-queue-form-enabled_manual_assist")).not.toBeChecked();
+    expect(screen.getByTestId("admin-ai-queue-form-ai_disclosure_enabled")).not.toBeChecked();
+    expect(screen.getByTestId("admin-ai-queue-form-max_clarifications")).toHaveValue(2);
+    expect(screen.getByTestId("admin-ai-queue-form-max_auto_replies")).toHaveValue(5);
+    expect(screen.getByTestId("admin-ai-queue-form-max_replies_per_hour")).toHaveValue(20);
+    expect(screen.getByTestId("admin-ai-queue-form-budget_tokens_day")).toHaveValue(500000);
+    expect(screen.getByTestId("admin-ai-queue-form-summary_article_threshold")).toHaveValue(10);
+    expect(screen.getByTestId("admin-ai-queue-form-summary_char_threshold")).toHaveValue(20000);
+    expect(
+      screen.getByTestId("admin-ai-queue-form-summary_incremental_min_articles"),
+    ).toHaveValue(2);
+    expect(screen.getByTestId("admin-ai-queue-form-summary_incremental_min_chars")).toHaveValue(
+      2000,
+    );
+    // The sole configured provider is preselected.
+    expect(screen.getByTestId("admin-ai-queue-form-llm_provider_id")).toHaveTextContent("Nebius");
+  });
+
+  it("leaves the provider unset in the create dialog when more than one exists", async () => {
+    listProviders.mockResolvedValue({
+      items: [
+        { id: 7, name: "Nebius" },
+        { id: 8, name: "OpenAI" },
+      ],
+      total: 2,
+      page: 1,
+      page_size: 2,
+    });
+    renderPage();
+    await waitFor(() => expect(screen.getByTestId("admin-ai-queues-new")).not.toBeDisabled());
+    fireEvent.click(screen.getByTestId("admin-ai-queues-new"));
+
+    await waitFor(() =>
+      expect(screen.getByTestId("admin-ai-queue-form-llm_provider_id")).toBeInTheDocument(),
+    );
+    expect(screen.getByTestId("admin-ai-queue-form-llm_provider_id")).not.toHaveTextContent(
+      "Nebius",
+    );
+  });
+
+  it("creates a policy for a queue without one, picked via the SelectMenu", async () => {
+    createQueuePolicy.mockResolvedValue({ ...samplePolicy, id: 2, queue_id: 12 });
     renderPage();
     await waitFor(() =>
       expect(screen.getByTestId("admin-ai-queues-table")).toHaveTextContent("Support"),
@@ -176,11 +282,15 @@ describe("AiQueuePoliciesPage", () => {
 
     fireEvent.click(screen.getByTestId("admin-ai-queues-new"));
     await waitFor(() => expect(screen.getByTestId("admin-ai-queue-form-queue_id")).toBeInTheDocument());
-    fireEvent.change(screen.getByTestId("admin-ai-queue-form-queue_id"), { target: { value: "11" } });
+
+    // Default selection is the first available queue (Sales, #11) — explicitly
+    // pick Billing (#12) via the SelectMenu to exercise the picker itself.
+    fireEvent.click(screen.getByTestId("admin-ai-queue-form-queue_id"));
+    fireEvent.click(screen.getByTestId("admin-ai-queue-form-queue_id-panel-option-12"));
     fireEvent.click(screen.getByTestId("admin-ai-queue-form-submit"));
 
     await waitFor(() => {
-      expect(createQueuePolicy).toHaveBeenCalledWith(expect.objectContaining({ queue_id: 11 }));
+      expect(createQueuePolicy).toHaveBeenCalledWith(expect.objectContaining({ queue_id: 12 }));
     });
   });
 });

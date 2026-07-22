@@ -83,7 +83,6 @@ describe("ApiKeysPage", () => {
     listUsers.mockReset();
     listUsers.mockResolvedValue(users);
     listKeys.mockResolvedValue({ items: [unboundedKey, expiredKey], total: 2, page: 1, page_size: 500 });
-    vi.spyOn(window, "confirm").mockReturnValue(true);
   });
 
   afterEach(() => {
@@ -123,7 +122,9 @@ describe("ApiKeysPage", () => {
     expect(screen.queryByTestId("admin-api-keys-delete-10")).not.toBeInTheDocument();
     fireEvent.click(screen.getByTestId("admin-row-delete-10"));
 
-    expect(window.confirm).toHaveBeenCalled();
+    await screen.findByTestId("confirm-dialog");
+    fireEvent.click(screen.getByTestId("confirm-dialog-confirm"));
+
     await waitFor(() => expect(removeKey).toHaveBeenCalledWith(10));
   });
 

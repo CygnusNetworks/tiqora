@@ -25,7 +25,6 @@ from tiqora.ai.summary import (
     TRIGGER_AUTO,
     TRIGGER_MANUAL,
     SummaryAclDeniedError,
-    SummaryError,
     SummaryPolicyDisabledError,
     auto_summary_due,
     summarize_ticket,
@@ -593,7 +592,10 @@ async def test_acl_manual_deny_blocks_summarize(mariadb_znuny_url: str) -> None:
         await engine.dispose()
 
 
-async def test_gate_closed_blocks_summarize(mariadb_znuny_url: str) -> None:
+async def test_summarize_runs_in_parallel_operation(mariadb_znuny_url: str) -> None:
+    """Plan §3.0 v1.1 relaxation (Phase E): summaries are state-only and
+    never gated by ``operation_mode`` — manual summarize must succeed in
+    ``parallel`` operation just as it does in ``tiqora_primary``."""
     from tiqora.ai.gate import OPERATION_MODE_PARALLEL
 
     seed = _seed_ticket(mariadb_znuny_url, ns=9)
@@ -607,16 +609,17 @@ async def test_gate_closed_blocks_summarize(mariadb_znuny_url: str) -> None:
             await _setup_policy(session, seed=seed)
             await set_operation_mode(session, OPERATION_MODE_PARALLEL)
 
-        llm = ScriptedLlm(["Should not run."])
+        llm = ScriptedLlm(["A summary written while in parallel operation."])
         async with factory() as session:
-            with pytest.raises(SummaryError):
-                await summarize_ticket(
-                    session,
-                    llm=llm,
-                    ticket_id=seed["ticket_id"],
-                    trigger=TRIGGER_MANUAL,
-                    acting_user_id=seed["agent_id"],
-                )
+            result = await summarize_ticket(
+                session,
+                llm=llm,
+                ticket_id=seed["ticket_id"],
+                trigger=TRIGGER_MANUAL,
+                acting_user_id=seed["agent_id"],
+            )
+        assert result.status == STATUS_UPDATED
+        assert llm.calls == 1
     finally:
         await engine.dispose()
 

@@ -110,6 +110,19 @@ describe("AiProvidersPage", () => {
     });
   });
 
+  it("deletes a provider only after confirming in the ConfirmDialog", async () => {
+    deleteProvider.mockResolvedValue(undefined);
+    renderPage();
+    await waitFor(() => expect(screen.getByTestId("admin-row-delete-1")).toBeInTheDocument());
+
+    fireEvent.click(screen.getByTestId("admin-row-delete-1"));
+    await screen.findByTestId("confirm-dialog");
+    expect(deleteProvider).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByTestId("confirm-dialog-confirm"));
+    await waitFor(() => expect(deleteProvider).toHaveBeenCalledWith(1));
+  });
+
   it("shows the test result after clicking the test button", async () => {
     testProvider.mockResolvedValue({ ok: true, model: "llama-3.3-70b", tool_calling_ok: true, error: null });
     renderPage();

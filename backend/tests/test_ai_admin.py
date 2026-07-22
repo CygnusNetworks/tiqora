@@ -406,6 +406,63 @@ async def test_queue_policy_gate_enforcement_409_then_ok_then_regression(
         get_settings.cache_clear()
 
 
+async def test_queue_policy_manual_assist_and_summary_enable_in_parallel_operation(
+    mariadb_znuny_url: str,
+) -> None:
+    """Plan §3.0 v1.1 relaxation (Phase E): only ``enabled_auto_reply`` is
+    gated by ``operation_mode`` — ``enabled_manual_assist``/``enabled_summary``
+    must be enable-able while still in ``parallel`` operation (the default,
+    unchanged here)."""
+    _ensure_tiqora_tables(mariadb_znuny_url)
+    get_settings.cache_clear()
+    settings = get_settings()
+    engine = create_async_engine(_mysql_async(mariadb_znuny_url))
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    try:
+        async with factory() as session:
+            provider = await ai_providers.create_provider(
+                session,
+                settings=settings,
+                change_by=1,
+                name="p-parallel",
+                kind="openai_compat",
+                base_url="https://example.com/v1",
+                default_model="m",
+                api_key=None,
+                extra_json=None,
+                supports_tools=True,
+                supports_streaming=True,
+                eu_hosted=False,
+            )
+
+            created = await admin_ai.create_queue_policy_route(
+                AiQueuePolicyCreate(queue_id=1, enabled_manual_assist=True, enabled_summary=True),
+                _root_user(),
+                session,
+            )
+            assert created.enabled_manual_assist is True
+            assert created.enabled_summary is True
+
+            # Still 409 for auto_reply in the same (parallel) operation_mode —
+            # service_user_id/llm_provider_id are set so the gate is the only
+            # thing blocking this, isolating it from the 422 validation path.
+            with pytest.raises(HTTPException) as exc_info:
+                await admin_ai.update_queue_policy_route(
+                    created.id,
+                    AiQueuePolicyUpdate(
+                        enabled_auto_reply=True,
+                        service_user_id=42,
+                        llm_provider_id=provider.id,
+                    ),
+                    _root_user(),
+                    session,
+                )
+            assert exc_info.value.status_code == 409
+    finally:
+        await engine.dispose()
+        get_settings.cache_clear()
+
+
 async def test_queue_policy_auto_reply_requires_service_user_and_provider(
     mariadb_znuny_url: str,
 ) -> None:

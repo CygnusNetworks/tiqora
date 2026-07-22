@@ -15,6 +15,7 @@ import { CrudDrawer, type FieldDef, type FieldValues } from "@/components/admin/
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import { Spinner } from "@/components/ui/Spinner";
+import { useConfirm } from "@/components/ui/ConfirmDialog";
 import { PlusIcon } from "@/components/ui/icons";
 
 const QUERY_KEY = ["admin", "ai", "providers"] as const;
@@ -47,6 +48,7 @@ function toFormValues(row: LlmProviderOut | null): FieldValues {
 export function AiProvidersPage() {
   const { t } = useTranslation();
   const qc = useQueryClient();
+  const { confirm, dialog: confirmDialog } = useConfirm();
 
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [editing, setEditing] = useState<LlmProviderOut | null>(null);
@@ -255,10 +257,13 @@ export function AiProvidersPage() {
         isLoading={listQ.isLoading}
         isRowValid={(r) => r.valid_id === 1}
         onEdit={openEdit}
-        onDelete={(row) => {
-          if (window.confirm(t("admin.ai.providers.deleteConfirm", { name: row.name }))) {
-            deleteM.mutate(row.id);
-          }
+        onDelete={async (row) => {
+          const ok = await confirm({
+            title: t("admin.ai.providers.title"),
+            message: t("admin.ai.providers.deleteConfirm", { name: row.name }),
+            variant: "danger",
+          });
+          if (ok) deleteM.mutate(row.id);
         }}
         testId="admin-ai-providers-table"
       />
@@ -278,6 +283,8 @@ export function AiProvidersPage() {
         submitError={formError}
         testIdPrefix="admin-ai-provider-form"
       />
+
+      {confirmDialog}
     </div>
   );
 }

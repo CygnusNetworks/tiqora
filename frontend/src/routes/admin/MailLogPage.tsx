@@ -12,6 +12,8 @@ import {
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Spinner } from "@/components/ui/Spinner";
+import { SelectMenu, type SelectMenuItem } from "@/components/ui/SelectMenu";
+import { ChevronDownIcon } from "@/components/ui/icons";
 import { formatDateTime } from "@/lib/format";
 import { cn } from "@/lib/cn";
 
@@ -81,6 +83,20 @@ export function MailLogPage() {
     queryFn: ({ signal }) => api.listMailLog(listParams, signal),
   });
 
+  const directionItems: SelectMenuItem<MailLogDirection | "">[] = [
+    { value: "", label: t("admin.mailLog.all") },
+    { value: "in", label: t("admin.mailLog.dirIn") },
+    { value: "out", label: t("admin.mailLog.dirOut") },
+  ];
+  const statusItems: SelectMenuItem<MailLogStatus | "">[] = [
+    { value: "", label: t("admin.mailLog.all") },
+    { value: "sent", label: "sent" },
+    { value: "failed", label: "failed" },
+    { value: "queued", label: "queued" },
+    { value: "received", label: "received" },
+    { value: "filtered", label: "filtered" },
+  ];
+
   const detailQ = useQuery({
     queryKey: [...QUERY_KEY, "detail", selected?.id],
     queryFn: ({ signal }) => api.getMailLog(selected!.id, signal),
@@ -108,38 +124,55 @@ export function MailLogPage() {
       >
         <label className="flex flex-col gap-1 text-xs text-muted">
           {t("admin.mailLog.direction")}
-          <select
-            data-testid="mail-log-filter-direction"
-            className="rounded border border-hairline bg-bg px-2 py-1.5 text-sm text-ink"
+          <SelectMenu
+            items={directionItems}
             value={direction}
-            onChange={(e) => {
-              setDirection(e.target.value as MailLogDirection | "");
+            onSelect={(v) => {
+              setDirection(v);
               setPage(1);
             }}
-          >
-            <option value="">{t("admin.mailLog.all")}</option>
-            <option value="in">{t("admin.mailLog.dirIn")}</option>
-            <option value="out">{t("admin.mailLog.dirOut")}</option>
-          </select>
+            panelTestId="mail-log-filter-direction-panel"
+            trigger={({ open, ref, toggleProps }) => (
+              <button
+                ref={ref}
+                type="button"
+                data-testid="mail-log-filter-direction"
+                {...toggleProps}
+                className="flex min-w-[8rem] items-center justify-between gap-2 rounded border border-hairline bg-surface px-2 py-1.5 text-sm text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent"
+              >
+                <span>{directionItems.find((i) => i.value === direction)?.label}</span>
+                <ChevronDownIcon
+                  className={cn("shrink-0 text-muted transition-transform duration-150", open && "rotate-180")}
+                />
+              </button>
+            )}
+          />
         </label>
         <label className="flex flex-col gap-1 text-xs text-muted">
           {t("admin.mailLog.status")}
-          <select
-            data-testid="mail-log-filter-status"
-            className="rounded border border-hairline bg-bg px-2 py-1.5 text-sm text-ink"
+          <SelectMenu
+            items={statusItems}
             value={status}
-            onChange={(e) => {
-              setStatus(e.target.value as MailLogStatus | "");
+            onSelect={(v) => {
+              setStatus(v);
               setPage(1);
             }}
-          >
-            <option value="">{t("admin.mailLog.all")}</option>
-            <option value="sent">sent</option>
-            <option value="failed">failed</option>
-            <option value="queued">queued</option>
-            <option value="received">received</option>
-            <option value="filtered">filtered</option>
-          </select>
+            panelTestId="mail-log-filter-status-panel"
+            trigger={({ open, ref, toggleProps }) => (
+              <button
+                ref={ref}
+                type="button"
+                data-testid="mail-log-filter-status"
+                {...toggleProps}
+                className="flex min-w-[8rem] items-center justify-between gap-2 rounded border border-hairline bg-surface px-2 py-1.5 text-sm text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent"
+              >
+                <span>{statusItems.find((i) => i.value === status)?.label}</span>
+                <ChevronDownIcon
+                  className={cn("shrink-0 text-muted transition-transform duration-150", open && "rotate-180")}
+                />
+              </button>
+            )}
+          />
         </label>
         <label className="flex min-w-[12rem] flex-1 flex-col gap-1 text-xs text-muted">
           {t("admin.mailLog.search")}

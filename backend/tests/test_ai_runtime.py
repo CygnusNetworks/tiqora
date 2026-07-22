@@ -571,14 +571,17 @@ async def test_freshness_supersede_when_new_customer_article_arrives_mid_run(
         await engine.dispose()
 
 
-async def test_gate_closed_blocks_run(mariadb_znuny_url: str) -> None:
+async def test_gate_closed_blocks_auto_run(mariadb_znuny_url: str) -> None:
+    """Only the auto trigger is gated (plan §3.0 v1.1 relaxation, Phase E) —
+    auto-reply posts a customer-visible article via the Tiqora outbox, which
+    Znuny cannot see in parallel operation."""
     seed = _seed_ticket(mariadb_znuny_url, ns=6)
     engine = create_async_engine(_mysql_async(mariadb_znuny_url))
     factory = async_sessionmaker(engine, expire_on_commit=False)
     settings = get_settings()
     try:
         async with factory() as session:
-            await _setup_policy(session, seed=seed, autonomy=AUTONOMY_OFF)
+            await _setup_policy(session, seed=seed, autonomy=AUTONOMY_OFF, enabled_auto_reply=True)
             await set_operation_mode(session, OPERATION_MODE_PARALLEL)
 
         llm = ScriptedLlm([_propose_response("reply", "Answer")])
@@ -589,10 +592,39 @@ async def test_gate_closed_blocks_run(mariadb_znuny_url: str) -> None:
                     settings=settings,
                     llm=llm,
                     ticket_id=seed["ticket_id"],
-                    trigger=TRIGGER_MANUAL,
-                    acting_user_id=seed["agent_id"],
+                    trigger=TRIGGER_AUTO,
+                    acting_user_id=None,
                     run_id="run-6",
                 )
+    finally:
+        await engine.dispose()
+
+
+async def test_manual_assist_runs_in_parallel_operation(mariadb_znuny_url: str) -> None:
+    """Manual Assist is never gated (plan §3.0 v1.1 relaxation, Phase E) —
+    it only ever produces a draft, so it must succeed in ``parallel``
+    operation just as it does in ``tiqora_primary``."""
+    seed = _seed_ticket(mariadb_znuny_url, ns=10)
+    engine = create_async_engine(_mysql_async(mariadb_znuny_url))
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    settings = get_settings()
+    try:
+        async with factory() as session:
+            await _setup_policy(session, seed=seed, autonomy=AUTONOMY_OFF)
+            await set_operation_mode(session, OPERATION_MODE_PARALLEL)
+
+        llm = ScriptedLlm([_propose_response("reply", "Answer while parallel.")])
+        async with factory() as session:
+            result = await run_ticket_agent(
+                session,
+                settings=settings,
+                llm=llm,
+                ticket_id=seed["ticket_id"],
+                trigger=TRIGGER_MANUAL,
+                acting_user_id=seed["agent_id"],
+                run_id="run-10",
+            )
+        assert result.status == "drafted"
     finally:
         await engine.dispose()
 
