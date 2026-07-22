@@ -6,11 +6,11 @@ import { formatDateTime } from "@/lib/format";
 import { decodeEntities, stripHtml } from "@/lib/html";
 import { groupByDay } from "@/lib/article";
 import {
+  avatarTone,
   channelIcon,
   emailFromAddress,
   initialsFor,
   isInternalNote,
-  senderRingClass,
 } from "@/lib/articleChannel";
 import { cn } from "@/lib/cn";
 import { Avatar } from "@/components/ui/Avatar";
@@ -131,18 +131,13 @@ function Bubble({
       data-side={side}
     >
       <div className={cn("flex max-w-[76%] items-start gap-2", side === "right" && "flex-row-reverse")}>
-        <span
-          className={cn(
-            "mt-0.5 shrink-0 rounded-full",
-            senderRingClass(article.sender_type, article.communication_channel_id),
-          )}
-        >
-          <Avatar
-            initials={initialsFor(article)}
-            email={emailFromAddress(article.from_address)}
-            size={24}
-          />
-        </span>
+        <Avatar
+          initials={initialsFor(article)}
+          email={emailFromAddress(article.from_address)}
+          tone={avatarTone(article.sender_type)}
+          size={24}
+          className="mt-0.5"
+        />
         <div className="relative min-w-0">
           <div className={cn("space-y-1 rounded-2xl px-3 py-2", tone)}>
             <div className="flex flex-wrap items-center gap-1.5 text-[11px] text-muted">

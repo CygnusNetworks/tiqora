@@ -824,8 +824,10 @@ export function MergeDialog({
   const merge = useMutation({
     mutationFn: () => api.mergeTicket(ticketId, { main_ticket_id: Number(mainId) }),
     onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: ["tickets", ticketId] });
-      void qc.invalidateQueries({ queryKey: ["tickets", ticketId, "articles"] });
+      // Merging closes the source ticket, which moves it out of the queue's
+      // open count — same broad invalidation usePatchTicket uses.
+      void qc.invalidateQueries({ queryKey: ["tickets"] });
+      void qc.invalidateQueries({ queryKey: ["queues"] });
       onClose();
     },
   });

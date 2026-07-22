@@ -19,8 +19,9 @@ describe("handleSSEMessage", () => {
       JSON.stringify({ type: "ticket_changed", ticket_id: 42, event: "TicketCreate" }),
     );
 
-    expect(spy).toHaveBeenCalledTimes(1);
+    expect(spy).toHaveBeenCalledTimes(2);
     expect(spy).toHaveBeenCalledWith({ queryKey: ["tickets"] });
+    expect(spy).toHaveBeenCalledWith({ queryKey: ["queues"] });
   });
 
   it("invalidates the ticket-scoped presence cache for presence_changed", () => {

@@ -3,7 +3,7 @@ import { useTranslation } from "react-i18next";
 import { api, type ArticleListItem } from "@/lib/api";
 import { formatDateTime } from "@/lib/format";
 import { decodeEntities, stripHtml } from "@/lib/html";
-import { channelIcon, emailFromAddress, initialsFor, senderRingClass } from "@/lib/articleChannel";
+import { avatarTone, channelIcon, emailFromAddress, initialsFor } from "@/lib/articleChannel";
 import { cn } from "@/lib/cn";
 import { Avatar } from "@/components/ui/Avatar";
 import { Badge } from "@/components/ui/Badge";
@@ -93,13 +93,13 @@ function ArticleListRow({
         selected ? "border-l-accent bg-accent/10" : "border-l-transparent hover:bg-surface-subtle",
       )}
     >
-      <span className={cn("mt-0.5 shrink-0 rounded-full", senderRingClass(article.sender_type, article.communication_channel_id))}>
-        <Avatar
-          initials={initialsFor(article)}
-          email={emailFromAddress(article.from_address)}
-          size={24}
-        />
-      </span>
+      <Avatar
+        initials={initialsFor(article)}
+        email={emailFromAddress(article.from_address)}
+        tone={avatarTone(article.sender_type)}
+        size={24}
+        className="mt-0.5"
+      />
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-1.5">
           <span

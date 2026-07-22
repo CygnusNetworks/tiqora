@@ -156,3 +156,75 @@ describe("TicketTable selection mode", () => {
     expect(onToggleAllPage).toHaveBeenCalledTimes(1);
   });
 });
+
+describe("TicketTable quick edit", () => {
+  function quickEditProps(overrides: Partial<ComponentProps<typeof TicketTable>["quickEdit"]> = {}) {
+    return {
+      stateItems: [
+        { value: 1, label: "New" },
+        { value: 4, label: "Open" },
+      ],
+      priorityItems: [
+        { value: 3, label: "3 normal" },
+        { value: 4, label: "4 high" },
+      ],
+      agentItems: [
+        { value: 1, label: "Ada Agent", hint: "ada" },
+        { value: 2, label: "Bob Agent", hint: "bob" },
+      ],
+      onRequestOptions: vi.fn(),
+      onPatch: vi.fn(),
+      ...overrides,
+    };
+  }
+
+  it("clicking the state cell opens the listbox and patches state_id without navigating", async () => {
+    const onPatch = vi.fn();
+    const onRequestOptions = vi.fn();
+    await renderTable([makeItem()], {
+      quickEdit: quickEditProps({ onPatch, onRequestOptions }),
+    });
+
+    fireEvent.click(screen.getByTestId("ticket-row-state-11"));
+    expect(onRequestOptions).toHaveBeenCalledTimes(1);
+
+    const option = await screen.findByTestId("ticket-row-state-menu-11-option-4");
+    fireEvent.click(option);
+
+    expect(onPatch).toHaveBeenCalledWith(11, { state_id: 4 });
+    // No route change: still on "/".
+    expect(window.location.pathname).toBe("/");
+  });
+
+  it("clicking the owner cell opens a searchable listbox and patches owner_id", async () => {
+    const onPatch = vi.fn();
+    await renderTable([makeItem()], {
+      quickEdit: quickEditProps({ onPatch }),
+    });
+
+    fireEvent.click(screen.getByTestId("ticket-row-owner-11"));
+    const option = await screen.findByTestId("ticket-row-owner-menu-11-option-2");
+    fireEvent.click(option);
+
+    expect(onPatch).toHaveBeenCalledWith(11, { owner_id: 2 });
+  });
+
+  it("is disabled while selection mode is active — cells render read-only", async () => {
+    await renderTable([makeItem()], {
+      quickEdit: quickEditProps(),
+      selection: {
+        selected: new Set(),
+        onToggleRow: vi.fn(),
+        onToggleAllPage: vi.fn(),
+        allPageSelected: false,
+        somePageSelected: false,
+      },
+    });
+
+    expect(screen.queryByTestId("ticket-row-state-11")).toBeNull();
+    expect(screen.queryByTestId("ticket-row-priority-11")).toBeNull();
+    expect(screen.queryByTestId("ticket-row-owner-11")).toBeNull();
+    // The chip/testids used elsewhere still render, just non-interactive.
+    expect(screen.getByTestId("ticket-state-chip-11")).toBeInTheDocument();
+  });
+});
