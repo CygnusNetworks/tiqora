@@ -127,6 +127,10 @@ class TicketListItem(BaseModel):
     owner_name: str | None = None
     customer_id: str | None = None
     customer_user_id: str | None = None
+    first_from: str | None = None
+    """Raw ``From`` header of the ticket's first article — a display fallback
+    for the queue list when no customer is assigned. ``None`` if the ticket
+    has no articles (or that article has no MIME row)."""
     create_time: datetime
     change_time: datetime
     age_seconds: int | None = None

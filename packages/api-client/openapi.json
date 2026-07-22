@@ -10807,6 +10807,17 @@
             "title": "Escalation Update Time",
             "type": "integer"
           },
+          "first_from": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "First From"
+          },
           "id": {
             "title": "Id",
             "type": "integer"
@@ -11161,6 +11172,17 @@
             "default": 0,
             "title": "Escalation Update Time",
             "type": "integer"
+          },
+          "first_from": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "First From"
           },
           "id": {
             "title": "Id",

@@ -202,6 +202,7 @@
     "created": "Erstellt",
     "queue": "Queue",
     "noTickets": "Keine Tickets für diesen Filter.",
+    "senderNoCustomer": "Absender des ersten Artikels — kein Kunde hinterlegt",
     "pagination": "{{from}}–{{to}} von {{total}}",
     "escalated": "Eskaliert",
     "slaCountdown": "SLA {{value}}",
@@ -361,7 +362,14 @@
       "apptStart": "Beginn",
       "apptEnd": "Ende",
       "genericError": "Aktion fehlgeschlagen. Bitte erneut versuchen.",
-      "currentCustomer": "Aktuell"
+      "currentCustomer": "Aktuell",
+      "back": "Zurück",
+      "newCustomer": "Neuen Kunden anlegen",
+      "customerLogin": "Login",
+      "customerEmail": "E-Mail",
+      "customerFirstName": "Vorname",
+      "customerLastName": "Nachname",
+      "customerLoginConflict": "Dieser Login existiert bereits. Bitte einen anderen Login wählen oder den bestehenden Kunden über die Suche zuweisen."
     }
   },
   "search": {

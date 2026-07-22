@@ -11,11 +11,13 @@ const {
   listReferencePriorities,
   listReferenceStates,
   searchReferenceCustomers,
+  createCustomer,
 } = vi.hoisted(() => ({
   patchTicket: vi.fn(),
   listReferencePriorities: vi.fn(),
   listReferenceStates: vi.fn(),
   searchReferenceCustomers: vi.fn(),
+  createCustomer: vi.fn(),
 }));
 
 const listReferenceAgents = vi.hoisted(() =>
@@ -35,6 +37,7 @@ vi.mock("@/lib/api", async () => {
       listReferenceStates,
       listReferenceAgents,
       searchReferenceCustomers,
+      createCustomer,
       listQueues: vi.fn().mockResolvedValue([]),
       listTicketLinks: vi.fn().mockResolvedValue([]),
     },
@@ -96,6 +99,7 @@ describe("ActionToolbar", () => {
   beforeEach(() => {
     patchTicket.mockReset().mockResolvedValue(undefined);
     searchReferenceCustomers.mockReset().mockResolvedValue([]);
+    createCustomer.mockReset();
     listReferencePriorities.mockReset().mockResolvedValue([
       { id: 3, name: "3 normal" },
       { id: 5, name: "5 very high" },
@@ -253,5 +257,80 @@ describe("ActionToolbar", () => {
     expect(screen.getByTestId("customer-picker-result-alice")).toHaveTextContent(
       "alice@example.com",
     );
+  });
+
+  it("creates a new customer and assigns it to the ticket on success", async () => {
+    createCustomer.mockResolvedValue({
+      login: "newlogin",
+      email: "new@example.com",
+      customer_id: "C-NEW",
+      first_name: "New",
+      last_name: "Person",
+    });
+    wrap(<ActionToolbar ticket={makeTicket()} />);
+    fireEvent.click(screen.getByTestId("toolbar-customer"));
+    fireEvent.click(screen.getByTestId("customer-picker-new"));
+    expect(screen.getByTestId("customer-create-dialog")).toBeInTheDocument();
+
+    fireEvent.change(screen.getByTestId("customer-create-login"), {
+      target: { value: "newlogin" },
+    });
+    fireEvent.change(screen.getByTestId("customer-create-email"), {
+      target: { value: "new@example.com" },
+    });
+    fireEvent.change(screen.getByTestId("customer-create-first-name"), {
+      target: { value: "New" },
+    });
+    fireEvent.change(screen.getByTestId("customer-create-last-name"), {
+      target: { value: "Person" },
+    });
+    fireEvent.change(screen.getByTestId("customer-create-customer-id"), {
+      target: { value: "C-NEW" },
+    });
+    fireEvent.click(screen.getByTestId("customer-create-submit"));
+
+    await waitFor(() =>
+      expect(createCustomer).toHaveBeenCalledWith({
+        login: "newlogin",
+        email: "new@example.com",
+        first_name: "New",
+        last_name: "Person",
+        customer_id: "C-NEW",
+      }),
+    );
+    await waitFor(() =>
+      expect(patchTicket).toHaveBeenCalledWith(7, {
+        customer_user_id: "newlogin",
+        customer_id: "C-NEW",
+      }),
+    );
+  });
+
+  it("shows a conflict message when the chosen login already exists (409)", async () => {
+    const { ApiError } = await vi.importActual<typeof import("@/lib/api")>("@/lib/api");
+    createCustomer.mockRejectedValue(new ApiError(409, "Customer user login already exists", "/api/v1/customers"));
+    wrap(<ActionToolbar ticket={makeTicket()} />);
+    fireEvent.click(screen.getByTestId("toolbar-customer"));
+    fireEvent.click(screen.getByTestId("customer-picker-new"));
+
+    fireEvent.change(screen.getByTestId("customer-create-login"), {
+      target: { value: "taken" },
+    });
+    fireEvent.change(screen.getByTestId("customer-create-email"), {
+      target: { value: "taken@example.com" },
+    });
+    fireEvent.change(screen.getByTestId("customer-create-first-name"), {
+      target: { value: "Tak" },
+    });
+    fireEvent.change(screen.getByTestId("customer-create-last-name"), {
+      target: { value: "En" },
+    });
+    fireEvent.change(screen.getByTestId("customer-create-customer-id"), {
+      target: { value: "C-1" },
+    });
+    fireEvent.click(screen.getByTestId("customer-create-submit"));
+
+    expect(await screen.findByTestId("customer-create-conflict")).toBeInTheDocument();
+    expect(patchTicket).not.toHaveBeenCalled();
   });
 });
