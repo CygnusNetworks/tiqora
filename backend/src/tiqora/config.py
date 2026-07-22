@@ -299,6 +299,11 @@ class Settings(BaseSettings):
     generic_agent_interval_seconds: int = Field(
         default=60, validation_alias="TIQORA_GENERIC_AGENT_INTERVAL"
     )
+    # Outbox drain cadence (Phase 2c subtask 6). ``daemon.outbox.enabled``
+    # (default ON) is the takeover switch; this is only the poll interval.
+    outbox_drain_interval_seconds: int = Field(
+        default=60, validation_alias="TIQORA_OUTBOX_DRAIN_INTERVAL"
+    )
 
     # PGP / S/MIME (Phase 2c). Both OFF by default and require their
     # respective external tool (gpg / openssl) — see docs/crypto.md. When

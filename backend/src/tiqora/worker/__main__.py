@@ -1,4 +1,4 @@
-"""Worker process: taskiq consumer + lightweight poller loop."""
+"""Worker process: lightweight asyncio loops (no external scheduler)."""
 
 from __future__ import annotations
 
@@ -6,16 +6,25 @@ import asyncio
 import os
 import signal
 import time
+from collections.abc import Awaitable, Callable
+from typing import Any
 
 import structlog
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from tiqora.config import get_settings
+from tiqora.db.engine import get_session_factory
+from tiqora.domain.settings_store import get_setting_int
 from tiqora.logging_setup import configure_logging
 from tiqora.worker.escalation import run_escalation_tick
+from tiqora.worker.gdpr_erasure_purge import run_gdpr_erasure_purge_tick
+from tiqora.worker.gdpr_retention import run_gdpr_retention_tick
 from tiqora.worker.generic_agent import run_generic_agent_tick
 from tiqora.worker.notifications import run_notifications_tick
+from tiqora.worker.outbox_drain import drain_outbox
 from tiqora.worker.poller import poll_once
 from tiqora.worker.postmaster import run_postmaster_tick
+from tiqora.worker.status import record_tick_status, seconds_until_daily
 
 logger = structlog.get_logger(__name__)
 
@@ -24,6 +33,8 @@ logger = structlog.get_logger(__name__)
 #: asyncio event loop is still alive (see docker-compose healthcheck).
 _HEARTBEAT_FILE = os.environ.get("TIQORA_WORKER_HEARTBEAT_FILE", "/tmp/tiqora-worker.heartbeat")
 _HEARTBEAT_INTERVAL_SECONDS = 15
+
+Tick = Callable[[], Awaitable[dict[str, Any]]]
 
 
 def _write_heartbeat() -> None:
@@ -51,112 +62,138 @@ async def _heartbeat_loop(stop: asyncio.Event) -> None:
     logger.info("heartbeat_loop_stopped")
 
 
-async def _poller_loop(stop: asyncio.Event) -> None:
-    settings = get_settings()
-    interval = max(5, settings.poller_interval_seconds)
-    logger.info("poller_loop_started", interval_seconds=interval)
+async def _effective_interval(
+    factory: async_sessionmaker[AsyncSession], interval_key: str | None, interval_default: int
+) -> int:
+    """DB override (``interval_key``) or the config default, clamped to >=5s.
+
+    ``interval_key=None`` (the poller, which has no admin-editable override)
+    skips the DB round-trip entirely.
+    """
+    if interval_key is None:
+        return max(5, interval_default)
+    async with factory() as session:
+        value = await get_setting_int(session, interval_key, interval_default)
+    return max(5, value)
+
+
+async def _interval_loop(
+    name: str,
+    tick: Tick,
+    interval_default: int,
+    interval_key: str | None,
+    stop: asyncio.Event,
+) -> None:
+    """Generic fixed-cadence tick loop, replacing the former per-service
+    copy-paste loops. Records ``daemon.<name>.status.*`` after every tick
+    (see ``tiqora.worker.status``) and survives any tick exception — one
+    broken cycle must never take the whole worker process down.
+    """
+    factory = get_session_factory()
+    logger.info(f"{name}_loop_started", interval_default_seconds=interval_default)
+    interval = max(5, interval_default)
     while not stop.is_set():
         try:
-            await poll_once(settings=settings)
-        except Exception:  # noqa: BLE001 — keep loop alive
-            logger.exception("poller_loop_error")
+            interval = await _effective_interval(factory, interval_key, interval_default)
+            result = await tick()
+            await record_tick_status(name, ok=True, result=result, session_factory=factory)
+        except Exception as exc:  # noqa: BLE001 — keep loop alive
+            logger.exception(f"{name}_loop_error")
+            await record_tick_status(name, ok=False, error=str(exc), session_factory=factory)
         try:
             await asyncio.wait_for(stop.wait(), timeout=interval)
         except TimeoutError:
             continue
-    logger.info("poller_loop_stopped")
+    logger.info(f"{name}_loop_stopped")
 
 
-async def _postmaster_loop(stop: asyncio.Event) -> None:
-    """Postmaster tick loop. A no-op unless daemon.postmaster.enabled=1 (see
-    tiqora.domain.settings_store) — the tick itself checks the flag every
-    cycle so it can be toggled at runtime without a worker restart."""
-    settings = get_settings()
-    interval = max(5, settings.postmaster_interval_seconds)
-    logger.info("postmaster_loop_started", interval_seconds=interval)
+async def _daily_loop(name: str, tick: Tick, at_hhmm: str, stop: asyncio.Event) -> None:
+    """Generic once-daily tick loop (UTC ``HH:MM``). Sleep is interruptible by
+    ``stop`` and recomputed from scratch after every wake-up via
+    ``seconds_until_daily`` — no drift bookkeeping needed."""
+    factory = get_session_factory()
+    logger.info(f"{name}_loop_started", at_utc=at_hhmm)
     while not stop.is_set():
         try:
-            await run_postmaster_tick(settings=settings)
-        except Exception:  # noqa: BLE001 — keep loop alive
-            logger.exception("postmaster_loop_error")
-        try:
-            await asyncio.wait_for(stop.wait(), timeout=interval)
+            await asyncio.wait_for(stop.wait(), timeout=seconds_until_daily(at_hhmm))
+            break  # stop was set while sleeping
         except TimeoutError:
-            continue
-    logger.info("postmaster_loop_stopped")
-
-
-async def _escalation_loop(stop: asyncio.Event) -> None:
-    """Escalation sweep tick loop. A no-op unless daemon.escalation.enabled=1 (see
-    tiqora.domain.settings_store) — the tick itself checks the flag every cycle
-    so it can be toggled at runtime without a worker restart."""
-    settings = get_settings()
-    interval = max(5, settings.escalation_interval_seconds)
-    logger.info("escalation_loop_started", interval_seconds=interval)
-    while not stop.is_set():
+            pass
         try:
-            await run_escalation_tick(settings=settings)
-        except Exception:  # noqa: BLE001 — keep loop alive
-            logger.exception("escalation_loop_error")
-        try:
-            await asyncio.wait_for(stop.wait(), timeout=interval)
-        except TimeoutError:
-            continue
-    logger.info("escalation_loop_stopped")
-
-
-async def _notifications_loop(stop: asyncio.Event) -> None:
-    """Notification engine tick loop. A no-op unless daemon.notifications.enabled=1
-    (see tiqora.domain.settings_store) — the tick itself checks the flag every
-    cycle so it can be toggled at runtime without a worker restart."""
-    settings = get_settings()
-    interval = max(5, settings.notifications_interval_seconds)
-    logger.info("notifications_loop_started", interval_seconds=interval)
-    while not stop.is_set():
-        try:
-            await run_notifications_tick(settings=settings)
-        except Exception:  # noqa: BLE001 — keep loop alive
-            logger.exception("notifications_loop_error")
-        try:
-            await asyncio.wait_for(stop.wait(), timeout=interval)
-        except TimeoutError:
-            continue
-    logger.info("notifications_loop_stopped")
-
-
-async def _generic_agent_loop(stop: asyncio.Event) -> None:
-    """GenericAgent tick loop. A no-op unless daemon.generic_agent.enabled=1
-    (see tiqora.domain.settings_store) — the tick itself checks the flag every
-    cycle so it can be toggled at runtime without a worker restart. Evaluated
-    every minute (Znuny's own GenericAgent daemon task cron granularity)."""
-    settings = get_settings()
-    interval = max(5, settings.generic_agent_interval_seconds)
-    logger.info("generic_agent_loop_started", interval_seconds=interval)
-    while not stop.is_set():
-        try:
-            await run_generic_agent_tick(settings=settings)
-        except Exception:  # noqa: BLE001 — keep loop alive
-            logger.exception("generic_agent_loop_error")
-        try:
-            await asyncio.wait_for(stop.wait(), timeout=interval)
-        except TimeoutError:
-            continue
-    logger.info("generic_agent_loop_stopped")
+            result = await tick()
+            await record_tick_status(name, ok=True, result=result, session_factory=factory)
+        except Exception as exc:  # noqa: BLE001 — keep loop alive
+            logger.exception(f"{name}_loop_error")
+            await record_tick_status(name, ok=False, error=str(exc), session_factory=factory)
+    logger.info(f"{name}_loop_stopped")
 
 
 async def _run_all_loops(stop: asyncio.Event) -> None:
+    settings = get_settings()
+
+    async def poller_tick() -> dict[str, int]:
+        return await poll_once(settings=settings)
+
+    async def outbox_tick() -> dict[str, int]:
+        return await drain_outbox(settings=settings)
+
+    async def postmaster_tick() -> dict[str, int]:
+        return await run_postmaster_tick(settings=settings)
+
+    async def escalation_tick() -> dict[str, int]:
+        return await run_escalation_tick(settings=settings)
+
+    async def notifications_tick() -> dict[str, int]:
+        return await run_notifications_tick(settings=settings)
+
+    async def generic_agent_tick() -> dict[str, int]:
+        return await run_generic_agent_tick(settings=settings)
+
     await asyncio.gather(
         _heartbeat_loop(stop),
-        _poller_loop(stop),
-        _postmaster_loop(stop),
-        _escalation_loop(stop),
-        _notifications_loop(stop),
-        _generic_agent_loop(stop),
+        _interval_loop("poller", poller_tick, settings.poller_interval_seconds, None, stop),
+        _interval_loop(
+            "outbox",
+            outbox_tick,
+            settings.outbox_drain_interval_seconds,
+            "daemon.outbox.interval_seconds",
+            stop,
+        ),
+        _interval_loop(
+            "postmaster",
+            postmaster_tick,
+            settings.postmaster_interval_seconds,
+            "daemon.postmaster.interval_seconds",
+            stop,
+        ),
+        _interval_loop(
+            "escalation",
+            escalation_tick,
+            settings.escalation_interval_seconds,
+            "daemon.escalation.interval_seconds",
+            stop,
+        ),
+        _interval_loop(
+            "notifications",
+            notifications_tick,
+            settings.notifications_interval_seconds,
+            "daemon.notifications.interval_seconds",
+            stop,
+        ),
+        _interval_loop(
+            "generic_agent",
+            generic_agent_tick,
+            settings.generic_agent_interval_seconds,
+            "daemon.generic_agent.interval_seconds",
+            stop,
+        ),
+        _daily_loop("gdpr_retention", run_gdpr_retention_tick, "03:00", stop),
+        _daily_loop("gdpr_erasure_purge", run_gdpr_erasure_purge_tick, "03:30", stop),
     )
 
 
 def run_worker() -> None:
-    """Start the background worker (poller + postmaster loops; taskiq CLI is optional)."""
+    """Start the background worker (poller, daemon takeover loops, heartbeat)."""
     settings = get_settings()
     configure_logging(settings)
     stop = asyncio.Event()

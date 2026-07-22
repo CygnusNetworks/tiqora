@@ -2641,6 +2641,34 @@
         "title": "ChannelConfigUpdate",
         "type": "object"
       },
+      "ComposeContextOut": {
+        "properties": {
+          "from_address": {
+            "title": "From Address",
+            "type": "string"
+          },
+          "rich_text": {
+            "default": true,
+            "title": "Rich Text",
+            "type": "boolean"
+          },
+          "signature": {
+            "default": "",
+            "title": "Signature",
+            "type": "string"
+          },
+          "signature_is_html": {
+            "default": false,
+            "title": "Signature Is Html",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "from_address"
+        ],
+        "title": "ComposeContextOut",
+        "type": "object"
+      },
       "CustomerCompanyCreate": {
         "properties": {
           "city": {
@@ -3689,6 +3717,158 @@
           "last_name"
         ],
         "title": "CustomerUserOut",
+        "type": "object"
+      },
+      "DaemonListOut": {
+        "properties": {
+          "services": {
+            "items": {
+              "$ref": "#/components/schemas/DaemonServiceOut"
+            },
+            "title": "Services",
+            "type": "array"
+          }
+        },
+        "required": [
+          "services"
+        ],
+        "title": "DaemonListOut",
+        "type": "object"
+      },
+      "DaemonServiceOut": {
+        "description": "One row of the daemon catalog with effective schedule + live status.",
+        "properties": {
+          "daily_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Daily At"
+          },
+          "enabled": {
+            "title": "Enabled",
+            "type": "boolean"
+          },
+          "interval_overridden": {
+            "default": false,
+            "title": "Interval Overridden",
+            "type": "boolean"
+          },
+          "interval_seconds": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Interval Seconds"
+          },
+          "last_error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Error"
+          },
+          "last_ok_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Ok At"
+          },
+          "last_result": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Result"
+          },
+          "last_run_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Run At"
+          },
+          "schedule": {
+            "enum": [
+              "interval",
+              "daily"
+            ],
+            "title": "Schedule",
+            "type": "string"
+          },
+          "slug": {
+            "title": "Slug",
+            "type": "string"
+          },
+          "toggleable": {
+            "title": "Toggleable",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "slug",
+          "enabled",
+          "toggleable",
+          "schedule"
+        ],
+        "title": "DaemonServiceOut",
+        "type": "object"
+      },
+      "DaemonUpdate": {
+        "description": "``enabled``/``interval_seconds`` null or omitted leaves the field\nuntouched; ``interval_seconds=0`` or ``null`` (when explicitly sent)\nclears the DB override and reverts to the config default.",
+        "properties": {
+          "enabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Enabled"
+          },
+          "interval_seconds": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Interval Seconds"
+          }
+        },
+        "title": "DaemonUpdate",
         "type": "object"
       },
       "DashboardSummary": {
@@ -16977,6 +17157,155 @@
         "summary": "Revoke Customer User Group",
         "tags": [
           "admin:customers"
+        ]
+      }
+    },
+    "/api/v1/admin/daemons": {
+      "get": {
+        "operationId": "list_daemons_api_v1_admin_daemons_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DaemonListOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Daemons",
+        "tags": [
+          "admin:daemons"
+        ]
+      }
+    },
+    "/api/v1/admin/daemons/{slug}": {
+      "put": {
+        "operationId": "update_daemon_api_v1_admin_daemons__slug__put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "slug",
+            "required": true,
+            "schema": {
+              "title": "Slug",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DaemonUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DaemonServiceOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Daemon",
+        "tags": [
+          "admin:daemons"
         ]
       }
     },
@@ -31183,6 +31512,83 @@
           }
         },
         "summary": "List Agents",
+        "tags": [
+          "reference"
+        ]
+      }
+    },
+    "/api/v1/reference/compose-context": {
+      "get": {
+        "description": "From-address, signature preview, and rich-text flag for a new-ticket compose form.\n\nReuses ``queue_outbound_meta``, the same queue lookup the agent-reply send\npath (``deliver_agent_email_reply``) resolves From/signature from, so the\npreview matches what an actual reply on that queue would show. The\nsignature is returned RAW (placeholders unexpanded): a not-yet-created\nticket has no ticket/customer context to expand OTRS_TICKET_*/\nOTRS_CUSTOMER_DATA_* tags against, so this preview is only approximate \u2014\nthe real expansion happens in ``prepare_outgoing_agent_email`` at send time.",
+        "operationId": "compose_context_api_v1_reference_compose_context_get",
+        "parameters": [
+          {
+            "description": "Queue to resolve From-address/signature for",
+            "in": "query",
+            "name": "queue_id",
+            "required": true,
+            "schema": {
+              "description": "Queue to resolve From-address/signature for",
+              "title": "Queue Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ComposeContextOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Compose Context",
         "tags": [
           "reference"
         ]

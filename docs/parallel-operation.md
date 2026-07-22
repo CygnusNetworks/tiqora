@@ -204,6 +204,25 @@ Each of the following moves to Tiqora independently:
 Flags must be **mutually exclusive** with the Znuny side for each function to
 avoid double-send or double-escalation.
 
+**Preferred switch: Admin → Dienste** (`/admin/daemons`) toggles every
+`daemon.*.enabled` flag and admin-overridable interval listed below, and
+shows live per-service status — no SQL required for day-to-day operation.
+The raw `tiqora_settings` SQL in the sections below remains documented as a
+fallback (scripting, migrations, or when the admin UI itself is unavailable).
+
+### Status keys and the health rule
+
+Every takeover loop (plus the always-on poller) writes
+`daemon.<slug>.status.{last_run,last_ok,last_error,last_result}` to
+`tiqora_settings` after each tick (`tiqora.worker.status.record_tick_status`,
+one commit per tick, best-effort — a status-write failure never kills the
+loop or masks the tick's own outcome). The admin page derives a health badge
+per service from these keys: red when `last_error` is set and `last_ok` is
+older than `last_run` (last tick failed); grey when disabled; green when
+`last_ok` is within 3× the effective interval (26h for the two UTC-daily GDPR
+jobs); amber otherwise (enabled but stale — no successful tick recently
+enough).
+
 ## Taking over mail processing (Phase 4a)
 
 Tiqora's postmaster pipeline (`tiqora.worker.postmaster`, `tiqora.channels.email.*`)
@@ -225,8 +244,9 @@ POP3/IMAP delete-after-fetch semantics, race to delete) messages.
      → `MailAccountFetch`), or
    - Stop/disable the Znuny daemon process entirely if nothing else on it is
      needed yet.
-2. Set the Tiqora feature flag (a `tiqora_settings` row, not an env var —
-   toggle at runtime without restarting the worker):
+2. Set the Tiqora feature flag: Admin → Dienste → toggle *postmaster* (or, as
+   a fallback, a `tiqora_settings` row — not an env var, toggle at runtime
+   without restarting the worker):
    ```sql
    INSERT INTO tiqora_settings (key, value) VALUES ('daemon.postmaster.enabled', '1')
      ON CONFLICT (key) DO UPDATE SET value = '1';  -- Postgres
@@ -328,8 +348,9 @@ rows and duplicate any downstream notification.
 1. Disable Znuny's `EscalationCheck` daemon task (SysConfig UI → *Daemon →
    SchedulerCronTaskManager* → `EscalationCheck`, or set it invalid via
    `Admin::Config::Update`).
-2. Set `daemon.escalation.enabled = 1` in `tiqora_settings` (see the SQL
-   pattern in "Taking over mail processing" above).
+2. Admin → Dienste → toggle *escalation* (or set `daemon.escalation.enabled
+   = 1` in `tiqora_settings` directly — see the SQL pattern in "Taking over
+   mail processing" above).
 3. The worker polls this flag every tick (default 300s,
    `TIQORA_ESCALATION_INTERVAL`).
 4. Verify: a ticket crossing its escalation time gets exactly one
@@ -380,7 +401,8 @@ is sent twice.
    handler) — **recommended**: disable it, since Tiqora's outbox sees writes
    from *both* Znuny and Tiqora, so leaving Znuny's handler on double-sends
    for every write regardless of origin.
-2. Set `daemon.notifications.enabled = 1` in `tiqora_settings`.
+2. Admin → Dienste → toggle *notifications* (or set
+   `daemon.notifications.enabled = 1` in `tiqora_settings` directly).
 3. The worker polls this flag every tick (default 60s,
    `TIQORA_NOTIFICATIONS_INTERVAL`).
 4. Verify: a matching event produces exactly one email/article per
@@ -419,7 +441,8 @@ action (double note, double state-flap history, etc.).
 
 1. Disable Znuny's `GenericAgent` daemon task (SysConfig UI → *Daemon →
    SchedulerCronTaskManager* → `GenericAgent`).
-2. Set `daemon.generic_agent.enabled = 1` in `tiqora_settings`.
+2. Admin → Dienste → toggle *generic_agent* (or set
+   `daemon.generic_agent.enabled = 1` in `tiqora_settings` directly).
 3. The worker polls this flag every tick (default 60s,
    `TIQORA_GENERIC_AGENT_INTERVAL`) and evaluates each valid job's
    `ScheduleDays`/`Hours`/`Minutes` against the current time every tick.

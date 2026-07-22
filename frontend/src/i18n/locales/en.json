@@ -483,7 +483,8 @@
       "queuesTemplates": "Queues & templates",
       "email": "Email",
       "placeholderVariables": "Placeholder variables",
-      "compliance": "Compliance"
+      "compliance": "Compliance",
+      "operations": "Operations"
     },
     "nav": {
       "users": "Users",
@@ -520,7 +521,8 @@
       "queueVariables": "Queue variables",
       "customerFields": "Customer fields",
       "authConfig": "Authentication / 2FA",
-      "gdpr": "Privacy / GDPR"
+      "gdpr": "Privacy / GDPR",
+      "daemons": "Services"
     },
     "table": {
       "id": "ID",
@@ -924,6 +926,66 @@
       "saveError": "Failed to save settings.",
       "resetToZnuny": "Reset to Znuny values",
       "loadError": "Failed to load settings."
+    },
+    "daemons": {
+      "title": "Services",
+      "description": "Periodic background services run by the Tiqora worker: enable/disable, interval, and live run status.",
+      "loadError": "Failed to load services.",
+      "columns": {
+        "status": "Status",
+        "service": "Service",
+        "enabled": "Enabled",
+        "schedule": "Interval",
+        "lastOk": "Last success",
+        "lastResult": "Last result"
+      },
+      "status": {
+        "green": "OK",
+        "amber": "Delayed",
+        "red": "Error",
+        "grey": "Disabled"
+      },
+      "alwaysOn": "always on",
+      "dailyAt": "daily at {{time}} UTC",
+      "intervalSeconds": "{{seconds}}s",
+      "seconds": "s",
+      "reset": "Reset",
+      "takeoverNote": "Mutually exclusive with the matching Znuny daemon task — see docs/parallel-operation.md.",
+      "docsHint": "For takeover, rollback, and safety-flag details see docs/parallel-operation.md.",
+      "services": {
+        "poller": {
+          "name": "Poller",
+          "description": "Tracks Znuny writes and keeps the search index up to date."
+        },
+        "outbox": {
+          "name": "Outbox drain",
+          "description": "Drains tiqora_event_outbox: search index, webhooks, live updates."
+        },
+        "postmaster": {
+          "name": "Postmaster",
+          "description": "Mail fetch and processing (takeover of Znuny's mail daemon)."
+        },
+        "escalation": {
+          "name": "Escalation",
+          "description": "Recomputes the escalation index and fires Start/Stop/NotifyBefore events."
+        },
+        "notifications": {
+          "name": "Notifications",
+          "description": "Sends event-driven notifications to agents and customers."
+        },
+        "generic_agent": {
+          "name": "GenericAgent",
+          "description": "Runs scheduled GenericAgent jobs."
+        },
+        "gdpr_retention": {
+          "name": "GDPR retention",
+          "description": "Applies configured retention rules once a day."
+        },
+        "gdpr_erasure_purge": {
+          "name": "GDPR erasure purge",
+          "description": "Removes expired erasure backups once a day."
+        }
+      }
     },
     "mailLog": {
       "title": "Email communication log",

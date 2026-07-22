@@ -7,7 +7,7 @@ import redis.asyncio as redis
 import structlog
 from fastapi import FastAPI, HTTPException, Response
 from fastapi.middleware.cors import CORSMiddleware
-from prometheus_client import CONTENT_TYPE_LATEST, Counter, Gauge, Histogram, generate_latest
+from prometheus_client import CONTENT_TYPE_LATEST, Counter, Histogram, generate_latest
 from starlette.requests import Request
 from starlette.responses import Response as StarletteResponse
 
@@ -31,19 +31,6 @@ REQUEST_LATENCY = Histogram(
     "tiqora_http_request_duration_seconds",
     "HTTP request latency in seconds",
     ["method", "path"],
-)
-POLLER_HISTORY_LAG = Gauge(
-    "tiqora_poller_history_lag",
-    "Rows behind max ticket_history.id watermark",
-)
-POLLER_ARTICLE_LAG = Gauge(
-    "tiqora_poller_article_lag",
-    "Rows behind max article.id watermark",
-)
-POLLER_RUNS = Counter(
-    "tiqora_poller_runs_total",
-    "Znuny-write poller runs",
-    ["status"],
 )
 INDEX_DOCS = Counter(
     "tiqora_index_documents_total",

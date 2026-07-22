@@ -882,6 +882,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/daemons": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Daemons */
+        get: operations["list_daemons_api_v1_admin_daemons_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/daemons/{slug}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Update Daemon */
+        put: operations["update_daemon_api_v1_admin_daemons__slug__put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/dynamic-fields": {
         parameters: {
             query?: never;
@@ -3239,6 +3273,34 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/reference/compose-context": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Compose Context
+         * @description From-address, signature preview, and rich-text flag for a new-ticket compose form.
+         *
+         *     Reuses ``queue_outbound_meta``, the same queue lookup the agent-reply send
+         *     path (``deliver_agent_email_reply``) resolves From/signature from, so the
+         *     preview matches what an actual reply on that queue would show. The
+         *     signature is returned RAW (placeholders unexpanded): a not-yet-created
+         *     ticket has no ticket/customer context to expand OTRS_TICKET_*\/
+         *     OTRS_CUSTOMER_DATA_* tags against, so this preview is only approximate —
+         *     the real expansion happens in ``prepare_outgoing_agent_email`` at send time.
+         */
+        get: operations["compose_context_api_v1_reference_compose_context_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/reference/customers": {
         parameters: {
             query?: never;
@@ -5055,6 +5117,26 @@ export interface components {
             /** Enabled */
             enabled?: boolean | null;
         };
+        /** ComposeContextOut */
+        ComposeContextOut: {
+            /** From Address */
+            from_address: string;
+            /**
+             * Rich Text
+             * @default true
+             */
+            rich_text: boolean;
+            /**
+             * Signature
+             * @default
+             */
+            signature: string;
+            /**
+             * Signature Is Html
+             * @default false
+             */
+            signature_is_html: boolean;
+        };
         /** CustomerCompanyCreate */
         CustomerCompanyCreate: {
             /** City */
@@ -5327,6 +5409,59 @@ export interface components {
             phone?: string | null;
             /** Title */
             title?: string | null;
+        };
+        /** DaemonListOut */
+        DaemonListOut: {
+            /** Services */
+            services: components["schemas"]["DaemonServiceOut"][];
+        };
+        /**
+         * DaemonServiceOut
+         * @description One row of the daemon catalog with effective schedule + live status.
+         */
+        DaemonServiceOut: {
+            /** Daily At */
+            daily_at?: string | null;
+            /** Enabled */
+            enabled: boolean;
+            /**
+             * Interval Overridden
+             * @default false
+             */
+            interval_overridden: boolean;
+            /** Interval Seconds */
+            interval_seconds?: number | null;
+            /** Last Error */
+            last_error?: string | null;
+            /** Last Ok At */
+            last_ok_at?: string | null;
+            /** Last Result */
+            last_result?: {
+                [key: string]: unknown;
+            } | null;
+            /** Last Run At */
+            last_run_at?: string | null;
+            /**
+             * Schedule
+             * @enum {string}
+             */
+            schedule: "interval" | "daily";
+            /** Slug */
+            slug: string;
+            /** Toggleable */
+            toggleable: boolean;
+        };
+        /**
+         * DaemonUpdate
+         * @description ``enabled``/``interval_seconds`` null or omitted leaves the field
+         *     untouched; ``interval_seconds=0`` or ``null`` (when explicitly sent)
+         *     clears the DB override and reverts to the config default.
+         */
+        DaemonUpdate: {
+            /** Enabled */
+            enabled?: boolean | null;
+            /** Interval Seconds */
+            interval_seconds?: number | null;
         };
         /**
          * DashboardSummary
@@ -10482,6 +10617,78 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_daemons_api_v1_admin_daemons_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DaemonListOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_daemon_api_v1_admin_daemons__slug__put: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                slug: string;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DaemonUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DaemonServiceOut"];
+                };
             };
             /** @description Validation Error */
             422: {
@@ -16920,6 +17127,42 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AgentRefOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    compose_context_api_v1_reference_compose_context_get: {
+        parameters: {
+            query: {
+                /** @description Queue to resolve From-address/signature for */
+                queue_id: number;
+            };
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ComposeContextOut"];
                 };
             };
             /** @description Validation Error */

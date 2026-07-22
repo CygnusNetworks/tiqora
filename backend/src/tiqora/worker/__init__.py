@@ -1,1 +1,1 @@
-"""taskiq worker process: indexing, mail, and future daemon-equivalent jobs."""
+"""Worker process: indexing, mail, and Znuny daemon-equivalent takeover jobs."""

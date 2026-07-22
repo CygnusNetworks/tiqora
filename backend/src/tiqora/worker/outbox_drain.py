@@ -1,6 +1,8 @@
 """Outbox drain task: reads tiqora_event_outbox and re-indexes affected tickets.
 
-Runs every minute via taskiq scheduler. Marks rows as processed after
+Gated by the ``daemon.outbox.enabled`` tiqora_settings key (default ON — see
+``tiqora.domain.settings_store``); runs on a fixed cadence from the
+``outbox`` loop in ``tiqora.worker.__main__``. Marks rows as processed after
 successful Meilisearch indexing, so a crash between index and mark will
 cause double-processing (idempotent: re-index is harmless).
 """
@@ -14,6 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from tiqora.config import Settings, get_settings
 from tiqora.db.engine import get_session_factory
 from tiqora.domain.search import SearchIndexService
+from tiqora.domain.settings_store import KEY_OUTBOX_ENABLED, get_setting_bool
 from tiqora.events.pubsub import get_pubsub_redis, publish_ticket_event
 from tiqora.worker.webhooks import dispatch_webhooks
 
@@ -34,6 +37,13 @@ async def drain_outbox(
     """
     cfg = settings or get_settings()
     factory = session_factory or get_session_factory()
+
+    async with factory() as session:
+        # Default ON — only skip when explicitly disabled (Muster: gdpr_retention).
+        enabled = await get_setting_bool(session, KEY_OUTBOX_ENABLED, True)
+    if not enabled:
+        logger.debug("outbox_drain_disabled")
+        return {"enabled": 0}
 
     async with factory() as session:
         rows = (
