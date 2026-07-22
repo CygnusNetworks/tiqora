@@ -547,7 +547,11 @@
     "bulk": {
       "selected": "{{count}} ausgewählt",
       "selectAll": "Alle auf der Seite auswählen",
-      "selectRow": "Zeile auswählen"
+      "selectRow": "Zeile auswählen",
+      "done": "{{count}} aktualisiert",
+      "progress": "{{done}}/{{total}} verarbeitet…",
+      "error": "Aktion fehlgeschlagen: {{message}}",
+      "errorGeneric": "Aktion fehlgeschlagen."
     },
     "pagination": {
       "prev": "Zurück",
