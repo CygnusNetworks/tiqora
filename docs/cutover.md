@@ -19,7 +19,7 @@ Znuny and Tiqora hosts, the shared database, and the nginx frontend.
 
 Before starting *any* stage below:
 
-- [ ] All Phase 4b daemon takeovers are live and have been running cleanly in
+- [ ] All daemon takeovers are live and have been running cleanly in
       production for a representative period (see
       `docs/parallel-operation.md` → "Taking over ..." sections):
       `daemon.postmaster.enabled`, `daemon.escalation.enabled`,

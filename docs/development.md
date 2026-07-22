@@ -67,8 +67,12 @@ uv run python -c 'import tiqora; print(tiqora.__version__)'
 
 ### Package map
 
-See module docstrings under `backend/src/tiqora/`. Stub packages (`znuny/`,
-`domain/`, …) exist so imports and CI pass while Phase 0 logic is implemented.
+See module docstrings under `backend/src/tiqora/`. Layout:
+
+```
+backend/src/tiqora/
+  api/ domain/ permissions/ znuny/ db/ worker/ kb/ channels/ …
+```
 
 ### Alembic
 
@@ -211,3 +215,26 @@ documented in `tiqora.config.Settings` and [deployment.md](./deployment.md).
 | `make mcp` | Run MCP process |
 | `make compose-check` | Validate compose YAML |
 | `make build` | Local Docker image `tiqora:local` |
+
+## Release checklist
+
+Day-to-day pushes run **CI** and an **amd64 Docker** image. Marketing site,
+multi-arch Docker, and Playwright e2e run on **`v*` tags** (or manual
+workflow dispatch where available). Before tagging a release:
+
+1. **Screenshots** (if UI changed meaningfully):
+   ```bash
+   cd frontend && pnpm build
+   SCREENSHOTS=1 pnpm exec playwright test screenshots --project=chromium
+   ```
+2. **OpenAPI + typed client** (if REST models/routes changed):
+   ```bash
+   cd backend && uv run tiqora openapi -o ../docs/api/openapi.json
+   # also refresh packages/api-client/openapi.json and regenerate types
+   pnpm --filter @tiqora/api-client generate && pnpm --filter @tiqora/api-client build
+   ```
+3. **Tag** `vX.Y.Z` → CI (with e2e), multi-arch Docker push, product site + demo deploy.
+4. **Optional:** run golden-master via Actions (`workflow_dispatch`) if ticket-write
+   invariants or the GenericInterface layer changed.
+5. **Optional:** deploy the product site without a tag via
+   **Actions → Product site (GitHub Pages) → Run workflow**.

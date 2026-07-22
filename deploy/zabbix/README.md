@@ -1,6 +1,6 @@
 # Zabbix template for Tiqora
 
-**Status:** placeholder — template not yet authored (Phase 0/1 observability).
+**Status:** placeholder — template not yet authored.
 
 ## Planned coverage
 
@@ -11,8 +11,8 @@
 | Prometheus metrics | HTTP agent / Prometheus scrape | `GET /metrics` |
 | Request latency | Metric items | `tiqora_http_request_duration_seconds` |
 | Worker queue depth | Metric items | (taskiq metrics — TBD) |
-| Poller lag | Metric items | (Znuny write poller — Phase 1) |
-| Mail queue errors | Metric items | (Phase 4) |
+| Poller lag | Metric items | (Znuny write poller) |
+| Mail queue errors | Metric items | |
 
 ## Layout (forthcoming)
 

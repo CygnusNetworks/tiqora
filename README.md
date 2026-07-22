@@ -1,18 +1,14 @@
 # Tiqora
 
-> **⚠️ Beta — parallel operation.**
->
-> Phases 0–5 mechanics are implemented and covered by golden-master and
-> compat test suites: legacy models/auth/permissions, read-only UI +
-> indexing, TicketService write path + GenericInterface compat + MCP, portal
-> + KB + admin + OIDC/Kerberos/TOTP, daemon takeover feature flags, and the
-> cutover mechanics (schema-ownership gate, additive owned migrations,
-> [cutover runbook](./docs/cutover.md), [AI integration
-> contract](./docs/ai-integration.md)). No production cutover has been
-> performed with this codebase yet — schema ownership defaults OFF and
-> requires an explicit, gated operator action (see the runbook). APIs,
-> schema conventions, and operational behaviour may still change without
-> notice.
+[![License: AGPL-3.0](https://img.shields.io/badge/License-AGPL--3.0-blue.svg)](./LICENSE)
+[![Python 3.12+](https://img.shields.io/badge/Python-3.12%2B-3776AB?logo=python&logoColor=white)](./backend)
+[![React + TypeScript](https://img.shields.io/badge/React-TypeScript-61DAFB?logo=react&logoColor=black)](./frontend)
+[![Znuny 6.5 DB](https://img.shields.io/badge/Znuny%2FOTRS-6.5%20DB%20compatible-5B8CFF)](./docs/compatibility.md)
+[![Docker](https://img.shields.io/badge/Docker-ready-2496ED?logo=docker&logoColor=white)](./docs/deploy/docker-compose.md)
+[![Live site](https://img.shields.io/badge/Live-demo%20%26%20product%20site-5B8CFF)](https://cygnusnetworks.github.io/tiqora/)
+
+> **Still under active development.** Production use is not yet recommended.
+> APIs, schema conventions, and operational behaviour may still change.
 
 **Tiqora** is a modern, self-hosted ticket / helpdesk system that is **database-compatible
 with Znuny / OTRS 6.5**. It is a clean-room reimplementation (Python FastAPI + React),
@@ -22,94 +18,80 @@ not a fork of Znuny — no Znuny source code is included or redistributed.
 |---|---|
 | **Backend** | Python 3.12+, FastAPI, SQLAlchemy 2 async, Alembic, Pydantic v2 |
 | **Frontend** | React + TypeScript + Vite, Tailwind, theming via CSS variables |
-| **Search** | Meilisearch (hybrid / vector RAG planned) |
+| **Search** | Meilisearch (full-text; hybrid / vector RAG planned later) |
 | **Jobs** | taskiq on Redis |
-| **AI surface** | MCP server (FastMCP) with full agent access under the same permission engine |
+| **AI surface** | MCP server (FastMCP) under the same permission engine as UI/REST |
 | **License** | [AGPL-3.0](./LICENSE) — Copyright © 2026 Cygnus Networks GmbH |
 
-## What Tiqora is
+## Why Tiqora
 
-Tiqora targets organisations that run (or want to leave) Znuny/OTRS 6.5 and need:
+- **Modern web UI** — agent workspace, admin console, and customer portal that feel
+  like a current product, not a 2000s helpdesk skin.
+- **Znuny / OTRS 6.5 database compatibility** — same core tables; **parallel operation**
+  on one shared database is a first-class path (additive `tiqora_*` tables only until
+  you explicitly take schema ownership).
+- **AI-ready ticket search** — Meilisearch indexing plus an **MCP server** so AI agents
+  act with the same ACLs as humans.
+- **GDPR tooling** — anonymization, retention jobs, and audit trails in admin.
+- **Modern design** — dark/light themes, EN + DE i18n, compact cobalt design system.
+- **No Perl application stack** — Python FastAPI + React throughout Tiqora itself
+  (optional small Znuny OPM addon only if you co-run Znuny for cache coherence).
+- **Customer portal & knowledge base** — self-service tickets and Markdown KB.
+- **Integration-friendly** — REST `/api/v1`, GenericInterface REST/SOAP compatibility,
+  webhooks, channel plugins (email, SMS, WhatsApp, phone/CTI).
+- **Modern auth** — legacy password hashes, OIDC, LDAP/AD, Kerberos/SPNEGO, TOTP, passkeys.
 
-1. A modern agent UI, customer portal, and admin console.
-2. A first-class REST API (`/api/v1`) and an MCP server for AI agents.
-3. **Parallel operation** with an existing Znuny instance on the **same database**
-   (PostgreSQL or MySQL/MariaDB), with zero schema changes to Znuny tables until
-   an explicit post-cutover “schema ownership” mode is enabled.
-4. A path to take over mail/escalation/notification/GenericAgent work from the
-   Znuny daemon, feature-flag by feature-flag.
+## Live product site & demo
 
-Tiqora only adds new tables under the `tiqora_*` prefix. Znuny keeps owning its
-existing schema during parallel operation.
+**[Product site](https://cygnusnetworks.github.io/tiqora/)** — overview, features, screenshots.
 
-## Live demo
+**[Interactive demo](https://cygnusnetworks.github.io/tiqora/demo/)** — full agent, admin, and
+portal UI in the browser against mock data (nothing is saved). Built from `frontend/`
+with [Mock Service Worker](https://mswjs.io/); local build:
 
-**[▶ Try the interactive demo](https://cygnusnetworks.github.io/tiqora/)** — the full
-agent, admin, and portal UI running entirely in your browser against mock data (no
-backend, nothing is saved). Deployed to GitHub Pages from `frontend/` via
-[Mock Service Worker](https://mswjs.io/); build it locally with
-`VITE_BASE=/tiqora/ pnpm --filter tiqora-frontend build:demo`.
+```bash
+VITE_BASE=/tiqora/demo/ pnpm --filter tiqora-frontend build:demo
+```
 
 ## Screenshots
-
-The agent workspace, ticket zoom (with a permission-aware action bar), reporting,
-the admin console, privacy/GDPR tooling, and the customer portal:
 
 | Agent dashboard | Ticket zoom |
 |---|---|
 | ![Agent dashboard](./docs/images/agent-dashboard.png) | ![Ticket zoom](./docs/images/agent-ticket-zoom.png) |
 
-| Reporting & SLA | Queue view |
+| Queue view | Search |
 |---|---|
-| ![Reporting](./docs/images/agent-stats.png) | ![Queue view](./docs/images/agent-queues.png) |
+| ![Queue view](./docs/images/agent-queues.png) | ![Search](./docs/images/agent-search.png) |
 
-| Admin — queues | Authentication / 2FA |
+| Reporting & SLA | Knowledge base |
 |---|---|
-| ![Admin queues](./docs/images/admin-queues.png) | ![2FA administration](./docs/images/admin-2fa.png) |
+| ![Reporting](./docs/images/agent-stats.png) | ![Knowledge base](./docs/images/agent-kb.png) |
 
-| Privacy / GDPR erasure | Customer portal |
+| Admin — queues | Privacy / GDPR |
 |---|---|
-| ![GDPR](./docs/images/admin-gdpr.png) | ![Customer portal](./docs/images/portal.png) |
+| ![Admin queues](./docs/images/admin-queues.png) | ![GDPR](./docs/images/admin-gdpr.png) |
 
-<sub>Rendered from representative data via `SCREENSHOTS=1 pnpm exec playwright test screenshots`
+| Authentication / 2FA | Customer portal |
+|---|---|
+| ![2FA administration](./docs/images/admin-2fa.png) | ![Customer portal](./docs/images/portal.png) |
+
+<sub>Generated with `SCREENSHOTS=1 pnpm exec playwright test screenshots`
 (`e2e/fixtures/rich-mock.ts`) — no backend required. Use `THEME=dark` / `LANG_UI=de` for variants.</sub>
 
-## Key features
+## Also included
 
-| Area | Status | Notes |
-|---|---|---|
-| Project scaffolding, CI, Docker images | ✅ Done (Phase 0) | This repository state |
-| Dev stack (MariaDB, Postgres, Redis, Meili, Mailpit) | ✅ Done | `docker-compose.dev.yml` |
-| Config, async DB engine, health/ready/metrics | ✅ Done | `backend/src/tiqora` |
-| Znuny legacy models + schema conformance tests | ✅ Done (Phase 0) | ~45 V1 tables, `tests/test_schema_conformance.py` |
-| Auth: legacy password hashes, Redis sessions, API keys | ✅ Done (Phase 0) | bcrypt / sha256 / md5-crypt |
-| Permission engine (groups, roles, ACL) | ✅ Done (Phase 0) | Shared by UI / REST / MCP |
-| Read-only agent UI + Meilisearch index | ✅ Done (Phase 1) | Znuny-write poller, queue/zoom/search |
-| TicketService write path + Znuny invariants | ✅ Done (Phase 2) | Golden-master validated against real Znuny 6.5.22 |
-| GenericInterface compatibility layer | ✅ Done (Phase 2c) | TicketCreate/Update/Get/Search, SessionCreate, dynamic router |
-| MCP server tools | ✅ Done (Phase 2c) | ticket_*, customer_lookup, kb_* — see `docs/ai-integration.md` |
-| Customer portal | ✅ API + UI (Phase 3a/3b) | REST at `/api/portal/*`, UI at `/portal` |
-| Knowledge base (`tiqora_kb_*`, RAG-ready) | ✅ API + UI (Phase 3a/3b) | Markdown, chunking, Meilisearch; agent editor + portal search UI |
-| Admin CRUD (queues, DF, ACL, GenericAgent) | ✅ API + UI (Phase 3a/3b) | REST at `/api/v1/admin/*`, UI at `/admin` |
-| OIDC, Kerberos/SPNEGO, TOTP | ✅ Done (Phase 3c) | Feature-flagged, off by default |
-| Daemon takeover (mail, escalation, notify, GA) | ✅ Done (Phase 4) | Per-function `daemon.*.enabled` flags, default OFF |
-| Schema-ownership gate + CLI + preflight | ✅ Done (Phase 5) | `tiqora ownership status/enable/orphan-report` |
-| First owned migration + orphan report | ✅ Done (Phase 5) | Additive composite indexes only; read-only orphan counts |
-| Cutover runbook | ✅ Done (Phase 5) | [docs/cutover.md](./docs/cutover.md) — no cutover performed yet |
-| AI integration contract (webhooks + MCP) | ✅ Done (Phase 5) | [docs/ai-integration.md](./docs/ai-integration.md); no LLM code |
-| TiqoraSync Znuny addon (cache coherence) | ✅ Done | OPM package in `packages/znuny-addon/TiqoraSync/` — daemon cron clears stale Znuny ticket caches |
-| SSE realtime + agent presence | ✅ Done | `GET /api/v1/events/stream`; presence chips + stale-reply warning on ticket zoom |
-| CSV ticket export | ✅ Done | `GET /api/v1/tickets/export.csv` — permission-filtered, streaming, Excel-friendly |
-| Dev tooling: seed + dump anonymizer | ✅ Done | `tiqora dev seed` / `tiqora dev anonymize` — [docs/development.md](./docs/development.md) |
-| Reports/stats (volume, backlog, SLA, workload) | ✅ Done | `GET /api/v1/stats/*` (+ CSV export) — `/agent/stats` UI, permission-filtered by queue |
-| Calendar / appointments (recurrence, ICS export/feed, ticket links) | ✅ Done | `GET/POST /api/v1/calendar/*` — `/agent/calendar` UI (month/week/agenda), reuses Znuny `calendar*` tables |
-| Communication channels: SMS, WhatsApp Business, phone/CTI | ✅ Done | Channel plugin interface — [docs/channels.md](./docs/channels.md); enable-flagged, off by default |
-| LDAP/AD auth (agent + customer) | ✅ Done | Bind-search-bind, no auto-provisioning; feature-flagged |
-| GDPR tools (anonymization + retention) | ✅ Done | Ownership-gated; `tiqora gdpr *` — [docs/gdpr.md](./docs/gdpr.md) |
-| PGP / S-MIME (verify/decrypt inbound, sign/encrypt outbound) | ✅ Done | Flag-gated — [docs/crypto.md](./docs/crypto.md) |
-| Process Management (BPM ticket processes) | ✅ Done | `GET/POST /api/v1/process/*` (6 endpoints) — reuses Znuny `pm_*` tables; no visual designer — [docs/process-management.md](./docs/process-management.md) |
-| SOAP compat transport | ✅ Done | `POST /znuny-compat/soap/{webservice}` (+ dynamic `Webservice`/`WebserviceID` routes) — same 5 ops as REST, own operation-dispatch-from-Body-element codec — [docs/compatibility.md](./docs/compatibility.md#soap-transport) |
-| Package manager (OPM remote install) | 🔲 Planned | Not started |
+| Area | Notes |
+|---|---|
+| Ticket write path + Znuny invariants | Golden-master tested against Znuny 6.5 behaviour |
+| GenericInterface compatibility | TicketCreate/Update/Get/Search, SessionCreate; REST + SOAP |
+| MCP tools | `ticket_*`, customer lookup, KB — see [docs/ai-integration.md](./docs/ai-integration.md) |
+| Daemon takeover (mail, escalation, notify, GA) | Per-function flags, off by default |
+| Calendar / appointments | Month/week/agenda UI; reuses Znuny `calendar*` tables |
+| Process management (BPM) | Reuses Znuny `pm_*` tables — [docs/process-management.md](./docs/process-management.md) |
+| PGP / S-MIME | Flag-gated — [docs/crypto.md](./docs/crypto.md) |
+| SSE realtime + agent presence | Live updates on ticket zoom |
+| CSV ticket export | Permission-filtered streaming export |
+| TiqoraSync Znuny addon | Optional OPM for cache coherence during parallel op |
 
 ## Architecture overview
 
@@ -143,7 +125,7 @@ the admin console, privacy/GDPR tooling, and the customer portal:
                       │                       │
          ┌────────────▼──────────┐            │
          │  Znuny instance       │            │
-         │  (parallel operation) │◄── cache invalidation via TiqoraSync OPM
+         │  (optional parallel)  │◄── cache invalidation via TiqoraSync OPM
          └───────────────────────┘
                       │
          ┌────────────▼────────────────────────────────────┐
@@ -298,65 +280,49 @@ make lint
 | Search | Meilisearch | Fast full-text; later hybrid/vector for RAG |
 | Sessions | Redis server-side | No JWT; Znuny-compatible session table for compat API |
 | Frontend | Vite, React, TS, Tailwind | One app, three route trees, code-split |
-| i18n | react-i18next | EN + DE from day one |
-| Observability | structlog JSON, Prometheus `/metrics` | Zabbix template planned under `deploy/zabbix/` |
+| i18n | react-i18next | EN + DE |
+| Observability | structlog JSON, Prometheus `/metrics` | Zabbix template placeholder under `deploy/zabbix/` |
 | MCP | FastMCP (separate process) | Same permission engine as UI/REST |
 
-## Project status / roadmap
+## Status
 
-Summarised from the design plan. Durations are indicative.
-
-| Phase | Focus | Exit criteria (summary) |
-|---|---|---|
-| **0 — Foundation** (2–3 w) | Scaffolding, legacy models, auth, permissions, CI matrix | Login against a real Znuny dump with all hash schemes |
-| **1 — Read-only agent UI** (3–4 w) | REST reads, Meili bulk index, Znuny write poller, queue/zoom/search | Side-by-side diff vs Znuny zoom; Playwright smoke |
-| **2 — Write path + compat + MCP** (5–6 w) | TicketService, invariants, TiqoraSync, SMTP, compat API, MCP | Golden-master API/DB diffs; TN concurrency with mixed writers |
-| **3 — Portal + KB + Admin** (4–5 w) | Portal, KB, admin CRUD, OIDC/Kerberos/TOTP | Queue created in Tiqora appears in Znuny (cache path proven) |
-| **4 — Daemon takeover** (4–6 w) | Postmaster, escalation, notifications, GenericAgent, auto-responses | Mail round-trip via Mailpit; notification diffs |
-| **5 — Cutover + ownership + AI** (2–3 w) | Runbook, ownership flag, additive indexes, webhooks | ✅ Mechanics complete; production cutover/rollback drill still pending |
-
-Phases 0–5 mechanics are complete. **Project status: beta — parallel
-operation.** No production cutover (Phase 5's runbook) has been executed
-against a real Znuny instance with this codebase; that remains the next
-real-world milestone, not a code deliverable.
-
-Detailed design: [docs/specs/2026-07-19-tiqora-design.md](./docs/specs/2026-07-19-tiqora-design.md).
+Core functionality is implemented and covered by automated tests, including
+golden-master checks against Znuny 6.5 behaviour. The product is still under
+active development: production cutover against a live Znuny estate has not been
+performed with this codebase, and APIs may still change. Schema ownership defaults
+**off** and requires an explicit operator action — see [docs/cutover.md](./docs/cutover.md).
 
 ## Documentation
 
-Full index: **[docs/README.md](./docs/README.md)** — API reference
-(`docs/api/`), the Znuny-to-Tiqora migration playbook (`docs/guide/`),
-Docker Compose deployment (`docs/deploy/`), architecture, parallel
-operation, cutover, and feature-area docs.
+Full index: **[docs/README.md](./docs/README.md)**
 
 **Getting started & operating**
 
 | Document | Content |
 |---|---|
-| [docs/guide/znuny-to-tiqora.md](./docs/guide/znuny-to-tiqora.md) | Operator playbook: run alongside Znuny, then migrate onto Tiqora (5 stages) |
-| [docs/deploy/docker-compose.md](./docs/deploy/docker-compose.md) | Docker Compose deployment — services, env vars, external DB, reverse proxy |
+| [docs/guide/znuny-to-tiqora.md](./docs/guide/znuny-to-tiqora.md) | Operator playbook: run alongside Znuny, then migrate onto Tiqora |
+| [docs/deploy/docker-compose.md](./docs/deploy/docker-compose.md) | Docker Compose deployment — services, env vars, reverse proxy |
 | [docs/deployment.md](./docs/deployment.md) · [docs/parallel-operation.md](./docs/parallel-operation.md) · [docs/cutover.md](./docs/cutover.md) | Deployment notes, parallel-operation invariants, cutover runbook |
-| [docs/development.md](./docs/development.md) · [docs/testing.md](./docs/testing.md) | Local dev, seeding/anonymizing, running the test suites incl. golden-master |
+| [docs/development.md](./docs/development.md) · [docs/testing.md](./docs/testing.md) | Local dev, seeding/anonymizing, test suites |
 
 **API & integrations**
 
 | Document | Content |
 |---|---|
-| [docs/api/README.md](./docs/api/README.md) | API surfaces overview (v1 / portal / compat / MCP), auth, conventions |
+| [docs/api/README.md](./docs/api/README.md) | API surfaces overview (v1 / portal / compat / MCP) |
 | [docs/api/rest-v1.md](./docs/api/rest-v1.md) | Guided `/api/v1` reference with curl examples |
 | [docs/api/openapi.json](./docs/api/openapi.json) | Generated OpenAPI spec (`tiqora openapi`) |
-| [docs/api/compat.md](./docs/api/compat.md) | GenericInterface compatibility layer for existing Znuny REST clients |
-| [docs/api/mcp.md](./docs/api/mcp.md) · [docs/ai-integration.md](./docs/ai-integration.md) | MCP tools, webhook contract, AI-agent patterns, prompt-injection guidance |
-| [docs/channels.md](./docs/channels.md) | Communication channel plugins (SMS, WhatsApp, phone/CTI) |
+| [docs/api/compat.md](./docs/api/compat.md) | GenericInterface compatibility layer |
+| [docs/api/mcp.md](./docs/api/mcp.md) · [docs/ai-integration.md](./docs/ai-integration.md) | MCP tools, webhook contract, AI-agent patterns |
+| [docs/channels.md](./docs/channels.md) | Communication channel plugins |
 | [docs/gdpr.md](./docs/gdpr.md) | GDPR anonymization & retention tooling |
 
 **Reference**
 
 | Document | Content |
 |---|---|
-| [docs/README.md](./docs/README.md) | **Full documentation index** |
 | [docs/architecture.md](./docs/architecture.md) | System components and data flow |
-| [docs/specs/2026-07-19-tiqora-design.md](./docs/specs/2026-07-19-tiqora-design.md) | Full design specification |
+| [docs/specs/2026-07-19-tiqora-design.md](./docs/specs/2026-07-19-tiqora-design.md) | Historical design specification |
 | [NOTICE.md](./NOTICE.md) | Licensing breakdown and trademark notes |
 
 ## Compatibility statement
@@ -374,7 +340,7 @@ operation, cutover, and feature-area docs.
 2. Keep all documentation, user-facing strings (via i18n keys), and code comments in **English**.
 3. Do **not** copy any Znuny/OTRS source into the tree (AGPL cleanliness for Znuny; Tiqora is AGPL-3.0 of its own).
 4. Run `make lint` and `make test` before opening a PR.
-5. Prefer small, reviewable PRs aligned with the phase roadmap.
+5. Prefer small, reviewable PRs.
 
 ## License
 

@@ -186,16 +186,16 @@ in [`../parallel-operation.md`](../parallel-operation.md)):
 1. **Escalation sweep** — lowest blast radius; the math is deterministic and
    idempotent, so even a brief overlap during the flag flip just means a
    value gets recomputed twice, not corrupted.
-   → [`../parallel-operation.md`](../parallel-operation.md#taking-over-escalation-index-rebuild-phase-4b)
+   → [`../parallel-operation.md`](../parallel-operation.md#taking-over-escalation-index-rebuild)
 2. **Notifications** — verify no double-send before moving on.
-   → [`../parallel-operation.md`](../parallel-operation.md#taking-over-event-notifications-phase-4b)
+   → [`../parallel-operation.md`](../parallel-operation.md#taking-over-event-notifications)
 3. **GenericAgent** — verify job matches against a read-only run before
    enabling `daemon.generic_agent.allow_delete`.
-   → [`../parallel-operation.md`](../parallel-operation.md#taking-over-genericagent-phase-4b)
+   → [`../parallel-operation.md`](../parallel-operation.md#taking-over-genericagent)
 4. **Postmaster (inbound mail) — last.** This is the highest-risk takeover:
    getting it wrong risks duplicate-processed or (for POP3/IMAP
    delete-after-fetch) lost mail.
-   → [`../parallel-operation.md`](../parallel-operation.md#taking-over-mail-processing-phase-4a)
+   → [`../parallel-operation.md`](../parallel-operation.md#taking-over-mail-processing)
 
    **OAuth2-mail caveat**: Tiqora's postmaster pipeline only implements
    `password` mail-account authentication. If any mail account uses OAuth2
