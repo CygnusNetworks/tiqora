@@ -15,6 +15,7 @@ from sqlalchemy import select
 
 from tiqora.api.deps import CurrentUser, DbSession
 from tiqora.channels.email.outbound_reply import queue_outbound_meta
+from tiqora.channels.email.placeholder import expand_placeholders
 from tiqora.db.legacy.customer import CustomerUser
 from tiqora.db.legacy.queue import Queue
 from tiqora.db.legacy.ticket import TicketPriority, TicketState, TicketStateType
@@ -187,21 +188,31 @@ async def compose_context(
 
     Reuses ``queue_outbound_meta``, the same queue lookup the agent-reply send
     path (``deliver_agent_email_reply``) resolves From/signature from, so the
-    preview matches what an actual reply on that queue would show. The
-    signature is returned RAW (placeholders unexpanded): a not-yet-created
-    ticket has no ticket/customer context to expand OTRS_TICKET_*/
-    OTRS_CUSTOMER_DATA_* tags against, so this preview is only approximate —
-    the real expansion happens in ``prepare_outgoing_agent_email`` at send time.
+    preview matches what an actual reply on that queue would show. Agent tags
+    (``<OTRS_First_Name>`` etc.) are expanded against the current agent, same
+    as ``TicketService.get_reply_draft``. A not-yet-created ticket has no
+    ticket/customer context, so ticket_id is omitted and OTRS_TICKET_*/
+    OTRS_CUSTOMER_DATA_* tags resolve empty here — the real expansion happens
+    in ``prepare_outgoing_agent_email`` at send time once the ticket exists.
     """
-    _ = user
     try:
-        from_line, _queue_name, sig_text, sig_ct = await queue_outbound_meta(session, queue_id)
+        from_line, queue_name, sig_text, sig_ct = await queue_outbound_meta(session, queue_id)
     except InvalidInput as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
-    rich_text = bool(await SysConfig(session).get("Frontend::RichText", 1))
+    sysconfig = SysConfig(session)
+    rich_text = bool(await sysconfig.get("Frontend::RichText", 1))
+    signature = sig_text or ""
+    if signature.strip():
+        signature = await expand_placeholders(
+            session,
+            sysconfig,
+            signature,
+            user_id=user.id,
+            queue_name=queue_name or "",
+        )
     return ComposeContextOut(
         from_address=from_line,
-        signature=sig_text or "",
+        signature=signature,
         signature_is_html="html" in (sig_ct or "").lower(),
         rich_text=rich_text,
     )
