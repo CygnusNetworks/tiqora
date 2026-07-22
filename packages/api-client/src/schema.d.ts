@@ -1048,6 +1048,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/tickets/{ticket_id}/ai/summarize": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Request Summarize
+         * @description Manual "Zusammenfassen" trigger (plan §3.5) — state-only, never an
+         *     article/note. Reuses the same ``note`` permission as Manual Assist since
+         *     it is likewise an agent action on the ticket.
+         */
+        post: operations["request_summarize_api_v1_tickets__ticket_id__ai_summarize_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/tickets/{ticket_id}/ai/drafts/{draft_id}/discard": {
         parameters: {
             query?: never;
@@ -5087,6 +5109,8 @@ export interface components {
             manual_assist_available: boolean;
             /** Summary Available */
             summary_available: boolean;
+            /** Can Summarize */
+            can_summarize: boolean;
             /** Operation Mode Ready */
             operation_mode_ready: boolean;
             /** Drafts */
@@ -5095,6 +5119,15 @@ export interface components {
             summary_body: string | null;
             /** Last Summary Upto Article Id */
             last_summary_upto_article_id: number | null;
+        };
+        /** AiSummarizeOut */
+        AiSummarizeOut: {
+            /** Status */
+            status: string;
+            /** Summary Body */
+            summary_body?: string | null;
+            /** Upto Article Id */
+            upto_article_id?: number | null;
         };
         /** AiUsageOut */
         AiUsageOut: {
@@ -11409,6 +11442,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AiDraftRequestOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    request_summarize_api_v1_tickets__ticket_id__ai_summarize_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                ticket_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AiSummarizeOut"];
                 };
             };
             /** @description Validation Error */

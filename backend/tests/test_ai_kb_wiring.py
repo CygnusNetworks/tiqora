@@ -1,8 +1,10 @@
-"""Unit tests for the KB wiring in tiqora.api.v1.ai (plan §3.4 step 7).
+"""Unit tests for the KB wiring in tiqora.ai.kb_wiring (plan §3.4 step 7).
 
 A mocked KbService (monkeypatched at the ``tiqora.kb.service`` module level,
 where the wiring functions import it lazily) is enough here — no real
-Meilisearch/DB is exercised.
+Meilisearch/DB is exercised. Shared between the manual-assist API route and
+the auto-reply worker (plan Phase D: "extrahiere die Helpers in ein
+gemeinsames Modul").
 """
 
 from __future__ import annotations
@@ -13,7 +15,7 @@ from typing import Any
 
 import pytest
 
-from tiqora.api.v1 import ai as ai_api
+from tiqora.ai import kb_wiring
 from tiqora.kb.service import KbNotFound
 
 
@@ -63,7 +65,7 @@ async def test_kb_bundle_builds_markdown_from_tagged_articles(
 ) -> None:
     monkeypatch.setattr("tiqora.kb.service.KbService", _FakeKbService)
     policy = SimpleNamespace(kb_tags=json.dumps(["reset"]), kb_category_ids=None)
-    bundle = await ai_api._kb_bundle(None, None, 1, policy)  # type: ignore[arg-type]
+    bundle = await kb_wiring.kb_bundle(None, None, 1, policy)  # type: ignore[arg-type]
     assert bundle is not None
     assert "Reset password" in bundle
     assert "Step 1. Step 2." in bundle
@@ -71,13 +73,13 @@ async def test_kb_bundle_builds_markdown_from_tagged_articles(
 
 async def test_kb_bundle_none_when_queue_has_no_tags_or_category() -> None:
     policy = SimpleNamespace(kb_tags=None, kb_category_ids=None)
-    bundle = await ai_api._kb_bundle(None, None, 1, policy)  # type: ignore[arg-type]
+    bundle = await kb_wiring.kb_bundle(None, None, 1, policy)  # type: ignore[arg-type]
     assert bundle is None
 
 
 async def test_kb_search_fn_returns_hits(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr("tiqora.kb.service.KbService", _FakeKbService)
-    search = ai_api._kb_search_fn(None, None, 1)  # type: ignore[arg-type]
+    search = kb_wiring.kb_search_fn(None, None, 1)  # type: ignore[arg-type]
     results = await search("reset password", limit=5)
     assert results == [
         {"article_id": 1, "title": "Reset password", "snippet": "Result for reset password"}
@@ -88,7 +90,7 @@ async def test_kb_search_fn_degrades_cleanly_when_unavailable(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setattr("tiqora.kb.service.KbService", _FailingKbService)
-    search = ai_api._kb_search_fn(None, None, 1)  # type: ignore[arg-type]
+    search = kb_wiring.kb_search_fn(None, None, 1)  # type: ignore[arg-type]
     results = await search("reset password", limit=5)
     assert results == []
 
@@ -97,7 +99,7 @@ async def test_kb_get_article_fn_returns_none_for_missing_or_forbidden(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setattr("tiqora.kb.service.KbService", _FakeKbService)
-    get_article = ai_api._kb_get_article_fn(None, None, 1)  # type: ignore[arg-type]
+    get_article = kb_wiring.kb_get_article_fn(None, None, 1)  # type: ignore[arg-type]
     assert await get_article(999) is None
     found = await get_article(1)
     assert found == {"id": 1, "title": "Reset password", "body": "Full steps"}

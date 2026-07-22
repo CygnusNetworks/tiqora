@@ -17,13 +17,22 @@ from email.utils import parseaddr
 from typing import Any
 
 import structlog
-from sqlalchemy import select, text
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from tiqora.ai import drafts as draft_service
 from tiqora.ai import usage as usage_service
 from tiqora.ai.acl import AclLimitExceededError as AiAclLimitExceededError
 from tiqora.ai.acl import check_feature_access, check_feature_limits
+from tiqora.ai.context import (
+    ArticleSnapshot,
+    TicketNotFoundError,
+    TicketSnapshot,
+    get_or_create_state,
+    latest_customer_article_id,
+    load_articles,
+    ticket_snapshot,
+)
 from tiqora.ai.gate import AiGateError, require_tiqora_primary
 from tiqora.ai.llm import LlmClient, LlmMessage, LlmResponse
 from tiqora.ai.models import (
@@ -105,25 +114,6 @@ class AgentRunResult:
     completion_tokens: int = 0
 
 
-@dataclass(frozen=True, slots=True)
-class _TicketSnapshot:
-    ticket_id: int
-    queue_id: int
-    customer_id: str | None
-    title: str
-
-
-@dataclass(frozen=True, slots=True)
-class _ArticleSnapshot:
-    id: int
-    sender_type: str
-    is_visible_for_customer: bool
-    subject: str | None
-    body: str | None
-    from_address: str | None
-    is_ai_origin: bool
-
-
 def _map_customer_message(*, trigger: str, autonomy: str, kind: str) -> str:
     """Plan §3.4 autonomy matrix. Returns ``"draft"`` or ``"send"``.
 
@@ -143,73 +133,8 @@ def _map_customer_message(*, trigger: str, autonomy: str, kind: str) -> str:
     return "draft"
 
 
-async def _ticket_snapshot(session: AsyncSession, ticket_id: int) -> _TicketSnapshot:
-    row = (
-        (
-            await session.execute(
-                text("SELECT id, queue_id, customer_id, title FROM ticket WHERE id = :tid LIMIT 1"),
-                {"tid": ticket_id},
-            )
-        )
-        .mappings()
-        .first()
-    )
-    if row is None:
-        raise AgentRunError(f"Ticket {ticket_id} not found")
-    return _TicketSnapshot(
-        ticket_id=int(row["id"]),
-        queue_id=int(row["queue_id"]),
-        customer_id=row["customer_id"],
-        title=row["title"] or "",
-    )
-
-
-async def _load_articles(session: AsyncSession, ticket_id: int) -> list[_ArticleSnapshot]:
-    rows = (
-        (
-            await session.execute(
-                text(
-                    "SELECT a.id, st.name AS sender_type, a.is_visible_for_customer,"
-                    " m.a_subject, m.a_body, m.a_from,"
-                    " (o.article_id IS NOT NULL) AS is_ai_origin"
-                    " FROM article a"
-                    " JOIN article_sender_type st ON st.id = a.article_sender_type_id"
-                    " LEFT JOIN article_data_mime m ON m.article_id = a.id"
-                    " LEFT JOIN tiqora_ai_article_origin o ON o.article_id = a.id"
-                    " WHERE a.ticket_id = :tid ORDER BY a.id"
-                ),
-                {"tid": ticket_id},
-            )
-        )
-        .mappings()
-        .all()
-    )
-    return [
-        _ArticleSnapshot(
-            id=int(r["id"]),
-            sender_type=str(r["sender_type"]),
-            is_visible_for_customer=bool(r["is_visible_for_customer"]),
-            subject=r["a_subject"],
-            body=r["a_body"],
-            from_address=r["a_from"],
-            is_ai_origin=bool(r["is_ai_origin"]),
-        )
-        for r in rows
-    ]
-
-
-async def _get_or_create_state(session: AsyncSession, ticket_id: int) -> TiqoraAiTicketState:
-    state = await session.get(TiqoraAiTicketState, ticket_id)
-    if state is None:
-        state = TiqoraAiTicketState(ticket_id=ticket_id)
-        session.add(state)
-        await session.commit()
-        await session.refresh(state)
-    return state
-
-
 async def _acquire_lock(session: AsyncSession, ticket_id: int, owner: str) -> TiqoraAiTicketState:
-    state = await _get_or_create_state(session, ticket_id)
+    state = await get_or_create_state(session, ticket_id)
     now = datetime.now(UTC).replace(tzinfo=None)
     if state.run_lock_owner and state.run_lock_at:
         age = now - state.run_lock_at
@@ -313,8 +238,8 @@ def _build_system_prompt(
 
 
 def _build_user_message(
-    ticket: _TicketSnapshot,
-    articles: list[_ArticleSnapshot],
+    ticket: TicketSnapshot,
+    articles: list[ArticleSnapshot],
     *,
     pii: PiiMapper,
     mask: bool,
@@ -377,7 +302,10 @@ async def run_ticket_agent(
     await _acquire_lock(session, ticket_id, lock_owner)
 
     try:
-        ticket = await _ticket_snapshot(session, ticket_id)
+        try:
+            ticket = await ticket_snapshot(session, ticket_id)
+        except TicketNotFoundError as exc:
+            raise AgentRunError(str(exc)) from exc
 
         # 3. Policy + feature + ACL
         policy = await get_queue_policy_by_queue(session, ticket.queue_id)
@@ -408,7 +336,7 @@ async def run_ticket_agent(
         sysconfig = SysConfig(session)
 
         # 4. Load ticket + articles; based_on_article_id = latest customer article
-        articles = await _load_articles(session, ticket_id)
+        articles = await load_articles(session, ticket_id)
         customer_articles = [a for a in articles if a.sender_type == "customer"]
         based_on_article_id = customer_articles[-1].id if customer_articles else None
 
@@ -510,7 +438,7 @@ async def run_ticket_agent(
         )
 
         # 12 (ticket state bookkeeping happens below, after we know the outcome)
-        state = await _get_or_create_state(session, ticket_id)
+        state = await get_or_create_state(session, ticket_id)
 
         if outcome is None:
             state.last_run_at = datetime.now(UTC).replace(tzinfo=None)
@@ -536,7 +464,7 @@ async def run_ticket_agent(
         assert outcome.proposal is not None
 
         # 10. Freshness check
-        latest_customer = await _latest_customer_article_id(session, ticket_id)
+        latest_customer = await latest_customer_article_id(session, ticket_id)
         if (
             based_on_article_id is not None
             and latest_customer is not None
@@ -662,21 +590,6 @@ async def run_ticket_agent(
         raise
     finally:
         await _release_lock(session, ticket_id)
-
-
-async def _latest_customer_article_id(session: AsyncSession, ticket_id: int) -> int | None:
-    row = (
-        await session.execute(
-            text(
-                "SELECT a.id FROM article a"
-                " JOIN article_sender_type st ON st.id = a.article_sender_type_id"
-                " WHERE a.ticket_id = :tid AND st.name = 'customer'"
-                " ORDER BY a.id DESC LIMIT 1"
-            ),
-            {"tid": ticket_id},
-        )
-    ).first()
-    return int(row[0]) if row else None
 
 
 __all__ = [
