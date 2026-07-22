@@ -305,6 +305,15 @@ class Settings(BaseSettings):
         default=60, validation_alias="TIQORA_OUTBOX_DRAIN_INTERVAL"
     )
 
+    # AI worker (tiqora-ai-worker, separate process/compose service — see
+    # ~/TIQORA_LLM_PLAN.md §3.0/§3.4). ``daemon.ai_worker.enabled``
+    # (default OFF) is the takeover switch; this is only the tick cadence.
+    # Phase A: the loop only re-checks the Readiness-Gate and records a
+    # heartbeat, no ticket side effects yet.
+    ai_worker_interval_seconds: int = Field(
+        default=10, validation_alias="TIQORA_AI_WORKER_INTERVAL"
+    )
+
     # PGP / S/MIME (Phase 2c). Both OFF by default and require their
     # respective external tool (gpg / openssl) — see docs/crypto.md. When
     # enabled, inbound postmaster mail is checked for PGP/S/MIME

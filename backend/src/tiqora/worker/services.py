@@ -16,6 +16,8 @@ from dataclasses import dataclass
 from typing import Literal
 
 from tiqora.domain.settings_store import (
+    KEY_AI_WORKER_ENABLED,
+    KEY_AI_WORKER_INTERVAL_SECONDS,
     KEY_ESCALATION_ENABLED,
     KEY_ESCALATION_INTERVAL_SECONDS,
     KEY_GDPR_ERASURE_PURGE_ENABLED,
@@ -123,6 +125,20 @@ DAEMON_SERVICES: tuple[DaemonService, ...] = (
         toggleable=True,
         schedule_kind="daily",
         daily_at="03:30",
+    ),
+    # Status is written by the separate tiqora-ai-worker process (own
+    # heartbeat/entrypoint role, tiqora.ai.worker.run_ai_worker) — but
+    # daemon.*.status.* keys live in tiqora_settings regardless of which
+    # process writes them, so this catalog entry is process-independent like
+    # every other row here and the "Dienste" page shows it the same way.
+    DaemonService(
+        slug="ai_worker",
+        enabled_key=KEY_AI_WORKER_ENABLED,
+        default_enabled=False,
+        toggleable=True,
+        schedule_kind="interval",
+        interval_key=KEY_AI_WORKER_INTERVAL_SECONDS,
+        interval_settings_attr="ai_worker_interval_seconds",
     ),
 )
 

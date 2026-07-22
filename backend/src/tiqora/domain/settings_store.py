@@ -76,6 +76,19 @@ KEY_TOTP_ENFORCE_ALL = "auth.totp.enforce_all"
 # empty list (stored as missing / "[]").
 KEY_TOTP_ENFORCE_GROUP_IDS = "auth.totp.enforce_group_ids"
 
+# AI subsystem (Tiqora LLM/MCP agent, see ~/TIQORA_LLM_PLAN.md). Readiness-Gate
+# helpers live in tiqora.ai.gate, which consumes these keys.
+KEY_OPERATION_MODE = "system.operation_mode"
+KEY_AI_DISCLOSURE_DEFAULT = "ai.disclosure.default_text"
+KEY_AI_GLOBAL_REPLIES_PER_HOUR = "ai.auto_reply.global_max_per_hour"
+KEY_AI_WORKER_ENABLED = "daemon.ai_worker.enabled"
+KEY_AI_WORKER_INTERVAL_SECONDS = "daemon.ai_worker.interval_seconds"
+# Watermark cursor for the AI worker's own tiqora_event_outbox consumer
+# (deliberately separate from the main worker's indexer/webhook cursor — see
+# plan §3.9). Consumption itself lands in Phase D; Phase A only reserves the
+# key so the settings_store surface is stable.
+KEY_AI_OUTBOX_WATERMARK = "daemon.ai_worker.outbox_watermark"
+
 
 async def get_setting_bool(session: AsyncSession, key: str, default: bool = False) -> bool:
     raw = await get_setting(session, key)

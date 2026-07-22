@@ -22,8 +22,11 @@ case "$ROLE" in
   mcp)
     exec python -m tiqora.main mcp
     ;;
+  ai-worker)
+    exec python -m tiqora.main ai-worker
+    ;;
   *)
-    echo "Unknown role: $ROLE (expected api|worker|mcp)" >&2
+    echo "Unknown role: $ROLE (expected api|worker|mcp|ai-worker)" >&2
     exit 1
     ;;
 esac
