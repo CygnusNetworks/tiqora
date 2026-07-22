@@ -97,6 +97,10 @@
   },
   "security": {
     "title": "Sicherheit",
+    "help": {
+      "totp": "Zeitbasierte Einmalcodes aus einer Authenticator-App (z. B. Google Authenticator, Authy) — ein zweiter Faktor zusätzlich zum Passwort.",
+      "passkey": "Passkeys (WebAuthn) authentifizieren über die geräteeigene Sicherheitsfunktion (Fingerabdruck, Gesicht oder PIN) oder einen Hardware-Schlüssel statt eines einzugebenden Codes — meist schneller und phishing-resistent."
+    },
     "totpHeading": "Zwei-Faktor-Authentifizierung",
     "totpEnabled": "Aktiviert",
     "totpDisabled": "Nicht aktiviert",
@@ -326,6 +330,10 @@
     "splitNewTitle": "Titel des neuen Tickets (optional)",
     "ai": {
       "title": "KI-Unterstützung",
+      "help": {
+        "summary": "Wird vom konfigurierten Modell der Queue aus den Ticket-Artikeln erzeugt und ausschließlich im Ticket-Status gespeichert, nie als Notiz — wird nie von selbst an den Kunden verschickt.",
+        "drafts": "Vom Modell aus dem bisherigen Ticketverlauf erzeugt. Jeder Entwurf ist ein eigener Datensatz — nichts wird automatisch verschickt; er muss geöffnet und explizit gesendet oder verworfen werden."
+      },
       "summaryLabel": "Zusammenfassung",
       "summarizeButton": "Zusammenfassen",
       "summaryEmpty": "Noch keine Zusammenfassung.",
@@ -819,6 +827,42 @@
       "acl": {
         "match": "Bedingungen, unter denen diese ACL greift (z. B. aktuelle Queue, Status, Formularfeld). Nur wenn alle hier hinterlegten Kriterien zutreffen, wird die Änderung rechts angewendet.",
         "change": "Wirkung der ACL, sobald die Bedingungen zutreffen — typischerweise werden dadurch Auswahlmöglichkeiten in Formularen eingeschränkt oder erzwungen (z. B. nur bestimmte Folgestatus erlaubt)."
+      },
+      "mailOutbound": {
+        "host": "Hostname des SMTP-Servers für ausgehende Mail. Muss von diesem Server aus über den unten angegebenen Port erreichbar sein (DNS + Firewall).",
+        "port": "TCP-Port des SMTP-Servers — üblich sind 25 oder 587 für STARTTLS, 465 für implizites TLS (SSL).",
+        "security": "Transportverschlüsselung gegenüber dem SMTP-Server: „Keine“ sendet unverschlüsselt, „STARTTLS“ hebt eine Klartext-Verbindung an, „SSL“ verbindet von Anfang an TLS-verschlüsselt.",
+        "authType": "„Keine“ sendet ohne Authentifizierung (anonymes Relay) — funktioniert nur, wenn der Server das für diesen Host erlaubt. „Passwort“ nutzt SMTP-AUTH mit den Zugangsdaten unten.",
+        "fromDefault": "Standard-Absenderadresse (From:), wenn für Queue oder Ticket keine speziellere Absenderadresse konfiguriert ist.",
+        "timeoutSeconds": "Verbindungs- und Antwort-Timeout in Sekunden, bevor ein Sendeversuch abgebrochen und als fehlgeschlagen protokolliert wird."
+      },
+      "subjectConfig": {
+        "hook": "Das Präfix-Tag vor der Ticketnummer im Betreff (z. B. „Ticket#“). Leer lässt Znunys eigenen konfigurierten Hook gelten.",
+        "divider": "Zeichen zwischen Hook und Ticketnummer innerhalb der Klammern, z. B. „Ticket#123“ vs. „Ticket# 123“.",
+        "subjectFormat": "Position des [Hook#Nummer]-Tags im Betreff: „Links“ stellt es voran, „Rechts“ hängt es an, „Keine“ lässt es weg (Ticketzuordnung läuft dann nur noch über die Message-ID)."
+      },
+      "postmasterFilters": {
+        "match": "Header/Wert-Paare, die eine eingehende Mail erfüllen muss, damit dieser Filter greift. Alle Zeilen werden UND-verknüpft; „negieren“ verlangt, dass der Header NICHT passt.",
+        "set": "X-OTRS-* Pseudo-Header, die auf das Ticket geschrieben werden, sobald alle Match-Regeln oben erfüllt sind — z. B. X-OTRS-Queue, um in eine bestimmte Queue zu routen."
+      },
+      "autoResponses": {
+        "typeId": "Numerische ID aus Znunys Tabelle auto_response_type, kein Auswahlfeld hier: üblich sind 1 = auto reply, 2 = auto reject, 3 = auto follow up, 4 = auto reply/new ticket, 5 = auto remove.",
+        "systemAddressId": "Numerische ID der System-Adresse (Absender), von der diese Autoantwort verschickt wird — die ID findet sich in Admin → Queues in der System-Adressen-Auswahl."
+      },
+      "apiKeys": {
+        "name": "Freitext-Bezeichnung zur Unterscheidung — ein Nutzer kann beliebig viele API-Keys gleichzeitig besitzen, z. B. einen pro Integration.",
+        "expires": "„Unbegrenzt“ gültige Keys laufen nie von selbst ab und bleiben bis zum manuellen Widerruf gültig — bevorzugen Sie ein festes Ablaufdatum, außer die Integration braucht wirklich einen dauerhaften Key."
+      },
+      "daemons": {
+        "enabled": "Ob der geplante Lauf des Dienstes aktiv ist. Dienste mit „immer aktiv“ haben keinen Schalter — sie sind Kernbestandteil der App und laufen immer.",
+        "schedule": "Wie oft der Dienst läuft. Tägliche Dienste feuern immer zur festen UTC-Zeit; intervallbasierte lassen sich hier bearbeiten und auf ihren eingebauten Standardwert zurücksetzen.",
+        "takeover": "Dieser Dienst ersetzt die entsprechende Znuny-Hintergrundaufgabe. Znunys eigenen Cron/Daemon dafür deaktiviert lassen — laufen beide gleichzeitig, geschieht dieselbe Arbeit doppelt und es kann zu Race Conditions auf denselben Datensätzen kommen."
+      },
+      "gdpr": {
+        "mode": "„Anonymisieren“ entfernt personenbezogene Daten, behält aber Ticket-Datensätze und -Historie (referenzielle Integrität bleibt erhalten). „Löschen“ entfernt den Kundendatensatz vollständig; Ticketdaten werden nur mitgelöscht, wenn die Checkbox unten gesetzt ist.",
+        "filters": "Zusätzliche Selektoren grenzen die Kundenmenge weiter ein — jeder hinzugefügte Filter wird UND-verknüpft mit Logins/Firmen oben und mit den übrigen Filtern.",
+        "negate": "Umschalten zwischen „entspricht“ (Kunden, auf die das Muster zutrifft) und „entspricht nicht“ (≠, Kunden, auf die es NICHT zutrifft).",
+        "validId": "„Temp“ (valid_id 3) ist Znunys dritter Gültigkeitsstatus — typischerweise ein Konto, das auf Bestätigung wartet (z. B. unbestätigte Selbstregistrierung), unterscheidet sich von schlicht gültig/ungültig."
       }
     },
     "nav": {
@@ -1707,6 +1751,12 @@
       "review": "In Prüfung",
       "published": "Veröffentlicht",
       "archived": "Archiviert"
+    },
+    "help": {
+      "category": "Ordnet den Artikel in der Wissensdatenbank-Seitenleiste ein und grenzt ein, welche Artikel eine KI-Queue-Policy über ihren Kategorie-ID-Filter einbeziehen kann.",
+      "language": "Die Inhaltssprache des Artikels. Agenten und die KI-Wissenssuche können danach filtern — mehrsprachige Inhalte sollten daher in separate Artikel pro Sprache aufgeteilt werden.",
+      "state": "„Entwurf“/„In Prüfung“ sind nur in diesem Editor sichtbar; nur „Veröffentlicht“ erscheint in der kundenseitigen Suche und kann als KI-Wissenskontext genutzt werden. „Archiviert“ blendet ihn aus beidem aus, ohne ihn zu löschen.",
+      "tags": "Kommagetrennte Schlagworte für Navigation und Suche — zugleich der Anknüpfungspunkt, gegen den die Einstellung „KB-Tags“ einer KI-Queue-Policy abgleicht, welche Artikel dem Modell zugeführt werden."
     },
     "field": {
       "title": "Titel",

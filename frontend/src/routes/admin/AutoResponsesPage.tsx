@@ -42,12 +42,25 @@ export function AutoResponsesPage() {
 
   const fields: FieldDef[] = [
     { name: "name", label: t("admin.autoResponses.name"), type: "text", required: true },
-    { name: "type_id", label: t("admin.autoResponses.typeId"), type: "number", required: true },
+    {
+      name: "type_id",
+      label: t("admin.autoResponses.typeId"),
+      type: "number",
+      required: true,
+      help: {
+        title: t("admin.autoResponses.typeId"),
+        description: t("admin.help.autoResponses.typeId"),
+      },
+    },
     {
       name: "system_address_id",
       label: t("admin.queues.systemAddressId"),
       type: "number",
       required: true,
+      help: {
+        title: t("admin.queues.systemAddressId"),
+        description: t("admin.help.autoResponses.systemAddressId"),
+      },
     },
     { name: "text0", label: t("admin.autoResponses.subject"), type: "text" },
     { name: "text1", label: t("admin.autoResponses.body"), type: "textarea" },

@@ -86,6 +86,28 @@ describe("MailOutboundPage", () => {
     expect(body).not.toHaveProperty("auth_password");
   });
 
+  it("shows a help popover explaining the security field", async () => {
+    getMailOutbound.mockResolvedValue({
+      enabled: false,
+      host: "",
+      port: 25,
+      security: "none",
+      auth_type: "none",
+      auth_user: "",
+      has_password: false,
+      from_default: "",
+      timeout_seconds: 60,
+    });
+
+    renderPage();
+    await waitFor(() => {
+      expect(screen.getByTestId("mail-outbound-help-security")).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByTestId("mail-outbound-help-security"));
+    expect(screen.getByTestId("mail-outbound-help-security-panel")).toBeInTheDocument();
+  });
+
   it("does not show gesetzt badge when no password is stored", async () => {
     getMailOutbound.mockResolvedValue({
       enabled: false,
