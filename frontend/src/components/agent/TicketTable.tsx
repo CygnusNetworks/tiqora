@@ -24,6 +24,14 @@ export type SortKey =
   | "age"
   | "changed";
 
+export type TicketTableSelection = {
+  selected: Set<number>;
+  onToggleRow: (id: number) => void;
+  onToggleAllPage: () => void;
+  allPageSelected: boolean;
+  somePageSelected: boolean;
+};
+
 export type TicketTableProps = {
   items: TicketListItem[];
   total: number;
@@ -34,6 +42,8 @@ export type TicketTableProps = {
   isLoading?: boolean;
   onSortChange: (sort: SortKey, order: "asc" | "desc") => void;
   onPageChange: (offset: number) => void;
+  /** Opt-in row-checkbox selection mode — row click toggles rather than navigates. */
+  selection?: TicketTableSelection;
 };
 
 const SORT_COLUMNS: { key: SortKey; labelKey: string }[] = [
@@ -52,6 +62,7 @@ const SORT_COLUMNS: { key: SortKey; labelKey: string }[] = [
    table column-width calculation. Grid rows don't have that failure mode. */
 const GRID_COLS =
   "minmax(120px,136px) minmax(180px,2.2fr) 96px 96px minmax(90px,120px) 84px";
+const SELECT_GRID_COLS = `28px ${GRID_COLS}`;
 
 export function TicketTable({
   items,
@@ -63,12 +74,14 @@ export function TicketTable({
   isLoading,
   onSortChange,
   onPageChange,
+  selection,
 }: TicketTableProps) {
   const { t, i18n } = useTranslation();
   const navigate = useNavigate();
   const [focusIdx, setFocusIdx] = useState(0);
   const rootRef = useRef<HTMLDivElement>(null);
   const locale = i18n.language?.startsWith("de") ? "de" : "en";
+  const gridCols = selection ? SELECT_GRID_COLS : GRID_COLS;
 
   useEffect(() => {
     setFocusIdx(0);
@@ -87,8 +100,15 @@ export function TicketTable({
       } else if (e.key === "k") {
         e.preventDefault();
         setFocusIdx((i) => Math.max(i - 1, 0));
+      } else if (e.key === " " && selection && items[focusIdx]) {
+        e.preventDefault();
+        selection.onToggleRow(items[focusIdx].id);
       } else if (e.key === "Enter" && items[focusIdx]) {
         e.preventDefault();
+        if (selection) {
+          selection.onToggleRow(items[focusIdx].id);
+          return;
+        }
         void navigate({
           to: "/agent/tickets/$ticketId",
           params: { ticketId: String(items[focusIdx].id) },
@@ -97,7 +117,7 @@ export function TicketTable({
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [items, focusIdx, navigate]);
+  }, [items, focusIdx, navigate, selection]);
 
   const toggleSort = (key: SortKey) => {
     if (sort === key) {
@@ -120,8 +140,21 @@ export function TicketTable({
         <div
           role="row"
           className="hidden items-center gap-3 border-b border-hairline bg-surface-subtle px-4 py-2.5 text-[10.5px] font-semibold uppercase tracking-wide text-muted md:grid"
-          style={{ gridTemplateColumns: GRID_COLS }}
+          style={{ gridTemplateColumns: gridCols }}
         >
+          {selection && (
+            <input
+              type="checkbox"
+              checked={selection.allPageSelected}
+              ref={(el) => {
+                if (el) el.indeterminate = selection.somePageSelected;
+              }}
+              onChange={selection.onToggleAllPage}
+              data-testid="queue-select-all-page"
+              aria-label={t("queue.bulk.selectAllOnPage")}
+              className="rounded border-hairline text-accent focus:ring-accent"
+            />
+          )}
           {SORT_COLUMNS.map((col) => (
             <button
               key={col.key}
@@ -190,25 +223,55 @@ export function TicketTable({
               style={
                 {
                   "--spine-color": spineColor,
-                  gridTemplateColumns: GRID_COLS,
+                  gridTemplateColumns: gridCols,
                 } as CSSProperties
               }
-              onClick={() =>
+              onClick={() => {
+                if (selection) {
+                  selection.onToggleRow(ticket.id);
+                  return;
+                }
                 void navigate({
                   to: "/agent/tickets/$ticketId",
                   params: { ticketId: String(ticket.id) },
-                })
-              }
+                });
+              }}
               onMouseEnter={() => setFocusIdx(idx)}
             >
-              {/* Mobile card header: TN + age */}
+              {/* Mobile card header: selection checkbox + TN + age */}
               <div className="flex items-center justify-between gap-2 md:hidden">
-                <span className="font-mono text-xs tabular-nums text-accent">{ticket.tn}</span>
+                <span className="flex items-center gap-2">
+                  {selection && (
+                    <input
+                      type="checkbox"
+                      checked={selection.selected.has(ticket.id)}
+                      onChange={() => selection.onToggleRow(ticket.id)}
+                      onClick={(e) => e.stopPropagation()}
+                      data-testid={`queue-row-check-mobile-${ticket.id}`}
+                      aria-label={t("queue.bulk.selectRow")}
+                      className="rounded border-hairline text-accent focus:ring-accent"
+                    />
+                  )}
+                  <span className="font-mono text-xs tabular-nums text-accent">{ticket.tn}</span>
+                </span>
                 <span className="font-mono text-[11px] tabular-nums text-muted">
                   {formatAgeSeconds(ticket.age_seconds, locale)}
                 </span>
               </div>
 
+              {selection && (
+                <span className="hidden items-center md:inline-flex">
+                  <input
+                    type="checkbox"
+                    checked={selection.selected.has(ticket.id)}
+                    onChange={() => selection.onToggleRow(ticket.id)}
+                    onClick={(e) => e.stopPropagation()}
+                    data-testid={`queue-row-check-${ticket.id}`}
+                    aria-label={t("queue.bulk.selectRow")}
+                    className="rounded border-hairline text-accent focus:ring-accent"
+                  />
+                </span>
+              )}
               <span className="hidden truncate font-mono text-xs text-accent md:inline">
                 {ticket.tn}
                 {escalationBadge}

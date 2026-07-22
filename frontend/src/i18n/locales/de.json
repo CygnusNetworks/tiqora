@@ -166,6 +166,28 @@
       "pending": "Wartend",
       "closed": "Geschlossen",
       "all": "Alle"
+    },
+    "bulk": {
+      "select": "☑ Auswählen",
+      "done": "Fertig",
+      "selectRow": "Zeile auswählen",
+      "selectAllOnPage": "Alle auf dieser Seite auswählen",
+      "selectedOnPage": "{{count}} auf dieser Seite ausgewählt",
+      "selectAllMatches": "Alle {{count}} in „{{queue}}“ auswählen",
+      "selectAllMatchesLoading": "Lade Tickets…",
+      "allSelected": "Alle {{count}} ausgewählt",
+      "allSelectedCapped": "Alle {{count}} ausgewählt (auf {{cap}} begrenzt)",
+      "clearSelection": "Auswahl aufheben",
+      "fieldState": "Status",
+      "fieldPriority": "Priorität",
+      "fieldOwner": "Besitzer",
+      "confirmTitle": "{{field}} ändern?",
+      "confirmText": "{{field}} auf „{{value}}“ für {{count}} Tickets ändern?",
+      "confirmApply": "Ändern",
+      "confirmCancel": "Abbrechen",
+      "progress": "{{done}}/{{total}} geändert…",
+      "updated": "{{count}} aktualisiert",
+      "partialFail": "{{done}} aktualisiert, {{failed}} fehlgeschlagen: {{ids}}"
     }
   },
   "ticket": {
