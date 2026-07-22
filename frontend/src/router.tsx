@@ -69,6 +69,7 @@ import { WebhooksPage } from "@/routes/admin/WebhooksPage";
 import { MailOutboundPage } from "@/routes/admin/MailOutboundPage";
 import { MailLogPage } from "@/routes/admin/MailLogPage";
 import { SubjectConfigPage } from "@/routes/admin/SubjectConfigPage";
+import { DaemonsPage } from "@/routes/admin/DaemonsPage";
 import { PostmasterFiltersPage } from "@/routes/admin/PostmasterFiltersPage";
 import { PostmasterFilterDetailPage } from "@/routes/admin/PostmasterFilterDetailPage";
 import { AclPage } from "@/routes/admin/AclPage";
@@ -589,6 +590,12 @@ const adminGdprRoute = createRoute({
   component: GdprPage,
 });
 
+const adminDaemonsRoute = createRoute({
+  getParentRoute: () => adminLayoutRoute,
+  path: "/daemons",
+  component: DaemonsPage,
+});
+
 const adminProcessDetailRoute = createRoute({
   getParentRoute: () => adminLayoutRoute,
   path: "/processes/$processEntityId",
@@ -671,6 +678,7 @@ const routeTree = rootRoute.addChildren([
     adminQueueVariablesRoute,
     adminCustomerFieldsRoute,
     adminGdprRoute,
+    adminDaemonsRoute,
   ]),
   catchAllRoute,
 ]);

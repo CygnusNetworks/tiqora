@@ -80,8 +80,8 @@ class TiqoraEventOutbox(TiqoraBase):
     """Transactional outbox for ticket/article events.
 
     Written in the same transaction as all write operations; drained by the
-    taskiq worker which re-indexes affected tickets in Meilisearch and may
-    fan out to webhooks in Phase 3.
+    worker's ``outbox`` loop, which re-indexes affected tickets in
+    Meilisearch and fans out to webhooks/SSE.
 
     Event names match Znuny-style event identifiers (TicketCreate,
     ArticleCreate, TicketStateUpdate, TicketQueueUpdate, …) so that the
@@ -255,9 +255,9 @@ class TiqoraGdprAudit(TiqoraBase):
     """Audit trail for GDPR anonymization/retention runs (Phase 2c).
 
     One row per run of ``tiqora gdpr anonymize-customer`` /
-    ``tiqora gdpr retention-run`` (and the retention taskiq worker task).
-    Never stores the anonymized values themselves — only who/what/when and
-    row counts, so the audit log itself carries no PII.
+    ``tiqora gdpr retention-run`` (and the worker's ``gdpr_retention`` daily
+    loop). Never stores the anonymized values themselves — only who/what/when
+    and row counts, so the audit log itself carries no PII.
     """
 
     __tablename__ = "tiqora_gdpr_audit"

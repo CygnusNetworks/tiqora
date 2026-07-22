@@ -227,6 +227,9 @@ export type PhysicalQueueVariableOut = Schemas["PhysicalQueueVariableOut"];
 export type PlaceholderFieldOut = Schemas["PlaceholderFieldOut"];
 export type PlaceholderFieldCreate = Schemas["PlaceholderFieldCreate"];
 export type PlaceholderFieldUpdate = Schemas["PlaceholderFieldUpdate"];
+export type DaemonServiceOut = Schemas["DaemonServiceOut"];
+export type DaemonListOut = Schemas["DaemonListOut"];
+export type DaemonUpdate = Schemas["DaemonUpdate"];
 // Hand-written until openapi.json is regenerated (schemas also appear there).
 export type MailSecurity = "none" | "starttls" | "ssl";
 export type MailAuthType = "none" | "password";
@@ -1863,6 +1866,18 @@ export class ApiClient {
 
   putSubjectConfig(body: SubjectConfigUpdate, signal?: AbortSignal) {
     return this.request<SubjectConfigOut>("PUT", "/api/v1/admin/subject-config", {
+      body,
+      signal,
+    });
+  }
+
+  /** "Dienste" — daemon takeover status/toggle/interval (admin). */
+  getDaemons(signal?: AbortSignal) {
+    return this.request<DaemonListOut>("GET", "/api/v1/admin/daemons", { signal });
+  }
+
+  putDaemon(slug: string, body: DaemonUpdate, signal?: AbortSignal) {
+    return this.request<DaemonServiceOut>("PUT", `/api/v1/admin/daemons/${slug}`, {
       body,
       signal,
     });

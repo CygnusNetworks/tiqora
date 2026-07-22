@@ -1082,3 +1082,37 @@ class GdprRollbackOut(BaseModel):
 
 class GdprPurgeOut(BaseModel):
     deleted_backups: int
+
+
+# ---------------------------------------------------------------------------
+# Daemons — admin "Dienste" page (worker.services.DAEMON_SERVICES)
+# ---------------------------------------------------------------------------
+
+
+class DaemonServiceOut(BaseModel):
+    """One row of the daemon catalog with effective schedule + live status."""
+
+    slug: str
+    enabled: bool
+    toggleable: bool
+    schedule: Literal["interval", "daily"]
+    interval_seconds: int | None = None
+    interval_overridden: bool = False
+    daily_at: str | None = None
+    last_run_at: datetime | None = None
+    last_ok_at: datetime | None = None
+    last_error: str | None = None
+    last_result: dict[str, Any] | None = None
+
+
+class DaemonListOut(BaseModel):
+    services: list[DaemonServiceOut]
+
+
+class DaemonUpdate(BaseModel):
+    """``enabled``/``interval_seconds`` null or omitted leaves the field
+    untouched; ``interval_seconds=0`` or ``null`` (when explicitly sent)
+    clears the DB override and reverts to the config default."""
+
+    enabled: bool | None = None
+    interval_seconds: int | None = None
