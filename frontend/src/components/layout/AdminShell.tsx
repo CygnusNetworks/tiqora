@@ -162,6 +162,16 @@ const NAV_GROUPS: NavGroup[] = [
     ],
   },
   {
+    titleKey: "admin.group.operations",
+    links: [
+      {
+        to: "/admin/daemons",
+        labelKey: "admin.nav.daemons",
+        testId: "admin-nav-daemons",
+      },
+    ],
+  },
+  {
     titleKey: "admin.group.placeholderVariables",
     links: [
       {

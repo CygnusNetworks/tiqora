@@ -483,7 +483,8 @@
       "queuesTemplates": "Queues & Vorlagen",
       "email": "E-Mail",
       "placeholderVariables": "Platzhalter-Variablen",
-      "compliance": "Compliance"
+      "compliance": "Compliance",
+      "operations": "Betrieb"
     },
     "nav": {
       "users": "Benutzer",
@@ -520,7 +521,8 @@
       "queueVariables": "Queue-Variablen",
       "customerFields": "Customer-Felder",
       "authConfig": "Authentifizierung / 2FA",
-      "gdpr": "Datenschutz / DSGVO"
+      "gdpr": "Datenschutz / DSGVO",
+      "daemons": "Dienste"
     },
     "table": {
       "id": "ID",
@@ -924,6 +926,66 @@
       "saveError": "Speichern fehlgeschlagen.",
       "resetToZnuny": "Znuny-Werte wiederherstellen",
       "loadError": "Einstellungen konnten nicht geladen werden."
+    },
+    "daemons": {
+      "title": "Dienste",
+      "description": "Periodische Hintergrunddienste des Tiqora-Workers: Aktivierung, Intervall und Laufzeit-Status.",
+      "loadError": "Dienste konnten nicht geladen werden.",
+      "columns": {
+        "status": "Status",
+        "service": "Dienst",
+        "enabled": "Aktiv",
+        "schedule": "Intervall",
+        "lastOk": "Letzter Erfolg",
+        "lastResult": "Letztes Ergebnis"
+      },
+      "status": {
+        "green": "OK",
+        "amber": "Verzögert",
+        "red": "Fehler",
+        "grey": "Deaktiviert"
+      },
+      "alwaysOn": "immer aktiv",
+      "dailyAt": "täglich {{time}} UTC",
+      "intervalSeconds": "{{seconds}}s",
+      "seconds": "s",
+      "reset": "Zurücksetzen",
+      "takeoverNote": "Exklusiv zum entsprechenden Znuny-Daemon-Task — siehe docs/parallel-operation.md.",
+      "docsHint": "Details zu Übernahme, Rollback und Sicherheits-Flags: docs/parallel-operation.md.",
+      "services": {
+        "poller": {
+          "name": "Poller",
+          "description": "Verfolgt Znuny-Schreibzugriffe und aktualisiert den Suchindex."
+        },
+        "outbox": {
+          "name": "Outbox-Drain",
+          "description": "Verarbeitet tiqora_event_outbox: Suchindex, Webhooks, Live-Updates."
+        },
+        "postmaster": {
+          "name": "Postmaster",
+          "description": "Mailabruf und -verarbeitung (Übernahme des Znuny-Mail-Daemons)."
+        },
+        "escalation": {
+          "name": "Eskalation",
+          "description": "Eskalations-Index neu berechnen und Start/Stop/NotifyBefore-Events auslösen."
+        },
+        "notifications": {
+          "name": "Benachrichtigungen",
+          "description": "Event-basierte Benachrichtigungen an Agenten und Kunden versenden."
+        },
+        "generic_agent": {
+          "name": "GenericAgent",
+          "description": "Geplante GenericAgent-Jobs ausführen."
+        },
+        "gdpr_retention": {
+          "name": "DSGVO-Aufbewahrung",
+          "description": "Konfigurierte Aufbewahrungsregeln täglich anwenden."
+        },
+        "gdpr_erasure_purge": {
+          "name": "DSGVO-Löschbereinigung",
+          "description": "Abgelaufene Lösch-Backups täglich entfernen."
+        }
+      }
     },
     "mailLog": {
       "title": "E-Mail-Kommunikationsprotokoll",
