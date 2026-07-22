@@ -106,7 +106,7 @@ async def bulk_update_customer_users(
     if len(body.ids) > 1000:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="ids length must be <= 1000",
+            detail="at most 1000 ids per call — send larger selections in chunks",
         )
 
     # Nothing to change besides audit stamps — treat as no-op.
