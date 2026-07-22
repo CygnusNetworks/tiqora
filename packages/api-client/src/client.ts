@@ -631,6 +631,14 @@ export type CustomerRef = {
 };
 export type QueueRef = { id: number; name: string };
 
+/** GET /api/v1/reference/compose-context — new-ticket compose preview per queue. */
+export type ComposeContext = {
+  from_address: string;
+  signature: string;
+  signature_is_html: boolean;
+  rich_text: boolean;
+};
+
 /** Compact ticket hit for agent link/merge pickers (GET /api/v1/tickets/search). */
 export type TicketSearchHit = {
   ticket_id: number;
@@ -1245,6 +1253,14 @@ export class ApiClient {
   ) {
     return this.request<QueueRef[]>("GET", "/api/v1/reference/queues", {
       query: params,
+      signal,
+    });
+  }
+
+  /** From-address + signature preview + rich-text flag for the new-ticket compose form. */
+  getComposeContext(queueId: number, signal?: AbortSignal) {
+    return this.request<ComposeContext>("GET", "/api/v1/reference/compose-context", {
+      query: { queue_id: queueId },
       signal,
     });
   }
