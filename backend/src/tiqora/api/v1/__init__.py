@@ -4,6 +4,7 @@ from fastapi import APIRouter
 
 from tiqora.api.v1 import (
     agents,
+    ai,
     auth,
     calendar,
     channels_phone,
@@ -27,6 +28,7 @@ api_v1_router.include_router(agents.router)
 api_v1_router.include_router(calendar.router)
 api_v1_router.include_router(queues.router)
 api_v1_router.include_router(tickets.router)
+api_v1_router.include_router(ai.router)
 api_v1_router.include_router(process.router)
 api_v1_router.include_router(events.router)
 api_v1_router.include_router(customers.router)

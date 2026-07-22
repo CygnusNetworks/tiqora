@@ -14,6 +14,7 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from tiqora.ai.escalation import EscalationRuleError, validate_escalation_rules
 from tiqora.ai.gate import require_tiqora_primary
 from tiqora.ai.models import AUTONOMY_MODES, IDENTITY_MODES, TiqoraAiQueuePolicy
 
@@ -44,6 +45,23 @@ async def get_queue_policy_by_queue(
             select(TiqoraAiQueuePolicy).where(TiqoraAiQueuePolicy.queue_id == queue_id)
         )
     ).scalar_one_or_none()
+
+
+def _validate_escalation_rules_json(raw: str | None) -> None:
+    if raw is None or raw == "":
+        return
+    import json
+
+    try:
+        parsed = json.loads(raw)
+    except (json.JSONDecodeError, TypeError) as exc:
+        raise QueuePolicyValidationError(f"escalation_rules is not valid JSON: {exc}") from exc
+    if not isinstance(parsed, list):
+        raise QueuePolicyValidationError("escalation_rules must be a JSON array")
+    try:
+        validate_escalation_rules(parsed)
+    except EscalationRuleError as exc:
+        raise QueuePolicyValidationError(f"escalation_rules: {exc}") from exc
 
 
 def _validate_fields(
@@ -134,6 +152,7 @@ async def create_queue_policy(
         service_user_id=service_user_id,
         llm_provider_id=llm_provider_id,
     )
+    _validate_escalation_rules_json(escalation_rules)
     await _enforce_gate_on_enable(
         session,
         previous=None,
@@ -201,6 +220,8 @@ async def update_queue_policy(
         service_user_id=effective_service_user_id,
         llm_provider_id=effective_llm_provider_id,
     )
+    if "escalation_rules" in fields:
+        _validate_escalation_rules_json(fields.get("escalation_rules"))
     await _enforce_gate_on_enable(
         session,
         previous=row,
