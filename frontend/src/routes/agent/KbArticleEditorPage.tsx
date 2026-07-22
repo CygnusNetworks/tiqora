@@ -211,6 +211,22 @@ function KbArticleEditor({ articleId }: { articleId?: number }) {
         )}
       </div>
 
+      {categoriesQ.data && categoriesQ.data.length === 0 && (
+        <div
+          className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-escalation/40 bg-escalation/10 px-4 py-3 text-sm text-ink"
+          data-testid="kb-editor-no-categories"
+        >
+          <span>{t("kb.editorNoCategories")}</span>
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => void navigate({ to: "/agent/kb/categories", search: { new: true } })}
+          >
+            {t("kb.createFirstCategory")}
+          </Button>
+        </div>
+      )}
+
       <form onSubmit={(e) => void onSubmit(e)} className="space-y-4">
         <div className="grid grid-cols-1 gap-3 rounded-lg border border-hairline bg-surface p-4 sm:grid-cols-2">
           <label className="block text-sm sm:col-span-2">

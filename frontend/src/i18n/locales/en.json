@@ -1756,7 +1756,11 @@
       "category": "Groups the article in the knowledge-base sidebar and narrows which articles an AI queue policy can pull in via its category-ID filter.",
       "language": "The article's content language. Agents and the AI knowledge lookup can filter by it, so mixed-language content should be split into separate per-language articles.",
       "state": "\"Draft\"/\"In review\" are only visible in this editor; only \"Published\" articles show up in customer-facing search and can be used as AI knowledge context. \"Archived\" hides it from both without deleting it.",
-      "tags": "Comma-separated tags used for browsing and search — also the hook an AI queue policy's \"KB tags\" setting matches against to decide which articles feed the model."
+      "tags": "Comma-separated tags used for browsing and search — also the hook an AI queue policy's \"KB tags\" setting matches against to decide which articles feed the model.",
+      "categoryParent": "Places the category as a subcategory. The tree is navigation only — permissions are not inherited; every category has its own groups.",
+      "categorySlug": "URL slug of the category. Leave empty to derive it from the name automatically (collisions get a numeric suffix).",
+      "categorySort": "Sort position within its level — smaller numbers come first.",
+      "categoryCustomerVisible": "Published articles in this category appear in the customer portal. Unchecked keeps the category internal only."
     },
     "field": {
       "title": "Title",
@@ -1799,7 +1803,11 @@
       "noGroups": "You have no groups you may assign.",
       "empty": "No categories yet. Create one to get started.",
       "saveError": "Could not save this category. Please try again."
-    }
+    },
+    "createFirstCategory": "Create first category",
+    "manageCategories": "Manage categories",
+    "newCategory": "New category",
+    "editorNoCategories": "Saving an article requires a category — none exist yet."
   },
   "stats": {
     "title": "Reports",

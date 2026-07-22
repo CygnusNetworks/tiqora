@@ -233,6 +233,10 @@ const agentKbNewRoute = createRoute({
 const agentKbCategoriesRoute = createRoute({
   getParentRoute: () => agentLayoutRoute,
   path: "/kb/categories",
+  // ?new=1 opens the create drawer immediately (deep link from the KB page's
+  // "+ Kategorie" affordance).
+  validateSearch: (s: Record<string, unknown>): { new?: boolean } =>
+    s.new === true || s.new === 1 || s.new === "1" ? { new: true } : {},
   component: KbCategoriesPage,
 });
 

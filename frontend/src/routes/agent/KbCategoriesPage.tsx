@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { Link, useSearch } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
 import {
   api,
@@ -29,9 +30,20 @@ function asNumberArray(value: unknown): number[] {
 export function KbCategoriesPage() {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
+  const search = useSearch({ from: "/agent/kb/categories" }) as { new?: boolean };
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [editing, setEditing] = useState<CategoryOut | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
+
+  // Deep link from the KB page's "+ Kategorie": open the create drawer once.
+  useEffect(() => {
+    if (search.new) {
+      setEditing(null);
+      setFormError(null);
+      setDrawerOpen(true);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const categoriesQ = useQuery({
     queryKey: ["kb", "categories"],
@@ -108,15 +120,40 @@ export function KbCategoriesPage() {
       label: t("kb.category.parent"),
       type: "select",
       options: [{ value: NO_PARENT, label: t("kb.category.noParent") }, ...parentOptions],
+      help: {
+        title: t("kb.category.parent"),
+        description: t("kb.help.categoryParent"),
+      },
     },
     {
       name: "slug",
       label: t("kb.category.slug"),
       type: "text",
       placeholder: t("kb.category.slugPlaceholder"),
+      help: {
+        title: t("kb.category.slug"),
+        description: t("kb.help.categorySlug"),
+      },
     },
-    { name: "sort", label: t("kb.category.sort"), type: "number" },
-    { name: "customer_visible", label: t("kb.category.customerVisible"), type: "checkbox" },
+    {
+      name: "sort",
+      label: t("kb.category.sort"),
+      type: "number",
+      help: {
+        title: t("kb.category.sort"),
+        description: t("kb.help.categorySort"),
+        defaultHint: "0",
+      },
+    },
+    {
+      name: "customer_visible",
+      label: t("kb.category.customerVisible"),
+      type: "checkbox",
+      help: {
+        title: t("kb.category.customerVisible"),
+        description: t("kb.help.categoryCustomerVisible"),
+      },
+    },
     groupField,
     { name: "valid", label: t("kb.category.active"), type: "checkbox", hideOnCreate: true },
   ];
@@ -186,7 +223,16 @@ export function KbCategoriesPage() {
   return (
     <div className="mx-auto w-full max-w-3xl space-y-4 p-3" data-testid="kb-categories-page">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h1 className="font-display text-xl font-semibold text-ink">{t("kb.category.title")}</h1>
+        <div>
+          <h1 className="font-display text-xl font-semibold text-ink">{t("kb.category.title")}</h1>
+          <Link
+            to="/agent/kb"
+            className="text-xs text-accent hover:underline"
+            data-testid="kb-category-back"
+          >
+            ← {t("kb.title")}
+          </Link>
+        </div>
         <Button variant="primary" onClick={openNew} data-testid="kb-category-new">
           {t("kb.category.new")}
         </Button>

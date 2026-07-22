@@ -118,12 +118,16 @@ function Bubble({
 }) {
   const { t } = useTranslation();
   const senderName = senderDisplayName(article.from_address) || t("ticket.unknownSender");
-  const tone =
-    side === "right"
-      ? "bg-accent/15"
-      : (article.sender_type || "").toLowerCase() === "system"
-        ? "bg-surface-subtle"
-        : "bg-green/10";
+  const isSystem = (article.sender_type || "").toLowerCase() === "system";
+  // Side alone is easy to lose while scrolling — pair it with a clear hue:
+  // agent = accent (cobalt), customer = green, system = neutral. Border and
+  // sender-name color repeat the hue so it also works for short bubbles.
+  const tone = isSystem
+    ? "border border-hairline bg-surface-subtle"
+    : side === "right"
+      ? "border border-accent/35 bg-accent/15 rounded-br-md"
+      : "border border-green/35 bg-green/10 rounded-bl-md";
+  const nameTone = isSystem ? "text-muted" : side === "right" ? "text-accent" : "text-green";
 
   return (
     <div
@@ -142,7 +146,7 @@ function Bubble({
         <div className="relative min-w-0">
           <div className={cn("space-y-1 rounded-2xl px-3 py-2", tone)}>
             <div className="flex flex-wrap items-center gap-1.5 text-[11px] text-muted">
-              <span className="font-semibold text-ink">{senderName}</span>
+              <span className={cn("font-semibold", nameTone)}>{senderName}</span>
               <span aria-hidden>{channelIcon(article.communication_channel_id)}</span>
               <span className="font-mono tabular-nums">{formatDateTime(article.create_time, locale)}</span>
               <span
@@ -191,7 +195,14 @@ function BubbleBody({ ticketId, article }: { ticketId: number; article: ArticleL
       {expanded ? (
         <ArticleBodyRenderer body={bodyQ.data.body} isHtml={bodyQ.data.is_html} className="text-sm" />
       ) : (
-        <p className="whitespace-pre-wrap text-sm text-ink">
+        <p
+          className={cn(
+            "whitespace-pre-wrap text-ink",
+            // Mail bodies are plain text more often than not — monospace keeps
+            // quoting/indentation/ASCII tables legible inside a bubble.
+            bodyQ.data.is_html ? "text-sm" : "font-mono text-[12.5px] leading-relaxed",
+          )}
+        >
           {isLong ? `${plain.slice(0, PREVIEW_CHARS)}…` : plain}
         </p>
       )}
