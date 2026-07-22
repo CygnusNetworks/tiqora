@@ -294,6 +294,10 @@ export function ApiKeysPage() {
           label: t("admin.apiKeys.name"),
           type: "text",
           required: true,
+          help: {
+            title: t("admin.apiKeys.name"),
+            description: t("admin.help.apiKeys.name"),
+          },
         },
         {
           name: "user_id",
@@ -309,6 +313,10 @@ export function ApiKeysPage() {
           name: "expires_at",
           label: t("admin.apiKeys.expires"),
           type: "custom",
+          help: {
+            title: t("admin.apiKeys.expires"),
+            description: t("admin.help.apiKeys.expires"),
+          },
           render: (value, onChange) => (
             <ExpiryField
               value={typeof value === "string" ? value : null}
@@ -329,6 +337,10 @@ export function ApiKeysPage() {
           label: t("admin.apiKeys.name"),
           type: "text",
           required: true,
+          help: {
+            title: t("admin.apiKeys.name"),
+            description: t("admin.help.apiKeys.name"),
+          },
         },
         {
           name: "user_id",
@@ -370,6 +382,10 @@ export function ApiKeysPage() {
           name: "expires_at",
           label: t("admin.apiKeys.expires"),
           type: "custom",
+          help: {
+            title: t("admin.apiKeys.expires"),
+            description: t("admin.help.apiKeys.expires"),
+          },
           render: (value, onChange) => (
             <ExpiryField
               value={typeof value === "string" ? value : null}

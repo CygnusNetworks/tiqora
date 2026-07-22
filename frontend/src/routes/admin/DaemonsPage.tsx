@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/Button";
 import { Spinner } from "@/components/ui/Spinner";
 import { formatDateTime } from "@/lib/format";
 import { statusColor, type StatusColor } from "@/lib/daemonStatus";
+import { HelpPopover } from "@/components/ui/HelpPopover";
 
 const QUERY_KEY = ["admin", "daemons"] as const;
 const REFETCH_INTERVAL_MS = 10_000;
@@ -108,8 +109,22 @@ export function DaemonsPage() {
             <tr>
               <th className="px-3 py-2">{t("admin.daemons.columns.status")}</th>
               <th className="px-3 py-2">{t("admin.daemons.columns.service")}</th>
-              <th className="px-3 py-2">{t("admin.daemons.columns.enabled")}</th>
-              <th className="px-3 py-2">{t("admin.daemons.columns.schedule")}</th>
+              <th className="px-3 py-2">
+                <span className="inline-flex items-center gap-1.5">
+                  {t("admin.daemons.columns.enabled")}
+                  <HelpPopover title={t("admin.daemons.columns.enabled")} testId="daemons-help-enabled">
+                    {t("admin.help.daemons.enabled")}
+                  </HelpPopover>
+                </span>
+              </th>
+              <th className="px-3 py-2">
+                <span className="inline-flex items-center gap-1.5">
+                  {t("admin.daemons.columns.schedule")}
+                  <HelpPopover title={t("admin.daemons.columns.schedule")} testId="daemons-help-schedule">
+                    {t("admin.help.daemons.schedule")}
+                  </HelpPopover>
+                </span>
+              </th>
               <th className="px-3 py-2">{t("admin.daemons.columns.lastOk")}</th>
               <th className="px-3 py-2">{t("admin.daemons.columns.lastResult")}</th>
             </tr>
@@ -140,8 +155,16 @@ export function DaemonsPage() {
                     ) : null}
                   </td>
                   <td className="px-3 py-2 align-top">
-                    <div className="font-medium text-ink">
+                    <div className="flex items-center gap-1.5 font-medium text-ink">
                       {t(`admin.daemons.services.${svc.slug}.name`)}
+                      {TAKEOVER_SLUGS.has(svc.slug) && (
+                        <HelpPopover
+                          title={t(`admin.daemons.services.${svc.slug}.name`)}
+                          testId={`daemons-help-takeover-${svc.slug}`}
+                        >
+                          {t("admin.help.daemons.takeover")}
+                        </HelpPopover>
+                      )}
                     </div>
                     <div className="text-xs text-muted">
                       {t(`admin.daemons.services.${svc.slug}.description`)}

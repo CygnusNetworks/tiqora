@@ -10,6 +10,7 @@ import { SelectMenu, type SelectMenuItem } from "@/components/ui/SelectMenu";
 import { ChevronDownIcon } from "@/components/ui/icons";
 import { MarkdownView } from "@/components/kb/MarkdownView";
 import { KbAttachments } from "@/components/kb/KbAttachments";
+import { HelpPopover } from "@/components/ui/HelpPopover";
 import { slugify } from "@/lib/slug";
 import { cn } from "@/lib/cn";
 
@@ -255,7 +256,12 @@ function KbArticleEditor({ articleId }: { articleId?: number }) {
             )}
           </div>
           <label className="block text-sm">
-            <span className="mb-1 block text-muted">{t("kb.field.category")}</span>
+            <span className="mb-1 flex items-center gap-1.5 text-muted">
+              {t("kb.field.category")}
+              <HelpPopover title={t("kb.field.category")} testId="kb-help-category">
+                {t("kb.help.category")}
+              </HelpPopover>
+            </span>
             <SelectMenu
               items={categoryItems}
               value={form.categoryId ?? undefined}
@@ -283,7 +289,12 @@ function KbArticleEditor({ articleId }: { articleId?: number }) {
             />
           </label>
           <label className="block text-sm">
-            <span className="mb-1 block text-muted">{t("kb.field.language")}</span>
+            <span className="mb-1 flex items-center gap-1.5 text-muted">
+              {t("kb.field.language")}
+              <HelpPopover title={t("kb.field.language")} testId="kb-help-language">
+                {t("kb.help.language")}
+              </HelpPopover>
+            </span>
             <SelectMenu
               items={languageItems}
               value={form.language}
@@ -306,7 +317,12 @@ function KbArticleEditor({ articleId }: { articleId?: number }) {
             />
           </label>
           <label className="block text-sm">
-            <span className="mb-1 block text-muted">{t("kb.field.state")}</span>
+            <span className="mb-1 flex items-center gap-1.5 text-muted">
+              {t("kb.field.state")}
+              <HelpPopover title={t("kb.field.state")} testId="kb-help-state">
+                {t("kb.help.state")}
+              </HelpPopover>
+            </span>
             <SelectMenu
               items={stateItems}
               value={form.state}
@@ -329,7 +345,12 @@ function KbArticleEditor({ articleId }: { articleId?: number }) {
             />
           </label>
           <label className="block text-sm sm:col-span-2">
-            <span className="mb-1 block text-muted">{t("kb.field.tags")}</span>
+            <span className="mb-1 flex items-center gap-1.5 text-muted">
+              {t("kb.field.tags")}
+              <HelpPopover title={t("kb.field.tags")} testId="kb-help-tags">
+                {t("kb.help.tags")}
+              </HelpPopover>
+            </span>
             <input
               data-testid="kb-form-tags"
               value={form.tags}
