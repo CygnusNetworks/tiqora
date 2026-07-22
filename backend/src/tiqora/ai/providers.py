@@ -72,11 +72,14 @@ async def create_provider(
     supports_streaming: bool,
     eu_hosted: bool,
 ) -> TiqoraLlmProvider:
+    # Keys/URLs arrive via copy-paste; stray whitespace or a trailing newline
+    # silently breaks the Bearer header at the provider (opaque 401s).
+    api_key = api_key.strip() if api_key else None
     row = TiqoraLlmProvider(
         name=name,
         kind=kind,
-        base_url=base_url,
-        default_model=default_model,
+        base_url=base_url.strip(),
+        default_model=default_model.strip(),
         api_key_enc=encrypt_secret(settings.secret_key, api_key) if api_key else None,
         extra_json=extra_json,
         supports_tools=supports_tools,
@@ -113,11 +116,11 @@ async def update_provider(
     if kind is not None:
         row.kind = kind
     if base_url is not None:
-        row.base_url = base_url
+        row.base_url = base_url.strip()
     if default_model is not None:
-        row.default_model = default_model
-    if api_key is not None and api_key != "":
-        row.api_key_enc = encrypt_secret(settings.secret_key, api_key)
+        row.default_model = default_model.strip()
+    if api_key is not None and api_key.strip() != "":
+        row.api_key_enc = encrypt_secret(settings.secret_key, api_key.strip())
     if extra_json is not None:
         row.extra_json = extra_json
     if supports_tools is not None:

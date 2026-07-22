@@ -70,7 +70,11 @@ async def create_mcp_client(
     row = TiqoraMcpClient(
         name=name,
         url=url,
-        auth_token_enc=encrypt_secret(settings.secret_key, auth_token) if auth_token else None,
+        auth_token_enc=(
+            encrypt_secret(settings.secret_key, auth_token.strip())
+            if auth_token and auth_token.strip()
+            else None
+        ),
         transport=transport,
         create_by=change_by,
         change_by=change_by,
@@ -97,8 +101,8 @@ async def update_mcp_client(
         row.name = name
     if url is not None:
         row.url = url
-    if auth_token is not None and auth_token != "":
-        row.auth_token_enc = encrypt_secret(settings.secret_key, auth_token)
+    if auth_token is not None and auth_token.strip() != "":
+        row.auth_token_enc = encrypt_secret(settings.secret_key, auth_token.strip())
     if transport is not None:
         row.transport = transport
     if valid_id is not None:
