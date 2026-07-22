@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import { useNavigate } from "@tanstack/react-router";
 import type { MutationRequest, TicketListItem } from "@/lib/api";
 import { formatAgeSeconds, formatDateTime, isEscalated } from "@/lib/format";
+import { senderDisplayName } from "@/lib/articleChannel";
 import { cn } from "@/lib/cn";
 import { Button } from "@/components/ui/Button";
 import { SelectMenu, type SelectMenuItem } from "@/components/ui/SelectMenu";
@@ -218,6 +219,8 @@ export function TicketTable({
             isEscalated(ticket.escalation_update_time) ||
             isEscalated(ticket.escalation_solution_time);
           const spineColor = escLevel === "none" ? stateColorVar(ticket.state) : undefined;
+          const customerLabel = ticket.customer_user_id || ticket.customer_id;
+          const senderFallback = !customerLabel ? senderDisplayName(ticket.first_from) : null;
           const escalationBadge = esc && (
             <span
               className="ml-1.5 whitespace-nowrap rounded-md bg-amber px-2 py-0.5 font-mono text-[10px] font-semibold tabular-nums text-[#0E1015]"
@@ -305,8 +308,23 @@ export function TicketTable({
                 <span className="block truncate text-[12.8px] font-medium text-ink" title={ticket.title ?? ""}>
                   {ticket.title || "—"}
                 </span>
-                <span className="block truncate text-[11.5px] text-muted">
-                  {ticket.customer_user_id || ticket.customer_id || "—"}
+                <span
+                  className="block truncate text-[11.5px] text-muted"
+                  data-testid={`ticket-customer-cell-${ticket.id}`}
+                >
+                  {customerLabel ? (
+                    customerLabel
+                  ) : senderFallback ? (
+                    <span
+                      className="italic"
+                      title={t("ticket.senderNoCustomer")}
+                      data-testid={`ticket-sender-fallback-${ticket.id}`}
+                    >
+                      ✉ {senderFallback}
+                    </span>
+                  ) : (
+                    "—"
+                  )}
                 </span>
               </span>
               <span className="hidden min-w-0 items-center md:inline-flex">

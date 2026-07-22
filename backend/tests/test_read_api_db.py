@@ -329,6 +329,12 @@ async def test_queue_ticket_detail_attachment_permissions(
         assert listed.total >= 1
         assert listed.items[0].tn == "20240601000001"
 
+        # first_from: ticket 500 has one article (a_from='alice@example.com'),
+        # ticket 501 has none — must surface as None, not an error.
+        by_tn = {i.tn: i for i in listed.items}
+        assert by_tn["20240601000001"].first_from == "alice@example.com"
+        assert by_tn["20240601000002"].first_from is None
+
         # Default "Offen" view (state_type=open) must include "new" tickets —
         # Znuny's Ticket::ViewableStateType is new+open+pending reminder+
         # pending auto, not a literal match on the state type named "open".

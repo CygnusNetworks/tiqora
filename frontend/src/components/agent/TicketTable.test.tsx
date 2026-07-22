@@ -111,6 +111,33 @@ describe("TicketTable state display", () => {
   });
 });
 
+describe("TicketTable customer cell", () => {
+  it("shows the customer_user_id when a customer is assigned", async () => {
+    await renderTable([makeItem({ customer_user_id: "bob", first_from: "alice@example.com" })]);
+    expect(screen.getByTestId("ticket-customer-cell-11")).toHaveTextContent("bob");
+    expect(screen.queryByTestId("ticket-sender-fallback-11")).toBeNull();
+  });
+
+  it("falls back to the first article's sender when no customer is assigned", async () => {
+    await renderTable([
+      makeItem({
+        customer_user_id: undefined,
+        customer_id: undefined,
+        first_from: '"Alice Example" <alice@example.com>',
+      }),
+    ]);
+    const fallback = screen.getByTestId("ticket-sender-fallback-11");
+    expect(fallback).toHaveTextContent("Alice Example");
+    expect(fallback).toHaveAttribute("title", "Sender of the first article — no customer assigned");
+  });
+
+  it("shows a dash when neither a customer nor a first_from are present", async () => {
+    await renderTable([makeItem({ customer_user_id: undefined, customer_id: undefined, first_from: undefined })]);
+    expect(screen.getByTestId("ticket-customer-cell-11")).toHaveTextContent("—");
+    expect(screen.queryByTestId("ticket-sender-fallback-11")).toBeNull();
+  });
+});
+
 describe("TicketTable selection mode", () => {
   it("without a selection prop, row click navigates (no checkboxes rendered)", async () => {
     await renderTable([makeItem()]);
