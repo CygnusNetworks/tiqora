@@ -216,6 +216,9 @@ class AttachmentMetaOut(BaseModel):
     content_size: str | None = None
     content_id: str | None = None
     disposition: str | None = None
+    # Referenced from the HTML body via cid: (embedded signature logos etc.) —
+    # UIs group these separately instead of listing them as real attachments.
+    inline: bool = False
 
 
 class HistoryEntry(BaseModel):
