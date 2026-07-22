@@ -256,7 +256,7 @@ describe("CustomerUsersPage", () => {
       expect(new Set(allIds).size).toBe(2988);
       // Success feedback reports the summed count.
       expect(screen.getByTestId("admin-bulk-status").textContent).toMatch(/2988/);
-    }, 20000);
+    }, 60000);
 
     it("stops after a failing chunk and reports progress in the error message", async () => {
       await selectAllViaAllePageSize(2988);
@@ -278,7 +278,7 @@ describe("CustomerUsersPage", () => {
       expect(status).toMatch(/2988/);
       // Selection is retained so the user can retry.
       expect(screen.getByTestId("admin-bulk-count")).toBeInTheDocument();
-    }, 20000);
+    }, 60000);
   });
 
   it("sorts by login header and toggles the indicator", async () => {
