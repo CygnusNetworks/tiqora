@@ -290,6 +290,253 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/ai/acl": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Ai Acl */
+        get: operations["list_ai_acl_api_v1_admin_ai_acl_get"];
+        put?: never;
+        /** Create Ai Acl */
+        post: operations["create_ai_acl_api_v1_admin_ai_acl_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/ai/acl/{acl_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Update Ai Acl */
+        put: operations["update_ai_acl_api_v1_admin_ai_acl__acl_id__put"];
+        post?: never;
+        /** Delete Ai Acl */
+        delete: operations["delete_ai_acl_api_v1_admin_ai_acl__acl_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/ai/mcp-clients": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Mcp Clients Route */
+        get: operations["list_mcp_clients_route_api_v1_admin_ai_mcp_clients_get"];
+        put?: never;
+        /** Create Mcp Client Route */
+        post: operations["create_mcp_client_route_api_v1_admin_ai_mcp_clients_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/ai/mcp-clients/{client_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Update Mcp Client Route */
+        put: operations["update_mcp_client_route_api_v1_admin_ai_mcp_clients__client_id__put"];
+        post?: never;
+        /** Delete Mcp Client Route */
+        delete: operations["delete_mcp_client_route_api_v1_admin_ai_mcp_clients__client_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/ai/mcp-clients/{client_id}/discover": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Discover Mcp Client Tools */
+        post: operations["discover_mcp_client_tools_api_v1_admin_ai_mcp_clients__client_id__discover_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/ai/mcp-clients/{client_id}/tools": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Mcp Tool Policies */
+        get: operations["list_mcp_tool_policies_api_v1_admin_ai_mcp_clients__client_id__tools_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/ai/mcp-clients/{client_id}/tools/{tool_name}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Update Mcp Tool Policy */
+        put: operations["update_mcp_tool_policy_api_v1_admin_ai_mcp_clients__client_id__tools__tool_name__put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/ai/providers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Llm Providers */
+        get: operations["list_llm_providers_api_v1_admin_ai_providers_get"];
+        put?: never;
+        /** Create Llm Provider */
+        post: operations["create_llm_provider_api_v1_admin_ai_providers_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/ai/providers/{provider_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Update Llm Provider */
+        put: operations["update_llm_provider_api_v1_admin_ai_providers__provider_id__put"];
+        post?: never;
+        /** Delete Llm Provider */
+        delete: operations["delete_llm_provider_api_v1_admin_ai_providers__provider_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/ai/providers/{provider_id}/test": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Test Llm Provider */
+        post: operations["test_llm_provider_api_v1_admin_ai_providers__provider_id__test_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/ai/queue-policies": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Queue Policies Route */
+        get: operations["list_queue_policies_route_api_v1_admin_ai_queue_policies_get"];
+        put?: never;
+        /** Create Queue Policy Route */
+        post: operations["create_queue_policy_route_api_v1_admin_ai_queue_policies_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/ai/queue-policies/{policy_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Update Queue Policy Route */
+        put: operations["update_queue_policy_route_api_v1_admin_ai_queue_policies__policy_id__put"];
+        post?: never;
+        /** Delete Queue Policy Route */
+        delete: operations["delete_queue_policy_route_api_v1_admin_ai_queue_policies__policy_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/ai/settings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Ai Settings */
+        get: operations["get_ai_settings_api_v1_admin_ai_settings_get"];
+        /** Put Ai Settings */
+        put: operations["put_ai_settings_api_v1_admin_ai_settings_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/ai/usage": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Ai Usage */
+        get: operations["list_ai_usage_api_v1_admin_ai_usage_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/api-keys": {
         parameters: {
             query?: never;
@@ -4433,6 +4680,368 @@ export interface components {
             /** User Id */
             user_id: number;
         };
+        /** AiAclCreate */
+        AiAclCreate: {
+            /**
+             * Allowed
+             * @default true
+             */
+            allowed: boolean;
+            /**
+             * Feature
+             * @enum {string}
+             */
+            feature: "summary" | "auto_reply" | "manual_assist" | "mcp";
+            /** Limit Requests Day */
+            limit_requests_day?: number | null;
+            /** Limit Requests Month */
+            limit_requests_month?: number | null;
+            /** Limit Tokens Day */
+            limit_tokens_day?: number | null;
+            /** Subject Id */
+            subject_id: number;
+            /**
+             * Subject Type
+             * @enum {string}
+             */
+            subject_type: "group" | "role" | "user";
+        };
+        /** AiAclOut */
+        AiAclOut: {
+            /** Allowed */
+            allowed: boolean;
+            /**
+             * Feature
+             * @enum {string}
+             */
+            feature: "summary" | "auto_reply" | "manual_assist" | "mcp";
+            /** Id */
+            id: number;
+            /** Limit Requests Day */
+            limit_requests_day: number | null;
+            /** Limit Requests Month */
+            limit_requests_month: number | null;
+            /** Limit Tokens Day */
+            limit_tokens_day: number | null;
+            /** Subject Id */
+            subject_id: number;
+            /**
+             * Subject Type
+             * @enum {string}
+             */
+            subject_type: "group" | "role" | "user";
+        };
+        /** AiAclUpdate */
+        AiAclUpdate: {
+            /** Allowed */
+            allowed?: boolean | null;
+            /** Feature */
+            feature?: ("summary" | "auto_reply" | "manual_assist" | "mcp") | null;
+            /** Limit Requests Day */
+            limit_requests_day?: number | null;
+            /** Limit Requests Month */
+            limit_requests_month?: number | null;
+            /** Limit Tokens Day */
+            limit_tokens_day?: number | null;
+            /** Subject Id */
+            subject_id?: number | null;
+            /** Subject Type */
+            subject_type?: ("group" | "role" | "user") | null;
+        };
+        /** AiQueuePolicyCreate */
+        AiQueuePolicyCreate: {
+            /**
+             * Ai Disclosure Enabled
+             * @default false
+             */
+            ai_disclosure_enabled: boolean;
+            /** Ai Disclosure Text */
+            ai_disclosure_text?: string | null;
+            /**
+             * Autonomy
+             * @default off
+             * @enum {string}
+             */
+            autonomy: "off" | "clarify_only" | "full";
+            /** Budget Tokens Day */
+            budget_tokens_day?: number | null;
+            /** Clarify Schema Json */
+            clarify_schema_json?: string | null;
+            /**
+             * Enabled Auto Reply
+             * @default false
+             */
+            enabled_auto_reply: boolean;
+            /**
+             * Enabled Manual Assist
+             * @default false
+             */
+            enabled_manual_assist: boolean;
+            /**
+             * Enabled Summary
+             * @default false
+             */
+            enabled_summary: boolean;
+            /** Escalation Rules */
+            escalation_rules?: string | null;
+            /**
+             * Identity Mode
+             * @default ticket_customer_id
+             * @enum {string}
+             */
+            identity_mode: "ticket_customer_id" | "clarify_schema" | "off";
+            /** Kb Category Ids */
+            kb_category_ids?: string | null;
+            /** Kb Tags */
+            kb_tags?: string | null;
+            /** Llm Provider Id */
+            llm_provider_id?: number | null;
+            /**
+             * Max Auto Replies
+             * @default 5
+             */
+            max_auto_replies: number;
+            /**
+             * Max Clarifications
+             * @default 2
+             */
+            max_clarifications: number;
+            /** Max Replies Per Hour */
+            max_replies_per_hour?: number | null;
+            /** Mcp Client Ids */
+            mcp_client_ids?: string | null;
+            /** Mcp Tool Overrides */
+            mcp_tool_overrides?: string | null;
+            /** Model Override */
+            model_override?: string | null;
+            /**
+             * Pii Masking
+             * @default true
+             */
+            pii_masking: boolean;
+            /** Queue Id */
+            queue_id: number;
+            /** Service User Id */
+            service_user_id?: number | null;
+            /** Summary Article Threshold */
+            summary_article_threshold?: number | null;
+            /** Summary Char Threshold */
+            summary_char_threshold?: number | null;
+            /** Summary Incremental Min Articles */
+            summary_incremental_min_articles?: number | null;
+            /** Summary Incremental Min Chars */
+            summary_incremental_min_chars?: number | null;
+            /**
+             * System Prompt
+             * @default
+             */
+            system_prompt: string;
+        };
+        /** AiQueuePolicyOut */
+        AiQueuePolicyOut: {
+            /** Ai Disclosure Enabled */
+            ai_disclosure_enabled: boolean;
+            /** Ai Disclosure Text */
+            ai_disclosure_text: string | null;
+            /**
+             * Autonomy
+             * @enum {string}
+             */
+            autonomy: "off" | "clarify_only" | "full";
+            /** Budget Tokens Day */
+            budget_tokens_day: number | null;
+            /**
+             * Change Time
+             * Format: date-time
+             */
+            change_time: string;
+            /** Clarify Schema Json */
+            clarify_schema_json: string | null;
+            /**
+             * Create Time
+             * Format: date-time
+             */
+            create_time: string;
+            /** Enabled Auto Reply */
+            enabled_auto_reply: boolean;
+            /** Enabled Manual Assist */
+            enabled_manual_assist: boolean;
+            /** Enabled Summary */
+            enabled_summary: boolean;
+            /** Escalation Rules */
+            escalation_rules: string | null;
+            /** Id */
+            id: number;
+            /**
+             * Identity Mode
+             * @enum {string}
+             */
+            identity_mode: "ticket_customer_id" | "clarify_schema" | "off";
+            /** Kb Category Ids */
+            kb_category_ids: string | null;
+            /** Kb Tags */
+            kb_tags: string | null;
+            /** Llm Provider Id */
+            llm_provider_id: number | null;
+            /** Max Auto Replies */
+            max_auto_replies: number;
+            /** Max Clarifications */
+            max_clarifications: number;
+            /** Max Replies Per Hour */
+            max_replies_per_hour: number | null;
+            /** Mcp Client Ids */
+            mcp_client_ids: string | null;
+            /** Mcp Tool Overrides */
+            mcp_tool_overrides: string | null;
+            /** Model Override */
+            model_override: string | null;
+            /** Pii Masking */
+            pii_masking: boolean;
+            /** Queue Id */
+            queue_id: number;
+            /** Service User Id */
+            service_user_id: number | null;
+            /** Summary Article Threshold */
+            summary_article_threshold: number | null;
+            /** Summary Char Threshold */
+            summary_char_threshold: number | null;
+            /** Summary Incremental Min Articles */
+            summary_incremental_min_articles: number | null;
+            /** Summary Incremental Min Chars */
+            summary_incremental_min_chars: number | null;
+            /** System Prompt */
+            system_prompt: string;
+            /** Valid Id */
+            valid_id: number;
+        };
+        /** AiQueuePolicyUpdate */
+        AiQueuePolicyUpdate: {
+            /** Ai Disclosure Enabled */
+            ai_disclosure_enabled?: boolean | null;
+            /** Ai Disclosure Text */
+            ai_disclosure_text?: string | null;
+            /** Autonomy */
+            autonomy?: ("off" | "clarify_only" | "full") | null;
+            /** Budget Tokens Day */
+            budget_tokens_day?: number | null;
+            /** Clarify Schema Json */
+            clarify_schema_json?: string | null;
+            /** Enabled Auto Reply */
+            enabled_auto_reply?: boolean | null;
+            /** Enabled Manual Assist */
+            enabled_manual_assist?: boolean | null;
+            /** Enabled Summary */
+            enabled_summary?: boolean | null;
+            /** Escalation Rules */
+            escalation_rules?: string | null;
+            /** Identity Mode */
+            identity_mode?: ("ticket_customer_id" | "clarify_schema" | "off") | null;
+            /** Kb Category Ids */
+            kb_category_ids?: string | null;
+            /** Kb Tags */
+            kb_tags?: string | null;
+            /** Llm Provider Id */
+            llm_provider_id?: number | null;
+            /** Max Auto Replies */
+            max_auto_replies?: number | null;
+            /** Max Clarifications */
+            max_clarifications?: number | null;
+            /** Max Replies Per Hour */
+            max_replies_per_hour?: number | null;
+            /** Mcp Client Ids */
+            mcp_client_ids?: string | null;
+            /** Mcp Tool Overrides */
+            mcp_tool_overrides?: string | null;
+            /** Model Override */
+            model_override?: string | null;
+            /** Pii Masking */
+            pii_masking?: boolean | null;
+            /** Service User Id */
+            service_user_id?: number | null;
+            /** Summary Article Threshold */
+            summary_article_threshold?: number | null;
+            /** Summary Char Threshold */
+            summary_char_threshold?: number | null;
+            /** Summary Incremental Min Articles */
+            summary_incremental_min_articles?: number | null;
+            /** Summary Incremental Min Chars */
+            summary_incremental_min_chars?: number | null;
+            /** System Prompt */
+            system_prompt?: string | null;
+            /** Valid Id */
+            valid_id?: number | null;
+        };
+        /** AiSettingsOut */
+        AiSettingsOut: {
+            /** Disclosure Default Text */
+            disclosure_default_text: string;
+            /** Global Max Replies Per Hour */
+            global_max_replies_per_hour: number | null;
+            /**
+             * Operation Mode
+             * @enum {string}
+             */
+            operation_mode: "parallel" | "tiqora_primary";
+        };
+        /** AiSettingsUpdate */
+        AiSettingsUpdate: {
+            /** Disclosure Default Text */
+            disclosure_default_text?: string | null;
+            /** Global Max Replies Per Hour */
+            global_max_replies_per_hour?: number | null;
+            /** Operation Mode */
+            operation_mode?: ("parallel" | "tiqora_primary") | null;
+        };
+        /** AiUsageOut */
+        AiUsageOut: {
+            /** Completion Tokens */
+            completion_tokens: number;
+            /** Cost Hint */
+            cost_hint: number | null;
+            /** Error */
+            error: string | null;
+            /**
+             * Feature
+             * @enum {string}
+             */
+            feature: "summary" | "auto_reply" | "manual_assist" | "mcp";
+            /** Id */
+            id: number;
+            /** Model */
+            model: string | null;
+            /** Prompt Tokens */
+            prompt_tokens: number;
+            /** Provider Id */
+            provider_id: number | null;
+            /** Queue Id */
+            queue_id: number | null;
+            /** Success */
+            success: boolean;
+            /** Ticket Id */
+            ticket_id: number | null;
+            /**
+             * Ts
+             * Format: date-time
+             */
+            ts: string;
+            /** User Id */
+            user_id: number | null;
+        };
+        /** AiUsagePageOut */
+        AiUsagePageOut: {
+            /** Items */
+            items: components["schemas"]["AiUsageOut"][];
+            /** Page */
+            page: number;
+            /** Page Size */
+            page_size: number;
+            /** Total */
+            total: number;
+            /** Total Completion Tokens */
+            total_completion_tokens: number;
+            /** Total Prompt Tokens */
+            total_prompt_tokens: number;
+        };
         /** ApiKeyCreate */
         ApiKeyCreate: {
             /** Expires At */
@@ -6148,6 +6757,112 @@ export interface components {
             /** Total */
             total: number;
         };
+        /** LlmProviderCreate */
+        LlmProviderCreate: {
+            /** Api Key */
+            api_key?: string | null;
+            /** Base Url */
+            base_url: string;
+            /** Default Model */
+            default_model: string;
+            /**
+             * Eu Hosted
+             * @default false
+             */
+            eu_hosted: boolean;
+            /** Extra Json */
+            extra_json?: string | null;
+            /**
+             * Kind
+             * @default openai_compat
+             * @enum {string}
+             */
+            kind: "openai_compat" | "anthropic";
+            /** Name */
+            name: string;
+            /**
+             * Supports Streaming
+             * @default true
+             */
+            supports_streaming: boolean;
+            /**
+             * Supports Tools
+             * @default true
+             */
+            supports_tools: boolean;
+        };
+        /** LlmProviderOut */
+        LlmProviderOut: {
+            /** Base Url */
+            base_url: string;
+            /**
+             * Change Time
+             * Format: date-time
+             */
+            change_time: string;
+            /**
+             * Create Time
+             * Format: date-time
+             */
+            create_time: string;
+            /** Default Model */
+            default_model: string;
+            /** Eu Hosted */
+            eu_hosted: boolean;
+            /** Extra Json */
+            extra_json: string | null;
+            /** Has Api Key */
+            has_api_key: boolean;
+            /** Id */
+            id: number;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "openai_compat" | "anthropic";
+            /** Name */
+            name: string;
+            /** Supports Streaming */
+            supports_streaming: boolean;
+            /** Supports Tools */
+            supports_tools: boolean;
+            /** Valid Id */
+            valid_id: number;
+        };
+        /** LlmProviderTestOut */
+        LlmProviderTestOut: {
+            /** Error */
+            error: string | null;
+            /** Model */
+            model: string | null;
+            /** Ok */
+            ok: boolean;
+            /** Tool Calling Ok */
+            tool_calling_ok: boolean;
+        };
+        /** LlmProviderUpdate */
+        LlmProviderUpdate: {
+            /** Api Key */
+            api_key?: string | null;
+            /** Base Url */
+            base_url?: string | null;
+            /** Default Model */
+            default_model?: string | null;
+            /** Eu Hosted */
+            eu_hosted?: boolean | null;
+            /** Extra Json */
+            extra_json?: string | null;
+            /** Kind */
+            kind?: ("openai_compat" | "anthropic") | null;
+            /** Name */
+            name?: string | null;
+            /** Supports Streaming */
+            supports_streaming?: boolean | null;
+            /** Supports Tools */
+            supports_tools?: boolean | null;
+            /** Valid Id */
+            valid_id?: number | null;
+        };
         /** LoginRequest */
         LoginRequest: {
             /** Login */
@@ -6273,6 +6988,95 @@ export interface components {
             security?: ("none" | "starttls" | "ssl") | null;
             /** Timeout Seconds */
             timeout_seconds?: number | null;
+        };
+        /** McpClientCreate */
+        McpClientCreate: {
+            /** Auth Token */
+            auth_token?: string | null;
+            /** Name */
+            name: string;
+            /**
+             * Transport
+             * @default streamable_http
+             * @constant
+             */
+            transport: "streamable_http";
+            /** Url */
+            url: string;
+        };
+        /** McpClientOut */
+        McpClientOut: {
+            /**
+             * Change Time
+             * Format: date-time
+             */
+            change_time: string;
+            /**
+             * Create Time
+             * Format: date-time
+             */
+            create_time: string;
+            /** Has Auth Token */
+            has_auth_token: boolean;
+            /** Id */
+            id: number;
+            /** Last Discovered At */
+            last_discovered_at: string | null;
+            /** Name */
+            name: string;
+            /**
+             * Transport
+             * @constant
+             */
+            transport: "streamable_http";
+            /** Url */
+            url: string;
+            /** Valid Id */
+            valid_id: number;
+        };
+        /** McpClientUpdate */
+        McpClientUpdate: {
+            /** Auth Token */
+            auth_token?: string | null;
+            /** Name */
+            name?: string | null;
+            /** Transport */
+            transport?: "streamable_http" | null;
+            /** Url */
+            url?: string | null;
+            /** Valid Id */
+            valid_id?: number | null;
+        };
+        /** McpDiscoverOut */
+        McpDiscoverOut: {
+            /** Added */
+            added: string[];
+            /** Removed */
+            removed: string[];
+            /** Tool Names */
+            tool_names: string[];
+        };
+        /** McpToolPolicyOut */
+        McpToolPolicyOut: {
+            /** Description Snapshot */
+            description_snapshot: string | null;
+            /** Enabled */
+            enabled: boolean;
+            /** Id */
+            id: number;
+            /** Mcp Client Id */
+            mcp_client_id: number;
+            /** Mutating */
+            mutating: boolean;
+            /** Tool Name */
+            tool_name: string;
+        };
+        /** McpToolPolicyUpdate */
+        McpToolPolicyUpdate: {
+            /** Enabled */
+            enabled?: boolean | null;
+            /** Mutating */
+            mutating?: boolean | null;
         };
         /** MergeRequest */
         MergeRequest: {
@@ -8906,6 +9710,829 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AclOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_ai_acl_api_v1_admin_ai_acl_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AiAclOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_ai_acl_api_v1_admin_ai_acl_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AiAclCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AiAclOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_ai_acl_api_v1_admin_ai_acl__acl_id__put: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                acl_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AiAclUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AiAclOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_ai_acl_api_v1_admin_ai_acl__acl_id__delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                acl_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_mcp_clients_route_api_v1_admin_ai_mcp_clients_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["McpClientOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_mcp_client_route_api_v1_admin_ai_mcp_clients_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["McpClientCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["McpClientOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_mcp_client_route_api_v1_admin_ai_mcp_clients__client_id__put: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                client_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["McpClientUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["McpClientOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_mcp_client_route_api_v1_admin_ai_mcp_clients__client_id__delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                client_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    discover_mcp_client_tools_api_v1_admin_ai_mcp_clients__client_id__discover_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                client_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["McpDiscoverOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_mcp_tool_policies_api_v1_admin_ai_mcp_clients__client_id__tools_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                client_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["McpToolPolicyOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_mcp_tool_policy_api_v1_admin_ai_mcp_clients__client_id__tools__tool_name__put: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                client_id: number;
+                tool_name: string;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["McpToolPolicyUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["McpToolPolicyOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_llm_providers_api_v1_admin_ai_providers_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LlmProviderOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_llm_provider_api_v1_admin_ai_providers_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LlmProviderCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LlmProviderOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_llm_provider_api_v1_admin_ai_providers__provider_id__put: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                provider_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LlmProviderUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LlmProviderOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_llm_provider_api_v1_admin_ai_providers__provider_id__delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                provider_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    test_llm_provider_api_v1_admin_ai_providers__provider_id__test_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                provider_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LlmProviderTestOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_queue_policies_route_api_v1_admin_ai_queue_policies_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AiQueuePolicyOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_queue_policy_route_api_v1_admin_ai_queue_policies_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AiQueuePolicyCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AiQueuePolicyOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_queue_policy_route_api_v1_admin_ai_queue_policies__policy_id__put: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                policy_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AiQueuePolicyUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AiQueuePolicyOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_queue_policy_route_api_v1_admin_ai_queue_policies__policy_id__delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                policy_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_ai_settings_api_v1_admin_ai_settings_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AiSettingsOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    put_ai_settings_api_v1_admin_ai_settings_put: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AiSettingsUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AiSettingsOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_ai_usage_api_v1_admin_ai_usage_get: {
+        parameters: {
+            query?: {
+                queue_id?: number | null;
+                feature?: string | null;
+                from?: string | null;
+                to?: string | null;
+                page?: number;
+                page_size?: number;
+            };
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AiUsagePageOut"];
                 };
             };
             /** @description Validation Error */

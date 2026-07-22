@@ -1,0 +1,82 @@
+"""Readiness-Gate (plan §3.0): the AI subsystem may only be enabled once the
+operator has switched the install to Tiqora-primary operation (mail ingestion
+fully on Tiqora, Znuny read-only/off). This is a deliberate operator decision
+via ``system.operation_mode``, never auto-detected from running processes.
+
+Enforcement happens in two places, both required:
+
+1. Admin API (``tiqora.api.v1.admin.ai``) calls :func:`require_tiqora_primary`
+   before allowing a queue policy to flip ``enabled_auto_reply`` /
+   ``enabled_summary`` / ``enabled_manual_assist`` to ``true``.
+2. The AI worker re-checks :func:`is_tiqora_primary` at the start of every run
+   (Phase A: the worker skeleton only checks it once per tick).
+
+Switching back to ``parallel`` is always allowed (regression must never be
+blocked) and pauses all AI runs.
+"""
+
+from __future__ import annotations
+
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from tiqora.domain.settings_store import KEY_OPERATION_MODE, get_setting, set_setting
+
+OPERATION_MODE_PARALLEL = "parallel"
+OPERATION_MODE_TIQORA_PRIMARY = "tiqora_primary"
+VALID_OPERATION_MODES = frozenset({OPERATION_MODE_PARALLEL, OPERATION_MODE_TIQORA_PRIMARY})
+
+
+class AiGateError(RuntimeError):
+    """Raised when an AI feature is enabled/run while the gate is not open."""
+
+
+async def get_operation_mode(session: AsyncSession) -> str:
+    """Return the current ``system.operation_mode`` (default ``parallel``)."""
+    raw = await get_setting(session, KEY_OPERATION_MODE)
+    if raw is None or raw.strip() not in VALID_OPERATION_MODES:
+        return OPERATION_MODE_PARALLEL
+    return raw.strip()
+
+
+async def set_operation_mode(session: AsyncSession, mode: str) -> str:
+    """Validate and persist ``system.operation_mode``.
+
+    Raises :class:`ValueError` for unknown values — callers (admin API)
+    translate that into a 422; this module has no HTTP dependency.
+    """
+    if mode not in VALID_OPERATION_MODES:
+        raise ValueError(
+            f"Invalid operation_mode: {mode!r} (expected one of {sorted(VALID_OPERATION_MODES)})"
+        )
+    await set_setting(session, KEY_OPERATION_MODE, mode)
+    return mode
+
+
+async def is_tiqora_primary(session: AsyncSession) -> bool:
+    return await get_operation_mode(session) == OPERATION_MODE_TIQORA_PRIMARY
+
+
+async def require_tiqora_primary(session: AsyncSession) -> None:
+    """Raise :class:`AiGateError` unless ``operation_mode == tiqora_primary``.
+
+    Switching a feature *off* (or reverting to ``parallel``) is always
+    allowed regardless of this check — callers must only invoke this guard on
+    the "enable" path, never on "disable".
+    """
+    if not await is_tiqora_primary(session):
+        raise AiGateError(
+            "AI features require operation_mode=tiqora_primary "
+            "(the AI agent cannot run safely in parallel operation with Znuny)"
+        )
+
+
+__all__ = [
+    "OPERATION_MODE_PARALLEL",
+    "OPERATION_MODE_TIQORA_PRIMARY",
+    "VALID_OPERATION_MODES",
+    "AiGateError",
+    "get_operation_mode",
+    "is_tiqora_primary",
+    "require_tiqora_primary",
+    "set_operation_mode",
+]
