@@ -67,6 +67,12 @@ export type DataTableProps<T> = {
    * with API key `valid_id`.
    */
   statusSortable?: boolean;
+  /**
+   * True while a background refetch (not the initial load) is in flight.
+   * Dims the row body and blocks pointer interaction there, leaving the
+   * header/toolbar interactive — old rows stay visible underneath.
+   */
+  busy?: boolean;
   testId?: string;
 };
 
@@ -193,6 +199,7 @@ export function DataTable<T>({
   sort,
   onSortChange,
   statusSortable = false,
+  busy = false,
   testId = "admin-data-table",
 }: DataTableProps<T>) {
   const { t } = useTranslation();
@@ -263,7 +270,10 @@ export function DataTable<T>({
             )}
           </tr>
         </thead>
-        <tbody>
+        <tbody
+          data-state={busy ? "busy" : undefined}
+          className={cn(busy && "pointer-events-none opacity-45 transition-opacity duration-150")}
+        >
           {isLoading && rows.length === 0 && (
             <tr>
               <td colSpan={colCount} className="px-3 py-8 text-center text-muted">
