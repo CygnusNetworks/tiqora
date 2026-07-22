@@ -474,17 +474,11 @@
       "error": "Could not check admin access. Please try again."
     },
     "group": {
-      "usersPermissions": "Users & permissions",
-      "ticketConfig": "Ticket config",
-      "customers": "Customers",
-      "communication": "Communication",
+      "access": "Access & users",
+      "tickets": "Tickets & workflow",
+      "communication": "Communication & templates",
       "automation": "Automation",
-      "system": "System",
-      "queuesTemplates": "Queues & templates",
-      "email": "Email",
-      "placeholderVariables": "Placeholder variables",
-      "compliance": "Compliance",
-      "operations": "Operations"
+      "system": "System & operations"
     },
     "nav": {
       "users": "Users",
@@ -1220,6 +1214,56 @@
       "rollbackBody": "Restore backup for job #{{id}}? The current state will be overwritten.",
       "purgeTitle": "Permanently purge backup",
       "purgeBody": "Permanently delete backup for job #{{id}}? Rollback will no longer be possible."
+    },
+    "commandPalette": {
+      "title": "Search settings & pages",
+      "placeholder": "Search settings & pages…",
+      "noResults": "No matching pages."
+    },
+    "dashboard": {
+      "agents": "Agents",
+      "queues": "Queues",
+      "daemons": "Daemons",
+      "daemonsActive": "{{active}}/{{total}} active",
+      "daemonsErrors": "{{count}} with errors"
+    },
+    "pageDescriptions": {
+      "users": "Create, edit and deactivate agents.",
+      "groups": "Manage permission groups for agents and queues.",
+      "roles": "Define roles and bundle permissions.",
+      "agentRoles": "Assign roles to agents.",
+      "agentGroups": "Assign read/write group permissions to agents.",
+      "roleGroups": "Link roles to group permissions.",
+      "customerUsers": "Manage customer user accounts.",
+      "customerCompanies": "Manage customer companies and their master data.",
+      "customerUserCustomers": "Assign customer users to companies.",
+      "customerUserGroups": "Assign customer users to groups.",
+      "authConfig": "Control SSO eligibility and 2FA enforcement per agent.",
+      "queues": "Configure queues, ownership and escalation times.",
+      "queueTemplates": "Assign templates to the queues they're available in.",
+      "queueAutoResponses": "Assign auto responses to the queues that trigger them.",
+      "queueVariables": "Maintain placeholder variables for queues.",
+      "states": "Manage ticket states and their state logic.",
+      "priorities": "Manage ticket priorities.",
+      "dynamicFields": "Manage custom ticket and article fields.",
+      "acl": "Maintain access control lists for actions and fields.",
+      "processes": "Manage ticket workflows and process automation.",
+      "templates": "Manage response templates and text snippets.",
+      "templateAttachments": "Assign fixed attachments to templates.",
+      "attachments": "Manage reusable attachments.",
+      "signatures": "Manage agent signatures.",
+      "salutations": "Manage salutations for response templates.",
+      "autoResponses": "Manage automatic responses (e.g. acknowledgement, out-of-office).",
+      "mailOutbound": "Configure the outbound SMTP server and sender address.",
+      "subjectConfig": "Configure the subject format and ticket-number hook.",
+      "postmasterFilters": "Maintain rules for processing incoming mail.",
+      "genericAgentJobs": "Manage scheduled GenericAgent automation jobs.",
+      "webhooks": "Manage outbound webhooks for ticket events.",
+      "apiKeys": "Manage API keys for external integrations.",
+      "daemons": "Control the status and intervals of background daemons.",
+      "gdpr": "GDPR requests: access, anonymization and deletion with backup.",
+      "mailLog": "Review inbound and outbound email delivery attempts.",
+      "customerFields": "Maintain placeholder variables for customer users."
     }
   },
   "kb": {

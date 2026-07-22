@@ -474,17 +474,11 @@
       "error": "Admin-Zugriff konnte nicht geprüft werden. Bitte erneut versuchen."
     },
     "group": {
-      "usersPermissions": "Benutzer & Rechte",
-      "ticketConfig": "Ticket-Konfiguration",
-      "customers": "Kunden",
-      "communication": "Kommunikation",
+      "access": "Zugriff & Benutzer",
+      "tickets": "Tickets & Workflow",
+      "communication": "Kommunikation & Vorlagen",
       "automation": "Automatisierung",
-      "system": "System",
-      "queuesTemplates": "Queues & Vorlagen",
-      "email": "E-Mail",
-      "placeholderVariables": "Platzhalter-Variablen",
-      "compliance": "Compliance",
-      "operations": "Betrieb"
+      "system": "System & Betrieb"
     },
     "nav": {
       "users": "Benutzer",
@@ -1220,6 +1214,56 @@
       "rollbackBody": "Backup von Auftrag #{{id}} wiederherstellen? Der aktuelle Zustand wird überschrieben.",
       "purgeTitle": "Backup unwiderruflich löschen",
       "purgeBody": "Backup von Auftrag #{{id}} endgültig löschen? Rollback ist danach nicht mehr möglich."
+    },
+    "commandPalette": {
+      "title": "Einstellungen & Seiten suchen",
+      "placeholder": "Einstellungen & Seiten suchen…",
+      "noResults": "Keine passenden Seiten."
+    },
+    "dashboard": {
+      "agents": "Agenten",
+      "queues": "Queues",
+      "daemons": "Dienste",
+      "daemonsActive": "{{active}}/{{total}} aktiv",
+      "daemonsErrors": "{{count}} mit Fehler"
+    },
+    "pageDescriptions": {
+      "users": "Agenten anlegen, bearbeiten und deaktivieren.",
+      "groups": "Berechtigungsgruppen für Agenten und Queues verwalten.",
+      "roles": "Rollen definieren und Rechte bündeln.",
+      "agentRoles": "Agenten Rollen zuordnen.",
+      "agentGroups": "Agenten Gruppen mit Lese-/Schreibrechten zuordnen.",
+      "roleGroups": "Rollen mit Gruppenrechten verknüpfen.",
+      "customerUsers": "Kundenbenutzer-Konten verwalten.",
+      "customerCompanies": "Kundenunternehmen und ihre Stammdaten verwalten.",
+      "customerUserCustomers": "Kundenbenutzer Unternehmen zuordnen.",
+      "customerUserGroups": "Kundenbenutzer Gruppen zuordnen.",
+      "authConfig": "SSO-Berechtigung und 2FA-Erzwingung je Agent steuern.",
+      "queues": "Queues, Zuständigkeiten und Eskalationszeiten konfigurieren.",
+      "queueTemplates": "Vorlagen den Queues zuordnen, in denen sie verfügbar sind.",
+      "queueAutoResponses": "Autoantworten den Queues zuordnen, die sie auslösen.",
+      "queueVariables": "Platzhalter-Variablen für Queues pflegen.",
+      "states": "Ticket-Status und ihre Zustandslogik verwalten.",
+      "priorities": "Ticket-Prioritäten verwalten.",
+      "dynamicFields": "Benutzerdefinierte Ticket- und Artikelfelder verwalten.",
+      "acl": "Zugriffskontrolllisten für Aktionen und Felder pflegen.",
+      "processes": "Ticket-Workflows und Prozessautomatisierung verwalten.",
+      "templates": "Antwortvorlagen und Textbausteine verwalten.",
+      "templateAttachments": "Vorlagen feste Anhänge zuordnen.",
+      "attachments": "Wiederverwendbare Anhänge verwalten.",
+      "signatures": "Agent-Signaturen verwalten.",
+      "salutations": "Anreden für Antwortvorlagen verwalten.",
+      "autoResponses": "Automatische Antworten (z. B. Bestätigung, Abwesenheit) verwalten.",
+      "mailOutbound": "SMTP-Ausgangsserver und Absenderadresse konfigurieren.",
+      "subjectConfig": "Betreff-Format und Ticketnummer-Hook konfigurieren.",
+      "postmasterFilters": "Regeln zur Verarbeitung eingehender E-Mails pflegen.",
+      "genericAgentJobs": "Geplante GenericAgent-Automatisierungsjobs verwalten.",
+      "webhooks": "Ausgehende Webhooks für Ticket-Ereignisse verwalten.",
+      "apiKeys": "API-Schlüssel für externe Integrationen verwalten.",
+      "daemons": "Status und Intervalle der Hintergrunddienste steuern.",
+      "gdpr": "DSGVO-Anfragen: Auskunft, Anonymisierung und Löschung mit Backup.",
+      "mailLog": "Ein- und ausgehende E-Mail-Zustellversuche einsehen.",
+      "customerFields": "Platzhalter-Variablen für Kundenbenutzer pflegen."
     }
   },
   "kb": {
