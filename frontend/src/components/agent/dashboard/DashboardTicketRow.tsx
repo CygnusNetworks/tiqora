@@ -2,22 +2,26 @@ import type { ReactNode } from "react";
 import { Link } from "@tanstack/react-router";
 import type { TicketListItem } from "@/lib/api";
 import { PriorityChip, StateChip } from "@/components/ui/StatusChip";
+import { cn } from "@/lib/cn";
 
 /**
  * A single ticket row for the dashboard work lists: number + title, then a
  * compact meta cluster (queue, state soft-chip, priority soft-chip). The
  * right-hand `trailing` slot carries whatever each list needs there — a
- * changed date, an escalation countdown, or a due time.
+ * changed date, an escalation countdown, or a due time. `escalated` adds the
+ * red left border used to flag overdue rows in the escalated group/view.
  */
 export function DashboardTicketRow({
   ticket,
   trailing,
+  escalated,
 }: {
   ticket: TicketListItem;
   trailing?: ReactNode;
+  escalated?: boolean;
 }) {
   return (
-    <li>
+    <li className={cn(escalated && "border-l-2 border-danger")}>
       <Link
         to="/agent/tickets/$ticketId"
         params={{ ticketId: String(ticket.id) }}

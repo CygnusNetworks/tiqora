@@ -39,6 +39,8 @@ export default tseslint.config(
             "moveRecipientBetween",
             "queueHasWork",
             "selectQueueShortcuts",
+            "formatDurationSince",
+            "greetingKey",
           ],
         },
       ],
