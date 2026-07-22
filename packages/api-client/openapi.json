@@ -4410,6 +4410,100 @@
         "title": "ForwardRequest",
         "type": "object"
       },
+      "GdprCustomerRecordPreviewOut": {
+        "properties": {
+          "delete_summary": {
+            "items": {
+              "$ref": "#/components/schemas/GdprDeleteSummaryRowOut"
+            },
+            "title": "Delete Summary",
+            "type": "array"
+          },
+          "fields": {
+            "items": {
+              "$ref": "#/components/schemas/GdprFieldPreviewOut"
+            },
+            "title": "Fields",
+            "type": "array"
+          },
+          "login": {
+            "title": "Login",
+            "type": "string"
+          },
+          "mode": {
+            "enum": [
+              "anonymize",
+              "delete"
+            ],
+            "title": "Mode",
+            "type": "string"
+          }
+        },
+        "required": [
+          "login",
+          "mode"
+        ],
+        "title": "GdprCustomerRecordPreviewOut",
+        "type": "object"
+      },
+      "GdprCustomerRecordPreviewRequest": {
+        "description": "Per-customer before/after preview request. Login is body-only because\nlogins may contain characters (e.g. ``#``) that are unsafe as a path segment.",
+        "properties": {
+          "delete_tickets": {
+            "default": false,
+            "title": "Delete Tickets",
+            "type": "boolean"
+          },
+          "login": {
+            "title": "Login",
+            "type": "string"
+          },
+          "mode": {
+            "default": "anonymize",
+            "enum": [
+              "anonymize",
+              "delete"
+            ],
+            "title": "Mode",
+            "type": "string"
+          },
+          "seed": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Seed"
+          }
+        },
+        "required": [
+          "login"
+        ],
+        "title": "GdprCustomerRecordPreviewRequest",
+        "type": "object"
+      },
+      "GdprDeleteSummaryRowOut": {
+        "description": "One row/object count that would be removed by a delete-mode erasure.",
+        "properties": {
+          "count": {
+            "title": "Count",
+            "type": "integer"
+          },
+          "table": {
+            "title": "Table",
+            "type": "string"
+          }
+        },
+        "required": [
+          "table",
+          "count"
+        ],
+        "title": "GdprDeleteSummaryRowOut",
+        "type": "object"
+      },
       "GdprErasureJobCreate": {
         "description": "Only destructive entry point \u2014 requires confirm=true.",
         "properties": {
@@ -4753,6 +4847,42 @@
         "title": "GdprErasurePreviewRequest",
         "type": "object"
       },
+      "GdprFieldPreviewOut": {
+        "description": "One before/after row in the per-customer record preview (anonymize mode).",
+        "properties": {
+          "after": {
+            "title": "After"
+          },
+          "before": {
+            "title": "Before"
+          },
+          "changed": {
+            "title": "Changed",
+            "type": "boolean"
+          },
+          "field": {
+            "title": "Field",
+            "type": "string"
+          },
+          "occurrences": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Occurrences"
+          }
+        },
+        "required": [
+          "field",
+          "changed"
+        ],
+        "title": "GdprFieldPreviewOut",
+        "type": "object"
+      },
       "GdprPurgeOut": {
         "properties": {
           "deleted_backups": {
@@ -4827,6 +4957,33 @@
           "summary"
         ],
         "title": "GdprSampleRowOut",
+        "type": "object"
+      },
+      "GdprSelectorCountOut": {
+        "description": "Fast match count for the selector live-counter (no joins/samples).",
+        "properties": {
+          "count": {
+            "title": "Count",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "count"
+        ],
+        "title": "GdprSelectorCountOut",
+        "type": "object"
+      },
+      "GdprSelectorCountRequest": {
+        "description": "Live match-count request \u2014 shares the selector shape with preview/apply.",
+        "properties": {
+          "selector": {
+            "$ref": "#/components/schemas/ErasureSelectorIn"
+          }
+        },
+        "required": [
+          "selector"
+        ],
+        "title": "GdprSelectorCountRequest",
         "type": "object"
       },
       "GenericAgentJobOut": {
@@ -18423,6 +18580,158 @@
           }
         },
         "summary": "Preview Erasure",
+        "tags": [
+          "admin:gdpr"
+        ]
+      }
+    },
+    "/api/v1/admin/gdpr/record-preview": {
+      "post": {
+        "description": "Per-customer before/after preview. Read-only: no commit is ever issued,\nand the session is rolled back explicitly in case the engine's read helpers\never pick up a pending flush.",
+        "operationId": "customer_record_preview_api_v1_admin_gdpr_record_preview_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GdprCustomerRecordPreviewRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GdprCustomerRecordPreviewOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Customer Record Preview",
+        "tags": [
+          "admin:gdpr"
+        ]
+      }
+    },
+    "/api/v1/admin/gdpr/selector-count": {
+      "post": {
+        "description": "Fast match count for the live selector counter (same selector shape as\n``/preview``, but resolves ids only \u2014 no customer/sample/count breakdown).",
+        "operationId": "selector_count_api_v1_admin_gdpr_selector_count_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GdprSelectorCountRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GdprSelectorCountOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Selector Count",
         "tags": [
           "admin:gdpr"
         ]

@@ -1209,6 +1209,41 @@
         "all": "Alle",
         "temp": "Temporär"
       },
+      "filters": {
+        "title": "Weitere Filter",
+        "addButton": "Filter",
+        "addPlaceholder": "Filter wählen…",
+        "commit": "Übernehmen",
+        "remove": "Filter entfernen: {{label}}",
+        "noneActive": "Keine weiteren Filter aktiv."
+      },
+      "summary": {
+        "title": "Aktive Auswahl",
+        "logins": "{{count}} Login(s) direkt ausgewählt",
+        "companies": "Unternehmen: {{list}}",
+        "empty": "Noch keine Selektionskriterien gewählt."
+      },
+      "liveCount": {
+        "label": "Live-Treffer",
+        "loading": "Wird gezählt…",
+        "error": "Zählung fehlgeschlagen.",
+        "zero": "Keine Treffer für diese Auswahl.",
+        "high": "Sehr große Auswahl (> 1000) — bitte prüfen."
+      },
+      "recordPreview": {
+        "action": "Vorschau",
+        "close": "Schließen",
+        "loading": "Lade Datensatz-Vorschau…",
+        "error": "Datensatz-Vorschau fehlgeschlagen.",
+        "field": "Feld",
+        "before": "Vorher",
+        "after": "Nachher",
+        "unchanged": "bleibt",
+        "deleteTable": "Tabelle",
+        "deleteCount": "Anzahl",
+        "deleteEmpty": "Keine zu löschenden Datensätze.",
+        "anonymizeEmpty": "Keine anonymisierbaren Felder gefunden."
+      },
       "add": "Hinzufügen",
       "preview": "Vorschau",
       "reset": "Zurücksetzen",

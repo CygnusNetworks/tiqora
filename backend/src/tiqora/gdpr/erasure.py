@@ -277,6 +277,31 @@ class ErasureResult:
     resolved_logins: list[str]
 
 
+@dataclass
+class FieldPreview:
+    """One before/after row for the per-customer record preview (anonymize)."""
+
+    field: str
+    before: Any
+    after: Any
+    changed: bool
+    occurrences: int | None = None
+
+
+@dataclass
+class DeleteSummaryRow:
+    table: str
+    count: int
+
+
+@dataclass
+class CustomerRecordPreview:
+    login: str
+    mode: ErasureMode
+    fields: list[FieldPreview]
+    delete_summary: list[DeleteSummaryRow]
+
+
 # ---------------------------------------------------------------------------
 # JSON helpers (datetime / bytes)
 # ---------------------------------------------------------------------------
@@ -799,6 +824,192 @@ async def build_erasure_preview_for_ids(
         columns_changed=columns_changed,
         tables_deleted=tables_deleted,
     )
+
+
+def _decode_body_text(raw: Any) -> str:
+    """Decode a body/plain column value (bytes on MariaDB, str on the PG fixture)."""
+    if isinstance(raw, (bytes, memoryview)):
+        return bytes(raw).decode("utf-8", errors="replace")
+    return str(raw or "")
+
+
+_RECORD_PREVIEW_BODY_TRUNCATE = 200
+
+
+async def build_customer_record_preview(
+    session: AsyncSession,
+    login: str,
+    mode: ErasureMode = "anonymize",
+    *,
+    seed: int | None = None,
+    delete_tickets: bool = False,
+) -> CustomerRecordPreview:
+    """Read-only per-customer before/after preview. Writes nothing.
+
+    Anonymize mode reuses the exact same :class:`ValueMapper` calls and PII
+    column resolution as :func:`run_erasure` so the "after" values shown here
+    are guaranteed to match what a real run would produce. Delete mode reuses
+    :func:`build_erasure_preview_for_ids` for the row/object counts that would
+    be removed.
+    """
+    if mode not in ("anonymize", "delete"):
+        raise ErasureError(f"mode must be 'anonymize' or 'delete', got {mode!r}")
+    if delete_tickets and mode != "delete":
+        raise ErasureError("delete_tickets requires mode='delete'")
+
+    cust = (
+        await session.execute(select(CustomerUser.id).where(CustomerUser.login == login))
+    ).scalar_one_or_none()
+    if cust is None:
+        raise ErasureNotFoundError(f"customer_user {login!r} not found")
+    cust_id = int(cust)
+
+    if mode == "delete":
+        preview = await build_erasure_preview_for_ids(
+            session, [cust_id], mode="delete", delete_tickets=delete_tickets
+        )
+        delete_summary = [
+            DeleteSummaryRow(table=table, count=count)
+            for table, count in preview.counts.items()
+            if count
+        ]
+        return CustomerRecordPreview(
+            login=login, mode=mode, fields=[], delete_summary=delete_summary
+        )
+
+    # ---- anonymize: same field-by-field logic as run_erasure ----
+    full = await _fetch_full_row(session, "customer_user", {"id": cust_id})
+    if full is None:
+        raise ErasureNotFoundError(f"customer_user {login!r} not found")
+
+    mapper = ValueMapper(seed=seed)
+    pii_cols = await resolve_customer_user_pii_columns(session)
+    new_login: str | None = None
+    fields: list[FieldPreview] = []
+    for col in pii_cols:
+        if col not in full:
+            continue
+        orig = full[col]
+        if col == "login":
+            new_val: Any = mapper.map_value(str(orig), "login") or f"gdpr-user-{cust_id}"
+            new_login = str(new_val)
+        elif col == "pw":
+            new_val = None
+        else:
+            new_val = mapper.map_value(str(orig) if orig is not None else None, _kind_for(col))
+        fields.append(
+            FieldPreview(
+                field=f"customer_user.{col}", before=orig, after=new_val, changed=orig != new_val
+            )
+        )
+    if new_login is None:
+        new_login = str(mapper.map_value(str(full["login"]), "login") or f"gdpr-user-{cust_id}")
+
+    valid_before = full.get("valid_id")
+    fields.append(
+        FieldPreview(
+            field="customer_user.valid_id",
+            before=valid_before,
+            after=INVALID_VALID_ID,
+            changed=valid_before != INVALID_VALID_ID,
+        )
+    )
+
+    # ---- ticket/article aggregate fields (occurrence-counted across all
+    # tickets of this customer) ----
+    ticket_rows = (
+        await session.execute(
+            select(Ticket.id, Ticket.title).where(Ticket.customer_user_id == login)
+        )
+    ).all()
+    ticket_ids = [int(r.id) for r in ticket_rows]
+    titled = [str(r.title) for r in ticket_rows if r.title]
+    example_title = titled[0] if titled else None
+    fields.append(
+        FieldPreview(
+            field="ticket.title",
+            before=example_title,
+            after=_ANON_PLACEHOLDER if example_title is not None else None,
+            changed=len(titled) > 0,
+            occurrences=len(titled),
+        )
+    )
+
+    article_ids: list[int] = []
+    if ticket_ids:
+        article_ids = list(
+            (await session.execute(select(Article.id).where(Article.ticket_id.in_(ticket_ids))))
+            .scalars()
+            .all()
+        )
+
+    from_addrs = (
+        list(
+            (
+                await session.execute(
+                    select(ArticleDataMime.a_from).where(
+                        ArticleDataMime.article_id.in_(article_ids)
+                    )
+                )
+            )
+            .scalars()
+            .all()
+        )
+        if article_ids
+        else []
+    )
+    from_changed = 0
+    example_from_before: str | None = None
+    example_from_after: str | None = None
+    for addr in from_addrs:
+        new_addr = mapper.anonymize_address_field(addr)
+        if addr != new_addr:
+            from_changed += 1
+            if example_from_before is None:
+                example_from_before, example_from_after = addr, new_addr
+    fields.append(
+        FieldPreview(
+            field="article_data_mime.a_from",
+            before=example_from_before,
+            after=example_from_after,
+            changed=from_changed > 0,
+            occurrences=from_changed,
+        )
+    )
+
+    body_rows = (
+        list(
+            (
+                await session.execute(
+                    select(ArticleDataMimePlain.body).where(
+                        ArticleDataMimePlain.article_id.in_(article_ids)
+                    )
+                )
+            )
+            .scalars()
+            .all()
+        )
+        if article_ids
+        else []
+    )
+    non_empty_bodies = [b for b in body_rows if b]
+    example_body_before: str | None = None
+    example_body_after: str | None = None
+    if non_empty_bodies:
+        decoded = _decode_body_text(non_empty_bodies[0])[:_RECORD_PREVIEW_BODY_TRUNCATE]
+        example_body_before = decoded
+        example_body_after = (mapper.anonymize_body(decoded) or "")[:_RECORD_PREVIEW_BODY_TRUNCATE]
+    fields.append(
+        FieldPreview(
+            field="article_data_mime_plain.body",
+            before=example_body_before,
+            after=example_body_after,
+            changed=len(non_empty_bodies) > 0,
+            occurrences=len(non_empty_bodies),
+        )
+    )
+
+    return CustomerRecordPreview(login=login, mode=mode, fields=fields, delete_summary=[])
 
 
 # ---------------------------------------------------------------------------

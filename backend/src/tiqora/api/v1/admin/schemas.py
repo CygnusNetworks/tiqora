@@ -1084,6 +1084,53 @@ class GdprPurgeOut(BaseModel):
     deleted_backups: int
 
 
+class GdprSelectorCountOut(BaseModel):
+    """Fast match count for the selector live-counter (no joins/samples)."""
+
+    count: int
+
+
+class GdprFieldPreviewOut(BaseModel):
+    """One before/after row in the per-customer record preview (anonymize mode)."""
+
+    field: str
+    before: Any = None
+    after: Any = None
+    changed: bool
+    # Set only for aggregate ticket/article fields (e.g. "N of M tickets").
+    occurrences: int | None = None
+
+
+class GdprDeleteSummaryRowOut(BaseModel):
+    """One row/object count that would be removed by a delete-mode erasure."""
+
+    table: str
+    count: int
+
+
+class GdprCustomerRecordPreviewOut(BaseModel):
+    login: str
+    mode: Literal["anonymize", "delete"]
+    fields: list[GdprFieldPreviewOut] = Field(default_factory=list)
+    delete_summary: list[GdprDeleteSummaryRowOut] = Field(default_factory=list)
+
+
+class GdprSelectorCountRequest(BaseModel):
+    """Live match-count request — shares the selector shape with preview/apply."""
+
+    selector: ErasureSelectorIn
+
+
+class GdprCustomerRecordPreviewRequest(BaseModel):
+    """Per-customer before/after preview request. Login is body-only because
+    logins may contain characters (e.g. ``#``) that are unsafe as a path segment."""
+
+    login: str
+    mode: Literal["anonymize", "delete"] = "anonymize"
+    delete_tickets: bool = False
+    seed: int | None = None
+
+
 # ---------------------------------------------------------------------------
 # Daemons — admin "Dienste" page (worker.services.DAEMON_SERVICES)
 # ---------------------------------------------------------------------------

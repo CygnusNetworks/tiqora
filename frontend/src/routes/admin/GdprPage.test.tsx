@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, waitFor, fireEvent } from "@testing-library/react";
+import { render, screen, waitFor, fireEvent, within } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { I18nextProvider } from "react-i18next";
 import i18n from "@/i18n";
@@ -12,6 +12,8 @@ const getJob = vi.fn();
 const rollback = vi.fn();
 const purgeBackup = vi.fn();
 const backupDownloadUrl = vi.fn((id: number) => `/api/v1/admin/gdpr/jobs/${id}/backup/download`);
+const selectorCount = vi.fn();
+const recordPreview = vi.fn();
 const searchReferenceCustomers = vi.fn();
 
 let searchParams: { logins?: string; tab?: string } = {};
@@ -31,6 +33,8 @@ vi.mock("@/lib/api", () => ({
       rollback: (...args: unknown[]) => rollback(...args),
       purgeBackup: (...args: unknown[]) => purgeBackup(...args),
       backupDownloadUrl: (id: number) => backupDownloadUrl(id),
+      selectorCount: (...args: unknown[]) => selectorCount(...args),
+      recordPreview: (...args: unknown[]) => recordPreview(...args),
     },
     searchReferenceCustomers: (...args: unknown[]) => searchReferenceCustomers(...args),
   },
@@ -80,6 +84,38 @@ const previewPayload = {
   tables_deleted: [],
 };
 
+const recordPreviewAnonymizePayload = {
+  login: "alice@example.com",
+  mode: "anonymize",
+  fields: [
+    {
+      field: "customer_user.login",
+      before: "alice@example.com",
+      after: "gdpr-user-10",
+      changed: true,
+      occurrences: null,
+    },
+    {
+      field: "customer_user.phone",
+      before: null,
+      after: null,
+      changed: false,
+      occurrences: null,
+    },
+  ],
+  delete_summary: [],
+};
+
+const recordPreviewDeletePayload = {
+  login: "alice@example.com",
+  mode: "delete",
+  fields: [],
+  delete_summary: [
+    { table: "customer_user", count: 1 },
+    { table: "tickets", count: 3 },
+  ],
+};
+
 describe("GdprPage", () => {
   beforeEach(() => {
     preview.mockReset();
@@ -88,10 +124,14 @@ describe("GdprPage", () => {
     getJob.mockReset();
     rollback.mockReset();
     purgeBackup.mockReset();
+    selectorCount.mockReset();
+    recordPreview.mockReset();
     searchReferenceCustomers.mockReset();
     searchParams = {};
 
     preview.mockResolvedValue(previewPayload);
+    selectorCount.mockResolvedValue({ count: 2 });
+    recordPreview.mockResolvedValue(recordPreviewAnonymizePayload);
     createJob.mockResolvedValue({
       id: 99,
       mode: "anonymize",
@@ -285,5 +325,137 @@ describe("GdprPage", () => {
     });
     expect(screen.queryByTestId("gdpr-confirm-type")).not.toBeInTheDocument();
     expect(screen.getByTestId("gdpr-confirm-submit")).toBeEnabled();
+  });
+
+  it("adds and removes a chip-baukasten filter (login regex)", async () => {
+    renderPage();
+
+    fireEvent.click(screen.getByTestId("gdpr-add-filter"));
+    await waitFor(() => {
+      expect(screen.getByTestId("gdpr-add-filter-panel")).toBeInTheDocument();
+    });
+    fireEvent.click(screen.getByTestId("gdpr-add-filter-panel-option-loginRegex"));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("gdpr-filter-open-loginRegex")).toBeInTheDocument();
+    });
+    const input = within(screen.getByTestId("gdpr-filter-open-loginRegex")).getByRole("textbox");
+    fireEvent.change(input, { target: { value: "^old-.*" } });
+    fireEvent.click(screen.getByTestId("gdpr-filter-commit-loginRegex"));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("gdpr-filter-chip-loginRegex")).toHaveTextContent("^old-.*");
+    });
+    expect(screen.queryByTestId("gdpr-filter-open-loginRegex")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId("gdpr-preview"));
+    await waitFor(() => {
+      expect(preview).toHaveBeenCalledWith(
+        expect.objectContaining({
+          selector: expect.objectContaining({ login_regex: "^old-.*" }),
+        }),
+      );
+    });
+
+    fireEvent.click(screen.getByTestId("gdpr-filter-chip-remove-loginRegex"));
+    await waitFor(() => {
+      expect(screen.queryByTestId("gdpr-filter-chip-loginRegex")).not.toBeInTheDocument();
+    });
+  });
+
+  it("shows a debounced live match count for the active selector", async () => {
+    renderPage();
+
+    fireEvent.change(screen.getByTestId("gdpr-login-input"), {
+      target: { value: "alice@example.com" },
+    });
+    fireEvent.click(screen.getByTestId("gdpr-login-add"));
+
+    await waitFor(
+      () => {
+        expect(selectorCount).toHaveBeenCalledWith(
+          expect.objectContaining({
+            selector: expect.objectContaining({ logins: ["alice@example.com"] }),
+          }),
+          expect.anything(),
+        );
+      },
+      { timeout: 2000 },
+    );
+    await waitFor(() => {
+      expect(screen.getByTestId("gdpr-live-count")).toHaveTextContent("2");
+    });
+  });
+
+  it("flags zero live matches", async () => {
+    selectorCount.mockResolvedValue({ count: 0 });
+    renderPage();
+
+    fireEvent.change(screen.getByTestId("gdpr-login-input"), {
+      target: { value: "nobody@example.com" },
+    });
+    fireEvent.click(screen.getByTestId("gdpr-login-add"));
+
+    await waitFor(
+      () => {
+        expect(screen.getByTestId("gdpr-live-count")).toHaveTextContent("0");
+      },
+      { timeout: 2000 },
+    );
+    expect(screen.getByTestId("gdpr-live-count-hint")).toBeInTheDocument();
+  });
+
+  it("expands the record preview accordion and shows before/after with unchanged state", async () => {
+    renderPage();
+
+    fireEvent.change(screen.getByTestId("gdpr-login-input"), {
+      target: { value: "alice@example.com" },
+    });
+    fireEvent.click(screen.getByTestId("gdpr-login-add"));
+    fireEvent.click(screen.getByTestId("gdpr-preview"));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("gdpr-record-preview-toggle-alice@example.com")).toBeInTheDocument();
+    });
+    fireEvent.click(screen.getByTestId("gdpr-record-preview-toggle-alice@example.com"));
+
+    await waitFor(() => {
+      expect(
+        screen.getByTestId("gdpr-record-preview-panel-alice@example.com"),
+      ).toBeInTheDocument();
+    });
+    expect(recordPreview).toHaveBeenCalledWith(
+      expect.objectContaining({ login: "alice@example.com", mode: "anonymize" }),
+      expect.anything(),
+    );
+    const panel = screen.getByTestId("gdpr-record-preview-panel-alice@example.com");
+    expect(panel).toHaveTextContent("gdpr-user-10");
+    expect(panel).toHaveTextContent("unchanged");
+  });
+
+  it("shows delete_summary in the accordion for delete mode", async () => {
+    recordPreview.mockResolvedValue(recordPreviewDeletePayload);
+    renderPage();
+
+    fireEvent.click(screen.getByTestId("gdpr-mode-delete"));
+    fireEvent.change(screen.getByTestId("gdpr-login-input"), {
+      target: { value: "alice@example.com" },
+    });
+    fireEvent.click(screen.getByTestId("gdpr-login-add"));
+    fireEvent.click(screen.getByTestId("gdpr-preview"));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("gdpr-record-preview-toggle-alice@example.com")).toBeInTheDocument();
+    });
+    fireEvent.click(screen.getByTestId("gdpr-record-preview-toggle-alice@example.com"));
+
+    await waitFor(() => {
+      expect(
+        screen.getByTestId("gdpr-record-preview-panel-alice@example.com"),
+      ).toBeInTheDocument();
+    });
+    const panel = screen.getByTestId("gdpr-record-preview-panel-alice@example.com");
+    expect(panel).toHaveTextContent("customer_user");
+    expect(panel).toHaveTextContent("tickets");
   });
 });
