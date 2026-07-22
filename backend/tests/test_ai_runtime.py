@@ -98,6 +98,7 @@ class ScriptedLlm:
         self._responses = list(responses)
         self._on_call = on_call
         self.calls = 0
+        self.last_messages: list[LlmMessage] = []
 
     async def chat(
         self,
@@ -109,9 +110,17 @@ class ScriptedLlm:
         temperature: float = 0.2,
     ) -> LlmResponse:
         self.calls += 1
+        self.last_messages = messages
         if self._on_call is not None:
             await self._on_call()
         return self._responses.pop(0)
+
+    @property
+    def last_user_message(self) -> str | None:
+        return next(
+            (m.content for m in reversed(self.last_messages) if m.role == "user"),
+            None,  # type: ignore[misc]
+        )
 
 
 def _propose_response(kind: str, body: str, subject: str = "Re: Help") -> LlmResponse:
@@ -272,6 +281,38 @@ def _seed_ticket(sync_url: str, *, ns: int) -> dict[str, Any]:
         "ticket_id": ticket_id,
         "customer_article_id": int(customer_article_id),
     }
+
+
+def _add_attachment(
+    sync_url: str,
+    *,
+    article_id: int,
+    filename: str,
+    content_type: str,
+    content: bytes,
+    disposition: str = "attachment",
+) -> int:
+    engine = create_engine(sync_url)
+    with engine.begin() as conn:
+        row = conn.execute(
+            text(
+                "INSERT INTO article_data_mime_attachment (article_id, filename, content_size,"
+                " content_type, disposition, content, create_time, create_by, change_time,"
+                " change_by) VALUES (:aid, :fn, :size, :ct, :disp, :content, :t, 1, :t, 1)"
+            ),
+            {
+                "aid": article_id,
+                "fn": filename,
+                "size": str(len(content)),
+                "ct": content_type,
+                "disp": disposition,
+                "content": content,
+                "t": NOW,
+            },
+        )
+        attachment_id = row.lastrowid
+    engine.dispose()
+    return int(attachment_id)
 
 
 async def _setup_policy(
@@ -733,5 +774,315 @@ async def test_acl_limit_exceeded_blocks_manual_assist(mariadb_znuny_url: str) -
                     run_id="run-9b",
                 )
         assert llm2.calls == 0
+    finally:
+        await engine.dispose()
+
+
+# ---------------------------------------------------------------------------
+# Attachment context (document extraction + vision pre-pass)
+# ---------------------------------------------------------------------------
+
+
+async def test_document_attachment_text_appears_in_prompt(mariadb_znuny_url: str) -> None:
+    seed = _seed_ticket(mariadb_znuny_url, ns=11)
+    _add_attachment(
+        mariadb_znuny_url,
+        article_id=seed["customer_article_id"],
+        filename="notes.txt",
+        content_type="text/plain",
+        content=b"Wichtiger Kontext: Seriennummer AB-12345",
+    )
+    engine = create_async_engine(_mysql_async(mariadb_znuny_url))
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    settings = get_settings()
+    try:
+        async with factory() as session:
+            await _setup_policy(session, seed=seed, autonomy=AUTONOMY_OFF)
+
+        llm = ScriptedLlm([_propose_response("reply", "Answer")])
+        async with factory() as session:
+            result = await run_ticket_agent(
+                session,
+                settings=settings,
+                llm=llm,
+                ticket_id=seed["ticket_id"],
+                trigger=TRIGGER_MANUAL,
+                acting_user_id=seed["agent_id"],
+                run_id="run-11",
+            )
+        assert result.status == "drafted"
+        assert llm.last_user_message is not None
+        assert "Seriennummer AB-12345" in llm.last_user_message
+        assert "[Anhang: notes.txt]" in llm.last_user_message
+    finally:
+        await engine.dispose()
+
+
+async def test_image_attachment_ignored_without_vision_provider(mariadb_znuny_url: str) -> None:
+    seed = _seed_ticket(mariadb_znuny_url, ns=12)
+    _add_attachment(
+        mariadb_znuny_url,
+        article_id=seed["customer_article_id"],
+        filename="screenshot.png",
+        content_type="image/png",
+        content=b"\x89PNG fake bytes",
+    )
+    engine = create_async_engine(_mysql_async(mariadb_znuny_url))
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    settings = get_settings()
+    try:
+        async with factory() as session:
+            await _setup_policy(session, seed=seed, autonomy=AUTONOMY_OFF)
+
+        llm = ScriptedLlm([_propose_response("reply", "Answer")])
+        async with factory() as session:
+            result = await run_ticket_agent(
+                session,
+                settings=settings,
+                llm=llm,
+                ticket_id=seed["ticket_id"],
+                trigger=TRIGGER_MANUAL,
+                acting_user_id=seed["agent_id"],
+                run_id="run-12",
+            )
+        assert result.status == "drafted"
+        assert llm.last_user_message is not None
+        assert "Bild-Anhang" not in llm.last_user_message
+        assert "screenshot.png" not in llm.last_user_message
+    finally:
+        await engine.dispose()
+
+
+async def test_image_attachment_described_via_vision_provider(mariadb_znuny_url: str) -> None:
+    seed = _seed_ticket(mariadb_znuny_url, ns=13)
+    _add_attachment(
+        mariadb_znuny_url,
+        article_id=seed["customer_article_id"],
+        filename="error.png",
+        content_type="image/png",
+        # >5KB so it clears the tiny-image (tracking pixel) skip.
+        content=b"\x89PNG fake bytes" + b"x" * 6000,
+    )
+    engine = create_async_engine(_mysql_async(mariadb_znuny_url))
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    settings = get_settings()
+
+    class FakeVisionLlm:
+        async def chat(self, **kwargs: Any) -> LlmResponse:
+            return LlmResponse(content="A red error dialog box.", usage=LlmUsage())
+
+    fake_vision = FakeVisionLlm()
+    try:
+        async with factory() as session:
+            await _setup_policy(session, seed=seed, autonomy=AUTONOMY_OFF)
+            from tiqora.ai import providers as ai_providers
+
+            vision_provider = await ai_providers.create_provider(
+                session,
+                settings=settings,
+                change_by=1,
+                name=f"fake-vision-provider-{seed['queue_id']}",
+                kind="openai_compat",
+                base_url="https://vision.example/v1",
+                default_model="fake-vision-model",
+                api_key=None,
+                extra_json=None,
+                supports_tools=False,
+                supports_streaming=False,
+                eu_hosted=True,
+                supports_vision=True,
+            )
+            policy = await ai_policies.get_queue_policy_by_queue(session, seed["queue_id"])
+            assert policy is not None
+            await ai_policies.update_queue_policy(
+                session, policy, change_by=1, vision_provider_id=vision_provider.id
+            )
+
+        llm = ScriptedLlm([_propose_response("reply", "Answer")])
+        async with factory() as session:
+            result = await run_ticket_agent(
+                session,
+                settings=settings,
+                llm=llm,
+                ticket_id=seed["ticket_id"],
+                trigger=TRIGGER_MANUAL,
+                acting_user_id=seed["agent_id"],
+                run_id="run-13",
+                vision_llm_factory=lambda: fake_vision,
+            )
+        assert result.status == "drafted"
+        assert llm.last_user_message is not None
+        assert "A red error dialog box." in llm.last_user_message
+        assert "Bild-Anhang: error.png" in llm.last_user_message
+    finally:
+        await engine.dispose()
+
+
+async def test_body_part_duplicate_attachment_never_extracted(mariadb_znuny_url: str) -> None:
+    """Znuny stores the mail's own MIME body alternatives as pseudo-attachments
+    (``file-1`` text/plain / ``file-2`` text/html) — these duplicate the
+    article body and must never be fed back into the LLM context."""
+    seed = _seed_ticket(mariadb_znuny_url, ns=14)
+    _add_attachment(
+        mariadb_znuny_url,
+        article_id=seed["customer_article_id"],
+        filename="file-1",
+        content_type="text/plain",
+        content=b"THIS-IS-THE-BODY-DUPLICATE-MARKER",
+    )
+    engine = create_async_engine(_mysql_async(mariadb_znuny_url))
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    settings = get_settings()
+    try:
+        async with factory() as session:
+            await _setup_policy(session, seed=seed, autonomy=AUTONOMY_OFF)
+
+        llm = ScriptedLlm([_propose_response("reply", "Answer")])
+        async with factory() as session:
+            result = await run_ticket_agent(
+                session,
+                settings=settings,
+                llm=llm,
+                ticket_id=seed["ticket_id"],
+                trigger=TRIGGER_MANUAL,
+                acting_user_id=seed["agent_id"],
+                run_id="run-14",
+            )
+        assert result.status == "drafted"
+        assert llm.last_user_message is not None
+        assert "THIS-IS-THE-BODY-DUPLICATE-MARKER" not in llm.last_user_message
+        assert "[Anhang: file-1]" not in llm.last_user_message
+    finally:
+        await engine.dispose()
+
+
+async def test_inline_signature_image_skipped_regardless_of_size(mariadb_znuny_url: str) -> None:
+    """An inline (disposition=inline) image is skipped even if it's large —
+    inline vs. real-attachment is a disposition/content_id property, not a
+    size heuristic."""
+    seed = _seed_ticket(mariadb_znuny_url, ns=15)
+    _add_attachment(
+        mariadb_znuny_url,
+        article_id=seed["customer_article_id"],
+        filename="signature-logo.png",
+        content_type="image/png",
+        content=b"\x89PNG fake bytes" + b"x" * 6000,
+        disposition="inline",
+    )
+    engine = create_async_engine(_mysql_async(mariadb_znuny_url))
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    settings = get_settings()
+    try:
+        async with factory() as session:
+            await _setup_policy(session, seed=seed, autonomy=AUTONOMY_OFF)
+            from tiqora.ai import providers as ai_providers
+
+            vision_provider = await ai_providers.create_provider(
+                session,
+                settings=settings,
+                change_by=1,
+                name=f"fake-vision-provider-inline-{seed['queue_id']}",
+                kind="openai_compat",
+                base_url="https://vision.example/v1",
+                default_model="fake-vision-model",
+                api_key=None,
+                extra_json=None,
+                supports_tools=False,
+                supports_streaming=False,
+                eu_hosted=True,
+                supports_vision=True,
+            )
+            policy = await ai_policies.get_queue_policy_by_queue(session, seed["queue_id"])
+            assert policy is not None
+            await ai_policies.update_queue_policy(
+                session, policy, change_by=1, vision_provider_id=vision_provider.id
+            )
+
+        class FakeVisionLlm:
+            async def chat(self, **kwargs: Any) -> LlmResponse:
+                return LlmResponse(content="Should never be called.", usage=LlmUsage())
+
+        llm = ScriptedLlm([_propose_response("reply", "Answer")])
+        async with factory() as session:
+            result = await run_ticket_agent(
+                session,
+                settings=settings,
+                llm=llm,
+                ticket_id=seed["ticket_id"],
+                trigger=TRIGGER_MANUAL,
+                acting_user_id=seed["agent_id"],
+                run_id="run-15",
+                vision_llm_factory=lambda: FakeVisionLlm(),
+            )
+        assert result.status == "drafted"
+        assert llm.last_user_message is not None
+        assert "Bild-Anhang" not in llm.last_user_message
+        assert "Should never be called" not in llm.last_user_message
+    finally:
+        await engine.dispose()
+
+
+async def test_small_real_image_skipped_as_tracking_pixel(mariadb_znuny_url: str) -> None:
+    """A real (non-inline) image attachment under the 5 KB floor is treated
+    as a tracking pixel / mini icon and skipped even with a vision provider
+    configured."""
+    seed = _seed_ticket(mariadb_znuny_url, ns=16)
+    _add_attachment(
+        mariadb_znuny_url,
+        article_id=seed["customer_article_id"],
+        filename="pixel.png",
+        content_type="image/png",
+        content=b"\x89PNG tiny",
+        disposition="attachment",
+    )
+    engine = create_async_engine(_mysql_async(mariadb_znuny_url))
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    settings = get_settings()
+    try:
+        async with factory() as session:
+            await _setup_policy(session, seed=seed, autonomy=AUTONOMY_OFF)
+            from tiqora.ai import providers as ai_providers
+
+            vision_provider = await ai_providers.create_provider(
+                session,
+                settings=settings,
+                change_by=1,
+                name=f"fake-vision-provider-pixel-{seed['queue_id']}",
+                kind="openai_compat",
+                base_url="https://vision.example/v1",
+                default_model="fake-vision-model",
+                api_key=None,
+                extra_json=None,
+                supports_tools=False,
+                supports_streaming=False,
+                eu_hosted=True,
+                supports_vision=True,
+            )
+            policy = await ai_policies.get_queue_policy_by_queue(session, seed["queue_id"])
+            assert policy is not None
+            await ai_policies.update_queue_policy(
+                session, policy, change_by=1, vision_provider_id=vision_provider.id
+            )
+
+        class FakeVisionLlm:
+            async def chat(self, **kwargs: Any) -> LlmResponse:
+                return LlmResponse(content="Should never be called.", usage=LlmUsage())
+
+        llm = ScriptedLlm([_propose_response("reply", "Answer")])
+        async with factory() as session:
+            result = await run_ticket_agent(
+                session,
+                settings=settings,
+                llm=llm,
+                ticket_id=seed["ticket_id"],
+                trigger=TRIGGER_MANUAL,
+                acting_user_id=seed["agent_id"],
+                run_id="run-16",
+                vision_llm_factory=lambda: FakeVisionLlm(),
+            )
+        assert result.status == "drafted"
+        assert llm.last_user_message is not None
+        assert "Bild-Anhang" not in llm.last_user_message
+        assert "Should never be called" not in llm.last_user_message
     finally:
         await engine.dispose()

@@ -20,7 +20,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from tiqora.ai.escalation import EscalationRuleError, validate_escalation_rules
 from tiqora.ai.gate import require_feature_allowed
-from tiqora.ai.models import AUTONOMY_MODES, FEATURE_AUTO_REPLY, IDENTITY_MODES, TiqoraAiQueuePolicy
+from tiqora.ai.models import (
+    AUTONOMY_MODES,
+    FEATURE_AUTO_REPLY,
+    IDENTITY_MODES,
+    TiqoraAiQueuePolicy,
+    TiqoraLlmProvider,
+)
 
 
 class QueuePolicyValidationError(ValueError):
@@ -95,6 +101,18 @@ def _validate_fields(
             )
 
 
+async def _validate_vision_provider(session: AsyncSession, vision_provider_id: int | None) -> None:
+    if vision_provider_id is None:
+        return
+    provider = await session.get(TiqoraLlmProvider, vision_provider_id)
+    if provider is None:
+        raise QueuePolicyValidationError(f"vision_provider_id {vision_provider_id} does not exist")
+    if not provider.supports_vision:
+        raise QueuePolicyValidationError(
+            f"Provider {vision_provider_id!r} does not have supports_vision enabled"
+        )
+
+
 async def _enforce_gate_on_enable(
     session: AsyncSession,
     *,
@@ -128,6 +146,7 @@ async def create_queue_policy(
     service_user_id: int | None = None,
     llm_provider_id: int | None = None,
     model_override: str | None = None,
+    vision_provider_id: int | None = None,
     kb_tags: str | None = None,
     kb_category_ids: str | None = None,
     mcp_client_ids: str | None = None,
@@ -155,6 +174,7 @@ async def create_queue_policy(
         llm_provider_id=llm_provider_id,
     )
     _validate_escalation_rules_json(escalation_rules)
+    await _validate_vision_provider(session, vision_provider_id)
     await _enforce_gate_on_enable(
         session,
         previous=None,
@@ -173,6 +193,7 @@ async def create_queue_policy(
         service_user_id=service_user_id,
         llm_provider_id=llm_provider_id,
         model_override=model_override,
+        vision_provider_id=vision_provider_id,
         kb_tags=kb_tags,
         kb_category_ids=kb_category_ids,
         mcp_client_ids=mcp_client_ids,
@@ -224,6 +245,8 @@ async def update_queue_policy(
     )
     if "escalation_rules" in fields:
         _validate_escalation_rules_json(fields.get("escalation_rules"))
+    if "vision_provider_id" in fields:
+        await _validate_vision_provider(session, fields.get("vision_provider_id"))
     await _enforce_gate_on_enable(
         session,
         previous=row,

@@ -3955,6 +3955,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/ai/providers/{provider_id}/duplicate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Duplicate Llm Provider */
+        post: operations["duplicate_llm_provider_api_v1_admin_ai_providers__provider_id__duplicate_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/ai/providers/{provider_id}/test": {
         parameters: {
             query?: never;
@@ -4895,6 +4912,8 @@ export interface components {
             llm_provider_id?: number | null;
             /** Model Override */
             model_override?: string | null;
+            /** Vision Provider Id */
+            vision_provider_id?: number | null;
             /** Kb Tags */
             kb_tags?: string | null;
             /** Kb Category Ids */
@@ -4973,6 +4992,8 @@ export interface components {
             llm_provider_id: number | null;
             /** Model Override */
             model_override: string | null;
+            /** Vision Provider Id */
+            vision_provider_id: number | null;
             /** Kb Tags */
             kb_tags: string | null;
             /** Kb Category Ids */
@@ -5043,6 +5064,8 @@ export interface components {
             llm_provider_id?: number | null;
             /** Model Override */
             model_override?: string | null;
+            /** Vision Provider Id */
+            vision_provider_id?: number | null;
             /** Kb Tags */
             kb_tags?: string | null;
             /** Kb Category Ids */
@@ -5586,6 +5609,11 @@ export interface components {
             content_id?: string | null;
             /** Disposition */
             disposition?: string | null;
+            /**
+             * Inline
+             * @default false
+             */
+            inline: boolean;
         };
         /**
          * AttachmentOut
@@ -6929,6 +6957,11 @@ export interface components {
              * @default false
              */
             eu_hosted: boolean;
+            /**
+             * Supports Vision
+             * @default false
+             */
+            supports_vision: boolean;
         };
         /** LlmProviderOut */
         LlmProviderOut: {
@@ -6955,6 +6988,8 @@ export interface components {
             supports_streaming: boolean;
             /** Eu Hosted */
             eu_hosted: boolean;
+            /** Supports Vision */
+            supports_vision: boolean;
             /** Valid Id */
             valid_id: number;
             /**
@@ -6999,6 +7034,8 @@ export interface components {
             supports_streaming?: boolean | null;
             /** Eu Hosted */
             eu_hosted?: boolean | null;
+            /** Supports Vision */
+            supports_vision?: boolean | null;
             /** Valid Id */
             valid_id?: number | null;
         };
@@ -19819,6 +19856,41 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    duplicate_llm_provider_api_v1_admin_ai_providers__provider_id__duplicate_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                provider_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LlmProviderOut"];
+                };
             };
             /** @description Validation Error */
             422: {

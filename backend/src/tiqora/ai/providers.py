@@ -71,6 +71,7 @@ async def create_provider(
     supports_tools: bool,
     supports_streaming: bool,
     eu_hosted: bool,
+    supports_vision: bool = False,
 ) -> TiqoraLlmProvider:
     # Keys/URLs arrive via copy-paste; stray whitespace or a trailing newline
     # silently breaks the Bearer header at the provider (opaque 401s).
@@ -85,6 +86,7 @@ async def create_provider(
         supports_tools=supports_tools,
         supports_streaming=supports_streaming,
         eu_hosted=eu_hosted,
+        supports_vision=supports_vision,
         create_by=change_by,
         change_by=change_by,
     )
@@ -109,6 +111,7 @@ async def update_provider(
     supports_tools: bool | None = None,
     supports_streaming: bool | None = None,
     eu_hosted: bool | None = None,
+    supports_vision: bool | None = None,
     valid_id: int | None = None,
 ) -> TiqoraLlmProvider:
     if name is not None:
@@ -129,6 +132,8 @@ async def update_provider(
         row.supports_streaming = supports_streaming
     if eu_hosted is not None:
         row.eu_hosted = eu_hosted
+    if supports_vision is not None:
+        row.supports_vision = supports_vision
     if valid_id is not None:
         row.valid_id = valid_id
     row.change_by = change_by
@@ -143,6 +148,48 @@ async def delete_provider(session: AsyncSession, row: TiqoraLlmProvider) -> None
     await session.commit()
 
 
+async def _next_copy_name(session: AsyncSession, base_name: str) -> str:
+    """``"<name> (Kopie)"``, or ``"<name> (Kopie 2)"``, ``"(Kopie 3)"``, … on
+    collision with the ``name`` unique constraint."""
+    existing = set((await session.execute(select(TiqoraLlmProvider.name))).scalars().all())
+    candidate = f"{base_name} (Kopie)"
+    suffix = 2
+    while candidate in existing:
+        candidate = f"{base_name} (Kopie {suffix})"
+        suffix += 1
+    return candidate
+
+
+async def duplicate_provider(
+    session: AsyncSession, row: TiqoraLlmProvider, *, change_by: int
+) -> TiqoraLlmProvider:
+    """Copy a provider row, including its encrypted API key ciphertext (the
+    plaintext key never leaves the server — this is a same-process copy of
+    the Fernet-encrypted column, not a re-entry). Typical use case: several
+    models at the same provider/API key.
+    """
+    name = await _next_copy_name(session, row.name)
+    copy = TiqoraLlmProvider(
+        name=name,
+        kind=row.kind,
+        base_url=row.base_url,
+        api_key_enc=row.api_key_enc,
+        default_model=row.default_model,
+        extra_json=row.extra_json,
+        supports_tools=row.supports_tools,
+        supports_streaming=row.supports_streaming,
+        eu_hosted=row.eu_hosted,
+        supports_vision=row.supports_vision,
+        valid_id=row.valid_id,
+        create_by=change_by,
+        change_by=change_by,
+    )
+    session.add(copy)
+    await session.commit()
+    await session.refresh(copy)
+    return copy
+
+
 def provider_to_public_dict(row: TiqoraLlmProvider) -> dict[str, object]:
     return {
         "id": row.id,
@@ -155,6 +202,7 @@ def provider_to_public_dict(row: TiqoraLlmProvider) -> dict[str, object]:
         "supports_tools": bool(row.supports_tools),
         "supports_streaming": bool(row.supports_streaming),
         "eu_hosted": bool(row.eu_hosted),
+        "supports_vision": bool(row.supports_vision),
         "valid_id": int(row.valid_id),
         "create_time": row.create_time,
         "change_time": row.change_time,
@@ -215,6 +263,7 @@ __all__ = [
     "ProviderTestResult",
     "create_provider",
     "delete_provider",
+    "duplicate_provider",
     "get_provider",
     "list_providers",
     "provider_to_public_dict",

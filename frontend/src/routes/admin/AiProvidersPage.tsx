@@ -32,6 +32,7 @@ function toFormValues(row: LlmProviderOut | null): FieldValues {
         supports_tools: row.supports_tools,
         supports_streaming: row.supports_streaming,
         eu_hosted: row.eu_hosted,
+        supports_vision: row.supports_vision,
       }
     : {
         name: "",
@@ -42,6 +43,7 @@ function toFormValues(row: LlmProviderOut | null): FieldValues {
         supports_tools: true,
         supports_streaming: true,
         eu_hosted: false,
+        supports_vision: false,
       };
 }
 
@@ -55,6 +57,8 @@ export function AiProvidersPage() {
   const [formError, setFormError] = useState<string | null>(null);
   const [testResults, setTestResults] = useState<Record<number, LlmProviderTestOut>>({});
   const [testingId, setTestingId] = useState<number | null>(null);
+  const [duplicatingId, setDuplicatingId] = useState<number | null>(null);
+  const [duplicateError, setDuplicateError] = useState<string | null>(null);
 
   const listQ = useQuery({
     queryKey: QUERY_KEY,
@@ -102,6 +106,22 @@ export function AiProvidersPage() {
     onSettled: () => setTestingId(null),
   });
 
+  const duplicateM = useMutation({
+    mutationFn: (id: number) => aiApi.duplicateProvider(id),
+    onMutate: (id) => {
+      setDuplicateError(null);
+      setDuplicatingId(id);
+    },
+    onSuccess: async (copy) => {
+      await invalidate();
+      // Open the copy's edit dialog directly so the operator can rename the
+      // model right away (typical case: several models, same provider/key).
+      openEdit(copy);
+    },
+    onError: (err) => setDuplicateError(err instanceof ApiError ? err.message : String(err)),
+    onSettled: () => setDuplicatingId(null),
+  });
+
   const openCreate = () => {
     setEditing(null);
     setFormError(null);
@@ -123,6 +143,7 @@ export function AiProvidersPage() {
       supports_tools: Boolean(values.supports_tools),
       supports_streaming: Boolean(values.supports_streaming),
       eu_hosted: Boolean(values.eu_hosted),
+      supports_vision: Boolean(values.supports_vision),
     };
     const apiKey = typeof values.api_key === "string" ? values.api_key.trim() : "";
     try {
@@ -164,6 +185,7 @@ export function AiProvidersPage() {
       render: (r) => (
         <div className="flex flex-wrap gap-1">
           {r.supports_tools && <Badge tone="accent">{t("admin.ai.providers.flagTools")}</Badge>}
+          {r.supports_vision && <Badge tone="accent">{t("admin.ai.providers.flagVision")}</Badge>}
           {r.eu_hosted && <Badge tone="success">{t("admin.ai.providers.flagEu")}</Badge>}
           {r.has_api_key && <Badge tone="muted">{t("admin.ai.providers.hasKey")}</Badge>}
         </div>
@@ -184,6 +206,19 @@ export function AiProvidersPage() {
               onClick={() => testM.mutate(r.id)}
             >
               {testingId === r.id ? <Spinner className="h-3 w-3" /> : t("admin.ai.providers.testAction")}
+            </Button>
+            <Button
+              size="sm"
+              variant="secondary"
+              disabled={duplicatingId === r.id}
+              data-testid={`admin-ai-provider-duplicate-${r.id}`}
+              onClick={() => duplicateM.mutate(r.id)}
+            >
+              {duplicatingId === r.id ? (
+                <Spinner className="h-3 w-3" />
+              ) : (
+                t("admin.ai.providers.duplicateAction")
+              )}
             </Button>
             {result && (
               <span
@@ -228,6 +263,12 @@ export function AiProvidersPage() {
     { name: "supports_tools", label: t("admin.ai.providers.flagTools"), type: "checkbox" },
     { name: "supports_streaming", label: t("admin.ai.providers.flagStreaming"), type: "checkbox" },
     { name: "eu_hosted", label: t("admin.ai.providers.flagEu"), type: "checkbox" },
+    {
+      name: "supports_vision",
+      label: t("admin.ai.providers.flagVision"),
+      type: "checkbox",
+      helpText: t("admin.ai.providers.flagVisionHelp"),
+    },
   ];
 
   return (
@@ -249,6 +290,11 @@ export function AiProvidersPage() {
         </Button>
       </div>
       <p className="text-xs text-muted">{t("admin.ai.providers.description")}</p>
+      {duplicateError && (
+        <p className="text-sm text-danger" data-testid="admin-ai-providers-duplicate-error">
+          {duplicateError}
+        </p>
+      )}
 
       <DataTable
         columns={columns}

@@ -40,6 +40,7 @@ export type LlmProviderOut = {
   supports_tools: boolean;
   supports_streaming: boolean;
   eu_hosted: boolean;
+  supports_vision: boolean;
   valid_id: number;
   create_time: string;
   change_time: string;
@@ -55,6 +56,7 @@ export type LlmProviderCreate = {
   supports_tools?: boolean;
   supports_streaming?: boolean;
   eu_hosted?: boolean;
+  supports_vision?: boolean;
 };
 
 export type LlmProviderUpdate = Partial<LlmProviderCreate> & { valid_id?: number };
@@ -118,6 +120,7 @@ export type AiQueuePolicyOut = {
   service_user_id: number | null;
   llm_provider_id: number | null;
   model_override: string | null;
+  vision_provider_id: number | null;
   kb_tags: string | null;
   kb_category_ids: string | null;
   mcp_client_ids: string | null;
@@ -151,6 +154,7 @@ export type AiQueuePolicyCreate = {
   service_user_id?: number | null;
   llm_provider_id?: number | null;
   model_override?: string | null;
+  vision_provider_id?: number | null;
   kb_tags?: string | null;
   kb_category_ids?: string | null;
   mcp_client_ids?: string | null;
@@ -256,6 +260,11 @@ export const aiApi = {
   },
   testProvider(id: number | string, signal?: AbortSignal) {
     return api.request<LlmProviderTestOut>("POST", `/api/v1/admin/ai/providers/${id}/test`, {
+      signal,
+    });
+  },
+  duplicateProvider(id: number | string, signal?: AbortSignal) {
+    return api.request<LlmProviderOut>("POST", `/api/v1/admin/ai/providers/${id}/duplicate`, {
       signal,
     });
   },

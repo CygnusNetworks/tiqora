@@ -44,6 +44,7 @@ type FormState = {
   system_prompt: string;
   llm_provider_id: number;
   model_override: string;
+  vision_provider_id: number;
   service_user_id: number;
   kb_tags: string;
   kb_category_ids: string;
@@ -79,6 +80,7 @@ function emptyForm(queueId: number): FormState {
     system_prompt: "",
     llm_provider_id: NONE,
     model_override: "",
+    vision_provider_id: NONE,
     service_user_id: NONE,
     kb_tags: "",
     kb_category_ids: "",
@@ -110,6 +112,7 @@ function toForm(row: AiQueuePolicyOut): FormState {
     system_prompt: row.system_prompt,
     llm_provider_id: row.llm_provider_id ?? NONE,
     model_override: row.model_override ?? "",
+    vision_provider_id: row.vision_provider_id ?? NONE,
     service_user_id: row.service_user_id ?? NONE,
     kb_tags: row.kb_tags ?? "",
     kb_category_ids: row.kb_category_ids ?? "",
@@ -366,6 +369,7 @@ function AiQueuePolicyEditor({ policyId }: { policyId?: number }) {
     system_prompt: f.system_prompt,
     llm_provider_id: f.llm_provider_id !== NONE ? f.llm_provider_id : null,
     model_override: f.model_override.trim() || null,
+    vision_provider_id: f.vision_provider_id !== NONE ? f.vision_provider_id : null,
     service_user_id: f.service_user_id !== NONE ? f.service_user_id : null,
     kb_tags: f.kb_tags.trim() || null,
     kb_category_ids: f.kb_category_ids.trim() || null,
@@ -614,6 +618,27 @@ function AiQueuePolicyEditor({ policyId }: { policyId?: number }) {
                 value={form.model_override}
                 onChange={(e) => setField("model_override", e.target.value)}
                 className={inputClass}
+              />
+            </label>
+            <label className="block text-sm sm:col-span-2">
+              <FieldLabel
+                text={t("admin.ai.queues.visionProvider")}
+                help={t("admin.help.aiQueue.visionProvider")}
+                defaultHint={t("admin.ai.queues.visionProviderNone")}
+                testId="admin-ai-queue-help-vision_provider_id"
+              />
+              <PickerField
+                testId="admin-ai-queue-form-vision_provider_id"
+                value={form.vision_provider_id}
+                items={[
+                  { value: NONE, label: t("admin.ai.queues.visionProviderNone") },
+                  ...(providersQ.data?.items ?? [])
+                    .filter((p) => p.supports_vision)
+                    .map((p) => ({ value: p.id, label: p.name })),
+                ]}
+                placeholder={t("admin.form.selectPlaceholder")}
+                loading={providersQ.isLoading}
+                onSelect={(v) => setField("vision_provider_id", v)}
               />
             </label>
           </div>

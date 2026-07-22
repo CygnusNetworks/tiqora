@@ -10,6 +10,7 @@ const createProvider = vi.fn();
 const updateProvider = vi.fn();
 const deleteProvider = vi.fn();
 const testProvider = vi.fn();
+const duplicateProvider = vi.fn();
 
 vi.mock("@/lib/api", () => ({
   ApiError: class ApiError extends Error {
@@ -31,6 +32,7 @@ vi.mock("@/lib/aiApi", () => ({
     updateProvider: (...args: unknown[]) => updateProvider(...args),
     deleteProvider: (...args: unknown[]) => deleteProvider(...args),
     testProvider: (...args: unknown[]) => testProvider(...args),
+    duplicateProvider: (...args: unknown[]) => duplicateProvider(...args),
   },
 }));
 
@@ -45,6 +47,7 @@ const sampleProvider = {
   supports_tools: true,
   supports_streaming: true,
   eu_hosted: true,
+  supports_vision: false,
   valid_id: 1,
   create_time: "2026-07-01T00:00:00Z",
   change_time: "2026-07-01T00:00:00Z",
@@ -70,6 +73,7 @@ describe("AiProvidersPage", () => {
     updateProvider.mockReset();
     deleteProvider.mockReset();
     testProvider.mockReset();
+    duplicateProvider.mockReset();
 
     listProviders.mockResolvedValue({ items: [sampleProvider], total: 1, page: 1, page_size: 1 });
   });
@@ -132,5 +136,22 @@ describe("AiProvidersPage", () => {
     await waitFor(() => {
       expect(screen.getByTestId("admin-ai-provider-test-result-1").textContent).toMatch(/llama-3.3-70b/);
     });
+  });
+
+  it("duplicates a provider and opens the edit dialog for the copy", async () => {
+    const copy = { ...sampleProvider, id: 2, name: "Nebius (Kopie)" };
+    duplicateProvider.mockResolvedValue(copy);
+    listProviders.mockResolvedValue({ items: [sampleProvider], total: 1, page: 1, page_size: 1 });
+    renderPage();
+    await waitFor(() =>
+      expect(screen.getByTestId("admin-ai-provider-duplicate-1")).toBeInTheDocument(),
+    );
+
+    fireEvent.click(screen.getByTestId("admin-ai-provider-duplicate-1"));
+    await waitFor(() => expect(duplicateProvider).toHaveBeenCalledWith(1));
+
+    await waitFor(() =>
+      expect(screen.getByTestId("admin-ai-provider-form-name")).toHaveValue("Nebius (Kopie)"),
+    );
   });
 });

@@ -290,6 +290,51 @@ summarization at all, once `summary_article_threshold` or
 `summary_char_threshold` is exceeded (`NULL` = no auto-summary for that
 queue).
 
+### Attachments
+
+Article attachments are handled by two separate paths — a corrupt or
+unusual attachment must never abort an agent run, so both are best-effort
+and fail silently (structlog warning + skip):
+
+- **Document attachments** (PDF, docx, xlsx, odt/ods, txt/csv/md/html) are
+  text-extracted server-side (`tiqora.ai.attachments`) and the extracted
+  text is embedded directly into the main model's context, right after the
+  article it belongs to (`[Anhang: rechnung.pdf]\n<text>`). Caps: input over
+  10 MB is skipped entirely; extracted text is capped at 20,000 chars per
+  attachment; the whole run has a combined budget of 50,000 chars across all
+  attachments, applied in chronological article order — attachments beyond
+  the budget are replaced with a `[Anhang übersprungen: budget]` marker
+  rather than silently dropped. Extracted text passes through the same PII
+  masking as the article body it's attached to.
+- **Image attachments** (png/jpeg/gif/webp) are **never** shown to the main
+  model. Instead, a dedicated vision-capable provider
+  (`tiqora_llm_provider.supports_vision`, selected per queue via
+  `tiqora_ai_queue_policy.vision_provider_id` — `NULL` means images are
+  ignored) is called once per image with a neutral description prompt
+  (`tiqora.ai.vision`). The plain-text description it returns is what gets
+  embedded into the main model's context
+  (`[Bild-Anhang: foto.png — Beschreibung durch Vision-Modell]\n<text>`) —
+  the vision model never sees ticket text, and the main model never sees
+  image bytes. At most 4 images per run are described (newest first), each
+  capped at 8 MB; a failed/oversized image yields an empty description
+  rather than aborting the run. A real (non-inline) image under 5 KB is
+  treated as a tracking pixel / mini icon and skipped before spending a
+  vision call. Because images cannot be masked for PII the way text can,
+  the only control is *which* provider is allowed to see them — prefer an
+  `eu_hosted` provider and treat enabling `vision_provider_id` per queue as
+  a deliberate decision, not a default.
+- Two canonical `article_data_mime_attachment` marker categories are
+  excluded from both paths entirely (same predicates as the ticket-zoom
+  attachment list in `tiqora.domain.ticket_service`, single source of
+  truth): **body-part duplicates** — Znuny's own MIME body alternatives
+  (`content_alternative` set, or `file-1`/text-plain and
+  `file-2`/`file-1.html`/text-html) — which would otherwise re-inject the
+  article's own text as a fake "attachment"; and **inline parts**
+  (`content_id` set, or `disposition=inline`) such as `cid:`-referenced
+  signature logos. A real image attachment (no `content_id`,
+  `disposition=attachment`) still goes through the vision pass normally
+  even if it happens to be named "logo.png".
+
 ### Auto-reply caps and budget
 
 The auto-reply worker consumes `tiqora_event_outbox` (`ArticleCreate`,

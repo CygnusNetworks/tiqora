@@ -136,6 +136,7 @@ async def create_llm_provider(
         supports_tools=body.supports_tools,
         supports_streaming=body.supports_streaming,
         eu_hosted=body.eu_hosted,
+        supports_vision=body.supports_vision,
     )
     return LlmProviderOut.model_validate(ai_providers.provider_to_public_dict(row))
 
@@ -165,6 +166,21 @@ async def delete_llm_provider(provider_id: int, admin: AdminUser, session: DbSes
     if row is None:
         raise _not_found("Provider", provider_id)
     await ai_providers.delete_provider(session, row)
+
+
+@router.post(
+    "/providers/{provider_id}/duplicate",
+    response_model=LlmProviderOut,
+    status_code=status.HTTP_201_CREATED,
+)
+async def duplicate_llm_provider(
+    provider_id: int, admin: AdminUser, session: DbSession
+) -> LlmProviderOut:
+    row = await ai_providers.get_provider(session, provider_id)
+    if row is None:
+        raise _not_found("Provider", provider_id)
+    copy = await ai_providers.duplicate_provider(session, row, change_by=admin.id)
+    return LlmProviderOut.model_validate(ai_providers.provider_to_public_dict(copy))
 
 
 @router.post("/providers/{provider_id}/test", response_model=LlmProviderTestOut)

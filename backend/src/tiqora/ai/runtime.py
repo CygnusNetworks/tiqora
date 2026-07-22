@@ -24,6 +24,7 @@ from tiqora.ai import drafts as draft_service
 from tiqora.ai import usage as usage_service
 from tiqora.ai.acl import AclLimitExceededError as AiAclLimitExceededError
 from tiqora.ai.acl import check_feature_access, check_feature_limits
+from tiqora.ai.attachment_context import build_attachment_context
 from tiqora.ai.context import (
     ArticleSnapshot,
     TicketNotFoundError,
@@ -34,6 +35,7 @@ from tiqora.ai.context import (
     ticket_snapshot,
 )
 from tiqora.ai.gate import AiGateError, require_feature_allowed
+from tiqora.ai.kb_wiring import build_vision_llm_factory
 from tiqora.ai.listfields import parse_int_list
 from tiqora.ai.llm import LlmClient, LlmMessage, LlmResponse
 from tiqora.ai.models import (
@@ -245,6 +247,7 @@ def _build_user_message(
     pii: PiiMapper,
     mask: bool,
     kb_bundle: str | None,
+    attachment_blocks: dict[int, str] | None = None,
 ) -> str:
     lines = [f"Ticket #{ticket.ticket_id}: {ticket.title}", ""]
     for a in articles:
@@ -252,6 +255,9 @@ def _build_user_message(
         if a.is_ai_origin:
             label += " (AI, previous own action)"
         body = a.body or ""
+        attach_text = (attachment_blocks or {}).get(a.id)
+        if attach_text:
+            body = f"{body}\n\n{attach_text}" if body else attach_text
         if mask:
             body = pii.mask(body)
         # Untrusted content delimiter (plan §3.8) — the article body is
@@ -285,12 +291,17 @@ async def run_ticket_agent(
     kb_search_fn: Any = None,
     kb_get_article_fn: Any = None,
     kb_bundle: str | None = None,
+    vision_llm_factory: Any = None,
 ) -> AgentRunResult:
     """Run the agent once for one ticket (plan §3.4 steps 1-12).
 
     ``run_id``/``worker_instance`` form the lock owner (``worker:run_id``).
     ``mcp_caller``/``kb_search_fn``/``kb_get_article_fn`` are injectable seams
-    for tests; production omits them (real fastmcp/KB calls).
+    for tests; production omits them (real fastmcp/KB calls). ``vision_llm_factory``
+    (a sync ``() -> LlmClient``) is an injectable seam for the attachment
+    vision pre-pass — production omits it and the queue policy's
+    ``vision_provider_id`` is resolved automatically; tests inject a fake to
+    assert on the vision prompt without a real endpoint.
     """
     # 1. Readiness gate — auto-reply only (plan §3.0 v1.1 relaxation, Phase
     # E). Manual Assist always runs regardless of operation_mode: it only
@@ -348,11 +359,29 @@ async def run_ticket_agent(
         # 5. AI-content filter is applied when rendering (labels own AI output,
         # see _build_user_message) — nothing is physically removed.
 
-        # 6/7. Prompts
+        # 6/7. Prompts — document/image attachments are rendered into the
+        # per-article text before masking (see build_attachment_context).
+        effective_vision_factory = vision_llm_factory
+        if effective_vision_factory is None and policy.vision_provider_id is not None:
+            effective_vision_factory = await build_vision_llm_factory(
+                session, settings, policy.vision_provider_id
+            )
+        attachment_context = await build_attachment_context(
+            session,
+            articles,
+            vision_enabled=policy.vision_provider_id is not None,
+            vision_llm_factory=effective_vision_factory,
+        )
+
         pii = PiiMapper(never_mask={ticket.customer_id} if ticket.customer_id else None)
         system_prompt = _build_system_prompt(policy, trigger=trigger, kind_hint=kind_hint)
         user_message = _build_user_message(
-            ticket, articles, pii=pii, mask=bool(policy.pii_masking), kb_bundle=kb_bundle
+            ticket,
+            articles,
+            pii=pii,
+            mask=bool(policy.pii_masking),
+            kb_bundle=kb_bundle,
+            attachment_blocks=attachment_context.blocks,
         )
 
         # 8. Tools
@@ -381,8 +410,8 @@ async def run_ticket_agent(
         ]
         schemas = registry.build_schemas()
 
-        prompt_tokens = 0
-        completion_tokens = 0
+        prompt_tokens = attachment_context.vision_usage.prompt_tokens
+        completion_tokens = attachment_context.vision_usage.completion_tokens
         outcome: ToolOutcome | None = None
 
         # 9. Tool loop

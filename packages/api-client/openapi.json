@@ -24497,6 +24497,80 @@
         }
       }
     },
+    "/api/v1/admin/ai/providers/{provider_id}/duplicate": {
+      "post": {
+        "tags": [
+          "admin:ai"
+        ],
+        "summary": "Duplicate Llm Provider",
+        "operationId": "duplicate_llm_provider_api_v1_admin_ai_providers__provider_id__duplicate_post",
+        "parameters": [
+          {
+            "name": "provider_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Provider Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "tiqora_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LlmProviderOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/admin/ai/providers/{provider_id}/test": {
       "post": {
         "tags": [
@@ -27929,6 +28003,17 @@
             ],
             "title": "Model Override"
           },
+          "vision_provider_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Vision Provider Id"
+          },
           "kb_tags": {
             "anyOf": [
               {
@@ -28177,6 +28262,17 @@
             ],
             "title": "Model Override"
           },
+          "vision_provider_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Vision Provider Id"
+          },
           "kb_tags": {
             "anyOf": [
               {
@@ -28372,6 +28468,7 @@
           "service_user_id",
           "llm_provider_id",
           "model_override",
+          "vision_provider_id",
           "kb_tags",
           "kb_category_ids",
           "mcp_client_ids",
@@ -28490,6 +28587,17 @@
               }
             ],
             "title": "Model Override"
+          },
+          "vision_provider_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Vision Provider Id"
           },
           "kb_tags": {
             "anyOf": [
@@ -30331,6 +30439,11 @@
               }
             ],
             "title": "Disposition"
+          },
+          "inline": {
+            "type": "boolean",
+            "title": "Inline",
+            "default": false
           }
         },
         "type": "object",
@@ -34184,6 +34297,11 @@
             "type": "boolean",
             "title": "Eu Hosted",
             "default": false
+          },
+          "supports_vision": {
+            "type": "boolean",
+            "title": "Supports Vision",
+            "default": false
           }
         },
         "type": "object",
@@ -34247,6 +34365,10 @@
             "type": "boolean",
             "title": "Eu Hosted"
           },
+          "supports_vision": {
+            "type": "boolean",
+            "title": "Supports Vision"
+          },
           "valid_id": {
             "type": "integer",
             "title": "Valid Id"
@@ -34274,6 +34396,7 @@
           "supports_tools",
           "supports_streaming",
           "eu_hosted",
+          "supports_vision",
           "valid_id",
           "create_time",
           "change_time"
@@ -34426,6 +34549,17 @@
               }
             ],
             "title": "Eu Hosted"
+          },
+          "supports_vision": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Supports Vision"
           },
           "valid_id": {
             "anyOf": [
