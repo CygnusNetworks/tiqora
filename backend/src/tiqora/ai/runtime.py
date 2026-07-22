@@ -1,0 +1,699 @@
+"""AgentRuntime — the per-ticket agent run (plan §3.4 steps 1-12).
+
+Entry point: :func:`run_ticket_agent`. Phase B wires this up fully for the
+**manual** trigger (Manual Assist, always the draft path — plan §3.4:
+"Manual Assist ist immer Draft-Pfad"); the **auto** trigger's autonomy →
+draft/send mapping is implemented and unit-tested here too (plan requires
+the mapping logic to exist now), but nothing calls it with ``trigger="auto"``
+until the outbox-driven worker lands in Phase D.
+"""
+
+from __future__ import annotations
+
+import json
+from dataclasses import dataclass
+from datetime import UTC, datetime, timedelta
+from email.utils import parseaddr
+from typing import Any
+
+import structlog
+from sqlalchemy import select, text
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from tiqora.ai import drafts as draft_service
+from tiqora.ai import usage as usage_service
+from tiqora.ai.acl import AclLimitExceededError as AiAclLimitExceededError
+from tiqora.ai.acl import check_feature_access, check_feature_limits
+from tiqora.ai.gate import AiGateError, require_tiqora_primary
+from tiqora.ai.llm import LlmClient, LlmMessage, LlmResponse
+from tiqora.ai.models import (
+    AUTONOMY_CLARIFY_ONLY,
+    AUTONOMY_FULL,
+    AUTONOMY_OFF,
+    DRAFT_KIND_CLARIFY,
+    DRAFT_KIND_REPLY,
+    FEATURE_AUTO_REPLY,
+    FEATURE_MANUAL_ASSIST,
+    SOURCE_AUTO,
+    SOURCE_MANUAL,
+    TiqoraAiArticleOrigin,
+    TiqoraAiQueuePolicy,
+    TiqoraAiTicketState,
+    TiqoraMcpClient,
+    TiqoraMcpToolPolicy,
+)
+from tiqora.ai.pii import PiiMapper
+from tiqora.ai.policies import get_queue_policy_by_queue
+from tiqora.ai.tools import (
+    McpToolSpec,
+    ToolArgumentError,
+    ToolExecutor,
+    ToolOutcome,
+    ToolRegistry,
+    UnknownToolError,
+)
+from tiqora.config import Settings
+from tiqora.crypto.secret import decrypt_secret
+from tiqora.domain.settings_store import KEY_AI_DISCLOSURE_DEFAULT, get_setting
+from tiqora.domain.ticket_write_service import ArticleIn, add_article
+from tiqora.znuny.sysconfig import SysConfig
+
+logger = structlog.get_logger(__name__)
+
+_LOCK_MAX_AGE = timedelta(minutes=15)
+DEFAULT_MAX_TOOL_ROUNDS = 8
+
+TRIGGER_MANUAL = "manual"
+TRIGGER_AUTO = "auto"
+
+STATUS_DRAFTED = "drafted"
+STATUS_SENT = "sent"
+STATUS_ESCALATED = "escalated"
+STATUS_SUPERSEDED = "superseded"
+STATUS_SKIPPED = "skipped"
+STATUS_ERROR = "error"
+
+
+class AgentRunError(Exception):
+    """Base class for run-abort conditions (all mapped to a clear HTTP status
+    by the caller — see ``tiqora.api.v1.ai``)."""
+
+
+class LockHeldError(AgentRunError):
+    """Another run currently holds the per-ticket lock (not yet expired)."""
+
+
+class PolicyDisabledError(AgentRunError):
+    """The queue has no AI policy, or the requested feature is disabled."""
+
+
+class AclDeniedError(AgentRunError):
+    """The acting user/subject is not allowed to use this feature."""
+
+
+class AclLimitExceededError(AgentRunError):
+    """An ACL request/token limit (plan §3.6) is already reached."""
+
+
+@dataclass(frozen=True, slots=True)
+class AgentRunResult:
+    status: str
+    draft_id: int | None = None
+    article_id: int | None = None
+    notes: str | None = None
+    prompt_tokens: int = 0
+    completion_tokens: int = 0
+
+
+@dataclass(frozen=True, slots=True)
+class _TicketSnapshot:
+    ticket_id: int
+    queue_id: int
+    customer_id: str | None
+    title: str
+
+
+@dataclass(frozen=True, slots=True)
+class _ArticleSnapshot:
+    id: int
+    sender_type: str
+    is_visible_for_customer: bool
+    subject: str | None
+    body: str | None
+    from_address: str | None
+    is_ai_origin: bool
+
+
+def _map_customer_message(*, trigger: str, autonomy: str, kind: str) -> str:
+    """Plan §3.4 autonomy matrix. Returns ``"draft"`` or ``"send"``.
+
+    Manual is *always* draft, regardless of queue autonomy — a human clicking
+    "AI draft" must never trigger a customer-visible send.
+    """
+    if trigger == TRIGGER_MANUAL:
+        return "draft"
+    if autonomy == AUTONOMY_OFF:
+        return "draft"
+    if autonomy == AUTONOMY_CLARIFY_ONLY:
+        # Hard code-level block: a factual reply is never auto-sent in
+        # clarify_only, no matter what the model/prompt intended.
+        return "send" if kind == DRAFT_KIND_CLARIFY else "draft"
+    if autonomy == AUTONOMY_FULL:
+        return "send"
+    return "draft"
+
+
+async def _ticket_snapshot(session: AsyncSession, ticket_id: int) -> _TicketSnapshot:
+    row = (
+        (
+            await session.execute(
+                text("SELECT id, queue_id, customer_id, title FROM ticket WHERE id = :tid LIMIT 1"),
+                {"tid": ticket_id},
+            )
+        )
+        .mappings()
+        .first()
+    )
+    if row is None:
+        raise AgentRunError(f"Ticket {ticket_id} not found")
+    return _TicketSnapshot(
+        ticket_id=int(row["id"]),
+        queue_id=int(row["queue_id"]),
+        customer_id=row["customer_id"],
+        title=row["title"] or "",
+    )
+
+
+async def _load_articles(session: AsyncSession, ticket_id: int) -> list[_ArticleSnapshot]:
+    rows = (
+        (
+            await session.execute(
+                text(
+                    "SELECT a.id, st.name AS sender_type, a.is_visible_for_customer,"
+                    " m.a_subject, m.a_body, m.a_from,"
+                    " (o.article_id IS NOT NULL) AS is_ai_origin"
+                    " FROM article a"
+                    " JOIN article_sender_type st ON st.id = a.article_sender_type_id"
+                    " LEFT JOIN article_data_mime m ON m.article_id = a.id"
+                    " LEFT JOIN tiqora_ai_article_origin o ON o.article_id = a.id"
+                    " WHERE a.ticket_id = :tid ORDER BY a.id"
+                ),
+                {"tid": ticket_id},
+            )
+        )
+        .mappings()
+        .all()
+    )
+    return [
+        _ArticleSnapshot(
+            id=int(r["id"]),
+            sender_type=str(r["sender_type"]),
+            is_visible_for_customer=bool(r["is_visible_for_customer"]),
+            subject=r["a_subject"],
+            body=r["a_body"],
+            from_address=r["a_from"],
+            is_ai_origin=bool(r["is_ai_origin"]),
+        )
+        for r in rows
+    ]
+
+
+async def _get_or_create_state(session: AsyncSession, ticket_id: int) -> TiqoraAiTicketState:
+    state = await session.get(TiqoraAiTicketState, ticket_id)
+    if state is None:
+        state = TiqoraAiTicketState(ticket_id=ticket_id)
+        session.add(state)
+        await session.commit()
+        await session.refresh(state)
+    return state
+
+
+async def _acquire_lock(session: AsyncSession, ticket_id: int, owner: str) -> TiqoraAiTicketState:
+    state = await _get_or_create_state(session, ticket_id)
+    now = datetime.now(UTC).replace(tzinfo=None)
+    if state.run_lock_owner and state.run_lock_at:
+        age = now - state.run_lock_at
+        if age < _LOCK_MAX_AGE:
+            raise LockHeldError(
+                f"Ticket {ticket_id} run lock held by {state.run_lock_owner} ({age} ago)"
+            )
+        logger.warning(
+            "ai_run_lock_stolen",
+            ticket_id=ticket_id,
+            previous_owner=state.run_lock_owner,
+            age_seconds=age.total_seconds(),
+        )
+    state.run_lock_owner = owner
+    state.run_lock_at = now
+    await session.commit()
+    return state
+
+
+async def _release_lock(session: AsyncSession, ticket_id: int) -> None:
+    state = await session.get(TiqoraAiTicketState, ticket_id)
+    if state is not None:
+        state.run_lock_owner = None
+        state.run_lock_at = None
+        await session.commit()
+
+
+async def _load_mcp_tools(
+    session: AsyncSession, policy: TiqoraAiQueuePolicy, *, settings: Settings
+) -> list[McpToolSpec]:
+    client_ids: list[int] = json.loads(policy.mcp_client_ids) if policy.mcp_client_ids else []
+    if not client_ids:
+        return []
+    clients = (
+        (await session.execute(select(TiqoraMcpClient).where(TiqoraMcpClient.id.in_(client_ids))))
+        .scalars()
+        .all()
+    )
+    specs: list[McpToolSpec] = []
+    for client in clients:
+        auth_token = (
+            decrypt_secret(settings.secret_key, client.auth_token_enc)
+            if client.auth_token_enc
+            else None
+        )
+        policies = (
+            (
+                await session.execute(
+                    select(TiqoraMcpToolPolicy).where(
+                        TiqoraMcpToolPolicy.mcp_client_id == client.id,
+                        TiqoraMcpToolPolicy.enabled.is_(True),
+                    )
+                )
+            )
+            .scalars()
+            .all()
+        )
+        for tp in policies:
+            specs.append(
+                McpToolSpec(
+                    client_name=client.name,
+                    client_url=client.url,
+                    auth_token=auth_token,
+                    tool_name=tp.tool_name,
+                    mutating=bool(tp.mutating),
+                    description=tp.description_snapshot,
+                )
+            )
+    return specs
+
+
+def _build_system_prompt(
+    policy: TiqoraAiQueuePolicy, *, trigger: str, kind_hint: str | None
+) -> str:
+    parts = [policy.system_prompt or ""]
+    if trigger == TRIGGER_MANUAL:
+        parts.append(
+            "You are assisting a human agent (Manual Assist). Whatever you propose via "
+            "propose_customer_message will ALWAYS become a draft for the agent to review "
+            "and edit — it is never sent automatically."
+        )
+    elif policy.autonomy == AUTONOMY_OFF:
+        parts.append(
+            "Any customer message you propose will be kept as a draft for a human to "
+            "review and send — nothing you write reaches the customer directly."
+        )
+    elif policy.autonomy == AUTONOMY_CLARIFY_ONLY:
+        parts.append(
+            "A clarifying question (kind=clarify) you propose will be sent to the "
+            "customer directly. A factual reply (kind=reply) will always be kept as a "
+            "draft for a human to review."
+        )
+    else:
+        parts.append(
+            "Any customer message you propose (reply or clarify) will be sent to the "
+            "customer directly — write as if you are the final responder."
+        )
+    if kind_hint:
+        parts.append(f"Hint: this run is expected to produce a '{kind_hint}' message.")
+    return "\n\n".join(p for p in parts if p)
+
+
+def _build_user_message(
+    ticket: _TicketSnapshot,
+    articles: list[_ArticleSnapshot],
+    *,
+    pii: PiiMapper,
+    mask: bool,
+    kb_bundle: str | None,
+) -> str:
+    lines = [f"Ticket #{ticket.ticket_id}: {ticket.title}", ""]
+    for a in articles:
+        label = "agent" if a.sender_type == "agent" else a.sender_type
+        if a.is_ai_origin:
+            label += " (AI, previous own action)"
+        body = a.body or ""
+        if mask:
+            body = pii.mask(body)
+        # Untrusted content delimiter (plan §3.8) — the article body is
+        # customer/agent free text, never instructions to the model.
+        lines.append(f"--- article {a.id} [{label}] ---")
+        lines.append(body)
+        lines.append("")
+    if kb_bundle:
+        lines.append("--- knowledge base ---")
+        lines.append(kb_bundle)
+    return "\n".join(lines)
+
+
+def _disclosure_footer(default_text: str, override_text: str | None) -> str:
+    return (override_text or default_text or "").strip()
+
+
+async def run_ticket_agent(
+    session: AsyncSession,
+    *,
+    settings: Settings,
+    llm: LlmClient,
+    ticket_id: int,
+    trigger: str,
+    acting_user_id: int | None,
+    kind_hint: str | None = None,
+    run_id: str,
+    worker_instance: str = "manual",
+    max_tool_rounds: int = DEFAULT_MAX_TOOL_ROUNDS,
+    mcp_caller: Any = None,
+    kb_search_fn: Any = None,
+    kb_get_article_fn: Any = None,
+    kb_bundle: str | None = None,
+) -> AgentRunResult:
+    """Run the agent once for one ticket (plan §3.4 steps 1-12).
+
+    ``run_id``/``worker_instance`` form the lock owner (``worker:run_id``).
+    ``mcp_caller``/``kb_search_fn``/``kb_get_article_fn`` are injectable seams
+    for tests; production omits them (real fastmcp/KB calls).
+    """
+    # 1. Readiness gate
+    try:
+        await require_tiqora_primary(session)
+    except AiGateError as exc:
+        raise AgentRunError(str(exc)) from exc
+
+    # 2. Per-ticket lock
+    lock_owner = f"{worker_instance}:{run_id}"
+    await _acquire_lock(session, ticket_id, lock_owner)
+
+    try:
+        ticket = await _ticket_snapshot(session, ticket_id)
+
+        # 3. Policy + feature + ACL
+        policy = await get_queue_policy_by_queue(session, ticket.queue_id)
+        if policy is None:
+            raise PolicyDisabledError(f"No AI policy configured for queue {ticket.queue_id}")
+
+        feature = FEATURE_MANUAL_ASSIST if trigger == TRIGGER_MANUAL else FEATURE_AUTO_REPLY
+        if trigger == TRIGGER_MANUAL and not policy.enabled_manual_assist:
+            raise PolicyDisabledError("Manual Assist is disabled for this queue")
+        if trigger == TRIGGER_AUTO and not policy.enabled_auto_reply:
+            raise PolicyDisabledError("Auto-reply is disabled for this queue")
+
+        if trigger == TRIGGER_MANUAL:
+            if acting_user_id is None:
+                raise AgentRunError("Manual Assist requires an acting user")
+            if not await check_feature_access(session, acting_user_id, feature):
+                raise AclDeniedError(f"User {acting_user_id} is not allowed to use {feature}")
+            try:
+                await check_feature_limits(session, acting_user_id, feature)
+            except AiAclLimitExceededError as exc:
+                raise AclLimitExceededError(str(exc)) from exc
+            actor_user_id = acting_user_id
+        else:
+            if policy.service_user_id is None:
+                raise PolicyDisabledError("Auto-reply enabled but no service_user_id configured")
+            actor_user_id = policy.service_user_id
+
+        sysconfig = SysConfig(session)
+
+        # 4. Load ticket + articles; based_on_article_id = latest customer article
+        articles = await _load_articles(session, ticket_id)
+        customer_articles = [a for a in articles if a.sender_type == "customer"]
+        based_on_article_id = customer_articles[-1].id if customer_articles else None
+
+        # 5. AI-content filter is applied when rendering (labels own AI output,
+        # see _build_user_message) — nothing is physically removed.
+
+        # 6/7. Prompts
+        pii = PiiMapper(never_mask={ticket.customer_id} if ticket.customer_id else None)
+        system_prompt = _build_system_prompt(policy, trigger=trigger, kind_hint=kind_hint)
+        user_message = _build_user_message(
+            ticket, articles, pii=pii, mask=bool(policy.pii_masking), kb_bundle=kb_bundle
+        )
+
+        # 8. Tools
+        mcp_tools = await _load_mcp_tools(session, policy, settings=settings)
+        kb_enabled = bool(policy.kb_tags or policy.kb_category_ids)
+        registry = ToolRegistry(
+            autonomy=policy.autonomy, mcp_tools=mcp_tools, kb_enabled=kb_enabled
+        )
+        escalation_rules = json.loads(policy.escalation_rules) if policy.escalation_rules else None
+        executor = ToolExecutor(
+            session=session,
+            sysconfig=sysconfig,
+            registry=registry,
+            ticket_id=ticket_id,
+            acting_user_id=actor_user_id,
+            pii=pii,
+            escalation_rules=escalation_rules,
+            mcp_caller=mcp_caller,
+            kb_search_fn=kb_search_fn,
+            kb_get_article_fn=kb_get_article_fn,
+        )
+
+        messages: list[LlmMessage] = [
+            LlmMessage(role="system", content=system_prompt),
+            LlmMessage(role="user", content=user_message),
+        ]
+        schemas = registry.build_schemas()
+
+        prompt_tokens = 0
+        completion_tokens = 0
+        outcome: ToolOutcome | None = None
+
+        # 9. Tool loop
+        for _round in range(max_tool_rounds):
+            response: LlmResponse = await llm.chat(messages=messages, tools=schemas)
+            prompt_tokens += response.usage.prompt_tokens
+            completion_tokens += response.usage.completion_tokens
+
+            if not response.tool_calls:
+                # Model produced plain text with no terminal tool call: it
+                # never gets a customer-facing path (no send-tool exists), so
+                # the run ends without a proposal.
+                break
+
+            messages.append(
+                LlmMessage(
+                    role="assistant", content=response.content, tool_calls=response.tool_calls
+                )
+            )
+            terminal_hit = False
+            for tc in response.tool_calls:
+                try:
+                    result = await executor.execute(tc.name, tc.arguments)
+                except (UnknownToolError, ToolArgumentError) as exc:
+                    messages.append(
+                        LlmMessage(
+                            role="tool", tool_call_id=tc.id, name=tc.name, content=f"Error: {exc}"
+                        )
+                    )
+                    continue
+                messages.append(
+                    LlmMessage(
+                        role="tool",
+                        tool_call_id=tc.id,
+                        name=tc.name,
+                        content=result.content_for_model,
+                    )
+                )
+                if result.terminal:
+                    outcome = result
+                    terminal_hit = True
+                    break
+            if terminal_hit:
+                break
+
+        await usage_service.record_usage(
+            session,
+            user_id=acting_user_id if trigger == TRIGGER_MANUAL else None,
+            queue_id=ticket.queue_id,
+            ticket_id=ticket_id,
+            feature=feature,
+            provider_id=policy.llm_provider_id,
+            model=policy.model_override,
+            prompt_tokens=prompt_tokens,
+            completion_tokens=completion_tokens,
+            success=True,
+            extra_json=json.dumps({"tool_trace": "masked_in_messages"}),
+        )
+
+        # 12 (ticket state bookkeeping happens below, after we know the outcome)
+        state = await _get_or_create_state(session, ticket_id)
+
+        if outcome is None:
+            state.last_run_at = datetime.now(UTC).replace(tzinfo=None)
+            await session.commit()
+            return AgentRunResult(
+                status=STATUS_SKIPPED,
+                notes="No terminal tool call produced (no proposal, no escalation).",
+                prompt_tokens=prompt_tokens,
+                completion_tokens=completion_tokens,
+            )
+
+        if outcome.escalate_reason is not None:
+            state.last_run_at = datetime.now(UTC).replace(tzinfo=None)
+            await session.commit()
+            return AgentRunResult(
+                status=STATUS_ESCALATED,
+                notes=outcome.escalate_reason,
+                prompt_tokens=prompt_tokens,
+                completion_tokens=completion_tokens,
+            )
+
+        # propose_customer_message is the only other terminal path.
+        assert outcome.proposal is not None
+
+        # 10. Freshness check
+        latest_customer = await _latest_customer_article_id(session, ticket_id)
+        if (
+            based_on_article_id is not None
+            and latest_customer is not None
+            and latest_customer != based_on_article_id
+        ):
+            await _release_lock(session, ticket_id)
+            return AgentRunResult(
+                status=STATUS_SUPERSEDED,
+                notes="A newer customer article arrived during this run.",
+                prompt_tokens=prompt_tokens,
+                completion_tokens=completion_tokens,
+            )
+
+        # 11. Autonomy mapping
+        destination = _map_customer_message(
+            trigger=trigger, autonomy=policy.autonomy, kind=outcome.proposal["kind"]
+        )
+        source = SOURCE_MANUAL if trigger == TRIGGER_MANUAL else SOURCE_AUTO
+        created_by_user_id = acting_user_id if trigger == TRIGGER_MANUAL else None
+
+        if destination == "draft":
+            draft = await draft_service.create_draft(
+                session,
+                ticket_id=ticket_id,
+                queue_id=ticket.queue_id,
+                kind=outcome.proposal["kind"],
+                body=outcome.proposal["body"],
+                subject=outcome.proposal.get("subject") or None,
+                based_on_article_id=based_on_article_id,
+                tool_trace_json=json.dumps([m.to_wire() for m in messages if m.role == "tool"]),
+                created_by_user_id=created_by_user_id,
+                source=source,
+                actor_user_id=actor_user_id,
+            )
+            state.last_run_at = datetime.now(UTC).replace(tzinfo=None)
+            state.last_customer_article_id = based_on_article_id
+            await session.commit()
+            return AgentRunResult(
+                status=STATUS_DRAFTED,
+                draft_id=draft.id,
+                prompt_tokens=prompt_tokens,
+                completion_tokens=completion_tokens,
+            )
+
+        # destination == "send": auto path only (manual always drafts above)
+        footer = ""
+        if policy.ai_disclosure_enabled:
+            default_text = await get_setting(session, KEY_AI_DISCLOSURE_DEFAULT) or ""
+            footer = _disclosure_footer(default_text, policy.ai_disclosure_text)
+        body = outcome.proposal["body"]
+        if footer:
+            body = f"{body}\n\n{footer}"
+
+        to_address = None
+        if based_on_article_id is not None:
+            src = next((a for a in articles if a.id == based_on_article_id), None)
+            if src is not None and src.from_address:
+                to_address = parseaddr(src.from_address)[1] or None
+
+        if to_address:
+            from tiqora.channels.email.outbound_reply import deliver_agent_email_reply
+
+            article_id = await deliver_agent_email_reply(
+                session,
+                sysconfig,
+                None,
+                ticket_id=ticket_id,
+                queue_id=ticket.queue_id,
+                user_id=actor_user_id,
+                article=ArticleIn(
+                    sender_type="agent",
+                    is_visible_for_customer=True,
+                    subject=outcome.proposal.get("subject") or ticket.title,
+                    body=body,
+                    to_address=to_address,
+                    channel="email",
+                ),
+            )
+        else:
+            article_id = await add_article(
+                session,
+                ticket_id=ticket_id,
+                article=ArticleIn(
+                    sender_type="agent",
+                    is_visible_for_customer=True,
+                    subject=outcome.proposal.get("subject") or ticket.title,
+                    body=body,
+                    channel="note",
+                ),
+                user_id=actor_user_id,
+                sysconfig=sysconfig,
+            )
+
+        session.add(
+            TiqoraAiArticleOrigin(
+                article_id=article_id,
+                source=SOURCE_AUTO,
+                queue_id=ticket.queue_id,
+                service_user_id=actor_user_id,
+            )
+        )
+        state.last_run_at = datetime.now(UTC).replace(tzinfo=None)
+        state.last_customer_article_id = based_on_article_id
+        if outcome.proposal["kind"] == DRAFT_KIND_REPLY:
+            state.auto_reply_count = (state.auto_reply_count or 0) + 1
+        else:
+            state.clarification_count = (state.clarification_count or 0) + 1
+        await session.commit()
+        return AgentRunResult(
+            status=STATUS_SENT,
+            article_id=article_id,
+            prompt_tokens=prompt_tokens,
+            completion_tokens=completion_tokens,
+        )
+    except AgentRunError as exc:
+        try:
+            error_state = await session.get(TiqoraAiTicketState, ticket_id)
+            if error_state is not None:
+                error_state.last_error = str(exc)
+                await session.commit()
+        except Exception:  # noqa: BLE001 — best-effort bookkeeping only
+            logger.exception("ai_runtime_error_bookkeeping_failed", ticket_id=ticket_id)
+        raise
+    finally:
+        await _release_lock(session, ticket_id)
+
+
+async def _latest_customer_article_id(session: AsyncSession, ticket_id: int) -> int | None:
+    row = (
+        await session.execute(
+            text(
+                "SELECT a.id FROM article a"
+                " JOIN article_sender_type st ON st.id = a.article_sender_type_id"
+                " WHERE a.ticket_id = :tid AND st.name = 'customer'"
+                " ORDER BY a.id DESC LIMIT 1"
+            ),
+            {"tid": ticket_id},
+        )
+    ).first()
+    return int(row[0]) if row else None
+
+
+__all__ = [
+    "DEFAULT_MAX_TOOL_ROUNDS",
+    "STATUS_DRAFTED",
+    "STATUS_ERROR",
+    "STATUS_ESCALATED",
+    "STATUS_SENT",
+    "STATUS_SKIPPED",
+    "STATUS_SUPERSEDED",
+    "TRIGGER_AUTO",
+    "TRIGGER_MANUAL",
+    "AclDeniedError",
+    "AclLimitExceededError",
+    "AgentRunError",
+    "AgentRunResult",
+    "LockHeldError",
+    "PolicyDisabledError",
+    "run_ticket_agent",
+]
