@@ -1,10 +1,19 @@
 name: Docker
 
+# Day-to-day (push to main): native linux/amd64 only — fast, no QEMU.
+# Release tags (v*): multi-arch linux/amd64 + linux/arm64.
+# Manual dispatch can force multi-arch via the multiarch input.
+
 on:
   push:
     branches: [main]
     tags: ["v*"]
   workflow_dispatch:
+    inputs:
+      multiarch:
+        description: "Build multi-arch (amd64 + arm64) even without a v* tag"
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -16,13 +25,27 @@ env:
 
 jobs:
   build-and-push:
-    name: Build multi-arch and push
+    name: Build and push
     runs-on: ubuntu-latest
     env:
       # Docker Hub push is optional: it only happens when the secrets are configured.
       HAS_DOCKERHUB: ${{ secrets.DOCKER_USERNAME != '' && secrets.DOCKER_TOKEN != '' }}
+      # Multi-arch on release tags, or when workflow_dispatch forces it.
+      MULTIARCH: ${{ (startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.multiarch)) && 'true' || 'false' }}
     steps:
       - uses: actions/checkout@v4
+
+      - name: Determine platforms
+        id: platforms
+        run: |
+          if [ "${MULTIARCH}" = "true" ]; then
+            echo "list=linux/amd64,linux/arm64" >> "$GITHUB_OUTPUT"
+            echo "label=multi-arch (amd64+arm64)" >> "$GITHUB_OUTPUT"
+          else
+            echo "list=linux/amd64" >> "$GITHUB_OUTPUT"
+            echo "label=amd64 only" >> "$GITHUB_OUTPUT"
+          fi
+          echo "Building for: $( [ "${MULTIARCH}" = "true" ] && echo multi-arch || echo amd64-only )"
 
       - name: Determine target images
         id: images
@@ -48,6 +71,7 @@ jobs:
             type=sha,prefix=sha-,format=short
 
       - name: Set up QEMU
+        if: env.MULTIARCH == 'true'
         uses: docker/setup-qemu-action@v3
 
       - name: Set up Docker Buildx
@@ -67,12 +91,12 @@ jobs:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_TOKEN }}
 
-      - name: Build and push
+      - name: Build and push (${{ steps.platforms.outputs.label }})
         uses: docker/build-push-action@v6
         with:
           context: .
           file: ./Dockerfile
-          platforms: linux/amd64,linux/arm64
+          platforms: ${{ steps.platforms.outputs.list }}
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}

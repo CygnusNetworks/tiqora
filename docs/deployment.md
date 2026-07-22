@@ -53,7 +53,7 @@ and never commit real credentials.
 Full settings live in `tiqora.config.Settings` (pydantic-settings). See below
 for OIDC and Kerberos/SPNEGO-specific variables.
 
-## OIDC / SSO configuration (Phase 3c)
+## OIDC / SSO configuration
 
 Optional; the agent login page shows a "Sign in with SSO" button once
 `TIQORA_OIDC_ENABLED=true` (discovered via `GET /api/v1/auth/methods`).
@@ -72,7 +72,7 @@ Optional; the agent login page shows a "Sign in with SSO" button once
 `users.login` with `valid_id = 1`, or the callback returns `403`. Provision
 agents in Znuny/Tiqora admin first, then point them at SSO.
 
-## Kerberos / SPNEGO configuration (Phase 3c)
+## Kerberos / SPNEGO configuration
 
 Optional. The **production Docker image** already includes the `kerberos`
 extra (`gssapi`) and MIT Kerberos runtime libraries; SPNEGO stays inert until
@@ -130,7 +130,7 @@ Manual verification against a real MIT Kerberos KDC:
    mismatch (the keytab principal must match the hostname the browser sees),
    and agents not flagged `sso_eligible`.
 
-## LDAP / Active Directory configuration (Phase 3c)
+## LDAP / Active Directory configuration
 
 Optional bind-search-bind auth against an LDAP/AD directory, tried as a
 fallback when local password auth fails (mirrors Znuny's chained
@@ -184,7 +184,7 @@ When co-running with Znuny:
 1. Point Tiqora at the **same** database Znuny uses (read/write credentials).
 2. Do **not** run `versions_owned` migrations.
 3. Install the `TiqoraSync` OPM on Znuny (or lower cache TTLs).
-4. Keep Znuny daemon jobs enabled until Phase 4 feature flags say otherwise.
+4. Keep Znuny daemon jobs enabled until Tiqora daemon feature flags say otherwise.
 5. Terminate TLS at a reverse proxy; route `/api`, `/mcp`, and static UI paths
    to Tiqora; leave Znuny paths as needed during migration.
 

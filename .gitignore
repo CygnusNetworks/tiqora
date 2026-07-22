@@ -86,6 +86,7 @@ uv.lock.bak
 .justfile.local
 
 # --- Generated / runtime ---
+_site/          # local assemble of product site + demo (CI artifact only)
 *.sqlite
 *.db
 tmp/

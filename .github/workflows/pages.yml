@@ -1,30 +1,30 @@
-name: Demo (GitHub Pages)
+name: Product site (GitHub Pages)
 
-# Builds the MSW-backed, backend-free demo of the Tiqora frontend and deploys it
-# to GitHub Pages. The app runs entirely in the browser against mock data.
+# Builds the static product landing page + MSW-backed interactive demo and
+# deploys both to GitHub Pages.
+#
+#   https://cygnusnetworks.github.io/tiqora/       → marketing landing
+#   https://cygnusnetworks.github.io/tiqora/demo/  → interactive demo
+#
+# Runs on release tags (v*) and manual dispatch — not on every main push.
 
 on:
   push:
-    branches: [main]
-    paths:
-      - "frontend/**"
-      - "packages/api-client/**"
-      - ".github/workflows/pages.yml"
-  workflow_dispatch:
+    tags: ["v*"]
+  workflow_dispatch: {}
 
 permissions:
   contents: read
   pages: write
   id-token: write
 
-# Allow one concurrent deployment; don't cancel an in-progress run.
 concurrency:
   group: pages
   cancel-in-progress: false
 
 jobs:
   build:
-    name: Build demo bundle
+    name: Build landing + demo
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -38,12 +38,40 @@ jobs:
         run: pnpm install --frozen-lockfile
       - name: Build api-client
         run: pnpm --filter @tiqora/api-client build
-      - name: Build demo (base = /tiqora/)
-        run: VITE_BASE=/tiqora/ pnpm --filter tiqora-frontend build:demo
+      - name: Build demo (base = /tiqora/demo/)
+        run: VITE_BASE=/tiqora/demo/ pnpm --filter tiqora-frontend build:demo
+      - name: Assemble Pages site
+        run: |
+          set -euo pipefail
+          rm -rf _site
+          mkdir -p _site/assets/screenshots _site/demo
+
+          # Landing
+          cp site/index.html site/styles.css _site/
+          cp frontend/public/logo.svg frontend/public/logo-wordmark.svg frontend/public/favicon.svg _site/assets/
+
+          # Screenshots used by the landing gallery
+          for f in \
+            agent-dashboard.png agent-ticket-zoom.png agent-queues.png \
+            agent-stats.png agent-search.png agent-kb.png \
+            admin-queues.png admin-gdpr.png portal.png
+          do
+            cp "docs/images/$f" "_site/assets/screenshots/$f"
+          done
+
+          # Interactive demo under /demo/
+          cp -a frontend/dist/. _site/demo/
+
+          # SPA fallback for demo deep-links under project pages
+          if [ -f _site/demo/index.html ]; then
+            cp _site/demo/index.html _site/demo/404.html
+          fi
+
+          ls -la _site _site/demo _site/assets/screenshots | head -80
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
-          path: frontend/dist
+          path: _site
 
   deploy:
     name: Deploy to Pages
