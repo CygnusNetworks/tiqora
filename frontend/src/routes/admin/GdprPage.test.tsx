@@ -363,6 +363,86 @@ describe("GdprPage", () => {
     });
   });
 
+  it("adds and removes a chip-baukasten filter (email regex)", async () => {
+    renderPage();
+
+    fireEvent.click(screen.getByTestId("gdpr-add-filter"));
+    await waitFor(() => {
+      expect(screen.getByTestId("gdpr-add-filter-panel")).toBeInTheDocument();
+    });
+    fireEvent.click(screen.getByTestId("gdpr-add-filter-panel-option-emailRegex"));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("gdpr-filter-open-emailRegex")).toBeInTheDocument();
+    });
+    fireEvent.change(screen.getByTestId("gdpr-email-regex-input"), {
+      target: { value: "@edu\\.example$" },
+    });
+    fireEvent.click(screen.getByTestId("gdpr-filter-commit-emailRegex"));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("gdpr-filter-chip-emailRegex")).toHaveTextContent(
+        "@edu\\.example$",
+      );
+    });
+    expect(screen.queryByTestId("gdpr-filter-open-emailRegex")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId("gdpr-preview"));
+    await waitFor(() => {
+      expect(preview).toHaveBeenCalledWith(
+        expect.objectContaining({
+          selector: expect.objectContaining({
+            email_regex: "@edu\\.example$",
+            email_regex_negate: false,
+          }),
+        }),
+      );
+    });
+
+    fireEvent.click(screen.getByTestId("gdpr-filter-chip-remove-emailRegex"));
+    await waitFor(() => {
+      expect(screen.queryByTestId("gdpr-filter-chip-emailRegex")).not.toBeInTheDocument();
+    });
+  });
+
+  it("negates a pattern filter (login regex) and reflects it in the summary + payload", async () => {
+    renderPage();
+
+    fireEvent.click(screen.getByTestId("gdpr-add-filter"));
+    await waitFor(() => {
+      expect(screen.getByTestId("gdpr-add-filter-panel")).toBeInTheDocument();
+    });
+    fireEvent.click(screen.getByTestId("gdpr-add-filter-panel-option-loginRegex"));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("gdpr-filter-open-loginRegex")).toBeInTheDocument();
+    });
+    const input = within(screen.getByTestId("gdpr-filter-open-loginRegex")).getByRole("textbox");
+    fireEvent.change(input, { target: { value: "^EDU-" } });
+    fireEvent.click(screen.getByTestId("gdpr-filter-negate-on-loginRegex"));
+    fireEvent.click(screen.getByTestId("gdpr-filter-commit-loginRegex"));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("gdpr-filter-chip-loginRegex")).toHaveTextContent("^EDU-");
+    });
+    // Negation is surfaced in the chip (≠) and the live summary sentence.
+    expect(screen.getByTestId("gdpr-filter-chip-loginRegex")).toHaveTextContent("≠");
+    const summary = screen.getByTestId("gdpr-summary-sentences");
+    expect(summary).toHaveTextContent(/NICHT|NOT/);
+
+    fireEvent.click(screen.getByTestId("gdpr-preview"));
+    await waitFor(() => {
+      expect(preview).toHaveBeenCalledWith(
+        expect.objectContaining({
+          selector: expect.objectContaining({
+            login_regex: "^EDU-",
+            login_regex_negate: true,
+          }),
+        }),
+      );
+    });
+  });
+
   it("shows a debounced live match count for the active selector", async () => {
     renderPage();
 

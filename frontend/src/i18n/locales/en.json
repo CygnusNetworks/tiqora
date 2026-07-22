@@ -1201,6 +1201,7 @@
         "companyIdPh": "e.g. ACME",
         "loginRegex": "Login regex",
         "customerIdRegex": "customer_id regex",
+        "emailRegex": "Email regex",
         "changedAfter": "Changed after",
         "changedBefore": "Changed before",
         "activity": "Activity",
@@ -1223,12 +1224,17 @@
         "addPlaceholder": "Choose a filter…",
         "commit": "Apply",
         "remove": "Remove filter: {{label}}",
-        "noneActive": "No additional filters active."
+        "noneActive": "No additional filters active.",
+        "negateToggle": "Negate filter",
+        "matches": "matches",
+        "matchesNot": "does NOT match"
       },
       "summary": {
         "title": "Active selection",
         "logins": "{{count}} login(s) selected directly",
         "companies": "Companies: {{list}}",
+        "pattern": "{{label}} matches: {{value}}",
+        "patternNegated": "{{label}} does NOT match: {{value}}",
         "empty": "No selection criteria chosen yet."
       },
       "liveCount": {

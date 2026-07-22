@@ -3329,11 +3329,12 @@ export interface paths {
          *
          *     Reuses ``queue_outbound_meta``, the same queue lookup the agent-reply send
          *     path (``deliver_agent_email_reply``) resolves From/signature from, so the
-         *     preview matches what an actual reply on that queue would show. The
-         *     signature is returned RAW (placeholders unexpanded): a not-yet-created
-         *     ticket has no ticket/customer context to expand OTRS_TICKET_*\/
-         *     OTRS_CUSTOMER_DATA_* tags against, so this preview is only approximate —
-         *     the real expansion happens in ``prepare_outgoing_agent_email`` at send time.
+         *     preview matches what an actual reply on that queue would show. Agent tags
+         *     (``<OTRS_First_Name>`` etc.) are expanded against the current agent, same
+         *     as ``TicketService.get_reply_draft``. A not-yet-created ticket has no
+         *     ticket/customer context, so ticket_id is omitted and OTRS_TICKET_*\/
+         *     OTRS_CUSTOMER_DATA_* tags resolve empty here — the real expansion happens
+         *     in ``prepare_outgoing_agent_email`` at send time once the ticket exists.
          */
         get: operations["compose_context_api_v1_reference_compose_context_get"];
         put?: never;
@@ -5656,10 +5657,27 @@ export interface components {
             changed_before?: string | null;
             /** Customer Id Regex */
             customer_id_regex?: string | null;
+            /**
+             * Customer Id Regex Negate
+             * @default false
+             */
+            customer_id_regex_negate: boolean;
             /** Customer Ids */
             customer_ids?: string[];
+            /** Email Regex */
+            email_regex?: string | null;
+            /**
+             * Email Regex Negate
+             * @default false
+             */
+            email_regex_negate: boolean;
             /** Login Regex */
             login_regex?: string | null;
+            /**
+             * Login Regex Negate
+             * @default false
+             */
+            login_regex_negate: boolean;
             /** Logins */
             logins?: string[];
             /** Valid Id */

@@ -456,6 +456,99 @@ async def test_resolve_selector_criteria(url_fixture: str, request: pytest.Fixtu
 @pytest.mark.db
 @pytest.mark.asyncio
 @pytest.mark.parametrize("url_fixture", ["mariadb_znuny_url", "postgres_znuny_url"])
+async def test_resolve_selector_email_regex_and_negation(
+    url_fixture: str, request: pytest.FixtureRequest
+) -> None:
+    """email_regex filter, plus negation (``*_negate``) for login/customer_id/email."""
+    url = request.getfixturevalue(url_fixture)
+    engine, factory = await _factory(url)
+    mysql = _is_mysql(url)
+    prefix = "neg_mysql" if mysql else "neg_pg"
+
+    async with factory() as session:
+        await _seed_tiqora_tables(session, mysql=mysql)
+        id_a = await _insert_customer(
+            session,
+            login=f"{prefix}.alice",
+            customer_id=f"{prefix}-A",
+            email=f"alice@{prefix}-edu.example",
+        )
+        id_b = await _insert_customer(
+            session,
+            login=f"{prefix}.bob",
+            customer_id=f"{prefix}-B",
+            email=f"bob@{prefix}-corp.example",
+        )
+        id_c = await _insert_customer(
+            session,
+            login=f"{prefix}.carol",
+            customer_id=f"{prefix}-A",
+            email=f"carol@{prefix}-corp.example",
+        )
+
+    async with factory() as session:
+        # email_regex: positive match
+        ids = await resolve_selector(
+            session,
+            ErasureSelector(
+                customer_ids=[f"{prefix}-A", f"{prefix}-B"],
+                email_regex=rf"@{prefix}-edu\.",
+            ),
+        )
+        assert ids == [id_a]
+
+        # email_regex: negated — everyone whose email does NOT match
+        ids = await resolve_selector(
+            session,
+            ErasureSelector(
+                customer_ids=[f"{prefix}-A", f"{prefix}-B"],
+                email_regex=rf"@{prefix}-edu\.",
+                email_regex_negate=True,
+            ),
+        )
+        assert set(ids) == {id_b, id_c}
+        assert id_a not in ids
+
+        # login_regex negated
+        ids = await resolve_selector(
+            session,
+            ErasureSelector(
+                customer_ids=[f"{prefix}-A", f"{prefix}-B"],
+                login_regex=rf"^{prefix}\.alice$",
+                login_regex_negate=True,
+            ),
+        )
+        assert set(ids) == {id_b, id_c}
+
+        # customer_id_regex negated
+        ids = await resolve_selector(
+            session,
+            ErasureSelector(
+                logins=[f"{prefix}.alice", f"{prefix}.bob", f"{prefix}.carol"],
+                customer_id_regex=rf"^{prefix}-A$",
+                customer_id_regex_negate=True,
+            ),
+        )
+        assert ids == [id_b]
+
+        # combined: negated login_regex AND positive email_regex (AND semantics)
+        ids = await resolve_selector(
+            session,
+            ErasureSelector(
+                customer_ids=[f"{prefix}-A", f"{prefix}-B"],
+                login_regex=rf"^{prefix}\.alice$",
+                login_regex_negate=True,
+                email_regex=rf"@{prefix}-corp\.",
+            ),
+        )
+        assert set(ids) == {id_b, id_c}
+
+    await engine.dispose()
+
+
+@pytest.mark.db
+@pytest.mark.asyncio
+@pytest.mark.parametrize("url_fixture", ["mariadb_znuny_url", "postgres_znuny_url"])
 async def test_resolve_selector_python_regex_semantics(
     url_fixture: str, request: pytest.FixtureRequest
 ) -> None:

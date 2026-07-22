@@ -201,7 +201,11 @@ class ErasureSelector:
     logins: list[str] = field(default_factory=list)
     customer_ids: list[str] = field(default_factory=list)
     login_regex: str | None = None
+    login_regex_negate: bool = False
     customer_id_regex: str | None = None
+    customer_id_regex_negate: bool = False
+    email_regex: str | None = None
+    email_regex_negate: bool = False
     changed_before: datetime | None = None
     changed_after: datetime | None = None
     # "no_tickets" | "no_open_tickets" | "inactive_since:YYYY-MM-DD"
@@ -226,7 +230,11 @@ class ErasureSelector:
             logins=list(data.get("logins") or []),
             customer_ids=list(data.get("customer_ids") or []),
             login_regex=data.get("login_regex"),
+            login_regex_negate=bool(data.get("login_regex_negate", False)),
             customer_id_regex=data.get("customer_id_regex"),
+            customer_id_regex_negate=bool(data.get("customer_id_regex_negate", False)),
+            email_regex=data.get("email_regex"),
+            email_regex_negate=bool(data.get("email_regex_negate", False)),
             changed_before=_parse_dt(cb) if cb else None,
             changed_after=_parse_dt(ca) if ca else None,
             activity=data.get("activity"),
@@ -418,6 +426,7 @@ def _has_any_selector(selector: ErasureSelector) -> bool:
         or selector.customer_ids
         or selector.login_regex
         or selector.customer_id_regex
+        or selector.email_regex
         or selector.changed_before is not None
         or selector.changed_after is not None
         or selector.activity
@@ -477,11 +486,17 @@ async def resolve_selector(session: AsyncSession, selector: ErasureSelector) -> 
         if selector.customer_id_regex
         else None
     )
+    email_cre = (
+        _compile_selector_regex(selector.email_regex, field="email_regex")
+        if selector.email_regex
+        else None
+    )
 
     # Candidate set: start broad, narrow with SQL where possible.
-    # Regex-only selectors load the whole customer_user (id, login, customer_id)
-    # into memory — tens of thousands of small tuples is fine for admin preview.
-    stmt = select(CustomerUser.id, CustomerUser.login, CustomerUser.customer_id)
+    # Regex-only selectors load the whole customer_user (id, login, customer_id,
+    # email) into memory — tens of thousands of small tuples is fine for admin
+    # preview.
+    stmt = select(CustomerUser.id, CustomerUser.login, CustomerUser.customer_id, CustomerUser.email)
     if selector.logins:
         stmt = stmt.where(CustomerUser.login.in_(list(selector.logins)))
     if selector.customer_ids:
@@ -495,19 +510,26 @@ async def resolve_selector(session: AsyncSession, selector: ErasureSelector) -> 
         stmt = stmt.where(CustomerUser.valid_id == selector.valid_id)
 
     rows = (await session.execute(stmt)).all()
-    candidates: list[tuple[int, str, str]] = [
-        (int(r.id), str(r.login), str(r.customer_id)) for r in rows
+    candidates: list[tuple[int, str, str, str]] = [
+        (int(r.id), str(r.login), str(r.customer_id), str(r.email)) for r in rows
     ]
     if not candidates:
         return []
 
     # Apply regex in Python (candidates already loaded). Native SQL REGEXP/~ does
     # not understand Python patterns like \\d, \\w, (?i) and would return empty.
+    # ``_negate`` flips "must match" into "must not match" per filter.
     if login_cre is not None:
-        candidates = [c for c in candidates if login_cre.search(c[1])]
+        negate = selector.login_regex_negate
+        candidates = [c for c in candidates if bool(login_cre.search(c[1])) != negate]
 
     if customer_id_cre is not None:
-        candidates = [c for c in candidates if customer_id_cre.search(c[2])]
+        negate = selector.customer_id_regex_negate
+        candidates = [c for c in candidates if bool(customer_id_cre.search(c[2])) != negate]
+
+    if email_cre is not None:
+        negate = selector.email_regex_negate
+        candidates = [c for c in candidates if bool(email_cre.search(c[3])) != negate]
 
     if selector.activity:
         candidates = await _filter_activity(session, candidates, selector.activity)
@@ -517,24 +539,26 @@ async def resolve_selector(session: AsyncSession, selector: ErasureSelector) -> 
 
 async def _filter_activity(
     session: AsyncSession,
-    candidates: list[tuple[int, str, str]],
+    candidates: list[tuple[int, str, str, str]],
     activity: str,
-) -> list[tuple[int, str, str]]:
+) -> list[tuple[int, str, str, str]]:
     if activity == "no_tickets":
-        out: list[tuple[int, str, str]] = []
-        for cid, login, company in candidates:
+        out: list[tuple[int, str, str, str]] = []
+        for cand in candidates:
+            login = cand[1]
             exists = (
                 await session.execute(
                     select(Ticket.id).where(Ticket.customer_user_id == login).limit(1)
                 )
             ).scalar_one_or_none()
             if exists is None:
-                out.append((cid, login, company))
+                out.append(cand)
         return out
 
     if activity == "no_open_tickets":
         out = []
-        for cid, login, company in candidates:
+        for cand in candidates:
+            login = cand[1]
             exists = (
                 await session.execute(
                     select(Ticket.id)
@@ -548,7 +572,7 @@ async def _filter_activity(
                 )
             ).scalar_one_or_none()
             if exists is None:
-                out.append((cid, login, company))
+                out.append(cand)
         return out
 
     if activity.startswith("inactive_since:"):
@@ -558,7 +582,8 @@ async def _filter_activity(
         except ValueError as exc:
             raise ErasureError(f"activity inactive_since expects YYYY-MM-DD, got {raw!r}") from exc
         out = []
-        for cid, login, company in candidates:
+        for cand in candidates:
+            login = cand[1]
             recent = (
                 await session.execute(
                     select(Ticket.id)
@@ -570,7 +595,7 @@ async def _filter_activity(
                 )
             ).scalar_one_or_none()
             if recent is None:
-                out.append((cid, login, company))
+                out.append(cand)
         return out
 
     raise ErasureError(
