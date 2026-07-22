@@ -49,3 +49,44 @@ export async function bulkInChunks(
 
   return { updated };
 }
+
+export type ConcurrentResult<Id> = { succeeded: Id[]; failed: Id[] };
+
+/**
+ * Apply `apply` to each of `ids` with at most `concurrency` in flight at
+ * once — used for per-ticket PATCH loops (no bulk endpoint exists for
+ * tickets, unlike the admin resources `bulkInChunks` serves). Failures are
+ * collected per id rather than aborting the whole run, so the caller can
+ * report a partial result and keep the failed ids selected for a retry.
+ */
+export async function runConcurrent<Id>(
+  ids: Id[],
+  apply: (id: Id) => Promise<void>,
+  concurrency: number,
+  onProgress?: (done: number, total: number) => void,
+): Promise<ConcurrentResult<Id>> {
+  const total = ids.length;
+  const succeeded: Id[] = [];
+  const failed: Id[] = [];
+  let done = 0;
+  let next = 0;
+
+  async function worker() {
+    while (next < ids.length) {
+      const id = ids[next++];
+      try {
+        await apply(id);
+        succeeded.push(id);
+      } catch {
+        failed.push(id);
+      }
+      done += 1;
+      onProgress?.(done, total);
+    }
+  }
+
+  await Promise.all(
+    Array.from({ length: Math.min(concurrency, ids.length) }, () => worker()),
+  );
+  return { succeeded, failed };
+}
