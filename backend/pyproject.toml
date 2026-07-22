@@ -36,6 +36,9 @@ dependencies = [
     # Sync drivers used by tiqora bootstrap (base-schema load) and tests.
     "pymysql>=1.2.0",
     "psycopg2-binary>=2.9.12",
+    # GDPR anonymize engine (ValueMapper) draws replacement values via faker
+    # at runtime — must ship in the prod image, not just the dev group.
+    "faker>=37.0.0",
 ]
 
 [project.optional-dependencies]
@@ -131,5 +134,4 @@ markers = [
 dev = [
     "psycopg2-binary>=2.9.12",
     "pymysql>=1.2.0",
-    "faker>=37.0.0",
 ]

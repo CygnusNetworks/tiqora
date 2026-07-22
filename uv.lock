@@ -2270,6 +2270,7 @@ dependencies = [
     { name = "bcrypt" },
     { name = "cryptography" },
     { name = "defusedxml" },
+    { name = "faker" },
     { name = "fastapi" },
     { name = "fastmcp" },
     { name = "httpx" },
@@ -2314,7 +2315,6 @@ kerberos = [
 
 [package.dev-dependencies]
 dev = [
-    { name = "faker" },
     { name = "psycopg2-binary" },
     { name = "pymysql" },
 ]
@@ -2329,6 +2329,7 @@ requires-dist = [
     { name = "bcrypt", specifier = ">=5.0.0" },
     { name = "cryptography", specifier = ">=43.0.0" },
     { name = "defusedxml", specifier = ">=0.7.1" },
+    { name = "faker", specifier = ">=37.0.0" },
     { name = "fastapi", specifier = ">=0.115.0" },
     { name = "fastmcp", specifier = ">=3.4.4" },
     { name = "gssapi", marker = "extra == 'kerberos'", specifier = ">=1.9.0" },
@@ -2366,7 +2367,6 @@ provides-extras = ["kerberos", "crypto", "dev"]
 
 [package.metadata.requires-dev]
 dev = [
-    { name = "faker", specifier = ">=37.0.0" },
     { name = "psycopg2-binary", specifier = ">=2.9.12" },
     { name = "pymysql", specifier = ">=1.2.0" },
 ]
