@@ -57,11 +57,15 @@ describe("AccountMenu", () => {
     expect(screen.queryByTestId("account-menu-settings")).not.toBeInTheDocument();
     expect(screen.queryByTestId("account-menu-admin")).not.toBeInTheDocument();
     expect(screen.getByTestId("account-menu-security")).toBeInTheDocument();
-    // Language is a native <select> (scales to many; renders above the menu).
-    const langSelect = screen.getByTestId("account-menu-lang-select");
-    expect(langSelect).toBeInTheDocument();
-    expect(within(langSelect).getByRole("option", { name: "Deutsch" })).toBeInTheDocument();
-    expect(within(langSelect).getByRole("option", { name: "English" })).toBeInTheDocument();
+    // Language is a portal-based SelectMenu trigger (scales to many; renders
+    // above the menu instead of being clipped by its overflow-hidden panel).
+    const langTrigger = screen.getByTestId("account-menu-lang-select");
+    expect(langTrigger).toBeInTheDocument();
+    fireEvent.click(langTrigger);
+    const langPanel = screen.getByTestId("account-menu-lang-panel");
+    expect(within(langPanel).getByText("Deutsch")).toBeInTheDocument();
+    expect(within(langPanel).getByText("English")).toBeInTheDocument();
+    fireEvent.click(langTrigger);
     expect(screen.getByTestId("account-menu-theme-light")).toBeInTheDocument();
     expect(screen.getByTestId("logout-btn")).toBeInTheDocument();
   });
@@ -91,14 +95,16 @@ describe("AccountMenu", () => {
     expect(navigate).toHaveBeenCalledWith({ to: "/agent/security" });
   });
 
-  it("changes language via the select and persists the choice", () => {
+  it("changes language via the SelectMenu and persists the choice, keeping the menu open", () => {
     const changeLanguage = vi.spyOn(i18n, "changeLanguage");
     open();
-    fireEvent.change(screen.getByTestId("account-menu-lang-select"), {
-      target: { value: "en" },
-    });
+    fireEvent.click(screen.getByTestId("account-menu-lang-select"));
+    fireEvent.click(within(screen.getByTestId("account-menu-lang-panel")).getByText("English"));
     expect(changeLanguage).toHaveBeenCalledWith("en");
     expect(localStorage.getItem("tiqora-lang")).toBe("en");
+    // The surrounding account Menu stays open — SelectMenu's portal panel is
+    // recognized as "inside" by Menu.tsx's outside-pointerdown handler.
+    expect(screen.getByTestId("account-menu")).toBeInTheDocument();
     changeLanguage.mockRestore();
   });
 

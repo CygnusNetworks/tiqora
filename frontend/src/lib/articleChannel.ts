@@ -1,6 +1,7 @@
 /** Channel/role presentation helpers shared by the split (master-detail) and
  * conversation (chat-bubble) article views, plus the auto view-mode switch. */
 import type { ArticleListItem } from "@/lib/api";
+import { parseRecipient } from "@/components/agent/RecipientsField";
 
 /**
  * Standard Znuny `communication_channel` seed order (see
@@ -48,6 +49,19 @@ export function initialsFor(a: ArticleListItem): string {
   const parts = local.replace(/[._-]+/g, " ").trim().split(/\s+/).filter(Boolean);
   const letters = parts.length >= 2 ? parts[0][0] + parts[1][0] : local.slice(0, 2);
   return letters.toUpperCase();
+}
+
+/**
+ * Extract the bare address out of an article's `from_address`, which arrives
+ * in either mail form ("Name <mail@host>") or a bare address — same shapes
+ * `parseRecipient` (RecipientsField.tsx) already handles for the compose
+ * side, reused here rather than re-implementing the angle-bracket parsing.
+ * Returns undefined when nothing plausible is present, so callers can hand
+ * it straight to `Avatar`'s optional `email` prop (Gravatar lookup, d=404
+ * falls back to initials).
+ */
+export function emailFromAddress(raw: string | null | undefined): string | undefined {
+  return parseRecipient(raw ?? "")?.email;
 }
 
 /** A note that isn't visible to the customer, on the internal channel — the
