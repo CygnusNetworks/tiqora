@@ -1,7 +1,11 @@
 # Tiqora design specification
 
+> **Historical design document.** Phases and timelines below reflect the original
+> delivery plan. Current product documentation lives in the root [README](../../README.md)
+> and [docs/](../README.md).
+
 **Date:** 2026-07-19  
-**Status:** Accepted plan → implementation scaffold  
+**Status:** Historical (accepted plan → largely implemented)  
 **Language of this document:** English  
 **Source plan:** internal planning note (German); this file is the authoritative
 design adaptation for the repository.

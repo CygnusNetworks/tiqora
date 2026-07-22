@@ -3,6 +3,7 @@ name: CI
 on:
   push:
     branches: [main]
+    tags: ["v*"]
   pull_request:
     branches: [main]
 
@@ -34,13 +35,11 @@ jobs:
       - name: Mypy
         run: uv run mypy src/tiqora
 
-  backend-test:
-    name: Backend tests (${{ matrix.db }})
+  # Separate jobs so each matrix cell only boots the DB it needs (GHA cannot
+  # conditionally enable services per matrix value).
+  backend-test-postgres:
+    name: Backend tests (postgres)
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        db: [postgres, mariadb]
     defaults:
       run:
         working-directory: backend
@@ -58,6 +57,43 @@ jobs:
           --health-interval 10s
           --health-timeout 5s
           --health-retries 10
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 3s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql+asyncpg://tiqora:tiqora@localhost:5432/tiqora
+      REDIS_URL: redis://localhost:6379/0
+      MEILI_URL: http://localhost:7700
+      MEILI_MASTER_KEY: tiqora-dev-master-key
+      TIQORA_ENV: test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install crypto tooling (gpg for PGP tests; openssl is preinstalled)
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends gnupg
+      - name: Install dependencies
+        run: uv sync --extra dev --extra crypto
+      - name: Pytest
+        run: uv run pytest -q
+
+  backend-test-mariadb:
+    name: Backend tests (mariadb)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    services:
       mariadb:
         image: mariadb:10.11
         env:
@@ -82,6 +118,7 @@ jobs:
           --health-timeout 3s
           --health-retries 10
     env:
+      DATABASE_URL: mysql+aiomysql://tiqora:tiqora@localhost:3306/tiqora
       REDIS_URL: redis://localhost:6379/0
       MEILI_URL: http://localhost:7700
       MEILI_MASTER_KEY: tiqora-dev-master-key
@@ -94,13 +131,6 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - name: Set DATABASE_URL
-        run: |
-          if [ "${{ matrix.db }}" = "postgres" ]; then
-            echo "DATABASE_URL=postgresql+asyncpg://tiqora:tiqora@localhost:5432/tiqora" >> "$GITHUB_ENV"
-          else
-            echo "DATABASE_URL=mysql+aiomysql://tiqora:tiqora@localhost:3306/tiqora" >> "$GITHUB_ENV"
-          fi
       - name: Install crypto tooling (gpg for PGP tests; openssl is preinstalled)
         run: sudo apt-get update && sudo apt-get install -y --no-install-recommends gnupg
       - name: Install dependencies
@@ -109,7 +139,7 @@ jobs:
         run: uv run pytest -q
 
   frontend:
-    name: Frontend (lint, build, vitest, e2e)
+    name: Frontend (lint, build, vitest)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -130,8 +160,11 @@ jobs:
         run: pnpm --filter tiqora-frontend build
       - name: Vitest
         run: pnpm --filter tiqora-frontend test
+      # Playwright e2e only on release tags (hard fail). Everyday PR/main skips
+      # saves ~4–5 min of runner time (install + full e2e suite).
       - name: Install Playwright Chromium
+        if: startsWith(github.ref, 'refs/tags/v')
         run: pnpm --filter tiqora-frontend exec playwright install --with-deps chromium
       - name: Playwright e2e (mocked API)
+        if: startsWith(github.ref, 'refs/tags/v')
         run: pnpm --filter tiqora-frontend e2e
-        continue-on-error: true

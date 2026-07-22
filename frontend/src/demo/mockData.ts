@@ -13,6 +13,8 @@ function page<T>(items: T[]) {
   return { items, total: items.length, page: 1, page_size: 500 };
 }
 
+const t0 = "2026-06-01T00:00:00Z";
+
 export const demoUser = {
   id: 1,
   login: "aturner",
@@ -127,21 +129,43 @@ const searchHits = {
   hits: ticketItems.slice(0, 4).map((t) => ({ id: t.id, tn: t.tn, title: t.title, queue_id: t.queue_id, queue_name: t.queue_name, state: t.state, state_type: t.state_type, priority: t.priority, owner_login: t.owner_login, customer_user_id: t.customer_user_id, create_time: t.create_time, excerpt: "…matched on the ticket subject and latest article…" })),
 };
 
+// KB categories match CategoryOut; articles match ArticleSummary[] (bare array).
 const kbCategories = [
-  { id: 1, name: "Getting started", parent_id: null, article_count: 6 },
-  { id: 2, name: "Email & calendar", parent_id: null, article_count: 9 },
-  { id: 3, name: "VPN & remote access", parent_id: null, article_count: 5 },
-  { id: 4, name: "Printing", parent_id: null, article_count: 4 },
+  { id: 1, name: "Getting started", slug: "getting-started", parent_id: null, sort: 10, valid: true, customer_visible: true, permission_group_ids: [2], create_time: t0, change_time: "2026-07-15T10:00:00Z" },
+  { id: 2, name: "Email & calendar", slug: "email-calendar", parent_id: null, sort: 20, valid: true, customer_visible: true, permission_group_ids: [2], create_time: t0, change_time: "2026-07-14T09:00:00Z" },
+  { id: 3, name: "VPN & remote access", slug: "vpn-remote", parent_id: null, sort: 30, valid: true, customer_visible: true, permission_group_ids: [2], create_time: t0, change_time: "2026-07-14T09:00:00Z" },
+  { id: 4, name: "Printing", slug: "printing", parent_id: null, sort: 40, valid: true, customer_visible: false, permission_group_ids: [2], create_time: t0, change_time: "2026-07-18T16:00:00Z" },
 ];
-const kbArticles = {
-  items: [
-    { id: 700, title: "How to reset your password", category_id: 1, category_name: "Getting started", state: "published", updated_at: "2026-07-15T10:00:00Z" },
-    { id: 701, title: "Setting up the VPN client", category_id: 3, category_name: "VPN & remote access", state: "published", updated_at: "2026-07-14T09:00:00Z" },
-    { id: 702, title: "Sharing a mailbox", category_id: 2, category_name: "Email & calendar", state: "published", updated_at: "2026-07-12T08:00:00Z" },
-    { id: 703, title: "Fixing common printer problems", category_id: 4, category_name: "Printing", state: "draft", updated_at: "2026-07-18T16:00:00Z" },
-  ],
-  total: 4, offset: 0, limit: 50,
+const kbArticleItems = [
+  { id: 700, title: "How to reset your password", slug: "how-to-reset-your-password", category_id: 1, state: "published", language: "en", version: 3, change_time: "2026-07-15T10:00:00Z" },
+  { id: 701, title: "Setting up the VPN client", slug: "setting-up-the-vpn-client", category_id: 3, state: "published", language: "en", version: 2, change_time: "2026-07-14T09:00:00Z" },
+  { id: 702, title: "Sharing a mailbox", slug: "sharing-a-mailbox", category_id: 2, state: "published", language: "en", version: 1, change_time: "2026-07-12T08:00:00Z" },
+  { id: 703, title: "Fixing common printer problems", slug: "fixing-common-printer-problems", category_id: 4, state: "draft", language: "en", version: 1, change_time: "2026-07-18T16:00:00Z" },
+  { id: 704, title: "Requesting a new laptop", slug: "requesting-a-new-laptop", category_id: 1, state: "published", language: "en", version: 1, change_time: "2026-07-11T11:00:00Z" },
+  { id: 705, title: "Calendar sharing best practices", slug: "calendar-sharing-best-practices", category_id: 2, state: "review", language: "en", version: 2, change_time: "2026-07-16T14:00:00Z" },
+];
+const kbArticleDetail = {
+  ...kbArticleItems[0],
+  body_md: "# How to reset your password\n\n1. Open the portal and choose **Forgot password**.\n2. Enter your work email.\n3. Follow the link we send you (valid for 30 minutes).\n4. Choose a new password that meets the complexity rules.\n\nIf you still cannot sign in, open a ticket with the **Support** queue.",
+  tags: ["password", "sso", "onboarding"],
+  customer_visible: true,
+  create_time: t0,
+  create_by: 1,
+  change_by: 1,
 };
+
+const historyEntries = [
+  { id: 9001, ticket_id: 100, history_type_id: 1, history_type: "NewTicket", name: "%%Printer offline in building A%%", rendered: "Created ticket", create_by: 10, create_by_login: "j.doe@acme.example", create_time: "2026-07-10T09:12:00Z", owner_id: 1, article_id: 500 },
+  { id: 9002, ticket_id: 100, history_type_id: 27, history_type: "OwnerUpdate", name: "%%aturner%%", rendered: "Owner set to aturner", create_by: 1, create_by_login: "aturner", create_time: "2026-07-10T09:40:00Z", owner_id: 1, article_id: null },
+  { id: 9003, ticket_id: 100, history_type_id: 8, history_type: "StateUpdate", name: "%%new%%open%%", rendered: "State changed from new to open", create_by: 1, create_by_login: "aturner", create_time: "2026-07-10T09:41:00Z", owner_id: 1, article_id: null },
+  { id: 9004, ticket_id: 100, history_type_id: 19, history_type: "AddNote", name: "%%Internal note%%", rendered: "Added note", create_by: 1, create_by_login: "aturner", create_time: "2026-07-10T10:05:00Z", owner_id: 1, article_id: 502 },
+];
+
+const onlineAgents = [
+  { id: 1, login: "aturner", full_name: "Alex Turner", avatar_url: null },
+  { id: 2, login: "bshah", full_name: "Bianca Shah", avatar_url: null },
+  { id: 3, login: "cmorris", full_name: "Chris Morris", avatar_url: null },
+];
 
 // ── Stats (14-day series, richer) ───────────────────────────────────────────
 const days = Array.from({ length: 14 }, (_, i) => `2026-07-${String(i + 8).padStart(2, "0")}`);
@@ -167,7 +191,6 @@ const occurrences = [
 ];
 
 // ── Admin data (envelope shape) ─────────────────────────────────────────────
-const t0 = "2026-06-01T00:00:00Z";
 const adminUsers = [
   ["aturner", "Alex", "Turner"], ["bshah", "Bianca", "Shah"], ["cmorris", "Chris", "Morris"],
   ["dpark", "Dana", "Park"], ["efox", "Erin", "Fox"], ["gliu", "Grace", "Liu"],
@@ -236,13 +259,18 @@ export function resolveData(path: string, method: string): unknown | undefined {
   if (p.endsWith("/api/v1/tickets") && method === "GET") return tickets;
   if (p.match(/\/api\/v1\/tickets\/\d+\/articles\/\d+\/body$/)) { const id = Number(p.split("/").slice(-2)[0]); return bodies[id] ?? bodies[500]; }
   if (p.match(/\/api\/v1\/tickets\/\d+\/articles$/)) return articles;
-  if (p.match(/\/api\/v1\/tickets\/\d+\/history$/)) return [];
+  if (p.match(/\/api\/v1\/tickets\/\d+\/history$/)) return historyEntries;
+  if (p.match(/\/api\/v1\/tickets\/\d+\/presence/)) return method === "GET" ? [] : {};
   if (p.match(/\/api\/v1\/tickets\/\d+\/attachments/) || p.match(/attachments/)) return [];
   if (p.match(/\/api\/v1\/tickets\/\d+$/) && method === "GET") return ticketDetail;
+  if (p.endsWith("/api/v1/agents/online")) return onlineAgents;
+  if (p.endsWith("/api/v1/agents/presence/ping") && method === "POST") return {};
   if (p.endsWith("/api/v1/search")) return searchHits;
-  if (p.endsWith("/api/v1/kb/search")) return { query: "", results: kbArticles.items };
+  if (p.endsWith("/api/v1/kb/search")) return { query: "", results: kbArticleItems };
   if (p.endsWith("/api/v1/kb/categories")) return kbCategories;
-  if (p.endsWith("/api/v1/kb/articles")) return kbArticles;
+  if (p.match(/\/api\/v1\/kb\/articles\/\d+$/) && method === "GET") return kbArticleDetail;
+  if (p.endsWith("/api/v1/kb/articles")) return kbArticleItems;
+  if (p.endsWith("/api/v1/kb/assignable-groups")) return [{ id: 2, name: "users" }, { id: 3, name: "support" }];
   if (p.endsWith("/api/v1/stats/volume")) return volume;
   if (p.endsWith("/api/v1/stats/backlog")) return backlog;
   if (p.endsWith("/api/v1/stats/open-snapshot")) return openSnapshot;
@@ -250,7 +278,7 @@ export function resolveData(path: string, method: string): unknown | undefined {
   if (p.endsWith("/api/v1/stats/agent-workload")) return agentWorkload;
   if (p.endsWith("/api/v1/calendar/calendars")) return calendars;
   if (p.endsWith("/api/v1/calendar/appointments")) return occurrences;
-  if (p.endsWith("/api/v1/process/")) return [];
+  if (p.includes("/api/v1/process")) return method === "GET" ? [] : {};
   // Admin — assignment editors (before the generic list handler)
   if (p.match(/\/admin\/groups\/\d+\/customer-users$/)) { const id = Number(p.split("/").slice(-2)[0]); return groupCustomerUsers[id] ?? []; }
   if (p.match(/\/admin\/groups\/\d+\/users$/)) { const id = Number(p.split("/").slice(-2)[0]); return groupUsers[id] ?? []; }

@@ -1,0 +1,324 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta
+      name="description"
+      content="Tiqora — modern self-hosted helpdesk. Znuny/OTRS 6.5 database-compatible, with a first-class web UI, AI-ready search, GDPR tools, and parallel operation."
+    />
+    <meta name="theme-color" content="#0e1015" />
+    <link rel="icon" type="image/svg+xml" href="./assets/favicon.svg" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="./styles.css" />
+    <title>Tiqora — modern helpdesk, Znuny/OTRS-compatible</title>
+  </head>
+  <body>
+    <header class="nav">
+      <div class="wrap nav-inner">
+        <a class="brand" href="./">
+          <img src="./assets/logo.svg" alt="" width="28" height="28" />
+          tiqora
+        </a>
+        <ul class="nav-links">
+          <li><a href="#features">Features</a></li>
+          <li><a href="#screenshots">Screenshots</a></li>
+          <li><a href="#paths">Get started</a></li>
+          <li><a href="https://github.com/CygnusNetworks/tiqora">GitHub</a></li>
+          <li><a class="btn btn-primary" href="./demo/">Live demo</a></li>
+        </ul>
+      </div>
+    </header>
+
+    <main>
+      <section class="hero">
+        <div class="wrap">
+          <div class="eyebrow">Self-hosted · AGPL-3.0 · Python + React</div>
+          <h1>Modern helpdesk. Znuny/OTRS-compatible.</h1>
+          <p class="lede">
+            Tiqora is a clean-room reimplementation of a ticket system that speaks the
+            Znuny&nbsp;/&nbsp;OTRS&nbsp;6.5 database — with a first-class web UI, AI-ready
+            search, and a path to run alongside your existing instance.
+          </p>
+          <div class="btn-row">
+            <a class="btn btn-primary" href="./demo/">Try the live demo</a>
+            <a class="btn btn-ghost" href="https://github.com/CygnusNetworks/tiqora">View on GitHub</a>
+            <a class="btn btn-ghost" href="https://github.com/CygnusNetworks/tiqora#documentation">Docs</a>
+          </div>
+          <p class="notice">
+            Still under active development. Production use is not yet recommended.
+          </p>
+        </div>
+      </section>
+
+      <section id="features">
+        <div class="wrap">
+          <div class="section-head">
+            <h2>Built for teams leaving the Perl era</h2>
+            <p>
+              Same familiar ticket data model when you need it — a modern stack and UI
+              when you work in it every day.
+            </p>
+          </div>
+          <div class="feature-grid">
+            <article class="feature">
+              <div class="icon">UI</div>
+              <h3>Modern web UI</h3>
+              <p>
+                Agent workspace, admin console, and customer portal — a clear step up
+                from classic OTRS/Znuny screens.
+              </p>
+            </article>
+            <article class="feature">
+              <div class="icon">DB</div>
+              <h3>Znuny/OTRS DB compatible</h3>
+              <p>
+                Works with the Znuny&nbsp;6.5 schema on PostgreSQL or MariaDB/MySQL.
+                Parallel operation on the same database is supported.
+              </p>
+            </article>
+            <article class="feature">
+              <div class="icon">AI</div>
+              <h3>AI-ready search &amp; MCP</h3>
+              <p>
+                Fast ticket search via Meilisearch, plus an MCP server so AI agents use
+                the same permission engine as humans.
+              </p>
+            </article>
+            <article class="feature">
+              <div class="icon">GD</div>
+              <h3>GDPR tooling</h3>
+              <p>
+                Customer anonymization, retention jobs, and audit trails — built into
+                admin workflows.
+              </p>
+            </article>
+            <article class="feature">
+              <div class="icon">✦</div>
+              <h3>Modern design</h3>
+              <p>
+                Dark and light themes, EN/DE i18n, compact cobalt design system —
+                built for daily agent use.
+              </p>
+            </article>
+            <article class="feature">
+              <div class="icon">λ</div>
+              <h3>No Perl app stack</h3>
+              <p>
+                Python FastAPI backend, React frontend, Redis, Meilisearch. Clean-room
+                code — not a Znuny fork.
+              </p>
+            </article>
+            <article class="feature">
+              <div class="icon">P</div>
+              <h3>Customer portal &amp; KB</h3>
+              <p>
+                Self-service tickets and a Markdown knowledge base with agent editing
+                and portal search.
+              </p>
+            </article>
+            <article class="feature">
+              <div class="icon">⇄</div>
+              <h3>Integration friendly</h3>
+              <p>
+                REST&nbsp;/api/v1, GenericInterface REST/SOAP compatibility, webhooks,
+                and channel plugins (email, SMS, WhatsApp, CTI).
+              </p>
+            </article>
+            <article class="feature">
+              <div class="icon">🔒</div>
+              <h3>Modern authentication</h3>
+              <p>
+                Legacy password hashes, OIDC, LDAP/AD, Kerberos/SPNEGO, TOTP, and
+                passkeys — feature-flagged as you need them.
+              </p>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <section id="screenshots">
+        <div class="wrap">
+          <div class="section-head">
+            <h2>See it in action</h2>
+            <p>Agent workspace, ticket zoom, reporting, admin, privacy tools, and portal.</p>
+          </div>
+          <div class="shots">
+            <figure class="shot shot-wide">
+              <img
+                src="./assets/screenshots/agent-dashboard.png"
+                alt="Tiqora agent dashboard"
+                width="1440"
+                height="900"
+                loading="lazy"
+              />
+              <figcaption>Agent dashboard — open work, queues, and presence at a glance</figcaption>
+            </figure>
+            <figure class="shot">
+              <img
+                src="./assets/screenshots/agent-ticket-zoom.png"
+                alt="Ticket zoom view"
+                width="1440"
+                height="900"
+                loading="lazy"
+              />
+              <figcaption>Ticket zoom with permission-aware actions</figcaption>
+            </figure>
+            <figure class="shot">
+              <img
+                src="./assets/screenshots/agent-queues.png"
+                alt="Queue view"
+                width="1440"
+                height="900"
+                loading="lazy"
+              />
+              <figcaption>Queue list with filters and bulk actions</figcaption>
+            </figure>
+            <figure class="shot">
+              <img
+                src="./assets/screenshots/agent-stats.png"
+                alt="Reporting and SLA"
+                width="1440"
+                height="900"
+                loading="lazy"
+              />
+              <figcaption>Reporting &amp; SLA</figcaption>
+            </figure>
+            <figure class="shot">
+              <img
+                src="./assets/screenshots/agent-search.png"
+                alt="Ticket search"
+                width="1440"
+                height="900"
+                loading="lazy"
+              />
+              <figcaption>Full-text ticket search</figcaption>
+            </figure>
+            <figure class="shot">
+              <img
+                src="./assets/screenshots/admin-queues.png"
+                alt="Admin queues"
+                width="1440"
+                height="900"
+                loading="lazy"
+              />
+              <figcaption>Admin — queues and configuration</figcaption>
+            </figure>
+            <figure class="shot">
+              <img
+                src="./assets/screenshots/admin-gdpr.png"
+                alt="GDPR tools"
+                width="1440"
+                height="900"
+                loading="lazy"
+              />
+              <figcaption>Privacy / GDPR erasure tooling</figcaption>
+            </figure>
+            <figure class="shot">
+              <img
+                src="./assets/screenshots/portal.png"
+                alt="Customer portal"
+                width="1440"
+                height="900"
+                loading="lazy"
+              />
+              <figcaption>Customer portal</figcaption>
+            </figure>
+            <figure class="shot">
+              <img
+                src="./assets/screenshots/agent-kb.png"
+                alt="Knowledge base"
+                width="1440"
+                height="900"
+                loading="lazy"
+              />
+              <figcaption>Knowledge base editor</figcaption>
+            </figure>
+          </div>
+        </div>
+      </section>
+
+      <section id="paths">
+        <div class="wrap">
+          <div class="section-head">
+            <h2>Three ways to run</h2>
+            <p>Greenfield, side-by-side with Znuny, or a controlled migration path.</p>
+          </div>
+          <div class="cards">
+            <article class="card">
+              <h3>Fresh install</h3>
+              <p>
+                Empty database, bootstrap with <code>tiqora bootstrap</code>, and run
+                Tiqora standalone.
+              </p>
+            </article>
+            <article class="card">
+              <h3>Parallel to Znuny</h3>
+              <p>
+                Share one Znuny&nbsp;6.5 database. Additive <code>tiqora_*</code> tables
+                only — no Znuny schema changes until you choose ownership.
+              </p>
+            </article>
+            <article class="card">
+              <h3>Migrate away</h3>
+              <p>
+                Take over daemons feature-flag by feature-flag, then follow the cutover
+                runbook when you are ready.
+              </p>
+            </article>
+          </div>
+          <div class="chips" aria-label="Tech stack">
+            <span class="chip">Python 3.12 · FastAPI</span>
+            <span class="chip">React · TypeScript · Vite</span>
+            <span class="chip">PostgreSQL / MariaDB</span>
+            <span class="chip">Meilisearch</span>
+            <span class="chip">Redis · taskiq</span>
+            <span class="chip">Docker</span>
+            <span class="chip">AGPL-3.0</span>
+          </div>
+        </div>
+      </section>
+
+      <section class="cta">
+        <div class="wrap">
+          <h2>Explore the interactive demo</h2>
+          <p>
+            Full agent, admin, and portal UI in your browser — mock data only, nothing
+            is saved.
+          </p>
+          <div class="btn-row">
+            <a class="btn btn-primary" href="./demo/">Launch demo</a>
+            <a class="btn btn-ghost" href="https://github.com/CygnusNetworks/tiqora">Star on GitHub</a>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer>
+      <div class="wrap">
+        <div class="footer-grid">
+          <div>
+            <strong style="color: var(--ink)">Tiqora</strong>
+            · Copyright © 2026 Cygnus Networks GmbH
+          </div>
+          <div class="footer-links">
+            <a href="https://github.com/CygnusNetworks/tiqora">GitHub</a>
+            <a href="https://github.com/CygnusNetworks/tiqora/blob/main/LICENSE">License</a>
+            <a href="https://github.com/CygnusNetworks/tiqora/blob/main/docs/README.md">Documentation</a>
+            <a href="./demo/">Demo</a>
+          </div>
+        </div>
+        <p class="legal">
+          “Znuny” is a trademark of Znuny GmbH; “OTRS” is a registered trademark of
+          OTRS AG. Tiqora is not affiliated with, endorsed by, or sponsored by either
+          company; the names are used solely to describe factual compatibility.
+        </p>
+      </div>
+    </footer>
+  </body>
+</html>

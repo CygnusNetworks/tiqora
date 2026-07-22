@@ -13,15 +13,15 @@ full design rationale, see [specs/2026-07-19-tiqora-design.md](./specs/2026-07-1
    and MCP share one ACL/group/role engine.
 4. **Incremental daemon takeover** — Mail, escalation, notifications, and
    GenericAgent move to Tiqora behind feature flags.
-5. **AI-ready surface** — MCP tools and (later) event webhooks as integration
-   points for agents and automation.
+5. **AI-ready surface** — MCP tools and event webhooks as integration points
+   for agents and automation.
 
 ## Runtime processes
 
 | Process | Image / command | Responsibility |
 |---|---|---|
 | `tiqora-api` | `api` | HTTP: agent/portal/admin BFF, `/api/v1`, compat routes, `/health`, `/ready`, `/metrics` |
-| `tiqora-worker` | `worker` | taskiq consumers: indexer, mailer, pollers, later postmaster/escalation/GA |
+| `tiqora-worker` | `worker` | taskiq consumers: indexer, mailer, pollers, postmaster/escalation/GA (feature-flagged) |
 | `tiqora-mcp` | `mcp` | FastMCP over SSE; imports `domain/` directly (no second business layer) |
 
 All three share the same container image with a switchable entrypoint.
@@ -64,8 +64,8 @@ Adapters (REST, MCP, workers) must not invent partial writes.
   - `mysql+aiomysql://…` → aiomysql
 - Two Alembic version chains:
   - `alembic/versions_tiqora/` — active; creates only `tiqora_*` tables
-  - `alembic/versions_owned/` — empty until schema-ownership mode is enabled
-    after cutover (FKs, indexes, orphan reports)
+  - `alembic/versions_owned/` — gated until schema-ownership mode is enabled
+    after cutover (additive indexes, FKs, orphan reports)
 
 ### Search and attachments
 
@@ -108,7 +108,7 @@ disabled by default (`channel.<name>.enabled` in `tiqora_settings`), and
 configured via `/api/v1/admin/channels`. Full details, endpoints, and config
 keys: [channels.md](./channels.md).
 
-### Read path (Phase 1a)
+### Read path
 
 ```
 Browser / agent UI
@@ -133,21 +133,21 @@ Key endpoints: `/auth/login|me|logout`, `/queues`, `/tickets`,
   `Authorization: Bearer`.
 - `GET /api/v1/auth/methods` is a discovery endpoint (`{password, oidc,
   spnego, ldap}`) the agent login page uses to decide which buttons to show.
-- **OIDC/SSO** (Phase 3c, authlib): `/api/v1/auth/oidc/login` redirects to the
+- **OIDC/SSO** (authlib): `/api/v1/auth/oidc/login` redirects to the
   provider's authorization endpoint (state stored in Redis, short TTL);
   `/callback` exchanges the code, fetches `userinfo`, and maps a configurable
   claim (`TIQORA_OIDC_CLAIM`, default `preferred_username`) to `users.login`.
   **No auto-provisioning in v1** — the claim must match an existing,
   `valid_id = 1` user or the login is rejected (403). Same Redis session as
   password login is created on success.
-- **Kerberos/SPNEGO** (Phase 3c, optional `kerberos` extra / `gssapi`):
+- **Kerberos/SPNEGO** (optional `kerberos` extra / `gssapi`):
   `/api/v1/auth/spnego` implements the Negotiate challenge/response
   (`401 WWW-Authenticate: Negotiate` → `Authorization: Negotiate <token>`).
   All `gssapi` calls run in an executor (it's a sync, C-extension-backed
   library). Feature-flagged off by default (`TIQORA_SPNEGO_ENABLED`); returns
   `501` if `gssapi` isn't installed. Principal's primary part maps to
   `users.login`.
-- **TOTP 2FA** (Phase 3c, pyotp, per-user opt-in): `tiqora_user_totp` stores a
+- **TOTP 2FA** (pyotp, per-user opt-in): `tiqora_user_totp` stores a
   Fernet-encrypted secret (key derived from `TIQORA_SECRET_KEY`). After a
   successful password/SSO/SPNEGO login for a user with TOTP enabled, the
   session is created in a **pending-2FA state** — tagged so it is invisible
@@ -158,7 +158,7 @@ Key endpoints: `/auth/login|me|logout`, `/queues`, `/tickets`,
   code (`qrcode` lib, SVG factory — no `PIL` dependency); the agent security
   page (`/agent/security`) consumes it as a plain cookie-authenticated
   `<img src>`. 404 with no pending enrollment.
-- **LDAP/AD** (Phase 3c, `ldap3`, bind-search-bind): ports
+- **LDAP/AD** (`ldap3`, bind-search-bind): ports
   `Kernel::System::Auth::LDAP` / `CustomerAuth::LDAP`
   (`domain/auth_ldap.py` + `domain/customer_auth_ldap.py`, sharing the
   bind-search-bind core in `domain/_ldap_core.py`). Tried as a **fallback**
@@ -172,7 +172,7 @@ Key endpoints: `/auth/login|me|logout`, `/queues`, `/tickets`,
   `UserLowerCase`/per-directory charset knobs.
 - Planned: GenericInterface SessionIDs against Znuny `sessions`.
 
-### Webhooks (Phase 3c)
+### Webhooks
 
 `tiqora_webhook` (admin CRUD under `/api/v1/admin/webhooks`) subscribes to
 `tiqora_event_outbox` event types (empty list / `["*"]` = all events). The
@@ -185,7 +185,7 @@ keyed by the webhook's `secret`). Delivery retries up to
 retries are logged and counted in `tiqora_webhook_deliveries_total{status}`
 but never raised — webhook delivery must not block Meilisearch re-indexing.
 
-### Customer portal (Phase 3a)
+### Customer portal
 
 Mounted at `/api/portal` in the main API process (same `tiqora-api`), parallel
 to `/api/v1`:
@@ -214,7 +214,7 @@ to `/api/v1`:
   (`follow_up_id == 3`) is not yet implemented — treated the same as reopen;
   see `docs/compatibility.md` uncertainties.
 
-### Knowledge base (Phase 3a)
+### Knowledge base
 
 New module `tiqora.kb`, backed by dedicated `tiqora_kb_*` tables
 (`versions_tiqora/20260719_0004_kb_tables.py`): category, article,
@@ -241,7 +241,7 @@ are touched.
   tools `kb_search` / `kb_get_article` in `mcp_server/server.py` call the same
   `kb/service.py` functions.
 
-### Admin CRUD API (Phase 3a)
+### Admin CRUD API
 
 `/api/v1/admin/*`, guarded by `AdminUser` (`api/v1/admin/deps.py`): Znuny
 "admin" semantics — membership (direct via `group_user`, or via
@@ -411,7 +411,7 @@ possible-values editing UI.
 | structlog JSON | Request and worker logs |
 | `deploy/zabbix/` | Zabbix template (HTTP agent on metrics/JSON) |
 
-### MCP server (Phase 2c)
+### MCP server
 
 ```
 MCP client (Claude Code, Claude Desktop, ...)
@@ -445,7 +445,7 @@ MCP deliberately does **not** mirror admin/portal/calendar/BPM/stats/GDPR.
 no `time.sleep` anywhere in `mcp_server/`. Unavoidable sync operations (none currently)
 would use an executor helper.
 
-### GenericInterface compat layer (Phase 2c)
+### GenericInterface compat layer
 
 Mounted at `/znuny-compat` in the main API process (same `tiqora-api`).
 

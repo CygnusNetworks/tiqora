@@ -188,7 +188,7 @@ instead of `TIQORA_LDAP_*` (`ENABLED`, `HOST`, `PORT`, `USE_SSL`,
 | `TIQORA_SMTP_USER` | *(empty)* |
 | `TIQORA_SMTP_PASSWORD` | *(empty)* |
 
-### Daemon takeover poll intervals (Phase 4b)
+### Daemon takeover poll intervals
 
 | Variable | Default |
 |---|---|

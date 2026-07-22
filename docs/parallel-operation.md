@@ -60,8 +60,8 @@ Znuny uses a **lock-free** counter over the `ticket_number_counter` table:
 
 - Port the same algorithm (short autocommit transactions **per step**, never one
   long transaction holding locks across the whole allocation).
-- Safe under concurrent Znuny writers — mixed TN concurrency tests are a Phase 2
-  exit criterion.
+- Safe under concurrent Znuny writers — mixed TN concurrency is covered by
+  golden-master / concurrency tests.
 - Number module format (DateChecksum, AutoIncrement, …) must match the
   configured Znuny `Ticket::NumberGenerator` setting.
 
@@ -139,7 +139,7 @@ Older upgraded installs may still miss some constraints. Tiqora must:
   `users` id 1 / `valid` id 1 from initial_insert when testing),
 - enforce referential integrity in domain code,
 - tolerate and report orphans on legacy databases that lack constraints,
-- only own/alter FKs after schema-ownership mode (Phase 5).
+- only own/alter FKs after schema-ownership mode.
 
 ## Znuny cache invalidation
 
@@ -170,11 +170,11 @@ cleanly — it never dies inside the daemon.
 environments where installing the addon is not possible.
 
 Proving the path: an admin creates a queue in Tiqora and it appears in Znuny
-without restart (Phase 3 exit criterion).
+without restart.
 
 ## Detecting Znuny writes
 
-Tiqora poller (Phase 1+):
+Tiqora poller:
 
 | Watermark | Source | Use |
 |---|---|---|
@@ -189,7 +189,7 @@ TanStack Query invalidation. Agent presence (viewing/composing) uses 30 s
 Redis TTL keys (`tiqora:presence:<ticket_id>:<user_id>`) surfaced on the
 ticket zoom.
 
-## Feature-flag daemon takeover (Phase 4)
+## Feature-flag daemon takeover
 
 Each of the following moves to Tiqora independently:
 
@@ -223,7 +223,7 @@ older than `last_run` (last tick failed); grey when disabled; green when
 jobs); amber otherwise (enabled but stale — no successful tick recently
 enough).
 
-## Taking over mail processing (Phase 4a)
+## Taking over mail processing
 
 Tiqora's postmaster pipeline (`tiqora.worker.postmaster`, `tiqora.channels.email.*`)
 is a behavioural port of `Kernel/System/PostMaster.pm` and friends: mail
@@ -276,7 +276,7 @@ POP3/IMAP delete-after-fetch semantics, race to delete) messages.
   default. Set to `1` only for testing against a mailbox nothing else reads,
   never against a mailbox Znuny's daemon also polls.
 
-## Uncertainties (Phase 4a — postmaster)
+## Uncertainties (postmaster)
 
 Documented simplifications vs. exact Znuny behaviour, in descending order of
 likely impact:
@@ -325,7 +325,7 @@ likely impact:
   implemented — Tiqora fetches an account's whole mailbox in one pass rather
   than reconnecting every N messages.
 
-## Taking over escalation index rebuild (Phase 4b)
+## Taking over escalation index rebuild
 
 Tiqora's escalation sweep (`tiqora.worker.escalation`, math in
 `tiqora.znuny.escalation`) is a behavioural port of
@@ -373,7 +373,7 @@ rows and duplicate any downstream notification.
   `*NotifyBefore` event fires; a simplified, fixed-window substitute for
   Znuny's per-SLA/queue notify-before percentage (see Uncertainties below).
 
-## Taking over event notifications (Phase 4b)
+## Taking over event notifications
 
 Tiqora's notification engine (`tiqora.worker.notifications`) is a
 behavioural port of `Kernel::System::Ticket::Event::NotificationEvent` (+ its
@@ -384,7 +384,7 @@ against `tiqora_event_outbox` rows via a monotonic per-event watermark
 recipients (`AgentOwner`/`AgentResponsible`/`RecipientAgents`/
 `RecipientGroups`/`Customer`), evaluates ticket-attribute and `ArticleFilter`
 matching, renders the subject/body with the shared `<OTRS_...>` placeholder
-module (`tiqora.channels.email.placeholder`, reused from the Phase 4a
+module (`tiqora.channels.email.placeholder`, reused from the
 postmaster auto-response path rather than duplicated), and sends via SMTP.
 
 **It is OFF by default** and **mutually exclusive** with Znuny's own event
@@ -421,7 +421,7 @@ is sent twice.
 
 - `daemon.notifications.enabled` (`tiqora_settings`, default unset = OFF).
 
-## Taking over GenericAgent (Phase 4b)
+## Taking over GenericAgent
 
 Tiqora's GenericAgent executor (`tiqora.worker.generic_agent`) is a
 behavioural port of a pragmatic subset of `Kernel::System::GenericAgent`
@@ -465,7 +465,7 @@ action (double note, double state-flap history, etc.).
   OFF) — required in addition to the takeover flag before any job's
   `NewDelete` action actually deletes a ticket.
 
-## Uncertainties (Phase 4b — escalation, notifications, GenericAgent)
+## Uncertainties (escalation, notifications, GenericAgent)
 
 Documented simplifications vs. exact Znuny behaviour, in descending order of
 likely impact:
@@ -515,7 +515,7 @@ likely impact:
   the normal outbox/reindex path (a deleted ticket's stale search entry is
   removed on the next full reindex, not immediately).
 
-## Schema ownership (Phase 5)
+## Schema ownership
 
 When parallel operation ends:
 

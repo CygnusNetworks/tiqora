@@ -1,5 +1,10 @@
 # Tiqora documentation index
 
+**Product site & live demo:** [cygnusnetworks.github.io/tiqora](https://cygnusnetworks.github.io/tiqora/)
+([interactive demo](https://cygnusnetworks.github.io/tiqora/demo/)).
+
+> Still under active development. Production use is not yet recommended.
+
 ## Getting started — three ways to run
 
 | Path | When | Doc |
@@ -14,7 +19,7 @@
 |---|---|
 | [guide/fresh-install.md](guide/fresh-install.md) | Greenfield install: empty DB → `tiqora bootstrap` → login |
 | [architecture.md](architecture.md) | System components and data flow |
-| [development.md](development.md) | Local development workflow |
+| [development.md](development.md) | Local development workflow + release checklist |
 | [testing.md](testing.md) | Test suite layout, golden-master tests, testcontainers |
 | [deployment.md](deployment.md) | Production-oriented deployment notes |
 | [deploy/docker-compose.md](deploy/docker-compose.md) | Full Docker Compose walkthrough: services, env vars, external DB, reverse proxy, TLS, MCP streaming |
@@ -51,7 +56,7 @@
 
 | Document | Content |
 |---|---|
-| [specs/2026-07-19-tiqora-design.md](specs/2026-07-19-tiqora-design.md) | Full design specification |
+| [specs/2026-07-19-tiqora-design.md](specs/2026-07-19-tiqora-design.md) | Historical design specification (phases reflect original delivery plan) |
 
 ---
 

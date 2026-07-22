@@ -10,7 +10,7 @@ with Tiqora. It covers two complementary surfaces:
 - **MCP** (`tiqora.mcp_server`) — the primary structured interface for an
   agent to *read and act* on tickets once triggered.
 
-No LLM code ships in this phase — this is the contract other pieces (a
+No LLM code ships in this codebase — this is the contract other pieces (a
 future triage/draft-reply/KB-answer agent, in-house or third-party) are
 built against.
 
@@ -144,7 +144,7 @@ surface.
 ## 3. Recommended integration patterns
 
 These are architectural patterns for future agents to follow — none of them
-are implemented in this phase.
+are implemented in this codebase.
 
 ### Triage agent
 

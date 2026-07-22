@@ -47,7 +47,7 @@ These issues appear in real Znuny deployments and must not regress:
 | Error shape | Error codes/messages should stay parseable by common clients |
 | Empty search | Empty result sets return the same structure as Znuny (not HTTP 404) |
 
-Phase 2c golden-behaviour tests (16 in `tests/test_compat_operations.py`) cover
+Golden-behaviour tests (16 in `tests/test_compat_operations.py`) cover
 all five operations including the gotchas above with seeded MariaDB data.
 
 ## Implemented routes
@@ -209,7 +209,7 @@ Both forms are supported in Tiqora for convenience.
 1. **Compat SessionCreate** — legacy tools, SessionID cookie/header style.
 2. **SessionID** — validated against Znuny `sessions` key-value table (not Redis).
 3. **API keys** — preferred for MCP and modern automation (same permission engine).
-4. **OIDC / Kerberos** — UI and `/api/v1` (Phase 3); not required for basic
+4. **OIDC / Kerberos** — UI and `/api/v1`; not required for basic
    GenericInterface parity.
 
 ## What is not emulated
@@ -245,16 +245,16 @@ Znuny 6.5.22 container on the same MariaDB and validated:
 - **Divergence found and fixed**: compat TicketUpdate auto-locked the ticket
   on owner change; Znuny's GI TicketUpdate never does.
 
-## Phase 2c uncertainties
+## Known limitations (compat layer)
 
 - **SessionID TTL**: The compat layer validates `UserID`/`UserLogin`/`UserType`
   from the `sessions` table but does not check `UserLastRequest` or TTL. Expired
   but un-purged sessions will still authenticate. Mitigated: Znuny’s session
-  cleanup daemon removes stale rows; a future phase can add TTL checks.
+  cleanup daemon removes stale rows; a future release can add TTL checks.
 - **CustomerUserLogin auth**: Customer users authenticated via compat ops are
   mapped to `user_id=1` (system) internally since they have no Znuny agent ID.
   This means all compat customer writes appear as system-initiated in history.
-  Phase 3 will address this with a proper customer principal.
+  A later revision will address this with a proper customer principal.
 - **DynamicField_X search**: Only `Equals` and `Like` operators are implemented;
   `GreaterThan`, `SmallerThan`, `GreaterThanEquals`, `SmallerThanEquals` are not.
 - **Attachment storage**: Attachments are stored inline in `article_data_mime_attachment`
@@ -267,7 +267,7 @@ Znuny 6.5.22 container on the same MariaDB and validated:
   (validating the header against an expected `NameSpace#Operation` string) is
   not enforced — see [SOAP transport differences](#differences-vs-znunys-soap-transport-documented-deviations).
 
-## Phase 3a uncertainties
+## Known limitations (portal / customers)
 
 **Customer portal**
 
@@ -296,12 +296,12 @@ Znuny 6.5.22 container on the same MariaDB and validated:
   application-enforced only.
 - Soft deletes: categories → `valid = False`; articles → `state = "archived"`
   (content/chunks retained for audit/citation, not indexed for search).
-- Migration `20260719_0001_api_key_and_settings.py` (pre-existing, Phase 2)
+- Migration `20260719_0001_api_key_and_settings.py`
   fails to apply on PostgreSQL (`server_default=sa.text("1")` on a boolean
   column → `DatatypeMismatchError`). Discovered while validating the new KB
   migration (0004) on Postgres; 0004 itself applies/downgrades cleanly on
   MariaDB. The Postgres leg of the full migration chain needs a follow-up fix
-  to 0001, tracked separately from Phase 3a.
+  to 0001, tracked separately.
 
 **Admin CRUD API**
 
