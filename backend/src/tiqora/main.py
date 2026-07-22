@@ -36,6 +36,7 @@ def main(argv: list[str] | None = None) -> None:
     api_p.add_argument("--reload", action="store_true")
     sub.add_parser("worker", help="Run the background worker (poller)")
     sub.add_parser("mcp", help="Run the MCP server")
+    sub.add_parser("ai-worker", help="Run the AI subsystem worker (separate process)")
     add_ownership_subparser(sub)
     add_migrate_subparser(sub)
     add_bootstrap_subparser(sub)
@@ -81,6 +82,10 @@ def main(argv: list[str] | None = None) -> None:
         from tiqora.mcp_server.__main__ import run_mcp
 
         run_mcp()
+    elif command == "ai-worker":
+        from tiqora.ai.worker import run_ai_worker
+
+        run_ai_worker()
     elif command == "index":
         if args.index_command == "rebuild":
             from tiqora.worker.indexer import rebuild_index

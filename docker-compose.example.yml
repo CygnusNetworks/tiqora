@@ -169,6 +169,34 @@ services:
       retries: 3
       start_period: 60s
 
+  tiqora-ai-worker:
+    # Own process for the Tiqora AI subsystem (~/TIQORA_LLM_PLAN.md §3.0/§3.4)
+    # — independent of tiqora-worker so a hung LLM call never affects
+    # postmaster/outbox/indexer, and so it can be stopped alone as a
+    # cost/incident kill switch. Stays inert until an admin sets
+    # operation_mode=tiqora_primary AND enables daemon.ai_worker.enabled.
+    image: ghcr.io/cygnusnetworks/tiqora:latest
+    restart: unless-stopped
+    command: ["ai-worker"]
+    environment:
+      DATABASE_URL: postgresql+asyncpg://tiqora:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}@postgres:5432/tiqora
+      REDIS_URL: redis://:${REDIS_PASSWORD:?set REDIS_PASSWORD in .env}@redis:6379/0
+      MEILI_URL: http://meilisearch:7700
+      MEILI_MASTER_KEY: ${MEILI_MASTER_KEY:?set MEILI_MASTER_KEY in .env}
+      TIQORA_SECRET_KEY: ${TIQORA_SECRET_KEY:?set TIQORA_SECRET_KEY in .env}
+      TIQORA_ENV: production
+      TIQORA_LOG_LEVEL: INFO
+    depends_on:
+      - tiqora-api
+      - redis
+    healthcheck:
+      # No HTTP port — same heartbeat-file pattern as tiqora-worker, own file.
+      test: ["CMD-SHELL", "python -c \"import os,sys,time; f=os.environ.get('TIQORA_AI_WORKER_HEARTBEAT_FILE','/tmp/tiqora-ai-worker.heartbeat'); sys.exit(0 if os.path.exists(f) and time.time()-os.path.getmtime(f) < 90 else 1)\""]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
+
   tiqora-mcp:
     image: ghcr.io/cygnusnetworks/tiqora:latest
     restart: unless-stopped
