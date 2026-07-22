@@ -56,10 +56,15 @@ class LlmMessage:
     ``tool_calls`` is only set on assistant messages that invoked tools;
     ``tool_call_id`` (+ optionally ``name``) is only set on ``tool`` role
     messages (the tool result being fed back to the model).
+
+    ``content`` is usually plain text; it may also be a list of OpenAI-style
+    multimodal content parts (``{"type": "text", ...}`` /
+    ``{"type": "image_url", ...}``) — used only by the vision pre-pass
+    (:mod:`tiqora.ai.vision`), never by the main agent/summary model.
     """
 
     role: str
-    content: str | None = None
+    content: str | list[dict[str, Any]] | None = None
     tool_calls: list[ToolCall] | None = None
     tool_call_id: str | None = None
     name: str | None = None

@@ -213,6 +213,38 @@ def _add_article(
     return int(article_id)
 
 
+def _add_attachment(
+    sync_url: str,
+    *,
+    article_id: int,
+    filename: str,
+    content_type: str,
+    content: bytes,
+    disposition: str = "attachment",
+) -> int:
+    engine = create_engine(sync_url)
+    with engine.begin() as conn:
+        row = conn.execute(
+            text(
+                "INSERT INTO article_data_mime_attachment (article_id, filename, content_size,"
+                " content_type, disposition, content, create_time, create_by, change_time,"
+                " change_by) VALUES (:aid, :fn, :size, :ct, :disp, :content, :t, 1, :t, 1)"
+            ),
+            {
+                "aid": article_id,
+                "fn": filename,
+                "size": str(len(content)),
+                "ct": content_type,
+                "disp": disposition,
+                "content": content,
+                "t": NOW,
+            },
+        )
+        attachment_id = row.lastrowid
+    engine.dispose()
+    return int(attachment_id)
+
+
 async def _setup_policy(
     session: AsyncSession,
     *,
@@ -680,5 +712,43 @@ async def test_auto_summary_due_thresholds(mariadb_znuny_url: str) -> None:
             )
         async with factory() as session:
             assert await auto_summary_due(session, seed["ticket_id"]) is False
+    finally:
+        await engine.dispose()
+
+
+async def test_document_attachment_text_appears_in_summary_prompt(mariadb_znuny_url: str) -> None:
+    seed = _seed_ticket(mariadb_znuny_url, ns=12)
+    article_id = _add_article(
+        mariadb_znuny_url,
+        ticket_id=seed["ticket_id"],
+        sender_type="customer",
+        body="Bitte siehe Anhang.",
+    )
+    _add_attachment(
+        mariadb_znuny_url,
+        article_id=article_id,
+        filename="vertrag.txt",
+        content_type="text/plain",
+        content=b"Vertragsnummer: XY-987",
+    )
+    engine = create_async_engine(_mysql_async(mariadb_znuny_url))
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    try:
+        async with factory() as session:
+            await _setup_policy(session, seed=seed)
+
+        llm = ScriptedLlm(["Summary mentioning the contract."])
+        async with factory() as session:
+            result = await summarize_ticket(
+                session,
+                llm=llm,
+                ticket_id=seed["ticket_id"],
+                trigger=TRIGGER_MANUAL,
+                acting_user_id=seed["agent_id"],
+            )
+        assert result.status == STATUS_UPDATED
+        assert llm.last_user_message is not None
+        assert "Vertragsnummer: XY-987" in llm.last_user_message
+        assert "[Anhang: vertrag.txt]" in llm.last_user_message
     finally:
         await engine.dispose()

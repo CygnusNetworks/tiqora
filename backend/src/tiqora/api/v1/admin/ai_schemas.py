@@ -52,6 +52,7 @@ class LlmProviderOut(BaseModel):
     supports_tools: bool
     supports_streaming: bool
     eu_hosted: bool
+    supports_vision: bool
     valid_id: int
     create_time: datetime
     change_time: datetime
@@ -67,6 +68,7 @@ class LlmProviderCreate(BaseModel):
     supports_tools: bool = True
     supports_streaming: bool = True
     eu_hosted: bool = False
+    supports_vision: bool = False
 
 
 class LlmProviderUpdate(BaseModel):
@@ -80,6 +82,7 @@ class LlmProviderUpdate(BaseModel):
     supports_tools: bool | None = None
     supports_streaming: bool | None = None
     eu_hosted: bool | None = None
+    supports_vision: bool | None = None
     valid_id: int | None = None
 
 
@@ -164,6 +167,7 @@ class AiQueuePolicyOut(BaseModel):
     service_user_id: int | None
     llm_provider_id: int | None
     model_override: str | None
+    vision_provider_id: int | None
     kb_tags: str | None
     kb_category_ids: str | None
     mcp_client_ids: str | None
@@ -197,6 +201,7 @@ class AiQueuePolicyCreate(BaseModel):
     service_user_id: int | None = None
     llm_provider_id: int | None = None
     model_override: str | None = None
+    vision_provider_id: int | None = None
     kb_tags: str | None = None
     kb_category_ids: str | None = None
     mcp_client_ids: str | None = None
@@ -226,6 +231,7 @@ class AiQueuePolicyUpdate(BaseModel):
     service_user_id: int | None = None
     llm_provider_id: int | None = None
     model_override: str | None = None
+    vision_provider_id: int | None = None
     kb_tags: str | None = None
     kb_category_ids: str | None = None
     mcp_client_ids: str | None = None

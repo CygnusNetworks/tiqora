@@ -134,6 +134,68 @@ async def test_provider_crud_never_exposes_api_key(mariadb_znuny_url: str) -> No
         get_settings.cache_clear()
 
 
+async def test_provider_duplicate_copies_api_key_and_suffixes_name(
+    mariadb_znuny_url: str,
+) -> None:
+    _ensure_tiqora_tables(mariadb_znuny_url)
+    get_settings.cache_clear()
+    settings = get_settings()
+    engine = create_async_engine(_mysql_async(mariadb_znuny_url))
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    try:
+        async with factory() as session:
+            original = await admin_ai.create_llm_provider(
+                LlmProviderCreate(
+                    name="nebius",
+                    kind="openai_compat",
+                    base_url="https://api.studio.nebius.ai/v1",
+                    default_model="meta-llama/Llama-3.3-70B",
+                    api_key="sk-super-secret",
+                    eu_hosted=True,
+                    supports_vision=True,
+                ),
+                _root_user(),
+                session,
+            )
+
+            copy1 = await admin_ai.duplicate_llm_provider(original.id, _root_user(), session)
+            assert copy1.id != original.id
+            assert copy1.name == "nebius (Kopie)"
+            assert copy1.has_api_key is True
+            assert copy1.base_url == original.base_url
+            assert copy1.default_model == original.default_model
+            assert copy1.eu_hosted is True
+            assert copy1.supports_vision is True
+
+            # Ciphertext is byte-for-byte the same row (never re-entered/re-encrypted
+            # from plaintext) but decrypts to the same secret.
+            orig_row = (
+                await session.execute(
+                    select(TiqoraLlmProvider).where(TiqoraLlmProvider.id == original.id)
+                )
+            ).scalar_one()
+            copy_row = (
+                await session.execute(
+                    select(TiqoraLlmProvider).where(TiqoraLlmProvider.id == copy1.id)
+                )
+            ).scalar_one()
+            assert copy_row.api_key_enc == orig_row.api_key_enc
+            assert decrypt_secret(settings.secret_key, copy_row.api_key_enc) == "sk-super-secret"
+
+            # A second duplicate of the original collides with "(Kopie)" and
+            # counts up.
+            copy2 = await admin_ai.duplicate_llm_provider(original.id, _root_user(), session)
+            assert copy2.name == "nebius (Kopie 2)"
+
+            # Duplicating a nonexistent provider still 404s.
+            with pytest.raises(HTTPException) as exc_info:
+                await admin_ai.duplicate_llm_provider(999_999, _root_user(), session)
+            assert exc_info.value.status_code == 404
+    finally:
+        await engine.dispose()
+        get_settings.cache_clear()
+
+
 async def test_provider_test_connection_mocked_tool_calling(mariadb_znuny_url: str) -> None:
     _ensure_tiqora_tables(mariadb_znuny_url)
     get_settings.cache_clear()
