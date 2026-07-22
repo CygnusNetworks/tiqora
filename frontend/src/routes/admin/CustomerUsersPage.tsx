@@ -95,12 +95,25 @@ export function CustomerUsersPage() {
 
   const fields: FieldDef[] = [
     { name: "login", label: t("admin.customerUsers.login"), type: "text", required: true },
-    { name: "email", label: t("admin.customerUsers.email"), type: "text", required: true },
+    {
+      name: "email",
+      label: t("admin.customerUsers.email"),
+      type: "text",
+      required: true,
+      help: {
+        title: t("admin.customerUsers.email"),
+        description: t("admin.help.customerUsers.email"),
+      },
+    },
     {
       name: "customer_id",
       label: t("admin.customerUsers.customerId"),
       type: "text",
       required: true,
+      help: {
+        title: t("admin.customerUsers.customerId"),
+        description: t("admin.help.customerUsers.customerId"),
+      },
     },
     {
       name: "password",
@@ -121,6 +134,7 @@ export function CustomerUsersPage() {
         { value: 1, label: t("admin.table.valid") },
         { value: 2, label: t("admin.table.invalid") },
       ],
+      help: { title: t("admin.table.status"), description: t("admin.help.common.validId") },
     },
   ];
 

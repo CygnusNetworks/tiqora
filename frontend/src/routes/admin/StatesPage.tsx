@@ -54,6 +54,7 @@ export function StatesPage() {
       type: "select",
       required: true,
       options: STATE_TYPE_OPTIONS,
+      help: { title: t("admin.states.typeId"), description: t("admin.help.states.typeId") },
     },
     { name: "comments", label: t("admin.table.comments"), type: "textarea" },
     {
@@ -64,6 +65,7 @@ export function StatesPage() {
         { value: 1, label: t("admin.table.valid") },
         { value: 2, label: t("admin.table.invalid") },
       ],
+      help: { title: t("admin.table.status"), description: t("admin.help.common.validId") },
     },
   ];
 
