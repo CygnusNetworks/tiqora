@@ -10,6 +10,7 @@ import { formatDateTime } from "@/lib/format";
 import { Button } from "@/components/ui/Button";
 import { Spinner } from "@/components/ui/Spinner";
 import { Badge } from "@/components/ui/Badge";
+import { useConfirm, usePrompt } from "@/components/ui/ConfirmDialog";
 
 function browserSupportsWebAuthn(): boolean {
   return typeof window !== "undefined" && typeof window.PublicKeyCredential !== "undefined";
@@ -33,6 +34,8 @@ export function SecurityPage() {
   const [disableError, setDisableError] = useState<string | null>(null);
   const [passkeyError, setPasskeyError] = useState<string | null>(null);
   const [addingPasskey, setAddingPasskey] = useState(false);
+  const { confirm, dialog: confirmDialog } = useConfirm();
+  const { prompt, dialog: promptDialog } = usePrompt();
 
   const webauthnSupported = useMemo(() => browserSupportsWebAuthn(), []);
 
@@ -125,7 +128,10 @@ export function SecurityPage() {
         optionsJSON: options as unknown as PublicKeyCredentialCreationOptionsJSON,
       });
       const name =
-        window.prompt(t("security.passkeyNamePrompt"), t("security.passkeyDefaultName")) ?? "";
+        (await prompt({
+          title: t("security.passkeyNamePrompt"),
+          defaultValue: t("security.passkeyDefaultName"),
+        })) ?? "";
       await api.passkeyRegisterFinish({
         credential: credential as unknown as Record<string, unknown>,
         name: name.trim() || null,
@@ -317,10 +323,13 @@ export function SecurityPage() {
                         size="sm"
                         data-testid={`passkey-delete-${pk.id}`}
                         disabled={deletePasskeyMutation.isPending}
-                        onClick={() => {
-                          if (window.confirm(t("security.passkeyDeleteConfirm", { name: pk.name }))) {
-                            deletePasskeyMutation.mutate(pk.id);
-                          }
+                        onClick={async () => {
+                          const ok = await confirm({
+                            title: t("security.passkeyHeading"),
+                            message: t("security.passkeyDeleteConfirm", { name: pk.name }),
+                            variant: "danger",
+                          });
+                          if (ok) deletePasskeyMutation.mutate(pk.id);
                         }}
                       >
                         {t("security.passkeyRemove")}
@@ -349,6 +358,9 @@ export function SecurityPage() {
           )}
         </section>
       )}
+
+      {confirmDialog}
+      {promptDialog}
     </div>
   );
 }

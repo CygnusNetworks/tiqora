@@ -1,24 +1,34 @@
-"""Readiness-Gate (plan §3.0): the AI subsystem may only be enabled once the
-operator has switched the install to Tiqora-primary operation (mail ingestion
-fully on Tiqora, Znuny read-only/off). This is a deliberate operator decision
-via ``system.operation_mode``, never auto-detected from running processes.
+"""Readiness-Gate (plan §3.0, relaxed in v1.1 / Phase E): the AI subsystem's
+**auto-reply** feature may only be enabled once the operator has switched the
+install to Tiqora-primary operation (mail ingestion fully on Tiqora, Znuny
+read-only/off). This is a deliberate operator decision via
+``system.operation_mode``, never auto-detected from running processes.
 
-Enforcement happens in two places, both required:
+Auto-reply sends a customer-visible article via the Tiqora outbox, which
+Znuny does not observe while running in parallel — with Znuny's own
+autoresponders still active, a customer could receive two answers. Manual
+Assist (``tiqora_ai_draft`` is a distinct entity, never an article, always
+reviewed by a human before anything is sent) and Summaries (state-only,
+``tiqora_ai_ticket_state``, pull-based) write nothing Sync-relevant and are
+therefore **not** gated — see :func:`require_feature_allowed`.
+
+Enforcement happens in two places, both required for ``auto_reply``:
 
 1. Admin API (``tiqora.api.v1.admin.ai``) calls :func:`require_tiqora_primary`
-   before allowing a queue policy to flip ``enabled_auto_reply`` /
-   ``enabled_summary`` / ``enabled_manual_assist`` to ``true``.
-2. The AI worker re-checks :func:`is_tiqora_primary` at the start of every run
-   (Phase A: the worker skeleton only checks it once per tick).
+   before allowing a queue policy to flip ``enabled_auto_reply`` to ``true``.
+2. The AI runtime (:mod:`tiqora.ai.runtime`) re-checks the gate at the start
+   of every ``trigger="auto"`` run; the auto-worker tick skips invoking it at
+   all while the gate is closed (:mod:`tiqora.ai.auto_worker`).
 
 Switching back to ``parallel`` is always allowed (regression must never be
-blocked) and pauses all AI runs.
+blocked) and pauses auto-reply only.
 """
 
 from __future__ import annotations
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from tiqora.ai.models import FEATURE_AUTO_REPLY
 from tiqora.domain.settings_store import KEY_OPERATION_MODE, get_setting, set_setting
 
 OPERATION_MODE_PARALLEL = "parallel"
@@ -65,9 +75,21 @@ async def require_tiqora_primary(session: AsyncSession) -> None:
     """
     if not await is_tiqora_primary(session):
         raise AiGateError(
-            "AI features require operation_mode=tiqora_primary "
-            "(the AI agent cannot run safely in parallel operation with Znuny)"
+            "Auto-reply requires operation_mode=tiqora_primary "
+            "(sending would risk double-answering alongside Znuny's own autoresponders "
+            "while running in parallel operation)"
         )
+
+
+async def require_feature_allowed(session: AsyncSession, feature: str) -> None:
+    """Feature-scoped Readiness-Gate (plan §3.0 v1.1 relaxation, Phase E).
+
+    Only :data:`~tiqora.ai.models.FEATURE_AUTO_REPLY` requires
+    ``operation_mode=tiqora_primary`` — see the module docstring for why.
+    ``manual_assist`` and ``summary`` always pass, gate or no gate.
+    """
+    if feature == FEATURE_AUTO_REPLY:
+        await require_tiqora_primary(session)
 
 
 __all__ = [
@@ -77,6 +99,7 @@ __all__ = [
     "AiGateError",
     "get_operation_mode",
     "is_tiqora_primary",
+    "require_feature_allowed",
     "require_tiqora_primary",
     "set_operation_mode",
 ]

@@ -61,7 +61,9 @@
     "back": "Zurück",
     "backToQueues": "Zurück zu Queues",
     "loading": "Laden…",
-    "close": "Schließen"
+    "close": "Schließen",
+    "confirm": "Bestätigen",
+    "cancel": "Abbrechen"
   },
   "auth": {
     "login": "Anmelden",
@@ -689,6 +691,8 @@
         "budgetTokensDay": "Token-Budget/Tag",
         "escalationRules": "Eskalationsregeln (JSON)",
         "escalationRulesHint": "JSON-Array mit Matching-Regeln auf MCP-Tool-Ergebnisse, die eine Eskalation an einen Menschen auslösen.",
+        "escalationRulesPlaceholder": "leer = keine Regeln, z. B. [{\"tool\":\"client:*\",\"match\":\"substring\",\"values\":[\"ESCALATE\"]}]",
+        "emptyUnlimited": "leer = unbegrenzt",
         "disclosureEnabled": "KI-Kennzeichnung aktiv",
         "disclosureTextPlaceholder": "Leer = globalen Standardtext verwenden",
         "piiMasking": "PII-Maskierung",

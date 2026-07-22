@@ -11,6 +11,15 @@ reusing the same convention as :mod:`tiqora.ai.runtime` (via the shared
 :mod:`tiqora.ai.context` loader) so the model can see its own previous
 replies were already accounted for without re-summarizing them as "new
 customer information".
+
+Not gated by the Readiness-Gate (plan §3.0 v1.1 relaxation, Phase E):
+summaries are state-only (``tiqora_ai_ticket_state.summary_body``), never an
+article, and pull-based — they write nothing Sync-relevant, so both the
+manual "Zusammenfassen" trigger and the worker's auto-summary scan run
+regardless of ``system.operation_mode``. Note that the auto-summary scan
+itself only ever sees tickets touched by the outbox batch in
+:mod:`tiqora.ai.auto_worker`, which stays empty until mail ingestion moves to
+Tiqora — so in practice auto-summary has no effect until then anyway.
 """
 
 from __future__ import annotations
@@ -32,7 +41,6 @@ from tiqora.ai.context import (
     load_articles,
     ticket_snapshot,
 )
-from tiqora.ai.gate import AiGateError, require_tiqora_primary
 from tiqora.ai.llm import LlmClient, LlmMessage
 from tiqora.ai.models import FEATURE_SUMMARY, TiqoraAiQueuePolicy
 from tiqora.ai.pii import PiiMapper
@@ -143,12 +151,10 @@ async def summarize_ticket(
     ``acting_user_id`` is required for ``trigger="manual"`` (ACL check);
     ``None`` for ``trigger="auto"`` (queue-driven, no per-user ACL — mirrors
     the auto-reply path's "keine Kreuz-Anrechnung" rule, plan §3.6).
-    """
-    try:
-        await require_tiqora_primary(session)
-    except AiGateError as exc:
-        raise SummaryError(str(exc)) from exc
 
+    Not gated by the Readiness-Gate (plan §3.0 v1.1 / Phase E) — see the
+    module docstring.
+    """
     try:
         ticket = await ticket_snapshot(session, ticket_id)
     except TicketNotFoundError as exc:

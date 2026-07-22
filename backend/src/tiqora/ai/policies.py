@@ -1,9 +1,13 @@
 """Queue AI policy service (plan §3.1) — CRUD + Readiness-Gate enforcement.
 
-The gate (``tiqora.ai.gate.require_tiqora_primary``) is only checked on the
-*enabling* transition of ``enabled_auto_reply`` / ``enabled_summary`` /
-``enabled_manual_assist``: turning a flag off, or leaving it unchanged, never
-raises — regression to ``parallel`` must never be blocked (plan §3.0).
+The gate (``tiqora.ai.gate.require_feature_allowed``) is only checked on the
+*enabling* transition of ``enabled_auto_reply``, and only for that flag —
+plan §3.0 v1.1 relaxation (Phase E) allows ``enabled_summary`` /
+``enabled_manual_assist`` to be enabled regardless of ``operation_mode``,
+since drafts and summaries write nothing Sync-relevant (see
+``tiqora.ai.gate`` module docstring). Turning ``enabled_auto_reply`` off, or
+leaving it unchanged, never raises — regression to ``parallel`` must never be
+blocked (plan §3.0).
 """
 
 from __future__ import annotations
@@ -15,8 +19,8 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from tiqora.ai.escalation import EscalationRuleError, validate_escalation_rules
-from tiqora.ai.gate import require_tiqora_primary
-from tiqora.ai.models import AUTONOMY_MODES, IDENTITY_MODES, TiqoraAiQueuePolicy
+from tiqora.ai.gate import require_feature_allowed
+from tiqora.ai.models import AUTONOMY_MODES, FEATURE_AUTO_REPLY, IDENTITY_MODES, TiqoraAiQueuePolicy
 
 
 class QueuePolicyValidationError(ValueError):
@@ -99,18 +103,16 @@ async def _enforce_gate_on_enable(
     enabled_summary: bool | None,
     enabled_manual_assist: bool | None,
 ) -> None:
-    """Only re-check the gate for flags that are *becoming* true."""
-    prev_auto = bool(previous.enabled_auto_reply) if previous else False
-    prev_summary = bool(previous.enabled_summary) if previous else False
-    prev_manual = bool(previous.enabled_manual_assist) if previous else False
+    """Only re-check the gate when ``enabled_auto_reply`` is *becoming* true.
 
-    turning_on = (
-        (enabled_auto_reply is True and not prev_auto)
-        or (enabled_summary is True and not prev_summary)
-        or (enabled_manual_assist is True and not prev_manual)
-    )
-    if turning_on:
-        await require_tiqora_primary(session)
+    ``enabled_summary``/``enabled_manual_assist`` are accepted unconditionally
+    (plan §3.0 v1.1 relaxation) — the parameters are still passed in so the
+    calling code doesn't have to know which flag is gated.
+    """
+    _ = enabled_summary, enabled_manual_assist
+    prev_auto = bool(previous.enabled_auto_reply) if previous else False
+    if enabled_auto_reply is True and not prev_auto:
+        await require_feature_allowed(session, FEATURE_AUTO_REPLY)
 
 
 async def create_queue_policy(

@@ -561,14 +561,20 @@ async def test_error_in_one_event_does_not_abort_batch(
         await engine.dispose()
 
 
-async def test_gate_regression_skips_batch_entirely(
+async def test_gate_closed_skips_auto_reply_but_still_drains_watermark(
     mariadb_znuny_url: str, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    """Plan §3.0 v1.1 relaxation (Phase E): the gate no longer pauses the
+    whole tick. The batch is still drained and the watermark still advances
+    while ``parallel`` — only the auto-reply send itself is skipped. This is
+    the chosen design to avoid a flood of stale auto-replies firing on the
+    first tick after cutover to ``tiqora_primary`` (see
+    ``tiqora.ai.auto_worker`` module docstring)."""
     seed = _seed_ticket(mariadb_znuny_url, ns=11)
     article_id = _add_article(
         mariadb_znuny_url, ticket_id=seed["ticket_id"], sender_type="customer", body="Help!"
     )
-    _insert_outbox_event(
+    event_id = _insert_outbox_event(
         mariadb_znuny_url,
         ticket_id=seed["ticket_id"],
         event_type="ArticleCreate",
@@ -584,14 +590,21 @@ async def test_gate_regression_skips_batch_entirely(
 
         _patch_llm(monkeypatch, ScriptedLlm([_propose_response("reply", "Should not run.")]))
         totals = await run_auto_tick(settings=get_settings(), session_factory=factory)
-        assert totals == {"gate_open": 0}
+        assert totals["gate_open"] == 0
+        # The outbox table is a single shared testcontainer across the whole
+        # suite (see test_watermark_advances_even_for_irrelevant_events), so
+        # other tests may have queued events since the last drain — assert
+        # our own event was included, not an exact count.
+        assert totals["events"] >= 1
+        assert totals["auto_replies"] == 0
+        assert totals["errors"] == 0
 
         async with factory() as session:
             watermark_after = await get_setting_int(session, KEY_AI_OUTBOX_WATERMARK, 0)
-        assert watermark_after == watermark_before  # gate closed: batch untouched, no advance
+        # Drained/advanced past our event despite the gate being closed.
+        assert watermark_after >= event_id
+        assert watermark_after > watermark_before
     finally:
-        # Restore the gate and drop the never-drained event so it cannot
-        # leak into a later test's batch (this key/table is shared globally).
         async with factory() as session:
             await set_operation_mode(session, OPERATION_MODE_TIQORA_PRIMARY)
             await session.execute(

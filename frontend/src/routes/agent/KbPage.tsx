@@ -7,7 +7,10 @@ import { CategoryTree } from "@/components/agent/CategoryTree";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Spinner } from "@/components/ui/Spinner";
+import { SelectMenu, type SelectMenuItem } from "@/components/ui/SelectMenu";
+import { ChevronDownIcon } from "@/components/ui/icons";
 import { formatDateTime } from "@/lib/format";
+import { cn } from "@/lib/cn";
 
 const STATE_FILTERS = ["all", "draft", "review", "published", "archived"] as const;
 type StateFilter = (typeof STATE_FILTERS)[number];
@@ -69,6 +72,11 @@ export function KbPage() {
     () => new Map((categoriesQ.data ?? []).map((c) => [c.id, c])),
     [categoriesQ.data],
   );
+
+  const stateFilterItems: SelectMenuItem<StateFilter>[] = STATE_FILTERS.map((s) => ({
+    value: s,
+    label: t(`kb.state.${s}`),
+  }));
 
   const sidebarBody = categoriesQ.isLoading ? (
     <div className="flex justify-center py-6">
@@ -132,27 +140,34 @@ export function KbPage() {
             {t("kb.title")}
           </h1>
           <div className="ml-auto flex flex-wrap items-center gap-2">
-            <select
-              data-testid="kb-state-filter"
+            <SelectMenu
+              items={stateFilterItems}
               value={state}
-              onChange={(e) =>
-                setSearch({ state: e.target.value as StateFilter })
-              }
-              className="rounded-md border border-hairline bg-surface px-2 py-1.5 text-sm text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent"
-            >
-              {STATE_FILTERS.map((s) => (
-                <option key={s} value={s}>
-                  {t(`kb.state.${s}`)}
-                </option>
-              ))}
-            </select>
-            <Link
-              to="/agent/kb/new"
+              onSelect={(v) => setSearch({ state: v })}
+              panelTestId="kb-state-filter-panel"
+              trigger={({ open, ref, toggleProps }) => (
+                <button
+                  ref={ref}
+                  type="button"
+                  data-testid="kb-state-filter"
+                  {...toggleProps}
+                  className="flex min-w-[9rem] items-center justify-between gap-2 rounded-md border border-hairline bg-surface px-2 py-1.5 text-sm text-ink hover:bg-surface-subtle focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent"
+                >
+                  <span>{t(`kb.state.${state}`)}</span>
+                  <ChevronDownIcon
+                    className={cn("text-muted transition-transform duration-150", open && "rotate-180")}
+                  />
+                </button>
+              )}
+            />
+            <Button
+              variant="primary"
+              size="sm"
               data-testid="kb-new-article"
-              className="inline-flex items-center justify-center gap-1.5 rounded-md border border-transparent bg-accent px-3 py-1.5 text-sm font-medium text-accent-ink transition-colors duration-100 hover:opacity-90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+              onClick={() => void navigate({ to: "/agent/kb/new" })}
             >
               {t("kb.newArticle")}
-            </Link>
+            </Button>
           </div>
         </div>
 

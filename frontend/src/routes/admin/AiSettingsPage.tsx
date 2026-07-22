@@ -16,6 +16,7 @@ import { Badge } from "@/components/ui/Badge";
 import { DataTable, type DataTableColumn } from "@/components/admin/DataTable";
 import { CrudDrawer, type FieldDef, type FieldValues } from "@/components/admin/CrudDrawer";
 import { PlusIcon } from "@/components/ui/icons";
+import { cn } from "@/lib/cn";
 
 const SETTINGS_KEY = ["admin", "ai", "settings"] as const;
 const PROVIDERS_KEY = ["admin", "ai", "providers"] as const;
@@ -317,7 +318,11 @@ export function AiSettingsPage() {
           {t("admin.ai.settings.operationMode")}
         </h2>
         <p className="text-xs text-muted">{t("admin.ai.settings.operationModeHint")}</p>
-        <div className="flex flex-wrap items-center gap-2" role="group">
+        <div
+          className="inline-flex rounded-lg border border-hairline bg-surface p-0.5"
+          role="group"
+          aria-label={t("admin.ai.settings.operationMode")}
+        >
           {(["parallel", "tiqora_primary"] as OperationMode[]).map((m) => (
             <button
               key={m}
@@ -328,11 +333,12 @@ export function AiSettingsPage() {
               onClick={() => {
                 if (m !== mode) setPendingMode(m);
               }}
-              className={
+              className={cn(
+                "rounded-md px-3 py-1 text-xs font-medium transition-colors",
                 mode === m
-                  ? "rounded-md border border-accent bg-accent px-3 py-1.5 text-sm font-medium text-accent-ink"
-                  : "rounded-md border border-hairline bg-surface-subtle px-3 py-1.5 text-sm font-medium text-muted hover:text-ink"
-              }
+                  ? "bg-accent text-white"
+                  : "text-muted hover:bg-surface-subtle hover:text-ink",
+              )}
             >
               {t(`admin.ai.settings.mode.${m}`)}
             </button>

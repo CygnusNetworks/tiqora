@@ -225,14 +225,28 @@ indexing.
 
 ### Readiness-Gate
 
-The agent only runs when the global setting `system.operation_mode` is
-`tiqora_primary` (`tiqora.ai.gate`) — a deliberate operator decision, not
-auto-detection. It is unsafe to run in `parallel` operation alongside Znuny
-(races with Znuny agents, duplicate/missing triggers, sync noise). Every
-enable-transition (queue policy flipping `enabled_auto_reply` /
-`enabled_summary` / `enabled_manual_assist` to `true`) re-checks the gate;
-every agent run re-checks it again at the start. Reverting to `parallel`
-always works and immediately pauses all AI activity.
+The gate (`tiqora.ai.gate`) only applies to **auto-reply** — a deliberate
+operator decision, not auto-detection, via the global setting
+`system.operation_mode`. Enabling `enabled_auto_reply` on a queue policy
+re-checks the gate; every `trigger="auto"` agent run re-checks it again at
+the start; the worker's auto-reply send is skipped per-event while the gate
+is closed. Reverting to `parallel` always works and immediately pauses
+auto-reply.
+
+Auto-reply is unsafe in `parallel` operation: it posts into the Tiqora
+outbox, which Znuny does not see while running alongside it, so a customer
+could receive both Znuny's own autoresponder and Tiqora's AI reply.
+
+Manual Assist (drafts) and Summaries are **not** gated (v1.1 relaxation —
+they were originally gated too, but neither writes anything Sync-relevant):
+Manual Assist creates a `tiqora_ai_draft` row, a distinct entity that is
+never an article and always needs a human to accept/edit/send it; Summaries
+are state-only (`tiqora_ai_ticket_state.summary_body`) and pull-based. Both
+run in `parallel` operation as well as `tiqora_primary`. The worker's
+auto-summary scan is likewise ungated, though it only ever considers tickets
+touched by the outbox batch — which stays empty in `parallel` operation
+until mail ingestion moves to Tiqora, so it has no practical effect before
+then.
 
 ### Per-queue policy and autonomy
 

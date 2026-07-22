@@ -115,9 +115,8 @@ describe("MailLogPage", () => {
     renderPage();
     await waitFor(() => expect(listMailLog).toHaveBeenCalled());
 
-    fireEvent.change(screen.getByTestId("mail-log-filter-direction"), {
-      target: { value: "out" },
-    });
+    fireEvent.click(screen.getByTestId("mail-log-filter-direction"));
+    fireEvent.click(await screen.findByTestId("mail-log-filter-direction-panel-option-out"));
 
     await waitFor(() => {
       const last = listMailLog.mock.calls.at(-1)?.[0] as { direction?: string };
