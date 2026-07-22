@@ -294,3 +294,77 @@ describe("QueuesPage selection mode (Auswahlmodus)", () => {
     expect(screen.getByTestId("queue-bulk-owner")).toBeDisabled();
   });
 });
+
+describe("QueuesPage row quick edit", () => {
+  beforeEach(() => {
+    listQueues.mockReset();
+    listTickets.mockReset();
+    patchTicket.mockReset();
+    listReferenceStates.mockReset();
+    listReferencePriorities.mockReset();
+    listReferenceAgents.mockReset();
+    void i18n.changeLanguage("de");
+
+    listQueues.mockResolvedValue([]);
+    listTickets.mockResolvedValue(page(tickets, tickets.length));
+    listReferenceStates.mockResolvedValue([
+      { id: 1, name: "new", type_name: "new" },
+      { id: 4, name: "open", type_name: "open" },
+    ]);
+    listReferencePriorities.mockResolvedValue([
+      { id: 3, name: "3 normal" },
+      { id: 4, name: "4 high" },
+    ]);
+    listReferenceAgents.mockResolvedValue([
+      { id: 5, login: "agent1", full_name: "Ada Agent" },
+      { id: 6, login: "agent2", full_name: "Bob Agent" },
+    ]);
+    patchTicket.mockResolvedValue(undefined);
+  });
+
+  it("does not fetch reference lists before any quick-edit menu is opened", async () => {
+    await renderQueuesPage();
+    await screen.findByTestId("ticket-row-101");
+
+    expect(listReferenceStates).not.toHaveBeenCalled();
+    expect(listReferencePriorities).not.toHaveBeenCalled();
+    expect(listReferenceAgents).not.toHaveBeenCalled();
+  });
+
+  it("clicking a row's state cell lazily fetches states and patches only that ticket, without navigating", async () => {
+    const router = await renderQueuesPage();
+    await screen.findByTestId("ticket-row-101");
+
+    fireEvent.click(screen.getByTestId("ticket-row-state-101"));
+    await waitFor(() => expect(listReferenceStates).toHaveBeenCalledTimes(1));
+
+    const option = await screen.findByTestId("ticket-row-state-menu-101-option-4");
+    fireEvent.click(option);
+
+    await waitFor(() => expect(patchTicket).toHaveBeenCalledWith(101, { state_id: 4 }));
+    expect(patchTicket).toHaveBeenCalledTimes(1);
+    expect(router.state.location.pathname).toBe("/agent/queues");
+  });
+
+  it("clicking a row's owner cell patches owner_id", async () => {
+    await renderQueuesPage();
+    await screen.findByTestId("ticket-row-101");
+
+    fireEvent.click(screen.getByTestId("ticket-row-owner-102"));
+    const option = await screen.findByTestId("ticket-row-owner-menu-102-option-6");
+    fireEvent.click(option);
+
+    await waitFor(() => expect(patchTicket).toHaveBeenCalledWith(102, { owner_id: 6 }));
+  });
+
+  it("row quick edit is unavailable once selection mode is entered", async () => {
+    await renderQueuesPage();
+    await screen.findByTestId("ticket-row-101");
+
+    fireEvent.click(screen.getByTestId("queue-select-mode"));
+    await waitFor(() => expect(screen.getByTestId("queue-row-check-101")).toBeInTheDocument());
+
+    expect(screen.queryByTestId("ticket-row-state-101")).toBeNull();
+    expect(screen.queryByTestId("ticket-row-owner-101")).toBeNull();
+  });
+});

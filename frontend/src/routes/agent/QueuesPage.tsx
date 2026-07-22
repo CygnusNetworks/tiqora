@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useSearch } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
-import { api } from "@/lib/api";
+import { api, type MutationRequest } from "@/lib/api";
 import { flattenQueues } from "@/components/agent/QueueTree";
 import {
   TicketTable,
@@ -90,6 +90,10 @@ export function QueuesPage() {
     value: number;
     label: string;
   } | null>(null);
+  // Row-level quick edit (state/priority/owner) — reference lists are only
+  // fetched once the agent opens the first menu (either a row quick-edit
+  // trigger or, further below, the bulk-action toolbar), not on page load.
+  const [refDataRequested, setRefDataRequested] = useState(false);
   const [applying, setApplying] = useState(false);
   const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
   const [status, setStatus] = useState<{ tone: "success" | "error"; text: string } | null>(null);
@@ -154,20 +158,21 @@ export function QueuesPage() {
       }),
   });
 
+  const wantsReferenceData = selectMode || refDataRequested;
   const prioritiesQ = useQuery({
     queryKey: ["reference", "priorities"],
     queryFn: () => api.listReferencePriorities(),
-    enabled: selectMode,
+    enabled: wantsReferenceData,
   });
   const statesQ = useQuery({
     queryKey: ["reference", "states"],
     queryFn: () => api.listReferenceStates(),
-    enabled: selectMode,
+    enabled: wantsReferenceData,
   });
   const agentsQ = useQuery({
     queryKey: ["reference", "agents"],
     queryFn: () => api.listReferenceAgents(),
-    enabled: selectMode,
+    enabled: wantsReferenceData,
   });
 
   const selectedQueueName =
@@ -276,7 +281,11 @@ export function QueuesPage() {
       setFullSelection(false);
       setFullIds([]);
     }
+    // Bulk apply calls api.patchTicket directly (not usePatchTicket) to run
+    // requests concurrently — mirror its invalidation here so the sidebar
+    // queue badges refresh the same way a single-ticket patch does.
     void queryClient.invalidateQueries({ queryKey: ["tickets"] });
+    void queryClient.invalidateQueries({ queryKey: ["queues"] });
   };
 
   const stateItems: SelectMenuItem<number>[] = (statesQ.data ?? []).map((s) => ({
@@ -292,6 +301,16 @@ export function QueuesPage() {
     label: a.full_name,
     hint: a.login,
   }));
+
+  // Row quick edit: one ticket at a time, same invalidation as
+  // usePatchTicket/the bulk apply above so the sidebar badges stay in sync.
+  const rowPatch = useMutation({
+    mutationFn: ({ id, body }: { id: number; body: MutationRequest }) => api.patchTicket(id, body),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["tickets"] });
+      void queryClient.invalidateQueries({ queryKey: ["queues"] });
+    },
+  });
 
   const noSelection = selectedIds.length === 0;
 
@@ -515,6 +534,14 @@ export function QueuesPage() {
                 }
               : undefined
           }
+          quickEdit={{
+            stateItems,
+            priorityItems,
+            agentItems,
+            agentsLoading: agentsQ.isLoading,
+            onRequestOptions: () => setRefDataRequested(true),
+            onPatch: (id, body) => rowPatch.mutate({ id, body }),
+          }}
         />
       </div>
 

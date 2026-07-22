@@ -1,10 +1,11 @@
-import { useEffect, useRef, useState, type CSSProperties } from "react";
+import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "@tanstack/react-router";
-import type { TicketListItem } from "@/lib/api";
+import type { MutationRequest, TicketListItem } from "@/lib/api";
 import { formatAgeSeconds, formatDateTime, isEscalated } from "@/lib/format";
 import { cn } from "@/lib/cn";
 import { Button } from "@/components/ui/Button";
+import { SelectMenu, type SelectMenuItem } from "@/components/ui/SelectMenu";
 import { Spinner } from "@/components/ui/Spinner";
 import { PriorityChip, StateChip } from "@/components/ui/StatusChip";
 import {
@@ -32,6 +33,21 @@ export type TicketTableSelection = {
   somePageSelected: boolean;
 };
 
+/** Inline per-row quick edit for state/priority/owner — clicking one of those
+ * cells opens a `SelectMenu` that patches just that ticket. Reference option
+ * lists (states/priorities/agents) are owned by the caller (QueuesPage) and
+ * fetched lazily: `onRequestOptions` fires the first time any row's menu
+ * opens, letting the caller flip a query's `enabled` flag rather than every
+ * row firing its own request on mount. */
+export type TicketQuickEdit = {
+  stateItems: SelectMenuItem<number>[];
+  priorityItems: SelectMenuItem<number>[];
+  agentItems: SelectMenuItem<number>[];
+  agentsLoading?: boolean;
+  onPatch: (ticketId: number, body: MutationRequest) => void;
+  onRequestOptions: () => void;
+};
+
 export type TicketTableProps = {
   items: TicketListItem[];
   total: number;
@@ -44,6 +60,9 @@ export type TicketTableProps = {
   onPageChange: (offset: number) => void;
   /** Opt-in row-checkbox selection mode — row click toggles rather than navigates. */
   selection?: TicketTableSelection;
+  /** Opt-in inline quick edit for state/priority/owner cells. Disabled while
+   * `selection` is active — see the row-click contention note below. */
+  quickEdit?: TicketQuickEdit;
 };
 
 const SORT_COLUMNS: { key: SortKey; labelKey: string }[] = [
@@ -75,6 +94,7 @@ export function TicketTable({
   onSortChange,
   onPageChange,
   selection,
+  quickEdit,
 }: TicketTableProps) {
   const { t, i18n } = useTranslation();
   const navigate = useNavigate();
@@ -82,6 +102,11 @@ export function TicketTable({
   const rootRef = useRef<HTMLDivElement>(null);
   const locale = i18n.language?.startsWith("de") ? "de" : "en";
   const gridCols = selection ? SELECT_GRID_COLS : GRID_COLS;
+  // Selection mode's row click toggles the checkbox; letting a quick-edit
+  // trigger fire at the same time would be ambiguous (open a menu vs. select
+  // the row), so quick edit is simply off for the duration of selection mode
+  // — re-enabled the moment the agent exits it.
+  const quickEditActive = quickEdit && !selection;
 
   useEffect(() => {
     setFocusIdx(0);
@@ -285,24 +310,83 @@ export function TicketTable({
                 </span>
               </span>
               <span className="hidden min-w-0 items-center md:inline-flex">
-                <StateChip
-                  state={ticket.state}
-                  empty="—"
-                  className="max-w-full truncate"
-                  data-testid={`ticket-state-chip-${ticket.id}`}
-                />
+                {quickEditActive ? (
+                  <QuickEditTrigger
+                    testId={`ticket-row-state-${ticket.id}`}
+                    panelTestId={`ticket-row-state-menu-${ticket.id}`}
+                    items={quickEdit.stateItems}
+                    value={ticket.state_id}
+                    onOpen={quickEdit.onRequestOptions}
+                    onSelect={(id) => quickEdit.onPatch(ticket.id, { state_id: id })}
+                    placeholder={t("ticket.dialog.selectPlaceholder")}
+                  >
+                    <StateChip
+                      state={ticket.state}
+                      empty="—"
+                      className="max-w-full truncate"
+                      data-testid={`ticket-state-chip-${ticket.id}`}
+                    />
+                  </QuickEditTrigger>
+                ) : (
+                  <StateChip
+                    state={ticket.state}
+                    empty="—"
+                    className="max-w-full truncate"
+                    data-testid={`ticket-state-chip-${ticket.id}`}
+                  />
+                )}
               </span>
               <span className="hidden min-w-0 items-center md:inline-flex">
-                <PriorityChip
-                  priority={ticket.priority}
-                  priorityId={ticket.priority_id}
-                  empty="—"
-                  className="max-w-full truncate"
-                  data-testid={`ticket-priority-chip-${ticket.id}`}
-                />
+                {quickEditActive ? (
+                  <QuickEditTrigger
+                    testId={`ticket-row-priority-${ticket.id}`}
+                    panelTestId={`ticket-row-priority-menu-${ticket.id}`}
+                    items={quickEdit.priorityItems}
+                    value={ticket.priority_id}
+                    onOpen={quickEdit.onRequestOptions}
+                    onSelect={(id) => quickEdit.onPatch(ticket.id, { priority_id: id })}
+                    placeholder={t("ticket.dialog.selectPlaceholder")}
+                  >
+                    <PriorityChip
+                      priority={ticket.priority}
+                      priorityId={ticket.priority_id}
+                      empty="—"
+                      className="max-w-full truncate"
+                      data-testid={`ticket-priority-chip-${ticket.id}`}
+                    />
+                  </QuickEditTrigger>
+                ) : (
+                  <PriorityChip
+                    priority={ticket.priority}
+                    priorityId={ticket.priority_id}
+                    empty="—"
+                    className="max-w-full truncate"
+                    data-testid={`ticket-priority-chip-${ticket.id}`}
+                  />
+                )}
               </span>
-              <span className="hidden truncate text-xs text-muted md:inline">
-                {ticket.owner_name || ticket.owner_login || "—"}
+              <span className="hidden min-w-0 items-center md:inline-flex">
+                {quickEditActive ? (
+                  <QuickEditTrigger
+                    testId={`ticket-row-owner-${ticket.id}`}
+                    panelTestId={`ticket-row-owner-menu-${ticket.id}`}
+                    items={quickEdit.agentItems}
+                    value={ticket.owner_id}
+                    loading={quickEdit.agentsLoading}
+                    searchThreshold={8}
+                    onOpen={quickEdit.onRequestOptions}
+                    onSelect={(id) => quickEdit.onPatch(ticket.id, { owner_id: id })}
+                    placeholder={t("ticket.dialog.selectPlaceholder")}
+                  >
+                    <span className="max-w-full truncate text-xs text-muted">
+                      {ticket.owner_name || ticket.owner_login || "—"}
+                    </span>
+                  </QuickEditTrigger>
+                ) : (
+                  <span className="max-w-full truncate text-xs text-muted">
+                    {ticket.owner_name || ticket.owner_login || "—"}
+                  </span>
+                )}
               </span>
               <span
                 className="hidden truncate text-right font-mono text-[11.5px] tabular-nums text-muted md:inline"
@@ -364,5 +448,67 @@ export function TicketTable({
         </div>
       </div>
     </div>
+  );
+}
+
+/** Wraps a cell's existing chip/text in a `SelectMenu` trigger for the
+ * per-row quick edit — clicking opens the listbox and patches just this
+ * ticket, without navigating to it or (in a table row) toggling selection.
+ * `stopPropagation` on both click and keydown is what keeps the row's own
+ * click/navigate handler from also firing. */
+function QuickEditTrigger<T extends string | number>({
+  items,
+  value,
+  loading,
+  searchThreshold,
+  placeholder,
+  testId,
+  panelTestId,
+  onOpen,
+  onSelect,
+  children,
+}: {
+  items: SelectMenuItem<T>[];
+  value: T | null | undefined;
+  loading?: boolean;
+  searchThreshold?: number;
+  placeholder: string;
+  testId: string;
+  panelTestId: string;
+  onOpen: () => void;
+  onSelect: (value: T) => void;
+  children: ReactNode;
+}) {
+  return (
+    <SelectMenu
+      items={items}
+      value={value ?? undefined}
+      loading={loading}
+      searchThreshold={searchThreshold}
+      onSelect={onSelect}
+      placeholder={placeholder}
+      panelTestId={panelTestId}
+      trigger={({ ref, toggleProps }) => (
+        <button
+          ref={ref}
+          type="button"
+          data-testid={testId}
+          aria-haspopup={toggleProps["aria-haspopup"]}
+          aria-expanded={toggleProps["aria-expanded"]}
+          onClick={(e) => {
+            e.stopPropagation();
+            onOpen();
+            toggleProps.onClick();
+          }}
+          onKeyDown={(e) => {
+            e.stopPropagation();
+            toggleProps.onKeyDown(e);
+          }}
+          className="max-w-full truncate rounded text-left transition-colors duration-100 hover:bg-surface-subtle focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent"
+        >
+          {children}
+        </button>
+      )}
+    />
   );
 }

@@ -192,6 +192,12 @@ export function SelectMenu<T extends string | number>({
             data-portal-menu
             data-testid={panelTestId}
             onKeyDown={onPanelKeyDown}
+            // React bubbles portal events through the *component* tree, not
+            // the DOM tree — without this, a click on an option here would
+            // still reach a clickable-row ancestor's onClick (e.g. a
+            // TicketTable row's navigate-on-click) even though the panel is
+            // rendered into document.body, nowhere near that row in the DOM.
+            onClick={(e) => e.stopPropagation()}
             style={{
               position: "fixed",
               top: pos?.top,

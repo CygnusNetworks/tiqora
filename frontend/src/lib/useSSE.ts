@@ -59,6 +59,10 @@ export function handleSSEMessage(queryClient: QueryClient, raw: string): void {
     // (["tickets", ticketId, "articles"], ".../history", etc) — they all
     // share the "tickets" key prefix, so one invalidation covers them.
     void queryClient.invalidateQueries({ queryKey: ["tickets"] });
+    // A changed ticket can move between queues or open/closed state, which
+    // shifts the sidebar's per-queue open-count badges — refresh those too
+    // (own key, not under the "tickets" prefix above).
+    void queryClient.invalidateQueries({ queryKey: ["queues"] });
     return;
   }
 

@@ -6,14 +6,20 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import type { MutationRequest, TicketDetail } from "@/lib/api";
 
-/** Patch the ticket, then refresh the header/timeline by invalidating it. */
+/** Patch the ticket, then refresh everything a mutation can affect: the
+ * ticket itself/timeline, any ticket list (queue views), and the sidebar's
+ * queue-tree/my-counts badges — a patch can change state, queue or owner,
+ * any of which moves the ticket in/out of those counts. ``["tickets"]``
+ * covers detail + articles + list queries by prefix (see the queryKey
+ * shapes in QueuesPage/AgentShell); ``["queues"]`` is a separate root key
+ * so it needs its own invalidation. */
 export function usePatchTicket(ticketId: number, onDone?: () => void) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (body: MutationRequest) => api.patchTicket(ticketId, body),
     onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: ["tickets", ticketId] });
-      void qc.invalidateQueries({ queryKey: ["tickets", ticketId, "articles"] });
+      void qc.invalidateQueries({ queryKey: ["tickets"] });
+      void qc.invalidateQueries({ queryKey: ["queues"] });
       onDone?.();
     },
   });

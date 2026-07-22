@@ -14,6 +14,9 @@ export type AvatarProps = {
   className?: string;
   /** Optional test id for the root element. */
   testId?: string;
+  /** Background/text tint used only by the initials fallback — "customer"
+   * for a green (ok) tint, "accent" (default) for the usual accent tint. */
+  tone?: "accent" | "customer";
 };
 
 /**
@@ -28,6 +31,7 @@ export function Avatar({
   size = 24,
   className,
   testId,
+  tone = "accent",
 }: AvatarProps) {
   const [failed, setFailed] = useState(false);
   const explicit = (avatarUrl ?? "").trim() || null;
@@ -66,10 +70,10 @@ export function Avatar({
       data-testid={testId ?? "avatar-initials"}
       className={cn(
         base,
-        "bg-accent font-bold text-accent-ink",
-        size <= 24 ? "text-[10.5px]" : "text-[11px]",
+        "flex-shrink-0 border border-hairline font-bold",
+        tone === "customer" ? "bg-green/15 text-green" : "bg-accent-dim text-accent",
       )}
-      style={dim}
+      style={{ ...dim, fontSize: size * 0.42 }}
       aria-hidden
     >
       {initials}

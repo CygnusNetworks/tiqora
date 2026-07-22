@@ -36,11 +36,10 @@ export function channelIcon(channelId: number): string {
   return "✉";
 }
 
-export function senderRingClass(senderType: string | null | undefined, channelId: number): string {
-  if (channelId === CHANNEL_INTERNAL) return "ring-2 ring-hairline";
-  const s = (senderType || "").toLowerCase();
-  if (s === "customer") return "ring-2 ring-green/60";
-  return "ring-2 ring-accent/60";
+/** Avatar background/text tint by sender role — feeds `Avatar`'s `tone` prop
+ * so the initials fallback reads as a role tint rather than a ring. */
+export function avatarTone(senderType: string | null | undefined): "accent" | "customer" {
+  return (senderType || "").toLowerCase() === "customer" ? "customer" : "accent";
 }
 
 /** Best-effort initials from the mailbox-local part of `from_address`. */
