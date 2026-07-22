@@ -412,7 +412,8 @@
       "customerFirstName": "Vorname",
       "customerLastName": "Nachname",
       "customerLoginConflict": "Dieser Login existiert bereits. Bitte einen anderen Login wählen oder den bestehenden Kunden über die Suche zuweisen."
-    }
+    },
+    "inlineAttachments": "Eingebettete Bilder ({{count}})"
   },
   "search": {
     "title": "Suche",
