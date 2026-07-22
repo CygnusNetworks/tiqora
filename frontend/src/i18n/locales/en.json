@@ -202,6 +202,7 @@
     "created": "Created",
     "queue": "Queue",
     "noTickets": "No tickets match this filter.",
+    "senderNoCustomer": "Sender of the first article — no customer assigned",
     "pagination": "{{from}}–{{to}} of {{total}}",
     "escalated": "Escalated",
     "slaCountdown": "SLA {{value}}",
@@ -361,7 +362,14 @@
       "apptStart": "Start",
       "apptEnd": "End",
       "genericError": "Action failed. Please try again.",
-      "currentCustomer": "Current"
+      "currentCustomer": "Current",
+      "back": "Back",
+      "newCustomer": "Create new customer",
+      "customerLogin": "Login",
+      "customerEmail": "Email",
+      "customerFirstName": "First name",
+      "customerLastName": "Last name",
+      "customerLoginConflict": "This login already exists. Choose a different login, or assign the existing customer via search instead."
     }
   },
   "search": {

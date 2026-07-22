@@ -124,7 +124,9 @@ class TicketService:
             "user": users,
         }
 
-    def _to_list_item(self, t: Ticket, maps: dict[str, Any]) -> TicketListItem:
+    def _to_list_item(
+        self, t: Ticket, maps: dict[str, Any], first_from_by_ticket: dict[int, str] | None = None
+    ) -> TicketListItem:
         owner = maps["user"].get(t.user_id)
         return TicketListItem(
             id=t.id,
@@ -144,6 +146,7 @@ class TicketService:
             owner_name=owner[1] if owner else None,
             customer_id=t.customer_id,
             customer_user_id=t.customer_user_id,
+            first_from=(first_from_by_ticket or {}).get(t.id),
             create_time=t.create_time,
             change_time=t.change_time,
             age_seconds=age_seconds(t.create_time),
@@ -265,8 +268,33 @@ class TicketService:
         result = await self._session.execute(ordered.offset(offset).limit(min(limit, 200)))
         tickets = list(result.scalars().all())
         maps = await self._lookup_maps()
-        items = [self._to_list_item(t, maps) for t in tickets]
+        first_from_by_ticket = await self._first_article_from_by_ticket(
+            [t.id for t in tickets]
+        )
+        items = [self._to_list_item(t, maps, first_from_by_ticket) for t in tickets]
         return PaginatedTickets(items=items, total=total, offset=offset, limit=limit)
+
+    async def _first_article_from_by_ticket(self, ticket_ids: list[int]) -> dict[int, str]:
+        """Raw ``From`` header of each ticket's first article, keyed by ticket id.
+
+        A single extra query for the page's ticket ids: the first article per
+        ticket (``min(article.id)``) joined to its MIME row's ``a_from``.
+        Kept out of the main ``Ticket`` select so the permission-filtered
+        list/count/export query isn't burdened with a join most callers don't
+        need. Tickets without an article (or without a MIME row) are simply
+        absent from the returned dict.
+        """
+        if not ticket_ids:
+            return {}
+        first_article_ids = select(
+            func.min(Article.id).label("article_id")
+        ).where(Article.ticket_id.in_(ticket_ids)).group_by(Article.ticket_id).subquery()
+        rows = await self._session.execute(
+            select(Article.ticket_id, ArticleDataMime.a_from)
+            .join(first_article_ids, Article.id == first_article_ids.c.article_id)
+            .join(ArticleDataMime, ArticleDataMime.article_id == Article.id)
+        )
+        return {ticket_id: a_from for ticket_id, a_from in rows.all() if a_from}
 
     async def iter_tickets_for_export(
         self,

@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
-import { api } from "@/lib/api";
+import { api, ApiError } from "@/lib/api";
 import type { TicketDetail } from "@/lib/api";
 import { useAuth } from "@/auth/AuthContext";
 import { Badge } from "@/components/ui/Badge";
@@ -535,13 +535,26 @@ export function CustomerPickerDialog({
 }) {
   const { t } = useTranslation();
   const [q, setQ] = useState(currentCustomerUserId ?? "");
+  const [creating, setCreating] = useState(false);
   const customersQ = useQuery({
     queryKey: ["reference", "customers", q],
     queryFn: () => api.searchReferenceCustomers({ q }),
-    enabled: q.trim().length >= 2,
+    enabled: !creating && q.trim().length >= 2,
   });
   const patch = usePatchTicket(ticketId, onClose);
   const hasCurrent = Boolean(currentCustomerUserId || currentCustomerId);
+
+  if (creating) {
+    return (
+      <CustomerCreateDialog
+        onCreated={(c) =>
+          patch.mutate({ customer_user_id: c.login, customer_id: c.customer_id })
+        }
+        onBack={() => setCreating(false)}
+        onClose={onClose}
+      />
+    );
+  }
 
   return (
     <Dialog open onClose={onClose} title={t("ticket.toolbar.customer")}>
@@ -606,7 +619,136 @@ export function CustomerPickerDialog({
             ))
           )}
         </div>
+        <button
+          type="button"
+          data-testid="customer-picker-new"
+          onClick={() => setCreating(true)}
+          className="flex w-full items-center gap-2 rounded border border-dashed border-hairline px-3 py-1.5 text-left text-sm font-medium text-accent hover:bg-surface-subtle"
+        >
+          + {t("ticket.dialog.newCustomer")}
+        </button>
         {patch.isError && <p className="text-xs text-danger">{t("ticket.dialog.genericError")}</p>}
+      </div>
+    </Dialog>
+  );
+}
+
+/** "+ Neu anlegen" sub-form of `CustomerPickerDialog` — creates a customer
+ * user (``POST /api/v1/customers``, agent-accessible, no portal password)
+ * then hands the created ref back to the caller to assign to the ticket.
+ * A 409 (login already taken) is shown as a plain error, per spec: the
+ * create endpoint's conflict response carries no customer data to offer a
+ * "assign the existing one instead" shortcut. */
+function CustomerCreateDialog({
+  onCreated,
+  onBack,
+  onClose,
+}: {
+  onCreated: (c: { login: string; customer_id: string }) => void;
+  onBack: () => void;
+  onClose: () => void;
+}) {
+  const { t } = useTranslation();
+  const [login, setLogin] = useState("");
+  const [email, setEmail] = useState("");
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
+  const [customerId, setCustomerId] = useState("");
+
+  const create = useMutation({
+    mutationFn: () =>
+      api.createCustomer({
+        login: login.trim(),
+        email: email.trim(),
+        first_name: firstName.trim(),
+        last_name: lastName.trim(),
+        customer_id: customerId.trim(),
+      }),
+    onSuccess: (c) => onCreated({ login: c.login, customer_id: c.customer_id }),
+  });
+
+  const isConflict = create.isError && create.error instanceof ApiError && create.error.status === 409;
+  const valid = login.trim() && email.trim() && firstName.trim() && lastName.trim() && customerId.trim();
+
+  return (
+    <Dialog open onClose={onClose} title={t("ticket.dialog.newCustomer")}>
+      <div className="space-y-2" data-testid="customer-create-dialog">
+        <label className="block text-xs text-muted">
+          {t("ticket.dialog.customerLogin")}
+          <input
+            className={inputCls}
+            value={login}
+            autoFocus
+            onChange={(e) => setLogin(e.target.value)}
+            data-testid="customer-create-login"
+          />
+        </label>
+        <label className="block text-xs text-muted">
+          {t("ticket.dialog.customerEmail")}
+          <input
+            className={inputCls}
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            data-testid="customer-create-email"
+          />
+        </label>
+        <div className="flex gap-2">
+          <label className="block flex-1 text-xs text-muted">
+            {t("ticket.dialog.customerFirstName")}
+            <input
+              className={inputCls}
+              value={firstName}
+              onChange={(e) => setFirstName(e.target.value)}
+              data-testid="customer-create-first-name"
+            />
+          </label>
+          <label className="block flex-1 text-xs text-muted">
+            {t("ticket.dialog.customerLastName")}
+            <input
+              className={inputCls}
+              value={lastName}
+              onChange={(e) => setLastName(e.target.value)}
+              data-testid="customer-create-last-name"
+            />
+          </label>
+        </div>
+        <label className="block text-xs text-muted">
+          {t("ticket.toolbar.customerNumber")}
+          <input
+            className={inputCls}
+            value={customerId}
+            onChange={(e) => setCustomerId(e.target.value)}
+            data-testid="customer-create-customer-id"
+          />
+        </label>
+        {isConflict && (
+          <p className="text-xs text-danger" data-testid="customer-create-conflict">
+            {t("ticket.dialog.customerLoginConflict")}
+          </p>
+        )}
+        {create.isError && !isConflict && (
+          <p className="text-xs text-danger">{t("ticket.dialog.genericError")}</p>
+        )}
+        <div className="flex items-center justify-between gap-1.5 pt-2">
+          <Button variant="ghost" size="sm" onClick={onBack}>
+            {t("ticket.dialog.back")}
+          </Button>
+          <div className="flex gap-1.5">
+            <Button variant="ghost" size="sm" onClick={onClose}>
+              {t("ticket.dialog.cancel")}
+            </Button>
+            <Button
+              variant="primary"
+              size="sm"
+              disabled={!valid || create.isPending}
+              data-testid="customer-create-submit"
+              onClick={() => create.mutate()}
+            >
+              {t("ticket.dialog.save")}
+            </Button>
+          </div>
+        </div>
       </div>
     </Dialog>
   );

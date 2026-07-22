@@ -7893,6 +7893,8 @@ export interface components {
              * @default 0
              */
             escalation_update_time: number;
+            /** First From */
+            first_from?: string | null;
             /** Id */
             id: number;
             /**
@@ -8019,6 +8021,8 @@ export interface components {
              * @default 0
              */
             escalation_update_time: number;
+            /** First From */
+            first_from?: string | null;
             /** Id */
             id: number;
             /** Lock */
