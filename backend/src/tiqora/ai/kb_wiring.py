@@ -62,6 +62,34 @@ async def build_llm_client(
     )
 
 
+async def build_vision_llm_factory(
+    session: AsyncSession, settings: Settings, vision_provider_id: int | None
+) -> Callable[[], LlmClient] | None:
+    """Resolve ``vision_provider_id`` into a sync ``() -> LlmClient`` factory
+    for the attachment vision pre-pass (:mod:`tiqora.ai.attachment_context`).
+
+    Returns ``None`` (never raises) when no provider is configured, the
+    provider row is gone, or it does not have ``supports_vision`` set — the
+    caller treats this as "images are ignored for this run", matching the
+    documented "NULL = Bilder werden ignoriert" policy semantics.
+    """
+    if vision_provider_id is None:
+        return None
+    provider = await get_provider(session, vision_provider_id)
+    if provider is None or not provider.supports_vision:
+        return None
+    api_key = (
+        decrypt_secret(settings.secret_key, provider.api_key_enc) if provider.api_key_enc else None
+    )
+
+    def _factory() -> LlmClient:
+        return OpenAiCompatLlmClient(
+            base_url=provider.base_url, api_key=api_key, model=provider.default_model
+        )
+
+    return _factory
+
+
 async def kb_bundle(
     session: AsyncSession, settings: Settings, user_id: int, policy: TiqoraAiQueuePolicy
 ) -> str | None:
@@ -133,4 +161,10 @@ def kb_get_article_fn(
     return _get
 
 
-__all__ = ["build_llm_client", "kb_bundle", "kb_get_article_fn", "kb_search_fn"]
+__all__ = [
+    "build_llm_client",
+    "build_vision_llm_factory",
+    "kb_bundle",
+    "kb_get_article_fn",
+    "kb_search_fn",
+]

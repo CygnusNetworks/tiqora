@@ -120,6 +120,11 @@ class TiqoraLlmProvider(TiqoraBase):
     eu_hosted: Mapped[bool] = mapped_column(
         Boolean, nullable=False, default=False, server_default=false()
     )
+    # Vision (image-description) capability — a separate pre-pass call, never
+    # the main agent/summary model (see tiqora.ai.vision module docstring).
+    supports_vision: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default=false()
+    )
     valid_id: Mapped[int] = mapped_column(
         SmallInteger, nullable=False, default=1, server_default="1"
     )
@@ -215,6 +220,12 @@ class TiqoraAiQueuePolicy(TiqoraBase):
         ForeignKey("tiqora_llm_provider.id", ondelete="SET NULL"), nullable=True
     )
     model_override: Mapped[str | None] = mapped_column(String(200), nullable=True)
+
+    # Image attachments are never shown to the main model (plan: vision
+    # pre-pass) — NULL means images are ignored entirely for this queue.
+    vision_provider_id: Mapped[int | None] = mapped_column(
+        ForeignKey("tiqora_llm_provider.id", ondelete="SET NULL"), nullable=True
+    )
 
     kb_tags: Mapped[str | None] = mapped_column(Text, nullable=True)
     kb_category_ids: Mapped[str | None] = mapped_column(Text, nullable=True)

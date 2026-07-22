@@ -27,6 +27,7 @@ from __future__ import annotations
 import hashlib
 from dataclasses import dataclass
 from datetime import UTC, datetime
+from typing import Any
 
 import structlog
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -34,6 +35,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from tiqora.ai import usage as usage_service
 from tiqora.ai.acl import AclLimitExceededError as AiAclLimitExceededError
 from tiqora.ai.acl import check_feature_access, check_feature_limits
+from tiqora.ai.attachment_context import build_attachment_context
 from tiqora.ai.context import (
     ArticleSnapshot,
     TicketNotFoundError,
@@ -41,10 +43,12 @@ from tiqora.ai.context import (
     load_articles,
     ticket_snapshot,
 )
+from tiqora.ai.kb_wiring import build_vision_llm_factory
 from tiqora.ai.llm import LlmClient, LlmMessage
 from tiqora.ai.models import FEATURE_SUMMARY, TiqoraAiQueuePolicy
 from tiqora.ai.pii import PiiMapper
 from tiqora.ai.policies import get_queue_policy_by_queue
+from tiqora.config import Settings
 
 logger = structlog.get_logger(__name__)
 
@@ -97,10 +101,19 @@ def _label(article: ArticleSnapshot) -> str:
     return label
 
 
-def _render_articles(articles: list[ArticleSnapshot], *, pii: PiiMapper, mask: bool) -> str:
+def _render_articles(
+    articles: list[ArticleSnapshot],
+    *,
+    pii: PiiMapper,
+    mask: bool,
+    attachment_blocks: dict[int, str] | None = None,
+) -> str:
     lines: list[str] = []
     for a in articles:
         body = a.body or ""
+        attach_text = (attachment_blocks or {}).get(a.id)
+        if attach_text:
+            body = f"{body}\n\n{attach_text}" if body else attach_text
         if mask:
             body = pii.mask(body)
         lines.append(f"--- article {a.id} [{_label(a)}] ---")
@@ -145,12 +158,20 @@ async def summarize_ticket(
     ticket_id: int,
     trigger: str,
     acting_user_id: int | None,
+    settings: Settings | None = None,
+    vision_llm_factory: Any = None,
 ) -> SummaryResult:
     """Run the summary service once for one ticket (plan §3.5).
 
     ``acting_user_id`` is required for ``trigger="manual"`` (ACL check);
     ``None`` for ``trigger="auto"`` (queue-driven, no per-user ACL — mirrors
     the auto-reply path's "keine Kreuz-Anrechnung" rule, plan §3.6).
+
+    ``settings``/``vision_llm_factory`` support the same attachment vision
+    pre-pass as :func:`tiqora.ai.runtime.run_ticket_agent` (see
+    :mod:`tiqora.ai.attachment_context`); ``settings`` defaults to
+    :func:`tiqora.config.get_settings` when a ``vision_provider_id`` is
+    configured and no factory was injected.
 
     Not gated by the Readiness-Gate (plan §3.0 v1.1 / Phase E) — see the
     module docstring.
@@ -197,17 +218,37 @@ async def summarize_ticket(
     pii = PiiMapper(never_mask={ticket.customer_id} if ticket.customer_id else None)
     mask = bool(policy.pii_masking)
 
+    effective_vision_factory = vision_llm_factory
+    if effective_vision_factory is None and policy.vision_provider_id is not None:
+        from tiqora.config import get_settings
+
+        effective_settings = settings or get_settings()
+        effective_vision_factory = await build_vision_llm_factory(
+            session, effective_settings, policy.vision_provider_id
+        )
+    attachment_context = await build_attachment_context(
+        session,
+        articles,
+        vision_enabled=policy.vision_provider_id is not None,
+        vision_llm_factory=effective_vision_factory,
+    )
+    attachment_blocks = attachment_context.blocks
+
     has_previous = state.summary_body is not None and state.last_summary_upto_article_id is not None
     if has_previous:
         user_message = (
             f"Ticket #{ticket.ticket_id}: {ticket.title}\n\n"
             f"--- previous summary ---\n{state.summary_body}\n\n"
-            f"--- new articles since then ---\n{_render_articles(new_articles, pii=pii, mask=mask)}"
+            "--- new articles since then ---\n"
+            + _render_articles(
+                new_articles, pii=pii, mask=mask, attachment_blocks=attachment_blocks
+            )
         )
     else:
         user_message = (
             f"Ticket #{ticket.ticket_id}: {ticket.title}\n\n"
-            f"--- full conversation ---\n{_render_articles(articles, pii=pii, mask=mask)}"
+            "--- full conversation ---\n"
+            f"{_render_articles(articles, pii=pii, mask=mask, attachment_blocks=attachment_blocks)}"
         )
 
     messages = [
@@ -218,6 +259,13 @@ async def summarize_ticket(
 
     upto_article_id = new_articles[-1].id
 
+    # Vision-pass usage is added to this run's usage record (see
+    # tiqora.ai.attachment_context.AttachmentContextResult).
+    prompt_tokens = attachment_context.vision_usage.prompt_tokens + response.usage.prompt_tokens
+    completion_tokens = (
+        attachment_context.vision_usage.completion_tokens + response.usage.completion_tokens
+    )
+
     await usage_service.record_usage(
         session,
         user_id=acting_user_id if trigger == TRIGGER_MANUAL else None,
@@ -226,8 +274,8 @@ async def summarize_ticket(
         feature=FEATURE_SUMMARY,
         provider_id=policy.llm_provider_id,
         model=policy.model_override,
-        prompt_tokens=response.usage.prompt_tokens,
-        completion_tokens=response.usage.completion_tokens,
+        prompt_tokens=prompt_tokens,
+        completion_tokens=completion_tokens,
         success=bool(response.content),
     )
 
@@ -239,8 +287,8 @@ async def summarize_ticket(
             status=STATUS_SKIPPED,
             summary_body=state.summary_body,
             upto_article_id=state.last_summary_upto_article_id,
-            prompt_tokens=response.usage.prompt_tokens,
-            completion_tokens=response.usage.completion_tokens,
+            prompt_tokens=prompt_tokens,
+            completion_tokens=completion_tokens,
         )
     if mask:
         summary_text = pii.unmask(summary_text)
@@ -255,8 +303,8 @@ async def summarize_ticket(
         status=STATUS_UPDATED,
         summary_body=summary_text,
         upto_article_id=upto_article_id,
-        prompt_tokens=response.usage.prompt_tokens,
-        completion_tokens=response.usage.completion_tokens,
+        prompt_tokens=prompt_tokens,
+        completion_tokens=completion_tokens,
     )
 
 

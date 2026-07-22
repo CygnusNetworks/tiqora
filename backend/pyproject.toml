@@ -39,6 +39,12 @@ dependencies = [
     # GDPR anonymize engine (ValueMapper) draws replacement values via faker
     # at runtime — must ship in the prod image, not just the dev group.
     "faker>=37.0.0",
+    # AI attachment text extraction (tiqora.ai.attachments) — runs inside the
+    # agent runtime/summary render path, must ship in the prod image.
+    "pypdf>=5",
+    "python-docx>=1.1",
+    "openpyxl>=3.1",
+    "odfpy>=1.4",
 ]
 
 [project.optional-dependencies]
@@ -117,6 +123,12 @@ module = [
     "pymysql.*",
     "psycopg2",
     "psycopg2.*",
+    "docx",
+    "docx.*",
+    "odf",
+    "odf.*",
+    "openpyxl",
+    "openpyxl.*",
 ]
 ignore_missing_imports = true
 
