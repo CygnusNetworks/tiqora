@@ -111,8 +111,9 @@ h3 {
   padding: 4px 8px;
 }
 
-/* Sidebar section cards ("Titelband-Karten") — AdminShell + AgentShell.
-   Light cards so stacked groups stay clearly separated without heaviness. */
+/* Sidebar section cards ("Titelband-Karten") — AdminShell. AgentShell moved
+   to flat collapsible groups (see NavGroup in AgentShell.tsx) but keeps the
+   admin sidebar's boxed look here. */
 .nav-section-card {
   background: var(--color-surface);
   border: 1px solid var(--color-hairline);

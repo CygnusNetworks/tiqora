@@ -12,7 +12,7 @@ import { NewTicketButton } from "@/components/agent/NewTicketButton";
 import { ConnectionStatus } from "@/components/agent/ConnectionStatus";
 import { AccountMenu } from "@/components/agent/AccountMenu";
 import { OnlineAgentsPopover } from "@/components/agent/OnlineAgentsPopover";
-import { HelpIcon } from "@/components/ui/icons";
+import { ChevronDownIcon, HelpIcon } from "@/components/ui/icons";
 import { cn } from "@/lib/cn";
 import { appVersion } from "@/lib/appVersion";
 import { SSEProvider } from "@/lib/useSSE";
@@ -102,6 +102,64 @@ function NavItem({
   );
 }
 
+const SIDEBAR_COLLAPSED_GROUPS_KEY = "tiqora.sidebar.collapsedGroups";
+
+function readCollapsedGroups(): Record<string, boolean> {
+  if (typeof window === "undefined") return {};
+  try {
+    const raw = window.localStorage.getItem(SIDEBAR_COLLAPSED_GROUPS_KEY);
+    return raw ? (JSON.parse(raw) as Record<string, boolean>) : {};
+  } catch {
+    return {};
+  }
+}
+
+/** Flat, frameless sidebar section: an uppercase label row that expands or
+ * collapses the group's entries (per-group state persisted in
+ * localStorage). Replaces the old boxed "nav-section-card" look for the
+ * agent sidebar — AdminShell still uses that card style. */
+function NavGroup({
+  id,
+  title,
+  collapsed,
+  onToggle,
+  action,
+  children,
+}: {
+  id: string;
+  title: string;
+  collapsed: boolean;
+  onToggle: () => void;
+  action?: ReactNode;
+  children: ReactNode;
+}) {
+  return (
+    <div>
+      <div className="flex items-center gap-1">
+        <button
+          type="button"
+          onClick={onToggle}
+          aria-expanded={!collapsed}
+          data-testid={`sidebar-group-${id}-toggle`}
+          className="flex flex-1 items-center gap-1.5 rounded py-1 text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent"
+        >
+          <ChevronDownIcon
+            className={cn(
+              "h-3 w-3 shrink-0 text-muted transition-transform duration-100",
+              collapsed && "-rotate-90",
+            )}
+          />
+          <h2 className="flex-1 truncate text-[10px] font-semibold uppercase tracking-[0.09em] text-muted">
+            {title}
+          </h2>
+        </button>
+        {action}
+      </div>
+      {!collapsed && <div className="space-y-0.5 py-1">{children}</div>}
+    </div>
+  );
+}
+
 /** One queue row in the single sidebar queue navigator: name + open-count
  * badge, linking to that queue's ticket view. Queues holding unread ("new")
  * tickets are signalled by colour alone — the badge turns accent-tinted — so
@@ -158,7 +216,17 @@ function QueueNavRow({
  * renders its own tree). Defaults to queues that have content (open or new
  * tickets); a search box filters by name and an "all queues" toggle reveals
  * zero-count queues. */
-function QueueNavSection({ flat, onNavigate }: { flat: QueueNode[]; onNavigate?: () => void }) {
+function QueueNavSection({
+  flat,
+  onNavigate,
+  collapsed,
+  onToggle,
+}: {
+  flat: QueueNode[];
+  onNavigate?: () => void;
+  collapsed: boolean;
+  onToggle: () => void;
+}) {
   const { t } = useTranslation();
   const location = useLocation();
   const [query, setQuery] = useState("");
@@ -174,9 +242,12 @@ function QueueNavSection({ flat, onNavigate }: { flat: QueueNode[]; onNavigate?:
   });
 
   return (
-    <div className="nav-section-card">
-      <div className="nav-section-titleband">
-        <h2>{t("sidebar.queues")}</h2>
+    <NavGroup
+      id="queues"
+      title={t("sidebar.queues")}
+      collapsed={collapsed}
+      onToggle={onToggle}
+      action={
         <button
           type="button"
           data-testid="sidebar-queues-toggle-all"
@@ -185,35 +256,29 @@ function QueueNavSection({ flat, onNavigate }: { flat: QueueNode[]; onNavigate?:
         >
           {showAll ? t("sidebar.showActiveQueues") : t("sidebar.showAllQueues")}
         </button>
+      }
+    >
+      <div className="pb-1.5">
+        <input
+          data-testid="sidebar-queue-search"
+          type="search"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder={t("sidebar.queueSearch")}
+          className="w-full rounded-md border border-hairline bg-surface-subtle px-2.5 py-1.5 text-[12px] text-ink placeholder:text-muted focus:border-accent focus:outline-none"
+        />
       </div>
-      <div className="nav-section-body">
-        <div className="pb-1.5">
-          <input
-            data-testid="sidebar-queue-search"
-            type="search"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder={t("sidebar.queueSearch")}
-            className="w-full rounded-md border border-hairline bg-surface-subtle px-2.5 py-1.5 text-[12px] text-ink placeholder:text-muted focus:border-accent focus:outline-none"
-          />
-        </div>
-        <div className="space-y-0.5" data-testid="sidebar-queue-list">
-          {visible.map((q) => (
-            <QueueNavRow
-              key={q.id}
-              node={q}
-              active={q.id === activeQueueId}
-              onNavigate={onNavigate}
-            />
-          ))}
-          {visible.length === 0 && (
-            <p className="px-2.5 py-2 text-[11.5px] text-muted" data-testid="sidebar-queue-empty">
-              {term ? t("sidebar.noQueueMatch") : t("queue.empty")}
-            </p>
-          )}
-        </div>
+      <div className="space-y-0.5" data-testid="sidebar-queue-list">
+        {visible.map((q) => (
+          <QueueNavRow key={q.id} node={q} active={q.id === activeQueueId} onNavigate={onNavigate} />
+        ))}
+        {visible.length === 0 && (
+          <p className="px-2.5 py-2 text-[11.5px] text-muted" data-testid="sidebar-queue-empty">
+            {term ? t("sidebar.noQueueMatch") : t("queue.empty")}
+          </p>
+        )}
       </div>
-    </div>
+    </NavGroup>
   );
 }
 
@@ -234,6 +299,18 @@ function SidebarBody({ onNavigate }: { onNavigate?: () => void }) {
     queryFn: () => api.myTicketCounts(),
   });
 
+  const [collapsedGroups, setCollapsedGroups] =
+    useState<Record<string, boolean>>(readCollapsedGroups);
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(SIDEBAR_COLLAPSED_GROUPS_KEY, JSON.stringify(collapsedGroups));
+    } catch {
+      // best-effort persistence only
+    }
+  }, [collapsedGroups]);
+  const toggleGroup = (id: string) =>
+    setCollapsedGroups((prev) => ({ ...prev, [id]: !prev[id] }));
+
   return (
     <div className="flex h-full flex-col">
       <Link
@@ -253,87 +330,87 @@ function SidebarBody({ onNavigate }: { onNavigate?: () => void }) {
         <SidebarSearch />
       </div>
 
-      <nav className="flex-1 space-y-3 overflow-y-auto" data-testid="agent-sidebar-nav">
-        <div className="nav-section-card">
-          <div className="nav-section-titleband">
-            <h2>{t("sidebar.workspace")}</h2>
-          </div>
-          <div className="nav-section-body space-y-0.5">
-            <NavItem
-              to="/agent/queues"
-              search={{ state_type: "open" }}
-              label={t("sidebar.inbox")}
-              count={totalOpen}
-              testId="agent-nav-inbox"
-              onNavigate={onNavigate}
-            />
-            <NavItem
-              to="/agent"
-              label={t("sidebar.myTickets")}
-              count={myCountsQ.data?.open}
-              newCount={myCountsQ.data?.new}
-              testId="agent-nav-my-tickets"
-              onNavigate={onNavigate}
-              exact
-            />
-            <NavItem
-              to="/agent"
-              label={t("sidebar.watched")}
-              testId="agent-nav-watched"
-              disabled
-            />
-          </div>
-        </div>
+      <nav className="flex-1 space-y-2 overflow-y-auto" data-testid="agent-sidebar-nav">
+        <NavGroup
+          id="workspace"
+          title={t("sidebar.workspace")}
+          collapsed={!!collapsedGroups.workspace}
+          onToggle={() => toggleGroup("workspace")}
+        >
+          <NavItem
+            to="/agent/queues"
+            search={{ state_type: "open" }}
+            label={t("sidebar.inbox")}
+            count={totalOpen}
+            testId="agent-nav-inbox"
+            onNavigate={onNavigate}
+          />
+          <NavItem
+            to="/agent"
+            label={t("sidebar.myTickets")}
+            count={myCountsQ.data?.open}
+            newCount={myCountsQ.data?.new}
+            testId="agent-nav-my-tickets"
+            onNavigate={onNavigate}
+            exact
+          />
+          <NavItem to="/agent" label={t("sidebar.watched")} testId="agent-nav-watched" disabled />
+        </NavGroup>
 
-        <QueueNavSection flat={flat} onNavigate={onNavigate} />
+        <QueueNavSection
+          flat={flat}
+          onNavigate={onNavigate}
+          collapsed={!!collapsedGroups.queues}
+          onToggle={() => toggleGroup("queues")}
+        />
 
-        <div className="nav-section-card">
-          <div className="nav-section-titleband">
-            <h2>{t("sidebar.knowledge")}</h2>
-          </div>
-          <div className="nav-section-body space-y-0.5">
-            <NavItem
-              to="/agent/kb"
-              label={t("sidebar.knowledgeBase")}
-              testId="agent-nav-kb"
-              onNavigate={onNavigate}
-            />
-            <NavItem
-              to="/agent/kb/categories"
-              label={t("sidebar.kbCategories")}
-              testId="agent-nav-kb-categories"
-              onNavigate={onNavigate}
-            />
-          </div>
-        </div>
+        <NavGroup
+          id="knowledge"
+          title={t("sidebar.knowledge")}
+          collapsed={!!collapsedGroups.knowledge}
+          onToggle={() => toggleGroup("knowledge")}
+        >
+          <NavItem
+            to="/agent/kb"
+            label={t("sidebar.knowledgeBase")}
+            testId="agent-nav-kb"
+            onNavigate={onNavigate}
+          />
+          <NavItem
+            to="/agent/kb/categories"
+            label={t("sidebar.kbCategories")}
+            testId="agent-nav-kb-categories"
+            onNavigate={onNavigate}
+          />
+        </NavGroup>
 
-        <div className="nav-section-card">
-          <div className="nav-section-titleband">
-            <h2>{t("sidebar.calendar")}</h2>
-          </div>
-          <div className="nav-section-body space-y-0.5">
-            <NavItem
-              to="/agent/calendar"
-              label={t("sidebar.calendar")}
-              testId="agent-nav-calendar"
-              onNavigate={onNavigate}
-            />
-          </div>
-        </div>
+        <NavGroup
+          id="calendar"
+          title={t("sidebar.calendar")}
+          collapsed={!!collapsedGroups.calendar}
+          onToggle={() => toggleGroup("calendar")}
+        >
+          <NavItem
+            to="/agent/calendar"
+            label={t("sidebar.calendar")}
+            testId="agent-nav-calendar"
+            onNavigate={onNavigate}
+          />
+        </NavGroup>
 
-        <div className="nav-section-card">
-          <div className="nav-section-titleband">
-            <h2>{t("sidebar.reports")}</h2>
-          </div>
-          <div className="nav-section-body space-y-0.5">
-            <NavItem
-              to="/agent/stats"
-              label={t("sidebar.stats")}
-              testId="agent-nav-stats"
-              onNavigate={onNavigate}
-            />
-          </div>
-        </div>
+        <NavGroup
+          id="reports"
+          title={t("sidebar.reports")}
+          collapsed={!!collapsedGroups.reports}
+          onToggle={() => toggleGroup("reports")}
+        >
+          <NavItem
+            to="/agent/stats"
+            label={t("sidebar.stats")}
+            testId="agent-nav-stats"
+            onNavigate={onNavigate}
+          />
+        </NavGroup>
       </nav>
 
       {/* Version/git-sha footer — kept after removing the redundant bottom-left user card. */}
