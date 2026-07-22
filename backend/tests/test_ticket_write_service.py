@@ -340,6 +340,57 @@ async def test_add_article_invariants_mariadb(mariadb_znuny_url: str) -> None:
     await engine.dispose()
 
 
+@pytest.mark.db
+async def test_add_agent_note_without_from_stamps_agent_name_mariadb(
+    mariadb_znuny_url: str,
+) -> None:
+    """Agent notes without a From header get the acting agent's full name —
+    otherwise the UI renders the sender as "unbekannt"."""
+    url = _mysql_async(mariadb_znuny_url)
+    engine = create_async_engine(url)
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    sysconfig = _make_sysconfig()
+
+    async with factory() as session:
+        await _seed_tiqora_tables(session)
+
+    ticket_id = await _make_ticket(factory, sysconfig, "Note From Test")
+
+    async with factory() as session, session.begin():
+        article_id = await add_article(
+            session,
+            ticket_id=ticket_id,
+            article=ArticleIn(
+                sender_type="agent",
+                is_visible_for_customer=False,
+                subject="Interne Notiz",
+                body="Nur intern.",
+                content_type="text/plain; charset=utf-8",
+                channel="note",
+            ),
+            user_id=1,
+            sysconfig=sysconfig,
+        )
+
+    async with factory() as session:
+        row = (
+            await session.execute(
+                text("SELECT a_from FROM article_data_mime WHERE article_id = :aid"),
+                {"aid": article_id},
+            )
+        ).first()
+        expected = (
+            await session.execute(
+                text("SELECT first_name, last_name, login FROM users WHERE id = 1"),
+            )
+        ).first()
+        assert row is not None and expected is not None
+        full_name = " ".join(p for p in (expected[0], expected[1]) if p).strip()
+        assert row[0] == (full_name or expected[2])
+
+    await engine.dispose()
+
+
 # ---------------------------------------------------------------------------
 # Sub-task 3: field mutations
 # ---------------------------------------------------------------------------

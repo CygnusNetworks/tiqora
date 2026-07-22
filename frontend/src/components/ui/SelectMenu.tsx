@@ -133,16 +133,22 @@ export function SelectMenu<T extends string | number>({
         triggerRef.current?.focus();
       }
     };
-    const onScrollOrResize = () => close();
+    // Scrolling INSIDE the panel must not close it (long lists scroll past
+    // the fold — closing there made entries below it unselectable).
+    const onScroll = (e: Event) => {
+      if (e.target instanceof Node && panelRef.current?.contains(e.target)) return;
+      close();
+    };
+    const onResize = () => close();
     document.addEventListener("pointerdown", onPointerDown);
     document.addEventListener("keydown", onKey);
-    window.addEventListener("scroll", onScrollOrResize, true);
-    window.addEventListener("resize", onScrollOrResize);
+    window.addEventListener("scroll", onScroll, true);
+    window.addEventListener("resize", onResize);
     return () => {
       document.removeEventListener("pointerdown", onPointerDown);
       document.removeEventListener("keydown", onKey);
-      window.removeEventListener("scroll", onScrollOrResize, true);
-      window.removeEventListener("resize", onScrollOrResize);
+      window.removeEventListener("scroll", onScroll, true);
+      window.removeEventListener("resize", onResize);
     };
   }, [open, close]);
 

@@ -9,7 +9,6 @@ bundle/search/get-article seams the same way.
 
 from __future__ import annotations
 
-import json
 from collections.abc import Awaitable, Callable
 from typing import Any
 
@@ -17,6 +16,7 @@ import structlog
 from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from tiqora.ai.listfields import parse_int_list, parse_str_list
 from tiqora.ai.llm import LlmClient, OpenAiCompatLlmClient
 from tiqora.ai.models import TiqoraAiQueuePolicy
 from tiqora.ai.providers import get_provider
@@ -70,8 +70,8 @@ async def kb_bundle(
     Uses :meth:`KbService.get_knowledge`, which never touches Meilisearch
     (pure SQL by tags/category) — safe to call unconditionally.
     """
-    tags = json.loads(policy.kb_tags) if policy.kb_tags else None
-    category_ids = json.loads(policy.kb_category_ids) if policy.kb_category_ids else None
+    tags = parse_str_list(policy.kb_tags) or None
+    category_ids = parse_int_list(policy.kb_category_ids) or None
     category_id = category_ids[0] if category_ids else None
     if not tags and category_id is None:
         return None
