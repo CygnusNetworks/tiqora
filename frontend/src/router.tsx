@@ -83,6 +83,10 @@ import { CustomerFieldsPage } from "@/routes/admin/CustomerFieldsPage";
 import { ApiKeysPage } from "@/routes/admin/ApiKeysPage";
 import { AuthConfigPage } from "@/routes/admin/AuthConfigPage";
 import { GdprPage, type GdprSearch } from "@/routes/admin/GdprPage";
+import { AiSettingsPage } from "@/routes/admin/AiSettingsPage";
+import { AiProvidersPage } from "@/routes/admin/AiProvidersPage";
+import { AiMcpClientsPage } from "@/routes/admin/AiMcpClientsPage";
+import { AiQueuePoliciesPage } from "@/routes/admin/AiQueuePoliciesPage";
 
 const rootRoute = createRootRoute({
   component: () => <Outlet />,
@@ -602,6 +606,30 @@ const adminProcessDetailRoute = createRoute({
   component: ProcessDetailPage,
 });
 
+const adminAiRoute = createRoute({
+  getParentRoute: () => adminLayoutRoute,
+  path: "/ai",
+  component: AiSettingsPage,
+});
+
+const adminAiProvidersRoute = createRoute({
+  getParentRoute: () => adminLayoutRoute,
+  path: "/ai/providers",
+  component: AiProvidersPage,
+});
+
+const adminAiMcpRoute = createRoute({
+  getParentRoute: () => adminLayoutRoute,
+  path: "/ai/mcp",
+  component: AiMcpClientsPage,
+});
+
+const adminAiQueuesRoute = createRoute({
+  getParentRoute: () => adminLayoutRoute,
+  path: "/ai/queues",
+  component: AiQueuePoliciesPage,
+});
+
 const catchAllRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "$",
@@ -679,6 +707,10 @@ const routeTree = rootRoute.addChildren([
     adminCustomerFieldsRoute,
     adminGdprRoute,
     adminDaemonsRoute,
+    adminAiRoute,
+    adminAiProvidersRoute,
+    adminAiMcpRoute,
+    adminAiQueuesRoute,
   ]),
   catchAllRoute,
 ]);

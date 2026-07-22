@@ -515,6 +515,173 @@
       "automation": "Automatisierung",
       "system": "System & Betrieb"
     },
+    "ai": {
+      "settings": {
+        "title": "KI-Einstellungen",
+        "description": "Betriebsvoraussetzungen, globale Vorgaben und Status des KI-Subsystems.",
+        "loadError": "Einstellungen konnten nicht geladen werden.",
+        "saved": "Gespeichert.",
+        "saveError": "Speichern fehlgeschlagen.",
+        "parallelBanner": "KI inaktiv — Parallelbetrieb. KI-Funktionen erfordern den Modus „Nur Tiqora“ (tiqora_primary).",
+        "statProviders": "LLM-Provider",
+        "statMcp": "MCP-Clients",
+        "statActivePolicies": "Aktive Queue-Policies",
+        "operationMode": "Betriebsmodus",
+        "operationModeHint": "KI-Funktionen erfordern den Betriebsmodus „Nur Tiqora“. Die Umstellung sollte erst nach Migration/Cutover erfolgen — siehe Betriebsdokumentation.",
+        "mode": {
+          "parallel": "Parallelbetrieb (mit Znuny)",
+          "tiqora_primary": "Nur Tiqora"
+        },
+        "modeConfirm": "Betriebsmodus wirklich auf „{{mode}}“ umstellen?",
+        "modeConfirmApply": "Umstellen",
+        "disclosure": "Disclosure & globale Vorgaben",
+        "disclosureText": "Globaler Disclosure-Standardtext",
+        "globalCap": "Globaler Auto-Reply-Hard-Cap (pro Stunde)",
+        "globalCapPlaceholder": "leer = aus"
+      },
+      "acl": {
+        "title": "Zugriffskontrolle (ACL)",
+        "description": "Erlaubnisse und Limits je Gruppe/Rolle/Benutzer für KI-Funktionen.",
+        "new": "Neuer ACL-Eintrag",
+        "subject": "Subjekt",
+        "subjectType": {
+          "label": "Subjekttyp",
+          "group": "Gruppe",
+          "role": "Rolle",
+          "user": "Benutzer"
+        },
+        "subjectId": "Subjekt-ID",
+        "subjectIdHelp": "ID der Gruppe/Rolle/des Benutzers.",
+        "feature": "Funktion",
+        "allowed": "Erlaubt",
+        "allowedYes": "Erlaubt",
+        "allowedNo": "Gesperrt",
+        "limits": "Limits",
+        "limitRequestsDay": "Limit Requests/Tag",
+        "limitTokensDay": "Limit Tokens/Tag",
+        "limitRequestsMonth": "Limit Requests/Monat"
+      },
+      "feature": {
+        "summary": "Zusammenfassung",
+        "auto_reply": "Auto-Antwort",
+        "manual_assist": "Manuelle Unterstützung",
+        "mcp": "MCP"
+      },
+      "providers": {
+        "title": "LLM-Provider",
+        "description": "Sprachmodell-Anbieter für das KI-Subsystem verwalten.",
+        "new": "Neuer Provider",
+        "name": "Name",
+        "kind": "Art",
+        "kindLabel": {
+          "openai_compat": "OpenAI-kompatibel",
+          "anthropic": "Anthropic"
+        },
+        "baseUrl": "Basis-URL",
+        "defaultModel": "Standardmodell",
+        "flags": "Merkmale",
+        "flagTools": "Tool-Aufrufe",
+        "flagStreaming": "Streaming",
+        "flagEu": "EU-gehostet",
+        "hasKey": "API-Key gesetzt",
+        "test": "Test",
+        "testAction": "Verbindung testen",
+        "testOk": "OK",
+        "testFail": "Fehlgeschlagen",
+        "apiKey": "API-Key",
+        "apiKeySetHelp": "Ein API-Key ist gespeichert. Leer lassen, um ihn beizubehalten.",
+        "apiKeyHelp": "Wird verschlüsselt gespeichert und nie wieder angezeigt.",
+        "deleteConfirm": "Provider „{{name}}“ wirklich löschen?"
+      },
+      "mcp": {
+        "title": "MCP-Clients",
+        "description": "MCP-Server (Model Context Protocol) als Werkzeugquellen für die KI verwalten.",
+        "new": "Neuer MCP-Client",
+        "name": "Name",
+        "url": "URL",
+        "authToken": "Auth-Token",
+        "authTokenSetHelp": "Ein Token ist gespeichert. Leer lassen, um es beizubehalten.",
+        "authTokenHelp": "Wird verschlüsselt gespeichert und nie wieder angezeigt.",
+        "empty": "Noch keine MCP-Clients angelegt.",
+        "hasToken": "Token gesetzt",
+        "lastDiscovered": "Zuletzt aktualisiert: {{date}}",
+        "neverDiscovered": "Noch nie aktualisiert",
+        "discover": "Tools aktualisieren",
+        "discoverResult": "{{total}} Tools ({{added}} neu, {{removed}} entfernt).",
+        "deleteConfirm": "MCP-Client „{{name}}“ wirklich löschen?",
+        "toolsLoading": "Tools werden geladen…",
+        "noTools": "Noch keine Tools entdeckt.",
+        "mutating": "Mutierend",
+        "enabled": "Aktiv"
+      },
+      "queues": {
+        "title": "Queue-KI-Policies",
+        "description": "KI-Verhalten je Queue konfigurieren: Funktionen, Autonomie, Provider, Limits und Eskalation.",
+        "new": "Neue Policy",
+        "queue": "Queue",
+        "features": "Funktionen",
+        "queueRequired": "Bitte eine Queue auswählen.",
+        "deleteConfirm": "Policy wirklich löschen?",
+        "gateError": "Nicht möglich im Parallelbetrieb — erst Betriebsmodus auf „Nur Tiqora“ (tiqora_primary) umstellen.",
+        "invalidJson": "{{field}}: ungültiges JSON.",
+        "autonomy": {
+          "label": "Autonomie",
+          "off": "Aus (nur Entwürfe)",
+          "clarify_only": "Nur Rückfragen",
+          "full": "Voll autonom",
+          "offHint": "Die KI erstellt nur Entwürfe — ein Mensch muss jede Antwort freigeben.",
+          "clarify_onlyHint": "Die KI darf eigenständig Rückfragen stellen, aber keine abschließenden Antworten senden.",
+          "fullHint": "Die KI darf innerhalb der konfigurierten Limits eigenständig antworten."
+        },
+        "section": {
+          "features": "Funktionen",
+          "autonomy": "Autonomie",
+          "prompt": "System-Prompt",
+          "summary": "Zusammenfassungs-Schwellenwerte",
+          "caps": "Limits",
+          "disclosure": "Kennzeichnung & Datenschutz",
+          "identity": "Identität"
+        },
+        "modelOverride": "Modell-Override",
+        "serviceUser": "Service-Agent",
+        "kbTags": "KB-Tags",
+        "kbTagsPlaceholder": "tag1, tag2, …",
+        "kbCategoryIds": "KB-Kategorie-IDs",
+        "mcpClients": "MCP-Clients",
+        "summaryArticleThreshold": "Artikel-Schwellenwert",
+        "summaryCharThreshold": "Zeichen-Schwellenwert",
+        "summaryIncrementalMinArticles": "Min. Artikel (inkrementell)",
+        "summaryIncrementalMinChars": "Min. Zeichen (inkrementell)",
+        "maxClarifications": "Max. Rückfragen/Ticket",
+        "maxAutoReplies": "Max. Auto-Antworten/Ticket",
+        "maxRepliesPerHour": "Max. Antworten/Stunde",
+        "budgetTokensDay": "Token-Budget/Tag",
+        "escalationRules": "Eskalationsregeln (JSON)",
+        "escalationRulesHint": "JSON-Array mit Matching-Regeln auf MCP-Tool-Ergebnisse, die eine Eskalation an einen Menschen auslösen.",
+        "disclosureEnabled": "KI-Kennzeichnung aktiv",
+        "disclosureTextPlaceholder": "Leer = globalen Standardtext verwenden",
+        "piiMasking": "PII-Maskierung",
+        "identityMode": {
+          "ticket_customer_id": "Ticket-Kunde",
+          "clarify_schema": "Rückfrage-Schema",
+          "off": "Aus"
+        }
+      },
+      "usage": {
+        "title": "Nutzung",
+        "allQueues": "Alle Queues",
+        "allFeatures": "Alle Funktionen",
+        "totals": "Summe: {{prompt}} Prompt- / {{completion}} Completion-Tokens",
+        "ts": "Zeitpunkt",
+        "queue": "Queue",
+        "feature": "Funktion",
+        "model": "Modell",
+        "tokens": "Tokens (P/C)",
+        "success": "Status",
+        "ok": "OK",
+        "failed": "Fehler"
+      }
+    },
     "nav": {
       "users": "Benutzer",
       "groups": "Gruppen",
@@ -551,7 +718,11 @@
       "customerFields": "Customer-Felder",
       "authConfig": "Authentifizierung / 2FA",
       "gdpr": "Datenschutz / DSGVO",
-      "daemons": "Dienste"
+      "daemons": "Dienste",
+      "ai": "KI-Einstellungen",
+      "aiProviders": "KI-Provider",
+      "aiMcp": "KI-MCP-Clients",
+      "aiQueues": "KI-Queue-Policies"
     },
     "table": {
       "id": "ID",
@@ -1358,7 +1529,11 @@
       "daemons": "Status und Intervalle der Hintergrunddienste steuern.",
       "gdpr": "DSGVO-Anfragen: Auskunft, Anonymisierung und Löschung mit Backup.",
       "mailLog": "Ein- und ausgehende E-Mail-Zustellversuche einsehen.",
-      "customerFields": "Platzhalter-Variablen für Kundenbenutzer pflegen."
+      "customerFields": "Platzhalter-Variablen für Kundenbenutzer pflegen.",
+      "ai": "Betriebsmodus, Disclosure und Zugriffskontrolle des KI-Subsystems verwalten.",
+      "aiProviders": "LLM-Provider (OpenAI-kompatibel, Anthropic) verwalten und testen.",
+      "aiMcp": "MCP-Server als Werkzeugquellen für die KI verwalten und Tools freigeben.",
+      "aiQueues": "KI-Verhalten je Queue konfigurieren: Autonomie, Limits, Eskalation."
     }
   },
   "kb": {

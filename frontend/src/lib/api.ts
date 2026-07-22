@@ -196,6 +196,7 @@ export type {
   PriorityRef,
   StateRef,
   AgentRef,
+  QueueRef,
   CustomerRef,
   ComposeContext,
   AgentTicketCreateInput,

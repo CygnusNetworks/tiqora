@@ -515,6 +515,173 @@
       "automation": "Automation",
       "system": "System & operations"
     },
+    "ai": {
+      "settings": {
+        "title": "AI settings",
+        "description": "Operating prerequisites, global defaults and status of the AI subsystem.",
+        "loadError": "Settings could not be loaded.",
+        "saved": "Saved.",
+        "saveError": "Save failed.",
+        "parallelBanner": "AI inactive — parallel operation. AI features require \"Tiqora only\" (tiqora_primary) mode.",
+        "statProviders": "LLM providers",
+        "statMcp": "MCP clients",
+        "statActivePolicies": "Active queue policies",
+        "operationMode": "Operation mode",
+        "operationModeHint": "AI features require \"Tiqora only\" mode. Only switch after migration/cutover — see the operations docs.",
+        "mode": {
+          "parallel": "Parallel operation (with Znuny)",
+          "tiqora_primary": "Tiqora only"
+        },
+        "modeConfirm": "Really switch operation mode to \"{{mode}}\"?",
+        "modeConfirmApply": "Switch",
+        "disclosure": "Disclosure & global defaults",
+        "disclosureText": "Global default disclosure text",
+        "globalCap": "Global auto-reply hard cap (per hour)",
+        "globalCapPlaceholder": "empty = off"
+      },
+      "acl": {
+        "title": "Access control (ACL)",
+        "description": "Permissions and limits per group/role/user for AI features.",
+        "new": "New ACL entry",
+        "subject": "Subject",
+        "subjectType": {
+          "label": "Subject type",
+          "group": "Group",
+          "role": "Role",
+          "user": "User"
+        },
+        "subjectId": "Subject ID",
+        "subjectIdHelp": "ID of the group/role/user.",
+        "feature": "Feature",
+        "allowed": "Allowed",
+        "allowedYes": "Allowed",
+        "allowedNo": "Blocked",
+        "limits": "Limits",
+        "limitRequestsDay": "Limit requests/day",
+        "limitTokensDay": "Limit tokens/day",
+        "limitRequestsMonth": "Limit requests/month"
+      },
+      "feature": {
+        "summary": "Summary",
+        "auto_reply": "Auto reply",
+        "manual_assist": "Manual assist",
+        "mcp": "MCP"
+      },
+      "providers": {
+        "title": "LLM providers",
+        "description": "Manage language model providers for the AI subsystem.",
+        "new": "New provider",
+        "name": "Name",
+        "kind": "Kind",
+        "kindLabel": {
+          "openai_compat": "OpenAI-compatible",
+          "anthropic": "Anthropic"
+        },
+        "baseUrl": "Base URL",
+        "defaultModel": "Default model",
+        "flags": "Flags",
+        "flagTools": "Tool calling",
+        "flagStreaming": "Streaming",
+        "flagEu": "EU hosted",
+        "hasKey": "API key set",
+        "test": "Test",
+        "testAction": "Test connection",
+        "testOk": "OK",
+        "testFail": "Failed",
+        "apiKey": "API key",
+        "apiKeySetHelp": "An API key is stored. Leave empty to keep it.",
+        "apiKeyHelp": "Stored encrypted and never shown again.",
+        "deleteConfirm": "Really delete provider \"{{name}}\"?"
+      },
+      "mcp": {
+        "title": "MCP clients",
+        "description": "Manage MCP servers (Model Context Protocol) as tool sources for the AI.",
+        "new": "New MCP client",
+        "name": "Name",
+        "url": "URL",
+        "authToken": "Auth token",
+        "authTokenSetHelp": "A token is stored. Leave empty to keep it.",
+        "authTokenHelp": "Stored encrypted and never shown again.",
+        "empty": "No MCP clients created yet.",
+        "hasToken": "Token set",
+        "lastDiscovered": "Last refreshed: {{date}}",
+        "neverDiscovered": "Never refreshed",
+        "discover": "Refresh tools",
+        "discoverResult": "{{total}} tools ({{added}} added, {{removed}} removed).",
+        "deleteConfirm": "Really delete MCP client \"{{name}}\"?",
+        "toolsLoading": "Loading tools…",
+        "noTools": "No tools discovered yet.",
+        "mutating": "Mutating",
+        "enabled": "Enabled"
+      },
+      "queues": {
+        "title": "Queue AI policies",
+        "description": "Configure AI behavior per queue: features, autonomy, provider, limits and escalation.",
+        "new": "New policy",
+        "queue": "Queue",
+        "features": "Features",
+        "queueRequired": "Please select a queue.",
+        "deleteConfirm": "Really delete this policy?",
+        "gateError": "Not possible in parallel operation — switch operation mode to \"Tiqora only\" (tiqora_primary) first.",
+        "invalidJson": "{{field}}: invalid JSON.",
+        "autonomy": {
+          "label": "Autonomy",
+          "off": "Off (drafts only)",
+          "clarify_only": "Clarify only",
+          "full": "Fully autonomous",
+          "offHint": "The AI only creates drafts — a human must approve every reply.",
+          "clarify_onlyHint": "The AI may ask clarifying questions on its own, but not send final replies.",
+          "fullHint": "The AI may reply autonomously within the configured limits."
+        },
+        "section": {
+          "features": "Features",
+          "autonomy": "Autonomy",
+          "prompt": "System prompt",
+          "summary": "Summary thresholds",
+          "caps": "Caps",
+          "disclosure": "Disclosure & privacy",
+          "identity": "Identity"
+        },
+        "modelOverride": "Model override",
+        "serviceUser": "Service agent",
+        "kbTags": "KB tags",
+        "kbTagsPlaceholder": "tag1, tag2, …",
+        "kbCategoryIds": "KB category IDs",
+        "mcpClients": "MCP clients",
+        "summaryArticleThreshold": "Article threshold",
+        "summaryCharThreshold": "Character threshold",
+        "summaryIncrementalMinArticles": "Min. articles (incremental)",
+        "summaryIncrementalMinChars": "Min. characters (incremental)",
+        "maxClarifications": "Max clarifications/ticket",
+        "maxAutoReplies": "Max auto replies/ticket",
+        "maxRepliesPerHour": "Max replies/hour",
+        "budgetTokensDay": "Token budget/day",
+        "escalationRules": "Escalation rules (JSON)",
+        "escalationRulesHint": "JSON array of matching rules against MCP tool results that trigger escalation to a human.",
+        "disclosureEnabled": "AI disclosure enabled",
+        "disclosureTextPlaceholder": "Empty = use the global default text",
+        "piiMasking": "PII masking",
+        "identityMode": {
+          "ticket_customer_id": "Ticket customer",
+          "clarify_schema": "Clarify schema",
+          "off": "Off"
+        }
+      },
+      "usage": {
+        "title": "Usage",
+        "allQueues": "All queues",
+        "allFeatures": "All features",
+        "totals": "Total: {{prompt}} prompt / {{completion}} completion tokens",
+        "ts": "Timestamp",
+        "queue": "Queue",
+        "feature": "Feature",
+        "model": "Model",
+        "tokens": "Tokens (P/C)",
+        "success": "Status",
+        "ok": "OK",
+        "failed": "Failed"
+      }
+    },
     "nav": {
       "users": "Users",
       "groups": "Groups",
@@ -551,7 +718,11 @@
       "customerFields": "Customer fields",
       "authConfig": "Authentication / 2FA",
       "gdpr": "Privacy / GDPR",
-      "daemons": "Services"
+      "daemons": "Services",
+      "ai": "AI settings",
+      "aiProviders": "AI providers",
+      "aiMcp": "AI MCP clients",
+      "aiQueues": "AI queue policies"
     },
     "table": {
       "id": "ID",
@@ -1358,7 +1529,11 @@
       "daemons": "Control the status and intervals of background daemons.",
       "gdpr": "GDPR requests: access, anonymization and deletion with backup.",
       "mailLog": "Review inbound and outbound email delivery attempts.",
-      "customerFields": "Maintain placeholder variables for customer users."
+      "customerFields": "Maintain placeholder variables for customer users.",
+      "ai": "Manage the AI subsystem's operation mode, disclosure and access control.",
+      "aiProviders": "Manage and test LLM providers (OpenAI-compatible, Anthropic).",
+      "aiMcp": "Manage MCP servers as tool sources for the AI and enable tools.",
+      "aiQueues": "Configure AI behavior per queue: autonomy, caps, escalation."
     }
   },
   "kb": {
