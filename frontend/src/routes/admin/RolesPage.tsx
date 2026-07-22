@@ -21,7 +21,13 @@ export function RolesPage() {
   ];
 
   const fields: FieldDef[] = [
-    { name: "name", label: t("admin.roles.name"), type: "text", required: true },
+    {
+      name: "name",
+      label: t("admin.roles.name"),
+      type: "text",
+      required: true,
+      help: { title: t("admin.roles.name"), description: t("admin.help.roles.name") },
+    },
     { name: "comments", label: t("admin.table.comments"), type: "textarea" },
     {
       name: "valid_id",
@@ -31,6 +37,7 @@ export function RolesPage() {
         { value: 1, label: t("admin.table.valid") },
         { value: 2, label: t("admin.table.invalid") },
       ],
+      help: { title: t("admin.table.status"), description: t("admin.help.common.validId") },
     },
   ];
 
