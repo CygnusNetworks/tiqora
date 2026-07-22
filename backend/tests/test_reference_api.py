@@ -27,7 +27,14 @@ def _mysql_async(sync_url: str) -> str:
 
 def _seed(sync_url: str) -> dict[str, Any]:
     engine = create_engine(sync_url)
-    ids: dict[str, Any] = {"user_id": 700, "login": "ref.agent.alpha"}
+    ids: dict[str, Any] = {
+        "user_id": 700,
+        "login": "ref.agent.alpha",
+        "queue_id": 750,
+        "group_id": 750,
+        "signature_id": 750,
+        "system_address_id": 750,
+    }
     with engine.begin() as conn:
         # Idempotent: the MariaDB fixture is session-scoped and shared, so
         # each test re-seeds the same rows — clear our id/login block first.
@@ -35,6 +42,13 @@ def _seed(sync_url: str) -> dict[str, Any]:
         conn.execute(
             text("DELETE FROM customer_user WHERE login LIKE 'ref.cust.%'"),
         )
+        conn.execute(text("DELETE FROM queue WHERE id = :id"), {"id": ids["queue_id"]})
+        conn.execute(text("DELETE FROM signature WHERE id = :id"), {"id": ids["signature_id"]})
+        conn.execute(
+            text("DELETE FROM system_address WHERE id = :id"),
+            {"id": ids["system_address_id"]},
+        )
+        conn.execute(text("DELETE FROM permission_groups WHERE id = :id"), {"id": ids["group_id"]})
         for uid, login, valid in (
             (700, "ref.agent.alpha", 1),
             (701, "ref.agent.bravo", 1),
@@ -66,6 +80,48 @@ def _seed(sync_url: str) -> dict[str, Any]:
                 ),
                 {"login": login, "email": email, "cust": cust, "valid": valid, "t": NOW},
             )
+        conn.execute(
+            text(
+                "INSERT INTO permission_groups (id, name, valid_id,"
+                " create_time, create_by, change_time, change_by)"
+                " VALUES (:id, 'ref-compose-grp', 1, :t, 1, :t, 1)"
+            ),
+            {"id": ids["group_id"], "t": NOW},
+        )
+        conn.execute(
+            text(
+                "INSERT INTO signature (id, name, text, content_type, comments, valid_id,"
+                " create_by, create_time, change_by, change_time)"
+                " VALUES (:id, 'ref-compose-sig', :txt, 'text/plain; charset=utf-8',"
+                " 'test', 1, 1, :t, 1, :t)"
+            ),
+            {"id": ids["signature_id"], "txt": "Kind regards,\nRef Support", "t": NOW},
+        )
+        conn.execute(
+            text(
+                "INSERT INTO system_address (id, value0, value1, comments, valid_id,"
+                " queue_id, create_by, create_time, change_by, change_time)"
+                " VALUES (:id, 'compose@ref.example', 'Ref Support', 'test', 1, 1,"
+                " 1, :t, 1, :t)"
+            ),
+            {"id": ids["system_address_id"], "t": NOW},
+        )
+        conn.execute(
+            text(
+                "INSERT INTO queue (id, name, group_id, system_address_id, salutation_id,"
+                " signature_id, follow_up_id, follow_up_lock, valid_id,"
+                " create_time, create_by, change_time, change_by)"
+                " VALUES (:id, 'RefComposeQueue', :gid, :sa, 1, :sig, 1, 0, 1,"
+                " :t, 1, :t, 1)"
+            ),
+            {
+                "id": ids["queue_id"],
+                "gid": ids["group_id"],
+                "sa": ids["system_address_id"],
+                "sig": ids["signature_id"],
+                "t": NOW,
+            },
+        )
     engine.dispose()
     return ids
 
@@ -156,6 +212,36 @@ async def test_reference_customers_search(mariadb_znuny_url: str) -> None:
     assert "ref.cust.match" in logins
     assert "ref.cust.other" not in logins
     assert "ref.cust.invalid" not in logins
+
+
+@pytest.mark.asyncio
+async def test_reference_compose_context(mariadb_znuny_url: str) -> None:
+    ids = _seed(mariadb_znuny_url)
+    client, engine = await _client_for(mariadb_znuny_url, ids)
+    async with client:
+        resp = await client.get(
+            "/api/v1/reference/compose-context", params={"queue_id": ids["queue_id"]}
+        )
+    await engine.dispose()
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["from_address"] == "Ref Support <compose@ref.example>"
+    assert "Ref Support" in body["signature"]
+    assert body["signature_is_html"] is False
+    # Frontend::RichText has no seeded sysconfig row for this DB — falls back
+    # to the endpoint's own default (true), same as ZNUNY_SETTING_DEFAULTS
+    # fallback semantics for unknown keys.
+    assert body["rich_text"] is True
+
+
+@pytest.mark.asyncio
+async def test_reference_compose_context_unknown_queue(mariadb_znuny_url: str) -> None:
+    ids = _seed(mariadb_znuny_url)
+    client, engine = await _client_for(mariadb_znuny_url, ids)
+    async with client:
+        resp = await client.get("/api/v1/reference/compose-context", params={"queue_id": 999_999})
+    await engine.dispose()
+    assert resp.status_code == 404
 
 
 @pytest.mark.asyncio

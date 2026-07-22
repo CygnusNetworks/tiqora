@@ -1,23 +1,27 @@
 """Agent-accessible reference data for ticket-zoom action pickers.
 
-These are read-only lookups (priorities, states, agents, customers, queues)
-that the agent UI needs to populate the ticket action toolbar's dropdowns and
-dialogs. Unlike the admin CRUD under ``/admin/*`` (which is AdminUser-gated),
-these are guarded only by ``CurrentUser`` — any logged-in agent may read them.
+These are read-only lookups (priorities, states, agents, customers, queues,
+compose-context) that the agent UI needs to populate the ticket action
+toolbar's dropdowns/dialogs and the new-ticket compose form. Unlike the admin
+CRUD under ``/admin/*`` (which is AdminUser-gated), these are guarded only by
+``CurrentUser`` — any logged-in agent may read them.
 """
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, HTTPException, Query, status
 from pydantic import BaseModel
 from sqlalchemy import select
 
 from tiqora.api.deps import CurrentUser, DbSession
+from tiqora.channels.email.outbound_reply import queue_outbound_meta
 from tiqora.db.legacy.customer import CustomerUser
 from tiqora.db.legacy.queue import Queue
 from tiqora.db.legacy.ticket import TicketPriority, TicketState, TicketStateType
 from tiqora.db.legacy.user import Users
+from tiqora.domain.ticket_write_service import InvalidInput
 from tiqora.permissions.engine import PermissionEngine
+from tiqora.znuny.sysconfig import SysConfig
 
 router = APIRouter(prefix="/reference", tags=["reference"])
 
@@ -52,6 +56,13 @@ class CustomerRefOut(BaseModel):
 class QueueRefOut(BaseModel):
     id: int
     name: str
+
+
+class ComposeContextOut(BaseModel):
+    from_address: str
+    signature: str = ""
+    signature_is_html: bool = False
+    rich_text: bool = True
 
 
 @router.get("/priorities", response_model=list[PriorityRefOut])
@@ -164,3 +175,33 @@ async def list_reference_queues(
         )
     ).scalars()
     return [QueueRefOut(id=q.id, name=q.name) for q in rows]
+
+
+@router.get("/compose-context", response_model=ComposeContextOut)
+async def compose_context(
+    user: CurrentUser,
+    session: DbSession,
+    queue_id: int = Query(..., description="Queue to resolve From-address/signature for"),
+) -> ComposeContextOut:
+    """From-address, signature preview, and rich-text flag for a new-ticket compose form.
+
+    Reuses ``queue_outbound_meta``, the same queue lookup the agent-reply send
+    path (``deliver_agent_email_reply``) resolves From/signature from, so the
+    preview matches what an actual reply on that queue would show. The
+    signature is returned RAW (placeholders unexpanded): a not-yet-created
+    ticket has no ticket/customer context to expand OTRS_TICKET_*/
+    OTRS_CUSTOMER_DATA_* tags against, so this preview is only approximate —
+    the real expansion happens in ``prepare_outgoing_agent_email`` at send time.
+    """
+    _ = user
+    try:
+        from_line, _queue_name, sig_text, sig_ct = await queue_outbound_meta(session, queue_id)
+    except InvalidInput as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    rich_text = bool(await SysConfig(session).get("Frontend::RichText", 1))
+    return ComposeContextOut(
+        from_address=from_line,
+        signature=sig_text or "",
+        signature_is_html="html" in (sig_ct or "").lower(),
+        rich_text=rich_text,
+    )

@@ -451,11 +451,17 @@ async def deliver_agent_email_reply(
     return article_id
 
 
+# Public alias so callers outside this module (e.g. the reference compose-context
+# endpoint, which needs the same From/signature resolution for a preview) don't
+# have to reach into a leading-underscore name.
+queue_outbound_meta = _queue_outbound_meta
+
 __all__ = [
     "OutboundMailError",
     "append_signature",
     "deliver_agent_email_reply",
     "generate_message_id",
     "prepare_outgoing_agent_email",
+    "queue_outbound_meta",
     "send_prepared_agent_email",
 ]
