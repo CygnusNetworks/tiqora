@@ -278,7 +278,9 @@ async def test_list_queue_physical_variables_custom_column(
 
     sync_url: str = request.getfixturevalue(url_fixture)
     ns = uuid.uuid4().int % 100_000
-    queue_id = 9400 + (ns % 500)
+    # Own 884xx block — 9400+(ns%500) overlapped the AI tests' 96xx-98xx
+    # queue ranges; their tickets FK-blocked this test's pre-seed DELETE.
+    queue_id = 88400 + (ns % 100)
     _seed_queue(sync_url, queue_id=queue_id, name=f"PhysVarQ-{ns}")
     assert _ensure_queue_domain_column(sync_url)
     domain_val = f"phys-{ns}.example"
