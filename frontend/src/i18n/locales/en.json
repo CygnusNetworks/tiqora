@@ -166,6 +166,28 @@
       "pending": "Pending",
       "closed": "Closed",
       "all": "All"
+    },
+    "bulk": {
+      "select": "☑ Select",
+      "done": "Done",
+      "selectRow": "Select row",
+      "selectAllOnPage": "Select all on this page",
+      "selectedOnPage": "{{count}} selected on this page",
+      "selectAllMatches": "Select all {{count}} in \"{{queue}}\"",
+      "selectAllMatchesLoading": "Loading tickets…",
+      "allSelected": "All {{count}} selected",
+      "allSelectedCapped": "All {{count}} selected (capped at {{cap}})",
+      "clearSelection": "Clear selection",
+      "fieldState": "Status",
+      "fieldPriority": "Priority",
+      "fieldOwner": "Owner",
+      "confirmTitle": "Change {{field}}?",
+      "confirmText": "Change {{field}} to \"{{value}}\" for {{count}} tickets?",
+      "confirmApply": "Change",
+      "confirmCancel": "Cancel",
+      "progress": "{{done}}/{{total}} changed…",
+      "updated": "{{count}} updated",
+      "partialFail": "{{done}} updated, {{failed}} failed: {{ids}}"
     }
   },
   "ticket": {

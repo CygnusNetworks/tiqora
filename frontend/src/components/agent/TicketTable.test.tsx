@@ -1,5 +1,6 @@
+import type { ComponentProps } from "react";
 import { describe, it, expect, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, fireEvent } from "@testing-library/react";
 import { I18nextProvider } from "react-i18next";
 import {
   RouterProvider,
@@ -39,7 +40,10 @@ function makeItem(overrides: Partial<TicketListItem> = {}): TicketListItem {
   } as TicketListItem;
 }
 
-async function renderTable(items: TicketListItem[]) {
+async function renderTable(
+  items: TicketListItem[],
+  extraProps: Partial<ComponentProps<typeof TicketTable>> = {},
+) {
   const ui = (
     <I18nextProvider i18n={i18n}>
       <TicketTable
@@ -51,6 +55,7 @@ async function renderTable(items: TicketListItem[]) {
         order="desc"
         onSortChange={vi.fn()}
         onPageChange={vi.fn()}
+        {...extraProps}
       />
     </I18nextProvider>
   );
@@ -103,5 +108,51 @@ describe("TicketTable state display", () => {
     expect(chip).not.toHaveTextContent("5 very");
     expect(chip).toHaveAttribute("data-kind", "priority");
     expect(chip).toHaveStyle({ color: "var(--color-prio-5)" });
+  });
+});
+
+describe("TicketTable selection mode", () => {
+  it("without a selection prop, row click navigates (no checkboxes rendered)", async () => {
+    await renderTable([makeItem()]);
+    expect(screen.queryByTestId("queue-row-check-11")).toBeNull();
+    expect(screen.queryByTestId("queue-select-all-page")).toBeNull();
+  });
+
+  it("with a selection prop, row click toggles the row instead of navigating", async () => {
+    const onToggleRow = vi.fn();
+    await renderTable([makeItem()], {
+      selection: {
+        selected: new Set(),
+        onToggleRow,
+        onToggleAllPage: vi.fn(),
+        allPageSelected: false,
+        somePageSelected: false,
+      },
+    });
+
+    const checkbox = await screen.findByTestId("queue-row-check-11");
+    expect(checkbox).not.toBeChecked();
+
+    fireEvent.click(screen.getByTestId("ticket-row-11"));
+    expect(onToggleRow).toHaveBeenCalledWith(11);
+  });
+
+  it("header checkbox reflects allPageSelected/somePageSelected and calls onToggleAllPage", async () => {
+    const onToggleAllPage = vi.fn();
+    await renderTable([makeItem(), makeItem({ id: 12, tn: "20240601000012" })], {
+      selection: {
+        selected: new Set([11]),
+        onToggleRow: vi.fn(),
+        onToggleAllPage,
+        allPageSelected: false,
+        somePageSelected: true,
+      },
+    });
+
+    const headerCheckbox = await screen.findByTestId("queue-select-all-page");
+    expect((headerCheckbox as HTMLInputElement).indeterminate).toBe(true);
+
+    fireEvent.click(headerCheckbox);
+    expect(onToggleAllPage).toHaveBeenCalledTimes(1);
   });
 });
