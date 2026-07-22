@@ -381,6 +381,34 @@ async def list_customer_user_columns(session: AsyncSession) -> list[str]:
     return [str(row[0]).lower() for row in result.all()]
 
 
+async def column_max_lengths(session: AsyncSession, table: str) -> dict[str, int]:
+    """``{column: character_maximum_length}`` for *table* (both dialects).
+
+    Columns without a length limit (numeric/date/unbounded text) are
+    omitted. Used to truncate Faker replacement values so a narrow
+    ``varchar`` column (e.g. ``phone``, ``street``) never overflows in
+    MariaDB strict mode. Shared by preview and apply so both truncate
+    identically.
+    """
+    rows = (
+        await session.execute(
+            text(
+                "SELECT column_name, character_maximum_length"
+                " FROM information_schema.columns WHERE table_name = :t"
+            ),
+            {"t": table},
+        )
+    ).all()
+    return {str(r[0]).lower(): int(r[1]) for r in rows if r[1] is not None}
+
+
+def _truncate_to_column(value: Any, max_len: int | None) -> Any:
+    """Truncate a string replacement to *max_len* chars, if both are set."""
+    if max_len is None or not isinstance(value, str):
+        return value
+    return value[:max_len] if len(value) > max_len else value
+
+
 async def resolve_customer_user_pii_columns(session: AsyncSession) -> list[str]:
     """PII columns on ``customer_user``: vanilla + extras + settings list."""
     cols = set(await list_customer_user_columns(session))
@@ -909,6 +937,7 @@ async def build_customer_record_preview(
 
     mapper = ValueMapper(seed=seed)
     pii_cols = await resolve_customer_user_pii_columns(session)
+    cu_max_lengths = await column_max_lengths(session, "customer_user")
     new_login: str | None = None
     fields: list[FieldPreview] = []
     for col in pii_cols:
@@ -917,11 +946,13 @@ async def build_customer_record_preview(
         orig = full[col]
         if col == "login":
             new_val: Any = mapper.map_value(str(orig), "login") or f"gdpr-user-{cust_id}"
+            new_val = _truncate_to_column(new_val, cu_max_lengths.get(col))
             new_login = str(new_val)
         elif col == "pw":
             new_val = None
         else:
             new_val = mapper.map_value(str(orig) if orig is not None else None, _kind_for(col))
+            new_val = _truncate_to_column(new_val, cu_max_lengths.get(col))
         fields.append(
             FieldPreview(
                 field=f"customer_user.{col}", before=orig, after=new_val, changed=orig != new_val
@@ -929,6 +960,7 @@ async def build_customer_record_preview(
         )
     if new_login is None:
         new_login = str(mapper.map_value(str(full["login"]), "login") or f"gdpr-user-{cust_id}")
+        new_login = str(_truncate_to_column(new_login, cu_max_lengths.get("login")))
 
     valid_before = full.get("valid_id")
     fields.append(
@@ -1021,9 +1053,10 @@ async def build_customer_record_preview(
     example_body_before: str | None = None
     example_body_after: str | None = None
     if non_empty_bodies:
-        decoded = _decode_body_text(non_empty_bodies[0])[:_RECORD_PREVIEW_BODY_TRUNCATE]
-        example_body_before = decoded
-        example_body_after = (mapper.anonymize_body(decoded) or "")[:_RECORD_PREVIEW_BODY_TRUNCATE]
+        raw_first = non_empty_bodies[0]
+        example_body_before = _decode_body_text(raw_first)[:_RECORD_PREVIEW_BODY_TRUNCATE]
+        scrubbed = mapper.anonymize_mime_message(raw_first)
+        example_body_after = _decode_body_text(scrubbed)[:_RECORD_PREVIEW_BODY_TRUNCATE]
     fields.append(
         FieldPreview(
             field="article_data_mime_plain.body",
@@ -1097,6 +1130,9 @@ async def run_erasure(
 
     async with session_factory() as session, session.begin():
         pii_cols = await resolve_customer_user_pii_columns(session)
+        cu_max_lengths = await column_max_lengths(session, "customer_user")
+        co_max_lengths = await column_max_lengths(session, "customer_company")
+        att_max_lengths = await column_max_lengths(session, "article_data_mime_attachment")
         customers = (
             (
                 await session.execute(
@@ -1225,7 +1261,10 @@ async def run_erasure(
                 continue
             old_login = str(full["login"])
             old_company = str(full["customer_id"])
-            new_login = mapper.map_value(old_login, "login") or f"gdpr-user-{cust.id}"
+            new_login = _truncate_to_column(
+                mapper.map_value(old_login, "login") or f"gdpr-user-{cust.id}",
+                cu_max_lengths.get("login"),
+            )
             login_to_new[old_login] = new_login
             if old_company not in company_to_new:
                 company_to_new[old_company] = (
@@ -1247,6 +1286,7 @@ async def run_erasure(
                         new_val = mapper.map_value(
                             str(orig) if orig is not None else None, _kind_for(col)
                         )
+                        new_val = _truncate_to_column(new_val, cu_max_lengths.get(col))
                     if orig != new_val:
                         changed[col] = orig
                         updates[col] = new_val
@@ -1585,17 +1625,10 @@ async def run_erasure(
             )
             for plain in plain_rows:
                 orig_body = plain.body
-                # MariaDB: LONGBLOB (bytes). PG fixture: TEXT (str).
-                if isinstance(orig_body, (bytes, memoryview)):
-                    text_body = (
-                        bytes(orig_body).decode("utf-8", errors="replace") if orig_body else ""
-                    )
-                    store_as_bytes = True
-                else:
-                    text_body = str(orig_body or "")
-                    store_as_bytes = False
-                new_text = mapper.anonymize_body(text_body) or ""
-                new_body: Any = new_text.encode("utf-8") if store_as_bytes else new_text
+                # MariaDB: LONGBLOB (bytes). PG fixture: TEXT (str). The column
+                # holds the raw MIME message (headers + body) — scrub it
+                # structure-preservingly, not as flat lorem text.
+                new_body: Any = mapper.anonymize_mime_message(orig_body) if orig_body else ""
                 if isinstance(orig_body, (bytes, memoryview)):
                     backup_body: Any = bytes(orig_body)
                 else:
@@ -1630,6 +1663,7 @@ async def run_erasure(
                 updates_a: dict[str, Any] = {}
                 if att.filename:
                     new_fn = mapper.map_value(att.filename, "login") or "redacted.bin"
+                    new_fn = _truncate_to_column(new_fn, att_max_lengths.get("filename"))
                     changed_a["filename"] = att.filename
                     updates_a["filename"] = new_fn
                 if att.content is not None:
@@ -1719,6 +1753,7 @@ async def run_erasure(
                     new_val = mapper.map_value(
                         str(orig) if orig is not None else None, _kind_for(col)
                     )
+                    new_val = _truncate_to_column(new_val, co_max_lengths.get(col))
                     if orig != new_val:
                         changed_c[col] = orig
                         updates_c[col] = new_val
@@ -1763,6 +1798,7 @@ async def run_erasure(
                         new_val = mapper.map_value(
                             str(orig) if orig is not None else None, _kind_for(col)
                         )
+                        new_val = _truncate_to_column(new_val, co_max_lengths.get(col))
                         if orig != new_val:
                             changed_c[col] = orig
                             updates_c[col] = new_val

@@ -1650,3 +1650,308 @@ async def test_admin_selector_count_endpoint(mariadb_znuny_url: str) -> None:
         assert out_none.count == 0
 
     await engine.dispose()
+
+
+# ---------------------------------------------------------------------------
+# FIX 1: format-preserving replacement for unmapped-kind columns
+# ---------------------------------------------------------------------------
+
+
+def test_format_preserving_replacement_digits_and_length() -> None:
+    mapper = ValueMapper(seed=1)
+
+    out = mapper.map_value("777777", "pkz")
+    assert out is not None
+    assert len(out) == 6
+    assert out.isdigit()
+    assert out != "777777"
+
+    out_single = mapper.map_value("0", "locked")
+    assert out_single is not None
+    assert len(out_single) == 1
+    assert out_single.isdigit()
+
+
+def test_format_preserving_replacement_keeps_separators_and_length() -> None:
+    mapper = ValueMapper(seed=1)
+    mixed = "545-03-99-99-9"
+    out = mapper.map_value(mixed, "sozialversicherungsnummer")
+    assert out is not None
+    assert len(out) == len(mixed)
+    assert out != mixed
+    for orig_ch, new_ch in zip(mixed, out, strict=True):
+        if orig_ch == "-":
+            assert new_ch == "-"
+        else:
+            assert new_ch.isdigit()
+
+
+def test_format_preserving_replacement_preserves_letter_case() -> None:
+    mapper = ValueMapper(seed=4)
+    original = "AbC-123-xyz"
+    out = mapper.map_value(original, "custom_code")
+    assert out is not None
+    assert len(out) == len(original)
+    for orig_ch, new_ch in zip(original, out, strict=True):
+        if orig_ch == "-":
+            assert new_ch == "-"
+        elif orig_ch.isdigit():
+            assert new_ch.isdigit()
+        else:
+            assert new_ch.isalpha()
+            assert new_ch.isupper() == orig_ch.isupper()
+
+
+def test_format_preserving_replacement_deterministic_per_seed() -> None:
+    mapper_a = ValueMapper(seed=42)
+    mapper_b = ValueMapper(seed=42)
+    assert mapper_a.map_value("777777", "pkz") == mapper_b.map_value("777777", "pkz")
+
+    mapper_c = ValueMapper(seed=43)
+    assert mapper_a.map_value("777777", "pkz") != mapper_c.map_value("777777", "pkz")
+
+
+def test_explicitly_mapped_kinds_still_use_faker() -> None:
+    """Kinds with dedicated draw logic (email, first_name, ...) are untouched."""
+    mapper = ValueMapper(seed=1)
+    out = mapper.map_value("Alice", "first_name")
+    assert out != "Alice"
+    assert out is not None and out.isalpha()
+
+
+# ---------------------------------------------------------------------------
+# FIX 2: length-capping helpers (shared by preview + apply)
+# ---------------------------------------------------------------------------
+
+
+def test_truncate_to_column_helper() -> None:
+    from tiqora.gdpr.erasure import _truncate_to_column
+
+    assert _truncate_to_column("abcdef", 3) == "abc"
+    assert _truncate_to_column("ab", 3) == "ab"
+    assert _truncate_to_column("abcdef", None) == "abcdef"
+    assert _truncate_to_column(None, 3) is None
+    assert _truncate_to_column(123, 3) == 123
+
+
+@pytest.mark.db
+@pytest.mark.asyncio
+async def test_column_max_lengths_introspection(mariadb_znuny_url: str) -> None:
+    from tiqora.gdpr.erasure import _truncate_to_column, column_max_lengths
+
+    engine, factory = await _factory(mariadb_znuny_url)
+    async with factory() as session:
+        await _seed_tiqora_tables(session, mysql=True)
+        with contextlib.suppress(Exception):
+            await session.execute(text("DROP TABLE IF EXISTS tiqora_gdpr_test_lenchk"))
+            await session.commit()
+        await session.execute(
+            text("CREATE TABLE tiqora_gdpr_test_lenchk (id INT PRIMARY KEY, code VARCHAR(5))")
+        )
+        await session.commit()
+
+        lengths = await column_max_lengths(session, "tiqora_gdpr_test_lenchk")
+        assert lengths.get("code") == 5
+
+        long_value = "this-is-way-too-long-for-the-column"
+        truncated = _truncate_to_column(long_value, lengths.get("code"))
+        assert truncated == long_value[:5]
+        assert len(truncated) == 5
+
+        # customer_user has real length-limited PII columns (e.g. phone).
+        cu_lengths = await column_max_lengths(session, "customer_user")
+        assert "phone" in cu_lengths
+        assert cu_lengths["phone"] > 0
+
+        await session.execute(text("DROP TABLE tiqora_gdpr_test_lenchk"))
+        await session.commit()
+    await engine.dispose()
+
+
+# ---------------------------------------------------------------------------
+# FIX 3: address-field anonymization also scrubs display names
+# ---------------------------------------------------------------------------
+
+
+def test_anonymize_address_field_scrubs_display_name() -> None:
+    mapper = ValueMapper(seed=3)
+    out = mapper.anonymize_address_field('"Torge Valerius" <t@x.de>')
+    assert out is not None
+    assert "Torge" not in out
+    assert "Valerius" not in out
+    assert "t@x.de" not in out
+    assert "<" in out and ">" in out
+
+    # deterministic for the same seed/value.
+    out2 = mapper.anonymize_address_field('"Torge Valerius" <t@x.de>')
+    assert out == out2
+
+
+def test_anonymize_address_field_multiple_addresses_and_quoted_comma_name() -> None:
+    mapper = ValueMapper(seed=3)
+    value = '"Torge Valerius" <t@x.de>, "Nachname, Vorname" <other@y.de>'
+    out = mapper.anonymize_address_field(value)
+    assert out is not None
+    for leaked in ("Torge", "Valerius", "t@x.de", "Nachname", "Vorname", "other@y.de"):
+        assert leaked not in out
+    # Still two comma-separated address entries with angle brackets.
+    assert out.count("<") == 2
+    assert out.count(">") == 2
+
+
+def test_anonymize_address_field_bare_email_no_display_name() -> None:
+    mapper = ValueMapper(seed=2)
+    out = mapper.anonymize_address_field("plain@example.com")
+    assert out is not None
+    assert out != "plain@example.com"
+    assert "@" in out
+
+
+def test_anonymize_address_field_empty_and_none() -> None:
+    mapper = ValueMapper(seed=1)
+    assert mapper.anonymize_address_field(None) is None
+    assert mapper.anonymize_address_field("") == ""
+
+
+# ---------------------------------------------------------------------------
+# FIX 4: MIME-structure-preserving anonymization of raw mail bodies
+# ---------------------------------------------------------------------------
+
+
+def test_anonymize_mime_message_preserves_headers_scrubs_addresses_and_body() -> None:
+    mapper = ValueMapper(seed=5)
+    raw = (
+        'From: "Torge Valerius" <torge@example.com>\r\n'
+        "To: agent@tiqora.test\r\n"
+        "Subject: Hello Torge\r\n"
+        "Message-ID: <abc123@example.com>\r\n"
+        "MIME-Version: 1.0\r\n"
+        "Content-Type: text/plain; charset=utf-8\r\n"
+        "\r\n"
+        "Hi Torge Valerius, this is a private message.\r\n"
+    )
+
+    out = mapper.anonymize_mime_message(raw)
+    assert isinstance(out, str)
+    for leaked in ("Torge", "Valerius", "torge@example.com"):
+        assert leaked not in out
+
+    from email.parser import Parser
+
+    msg = Parser().parsestr(out)
+    assert msg["Message-ID"] is not None
+    assert msg["Subject"] is not None
+    assert msg["Subject"] != "Hello Torge"
+    assert msg.get_content_type() == "text/plain"
+    body_text = msg.get_payload()
+    assert isinstance(body_text, str)
+    for leaked in ("Torge", "Valerius"):
+        assert leaked not in body_text
+
+
+def test_anonymize_mime_message_bytes_roundtrip_and_deterministic() -> None:
+    mapper = ValueMapper(seed=9)
+    raw = b"From: a@example.com\r\nTo: b@example.com\r\nSubject: hi there\r\n\r\nbody text\r\n"
+
+    out = mapper.anonymize_mime_message(raw)
+    assert isinstance(out, bytes)
+
+    from email.parser import BytesParser
+
+    msg = BytesParser().parsebytes(out)
+    assert msg["From"] is not None
+    assert b"a@example.com" not in out
+    assert b"b@example.com" not in out
+
+    out2 = mapper.anonymize_mime_message(raw)
+    assert out == out2
+
+
+def test_anonymize_mime_message_falls_back_on_unparseable_input() -> None:
+    mapper = ValueMapper(seed=1)
+    raw = "just some random text\nwithout any header lines at all\nlast line here"
+    out = mapper.anonymize_mime_message(raw)
+    assert isinstance(out, str)
+    assert "random text" not in out
+    assert len(out.split("\n")) == len(raw.split("\n"))
+
+
+def test_anonymize_mime_message_falls_back_on_unparseable_bytes() -> None:
+    mapper = ValueMapper(seed=1)
+    raw = b"just some random text\nwithout headers at all"
+    out = mapper.anonymize_mime_message(raw)
+    assert isinstance(out, bytes)
+    assert b"random text" not in out
+
+
+def test_anonymize_mime_message_empty_and_none() -> None:
+    mapper = ValueMapper(seed=1)
+    assert mapper.anonymize_mime_message(None) is None
+    assert mapper.anonymize_mime_message("") == ""
+    assert mapper.anonymize_mime_message(b"") == b""
+
+
+@pytest.mark.db
+@pytest.mark.asyncio
+async def test_run_erasure_mime_plain_body_preserves_structure(mariadb_znuny_url: str) -> None:
+    """End-to-end: article_data_mime_plain.body is a raw MIME message; after
+    run_erasure it must still be a parseable message with headers intact and
+    no leaked name/address, matching the CustomerRecordPreview output."""
+    engine, factory = await _factory(mariadb_znuny_url)
+    login = "erase.mime.my@example.com"
+    company = "ERASE-MIME-MY"
+    raw_mail = (
+        'From: "Torge Valerius" <torge@example.com>\r\n'
+        f"To: {login}\r\n"
+        "Subject: Hello Torge\r\n"
+        "Message-ID: <mime-plain-test@example.com>\r\n"
+        "MIME-Version: 1.0\r\n"
+        "Content-Type: text/plain; charset=utf-8\r\n"
+        "\r\n"
+        "Hi Torge Valerius, this is a private message.\r\n"
+    )
+
+    async with factory() as session:
+        await _seed_tiqora_tables(session, mysql=True)
+        await _insert_company(session, customer_id=company, name="Acme Mime")
+        cuid = await _insert_customer(session, login=login, customer_id=company)
+        tid = await _insert_ticket(
+            session, customer_user_id=login, customer_id=company, tn=f"2026MIME{cuid}"
+        )
+        await _insert_article_bundle(session, ticket_id=tid, from_addr=login, body=raw_mail)
+
+    result = await run_erasure(
+        factory,
+        Settings(),
+        customer_user_ids=[cuid],
+        mode="anonymize",
+        seed=11,
+        force_parallel=True,
+        actor="test",
+    )
+    assert result.counts["article_data_mime_plain"] >= 1
+
+    async with factory() as session:
+        plain = (
+            await session.execute(
+                text(
+                    "SELECT body FROM article_data_mime_plain"
+                    " WHERE article_id IN (SELECT id FROM article WHERE ticket_id = :t)"
+                ),
+                {"t": tid},
+            )
+        ).scalar_one()
+        plain_text = plain.decode("utf-8") if isinstance(plain, (bytes, memoryview)) else str(plain)
+
+        for leaked in ("Torge", "Valerius", "torge@example.com"):
+            assert leaked not in plain_text
+
+        from email.parser import Parser
+
+        msg = Parser().parsestr(plain_text)
+        assert msg["Message-ID"] is not None
+        assert msg["Subject"] is not None
+        assert msg["Subject"] != "Hello Torge"
+        assert msg.get_content_type() == "text/plain"
+
+    await engine.dispose()

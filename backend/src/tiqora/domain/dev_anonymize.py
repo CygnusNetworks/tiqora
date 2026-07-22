@@ -27,9 +27,15 @@ from __future__ import annotations
 
 import hashlib
 import re
+import string
 from collections.abc import Iterator, Sequence
 from dataclasses import dataclass, field
-from typing import Any
+from email.errors import MessageError
+from email.message import Message
+from email.parser import BytesParser, Parser
+from email.policy import compat32
+from email.utils import formataddr, getaddresses
+from typing import Any, cast
 
 from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
@@ -39,6 +45,15 @@ from tiqora.db.legacy.customer import CustomerCompany, CustomerUser
 from tiqora.db.legacy.user import Users
 
 _EMAIL_RE = re.compile(r"[A-Za-z0-9_.+-]+@[A-Za-z0-9-]+\.[A-Za-z0-9.-]+")
+
+# Address-like headers on a raw MIME message: display name + address both get
+# anonymized (via anonymize_address_field), structure preserved.
+_MIME_ADDRESS_HEADERS = frozenset(
+    {"from", "to", "cc", "bcc", "reply-to", "return-path", "delivered-to"}
+)
+# Identifier headers: replaced with a deterministic opaque token (same
+# treatment run_erasure already applies to article_data_mime.a_message_id).
+_MIME_ID_HEADERS = frozenset({"message-id", "in-reply-to", "references"})
 
 
 class AnonymizeError(Exception):
@@ -65,6 +80,28 @@ def _chunks[T](items: Sequence[T], size: int) -> Iterator[Sequence[T]]:
 # Kinds whose replacements land in a column with a UNIQUE constraint (or that is
 # effectively unique). The mapper guarantees no duplicate replacement per kind.
 _UNIQUE_KINDS = frozenset({"company", "login", "email"})
+
+# Kinds with dedicated Faker-based replacement logic in ``_draw``. Any other
+# kind (i.e. an unmapped site-specific column, where callers pass the column
+# name itself as "kind" — see ``tiqora.gdpr.erasure._kind_for``) gets
+# format-preserving character substitution instead: digits/letters replaced
+# in place, everything else (separators, whitespace) left untouched, and the
+# length is always identical to the original.
+_FAKER_KINDS = frozenset(
+    {
+        "first_name",
+        "last_name",
+        "email",
+        "login",
+        "company",
+        "phone",
+        "street",
+        "city",
+        "zip",
+        "country",
+        "body",
+    }
+)
 
 
 class ValueMapper:
@@ -115,6 +152,26 @@ class ValueMapper:
             return str(fake.country())
         return str(fake.word())
 
+    @staticmethod
+    def _format_preserving(fake: Any, original: str) -> str:
+        """Replace digits/letters in place, keep separators, keep the length.
+
+        Used for site-specific columns with no known PII shape (e.g. a
+        numeric member ID or a mixed alphanumeric code) — a fixed-length
+        Faker value (or one that overflows a narrow ``varchar``) would either
+        look wrong or break the column's format invariants downstream.
+        """
+        out_chars: list[str] = []
+        for ch in original:
+            if ch.isdigit():
+                out_chars.append(str(fake.random_int(min=0, max=9)))
+            elif ch.isalpha():
+                pool = string.ascii_uppercase if ch.isupper() else string.ascii_lowercase
+                out_chars.append(str(fake.random_element(elements=pool)))
+            else:
+                out_chars.append(ch)
+        return "".join(out_chars)
+
     def map_value(self, original: str | None, kind: str) -> str | None:
         if not original:
             return original
@@ -128,7 +185,11 @@ class ValueMapper:
         attempt = 0
         while True:
             salt = original if attempt == 0 else f"{original}#{attempt}"
-            value = self._draw(self._faker_for(kind, salt), kind)
+            fake = self._faker_for(kind, salt)
+            if kind in _FAKER_KINDS:
+                value = self._draw(fake, kind)
+            else:
+                value = self._format_preserving(fake, original)
             if kind not in _UNIQUE_KINDS or value not in self._used.setdefault(kind, set()):
                 break
             attempt += 1
@@ -137,11 +198,39 @@ class ValueMapper:
         self._cache[key] = value
         return value
 
+    def _anonymize_display_name(self, name: str) -> str:
+        """Deterministic fake full name for an address header display name.
+
+        Handles both "First Last" and "Last, First" forms the same way: the
+        whole string is replaced by a fake full name, so no fragment of the
+        original (in either order) survives.
+        """
+        if not name:
+            return name
+        fake = self._faker_for("address_display_name", name)
+        return str(fake.name())
+
     def anonymize_address_field(self, value: str | None) -> str | None:
-        """Replace every email address found in *value*, leaving the rest intact."""
+        """Anonymize an RFC 5322 address-list header value.
+
+        Replaces both the email address and any display name
+        (``"Name" <addr>``, ``Name <addr>``, or bare ``addr``) for every
+        address in the list, preserving the ``Name <mail>`` structure and
+        comma-separation. Falls back to a bare email-regex substitution if
+        the value doesn't parse as an address list at all (e.g. free text
+        that merely contains an address).
+        """
         if not value:
             return value
-        return _EMAIL_RE.sub(lambda m: self.map_value(m.group(0), "email") or "", value)
+        pairs = getaddresses([value])
+        if not pairs or all(not name and not addr for name, addr in pairs):
+            return _EMAIL_RE.sub(lambda m: self.map_value(m.group(0), "email") or "", value)
+        parts: list[str] = []
+        for name, addr in pairs:
+            new_addr = self.map_value(addr, "email") if addr else addr
+            new_name = self._anonymize_display_name(name) if name else name
+            parts.append(formataddr((new_name, new_addr or "")))
+        return ", ".join(parts)
 
     def anonymize_body(self, value: str | None) -> str | None:
         """Lorem-scrub a body, preserving line count and rough per-line length."""
@@ -157,6 +246,99 @@ class ValueMapper:
             text_line = fake.text(max_nb_chars=max(length, 5))
             out_lines.append(text_line[:length])
         return "\n".join(out_lines)
+
+    def _scrub_mime_headers(self, msg: Message) -> None:
+        """Anonymize address/subject/identifier headers on *msg*, in place."""
+        original_casing: dict[str, str] = {}
+        for key, _value in msg.items():
+            original_casing.setdefault(key.lower(), key)
+
+        for lower_name, orig_name in original_casing.items():
+            if lower_name in _MIME_ADDRESS_HEADERS:
+                values = msg.get_all(orig_name) or []
+                new_values = [self.anonymize_address_field(v) for v in values]
+                del msg[orig_name]
+                for v in new_values:
+                    if v:
+                        msg[orig_name] = v
+            elif lower_name == "subject":
+                value = msg.get(orig_name)
+                if value:
+                    new_value = self.anonymize_body(str(value))
+                    del msg[orig_name]
+                    if new_value:
+                        msg[orig_name] = new_value
+            elif lower_name in _MIME_ID_HEADERS:
+                values = msg.get_all(orig_name) or []
+                id_values = [str(self.map_value(str(v), "login") or v) for v in values]
+                del msg[orig_name]
+                for v in id_values:
+                    msg[orig_name] = v
+
+    def _scrub_mime_body_parts(self, msg: Message) -> None:
+        """Lorem-scrub text parts, empty out non-text (attachment) parts."""
+        for part in msg.walk():
+            if part.is_multipart():
+                continue
+            if part.get_content_maintype() == "text":
+                payload_raw = part.get_payload(decode=True)
+                if not payload_raw:
+                    continue
+                payload = cast(bytes, payload_raw)
+                charset = part.get_content_charset() or "utf-8"
+                try:
+                    text_payload = payload.decode(charset, errors="replace")
+                except (LookupError, UnicodeDecodeError):
+                    text_payload = payload.decode("utf-8", errors="replace")
+                new_text = self.anonymize_body(text_payload) or ""
+                part.set_payload(new_text)
+                if "Content-Transfer-Encoding" in part:
+                    del part["Content-Transfer-Encoding"]
+            else:
+                # Attachments: emptied, consistent with the
+                # article_data_mime_attachment scrub path (content -> b""/"").
+                part.set_payload("")
+                if "Content-Transfer-Encoding" in part:
+                    del part["Content-Transfer-Encoding"]
+
+    def anonymize_mime_message(self, raw: str | bytes | None) -> str | bytes | None:
+        """Structure-preserving anonymization of a raw MIME message.
+
+        Parses *raw* (``article_data_mime_plain.body`` — bytes on MariaDB,
+        str on the Postgres test fixture) as an RFC 5322 message: headers are
+        kept, but address/subject/identifier headers are anonymized in
+        place; text body parts are lorem-scrubbed; non-text parts
+        (attachments) are emptied. Falls back to the previous whole-text
+        line-scrub (:meth:`anonymize_body`) if *raw* doesn't parse as a
+        message with any headers (e.g. a corrupt/partial mail), so the
+        anonymizer never raises on bad input.
+        """
+        if not raw:
+            return raw
+        if isinstance(raw, (bytes, memoryview)):
+            is_bytes = True
+            raw_bytes: bytes | None = bytes(raw)
+        else:
+            is_bytes = False
+            raw_bytes = None
+        try:
+            msg: Message = (
+                BytesParser(policy=compat32).parsebytes(raw_bytes)
+                if raw_bytes is not None
+                else Parser(policy=compat32).parsestr(str(raw))
+            )
+            if not msg.items():
+                raise MessageError("no headers parsed — not a MIME message")
+        except Exception:
+            if is_bytes:
+                text_in = raw_bytes.decode("utf-8", errors="replace") if raw_bytes else ""
+                scrubbed = self.anonymize_body(text_in) or ""
+                return scrubbed.encode("utf-8")
+            return self.anonymize_body(str(raw))
+
+        self._scrub_mime_headers(msg)
+        self._scrub_mime_body_parts(msg)
+        return msg.as_bytes() if is_bytes else msg.as_string()
 
 
 @dataclass
