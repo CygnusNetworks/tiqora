@@ -5,9 +5,11 @@ worker): a hung/slow LLM call must never affect the poller, outbox drain, or
 any other core daemon, and the AI worker needs to be independently
 stoppable as a cost/incident kill switch.
 
-Phase A ships only the loop skeleton: Readiness-Gate check, tick-status
-recording, sleep. No ticket side effects — the agent runtime (tool loop,
-per-ticket lock, outbox consumption) lands in Phase B/D.
+Phase A shipped only the loop skeleton (Readiness-Gate check, tick-status
+recording, sleep). Phase D adds the actual work: draining
+``tiqora_event_outbox`` for auto-reply-relevant events and running the
+queue-threshold auto-summary scan — see :mod:`tiqora.ai.auto_worker` for the
+tick logic itself; this module stays the thin process/loop shell.
 """
 
 from __future__ import annotations
@@ -21,6 +23,7 @@ from typing import Any
 import structlog
 from sqlalchemy.ext.asyncio import async_sessionmaker
 
+from tiqora.ai.auto_worker import run_auto_tick
 from tiqora.ai.gate import is_tiqora_primary
 from tiqora.config import get_settings
 from tiqora.db.engine import get_session_factory
@@ -67,8 +70,8 @@ async def _heartbeat_loop(stop: asyncio.Event) -> None:
 
 
 async def _ai_tick(factory: async_sessionmaker[Any]) -> dict[str, Any]:
-    """One tick: honour ``daemon.ai_worker.enabled`` and re-check the
-    Readiness-Gate. Phase A does nothing else (no ticket side effects)."""
+    """One tick: honour ``daemon.ai_worker.enabled``, re-check the
+    Readiness-Gate, and (gate open) run the auto-reply/auto-summary tick."""
     async with factory() as session:
         enabled = await get_setting_bool(session, KEY_AI_WORKER_ENABLED, False)
         if not enabled:
@@ -76,7 +79,9 @@ async def _ai_tick(factory: async_sessionmaker[Any]) -> dict[str, Any]:
         gate_open = await is_tiqora_primary(session)
     if not gate_open:
         logger.info("ai_worker_gate_closed")
-    return {"enabled": True, "gate_open": gate_open}
+        return {"enabled": True, "gate_open": False}
+    result = await run_auto_tick(session_factory=factory)
+    return {"enabled": True, "gate_open": True, **result}
 
 
 async def _run_loop(stop: asyncio.Event) -> None:

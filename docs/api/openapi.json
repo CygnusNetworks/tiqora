@@ -4614,6 +4614,81 @@
         }
       }
     },
+    "/api/v1/tickets/{ticket_id}/ai/summarize": {
+      "post": {
+        "tags": [
+          "ai"
+        ],
+        "summary": "Request Summarize",
+        "description": "Manual \"Zusammenfassen\" trigger (plan \u00a73.5) \u2014 state-only, never an\narticle/note. Reuses the same ``note`` permission as Manual Assist since\nit is likewise an agent action on the ticket.",
+        "operationId": "request_summarize_api_v1_tickets__ticket_id__ai_summarize_post",
+        "parameters": [
+          {
+            "name": "ticket_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Ticket Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "tiqora_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AiSummarizeOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/tickets/{ticket_id}/ai/drafts/{draft_id}/discard": {
       "post": {
         "tags": [
@@ -28722,6 +28797,10 @@
             "type": "boolean",
             "title": "Summary Available"
           },
+          "can_summarize": {
+            "type": "boolean",
+            "title": "Can Summarize"
+          },
           "operation_mode_ready": {
             "type": "boolean",
             "title": "Operation Mode Ready"
@@ -28760,12 +28839,48 @@
         "required": [
           "manual_assist_available",
           "summary_available",
+          "can_summarize",
           "operation_mode_ready",
           "drafts",
           "summary_body",
           "last_summary_upto_article_id"
         ],
         "title": "AiStateOut"
+      },
+      "AiSummarizeOut": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "summary_body": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Summary Body"
+          },
+          "upto_article_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Upto Article Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status"
+        ],
+        "title": "AiSummarizeOut"
       },
       "AiUsageOut": {
         "properties": {
