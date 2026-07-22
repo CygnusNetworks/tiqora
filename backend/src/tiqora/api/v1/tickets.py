@@ -91,6 +91,12 @@ class ArticleCreateRequest(BaseModel):
     in_reply_to: str | None = None
     references: str | None = None
     channel: str = "note"
+    # Optional accept-hook (Tiqora AI, plan §3.1/§3.4): when set and the draft
+    # is still `open` and belongs to this ticket, it is marked `accepted` with
+    # `accepted_article_id` = the article just created. Never set at prefill
+    # time — only once the article actually exists. Absent/unknown values are
+    # a no-op so this stays fully backward compatible.
+    ai_draft_id: int | None = None
 
 
 class ArticleCreateResponse(BaseModel):
@@ -625,6 +631,18 @@ async def create_article(
             )
     except (WriteAccessDenied, WriteNotFound, InvalidInput, OutboundMailError) as exc:
         raise _map_exc(exc) from exc
+
+    if body.ai_draft_id is not None:
+        # Outside the write transaction above (already committed): the AI
+        # service modules commit internally (see tiqora.ai.drafts), so this
+        # runs as its own follow-up transaction rather than nesting commits.
+        from tiqora.ai import drafts as ai_drafts
+
+        draft = await ai_drafts.get_draft(session, body.ai_draft_id)
+        if draft is not None and draft.ticket_id == ticket_id:
+            await ai_drafts.mark_accepted(
+                session, body.ai_draft_id, article_id=aid, actor_user_id=user.id
+            )
     return ArticleCreateResponse(article_id=aid)
 
 

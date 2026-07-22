@@ -1,0 +1,100 @@
+"""Unit tests for tiqora.ai.tools (plan §3.3/§3.4/§3.8). No DB, no network:
+the executor is exercised only for the "reject unknown/blocked tool" path,
+which never touches the session."""
+
+from __future__ import annotations
+
+import pytest
+
+from tiqora.ai.models import AUTONOMY_CLARIFY_ONLY, AUTONOMY_FULL, AUTONOMY_OFF
+from tiqora.ai.pii import PiiMapper
+from tiqora.ai.tools import (
+    TOOL_ADD_INTERNAL_NOTE,
+    TOOL_ESCALATE_TO_HUMAN,
+    TOOL_PROPOSE_CUSTOMER_MESSAGE,
+    McpToolSpec,
+    ToolExecutor,
+    ToolRegistry,
+    UnknownToolError,
+)
+
+
+def _mcp_spec(*, mutating: bool) -> McpToolSpec:
+    return McpToolSpec(
+        client_name="netadmin",
+        client_url="https://mcp.example/netadmin",
+        auth_token=None,
+        tool_name="diagnose",
+        mutating=mutating,
+    )
+
+
+def test_local_tools_always_present() -> None:
+    registry = ToolRegistry(autonomy=AUTONOMY_OFF)
+    names = {s["function"]["name"] for s in registry.build_schemas()}
+    assert TOOL_PROPOSE_CUSTOMER_MESSAGE in names
+    assert TOOL_ADD_INTERNAL_NOTE in names
+    assert TOOL_ESCALATE_TO_HUMAN in names
+
+
+def test_readonly_mcp_tool_available_in_every_autonomy_mode() -> None:
+    spec = _mcp_spec(mutating=False)
+    for autonomy in (AUTONOMY_OFF, AUTONOMY_CLARIFY_ONLY, AUTONOMY_FULL):
+        registry = ToolRegistry(autonomy=autonomy, mcp_tools=[spec])
+        names = {s["function"]["name"] for s in registry.build_schemas()}
+        assert spec.full_name in names
+        assert registry.is_known(spec.full_name)
+
+
+def test_mutating_mcp_tool_only_available_at_full_autonomy() -> None:
+    spec = _mcp_spec(mutating=True)
+    for autonomy in (AUTONOMY_OFF, AUTONOMY_CLARIFY_ONLY):
+        registry = ToolRegistry(autonomy=autonomy, mcp_tools=[spec])
+        names = {s["function"]["name"] for s in registry.build_schemas()}
+        assert spec.full_name not in names
+        assert not registry.is_known(spec.full_name)
+
+    registry = ToolRegistry(autonomy=AUTONOMY_FULL, mcp_tools=[spec])
+    names = {s["function"]["name"] for s in registry.build_schemas()}
+    assert spec.full_name in names
+    assert registry.is_known(spec.full_name)
+
+
+def test_kb_tools_hidden_when_kb_disabled() -> None:
+    registry = ToolRegistry(autonomy=AUTONOMY_OFF, kb_enabled=False)
+    names = {s["function"]["name"] for s in registry.build_schemas()}
+    assert "kb_search" not in names
+    assert "kb_get_article" not in names
+
+
+@pytest.mark.asyncio
+async def test_executor_rejects_unknown_tool_name() -> None:
+    registry = ToolRegistry(autonomy=AUTONOMY_OFF)
+    executor = ToolExecutor(
+        session=None,  # type: ignore[arg-type]
+        sysconfig=None,  # type: ignore[arg-type]
+        registry=registry,
+        ticket_id=1,
+        acting_user_id=1,
+        pii=PiiMapper(),
+        escalation_rules=None,
+    )
+    with pytest.raises(UnknownToolError):
+        await executor.execute("delete_everything", {})
+
+
+@pytest.mark.asyncio
+async def test_executor_rejects_mutating_mcp_tool_when_not_full_autonomy() -> None:
+    spec = _mcp_spec(mutating=True)
+    registry = ToolRegistry(autonomy=AUTONOMY_CLARIFY_ONLY, mcp_tools=[spec])
+    executor = ToolExecutor(
+        session=None,  # type: ignore[arg-type]
+        sysconfig=None,  # type: ignore[arg-type]
+        registry=registry,
+        ticket_id=1,
+        acting_user_id=1,
+        pii=PiiMapper(),
+        escalation_rules=None,
+    )
+    with pytest.raises(UnknownToolError):
+        await executor.execute(spec.full_name, {})
