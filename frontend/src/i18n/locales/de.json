@@ -1756,7 +1756,11 @@
       "category": "Ordnet den Artikel in der Wissensdatenbank-Seitenleiste ein und grenzt ein, welche Artikel eine KI-Queue-Policy über ihren Kategorie-ID-Filter einbeziehen kann.",
       "language": "Die Inhaltssprache des Artikels. Agenten und die KI-Wissenssuche können danach filtern — mehrsprachige Inhalte sollten daher in separate Artikel pro Sprache aufgeteilt werden.",
       "state": "„Entwurf“/„In Prüfung“ sind nur in diesem Editor sichtbar; nur „Veröffentlicht“ erscheint in der kundenseitigen Suche und kann als KI-Wissenskontext genutzt werden. „Archiviert“ blendet ihn aus beidem aus, ohne ihn zu löschen.",
-      "tags": "Kommagetrennte Schlagworte für Navigation und Suche — zugleich der Anknüpfungspunkt, gegen den die Einstellung „KB-Tags“ einer KI-Queue-Policy abgleicht, welche Artikel dem Modell zugeführt werden."
+      "tags": "Kommagetrennte Schlagworte für Navigation und Suche — zugleich der Anknüpfungspunkt, gegen den die Einstellung „KB-Tags“ einer KI-Queue-Policy abgleicht, welche Artikel dem Modell zugeführt werden.",
+      "categoryParent": "Ordnet die Kategorie als Unterkategorie ein. Die Baumstruktur dient nur der Navigation — Berechtigungen werden nicht vererbt, jede Kategorie hat eigene Gruppen.",
+      "categorySlug": "URL-Kürzel der Kategorie. Leer lassen: wird automatisch aus dem Namen erzeugt (Kollisionen bekommen ein Nummern-Suffix).",
+      "categorySort": "Sortierposition innerhalb der Ebene — kleinere Zahlen stehen oben.",
+      "categoryCustomerVisible": "Veröffentlichte Artikel dieser Kategorie erscheinen im Kundenportal. Ohne Haken bleibt die Kategorie rein intern."
     },
     "field": {
       "title": "Titel",
@@ -1799,7 +1803,11 @@
       "noGroups": "Sie haben keine zuweisbaren Gruppen.",
       "empty": "Noch keine Kategorien. Legen Sie eine an, um zu beginnen.",
       "saveError": "Kategorie konnte nicht gespeichert werden. Bitte erneut versuchen."
-    }
+    },
+    "createFirstCategory": "Erste Kategorie anlegen",
+    "manageCategories": "Kategorien verwalten",
+    "newCategory": "Neue Kategorie",
+    "editorNoCategories": "Zum Speichern eines Artikels wird eine Kategorie benötigt — es existiert noch keine."
   },
   "stats": {
     "title": "Berichte",
