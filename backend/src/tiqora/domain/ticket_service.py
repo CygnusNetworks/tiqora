@@ -268,9 +268,7 @@ class TicketService:
         result = await self._session.execute(ordered.offset(offset).limit(min(limit, 200)))
         tickets = list(result.scalars().all())
         maps = await self._lookup_maps()
-        first_from_by_ticket = await self._first_article_from_by_ticket(
-            [t.id for t in tickets]
-        )
+        first_from_by_ticket = await self._first_article_from_by_ticket([t.id for t in tickets])
         items = [self._to_list_item(t, maps, first_from_by_ticket) for t in tickets]
         return PaginatedTickets(items=items, total=total, offset=offset, limit=limit)
 
@@ -286,9 +284,12 @@ class TicketService:
         """
         if not ticket_ids:
             return {}
-        first_article_ids = select(
-            func.min(Article.id).label("article_id")
-        ).where(Article.ticket_id.in_(ticket_ids)).group_by(Article.ticket_id).subquery()
+        first_article_ids = (
+            select(func.min(Article.id).label("article_id"))
+            .where(Article.ticket_id.in_(ticket_ids))
+            .group_by(Article.ticket_id)
+            .subquery()
+        )
         rows = await self._session.execute(
             select(Article.ticket_id, ArticleDataMime.a_from)
             .join(first_article_ids, Article.id == first_article_ids.c.article_id)
