@@ -13,9 +13,105 @@ import {
 import { DataTable, type DataTableColumn } from "@/components/admin/DataTable";
 import { CrudDrawer, type FieldDef, type FieldValues } from "@/components/admin/CrudDrawer";
 import { Button } from "@/components/ui/Button";
-import { PlusIcon } from "@/components/ui/icons";
+import { Badge } from "@/components/ui/Badge";
+import { PlusIcon, ChevronDownIcon } from "@/components/ui/icons";
 import { Dialog } from "@/components/ui/Dialog";
-import { formatDateTime } from "@/lib/format";
+import { SelectMenu, type SelectMenuItem } from "@/components/ui/SelectMenu";
+import { formatDateTime, formatDateOnly } from "@/lib/format";
+import { cn } from "@/lib/cn";
+import {
+  type ExpiryPreset,
+  presetToExpiresAt,
+  dateToExpiresAt,
+  tomorrowDateStr,
+  isExpired,
+} from "@/lib/apiKeyExpiry";
+
+const PRESETS: { key: ExpiryPreset; labelKey: string }[] = [
+  { key: "unlimited", labelKey: "expiryPresetUnlimited" },
+  { key: "30", labelKey: "expiryPreset30" },
+  { key: "90", labelKey: "expiryPreset90" },
+  { key: "180", labelKey: "expiryPreset180" },
+  { key: "365", labelKey: "expiryPreset365" },
+  { key: "custom", labelKey: "expiryPresetCustom" },
+];
+
+/**
+ * Segmented preset row + native date fallback for `expires_at`. Internal
+ * preset/date state is derived once from `value` on mount — the field
+ * remounts fresh each time the drawer (Dialog) opens, so there is no need to
+ * resync on prop changes.
+ */
+function ExpiryField({
+  value,
+  onChange,
+  locale,
+}: {
+  value: string | null;
+  onChange: (v: string | null) => void;
+  locale: string;
+}) {
+  const { t } = useTranslation();
+  const [preset, setPreset] = useState<ExpiryPreset>(value ? "custom" : "unlimited");
+  const [customDate, setCustomDate] = useState<string>(
+    value ? new Date(value).toISOString().slice(0, 10) : "",
+  );
+
+  const choosePreset = (p: ExpiryPreset) => {
+    setPreset(p);
+    if (p === "unlimited") onChange(null);
+    else if (p === "custom") onChange(customDate ? dateToExpiresAt(customDate) : null);
+    else onChange(presetToExpiresAt(p));
+  };
+
+  const chooseDate = (d: string) => {
+    setCustomDate(d);
+    onChange(d ? dateToExpiresAt(d) : null);
+  };
+
+  return (
+    <div className="space-y-2">
+      <div
+        className="flex flex-wrap gap-1.5"
+        role="group"
+        data-testid="admin-api-keys-form-expiry-presets"
+      >
+        {PRESETS.map((p) => (
+          <button
+            key={p.key}
+            type="button"
+            data-testid={`admin-api-keys-form-expiry-preset-${p.key}`}
+            aria-pressed={preset === p.key}
+            onClick={() => choosePreset(p.key)}
+            className={cn(
+              "rounded-full border px-2.5 py-1 text-xs font-medium transition-colors duration-100",
+              preset === p.key
+                ? "border-accent bg-accent-dim text-accent"
+                : "border-hairline bg-surface-subtle text-muted hover:text-ink",
+            )}
+          >
+            {t(`admin.apiKeys.${p.labelKey}`)}
+          </button>
+        ))}
+      </div>
+      {preset === "custom" && (
+        <input
+          type="date"
+          data-testid="admin-api-keys-form-expiry-date"
+          value={customDate}
+          min={tomorrowDateStr()}
+          onChange={(e) => chooseDate(e.target.value)}
+          className="w-full rounded-md border border-hairline bg-surface-subtle px-3 py-1.5 text-sm text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent"
+        />
+      )}
+      <p className="text-xs text-muted" data-testid="admin-api-keys-form-expiry-preview">
+        {value
+          ? t("admin.apiKeys.expiryPreviewLabel", { date: formatDateOnly(value, locale) })
+          : t("admin.apiKeys.expiryPreviewUnlimited")}
+      </p>
+    </div>
+  );
+}
 
 export function ApiKeysPage() {
   const { t, i18n } = useTranslation();
@@ -48,6 +144,16 @@ export function ApiKeysPage() {
     }
     return (id: number) => map.get(id) ?? String(id);
   }, [usersQ.data]);
+
+  const userItems: SelectMenuItem<number>[] = useMemo(
+    () =>
+      (usersQ.data?.items ?? []).map((u) => ({
+        value: u.id,
+        label: [u.first_name, u.last_name].filter(Boolean).join(" ") || u.login,
+        hint: u.login,
+      })),
+    [usersQ.data],
+  );
 
   const invalidate = () => queryClient.invalidateQueries({ queryKey: ["admin", "api-keys"] });
 
@@ -95,16 +201,7 @@ export function ApiKeysPage() {
   const handleSubmit = async (values: FieldValues) => {
     setFormError(null);
     const name = String(values.name ?? "").trim();
-    const expiresRaw = String(values.expires_at ?? "").trim();
-    let expires_at: string | null = null;
-    if (expiresRaw) {
-      const d = new Date(expiresRaw);
-      if (Number.isNaN(d.getTime())) {
-        setFormError(t("admin.apiKeys.expiresInvalid"));
-        throw new Error("invalid expires");
-      }
-      expires_at = d.toISOString();
-    }
+    const expires_at = typeof values.expires_at === "string" && values.expires_at ? values.expires_at : null;
     try {
       if (editing) {
         await updateM.mutateAsync({
@@ -128,7 +225,7 @@ export function ApiKeysPage() {
         });
       }
     } catch (err) {
-      if (!(err instanceof Error && (err.message === "user required" || err.message === "invalid expires"))) {
+      if (!(err instanceof Error && err.message === "user required")) {
         setFormError(err instanceof ApiError ? err.message : t("admin.form.genericError"));
       }
       throw err;
@@ -170,33 +267,23 @@ export function ApiKeysPage() {
     {
       key: "expires_at",
       header: t("admin.apiKeys.expires"),
-      render: (r) => formatDateTime(r.expires_at, locale),
-    },
-    {
-      key: "delete",
-      header: t("admin.apiKeys.delete"),
-      render: (r) => (
-        <Button
-          variant="ghost"
-          size="sm"
-          data-testid={`admin-api-keys-delete-${r.id}`}
-          onClick={(e) => {
-            e.stopPropagation();
-            if (window.confirm(t("admin.apiKeys.deleteConfirm", { name: r.name }))) {
-              deleteM.mutate(r.id);
-            }
-          }}
-        >
-          {t("admin.apiKeys.delete")}
-        </Button>
-      ),
+      render: (r) =>
+        r.expires_at ? (
+          <span className="inline-flex items-center gap-1.5">
+            <span className={isExpired(r.expires_at) ? "text-danger" : undefined}>
+              {formatDateOnly(r.expires_at, locale)}
+            </span>
+            {isExpired(r.expires_at) && (
+              <Badge tone="danger" data-testid={`admin-api-keys-expired-${r.id}`}>
+                {t("admin.apiKeys.expired")}
+              </Badge>
+            )}
+          </span>
+        ) : (
+          <span className="text-muted">{t("admin.apiKeys.unbounded")}</span>
+        ),
     },
   ];
-
-  const userOptions = (usersQ.data?.items ?? []).map((u) => ({
-    value: u.id,
-    label: u.login ? `${u.login} (#${u.id})` : `#${u.id}`,
-  }));
 
   const fields: FieldDef[] = editing
     ? [
@@ -219,9 +306,14 @@ export function ApiKeysPage() {
         {
           name: "expires_at",
           label: t("admin.apiKeys.expires"),
-          type: "text",
-          placeholder: "2027-01-01T00:00:00Z",
-          helpText: t("admin.apiKeys.expiresHelp"),
+          type: "custom",
+          render: (value, onChange) => (
+            <ExpiryField
+              value={typeof value === "string" ? value : null}
+              onChange={onChange}
+              locale={locale}
+            />
+          ),
         },
         {
           name: "valid",
@@ -239,16 +331,50 @@ export function ApiKeysPage() {
         {
           name: "user_id",
           label: t("admin.apiKeys.user"),
-          type: "select",
+          type: "custom",
           required: true,
-          options: userOptions,
+          render: (value, onChange) => (
+            <SelectMenu
+              items={userItems}
+              value={typeof value === "number" ? value : undefined}
+              onSelect={onChange}
+              loading={usersQ.isLoading}
+              placeholder={t("admin.form.selectPlaceholder")}
+              panelTestId="admin-api-keys-form-user-panel"
+              trigger={({ open, ref, toggleProps }) => (
+                <button
+                  ref={ref}
+                  type="button"
+                  data-testid="admin-api-keys-form-user_id"
+                  {...toggleProps}
+                  className="flex w-full items-center justify-between gap-2 rounded-md border border-hairline bg-surface-subtle px-3 py-1.5 text-left text-sm text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent"
+                >
+                  <span className="min-w-0 flex-1 truncate">
+                    {userItems.find((i) => i.value === value)?.label ??
+                      t("admin.form.selectPlaceholder")}
+                  </span>
+                  <ChevronDownIcon
+                    className={cn(
+                      "shrink-0 text-muted transition-transform duration-150",
+                      open && "rotate-180",
+                    )}
+                  />
+                </button>
+              )}
+            />
+          ),
         },
         {
           name: "expires_at",
           label: t("admin.apiKeys.expires"),
-          type: "text",
-          placeholder: "2027-01-01T00:00:00Z",
-          helpText: t("admin.apiKeys.expiresHelp"),
+          type: "custom",
+          render: (value, onChange) => (
+            <ExpiryField
+              value={typeof value === "string" ? value : null}
+              onChange={onChange}
+              locale={locale}
+            />
+          ),
         },
       ];
 
@@ -277,16 +403,36 @@ export function ApiKeysPage() {
         <span className="text-xs font-medium uppercase tracking-wide text-muted">
           {t("admin.filter.label")}
         </span>
-        <select
-          data-testid="admin-api-keys-valid-filter"
-          className="min-w-[10rem] rounded-md border border-hairline bg-surface px-2 py-1.5 text-sm text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent"
+        <SelectMenu
+          items={[
+            { value: "valid" as AdminValidFilter, label: t("admin.filter.valid") },
+            { value: "invalid" as AdminValidFilter, label: t("admin.filter.invalid") },
+            { value: "all" as AdminValidFilter, label: t("admin.filter.all") },
+          ]}
           value={validFilter}
-          onChange={(e) => setValidFilter(e.target.value as AdminValidFilter)}
-        >
-          <option value="valid">{t("admin.filter.valid")}</option>
-          <option value="invalid">{t("admin.filter.invalid")}</option>
-          <option value="all">{t("admin.filter.all")}</option>
-        </select>
+          onSelect={setValidFilter}
+          panelTestId="admin-api-keys-filter-panel"
+          trigger={({ open, ref, toggleProps }) => (
+            <button
+              ref={ref}
+              type="button"
+              data-testid="admin-api-keys-filter"
+              {...toggleProps}
+              className="flex min-w-[10rem] items-center justify-between gap-2 rounded-md border border-hairline bg-surface px-2 py-1.5 text-sm text-ink hover:bg-surface-subtle focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent"
+            >
+              <span>
+                {validFilter === "valid"
+                  ? t("admin.filter.valid")
+                  : validFilter === "invalid"
+                    ? t("admin.filter.invalid")
+                    : t("admin.filter.all")}
+              </span>
+              <ChevronDownIcon
+                className={cn("text-muted transition-transform duration-150", open && "rotate-180")}
+              />
+            </button>
+          )}
+        />
       </label>
 
       <p className="text-xs text-muted">{t("admin.apiKeys.hint")}</p>
@@ -302,6 +448,11 @@ export function ApiKeysPage() {
         onDeactivate={(row) => {
           if (row.valid && window.confirm(t("admin.apiKeys.revokeConfirm", { name: row.name }))) {
             revokeM.mutate(row.id);
+          }
+        }}
+        onDelete={(row) => {
+          if (window.confirm(t("admin.apiKeys.deleteConfirm", { name: row.name }))) {
+            deleteM.mutate(row.id);
           }
         }}
         testId="admin-api-keys-table"
@@ -322,15 +473,13 @@ export function ApiKeysPage() {
             ? {
                 name: editing.name,
                 user_id: editing.user_id,
-                expires_at: editing.expires_at
-                  ? new Date(editing.expires_at).toISOString()
-                  : "",
+                expires_at: editing.expires_at ?? null,
                 valid: editing.valid,
               }
             : {
                 name: "",
-                user_id: userOptions[0]?.value ?? "",
-                expires_at: "",
+                user_id: userItems[0]?.value ?? "",
+                expires_at: null,
               }
         }
         onSubmit={handleSubmit}

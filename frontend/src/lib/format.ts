@@ -27,6 +27,21 @@ export function formatDateTime(
   }).format(d);
 }
 
+/** Date-only (no time-of-day) formatting, e.g. for expiry previews. */
+export function formatDateOnly(
+  value: string | Date | null | undefined,
+  locale: string,
+): string {
+  if (!value) return "—";
+  const d = typeof value === "string" ? new Date(value) : value;
+  if (Number.isNaN(d.getTime())) return "—";
+  return new Intl.DateTimeFormat(locale, {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(d);
+}
+
 export function formatBytes(size: string | number | null | undefined): string {
   if (size == null || size === "") return "—";
   const n = typeof size === "string" ? Number(size) : size;
