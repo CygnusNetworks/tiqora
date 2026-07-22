@@ -4284,12 +4284,33 @@
             ],
             "title": "Customer Id Regex"
           },
+          "customer_id_regex_negate": {
+            "default": false,
+            "title": "Customer Id Regex Negate",
+            "type": "boolean"
+          },
           "customer_ids": {
             "items": {
               "type": "string"
             },
             "title": "Customer Ids",
             "type": "array"
+          },
+          "email_regex": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Email Regex"
+          },
+          "email_regex_negate": {
+            "default": false,
+            "title": "Email Regex Negate",
+            "type": "boolean"
           },
           "login_regex": {
             "anyOf": [
@@ -4301,6 +4322,11 @@
               }
             ],
             "title": "Login Regex"
+          },
+          "login_regex_negate": {
+            "default": false,
+            "title": "Login Regex Negate",
+            "type": "boolean"
           },
           "logins": {
             "items": {
@@ -31850,7 +31876,7 @@
     },
     "/api/v1/reference/compose-context": {
       "get": {
-        "description": "From-address, signature preview, and rich-text flag for a new-ticket compose form.\n\nReuses ``queue_outbound_meta``, the same queue lookup the agent-reply send\npath (``deliver_agent_email_reply``) resolves From/signature from, so the\npreview matches what an actual reply on that queue would show. The\nsignature is returned RAW (placeholders unexpanded): a not-yet-created\nticket has no ticket/customer context to expand OTRS_TICKET_*/\nOTRS_CUSTOMER_DATA_* tags against, so this preview is only approximate \u2014\nthe real expansion happens in ``prepare_outgoing_agent_email`` at send time.",
+        "description": "From-address, signature preview, and rich-text flag for a new-ticket compose form.\n\nReuses ``queue_outbound_meta``, the same queue lookup the agent-reply send\npath (``deliver_agent_email_reply``) resolves From/signature from, so the\npreview matches what an actual reply on that queue would show. Agent tags\n(``<OTRS_First_Name>`` etc.) are expanded against the current agent, same\nas ``TicketService.get_reply_draft``. A not-yet-created ticket has no\nticket/customer context, so ticket_id is omitted and OTRS_TICKET_*/\nOTRS_CUSTOMER_DATA_* tags resolve empty here \u2014 the real expansion happens\nin ``prepare_outgoing_agent_email`` at send time once the ticket exists.",
         "operationId": "compose_context_api_v1_reference_compose_context_get",
         "parameters": [
           {

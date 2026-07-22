@@ -38,7 +38,11 @@ type SelectorForm = {
   logins: string[];
   customerIds: string[];
   loginRegex: string;
+  loginRegexNegate: boolean;
   customerIdRegex: string;
+  customerIdRegexNegate: boolean;
+  emailRegex: string;
+  emailRegexNegate: boolean;
   changedAfter: string;
   changedBefore: string;
   activityKind: ActivityKind;
@@ -52,7 +56,11 @@ const emptyForm = (): SelectorForm => ({
   logins: [],
   customerIds: [],
   loginRegex: "",
+  loginRegexNegate: false,
   customerIdRegex: "",
+  customerIdRegexNegate: false,
+  emailRegex: "",
+  emailRegexNegate: false,
   changedAfter: "",
   changedBefore: "",
   activityKind: "",
@@ -68,14 +76,19 @@ const emptyForm = (): SelectorForm => ({
 type FilterKind =
   | "loginRegex"
   | "customerIdRegex"
+  | "emailRegex"
   | "changedAfter"
   | "changedBefore"
   | "activity"
   | "validId";
 
+/** Pattern-filter kinds that support the "trifft NICHT" negation toggle. */
+const NEGATABLE_FILTER_KINDS: FilterKind[] = ["loginRegex", "customerIdRegex", "emailRegex"];
+
 const FILTER_KIND_ORDER: FilterKind[] = [
   "loginRegex",
   "customerIdRegex",
+  "emailRegex",
   "changedAfter",
   "changedBefore",
   "activity",
@@ -88,6 +101,8 @@ function filterKindActive(form: SelectorForm, kind: FilterKind): boolean {
       return form.loginRegex.trim() !== "";
     case "customerIdRegex":
       return form.customerIdRegex.trim() !== "";
+    case "emailRegex":
+      return form.emailRegex.trim() !== "";
     case "changedAfter":
       return form.changedAfter !== "";
     case "changedBefore":
@@ -102,9 +117,11 @@ function filterKindActive(form: SelectorForm, kind: FilterKind): boolean {
 function clearFilterKind(form: SelectorForm, kind: FilterKind): SelectorForm {
   switch (kind) {
     case "loginRegex":
-      return { ...form, loginRegex: "" };
+      return { ...form, loginRegex: "", loginRegexNegate: false };
     case "customerIdRegex":
-      return { ...form, customerIdRegex: "" };
+      return { ...form, customerIdRegex: "", customerIdRegexNegate: false };
+    case "emailRegex":
+      return { ...form, emailRegex: "", emailRegexNegate: false };
     case "changedAfter":
       return { ...form, changedAfter: "" };
     case "changedBefore":
@@ -113,6 +130,33 @@ function clearFilterKind(form: SelectorForm, kind: FilterKind): SelectorForm {
       return { ...form, activityKind: "", inactiveSince: "" };
     case "validId":
       return { ...form, validId: "" };
+  }
+}
+
+/** Negation flag getter/setter for the three negatable pattern filters. */
+function filterNegated(form: SelectorForm, kind: FilterKind): boolean {
+  switch (kind) {
+    case "loginRegex":
+      return form.loginRegexNegate;
+    case "customerIdRegex":
+      return form.customerIdRegexNegate;
+    case "emailRegex":
+      return form.emailRegexNegate;
+    default:
+      return false;
+  }
+}
+
+function setFilterNegated(form: SelectorForm, kind: FilterKind, negate: boolean): SelectorForm {
+  switch (kind) {
+    case "loginRegex":
+      return { ...form, loginRegexNegate: negate };
+    case "customerIdRegex":
+      return { ...form, customerIdRegexNegate: negate };
+    case "emailRegex":
+      return { ...form, emailRegexNegate: negate };
+    default:
+      return form;
   }
 }
 
@@ -156,7 +200,12 @@ function buildSelector(form: SelectorForm): ErasureSelectorIn {
     logins: form.logins,
     customer_ids: form.customerIds,
     login_regex: form.loginRegex.trim() || null,
+    login_regex_negate: form.loginRegex.trim() !== "" && form.loginRegexNegate,
     customer_id_regex: form.customerIdRegex.trim() || null,
+    customer_id_regex_negate:
+      form.customerIdRegex.trim() !== "" && form.customerIdRegexNegate,
+    email_regex: form.emailRegex.trim() || null,
+    email_regex_negate: form.emailRegex.trim() !== "" && form.emailRegexNegate,
     changed_after: dateToIsoStart(form.changedAfter),
     changed_before: dateToIsoEnd(form.changedBefore),
     activity,
@@ -170,6 +219,7 @@ function hasAnySelector(selector: ErasureSelectorIn): boolean {
       (selector.customer_ids && selector.customer_ids.length > 0) ||
       selector.login_regex ||
       selector.customer_id_regex ||
+      selector.email_regex ||
       selector.changed_after ||
       selector.changed_before ||
       selector.activity ||
@@ -757,6 +807,8 @@ export function GdprPage() {
         return t("admin.gdpr.field.loginRegex");
       case "customerIdRegex":
         return t("admin.gdpr.field.customerIdRegex");
+      case "emailRegex":
+        return t("admin.gdpr.field.emailRegex");
       case "changedAfter":
         return t("admin.gdpr.field.changedAfter");
       case "changedBefore":
@@ -792,6 +844,8 @@ export function GdprPage() {
         return form.loginRegex;
       case "customerIdRegex":
         return form.customerIdRegex;
+      case "emailRegex":
+        return form.emailRegex;
       case "changedAfter":
         return formatDateOnly(form.changedAfter, locale);
       case "changedBefore":
@@ -801,6 +855,17 @@ export function GdprPage() {
       case "validId":
         return validityValueText();
     }
+  };
+
+  /** Human-readable "…deren Login NICHT mit EDU- beginnt…"-style sentence for
+   * a negatable pattern filter; falls back to the plain "label: value" form
+   * for non-negatable filters. */
+  const filterSummaryText = (kind: FilterKind): string => {
+    const value = filterValueText(kind);
+    if (!NEGATABLE_FILTER_KINDS.includes(kind)) return `${filterLabel(kind)}: ${value}`;
+    return filterNegated(form, kind)
+      ? t("admin.gdpr.summary.patternNegated", { label: filterLabel(kind), value })
+      : t("admin.gdpr.summary.pattern", { label: filterLabel(kind), value });
   };
 
   const activeFilterKinds = FILTER_KIND_ORDER.filter(
@@ -822,7 +887,7 @@ export function GdprPage() {
   for (const kind of activeFilterKinds) {
     const value = filterValueText(kind);
     if (!value) continue;
-    summarySentences.push(`${filterLabel(kind)}: ${value}`);
+    summarySentences.push(filterSummaryText(kind));
   }
 
   const liveCount = liveCountQ.data?.count;
@@ -1088,7 +1153,11 @@ export function GdprPage() {
                       className="inline-flex items-center gap-1.5 rounded-full border border-accent/40 bg-accent-dim px-2.5 py-1 text-xs text-accent"
                     >
                       <span>
-                        {filterLabel(kind)}: {filterValueText(kind)}
+                        {filterLabel(kind)}
+                        {NEGATABLE_FILTER_KINDS.includes(kind) && filterNegated(form, kind)
+                          ? " ≠ "
+                          : ": "}
+                        {filterValueText(kind)}
                       </span>
                       <button
                         type="button"
@@ -1111,6 +1180,45 @@ export function GdprPage() {
                     <p className="mb-1.5 text-xs font-medium text-ink">
                       {filterLabel(openFilterKind)}
                     </p>
+                    {NEGATABLE_FILTER_KINDS.includes(openFilterKind) && (
+                      <div
+                        className="mb-1.5 inline-flex rounded-md border border-hairline p-0.5"
+                        role="group"
+                        aria-label={t("admin.gdpr.filters.negateToggle")}
+                        data-testid={`gdpr-filter-negate-${openFilterKind}`}
+                      >
+                        <button
+                          type="button"
+                          data-testid={`gdpr-filter-negate-off-${openFilterKind}`}
+                          className={cn(
+                            "rounded px-2 py-1 text-xs font-mono",
+                            !filterNegated(form, openFilterKind)
+                              ? "bg-accent-dim font-medium text-accent"
+                              : "text-muted hover:text-ink",
+                          )}
+                          onClick={() =>
+                            setForm((f) => setFilterNegated(f, openFilterKind, false))
+                          }
+                        >
+                          = {t("admin.gdpr.filters.matches")}
+                        </button>
+                        <button
+                          type="button"
+                          data-testid={`gdpr-filter-negate-on-${openFilterKind}`}
+                          className={cn(
+                            "rounded px-2 py-1 text-xs font-mono",
+                            filterNegated(form, openFilterKind)
+                              ? "bg-danger/20 font-medium text-danger"
+                              : "text-muted hover:text-ink",
+                          )}
+                          onClick={() =>
+                            setForm((f) => setFilterNegated(f, openFilterKind, true))
+                          }
+                        >
+                          ≠ {t("admin.gdpr.filters.matchesNot")}
+                        </button>
+                      </div>
+                    )}
                     {openFilterKind === "loginRegex" && (
                       <input
                         type="text"
@@ -1130,6 +1238,17 @@ export function GdprPage() {
                           setForm((f) => ({ ...f, customerIdRegex: e.target.value }))
                         }
                         placeholder="^LEGACY-.*"
+                        className="w-full rounded-md border border-hairline bg-surface px-3 py-1.5 font-mono text-sm text-ink"
+                      />
+                    )}
+                    {openFilterKind === "emailRegex" && (
+                      <input
+                        type="text"
+                        autoFocus
+                        data-testid="gdpr-email-regex-input"
+                        value={form.emailRegex}
+                        onChange={(e) => setForm((f) => ({ ...f, emailRegex: e.target.value }))}
+                        placeholder="@edu\.example$"
                         className="w-full rounded-md border border-hairline bg-surface px-3 py-1.5 font-mono text-sm text-ink"
                       />
                     )}

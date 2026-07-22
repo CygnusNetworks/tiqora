@@ -1003,7 +1003,11 @@ class ErasureSelectorIn(BaseModel):
     logins: list[str] = Field(default_factory=list)
     customer_ids: list[str] = Field(default_factory=list)
     login_regex: str | None = None
+    login_regex_negate: bool = False
     customer_id_regex: str | None = None
+    customer_id_regex_negate: bool = False
+    email_regex: str | None = None
+    email_regex_negate: bool = False
     changed_before: datetime | None = None
     changed_after: datetime | None = None
     # "no_tickets" | "no_open_tickets" | "inactive_since:YYYY-MM-DD"

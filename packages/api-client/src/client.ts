@@ -328,7 +328,11 @@ export type ErasureSelectorIn = {
   logins?: string[];
   customer_ids?: string[];
   login_regex?: string | null;
+  login_regex_negate?: boolean;
   customer_id_regex?: string | null;
+  customer_id_regex_negate?: boolean;
+  email_regex?: string | null;
+  email_regex_negate?: boolean;
   changed_before?: string | null;
   changed_after?: string | null;
   activity?: string | null;
