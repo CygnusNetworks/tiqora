@@ -336,4 +336,46 @@ describe("ReplyDialog recipient toggles", () => {
       "Outbound email delivery failed: SMTP refused",
     );
   });
+
+  it("seeds the body from an AI draft and sends with ai_draft_id", async () => {
+    getReplyDraft.mockResolvedValue({
+      ...baseDraft,
+      to_address: "to@x.com",
+    });
+
+    wrap(
+      <ReplyDialog
+        ticketId={1}
+        articleId={2}
+        replyAll={false}
+        open
+        onClose={vi.fn()}
+        initialDraft={{ id: 42, subject: "Re: AI subject", body: "AI drafted answer" }}
+      />,
+    );
+
+    await waitFor(() => expect(screen.getByTestId("reply-dialog")).toBeTruthy());
+    const body = screen.getByTestId("reply-body") as HTMLTextAreaElement;
+    expect(body.value).toContain("AI drafted answer");
+    expect(body.value).toContain("> quoted");
+
+    fireEvent.click(screen.getByTestId("reply-send"));
+
+    await waitFor(() => expect(createArticle).toHaveBeenCalled());
+    const payload = createArticle.mock.calls[0][1] as { ai_draft_id: number | null };
+    expect(payload.ai_draft_id).toBe(42);
+  });
+
+  it("sends ai_draft_id null when no AI draft is used", async () => {
+    getReplyDraft.mockResolvedValue({ ...baseDraft, to_address: "to@x.com" });
+
+    wrap(<ReplyDialog ticketId={1} articleId={2} replyAll={false} open onClose={vi.fn()} />);
+
+    await waitFor(() => expect(screen.getByTestId("reply-dialog")).toBeTruthy());
+    fireEvent.click(screen.getByTestId("reply-send"));
+
+    await waitFor(() => expect(createArticle).toHaveBeenCalled());
+    const payload = createArticle.mock.calls[0][1] as { ai_draft_id: number | null };
+    expect(payload.ai_draft_id).toBeNull();
+  });
 });

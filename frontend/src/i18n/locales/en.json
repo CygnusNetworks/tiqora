@@ -321,6 +321,37 @@
     "splitDialogTitle": "Split into new ticket",
     "splitQueue": "Target queue",
     "splitNewTitle": "New ticket title (optional)",
+    "ai": {
+      "title": "AI Assist",
+      "summaryLabel": "Summary",
+      "summarizeButton": "Summarize",
+      "summaryEmpty": "No summary yet.",
+      "summaryAsOf": "As of article #{{articleId}}",
+      "summaryUpToDate": "Already up to date — no new articles since the last summary.",
+      "draftsLabel": "Drafts",
+      "createDraftButton": "Create AI draft",
+      "createDraftHint": "This can take up to a minute…",
+      "draftsEmpty": "No AI drafts yet.",
+      "draftKind": {
+        "reply": "Reply",
+        "clarify": "Clarify"
+      },
+      "draftSource": {
+        "auto": "Automatic",
+        "manual": "Manual"
+      },
+      "basedOnArticle": "Based on article #{{articleId}}",
+      "expand": "Expand",
+      "collapse": "Collapse",
+      "useDraft": "Use as reply",
+      "discardDraft": "Discard",
+      "discardConfirm": "Discard this AI draft? This cannot be undone.",
+      "errorLocked": "An AI run is already active for this ticket. Please try again shortly.",
+      "errorForbidden": "You don't have permission to use this AI feature.",
+      "errorRateLimited": "Limit reached — please try again later.",
+      "errorDisabled": "This AI feature is currently disabled.",
+      "errorGeneric": "Something went wrong. Please try again."
+    },
     "toolbar": {
       "print": "Print",
       "priority": "Priority",
