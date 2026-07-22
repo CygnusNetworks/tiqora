@@ -1,9 +1,47 @@
-import { describe, it, expect } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { describe, it, expect, vi, beforeEach } from "vitest";
+import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { I18nextProvider } from "react-i18next";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import i18n from "@/i18n";
 import type { TicketDetail } from "@/lib/api";
 import { TicketHeader } from "./TicketHeader";
+
+// TicketHeader now embeds TicketHeaderActions (pills + Antworten/Notiz/Mehr),
+// which fetches reference data and articles — mock the same surface
+// ActionToolbar.test.tsx mocks.
+const { listReferencePriorities, listReferenceStates, listArticles, patchTicket } = vi.hoisted(
+  () => ({
+    listReferencePriorities: vi.fn(),
+    listReferenceStates: vi.fn(),
+    listArticles: vi.fn(),
+    patchTicket: vi.fn(),
+  }),
+);
+
+vi.mock("@/lib/api", async () => {
+  const actual = await vi.importActual<typeof import("@/lib/api")>("@/lib/api");
+  return {
+    ...actual,
+    api: {
+      listReferencePriorities,
+      listReferenceStates,
+      listArticles,
+      patchTicket,
+      listQueues: vi.fn().mockResolvedValue([]),
+      listTicketLinks: vi.fn().mockResolvedValue([]),
+      listReferenceAgents: vi.fn().mockResolvedValue([]),
+      searchReferenceCustomers: vi.fn().mockResolvedValue([]),
+    },
+  };
+});
+
+vi.mock("@/auth/AuthContext", () => ({
+  useAuth: () => ({ user: { id: 42, login: "agent" } }),
+}));
+
+vi.mock("@tanstack/react-router", () => ({
+  useNavigate: () => vi.fn(),
+}));
 
 function makeTicket(overrides: Partial<TicketDetail> = {}): TicketDetail {
   return {
@@ -30,35 +68,49 @@ function makeTicket(overrides: Partial<TicketDetail> = {}): TicketDetail {
 }
 
 function wrap(ticket: TicketDetail, overflowMenu?: React.ReactNode) {
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+  });
   return render(
-    <I18nextProvider i18n={i18n}>
-      <TicketHeader ticket={ticket} overflowMenu={overflowMenu} />
-    </I18nextProvider>,
+    <QueryClientProvider client={queryClient}>
+      <I18nextProvider i18n={i18n}>
+        <TicketHeader
+          ticket={ticket}
+          overflowMenu={overflowMenu}
+          canNote
+          onOpenNote={vi.fn()}
+        />
+      </I18nextProvider>
+    </QueryClientProvider>,
   );
 }
 
 describe("TicketHeader", () => {
-  it("shows status and priority as soft-chips in the meta line", () => {
+  beforeEach(() => {
+    listReferencePriorities.mockReset().mockResolvedValue([
+      { id: 3, name: "3 normal" },
+      { id: 5, name: "5 very high" },
+    ]);
+    listReferenceStates.mockReset().mockResolvedValue([
+      { id: 4, name: "open", type_name: "open" },
+      { id: 2, name: "closed successful", type_name: "closed" },
+      { id: 8, name: "pending reminder", type_name: "pending reminder" },
+    ]);
+    listArticles.mockReset().mockResolvedValue([]);
+    patchTicket.mockReset().mockResolvedValue(undefined);
+  });
+
+  it("shows status and priority as soft-chips inside the interactive pills", async () => {
     wrap(makeTicket({ state: "pending reminder", state_type: "pending reminder" }));
-    const stateChip = screen.getByTestId("ticket-header-state-chip");
-    expect(stateChip).toHaveTextContent("Pending reminder");
-    expect(stateChip).toHaveAttribute("data-kind", "state");
-    expect(stateChip).toHaveStyle({ color: "var(--color-state-pending)" });
-
-    const prioChip = screen.getByTestId("ticket-header-priority-chip");
-    expect(prioChip).toHaveTextContent("normal");
-    expect(prioChip).toHaveAttribute("data-kind", "priority");
-    expect(prioChip).toHaveStyle({ color: "var(--color-prio-3)" });
-
-    // Old NEU-only badge special-case is gone.
-    expect(screen.queryByTestId("ticket-header-new-badge")).toBeNull();
+    const statePill = screen.getByTestId("ticket-pill-state");
+    expect(statePill).toHaveTextContent("Pending reminder");
+    const prioPill = screen.getByTestId("ticket-pill-priority");
+    expect(prioPill).toHaveTextContent("normal");
   });
 
   it("shows the same soft-chip for new tickets (no separate Neu badge)", () => {
     wrap(makeTicket({ state: "new", state_type: "new" }));
-    const stateChip = screen.getByTestId("ticket-header-state-chip");
-    expect(stateChip).toHaveTextContent("New");
-    expect(stateChip).toHaveStyle({ color: "var(--color-state-new)" });
+    expect(screen.getByTestId("ticket-pill-state")).toHaveTextContent("New");
     expect(screen.queryByTestId("ticket-header-new-badge")).toBeNull();
   });
 
@@ -67,5 +119,24 @@ describe("TicketHeader", () => {
     expect(screen.getByTestId("ticket-header-overflow")).toContainElement(
       screen.getByTestId("overflow-stub"),
     );
+  });
+
+  it("renders the queue/owner/customer pills and the primary action buttons", () => {
+    wrap(makeTicket({ customer_id: "C-9", customer_user_id: "bob" }));
+    expect(screen.getByTestId("ticket-pill-queue")).toHaveTextContent("Support");
+    expect(screen.getByTestId("ticket-pill-owner")).toHaveTextContent("Ada");
+    expect(screen.getByTestId("ticket-pill-customer")).toHaveTextContent("bob");
+    expect(screen.getByTestId("ticket-actions-reply")).toBeInTheDocument();
+    expect(screen.getByTestId("ticket-actions-note")).toBeInTheDocument();
+    expect(screen.getByTestId("ticket-actions-more")).toBeInTheDocument();
+  });
+
+  it("patches priority when picked from the priority pill's menu", async () => {
+    wrap(makeTicket());
+    await waitFor(() => expect(screen.getByTestId("ticket-pill-priority")).toBeInTheDocument());
+    fireEvent.click(screen.getByTestId("ticket-pill-priority"));
+    const item = await screen.findByText("5 very high");
+    fireEvent.click(item);
+    await waitFor(() => expect(patchTicket).toHaveBeenCalledWith(7, { priority_id: 5 }));
   });
 });
