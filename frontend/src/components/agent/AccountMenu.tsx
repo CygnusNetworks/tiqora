@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import { useAuth } from "@/auth/AuthContext";
 import { useTheme } from "@/themes/theme";
 import { Menu, MenuHeader, MenuItem, MenuLabel, MenuSeparator } from "@/components/ui/Menu";
+import { SelectMenu } from "@/components/ui/SelectMenu";
 import { Avatar } from "@/components/ui/Avatar";
 import {
   ChevronDownIcon,
@@ -24,8 +25,9 @@ const LANGUAGES = [
 /**
  * Avatar dropdown for account actions, shared by the agent and admin shells.
  * Opens a Menu with the signed-in identity, a link to security / 2FA settings
- * (general preferences live in the sidebar), a language <select>
- * (Deutsch / English), a light/dark theme toggle, and finally sign-out.
+ * (general preferences live in the sidebar), a language picker (Deutsch /
+ * English, via the portal-based `SelectMenu`), a light/dark theme toggle,
+ * and finally sign-out.
  * Admins additionally get a highlighted "Admin-Bereich" entry.
  *
  * `logoutTestId` keeps the existing `logout-btn` (mobile) / `logout-btn-desktop`
@@ -117,27 +119,43 @@ export function AccountMenu({ logoutTestId = "logout-btn" }: { logoutTestId?: st
       </div>
 
       <MenuLabel>{t("account.language")}</MenuLabel>
-      {/* Native <select> so the list renders above everything (the menu panel is
-          overflow-hidden, which would clip a nested flyout) and scales to many
-          languages without bloating the menu. */}
-      <div className="flex items-center gap-2.5 px-2.5 py-1.5">
-        <span className="flex w-4 shrink-0 justify-center text-[15px] text-muted" aria-hidden>
-          <GlobeIcon />
-        </span>
-        <select
-          aria-label={t("account.language")}
-          data-testid="account-menu-lang-select"
-          value={currentLang}
-          onChange={(e) => changeLang(e.target.value)}
-          className="min-w-0 flex-1 rounded-md border border-hairline bg-surface px-2 py-1 text-[13px] text-ink focus:outline-none focus-visible:ring-1 focus-visible:ring-accent"
-        >
-          {LANGUAGES.map((lang) => (
-            <option key={lang.code} value={lang.code}>
-              {lang.label}
-            </option>
-          ))}
-        </select>
-      </div>
+      {/* Portal-based SelectMenu instead of a nested Menu — the account
+          menu's own panel is overflow-hidden, which would clip a plain
+          flyout; the portal panel renders above everything instead. The
+          surrounding Menu stays open on selection (Menu.tsx's outside-click
+          handler ignores `[data-portal-menu]`). */}
+      <SelectMenu
+        items={LANGUAGES.map((lang) => ({ value: lang.code, label: lang.label }))}
+        value={currentLang}
+        onSelect={changeLang}
+        panelTestId="account-menu-lang-panel"
+        trigger={({ open, ref, toggleProps }) => (
+          <button
+            ref={ref}
+            type="button"
+            data-testid="account-menu-lang-select"
+            aria-label={t("account.language")}
+            {...toggleProps}
+            className={cn(
+              "flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-[13px] text-ink/90 transition-colors duration-100 hover:bg-surface-subtle focus:outline-none",
+              open && "bg-surface-subtle",
+            )}
+          >
+            <span className="flex w-4 shrink-0 justify-center text-[15px] text-muted" aria-hidden>
+              <GlobeIcon />
+            </span>
+            <span className="min-w-0 flex-1 truncate">
+              {LANGUAGES.find((lang) => lang.code === currentLang)?.label}
+            </span>
+            <span
+              className={cn("text-muted transition-transform duration-150", open && "rotate-180")}
+              aria-hidden
+            >
+              ⌄
+            </span>
+          </button>
+        )}
+      />
 
       <MenuLabel>{t("account.theme")}</MenuLabel>
       <MenuItem

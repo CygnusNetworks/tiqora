@@ -12,12 +12,16 @@ const {
   listReferenceStates,
   listArticles,
   getReplyDraft,
+  listQueues,
+  listReferenceAgents,
 } = vi.hoisted(() => ({
   patchTicket: vi.fn(),
   listReferencePriorities: vi.fn(),
   listReferenceStates: vi.fn(),
   listArticles: vi.fn(),
   getReplyDraft: vi.fn(),
+  listQueues: vi.fn(),
+  listReferenceAgents: vi.fn(),
 }));
 
 vi.mock("@/lib/api", async () => {
@@ -30,12 +34,10 @@ vi.mock("@/lib/api", async () => {
       listReferenceStates,
       listArticles,
       getReplyDraft,
+      listQueues,
+      listReferenceAgents,
       listTemplates: vi.fn().mockResolvedValue([]),
-      listQueues: vi.fn().mockResolvedValue([]),
       listTicketLinks: vi.fn().mockResolvedValue([]),
-      listReferenceAgents: vi.fn().mockResolvedValue([
-        { id: 2, login: "ada", full_name: "Ada Lovelace" },
-      ]),
       searchReferenceCustomers: vi.fn().mockResolvedValue([]),
     },
   };
@@ -123,6 +125,10 @@ describe("TicketHeaderActions", () => {
         to_address: "support@example.com",
       },
     ]);
+    listQueues.mockReset().mockResolvedValue([]);
+    listReferenceAgents
+      .mockReset()
+      .mockResolvedValue([{ id: 2, login: "ada", full_name: "Ada Lovelace" }]);
     getReplyDraft.mockResolvedValue({
       to_address: "customer@example.com",
       cc: "",
@@ -159,17 +165,36 @@ describe("TicketHeaderActions", () => {
     expect(await screen.findByTestId("pending-dialog")).toBeInTheDocument();
   });
 
-  it("opens the queue picker dialog from the queue pill", async () => {
+  it("opens the queue pill's listbox and patches queue_id on selection", async () => {
+    listQueues.mockResolvedValue([{ id: 9, name: "Sales", group_id: 1, valid: true }]);
     wrap(<TicketHeaderActions ticket={makeTicket()} canNote onOpenNote={vi.fn()} />);
     fireEvent.click(screen.getByTestId("ticket-pill-queue"));
-    expect(await screen.findByTestId("move-picker-dialog")).toBeInTheDocument();
+    fireEvent.click(await screen.findByText("Sales"));
+    await waitFor(() => expect(patchTicket).toHaveBeenCalledWith(7, { queue_id: 9 }));
   });
 
-  it("opens the owner picker dialog from the owner pill, prefilled", async () => {
-    wrap(<TicketHeaderActions ticket={makeTicket({ owner_id: 2 })} canNote onOpenNote={vi.fn()} />);
+  it("opens the owner pill's listbox and patches owner_id on selection", async () => {
+    wrap(<TicketHeaderActions ticket={makeTicket()} canNote onOpenNote={vi.fn()} />);
     fireEvent.click(screen.getByTestId("ticket-pill-owner"));
-    const select = await screen.findByTestId("agent-picker-select");
-    expect(select).toHaveValue("2");
+    fireEvent.click(await screen.findByText("Ada Lovelace"));
+    await waitFor(() => expect(patchTicket).toHaveBeenCalledWith(7, { owner_id: 2 }));
+  });
+
+  it("shows a Responsible pill next to Owner and patches responsible_id on selection", async () => {
+    wrap(<TicketHeaderActions ticket={makeTicket()} canNote onOpenNote={vi.fn()} />);
+    expect(screen.getByTestId("ticket-pill-responsible")).toHaveTextContent("—");
+    fireEvent.click(screen.getByTestId("ticket-pill-responsible"));
+    fireEvent.click(await screen.findByText("Ada Lovelace"));
+    await waitFor(() => expect(patchTicket).toHaveBeenCalledWith(7, { responsible_id: 2 }));
+  });
+
+  it("shows a search field in the owner listbox once there are more than 8 agents", async () => {
+    listReferenceAgents.mockResolvedValue(
+      Array.from({ length: 9 }, (_, i) => ({ id: i + 1, login: `agent${i}`, full_name: `Agent ${i}` })),
+    );
+    wrap(<TicketHeaderActions ticket={makeTicket()} canNote onOpenNote={vi.fn()} />);
+    fireEvent.click(screen.getByTestId("ticket-pill-owner"));
+    expect(await screen.findByTestId("ticket-pill-owner-menu-search")).toBeInTheDocument();
   });
 
   it("opens the customer picker dialog from the customer pill", async () => {
@@ -203,6 +228,8 @@ describe("TicketHeaderActions", () => {
     expect(screen.getByTestId("more-merge")).toBeInTheDocument();
     expect(screen.getByTestId("more-print")).toBeInTheDocument();
     expect(screen.getByTestId("more-appointment")).toBeInTheDocument();
+    // Verantwortlicher moved out into its own pill (see the Responsible-pill test).
+    expect(screen.queryByTestId("more-responsible")).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByTestId("more-link"));
     expect(await screen.findByTestId("link-dialog")).toBeInTheDocument();
