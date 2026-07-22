@@ -18,8 +18,11 @@ export async function startDemo(base: string): Promise<void> {
   });
   addBanner();
   // Land the visitor in the agent workspace (they're auto-authenticated).
-  if (location.pathname === base || location.pathname === `${base}` || location.pathname.replace(/\/$/, "") === base.replace(/\/$/, "")) {
-    history.replaceState(null, "", `${base}agent`);
+  // Keep the Vite base prefix so we stay under /tiqora/demo/…, not host-root /agent.
+  const baseNorm = base.replace(/\/+$/, "") || "";
+  const pathNorm = location.pathname.replace(/\/+$/, "") || "";
+  if (pathNorm === baseNorm || pathNorm === "") {
+    history.replaceState(null, "", `${baseNorm}/agent`);
   }
 }
 
