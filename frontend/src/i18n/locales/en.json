@@ -63,7 +63,8 @@
     "loading": "Loading…",
     "close": "Close",
     "confirm": "Confirm",
-    "cancel": "Cancel"
+    "cancel": "Cancel",
+    "help": "Help"
   },
   "auth": {
     "login": "Sign in",
@@ -681,6 +682,14 @@
         "kbTagsPlaceholder": "tag1, tag2, …",
         "kbCategoryIds": "KB category IDs",
         "mcpClients": "MCP clients",
+        "mcpClientsSelected": "{{count}} selected",
+        "promptLoadFile": "Load from file…",
+        "promptCharCount": "{{formatted}} characters",
+        "promptCharCountWarning": "Very large prompt — context/cost risk.",
+        "promptFileTooLarge": "File too large (max. 2 MB).",
+        "promptFileBinary": "The file appears to be binary — only text/markdown files are supported.",
+        "promptReplaceConfirmTitle": "Replace content?",
+        "promptReplaceConfirmMessage": "The current system prompt will be replaced with the file's content. Continue?",
         "summaryArticleThreshold": "Article threshold",
         "summaryCharThreshold": "Character threshold",
         "summaryIncrementalMinArticles": "Min. articles (incremental)",
@@ -700,7 +709,24 @@
           "ticket_customer_id": "Ticket customer",
           "clarify_schema": "Clarify schema",
           "off": "Off"
-        }
+        },
+        "list": {
+          "tabPolicies": "Policies",
+          "tabUsage": "Usage"
+        },
+        "tab": {
+          "basics": "Basics",
+          "drafts": "Drafts",
+          "summaries": "Summaries",
+          "auto": "Auto replies",
+          "safety": "Safety"
+        },
+        "editor": {
+          "newTitle": "New queue policy",
+          "loadError": "The policy could not be loaded.",
+          "queueLocked": "The queue can no longer be changed after creation."
+        },
+        "autoGateWarning": "Auto replies require \"Tiqora only\" (tiqora_primary) mode. Currently: parallel operation — the switch stays locked."
       },
       "usage": {
         "title": "Usage",
@@ -715,6 +741,36 @@
         "success": "Status",
         "ok": "OK",
         "failed": "Failed"
+      }
+    },
+    "help": {
+      "aiQueue": {
+        "queue": "The queue this policy applies to. Each queue can have at most one policy; policies are not inherited by subqueues.",
+        "systemPrompt": "Extra prompt text prepended to every model request (e.g. tone, queue-specific context) — combined with the autonomy template and any identity rules.",
+        "llmProvider": "The language model provider for this queue. Must support tool calling once MCP tools or autonomy are used.",
+        "modelOverride": "Overrides the selected provider's default model for this queue only.",
+        "enabledManualAssist": "Shows the \"AI draft\" button in the ticket zoom. Drafts are their own record, never an article — an agent must explicitly accept and send each one. Not affected by the operation-mode gate.",
+        "kbTags": "Comma-separated tags whose knowledge-base articles are given to the model as context.",
+        "kbCategoryIds": "Comma-separated knowledge-base category IDs, included in addition to the tags.",
+        "mcpClients": "MCP clients whose enabled tools are available to the model for this queue. Mutating tools are only allowed at \"Fully autonomous\".",
+        "enabledSummary": "Shows the \"Summarize\" button in the ticket zoom and allows automatic summaries once the thresholds below are met. Stored exclusively in the ticket state, never as an internal note.",
+        "summaryArticleThreshold": "Triggers an automatic re-summary once at least this many articles have arrived since the last summary.",
+        "summaryCharThreshold": "Triggers an automatic re-summary once the new content since the last summary exceeds this many characters.",
+        "summaryIncrementalMinArticles": "Minimum number of new articles before an incremental (rather than full) recompute is triggered.",
+        "summaryIncrementalMinChars": "Minimum number of new characters before an incremental recompute is triggered.",
+        "enabledAutoReply": "Enables the autonomous auto-reply worker for this queue — sends customer replies without human approval, per the autonomy matrix. Requires \"Tiqora only\" (tiqora_primary) mode.",
+        "autonomy": "Controls what the AI may do without human approval: \"Off\" = drafts only, \"Clarify only\" = clarifying questions may go out directly (substantive replies stay drafts), \"Fully autonomous\" = both may be sent automatically, including mutating MCP tools.",
+        "serviceUser": "The agent account under which this queue's automatic replies/clarifications are created (audit and permission identity). Required once auto replies are enabled.",
+        "maxClarifications": "Maximum number of automatic clarifying questions per ticket before escalating.",
+        "maxAutoReplies": "Maximum number of automatic replies per ticket.",
+        "maxRepliesPerHour": "Maximum number of automatic replies for this queue per hour — a cost brake.",
+        "budgetTokensDay": "Daily token budget for this queue's auto-reply path. Once exceeded, the auto-worker pauses until the next day.",
+        "disclosureEnabled": "Appends an AI-disclosure footer to autonomously sent customer replies. Drafts an agent accepts and sends count as a human reply and get no footer.",
+        "disclosureText": "Queue-specific disclosure text. Empty = the global default text from AI settings is used.",
+        "escalationRules": "JSON rules that check MCP tool results before PII masking; any match hard-stops automatic sending and escalates to a human (pure OR logic, no priority between rules).",
+        "piiMasking": "Masks recognized customer identifiers (email, phone, MAC, IP) in ticket text and MCP tool results before they reach the model, and unmasks them again before the actual tool call or send. Complements, but does not replace, provider choice (EU hosting/DPA) as the primary privacy control.",
+        "identityMode": "How customer identity is resolved for tool calls: \"Ticket customer\" uses the customer ID on the ticket, \"Clarify schema\" lets the AI actively ask for missing information, \"Off\" disables identity resolution.",
+        "clarifySchemaJson": "JSON description of the fields the AI may actively collect under the clarify schema (field name + optional MCP match tool)."
       }
     },
     "nav": {

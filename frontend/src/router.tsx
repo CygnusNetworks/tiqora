@@ -87,6 +87,10 @@ import { AiSettingsPage } from "@/routes/admin/AiSettingsPage";
 import { AiProvidersPage } from "@/routes/admin/AiProvidersPage";
 import { AiMcpClientsPage } from "@/routes/admin/AiMcpClientsPage";
 import { AiQueuePoliciesPage } from "@/routes/admin/AiQueuePoliciesPage";
+import {
+  AiQueuePolicyNewPage,
+  AiQueuePolicyEditPage,
+} from "@/routes/admin/AiQueuePolicyEditorPage";
 
 const rootRoute = createRootRoute({
   component: () => <Outlet />,
@@ -630,6 +634,18 @@ const adminAiQueuesRoute = createRoute({
   component: AiQueuePoliciesPage,
 });
 
+const adminAiQueueNewRoute = createRoute({
+  getParentRoute: () => adminLayoutRoute,
+  path: "/ai/queues/new",
+  component: AiQueuePolicyNewPage,
+});
+
+const adminAiQueueEditRoute = createRoute({
+  getParentRoute: () => adminLayoutRoute,
+  path: "/ai/queues/$policyId",
+  component: AiQueuePolicyEditPage,
+});
+
 const catchAllRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "$",
@@ -711,6 +727,8 @@ const routeTree = rootRoute.addChildren([
     adminAiProvidersRoute,
     adminAiMcpRoute,
     adminAiQueuesRoute,
+    adminAiQueueNewRoute,
+    adminAiQueueEditRoute,
   ]),
   catchAllRoute,
 ]);
