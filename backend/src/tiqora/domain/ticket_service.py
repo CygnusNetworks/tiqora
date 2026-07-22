@@ -51,7 +51,7 @@ from tiqora.domain.schemas import (
 )
 from tiqora.domain.subject_hook import load_subject_config
 from tiqora.permissions.engine import PERMISSION_KEYS, PermissionEngine
-from tiqora.storage.backend import AttachmentContent, DbMimeStorage
+from tiqora.storage.backend import AttachmentContent, AttachmentMeta, DbMimeStorage
 
 #: Named ``state_type`` query-param views resolved to one-or-more
 #: ``ticket_state_type.name`` values. Mirrors Znuny's
@@ -67,6 +67,25 @@ VIEW_STATE_TYPES: dict[str, frozenset[str]] = {
     "new": frozenset({"new"}),
     "pending": frozenset({"pending reminder", "pending auto"}),
 }
+
+
+def _is_body_part_attachment(a: AttachmentMeta) -> bool:
+    """Znuny stores the mail body's MIME alternatives as pseudo-attachments
+    (``file-1`` text/plain, ``file-2`` / ``file-1.html`` text/html, plus rows
+    flagged via ``content_alternative``). They duplicate the article body and
+    are hidden in Znuny's zoom — hide them here too."""
+    if a.content_alternative:
+        return True
+    name = (a.filename or "").lower()
+    ctype = (a.content_type or "").lower()
+    if name == "file-1" and ctype.startswith("text/plain"):
+        return True
+    return name in ("file-2", "file-1.html") and ctype.startswith("text/html")
+
+
+def _is_inline_attachment(a: AttachmentMeta) -> bool:
+    """cid:-referenced parts of the HTML body (signature logos etc.)."""
+    return bool(a.content_id) or (a.disposition or "").lower() == "inline"
 
 
 class TicketAccessDenied(Exception):
@@ -700,8 +719,10 @@ class TicketService:
                 content_size=a.content_size,
                 content_id=a.content_id,
                 disposition=a.disposition,
+                inline=_is_inline_attachment(a),
             )
             for a in atts
+            if not _is_body_part_attachment(a)
         ]
 
     async def get_attachment(

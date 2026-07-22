@@ -446,31 +446,51 @@ export function AttachmentList({
   });
 
   if (attQ.isLoading) return null;
-  const items = attQ.data ?? [];
+  // `inline` lands in the generated client with the next OpenAPI regen —
+  // typed optional here so this renders correctly with either client version.
+  type Att = NonNullable<typeof attQ.data>[number] & { inline?: boolean };
+  const items: Att[] = attQ.data ?? [];
   if (items.length === 0) return null;
+
+  // Embedded cid: parts (signature logos etc.) are noise next to real
+  // attachments — tuck them behind a small disclosure instead.
+  const real = items.filter((a) => !a.inline);
+  const inline = items.filter((a) => a.inline);
+
+  const renderItem = (a: (typeof items)[number]) => (
+    <li key={a.id}>
+      <a
+        className="inline-flex items-center gap-2 text-xs text-accent hover:underline"
+        href={api.attachmentDownloadUrl(ticketId, articleId, a.id, true)}
+        download={a.filename ?? undefined}
+        data-testid={`attachment-${a.id}`}
+      >
+        <span>{a.filename || `attachment-${a.id}`}</span>
+        <span className="text-muted">
+          {formatBytes(a.content_size)} · {a.content_type || "—"}
+        </span>
+      </a>
+    </li>
+  );
+
+  if (real.length === 0 && inline.length === 0) return null;
 
   return (
     <div data-testid="attachment-list">
-      <h4 className="mb-1 text-xs font-semibold text-muted">
-        {t("ticket.attachments")}
-      </h4>
-      <ul className="space-y-1">
-        {items.map((a) => (
-          <li key={a.id}>
-            <a
-              className="inline-flex items-center gap-2 text-xs text-accent hover:underline"
-              href={api.attachmentDownloadUrl(ticketId, articleId, a.id, true)}
-              download={a.filename ?? undefined}
-              data-testid={`attachment-${a.id}`}
-            >
-              <span>{a.filename || `attachment-${a.id}`}</span>
-              <span className="text-muted">
-                {formatBytes(a.content_size)} · {a.content_type || "—"}
-              </span>
-            </a>
-          </li>
-        ))}
-      </ul>
+      {real.length > 0 && (
+        <>
+          <h4 className="mb-1 text-xs font-semibold text-muted">{t("ticket.attachments")}</h4>
+          <ul className="space-y-1">{real.map(renderItem)}</ul>
+        </>
+      )}
+      {inline.length > 0 && (
+        <details className="mt-1" data-testid="attachment-inline-group">
+          <summary className="cursor-pointer select-none text-xs text-muted hover:text-accent">
+            {t("ticket.inlineAttachments", { count: inline.length })}
+          </summary>
+          <ul className="mt-1 space-y-1">{inline.map(renderItem)}</ul>
+        </details>
+      )}
     </div>
   );
 }
