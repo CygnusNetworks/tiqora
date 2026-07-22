@@ -188,6 +188,7 @@ export type {
   StateRef,
   AgentRef,
   CustomerRef,
+  ComposeContext,
   AgentTicketCreateInput,
   AdminPage,
   AdminListParams,

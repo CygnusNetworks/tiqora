@@ -217,6 +217,7 @@ export {
   type AgentRef,
   type CustomerRef,
   type QueueRef,
+  type ComposeContext,
   type TicketSearchHit,
   type AgentCustomerCreateInput,
   type AgentCustomerCreateOut,
