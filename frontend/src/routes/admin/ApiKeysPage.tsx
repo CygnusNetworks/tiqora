@@ -16,6 +16,7 @@ import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import { PlusIcon, ChevronDownIcon } from "@/components/ui/icons";
 import { Dialog } from "@/components/ui/Dialog";
+import { useConfirm } from "@/components/ui/ConfirmDialog";
 import { SelectMenu, type SelectMenuItem } from "@/components/ui/SelectMenu";
 import { formatDateTime, formatDateOnly } from "@/lib/format";
 import { cn } from "@/lib/cn";
@@ -124,6 +125,7 @@ export function ApiKeysPage() {
   const [formError, setFormError] = useState<string | null>(null);
   const [createdKey, setCreatedKey] = useState<ApiKeyCreated | null>(null);
   const [copied, setCopied] = useState(false);
+  const { confirm, dialog: confirmDialog } = useConfirm();
 
   const keysQ = useQuery({
     queryKey: ["admin", "api-keys", validFilter],
@@ -445,15 +447,21 @@ export function ApiKeysPage() {
         emptyLabel={t("admin.apiKeys.empty")}
         isRowValid={(r) => r.valid}
         onEdit={openEdit}
-        onDeactivate={(row) => {
-          if (row.valid && window.confirm(t("admin.apiKeys.revokeConfirm", { name: row.name }))) {
-            revokeM.mutate(row.id);
-          }
+        onDeactivate={async (row) => {
+          if (!row.valid) return;
+          const ok = await confirm({
+            title: t("common.confirm"),
+            message: t("admin.apiKeys.revokeConfirm", { name: row.name }),
+          });
+          if (ok) revokeM.mutate(row.id);
         }}
-        onDelete={(row) => {
-          if (window.confirm(t("admin.apiKeys.deleteConfirm", { name: row.name }))) {
-            deleteM.mutate(row.id);
-          }
+        onDelete={async (row) => {
+          const ok = await confirm({
+            title: t("admin.apiKeys.delete"),
+            message: t("admin.apiKeys.deleteConfirm", { name: row.name }),
+            variant: "danger",
+          });
+          if (ok) deleteM.mutate(row.id);
         }}
         testId="admin-api-keys-table"
       />
@@ -513,6 +521,8 @@ export function ApiKeysPage() {
           </div>
         </div>
       </Dialog>
+
+      {confirmDialog}
     </div>
   );
 }

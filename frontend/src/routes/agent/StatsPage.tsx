@@ -10,6 +10,8 @@ import { LineChart } from "@/components/agent/stats/LineChart";
 import { Tabs } from "@/components/ui/Tabs";
 import { Button } from "@/components/ui/Button";
 import { Spinner } from "@/components/ui/Spinner";
+import { SelectMenu, type SelectMenuItem } from "@/components/ui/SelectMenu";
+import { ChevronDownIcon } from "@/components/ui/icons";
 import { cn } from "@/lib/cn";
 import {
   DATE_RANGE_PRESETS,
@@ -52,6 +54,14 @@ export function StatsPage() {
 
   const queuesQ = useQuery({ queryKey: ["queues"], queryFn: () => api.listQueues() });
   const flatQueues = flattenQueues(queuesQ.data ?? []);
+  const queueItems: SelectMenuItem<number>[] = flatQueues.map((q) => ({
+    value: q.id,
+    label: q.name,
+  }));
+  const granularityItems: SelectMenuItem<StatsGranularity>[] = GRANULARITIES.map((g) => ({
+    value: g,
+    label: t(`stats.filters.granularityOptions.${g}`),
+  }));
 
   const volumeQ = useQuery({
     queryKey: ["stats", "volume", filterParams, granularity],
@@ -126,19 +136,29 @@ export function StatsPage() {
         <div className="flex flex-wrap items-end gap-3">
           <label className="flex flex-col gap-1 text-xs text-muted">
             {t("stats.filters.queue")}
-            <select
-              className="rounded-md border border-hairline bg-bg px-2 py-1.5 text-sm text-ink"
-              value={queueId ?? ""}
-              onChange={(e) => setQueueId(e.target.value ? Number(e.target.value) : undefined)}
-              data-testid="stats-filter-queue"
-            >
-              <option value="">{t("queue.allQueues")}</option>
-              {flatQueues.map((q) => (
-                <option key={q.id} value={q.id}>
-                  {q.name}
-                </option>
-              ))}
-            </select>
+            <SelectMenu
+              items={queueItems}
+              value={queueId}
+              onSelect={setQueueId}
+              placeholder={t("queue.allQueues")}
+              panelTestId="stats-filter-queue-panel"
+              trigger={({ open, ref, toggleProps }) => (
+                <button
+                  ref={ref}
+                  type="button"
+                  data-testid="stats-filter-queue"
+                  {...toggleProps}
+                  className="flex min-w-[10rem] items-center justify-between gap-2 rounded-md border border-hairline bg-surface px-2 py-1.5 text-sm text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent"
+                >
+                  <span className="min-w-0 flex-1 truncate">
+                    {queueItems.find((i) => i.value === queueId)?.label ?? t("queue.allQueues")}
+                  </span>
+                  <ChevronDownIcon
+                    className={cn("shrink-0 text-muted transition-transform duration-150", open && "rotate-180")}
+                  />
+                </button>
+              )}
+            />
           </label>
           <label className="flex flex-col gap-1 text-xs text-muted">
             {t("stats.filters.dateFrom")}
@@ -162,18 +182,26 @@ export function StatsPage() {
           </label>
           <label className="flex flex-col gap-1 text-xs text-muted">
             {t("stats.filters.granularity")}
-            <select
-              className="rounded-md border border-hairline bg-bg px-2 py-1.5 text-sm text-ink"
+            <SelectMenu
+              items={granularityItems}
               value={granularity}
-              onChange={(e) => setGranularity(e.target.value as StatsGranularity)}
-              data-testid="stats-filter-granularity"
-            >
-              {GRANULARITIES.map((g) => (
-                <option key={g} value={g}>
-                  {t(`stats.filters.granularityOptions.${g}`)}
-                </option>
-              ))}
-            </select>
+              onSelect={setGranularity}
+              panelTestId="stats-filter-granularity-panel"
+              trigger={({ open, ref, toggleProps }) => (
+                <button
+                  ref={ref}
+                  type="button"
+                  data-testid="stats-filter-granularity"
+                  {...toggleProps}
+                  className="flex min-w-[8rem] items-center justify-between gap-2 rounded-md border border-hairline bg-surface px-2 py-1.5 text-sm text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent"
+                >
+                  <span>{t(`stats.filters.granularityOptions.${granularity}`)}</span>
+                  <ChevronDownIcon
+                    className={cn("shrink-0 text-muted transition-transform duration-150", open && "rotate-180")}
+                  />
+                </button>
+              )}
+            />
           </label>
         </div>
       </div>

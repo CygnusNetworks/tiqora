@@ -6,10 +6,16 @@ any other core daemon, and the AI worker needs to be independently
 stoppable as a cost/incident kill switch.
 
 Phase A shipped only the loop skeleton (Readiness-Gate check, tick-status
-recording, sleep). Phase D adds the actual work: draining
+recording, sleep). Phase D added the actual work: draining
 ``tiqora_event_outbox`` for auto-reply-relevant events and running the
 queue-threshold auto-summary scan — see :mod:`tiqora.ai.auto_worker` for the
 tick logic itself; this module stays the thin process/loop shell.
+
+Phase E (plan §3.0 v1.1 relaxation): the Readiness-Gate no longer pauses the
+whole tick. Only auto-reply is gated, and that is now checked per-event
+inside :func:`tiqora.ai.auto_worker.run_auto_tick` (which still drains the
+outbox and runs auto-summary regardless of the gate) — this module just
+calls it unconditionally whenever ``daemon.ai_worker.enabled`` is on.
 """
 
 from __future__ import annotations
@@ -24,7 +30,6 @@ import structlog
 from sqlalchemy.ext.asyncio import async_sessionmaker
 
 from tiqora.ai.auto_worker import run_auto_tick
-from tiqora.ai.gate import is_tiqora_primary
 from tiqora.config import get_settings
 from tiqora.db.engine import get_session_factory
 from tiqora.domain.settings_store import (
@@ -70,18 +75,17 @@ async def _heartbeat_loop(stop: asyncio.Event) -> None:
 
 
 async def _ai_tick(factory: async_sessionmaker[Any]) -> dict[str, Any]:
-    """One tick: honour ``daemon.ai_worker.enabled``, re-check the
-    Readiness-Gate, and (gate open) run the auto-reply/auto-summary tick."""
+    """One tick: honour ``daemon.ai_worker.enabled`` and run the
+    auto-reply/auto-summary tick. The Readiness-Gate is no longer checked
+    here — ``run_auto_tick`` drains the outbox and runs auto-summary
+    regardless of the gate, and only skips the auto-reply send while it is
+    closed (see :mod:`tiqora.ai.auto_worker`)."""
     async with factory() as session:
         enabled = await get_setting_bool(session, KEY_AI_WORKER_ENABLED, False)
         if not enabled:
             return {"enabled": False}
-        gate_open = await is_tiqora_primary(session)
-    if not gate_open:
-        logger.info("ai_worker_gate_closed")
-        return {"enabled": True, "gate_open": False}
     result = await run_auto_tick(session_factory=factory)
-    return {"enabled": True, "gate_open": True, **result}
+    return {"enabled": True, **result}
 
 
 async def _run_loop(stop: asyncio.Event) -> None:

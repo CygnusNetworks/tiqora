@@ -166,16 +166,16 @@ describe("AiPanel", () => {
       ],
     });
     discardDraft.mockResolvedValue(undefined);
-    const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(true);
 
     wrap(<AiPanel ticketId={1} canNote />);
 
     await waitFor(() => expect(screen.getByTestId("ai-panel-draft-discard-7")).toBeTruthy());
     fireEvent.click(screen.getByTestId("ai-panel-draft-discard-7"));
 
-    expect(confirmSpy).toHaveBeenCalled();
+    await screen.findByTestId("confirm-dialog");
+    fireEvent.click(screen.getByTestId("confirm-dialog-confirm"));
+
     await waitFor(() => expect(discardDraft).toHaveBeenCalledWith(1, 7));
-    confirmSpy.mockRestore();
   });
 
   it("does not discard when the confirm is dismissed", async () => {
@@ -196,16 +196,15 @@ describe("AiPanel", () => {
         },
       ],
     });
-    const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(false);
-
     wrap(<AiPanel ticketId={1} canNote />);
 
     await waitFor(() => expect(screen.getByTestId("ai-panel-draft-discard-8")).toBeTruthy());
     fireEvent.click(screen.getByTestId("ai-panel-draft-discard-8"));
 
-    expect(confirmSpy).toHaveBeenCalled();
+    await screen.findByTestId("confirm-dialog");
+    fireEvent.click(screen.getByTestId("confirm-dialog-cancel"));
+
     expect(discardDraft).not.toHaveBeenCalled();
-    confirmSpy.mockRestore();
   });
 
   it("opens the reply editor prefilled with the draft body and sends with ai_draft_id", async () => {

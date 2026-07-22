@@ -13,6 +13,7 @@ import { CrudDrawer, type FieldDef, type FieldValues } from "@/components/admin/
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import { Spinner } from "@/components/ui/Spinner";
+import { useConfirm } from "@/components/ui/ConfirmDialog";
 import { PlusIcon, ChevronDownIcon } from "@/components/ui/icons";
 import { formatDateTime } from "@/lib/format";
 import { cn } from "@/lib/cn";
@@ -105,6 +106,7 @@ export function AiMcpClientsPage() {
   const { t, i18n } = useTranslation();
   const locale = i18n.language?.startsWith("de") ? "de" : "en";
   const qc = useQueryClient();
+  const { confirm, dialog: confirmDialog } = useConfirm();
 
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [editing, setEditing] = useState<McpClientOut | null>(null);
@@ -287,10 +289,14 @@ export function AiMcpClientsPage() {
                     <Button
                       size="sm"
                       variant="danger"
-                      onClick={() => {
-                        if (window.confirm(t("admin.ai.mcp.deleteConfirm", { name: c.name }))) {
-                          deleteM.mutate(c.id);
-                        }
+                      data-testid={`admin-ai-mcp-delete-${c.id}`}
+                      onClick={async () => {
+                        const ok = await confirm({
+                          title: t("admin.ai.mcp.title"),
+                          message: t("admin.ai.mcp.deleteConfirm", { name: c.name }),
+                          variant: "danger",
+                        });
+                        if (ok) deleteM.mutate(c.id);
                       }}
                     >
                       {t("admin.table.delete")}
@@ -336,6 +342,8 @@ export function AiMcpClientsPage() {
         submitError={formError}
         testIdPrefix="admin-ai-mcp-form"
       />
+
+      {confirmDialog}
     </div>
   );
 }

@@ -8,6 +8,8 @@ import { flattenQueues } from "@/components/agent/QueueTree";
 import { Button } from "@/components/ui/Button";
 import { Spinner } from "@/components/ui/Spinner";
 import { Badge } from "@/components/ui/Badge";
+import { SelectMenu, type SelectMenuItem } from "@/components/ui/SelectMenu";
+import { ChevronDownIcon } from "@/components/ui/icons";
 import { stateLabel } from "@/lib/status";
 import { cn } from "@/lib/cn";
 import {
@@ -22,6 +24,9 @@ import { ArticleBodyRenderer } from "@/components/agent/ArticleBodyRenderer";
 
 const FIELD_CLASS =
   "w-full rounded-md border border-hairline bg-surface-subtle px-3 py-2 text-[13.5px] text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent focus:border-accent";
+
+const SELECT_TRIGGER_CLASS =
+  "flex w-full items-center justify-between gap-2 rounded-md border border-hairline bg-surface-subtle px-3 py-2 text-left text-[13.5px] text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent";
 
 const toggleCls =
   "inline-flex items-center gap-1 rounded border border-hairline px-2 py-0.5 text-muted transition-colors duration-100 hover:text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent";
@@ -99,6 +104,19 @@ export function NewTicketPage() {
         (s) => s.type_name === "new" || s.type_name === "open" || s.type_name === "pending auto",
       ),
     [statesQ.data],
+  );
+
+  const queueItems: SelectMenuItem<number>[] = useMemo(
+    () => queues.map((q) => ({ value: q.id, label: q.name })),
+    [queues],
+  );
+  const priorityItems: SelectMenuItem<number>[] = useMemo(
+    () => priorities.map((p) => ({ value: p.id, label: p.name })),
+    [priorities],
+  );
+  const stateItems: SelectMenuItem<number>[] = useMemo(
+    () => states.map((s) => ({ value: s.id, label: stateLabel(t, s.name) })),
+    [states, t],
   );
 
   const [ticketType, setTicketType] = useState<TicketType>("email");
@@ -411,20 +429,29 @@ export function NewTicketPage() {
                 <span className="mb-1 block text-[12px] font-medium text-muted">
                   {t("newTicket.queue")}
                 </span>
-                <select
-                  data-testid="new-ticket-queue"
-                  required
-                  value={queue}
-                  onChange={(e) => setQueue(e.target.value ? Number(e.target.value) : "")}
-                  className={FIELD_CLASS}
-                >
-                  {queues.length === 0 && <option value="">{t("newTicket.noQueues")}</option>}
-                  {queues.map((q) => (
-                    <option key={q.id} value={q.id}>
-                      {q.name}
-                    </option>
-                  ))}
-                </select>
+                <SelectMenu
+                  items={queueItems}
+                  value={typeof queue === "number" ? queue : undefined}
+                  onSelect={setQueue}
+                  placeholder={t("newTicket.noQueues")}
+                  panelTestId="new-ticket-queue-panel"
+                  trigger={({ open, ref, toggleProps }) => (
+                    <button
+                      ref={ref}
+                      type="button"
+                      data-testid="new-ticket-queue"
+                      {...toggleProps}
+                      className={SELECT_TRIGGER_CLASS}
+                    >
+                      <span className="min-w-0 flex-1 truncate">
+                        {queueItems.find((i) => i.value === queue)?.label ?? t("newTicket.noQueues")}
+                      </span>
+                      <ChevronDownIcon
+                        className={cn("shrink-0 text-muted transition-transform duration-150", open && "rotate-180")}
+                      />
+                    </button>
+                  )}
+                />
               </label>
 
               {ticketType === "email" ? (
@@ -551,38 +578,60 @@ export function NewTicketPage() {
                 <span className="mb-1 block text-[12px] font-medium text-muted">
                   {t("newTicket.priority")}
                 </span>
-                <select
-                  data-testid="new-ticket-priority"
-                  required
-                  value={priority}
-                  onChange={(e) => setPriority(e.target.value ? Number(e.target.value) : "")}
-                  className={FIELD_CLASS}
-                >
-                  {priorities.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.name}
-                    </option>
-                  ))}
-                </select>
+                <SelectMenu
+                  items={priorityItems}
+                  value={typeof priority === "number" ? priority : undefined}
+                  onSelect={setPriority}
+                  placeholder={t("admin.form.selectPlaceholder")}
+                  panelTestId="new-ticket-priority-panel"
+                  trigger={({ open, ref, toggleProps }) => (
+                    <button
+                      ref={ref}
+                      type="button"
+                      data-testid="new-ticket-priority"
+                      {...toggleProps}
+                      className={SELECT_TRIGGER_CLASS}
+                    >
+                      <span className="min-w-0 flex-1 truncate">
+                        {priorityItems.find((i) => i.value === priority)?.label ??
+                          t("admin.form.selectPlaceholder")}
+                      </span>
+                      <ChevronDownIcon
+                        className={cn("shrink-0 text-muted transition-transform duration-150", open && "rotate-180")}
+                      />
+                    </button>
+                  )}
+                />
               </label>
 
               <label className="block">
                 <span className="mb-1 block text-[12px] font-medium text-muted">
                   {t("newTicket.state")}
                 </span>
-                <select
-                  data-testid="new-ticket-state"
-                  required
-                  value={state}
-                  onChange={(e) => setState(e.target.value ? Number(e.target.value) : "")}
-                  className={FIELD_CLASS}
-                >
-                  {states.map((s) => (
-                    <option key={s.id} value={s.id}>
-                      {stateLabel(t, s.name)}
-                    </option>
-                  ))}
-                </select>
+                <SelectMenu
+                  items={stateItems}
+                  value={typeof state === "number" ? state : undefined}
+                  onSelect={setState}
+                  placeholder={t("admin.form.selectPlaceholder")}
+                  panelTestId="new-ticket-state-panel"
+                  trigger={({ open, ref, toggleProps }) => (
+                    <button
+                      ref={ref}
+                      type="button"
+                      data-testid="new-ticket-state"
+                      {...toggleProps}
+                      className={SELECT_TRIGGER_CLASS}
+                    >
+                      <span className="min-w-0 flex-1 truncate">
+                        {stateItems.find((i) => i.value === state)?.label ??
+                          t("admin.form.selectPlaceholder")}
+                      </span>
+                      <ChevronDownIcon
+                        className={cn("shrink-0 text-muted transition-transform duration-150", open && "rotate-180")}
+                      />
+                    </button>
+                  )}
+                />
               </label>
             </div>
 

@@ -13,6 +13,7 @@ import { CrudDrawer, type FieldDef, type FieldValues } from "@/components/admin/
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { PlusIcon } from "@/components/ui/icons";
+import { useConfirm } from "@/components/ui/ConfirmDialog";
 
 type MatchRow = { key: string; value: string; negate: boolean };
 type SetRow = { key: string; value: string };
@@ -207,6 +208,7 @@ export function PostmasterFiltersPage() {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [editing, setEditing] = useState<PostmasterFilterOut | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
+  const { confirm, dialog: confirmDialog } = useConfirm();
 
   const listQ = useQuery({
     queryKey: ["admin", "postmaster-filters"],
@@ -250,10 +252,12 @@ export function PostmasterFiltersPage() {
     setDrawerOpen(true);
   };
 
-  const handleDelete = (row: PostmasterFilterOut) => {
-    const ok = window.confirm(
-      t("admin.postmasterFilters.deleteConfirm", { name: row.name }),
-    );
+  const handleDelete = async (row: PostmasterFilterOut) => {
+    const ok = await confirm({
+      title: t("admin.postmasterFilters.title_plural"),
+      message: t("admin.postmasterFilters.deleteConfirm", { name: row.name }),
+      variant: "danger",
+    });
     if (!ok) return;
     deleteM.mutate(row.name);
   };
@@ -458,6 +462,8 @@ export function PostmasterFiltersPage() {
         submitError={formError}
         testIdPrefix="admin-postmaster-filters-form"
       />
+
+      {confirmDialog}
     </div>
   );
 }

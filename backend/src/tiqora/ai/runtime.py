@@ -33,7 +33,7 @@ from tiqora.ai.context import (
     load_articles,
     ticket_snapshot,
 )
-from tiqora.ai.gate import AiGateError, require_tiqora_primary
+from tiqora.ai.gate import AiGateError, require_feature_allowed
 from tiqora.ai.llm import LlmClient, LlmMessage, LlmResponse
 from tiqora.ai.models import (
     AUTONOMY_CLARIFY_ONLY,
@@ -291,11 +291,15 @@ async def run_ticket_agent(
     ``mcp_caller``/``kb_search_fn``/``kb_get_article_fn`` are injectable seams
     for tests; production omits them (real fastmcp/KB calls).
     """
-    # 1. Readiness gate
-    try:
-        await require_tiqora_primary(session)
-    except AiGateError as exc:
-        raise AgentRunError(str(exc)) from exc
+    # 1. Readiness gate — auto-reply only (plan §3.0 v1.1 relaxation, Phase
+    # E). Manual Assist always runs regardless of operation_mode: it only
+    # ever produces a draft (see _map_customer_message below), never a
+    # customer-visible send.
+    if trigger == TRIGGER_AUTO:
+        try:
+            await require_feature_allowed(session, FEATURE_AUTO_REPLY)
+        except AiGateError as exc:
+            raise AgentRunError(str(exc)) from exc
 
     # 2. Per-ticket lock
     lock_owner = f"{worker_instance}:{run_id}"

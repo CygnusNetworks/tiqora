@@ -108,7 +108,6 @@ describe("SecurityPage passkeys", () => {
       },
     ]);
     passkeyDelete.mockResolvedValue(undefined);
-    vi.spyOn(window, "confirm").mockReturnValue(true);
 
     renderPage();
 
@@ -118,6 +117,9 @@ describe("SecurityPage passkeys", () => {
     expect(screen.getByTestId("passkey-item-7")).toHaveTextContent("YubiKey");
 
     fireEvent.click(screen.getByTestId("passkey-delete-7"));
+    await screen.findByTestId("confirm-dialog");
+    fireEvent.click(screen.getByTestId("confirm-dialog-confirm"));
+
     await waitFor(() => {
       expect(passkeyDelete).toHaveBeenCalledWith(7);
     });
@@ -129,7 +131,6 @@ describe("SecurityPage passkeys", () => {
     passkeyRegisterBegin.mockResolvedValue(options);
     startRegistration.mockResolvedValue(credential);
     passkeyRegisterFinish.mockResolvedValue({ id: 9, name: "Laptop", enabled: true });
-    vi.spyOn(window, "prompt").mockReturnValue("Laptop");
 
     renderPage();
 
@@ -138,6 +139,10 @@ describe("SecurityPage passkeys", () => {
     });
 
     fireEvent.click(screen.getByTestId("passkey-add"));
+
+    const input = await screen.findByTestId("confirm-dialog-input");
+    fireEvent.change(input, { target: { value: "Laptop" } });
+    fireEvent.click(screen.getByTestId("confirm-dialog-confirm"));
 
     await waitFor(() => {
       expect(passkeyRegisterBegin).toHaveBeenCalled();

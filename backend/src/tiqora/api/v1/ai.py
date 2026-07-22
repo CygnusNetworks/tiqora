@@ -127,11 +127,14 @@ async def get_ai_state(ticket_id: int, user: CurrentUser, session: DbSession) ->
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden") from exc
 
     policy = await get_queue_policy_by_queue(session, ticket.queue_id)
+    # operation_mode_ready only describes whether *auto-reply* may run (plan
+    # §3.0 v1.1 relaxation, Phase E) — Manual Assist and Summary availability
+    # no longer depend on it, since neither is gated.
     ready = await is_tiqora_primary(session)
 
     manual_available = False
     summary_available = False
-    if policy is not None and ready:
+    if policy is not None:
         if policy.enabled_manual_assist:
             manual_available = await check_feature_access(session, user.id, "manual_assist")
         if policy.enabled_summary:

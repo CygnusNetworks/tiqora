@@ -7,6 +7,7 @@ import { articleSortKey } from "@/lib/article";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import { Spinner } from "@/components/ui/Spinner";
+import { useConfirm } from "@/components/ui/ConfirmDialog";
 import { ReplyDialog } from "./ReplyDialog";
 
 /**
@@ -21,6 +22,7 @@ import { ReplyDialog } from "./ReplyDialog";
 export function AiPanel({ ticketId, canNote }: { ticketId: number; canNote: boolean }) {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
+  const { confirm, dialog: confirmDialog } = useConfirm();
   const [expandedDraftId, setExpandedDraftId] = useState<number | null>(null);
   const [replyDraft, setReplyDraft] = useState<AiDraftOut | null>(null);
 
@@ -211,10 +213,13 @@ export function AiPanel({ ticketId, canNote }: { ticketId: number; canNote: bool
                           variant="ghost"
                           data-testid={`ai-panel-draft-discard-${draft.id}`}
                           disabled={discardMutation.isPending}
-                          onClick={() => {
-                            if (window.confirm(t("ticket.ai.discardConfirm"))) {
-                              discardMutation.mutate(draft.id);
-                            }
+                          onClick={async () => {
+                            const ok = await confirm({
+                              title: t("ticket.ai.discardDraft"),
+                              message: t("ticket.ai.discardConfirm"),
+                              variant: "danger",
+                            });
+                            if (ok) discardMutation.mutate(draft.id);
                           }}
                         >
                           {t("ticket.ai.discardDraft")}
@@ -252,6 +257,8 @@ export function AiPanel({ ticketId, canNote }: { ticketId: number; canNote: bool
           initialDraft={{ id: replyDraft.id, subject: replyDraft.subject, body: replyDraft.body }}
         />
       )}
+
+      {confirmDialog}
     </div>
   );
 }

@@ -2,13 +2,14 @@
 see ``~/TIQORA_LLM_PLAN.md``). Every route requires
 :data:`tiqora.api.v1.admin.deps.AdminUser`.
 
-Readiness-Gate enforcement (plan §3.0): enabling any of
-``enabled_auto_reply`` / ``enabled_summary`` / ``enabled_manual_assist`` on a
-queue policy raises :class:`~tiqora.ai.gate.AiGateError`, translated here to
-**409** — the client action was rejected because of the current
-``operation_mode``, not because the request itself was malformed (422 is
-reserved for validation errors: bad autonomy value, missing
-service_user_id/llm_provider_id on auto-reply enable, etc.).
+Readiness-Gate enforcement (plan §3.0, scope relaxed in v1.1 / Phase E):
+enabling ``enabled_auto_reply`` on a queue policy raises
+:class:`~tiqora.ai.gate.AiGateError`, translated here to **409** — the client
+action was rejected because of the current ``operation_mode``, not because
+the request itself was malformed (422 is reserved for validation errors: bad
+autonomy value, missing service_user_id/llm_provider_id on auto-reply enable,
+etc.). ``enabled_summary``/``enabled_manual_assist`` are no longer gated —
+see ``tiqora.ai.gate`` and ``tiqora.ai.policies`` module docstrings.
 """
 
 from __future__ import annotations

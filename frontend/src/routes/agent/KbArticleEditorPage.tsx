@@ -6,6 +6,8 @@ import { api, ApiError } from "@/lib/api";
 import { Button } from "@/components/ui/Button";
 import { Spinner } from "@/components/ui/Spinner";
 import { Dialog } from "@/components/ui/Dialog";
+import { SelectMenu, type SelectMenuItem } from "@/components/ui/SelectMenu";
+import { ChevronDownIcon } from "@/components/ui/icons";
 import { MarkdownView } from "@/components/kb/MarkdownView";
 import { KbAttachments } from "@/components/kb/KbAttachments";
 import { slugify } from "@/lib/slug";
@@ -16,6 +18,9 @@ const LANGUAGES = ["en", "de"] as const;
 
 const inputClass =
   "w-full rounded-md border border-hairline bg-surface-subtle px-3 py-2 text-sm text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent focus:border-accent";
+
+const selectTriggerClass =
+  "flex w-full items-center justify-between gap-2 rounded-md border border-hairline bg-surface-subtle px-3 py-2 text-left text-sm text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent";
 
 type FormState = {
   title: string;
@@ -166,6 +171,19 @@ function KbArticleEditor({ articleId }: { articleId?: number }) {
     }
   };
 
+  const categoryItems: SelectMenuItem<number>[] = (categoriesQ.data ?? []).map((c) => ({
+    value: c.id,
+    label: c.name,
+  }));
+  const languageItems: SelectMenuItem<string>[] = LANGUAGES.map((l) => ({
+    value: l,
+    label: l.toUpperCase(),
+  }));
+  const stateItems: SelectMenuItem<string>[] = STATES.map((s) => ({
+    value: s,
+    label: t(`kb.state.${s}`),
+  }));
+
   if (isEdit && articleQ.isLoading) {
     return (
       <div className="flex justify-center py-10">
@@ -238,54 +256,77 @@ function KbArticleEditor({ articleId }: { articleId?: number }) {
           </div>
           <label className="block text-sm">
             <span className="mb-1 block text-muted">{t("kb.field.category")}</span>
-            <select
-              data-testid="kb-form-category"
-              required
-              value={form.categoryId ?? ""}
-              onChange={(e) =>
-                setForm((f) => ({ ...f, categoryId: Number(e.target.value) }))
-              }
-              className={inputClass}
-            >
-              <option value="" disabled>
-                {t("kb.field.category")}
-              </option>
-              {(categoriesQ.data ?? []).map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
-                </option>
-              ))}
-            </select>
+            <SelectMenu
+              items={categoryItems}
+              value={form.categoryId ?? undefined}
+              onSelect={(v) => setForm((f) => ({ ...f, categoryId: v }))}
+              loading={categoriesQ.isLoading}
+              placeholder={t("kb.field.category")}
+              panelTestId="kb-form-category-panel"
+              trigger={({ open, ref, toggleProps }) => (
+                <button
+                  ref={ref}
+                  type="button"
+                  data-testid="kb-form-category"
+                  {...toggleProps}
+                  className={selectTriggerClass}
+                >
+                  <span className="min-w-0 flex-1 truncate">
+                    {categoryItems.find((i) => i.value === form.categoryId)?.label ??
+                      t("kb.field.category")}
+                  </span>
+                  <ChevronDownIcon
+                    className={cn("shrink-0 text-muted transition-transform duration-150", open && "rotate-180")}
+                  />
+                </button>
+              )}
+            />
           </label>
           <label className="block text-sm">
             <span className="mb-1 block text-muted">{t("kb.field.language")}</span>
-            <select
-              data-testid="kb-form-language"
+            <SelectMenu
+              items={languageItems}
               value={form.language}
-              onChange={(e) => setForm((f) => ({ ...f, language: e.target.value }))}
-              className={inputClass}
-            >
-              {LANGUAGES.map((l) => (
-                <option key={l} value={l}>
-                  {l.toUpperCase()}
-                </option>
-              ))}
-            </select>
+              onSelect={(v) => setForm((f) => ({ ...f, language: v }))}
+              panelTestId="kb-form-language-panel"
+              trigger={({ open, ref, toggleProps }) => (
+                <button
+                  ref={ref}
+                  type="button"
+                  data-testid="kb-form-language"
+                  {...toggleProps}
+                  className={selectTriggerClass}
+                >
+                  <span>{form.language.toUpperCase()}</span>
+                  <ChevronDownIcon
+                    className={cn("shrink-0 text-muted transition-transform duration-150", open && "rotate-180")}
+                  />
+                </button>
+              )}
+            />
           </label>
           <label className="block text-sm">
             <span className="mb-1 block text-muted">{t("kb.field.state")}</span>
-            <select
-              data-testid="kb-form-state"
+            <SelectMenu
+              items={stateItems}
               value={form.state}
-              onChange={(e) => setForm((f) => ({ ...f, state: e.target.value }))}
-              className={inputClass}
-            >
-              {STATES.map((s) => (
-                <option key={s} value={s}>
-                  {t(`kb.state.${s}`)}
-                </option>
-              ))}
-            </select>
+              onSelect={(v) => setForm((f) => ({ ...f, state: v }))}
+              panelTestId="kb-form-state-panel"
+              trigger={({ open, ref, toggleProps }) => (
+                <button
+                  ref={ref}
+                  type="button"
+                  data-testid="kb-form-state"
+                  {...toggleProps}
+                  className={selectTriggerClass}
+                >
+                  <span>{t(`kb.state.${form.state}`)}</span>
+                  <ChevronDownIcon
+                    className={cn("shrink-0 text-muted transition-transform duration-150", open && "rotate-180")}
+                  />
+                </button>
+              )}
+            />
           </label>
           <label className="block text-sm sm:col-span-2">
             <span className="mb-1 block text-muted">{t("kb.field.tags")}</span>

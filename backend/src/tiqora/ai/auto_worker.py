@@ -1,10 +1,23 @@
-"""Auto-reply + auto-summary tick (plan §3.4/§3.5/§3.9, Phase D).
+"""Auto-reply + auto-summary tick (plan §3.4/§3.5/§3.9, Phase D; gate scope
+relaxed in v1.1 / Phase E).
 
 Runs inside ``tiqora-ai-worker`` (:mod:`tiqora.ai.worker`), never inside the
 main takeover worker. Consumes ``tiqora_event_outbox`` with its **own**
 watermark cursor (``KEY_AI_OUTBOX_WATERMARK``) — deliberately separate from
 the main worker's outbox-drain cursor (indexer/webhooks) so the two
 consumers never interfere.
+
+The Readiness-Gate (``operation_mode=tiqora_primary``) only gates the
+auto-**reply** send, not the tick itself: the outbox batch is always drained
+and the watermark always advances, and the auto-summary scan (state-only,
+never gated — see :mod:`tiqora.ai.summary`) always runs for tickets touched
+by the batch. Only :func:`_process_customer_article_event` is skipped while
+the gate is closed. This is deliberate, not just a simplification: if the
+watermark stopped advancing for the whole duration of parallel operation, the
+first tick after cutover to ``tiqora_primary`` would suddenly see every
+customer article accumulated since — a flood of auto-replies fired at once.
+Draining (without replying) keeps the watermark caught up the whole time, so
+cutover starts clean from "now" with no special initialization needed.
 
 At-most-once semantics: the watermark always advances past a processed
 batch, even if an individual event failed (its error is logged and recorded
@@ -184,7 +197,10 @@ async def _process_customer_article_event(
 ) -> AgentRunResult | None:
     """Handle one ``ArticleCreate`` outbox event. Returns the agent run
     result iff the auto-reply runtime was actually invoked (``None`` for
-    every skip — irrelevant event, disabled policy, cap hit, loop guard)."""
+    every skip — irrelevant event, disabled policy, cap hit, loop guard).
+
+    Callers only invoke this while the Readiness-Gate is open — see
+    :func:`run_auto_tick`."""
     article_id = event.payload.get("article_id")
     if article_id is None:
         return None
@@ -267,21 +283,28 @@ async def run_auto_tick(
     session_factory: async_sessionmaker[AsyncSession] | None = None,
 ) -> dict[str, int]:
     """One tick: drain new ``tiqora_event_outbox`` rows, run auto-reply for
-    relevant customer-article events, and auto-summarize tickets touched by
-    this batch whose queue thresholds are now exceeded (plan §3.5's
-    "einfachste robuste Variante": only tickets seen in this batch, not a
-    full-table scan)."""
+    relevant customer-article events (only while the Readiness-Gate is open —
+    see module docstring), and auto-summarize tickets touched by this batch
+    whose queue thresholds are now exceeded (plan §3.5's "einfachste robuste
+    Variante": only tickets seen in this batch, not a full-table scan)."""
     cfg = settings or get_settings()
     factory = session_factory or get_session_factory()
 
     async with factory() as session:
-        if not await is_tiqora_primary(session):
-            logger.info("ai_auto_worker_gate_closed")
-            return {"gate_open": 0}
+        gate_open = await is_tiqora_primary(session)
         watermark = await get_setting_int(session, KEY_AI_OUTBOX_WATERMARK, 0)
         batch = await _next_outbox_batch(session, watermark, _BATCH_SIZE)
 
-    totals = {"events": 0, "auto_replies": 0, "summaries": 0, "errors": 0}
+    if not gate_open:
+        logger.info("ai_auto_worker_auto_reply_gated_skipping")
+
+    totals = {
+        "events": 0,
+        "auto_replies": 0,
+        "summaries": 0,
+        "errors": 0,
+        "gate_open": int(gate_open),
+    }
     last_id = watermark
     touched_ticket_ids: set[int] = set()
 
@@ -291,6 +314,11 @@ async def run_auto_tick(
         if event.event_type != "ArticleCreate":
             continue
         touched_ticket_ids.add(event.ticket_id)
+        if not gate_open:
+            # Auto-reply is gated; still counted as "seen" so the watermark
+            # advances and the ticket is still eligible for auto-summary
+            # below (summaries are never gated).
+            continue
         try:
             async with factory() as session:
                 result = await _process_customer_article_event(session, cfg, event)
@@ -298,8 +326,8 @@ async def run_auto_tick(
                 totals["auto_replies"] += 1
         except AgentRunError:
             # Expected abort conditions (lock held, policy disabled between
-            # read and write, ACL, gate regression mid-batch) — not a bug,
-            # just a skip. run_ticket_agent already persisted last_error.
+            # read and write, ACL) — not a bug, just a skip. run_ticket_agent
+            # already persisted last_error.
             logger.info("ai_auto_worker_run_aborted", event_id=event.id, ticket_id=event.ticket_id)
         except Exception:  # noqa: BLE001 — one broken event must not stop the batch
             logger.exception(
