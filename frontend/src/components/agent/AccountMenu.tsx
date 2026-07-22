@@ -24,7 +24,7 @@ const LANGUAGES = [
 /**
  * Avatar dropdown for account actions, shared by the agent and admin shells.
  * Opens a Menu with the signed-in identity, a link to security / 2FA settings
- * (general preferences live in the sidebar), inline language choices
+ * (general preferences live in the sidebar), a language <select>
  * (Deutsch / English), a light/dark theme toggle, and finally sign-out.
  * Admins additionally get a highlighted "Admin-Bereich" entry.
  *
@@ -117,18 +117,27 @@ export function AccountMenu({ logoutTestId = "logout-btn" }: { logoutTestId?: st
       </div>
 
       <MenuLabel>{t("account.language")}</MenuLabel>
-      {LANGUAGES.map((lang) => (
-        <MenuItem
-          key={lang.code}
-          icon={<GlobeIcon />}
-          keepOpen
-          selected={currentLang === lang.code}
-          testId={`account-menu-lang-${lang.code}`}
-          onSelect={() => changeLang(lang.code)}
+      {/* Native <select> so the list renders above everything (the menu panel is
+          overflow-hidden, which would clip a nested flyout) and scales to many
+          languages without bloating the menu. */}
+      <div className="flex items-center gap-2.5 px-2.5 py-1.5">
+        <span className="flex w-4 shrink-0 justify-center text-[15px] text-muted" aria-hidden>
+          <GlobeIcon />
+        </span>
+        <select
+          aria-label={t("account.language")}
+          data-testid="account-menu-lang-select"
+          value={currentLang}
+          onChange={(e) => changeLang(e.target.value)}
+          className="min-w-0 flex-1 rounded-md border border-hairline bg-surface px-2 py-1 text-[13px] text-ink focus:outline-none focus-visible:ring-1 focus-visible:ring-accent"
         >
-          {lang.label}
-        </MenuItem>
-      ))}
+          {LANGUAGES.map((lang) => (
+            <option key={lang.code} value={lang.code}>
+              {lang.label}
+            </option>
+          ))}
+        </select>
+      </div>
 
       <MenuLabel>{t("account.theme")}</MenuLabel>
       <MenuItem

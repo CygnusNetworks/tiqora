@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen, fireEvent, within } from "@testing-library/react";
 import { I18nextProvider } from "react-i18next";
 import i18n from "@/i18n";
 import { AccountMenu } from "./AccountMenu";
@@ -57,9 +57,11 @@ describe("AccountMenu", () => {
     expect(screen.queryByTestId("account-menu-settings")).not.toBeInTheDocument();
     expect(screen.queryByTestId("account-menu-admin")).not.toBeInTheDocument();
     expect(screen.getByTestId("account-menu-security")).toBeInTheDocument();
-    // Languages are inline items (no nested flyout that would clip inside the menu).
-    expect(screen.getByTestId("account-menu-lang-de")).toBeInTheDocument();
-    expect(screen.getByTestId("account-menu-lang-en")).toBeInTheDocument();
+    // Language is a native <select> (scales to many; renders above the menu).
+    const langSelect = screen.getByTestId("account-menu-lang-select");
+    expect(langSelect).toBeInTheDocument();
+    expect(within(langSelect).getByRole("option", { name: "Deutsch" })).toBeInTheDocument();
+    expect(within(langSelect).getByRole("option", { name: "English" })).toBeInTheDocument();
     expect(screen.getByTestId("account-menu-theme-light")).toBeInTheDocument();
     expect(screen.getByTestId("logout-btn")).toBeInTheDocument();
   });
@@ -89,11 +91,12 @@ describe("AccountMenu", () => {
     expect(navigate).toHaveBeenCalledWith({ to: "/agent/security" });
   });
 
-  it("changes language inline and persists the choice", () => {
+  it("changes language via the select and persists the choice", () => {
     const changeLanguage = vi.spyOn(i18n, "changeLanguage");
     open();
-    // Inline item — clickable directly, not hidden behind a flyout.
-    fireEvent.click(screen.getByTestId("account-menu-lang-en"));
+    fireEvent.change(screen.getByTestId("account-menu-lang-select"), {
+      target: { value: "en" },
+    });
     expect(changeLanguage).toHaveBeenCalledWith("en");
     expect(localStorage.getItem("tiqora-lang")).toBe("en");
     changeLanguage.mockRestore();
