@@ -71,7 +71,9 @@ async def test_queue_variable_crud_roundtrip(
 ) -> None:
     sync_url: str = request.getfixturevalue(url_fixture)
     ns = uuid.uuid4().int % 100_000
-    queue_id = 9300 + (ns % 500)
+    # 885xx block — 9300+(ns%500) overlaps mail_log (93xx) and the AI
+    # tests' 96xx-98xx ticket-seeded queues (FK blocks pre-seed DELETE).
+    queue_id = 88500 + (ns % 100)
     session, engine = await _make_session(sync_url)
     admin = _admin()
     params = ListParams(page=1, page_size=50, valid="all")
@@ -325,7 +327,8 @@ async def test_list_queue_physical_variables_stock_empty(
 
     sync_url: str = request.getfixturevalue(url_fixture)
     ns = uuid.uuid4().int % 100_000
-    queue_id = 9450 + (ns % 500)
+    # 886xx block — see comment at the sibling test above.
+    queue_id = 88600 + (ns % 100)
     _seed_queue(sync_url, queue_id=queue_id, name=f"PhysVarStock-{ns}")
 
     session, engine = await _make_session(sync_url)
