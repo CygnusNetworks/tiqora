@@ -5,6 +5,7 @@ import { api, type DaemonServiceOut, type DaemonUpdate } from "@/lib/api";
 import { Button } from "@/components/ui/Button";
 import { Spinner } from "@/components/ui/Spinner";
 import { formatDateTime } from "@/lib/format";
+import { statusColor, type StatusColor } from "@/lib/daemonStatus";
 
 const QUERY_KEY = ["admin", "daemons"] as const;
 const REFETCH_INTERVAL_MS = 10_000;
@@ -13,21 +14,6 @@ const REFETCH_INTERVAL_MS = 10_000;
 // takeovers and must stay mutually exclusive with the corresponding Znuny
 // scheduler task — see docs/parallel-operation.md.
 const TAKEOVER_SLUGS = new Set(["postmaster", "escalation", "notifications", "generic_agent"]);
-
-type StatusColor = "green" | "amber" | "red" | "grey";
-
-function statusColor(svc: DaemonServiceOut, nowMs: number): StatusColor {
-  if (!svc.enabled) return "grey";
-  const lastOkMs = svc.last_ok_at ? new Date(svc.last_ok_at).getTime() : null;
-  const lastRunMs = svc.last_run_at ? new Date(svc.last_run_at).getTime() : null;
-  if (svc.last_error && (lastOkMs === null || (lastRunMs !== null && lastOkMs < lastRunMs))) {
-    return "red";
-  }
-  if (lastOkMs === null) return "amber";
-  const thresholdMs =
-    svc.schedule === "daily" ? 26 * 3600 * 1000 : (svc.interval_seconds ?? 60) * 3 * 1000;
-  return nowMs - lastOkMs <= thresholdMs ? "green" : "amber";
-}
 
 const DOT_CLASS: Record<StatusColor, string> = {
   green: "bg-accent",

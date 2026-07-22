@@ -157,6 +157,46 @@ export function LogOutIcon(props: IconProps) {
   );
 }
 
+/** Ticket/tag shape — used for the "Tickets & Workflow" admin nav group. */
+export function TicketIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M4 9a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v1.5a1.5 1.5 0 0 0 0 3V15a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-1.5a1.5 1.5 0 0 0 0-3V9Z" />
+      <path d="M9.5 7v10" strokeDasharray="1.5 2.5" />
+    </Icon>
+  );
+}
+
+/** Envelope shape — used for the "Kommunikation & Vorlagen" admin nav group. */
+export function MailIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <rect x="3.5" y="5.5" width="17" height="13" rx="2" />
+      <path d="m4.5 7 7.5 6 7.5-6" />
+    </Icon>
+  );
+}
+
+/** Lightning bolt — used for the "Automatisierung" admin nav group. */
+export function BoltIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M13 3 5 13.5h5.5L11 21l8-11h-5.5L13 3Z" />
+    </Icon>
+  );
+}
+
+/** Server stack — used for the "System & Betrieb" admin nav group. */
+export function ServerIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <rect x="4" y="4" width="16" height="6" rx="1.5" />
+      <rect x="4" y="14" width="16" height="6" rx="1.5" />
+      <path d="M7.5 7h.01M7.5 17h.01" strokeLinecap="round" strokeWidth={2.5} />
+    </Icon>
+  );
+}
+
 /** Filled presence/status dot. Unlike the outline icons it uses a fill so a
  * small size still reads as a solid signal; size via `className`. */
 export function DotIcon(props: IconProps) {
