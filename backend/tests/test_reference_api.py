@@ -95,7 +95,11 @@ def _seed(sync_url: str) -> dict[str, Any]:
                 " VALUES (:id, 'ref-compose-sig', :txt, 'text/plain; charset=utf-8',"
                 " 'test', 1, 1, :t, 1, :t)"
             ),
-            {"id": ids["signature_id"], "txt": "Kind regards,\nRef Support", "t": NOW},
+            {
+                "id": ids["signature_id"],
+                "txt": "Kind regards,\n<OTRS_FIRST_NAME> <OTRS_LAST_NAME> - Ref Support",
+                "t": NOW,
+            },
         )
         conn.execute(
             text(
@@ -226,7 +230,11 @@ async def test_reference_compose_context(mariadb_znuny_url: str) -> None:
     assert resp.status_code == 200
     body = resp.json()
     assert body["from_address"] == "Ref Support <compose@ref.example>"
-    assert "Ref Support" in body["signature"]
+    # Placeholders must be expanded against the *current agent* (ids["user_id"],
+    # login "ref.agent.alpha"), same as the reply-draft signature preview —
+    # not left raw like "<OTRS_FIRST_NAME> <OTRS_LAST_NAME>".
+    assert "Ref ref.agent.alpha - Ref Support" in body["signature"]
+    assert "<OTRS_" not in body["signature"]
     assert body["signature_is_html"] is False
     # Frontend::RichText has no seeded sysconfig row for this DB — falls back
     # to the endpoint's own default (true), same as ZNUNY_SETTING_DEFAULTS
