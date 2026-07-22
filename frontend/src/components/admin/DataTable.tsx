@@ -49,6 +49,8 @@ export type DataTableProps<T> = {
   onDeactivate?: (row: T) => void;
   /** Reactivate a soft-deleted row (valid_id → 1). Shown only for invalid rows. */
   onActivate?: (row: T) => void;
+  /** Permanently remove a row (hard delete, unlike onDeactivate's soft revoke). Shown for every row. */
+  onDelete?: (row: T) => void;
   /** True for a row whose valid_id !== 1 (or equivalent) — renders the invalid Badge. */
   isRowValid?: (row: T) => boolean;
   /** Opt-in leading checkbox column for bulk selection. */
@@ -97,6 +99,20 @@ function ActivateIcon() {
         d="m5 12.5 4.5 4.5L19 7"
         stroke="currentColor"
         strokeWidth="1.9"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function DeleteIcon() {
+  return (
+    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" aria-hidden="true">
+      <path
+        d="M5 7h14M9 7V5.5A1.5 1.5 0 0 1 10.5 4h3A1.5 1.5 0 0 1 15 5.5V7m2 0-.7 12.1a2 2 0 0 1-2 1.9H9.7a2 2 0 0 1-2-1.9L7 7"
+        stroke="currentColor"
+        strokeWidth="1.8"
         strokeLinecap="round"
         strokeLinejoin="round"
       />
@@ -171,6 +187,7 @@ export function DataTable<T>({
   onEdit,
   onDeactivate,
   onActivate,
+  onDelete,
   isRowValid,
   selection,
   sort,
@@ -179,7 +196,7 @@ export function DataTable<T>({
   testId = "admin-data-table",
 }: DataTableProps<T>) {
   const { t } = useTranslation();
-  const hasActions = Boolean(onEdit || onDeactivate || onActivate);
+  const hasActions = Boolean(onEdit || onDeactivate || onActivate || onDelete);
   const hasSelection = Boolean(selection);
   const sortEnabled = Boolean(onSortChange);
   const colCount =
@@ -340,6 +357,19 @@ export function DataTable<T>({
                           <span className="inline-flex items-center gap-1">
                             <ActivateIcon />
                             {t("admin.table.activate")}
+                          </span>
+                        </Button>
+                      )}
+                      {onDelete && (
+                        <Button
+                          size="sm"
+                          variant="danger"
+                          data-testid={`admin-row-delete-${id}`}
+                          onClick={() => onDelete(row)}
+                        >
+                          <span className="inline-flex items-center gap-1">
+                            <DeleteIcon />
+                            {t("admin.table.delete")}
                           </span>
                         </Button>
                       )}
