@@ -9,6 +9,7 @@ import {
 } from "@/lib/api";
 import { Button } from "@/components/ui/Button";
 import { Spinner } from "@/components/ui/Spinner";
+import { HelpPopover } from "@/components/ui/HelpPopover";
 
 const QUERY_KEY = ["admin", "subject-config"] as const;
 const PREVIEW_TN = "2026070100000019";
@@ -147,7 +148,12 @@ export function SubjectConfigPage() {
 
         <div className="grid gap-3 sm:grid-cols-2">
           <label className="block text-sm sm:col-span-2">
-            <span className="mb-1 block text-muted">{t("admin.subjectConfig.hook")}</span>
+            <span className="mb-1 flex items-center gap-1.5 text-muted">
+              {t("admin.subjectConfig.hook")}
+              <HelpPopover title={t("admin.subjectConfig.hook")} testId="subject-config-help-hook">
+                {t("admin.help.subjectConfig.hook")}
+              </HelpPopover>
+            </span>
             <input
               data-testid="subject-config-hook"
               type="text"
@@ -165,7 +171,12 @@ export function SubjectConfigPage() {
           </label>
 
           <label className="block text-sm">
-            <span className="mb-1 block text-muted">{t("admin.subjectConfig.divider")}</span>
+            <span className="mb-1 flex items-center gap-1.5 text-muted">
+              {t("admin.subjectConfig.divider")}
+              <HelpPopover title={t("admin.subjectConfig.divider")} testId="subject-config-help-divider">
+                {t("admin.help.subjectConfig.divider")}
+              </HelpPopover>
+            </span>
             <input
               data-testid="subject-config-divider"
               type="text"
@@ -185,7 +196,12 @@ export function SubjectConfigPage() {
           </label>
 
           <label className="block text-sm">
-            <span className="mb-1 block text-muted">{t("admin.subjectConfig.subjectFormat")}</span>
+            <span className="mb-1 flex items-center gap-1.5 text-muted">
+              {t("admin.subjectConfig.subjectFormat")}
+              <HelpPopover title={t("admin.subjectConfig.subjectFormat")} testId="subject-config-help-format">
+                {t("admin.help.subjectConfig.subjectFormat")}
+              </HelpPopover>
+            </span>
             <select
               data-testid="subject-config-format"
               value={form.subject_format}

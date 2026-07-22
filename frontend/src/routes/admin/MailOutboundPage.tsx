@@ -10,6 +10,7 @@ import {
 } from "@/lib/api";
 import { Button } from "@/components/ui/Button";
 import { Spinner } from "@/components/ui/Spinner";
+import { HelpPopover } from "@/components/ui/HelpPopover";
 
 const QUERY_KEY = ["admin", "mail", "outbound"] as const;
 
@@ -159,7 +160,12 @@ export function MailOutboundPage() {
 
         <div className="grid gap-3 sm:grid-cols-2">
           <label className="block text-sm sm:col-span-2">
-            <span className="mb-1 block text-muted">{t("admin.mailOutbound.host")}</span>
+            <span className="mb-1 flex items-center gap-1.5 text-muted">
+              {t("admin.mailOutbound.host")}
+              <HelpPopover title={t("admin.mailOutbound.host")} testId="mail-outbound-help-host">
+                {t("admin.help.mailOutbound.host")}
+              </HelpPopover>
+            </span>
             <input
               data-testid="mail-outbound-host"
               type="text"
@@ -171,7 +177,12 @@ export function MailOutboundPage() {
           </label>
 
           <label className="block text-sm">
-            <span className="mb-1 block text-muted">{t("admin.mailOutbound.port")}</span>
+            <span className="mb-1 flex items-center gap-1.5 text-muted">
+              {t("admin.mailOutbound.port")}
+              <HelpPopover title={t("admin.mailOutbound.port")} testId="mail-outbound-help-port">
+                {t("admin.help.mailOutbound.port")}
+              </HelpPopover>
+            </span>
             <input
               data-testid="mail-outbound-port"
               type="number"
@@ -184,7 +195,12 @@ export function MailOutboundPage() {
           </label>
 
           <label className="block text-sm">
-            <span className="mb-1 block text-muted">{t("admin.mailOutbound.security")}</span>
+            <span className="mb-1 flex items-center gap-1.5 text-muted">
+              {t("admin.mailOutbound.security")}
+              <HelpPopover title={t("admin.mailOutbound.security")} testId="mail-outbound-help-security">
+                {t("admin.help.mailOutbound.security")}
+              </HelpPopover>
+            </span>
             <select
               data-testid="mail-outbound-security"
               value={form.security}
@@ -200,7 +216,12 @@ export function MailOutboundPage() {
           </label>
 
           <label className="block text-sm">
-            <span className="mb-1 block text-muted">{t("admin.mailOutbound.authType")}</span>
+            <span className="mb-1 flex items-center gap-1.5 text-muted">
+              {t("admin.mailOutbound.authType")}
+              <HelpPopover title={t("admin.mailOutbound.authType")} testId="mail-outbound-help-auth-type">
+                {t("admin.help.mailOutbound.authType")}
+              </HelpPopover>
+            </span>
             <select
               data-testid="mail-outbound-auth-type"
               value={form.auth_type}
@@ -250,7 +271,12 @@ export function MailOutboundPage() {
           </label>
 
           <label className="block text-sm sm:col-span-2">
-            <span className="mb-1 block text-muted">{t("admin.mailOutbound.fromDefault")}</span>
+            <span className="mb-1 flex items-center gap-1.5 text-muted">
+              {t("admin.mailOutbound.fromDefault")}
+              <HelpPopover title={t("admin.mailOutbound.fromDefault")} testId="mail-outbound-help-from-default">
+                {t("admin.help.mailOutbound.fromDefault")}
+              </HelpPopover>
+            </span>
             <input
               data-testid="mail-outbound-from-default"
               type="text"
@@ -262,7 +288,12 @@ export function MailOutboundPage() {
           </label>
 
           <label className="block text-sm">
-            <span className="mb-1 block text-muted">{t("admin.mailOutbound.timeoutSeconds")}</span>
+            <span className="mb-1 flex items-center gap-1.5 text-muted">
+              {t("admin.mailOutbound.timeoutSeconds")}
+              <HelpPopover title={t("admin.mailOutbound.timeoutSeconds")} testId="mail-outbound-help-timeout">
+                {t("admin.help.mailOutbound.timeoutSeconds")}
+              </HelpPopover>
+            </span>
             <input
               data-testid="mail-outbound-timeout"
               type="number"

@@ -19,6 +19,7 @@ import { Dialog } from "@/components/ui/Dialog";
 import { Spinner } from "@/components/ui/Spinner";
 import { SelectMenu, type SelectMenuItem } from "@/components/ui/SelectMenu";
 import { PlusIcon } from "@/components/ui/icons";
+import { HelpPopover } from "@/components/ui/HelpPopover";
 import { formatDateTime, formatDateOnly } from "@/lib/format";
 import { cn } from "@/lib/cn";
 
@@ -943,7 +944,12 @@ export function GdprPage() {
               data-testid="gdpr-selector-form"
             >
               <div className="mb-4 flex flex-wrap items-center gap-3">
-                <span className="text-sm font-medium text-ink">{t("admin.gdpr.mode")}</span>
+                <span className="inline-flex items-center gap-1.5 text-sm font-medium text-ink">
+                  {t("admin.gdpr.mode")}
+                  <HelpPopover title={t("admin.gdpr.mode")} testId="gdpr-help-mode">
+                    {t("admin.help.gdpr.mode")}
+                  </HelpPopover>
+                </span>
                 <div className="inline-flex rounded-md border border-hairline p-0.5">
                   <button
                     type="button"
@@ -1118,8 +1124,11 @@ export function GdprPage() {
               {/* Chip-baukasten: additional selectors */}
               <div className="mt-4 border-t border-hairline pt-3">
                 <div className="mb-2 flex flex-wrap items-center gap-2">
-                  <span className="text-xs font-medium text-ink">
+                  <span className="inline-flex items-center gap-1.5 text-xs font-medium text-ink">
                     {t("admin.gdpr.filters.title")}
+                    <HelpPopover title={t("admin.gdpr.filters.title")} testId="gdpr-help-filters">
+                      {t("admin.help.gdpr.filters")}
+                    </HelpPopover>
                   </span>
                   <SelectMenu
                     items={availableFilterItems}
@@ -1177,8 +1186,24 @@ export function GdprPage() {
                     className="mt-2 rounded-lg border border-hairline bg-surface-subtle p-2.5"
                     data-testid={`gdpr-filter-open-${openFilterKind}`}
                   >
-                    <p className="mb-1.5 text-xs font-medium text-ink">
+                    <p className="mb-1.5 flex items-center gap-1.5 text-xs font-medium text-ink">
                       {filterLabel(openFilterKind)}
+                      {NEGATABLE_FILTER_KINDS.includes(openFilterKind) && (
+                        <HelpPopover
+                          title={filterLabel(openFilterKind)}
+                          testId={`gdpr-help-negate-${openFilterKind}`}
+                        >
+                          {t("admin.help.gdpr.negate")}
+                        </HelpPopover>
+                      )}
+                      {openFilterKind === "validId" && (
+                        <HelpPopover
+                          title={filterLabel(openFilterKind)}
+                          testId="gdpr-help-valid-id"
+                        >
+                          {t("admin.help.gdpr.validId")}
+                        </HelpPopover>
+                      )}
                     </p>
                     {NEGATABLE_FILTER_KINDS.includes(openFilterKind) && (
                       <div

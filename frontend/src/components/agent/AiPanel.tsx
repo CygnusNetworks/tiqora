@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import { Spinner } from "@/components/ui/Spinner";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
+import { HelpPopover } from "@/components/ui/HelpPopover";
 import { ReplyDialog } from "./ReplyDialog";
 
 /**
@@ -90,8 +91,11 @@ export function AiPanel({ ticketId, canNote }: { ticketId: number; canNote: bool
       {state.summary_available && (
         <div className="space-y-2" data-testid="ai-panel-summary">
           <div className="flex items-center justify-between gap-2">
-            <span className="text-xs uppercase tracking-wide text-muted">
+            <span className="inline-flex items-center gap-1.5 text-xs uppercase tracking-wide text-muted">
               {t("ticket.ai.summaryLabel")}
+              <HelpPopover title={t("ticket.ai.summaryLabel")} testId="ai-panel-help-summary">
+                {t("ticket.ai.help.summary")}
+              </HelpPopover>
             </span>
             <Button
               size="sm"
@@ -138,8 +142,11 @@ export function AiPanel({ ticketId, canNote }: { ticketId: number; canNote: bool
       {state.manual_assist_available && (
         <div className="space-y-2" data-testid="ai-panel-drafts">
           <div className="flex items-center justify-between gap-2">
-            <span className="text-xs uppercase tracking-wide text-muted">
+            <span className="inline-flex items-center gap-1.5 text-xs uppercase tracking-wide text-muted">
               {t("ticket.ai.draftsLabel")}
+              <HelpPopover title={t("ticket.ai.draftsLabel")} testId="ai-panel-help-drafts">
+                {t("ticket.ai.help.drafts")}
+              </HelpPopover>
             </span>
             <span title={!canNote ? t("ticket.toolbar.noPermission") : undefined}>
               <Button

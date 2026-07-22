@@ -340,6 +340,10 @@ export function PostmasterFiltersPage() {
       label: t("admin.postmasterFilters.matchRules"),
       type: "custom",
       required: true,
+      help: {
+        title: t("admin.postmasterFilters.matchRules"),
+        description: t("admin.help.postmasterFilters.match"),
+      },
       render: (value, onChange) => (
         <RuleListEditor<MatchRow>
           rows={(Array.isArray(value) ? value : []) as MatchRow[]}
@@ -375,6 +379,10 @@ export function PostmasterFiltersPage() {
       name: "set",
       label: t("admin.postmasterFilters.setRules"),
       type: "custom",
+      help: {
+        title: t("admin.postmasterFilters.setRules"),
+        description: t("admin.help.postmasterFilters.set"),
+      },
       render: (value, onChange) => (
         <RuleListEditor<SetRow>
           rows={(Array.isArray(value) ? value : []) as SetRow[]}

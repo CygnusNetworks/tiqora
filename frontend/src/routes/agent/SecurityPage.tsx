@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/Button";
 import { Spinner } from "@/components/ui/Spinner";
 import { Badge } from "@/components/ui/Badge";
 import { useConfirm, usePrompt } from "@/components/ui/ConfirmDialog";
+import { HelpPopover } from "@/components/ui/HelpPopover";
 
 function browserSupportsWebAuthn(): boolean {
   return typeof window !== "undefined" && typeof window.PublicKeyCredential !== "undefined";
@@ -159,7 +160,12 @@ export function SecurityPage() {
 
       <section className="mt-6 rounded-xl border border-hairline bg-surface p-5">
         <div className="flex items-center justify-between">
-          <h2 className="text-sm font-semibold text-ink">{t("security.totpHeading")}</h2>
+          <span className="inline-flex items-center gap-1.5">
+            <h2 className="text-sm font-semibold text-ink">{t("security.totpHeading")}</h2>
+            <HelpPopover title={t("security.totpHeading")} testId="security-help-totp">
+              {t("security.help.totp")}
+            </HelpPopover>
+          </span>
           {statusQuery.isLoading ? (
             <Spinner />
           ) : (
@@ -268,7 +274,12 @@ export function SecurityPage() {
           data-testid="passkeys-section"
         >
           <div className="flex items-center justify-between">
-            <h2 className="text-sm font-semibold text-ink">{t("security.passkeyHeading")}</h2>
+            <span className="inline-flex items-center gap-1.5">
+              <h2 className="text-sm font-semibold text-ink">{t("security.passkeyHeading")}</h2>
+              <HelpPopover title={t("security.passkeyHeading")} testId="security-help-passkey">
+                {t("security.help.passkey")}
+              </HelpPopover>
+            </span>
             {passkeysQuery.isLoading ? (
               <Spinner />
             ) : (

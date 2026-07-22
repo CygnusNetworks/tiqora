@@ -151,4 +151,19 @@ describe("DaemonsPage", () => {
       expect(screen.getByTestId("daemon-interval-reset-postmaster")).toBeInTheDocument();
     });
   });
+
+  it("shows a takeover help popover only for takeover services, not for the poller", async () => {
+    getDaemons.mockResolvedValue({ services: [poller(), postmaster()] });
+
+    renderPage();
+    await waitFor(() => {
+      expect(screen.getByTestId("daemon-row-postmaster")).toBeInTheDocument();
+    });
+
+    expect(screen.getByTestId("daemons-help-takeover-postmaster")).toBeInTheDocument();
+    expect(screen.queryByTestId("daemons-help-takeover-poller")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId("daemons-help-takeover-postmaster"));
+    expect(screen.getByTestId("daemons-help-takeover-postmaster-panel")).toBeInTheDocument();
+  });
 });
