@@ -5,8 +5,7 @@ import { useTranslation } from "react-i18next";
 import { api } from "@/lib/api";
 import { useAuth } from "@/auth/AuthContext";
 import { TicketHeader } from "@/components/agent/TicketHeader";
-import { ActionToolbar } from "@/components/agent/ActionToolbar";
-import { ArticleTimeline } from "@/components/agent/ArticleTimeline";
+import { ArticleMasterDetail } from "@/components/agent/ArticleMasterDetail";
 import { HistoryTable } from "@/components/agent/HistoryTable";
 import { PresenceBar } from "@/components/agent/PresenceBar";
 import { ProcessWidget } from "@/components/agent/process/ProcessWidget";
@@ -137,9 +136,13 @@ export function TicketZoomPage() {
       <Link to="/agent/queues" className="text-xs text-accent hover:underline">
         ← {t("common.backToQueues")}
       </Link>
-      {/* Ticket info first, then editable metadata controls, then content. */}
-      <TicketHeader ticket={ticketQ.data} overflowMenu={overflowMenu} />
-      <ActionToolbar ticket={ticketQ.data} />
+      {/* Ticket info + primary actions/pills, then content. */}
+      <TicketHeader
+        ticket={ticketQ.data}
+        overflowMenu={overflowMenu}
+        canNote={canNote}
+        onOpenNote={() => setNoteOpen(true)}
+      />
       <ProcessWidget
         ticketId={ticketId}
         hideInactiveStart
@@ -148,10 +151,11 @@ export function TicketZoomPage() {
       />
       <PresenceBar ticketId={ticketId} selfUserId={user?.id} />
       {tab === "articles" ? (
-        <ArticleTimeline
+        <ArticleMasterDetail
           ticketId={ticketId}
           onComposingChange={setComposing}
           descending={articleDescending}
+          onToggleDescending={() => setArticleDescending((d) => !d)}
           noteOpen={noteOpen}
           onNoteOpenChange={setNoteOpen}
           canNote={canNote}

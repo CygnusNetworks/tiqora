@@ -14,6 +14,7 @@ import {
   SplitDialog,
 } from "./ArticleActionDialogs";
 import { cn } from "@/lib/cn";
+import { articleSortKey, groupByDay } from "@/lib/article";
 
 function senderTone(
   senderType: string | null | undefined,
@@ -31,19 +32,6 @@ function senderTintClass(senderType: string | null | undefined): string {
   if (s === "customer") return "bg-article-customer border-article-customer-border";
   if (s === "system") return "bg-article-system border-hairline";
   return "bg-article-agent border-hairline";
-}
-
-/** Sort key: incoming_time (epoch seconds) preferred, else create_time. */
-function articleSortKey(a: ArticleListItem): number {
-  if (typeof a.incoming_time === "number" && a.incoming_time > 0) {
-    return a.incoming_time * 1000;
-  }
-  return new Date(a.create_time).getTime();
-}
-
-function dayKey(iso: string, locale: string): string {
-  const d = new Date(iso);
-  return new Intl.DateTimeFormat(locale, { dateStyle: "full" }).format(d);
 }
 
 export function ArticleTimeline({
@@ -93,13 +81,7 @@ export function ArticleTimeline({
   });
 
   // Group by day (order follows the sorted list).
-  const groups: { day: string; items: ArticleListItem[] }[] = [];
-  for (const a of sorted) {
-    const day = dayKey(a.create_time, locale);
-    const last = groups[groups.length - 1];
-    if (last && last.day === day) last.items.push(a);
-    else groups.push({ day, items: [a] });
-  }
+  const groups = groupByDay(sorted, locale);
 
   return (
     <div className="space-y-6" data-testid="article-timeline">
@@ -300,7 +282,7 @@ function maxArticleId(articles: ArticleListItem[]): number {
  * refetch — shows a banner if that refetch ever yields a higher id while
  * still composing. No diffing beyond that single max-id comparison.
  */
-function ArticleComposer({
+export function ArticleComposer({
   ticketId,
   articles,
   onComposingChange,
@@ -422,7 +404,7 @@ function ArticleComposer({
   );
 }
 
-function ArticleBodyLoader({
+export function ArticleBodyLoader({
   ticketId,
   articleId,
 }: {
@@ -449,7 +431,7 @@ function ArticleBodyLoader({
   );
 }
 
-function AttachmentList({
+export function AttachmentList({
   ticketId,
   articleId,
 }: {

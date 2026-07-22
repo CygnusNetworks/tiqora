@@ -1,8 +1,8 @@
 import { useTranslation } from "react-i18next";
 import type { TicketDetail } from "@/lib/api";
-import { formatDateTime, isEscalated } from "@/lib/format";
+import { isEscalated } from "@/lib/format";
 import { Badge } from "@/components/ui/Badge";
-import { PriorityChip, StateChip } from "@/components/ui/StatusChip";
+import { TicketHeaderActions } from "./TicketHeaderActions";
 import {
   combinedEscalationLevel,
   formatCountdown,
@@ -14,13 +14,18 @@ import type { CSSProperties, ReactNode } from "react";
 export function TicketHeader({
   ticket,
   overflowMenu,
+  canNote,
+  onOpenNote,
 }: {
   ticket: TicketDetail;
   /** Optional ⋮ overflow menu anchored top-right of the ticket-info box. */
   overflowMenu?: ReactNode;
+  /** Whether the agent may reply / add notes (``note`` permission). */
+  canNote: boolean;
+  /** Opens the internal-note composer at the bottom of the article list. */
+  onOpenNote: () => void;
 }) {
-  const { t, i18n } = useTranslation();
-  const locale = i18n.language?.startsWith("de") ? "de" : "en";
+  const { t } = useTranslation();
 
   const badges: { label: string; tone: "danger" | "warn" }[] = [];
   if (isEscalated(ticket.escalation_response_time)) {
@@ -89,27 +94,10 @@ export function TicketHeader({
           </div>
         )}
       </div>
-      {/* Compact metadata line — status and priority as uniform soft-chips. */}
-      <dl
-        className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm"
-        data-testid="ticket-meta-line"
-      >
-        <Meta label={t("ticket.state")}>
-          <StateChip state={ticket.state} data-testid="ticket-header-state-chip" />
-        </Meta>
-        <Meta label={t("ticket.priority")}>
-          <PriorityChip
-            priority={ticket.priority}
-            priorityId={ticket.priority_id}
-            data-testid="ticket-header-priority-chip"
-          />
-        </Meta>
-        <Meta label={t("ticket.queue")} value={ticket.queue_name} />
-        <Meta label={t("ticket.owner")} value={ticket.owner_name || ticket.owner_login} />
-        <Meta label={t("ticket.customer")} value={ticket.customer_user_id || ticket.customer_id} />
-        <Meta label={t("ticket.created")} value={formatDateTime(ticket.create_time, locale)} />
-        <Meta label={t("ticket.changed")} value={formatDateTime(ticket.change_time, locale)} />
-      </dl>
+      {/* Primary actions + interactive metadata pills (replaces the old flat
+          ActionToolbar row and the read-only meta line — see
+          TicketHeaderActions). */}
+      <TicketHeaderActions ticket={ticket} canNote={canNote} onOpenNote={onOpenNote} />
       {ticket.dynamic_fields && ticket.dynamic_fields.length > 0 && (
         <details className="rounded border border-hairline bg-surface-subtle px-3 py-2 text-sm">
           <summary className="cursor-pointer font-medium text-muted">
@@ -131,28 +119,3 @@ export function TicketHeader({
   );
 }
 
-function Meta({
-  label,
-  value,
-  children,
-}: {
-  label: string;
-  value?: string | null | undefined;
-  children?: ReactNode;
-}) {
-  if (children) {
-    return (
-      <div className="inline-flex items-center gap-1.5">
-        <dt className="text-[11px] uppercase tracking-wide text-muted">{label}</dt>
-        <dd>{children}</dd>
-      </div>
-    );
-  }
-  if (!value) return null;
-  return (
-    <div className="inline-flex items-center gap-1.5">
-      <dt className="text-[11px] uppercase tracking-wide text-muted">{label}</dt>
-      <dd className="font-medium text-ink">{value}</dd>
-    </div>
-  );
-}

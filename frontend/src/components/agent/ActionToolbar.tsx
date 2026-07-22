@@ -3,31 +3,17 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
 import { api } from "@/lib/api";
-import type { MutationRequest, TicketDetail } from "@/lib/api";
+import type { TicketDetail } from "@/lib/api";
 import { useAuth } from "@/auth/AuthContext";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Dialog } from "@/components/ui/Dialog";
 import { Spinner } from "@/components/ui/Spinner";
 import { stateLabel } from "@/lib/status";
+import { ticketPerms, usePatchTicket } from "@/lib/ticket";
 
 const inputCls =
   "w-full rounded border border-hairline bg-surface px-2 py-1.5 text-sm text-ink placeholder:text-muted focus:outline-none focus:ring-1 focus:ring-accent";
-
-// ── Shared mutation hook ───────────────────────────────────────────────────
-
-/** Patch the ticket, then refresh the header/timeline by invalidating it. */
-function usePatchTicket(ticketId: number, onDone?: () => void) {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: (body: MutationRequest) => api.patchTicket(ticketId, body),
-    onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: ["tickets", ticketId] });
-      void qc.invalidateQueries({ queryKey: ["tickets", ticketId, "articles"] });
-      onDone?.();
-    },
-  });
-}
 
 // ── Dropdown menu primitive ────────────────────────────────────────────────
 
@@ -151,41 +137,6 @@ function ToolbarButton({
     );
   }
   return btn;
-}
-
-/** Resolve per-action flags; fall back to blanket ``can_write`` when the
- * backend has not yet shipped the ``permissions`` object. */
-function ticketPerms(ticket: TicketDetail): {
-  ro: boolean;
-  move_into: boolean;
-  create: boolean;
-  note: boolean;
-  owner: boolean;
-  priority: boolean;
-  rw: boolean;
-} {
-  const p = ticket.permissions;
-  if (p) {
-    return {
-      ro: Boolean(p.ro),
-      move_into: Boolean(p.move_into),
-      create: Boolean(p.create),
-      note: Boolean(p.note),
-      owner: Boolean(p.owner),
-      priority: Boolean(p.priority),
-      rw: Boolean(p.rw),
-    };
-  }
-  const all = Boolean(ticket.can_write);
-  return {
-    ro: all,
-    move_into: all,
-    create: all,
-    note: all,
-    owner: all,
-    priority: all,
-    rw: all,
-  };
 }
 
 // ── Minimal inline icons (single-path, 14px) ───────────────────────────────
@@ -517,7 +468,7 @@ function DialogActions({
   );
 }
 
-function AgentPickerDialog({
+export function AgentPickerDialog({
   title,
   ticketId,
   field,
@@ -571,7 +522,7 @@ function AgentPickerDialog({
   );
 }
 
-function CustomerPickerDialog({
+export function CustomerPickerDialog({
   ticketId,
   currentCustomerId,
   currentCustomerUserId,
@@ -676,7 +627,7 @@ function flattenQueues(
   return out;
 }
 
-function MovePickerDialog({
+export function MovePickerDialog({
   ticketId,
   currentQueueId,
   onClose,
@@ -718,7 +669,7 @@ function MovePickerDialog({
   );
 }
 
-function PendingDialog({
+export function PendingDialog({
   ticketId,
   pendingStates,
   onClose,
@@ -779,7 +730,7 @@ function PendingDialog({
 
 const LINK_TYPES = ["Normal", "ParentChild"] as const;
 
-function LinkDialog({
+export function LinkDialog({
   ticketId,
   onClose,
 }: {
@@ -859,7 +810,7 @@ function LinkDialog({
   );
 }
 
-function MergeDialog({
+export function MergeDialog({
   ticketId,
   onClose,
 }: {
