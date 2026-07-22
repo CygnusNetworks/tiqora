@@ -7,20 +7,15 @@ import type { TicketDetail } from "@/lib/api";
 import { useAuth } from "@/auth/AuthContext";
 import { Button } from "@/components/ui/Button";
 import { Menu, MenuItem, MenuLabel, MenuSeparator } from "@/components/ui/Menu";
+import { SelectMenu, type SelectMenuItem } from "@/components/ui/SelectMenu";
 import { PriorityChip, StateChip } from "@/components/ui/StatusChip";
 import { formatDateTime } from "@/lib/format";
 import { stateLabel } from "@/lib/status";
 import { cn } from "@/lib/cn";
 import { ReplyDialog } from "./ReplyDialog";
 import { articleSortKey } from "@/lib/article";
-import {
-  AgentPickerDialog,
-  CustomerPickerDialog,
-  LinkDialog,
-  MergeDialog,
-  MovePickerDialog,
-  PendingDialog,
-} from "./ActionToolbar";
+import { flattenQueues } from "./QueueTree";
+import { CustomerPickerDialog, LinkDialog, MergeDialog, PendingDialog } from "./ActionToolbar";
 import { ticketPerms, usePatchTicket } from "@/lib/ticket";
 
 /**
@@ -59,6 +54,11 @@ export function TicketHeaderActions({
     queryKey: ["reference", "states"],
     queryFn: () => api.listReferenceStates(),
   });
+  const queuesQ = useQuery({ queryKey: ["queues"], queryFn: () => api.listQueues() });
+  const agentsQ = useQuery({
+    queryKey: ["reference", "agents"],
+    queryFn: () => api.listReferenceAgents(),
+  });
   // Latest article drives the header's "Antworten" shortcut — same target a
   // customer-visible per-article reply would pick, so it stays cheap to
   // find rather than adding a dedicated endpoint.
@@ -82,12 +82,24 @@ export function TicketHeaderActions({
 
   const isLocked = Boolean(ticket.lock && ticket.lock.toLowerCase() !== "unlock");
 
+  // Queue/owner/responsible pills are SelectMenu listboxes now (see below) —
+  // only Kunde still opens a modal (CustomerPickerDialog has server-side
+  // search, which doesn't fit a listbox).
+  const queueItems: SelectMenuItem<number>[] = flattenQueues(queuesQ.data ?? [])
+    .filter((q) => q.valid)
+    .map((q) => ({ value: q.id, label: q.name }));
+  const agents = agentsQ.data ?? [];
+  const agentItems: SelectMenuItem<number>[] = agents.map((a) => ({
+    value: a.id,
+    label: a.full_name,
+    hint: a.login,
+  }));
+  const responsibleAgent = agents.find((a) => a.id === ticket.responsible_user_id);
+
   // Which modal dialog is open (null = none) — mirrors ActionToolbar's own
   // single-dialog-at-a-time state, kept separately since this is a second,
   // independent trigger surface for the same dialogs.
-  const [dialog, setDialog] = useState<
-    "owner" | "responsible" | "customer" | "move" | "pending" | "link" | "merge" | null
-  >(null);
+  const [dialog, setDialog] = useState<"customer" | "pending" | "link" | "merge" | null>(null);
   const [replyOpen, setReplyOpen] = useState(false);
 
   const toggleWatch = () => {
@@ -138,11 +150,6 @@ export function TicketHeaderActions({
         )}
       >
         <MenuLabel>{t("ticket.actionsGroupAssign")}</MenuLabel>
-        {perms.owner && (
-          <MenuItem testId="more-responsible" onSelect={() => setDialog("responsible")}>
-            {t("ticket.toolbar.responsible")}
-          </MenuItem>
-        )}
         {perms.rw && (
           <MenuItem testId="more-lock" onSelect={() => patch.mutate({ lock: isLocked ? "unlock" : "lock" })}>
             {isLocked ? t("ticket.toolbar.unlock") : t("ticket.toolbar.lock")}
@@ -260,22 +267,40 @@ export function TicketHeaderActions({
           </Menu>
         </StatusPill>
 
-        <Pill
+        <SelectPill
           label={t("ticket.queue")}
           testId="ticket-pill-queue"
+          panelTestId="ticket-pill-queue-menu"
           disabledTitle={!perms.move_into ? noPerm : undefined}
-          onClick={perms.move_into ? () => setDialog("move") : undefined}
-        >
-          {ticket.queue_name}
-        </Pill>
-        <Pill
+          items={queueItems}
+          value={ticket.queue_id}
+          valueLabel={ticket.queue_name}
+          placeholder={t("ticket.dialog.selectPlaceholder")}
+          onSelect={(id) => patch.mutate({ queue_id: id })}
+        />
+        <SelectPill
           label={t("ticket.owner")}
           testId="ticket-pill-owner"
+          panelTestId="ticket-pill-owner-menu"
           disabledTitle={!perms.owner ? noPerm : undefined}
-          onClick={perms.owner ? () => setDialog("owner") : undefined}
-        >
-          {ticket.owner_name || ticket.owner_login}
-        </Pill>
+          items={agentItems}
+          value={ticket.owner_id}
+          valueLabel={ticket.owner_name || ticket.owner_login}
+          placeholder={t("ticket.dialog.selectPlaceholder")}
+          onSelect={(id) => patch.mutate({ owner_id: id })}
+        />
+        <SelectPill
+          label={t("ticket.toolbar.responsible")}
+          testId="ticket-pill-responsible"
+          panelTestId="ticket-pill-responsible-menu"
+          disabledTitle={!perms.owner ? noPerm : undefined}
+          dashed={!ticket.responsible_user_id}
+          items={agentItems}
+          value={ticket.responsible_user_id ?? null}
+          valueLabel={responsibleAgent?.full_name || "—"}
+          placeholder={t("ticket.dialog.selectPlaceholder")}
+          onSelect={(id) => patch.mutate({ responsible_id: id })}
+        />
         <Pill
           label={t("ticket.customer")}
           testId="ticket-pill-customer"
@@ -301,36 +326,11 @@ export function TicketHeaderActions({
           onClose={() => setReplyOpen(false)}
         />
       )}
-      {dialog === "owner" && (
-        <AgentPickerDialog
-          title={t("ticket.toolbar.owner")}
-          ticketId={ticketId}
-          field="owner_id"
-          currentId={ticket.owner_id}
-          onClose={() => setDialog(null)}
-        />
-      )}
-      {dialog === "responsible" && (
-        <AgentPickerDialog
-          title={t("ticket.toolbar.responsible")}
-          ticketId={ticketId}
-          field="responsible_id"
-          currentId={ticket.responsible_user_id ?? null}
-          onClose={() => setDialog(null)}
-        />
-      )}
       {dialog === "customer" && (
         <CustomerPickerDialog
           ticketId={ticketId}
           currentCustomerId={ticket.customer_id}
           currentCustomerUserId={ticket.customer_user_id}
-          onClose={() => setDialog(null)}
-        />
-      )}
-      {dialog === "move" && (
-        <MovePickerDialog
-          ticketId={ticketId}
-          currentQueueId={ticket.queue_id}
           onClose={() => setDialog(null)}
         />
       )}
@@ -365,12 +365,7 @@ function Pill({
   dashed?: boolean;
 }) {
   if (!children) return null;
-  const inner = (
-    <span className="flex flex-col items-start leading-tight">
-      <span className="text-[9px] font-semibold uppercase tracking-wide text-muted">{label}</span>
-      <span className="text-xs font-medium text-ink">{children}</span>
-    </span>
-  );
+  const inner = <PillInner label={label}>{children}</PillInner>;
   if (!onClick) {
     return (
       <span
@@ -397,6 +392,79 @@ function Pill({
     >
       {inner}
     </button>
+  );
+}
+
+/** Label-over-value content shared by every pill variant (`Pill`, `SelectPill`, `StatusPill`). */
+function PillInner({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <span className="flex flex-col items-start leading-tight">
+      <span className="text-[9px] font-semibold uppercase tracking-wide text-muted">{label}</span>
+      <span className="text-xs font-medium text-ink">{children}</span>
+    </span>
+  );
+}
+
+/** Pill whose value opens a `SelectMenu` listbox (queue/owner/responsible) instead of a
+ * modal dialog — same shell as `Pill`, but the trigger wires up `SelectMenu`'s portal panel.
+ * `dashed` renders the unset look (border-dashed, muted) while staying clickable, for
+ * Verantwortlicher when nothing is assigned yet. */
+function SelectPill<T extends string | number>({
+  label,
+  testId,
+  panelTestId,
+  disabledTitle,
+  items,
+  value,
+  valueLabel,
+  placeholder,
+  onSelect,
+  dashed,
+}: {
+  label: string;
+  testId: string;
+  panelTestId: string;
+  disabledTitle?: string;
+  items: SelectMenuItem<T>[];
+  value: T | null;
+  valueLabel: ReactNode;
+  placeholder: string;
+  onSelect: (value: T) => void;
+  dashed?: boolean;
+}) {
+  if (disabledTitle) {
+    return (
+      <span
+        data-testid={testId}
+        title={disabledTitle}
+        className="inline-flex items-center rounded-full border border-hairline bg-surface-subtle/60 px-2.5 py-1 opacity-50"
+      >
+        <PillInner label={label}>{valueLabel}</PillInner>
+      </span>
+    );
+  }
+  return (
+    <SelectMenu
+      items={items}
+      value={value}
+      onSelect={onSelect}
+      placeholder={placeholder}
+      panelTestId={panelTestId}
+      trigger={({ ref, toggleProps }) => (
+        <button
+          ref={ref}
+          type="button"
+          data-testid={testId}
+          {...toggleProps}
+          className={cn(
+            "inline-flex items-center rounded-full border px-2.5 py-1 transition-colors duration-100 hover:bg-surface-subtle focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent",
+            dashed ? "border-dashed border-hairline bg-transparent" : "border-hairline bg-surface",
+          )}
+        >
+          <PillInner label={label}>{valueLabel}</PillInner>
+        </button>
+      )}
+    />
   );
 }
 

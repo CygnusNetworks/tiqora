@@ -68,6 +68,11 @@ export function Menu({
     const onPointerDown = (e: PointerEvent) => {
       const target = e.target as Node;
       if (panelRef.current?.contains(target) || triggerRef.current?.contains(target)) return;
+      // A `SelectMenu` panel (e.g. the language picker nested in the account
+      // menu) is portal-rendered to `document.body`, so it sits outside this
+      // panel's DOM subtree — without this check, clicking into it would
+      // look like an outside click and close the surrounding Menu.
+      if (target instanceof Element && target.closest("[data-portal-menu]")) return;
       setOpen(false);
     };
     const onKey = (e: KeyboardEvent) => {
@@ -226,7 +231,9 @@ export function MenuItem({
   );
 }
 
-function CheckMark() {
+/** Shared with `SelectMenu` (the portal-based listbox), which shows the same
+ * "current value" tick next to its selected option. */
+export function CheckMark() {
   return (
     <svg
       viewBox="0 0 24 24"

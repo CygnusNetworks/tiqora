@@ -119,7 +119,27 @@ const BODIES: Record<number, { is_html: boolean; body: string }> = {
   3: { is_html: false, body: "Assigned to Level 2." },
   10: { is_html: false, body: "Hey, is anyone there? " + "x".repeat(420) },
   11: { is_html: false, body: "Yes, how can we help?" },
+  20: { is_html: false, body: "&gt; Danke &amp; Gruße, das Team" },
 };
+
+// Dedicated single-article, email-dominant fixture (ticket 9) for the
+// entity-decoding + Gravatar-avatar regression cases below — kept separate
+// from ARTICLES so it doesn't shift the "newest selected" default there.
+const ENTITY_ARTICLES = [
+  {
+    id: 20,
+    ticket_id: 9,
+    sender_type: "customer",
+    sender_type_id: 3,
+    communication_channel_id: 1, // Email
+    is_visible_for_customer: true,
+    create_time: "2024-06-03T09:00:00Z",
+    create_by: 30,
+    subject: "Re: quoted reply",
+    from_address: "Jane Doe <jane.doe@example.com>",
+    to_address: "support@example.com",
+  },
+];
 
 function wrap(ui: React.ReactElement) {
   const queryClient = new QueryClient({
@@ -136,7 +156,7 @@ describe("ArticleMasterDetail", () => {
   beforeEach(() => {
     window.localStorage.clear();
     listArticles.mockReset().mockImplementation((ticketId: number) =>
-      Promise.resolve(ticketId === 8 ? CHAT_ARTICLES : ARTICLES),
+      Promise.resolve(ticketId === 8 ? CHAT_ARTICLES : ticketId === 9 ? ENTITY_ARTICLES : ARTICLES),
     );
     getArticleBody.mockReset().mockImplementation((_ticketId: number, articleId: number) =>
       Promise.resolve({ article_id: articleId, content_type: "text/plain", ...BODIES[articleId] }),
@@ -254,7 +274,7 @@ describe("ArticleMasterDetail view switching (split vs. conversation)", () => {
   beforeEach(() => {
     window.localStorage.clear();
     listArticles.mockReset().mockImplementation((ticketId: number) =>
-      Promise.resolve(ticketId === 8 ? CHAT_ARTICLES : ARTICLES),
+      Promise.resolve(ticketId === 8 ? CHAT_ARTICLES : ticketId === 9 ? ENTITY_ARTICLES : ARTICLES),
     );
     getArticleBody.mockReset().mockImplementation((_ticketId: number, articleId: number) =>
       Promise.resolve({ article_id: articleId, content_type: "text/plain", ...BODIES[articleId] }),
@@ -310,6 +330,33 @@ describe("ArticleMasterDetail view switching (split vs. conversation)", () => {
     await screen.findByTestId("article-conversation");
     expect(screen.getByTestId("conversation-bubble-10")).toHaveAttribute("data-side", "left");
     expect(screen.getByTestId("conversation-bubble-11")).toHaveAttribute("data-side", "right");
+  });
+
+  it("resolves a Gravatar avatar for a bubble sender with a real from_address", async () => {
+    wrap(<ArticleMasterDetail ticketId={8} />);
+    await screen.findByTestId("article-conversation");
+    const bubble = screen.getByTestId("conversation-bubble-10");
+    // "wa-customer@example.com" (CHAT_ARTICLES id 10) — Avatar prefers
+    // Gravatar(email) over the initials fallback once an email is passed.
+    expect(within(bubble).getByTestId("avatar-image")).toHaveAttribute(
+      "src",
+      expect.stringMatching(/^https:\/\/www\.gravatar\.com\/avatar\/[0-9a-f]{32}\?/),
+    );
+  });
+
+  it("decodes HTML-escaped entities in the split-view list preview", async () => {
+    // The API stores plain-text bodies HTML-escaped — the preview must
+    // decode them (decodeEntities), not show literal &gt;/&amp;.
+    wrap(<ArticleMasterDetail ticketId={9} />);
+    const row = await screen.findByTestId("article-list-item-20");
+    expect(row).toHaveTextContent("> Danke & Gruße, das Team");
+    expect(row).not.toHaveTextContent("&gt;");
+    // Same fixture doubles as the split-view Avatar/Gravatar regression case
+    // ("Jane Doe <jane.doe@example.com>" → a resolvable email).
+    expect(within(row).getByTestId("avatar-image")).toHaveAttribute(
+      "src",
+      expect.stringMatching(/^https:\/\/www\.gravatar\.com\/avatar\/[0-9a-f]{32}\?/),
+    );
   });
 
   it("expands a long bubble body via 'Show full message'", async () => {

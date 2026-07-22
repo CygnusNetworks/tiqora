@@ -3,9 +3,15 @@ import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { api, type ArticleListItem } from "@/lib/api";
 import { formatDateTime } from "@/lib/format";
-import { stripHtml } from "@/lib/html";
+import { decodeEntities, stripHtml } from "@/lib/html";
 import { groupByDay } from "@/lib/article";
-import { channelIcon, initialsFor, isInternalNote, senderRingClass } from "@/lib/articleChannel";
+import {
+  channelIcon,
+  emailFromAddress,
+  initialsFor,
+  isInternalNote,
+  senderRingClass,
+} from "@/lib/articleChannel";
 import { cn } from "@/lib/cn";
 import { Avatar } from "@/components/ui/Avatar";
 import { ArticleBodyRenderer } from "./ArticleBodyRenderer";
@@ -131,7 +137,11 @@ function Bubble({
             senderRingClass(article.sender_type, article.communication_channel_id),
           )}
         >
-          <Avatar initials={initialsFor(article)} size={24} />
+          <Avatar
+            initials={initialsFor(article)}
+            email={emailFromAddress(article.from_address)}
+            size={24}
+          />
         </span>
         <div className="relative min-w-0">
           <div className={cn("space-y-1 rounded-2xl px-3 py-2", tone)}>
@@ -177,7 +187,7 @@ function BubbleBody({ ticketId, article }: { ticketId: number; article: ArticleL
   if (bodyQ.isLoading) return <p className="text-sm text-muted">…</p>;
   if (!bodyQ.data) return null;
 
-  const plain = bodyQ.data.is_html ? stripHtml(bodyQ.data.body) : bodyQ.data.body;
+  const plain = bodyQ.data.is_html ? stripHtml(bodyQ.data.body) : decodeEntities(bodyQ.data.body);
   const isLong = plain.length > PREVIEW_CHARS;
 
   return (
@@ -216,7 +226,11 @@ function NotePill({
   const [expanded, setExpanded] = useState(false);
   const bodyQ = useArticleBody(ticketId, article.id);
   const senderName = article.from_address || t("ticket.unknownSender");
-  const plain = bodyQ.data ? (bodyQ.data.is_html ? stripHtml(bodyQ.data.body) : bodyQ.data.body) : "";
+  const plain = bodyQ.data
+    ? bodyQ.data.is_html
+      ? stripHtml(bodyQ.data.body)
+      : decodeEntities(bodyQ.data.body)
+    : "";
 
   return (
     <div className="flex justify-center" data-testid={`conversation-note-${article.id}`}>

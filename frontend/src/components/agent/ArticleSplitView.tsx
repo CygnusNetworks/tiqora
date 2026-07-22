@@ -2,8 +2,8 @@ import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { api, type ArticleListItem } from "@/lib/api";
 import { formatDateTime } from "@/lib/format";
-import { stripHtml } from "@/lib/html";
-import { channelIcon, initialsFor, senderRingClass } from "@/lib/articleChannel";
+import { decodeEntities, stripHtml } from "@/lib/html";
+import { channelIcon, emailFromAddress, initialsFor, senderRingClass } from "@/lib/articleChannel";
 import { cn } from "@/lib/cn";
 import { Avatar } from "@/components/ui/Avatar";
 import { Badge } from "@/components/ui/Badge";
@@ -94,7 +94,11 @@ function ArticleListRow({
       )}
     >
       <span className={cn("mt-0.5 shrink-0 rounded-full", senderRingClass(article.sender_type, article.communication_channel_id))}>
-        <Avatar initials={initialsFor(article)} size={24} />
+        <Avatar
+          initials={initialsFor(article)}
+          email={emailFromAddress(article.from_address)}
+          size={24}
+        />
       </span>
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-1.5">
@@ -134,7 +138,7 @@ function ArticlePreview({ ticketId, article }: { ticketId: number; article: Arti
   });
   if (bodyQ.isLoading) return <span>…</span>;
   if (!bodyQ.data) return <span>{t("ticket.noSubject")}</span>;
-  const plain = bodyQ.data.is_html ? stripHtml(bodyQ.data.body) : bodyQ.data.body;
+  const plain = bodyQ.data.is_html ? stripHtml(bodyQ.data.body) : decodeEntities(bodyQ.data.body);
   return <span>{plain.slice(0, 80) || t("ticket.noSubject")}</span>;
 }
 
