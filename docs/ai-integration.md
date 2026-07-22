@@ -1,18 +1,16 @@
 # AI integration surface
 
-This document formalises how AI agents (triage bots, draft-reply assistants,
-knowledge-base answer bots, or any other automation) are meant to integrate
-with Tiqora. It covers two complementary surfaces:
+This document covers how AI agents integrate with Tiqora — both **built-in**
+(Tiqora's own LLM/MCP agent, `tiqora.ai.*`, see section 5) and **external**
+(a separate triage bot, draft-reply assistant, KB-answer bot, or any other
+automation talking to Tiqora over the network). For external agents this is
+the contract they are built against; it covers two complementary surfaces:
 
 - **Webhooks** (`tiqora_event_outbox` → `tiqora.worker.webhooks`) — push
   notifications of ticket/article events, for "wake up and look at this
   ticket" triggers.
 - **MCP** (`tiqora.mcp_server`) — the primary structured interface for an
   agent to *read and act* on tickets once triggered.
-
-No LLM code ships in this codebase — this is the contract other pieces (a
-future triage/draft-reply/KB-answer agent, in-house or third-party) are
-built against.
 
 ---
 
@@ -213,3 +211,90 @@ treat that content strictly as **data**, never as instructions:
 This warning applies to every recommended pattern in section 3 — triage,
 draft-reply, and KB-answer agents all ingest customer-controlled text by
 design.
+
+---
+
+## 5. Built-in AI agent (`tiqora.ai.*`)
+
+Tiqora also ships its own LLM/MCP agent, config-driven and admin-managed —
+functionally the "draft-reply agent" and "KB-answer agent" patterns above,
+implemented in-repo instead of as an external MCP client. It runs in its own
+process (`tiqora-ai-worker`, `tiqora.ai.worker`), never inside the main
+takeover worker, so a slow/hung LLM call can never affect postmaster/outbox/
+indexing.
+
+### Readiness-Gate
+
+The agent only runs when the global setting `system.operation_mode` is
+`tiqora_primary` (`tiqora.ai.gate`) — a deliberate operator decision, not
+auto-detection. It is unsafe to run in `parallel` operation alongside Znuny
+(races with Znuny agents, duplicate/missing triggers, sync noise). Every
+enable-transition (queue policy flipping `enabled_auto_reply` /
+`enabled_summary` / `enabled_manual_assist` to `true`) re-checks the gate;
+every agent run re-checks it again at the start. Reverting to `parallel`
+always works and immediately pauses all AI activity.
+
+### Per-queue policy and autonomy
+
+Each queue that wants AI assistance needs its own `tiqora_ai_queue_policy`
+row (admin API, no inheritance to subqueues) — system prompt, LLM provider/
+model, KB tag/category binding, allowed MCP tools, and an **autonomy**
+level:
+
+| Autonomy | Factual reply | Clarifying question | Internal note |
+|---|---|---|---|
+| `off` (default) | draft only | draft only | meta-info only |
+| `clarify_only` | draft only | sent as an article | meta-info only |
+| `full` | sent as an article | sent as an article | meta-info only |
+
+The model has exactly one way to hand text to a customer —
+`propose_customer_message(kind=reply\|clarify, ...)` — and the **runtime**,
+never the model, maps that call to a draft or a send according to the table
+above (`tiqora.ai.runtime._map_customer_message`). Manual Assist (an agent
+clicking "AI draft" in the ticket zoom) is always the draft path, regardless
+of queue autonomy.
+
+### Drafts
+
+A proposed customer message that isn't auto-sent becomes a
+`tiqora_ai_draft` row — never an article — until a human accepts or
+discards it (`tiqora.ai.drafts`). At most one `open` draft exists per
+`(ticket_id, based_on_article_id, kind)`; a new draft supersedes the old one.
+
+### Summaries
+
+A per-ticket running summary lives **only** in
+`tiqora_ai_ticket_state.summary_body` (+ `last_summary_upto_article_id` /
+`last_summary_hash`) — no internal note, no second copy (`tiqora.ai.summary`,
+`POST /api/v1/tickets/{id}/ai/summarize`). It is a plain LLM completion (no
+tool loop): previous summary + new articles in, updated summary text out.
+No-op if there are no new articles, or (auto-trigger only) if new content is
+below the queue's `summary_incremental_min_articles`/`_min_chars`
+threshold — a human triggering "Zusammenfassen" always proceeds given at
+least one new article. The auto-worker separately decides *when* to call
+summarization at all, once `summary_article_threshold` or
+`summary_char_threshold` is exceeded (`NULL` = no auto-summary for that
+queue).
+
+### Auto-reply caps and budget
+
+The auto-reply worker consumes `tiqora_event_outbox` (`ArticleCreate`,
+customer-authored) via its own watermark cursor
+(`daemon.ai_worker.outbox_watermark`, separate from the main worker's
+outbox-drain cursor), with a per-ticket loop guard
+(`tiqora_ai_ticket_state.last_customer_article_id`) so the same article
+never triggers two runs. Before invoking the runtime it checks, in order:
+the queue's `max_auto_replies`/`max_clarifications` per-ticket caps, the
+queue's `max_replies_per_hour`, an optional install-wide hard cap
+(`ai.auto_reply.global_max_per_hour`), and the queue's daily token budget
+(`budget_tokens_day`). Any cap hit is a silent skip, retried on the next
+relevant event — there is no catch-up queueing. These are separate from the
+per-agent ACL limits the manual-assist/summary path uses
+(`tiqora_ai_acl`) — auto-path and manual-path never cross-charge each other.
+
+### Disclosure
+
+Any auto-sent article (queue autonomy allowing it) can carry a disclosure
+footer identifying it as AI-generated, enabled per queue
+(`ai_disclosure_enabled`) with either a queue-specific text or the global
+default (`ai.disclosure.default_text`).
