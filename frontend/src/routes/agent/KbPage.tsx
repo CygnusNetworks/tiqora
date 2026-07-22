@@ -82,24 +82,57 @@ export function KbPage() {
     <div className="flex justify-center py-6">
       <Spinner />
     </div>
+  ) : (categoriesQ.data ?? []).length === 0 ? (
+    <div className="space-y-2 px-2 py-3">
+      <p className="text-xs text-muted">{t("kb.noCategories")}</p>
+      <Button
+        variant="secondary"
+        size="sm"
+        data-testid="kb-first-category"
+        onClick={() => void navigate({ to: "/agent/kb/categories", search: { new: true } })}
+      >
+        {t("kb.createFirstCategory")}
+      </Button>
+    </div>
   ) : (
-    <CategoryTree
-      categories={categoriesQ.data ?? []}
-      selectedId={categoryId}
-      counts={counts}
-      onSelect={(id) => {
-        setSearch({ category_id: id ?? undefined });
-        setDrawerOpen(false);
-      }}
-    />
+    <>
+      <CategoryTree
+        categories={categoriesQ.data ?? []}
+        selectedId={categoryId}
+        counts={counts}
+        onSelect={(id) => {
+          setSearch({ category_id: id ?? undefined });
+          setDrawerOpen(false);
+        }}
+      />
+      <Link
+        to="/agent/kb/categories"
+        data-testid="kb-manage-categories"
+        className="mt-2 block px-2 text-xs text-muted hover:text-accent hover:underline"
+      >
+        {t("kb.manageCategories")}
+      </Link>
+    </>
   );
 
   return (
     <div className="relative flex min-h-0 flex-1" data-testid="kb-page">
       <aside className="hidden w-56 shrink-0 overflow-y-auto border-r border-hairline bg-surface p-2 md:block lg:w-64">
-        <h2 className="mb-2 px-2 text-xs font-semibold uppercase tracking-wide text-muted">
-          {t("kb.sidebar")}
-        </h2>
+        <div className="mb-2 flex items-center justify-between px-2">
+          <h2 className="text-xs font-semibold uppercase tracking-wide text-muted">
+            {t("kb.sidebar")}
+          </h2>
+          <button
+            type="button"
+            data-testid="kb-new-category"
+            title={t("kb.newCategory")}
+            aria-label={t("kb.newCategory")}
+            onClick={() => void navigate({ to: "/agent/kb/categories", search: { new: true } })}
+            className="flex h-5 w-5 items-center justify-center rounded border border-hairline text-sm leading-none text-muted hover:border-accent hover:text-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent"
+          >
+            +
+          </button>
+        </div>
         {sidebarBody}
       </aside>
 
@@ -181,6 +214,27 @@ export function KbPage() {
             data-testid="kb-empty"
           >
             <p className="text-sm font-medium text-ink">{t("kb.empty")}</p>
+            <div className="mt-3 flex justify-center gap-2">
+              {(categoriesQ.data ?? []).length === 0 ? (
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() =>
+                    void navigate({ to: "/agent/kb/categories", search: { new: true } })
+                  }
+                >
+                  {t("kb.createFirstCategory")}
+                </Button>
+              ) : (
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => void navigate({ to: "/agent/kb/new" })}
+                >
+                  {t("kb.newArticle")}
+                </Button>
+              )}
+            </div>
           </div>
         ) : (
           <ul className="space-y-2" data-testid="kb-article-list">
