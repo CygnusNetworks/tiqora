@@ -11,6 +11,7 @@ import {
   emailFromAddress,
   initialsFor,
   isInternalNote,
+  senderDisplayName,
 } from "@/lib/articleChannel";
 import { cn } from "@/lib/cn";
 import { Avatar } from "@/components/ui/Avatar";
@@ -116,7 +117,7 @@ function Bubble({
   side: "left" | "right";
 }) {
   const { t } = useTranslation();
-  const senderName = article.from_address || t("ticket.unknownSender");
+  const senderName = senderDisplayName(article.from_address) || t("ticket.unknownSender");
   const tone =
     side === "right"
       ? "bg-accent/15"
@@ -220,7 +221,7 @@ function NotePill({
   const { t } = useTranslation();
   const [expanded, setExpanded] = useState(false);
   const bodyQ = useArticleBody(ticketId, article.id);
-  const senderName = article.from_address || t("ticket.unknownSender");
+  const senderName = senderDisplayName(article.from_address) || t("ticket.unknownSender");
   const plain = bodyQ.data
     ? bodyQ.data.is_html
       ? stripHtml(bodyQ.data.body)

@@ -1,7 +1,7 @@
 /** Channel/role presentation helpers shared by the split (master-detail) and
  * conversation (chat-bubble) article views, plus the auto view-mode switch. */
 import type { ArticleListItem } from "@/lib/api";
-import { parseRecipient } from "@/components/agent/RecipientsField";
+import { parseRecipient, parseRecipientList, formatRecipient } from "@/components/agent/RecipientsField";
 
 /**
  * Standard Znuny `communication_channel` seed order (see
@@ -42,11 +42,50 @@ export function avatarTone(senderType: string | null | undefined): "accent" | "c
   return (senderType || "").toLowerCase() === "customer" ? "customer" : "accent";
 }
 
-/** Best-effort initials from the mailbox-local part of `from_address`. */
+/** Strip surrounding matching quotes (`"…"` or `'…'`) some mail clients wrap
+ * a bare display name in when there's no `<email>` part to key off of —
+ * `parseRecipient` already strips these when it does match the `Name
+ * <email>` shape, this covers the name-only remainder. */
+function stripQuotes(raw: string): string {
+  return raw.trim().replace(/^["']|["']$/g, "").trim();
+}
+
+/**
+ * Human-readable sender label for an article's raw `from_address` header:
+ * the parsed display name when present, else the parsed (or bare) email,
+ * else the trimmed, quote-stripped raw string as a last resort. Never
+ * returns the raw string with its RFC-5322 quoting/angle-bracket wrapping
+ * intact.
+ */
+export function senderDisplayName(raw: string | null | undefined): string | null {
+  const value = (raw ?? "").trim();
+  if (!value) return null;
+  const parsed = parseRecipient(value);
+  if (parsed) return parsed.name || parsed.email;
+  return stripQuotes(value) || null;
+}
+
+/** Best-effort initials from an article's parsed sender display name (or, if
+ * that fails to parse, its raw `from_address`). Uses the first letters of
+ * the first two words — handling both "First Last" and the "Last, First"
+ * form Znuny sometimes stores — falling back to the first two characters of
+ * the mailbox-local part of the parsed (or bare) email address. */
 export function initialsFor(a: ArticleListItem): string {
-  const local = (a.from_address || "?").split("@")[0] || "?";
-  const parts = local.replace(/[._-]+/g, " ").trim().split(/\s+/).filter(Boolean);
-  const letters = parts.length >= 2 ? parts[0][0] + parts[1][0] : local.slice(0, 2);
+  const raw = a.from_address || "";
+  const parsed = parseRecipient(raw.trim());
+  const name = parsed?.name || (parsed ? "" : stripQuotes(raw));
+  const words = name
+    .replace(/,/g, " ")
+    .replace(/[._-]+/g, " ")
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean);
+  if (words.length >= 2) return (words[0][0] + words[1][0]).toUpperCase();
+
+  const email = parsed?.email || raw.split("@")[0];
+  const local = (email || "?").split("@")[0] || "?";
+  const localParts = local.replace(/[._-]+/g, " ").trim().split(/\s+/).filter(Boolean);
+  const letters = localParts.length >= 2 ? localParts[0][0] + localParts[1][0] : local.slice(0, 2) || "?";
   return letters.toUpperCase();
 }
 
@@ -61,6 +100,21 @@ export function initialsFor(a: ArticleListItem): string {
  */
 export function emailFromAddress(raw: string | null | undefined): string | undefined {
   return parseRecipient(raw ?? "")?.email;
+}
+
+/** Render a raw `from_address` header ("Name <mail@host>", quoted or not) as
+ * clean "Name <mail@host>" — same shape, quotes stripped. Falls back to the
+ * trimmed raw string when it doesn't parse as an address at all. */
+export function formatFromAddress(raw: string | null | undefined): string {
+  const parsed = parseRecipient((raw ?? "").trim());
+  return parsed ? formatRecipient(parsed) : (raw ?? "").trim();
+}
+
+/** Same as `formatFromAddress`, but for a comma-joined `to_address` header
+ * with (potentially) multiple recipients. */
+export function formatToAddresses(raw: string | null | undefined): string {
+  const recipients = parseRecipientList(raw);
+  return recipients.length ? recipients.map(formatRecipient).join(", ") : (raw ?? "").trim();
 }
 
 /** A note that isn't visible to the customer, on the internal channel — the

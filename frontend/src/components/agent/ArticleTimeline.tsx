@@ -15,6 +15,7 @@ import {
 } from "./ArticleActionDialogs";
 import { cn } from "@/lib/cn";
 import { articleSortKey, groupByDay } from "@/lib/article";
+import { formatFromAddress, formatToAddresses } from "@/lib/articleChannel";
 
 function senderTone(
   senderType: string | null | undefined,
@@ -143,8 +144,8 @@ export function ArticleTimeline({
                           {article.subject || t("ticket.noSubject")}
                         </p>
                         <p className="truncate text-xs text-muted">
-                          {article.from_address}
-                          {article.to_address ? ` → ${article.to_address}` : ""}
+                          {formatFromAddress(article.from_address)}
+                          {article.to_address ? ` → ${formatToAddresses(article.to_address)}` : ""}
                         </p>
                       </div>
                     </button>
