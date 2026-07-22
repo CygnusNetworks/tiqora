@@ -34,6 +34,7 @@ from tiqora.ai.context import (
     ticket_snapshot,
 )
 from tiqora.ai.gate import AiGateError, require_feature_allowed
+from tiqora.ai.listfields import parse_int_list
 from tiqora.ai.llm import LlmClient, LlmMessage, LlmResponse
 from tiqora.ai.models import (
     AUTONOMY_CLARIFY_ONLY,
@@ -165,7 +166,7 @@ async def _release_lock(session: AsyncSession, ticket_id: int) -> None:
 async def _load_mcp_tools(
     session: AsyncSession, policy: TiqoraAiQueuePolicy, *, settings: Settings
 ) -> list[McpToolSpec]:
-    client_ids: list[int] = json.loads(policy.mcp_client_ids) if policy.mcp_client_ids else []
+    client_ids = parse_int_list(policy.mcp_client_ids)
     if not client_ids:
         return []
     clients = (

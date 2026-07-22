@@ -26,7 +26,7 @@ from __future__ import annotations
 
 import secrets
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import datetime
 from typing import Any
 
@@ -438,6 +438,20 @@ async def add_article(
     - Emits ArticleCreate outbox event
     """
     sender_type_id = await _sender_type_id(session, article.sender_type)
+
+    # Agent notes arrive without a From header (unlike email replies, which
+    # carry the system address). Znuny stamps the acting agent's full name
+    # there; without it the UI shows the sender as "unbekannt".
+    if not article.from_address and article.sender_type == "agent":
+        agent_row = (
+            await session.execute(
+                text("SELECT first_name, last_name, login FROM users WHERE id = :uid"),
+                {"uid": user_id},
+            )
+        ).first()
+        if agent_row is not None:
+            full_name = " ".join(p for p in (agent_row[0], agent_row[1]) if p).strip()
+            article = replace(article, from_address=full_name or agent_row[2])
 
     # Resolve communication channel id by channel name
     channel_name_map: dict[str, str] = {
