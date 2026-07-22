@@ -584,6 +584,12 @@
       "showing": "{{from}}–{{to}} von {{total}}",
       "all": "Alle"
     },
+    "list": {
+      "countShown": "{{total}} Treffer · {{from}}–{{to}} angezeigt",
+      "countShownAll": "alle {{total}} angezeigt",
+      "countNone": "Keine Treffer",
+      "refreshing": "Aktualisiere…"
+    },
     "roleAssignments": {
       "title": "Rollenzuordnung",
       "subtitle": "Wähle einen Agenten und lege fest, welche Rollen er hat.",
