@@ -399,6 +399,28 @@ export type GdprJobListParams = {
 };
 export type GdprRollbackOut = { restored_rows: number };
 export type GdprPurgeOut = { deleted_backups: number };
+export type GdprSelectorCountRequest = { selector: ErasureSelectorIn };
+export type GdprSelectorCountOut = { count: number };
+export type GdprCustomerRecordPreviewRequest = {
+  login: string;
+  mode?: ErasureMode;
+  delete_tickets?: boolean;
+  seed?: number | null;
+};
+export type GdprFieldPreviewOut = {
+  field: string;
+  before?: unknown;
+  after?: unknown;
+  changed: boolean;
+  occurrences?: number | null;
+};
+export type GdprDeleteSummaryRowOut = { table: string; count: number };
+export type GdprCustomerRecordPreviewOut = {
+  login: string;
+  mode: ErasureMode;
+  fields: GdprFieldPreviewOut[];
+  delete_summary: GdprDeleteSummaryRowOut[];
+};
 export type PostmasterFilterOut = Schemas["PostmasterFilterOut"];
 export type PostmasterFilterRuleOut = Schemas["PostmasterFilterRuleOut"];
 export type PostmasterFilterWrite = Schemas["PostmasterFilterWrite"];
@@ -1945,6 +1967,15 @@ export class ApiClient {
     return {
       preview: (body: GdprErasurePreviewRequest, signal?: AbortSignal) =>
         this.request<GdprErasurePreviewOut>("POST", `${base}/preview`, { body, signal }),
+      /** Fast match count for the live selector counter (same selector shape as `preview`). */
+      selectorCount: (body: GdprSelectorCountRequest, signal?: AbortSignal) =>
+        this.request<GdprSelectorCountOut>("POST", `${base}/selector-count`, { body, signal }),
+      /** Per-customer before/after preview (read-only). */
+      recordPreview: (body: GdprCustomerRecordPreviewRequest, signal?: AbortSignal) =>
+        this.request<GdprCustomerRecordPreviewOut>("POST", `${base}/record-preview`, {
+          body,
+          signal,
+        }),
       createJob: (body: GdprErasureJobCreate, signal?: AbortSignal) =>
         this.request<GdprErasureJobDetailOut>("POST", `${base}/jobs`, { body, signal }),
       listJobs: (params?: GdprJobListParams, signal?: AbortSignal) =>

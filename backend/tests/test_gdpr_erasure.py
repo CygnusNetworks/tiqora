@@ -11,16 +11,26 @@ import json
 from datetime import UTC, datetime
 
 import pytest
+from fastapi import HTTPException
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
+from tiqora.api.v1.admin import gdpr as admin_gdpr
+from tiqora.api.v1.admin.schemas import (
+    ErasureSelectorIn,
+    GdprCustomerRecordPreviewRequest,
+    GdprSelectorCountRequest,
+)
 from tiqora.config import Settings
 from tiqora.db.legacy.customer import CustomerCompany, CustomerUser
 from tiqora.db.legacy.ticket import Ticket
+from tiqora.domain.auth import AuthenticatedUser
 from tiqora.domain.dev_anonymize import ValueMapper
 from tiqora.gdpr.erasure import (
     ErasureError,
+    ErasureNotFoundError,
     ErasureSelector,
+    build_customer_record_preview,
     build_erasure_preview,
     purge_expired_backups,
     purge_job_backup,
@@ -29,6 +39,13 @@ from tiqora.gdpr.erasure import (
     run_erasure,
 )
 from tiqora.gdpr.gate import GdprRefusedError
+
+
+def _root_user() -> AuthenticatedUser:
+    return AuthenticatedUser(
+        id=1, login="root@localhost", first_name="Admin", last_name="Znuny", auth_method="session"
+    )
+
 
 NOW = datetime(2026, 1, 1, 12, 0, 0)
 
@@ -1295,5 +1312,248 @@ async def test_delete_tickets_hard_delete_and_rollback_restores(
             await _count(session, "SELECT COUNT(*) FROM customer_user WHERE id = :id", {"id": cuid})
             == 1
         )
+
+    await engine.dispose()
+
+
+# ---------------------------------------------------------------------------
+# build_customer_record_preview / admin record-preview + selector-count API
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.db
+@pytest.mark.asyncio
+@pytest.mark.parametrize("url_fixture", ["mariadb_znuny_url", "postgres_znuny_url"])
+async def test_build_customer_record_preview_anonymize(
+    url_fixture: str, request: pytest.FixtureRequest
+) -> None:
+    url = request.getfixturevalue(url_fixture)
+    engine, factory = await _factory(url)
+    mysql = _is_mysql(url)
+    login = f"rp.anon.{'my' if mysql else 'pg'}@example.com"
+    company = f"RP-ANON-{'MY' if mysql else 'PG'}"
+
+    async with factory() as session:
+        await _seed_tiqora_tables(session, mysql=mysql)
+        await _insert_company(session, customer_id=company, name="Acme Preview")
+        cuid = await _insert_customer(session, login=login, customer_id=company)
+        tid = await _insert_ticket(
+            session, customer_user_id=login, customer_id=company, tn=f"2026RPAN{cuid}"
+        )
+        await _insert_article_bundle(
+            session,
+            ticket_id=tid,
+            from_addr=login,
+            body=f"Private body for {login}",
+        )
+
+    async with factory() as session:
+        # Full snapshot of every row this preview touches, taken *before* the
+        # call, to prove the preview does not write anything.
+        before_cu = dict(
+            (
+                await session.execute(
+                    text("SELECT * FROM customer_user WHERE id = :id"), {"id": cuid}
+                )
+            )
+            .mappings()
+            .one()
+        )
+        before_ticket_title = (
+            await session.execute(text("SELECT title FROM ticket WHERE id = :t"), {"t": tid})
+        ).scalar_one()
+        before_mime_from = (
+            await session.execute(
+                text(
+                    "SELECT a_from FROM article_data_mime"
+                    " WHERE article_id IN (SELECT id FROM article WHERE ticket_id = :t)"
+                ),
+                {"t": tid},
+            )
+        ).scalar_one()
+
+        preview = await build_customer_record_preview(session, login, "anonymize", seed=42)
+
+    assert preview.login == login
+    assert preview.mode == "anonymize"
+    assert preview.delete_summary == []
+
+    by_field = {f.field: f for f in preview.fields}
+    mapper = ValueMapper(seed=42)
+    expected_login = mapper.map_value(login, "login")
+
+    assert by_field["customer_user.login"].before == login
+    assert by_field["customer_user.login"].after == expected_login
+    assert by_field["customer_user.login"].changed is True
+
+    valid_field = by_field["customer_user.valid_id"]
+    assert valid_field.before == 1
+    assert valid_field.after == 2
+    assert valid_field.changed is True
+
+    title_field = by_field["ticket.title"]
+    assert title_field.before == "Erase me"
+    assert title_field.changed is True
+    assert title_field.occurrences == 1
+
+    from_field = by_field["article_data_mime.a_from"]
+    assert from_field.before == login
+    assert login not in (from_field.after or "")
+    assert from_field.occurrences == 1
+
+    body_field = by_field["article_data_mime_plain.body"]
+    assert f"Private body for {login}" in (body_field.before or "")
+    assert login not in (body_field.after or "")
+    assert body_field.occurrences == 1
+
+    # Read-only: nothing in the DB actually changed.
+    async with factory() as session:
+        after_cu = dict(
+            (
+                await session.execute(
+                    text("SELECT * FROM customer_user WHERE id = :id"), {"id": cuid}
+                )
+            )
+            .mappings()
+            .one()
+        )
+        after_ticket_title = (
+            await session.execute(text("SELECT title FROM ticket WHERE id = :t"), {"t": tid})
+        ).scalar_one()
+        after_mime_from = (
+            await session.execute(
+                text(
+                    "SELECT a_from FROM article_data_mime"
+                    " WHERE article_id IN (SELECT id FROM article WHERE ticket_id = :t)"
+                ),
+                {"t": tid},
+            )
+        ).scalar_one()
+        assert after_cu == before_cu
+        assert after_ticket_title == before_ticket_title
+        assert after_mime_from == before_mime_from
+
+    await engine.dispose()
+
+
+@pytest.mark.db
+@pytest.mark.asyncio
+@pytest.mark.parametrize("url_fixture", ["mariadb_znuny_url", "postgres_znuny_url"])
+async def test_build_customer_record_preview_delete_mode(
+    url_fixture: str, request: pytest.FixtureRequest
+) -> None:
+    url = request.getfixturevalue(url_fixture)
+    engine, factory = await _factory(url)
+    mysql = _is_mysql(url)
+    login = f"rp.del.{'my' if mysql else 'pg'}@example.com"
+    company = f"RP-DEL-{'MY' if mysql else 'PG'}"
+
+    async with factory() as session:
+        await _seed_tiqora_tables(session, mysql=mysql)
+        await _insert_company(session, customer_id=company, name="Acme Record Preview Delete")
+        await _insert_customer(session, login=login, customer_id=company)
+        tid = await _insert_ticket(session, customer_user_id=login, customer_id=company)
+        await _insert_article_bundle(
+            session, ticket_id=tid, from_addr=login, body="body to be deleted"
+        )
+
+    async with factory() as session:
+        preview = await build_customer_record_preview(session, login, "delete")
+
+    assert preview.login == login
+    assert preview.mode == "delete"
+    assert preview.fields == []
+    by_table = {row.table: row.count for row in preview.delete_summary}
+    assert by_table["customer_user"] == 1
+    assert by_table["tickets"] == 1
+    assert by_table["articles"] == 1
+
+    await engine.dispose()
+
+
+@pytest.mark.db
+@pytest.mark.asyncio
+async def test_build_customer_record_preview_not_found(mariadb_znuny_url: str) -> None:
+    engine, factory = await _factory(mariadb_znuny_url)
+    async with factory() as session:
+        await _seed_tiqora_tables(session, mysql=True)
+
+    async with factory() as session:
+        with pytest.raises(ErasureNotFoundError):
+            await build_customer_record_preview(session, "does.not.exist@example.com")
+
+    await engine.dispose()
+
+
+@pytest.mark.db
+@pytest.mark.asyncio
+async def test_admin_record_preview_endpoint_404(mariadb_znuny_url: str) -> None:
+    engine, factory = await _factory(mariadb_znuny_url)
+    async with factory() as session:
+        await _seed_tiqora_tables(session, mysql=True)
+
+    async with factory() as session:
+        with pytest.raises(HTTPException) as exc_info:
+            await admin_gdpr.customer_record_preview(
+                GdprCustomerRecordPreviewRequest(login="ghost@example.com"),
+                _root_user(),
+                session,
+            )
+        assert exc_info.value.status_code == 404
+
+    await engine.dispose()
+
+
+@pytest.mark.db
+@pytest.mark.asyncio
+async def test_admin_record_preview_endpoint_anonymize(mariadb_znuny_url: str) -> None:
+    engine, factory = await _factory(mariadb_znuny_url)
+    login = "rp.endpoint@example.com"
+    company = "RP-ENDPOINT"
+
+    async with factory() as session:
+        await _seed_tiqora_tables(session, mysql=True)
+        await _insert_company(session, customer_id=company, name="Acme Endpoint")
+        await _insert_customer(session, login=login, customer_id=company)
+
+    async with factory() as session:
+        out = await admin_gdpr.customer_record_preview(
+            GdprCustomerRecordPreviewRequest(login=login, mode="anonymize", seed=7),
+            _root_user(),
+            session,
+        )
+        assert out.login == login
+        assert out.mode == "anonymize"
+        assert any(f.field == "customer_user.login" and f.changed for f in out.fields)
+
+    await engine.dispose()
+
+
+@pytest.mark.db
+@pytest.mark.asyncio
+async def test_admin_selector_count_endpoint(mariadb_znuny_url: str) -> None:
+    engine, factory = await _factory(mariadb_znuny_url)
+    company = "SEL-COUNT"
+
+    async with factory() as session:
+        await _seed_tiqora_tables(session, mysql=True)
+        await _insert_customer(session, login="sc.a@example.com", customer_id=company)
+        await _insert_customer(session, login="sc.b@example.com", customer_id=company)
+        await _insert_customer(session, login="sc.c@example.com", customer_id="SEL-COUNT-OTHER")
+
+    async with factory() as session:
+        out = await admin_gdpr.selector_count(
+            GdprSelectorCountRequest(selector=ErasureSelectorIn(customer_ids=[company])),
+            _root_user(),
+            session,
+        )
+        assert out.count == 2
+
+        out_none = await admin_gdpr.selector_count(
+            GdprSelectorCountRequest(selector=ErasureSelectorIn(customer_ids=["no-such-company"])),
+            _root_user(),
+            session,
+        )
+        assert out_none.count == 0
 
     await engine.dispose()
