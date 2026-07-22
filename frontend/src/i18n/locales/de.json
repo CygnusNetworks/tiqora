@@ -771,6 +771,54 @@
         "piiMasking": "Maskiert erkannte Kunden-Identifikatoren (E-Mail, Telefon, MAC, IP) im Ticket-Text und in MCP-Tool-Ergebnissen, bevor sie an das Modell gehen, und löst sie vor dem eigentlichen Tool-Aufruf bzw. vor dem Senden wieder auf. Ergänzt, ersetzt aber nicht die Provider-Wahl (EU-Hosting/AVV) als primäre Datenschutzmaßnahme.",
         "identityMode": "Wie die Kundenidentität für Tool-Aufrufe aufgelöst wird: „Ticket-Kunde“ nutzt die am Ticket hinterlegte Kunden-ID, „Rückfrage-Schema“ lässt die KI fehlende Angaben aktiv erfragen, „Aus“ deaktiviert die Identitätsauflösung.",
         "clarifySchemaJson": "JSON-Beschreibung der Felder, die die KI beim Rückfrage-Schema aktiv erheben darf (Feldname + optionales MCP-Match-Tool)."
+      },
+      "common": {
+        "validId": "Gültig/Ungültig ist ein weicher Löschstatus: „Ungültig“ blendet den Eintrag aus Auswahllisten für neue Datensätze aus, ohne bestehende Verknüpfungen (z. B. Tickets, Zuordnungen) zu löschen. Ein echtes Löschen ist nicht vorgesehen."
+      },
+      "groups": {
+        "name": "Gruppen steuern den Zugriff auf Queues: Jede Queue gehört zu genau einer Gruppe, und Agenten, Rollen oder Kundenbenutzer erhalten Lese- („ro“) oder Vollzugriff („rw“) ausschließlich über die Gruppenmitgliedschaft, nie direkt auf die Queue."
+      },
+      "roles": {
+        "name": "Rollen bündeln Gruppenberechtigungen, die dann gemeinsam vielen Agenten zugewiesen werden — Änderungen an der Rolle wirken sich sofort auf alle zugeordneten Agenten aus. Rollen sind optional: Gruppen können Agenten auch direkt zugewiesen werden; beide Wege gelten gleichzeitig (Vereinigung der Rechte)."
+      },
+      "customerUsers": {
+        "customerId": "Die Stammfirma dieses Kundenbenutzers. Zugriff auf weitere Firmen wird unabhängig davon über „Kundenbenutzer ↔ Unternehmen“ vergeben, ohne diese Stammzuordnung zu ändern.",
+        "email": "Wird für Benachrichtigungen (z. B. Ticket-Updates) verwendet. Unabhängig vom Login-Namen — die E-Mail-Adresse muss nicht mit dem Login übereinstimmen."
+      },
+      "customerCompanies": {
+        "customerId": "Eindeutiger Schlüssel der Firma, auf den Tickets und Kundenbenutzer verweisen. Wird beim Anlegen festgelegt — nachträgliche Änderungen sollten vermieden werden, da bestehende Referenzen sonst ins Leere zeigen."
+      },
+      "authConfig": {
+        "enforceAll": "Erzwingt Zwei-Faktor-Authentifizierung (TOTP) für alle Agenten-Konten, unabhängig von der Gruppen-Auswahl und den einzelnen Haken pro Agent unten.",
+        "enforceGroups": "Erzwingt 2FA zusätzlich für alle Agenten, die Mitglied einer hier markierten Gruppe sind — auch wenn „Für alle erzwingen“ aus ist.",
+        "sso": "Erlaubt diesem Agenten die Anmeldung über den externen SSO/Identity-Provider-Pfad. Konfiguriert nicht den SSO-Provider selbst, sondern nur, ob dieser Agent ihn nutzen darf.",
+        "enforce": "Erzwingt 2FA für dieses einzelne Agenten-Konto, unabhängig von den globalen Einstellungen oben.",
+        "reset": "Löscht sowohl die TOTP-Registrierung als auch alle registrierten Passkeys dieses Agenten unwiderruflich. Der Agent muss die Einrichtung danach komplett neu durchlaufen — es gibt keinen weichen Zwischenzustand."
+      },
+      "queues": {
+        "group": "Legt fest, wer diese Queue sehen und bearbeiten darf — der Zugriff wird ausschließlich über die Gruppe gesteuert, nicht pro Queue einzeln vergeben.",
+        "systemAddress": "Absenderadresse für ausgehende Mails aus dieser Queue; eingehende Mail an diese Adresse wird automatisch dieser Queue zugeordnet.",
+        "followUp": "Verhalten, wenn ein Kunde auf ein bereits geschlossenes Ticket antwortet: je nach Option wird das Ticket wieder geöffnet, die Antwort abgewiesen, oder ein komplett neues Ticket angelegt.",
+        "followUpLock": "Entsperrt ein gesperrtes Ticket automatisch zurück an den Besitzer, sobald ein Kunden-Follow-up eintrifft.",
+        "calendarName": "Referenziert einen Geschäftszeiten-Kalender (Feiertage, Öffnungszeiten) für die Eskalationsberechnung. Leer = Standardkalender rund um die Uhr.",
+        "defaultSignKey": "Name eines PGP/S-MIME-Schlüssels, mit dem ausgehende Mails aus dieser Queue automatisch signiert werden. Leer = keine automatische Signatur."
+      },
+      "states": {
+        "typeId": "Der Typ steuert das Verhalten des Status, nicht der Name: Zustände vom Typ „Neu“/„Offen“/„Wartend“ zählen als offene Tickets, „Zusammengeführt“ blendet das Ticket aus der normalen Suche aus (der Datensatz bleibt erhalten). Mehrere Status-Namen können sich denselben Typ teilen."
+      },
+      "priorities": {
+        "name": "Es gibt keine separate Sortier-Spalte: Die Reihenfolge in Listen richtet sich nach der numerischen ID (kleinere ID = niedrigere Priorität), nicht nach dem Namen."
+      },
+      "dynamicFields": {
+        "name": "Interner, technischer Feldname (z. B. für Platzhalter und die API). Nach dem Anlegen nicht mehr änderbar.",
+        "fieldType": "Legt das Eingabe-Steuerelement fest (Text, Dropdown, Datum, …) und ist nach dem Anlegen nicht mehr änderbar, da bestehende gespeicherte Werte sonst ihre Bedeutung verlieren würden.",
+        "objectType": "Legt fest, wo das Feld erscheint: „Ticket“ hängt am gesamten Vorgang, „Artikel“ an einer einzelnen Nachricht innerhalb des Tickets.",
+        "config": "Feldtyp-spezifische Optionen — z. B. Auswahlwerte bei Dropdown/Mehrfachauswahl, Zeilenzahl bei Textbereichen, Jahresbereich bei Datumsfeldern.",
+        "fieldOrder": "Bestimmt die Anzeigereihenfolge relativ zu anderen Feldern desselben Objekttyps — eine kleinere Zahl erscheint weiter oben."
+      },
+      "acl": {
+        "match": "Bedingungen, unter denen diese ACL greift (z. B. aktuelle Queue, Status, Formularfeld). Nur wenn alle hier hinterlegten Kriterien zutreffen, wird die Änderung rechts angewendet.",
+        "change": "Wirkung der ACL, sobald die Bedingungen zutreffen — typischerweise werden dadurch Auswahlmöglichkeiten in Formularen eingeschränkt oder erzwungen (z. B. nur bestimmte Folgestatus erlaubt)."
       }
     },
     "nav": {

@@ -11,6 +11,7 @@ import { DataTable, type DataTableColumn } from "@/components/admin/DataTable";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Dialog } from "@/components/ui/Dialog";
+import { HelpPopover } from "@/components/ui/HelpPopover";
 import { Spinner } from "@/components/ui/Spinner";
 
 const LIST_KEY = ["admin", "auth-config"] as const;
@@ -230,10 +231,24 @@ export function AuthConfigPage() {
                 className="rounded border-hairline"
               />
               {t("admin.authConfig.enforceAll")}
+              <HelpPopover
+                title={t("admin.authConfig.enforceAll")}
+                testId="auth-config-help-enforce-all"
+              >
+                {t("admin.help.authConfig.enforceAll")}
+              </HelpPopover>
             </label>
 
             <div>
-              <p className="mb-2 text-sm text-muted">{t("admin.authConfig.enforceGroups")}</p>
+              <p className="mb-2 flex items-center gap-1.5 text-sm text-muted">
+                {t("admin.authConfig.enforceGroups")}
+                <HelpPopover
+                  title={t("admin.authConfig.enforceGroups")}
+                  testId="auth-config-help-enforce-groups"
+                >
+                  {t("admin.help.authConfig.enforceGroups")}
+                </HelpPopover>
+              </p>
               {groupsQ.isLoading ? (
                 <Spinner />
               ) : groups.length === 0 ? (
@@ -284,8 +299,13 @@ export function AuthConfigPage() {
       </section>
 
       <section>
-        <h2 className="mb-2 text-sm font-semibold text-ink">
+        <h2 className="mb-2 flex items-center gap-1.5 text-sm font-semibold text-ink">
           {t("admin.authConfig.agentsHeading")}
+          <HelpPopover title={t("admin.authConfig.agentsHeading")} testId="auth-config-help-agents">
+            <p>{t("admin.help.authConfig.sso")}</p>
+            <p className="mt-1.5">{t("admin.help.authConfig.enforce")}</p>
+            <p className="mt-1.5">{t("admin.help.authConfig.reset")}</p>
+          </HelpPopover>
         </h2>
         <DataTable
           testId="auth-config-table"

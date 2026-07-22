@@ -11,6 +11,7 @@ import {
 import { DataTable, type DataTableColumn } from "@/components/admin/DataTable";
 import { Dialog } from "@/components/ui/Dialog";
 import { Button } from "@/components/ui/Button";
+import { HelpPopover } from "@/components/ui/HelpPopover";
 import { PlusIcon } from "@/components/ui/icons";
 import {
   DynamicFieldConfigEditor,
@@ -132,7 +133,7 @@ export function DynamicFieldsPage() {
 
   const inputClass =
     "w-full rounded-md border border-hairline bg-surface-subtle px-3 py-1.5 text-sm text-ink placeholder:text-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent focus:border-accent";
-  const labelClass = "mb-1 block text-xs font-medium uppercase tracking-wide text-muted";
+  const labelClass = "mb-1 flex items-center gap-1.5 text-xs font-medium uppercase tracking-wide text-muted";
 
   const validate = (): boolean => {
     const nextErrors: Record<string, boolean> = {};
@@ -226,6 +227,12 @@ export function DynamicFieldsPage() {
             <span className={labelClass}>
               {t("admin.dynamicFields.name")}
               {!editing && <span className="text-escalation"> *</span>}
+              <HelpPopover
+                title={t("admin.dynamicFields.name")}
+                testId="dynamic-field-help-name"
+              >
+                {t("admin.help.dynamicFields.name")}
+              </HelpPopover>
             </span>
             {editing ? (
               <p className="text-sm text-ink">{form.name}</p>
@@ -256,6 +263,12 @@ export function DynamicFieldsPage() {
             <span className={labelClass}>
               {t("admin.dynamicFields.fieldOrder")}
               <span className="text-escalation"> *</span>
+              <HelpPopover
+                title={t("admin.dynamicFields.fieldOrder")}
+                testId="dynamic-field-help-field-order"
+              >
+                {t("admin.help.dynamicFields.fieldOrder")}
+              </HelpPopover>
             </span>
             <input
               data-testid="dynamic-field-order"
@@ -272,7 +285,15 @@ export function DynamicFieldsPage() {
           </div>
 
           <div>
-            <span className={labelClass}>{t("admin.dynamicFields.fieldType")}</span>
+            <span className={labelClass}>
+              {t("admin.dynamicFields.fieldType")}
+              <HelpPopover
+                title={t("admin.dynamicFields.fieldType")}
+                testId="dynamic-field-help-field-type"
+              >
+                {t("admin.help.dynamicFields.fieldType")}
+              </HelpPopover>
+            </span>
             {editing ? (
               <p className="text-sm text-ink">{form.field_type}</p>
             ) : (
@@ -294,7 +315,15 @@ export function DynamicFieldsPage() {
           </div>
 
           <div>
-            <span className={labelClass}>{t("admin.dynamicFields.objectType")}</span>
+            <span className={labelClass}>
+              {t("admin.dynamicFields.objectType")}
+              <HelpPopover
+                title={t("admin.dynamicFields.objectType")}
+                testId="dynamic-field-help-object-type"
+              >
+                {t("admin.help.dynamicFields.objectType")}
+              </HelpPopover>
+            </span>
             {editing ? (
               <p className="text-sm text-ink">{form.object_type}</p>
             ) : (
@@ -314,7 +343,15 @@ export function DynamicFieldsPage() {
           </div>
 
           <div>
-            <span className={labelClass}>{t("admin.dynamicFields.config")}</span>
+            <span className={labelClass}>
+              {t("admin.dynamicFields.config")}
+              <HelpPopover
+                title={t("admin.dynamicFields.config")}
+                testId="dynamic-field-help-config"
+              >
+                {t("admin.help.dynamicFields.config")}
+              </HelpPopover>
+            </span>
             <DynamicFieldConfigEditor
               fieldType={form.field_type}
               value={form.config}

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, fireEvent } from "@testing-library/react";
 import { I18nextProvider } from "react-i18next";
 import i18n from "@/i18n";
 import { CrudDrawer, type FieldDef } from "./CrudDrawer";
@@ -49,5 +49,29 @@ describe("CrudDrawer font for prose fields", () => {
     const ta = screen.getByTestId("admin-form-text");
     expect(ta.className).toContain("font-mono");
     expect(ta.className).not.toContain("font-sans");
+  });
+});
+
+describe("CrudDrawer field help popover", () => {
+  it("renders no help trigger when the field has no help", () => {
+    wrap([{ name: "text", label: "Text", type: "text" }]);
+    expect(screen.queryByTestId("admin-form-text-help")).not.toBeInTheDocument();
+  });
+
+  it("opens the popover and shows the description when a field defines help", () => {
+    wrap([
+      {
+        name: "text",
+        label: "Text",
+        type: "text",
+        help: { title: "Text", description: "Explains what this field does." },
+      },
+    ]);
+    const trigger = screen.getByTestId("admin-form-text-help");
+    expect(screen.queryByTestId("admin-form-text-help-panel")).not.toBeInTheDocument();
+    fireEvent.click(trigger);
+    expect(screen.getByTestId("admin-form-text-help-panel")).toHaveTextContent(
+      "Explains what this field does.",
+    );
   });
 });

@@ -771,6 +771,54 @@
         "piiMasking": "Masks recognized customer identifiers (email, phone, MAC, IP) in ticket text and MCP tool results before they reach the model, and unmasks them again before the actual tool call or send. Complements, but does not replace, provider choice (EU hosting/DPA) as the primary privacy control.",
         "identityMode": "How customer identity is resolved for tool calls: \"Ticket customer\" uses the customer ID on the ticket, \"Clarify schema\" lets the AI actively ask for missing information, \"Off\" disables identity resolution.",
         "clarifySchemaJson": "JSON description of the fields the AI may actively collect under the clarify schema (field name + optional MCP match tool)."
+      },
+      "common": {
+        "validId": "Valid/invalid is a soft-delete flag: marking an entry invalid hides it from pickers for new records without deleting existing references (e.g. tickets, assignments). There is no hard delete."
+      },
+      "groups": {
+        "name": "Groups gate queue access: every queue belongs to exactly one group, and agents, roles, or customer users get read (\"ro\") or full (\"rw\") access to it purely through group membership — never directly on the queue."
+      },
+      "roles": {
+        "name": "Roles bundle group permissions that are then assigned to many agents at once — editing the role immediately affects every agent who holds it. Roles are optional: groups can also be assigned to agents directly, and both paths are additive (a user gets the union of both)."
+      },
+      "customerUsers": {
+        "customerId": "This customer user's home company. Access to additional companies is granted separately via \"Customer Users ↔ Companies\" and does not change this home assignment.",
+        "email": "Used for notifications (e.g. ticket updates). Independent of the login name — the email address does not need to match the login."
+      },
+      "customerCompanies": {
+        "customerId": "The company's unique key, referenced by tickets and customer users. Set on creation — avoid changing it afterwards, since existing references would otherwise no longer resolve."
+      },
+      "authConfig": {
+        "enforceAll": "Forces two-factor authentication (TOTP) for every agent account, regardless of the group selection and the per-agent checkboxes below.",
+        "enforceGroups": "Additionally forces 2FA for every agent who is a member of any group checked here — even when \"Enforce for all\" is off.",
+        "sso": "Allows this agent to authenticate via the external SSO/identity-provider path. Does not configure the SSO provider itself — only whether this agent may use it.",
+        "enforce": "Forces 2FA for this individual agent account, independent of the global settings above.",
+        "reset": "Irreversibly deletes both the agent's TOTP enrollment and all registered passkeys. The agent must set up 2FA from scratch afterwards — there is no soft intermediate state."
+      },
+      "queues": {
+        "group": "Determines who can see and work this queue — access is controlled entirely through the group, never granted per queue.",
+        "systemAddress": "The From address used for outgoing mail from this queue; inbound mail addressed to it is automatically filed into this queue.",
+        "followUp": "What happens when a customer replies to an already-closed ticket in this queue: depending on the option, the ticket reopens, the reply is rejected, or a brand-new ticket is created instead.",
+        "followUpLock": "Automatically unlocks a locked ticket back to its owner as soon as a customer follow-up arrives.",
+        "calendarName": "References a business-hours calendar (holidays, opening times) used when computing escalations. Empty = the default around-the-clock calendar.",
+        "defaultSignKey": "Name of a PGP/S-MIME key used to automatically sign outgoing mail from this queue. Empty = no automatic signing."
+      },
+      "states": {
+        "typeId": "The type — not the name — drives behavior: \"new\"/\"open\"/\"pending\" types count as open tickets, while \"merged\" hides the ticket from normal search (the record itself is kept). Multiple state names can share the same type."
+      },
+      "priorities": {
+        "name": "There is no separate sort-order column: list ordering follows the numeric ID (lower ID = lower priority), not the name."
+      },
+      "dynamicFields": {
+        "name": "Internal technical field name (used in placeholders and the API). Cannot be changed after creation.",
+        "fieldType": "Determines the input control (text, dropdown, date, …) and cannot be changed after creation, since existing stored values would otherwise lose their meaning.",
+        "objectType": "Determines where the field attaches: \"Ticket\" lives on the whole case, \"Article\" attaches to a single message within the ticket.",
+        "config": "Field-type-specific options — e.g. selectable values for dropdown/multiselect, row count for text areas, year range for date fields.",
+        "fieldOrder": "Controls the display order relative to other fields of the same object type — a lower number appears higher up."
+      },
+      "acl": {
+        "match": "Conditions under which this ACL applies (e.g. current queue, state, form field). The change on the right is only applied when every criterion listed here matches.",
+        "change": "The ACL's effect once its conditions match — typically it restricts or forces the choices available in forms (e.g. only certain follow-up states allowed)."
       }
     },
     "nav": {

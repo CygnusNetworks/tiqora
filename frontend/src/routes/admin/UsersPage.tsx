@@ -44,6 +44,7 @@ export function UsersPage() {
         { value: 1, label: t("admin.table.valid") },
         { value: 2, label: t("admin.table.invalid") },
       ],
+      help: { title: t("admin.table.status"), description: t("admin.help.common.validId") },
     },
   ];
 

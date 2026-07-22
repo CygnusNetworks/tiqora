@@ -2,6 +2,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { Dialog } from "@/components/ui/Dialog";
 import { Button } from "@/components/ui/Button";
+import { HelpPopover } from "@/components/ui/HelpPopover";
 
 export type FieldOption = { value: string | number; label: string };
 
@@ -46,6 +47,12 @@ export type FieldDef = {
   }) => ReactNode;
   /** Hide this field for create (e.g. immutable identity fields shown read-only). */
   hideOnCreate?: boolean;
+  /**
+   * Opt-in ⓘ popover rendered next to the label — for fields whose meaning or
+   * default isn't obvious from the label alone. Distinct from `helpText`
+   * (always-visible static hint below the control).
+   */
+  help?: { title: string; description: ReactNode; defaultHint?: string };
 };
 
 export type CrudDrawerProps = {
@@ -132,10 +139,21 @@ export function CrudDrawer({
           const labelEl = (
             <label
               htmlFor={id}
-              className="mb-1 block text-xs font-medium uppercase tracking-wide text-muted"
+              className="mb-1 flex items-center gap-1.5 text-xs font-medium uppercase tracking-wide text-muted"
             >
-              {f.label}
-              {f.required && <span className="text-escalation"> *</span>}
+              <span>
+                {f.label}
+                {f.required && <span className="text-escalation"> *</span>}
+              </span>
+              {f.help && (
+                <HelpPopover
+                  title={f.help.title}
+                  defaultHint={f.help.defaultHint}
+                  testId={`${id}-help`}
+                >
+                  {f.help.description}
+                </HelpPopover>
+              )}
             </label>
           );
           const baseInputClass =

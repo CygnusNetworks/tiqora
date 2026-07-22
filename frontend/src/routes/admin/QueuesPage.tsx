@@ -113,6 +113,7 @@ export function QueuesPage() {
       type: "select",
       required: true,
       options: groupOptions,
+      help: { title: t("admin.queues.group"), description: t("admin.help.queues.group") },
     },
     {
       name: "system_address_id",
@@ -120,6 +121,10 @@ export function QueuesPage() {
       type: "select",
       required: true,
       options: systemAddressOptions,
+      help: {
+        title: t("admin.queues.systemAddress"),
+        description: t("admin.help.queues.systemAddress"),
+      },
     },
     {
       name: "salutation_id",
@@ -141,6 +146,7 @@ export function QueuesPage() {
       type: "select",
       required: true,
       options: followUpOptions,
+      help: { title: t("admin.queues.followUp"), description: t("admin.help.queues.followUp") },
     },
     {
       name: "follow_up_lock",
@@ -150,6 +156,10 @@ export function QueuesPage() {
         { value: 0, label: t("admin.queues.no") },
         { value: 1, label: t("admin.queues.yes") },
       ],
+      help: {
+        title: t("admin.queues.followUpLock"),
+        description: t("admin.help.queues.followUpLock"),
+      },
     },
     {
       name: "unlock_timeout",
@@ -197,11 +207,19 @@ export function QueuesPage() {
       name: "calendar_name",
       label: t("admin.queues.calendarName"),
       type: "text",
+      help: {
+        title: t("admin.queues.calendarName"),
+        description: t("admin.help.queues.calendarName"),
+      },
     },
     {
       name: "default_sign_key",
       label: t("admin.queues.defaultSignKey"),
       type: "text",
+      help: {
+        title: t("admin.queues.defaultSignKey"),
+        description: t("admin.help.queues.defaultSignKey"),
+      },
     },
     { name: "comments", label: t("admin.table.comments"), type: "textarea" },
     {
@@ -212,6 +230,7 @@ export function QueuesPage() {
         { value: 1, label: t("admin.table.valid") },
         { value: 2, label: t("admin.table.invalid") },
       ],
+      help: { title: t("admin.table.status"), description: t("admin.help.common.validId") },
     },
   ];
 

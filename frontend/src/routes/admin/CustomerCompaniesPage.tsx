@@ -36,6 +36,10 @@ export function CustomerCompaniesPage() {
       label: t("admin.customerCompanies.customerId"),
       type: "text",
       required: true,
+      help: {
+        title: t("admin.customerCompanies.customerId"),
+        description: t("admin.help.customerCompanies.customerId"),
+      },
     },
     { name: "name", label: t("admin.customerCompanies.name"), type: "text", required: true },
     { name: "street", label: t("admin.customerUsers.street"), type: "text" },
@@ -50,6 +54,7 @@ export function CustomerCompaniesPage() {
         { value: 1, label: t("admin.table.valid") },
         { value: 2, label: t("admin.table.invalid") },
       ],
+      help: { title: t("admin.table.status"), description: t("admin.help.common.validId") },
     },
   ];
 

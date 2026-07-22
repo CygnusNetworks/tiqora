@@ -20,7 +20,13 @@ export function PrioritiesPage() {
   ];
 
   const fields: FieldDef[] = [
-    { name: "name", label: t("admin.priorities.name"), type: "text", required: true },
+    {
+      name: "name",
+      label: t("admin.priorities.name"),
+      type: "text",
+      required: true,
+      help: { title: t("admin.priorities.name"), description: t("admin.help.priorities.name") },
+    },
     {
       name: "valid_id",
       label: t("admin.table.status"),
@@ -29,6 +35,7 @@ export function PrioritiesPage() {
         { value: 1, label: t("admin.table.valid") },
         { value: 2, label: t("admin.table.invalid") },
       ],
+      help: { title: t("admin.table.status"), description: t("admin.help.common.validId") },
     },
   ];
 
