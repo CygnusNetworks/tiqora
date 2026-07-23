@@ -134,17 +134,24 @@ async def test_list_tags_acl_scoped_counts(factory: async_sessionmaker[AsyncSess
             await svc.update_article(WRITER, orphan.id, ArticleUpdateIn(tags=[]))
         await session.commit()
 
-        member_tags = dict(await svc.list_tags(MEMBER))
+        # Other test files create KB tags in the same shared database (this
+        # runs inside the full suite on CI) — assert only over OUR tag names
+        # instead of the full result.
+        ours = {"orphan-tag", "public-tag", "restricted-tag", "shared-tag"}
+
+        member_all = await svc.list_tags(MEMBER)
+        member_tags = {name: count for name, count in member_all if name in ours}
         assert member_tags == {
             "orphan-tag": 0,
             "public-tag": 1,
             "restricted-tag": 1,
             "shared-tag": 2,
         }
-        # Sorted by name.
-        assert [name for name, _ in await svc.list_tags(MEMBER)] == sorted(member_tags)
+        # Sorted by name (over the full result, our subset included).
+        assert [name for name, _ in member_all] == sorted(name for name, _ in member_all)
 
-        outsider_tags = dict(await svc.list_tags(OUTSIDER))
+        outsider_all = await svc.list_tags(OUTSIDER)
+        outsider_tags = {name: count for name, count in outsider_all if name in ours}
         assert outsider_tags == {
             "orphan-tag": 0,
             "public-tag": 1,
