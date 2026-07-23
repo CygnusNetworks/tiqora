@@ -112,6 +112,9 @@ export function TicketZoomPage() {
       ? Boolean(ticketQ.data.permissions.note || ticketQ.data.permissions.rw)
       : Boolean(ticketQ.data.can_write)
     : false;
+  // Deleting a note is destructive — gate on ``rw`` specifically, not the
+  // weaker ``note`` permission that's enough to create one.
+  const canDeleteNote = Boolean(ticketQ.data?.permissions?.rw);
 
   const overflowMenu = (
     <TicketZoomOverflowMenu
@@ -161,6 +164,7 @@ export function TicketZoomPage() {
           noteOpen={noteOpen}
           onNoteOpenChange={setNoteOpen}
           canNote={canNote}
+          canDelete={canDeleteNote}
         />
       ) : (
         <HistoryTable ticketId={ticketId} order={historyOrder} />

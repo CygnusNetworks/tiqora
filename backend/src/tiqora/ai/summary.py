@@ -296,7 +296,8 @@ async def summarize_ticket(
     state.summary_body = summary_text
     state.last_summary_upto_article_id = upto_article_id
     state.last_summary_hash = hashlib.sha256(summary_text.encode("utf-8")).hexdigest()
-    state.last_run_at = datetime.now(UTC).replace(tzinfo=None)
+    state.summary_created_at = datetime.now(UTC).replace(tzinfo=None)
+    state.last_run_at = state.summary_created_at
     await session.commit()
 
     return SummaryResult(

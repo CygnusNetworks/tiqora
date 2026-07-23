@@ -940,6 +940,29 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/tickets/{ticket_id}/articles/{article_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Delete Article Endpoint
+         * @description Hard-delete an internal note. Requires ``rw``.
+         *
+         *     Customer-visible or non-Internal-channel articles are never deletable and
+         *     return HTTP 409 instead.
+         */
+        delete: operations["delete_article_endpoint_api_v1_tickets__ticket_id__articles__article_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/tickets/{ticket_id}/links": {
         parameters: {
             query?: never;
@@ -4864,6 +4887,11 @@ export interface components {
             source: string;
             /** Accepted Article Id */
             accepted_article_id: number | null;
+            /**
+             * Create Time
+             * Format: date-time
+             */
+            create_time: string;
         };
         /** AiDraftRequestOut */
         AiDraftRequestOut: {
@@ -5142,6 +5170,8 @@ export interface components {
             summary_body: string | null;
             /** Last Summary Upto Article Id */
             last_summary_upto_article_id: number | null;
+            /** Summary Created At */
+            summary_created_at: string | null;
         };
         /** AiSummarizeOut */
         AiSummarizeOut: {
@@ -11227,6 +11257,40 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["TicketCreateResponse"];
                 };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_article_endpoint_api_v1_tickets__ticket_id__articles__article_id__delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                ticket_id: number;
+                article_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {

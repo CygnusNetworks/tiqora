@@ -1144,6 +1144,16 @@ export class ApiClient {
     );
   }
 
+  /** Hard-delete an internal note. Requires `rw`; 409 if the article isn't an
+   * internal, non-customer-visible note. */
+  deleteArticle(ticketId: number, articleId: number, signal?: AbortSignal) {
+    return this.request<void>(
+      "DELETE",
+      `/api/v1/tickets/${ticketId}/articles/${articleId}`,
+      { signal },
+    );
+  }
+
   listTicketLinks(ticketId: number, signal?: AbortSignal) {
     return this.request<TicketLinkTargetOut[]>(
       "GET",

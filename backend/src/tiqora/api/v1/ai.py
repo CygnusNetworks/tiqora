@@ -11,6 +11,7 @@ posting a reply/note on that queue).
 from __future__ import annotations
 
 import uuid
+from datetime import datetime
 
 import structlog
 from fastapi import APIRouter, HTTPException, status
@@ -61,6 +62,7 @@ class AiDraftOut(BaseModel):
     status: str
     source: str
     accepted_article_id: int | None
+    create_time: datetime
 
 
 class AiStateOut(BaseModel):
@@ -71,6 +73,7 @@ class AiStateOut(BaseModel):
     drafts: list[AiDraftOut]
     summary_body: str | None
     last_summary_upto_article_id: int | None
+    summary_created_at: datetime | None
 
 
 class AiSummarizeOut(BaseModel):
@@ -157,6 +160,7 @@ async def get_ai_state(ticket_id: int, user: CurrentUser, session: DbSession) ->
         drafts=[_draft_out(d) for d in drafts],
         summary_body=state.summary_body if state else None,
         last_summary_upto_article_id=state.last_summary_upto_article_id if state else None,
+        summary_created_at=state.summary_created_at if state else None,
     )
 
 

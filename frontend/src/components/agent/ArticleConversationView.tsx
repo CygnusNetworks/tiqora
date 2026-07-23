@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { api, type ArticleListItem } from "@/lib/api";
@@ -17,6 +17,9 @@ import { cn } from "@/lib/cn";
 import { Avatar } from "@/components/ui/Avatar";
 import { ArticleBodyRenderer } from "./ArticleBodyRenderer";
 import { ArticleQuickActions } from "./ArticleQuickActions";
+import { SummaryMarker } from "./SummaryMarker";
+import { useSummaryBoundary } from "./useSummaryBoundary";
+import { useDeleteArticleNote } from "./useDeleteArticleNote";
 
 /** Collapsed-preview length in characters — a rough proxy for "~6 lines" of
  * chat-bubble text without depending on CSS line-clamp (which doesn't work
@@ -39,6 +42,7 @@ export function ArticleConversationView({
   ticketId,
   articles,
   canNote,
+  canDelete = false,
   locale,
 }: {
   ticketId: number;
@@ -46,10 +50,13 @@ export function ArticleConversationView({
    * `useArticleListState().chronological`. */
   articles: ArticleListItem[];
   canNote: boolean;
+  /** Whether the agent may delete internal notes (``rw`` permission). */
+  canDelete?: boolean;
   locale: string;
 }) {
   const { t } = useTranslation();
   const bottomRef = useRef<HTMLDivElement>(null);
+  const { boundaryId, createdAt } = useSummaryBoundary(ticketId, articles);
 
   // Scroll to the newest message whenever this view mounts (tab switch) or
   // the ticket changes. jsdom (tests) doesn't implement scrollIntoView.
@@ -74,20 +81,30 @@ export function ArticleConversationView({
                 {g.day}
               </span>
             </div>
-            {g.items.map((a) =>
-              isInternalNote(a) ? (
-                <NotePill key={a.id} ticketId={ticketId} article={a} locale={locale} />
-              ) : (
-                <Bubble
-                  key={a.id}
-                  ticketId={ticketId}
-                  article={a}
-                  canNote={canNote}
-                  locale={locale}
-                  side={bubbleSide(a.sender_type)}
-                />
-              ),
-            )}
+            {g.items.map((a) => (
+              <Fragment key={a.id}>
+                {isInternalNote(a) ? (
+                  <NotePill
+                    ticketId={ticketId}
+                    article={a}
+                    canDelete={canDelete}
+                    locale={locale}
+                  />
+                ) : (
+                  <Bubble
+                    ticketId={ticketId}
+                    article={a}
+                    canNote={canNote}
+                    canDelete={canDelete}
+                    locale={locale}
+                    side={bubbleSide(a.sender_type)}
+                  />
+                )}
+                {/* Chronological view → marker goes below the newest
+                    summarized article. */}
+                {a.id === boundaryId && <SummaryMarker createdAt={createdAt} locale={locale} />}
+              </Fragment>
+            ))}
           </section>
         ))
       )}
@@ -107,12 +124,14 @@ function Bubble({
   ticketId,
   article,
   canNote,
+  canDelete,
   locale,
   side,
 }: {
   ticketId: number;
   article: ArticleListItem;
   canNote: boolean;
+  canDelete: boolean;
   locale: string;
   side: "left" | "right";
 }) {
@@ -167,7 +186,13 @@ function Bubble({
               reading pane, just icon-only to fit a bubble. */}
           <div className="pointer-events-none absolute -top-3 right-1 opacity-0 transition-opacity duration-100 group-hover:opacity-100 group-focus-within:opacity-100">
             <div className="pointer-events-auto rounded-md border border-hairline bg-surface p-0.5 shadow-sm">
-              <ArticleQuickActions ticketId={ticketId} article={article} canNote={canNote} compact />
+              <ArticleQuickActions
+                ticketId={ticketId}
+                article={article}
+                canNote={canNote}
+                canDelete={canDelete}
+                compact
+              />
             </div>
           </div>
         </div>
@@ -223,15 +248,18 @@ function BubbleBody({ ticketId, article }: { ticketId: number; article: ArticleL
 function NotePill({
   ticketId,
   article,
+  canDelete,
   locale,
 }: {
   ticketId: number;
   article: ArticleListItem;
+  canDelete: boolean;
   locale: string;
 }) {
   const { t } = useTranslation();
   const [expanded, setExpanded] = useState(false);
   const bodyQ = useArticleBody(ticketId, article.id);
+  const del = useDeleteArticleNote(ticketId, article.id);
   const senderName = senderDisplayName(article.from_address) || t("ticket.unknownSender");
   const plain = bodyQ.data
     ? bodyQ.data.is_html
@@ -240,22 +268,44 @@ function NotePill({
     : "";
 
   return (
-    <div className="flex justify-center" data-testid={`conversation-note-${article.id}`}>
-      <button
-        type="button"
-        onClick={() => setExpanded((v) => !v)}
-        className={cn(
-          "max-w-[80%] rounded-2xl border border-dashed border-escalation/50 bg-escalation/10 px-3 py-1.5 text-xs text-escalation",
-          expanded ? "text-left" : "text-center",
+    <div className="flex flex-col items-center gap-1" data-testid={`conversation-note-${article.id}`}>
+      <div className="group relative max-w-[80%]">
+        <button
+          type="button"
+          onClick={() => setExpanded((v) => !v)}
+          className={cn(
+            "w-full rounded-2xl border border-dashed border-escalation/50 bg-escalation/10 px-3 py-1.5 text-xs text-escalation",
+            expanded ? "text-left" : "text-center",
+          )}
+        >
+          <p className="font-semibold">
+            📝 {t("ticket.internalNote")} · {senderName} · {formatDateTime(article.create_time, locale)}
+          </p>
+          <p className={cn(expanded ? "mt-1 whitespace-pre-wrap" : "truncate")}>
+            {expanded ? plain : plain.slice(0, 60)}
+          </p>
+        </button>
+        {canDelete && (
+          <button
+            type="button"
+            aria-label={t("ticket.deleteNote")}
+            data-testid={`article-delete-${article.id}`}
+            onClick={(e) => {
+              e.stopPropagation();
+              void del.requestDelete();
+            }}
+            className="pointer-events-none absolute -top-2 right-1 inline-flex h-5 w-5 items-center justify-center rounded-full border border-hairline bg-surface text-[10px] text-muted opacity-0 transition-opacity duration-100 hover:text-danger group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100"
+          >
+            ✕
+          </button>
         )}
-      >
-        <p className="font-semibold">
-          📝 {t("ticket.internalNote")} · {senderName} · {formatDateTime(article.create_time, locale)}
+      </div>
+      {del.errorMessage && (
+        <p className="text-xs text-danger" data-testid={`article-delete-error-${article.id}`}>
+          {del.errorMessage}
         </p>
-        <p className={cn(expanded ? "mt-1 whitespace-pre-wrap" : "truncate")}>
-          {expanded ? plain : plain.slice(0, 60)}
-        </p>
-      </button>
+      )}
+      {canDelete && del.dialog}
     </div>
   );
 }

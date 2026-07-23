@@ -81,6 +81,10 @@ class InvalidInput(Exception):
     """Caller passed an invalid combination of parameters."""
 
 
+class ArticleNotDeletable(Exception):
+    """Article is not an internal, non-customer-visible note (never deletable)."""
+
+
 # ---------------------------------------------------------------------------
 # Input dataclasses
 # ---------------------------------------------------------------------------
@@ -1374,6 +1378,115 @@ async def bounce_article(
     )
 
 
+async def _table_exists(session: AsyncSession, table: str) -> bool:
+    """Whether *table* exists (Tiqora-owned tables may be unmigrated per install)."""
+    row = (
+        await session.execute(
+            text("SELECT 1 FROM information_schema.tables WHERE table_name = :t LIMIT 1"),
+            {"t": table},
+        )
+    ).first()
+    return row is not None
+
+
+async def delete_article(
+    session: AsyncSession,
+    *,
+    ticket_id: int,
+    article_id: int,
+    user_id: int,
+) -> None:
+    """Hard-delete one internal-note article and its dependent rows.
+
+    Only articles on the ``Internal`` communication channel with
+    ``is_visible_for_customer = 0`` may be deleted — customer communication is
+    never removable via this path (raises :class:`ArticleNotDeletable`).
+    Cascading delete order (children first): article_flag,
+    article_data_mime_attachment, article_data_mime_plain,
+    article_search_index, tiqora_ai_article_origin (if migrated),
+    time_accounting (article_id set to NULL — booked time is kept, not lost),
+    ticket_history rows for the article, article_data_mime, article.
+
+    Writes a ``Misc`` ticket_history row (``%%NoteDeleted%%<id>%%<subject>``)
+    and emits an ``ArticleDelete`` outbox event so Meilisearch drops the
+    article from the index on next drain.
+    """
+    await _ticket_must_exist(session, ticket_id)
+
+    art = (
+        (
+            await session.execute(
+                text(
+                    "SELECT a.ticket_id, a.is_visible_for_customer, cc.name AS channel_name"
+                    " FROM article a"
+                    " JOIN communication_channel cc ON cc.id = a.communication_channel_id"
+                    " WHERE a.id = :aid LIMIT 1"
+                ),
+                {"aid": article_id},
+            )
+        )
+        .mappings()
+        .first()
+    )
+    if art is None or int(art["ticket_id"]) != ticket_id:
+        raise TicketNotFound(f"article {article_id}")
+    if art["channel_name"] != "Internal" or int(art["is_visible_for_customer"]) != 0:
+        raise ArticleNotDeletable(
+            "Only internal notes (not visible to the customer) can be deleted"
+        )
+
+    mime = (
+        await session.execute(
+            text("SELECT a_subject FROM article_data_mime WHERE article_id = :aid LIMIT 1"),
+            {"aid": article_id},
+        )
+    ).first()
+    subject = str(mime[0] or "") if mime is not None else ""
+
+    await session.execute(
+        text("DELETE FROM article_flag WHERE article_id = :aid"), {"aid": article_id}
+    )
+    await session.execute(
+        text("DELETE FROM article_data_mime_attachment WHERE article_id = :aid"),
+        {"aid": article_id},
+    )
+    await session.execute(
+        text("DELETE FROM article_data_mime_plain WHERE article_id = :aid"),
+        {"aid": article_id},
+    )
+    await session.execute(
+        text("DELETE FROM article_search_index WHERE article_id = :aid"),
+        {"aid": article_id},
+    )
+    if await _table_exists(session, "tiqora_ai_article_origin"):
+        await session.execute(
+            text("DELETE FROM tiqora_ai_article_origin WHERE article_id = :aid"),
+            {"aid": article_id},
+        )
+    await session.execute(
+        text("UPDATE time_accounting SET article_id = NULL WHERE article_id = :aid"),
+        {"aid": article_id},
+    )
+    await session.execute(
+        text("DELETE FROM ticket_history WHERE article_id = :aid"), {"aid": article_id}
+    )
+    await session.execute(
+        text("DELETE FROM article_data_mime WHERE article_id = :aid"), {"aid": article_id}
+    )
+    await session.execute(text("DELETE FROM article WHERE id = :aid"), {"aid": article_id})
+
+    await history_add(
+        session,
+        ticket_id=ticket_id,
+        history_type=TYPE_MISC,
+        name=f"%%NoteDeleted%%{article_id}%%{subject[:100]}",
+        user_id=user_id,
+    )
+
+    await invalidate_ticket_cache(session, ticket_id)
+    await _emit_event(session, "ArticleDelete", ticket_id, {"article_id": article_id})
+
+
 async def _link_object_id(session: AsyncSession, name: str) -> int:
     """Resolve link_object.id by name, inserting the row if absent (Ticket)."""
     row = (
@@ -1825,6 +1938,17 @@ class TicketWriteService:
         )
         return new_ticket_id
 
+    async def delete_article(self, user_id: int, ticket_id: int, article_id: int) -> None:
+        """Hard-delete an internal note. Requires ``rw`` on the ticket's queue."""
+        t = await _ticket_must_exist(self._session, ticket_id)
+        await self._assert_rw(user_id, int(t["queue_id"]))
+        await delete_article(
+            self._session,
+            ticket_id=ticket_id,
+            article_id=article_id,
+            user_id=user_id,
+        )
+
     async def link_tickets(
         self, user_id: int, ticket_id: int, target_ticket_id: int, link_type: str = "Normal"
     ) -> None:
@@ -1887,6 +2011,7 @@ class TicketWriteService:
 
 __all__ = [
     "ArticleIn",
+    "ArticleNotDeletable",
     "InvalidInput",
     "TicketAccessDenied",
     "TicketIn",
@@ -1901,6 +2026,7 @@ __all__ = [
     "change_state",
     "change_title",
     "create_ticket",
+    "delete_article",
     "forward_article",
     "link_tickets",
     "lock_ticket",

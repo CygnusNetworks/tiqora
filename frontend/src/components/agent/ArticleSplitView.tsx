@@ -1,3 +1,4 @@
+import { Fragment } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { api, type ArticleListItem } from "@/lib/api";
@@ -17,6 +18,8 @@ import { Avatar } from "@/components/ui/Avatar";
 import { Badge } from "@/components/ui/Badge";
 import { ArticleQuickActions } from "./ArticleQuickActions";
 import { ArticleBodyLoader, AttachmentList } from "./ArticleTimeline";
+import { SummaryMarker } from "./SummaryMarker";
+import { useSummaryBoundary } from "./useSummaryBoundary";
 import type { ArticleListState } from "./useArticleListState";
 
 /**
@@ -28,16 +31,20 @@ import type { ArticleListState } from "./useArticleListState";
 export function ArticleSplitView({
   ticketId,
   canNote,
+  canDelete = false,
   locale,
   state,
 }: {
   ticketId: number;
   canNote: boolean;
+  /** Whether the agent may delete internal notes (``rw`` permission). */
+  canDelete?: boolean;
   locale: string;
   state: ArticleListState;
 }) {
   const { t } = useTranslation();
-  const { sorted, selectedId, setSelectedId, selected, onListKeyDown } = state;
+  const { sorted, selectedId, setSelectedId, selected, onListKeyDown, descending } = state;
+  const { boundaryId, createdAt } = useSummaryBoundary(ticketId, sorted);
 
   if (sorted.length === 0) {
     return <p className="text-sm text-muted">{t("ticket.noArticles")}</p>;
@@ -54,19 +61,34 @@ export function ArticleSplitView({
         className="max-h-[40vh] shrink-0 space-y-1 overflow-y-auto rounded-lg border border-hairline bg-surface p-1.5 md:max-h-none md:w-[300px]"
       >
         {sorted.map((a) => (
-          <ArticleListRow
-            key={a.id}
-            ticketId={ticketId}
-            article={a}
-            locale={locale}
-            selected={a.id === selectedId}
-            onSelect={() => setSelectedId(a.id)}
-          />
+          <Fragment key={a.id}>
+            {/* Marker sits between summarized and newer articles — above the
+                boundary row in newest-first order, below it in oldest-first. */}
+            {descending && a.id === boundaryId && (
+              <SummaryMarker createdAt={createdAt} locale={locale} />
+            )}
+            <ArticleListRow
+              ticketId={ticketId}
+              article={a}
+              locale={locale}
+              selected={a.id === selectedId}
+              onSelect={() => setSelectedId(a.id)}
+            />
+            {!descending && a.id === boundaryId && (
+              <SummaryMarker createdAt={createdAt} locale={locale} />
+            )}
+          </Fragment>
         ))}
       </div>
       <div className="min-w-0 flex-1" data-testid="article-reader">
         {selected ? (
-          <ArticleReader ticketId={ticketId} article={selected} canNote={canNote} locale={locale} />
+          <ArticleReader
+            ticketId={ticketId}
+            article={selected}
+            canNote={canNote}
+            canDelete={canDelete}
+            locale={locale}
+          />
         ) : (
           <p className="text-sm text-muted">{t("ticket.noArticles")}</p>
         )}
@@ -154,11 +176,13 @@ function ArticleReader({
   ticketId,
   article,
   canNote,
+  canDelete,
   locale,
 }: {
   ticketId: number;
   article: ArticleListItem;
   canNote: boolean;
+  canDelete: boolean;
   locale: string;
 }) {
   const { t } = useTranslation();
@@ -190,6 +214,7 @@ function ArticleReader({
         ticketId={ticketId}
         article={article}
         canNote={canNote}
+        canDelete={canDelete}
         replyTestId="article-reader-reply"
       />
       <ArticleBodyLoader ticketId={ticketId} articleId={article.id} />

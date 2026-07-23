@@ -53,7 +53,21 @@ const baseState = {
   drafts: [],
   summary_body: null,
   last_summary_upto_article_id: null,
+  summary_created_at: null,
 };
+
+const baseDraft = {
+  ticket_id: 1,
+  subject: null as string | null,
+  based_on_article_id: 3 as number | null,
+  status: "open",
+  accepted_article_id: null,
+  create_time: "2026-07-23T10:00:00",
+};
+
+function fakeArticle(id: number) {
+  return { id, create_time: "2026-07-01T10:00:00", incoming_time: null };
+}
 
 describe("AiPanel", () => {
   beforeEach(() => {
@@ -90,7 +104,9 @@ describe("AiPanel", () => {
       can_summarize: true,
       summary_body: "Existing summary text",
       last_summary_upto_article_id: 42,
+      summary_created_at: "2026-07-23T09:21:00",
     });
+    listArticles.mockResolvedValue([40, 41, 42, 43].map(fakeArticle));
     summarize.mockResolvedValue({ status: "up_to_date", summary_body: null, upto_article_id: null });
 
     wrap(<AiPanel ticketId={1} canNote />);
@@ -98,9 +114,31 @@ describe("AiPanel", () => {
     await waitFor(() => expect(screen.getByTestId("ai-panel-summary-body")).toBeTruthy());
     expect(screen.getByTestId("ai-panel-summary-body").textContent).toBe("Existing summary text");
 
+    // 42-of-43 covered → stale badge, coverage dots, created-at timestamp.
+    await waitFor(() => expect(screen.getByTestId("ai-summary-stale")).toBeTruthy());
+    expect(screen.getByTestId("ai-summary-coverage").getAttribute("aria-label")).toBe("3/4");
+    expect(screen.getByTestId("ai-summary-created-at").textContent).toContain("2026");
+
     fireEvent.click(screen.getByTestId("ai-panel-summarize-button"));
     await waitFor(() => expect(summarize).toHaveBeenCalledWith(1));
     await waitFor(() => expect(screen.getByTestId("ai-panel-summary-uptodate")).toBeTruthy());
+  });
+
+  it("shows the current badge when no articles are newer than the summary", async () => {
+    getState.mockResolvedValue({
+      ...baseState,
+      summary_available: true,
+      can_summarize: false,
+      summary_body: "Summary",
+      last_summary_upto_article_id: 42,
+      summary_created_at: "2026-07-23T09:21:00",
+    });
+    listArticles.mockResolvedValue([40, 41, 42].map(fakeArticle));
+
+    wrap(<AiPanel ticketId={1} canNote />);
+
+    await waitFor(() => expect(screen.getByTestId("ai-summary-current")).toBeTruthy());
+    expect(screen.getByTestId("ai-summary-coverage").getAttribute("aria-label")).toBe("3/3");
   });
 
   it("shows the empty summary state and disables the button when can_summarize is false", async () => {
@@ -122,17 +160,7 @@ describe("AiPanel", () => {
       ...baseState,
       manual_assist_available: true,
       drafts: [
-        {
-          id: 7,
-          ticket_id: 1,
-          kind: "reply",
-          subject: "Re: Hello",
-          body: "Draft body text",
-          based_on_article_id: 3,
-          status: "open",
-          source: "manual",
-          accepted_article_id: null,
-        },
+        { ...baseDraft, id: 7, kind: "reply", subject: "Re: Hello", body: "Draft body text", source: "manual" },
       ],
     });
     requestDraft.mockRejectedValue(new ApiError(429, "Too many requests", "/api/v1/tickets/1/ai/draft"));
@@ -140,6 +168,8 @@ describe("AiPanel", () => {
     wrap(<AiPanel ticketId={1} canNote />);
 
     await waitFor(() => expect(screen.getByTestId("ai-panel-draft-7")).toBeTruthy());
+    // Draft card meta line: timestamp + source + based-on article.
+    expect(screen.getByTestId("ai-panel-draft-meta-7").textContent).toContain("2026");
 
     fireEvent.click(screen.getByTestId("ai-panel-create-draft-button"));
     await waitFor(() => expect(requestDraft).toHaveBeenCalledWith(1));
@@ -151,19 +181,7 @@ describe("AiPanel", () => {
     getState.mockResolvedValue({
       ...baseState,
       manual_assist_available: true,
-      drafts: [
-        {
-          id: 7,
-          ticket_id: 1,
-          kind: "reply",
-          subject: null,
-          body: "Draft body",
-          based_on_article_id: 3,
-          status: "open",
-          source: "auto",
-          accepted_article_id: null,
-        },
-      ],
+      drafts: [{ ...baseDraft, id: 7, kind: "reply", body: "Draft body", source: "auto" }],
     });
     discardDraft.mockResolvedValue(undefined);
 
@@ -183,17 +201,7 @@ describe("AiPanel", () => {
       ...baseState,
       manual_assist_available: true,
       drafts: [
-        {
-          id: 8,
-          ticket_id: 1,
-          kind: "clarify",
-          subject: null,
-          body: "Draft body",
-          based_on_article_id: null,
-          status: "open",
-          source: "auto",
-          accepted_article_id: null,
-        },
+        { ...baseDraft, id: 8, kind: "clarify", body: "Draft body", based_on_article_id: null, source: "auto" },
       ],
     });
     wrap(<AiPanel ticketId={1} canNote />);
@@ -212,17 +220,7 @@ describe("AiPanel", () => {
       ...baseState,
       manual_assist_available: true,
       drafts: [
-        {
-          id: 9,
-          ticket_id: 1,
-          kind: "reply",
-          subject: "Re: Draft subject",
-          body: "AI drafted answer",
-          based_on_article_id: 3,
-          status: "open",
-          source: "manual",
-          accepted_article_id: null,
-        },
+        { ...baseDraft, id: 9, kind: "reply", subject: "Re: Draft subject", body: "AI drafted answer", source: "manual" },
       ],
     });
 

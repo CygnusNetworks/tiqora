@@ -78,9 +78,11 @@ def _is_body_part_attachment(a: AttachmentMeta) -> bool:
         return True
     name = (a.filename or "").lower()
     ctype = (a.content_type or "").lower()
-    if name == "file-1" and ctype.startswith("text/plain"):
-        return True
-    return name in ("file-2", "file-1.html") and ctype.startswith("text/html")
+    # ``file-1`` is text/plain for plain mails but text/html for HTML-only
+    # mails (no multipart/alternative) — both are body duplicates.
+    return name in ("file-1", "file-2", "file-1.html") and (
+        ctype.startswith("text/plain") or ctype.startswith("text/html")
+    )
 
 
 def _is_inline_attachment(a: AttachmentMeta) -> bool:
