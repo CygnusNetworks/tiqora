@@ -101,9 +101,15 @@ export function KbArticlePage() {
           {(article.tags ?? []).length > 0 && (
             <div className="flex flex-wrap gap-1">
               {(article.tags ?? []).map((tag) => (
-                <Badge key={tag} tone="muted">
+                <Link
+                  key={tag}
+                  to="/agent/kb"
+                  search={{ tag }}
+                  data-testid={`kb-article-tag-${tag}`}
+                  className="inline-flex items-center rounded-full bg-accent-dim px-2 py-0.5 text-[11px] font-medium text-accent hover:bg-accent/25"
+                >
                   {tag}
-                </Badge>
+                </Link>
               ))}
             </div>
           )}

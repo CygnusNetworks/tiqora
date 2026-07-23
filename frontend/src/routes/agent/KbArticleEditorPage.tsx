@@ -11,6 +11,7 @@ import { ChevronDownIcon } from "@/components/ui/icons";
 import { MarkdownView } from "@/components/kb/MarkdownView";
 import { KbAttachments } from "@/components/kb/KbAttachments";
 import { HelpPopover } from "@/components/ui/HelpPopover";
+import { TagInput } from "@/components/ui/TagInput";
 import { slugify } from "@/lib/slug";
 import { cn } from "@/lib/cn";
 
@@ -29,7 +30,7 @@ type FormState = {
   categoryId: number | null;
   language: string;
   state: string;
-  tags: string;
+  tags: string[];
   contentMd: string;
 };
 
@@ -39,7 +40,7 @@ const EMPTY_FORM: FormState = {
   categoryId: null,
   language: "en",
   state: "draft",
-  tags: "",
+  tags: [],
   contentMd: "",
 };
 
@@ -79,7 +80,7 @@ function KbArticleEditor({ articleId }: { articleId?: number }) {
       categoryId: a.category_id,
       language: a.language,
       state: a.state,
-      tags: (a.tags ?? []).join(", "),
+      tags: a.tags ?? [],
       contentMd: a.content_md,
     });
     setCurrentState(a.state);
@@ -94,11 +95,8 @@ function KbArticleEditor({ articleId }: { articleId?: number }) {
     }
   }, [isEdit, categoriesQ.data]);
 
-  const tagsArray = () =>
-    form.tags
-      .split(",")
-      .map((s) => s.trim())
-      .filter(Boolean);
+  const tagsQ = useQuery({ queryKey: ["kb", "tags"], queryFn: () => api.listKbTags() });
+  const tagsArray = () => form.tags;
 
   const onSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -367,12 +365,15 @@ function KbArticleEditor({ articleId }: { articleId?: number }) {
                 {t("kb.help.tags")}
               </HelpPopover>
             </span>
-            <input
-              data-testid="kb-form-tags"
+            <TagInput
+              testId="kb-form-tags"
               value={form.tags}
-              onChange={(e) => setForm((f) => ({ ...f, tags: e.target.value }))}
+              onChange={(tags) => setForm((f) => ({ ...f, tags }))}
+              suggestions={(tagsQ.data ?? []).map((tg) => ({
+                name: tg.name,
+                count: tg.article_count,
+              }))}
               placeholder={t("kb.field.tagsPlaceholder")}
-              className={inputClass}
             />
           </label>
         </div>

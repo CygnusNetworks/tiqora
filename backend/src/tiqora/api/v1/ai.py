@@ -19,9 +19,10 @@ from pydantic import BaseModel
 
 from tiqora.ai import drafts as ai_drafts
 from tiqora.ai.acl import check_feature_access
-from tiqora.ai.context import load_articles
+from tiqora.ai.context import article_from_address, latest_customer_article_id, load_articles
 from tiqora.ai.gate import is_tiqora_primary
 from tiqora.ai.kb_wiring import build_llm_client, kb_bundle, kb_get_article_fn, kb_search_fn
+from tiqora.ai.listfields import parse_str_list
 from tiqora.ai.models import TiqoraAiTicketState
 from tiqora.ai.policies import get_queue_policy_by_queue
 from tiqora.ai.runtime import (
@@ -34,6 +35,7 @@ from tiqora.ai.runtime import (
     PolicyDisabledError,
     run_ticket_agent,
 )
+from tiqora.ai.senders import matches_ignored
 from tiqora.ai.summary import TRIGGER_MANUAL as SUMMARY_TRIGGER_MANUAL
 from tiqora.ai.summary import (
     SummaryAclDeniedError,
@@ -187,6 +189,17 @@ async def request_manual_draft(
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT, detail="Manual Assist is disabled for this queue"
         )
+
+    if policy.ignore_senders_manual:
+        ignored_senders = parse_str_list(policy.ignored_senders)
+        if ignored_senders:
+            latest_id = await latest_customer_article_id(session, ticket_id)
+            from_address = await article_from_address(session, latest_id) if latest_id else None
+            if matches_ignored(from_address, ignored_senders):
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail="Sender is on the ignored-senders list for this queue",
+                )
 
     llm = await build_llm_client(session, settings, policy.llm_provider_id, policy.model_override)
     bundle = await kb_bundle(session, settings, user.id, policy)

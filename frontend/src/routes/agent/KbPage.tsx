@@ -22,7 +22,10 @@ const STATE_TONE: Record<string, "muted" | "accent" | "success" | "warn"> = {
   archived: "muted",
 };
 
-export type KbSearch = { category_id?: number; state?: StateFilter };
+export type KbSearch = { category_id?: number; state?: StateFilter; tag?: string };
+
+/** How many tag pills the filter bar shows before collapsing behind "more". */
+const TAG_BAR_LIMIT = 12;
 
 export function KbPage() {
   const { t, i18n } = useTranslation();
@@ -32,6 +35,11 @@ export function KbPage() {
 
   const categoryId = search.category_id ?? null;
   const state = search.state ?? "all";
+  const activeTags = useMemo(
+    () => (search.tag ?? "").split(",").map((s) => s.trim()).filter(Boolean),
+    [search.tag],
+  );
+  const [tagsExpanded, setTagsExpanded] = useState(false);
 
   const setSearch = (patch: Partial<KbSearch>) => {
     void navigate({
@@ -52,13 +60,37 @@ export function KbPage() {
   });
 
   const articlesQ = useQuery({
-    queryKey: ["kb", "articles", { categoryId, state }],
+    queryKey: ["kb", "articles", { categoryId, state, tag: search.tag ?? null }],
     queryFn: () =>
       api.listKbArticles({
         category_id: categoryId ?? undefined,
         state: state === "all" ? undefined : state,
+        tag: activeTags.length > 0 ? activeTags.join(",") : undefined,
       }),
   });
+
+  const tagsQ = useQuery({ queryKey: ["kb", "tags"], queryFn: () => api.listKbTags() });
+
+  // Filter bar shows the most-used tags first; active ones are always kept
+  // visible even when they fall outside the top slice.
+  const tagBar = useMemo(() => {
+    const sorted = [...(tagsQ.data ?? [])].sort((a, b) => b.article_count - a.article_count);
+    const visible = tagsExpanded ? sorted : sorted.slice(0, TAG_BAR_LIMIT);
+    for (const name of activeTags) {
+      if (!visible.some((tg) => tg.name === name)) {
+        const full = sorted.find((tg) => tg.name === name);
+        if (full) visible.push(full);
+      }
+    }
+    return { visible, hasMore: sorted.length > TAG_BAR_LIMIT };
+  }, [tagsQ.data, tagsExpanded, activeTags]);
+
+  const toggleTag = (name: string) => {
+    const next = activeTags.includes(name)
+      ? activeTags.filter((tg) => tg !== name)
+      : [...activeTags, name];
+    setSearch({ tag: next.length > 0 ? next.join(",") : undefined });
+  };
 
   const counts = useMemo(() => {
     const out: Record<number, number> = {};
@@ -204,6 +236,42 @@ export function KbPage() {
           </div>
         </div>
 
+        {(tagsQ.data ?? []).length > 0 && (
+          <div className="flex flex-wrap items-center gap-1.5" data-testid="kb-tag-bar">
+            {tagBar.visible.map((tg) => {
+              const active = activeTags.includes(tg.name);
+              return (
+                <button
+                  key={tg.name}
+                  type="button"
+                  data-testid={`kb-tag-filter-${tg.name}`}
+                  aria-pressed={active}
+                  onClick={() => toggleTag(tg.name)}
+                  className={cn(
+                    "inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-[12px] font-medium transition-colors duration-100",
+                    active
+                      ? "border-accent bg-accent-dim text-accent"
+                      : "border-hairline bg-surface text-muted hover:border-accent/50 hover:text-ink",
+                  )}
+                >
+                  {tg.name}
+                  <span className="text-[10px] tabular-nums opacity-70">{tg.article_count}</span>
+                </button>
+              );
+            })}
+            {tagBar.hasMore && (
+              <button
+                type="button"
+                data-testid="kb-tag-bar-more"
+                onClick={() => setTagsExpanded((v) => !v)}
+                className="text-[12px] font-medium text-accent hover:underline"
+              >
+                {tagsExpanded ? t("kb.tagBarLess") : t("kb.tagBarMore")}
+              </button>
+            )}
+          </div>
+        )}
+
         {articlesQ.isLoading ? (
           <div className="flex justify-center py-8">
             <Spinner />
@@ -259,6 +327,15 @@ export function KbPage() {
                         {categoriesById.get(a.category_id)!.name}
                       </span>
                     )}
+                    {(a.tags ?? []).map((tag) => (
+                      <span
+                        key={tag}
+                        className="inline-flex items-center rounded-full bg-accent-dim px-2 py-0.5 text-[11px] font-medium text-accent"
+                        data-testid={`kb-row-tag-${a.id}-${tag}`}
+                      >
+                        {tag}
+                      </span>
+                    ))}
                   </div>
                   <p className="mt-1 text-sm font-medium text-ink">{a.title}</p>
                   <p className="mt-0.5 text-xs text-muted">

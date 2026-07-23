@@ -220,7 +220,11 @@ const agentKbRoute = createRoute({
       s.state === "archived"
         ? s.state
         : undefined;
-    return { category_id: num(s.category_id), state };
+    return {
+      category_id: num(s.category_id),
+      state,
+      tag: typeof s.tag === "string" && s.tag !== "" ? s.tag : undefined,
+    };
   },
   component: KbPage,
 });

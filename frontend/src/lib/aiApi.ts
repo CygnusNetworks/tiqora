@@ -18,6 +18,7 @@ export type ProviderKind = "openai_compat" | "anthropic";
 export type McpTransport = "streamable_http";
 export type Autonomy = "off" | "clarify_only" | "full";
 export type IdentityMode = "ticket_customer_id" | "clarify_schema" | "off";
+export type ReplyLanguageMode = "off" | "fixed" | "auto";
 export type AclSubjectType = "group" | "role" | "user";
 export type AclFeature = "summary" | "auto_reply" | "manual_assist" | "mcp";
 
@@ -140,6 +141,12 @@ export type AiQueuePolicyOut = {
   pii_masking: boolean;
   identity_mode: IdentityMode;
   clarify_schema_json: string | null;
+  ignored_senders: string | null;
+  ignore_senders_manual: boolean;
+  reply_language_mode: ReplyLanguageMode;
+  reply_language_fixed: string | null;
+  reply_language_default: string | null;
+  allowed_state_types: string | null;
   valid_id: number;
   create_time: string;
   change_time: string;
@@ -174,6 +181,12 @@ export type AiQueuePolicyCreate = {
   pii_masking?: boolean;
   identity_mode?: IdentityMode;
   clarify_schema_json?: string | null;
+  ignored_senders?: string | null;
+  ignore_senders_manual?: boolean;
+  reply_language_mode?: ReplyLanguageMode;
+  reply_language_fixed?: string | null;
+  reply_language_default?: string | null;
+  allowed_state_types?: string | null;
 };
 
 export type AiQueuePolicyUpdate = Partial<AiQueuePolicyCreate> & { valid_id?: number };

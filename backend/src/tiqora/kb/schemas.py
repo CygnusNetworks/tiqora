@@ -112,6 +112,7 @@ class ArticleSummary(BaseModel):
     state: str
     version: int
     change_time: datetime
+    tags: list[str] = Field(default_factory=list)
 
 
 class ArticleVersionOut(BaseModel):
@@ -134,6 +135,13 @@ class AttachmentOut(BaseModel):
     filename: str
     content_type: str | None = None
     size: int
+
+
+class TagOut(BaseModel):
+    """A KB tag with the count of articles visible to the requesting user."""
+
+    name: str
+    article_count: int
 
 
 class KnowledgeArticle(BaseModel):

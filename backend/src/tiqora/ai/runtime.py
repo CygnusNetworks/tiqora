@@ -35,6 +35,7 @@ from tiqora.ai.context import (
     get_or_create_state,
     latest_customer_article_id,
     load_articles,
+    render_ticket_header,
     ticket_snapshot,
 )
 from tiqora.ai.gate import AiGateError, require_feature_allowed
@@ -49,6 +50,8 @@ from tiqora.ai.models import (
     DRAFT_KIND_REPLY,
     FEATURE_AUTO_REPLY,
     FEATURE_MANUAL_ASSIST,
+    REPLY_LANGUAGE_AUTO,
+    REPLY_LANGUAGE_FIXED,
     SOURCE_AUTO,
     SOURCE_MANUAL,
     TiqoraAiArticleOrigin,
@@ -59,6 +62,7 @@ from tiqora.ai.models import (
 )
 from tiqora.ai.pii import PiiMapper
 from tiqora.ai.policies import get_queue_policy_by_queue
+from tiqora.ai.reply_language import LANGUAGE_PROFILES, detect_reply_language
 from tiqora.ai.tools import (
     McpToolSpec,
     ToolArgumentError,
@@ -213,7 +217,11 @@ async def _load_mcp_tools(
 
 
 def _build_system_prompt(
-    policy: TiqoraAiQueuePolicy, *, trigger: str, kind_hint: str | None
+    policy: TiqoraAiQueuePolicy,
+    *,
+    trigger: str,
+    kind_hint: str | None,
+    reply_language_binding: bool = False,
 ) -> str:
     parts = [policy.system_prompt or ""]
     if trigger == TRIGGER_MANUAL:
@@ -240,7 +248,33 @@ def _build_system_prompt(
         )
     if kind_hint:
         parts.append(f"Hint: this run is expected to produce a '{kind_hint}' message.")
+    if reply_language_binding:
+        parts.append("The reply language stated in the ticket header is binding.")
     return "\n\n".join(p for p in parts if p)
+
+
+def _resolve_reply_language_line(
+    policy: TiqoraAiQueuePolicy, ticket: TicketSnapshot, customer_articles: list[ArticleSnapshot]
+) -> str | None:
+    """Plan block 3: at most one binding reply-language line, resolved once
+    per run — never per article. ``off`` (default) reproduces today's
+    behaviour exactly (no line at all)."""
+    if policy.reply_language_mode == REPLY_LANGUAGE_FIXED:
+        if not policy.reply_language_fixed:
+            return None
+        return f"Reply language (binding): {policy.reply_language_fixed}"
+    if policy.reply_language_mode == REPLY_LANGUAGE_AUTO:
+        if not policy.reply_language_default:
+            return None
+        latest_body = customer_articles[-1].body if customer_articles else None
+        lang = detect_reply_language(
+            ticket.title,
+            latest_body,
+            candidates=list(LANGUAGE_PROFILES),
+            default=policy.reply_language_default,
+        )
+        return f"Reply language (binding): {lang}"
+    return None
 
 
 def _build_user_message(
@@ -251,8 +285,12 @@ def _build_user_message(
     mask: bool,
     kb_bundle: str | None,
     attachment_blocks: dict[int, str] | None = None,
+    reply_language_line: str | None = None,
 ) -> str:
-    lines = [f"Ticket #{ticket.ticket_id}: {ticket.title}", ""]
+    lines = [render_ticket_header(ticket)]
+    if reply_language_line:
+        lines.append(reply_language_line)
+    lines.append("")
     for a in articles:
         label = "agent" if a.sender_type == "agent" else a.sender_type
         if a.is_ai_origin:
@@ -261,11 +299,16 @@ def _build_user_message(
         attach_text = (attachment_blocks or {}).get(a.id)
         if attach_text:
             body = f"{body}\n\n{attach_text}" if body else attach_text
+        subject_line = f"Subject: {a.subject}" if a.subject else None
         if mask:
             body = pii.mask(body)
+            if subject_line:
+                subject_line = pii.mask(subject_line)
         # Untrusted content delimiter (plan §3.8) — the article body is
         # customer/agent free text, never instructions to the model.
         lines.append(f"--- article {a.id} [{label}] ---")
+        if subject_line:
+            lines.append(subject_line)
         lines.append(body)
         lines.append("")
     if kb_bundle:
@@ -390,11 +433,18 @@ async def run_ticket_agent(
             vision_llm_factory=effective_vision_factory,
         )
 
-        pii = PiiMapper(never_mask={ticket.customer_id} if ticket.customer_id else None)
+        never_mask = {v for v in (ticket.customer_id, ticket.customer_user_id) if v}
+        pii = PiiMapper(never_mask=never_mask or None)
         llm = AuditingLlmClient(
             llm, settings=settings, context=audit_context, session=session, pii_mapper=pii
         )
-        system_prompt = _build_system_prompt(policy, trigger=trigger, kind_hint=kind_hint)
+        reply_language_line = _resolve_reply_language_line(policy, ticket, customer_articles)
+        system_prompt = _build_system_prompt(
+            policy,
+            trigger=trigger,
+            kind_hint=kind_hint,
+            reply_language_binding=reply_language_line is not None,
+        )
         user_message = _build_user_message(
             ticket,
             articles,
@@ -402,6 +452,7 @@ async def run_ticket_agent(
             mask=bool(policy.pii_masking),
             kb_bundle=kb_bundle,
             attachment_blocks=attachment_context.blocks,
+            reply_language_line=reply_language_line,
         )
 
         # 8. Tools
@@ -422,6 +473,7 @@ async def run_ticket_agent(
             mcp_caller=mcp_caller,
             kb_search_fn=kb_search_fn,
             kb_get_article_fn=kb_get_article_fn,
+            allowed_state_types_raw=policy.allowed_state_types,
         )
 
         messages: list[LlmMessage] = [

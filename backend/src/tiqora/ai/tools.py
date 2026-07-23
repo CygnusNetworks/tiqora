@@ -28,10 +28,12 @@ from dataclasses import dataclass
 from typing import Any, Protocol
 
 import structlog
+from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from tiqora.ai.escalation import check_escalation
-from tiqora.ai.models import AUTONOMY_FULL
+from tiqora.ai.listfields import parse_str_list
+from tiqora.ai.models import AUTONOMY_FULL, DEFAULT_ALLOWED_STATE_TYPES
 from tiqora.ai.pii import PiiMapper
 from tiqora.domain.ticket_write_service import ArticleIn, add_article, change_priority
 from tiqora.domain.ticket_write_service import change_state as _change_state
@@ -39,6 +41,20 @@ from tiqora.domain.ticket_write_service import set_customer as _set_customer
 from tiqora.znuny.sysconfig import SysConfig
 
 logger = structlog.get_logger(__name__)
+
+
+def resolve_allowed_state_types(raw: str | None) -> list[str]:
+    """Tolerant-parse ``tiqora_ai_queue_policy.allowed_state_types``.
+
+    ``None``/blank (never configured) falls back to
+    :data:`tiqora.ai.models.DEFAULT_ALLOWED_STATE_TYPES` — reopen allowed,
+    nothing else. An explicit empty JSON array (``"[]"``) is a deliberate
+    admin choice to disable state changes entirely and is returned as-is.
+    """
+    if raw is None or not raw.strip():
+        return list(DEFAULT_ALLOWED_STATE_TYPES)
+    return parse_str_list(raw)
+
 
 TOOL_PROPOSE_CUSTOMER_MESSAGE = "propose_customer_message"
 TOOL_ADD_INTERNAL_NOTE = "add_internal_note"
@@ -155,10 +171,16 @@ def _local_tool_schemas(*, kb_enabled: bool) -> list[dict[str, Any]]:
             "type": "function",
             "function": {
                 "name": TOOL_UPDATE_TICKET_FIELDS,
-                "description": "Set ticket state/priority/customer_id.",
+                "description": (
+                    "Set ticket state/priority/customer_id. Pass at most one of "
+                    "'state' (state name, e.g. \"open\") or 'state_id' (numeric id) — "
+                    "never both. Which target states are allowed is a queue policy "
+                    "setting; an unlisted state is rejected."
+                ),
                 "parameters": {
                     "type": "object",
                     "properties": {
+                        "state": {"type": "string"},
                         "state_id": {"type": "integer"},
                         "priority_id": {"type": "integer"},
                         "customer_id": {"type": "string"},
@@ -283,6 +305,7 @@ class ToolExecutor:
         mcp_caller: McpCaller | None = None,
         kb_search_fn: KbSearchFn | None = None,
         kb_get_article_fn: KbGetArticleFn | None = None,
+        allowed_state_types_raw: str | None = None,
     ) -> None:
         self._session = session
         self._sysconfig = sysconfig
@@ -294,6 +317,7 @@ class ToolExecutor:
         self._mcp_caller = mcp_caller or _default_mcp_call
         self._kb_search_fn = kb_search_fn
         self._kb_get_article_fn = kb_get_article_fn
+        self._allowed_state_types = resolve_allowed_state_types(allowed_state_types_raw)
 
     async def execute(self, name: str, arguments: dict[str, Any]) -> ToolOutcome:
         if not self._registry.is_known(name):
@@ -359,18 +383,67 @@ class ToolExecutor:
         )
         return ToolOutcome(name=TOOL_ADD_INTERNAL_NOTE, content_for_model="Internal note added.")
 
+    async def _resolve_state_id(self, *, state_id: Any, state_name: Any) -> int:
+        """Resolve the ``state``/``state_id`` argument pair to a concrete
+        ticket_state id, enforcing the policy's ``allowed_state_types``
+        whitelist against the target state's *type* — for both ways in
+        (name or numeric id) equally."""
+        if state_id is not None and state_name is not None:
+            raise ToolArgumentError("update_ticket_fields: pass only one of 'state' or 'state_id'")
+        if state_name is not None:
+            if not isinstance(state_name, str) or not state_name.strip():
+                raise ToolArgumentError("update_ticket_fields: 'state' must be a non-empty string")
+            row = (
+                await self._session.execute(
+                    text(
+                        "SELECT ts.id, tst.name FROM ticket_state ts"
+                        " JOIN ticket_state_type tst ON tst.id = ts.type_id"
+                        " WHERE LOWER(ts.name) = LOWER(:name) LIMIT 1"
+                    ),
+                    {"name": state_name.strip()},
+                )
+            ).first()
+            if row is None:
+                raise ToolArgumentError(f"Unknown ticket state: {state_name!r}")
+            resolved_id, type_name = int(row[0]), str(row[1])
+        else:
+            row = (
+                await self._session.execute(
+                    text(
+                        "SELECT tst.name FROM ticket_state ts"
+                        " JOIN ticket_state_type tst ON tst.id = ts.type_id"
+                        " WHERE ts.id = :sid LIMIT 1"
+                    ),
+                    {"sid": int(state_id)},
+                )
+            ).first()
+            if row is None:
+                raise ToolArgumentError(f"Unknown ticket state id: {state_id!r}")
+            resolved_id, type_name = int(state_id), str(row[0])
+
+        if type_name not in self._allowed_state_types:
+            raise ToolArgumentError(
+                f"State change to type {type_name!r} is not allowed by policy "
+                f"(allowed: {sorted(self._allowed_state_types)})"
+            )
+        return resolved_id
+
     async def _update_ticket_fields(self, arguments: dict[str, Any]) -> ToolOutcome:
         applied: list[str] = []
-        state_id = arguments.get("state_id")
-        if state_id is not None:
+        state_id_arg = arguments.get("state_id")
+        state_name_arg = arguments.get("state")
+        if state_id_arg is not None or state_name_arg is not None:
+            resolved_state_id = await self._resolve_state_id(
+                state_id=state_id_arg, state_name=state_name_arg
+            )
             await _change_state(
                 self._session,
                 ticket_id=self._ticket_id,
-                new_state_id=int(state_id),
+                new_state_id=resolved_state_id,
                 user_id=self._acting_user_id,
                 sysconfig=self._sysconfig,
             )
-            applied.append("state_id")
+            applied.append("state")
         priority_id = arguments.get("priority_id")
         if priority_id is not None:
             await change_priority(
@@ -491,4 +564,5 @@ __all__ = [
     "ToolOutcome",
     "ToolRegistry",
     "UnknownToolError",
+    "resolve_allowed_state_types",
 ]

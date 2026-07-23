@@ -6717,8 +6717,10 @@
                   "type": "null"
                 }
               ],
+              "description": "Tag name, or comma-separated list (OR)",
               "title": "Tag"
-            }
+            },
+            "description": "Tag name, or comma-separated list (OR)"
           },
           {
             "name": "authorization",
@@ -6837,6 +6839,76 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ArticleOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/kb/tags": {
+      "get": {
+        "tags": [
+          "kb"
+        ],
+        "summary": "List Tags",
+        "description": "All KB tags with the count of articles visible to the caller.",
+        "operationId": "list_tags_api_v1_kb_tags_get",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "tiqora_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/TagOut"
+                  },
+                  "title": "Response List Tags Api V1 Kb Tags Get"
                 }
               }
             }
@@ -28754,6 +28826,65 @@
               }
             ],
             "title": "Clarify Schema Json"
+          },
+          "ignored_senders": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ignored Senders"
+          },
+          "ignore_senders_manual": {
+            "type": "boolean",
+            "title": "Ignore Senders Manual",
+            "default": false
+          },
+          "reply_language_mode": {
+            "type": "string",
+            "enum": [
+              "off",
+              "fixed",
+              "auto"
+            ],
+            "title": "Reply Language Mode",
+            "default": "off"
+          },
+          "reply_language_fixed": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reply Language Fixed"
+          },
+          "reply_language_default": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reply Language Default"
+          },
+          "allowed_state_types": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Allowed State Types"
           }
         },
         "type": "object",
@@ -29009,6 +29140,63 @@
             ],
             "title": "Clarify Schema Json"
           },
+          "ignored_senders": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ignored Senders"
+          },
+          "ignore_senders_manual": {
+            "type": "boolean",
+            "title": "Ignore Senders Manual"
+          },
+          "reply_language_mode": {
+            "type": "string",
+            "enum": [
+              "off",
+              "fixed",
+              "auto"
+            ],
+            "title": "Reply Language Mode"
+          },
+          "reply_language_fixed": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reply Language Fixed"
+          },
+          "reply_language_default": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reply Language Default"
+          },
+          "allowed_state_types": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Allowed State Types"
+          },
           "valid_id": {
             "type": "integer",
             "title": "Valid Id"
@@ -29055,6 +29243,12 @@
           "pii_masking",
           "identity_mode",
           "clarify_schema_json",
+          "ignored_senders",
+          "ignore_senders_manual",
+          "reply_language_mode",
+          "reply_language_fixed",
+          "reply_language_default",
+          "allowed_state_types",
           "valid_id",
           "create_time",
           "change_time"
@@ -29369,6 +29563,77 @@
               }
             ],
             "title": "Clarify Schema Json"
+          },
+          "ignored_senders": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ignored Senders"
+          },
+          "ignore_senders_manual": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ignore Senders Manual"
+          },
+          "reply_language_mode": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "off",
+                  "fixed",
+                  "auto"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reply Language Mode"
+          },
+          "reply_language_fixed": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reply Language Fixed"
+          },
+          "reply_language_default": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reply Language Default"
+          },
+          "allowed_state_types": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Allowed State Types"
           },
           "valid_id": {
             "anyOf": [
@@ -30821,6 +31086,13 @@
             "type": "string",
             "format": "date-time",
             "title": "Change Time"
+          },
+          "tags": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Tags"
           }
         },
         "type": "object",
@@ -40916,6 +41188,25 @@
           "enabled"
         ],
         "title": "TOTPStatusOut"
+      },
+      "TagOut": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "article_count": {
+            "type": "integer",
+            "title": "Article Count"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "article_count"
+        ],
+        "title": "TagOut",
+        "description": "A KB tag with the count of articles visible to the requesting user."
       },
       "TemplateAttachmentsReplace": {
         "properties": {

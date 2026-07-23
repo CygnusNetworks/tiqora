@@ -164,21 +164,28 @@ describe("QueuesPage", () => {
       "valid_id",
     ] as const;
 
+    // CrudDrawer renders selects as SelectMenu trigger buttons now (no
+    // native <select>, and crucially no raw id number inputs).
     for (const name of selectFields) {
       const el = screen.getByTestId(`admin-form-${name}`);
-      expect(el.tagName).toBe("SELECT");
+      expect(el.tagName).toBe("BUTTON");
     }
 
-    // Options show human names, not bare numeric labels alone.
-    const groupSelect = screen.getByTestId("admin-form-group_id");
-    expect(within(groupSelect).getByText("users")).toBeInTheDocument();
-
-    const saSelect = screen.getByTestId("admin-form-system_address_id");
-    expect(within(saSelect).getByText("Znuny System <znuny@localhost>")).toBeInTheDocument();
-
-    const followUpSelect = screen.getByTestId("admin-form-follow_up_id");
-    expect(within(followUpSelect).getByText("possible")).toBeInTheDocument();
-    expect(within(followUpSelect).getByText("reject")).toBeInTheDocument();
+    // Options show human names, not bare numeric labels alone — open each
+    // menu and look inside its portal panel.
+    const openAndExpect = (testId: string, labels: string[]) => {
+      fireEvent.click(screen.getByTestId(testId));
+      const panel = screen.getByTestId(`${testId}-menu`);
+      for (const label of labels) {
+        expect(within(panel).getByText(label)).toBeInTheDocument();
+      }
+      // Close via outside pointerdown — Escape would also close the drawer
+      // (both the menu and the Dialog listen on document keydown).
+      fireEvent.pointerDown(document.body);
+    };
+    openAndExpect("admin-form-group_id", ["users"]);
+    openAndExpect("admin-form-system_address_id", ["Znuny System <znuny@localhost>"]);
+    openAndExpect("admin-form-follow_up_id", ["possible", "reject"]);
 
     // Escalation notify fields are number inputs labelled as % notify.
     for (const name of ["first_response_notify", "update_notify", "solution_notify"] as const) {

@@ -10,9 +10,11 @@ import {
   type AiQueuePolicyUpdate,
   type Autonomy,
   type IdentityMode,
+  type ReplyLanguageMode,
 } from "@/lib/aiApi";
 import { PickerField } from "@/components/admin/PickerField";
 import { HelpPopover } from "@/components/ui/HelpPopover";
+import { TagInput } from "@/components/ui/TagInput";
 import { Tabs, type TabItem } from "@/components/ui/Tabs";
 import { Button } from "@/components/ui/Button";
 import { Spinner } from "@/components/ui/Spinner";
@@ -32,6 +34,7 @@ const SETTINGS_KEY = ["admin", "ai", "settings"] as const;
 
 const AUTONOMY_VALUES: Autonomy[] = ["off", "clarify_only", "full"];
 const IDENTITY_MODES: IdentityMode[] = ["ticket_customer_id", "clarify_schema", "off"];
+const REPLY_LANGUAGE_MODES: ReplyLanguageMode[] = ["off", "fixed", "auto"];
 
 type TabId = "basics" | "drafts" | "summaries" | "auto" | "safety";
 
@@ -63,6 +66,12 @@ type FormState = {
   pii_masking: boolean;
   identity_mode: IdentityMode;
   clarify_schema_json: string;
+  ignored_senders: string;
+  ignore_senders_manual: boolean;
+  reply_language_mode: ReplyLanguageMode;
+  reply_language_fixed: string;
+  reply_language_default: string;
+  allowed_state_types: string;
 };
 
 /**
@@ -99,7 +108,45 @@ function emptyForm(queueId: number): FormState {
     pii_masking: true,
     identity_mode: "ticket_customer_id",
     clarify_schema_json: "",
+    ignored_senders: "",
+    ignore_senders_manual: false,
+    reply_language_mode: "off",
+    reply_language_fixed: "",
+    reply_language_default: "",
+    allowed_state_types: "",
   };
+}
+
+/** Newline/comma-tolerant textarea <-> stored-string conversion for
+ * `ignored_senders` (one address/glob per line in the UI, comma-joined on
+ * the wire — matches the backend's tolerant JSON-or-CSV parsing). */
+function sendersRawToLines(raw: string | null): string {
+  if (!raw || !raw.trim()) return "";
+  const trimmed = raw.trim();
+  try {
+    const parsed: unknown = JSON.parse(trimmed);
+    if (Array.isArray(parsed)) {
+      return parsed
+        .map((s) => String(s).trim())
+        .filter(Boolean)
+        .join("\n");
+    }
+  } catch {
+    // not JSON — fall through to CSV/newline splitting
+  }
+  return trimmed
+    .split(/[\n,]/)
+    .map((s) => s.trim())
+    .filter(Boolean)
+    .join("\n");
+}
+
+function linesToSendersRaw(text: string): string | null {
+  const items = text
+    .split("\n")
+    .map((s) => s.trim())
+    .filter(Boolean);
+  return items.length > 0 ? items.join(",") : null;
 }
 
 function toForm(row: AiQueuePolicyOut): FormState {
@@ -140,6 +187,12 @@ function toForm(row: AiQueuePolicyOut): FormState {
     pii_masking: row.pii_masking,
     identity_mode: row.identity_mode,
     clarify_schema_json: row.clarify_schema_json ?? "",
+    ignored_senders: sendersRawToLines(row.ignored_senders),
+    ignore_senders_manual: row.ignore_senders_manual,
+    reply_language_mode: row.reply_language_mode,
+    reply_language_fixed: row.reply_language_fixed ?? "",
+    reply_language_default: row.reply_language_default ?? "",
+    allowed_state_types: row.allowed_state_types ?? "",
   };
 }
 
@@ -238,6 +291,10 @@ function AiQueuePolicyEditor({ policyId }: { policyId?: number }) {
   const settingsQ = useQuery({
     queryKey: SETTINGS_KEY,
     queryFn: ({ signal }) => aiApi.getSettings(signal),
+  });
+  const kbTagsQ = useQuery({
+    queryKey: ["kb", "tags"],
+    queryFn: ({ signal }) => api.listKbTags(signal),
   });
 
   const editingRow = useMemo(
@@ -388,6 +445,12 @@ function AiQueuePolicyEditor({ policyId }: { policyId?: number }) {
     pii_masking: f.pii_masking,
     identity_mode: f.identity_mode,
     clarify_schema_json: f.clarify_schema_json.trim() || null,
+    ignored_senders: linesToSendersRaw(f.ignored_senders),
+    ignore_senders_manual: f.ignore_senders_manual,
+    reply_language_mode: f.reply_language_mode,
+    reply_language_fixed: f.reply_language_fixed.trim() || null,
+    reply_language_default: f.reply_language_default.trim() || null,
+    allowed_state_types: f.allowed_state_types.trim() || null,
   });
 
   const handleSave = async () => {
@@ -676,12 +739,15 @@ function AiQueuePolicyEditor({ policyId }: { policyId?: number }) {
                   help={t("admin.help.aiQueue.kbTags")}
                   testId="admin-ai-queue-help-kb_tags"
                 />
-                <input
-                  data-testid="admin-ai-queue-form-kb_tags"
-                  value={form.kb_tags}
-                  onChange={(e) => setField("kb_tags", e.target.value)}
+                <TagInput
+                  testId="admin-ai-queue-form-kb_tags"
+                  value={form.kb_tags.split(",").map((s) => s.trim()).filter(Boolean)}
+                  onChange={(tags) => setField("kb_tags", tags.join(","))}
+                  suggestions={(kbTagsQ.data ?? []).map((tg) => ({
+                    name: tg.name,
+                    count: tg.article_count,
+                  }))}
                   placeholder={t("admin.ai.queues.kbTagsPlaceholder")}
-                  className={inputClass}
                 />
               </label>
               <label className="block text-sm">
@@ -830,6 +896,92 @@ function AiQueuePolicyEditor({ policyId }: { policyId?: number }) {
 
         {tab === "auto" && (
           <div className="space-y-4">
+            <div className="space-y-2 border-b border-hairline pb-4">
+              <FieldLabel
+                text={t("admin.ai.queues.ignoredSenders")}
+                help={t("admin.help.aiQueue.ignoredSenders")}
+                testId="admin-ai-queue-help-ignored_senders"
+              />
+              <textarea
+                data-testid="admin-ai-queue-form-ignored_senders"
+                value={form.ignored_senders}
+                onChange={(e) => setField("ignored_senders", e.target.value)}
+                placeholder={t("admin.ai.queues.ignoredSendersPlaceholder")}
+                rows={3}
+                spellCheck={false}
+                className={cn(inputClass, "font-mono text-xs")}
+              />
+              <label className="flex items-center gap-2 text-sm text-ink">
+                <input
+                  type="checkbox"
+                  data-testid="admin-ai-queue-form-ignore_senders_manual"
+                  checked={form.ignore_senders_manual}
+                  onChange={(e) => setField("ignore_senders_manual", e.target.checked)}
+                  className="rounded border-hairline"
+                />
+                {t("admin.ai.queues.ignoreSendersManual")}
+                <HelpPopover
+                  title={t("admin.ai.queues.ignoreSendersManual")}
+                  testId="admin-ai-queue-help-ignore_senders_manual"
+                >
+                  {t("admin.help.aiQueue.ignoreSendersManual")}
+                </HelpPopover>
+              </label>
+            </div>
+
+            <div className="grid gap-4 border-b border-hairline pb-4 sm:grid-cols-2">
+              <label className="block text-sm">
+                <FieldLabel
+                  text={t("admin.ai.queues.replyLanguageMode.label")}
+                  help={t("admin.help.aiQueue.replyLanguageMode")}
+                  defaultHint={t("admin.ai.queues.replyLanguageMode.off")}
+                  testId="admin-ai-queue-help-reply_language_mode"
+                />
+                <PickerField
+                  testId="admin-ai-queue-form-reply_language_mode"
+                  value={form.reply_language_mode}
+                  items={REPLY_LANGUAGE_MODES.map((m) => ({
+                    value: m,
+                    label: t(`admin.ai.queues.replyLanguageMode.${m}`),
+                  }))}
+                  placeholder={t("admin.form.selectPlaceholder")}
+                  onSelect={(v) => setField("reply_language_mode", v)}
+                />
+              </label>
+              {form.reply_language_mode === "fixed" && (
+                <label className="block text-sm">
+                  <FieldLabel
+                    text={t("admin.ai.queues.replyLanguageFixed")}
+                    help={t("admin.help.aiQueue.replyLanguageFixed")}
+                    testId="admin-ai-queue-help-reply_language_fixed"
+                  />
+                  <input
+                    data-testid="admin-ai-queue-form-reply_language_fixed"
+                    value={form.reply_language_fixed}
+                    onChange={(e) => setField("reply_language_fixed", e.target.value)}
+                    placeholder="de"
+                    className={inputClass}
+                  />
+                </label>
+              )}
+              {form.reply_language_mode === "auto" && (
+                <label className="block text-sm">
+                  <FieldLabel
+                    text={t("admin.ai.queues.replyLanguageDefault")}
+                    help={t("admin.help.aiQueue.replyLanguageDefault")}
+                    testId="admin-ai-queue-help-reply_language_default"
+                  />
+                  <input
+                    data-testid="admin-ai-queue-form-reply_language_default"
+                    value={form.reply_language_default}
+                    onChange={(e) => setField("reply_language_default", e.target.value)}
+                    placeholder="de"
+                    className={inputClass}
+                  />
+                </label>
+              )}
+            </div>
+
             {!gateOpen && (
               <p
                 className="rounded-md border border-escalation/40 bg-escalation/10 p-2 text-xs text-escalation"
@@ -1055,6 +1207,21 @@ function AiQueuePolicyEditor({ policyId }: { policyId?: number }) {
                 }))}
                 placeholder={t("admin.form.selectPlaceholder")}
                 onSelect={(v) => setField("identity_mode", v)}
+              />
+            </label>
+            <label className="block text-sm sm:col-span-2">
+              <FieldLabel
+                text={t("admin.ai.queues.allowedStateTypes")}
+                help={t("admin.help.aiQueue.allowedStateTypes")}
+                defaultHint="open"
+                testId="admin-ai-queue-help-allowed_state_types"
+              />
+              <input
+                data-testid="admin-ai-queue-form-allowed_state_types"
+                value={form.allowed_state_types}
+                onChange={(e) => setField("allowed_state_types", e.target.value)}
+                placeholder="open"
+                className={inputClass}
               />
             </label>
             {form.identity_mode === "clarify_schema" && (

@@ -49,14 +49,17 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from tiqora.ai import summary as summary_service
 from tiqora.ai.context import (
     TicketNotFoundError,
+    article_from_address,
     get_or_create_state,
     ticket_snapshot,
 )
 from tiqora.ai.gate import is_tiqora_primary
 from tiqora.ai.kb_wiring import build_llm_client, kb_bundle, kb_get_article_fn, kb_search_fn
+from tiqora.ai.listfields import parse_str_list
 from tiqora.ai.models import FEATURE_AUTO_REPLY, TiqoraAiQueuePolicy, TiqoraAiUsage
 from tiqora.ai.policies import get_queue_policy_by_queue
 from tiqora.ai.runtime import TRIGGER_AUTO, AgentRunError, AgentRunResult, run_ticket_agent
+from tiqora.ai.senders import matches_ignored
 from tiqora.config import Settings, get_settings
 from tiqora.db.engine import get_session_factory
 from tiqora.domain.settings_store import (
@@ -217,6 +220,18 @@ async def _process_customer_article_event(
     policy = await get_queue_policy_by_queue(session, ticket.queue_id)
     if policy is None or not policy.enabled_auto_reply or policy.service_user_id is None:
         return None
+
+    ignored_senders = parse_str_list(policy.ignored_senders)
+    if ignored_senders:
+        from_address = await article_from_address(session, int(article_id))
+        if matches_ignored(from_address, ignored_senders):
+            logger.info(
+                "ai_auto_worker_sender_skip",
+                ticket_id=ticket_id,
+                queue_id=ticket.queue_id,
+                **{"from": from_address},
+            )
+            return None
 
     state = await get_or_create_state(session, ticket_id)
 

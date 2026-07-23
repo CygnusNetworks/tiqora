@@ -24,6 +24,9 @@ from tiqora.ai.models import (
     AUTONOMY_MODES,
     FEATURE_AUTO_REPLY,
     IDENTITY_MODES,
+    REPLY_LANGUAGE_AUTO,
+    REPLY_LANGUAGE_FIXED,
+    REPLY_LANGUAGE_MODES,
     TiqoraAiQueuePolicy,
     TiqoraLlmProvider,
 )
@@ -81,6 +84,9 @@ def _validate_fields(
     enabled_auto_reply: bool | None,
     service_user_id: int | None,
     llm_provider_id: int | None,
+    reply_language_mode: str | None,
+    reply_language_fixed: str | None,
+    reply_language_default: str | None,
 ) -> None:
     if autonomy is not None and autonomy not in AUTONOMY_MODES:
         raise QueuePolicyValidationError(
@@ -99,6 +105,19 @@ def _validate_fields(
             raise QueuePolicyValidationError(
                 "enabled_auto_reply=true requires llm_provider_id to be set"
             )
+    if reply_language_mode is not None and reply_language_mode not in REPLY_LANGUAGE_MODES:
+        raise QueuePolicyValidationError(
+            f"Invalid reply_language_mode: {reply_language_mode!r} "
+            f"(expected one of {sorted(REPLY_LANGUAGE_MODES)})"
+        )
+    if reply_language_mode == REPLY_LANGUAGE_FIXED and not reply_language_fixed:
+        raise QueuePolicyValidationError(
+            "reply_language_mode=fixed requires reply_language_fixed to be set"
+        )
+    if reply_language_mode == REPLY_LANGUAGE_AUTO and not reply_language_default:
+        raise QueuePolicyValidationError(
+            "reply_language_mode=auto requires reply_language_default to be set"
+        )
 
 
 async def _validate_vision_provider(session: AsyncSession, vision_provider_id: int | None) -> None:
@@ -165,6 +184,12 @@ async def create_queue_policy(
     pii_masking: bool = True,
     identity_mode: str = "ticket_customer_id",
     clarify_schema_json: str | None = None,
+    ignored_senders: str | None = None,
+    ignore_senders_manual: bool = False,
+    reply_language_mode: str = "off",
+    reply_language_fixed: str | None = None,
+    reply_language_default: str | None = None,
+    allowed_state_types: str | None = None,
 ) -> TiqoraAiQueuePolicy:
     _validate_fields(
         autonomy=autonomy,
@@ -172,6 +197,9 @@ async def create_queue_policy(
         enabled_auto_reply=enabled_auto_reply,
         service_user_id=service_user_id,
         llm_provider_id=llm_provider_id,
+        reply_language_mode=reply_language_mode,
+        reply_language_fixed=reply_language_fixed,
+        reply_language_default=reply_language_default,
     )
     _validate_escalation_rules_json(escalation_rules)
     await _validate_vision_provider(session, vision_provider_id)
@@ -212,6 +240,12 @@ async def create_queue_policy(
         pii_masking=pii_masking,
         identity_mode=identity_mode,
         clarify_schema_json=clarify_schema_json,
+        ignored_senders=ignored_senders,
+        ignore_senders_manual=ignore_senders_manual,
+        reply_language_mode=reply_language_mode,
+        reply_language_fixed=reply_language_fixed,
+        reply_language_default=reply_language_default,
+        allowed_state_types=allowed_state_types,
         create_by=change_by,
         change_by=change_by,
     )
@@ -235,6 +269,11 @@ async def update_queue_policy(
     effective_enabled_auto_reply = fields.get("enabled_auto_reply", row.enabled_auto_reply)
     effective_service_user_id = fields.get("service_user_id", row.service_user_id)
     effective_llm_provider_id = fields.get("llm_provider_id", row.llm_provider_id)
+    effective_reply_language_mode = fields.get("reply_language_mode", row.reply_language_mode)
+    effective_reply_language_fixed = fields.get("reply_language_fixed", row.reply_language_fixed)
+    effective_reply_language_default = fields.get(
+        "reply_language_default", row.reply_language_default
+    )
 
     _validate_fields(
         autonomy=effective_autonomy,
@@ -242,6 +281,9 @@ async def update_queue_policy(
         enabled_auto_reply=effective_enabled_auto_reply,
         service_user_id=effective_service_user_id,
         llm_provider_id=effective_llm_provider_id,
+        reply_language_mode=effective_reply_language_mode,
+        reply_language_fixed=effective_reply_language_fixed,
+        reply_language_default=effective_reply_language_default,
     )
     if "escalation_rules" in fields:
         _validate_escalation_rules_json(fields.get("escalation_rules"))

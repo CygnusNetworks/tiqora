@@ -16,6 +16,7 @@ from tiqora.ai.tools import (
     ToolExecutor,
     ToolRegistry,
     UnknownToolError,
+    resolve_allowed_state_types,
 )
 
 
@@ -98,3 +99,29 @@ async def test_executor_rejects_mutating_mcp_tool_when_not_full_autonomy() -> No
     )
     with pytest.raises(UnknownToolError):
         await executor.execute(spec.full_name, {})
+
+
+# ---------------------------------------------------------------------------
+# resolve_allowed_state_types (plan block 5)
+# ---------------------------------------------------------------------------
+
+
+def test_resolve_allowed_state_types_defaults_to_open_when_unset() -> None:
+    assert resolve_allowed_state_types(None) == ["open"]
+    assert resolve_allowed_state_types("") == ["open"]
+    assert resolve_allowed_state_types("   ") == ["open"]
+
+
+def test_resolve_allowed_state_types_explicit_empty_list_disables_all() -> None:
+    assert resolve_allowed_state_types("[]") == []
+
+
+def test_resolve_allowed_state_types_parses_json_array() -> None:
+    assert resolve_allowed_state_types('["open", "pending reminder"]') == [
+        "open",
+        "pending reminder",
+    ]
+
+
+def test_resolve_allowed_state_types_parses_csv() -> None:
+    assert resolve_allowed_state_types("open, closed") == ["open", "closed"]

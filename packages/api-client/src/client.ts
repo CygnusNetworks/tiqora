@@ -85,6 +85,9 @@ export type KbArticleUpdateIn = Schemas["ArticleUpdateIn"];
 export type ArticleSummary = Schemas["ArticleSummary"];
 export type ArticleVersionOut = Schemas["ArticleVersionOut"];
 export type AssignableGroup = Schemas["AssignableGroup"];
+// Hand-typed until the /kb/tags endpoint lands in the regenerated schema —
+// shape mirrors backend KbTagOut exactly.
+export type KbTagOut = { name: string; article_count: number };
 export type KbAttachmentOut = Schemas["AttachmentOut"];
 export type KnowledgeArticle = Schemas["KnowledgeArticle"];
 export type KnowledgeBundle = Schemas["KnowledgeBundle"];
@@ -1349,6 +1352,11 @@ export class ApiClient {
       query: params,
       signal,
     });
+  }
+
+  /** All KB tag names with ACL-filtered visible-article counts. */
+  listKbTags(signal?: AbortSignal) {
+    return this.request<KbTagOut[]>("GET", "/api/v1/kb/tags", { signal });
   }
 
   /** ACL-filtered agent-knowledge bundle selected by tag(s) and/or category. */

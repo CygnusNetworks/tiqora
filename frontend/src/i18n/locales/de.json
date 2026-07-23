@@ -764,7 +764,19 @@
           "loadError": "Policy konnte nicht geladen werden.",
           "queueLocked": "Die Queue kann nach dem Anlegen nicht mehr geändert werden."
         },
-        "autoGateWarning": "Auto-Antworten erfordern den Betriebsmodus „Nur Tiqora“ (tiqora_primary). Aktuell: Parallelbetrieb — der Schalter bleibt gesperrt."
+        "autoGateWarning": "Auto-Antworten erfordern den Betriebsmodus „Nur Tiqora“ (tiqora_primary). Aktuell: Parallelbetrieb — der Schalter bleibt gesperrt.",
+        "ignoredSenders": "Ignorierte Absender",
+        "ignoredSendersPlaceholder": "eine Adresse pro Zeile, z. B. noreply@example.com oder *@internal.example",
+        "ignoreSendersManual": "Auch bei manuellen Entwürfen blocken",
+        "replyLanguageMode": {
+          "label": "Antwortsprache",
+          "off": "Aus (unverändert)",
+          "fixed": "Fest",
+          "auto": "Automatisch erkennen"
+        },
+        "replyLanguageFixed": "Feste Sprache",
+        "replyLanguageDefault": "Rückfallsprache",
+        "allowedStateTypes": "Erlaubte Status-Typen"
       },
       "usage": {
         "title": "Nutzung",
@@ -884,7 +896,13 @@
         "escalationRules": "JSON-Regeln, die MCP-Tool-Ergebnisse vor dem PII-Masking prüfen; jeder Treffer stoppt das automatische Senden hart und eskaliert an einen Menschen (reine ODER-Verknüpfung, keine Priorität zwischen Regeln).",
         "piiMasking": "Maskiert erkannte Kunden-Identifikatoren (E-Mail, Telefon, MAC, IP) im Ticket-Text und in MCP-Tool-Ergebnissen, bevor sie an das Modell gehen, und löst sie vor dem eigentlichen Tool-Aufruf bzw. vor dem Senden wieder auf. Ergänzt, ersetzt aber nicht die Provider-Wahl (EU-Hosting/AVV) als primäre Datenschutzmaßnahme.",
         "identityMode": "Wie die Kundenidentität für Tool-Aufrufe aufgelöst wird: „Ticket-Kunde“ nutzt die am Ticket hinterlegte Kunden-ID, „Rückfrage-Schema“ lässt die KI fehlende Angaben aktiv erfragen, „Aus“ deaktiviert die Identitätsauflösung.",
-        "clarifySchemaJson": "JSON-Beschreibung der Felder, die die KI beim Rückfrage-Schema aktiv erheben darf (Feldname + optionales MCP-Match-Tool)."
+        "clarifySchemaJson": "JSON-Beschreibung der Felder, die die KI beim Rückfrage-Schema aktiv erheben darf (Feldname + optionales MCP-Match-Tool).",
+        "ignoredSenders": "Absender, für die niemals automatisch geantwortet wird — exakte Adresse oder \"*@domain\"-Muster, Groß-/Kleinschreibung egal. Ein Treffer führt zu einem stillen Skip (kein Lauf, kein Entwurf). Beispiele: noreply@example.com, *@internal.example.",
+        "ignoreSendersManual": "Blockiert bei Treffer auch den manuellen „KI-Entwurf“-Button (409-Fehler) — Standard: nur der Auto-Antwort-Pfad ist betroffen, Manual Assist läuft zu Debug-Zwecken weiter.",
+        "replyLanguageMode": "Steuert, ob dem Modell eine verbindliche Antwortsprache vorgegeben wird: „Aus“ = heutiges Verhalten (keine Vorgabe), „Fest“ = immer die angegebene Sprache, „Automatisch“ = Erkennung aus Betreff + letztem Kundenartikel, mit konfigurierter Rückfallsprache bei zu kurzem/uneindeutigem Text.",
+        "replyLanguageFixed": "BCP-47-Sprachcode (z. B. \"de\", \"en\"), der bei Modus „Fest“ immer als Antwortsprache vorgegeben wird.",
+        "replyLanguageDefault": "BCP-47-Sprachcode, auf den bei Modus „Automatisch“ zurückgefallen wird, wenn der Text keiner der bekannten Sprachprofile eindeutig zugeordnet werden kann.",
+        "allowedStateTypes": "Kommagetrennte Liste erlaubter Znuny-Status-Typen (z. B. \"open\" oder \"open,pending reminder\"), auf die die KI ein Ticket per update_ticket_fields setzen darf — geprüft für sowohl Status-Name als auch Status-ID. Leer = Standard nur \"open\" (Wiedereröffnen erlaubt, nie schließen); eine leere Liste \"[]\" deaktiviert Statusänderungen komplett."
       },
       "common": {
         "validId": "Gültig/Ungültig ist ein weicher Löschstatus: „Ungültig“ blendet den Eintrag aus Auswahllisten für neue Datensätze aus, ohne bestehende Verknüpfungen (z. B. Tickets, Zuordnungen) zu löschen. Ein echtes Löschen ist nicht vorgesehen."
@@ -1840,6 +1858,8 @@
   "kb": {
     "title": "Wissensdatenbank",
     "sidebar": "Kategorien",
+    "tagBarMore": "mehr…",
+    "tagBarLess": "weniger",
     "allCategories": "Alle Kategorien",
     "noCategories": "Noch keine Kategorien.",
     "empty": "Keine Artikel für diesen Filter.",

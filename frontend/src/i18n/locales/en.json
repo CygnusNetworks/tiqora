@@ -764,7 +764,19 @@
           "loadError": "The policy could not be loaded.",
           "queueLocked": "The queue can no longer be changed after creation."
         },
-        "autoGateWarning": "Auto replies require \"Tiqora only\" (tiqora_primary) mode. Currently: parallel operation — the switch stays locked."
+        "autoGateWarning": "Auto replies require \"Tiqora only\" (tiqora_primary) mode. Currently: parallel operation — the switch stays locked.",
+        "ignoredSenders": "Ignored senders",
+        "ignoredSendersPlaceholder": "one address per line, e.g. noreply@example.com or *@internal.example",
+        "ignoreSendersManual": "Also block manual drafts",
+        "replyLanguageMode": {
+          "label": "Reply language",
+          "off": "Off (unchanged)",
+          "fixed": "Fixed",
+          "auto": "Auto-detect"
+        },
+        "replyLanguageFixed": "Fixed language",
+        "replyLanguageDefault": "Fallback language",
+        "allowedStateTypes": "Allowed state types"
       },
       "usage": {
         "title": "Usage",
@@ -884,7 +896,13 @@
         "escalationRules": "JSON rules that check MCP tool results before PII masking; any match hard-stops automatic sending and escalates to a human (pure OR logic, no priority between rules).",
         "piiMasking": "Masks recognized customer identifiers (email, phone, MAC, IP) in ticket text and MCP tool results before they reach the model, and unmasks them again before the actual tool call or send. Complements, but does not replace, provider choice (EU hosting/DPA) as the primary privacy control.",
         "identityMode": "How customer identity is resolved for tool calls: \"Ticket customer\" uses the customer ID on the ticket, \"Clarify schema\" lets the AI actively ask for missing information, \"Off\" disables identity resolution.",
-        "clarifySchemaJson": "JSON description of the fields the AI may actively collect under the clarify schema (field name + optional MCP match tool)."
+        "clarifySchemaJson": "JSON description of the fields the AI may actively collect under the clarify schema (field name + optional MCP match tool).",
+        "ignoredSenders": "Senders that are never auto-replied to — an exact address or a \"*@domain\" glob, case-insensitive. A match is a silent skip (no run, no draft). Examples: noreply@example.com, *@internal.example.",
+        "ignoreSendersManual": "On a match, also blocks the manual \"AI draft\" button (409 error) — by default only the auto-reply path is affected, Manual Assist still runs for debugging.",
+        "replyLanguageMode": "Controls whether the model is given a binding reply language: \"Off\" = today's behaviour (no directive), \"Fixed\" = always the configured language, \"Auto\" = detected from the subject + latest customer article, falling back to the configured default when the text is too short/ambiguous.",
+        "replyLanguageFixed": "BCP-47 language code (e.g. \"de\", \"en\") always used as the binding reply language in \"Fixed\" mode.",
+        "replyLanguageDefault": "BCP-47 language code used in \"Auto\" mode when the text cannot be confidently matched to a known language profile.",
+        "allowedStateTypes": "Comma-separated list of allowed Znuny state types (e.g. \"open\" or \"open,pending reminder\") the AI may set a ticket to via update_ticket_fields — enforced for both the state name and the numeric state id. Empty = default \"open\" only (reopening allowed, never closing); an explicit empty list \"[]\" disables state changes entirely."
       },
       "common": {
         "validId": "Valid/invalid is a soft-delete flag: marking an entry invalid hides it from pickers for new records without deleting existing references (e.g. tickets, assignments). There is no hard delete."
@@ -1840,6 +1858,8 @@
   "kb": {
     "title": "Knowledge base",
     "sidebar": "Categories",
+    "tagBarMore": "more…",
+    "tagBarLess": "less",
     "allCategories": "All categories",
     "noCategories": "No categories yet.",
     "empty": "No articles match this filter.",
