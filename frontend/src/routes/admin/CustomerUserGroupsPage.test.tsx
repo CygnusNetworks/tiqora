@@ -107,4 +107,30 @@ describe("CustomerUserGroupsPage", () => {
       });
     });
   });
+
+  it("hides invalid groups by default and reveals them via the Gültigkeit filter", async () => {
+    listGroups.mockResolvedValue({
+      items: [
+        { id: 5, name: "users", valid_id: 1, comments: null },
+        { id: 6, name: "stats", valid_id: 1, comments: null },
+        { id: 7, name: "legacy", valid_id: 2, comments: null },
+      ],
+      total: 3,
+      page: 1,
+      page_size: 500,
+    });
+
+    renderPage();
+
+    await screen.findByTestId("admin-customer-user-groups-page-anchor-alice");
+    fireEvent.click(screen.getByTestId("admin-customer-user-groups-page-anchor-alice"));
+
+    await screen.findByTestId("admin-customer-user-groups-page-counterpart-5");
+    expect(
+      screen.queryByTestId("admin-customer-user-groups-page-counterpart-row-7"),
+    ).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId("admin-customer-user-groups-page-valid-all"));
+    await screen.findByTestId("admin-customer-user-groups-page-counterpart-row-7");
+  });
 });
