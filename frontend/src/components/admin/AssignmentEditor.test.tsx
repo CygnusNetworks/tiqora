@@ -391,6 +391,12 @@ describe("AssignmentEditor", () => {
     };
     renderEditor(config);
 
+    // Default filter ("Gültig") hides the invalid, unassigned anchor.
+    await screen.findByTestId("ae-qt-anchor-3");
+    expect(screen.queryByTestId("ae-qt-anchor-9")).not.toBeInTheDocument();
+
+    // Switching to "Alle" reveals it, grayed with the invalid marker.
+    fireEvent.click(screen.getByTestId("ae-qt-valid-all"));
     const invalidAnchor = await screen.findByTestId("ae-qt-anchor-9");
     expect(invalidAnchor).toHaveAttribute("data-invalid", "true");
     expect(invalidAnchor).toHaveTextContent(/ungültig|invalid/i);
@@ -405,6 +411,8 @@ describe("AssignmentEditor", () => {
       expect(screen.getByTestId("ae-qt-counterpart-22")).toBeChecked();
     });
 
+    // Already-assigned invalid counterpart (22) stays visible even under the
+    // default "Gültig" filter so it can still be unassigned.
     const invalidRow = screen.getByTestId("ae-qt-counterpart-row-22");
     expect(invalidRow).toHaveAttribute("data-invalid", "true");
     expect(invalidRow).toHaveTextContent(/ungültig|invalid/i);
@@ -419,5 +427,57 @@ describe("AssignmentEditor", () => {
     await waitFor(() => {
       expect(revoke).toHaveBeenCalledWith(3, 22);
     });
+  });
+
+  it("Gültigkeit filter defaults to hiding invalid entries and can reveal them", async () => {
+    listQueues.mockResolvedValue([
+      { id: 3, name: "Support", valid_id: 1 },
+      { id: 9, name: "Legacy", valid_id: 2 },
+    ]);
+    listTemplates.mockResolvedValue([
+      { id: 20, name: "Welcome", template_type: "Create", valid_id: 1 },
+      { id: 22, name: "Retired", template_type: "Close", valid_id: 2 },
+    ]);
+    listAssignedB.mockResolvedValue([]);
+
+    const config: AssignmentConfig<Queue, Template> = {
+      ...queueTemplateConfig,
+      sideA: {
+        ...queueTemplateConfig.sideA,
+        isValid: (q) => q.valid_id === 1,
+      },
+      sideB: {
+        ...queueTemplateConfig.sideB,
+        isValid: (t) => t.valid_id === 1,
+      },
+    };
+    renderEditor(config);
+
+    await screen.findByTestId("ae-qt-anchor-3");
+    expect(screen.queryByTestId("ae-qt-anchor-9")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId("ae-qt-anchor-3"));
+    await waitFor(() => {
+      expect(listAssignedB).toHaveBeenCalledWith(3);
+    });
+    // Unassigned invalid counterpart (22) is hidden by default.
+    await screen.findByTestId("ae-qt-counterpart-20");
+    expect(screen.queryByTestId("ae-qt-counterpart-row-22")).not.toBeInTheDocument();
+
+    // "Ungültig" shows only the invalid items on both lists.
+    fireEvent.click(screen.getByTestId("ae-qt-valid-invalid"));
+    await screen.findByTestId("ae-qt-anchor-9");
+    expect(screen.queryByTestId("ae-qt-anchor-3")).not.toBeInTheDocument();
+
+    // "Alle" shows everything again.
+    fireEvent.click(screen.getByTestId("ae-qt-valid-all"));
+    await screen.findByTestId("ae-qt-anchor-3");
+    await screen.findByTestId("ae-qt-anchor-9");
+  });
+
+  it("hides the Gültigkeit filter entirely when neither side defines isValid", async () => {
+    renderEditor(queueTemplateConfig);
+    await screen.findByTestId("ae-qt-anchor-3");
+    expect(screen.queryByTestId("ae-qt-valid-filter")).not.toBeInTheDocument();
   });
 });
