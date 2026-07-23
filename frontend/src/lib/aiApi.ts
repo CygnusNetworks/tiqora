@@ -499,6 +499,11 @@ export const aiApi = {
   adminDeleteDraft(draftId: number, signal?: AbortSignal) {
     return api.request<void>("DELETE", `/api/v1/admin/ai/drafts/${draftId}`, { signal });
   },
+  /** Admin-only: drop a ticket's stored AI summary (state-only, next run
+   * starts from scratch). */
+  adminDeleteSummary(ticketId: number, signal?: AbortSignal) {
+    return api.request<void>("DELETE", `/api/v1/admin/ai/summaries/${ticketId}`, { signal });
+  },
   testEscalationRules(body: EscalationTestIn, signal?: AbortSignal) {
     return api.request<EscalationTestOut>("POST", "/api/v1/admin/ai/escalation-test", {
       body,

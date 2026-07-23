@@ -48,6 +48,8 @@ export type AiStateOut = {
   summary_created_at: string | null;
 };
 
+export type SummaryDetail = "standard" | "detailed";
+
 export type AiSummarizeOut = {
   status: string;
   summary_body?: string | null;
@@ -63,17 +65,28 @@ export type AiDraftRequestOut = {
 
 export const ticketAiApi = {
   getState(ticketId: number, signal?: AbortSignal) {
-    return api.request<AiStateOut>("GET", `/api/v1/tickets/${ticketId}/ai`, { signal });
+    return api.request<AiStateOut>("GET", `/api/v1/tickets/${ticketId}/ai`, {
+      signal,
+    });
   },
   requestDraft(ticketId: number, signal?: AbortSignal) {
-    return api.request<AiDraftRequestOut>("POST", `/api/v1/tickets/${ticketId}/ai/draft`, {
-      signal,
-    });
+    return api.request<AiDraftRequestOut>(
+      "POST",
+      `/api/v1/tickets/${ticketId}/ai/draft`,
+      {
+        signal,
+      },
+    );
   },
-  summarize(ticketId: number, signal?: AbortSignal) {
-    return api.request<AiSummarizeOut>("POST", `/api/v1/tickets/${ticketId}/ai/summarize`, {
-      signal,
-    });
+  summarize(ticketId: number, detail?: SummaryDetail, signal?: AbortSignal) {
+    return api.request<AiSummarizeOut>(
+      "POST",
+      `/api/v1/tickets/${ticketId}/ai/summarize`,
+      {
+        body: detail ? { detail } : undefined,
+        signal,
+      },
+    );
   },
   discardDraft(ticketId: number, draftId: number, signal?: AbortSignal) {
     return api.request<void>(

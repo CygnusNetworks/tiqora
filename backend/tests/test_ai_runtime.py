@@ -1041,7 +1041,7 @@ async def test_document_attachment_text_appears_in_prompt(mariadb_znuny_url: str
         assert result.status == "drafted"
         assert llm.last_user_message is not None
         assert "Seriennummer AB-12345" in llm.last_user_message
-        assert "[Anhang: notes.txt]" in llm.last_user_message
+        assert "[Anhang: notes.txt — ca. " in llm.last_user_message
     finally:
         await engine.dispose()
 

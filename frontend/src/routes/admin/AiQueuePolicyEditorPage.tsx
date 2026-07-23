@@ -1,4 +1,11 @@
-import { useEffect, useMemo, useRef, useState, type ChangeEvent, type ReactNode } from "react";
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ChangeEvent,
+  type ReactNode,
+} from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useParams, Link } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
@@ -36,8 +43,15 @@ const AGENTS_KEY = ["admin", "ai", "reference-agents"] as const;
 const SETTINGS_KEY = ["admin", "ai", "settings"] as const;
 
 const AUTONOMY_VALUES: Autonomy[] = ["off", "clarify_only", "full"];
-const IDENTITY_MODES: IdentityMode[] = ["ticket_customer_id", "clarify_schema", "off"];
+const IDENTITY_MODES: IdentityMode[] = [
+  "ticket_customer_id",
+  "clarify_schema",
+  "off",
+];
 const REPLY_LANGUAGE_MODES: ReplyLanguageMode[] = ["off", "fixed", "auto"];
+/** Offered reply languages — deliberately just the two the Studierendenwerk
+ * actually answers in; free-text ISO codes confused operators. */
+const REPLY_LANGUAGES = ["de", "en"];
 
 type TabId = "basics" | "drafts" | "summaries" | "auto" | "safety";
 
@@ -179,16 +193,28 @@ function toForm(row: AiQueuePolicyOut): FormState {
         .filter((n) => Number.isFinite(n)),
     ),
     summary_detail: row.summary_detail,
-    summary_article_threshold: row.summary_article_threshold != null ? String(row.summary_article_threshold) : "",
-    summary_char_threshold: row.summary_char_threshold != null ? String(row.summary_char_threshold) : "",
+    summary_article_threshold:
+      row.summary_article_threshold != null
+        ? String(row.summary_article_threshold)
+        : "",
+    summary_char_threshold:
+      row.summary_char_threshold != null
+        ? String(row.summary_char_threshold)
+        : "",
     summary_incremental_min_articles:
-      row.summary_incremental_min_articles != null ? String(row.summary_incremental_min_articles) : "",
+      row.summary_incremental_min_articles != null
+        ? String(row.summary_incremental_min_articles)
+        : "",
     summary_incremental_min_chars:
-      row.summary_incremental_min_chars != null ? String(row.summary_incremental_min_chars) : "",
+      row.summary_incremental_min_chars != null
+        ? String(row.summary_incremental_min_chars)
+        : "",
     max_clarifications: String(row.max_clarifications),
     max_auto_replies: String(row.max_auto_replies),
-    max_replies_per_hour: row.max_replies_per_hour != null ? String(row.max_replies_per_hour) : "",
-    budget_tokens_day: row.budget_tokens_day != null ? String(row.budget_tokens_day) : "",
+    max_replies_per_hour:
+      row.max_replies_per_hour != null ? String(row.max_replies_per_hour) : "",
+    budget_tokens_day:
+      row.budget_tokens_day != null ? String(row.budget_tokens_day) : "",
     escalation_rules: row.escalation_rules ?? "",
     ai_disclosure_enabled: row.ai_disclosure_enabled,
     ai_disclosure_text: row.ai_disclosure_text ?? "",
@@ -249,11 +275,24 @@ function FieldLabel({
 }
 
 /** Tab label with a green "feature enabled" dot, matching the artefact mock. */
-function TabLabel({ label, active, testId }: { label: string; active: boolean; testId?: string }) {
+function TabLabel({
+  label,
+  active,
+  testId,
+}: {
+  label: string;
+  active: boolean;
+  testId?: string;
+}) {
   return (
     <span className="inline-flex items-center gap-1.5">
       {label}
-      {active && <span className="h-1.5 w-1.5 rounded-full bg-green" data-testid={testId} />}
+      {active && (
+        <span
+          className="h-1.5 w-1.5 rounded-full bg-green"
+          data-testid={testId}
+        />
+      )}
     </span>
   );
 }
@@ -272,7 +311,10 @@ function AiQueuePolicyEditor({ policyId }: { policyId?: number }) {
   const [tab, setTab] = useState<TabId>("basics");
   const [form, setForm] = useState<FormState | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
-  const [jsonErrors, setJsonErrors] = useState<{ escalation?: string; clarify?: string }>({});
+  const [jsonErrors, setJsonErrors] = useState<{
+    escalation?: string;
+    clarify?: string;
+  }>({});
   const [promptFileError, setPromptFileError] = useState<string | null>(null);
   const autoProviderApplied = useRef(false);
   const promptFileInputRef = useRef<HTMLInputElement>(null);
@@ -322,11 +364,19 @@ function AiQueuePolicyEditor({ policyId }: { policyId?: number }) {
     const next = new Set(selectedKbCategoryIds);
     if (next.has(id)) next.delete(id);
     else next.add(id);
-    setField("kb_category_ids", Array.from(next).sort((a, b) => a - b).join(","));
+    setField(
+      "kb_category_ids",
+      Array.from(next)
+        .sort((a, b) => a - b)
+        .join(","),
+    );
   };
 
   const editingRow = useMemo(
-    () => (isEdit ? (policiesQ.data?.items ?? []).find((p) => p.id === policyId) ?? null : null),
+    () =>
+      isEdit
+        ? ((policiesQ.data?.items ?? []).find((p) => p.id === policyId) ?? null)
+        : null,
     [isEdit, policiesQ.data, policyId],
   );
 
@@ -352,7 +402,8 @@ function AiQueuePolicyEditor({ policyId }: { policyId?: number }) {
   // Create only, once: auto-pick the sole configured provider (never override
   // a value the operator already touched or that came from a stored policy).
   useEffect(() => {
-    if (isEdit || autoProviderApplied.current || !form || !providersQ.data) return;
+    if (isEdit || autoProviderApplied.current || !form || !providersQ.data)
+      return;
     if (form.llm_provider_id !== NONE) return;
     if (providersQ.data.items.length === 1) {
       autoProviderApplied.current = true;
@@ -382,7 +433,8 @@ function AiQueuePolicyEditor({ policyId }: { policyId?: number }) {
     let controlChars = 0;
     for (let i = 0; i < text.length; i++) {
       const code = text.charCodeAt(i);
-      if (code === 0 || (code < 32 && code !== 9 && code !== 10 && code !== 13)) controlChars++;
+      if (code === 0 || (code < 32 && code !== 9 && code !== 10 && code !== 13))
+        controlChars++;
     }
     if (controlChars / Math.max(text.length, 1) > 0.01) {
       setPromptFileError(t("admin.ai.queues.promptFileBinary"));
@@ -395,8 +447,10 @@ function AiQueuePolicyEditor({ policyId }: { policyId?: number }) {
   const readFileAsText = (file: File): Promise<string> =>
     new Promise((resolve, reject) => {
       const reader = new FileReader();
-      reader.onload = () => resolve(typeof reader.result === "string" ? reader.result : "");
-      reader.onerror = () => reject(reader.error ?? new Error("file read failed"));
+      reader.onload = () =>
+        resolve(typeof reader.result === "string" ? reader.result : "");
+      reader.onerror = () =>
+        reject(reader.error ?? new Error("file read failed"));
       reader.readAsText(file);
     });
 
@@ -446,7 +500,9 @@ function AiQueuePolicyEditor({ policyId }: { policyId?: number }) {
     },
   });
 
-  const buildBody = (f: FormState): AiQueuePolicyCreate | AiQueuePolicyUpdate => ({
+  const buildBody = (
+    f: FormState,
+  ): AiQueuePolicyCreate | AiQueuePolicyUpdate => ({
     enabled_auto_reply: f.enabled_auto_reply,
     enabled_summary: f.enabled_summary,
     enabled_manual_assist: f.enabled_manual_assist,
@@ -454,15 +510,19 @@ function AiQueuePolicyEditor({ policyId }: { policyId?: number }) {
     system_prompt: f.system_prompt,
     llm_provider_id: f.llm_provider_id !== NONE ? f.llm_provider_id : null,
     model_override: f.model_override.trim() || null,
-    vision_provider_id: f.vision_provider_id !== NONE ? f.vision_provider_id : null,
+    vision_provider_id:
+      f.vision_provider_id !== NONE ? f.vision_provider_id : null,
     service_user_id: f.service_user_id !== NONE ? f.service_user_id : null,
     kb_tags: f.kb_tags.trim() || null,
     kb_category_ids: f.kb_category_ids.trim() || null,
-    mcp_client_ids: f.mcp_client_ids.size > 0 ? Array.from(f.mcp_client_ids).join(",") : null,
+    mcp_client_ids:
+      f.mcp_client_ids.size > 0 ? Array.from(f.mcp_client_ids).join(",") : null,
     summary_detail: f.summary_detail,
     summary_article_threshold: numOrNull(f.summary_article_threshold),
     summary_char_threshold: numOrNull(f.summary_char_threshold),
-    summary_incremental_min_articles: numOrNull(f.summary_incremental_min_articles),
+    summary_incremental_min_articles: numOrNull(
+      f.summary_incremental_min_articles,
+    ),
     summary_incremental_min_chars: numOrNull(f.summary_incremental_min_chars),
     max_clarifications: numOrNull(f.max_clarifications) ?? 2,
     max_auto_replies: numOrNull(f.max_auto_replies) ?? 5,
@@ -486,9 +546,20 @@ function AiQueuePolicyEditor({ policyId }: { policyId?: number }) {
   const handleSave = async () => {
     if (!form) return;
     setFormError(null);
-    const escalationErr = validateJson("escalation_rules", form.escalation_rules, t);
-    const clarifyErr = validateJson("clarify_schema_json", form.clarify_schema_json, t);
-    setJsonErrors({ escalation: escalationErr ?? undefined, clarify: clarifyErr ?? undefined });
+    const escalationErr = validateJson(
+      "escalation_rules",
+      form.escalation_rules,
+      t,
+    );
+    const clarifyErr = validateJson(
+      "clarify_schema_json",
+      form.clarify_schema_json,
+      t,
+    );
+    setJsonErrors({
+      escalation: escalationErr ?? undefined,
+      clarify: clarifyErr ?? undefined,
+    });
     if (escalationErr || clarifyErr) return;
 
     try {
@@ -499,22 +570,32 @@ function AiQueuePolicyEditor({ policyId }: { policyId?: number }) {
           setFormError(t("admin.ai.queues.queueRequired"));
           return;
         }
-        await createM.mutateAsync({ queue_id: form.queue_id, ...buildBody(form) });
+        await createM.mutateAsync({
+          queue_id: form.queue_id,
+          ...buildBody(form),
+        });
       }
     } catch (err) {
       if (err instanceof ApiError && err.status === 409) {
         setFormError(t("admin.ai.queues.gateError"));
       } else {
-        setFormError(err instanceof ApiError ? err.message : t("admin.form.genericError"));
+        setFormError(
+          err instanceof ApiError ? err.message : t("admin.form.genericError"),
+        );
       }
     }
   };
 
-  const isLoading = isEdit ? policiesQ.isLoading || (policiesQ.isSuccess && !editingRow) : !form;
+  const isLoading = isEdit
+    ? policiesQ.isLoading || (policiesQ.isSuccess && !editingRow)
+    : !form;
 
   if (isEdit && policiesQ.isSuccess && !editingRow) {
     return (
-      <div className="p-4 text-sm text-danger" data-testid="admin-ai-queue-editor-page">
+      <div
+        className="p-4 text-sm text-danger"
+        data-testid="admin-ai-queue-editor-page"
+      >
         {t("admin.ai.queues.editor.loadError")}
       </div>
     );
@@ -522,7 +603,10 @@ function AiQueuePolicyEditor({ policyId }: { policyId?: number }) {
 
   if (isLoading || !form) {
     return (
-      <div className="flex items-center gap-2 p-4" data-testid="admin-ai-queue-editor-page">
+      <div
+        className="flex items-center gap-2 p-4"
+        data-testid="admin-ai-queue-editor-page"
+      >
         <Spinner />
       </div>
     );
@@ -530,7 +614,8 @@ function AiQueuePolicyEditor({ policyId }: { policyId?: number }) {
 
   const gateOpen = settingsQ.data?.operation_mode === "tiqora_primary";
   const queueName =
-    (queuesQ.data ?? []).find((q) => q.id === form.queue_id)?.name ?? `#${form.queue_id}`;
+    (queuesQ.data ?? []).find((q) => q.id === form.queue_id)?.name ??
+    `#${form.queue_id}`;
 
   const tabs: TabItem[] = [
     { id: "basics", label: t("admin.ai.queues.tab.basics") },
@@ -568,13 +653,18 @@ function AiQueuePolicyEditor({ policyId }: { policyId?: number }) {
   ];
 
   return (
-    <div className="mx-auto w-full max-w-4xl space-y-4 p-4" data-testid="admin-ai-queue-editor-page">
+    <div
+      className="mx-auto w-full max-w-4xl space-y-4 p-4"
+      data-testid="admin-ai-queue-editor-page"
+    >
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
           <h1 className="font-display text-xl font-semibold text-ink">
             {isEdit ? queueName : t("admin.ai.queues.editor.newTitle")}
           </h1>
-          <p className="text-xs text-muted">{t("admin.ai.queues.description")}</p>
+          <p className="text-xs text-muted">
+            {t("admin.ai.queues.description")}
+          </p>
         </div>
         <div className="flex items-center gap-2">
           <Link
@@ -591,7 +681,9 @@ function AiQueuePolicyEditor({ policyId }: { policyId?: number }) {
             disabled={createM.isPending || updateM.isPending}
             onClick={() => void handleSave()}
           >
-            {createM.isPending || updateM.isPending ? t("admin.form.saving") : t("admin.form.save")}
+            {createM.isPending || updateM.isPending
+              ? t("admin.form.saving")
+              : t("admin.form.save")}
           </Button>
         </div>
       </div>
@@ -599,7 +691,10 @@ function AiQueuePolicyEditor({ policyId }: { policyId?: number }) {
       <Tabs items={tabs} value={tab} onChange={(id) => setTab(id as TabId)} />
 
       {formError && (
-        <p className="text-sm text-escalation" data-testid="admin-ai-queue-editor-error">
+        <p
+          className="text-sm text-escalation"
+          data-testid="admin-ai-queue-editor-error"
+        >
           {formError}
         </p>
       )}
@@ -618,18 +713,113 @@ function AiQueuePolicyEditor({ policyId }: { policyId?: number }) {
                   <p className="rounded-md border border-hairline bg-surface-subtle px-3 py-1.5 text-sm text-muted">
                     {queueName}
                   </p>
-                  <p className="mt-1 text-xs text-muted">{t("admin.ai.queues.editor.queueLocked")}</p>
+                  <p className="mt-1 text-xs text-muted">
+                    {t("admin.ai.queues.editor.queueLocked")}
+                  </p>
                 </>
               ) : (
                 <PickerField
                   testId="admin-ai-queue-form-queue_id"
                   value={form.queue_id}
-                  items={availableQueues.map((q) => ({ value: q.id, label: q.name }))}
+                  items={availableQueues.map((q) => ({
+                    value: q.id,
+                    label: q.name,
+                  }))}
                   placeholder={t("admin.form.selectPlaceholder")}
                   onSelect={(v) => setField("queue_id", v)}
                 />
               )}
             </label>
+
+            <div
+              className="rounded-lg border border-hairline p-3 sm:col-span-2"
+              data-testid="admin-ai-queue-language-section"
+            >
+              <h3 className="mb-3 text-xs font-semibold uppercase tracking-wide text-muted">
+                {t("admin.ai.queues.section.language")}
+              </h3>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <label className="block text-sm">
+                  <FieldLabel
+                    text={t("admin.ai.queues.replyLanguageMode.label")}
+                    help={t("admin.help.aiQueue.replyLanguageMode")}
+                    defaultHint={t("admin.ai.queues.replyLanguageMode.off")}
+                    testId="admin-ai-queue-help-reply_language_mode"
+                  />
+                  <PickerField
+                    testId="admin-ai-queue-form-reply_language_mode"
+                    value={form.reply_language_mode}
+                    items={REPLY_LANGUAGE_MODES.map((m) => ({
+                      value: m,
+                      label: t(`admin.ai.queues.replyLanguageMode.${m}`),
+                    }))}
+                    placeholder={t("admin.form.selectPlaceholder")}
+                    onSelect={(v) => {
+                      setField("reply_language_mode", v);
+                      // `fixed` requires a language — preselect German instead
+                      // of surfacing a 422 for a field that looks pre-filled.
+                      if (
+                        v === "fixed" &&
+                        !REPLY_LANGUAGES.includes(form.reply_language_fixed)
+                      ) {
+                        setField("reply_language_fixed", "de");
+                      }
+                    }}
+                  />
+                </label>
+                {form.reply_language_mode === "fixed" && (
+                  <label className="block text-sm">
+                    <FieldLabel
+                      text={t("admin.ai.queues.replyLanguageFixed")}
+                      help={t("admin.help.aiQueue.replyLanguageFixed")}
+                      testId="admin-ai-queue-help-reply_language_fixed"
+                    />
+                    <SelectField
+                      items={REPLY_LANGUAGES.map((l) => ({
+                        value: l,
+                        label: t(`admin.ai.queues.replyLanguage.${l}`),
+                      }))}
+                      value={
+                        REPLY_LANGUAGES.includes(form.reply_language_fixed)
+                          ? form.reply_language_fixed
+                          : "de"
+                      }
+                      onChange={(v) => setField("reply_language_fixed", v)}
+                      testId="admin-ai-queue-form-reply_language_fixed"
+                    />
+                  </label>
+                )}
+                {form.reply_language_mode === "auto" && (
+                  <label className="block text-sm">
+                    <FieldLabel
+                      text={t("admin.ai.queues.replyLanguageDefault")}
+                      help={t("admin.help.aiQueue.replyLanguageDefault")}
+                      defaultHint={t("admin.ai.queues.replyLanguageNone")}
+                      testId="admin-ai-queue-help-reply_language_default"
+                    />
+                    <SelectField
+                      items={[
+                        {
+                          value: "",
+                          label: t("admin.ai.queues.replyLanguageNone"),
+                        },
+                        ...REPLY_LANGUAGES.map((l) => ({
+                          value: l,
+                          label: t(`admin.ai.queues.replyLanguage.${l}`),
+                        })),
+                      ]}
+                      value={
+                        REPLY_LANGUAGES.includes(form.reply_language_default)
+                          ? form.reply_language_default
+                          : ""
+                      }
+                      onChange={(v) => setField("reply_language_default", v)}
+                      testId="admin-ai-queue-form-reply_language_default"
+                    />
+                  </label>
+                )}
+              </div>
+            </div>
 
             <div className="block text-sm sm:col-span-2">
               <div className="mb-1 flex items-center justify-between gap-2">
@@ -664,25 +854,38 @@ function AiQueuePolicyEditor({ policyId }: { policyId?: number }) {
                 className={cn(inputClass, "font-mono text-xs")}
               />
               <div className="mt-1 flex flex-wrap items-center justify-between gap-2 text-xs">
-                <span className="text-muted" data-testid="admin-ai-queue-form-prompt-char-count">
+                <span
+                  className="text-muted"
+                  data-testid="admin-ai-queue-form-prompt-char-count"
+                >
                   {t("admin.ai.queues.promptCharCount", {
-                    formatted: new Intl.NumberFormat(locale).format(form.system_prompt.length),
+                    formatted: new Intl.NumberFormat(locale).format(
+                      form.system_prompt.length,
+                    ),
                   })}
                 </span>
                 {form.system_prompt.length >= PROMPT_WARN_CHARS && (
-                  <span className="text-amber" data-testid="admin-ai-queue-form-prompt-char-warning">
+                  <span
+                    className="text-amber"
+                    data-testid="admin-ai-queue-form-prompt-char-warning"
+                  >
                     {t("admin.ai.queues.promptCharCountWarning")}
                   </span>
                 )}
               </div>
               {promptFileError && (
-                <p className="mt-1 text-xs text-escalation" data-testid="admin-ai-queue-form-prompt-file-error">
+                <p
+                  className="mt-1 text-xs text-escalation"
+                  data-testid="admin-ai-queue-form-prompt-file-error"
+                >
                   {promptFileError}
                 </p>
               )}
             </div>
 
-            {isEdit && policyId != null && <PromptPartsSection policyId={policyId} />}
+            {isEdit && policyId != null && (
+              <PromptPartsSection policyId={policyId} />
+            )}
 
             <label className="block text-sm">
               <FieldLabel
@@ -695,7 +898,10 @@ function AiQueuePolicyEditor({ policyId }: { policyId?: number }) {
                 value={form.llm_provider_id}
                 items={[
                   { value: NONE, label: t("admin.form.selectPlaceholder") },
-                  ...(providersQ.data?.items ?? []).map((p) => ({ value: p.id, label: p.name })),
+                  ...(providersQ.data?.items ?? []).map((p) => ({
+                    value: p.id,
+                    label: p.name,
+                  })),
                 ]}
                 placeholder={t("admin.form.selectPlaceholder")}
                 loading={providersQ.isLoading}
@@ -726,7 +932,10 @@ function AiQueuePolicyEditor({ policyId }: { policyId?: number }) {
                 testId="admin-ai-queue-form-vision_provider_id"
                 value={form.vision_provider_id}
                 items={[
-                  { value: NONE, label: t("admin.ai.queues.visionProviderNone") },
+                  {
+                    value: NONE,
+                    label: t("admin.ai.queues.visionProviderNone"),
+                  },
                   ...(providersQ.data?.items ?? [])
                     .filter((p) => p.supports_vision)
                     .map((p) => ({ value: p.id, label: p.name })),
@@ -746,7 +955,9 @@ function AiQueuePolicyEditor({ policyId }: { policyId?: number }) {
                 type="checkbox"
                 data-testid="admin-ai-queue-form-enabled_manual_assist"
                 checked={form.enabled_manual_assist}
-                onChange={(e) => setField("enabled_manual_assist", e.target.checked)}
+                onChange={(e) =>
+                  setField("enabled_manual_assist", e.target.checked)
+                }
                 className="rounded border-hairline"
               />
               {t("admin.ai.feature.manual_assist")}
@@ -773,7 +984,10 @@ function AiQueuePolicyEditor({ policyId }: { policyId?: number }) {
                 />
                 <TagInput
                   testId="admin-ai-queue-form-kb_tags"
-                  value={form.kb_tags.split(",").map((s) => s.trim()).filter(Boolean)}
+                  value={form.kb_tags
+                    .split(",")
+                    .map((s) => s.trim())
+                    .filter(Boolean)}
                   onChange={(tags) => setField("kb_tags", tags.join(","))}
                   suggestions={(kbTagsQ.data ?? []).map((tg) => ({
                     name: tg.name,
@@ -825,7 +1039,9 @@ function AiQueuePolicyEditor({ policyId }: { policyId?: number }) {
                     className="text-xs text-muted"
                     data-testid="admin-ai-queue-form-mcp-selected-count"
                   >
-                    {t("admin.ai.queues.mcpClientsSelected", { count: form.mcp_client_ids.size })}
+                    {t("admin.ai.queues.mcpClientsSelected", {
+                      count: form.mcp_client_ids.size,
+                    })}
                   </span>
                 </div>
                 <div className="flex flex-wrap gap-2">
@@ -843,12 +1059,16 @@ function AiQueuePolicyEditor({ policyId }: { policyId?: number }) {
                       />
                       <span>
                         <span className="block">{c.name}</span>
-                        <span className="block text-[11px] text-muted">{c.url}</span>
+                        <span className="block text-[11px] text-muted">
+                          {c.url}
+                        </span>
                       </span>
                     </label>
                   ))}
                   {(mcpQ.data?.items.length ?? 0) === 0 && (
-                    <span className="text-xs text-muted">{t("admin.ai.mcp.empty")}</span>
+                    <span className="text-xs text-muted">
+                      {t("admin.ai.mcp.empty")}
+                    </span>
                   )}
                 </div>
               </div>
@@ -867,32 +1087,21 @@ function AiQueuePolicyEditor({ policyId }: { policyId?: number }) {
                 className="rounded border-hairline"
               />
               {t("admin.ai.feature.summary")}
-              <HelpPopover title={t("admin.ai.feature.summary")} testId="admin-ai-queue-help-enabled_summary">
+              <HelpPopover
+                title={t("admin.ai.feature.summary")}
+                testId="admin-ai-queue-help-enabled_summary"
+              >
                 {t("admin.help.aiQueue.enabledSummary")}
               </HelpPopover>
             </label>
 
             <fieldset
               disabled={!form.enabled_summary}
-              className={cn("grid gap-4 sm:grid-cols-2", !form.enabled_summary && "opacity-50")}
+              className={cn(
+                "grid gap-4 sm:grid-cols-2",
+                !form.enabled_summary && "opacity-50",
+              )}
             >
-              <label className="block text-sm sm:col-span-2">
-                <FieldLabel
-                  text={t("admin.ai.queues.summaryDetail")}
-                  help={t("admin.help.aiQueue.summaryDetail")}
-                  defaultHint={t("admin.ai.queues.summaryDetailLevel.standard")}
-                  testId="admin-ai-queue-help-summary_detail"
-                />
-                <SelectField
-                  items={[
-                    { value: "standard", label: t("admin.ai.queues.summaryDetailLevel.standard") },
-                    { value: "detailed", label: t("admin.ai.queues.summaryDetailLevel.detailed") },
-                  ]}
-                  value={form.summary_detail}
-                  onChange={(v) => setField("summary_detail", v as "standard" | "detailed")}
-                  testId="admin-ai-queue-form-summary_detail"
-                />
-              </label>
               <label className="block text-sm">
                 <FieldLabel
                   text={t("admin.ai.queues.summaryArticleThreshold")}
@@ -904,7 +1113,9 @@ function AiQueuePolicyEditor({ policyId }: { policyId?: number }) {
                   type="number"
                   data-testid="admin-ai-queue-form-summary_article_threshold"
                   value={form.summary_article_threshold}
-                  onChange={(e) => setField("summary_article_threshold", e.target.value)}
+                  onChange={(e) =>
+                    setField("summary_article_threshold", e.target.value)
+                  }
                   placeholder={t("admin.ai.queues.emptyUnlimited")}
                   className={inputClass}
                 />
@@ -920,7 +1131,9 @@ function AiQueuePolicyEditor({ policyId }: { policyId?: number }) {
                   type="number"
                   data-testid="admin-ai-queue-form-summary_char_threshold"
                   value={form.summary_char_threshold}
-                  onChange={(e) => setField("summary_char_threshold", e.target.value)}
+                  onChange={(e) =>
+                    setField("summary_char_threshold", e.target.value)
+                  }
                   placeholder={t("admin.ai.queues.emptyUnlimited")}
                   className={inputClass}
                 />
@@ -936,7 +1149,9 @@ function AiQueuePolicyEditor({ policyId }: { policyId?: number }) {
                   type="number"
                   data-testid="admin-ai-queue-form-summary_incremental_min_articles"
                   value={form.summary_incremental_min_articles}
-                  onChange={(e) => setField("summary_incremental_min_articles", e.target.value)}
+                  onChange={(e) =>
+                    setField("summary_incremental_min_articles", e.target.value)
+                  }
                   placeholder={t("admin.ai.queues.emptyUnlimited")}
                   className={inputClass}
                 />
@@ -952,65 +1167,14 @@ function AiQueuePolicyEditor({ policyId }: { policyId?: number }) {
                   type="number"
                   data-testid="admin-ai-queue-form-summary_incremental_min_chars"
                   value={form.summary_incremental_min_chars}
-                  onChange={(e) => setField("summary_incremental_min_chars", e.target.value)}
+                  onChange={(e) =>
+                    setField("summary_incremental_min_chars", e.target.value)
+                  }
                   placeholder={t("admin.ai.queues.emptyUnlimited")}
                   className={inputClass}
                 />
               </label>
             </fieldset>
-
-            <div className="grid gap-4 rounded-lg border border-hairline p-3 sm:grid-cols-2">
-              <label className="block text-sm">
-                <FieldLabel
-                  text={t("admin.ai.queues.replyLanguageMode.label")}
-                  help={t("admin.help.aiQueue.replyLanguageMode")}
-                  defaultHint={t("admin.ai.queues.replyLanguageMode.off")}
-                  testId="admin-ai-queue-help-reply_language_mode"
-                />
-                <PickerField
-                  testId="admin-ai-queue-form-reply_language_mode"
-                  value={form.reply_language_mode}
-                  items={REPLY_LANGUAGE_MODES.map((m) => ({
-                    value: m,
-                    label: t(`admin.ai.queues.replyLanguageMode.${m}`),
-                  }))}
-                  placeholder={t("admin.form.selectPlaceholder")}
-                  onSelect={(v) => setField("reply_language_mode", v)}
-                />
-              </label>
-              {form.reply_language_mode === "fixed" && (
-                <label className="block text-sm">
-                  <FieldLabel
-                    text={t("admin.ai.queues.replyLanguageFixed")}
-                    help={t("admin.help.aiQueue.replyLanguageFixed")}
-                    testId="admin-ai-queue-help-reply_language_fixed"
-                  />
-                  <input
-                    data-testid="admin-ai-queue-form-reply_language_fixed"
-                    value={form.reply_language_fixed}
-                    onChange={(e) => setField("reply_language_fixed", e.target.value)}
-                    placeholder="de"
-                    className={inputClass}
-                  />
-                </label>
-              )}
-              {form.reply_language_mode === "auto" && (
-                <label className="block text-sm">
-                  <FieldLabel
-                    text={t("admin.ai.queues.replyLanguageDefault")}
-                    help={t("admin.help.aiQueue.replyLanguageDefault")}
-                    testId="admin-ai-queue-help-reply_language_default"
-                  />
-                  <input
-                    data-testid="admin-ai-queue-form-reply_language_default"
-                    value={form.reply_language_default}
-                    onChange={(e) => setField("reply_language_default", e.target.value)}
-                    placeholder="de"
-                    className={inputClass}
-                  />
-                </label>
-              )}
-            </div>
           </div>
         )}
 
@@ -1036,7 +1200,9 @@ function AiQueuePolicyEditor({ policyId }: { policyId?: number }) {
                   type="checkbox"
                   data-testid="admin-ai-queue-form-ignore_senders_manual"
                   checked={form.ignore_senders_manual}
-                  onChange={(e) => setField("ignore_senders_manual", e.target.checked)}
+                  onChange={(e) =>
+                    setField("ignore_senders_manual", e.target.checked)
+                  }
                   className="rounded border-hairline"
                 />
                 {t("admin.ai.queues.ignoreSendersManual")}
@@ -1063,18 +1229,26 @@ function AiQueuePolicyEditor({ policyId }: { policyId?: number }) {
                 data-testid="admin-ai-queue-form-enabled_auto_reply"
                 checked={form.enabled_auto_reply}
                 disabled={!gateOpen && !form.enabled_auto_reply}
-                onChange={(e) => setField("enabled_auto_reply", e.target.checked)}
+                onChange={(e) =>
+                  setField("enabled_auto_reply", e.target.checked)
+                }
                 className="rounded border-hairline disabled:cursor-not-allowed disabled:opacity-50"
               />
               {t("admin.ai.feature.auto_reply")}
-              <HelpPopover title={t("admin.ai.feature.auto_reply")} testId="admin-ai-queue-help-enabled_auto_reply">
+              <HelpPopover
+                title={t("admin.ai.feature.auto_reply")}
+                testId="admin-ai-queue-help-enabled_auto_reply"
+              >
                 {t("admin.help.aiQueue.enabledAutoReply")}
               </HelpPopover>
             </label>
 
             <fieldset
               disabled={!form.enabled_auto_reply}
-              className={cn("space-y-4", !form.enabled_auto_reply && "opacity-50")}
+              className={cn(
+                "space-y-4",
+                !form.enabled_auto_reply && "opacity-50",
+              )}
             >
               <div className="grid gap-4 sm:grid-cols-2">
                 <label className="block text-sm">
@@ -1128,7 +1302,9 @@ function AiQueuePolicyEditor({ policyId }: { policyId?: number }) {
                     type="number"
                     data-testid="admin-ai-queue-form-max_clarifications"
                     value={form.max_clarifications}
-                    onChange={(e) => setField("max_clarifications", e.target.value)}
+                    onChange={(e) =>
+                      setField("max_clarifications", e.target.value)
+                    }
                     className={inputClass}
                   />
                 </label>
@@ -1143,7 +1319,9 @@ function AiQueuePolicyEditor({ policyId }: { policyId?: number }) {
                     type="number"
                     data-testid="admin-ai-queue-form-max_auto_replies"
                     value={form.max_auto_replies}
-                    onChange={(e) => setField("max_auto_replies", e.target.value)}
+                    onChange={(e) =>
+                      setField("max_auto_replies", e.target.value)
+                    }
                     className={inputClass}
                   />
                 </label>
@@ -1158,7 +1336,9 @@ function AiQueuePolicyEditor({ policyId }: { policyId?: number }) {
                     type="number"
                     data-testid="admin-ai-queue-form-max_replies_per_hour"
                     value={form.max_replies_per_hour}
-                    onChange={(e) => setField("max_replies_per_hour", e.target.value)}
+                    onChange={(e) =>
+                      setField("max_replies_per_hour", e.target.value)
+                    }
                     placeholder={t("admin.ai.queues.emptyUnlimited")}
                     className={inputClass}
                   />
@@ -1174,7 +1354,9 @@ function AiQueuePolicyEditor({ policyId }: { policyId?: number }) {
                     type="number"
                     data-testid="admin-ai-queue-form-budget_tokens_day"
                     value={form.budget_tokens_day}
-                    onChange={(e) => setField("budget_tokens_day", e.target.value)}
+                    onChange={(e) =>
+                      setField("budget_tokens_day", e.target.value)
+                    }
                     placeholder={t("admin.ai.queues.emptyUnlimited")}
                     className={inputClass}
                   />
@@ -1187,7 +1369,9 @@ function AiQueuePolicyEditor({ policyId }: { policyId?: number }) {
                     type="checkbox"
                     data-testid="admin-ai-queue-form-ai_disclosure_enabled"
                     checked={form.ai_disclosure_enabled}
-                    onChange={(e) => setField("ai_disclosure_enabled", e.target.checked)}
+                    onChange={(e) =>
+                      setField("ai_disclosure_enabled", e.target.checked)
+                    }
                     className="rounded border-hairline"
                   />
                   {t("admin.ai.queues.disclosureEnabled")}
@@ -1207,7 +1391,9 @@ function AiQueuePolicyEditor({ policyId }: { policyId?: number }) {
                   <textarea
                     data-testid="admin-ai-queue-form-ai_disclosure_text"
                     value={form.ai_disclosure_text}
-                    onChange={(e) => setField("ai_disclosure_text", e.target.value)}
+                    onChange={(e) =>
+                      setField("ai_disclosure_text", e.target.value)
+                    }
                     placeholder={t("admin.ai.queues.disclosureTextPlaceholder")}
                     rows={2}
                     className={inputClass}
@@ -1255,7 +1441,10 @@ function AiQueuePolicyEditor({ policyId }: { policyId?: number }) {
                 className="rounded border-hairline"
               />
               {t("admin.ai.queues.piiMasking")}
-              <HelpPopover title={t("admin.ai.queues.piiMasking")} testId="admin-ai-queue-help-pii_masking">
+              <HelpPopover
+                title={t("admin.ai.queues.piiMasking")}
+                testId="admin-ai-queue-help-pii_masking"
+              >
                 {t("admin.help.aiQueue.piiMasking")}
               </HelpPopover>
             </label>
@@ -1269,7 +1458,10 @@ function AiQueuePolicyEditor({ policyId }: { policyId?: number }) {
                 className="rounded border-hairline"
               />
               {t("admin.ai.queues.piiNer")}
-              <HelpPopover title={t("admin.ai.queues.piiNer")} testId="admin-ai-queue-help-pii_ner_enabled">
+              <HelpPopover
+                title={t("admin.ai.queues.piiNer")}
+                testId="admin-ai-queue-help-pii_ner_enabled"
+              >
                 {t("admin.help.aiQueue.piiNer")}
               </HelpPopover>
             </label>
@@ -1277,7 +1469,9 @@ function AiQueuePolicyEditor({ policyId }: { policyId?: number }) {
               <FieldLabel
                 text={t("admin.ai.queues.section.identity")}
                 help={t("admin.help.aiQueue.identityMode")}
-                defaultHint={t("admin.ai.queues.identityMode.ticket_customer_id")}
+                defaultHint={t(
+                  "admin.ai.queues.identityMode.ticket_customer_id",
+                )}
                 testId="admin-ai-queue-help-identity_mode"
               />
               <PickerField
@@ -1301,7 +1495,9 @@ function AiQueuePolicyEditor({ policyId }: { policyId?: number }) {
               <input
                 data-testid="admin-ai-queue-form-allowed_state_types"
                 value={form.allowed_state_types}
-                onChange={(e) => setField("allowed_state_types", e.target.value)}
+                onChange={(e) =>
+                  setField("allowed_state_types", e.target.value)
+                }
                 placeholder="open"
                 className={inputClass}
               />
@@ -1316,7 +1512,9 @@ function AiQueuePolicyEditor({ policyId }: { policyId?: number }) {
                 <textarea
                   data-testid="admin-ai-queue-form-clarify_schema_json"
                   value={form.clarify_schema_json}
-                  onChange={(e) => setField("clarify_schema_json", e.target.value)}
+                  onChange={(e) =>
+                    setField("clarify_schema_json", e.target.value)
+                  }
                   rows={3}
                   spellCheck={false}
                   className={cn(inputClass, "font-mono text-xs")}

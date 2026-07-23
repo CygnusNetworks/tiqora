@@ -13,6 +13,7 @@ from __future__ import annotations
 import json
 import uuid
 from datetime import datetime
+from typing import Literal
 
 import structlog
 from fastapi import APIRouter, HTTPException, status
@@ -83,6 +84,13 @@ class AiStateOut(BaseModel):
     summary_body: str | None
     last_summary_upto_article_id: int | None
     summary_created_at: datetime | None
+
+
+class AiSummarizeIn(BaseModel):
+    """Per-run scope choice — the agent picks it in the ticket's AI panel;
+    ``None`` falls back to the queue policy's ``summary_detail``."""
+
+    detail: Literal["standard", "detailed"] | None = None
 
 
 class AiSummarizeOut(BaseModel):
@@ -269,7 +277,11 @@ async def request_manual_draft(
 
 @router.post("/summarize", response_model=AiSummarizeOut, status_code=status.HTTP_200_OK)
 async def request_summarize(
-    ticket_id: int, user: CurrentUser, session: DbSession, settings: AppSettings
+    ticket_id: int,
+    user: CurrentUser,
+    session: DbSession,
+    settings: AppSettings,
+    body: AiSummarizeIn | None = None,
 ) -> AiSummarizeOut:
     """Manual "Zusammenfassen" trigger (plan §3.5) — state-only, never an
     article/note. Reuses the same ``note`` permission as Manual Assist since
@@ -298,6 +310,7 @@ async def request_summarize(
             ticket_id=ticket_id,
             trigger=SUMMARY_TRIGGER_MANUAL,
             acting_user_id=user.id,
+            detail=body.detail if body else None,
         )
     except SummaryError as exc:
         raise _map_summary_error(exc) from exc

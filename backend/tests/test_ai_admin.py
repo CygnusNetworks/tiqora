@@ -10,6 +10,7 @@ injected ``fetch_tools`` fake.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from typing import Any
 
 import httpx
@@ -19,6 +20,7 @@ from sqlalchemy import create_engine, select, text
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 from tiqora.ai import acl as ai_acl
+from tiqora.ai import context as ai_context
 from tiqora.ai import drafts as ai_drafts
 from tiqora.ai import mcp as ai_mcp
 from tiqora.ai import policies as ai_policies
@@ -790,6 +792,39 @@ async def test_admin_delete_draft_removes_row_and_404s(mariadb_znuny_url: str) -
 
             with pytest.raises(HTTPException) as exc_info:
                 await admin_ai.delete_ai_draft(999_999, _root_user(), session)
+            assert exc_info.value.status_code == 404
+    finally:
+        await engine.dispose()
+
+
+async def test_admin_delete_summary_clears_state_and_404s(mariadb_znuny_url: str) -> None:
+    _ensure_tiqora_tables(mariadb_znuny_url)
+    engine = create_async_engine(_mysql_async(mariadb_znuny_url))
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    try:
+        async with factory() as session:
+            state = await ai_context.get_or_create_state(session, 89510)
+            state.summary_body = "Old summary"
+            state.last_summary_upto_article_id = 42
+            state.last_summary_hash = "abc"
+            state.summary_created_at = datetime.now(UTC).replace(tzinfo=None)
+            await session.commit()
+
+            deleted_ok = await admin_ai.delete_ai_summary(89510, _root_user(), session)
+            assert deleted_ok is None
+
+            state = await ai_context.get_or_create_state(session, 89510)
+            assert state.summary_body is None
+            assert state.last_summary_upto_article_id is None
+            assert state.last_summary_hash is None
+            assert state.summary_created_at is None
+
+            # Second delete (nothing stored) and unknown ticket both 404.
+            with pytest.raises(HTTPException) as exc_info:
+                await admin_ai.delete_ai_summary(89510, _root_user(), session)
+            assert exc_info.value.status_code == 404
+            with pytest.raises(HTTPException) as exc_info:
+                await admin_ai.delete_ai_summary(999_999, _root_user(), session)
             assert exc_info.value.status_code == 404
     finally:
         await engine.dispose()

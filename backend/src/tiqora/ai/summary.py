@@ -51,7 +51,12 @@ from tiqora.ai.context import (
 )
 from tiqora.ai.kb_wiring import build_vision_llm_factory
 from tiqora.ai.llm import LlmClient, LlmMessage
-from tiqora.ai.models import DETAIL_DETAILED, FEATURE_SUMMARY, TiqoraAiQueuePolicy
+from tiqora.ai.models import (
+    DETAIL_DETAILED,
+    FEATURE_SUMMARY,
+    TiqoraAiQueuePolicy,
+    TiqoraAiTicketState,
+)
 from tiqora.ai.pii import PiiMapper
 from tiqora.ai.policies import get_queue_policy_by_queue
 from tiqora.config import Settings, get_settings
@@ -75,18 +80,20 @@ _SYSTEM_PROMPT = (
     "a few short sentences - do not use headings, bullet points, or "
     "markdown formatting.\n\n"
     "If the input contains one or more attachment blocks labeled "
-    "'[Anhang: <filename>]' with extracted document text, add one further "
-    "paragraph starting with 'Dokumente:' followed by one line per "
-    "document: the filename, then a 1-2 sentence summary of that "
-    "document's content. Omit this paragraph entirely when no document "
-    "attachments are present in the input.\n\n"
+    "'[Anhang: <filename> — ca. <n> Zeichen]' with extracted document text, "
+    "add one further paragraph starting with 'Dokumente:' followed by one "
+    "entry per document: the filename, then a summary of that document's "
+    "content scaled to its stated size - 1-2 sentences for short documents "
+    "(under ~2000 characters), 3-5 sentences for longer ones. Omit this "
+    "paragraph entirely when no document attachments are present in the "
+    "input.\n\n"
     "Output ONLY the updated summary text - no preamble, no meta-commentary "
     "about what you changed."
 )
 
 # "detailed" (tiqora_ai_queue_policy.summary_detail) — same structure as
 # _SYSTEM_PROMPT, but paragraphs may run longer/more thorough and each
-# document gets a 3-5 sentence summary instead of 1-2.
+# document gets a size-scaled thorough summary instead of a short one.
 _SYSTEM_PROMPT_DETAILED = (
     "You maintain a thorough, agent-facing internal summary of a support "
     "ticket. Given the previous summary (if any) and the article(s) since "
@@ -99,11 +106,13 @@ _SYSTEM_PROMPT_DETAILED = (
     "wording - but still do not use headings, bullet points, or markdown "
     "formatting.\n\n"
     "If the input contains one or more attachment blocks labeled "
-    "'[Anhang: <filename>]' with extracted document text, add one further "
-    "paragraph starting with 'Dokumente:' followed by one line per "
-    "document: the filename, then a 3-5 sentence summary covering that "
-    "document's key contents. Omit this paragraph entirely when no document "
-    "attachments are present in the input.\n\n"
+    "'[Anhang: <filename> — ca. <n> Zeichen]' with extracted document text, "
+    "add one further paragraph starting with 'Dokumente:' followed by one "
+    "entry per document: the filename, then a thorough summary covering "
+    "that document's key contents, scaled to its stated size - at least 3-5 "
+    "sentences, up to a full paragraph for long documents (over ~10000 "
+    "characters). Omit this paragraph entirely when no document attachments "
+    "are present in the input.\n\n"
     "Output ONLY the updated summary text - no preamble, no meta-commentary "
     "about what you changed."
 )
@@ -210,8 +219,12 @@ async def summarize_ticket(
     settings: Settings | None = None,
     vision_llm_factory: Any = None,
     run_id: str | None = None,
+    detail: str | None = None,
 ) -> SummaryResult:
     """Run the summary service once for one ticket (plan §3.5).
+
+    ``detail`` (``"standard"``/``"detailed"``) overrides the queue policy's
+    ``summary_detail`` for this run — the agent picks the scope per ticket.
 
     ``acting_user_id`` is required for ``trigger="manual"`` (ACL check);
     ``None`` for ``trigger="auto"`` (queue-driven, no per-user ACL — mirrors
@@ -327,8 +340,9 @@ async def summarize_ticket(
             f"{_render_articles(articles, pii=pii, mask=mask, attachment_blocks=attachment_blocks)}"
         )
 
+    system_prompt = _system_prompt_for_detail(detail or policy.summary_detail)
     messages = [
-        LlmMessage(role="system", content=_system_prompt_for_detail(policy.summary_detail)),
+        LlmMessage(role="system", content=system_prompt),
         LlmMessage(role="user", content=user_message),
     ]
     response = await llm.chat(messages=messages, tools=None)
@@ -417,6 +431,21 @@ async def auto_summary_due(session: AsyncSession, ticket_id: int) -> bool:
     return False
 
 
+async def delete_summary(session: AsyncSession, ticket_id: int) -> bool:
+    """Drop a ticket's stored summary (state columns only — summaries are
+    never articles, see module docstring). Returns ``False`` when the ticket
+    has no stored summary."""
+    state = await session.get(TiqoraAiTicketState, ticket_id)
+    if state is None or state.summary_body is None:
+        return False
+    state.summary_body = None
+    state.last_summary_upto_article_id = None
+    state.last_summary_hash = None
+    state.summary_created_at = None
+    await session.commit()
+    return True
+
+
 __all__ = [
     "STATUS_SKIPPED",
     "STATUS_UP_TO_DATE",
@@ -429,5 +458,6 @@ __all__ = [
     "SummaryPolicyDisabledError",
     "SummaryResult",
     "auto_summary_due",
+    "delete_summary",
     "summarize_ticket",
 ]

@@ -53,12 +53,14 @@ def test_system_prompt_requires_paragraph_structure_and_document_section() -> No
     assert "already been tried" in _SYSTEM_PROMPT
     assert "open action items" in _SYSTEM_PROMPT
     assert "do not use headings, bullet points, or" in _SYSTEM_PROMPT
-    assert "[Anhang: <filename>]" in _SYSTEM_PROMPT
+    assert "[Anhang: <filename> — ca. <n> Zeichen]" in _SYSTEM_PROMPT
+    assert "scaled to its stated size" in _SYSTEM_PROMPT
     assert "Dokumente:" in _SYSTEM_PROMPT
 
 
-def test_detailed_prompt_asks_for_3_to_5_sentence_document_summaries() -> None:
-    assert "3-5 sentence" in _SYSTEM_PROMPT_DETAILED
+def test_detailed_prompt_asks_for_size_scaled_document_summaries() -> None:
+    assert "3-5 sentences" in _SYSTEM_PROMPT_DETAILED
+    assert "scaled to its stated size" in _SYSTEM_PROMPT_DETAILED
     assert "Dokumente:" in _SYSTEM_PROMPT_DETAILED
     # "standard" behaviour must stay byte-identical to before this change.
     assert _SYSTEM_PROMPT_DETAILED != _SYSTEM_PROMPT
@@ -785,7 +787,7 @@ async def test_document_attachment_text_appears_in_summary_prompt(mariadb_znuny_
         assert result.status == STATUS_UPDATED
         assert llm.last_user_message is not None
         assert "Vertragsnummer: XY-987" in llm.last_user_message
-        assert "[Anhang: vertrag.txt]" in llm.last_user_message
+        assert "[Anhang: vertrag.txt — ca. " in llm.last_user_message
     finally:
         await engine.dispose()
 
@@ -838,6 +840,36 @@ async def test_summary_detail_detailed_sends_detailed_system_prompt(
                 ticket_id=seed["ticket_id"],
                 trigger=TRIGGER_MANUAL,
                 acting_user_id=seed["agent_id"],
+            )
+        assert llm.last_system_message == _SYSTEM_PROMPT_DETAILED
+    finally:
+        await engine.dispose()
+
+
+async def test_summary_detail_request_override_beats_policy(
+    mariadb_znuny_url: str,
+) -> None:
+    """Per-run ``detail`` (the agent's per-ticket choice in the AI panel)
+    wins over the queue policy's stored ``summary_detail``."""
+    seed = _seed_ticket(mariadb_znuny_url, ns=31)
+    _add_article(
+        mariadb_znuny_url, ticket_id=seed["ticket_id"], sender_type="customer", body="Help!"
+    )
+    engine = create_async_engine(_mysql_async(mariadb_znuny_url))
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    try:
+        async with factory() as session:
+            await _setup_policy(session, seed=seed, summary_detail="standard")
+
+        llm = ScriptedLlm(["ok"])
+        async with factory() as session:
+            await summarize_ticket(
+                session,
+                llm=llm,
+                ticket_id=seed["ticket_id"],
+                trigger=TRIGGER_MANUAL,
+                acting_user_id=seed["agent_id"],
+                detail="detailed",
             )
         assert llm.last_system_message == _SYSTEM_PROMPT_DETAILED
     finally:

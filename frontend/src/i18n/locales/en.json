@@ -390,7 +390,20 @@
       "errorGeneric": "Something went wrong. Please try again.",
       "adminDeleteDraft": "Delete permanently",
       "adminDeleteDraftHint": "Admin: permanently delete this draft from the database",
-      "adminDeleteConfirm": "Permanently delete this AI draft? This cannot be undone."
+      "adminDeleteConfirm": "Permanently delete this AI draft? This cannot be undone.",
+      "detailLabel": "Scope",
+      "detail": {
+        "standard": "Standard",
+        "detailed": "Detailed"
+      },
+      "adminDeleteSummary": "Delete summary",
+      "adminDeleteSummaryHint": "Admin: delete the stored AI summary — the next run starts from scratch",
+      "adminDeleteSummaryConfirm": "Permanently delete this ticket's stored AI summary? The next run will summarize the ticket from scratch.",
+      "draftStatus": {
+        "accepted": "Accepted",
+        "discarded": "Discarded",
+        "superseded": "Superseded"
+      }
     },
     "toolbar": {
       "print": "Print",
@@ -678,7 +691,8 @@
         "priceInput": "Price input per 1M tokens",
         "priceOutput": "Price output per 1M tokens",
         "priceCurrency": "Currency",
-        "priceHelp": "Cost per 1M tokens (input/output) in the given currency — used for cost calculation in the LLM audit."
+        "priceHelp": "Cost per 1M tokens (input/output) in the given currency — used for cost calculation in the LLM audit.",
+        "priceCurrencyNone": "— none —"
       },
       "mcp": {
         "title": "MCP clients",
@@ -727,7 +741,8 @@
           "summary": "Summary thresholds",
           "caps": "Caps",
           "disclosure": "Disclosure & privacy",
-          "identity": "Identity"
+          "identity": "Identity",
+          "language": "Language"
         },
         "modelOverride": "Model override",
         "visionProvider": "Vision model (images)",
@@ -793,6 +808,11 @@
         },
         "replyLanguageFixed": "Fixed language",
         "replyLanguageDefault": "Fallback language",
+        "replyLanguageNone": "No default",
+        "replyLanguage": {
+          "de": "German",
+          "en": "English"
+        },
         "allowedStateTypes": "Allowed state types",
         "piiNer": "Detect person names automatically (NER)",
         "summaryDetail": "Summary detail level",

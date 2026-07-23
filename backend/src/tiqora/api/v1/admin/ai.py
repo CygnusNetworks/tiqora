@@ -24,6 +24,7 @@ from tiqora.ai import drafts as ai_drafts
 from tiqora.ai import mcp as ai_mcp
 from tiqora.ai import policies as ai_policies
 from tiqora.ai import providers as ai_providers
+from tiqora.ai import summary as ai_summary
 from tiqora.ai import usage as ai_usage
 from tiqora.ai.acl import AiAclValidationError
 from tiqora.ai.audit import DEFAULT_RETENTION_DAYS
@@ -635,3 +636,13 @@ async def delete_ai_draft(draft_id: int, admin: AdminUser, session: DbSession) -
     if row is None:
         raise _not_found("Draft", draft_id)
     await ai_drafts.delete_draft(session, row)
+
+
+@router.delete("/summaries/{ticket_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_ai_summary(ticket_id: int, admin: AdminUser, session: DbSession) -> None:
+    """Drop a ticket's stored AI summary (state-only, see
+    ``tiqora.ai.summary`` module docstring) — admin cleanup; the next
+    summarize run starts from scratch."""
+    _ = admin
+    if not await ai_summary.delete_summary(session, ticket_id):
+        raise _not_found("Summary", ticket_id)

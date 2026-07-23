@@ -23,7 +23,10 @@ import {
 } from "@/lib/adminSearch";
 import { cn } from "@/lib/cn";
 
-const GROUP_META: Record<AdminPageGroup, { titleKey: string; Icon: typeof UsersIcon }> = {
+const GROUP_META: Record<
+  AdminPageGroup,
+  { titleKey: string; Icon: typeof UsersIcon }
+> = {
   access: { titleKey: "admin.group.access", Icon: UsersIcon },
   tickets: { titleKey: "admin.group.tickets", Icon: TicketIcon },
   communication: { titleKey: "admin.group.communication", Icon: MailIcon },
@@ -48,7 +51,13 @@ function groupForPath(pathname: string): AdminPageGroup | null {
   return best?.group ?? null;
 }
 
-function SidebarSearchTrigger({ onClick, compact }: { onClick: () => void; compact?: boolean }) {
+function SidebarSearchTrigger({
+  onClick,
+  compact,
+}: {
+  onClick: () => void;
+  compact?: boolean;
+}) {
   const { t } = useTranslation();
   if (compact) {
     return (
@@ -71,7 +80,9 @@ function SidebarSearchTrigger({ onClick, compact }: { onClick: () => void; compa
       className="mb-2 flex w-full items-center gap-2 rounded-lg border border-hairline bg-surface-subtle px-2.5 py-[7px] text-left text-[13.5px] text-muted transition-colors duration-100 hover:bg-surface hover:text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent"
     >
       <SearchIcon className="h-4 w-4 shrink-0" />
-      <span className="flex-1 truncate">{t("admin.commandPalette.placeholder")}</span>
+      <span className="flex-1 truncate">
+        {t("admin.commandPalette.placeholder")}
+      </span>
       <kbd className="shrink-0 rounded border border-hairline bg-surface px-1 text-[10px] font-medium text-muted">
         ⌘K
       </kbd>
@@ -191,21 +202,28 @@ function ContextColumn({
 }
 
 /** Mobile keeps the full grouped list (all groups, all pages) in the
- * overlay — the rail pattern doesn't translate to a sheet. */
-function MobileNav({ onNavigate, onSearch }: { onNavigate?: () => void; onSearch: () => void }) {
+ * overlay — the rail pattern doesn't translate to a sheet. Styled like the
+ * desktop redesign's frameless look (flat group headers, no boxed cards). */
+function MobileNav({
+  onNavigate,
+  onSearch,
+}: {
+  onNavigate?: () => void;
+  onSearch: () => void;
+}) {
   const { t } = useTranslation();
   return (
-    <nav className="flex flex-col gap-3" data-testid="admin-sidebar-nav">
+    <nav className="flex flex-col gap-4" data-testid="admin-sidebar-nav">
       <SidebarSearchTrigger onClick={onSearch} />
       {ADMIN_PAGE_GROUPS.map((group) => {
         const { titleKey, Icon } = GROUP_META[group];
         return (
-          <div key={group} className="nav-section-card">
-            <div className="nav-section-titleband flex items-center gap-1.5">
+          <div key={group}>
+            <div className="mb-1 flex items-center gap-1.5 px-2.5 text-[11px] font-semibold uppercase tracking-wide text-muted">
               <Icon className="h-3.5 w-3.5 shrink-0" />
               <h2>{t(titleKey)}</h2>
             </div>
-            <ul className="nav-section-body list-none space-y-0.5">
+            <ul className="list-none space-y-0.5">
               {adminPagesByGroup(group).map((page) => (
                 <li key={page.slug}>
                   <Link
@@ -218,7 +236,6 @@ function MobileNav({ onNavigate, onSearch }: { onNavigate?: () => void; onSearch
                         "flex items-center gap-2 rounded-lg px-2.5 py-[7px] text-[13.5px] font-medium text-accent bg-accent-dim shadow-[inset_2px_0_0_var(--color-accent)]",
                     }}
                   >
-                    <Icon className="h-3.5 w-3.5 shrink-0 text-muted" />
                     <span className="truncate">{t(page.nameKey)}</span>
                   </Link>
                 </li>
@@ -302,7 +319,13 @@ export function AdminShell({ children }: { children: ReactNode }) {
             data-testid="admin-brand-link"
             className="flex shrink-0 items-center gap-2 font-display text-lg font-bold tracking-tight text-ink"
           >
-            <img src="/logo.svg" alt="" width={22} height={22} className="rounded" />
+            <img
+              src="/logo.svg"
+              alt=""
+              width={22}
+              height={22}
+              className="rounded"
+            />
             {t("app.name")}
           </Link>
           <span className="hidden shrink-0 rounded border border-hairline bg-surface-subtle px-1.5 py-0.5 text-[11px] font-medium uppercase tracking-wide text-muted sm:inline">
@@ -331,7 +354,9 @@ export function AdminShell({ children }: { children: ReactNode }) {
             onSelectGroup={onSelectGroup}
             onSearch={() => setSearchOpen(true)}
           />
-          {!collapsed && <ContextColumn group={activeGroup} onCollapse={toggleCollapsed} />}
+          {!collapsed && (
+            <ContextColumn group={activeGroup} onCollapse={toggleCollapsed} />
+          )}
         </aside>
         {sidebarOpen && (
           <div className="fixed inset-0 z-30 lg:hidden">
@@ -352,9 +377,14 @@ export function AdminShell({ children }: { children: ReactNode }) {
             </div>
           </div>
         )}
-        <main className={cn("min-w-0 flex-1 animate-route-in")}>{children}</main>
+        <main className={cn("min-w-0 flex-1 animate-route-in")}>
+          {children}
+        </main>
       </div>
-      <AdminCommandPalette open={searchOpen} onClose={() => setSearchOpen(false)} />
+      <AdminCommandPalette
+        open={searchOpen}
+        onClose={() => setSearchOpen(false)}
+      />
     </div>
   );
 }
