@@ -16,6 +16,7 @@ from tiqora.config import get_settings
 from tiqora.db.engine import get_session_factory
 from tiqora.domain.settings_store import get_setting_int
 from tiqora.logging_setup import configure_logging
+from tiqora.worker.ai_audit_cleanup import run_ai_audit_cleanup_tick
 from tiqora.worker.escalation import run_escalation_tick
 from tiqora.worker.gdpr_erasure_purge import run_gdpr_erasure_purge_tick
 from tiqora.worker.gdpr_retention import run_gdpr_retention_tick
@@ -189,6 +190,7 @@ async def _run_all_loops(stop: asyncio.Event) -> None:
         ),
         _daily_loop("gdpr_retention", run_gdpr_retention_tick, "03:00", stop),
         _daily_loop("gdpr_erasure_purge", run_gdpr_erasure_purge_tick, "03:30", stop),
+        _daily_loop("ai_audit_cleanup", run_ai_audit_cleanup_tick, "04:00", stop),
     )
 
 

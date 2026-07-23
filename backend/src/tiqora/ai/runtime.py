@@ -25,6 +25,9 @@ from tiqora.ai import usage as usage_service
 from tiqora.ai.acl import AclLimitExceededError as AiAclLimitExceededError
 from tiqora.ai.acl import check_feature_access, check_feature_limits
 from tiqora.ai.attachment_context import build_attachment_context
+from tiqora.ai.audit import FEATURE_AUTO_REPLY as AUDIT_FEATURE_AUTO_REPLY
+from tiqora.ai.audit import FEATURE_DRAFT as AUDIT_FEATURE_DRAFT
+from tiqora.ai.audit import AuditContext, AuditingLlmClient
 from tiqora.ai.context import (
     ArticleSnapshot,
     TicketNotFoundError,
@@ -361,10 +364,24 @@ async def run_ticket_agent(
 
         # 6/7. Prompts — document/image attachments are rendered into the
         # per-article text before masking (see build_attachment_context).
+        audit_feature = (
+            AUDIT_FEATURE_DRAFT if trigger == TRIGGER_MANUAL else AUDIT_FEATURE_AUTO_REPLY
+        )
+        audit_context = AuditContext(
+            feature=audit_feature,
+            run_id=run_id,
+            ticket_id=ticket_id,
+            queue_id=ticket.queue_id,
+            acting_user_id=actor_user_id,
+            trigger=trigger,
+            provider_id=policy.llm_provider_id,
+            model=policy.model_override,
+        )
+
         effective_vision_factory = vision_llm_factory
         if effective_vision_factory is None and policy.vision_provider_id is not None:
             effective_vision_factory = await build_vision_llm_factory(
-                session, settings, policy.vision_provider_id
+                session, settings, policy.vision_provider_id, audit=audit_context
             )
         attachment_context = await build_attachment_context(
             session,
@@ -374,6 +391,9 @@ async def run_ticket_agent(
         )
 
         pii = PiiMapper(never_mask={ticket.customer_id} if ticket.customer_id else None)
+        llm = AuditingLlmClient(
+            llm, settings=settings, context=audit_context, session=session, pii_mapper=pii
+        )
         system_prompt = _build_system_prompt(policy, trigger=trigger, kind_hint=kind_hint)
         user_message = _build_user_message(
             ticket,
