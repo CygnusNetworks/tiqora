@@ -184,9 +184,9 @@ describe("ProcessWidget", () => {
     fireEvent.click(await screen.findByTestId("process-widget-start-button"));
     await screen.findByTestId("process-start-select");
 
-    fireEvent.change(screen.getByTestId("process-start-select"), {
-      target: { value: "Process-1" },
-    });
+    // SelectField: open the menu and click the option in its portal panel.
+    fireEvent.click(screen.getByTestId("process-start-select"));
+    fireEvent.click(screen.getByTestId("process-start-select-menu-option-Process-1"));
     fireEvent.click(screen.getByTestId("process-start-submit"));
 
     await waitFor(() =>

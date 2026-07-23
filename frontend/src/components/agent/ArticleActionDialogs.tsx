@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 import { api } from "@/lib/api";
 import { Button } from "@/components/ui/Button";
 import { Dialog } from "@/components/ui/Dialog";
+import { SelectField } from "@/components/ui/SelectField";
 
 const inputCls =
   "w-full rounded border border-hairline bg-surface px-2 py-1.5 text-sm text-ink placeholder:text-muted focus:outline-none focus:ring-1 focus:ring-accent";
@@ -149,18 +150,13 @@ export function SplitDialog({
       <div className="space-y-2" data-testid="split-dialog">
         <label className="block text-xs text-muted">
           {t("ticket.splitQueue")}
-          <select
-            className={inputCls}
-            value={queueId}
-            onChange={(e) => setQueueId(e.target.value)}
-          >
-            <option value="">{t("ticket.dialog.selectPlaceholder")}</option>
-            {queues.map((q) => (
-              <option key={q.id} value={q.id}>
-                {q.name}
-              </option>
-            ))}
-          </select>
+          <SelectField
+            items={queues.map((q) => ({ value: String(q.id), label: q.name }))}
+            value={queueId || null}
+            onChange={setQueueId}
+            placeholder={t("ticket.dialog.selectPlaceholder")}
+            testId="split-queue-select"
+          />
         </label>
         <label className="block text-xs text-muted">
           {t("ticket.splitNewTitle")}

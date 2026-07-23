@@ -20,6 +20,7 @@ import { Spinner } from "@/components/ui/Spinner";
 import { SelectMenu, type SelectMenuItem } from "@/components/ui/SelectMenu";
 import { PlusIcon } from "@/components/ui/icons";
 import { HelpPopover } from "@/components/ui/HelpPopover";
+import { SelectField } from "@/components/ui/SelectField";
 import { formatDateTime, formatDateOnly } from "@/lib/format";
 import { cn } from "@/lib/cn";
 
@@ -1297,26 +1298,19 @@ export function GdprPage() {
                     )}
                     {openFilterKind === "activity" && (
                       <div className="space-y-2">
-                        <select
-                          data-testid="gdpr-activity"
+                        <SelectField
+                          items={[
+                            { value: "", label: t("admin.gdpr.activity.all") },
+                            { value: "no_tickets", label: t("admin.gdpr.activity.noTickets") },
+                            { value: "no_open_tickets", label: t("admin.gdpr.activity.noOpenTickets") },
+                            { value: "inactive_since", label: t("admin.gdpr.activity.inactiveSince") },
+                          ]}
                           value={form.activityKind}
-                          onChange={(e) =>
-                            setForm((f) => ({
-                              ...f,
-                              activityKind: e.target.value as ActivityKind,
-                            }))
+                          onChange={(v) =>
+                            setForm((f) => ({ ...f, activityKind: v as ActivityKind }))
                           }
-                          className="w-full rounded-md border border-hairline bg-surface px-3 py-1.5 text-sm text-ink"
-                        >
-                          <option value="">{t("admin.gdpr.activity.all")}</option>
-                          <option value="no_tickets">{t("admin.gdpr.activity.noTickets")}</option>
-                          <option value="no_open_tickets">
-                            {t("admin.gdpr.activity.noOpenTickets")}
-                          </option>
-                          <option value="inactive_since">
-                            {t("admin.gdpr.activity.inactiveSince")}
-                          </option>
-                        </select>
+                          testId="gdpr-activity"
+                        />
                         {form.activityKind === "inactive_since" && (
                           <input
                             type="date"
@@ -1331,22 +1325,19 @@ export function GdprPage() {
                       </div>
                     )}
                     {openFilterKind === "validId" && (
-                      <select
-                        data-testid="gdpr-valid-id"
+                      <SelectField
+                        items={[
+                          { value: "", label: t("admin.gdpr.validity.all") },
+                          { value: "1", label: t("admin.table.valid") },
+                          { value: "2", label: t("admin.table.invalid") },
+                          { value: "3", label: t("admin.gdpr.validity.temp") },
+                        ]}
                         value={form.validId}
-                        onChange={(e) =>
-                          setForm((f) => ({
-                            ...f,
-                            validId: e.target.value as SelectorForm["validId"],
-                          }))
+                        onChange={(v) =>
+                          setForm((f) => ({ ...f, validId: v as SelectorForm["validId"] }))
                         }
-                        className="w-full rounded-md border border-hairline bg-surface px-3 py-1.5 text-sm text-ink"
-                      >
-                        <option value="">{t("admin.gdpr.validity.all")}</option>
-                        <option value="1">{t("admin.table.valid")}</option>
-                        <option value="2">{t("admin.table.invalid")}</option>
-                        <option value="3">{t("admin.gdpr.validity.temp")}</option>
-                      </select>
+                        testId="gdpr-valid-id"
+                      />
                     )}
                     <div className="mt-2 flex justify-end gap-2">
                       <Button

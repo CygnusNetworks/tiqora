@@ -12,6 +12,7 @@ import {
 import { DataTable, type DataTableColumn } from "@/components/admin/DataTable";
 import { CrudDrawer, type FieldDef, type FieldValues } from "@/components/admin/CrudDrawer";
 import { Button } from "@/components/ui/Button";
+import { SelectField } from "@/components/ui/SelectField";
 import { PlusIcon } from "@/components/ui/icons";
 
 /** Sentinel for the "Global (all queues)" option → queue_id = null / global_only. */
@@ -185,22 +186,16 @@ export function QueueVariablesPage() {
         <span className="text-xs font-medium uppercase tracking-wide text-muted">
           {t("admin.queueVariables.queue")}
         </span>
-        <select
-          data-testid="admin-queue-variables-queue-select"
-          className="min-w-[16rem] rounded-md border border-hairline bg-surface px-2 py-1.5 text-sm text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent"
+        <SelectField
+          items={[
+            { value: GLOBAL_SENTINEL, label: t("admin.queueVariables.global") },
+            ...queues.map((q) => ({ value: String(q.id), label: q.name })),
+          ]}
           value={scope === GLOBAL_SENTINEL ? GLOBAL_SENTINEL : String(scope)}
-          onChange={(e) => {
-            const v = e.target.value;
-            setScope(v === GLOBAL_SENTINEL ? GLOBAL_SENTINEL : Number(v));
-          }}
-        >
-          <option value={GLOBAL_SENTINEL}>{t("admin.queueVariables.global")}</option>
-          {queues.map((q) => (
-            <option key={q.id} value={q.id}>
-              {q.name}
-            </option>
-          ))}
-        </select>
+          onChange={(v) => setScope(v === GLOBAL_SENTINEL ? GLOBAL_SENTINEL : Number(v))}
+          testId="admin-queue-variables-queue-select"
+          className="w-auto min-w-[16rem]"
+        />
       </label>
 
       <p className="text-xs text-muted" data-testid="admin-queue-variables-hint">

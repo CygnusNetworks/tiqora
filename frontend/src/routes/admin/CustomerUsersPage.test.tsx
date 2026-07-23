@@ -146,16 +146,17 @@ describe("CustomerUsersPage", () => {
     await waitFor(() => {
       expect(screen.getByTestId("admin-customer-users-page-size")).toBeInTheDocument();
     });
-    const select = screen.getByTestId("admin-customer-users-page-size");
-    expect(select.querySelector('[data-testid="admin-customer-users-page-size-all"]')).not.toBeNull();
-    // Option value stays the 100_000 sentinel; the client never sends that size.
-    const allOption = Array.from(select.querySelectorAll("option")).find(
-      (o) => o.getAttribute("value") === "100000",
-    );
-    expect(allOption).toBeTruthy();
+    // SelectField trigger button; the Alle option lives in the portal menu
+    // with the 100_000 sentinel as its value — the client never sends that
+    // size.
+    const trigger = screen.getByTestId("admin-customer-users-page-size");
+    expect(trigger.tagName).toBe("BUTTON");
 
     list.mockClear();
-    fireEvent.change(select, { target: { value: "100000" } });
+    fireEvent.click(trigger);
+    fireEvent.click(
+      screen.getByTestId("admin-customer-users-page-size-menu-option-100000"),
+    );
     await waitFor(() => {
       expect(list).toHaveBeenCalledWith(
         expect.objectContaining({ pageSize: 500, page: 1 }),
@@ -222,9 +223,8 @@ describe("CustomerUsersPage", () => {
       await waitFor(() => {
         expect(screen.getByTestId("admin-customer-users-page-size")).toBeInTheDocument();
       });
-      fireEvent.change(screen.getByTestId("admin-customer-users-page-size"), {
-        target: { value: "100000" },
-      });
+      fireEvent.click(screen.getByTestId("admin-customer-users-page-size"));
+      fireEvent.click(screen.getByTestId("admin-customer-users-page-size-menu-option-100000"));
       await waitFor(() => {
         expect(screen.getByTestId(`admin-row-${total}`)).toBeInTheDocument();
       });

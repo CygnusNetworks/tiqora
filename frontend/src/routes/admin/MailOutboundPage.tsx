@@ -11,6 +11,7 @@ import {
 import { Button } from "@/components/ui/Button";
 import { Spinner } from "@/components/ui/Spinner";
 import { HelpPopover } from "@/components/ui/HelpPopover";
+import { SelectField } from "@/components/ui/SelectField";
 
 const QUERY_KEY = ["admin", "mail", "outbound"] as const;
 
@@ -201,18 +202,16 @@ export function MailOutboundPage() {
                 {t("admin.help.mailOutbound.security")}
               </HelpPopover>
             </span>
-            <select
-              data-testid="mail-outbound-security"
+            <SelectField
+              items={[
+                { value: "none", label: t("admin.mailOutbound.securityNone") },
+                { value: "starttls", label: t("admin.mailOutbound.securityStarttls") },
+                { value: "ssl", label: t("admin.mailOutbound.securitySsl") },
+              ]}
               value={form.security}
-              onChange={(e) =>
-                setForm((f) => ({ ...f, security: e.target.value as MailSecurity }))
-              }
-              className="w-full rounded-md border border-hairline bg-surface-subtle px-3 py-1.5 text-sm text-ink"
-            >
-              <option value="none">{t("admin.mailOutbound.securityNone")}</option>
-              <option value="starttls">{t("admin.mailOutbound.securityStarttls")}</option>
-              <option value="ssl">{t("admin.mailOutbound.securitySsl")}</option>
-            </select>
+              onChange={(v) => setForm((f) => ({ ...f, security: v as MailSecurity }))}
+              testId="mail-outbound-security"
+            />
           </label>
 
           <label className="block text-sm">
@@ -222,17 +221,15 @@ export function MailOutboundPage() {
                 {t("admin.help.mailOutbound.authType")}
               </HelpPopover>
             </span>
-            <select
-              data-testid="mail-outbound-auth-type"
+            <SelectField
+              items={[
+                { value: "none", label: t("admin.mailOutbound.authNone") },
+                { value: "password", label: t("admin.mailOutbound.authPassword") },
+              ]}
               value={form.auth_type}
-              onChange={(e) =>
-                setForm((f) => ({ ...f, auth_type: e.target.value as MailAuthType }))
-              }
-              className="w-full rounded-md border border-hairline bg-surface-subtle px-3 py-1.5 text-sm text-ink"
-            >
-              <option value="none">{t("admin.mailOutbound.authNone")}</option>
-              <option value="password">{t("admin.mailOutbound.authPassword")}</option>
-            </select>
+              onChange={(v) => setForm((f) => ({ ...f, auth_type: v as MailAuthType }))}
+              testId="mail-outbound-auth-type"
+            />
           </label>
 
           <label className="block text-sm">
