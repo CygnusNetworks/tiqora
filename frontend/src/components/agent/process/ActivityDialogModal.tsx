@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 import { api, ApiError, type ActivityDialogFieldOut } from "@/lib/api";
 import { Dialog } from "@/components/ui/Dialog";
 import { Button } from "@/components/ui/Button";
+import { SelectField } from "@/components/ui/SelectField";
 import { Spinner } from "@/components/ui/Spinner";
 import { flattenQueues } from "@/components/agent/QueueTree";
 import {
@@ -212,19 +213,15 @@ function FieldInput({
     return (
       <div data-testid={`process-field-${name}`}>
         <span className={labelClass}>{label}</span>
-        <select
-          className={inputClass}
+        <SelectField
+          items={[
+            { value: "", label: "—" },
+            ...(queues ?? []).map((q) => ({ value: String(q.id), label: q.name })),
+          ]}
           value={value === undefined || value === null ? "" : String(value)}
-          onChange={(e) => onChange(e.target.value === "" ? "" : Number(e.target.value))}
-          data-testid={`process-field-${name}-input`}
-        >
-          <option value="">—</option>
-          {(queues ?? []).map((q) => (
-            <option key={q.id} value={q.id}>
-              {q.name}
-            </option>
-          ))}
-        </select>
+          onChange={(v) => onChange(v === "" ? "" : Number(v))}
+          testId={`process-field-${name}-input`}
+        />
         {invalid && <p className="mt-1 text-xs text-danger">{t("process.dialog.requiredError")}</p>}
       </div>
     );

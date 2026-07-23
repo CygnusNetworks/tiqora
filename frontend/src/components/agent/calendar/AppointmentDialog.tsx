@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Dialog } from "@/components/ui/Dialog";
 import { Button } from "@/components/ui/Button";
+import { SelectField } from "@/components/ui/SelectField";
 import type { CalendarOut, RecurrenceIn } from "@/lib/api";
 import type { AppointmentFormValue } from "./appointmentForm";
 
@@ -67,18 +68,12 @@ export function AppointmentDialog({
 
         <div>
           <span className={labelClass}>{t("calendar.form.calendar")}</span>
-          <select
-            data-testid="appointment-calendar"
+          <SelectField
+            items={calendars.map((c) => ({ value: c.id, label: c.name }))}
             value={form.calendar_id}
-            onChange={(e) => setForm((f) => ({ ...f, calendar_id: Number(e.target.value) }))}
-            className={inputClass}
-          >
-            {calendars.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name}
-              </option>
-            ))}
-          </select>
+            onChange={(v) => setForm((f) => ({ ...f, calendar_id: v }))}
+            testId="appointment-calendar"
+          />
         </div>
 
         <div className="grid grid-cols-2 gap-2">
@@ -139,24 +134,20 @@ export function AppointmentDialog({
 
         <div>
           <span className={labelClass}>{t("calendar.form.recurrence")}</span>
-          <select
-            data-testid="appointment-recurrence-type"
+          <SelectField
+            items={[
+              { value: "", label: t("calendar.form.recurrenceNone") },
+              ...RECUR_TYPES.map((r) => ({ value: r as string, label: t(`calendar.recurrence.${r}`) })),
+            ]}
             value={form.recurrence.type}
-            onChange={(e) =>
+            onChange={(v) =>
               setForm((f) => ({
                 ...f,
-                recurrence: { ...f.recurrence, type: e.target.value as RecurrenceIn["type"] | "" },
+                recurrence: { ...f.recurrence, type: v as RecurrenceIn["type"] | "" },
               }))
             }
-            className={inputClass}
-          >
-            <option value="">{t("calendar.form.recurrenceNone")}</option>
-            {RECUR_TYPES.map((r) => (
-              <option key={r} value={r}>
-                {t(`calendar.recurrence.${r}`)}
-              </option>
-            ))}
-          </select>
+            testId="appointment-recurrence-type"
+          />
         </div>
 
         {form.recurrence.type && (

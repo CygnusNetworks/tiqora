@@ -213,8 +213,10 @@ describe("ActionToolbar", () => {
   it("prefills the owner picker with the current owner_id", async () => {
     wrap(<ActionToolbar ticket={makeTicket({ owner_id: 2 })} />);
     fireEvent.click(screen.getByTestId("toolbar-owner"));
-    const select = await screen.findByTestId("agent-picker-select");
-    expect(select).toHaveValue("2");
+    // SelectField trigger button shows the pre-selected agent's label.
+    const trigger = await screen.findByTestId("agent-picker-select");
+    expect(trigger.tagName).toBe("BUTTON");
+    expect(trigger).toHaveTextContent("Ada Lovelace");
   });
 
   it("shows the current customer and prefills search", async () => {

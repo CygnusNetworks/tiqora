@@ -4,10 +4,9 @@ import { useTranslation } from "react-i18next";
 import { api, ApiError } from "@/lib/api";
 import { Dialog } from "@/components/ui/Dialog";
 import { Button } from "@/components/ui/Button";
+import { SelectField } from "@/components/ui/SelectField";
 import { Spinner } from "@/components/ui/Spinner";
 
-const inputClass =
-  "w-full rounded-md border border-hairline bg-surface-subtle px-3 py-1.5 text-sm text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent focus:border-accent";
 const labelClass = "mb-1 block text-xs font-medium uppercase tracking-wide text-muted";
 
 /**
@@ -73,22 +72,13 @@ export function StartProcessDialog({
         >
           <div>
             <span className={labelClass}>{t("process.start.selectLabel")}</span>
-            <select
-              className={inputClass}
-              value={selected}
-              onChange={(e) => setSelected(e.target.value)}
-              data-testid="process-start-select"
-              required
-            >
-              <option value="" disabled>
-                —
-              </option>
-              {listQ.data.map((p) => (
-                <option key={p.entity_id} value={p.entity_id}>
-                  {p.name}
-                </option>
-              ))}
-            </select>
+            <SelectField
+              items={listQ.data.map((p) => ({ value: p.entity_id, label: p.name }))}
+              value={selected || null}
+              onChange={setSelected}
+              placeholder="—"
+              testId="process-start-select"
+            />
           </div>
 
           {startM.isError && (

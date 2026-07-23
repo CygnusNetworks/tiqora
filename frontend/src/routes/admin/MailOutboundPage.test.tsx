@@ -60,7 +60,7 @@ describe("MailOutboundPage", () => {
 
     expect(screen.getByTestId("mail-outbound-host")).toHaveValue("mail.example.com");
     expect(screen.getByTestId("mail-outbound-port")).toHaveValue(587);
-    expect(screen.getByTestId("mail-outbound-security")).toHaveValue("starttls");
+    expect(screen.getByTestId("mail-outbound-security")).toHaveTextContent("STARTTLS");
     expect(screen.getByTestId("mail-outbound-enabled")).toBeChecked();
 
     const password = screen.getByTestId("mail-outbound-auth-password");

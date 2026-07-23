@@ -8,6 +8,7 @@ import { useAuth } from "@/auth/AuthContext";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Dialog } from "@/components/ui/Dialog";
+import { SelectField } from "@/components/ui/SelectField";
 import { Spinner } from "@/components/ui/Spinner";
 import { stateLabel } from "@/lib/status";
 import { ticketPerms, usePatchTicket } from "@/lib/ticket";
@@ -497,19 +498,17 @@ export function AgentPickerDialog({
             <Spinner />
           </div>
         ) : (
-          <select
-            className={inputCls}
-            value={agentId}
-            onChange={(e) => setAgentId(e.target.value)}
-            data-testid="agent-picker-select"
-          >
-            <option value="">{t("ticket.dialog.selectPlaceholder")}</option>
-            {(agentsQ.data ?? []).map((a) => (
-              <option key={a.id} value={a.id}>
-                {a.full_name} ({a.login})
-              </option>
-            ))}
-          </select>
+          <SelectField
+            items={(agentsQ.data ?? []).map((a) => ({
+              value: String(a.id),
+              label: a.full_name,
+              hint: a.login,
+            }))}
+            value={agentId || null}
+            onChange={setAgentId}
+            placeholder={t("ticket.dialog.selectPlaceholder")}
+            testId="agent-picker-select"
+          />
         )}
         {patch.isError && <p className="text-xs text-danger">{t("ticket.dialog.genericError")}</p>}
         <DialogActions
@@ -787,19 +786,13 @@ export function MovePickerDialog({
   return (
     <Dialog open onClose={onClose} title={t("ticket.toolbar.queue")}>
       <div className="space-y-2" data-testid="move-picker-dialog">
-        <select
-          className={inputCls}
-          value={queueId}
-          onChange={(e) => setQueueId(e.target.value)}
-          data-testid="queue-picker-select"
-        >
-          <option value="">{t("ticket.dialog.selectPlaceholder")}</option>
-          {queues.map((qu) => (
-            <option key={qu.id} value={qu.id}>
-              {qu.name}
-            </option>
-          ))}
-        </select>
+        <SelectField
+          items={queues.map((qu) => ({ value: String(qu.id), label: qu.name }))}
+          value={queueId || null}
+          onChange={setQueueId}
+          placeholder={t("ticket.dialog.selectPlaceholder")}
+          testId="queue-picker-select"
+        />
         {patch.isError && <p className="text-xs text-danger">{t("ticket.dialog.genericError")}</p>}
         <DialogActions
           onCancel={onClose}
@@ -832,18 +825,16 @@ export function PendingDialog({
       <div className="space-y-2" data-testid="pending-dialog">
         <label className="block text-xs text-muted">
           {t("ticket.toolbar.state")}
-          <select
-            className={inputCls}
-            value={stateId}
-            onChange={(e) => setStateId(e.target.value)}
-          >
-            <option value="">{t("ticket.dialog.selectPlaceholder")}</option>
-            {pendingStates.map((s) => (
-              <option key={s.id} value={s.id}>
-                {stateLabel(t, s.name)}
-              </option>
-            ))}
-          </select>
+          <SelectField
+            items={pendingStates.map((s) => ({
+              value: String(s.id),
+              label: stateLabel(t, s.name),
+            }))}
+            value={stateId || null}
+            onChange={setStateId}
+            placeholder={t("ticket.dialog.selectPlaceholder")}
+            testId="pending-state-select"
+          />
         </label>
         <label className="block text-xs text-muted">
           {t("ticket.dialog.apptStart")}
@@ -929,17 +920,12 @@ export function LinkDialog({
         </label>
         <label className="block text-xs text-muted">
           {t("ticket.dialog.linkType")}
-          <select
-            className={inputCls}
+          <SelectField
+            items={LINK_TYPES.map((lt) => ({ value: lt, label: lt }))}
             value={linkType}
-            onChange={(e) => setLinkType(e.target.value as (typeof LINK_TYPES)[number])}
-          >
-            {LINK_TYPES.map((lt) => (
-              <option key={lt} value={lt}>
-                {lt}
-              </option>
-            ))}
-          </select>
+            onChange={(v) => setLinkType(v as (typeof LINK_TYPES)[number])}
+            testId="link-type-select"
+          />
         </label>
         {create.isError && <p className="text-xs text-danger">{t("ticket.dialog.genericError")}</p>}
         <DialogActions

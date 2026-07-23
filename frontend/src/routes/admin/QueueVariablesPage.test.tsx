@@ -126,16 +126,18 @@ describe("QueueVariablesPage", () => {
     renderPage();
     await waitFor(() => expect(screen.getByText("Domain")).toBeInTheDocument());
     await waitFor(() => expect(listQueues).toHaveBeenCalled());
-    // Wait until the Support option is available
-    await waitFor(() => {
-      expect(screen.getByRole("option", { name: "Support" })).toBeInTheDocument();
-    });
-
     // Global scope: physical section hidden.
     expect(screen.queryByTestId("admin-queue-variables-physical")).not.toBeInTheDocument();
 
-    const select = screen.getByTestId("admin-queue-variables-queue-select");
-    fireEvent.change(select, { target: { value: "3" } });
+    // Open the SelectField menu; the Support option renders in its portal
+    // panel once the queue list has loaded.
+    fireEvent.click(screen.getByTestId("admin-queue-variables-queue-select"));
+    await waitFor(() => {
+      expect(
+        screen.getByTestId("admin-queue-variables-queue-select-menu-option-3"),
+      ).toBeInTheDocument();
+    });
+    fireEvent.click(screen.getByTestId("admin-queue-variables-queue-select-menu-option-3"));
 
     await waitFor(() => {
       expect(request).toHaveBeenCalledWith(

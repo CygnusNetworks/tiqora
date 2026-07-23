@@ -12,6 +12,7 @@ import { DataTable, type DataTableColumn } from "@/components/admin/DataTable";
 import { Dialog } from "@/components/ui/Dialog";
 import { Button } from "@/components/ui/Button";
 import { HelpPopover } from "@/components/ui/HelpPopover";
+import { SelectField } from "@/components/ui/SelectField";
 import { PlusIcon } from "@/components/ui/icons";
 import {
   DynamicFieldConfigEditor,
@@ -297,20 +298,12 @@ export function DynamicFieldsPage() {
             {editing ? (
               <p className="text-sm text-ink">{form.field_type}</p>
             ) : (
-              <select
-                data-testid="dynamic-field-type"
+              <SelectField
+                items={FIELD_TYPES.map((ft) => ({ value: ft as string, label: ft }))}
                 value={form.field_type}
-                onChange={(e) =>
-                  setForm((f) => ({ ...f, field_type: e.target.value, config: {} }))
-                }
-                className={inputClass}
-              >
-                {FIELD_TYPES.map((ft) => (
-                  <option key={ft} value={ft}>
-                    {ft}
-                  </option>
-                ))}
-              </select>
+                onChange={(v) => setForm((f) => ({ ...f, field_type: v, config: {} }))}
+                testId="dynamic-field-type"
+              />
             )}
           </div>
 
@@ -327,18 +320,12 @@ export function DynamicFieldsPage() {
             {editing ? (
               <p className="text-sm text-ink">{form.object_type}</p>
             ) : (
-              <select
-                data-testid="dynamic-field-object-type"
+              <SelectField
+                items={OBJECT_TYPES.map((ot) => ({ value: ot as string, label: ot }))}
                 value={form.object_type}
-                onChange={(e) => setForm((f) => ({ ...f, object_type: e.target.value }))}
-                className={inputClass}
-              >
-                {OBJECT_TYPES.map((ot) => (
-                  <option key={ot} value={ot}>
-                    {ot}
-                  </option>
-                ))}
-              </select>
+                onChange={(v) => setForm((f) => ({ ...f, object_type: v }))}
+                testId="dynamic-field-object-type"
+              />
             )}
           </div>
 
@@ -361,15 +348,15 @@ export function DynamicFieldsPage() {
 
           <div>
             <span className={labelClass}>{t("admin.table.status")}</span>
-            <select
-              data-testid="dynamic-field-valid"
+            <SelectField
+              items={[
+                { value: 1, label: t("admin.table.valid") },
+                { value: 2, label: t("admin.table.invalid") },
+              ]}
               value={form.valid_id}
-              onChange={(e) => setForm((f) => ({ ...f, valid_id: Number(e.target.value) }))}
-              className={inputClass}
-            >
-              <option value={1}>{t("admin.table.valid")}</option>
-              <option value={2}>{t("admin.table.invalid")}</option>
-            </select>
+              onChange={(v) => setForm((f) => ({ ...f, valid_id: v }))}
+              testId="dynamic-field-valid"
+            />
           </div>
 
           {submitError && (

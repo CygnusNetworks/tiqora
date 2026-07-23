@@ -8,6 +8,7 @@ import {
 import { useTranslation } from "react-i18next";
 import { ApiError, type AdminListParams, type AdminPage, type AdminValidFilter } from "@/lib/api";
 import { Button } from "@/components/ui/Button";
+import { SelectField } from "@/components/ui/SelectField";
 import { Spinner } from "@/components/ui/Spinner";
 import { CheckIcon, PlusIcon } from "@/components/ui/icons";
 import { cn } from "@/lib/cn";
@@ -528,23 +529,18 @@ export function AdminResourcePage<Out, Create, Update>({
           </span>
           <label className="inline-flex items-center gap-1.5 text-xs text-muted">
             {t("admin.pagination.pageSize")}
-            <select
-              className="rounded-md border border-hairline bg-surface px-1.5 py-1 text-xs text-ink"
+            <SelectField
+              items={[
+                ...pageSizeOptions.map((n) => ({ value: n, label: String(n) })),
+                ...(allowAllPageSize
+                  ? [{ value: allPageSize, label: t("admin.pagination.all") }]
+                  : []),
+              ]}
               value={pageSize}
-              data-testid={`admin-${resourceKey}-page-size`}
-              onChange={(e) => changePageSize(Number(e.target.value))}
-            >
-              {pageSizeOptions.map((n) => (
-                <option key={n} value={n}>
-                  {n}
-                </option>
-              ))}
-              {allowAllPageSize && (
-                <option value={allPageSize} data-testid={`admin-${resourceKey}-page-size-all`}>
-                  {t("admin.pagination.all")}
-                </option>
-              )}
-            </select>
+              onChange={changePageSize}
+              testId={`admin-${resourceKey}-page-size`}
+              className="w-auto px-1.5 py-1 text-xs"
+            />
           </label>
         </div>
       </div>

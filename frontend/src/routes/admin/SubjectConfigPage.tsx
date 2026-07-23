@@ -10,6 +10,7 @@ import {
 import { Button } from "@/components/ui/Button";
 import { Spinner } from "@/components/ui/Spinner";
 import { HelpPopover } from "@/components/ui/HelpPopover";
+import { SelectField } from "@/components/ui/SelectField";
 
 const QUERY_KEY = ["admin", "subject-config"] as const;
 const PREVIEW_TN = "2026070100000019";
@@ -202,21 +203,16 @@ export function SubjectConfigPage() {
                 {t("admin.help.subjectConfig.subjectFormat")}
               </HelpPopover>
             </span>
-            <select
-              data-testid="subject-config-format"
+            <SelectField
+              items={[
+                { value: "Left", label: t("admin.subjectConfig.formatLeft") },
+                { value: "Right", label: t("admin.subjectConfig.formatRight") },
+                { value: "None", label: t("admin.subjectConfig.formatNone") },
+              ]}
               value={form.subject_format}
-              onChange={(e) =>
-                setForm((f) => ({
-                  ...f,
-                  subject_format: e.target.value as SubjectFormat,
-                }))
-              }
-              className="w-full rounded-md border border-hairline bg-surface-subtle px-3 py-1.5 text-sm text-ink"
-            >
-              <option value="Left">{t("admin.subjectConfig.formatLeft")}</option>
-              <option value="Right">{t("admin.subjectConfig.formatRight")}</option>
-              <option value="None">{t("admin.subjectConfig.formatNone")}</option>
-            </select>
+              onChange={(v) => setForm((f) => ({ ...f, subject_format: v as SubjectFormat }))}
+              testId="subject-config-format"
+            />
             {znuny ? (
               <span className="mt-1 block text-xs text-muted">
                 {t("admin.subjectConfig.inheritedFromZnuny", { value: znuny.subject_format })}
