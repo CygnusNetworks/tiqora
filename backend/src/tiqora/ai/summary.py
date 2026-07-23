@@ -25,6 +25,7 @@ Tiqora — so in practice auto-summary has no effect until then anyway.
 from __future__ import annotations
 
 import hashlib
+import uuid
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
@@ -36,6 +37,8 @@ from tiqora.ai import usage as usage_service
 from tiqora.ai.acl import AclLimitExceededError as AiAclLimitExceededError
 from tiqora.ai.acl import check_feature_access, check_feature_limits
 from tiqora.ai.attachment_context import build_attachment_context
+from tiqora.ai.audit import FEATURE_SUMMARY as AUDIT_FEATURE_SUMMARY
+from tiqora.ai.audit import AuditContext, AuditingLlmClient
 from tiqora.ai.context import (
     ArticleSnapshot,
     TicketNotFoundError,
@@ -48,7 +51,7 @@ from tiqora.ai.llm import LlmClient, LlmMessage
 from tiqora.ai.models import FEATURE_SUMMARY, TiqoraAiQueuePolicy
 from tiqora.ai.pii import PiiMapper
 from tiqora.ai.policies import get_queue_policy_by_queue
-from tiqora.config import Settings
+from tiqora.config import Settings, get_settings
 
 logger = structlog.get_logger(__name__)
 
@@ -160,6 +163,7 @@ async def summarize_ticket(
     acting_user_id: int | None,
     settings: Settings | None = None,
     vision_llm_factory: Any = None,
+    run_id: str | None = None,
 ) -> SummaryResult:
     """Run the summary service once for one ticket (plan §3.5).
 
@@ -218,13 +222,22 @@ async def summarize_ticket(
     pii = PiiMapper(never_mask={ticket.customer_id} if ticket.customer_id else None)
     mask = bool(policy.pii_masking)
 
+    audit_context = AuditContext(
+        feature=AUDIT_FEATURE_SUMMARY,
+        run_id=run_id or uuid.uuid4().hex,
+        ticket_id=ticket_id,
+        queue_id=ticket.queue_id,
+        acting_user_id=acting_user_id,
+        trigger=trigger,
+        provider_id=policy.llm_provider_id,
+        model=policy.model_override,
+    )
+
     effective_vision_factory = vision_llm_factory
     if effective_vision_factory is None and policy.vision_provider_id is not None:
-        from tiqora.config import get_settings
-
         effective_settings = settings or get_settings()
         effective_vision_factory = await build_vision_llm_factory(
-            session, effective_settings, policy.vision_provider_id
+            session, effective_settings, policy.vision_provider_id, audit=audit_context
         )
     attachment_context = await build_attachment_context(
         session,
@@ -233,6 +246,14 @@ async def summarize_ticket(
         vision_llm_factory=effective_vision_factory,
     )
     attachment_blocks = attachment_context.blocks
+
+    llm = AuditingLlmClient(
+        llm,
+        settings=settings or get_settings(),
+        context=audit_context,
+        session=session,
+        pii_mapper=pii,
+    )
 
     has_previous = state.summary_body is not None and state.last_summary_upto_article_id is not None
     if has_previous:

@@ -16,6 +16,7 @@ from dataclasses import dataclass
 from typing import Literal
 
 from tiqora.domain.settings_store import (
+    KEY_AI_AUDIT_CLEANUP_ENABLED,
     KEY_AI_WORKER_ENABLED,
     KEY_AI_WORKER_INTERVAL_SECONDS,
     KEY_ESCALATION_ENABLED,
@@ -139,6 +140,14 @@ DAEMON_SERVICES: tuple[DaemonService, ...] = (
         schedule_kind="interval",
         interval_key=KEY_AI_WORKER_INTERVAL_SECONDS,
         interval_settings_attr="ai_worker_interval_seconds",
+    ),
+    DaemonService(
+        slug="ai_audit_cleanup",
+        enabled_key=KEY_AI_AUDIT_CLEANUP_ENABLED,
+        default_enabled=True,
+        toggleable=True,
+        schedule_kind="daily",
+        daily_at="04:00",
     ),
 )
 

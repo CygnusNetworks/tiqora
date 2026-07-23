@@ -26,12 +26,14 @@ class AiSettingsOut(BaseModel):
     operation_mode: OperationMode
     disclosure_default_text: str
     global_max_replies_per_hour: int | None
+    audit_retention_days: int
 
 
 class AiSettingsUpdate(BaseModel):
     operation_mode: OperationMode | None = None
     disclosure_default_text: str | None = None
     global_max_replies_per_hour: int | None = Field(default=None, ge=0)
+    audit_retention_days: int | None = Field(default=None, ge=1, le=365)
 
 
 # ---------------------------------------------------------------------------

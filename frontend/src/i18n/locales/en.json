@@ -779,6 +779,81 @@
         "success": "Status",
         "ok": "OK",
         "failed": "Failed"
+      },
+      "audit": {
+        "title": "LLM request audit",
+        "subtitle": "Every in/outgoing LLM request, with PII masking and reveal.",
+        "stat": {
+          "requests": "Requests",
+          "tokens": "Tokens total",
+          "errorRate": "Error rate",
+          "topModel": "Top model"
+        },
+        "period": "Period",
+        "periodToday": "Today",
+        "period7d": "7 days",
+        "period30d": "30 days",
+        "periodCustom": "Custom",
+        "provider": "Provider",
+        "allProviders": "All providers",
+        "feature": {
+          "label": "Feature",
+          "draft": "Draft",
+          "summary": "Summary",
+          "auto_reply": "Auto-reply",
+          "vision": "Vision",
+          "test": "Connection test"
+        },
+        "allFeatures": "All features",
+        "status": "Status",
+        "allStatuses": "All statuses",
+        "statusOk": "OK",
+        "error": "Error",
+        "ticketSearch": "Ticket",
+        "ticketSearchPlaceholder": "Ticket number or ID…",
+        "empty": "No requests match these filters.",
+        "table": {
+          "time": "Time",
+          "provider": "Provider / model",
+          "feature": "Feature",
+          "ticket": "Ticket",
+          "tokens": "Tokens (in/out)",
+          "duration": "Duration",
+          "pii": "PII",
+          "status": "Status"
+        },
+        "retention": "Rows are kept for {{count}} days.",
+        "retentionChange": "Change",
+        "retentionEdit": "Retention (days):",
+        "retentionSave": "Save",
+        "retentionCancel": "Cancel",
+        "piiKind": {
+          "EMAIL": "email",
+          "MAC": "MAC address",
+          "IPV4": "IP address",
+          "IPV6": "IP address",
+          "PHONE": "phone number",
+          "OTHER": "{{kind}}"
+        },
+        "detail": {
+          "title": "Audit entry",
+          "collapse": "collapse",
+          "showFull": "show full",
+          "empty": "—",
+          "response": "Response",
+          "error": "Error",
+          "copy": "Copy",
+          "download": "Download",
+          "runId": "Run ID",
+          "trigger": "Trigger",
+          "piiSummary": "{{count}} PII replacements",
+          "revealPii": "Show PII",
+          "revealPiiError": "PII could not be revealed.",
+          "tabMessages": "Messages",
+          "tabRaw": "Raw JSON",
+          "rawRequest": "Request",
+          "rawResponse": "Response"
+        }
       }
     },
     "help": {
@@ -889,6 +964,12 @@
         "schedule": "How often the service runs. Daily services always fire at the fixed UTC time shown; interval-based ones can be edited here and reset back to their built-in default.",
         "takeover": "This service replaces the matching Znuny background task. Keep Znuny's own cron/daemon for it disabled — running both at once means the same work happens twice and can race on the same records."
       },
+      "ai": {
+        "audit": {
+          "overview": "Every LLM chat-completion call (main model, vision pre-pass, provider connection test) is logged here — success or failure, with the exact payload sent after PII masking. Raw payloads and the PII mapping are only visible on the detail view; reveals are themselves logged.",
+          "retention": "Audit rows older than this many days are deleted automatically once a day. Range: 1–365 days."
+        }
+      },
       "gdpr": {
         "mode": "\"Anonymize\" scrubs personal data but keeps the ticket records and their history (referential integrity intact). \"Delete\" removes the customer record entirely; ticket data is only removed too if the checkbox below is set.",
         "filters": "Additional selectors narrow the customer set further — every added filter is ANDed with the logins/companies above and with each other.",
@@ -936,7 +1017,8 @@
       "ai": "AI settings",
       "aiProviders": "AI providers",
       "aiMcp": "AI MCP clients",
-      "aiQueues": "AI queue policies"
+      "aiQueues": "AI queue policies",
+      "aiAudit": "AI request audit"
     },
     "table": {
       "id": "ID",
@@ -1417,6 +1499,10 @@
         "gdpr_erasure_purge": {
           "name": "GDPR erasure purge",
           "description": "Removes expired erasure backups once a day."
+        },
+        "ai_audit_cleanup": {
+          "name": "AI audit cleanup",
+          "description": "Deletes LLM audit log rows past the configured retention once a day."
         }
       }
     },
@@ -1747,7 +1833,8 @@
       "ai": "Manage the AI subsystem's operation mode, disclosure and access control.",
       "aiProviders": "Manage and test LLM providers (OpenAI-compatible, Anthropic).",
       "aiMcp": "Manage MCP servers as tool sources for the AI and enable tools.",
-      "aiQueues": "Configure AI behavior per queue: autonomy, caps, escalation."
+      "aiQueues": "Configure AI behavior per queue: autonomy, caps, escalation.",
+      "aiAudit": "Full audit of every LLM request/response, with PII reveal."
     }
   },
   "kb": {

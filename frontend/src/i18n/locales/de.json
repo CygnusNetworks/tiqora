@@ -779,6 +779,81 @@
         "success": "Status",
         "ok": "OK",
         "failed": "Fehler"
+      },
+      "audit": {
+        "title": "LLM-Anfrage-Audit",
+        "subtitle": "Jede ein- und ausgehende LLM-Anfrage, mit PII-Maskierung und Aufdeckung.",
+        "stat": {
+          "requests": "Anfragen",
+          "tokens": "Tokens gesamt",
+          "errorRate": "Fehlerquote",
+          "topModel": "Top-Modell"
+        },
+        "period": "Zeitraum",
+        "periodToday": "Heute",
+        "period7d": "7 Tage",
+        "period30d": "30 Tage",
+        "periodCustom": "Benutzerdefiniert",
+        "provider": "Provider",
+        "allProviders": "Alle Provider",
+        "feature": {
+          "label": "Funktion",
+          "draft": "Entwurf",
+          "summary": "Zusammenfassung",
+          "auto_reply": "Auto-Antwort",
+          "vision": "Bildanalyse",
+          "test": "Verbindungstest"
+        },
+        "allFeatures": "Alle Funktionen",
+        "status": "Status",
+        "allStatuses": "Alle Status",
+        "statusOk": "OK",
+        "error": "Fehler",
+        "ticketSearch": "Ticket",
+        "ticketSearchPlaceholder": "Ticketnummer oder ID…",
+        "empty": "Keine Anfragen entsprechen diesen Filtern.",
+        "table": {
+          "time": "Zeit",
+          "provider": "Provider / Modell",
+          "feature": "Funktion",
+          "ticket": "Ticket",
+          "tokens": "Tokens (in/out)",
+          "duration": "Dauer",
+          "pii": "PII",
+          "status": "Status"
+        },
+        "retention": "Einträge werden {{count}} Tage aufbewahrt.",
+        "retentionChange": "Ändern",
+        "retentionEdit": "Aufbewahrung (Tage):",
+        "retentionSave": "Speichern",
+        "retentionCancel": "Abbrechen",
+        "piiKind": {
+          "EMAIL": "E-Mail",
+          "MAC": "MAC-Adresse",
+          "IPV4": "IP-Adresse",
+          "IPV6": "IP-Adresse",
+          "PHONE": "Telefonnummer",
+          "OTHER": "{{kind}}"
+        },
+        "detail": {
+          "title": "Audit-Eintrag",
+          "collapse": "einklappen",
+          "showFull": "vollständig anzeigen",
+          "empty": "—",
+          "response": "Antwort",
+          "error": "Fehler",
+          "copy": "Kopieren",
+          "download": "Herunterladen",
+          "runId": "Lauf-ID",
+          "trigger": "Auslöser",
+          "piiSummary": "{{count}} PII-Ersetzungen",
+          "revealPii": "PII einblenden",
+          "revealPiiError": "PII konnte nicht aufgedeckt werden.",
+          "tabMessages": "Nachrichten",
+          "tabRaw": "Roh-JSON",
+          "rawRequest": "Anfrage",
+          "rawResponse": "Antwort"
+        }
       }
     },
     "help": {
@@ -889,6 +964,12 @@
         "schedule": "Wie oft der Dienst läuft. Tägliche Dienste feuern immer zur festen UTC-Zeit; intervallbasierte lassen sich hier bearbeiten und auf ihren eingebauten Standardwert zurücksetzen.",
         "takeover": "Dieser Dienst ersetzt die entsprechende Znuny-Hintergrundaufgabe. Znunys eigenen Cron/Daemon dafür deaktiviert lassen — laufen beide gleichzeitig, geschieht dieselbe Arbeit doppelt und es kann zu Race Conditions auf denselben Datensätzen kommen."
       },
+      "ai": {
+        "audit": {
+          "overview": "Jeder LLM-Chat-Completion-Aufruf (Hauptmodell, Vision-Vorverarbeitung, Provider-Verbindungstest) wird hier protokolliert — erfolgreich oder fehlgeschlagen, mit dem exakten Payload nach PII-Maskierung. Roh-Payloads und die PII-Zuordnung sind nur in der Detailansicht sichtbar; das Aufdecken wird selbst protokolliert.",
+          "retention": "Audit-Einträge, die älter als diese Anzahl Tage sind, werden täglich automatisch gelöscht. Bereich: 1–365 Tage."
+        }
+      },
       "gdpr": {
         "mode": "„Anonymisieren“ entfernt personenbezogene Daten, behält aber Ticket-Datensätze und -Historie (referenzielle Integrität bleibt erhalten). „Löschen“ entfernt den Kundendatensatz vollständig; Ticketdaten werden nur mitgelöscht, wenn die Checkbox unten gesetzt ist.",
         "filters": "Zusätzliche Selektoren grenzen die Kundenmenge weiter ein — jeder hinzugefügte Filter wird UND-verknüpft mit Logins/Firmen oben und mit den übrigen Filtern.",
@@ -936,7 +1017,8 @@
       "ai": "KI-Einstellungen",
       "aiProviders": "KI-Provider",
       "aiMcp": "KI-MCP-Clients",
-      "aiQueues": "KI-Queue-Policies"
+      "aiQueues": "KI-Queue-Policies",
+      "aiAudit": "KI-Anfrage-Audit"
     },
     "table": {
       "id": "ID",
@@ -1417,6 +1499,10 @@
         "gdpr_erasure_purge": {
           "name": "DSGVO-Löschbereinigung",
           "description": "Abgelaufene Lösch-Backups täglich entfernen."
+        },
+        "ai_audit_cleanup": {
+          "name": "KI-Audit-Bereinigung",
+          "description": "Löscht LLM-Audit-Log-Einträge nach Ablauf der konfigurierten Aufbewahrungsfrist täglich."
         }
       }
     },
@@ -1747,7 +1833,8 @@
       "ai": "Betriebsmodus, Disclosure und Zugriffskontrolle des KI-Subsystems verwalten.",
       "aiProviders": "LLM-Provider (OpenAI-kompatibel, Anthropic) verwalten und testen.",
       "aiMcp": "MCP-Server als Werkzeugquellen für die KI verwalten und Tools freigeben.",
-      "aiQueues": "KI-Verhalten je Queue konfigurieren: Autonomie, Limits, Eskalation."
+      "aiQueues": "KI-Verhalten je Queue konfigurieren: Autonomie, Limits, Eskalation.",
+      "aiAudit": "Vollständiges Audit aller LLM-Anfragen/-Antworten, mit PII-Aufdeckung."
     }
   },
   "kb": {

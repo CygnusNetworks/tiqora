@@ -96,6 +96,25 @@ FEATURE_MANUAL_ASSIST = "manual_assist"
 FEATURE_MCP = "mcp"
 AI_FEATURES = frozenset({FEATURE_SUMMARY, FEATURE_AUTO_REPLY, FEATURE_MANUAL_ASSIST, FEATURE_MCP})
 
+# tiqora_ai_audit_log.feature — distinct from AI_FEATURES above: this is the
+# LLM *call site*, not the ACL/usage feature name (manual assist calls are
+# logged as "draft" — every Manual Assist run is always the draft path, see
+# tiqora.ai.runtime module docstring).
+AUDIT_FEATURE_DRAFT = "draft"
+AUDIT_FEATURE_SUMMARY = "summary"
+AUDIT_FEATURE_AUTO_REPLY = "auto_reply"
+AUDIT_FEATURE_VISION = "vision"
+AUDIT_FEATURE_TEST = "test"
+AUDIT_FEATURES = frozenset(
+    {
+        AUDIT_FEATURE_DRAFT,
+        AUDIT_FEATURE_SUMMARY,
+        AUDIT_FEATURE_AUTO_REPLY,
+        AUDIT_FEATURE_VISION,
+        AUDIT_FEATURE_TEST,
+    }
+)
+
 
 class TiqoraLlmProvider(TiqoraBase):
     """A configured LLM backend (OpenAI-compatible first, plan §3.2)."""
@@ -406,3 +425,62 @@ class TiqoraAiTicketState(TiqoraBase):
     )
     last_run_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     last_error: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+
+class TiqoraAiAuditLog(TiqoraBase):
+    """One LLM chat-completion call, in/out (full audit — separate from
+    :class:`TiqoraAiUsage`, which is aggregate cost/budget reporting only).
+
+    ``request_json``/``response_json`` store the wire payload **after**
+    PII masking (:mod:`tiqora.ai.pii`) — exactly what the provider saw. When
+    masking is off for the run, both columns hold the unmasked payload (the
+    provider saw that anyway). Vision requests never carry raw image bytes —
+    ``image_url`` data-URLs are replaced with a ``"[image: <n> bytes]"``
+    placeholder before the row is written (see :mod:`tiqora.ai.audit`).
+
+    ``pii_map_enc`` is a Fernet-encrypted JSON ``{placeholder: original}``
+    snapshot (same at-rest scheme as ``tiqora_llm_provider.api_key_enc``,
+    see :mod:`tiqora.crypto.secret`) — decrypted only via the admin
+    "reveal PII" action, which is itself logged. ``pii_counts_json`` is the
+    non-sensitive ``{"EMAIL": 3, ...}`` summary shown in list/detail views
+    without needing to decrypt anything.
+
+    Columns are plain ``Text`` rather than a MySQL-specific ``LONGTEXT`` to
+    stay portable across the MariaDB/PostgreSQL test fixtures (see the
+    module docstring's "not a dialect JSON type" convention) — image bytes
+    are already stripped before the row is built, so ordinary chat/tool
+    payloads comfortably fit.
+    """
+
+    __tablename__ = "tiqora_ai_audit_log"
+
+    id: Mapped[int] = mapped_column(
+        BigInteger, primary_key=True, autoincrement=True, nullable=False
+    )
+    ts: Mapped[datetime] = mapped_column(DateTime, nullable=False, server_default=func.now())
+    run_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    provider_id: Mapped[int | None] = mapped_column(
+        ForeignKey("tiqora_llm_provider.id", ondelete="SET NULL"), nullable=True
+    )
+    provider_name: Mapped[str] = mapped_column(String(200), nullable=False, default="")
+    model: Mapped[str] = mapped_column(String(200), nullable=False, default="")
+    feature: Mapped[str] = mapped_column(String(30), nullable=False)
+    ticket_id: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    queue_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    acting_user_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    trigger: Mapped[str | None] = mapped_column(String(30), nullable=True)
+    status_code: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    duration_ms: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
+    prompt_tokens: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    completion_tokens: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    request_json: Mapped[str] = mapped_column(Text, nullable=False)
+    response_json: Mapped[str | None] = mapped_column(Text, nullable=True)
+    pii_map_enc: Mapped[str | None] = mapped_column(Text, nullable=True)
+    pii_counts_json: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    __table_args__ = (
+        Index("ix_tiqora_ai_audit_log_ts", "ts"),
+        Index("ix_tiqora_ai_audit_log_run_id", "run_id"),
+        Index("ix_tiqora_ai_audit_log_ticket_ts", "ticket_id", "ts"),
+    )

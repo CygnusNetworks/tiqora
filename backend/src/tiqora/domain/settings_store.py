@@ -89,6 +89,12 @@ KEY_AI_WORKER_INTERVAL_SECONDS = "daemon.ai_worker.interval_seconds"
 # key so the settings_store surface is stable.
 KEY_AI_OUTBOX_WATERMARK = "daemon.ai_worker.outbox_watermark"
 
+# LLM-Request-Audit (tiqora.ai.audit) — how many days a tiqora_ai_audit_log
+# row is kept before the daily cleanup daemon deletes it. Default 30,
+# admin-editable within [1, 365] (tiqora.ai.audit.MIN/MAX_RETENTION_DAYS).
+KEY_AI_AUDIT_RETENTION_DAYS = "ai.audit.retention_days"
+KEY_AI_AUDIT_CLEANUP_ENABLED = "daemon.ai_audit_cleanup.enabled"
+
 
 async def get_setting_bool(session: AsyncSession, key: str, default: bool = False) -> bool:
     raw = await get_setting(session, key)

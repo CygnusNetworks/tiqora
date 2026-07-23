@@ -4188,6 +4188,74 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/ai/audit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Ai Audit Log */
+        get: operations["list_ai_audit_log_api_v1_admin_ai_audit_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/ai/audit/stats": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Ai Audit Log Stats */
+        get: operations["ai_audit_log_stats_api_v1_admin_ai_audit_stats_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/ai/audit/{entry_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Ai Audit Log Entry */
+        get: operations["get_ai_audit_log_entry_api_v1_admin_ai_audit__entry_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/ai/audit/{entry_id}/reveal-pii": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Reveal Ai Audit Pii */
+        post: operations["reveal_ai_audit_pii_api_v1_admin_ai_audit__entry_id__reveal_pii_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/znuny-compat/Session": {
         parameters: {
             query?: never;
@@ -5144,6 +5212,8 @@ export interface components {
             disclosure_default_text: string;
             /** Global Max Replies Per Hour */
             global_max_replies_per_hour: number | null;
+            /** Audit Retention Days */
+            audit_retention_days: number;
         };
         /** AiSettingsUpdate */
         AiSettingsUpdate: {
@@ -5153,6 +5223,8 @@ export interface components {
             disclosure_default_text?: string | null;
             /** Global Max Replies Per Hour */
             global_max_replies_per_hour?: number | null;
+            /** Audit Retention Days */
+            audit_retention_days?: number | null;
         };
         /** AiStateOut */
         AiStateOut: {
@@ -5674,6 +5746,122 @@ export interface components {
             filename: string;
             /** Content Type */
             content_type: string;
+        };
+        /** AuditLogDetailOut */
+        AuditLogDetailOut: {
+            /** Id */
+            id: number;
+            /**
+             * Ts
+             * Format: date-time
+             */
+            ts: string;
+            /** Run Id */
+            run_id: string | null;
+            /** Provider Id */
+            provider_id: number | null;
+            /** Provider Name */
+            provider_name: string;
+            /** Model */
+            model: string;
+            /** Feature */
+            feature: string;
+            /** Ticket Id */
+            ticket_id: number | null;
+            /** Queue Id */
+            queue_id: number | null;
+            /** Acting User Id */
+            acting_user_id: number | null;
+            /** Trigger */
+            trigger: string | null;
+            /** Status Code */
+            status_code: number | null;
+            /** Error */
+            error: string | null;
+            /** Duration Ms */
+            duration_ms: number;
+            /** Prompt Tokens */
+            prompt_tokens: number | null;
+            /** Completion Tokens */
+            completion_tokens: number | null;
+            /** Pii Counts */
+            pii_counts?: {
+                [key: string]: number;
+            } | null;
+            /** Request Json */
+            request_json: string;
+            /** Response Json */
+            response_json: string | null;
+        };
+        /** AuditLogListItemOut */
+        AuditLogListItemOut: {
+            /** Id */
+            id: number;
+            /**
+             * Ts
+             * Format: date-time
+             */
+            ts: string;
+            /** Run Id */
+            run_id: string | null;
+            /** Provider Id */
+            provider_id: number | null;
+            /** Provider Name */
+            provider_name: string;
+            /** Model */
+            model: string;
+            /** Feature */
+            feature: string;
+            /** Ticket Id */
+            ticket_id: number | null;
+            /** Queue Id */
+            queue_id: number | null;
+            /** Acting User Id */
+            acting_user_id: number | null;
+            /** Trigger */
+            trigger: string | null;
+            /** Status Code */
+            status_code: number | null;
+            /** Error */
+            error: string | null;
+            /** Duration Ms */
+            duration_ms: number;
+            /** Prompt Tokens */
+            prompt_tokens: number | null;
+            /** Completion Tokens */
+            completion_tokens: number | null;
+            /** Pii Counts */
+            pii_counts?: {
+                [key: string]: number;
+            } | null;
+        };
+        /** AuditLogPageOut */
+        AuditLogPageOut: {
+            /** Items */
+            items: components["schemas"]["AuditLogListItemOut"][];
+            /** Total */
+            total: number;
+            /** Page */
+            page: number;
+            /** Page Size */
+            page_size: number;
+        };
+        /** AuditLogStatsOut */
+        AuditLogStatsOut: {
+            /** Total Requests */
+            total_requests: number;
+            /** Total Prompt Tokens */
+            total_prompt_tokens: number;
+            /** Total Completion Tokens */
+            total_completion_tokens: number;
+            /** Error Rate */
+            error_rate: number;
+            /** Per Day */
+            per_day: {
+                [key: string]: unknown;
+            }[];
+            /** Top Model */
+            top_model: string | null;
         };
         /**
          * AuthConfigAgentOut
@@ -7712,6 +7900,13 @@ export interface components {
             name: string;
             /** Value */
             value: string;
+        };
+        /** PiiRevealOut */
+        PiiRevealOut: {
+            /** Mapping */
+            mapping: {
+                [key: string]: string;
+            };
         };
         /** PlaceholderFieldCreate */
         PlaceholderFieldCreate: {
@@ -20566,6 +20761,157 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_ai_audit_log_api_v1_admin_ai_audit_get: {
+        parameters: {
+            query?: {
+                from?: string | null;
+                to?: string | null;
+                provider_id?: number | null;
+                feature?: string | null;
+                ticket?: string | null;
+                status?: ("ok" | "error") | null;
+                page?: number;
+                page_size?: number;
+            };
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuditLogPageOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    ai_audit_log_stats_api_v1_admin_ai_audit_stats_get: {
+        parameters: {
+            query?: {
+                from?: string | null;
+                to?: string | null;
+                provider_id?: number | null;
+                feature?: string | null;
+                ticket?: string | null;
+            };
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuditLogStatsOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_ai_audit_log_entry_api_v1_admin_ai_audit__entry_id__get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                entry_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuditLogDetailOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    reveal_ai_audit_pii_api_v1_admin_ai_audit__entry_id__reveal_pii_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                entry_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PiiRevealOut"];
+                };
             };
             /** @description Validation Error */
             422: {

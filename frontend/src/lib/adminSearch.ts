@@ -333,6 +333,14 @@ export const ADMIN_PAGES: AdminPageEntry[] = [
     descriptionKey: "admin.pageDescriptions.aiQueues",
     keywords: ["ki", "queue", "autonomie", "eskalation", "policy"],
   },
+  {
+    slug: "ai-audit",
+    route: "/admin/ai/audit",
+    group: "automation",
+    nameKey: "admin.nav.aiAudit",
+    descriptionKey: "admin.pageDescriptions.aiAudit",
+    keywords: ["ki", "audit", "protokoll", "log", "llm", "pii", "anfragen"],
+  },
 
   // ── System & Betrieb ─────────────────────────────────────────────────
   {
