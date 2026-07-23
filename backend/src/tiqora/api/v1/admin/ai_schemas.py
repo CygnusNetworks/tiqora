@@ -57,6 +57,9 @@ class LlmProviderOut(BaseModel):
     supports_streaming: bool
     eu_hosted: bool
     supports_vision: bool
+    price_input_per_1m: float | None
+    price_output_per_1m: float | None
+    price_currency: str | None
     valid_id: int
     create_time: datetime
     change_time: datetime
@@ -73,6 +76,9 @@ class LlmProviderCreate(BaseModel):
     supports_streaming: bool = True
     eu_hosted: bool = False
     supports_vision: bool = False
+    price_input_per_1m: float | None = None
+    price_output_per_1m: float | None = None
+    price_currency: str | None = None
 
 
 class LlmProviderUpdate(BaseModel):
@@ -87,6 +93,9 @@ class LlmProviderUpdate(BaseModel):
     supports_streaming: bool | None = None
     eu_hosted: bool | None = None
     supports_vision: bool | None = None
+    price_input_per_1m: float | None = None
+    price_output_per_1m: float | None = None
+    price_currency: str | None = None
     valid_id: int | None = None
 
 

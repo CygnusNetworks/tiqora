@@ -36,6 +36,8 @@ function makeItem(overrides: Partial<TicketListItem> = {}): TicketListItem {
     escalation_update_time: 0,
     escalation_solution_time: 0,
     until_time: 0,
+    attachment_count: 0,
+    has_ai_summary: false,
     ...overrides,
   } as TicketListItem;
 }
@@ -135,6 +137,17 @@ describe("TicketTable customer cell", () => {
     await renderTable([makeItem({ customer_user_id: undefined, customer_id: undefined, first_from: undefined })]);
     expect(screen.getByTestId("ticket-customer-cell-11")).toHaveTextContent("—");
     expect(screen.queryByTestId("ticket-sender-fallback-11")).toBeNull();
+  });
+
+  it("shows attachment and AI-summary indicators only when present", async () => {
+    await renderTable([
+      makeItem({ id: 11, attachment_count: 3, has_ai_summary: true } as Partial<TicketListItem>),
+      makeItem({ id: 12, tn: "20240601000012", attachment_count: 0, has_ai_summary: false } as Partial<TicketListItem>),
+    ]);
+    expect(screen.getByTestId("ticket-attachment-indicator-11")).toHaveTextContent("3");
+    expect(screen.getByTestId("ticket-summary-indicator-11")).toBeInTheDocument();
+    expect(screen.queryByTestId("ticket-attachment-indicator-12")).toBeNull();
+    expect(screen.queryByTestId("ticket-summary-indicator-12")).toBeNull();
   });
 });
 

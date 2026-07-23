@@ -18,6 +18,7 @@ recent customer article body (never per-article) — a single binding
 from __future__ import annotations
 
 import re
+from dataclasses import dataclass
 
 # Small, deliberately generic function-word profiles (articles, pronouns,
 # conjunctions, common verbs/prepositions) — not exhaustive, just enough to
@@ -195,19 +196,33 @@ def _score(tokens: list[str], profile: frozenset[str]) -> int:
     return sum(1 for t in tokens if t in profile)
 
 
-def detect_reply_language(
+@dataclass(frozen=True, slots=True)
+class ReplyLanguageDetection:
+    """Result of a detection attempt, including whether the caller's
+    ``default`` had to be used as a fallback (score below :data:`_MIN_SCORE`,
+    or no usable tokens/candidates at all) — needed by callers (see
+    :mod:`tiqora.ai.runtime`) that only have a *default* to fall back to
+    when a queue explicitly configures none."""
+
+    language: str
+    score: int
+    used_fallback: bool
+
+
+def detect_reply_language_detailed(
     title: str | None,
     latest_customer_body: str | None,
     *,
     candidates: list[str],
     default: str,
-) -> str:
-    """Pick the best-matching language among ``candidates`` for ``title`` +
-    ``latest_customer_body``; falls back to ``default`` when no candidate
-    reaches the minimum stopword-match score (short/ambiguous text)."""
+) -> ReplyLanguageDetection:
+    """Like :func:`detect_reply_language` but also reports the winning score
+    and whether ``default`` was used as a fallback, so a caller without a
+    real default can decide for itself whether the detection is trustworthy
+    enough to act on."""
     tokens = _tokenize(f"{title or ''} {latest_customer_body or ''}")
     if not tokens or not candidates:
-        return default
+        return ReplyLanguageDetection(language=default, score=0, used_fallback=True)
     best_lang = default
     best_score = _MIN_SCORE - 1
     for lang in candidates:
@@ -219,8 +234,28 @@ def detect_reply_language(
             best_score = score
             best_lang = lang
     if best_score < _MIN_SCORE:
-        return default
-    return best_lang
+        return ReplyLanguageDetection(language=default, score=best_score, used_fallback=True)
+    return ReplyLanguageDetection(language=best_lang, score=best_score, used_fallback=False)
 
 
-__all__ = ["LANGUAGE_PROFILES", "detect_reply_language"]
+def detect_reply_language(
+    title: str | None,
+    latest_customer_body: str | None,
+    *,
+    candidates: list[str],
+    default: str,
+) -> str:
+    """Pick the best-matching language among ``candidates`` for ``title`` +
+    ``latest_customer_body``; falls back to ``default`` when no candidate
+    reaches the minimum stopword-match score (short/ambiguous text)."""
+    return detect_reply_language_detailed(
+        title, latest_customer_body, candidates=candidates, default=default
+    ).language
+
+
+__all__ = [
+    "LANGUAGE_PROFILES",
+    "ReplyLanguageDetection",
+    "detect_reply_language",
+    "detect_reply_language_detailed",
+]

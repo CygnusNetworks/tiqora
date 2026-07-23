@@ -219,6 +219,12 @@ export function TicketTable({
             isEscalated(ticket.escalation_update_time) ||
             isEscalated(ticket.escalation_solution_time);
           const spineColor = escLevel === "none" ? stateColorVar(ticket.state) : undefined;
+          const extras = ticket as typeof ticket & {
+            attachment_count?: number;
+            has_ai_summary?: boolean;
+          };
+          const attachmentCount = extras.attachment_count ?? 0;
+          const hasAiSummary = extras.has_ai_summary ?? false;
           const customerLabel = ticket.customer_user_id || ticket.customer_id;
           const senderFallback = !customerLabel ? senderDisplayName(ticket.first_from) : null;
           const escalationBadge = esc && (
@@ -305,8 +311,43 @@ export function TicketTable({
                 {escalationBadge}
               </span>
               <span className="min-w-0">
-                <span className="block truncate text-[12.8px] font-medium text-ink" title={ticket.title ?? ""}>
-                  {ticket.title || "—"}
+                <span className="flex min-w-0 items-center gap-1.5">
+                  <span
+                    className="min-w-0 truncate text-[12.8px] font-medium text-ink"
+                    title={ticket.title ?? ""}
+                  >
+                    {ticket.title || "—"}
+                  </span>
+                  {attachmentCount > 0 && (
+                    <span
+                      className="inline-flex flex-none items-center gap-0.5 font-mono text-[10.5px] tabular-nums text-muted"
+                      title={t("ticket.list.attachments", { count: attachmentCount })}
+                      data-testid={`ticket-attachment-indicator-${ticket.id}`}
+                    >
+                      <svg
+                        viewBox="0 0 16 16"
+                        className="h-3 w-3"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="1.4"
+                        strokeLinecap="round"
+                        aria-hidden
+                      >
+                        <path d="M10.5 4.5 5.9 9.1a1.6 1.6 0 0 0 2.3 2.3l5-5a3.1 3.1 0 0 0-4.4-4.4l-5 5a4.6 4.6 0 0 0 6.5 6.5l4.2-4.2" />
+                      </svg>
+                      {attachmentCount}
+                    </span>
+                  )}
+                  {hasAiSummary && (
+                    <span
+                      className="flex-none text-[11px] text-accent/80"
+                      title={t("ticket.list.hasSummary")}
+                      data-testid={`ticket-summary-indicator-${ticket.id}`}
+                      aria-label={t("ticket.list.hasSummary")}
+                    >
+                      ✦
+                    </span>
+                  )}
                 </span>
                 <span
                   className="block truncate text-[11.5px] text-muted"

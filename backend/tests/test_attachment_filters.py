@@ -64,6 +64,32 @@ def test_real_attachments_kept(filename: str, content_type: str) -> None:
 
 
 def test_inline_detection() -> None:
-    assert _is_inline_attachment(_meta(filename="logo.png", content_id="<cid123>"))
-    assert _is_inline_attachment(_meta(filename="logo.png", disposition="inline"))
-    assert not _is_inline_attachment(_meta(filename="scan.pdf", disposition="attachment"))
+    assert _is_inline_attachment(
+        _meta(filename="logo.png", content_type="image/png", content_id="<cid123>")
+    )
+    assert _is_inline_attachment(
+        _meta(filename="logo.png", content_type="image/png", disposition="inline")
+    )
+    assert not _is_inline_attachment(
+        _meta(filename="scan.pdf", content_type="application/pdf", disposition="attachment")
+    )
+
+
+def test_inline_requires_image_content_type() -> None:
+    """A Content-ID or ``inline`` disposition alone doesn't make it inline —
+    only image parts are folded into the collapsed "inline images" section.
+    Non-image documents (PDFs, Office files) stay regular attachments even
+    when the mail client tagged them with a Content-ID or inline
+    disposition (regression: a 71KB PDF with a Content-ID was hidden)."""
+    assert not _is_inline_attachment(
+        _meta(filename="report.pdf", content_type="application/pdf", content_id="<cid456>")
+    )
+    assert _is_inline_attachment(
+        _meta(filename="logo.png", content_type="image/png; name=logo.png", content_id="<cid789>")
+    )
+    assert _is_inline_attachment(
+        _meta(filename="logo.jpg", content_type="IMAGE/JPEG", disposition="inline")
+    )
+    assert not _is_inline_attachment(
+        _meta(filename="report.pdf", content_type="application/pdf", disposition="inline")
+    )

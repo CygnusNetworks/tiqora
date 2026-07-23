@@ -26557,6 +26557,74 @@
         }
       }
     },
+    "/api/v1/admin/ai/drafts/{draft_id}": {
+      "delete": {
+        "tags": [
+          "admin:ai"
+        ],
+        "summary": "Delete Ai Draft",
+        "description": "Hard-delete a draft, any status \u2014 admin cleanup, not part of the\nnormal lifecycle (see ``tiqora.ai.drafts`` module docstring).",
+        "operationId": "delete_ai_draft_api_v1_admin_ai_drafts__draft_id__delete",
+        "parameters": [
+          {
+            "name": "draft_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Draft Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "tiqora_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/admin/ai/audit": {
       "get": {
         "tags": [
@@ -32202,6 +32270,28 @@
             ],
             "title": "Pii Counts"
           },
+          "cost": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cost"
+          },
+          "cost_currency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cost Currency"
+          },
           "request_json": {
             "type": "string",
             "title": "Request Json"
@@ -32391,6 +32481,28 @@
               }
             ],
             "title": "Pii Counts"
+          },
+          "cost": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cost"
+          },
+          "cost_currency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cost Currency"
           }
         },
         "type": "object",
@@ -32481,6 +32593,28 @@
               }
             ],
             "title": "Top Model"
+          },
+          "total_cost": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total Cost"
+          },
+          "cost_currency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cost Currency"
           }
         },
         "type": "object",
@@ -32490,7 +32624,9 @@
           "total_completion_tokens",
           "error_rate",
           "per_day",
-          "top_model"
+          "top_model",
+          "total_cost",
+          "cost_currency"
         ],
         "title": "AuditLogStatsOut"
       },
@@ -36372,6 +36508,39 @@
             "type": "boolean",
             "title": "Supports Vision",
             "default": false
+          },
+          "price_input_per_1m": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Price Input Per 1M"
+          },
+          "price_output_per_1m": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Price Output Per 1M"
+          },
+          "price_currency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Price Currency"
           }
         },
         "type": "object",
@@ -36439,6 +36608,39 @@
             "type": "boolean",
             "title": "Supports Vision"
           },
+          "price_input_per_1m": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Price Input Per 1M"
+          },
+          "price_output_per_1m": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Price Output Per 1M"
+          },
+          "price_currency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Price Currency"
+          },
           "valid_id": {
             "type": "integer",
             "title": "Valid Id"
@@ -36467,6 +36669,9 @@
           "supports_streaming",
           "eu_hosted",
           "supports_vision",
+          "price_input_per_1m",
+          "price_output_per_1m",
+          "price_currency",
           "valid_id",
           "create_time",
           "change_time"
@@ -36630,6 +36835,39 @@
               }
             ],
             "title": "Supports Vision"
+          },
+          "price_input_per_1m": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Price Input Per 1M"
+          },
+          "price_output_per_1m": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Price Output Per 1M"
+          },
+          "price_currency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Price Currency"
           },
           "valid_id": {
             "anyOf": [
@@ -42309,6 +42547,16 @@
             ],
             "title": "First From"
           },
+          "attachment_count": {
+            "type": "integer",
+            "title": "Attachment Count",
+            "default": 0
+          },
+          "has_ai_summary": {
+            "type": "boolean",
+            "title": "Has Ai Summary",
+            "default": false
+          },
           "create_time": {
             "type": "string",
             "format": "date-time",
@@ -42713,6 +42961,16 @@
               }
             ],
             "title": "First From"
+          },
+          "attachment_count": {
+            "type": "integer",
+            "title": "Attachment Count",
+            "default": 0
+          },
+          "has_ai_summary": {
+            "type": "boolean",
+            "title": "Has Ai Summary",
+            "default": false
           },
           "create_time": {
             "type": "string",

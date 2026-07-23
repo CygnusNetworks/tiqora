@@ -32,6 +32,7 @@ from tiqora.ai.context import (
     ArticleSnapshot,
     TicketNotFoundError,
     TicketSnapshot,
+    collect_known_names,
     get_or_create_state,
     latest_customer_article_id,
     load_articles,
@@ -63,7 +64,11 @@ from tiqora.ai.models import (
 )
 from tiqora.ai.pii import PiiMapper
 from tiqora.ai.policies import get_queue_policy_by_queue, load_prompt_parts
-from tiqora.ai.reply_language import LANGUAGE_PROFILES, detect_reply_language
+from tiqora.ai.reply_language import (
+    LANGUAGE_PROFILES,
+    detect_reply_language,
+    detect_reply_language_detailed,
+)
 from tiqora.ai.tools import (
     McpToolSpec,
     ToolArgumentError,
@@ -268,16 +273,25 @@ def _resolve_reply_language_line(
             return None
         return f"Reply language (binding): {policy.reply_language_fixed}"
     if policy.reply_language_mode == REPLY_LANGUAGE_AUTO:
-        if not policy.reply_language_default:
-            return None
         latest_body = customer_articles[-1].body if customer_articles else None
-        lang = detect_reply_language(
-            ticket.title,
-            latest_body,
-            candidates=list(LANGUAGE_PROFILES),
-            default=policy.reply_language_default,
+        if policy.reply_language_default:
+            lang = detect_reply_language(
+                ticket.title,
+                latest_body,
+                candidates=list(LANGUAGE_PROFILES),
+                default=policy.reply_language_default,
+            )
+            return f"Reply language (binding): {lang}"
+        # No configured default: only trust the detector when it actually
+        # reached the minimum stopword-match score — otherwise emit no line
+        # at all rather than silently defaulting to some language the
+        # customer never wrote in (the prod bug this fixes).
+        detection = detect_reply_language_detailed(
+            ticket.title, latest_body, candidates=list(LANGUAGE_PROFILES), default=""
         )
-        return f"Reply language (binding): {lang}"
+        if detection.used_fallback:
+            return None
+        return f"Reply language (binding): {detection.language}"
     return None
 
 
@@ -439,7 +453,8 @@ async def run_ticket_agent(
         )
 
         never_mask = {v for v in (ticket.customer_id, ticket.customer_user_id) if v}
-        pii = PiiMapper(never_mask=never_mask or None)
+        known_names = await collect_known_names(session, ticket, articles)
+        pii = PiiMapper(never_mask=never_mask or None, known_names=known_names or None)
         llm = AuditingLlmClient(
             llm, settings=settings, context=audit_context, session=session, pii_mapper=pii
         )
