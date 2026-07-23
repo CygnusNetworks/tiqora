@@ -77,6 +77,7 @@ export function AiPanel({ ticketId, canNote }: { ticketId: number; canNote: bool
   const queryClient = useQueryClient();
   const { confirm, dialog: confirmDialog } = useConfirm();
   const [expandedDraftId, setExpandedDraftId] = useState<number | null>(null);
+  const [openTraceId, setOpenTraceId] = useState<number | null>(null);
   const [replyDraft, setReplyDraft] = useState<AiDraftOut | null>(null);
 
   const stateQ = useQuery({
@@ -334,14 +335,47 @@ export function AiPanel({ ticketId, canNote }: { ticketId: number; canNote: bool
                     >
                       {draft.body}
                     </p>
-                    <button
-                      type="button"
-                      className="text-[11px] font-medium text-accent hover:underline"
-                      data-testid={`ai-panel-draft-toggle-${draft.id}`}
-                      onClick={() => setExpandedDraftId(expanded ? null : draft.id)}
-                    >
-                      {expanded ? t("ticket.ai.collapse") : t("ticket.ai.expand")}
-                    </button>
+                    <div className="flex items-center gap-3">
+                      <button
+                        type="button"
+                        className="text-[11px] font-medium text-accent hover:underline"
+                        data-testid={`ai-panel-draft-toggle-${draft.id}`}
+                        onClick={() => setExpandedDraftId(expanded ? null : draft.id)}
+                      >
+                        {expanded ? t("ticket.ai.collapse") : t("ticket.ai.expand")}
+                      </button>
+                      {draft.tool_trace?.length > 0 && (
+                        <button
+                          type="button"
+                          className="text-[11px] font-medium text-muted hover:text-ink hover:underline"
+                          data-testid={`ai-panel-draft-trace-toggle-${draft.id}`}
+                          aria-expanded={openTraceId === draft.id}
+                          onClick={() =>
+                            setOpenTraceId(openTraceId === draft.id ? null : draft.id)
+                          }
+                        >
+                          {t("ticket.ai.toolTrace", { count: draft.tool_trace.length })}
+                          <span aria-hidden> {openTraceId === draft.id ? "▾" : "▸"}</span>
+                        </button>
+                      )}
+                    </div>
+                    {openTraceId === draft.id && (
+                      <ul
+                        className="space-y-1.5 border-l-2 border-hairline pl-2.5"
+                        data-testid={`ai-panel-draft-trace-${draft.id}`}
+                      >
+                        {draft.tool_trace.map((step, i) => (
+                          <li key={i} className="space-y-0.5">
+                            <div className="font-mono text-[11px] font-medium text-muted">
+                              {step.name}
+                            </div>
+                            <pre className="max-h-40 overflow-auto whitespace-pre-wrap break-words rounded bg-surface p-1.5 font-mono text-[11px] leading-snug text-ink/80">
+                              {step.content}
+                            </pre>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
                   </li>
                 );
               })}

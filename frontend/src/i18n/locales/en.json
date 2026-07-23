@@ -376,6 +376,8 @@
         "manual": "Manual"
       },
       "basedOnArticle": "Based on article #{{articleId}}",
+      "toolTrace_one": "Tool results (1)",
+      "toolTrace_other": "Tool results ({{count}})",
       "expand": "Expand",
       "collapse": "Collapse",
       "useDraft": "Use as reply",
@@ -866,6 +868,37 @@
           "rawRequest": "Request",
           "rawResponse": "Response"
         }
+      },
+      "promptParts": {
+        "title": "Prompt building blocks",
+        "addNote": "＋ Note",
+        "addFiles": "＋ Markdown file(s)",
+        "empty": "No building blocks yet — the base prompt is used on its own.",
+        "noteTitlePlaceholder": "Note title",
+        "noteTextPlaceholder": "Short instruction or clarification…",
+        "noteSave": "Add note",
+        "charCount": "{{formatted}} characters",
+        "enabled": "active",
+        "moveUp": "Move up",
+        "moveDown": "Move down",
+        "deleteTitle": "Delete building block",
+        "deleteConfirm": "Really delete “{{title}}”?",
+        "fileTooLarge": "{{name}}: file too large (max. 256 KB).",
+        "fileBinary": "{{name}}: file appears to be binary — only text/Markdown files are supported.",
+        "edit": "Edit",
+        "save": "Save",
+        "genericError": "Action failed — please try again."
+      },
+      "escalationTester": {
+        "title": "Rule tester",
+        "toolPlaceholder": "Tool name, e.g. netadmin:diagnose_connection",
+        "samplePlaceholder": "Sample tool result as JSON, e.g. {\"lock_code\": \"COPYR\"}",
+        "run": "Test",
+        "invalid": "Rules invalid",
+        "hit": "Hit — escalation",
+        "noHit": "No hit",
+        "hitDetail": "Rule #{{index}} · field: {{field}} · value: {{value}}",
+        "requestError": "Test failed — please try again."
       }
     },
     "help": {
@@ -986,7 +1019,9 @@
         "audit": {
           "overview": "Every LLM chat-completion call (main model, vision pre-pass, provider connection test) is logged here — success or failure, with the exact payload sent after PII masking. Raw payloads and the PII mapping are only visible on the detail view; reveals are themselves logged.",
           "retention": "Audit rows older than this many days are deleted automatically once a day. Range: 1–365 days."
-        }
+        },
+        "promptParts": "The effective system prompt is composed from the base prompt plus the active building blocks in the order shown (base first, then top to bottom). Notes are for small clarifications you can add, disable, or remove quickly without touching the main prompt file.",
+        "escalationTester": "Checks the rules above against a sample tool result without saving anything — the exact same logic the runtime guard uses before autonomous sending. A hit means autonomous sending would be stopped and escalated."
       },
       "gdpr": {
         "mode": "\"Anonymize\" scrubs personal data but keeps the ticket records and their history (referential integrity intact). \"Delete\" removes the customer record entirely; ticket data is only removed too if the checkbox below is set.",

@@ -4155,6 +4155,83 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/ai/queues/{policy_id}/prompt-parts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Prompt Parts Route */
+        get: operations["list_prompt_parts_route_api_v1_admin_ai_queues__policy_id__prompt_parts_get"];
+        put?: never;
+        /** Create Prompt Part Route */
+        post: operations["create_prompt_part_route_api_v1_admin_ai_queues__policy_id__prompt_parts_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/ai/queues/{policy_id}/prompt-parts/reorder": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Reorder Prompt Parts Route */
+        put: operations["reorder_prompt_parts_route_api_v1_admin_ai_queues__policy_id__prompt_parts_reorder_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/ai/queues/{policy_id}/prompt-parts/{part_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Update Prompt Part Route */
+        put: operations["update_prompt_part_route_api_v1_admin_ai_queues__policy_id__prompt_parts__part_id__put"];
+        post?: never;
+        /** Delete Prompt Part Route */
+        delete: operations["delete_prompt_part_route_api_v1_admin_ai_queues__policy_id__prompt_parts__part_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/ai/escalation-test": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Escalation Test Route
+         * @description Dry-run a sample tool result against escalation rules (plan block 6).
+         *
+         *     Pure function of the request body — nothing is read from or written to
+         *     the database; validation and matching reuse :mod:`tiqora.ai.escalation`
+         *     exactly as the runtime guard does.
+         */
+        post: operations["escalation_test_route_api_v1_admin_ai_escalation_test_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/ai/usage": {
         parameters: {
             query?: never;
@@ -4980,6 +5057,8 @@ export interface components {
              * Format: date-time
              */
             create_time: string;
+            /** Tool Trace */
+            tool_trace: components["schemas"]["AiToolTraceOut"][];
         };
         /** AiDraftRequestOut */
         AiDraftRequestOut: {
@@ -4991,6 +5070,62 @@ export interface components {
             article_id?: number | null;
             /** Notes */
             notes?: string | null;
+        };
+        /** AiPromptPartCreate */
+        AiPromptPartCreate: {
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "file" | "note";
+            /** Title */
+            title: string;
+            /** Content */
+            content: string;
+        };
+        /** AiPromptPartOut */
+        AiPromptPartOut: {
+            /** Id */
+            id: number;
+            /** Policy Id */
+            policy_id: number;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "file" | "note";
+            /** Title */
+            title: string;
+            /** Content */
+            content: string;
+            /** Position */
+            position: number;
+            /** Enabled */
+            enabled: boolean;
+            /**
+             * Create Time
+             * Format: date-time
+             */
+            create_time: string;
+            /**
+             * Change Time
+             * Format: date-time
+             */
+            change_time: string;
+        };
+        /** AiPromptPartReorder */
+        AiPromptPartReorder: {
+            /** Ordered Ids */
+            ordered_ids: number[];
+        };
+        /** AiPromptPartUpdate */
+        AiPromptPartUpdate: {
+            /** Title */
+            title?: string | null;
+            /** Content */
+            content?: string | null;
+            /** Enabled */
+            enabled?: boolean | null;
         };
         /** AiQueuePolicyCreate */
         AiQueuePolicyCreate: {
@@ -5319,6 +5454,13 @@ export interface components {
             summary_body?: string | null;
             /** Upto Article Id */
             upto_article_id?: number | null;
+        };
+        /** AiToolTraceOut */
+        AiToolTraceOut: {
+            /** Name */
+            name: string;
+            /** Content */
+            content: string;
         };
         /** AiUsageOut */
         AiUsageOut: {
@@ -6744,6 +6886,42 @@ export interface components {
             activity?: string | null;
             /** Valid Id */
             valid_id?: number | null;
+        };
+        /** EscalationHitOut */
+        EscalationHitOut: {
+            /** Rule Index */
+            rule_index: number;
+            /** Tool */
+            tool: string;
+            /** Field */
+            field: string | null;
+            /** Match */
+            match: string;
+            /** Value */
+            value: string;
+        };
+        /**
+         * EscalationTestIn
+         * @description Dry-run input for the escalation-rule tester (nothing is persisted).
+         *
+         *     ``rules_json`` is the same JSON-array text the policy editor holds in its
+         *     ``escalation_rules`` field; ``sample_json`` is a sample raw tool result.
+         */
+        EscalationTestIn: {
+            /** Rules Json */
+            rules_json: string;
+            /** Tool */
+            tool: string;
+            /** Sample Json */
+            sample_json: string;
+        };
+        /** EscalationTestOut */
+        EscalationTestOut: {
+            /** Valid */
+            valid: boolean;
+            /** Error */
+            error?: string | null;
+            hit?: components["schemas"]["EscalationHitOut"] | null;
         };
         /**
          * FollowUpPossibleOut
@@ -20691,6 +20869,230 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_prompt_parts_route_api_v1_admin_ai_queues__policy_id__prompt_parts_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                policy_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AiPromptPartOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_prompt_part_route_api_v1_admin_ai_queues__policy_id__prompt_parts_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                policy_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AiPromptPartCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AiPromptPartOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    reorder_prompt_parts_route_api_v1_admin_ai_queues__policy_id__prompt_parts_reorder_put: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                policy_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AiPromptPartReorder"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AiPromptPartOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_prompt_part_route_api_v1_admin_ai_queues__policy_id__prompt_parts__part_id__put: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                policy_id: number;
+                part_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AiPromptPartUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AiPromptPartOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_prompt_part_route_api_v1_admin_ai_queues__policy_id__prompt_parts__part_id__delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                policy_id: number;
+                part_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    escalation_test_route_api_v1_admin_ai_escalation_test_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EscalationTestIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EscalationTestOut"];
+                };
             };
             /** @description Validation Error */
             422: {
