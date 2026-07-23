@@ -4285,6 +4285,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/ai/drafts/{draft_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Delete Ai Draft
+         * @description Hard-delete a draft, any status — admin cleanup, not part of the
+         *     normal lifecycle (see ``tiqora.ai.drafts`` module docstring).
+         */
+        delete: operations["delete_ai_draft_api_v1_admin_ai_drafts__draft_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/ai/audit": {
         parameters: {
             query?: never;
@@ -5998,6 +6019,10 @@ export interface components {
             pii_counts?: {
                 [key: string]: number;
             } | null;
+            /** Cost */
+            cost?: number | null;
+            /** Cost Currency */
+            cost_currency?: string | null;
             /** Request Json */
             request_json: string;
             /** Response Json */
@@ -6044,6 +6069,10 @@ export interface components {
             pii_counts?: {
                 [key: string]: number;
             } | null;
+            /** Cost */
+            cost?: number | null;
+            /** Cost Currency */
+            cost_currency?: string | null;
         };
         /** AuditLogPageOut */
         AuditLogPageOut: {
@@ -6072,6 +6101,10 @@ export interface components {
             }[];
             /** Top Model */
             top_model: string | null;
+            /** Total Cost */
+            total_cost: number | null;
+            /** Cost Currency */
+            cost_currency: string | null;
         };
         /**
          * AuthConfigAgentOut
@@ -7426,6 +7459,12 @@ export interface components {
              * @default false
              */
             supports_vision: boolean;
+            /** Price Input Per 1M */
+            price_input_per_1m?: number | null;
+            /** Price Output Per 1M */
+            price_output_per_1m?: number | null;
+            /** Price Currency */
+            price_currency?: string | null;
         };
         /** LlmProviderOut */
         LlmProviderOut: {
@@ -7454,6 +7493,12 @@ export interface components {
             eu_hosted: boolean;
             /** Supports Vision */
             supports_vision: boolean;
+            /** Price Input Per 1M */
+            price_input_per_1m: number | null;
+            /** Price Output Per 1M */
+            price_output_per_1m: number | null;
+            /** Price Currency */
+            price_currency: string | null;
             /** Valid Id */
             valid_id: number;
             /**
@@ -7500,6 +7545,12 @@ export interface components {
             eu_hosted?: boolean | null;
             /** Supports Vision */
             supports_vision?: boolean | null;
+            /** Price Input Per 1M */
+            price_input_per_1m?: number | null;
+            /** Price Output Per 1M */
+            price_output_per_1m?: number | null;
+            /** Price Currency */
+            price_currency?: string | null;
             /** Valid Id */
             valid_id?: number | null;
         };
@@ -9357,6 +9408,16 @@ export interface components {
             /** First From */
             first_from?: string | null;
             /**
+             * Attachment Count
+             * @default 0
+             */
+            attachment_count: number;
+            /**
+             * Has Ai Summary
+             * @default false
+             */
+            has_ai_summary: boolean;
+            /**
              * Create Time
              * Format: date-time
              */
@@ -9500,6 +9561,16 @@ export interface components {
             customer_user_id?: string | null;
             /** First From */
             first_from?: string | null;
+            /**
+             * Attachment Count
+             * @default 0
+             */
+            attachment_count: number;
+            /**
+             * Has Ai Summary
+             * @default false
+             */
+            has_ai_summary: boolean;
             /**
              * Create Time
              * Format: date-time
@@ -21262,6 +21333,39 @@ export interface operations {
             };
             path: {
                 acl_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_ai_draft_api_v1_admin_ai_drafts__draft_id__delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                draft_id: number;
             };
             cookie?: {
                 tiqora_session?: string | null;

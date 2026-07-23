@@ -9,7 +9,9 @@ into an LLM prompt (plan §3.4 step 5).
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
+from email.utils import parseaddr
 
 from sqlalchemy import bindparam, text
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -264,12 +266,73 @@ async def article_from_address(session: AsyncSession, article_id: int) -> str | 
     return str(row[0]) if row and row[0] is not None else None
 
 
+async def customer_user_name(
+    session: AsyncSession, login: str | None
+) -> tuple[str | None, str | None]:
+    """Best-effort ``(first_name, last_name)`` lookup for a customer_user.
+
+    ``login`` is ``ticket.customer_user_id`` as stored on the ticket row —
+    Znuny's ticket table records the customer_user's *login*, not its
+    numeric ``customer_user.id`` PK. Used only to seed PII name-masking
+    candidates (see :func:`collect_known_names`); never customer-facing.
+    """
+    if not login:
+        return None, None
+    row = (
+        await session.execute(
+            text("SELECT first_name, last_name FROM customer_user WHERE login = :login LIMIT 1"),
+            {"login": login},
+        )
+    ).first()
+    if row is None:
+        return None, None
+    return row[0], row[1]
+
+
+_NAME_SPLIT_RE = re.compile(r"[\s,]+")
+
+
+def display_name_tokens(from_header: str | None) -> list[str]:
+    """Name candidates parsed out of a raw ``From:`` header's display-name
+    part (e.g. ``"Anna-Lena Meyer"`` and its individual tokens from
+    ``"Anna-Lena Meyer <a.meyer@example.com>"``). Mirrors the address-only
+    extraction in :mod:`tiqora.ai.senders`, which only needs the bare
+    address and discards the display name entirely."""
+    if not from_header:
+        return []
+    display_name = parseaddr(from_header)[0].strip()
+    if not display_name:
+        return []
+    return [display_name, *(p for p in _NAME_SPLIT_RE.split(display_name) if p)]
+
+
+async def collect_known_names(
+    session: AsyncSession, ticket: TicketSnapshot, articles: list[ArticleSnapshot]
+) -> list[str]:
+    """PII name-masking candidates (plan §3.7 gap): the ticket's
+    customer_user first/last name plus display-name tokens parsed from every
+    article's ``From:`` header. Purely additive/defensive — any piece that
+    can't be resolved simply yields fewer candidates, never an error, so a
+    ticket with no customer_user match or no From headers behaves exactly
+    like today (no name masking)."""
+    first, last = await customer_user_name(session, ticket.customer_user_id)
+    names = [n for n in (first, last) if n]
+    if first and last:
+        names.append(f"{first} {last}")
+    for article in articles:
+        names.extend(display_name_tokens(article.from_address))
+    return names
+
+
 __all__ = [
     "ArticleSnapshot",
     "AttachmentSnapshot",
     "TicketNotFoundError",
     "TicketSnapshot",
     "article_from_address",
+    "collect_known_names",
+    "customer_user_name",
+    "display_name_tokens",
     "get_or_create_state",
     "latest_customer_article_id",
     "load_articles",

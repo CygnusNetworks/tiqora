@@ -33,6 +33,8 @@ const ticket: TicketListItem = {
   escalation_update_time: 0,
   escalation_solution_time: 0,
   until_time: 0,
+  attachment_count: 0,
+  has_ai_summary: false,
 };
 
 async function renderInRouter(ui: React.ReactElement) {

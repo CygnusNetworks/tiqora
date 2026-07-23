@@ -42,6 +42,7 @@ from tiqora.ai.audit import AuditContext, AuditingLlmClient
 from tiqora.ai.context import (
     ArticleSnapshot,
     TicketNotFoundError,
+    collect_known_names,
     get_or_create_state,
     load_articles,
     render_ticket_header,
@@ -66,10 +67,20 @@ STATUS_SKIPPED = "skipped"
 _SYSTEM_PROMPT = (
     "You maintain a concise, agent-facing internal summary of a support "
     "ticket. Given the previous summary (if any) and the article(s) since "
-    "then, write an updated summary covering: current status, key facts/"
-    "identifiers, what the customer wants, what has already been tried, and "
-    "any open action items. Output ONLY the updated summary text - no "
-    "preamble, no headings, no meta-commentary about what you changed."
+    "then, write an updated summary as plain text, structured into short "
+    "paragraphs separated by a blank line, in this order: (1) current "
+    "status, (2) key facts/identifiers, (3) what the customer wants, (4) "
+    "what has already been tried, (5) open action items. Each paragraph is "
+    "a few short sentences - do not use headings, bullet points, or "
+    "markdown formatting.\n\n"
+    "If the input contains one or more attachment blocks labeled "
+    "'[Anhang: <filename>]' with extracted document text, add one further "
+    "paragraph starting with 'Dokumente:' followed by one line per "
+    "document: the filename, then a 1-2 sentence summary of that "
+    "document's content. Omit this paragraph entirely when no document "
+    "attachments are present in the input.\n\n"
+    "Output ONLY the updated summary text - no preamble, no meta-commentary "
+    "about what you changed."
 )
 
 
@@ -226,7 +237,8 @@ async def summarize_ticket(
         )
 
     never_mask = {v for v in (ticket.customer_id, ticket.customer_user_id) if v}
-    pii = PiiMapper(never_mask=never_mask or None)
+    known_names = await collect_known_names(session, ticket, articles)
+    pii = PiiMapper(never_mask=never_mask or None, known_names=known_names or None)
     mask = bool(policy.pii_masking)
 
     audit_context = AuditContext(

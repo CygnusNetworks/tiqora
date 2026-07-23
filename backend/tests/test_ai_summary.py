@@ -20,6 +20,7 @@ from tiqora.ai.gate import OPERATION_MODE_TIQORA_PRIMARY, set_operation_mode
 from tiqora.ai.llm import LlmMessage, LlmResponse, LlmUsage
 from tiqora.ai.models import TiqoraAiTicketState
 from tiqora.ai.summary import (
+    _SYSTEM_PROMPT,
     STATUS_UP_TO_DATE,
     STATUS_UPDATED,
     TRIGGER_AUTO,
@@ -35,6 +36,23 @@ from tiqora.db.tiqora.base import TiqoraBase
 pytestmark = pytest.mark.db
 
 NOW = datetime(2024, 6, 1, 12, 0, 0)
+
+
+# ---------------------------------------------------------------------------
+# Pure unit test: prompt structure (paragraphs + per-document summaries)
+# ---------------------------------------------------------------------------
+
+
+def test_system_prompt_requires_paragraph_structure_and_document_section() -> None:
+    assert "paragraphs separated by a blank line" in _SYSTEM_PROMPT
+    assert "current status" in _SYSTEM_PROMPT
+    assert "key facts" in _SYSTEM_PROMPT
+    assert "what the customer wants" in _SYSTEM_PROMPT
+    assert "already been tried" in _SYSTEM_PROMPT
+    assert "open action items" in _SYSTEM_PROMPT
+    assert "do not use headings, bullet points, or" in _SYSTEM_PROMPT
+    assert "[Anhang: <filename>]" in _SYSTEM_PROMPT
+    assert "Dokumente:" in _SYSTEM_PROMPT
 
 
 class ScriptedLlm:

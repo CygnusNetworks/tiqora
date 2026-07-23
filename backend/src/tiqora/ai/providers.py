@@ -23,6 +23,31 @@ from tiqora.crypto.secret import decrypt_secret, encrypt_secret
 
 _TEST_TIMEOUT_SECONDS = 20.0
 
+
+class ProviderValidationError(Exception):
+    """Raised for invalid provider pricing fields (translated to 422)."""
+
+
+def _validate_pricing(
+    *,
+    price_input_per_1m: float | None,
+    price_output_per_1m: float | None,
+    price_currency: str | None,
+) -> None:
+    for label, value in (
+        ("price_input_per_1m", price_input_per_1m),
+        ("price_output_per_1m", price_output_per_1m),
+    ):
+        if value is not None and value < 0:
+            raise ProviderValidationError(f"{label} must be >= 0")
+    if price_currency is not None and not (
+        len(price_currency) == 3 and price_currency.isalpha() and price_currency.isupper()
+    ):
+        raise ProviderValidationError(
+            "price_currency must be exactly 3 uppercase letters (e.g. 'USD')"
+        )
+
+
 # Minimal tool schema used to probe tool-calling support on /chat/completions.
 _TEST_TOOL_SCHEMA = [
     {
@@ -76,7 +101,15 @@ async def create_provider(
     supports_streaming: bool,
     eu_hosted: bool,
     supports_vision: bool = False,
+    price_input_per_1m: float | None = None,
+    price_output_per_1m: float | None = None,
+    price_currency: str | None = None,
 ) -> TiqoraLlmProvider:
+    _validate_pricing(
+        price_input_per_1m=price_input_per_1m,
+        price_output_per_1m=price_output_per_1m,
+        price_currency=price_currency,
+    )
     # Keys/URLs arrive via copy-paste; stray whitespace or a trailing newline
     # silently breaks the Bearer header at the provider (opaque 401s).
     api_key = api_key.strip() if api_key else None
@@ -91,6 +124,9 @@ async def create_provider(
         supports_streaming=supports_streaming,
         eu_hosted=eu_hosted,
         supports_vision=supports_vision,
+        price_input_per_1m=price_input_per_1m,
+        price_output_per_1m=price_output_per_1m,
+        price_currency=price_currency,
         create_by=change_by,
         change_by=change_by,
     )
@@ -116,8 +152,16 @@ async def update_provider(
     supports_streaming: bool | None = None,
     eu_hosted: bool | None = None,
     supports_vision: bool | None = None,
+    price_input_per_1m: float | None = None,
+    price_output_per_1m: float | None = None,
+    price_currency: str | None = None,
     valid_id: int | None = None,
 ) -> TiqoraLlmProvider:
+    _validate_pricing(
+        price_input_per_1m=price_input_per_1m,
+        price_output_per_1m=price_output_per_1m,
+        price_currency=price_currency,
+    )
     if name is not None:
         row.name = name
     if kind is not None:
@@ -138,6 +182,12 @@ async def update_provider(
         row.eu_hosted = eu_hosted
     if supports_vision is not None:
         row.supports_vision = supports_vision
+    if price_input_per_1m is not None:
+        row.price_input_per_1m = price_input_per_1m
+    if price_output_per_1m is not None:
+        row.price_output_per_1m = price_output_per_1m
+    if price_currency is not None:
+        row.price_currency = price_currency
     if valid_id is not None:
         row.valid_id = valid_id
     row.change_by = change_by
@@ -184,6 +234,9 @@ async def duplicate_provider(
         supports_streaming=row.supports_streaming,
         eu_hosted=row.eu_hosted,
         supports_vision=row.supports_vision,
+        price_input_per_1m=row.price_input_per_1m,
+        price_output_per_1m=row.price_output_per_1m,
+        price_currency=row.price_currency,
         valid_id=row.valid_id,
         create_by=change_by,
         change_by=change_by,
@@ -207,6 +260,9 @@ def provider_to_public_dict(row: TiqoraLlmProvider) -> dict[str, object]:
         "supports_streaming": bool(row.supports_streaming),
         "eu_hosted": bool(row.eu_hosted),
         "supports_vision": bool(row.supports_vision),
+        "price_input_per_1m": row.price_input_per_1m,
+        "price_output_per_1m": row.price_output_per_1m,
+        "price_currency": row.price_currency,
         "valid_id": int(row.valid_id),
         "create_time": row.create_time,
         "change_time": row.change_time,
@@ -293,6 +349,7 @@ async def test_provider_connection(
 
 __all__ = [
     "ProviderTestResult",
+    "ProviderValidationError",
     "create_provider",
     "delete_provider",
     "duplicate_provider",
