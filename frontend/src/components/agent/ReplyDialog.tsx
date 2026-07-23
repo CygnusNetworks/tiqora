@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 import { api, ApiError } from "@/lib/api";
 import { Button } from "@/components/ui/Button";
 import { Dialog } from "@/components/ui/Dialog";
+import { SelectField } from "@/components/ui/SelectField";
 import { Spinner } from "@/components/ui/Spinner";
 import { cn } from "@/lib/cn";
 import { ArticleBodyRenderer } from "./ArticleBodyRenderer";
@@ -306,19 +307,15 @@ export function ReplyDialog({
           {templates.length > 0 && (
             <label className="block text-xs text-muted">
               {t("ticket.replyTemplate")}
-              <select
-                className={inputCls}
+              <SelectField
+                items={[
+                  { value: "", label: t("ticket.replyTemplateNone") },
+                  ...templates.map((tpl) => ({ value: String(tpl.id), label: tpl.name })),
+                ]}
                 value={templateId}
-                data-testid="reply-template-select"
-                onChange={(e) => onPickTemplate(e.target.value)}
-              >
-                <option value="">{t("ticket.replyTemplateNone")}</option>
-                {templates.map((tpl) => (
-                  <option key={tpl.id} value={tpl.id}>
-                    {tpl.name}
-                  </option>
-                ))}
-              </select>
+                onChange={onPickTemplate}
+                testId="reply-template-select"
+              />
             </label>
           )}
           <label className="block text-xs text-muted">

@@ -96,9 +96,13 @@ describe("AdminResourcePage", () => {
     expect(screen.queryByTestId("admin-select-all")).not.toBeInTheDocument();
     expect(screen.queryByTestId("admin-row-select-1")).not.toBeInTheDocument();
     expect(screen.queryByTestId("admin-bulk-bar")).not.toBeInTheDocument();
-    // Page size select includes 500 for large lists.
-    const pageSize = screen.getByTestId("admin-test-resource-page-size");
-    expect(within(pageSize).getByRole("option", { name: "500" })).toBeInTheDocument();
+    // Page size menu includes 500 for large lists (open the SelectField
+    // portal panel, then close it again via outside pointerdown).
+    fireEvent.click(screen.getByTestId("admin-test-resource-page-size"));
+    expect(
+      screen.getByTestId("admin-test-resource-page-size-menu-option-500"),
+    ).toBeInTheDocument();
+    fireEvent.pointerDown(document.body);
   });
 
   it("sends search in list params when searchable", async () => {
@@ -287,8 +291,8 @@ describe("AdminResourcePage", () => {
       await waitFor(() => expect(list).toHaveBeenCalled());
       list.mockClear();
 
-      const select = screen.getByTestId("admin-test-resource-page-size");
-      fireEvent.change(select, { target: { value: "100000" } });
+      fireEvent.click(screen.getByTestId("admin-test-resource-page-size"));
+      fireEvent.click(screen.getByTestId("admin-test-resource-page-size-menu-option-100000"));
 
       await waitFor(() => {
         expect(screen.getByTestId("admin-row-1")).toBeInTheDocument();
@@ -321,7 +325,8 @@ describe("AdminResourcePage", () => {
 
       // All 1200 rows present in the table.
       expect(screen.getAllByTestId(/^admin-row-\d+$/)).toHaveLength(1200);
-    });
+      // Rendering 1200 rows in jsdom is slow — generous margin for CI runners.
+    }, 60_000);
 
     it("issues a single chunk request for a small table under Alle", async () => {
       const list = makeChunkedListMock(30);
@@ -330,9 +335,8 @@ describe("AdminResourcePage", () => {
       await waitFor(() => expect(list).toHaveBeenCalled());
       list.mockClear();
 
-      fireEvent.change(screen.getByTestId("admin-test-resource-page-size"), {
-        target: { value: "100000" },
-      });
+      fireEvent.click(screen.getByTestId("admin-test-resource-page-size"));
+      fireEvent.click(screen.getByTestId("admin-test-resource-page-size-menu-option-100000"));
 
       await waitFor(() => {
         expect(screen.getByTestId("admin-row-1")).toBeInTheDocument();
@@ -354,9 +358,8 @@ describe("AdminResourcePage", () => {
       await waitFor(() => expect(list).toHaveBeenCalled());
       list.mockClear();
 
-      fireEvent.change(screen.getByTestId("admin-test-resource-page-size"), {
-        target: { value: "50" },
-      });
+      fireEvent.click(screen.getByTestId("admin-test-resource-page-size"));
+      fireEvent.click(screen.getByTestId("admin-test-resource-page-size-menu-option-50"));
 
       await waitFor(() => {
         expect(list).toHaveBeenCalledWith(
@@ -368,9 +371,8 @@ describe("AdminResourcePage", () => {
       expect(list.mock.calls[0][0].pageSize).toBe(50);
 
       list.mockClear();
-      fireEvent.change(screen.getByTestId("admin-test-resource-page-size"), {
-        target: { value: "500" },
-      });
+      fireEvent.click(screen.getByTestId("admin-test-resource-page-size"));
+      fireEvent.click(screen.getByTestId("admin-test-resource-page-size-menu-option-500"));
 
       await waitFor(() => {
         expect(list).toHaveBeenCalledWith(
@@ -386,9 +388,8 @@ describe("AdminResourcePage", () => {
       renderPage({ allowAllPageSize: true }, list);
 
       await waitFor(() => expect(list).toHaveBeenCalled());
-      fireEvent.change(screen.getByTestId("admin-test-resource-page-size"), {
-        target: { value: "100000" },
-      });
+      fireEvent.click(screen.getByTestId("admin-test-resource-page-size"));
+      fireEvent.click(screen.getByTestId("admin-test-resource-page-size-menu-option-100000"));
 
       await waitFor(() => {
         expect(screen.getByTestId("admin-row-30")).toBeInTheDocument();
@@ -403,9 +404,8 @@ describe("AdminResourcePage", () => {
       await waitFor(() => expect(list).toHaveBeenCalled());
       list.mockClear();
 
-      fireEvent.change(screen.getByTestId("admin-test-resource-page-size"), {
-        target: { value: "100000" },
-      });
+      fireEvent.click(screen.getByTestId("admin-test-resource-page-size"));
+      fireEvent.click(screen.getByTestId("admin-test-resource-page-size-menu-option-100000"));
 
       await waitFor(() => {
         expect(screen.getByText(/No records yet|Noch keine Einträge/)).toBeInTheDocument();
