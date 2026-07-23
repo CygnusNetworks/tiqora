@@ -6,6 +6,8 @@ admin API never returns the decrypted API key, only ``has_api_key``.
 
 from __future__ import annotations
 
+import json
+import time
 from dataclasses import dataclass
 from datetime import UTC, datetime
 
@@ -13,6 +15,8 @@ import httpx
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from tiqora.ai.audit import FEATURE_TEST as AUDIT_FEATURE_TEST
+from tiqora.ai.audit import AuditContext, write_audit_log
 from tiqora.ai.models import TiqoraLlmProvider
 from tiqora.config import Settings
 from tiqora.crypto.secret import decrypt_secret, encrypt_secret
@@ -210,14 +214,21 @@ def provider_to_public_dict(row: TiqoraLlmProvider) -> dict[str, object]:
 
 
 async def test_provider_connection(
-    row: TiqoraLlmProvider, *, settings: Settings, client: httpx.AsyncClient | None = None
+    row: TiqoraLlmProvider,
+    *,
+    settings: Settings,
+    client: httpx.AsyncClient | None = None,
+    session: AsyncSession | None = None,
 ) -> ProviderTestResult:
     """Call ``POST {base_url}/chat/completions`` with a mini prompt + a mini
     tool schema to verify both connectivity/auth and tool-calling support.
 
     ``client`` is injectable (``httpx.AsyncClient(transport=httpx.MockTransport(...))``)
     so tests never hit the network; production callers omit it and a
-    short-lived client is created for the single request.
+    short-lived client is created for the single request. When ``session``
+    is given, the call (request/response, redacted of nothing — this probe
+    never carries PII) is written to ``tiqora_ai_audit_log`` with
+    ``feature="test"`` (see :mod:`tiqora.ai.audit`).
     """
     api_key = decrypt_secret(settings.secret_key, row.api_key_enc) if row.api_key_enc else None
     headers = {"Content-Type": "application/json"}
@@ -235,16 +246,19 @@ async def test_provider_connection(
     url = row.base_url.rstrip("/") + "/chat/completions"
     owns_client = client is None
     http_client = client or httpx.AsyncClient(timeout=_TEST_TIMEOUT_SECONDS)
+    start = time.monotonic()
+    status_code: int | None = None
+    error: str | None = None
+    response_json: str | None = None
+    model: str | None = None
     try:
         response = await http_client.post(url, headers=headers, json=payload)
+        status_code = response.status_code
         if response.status_code >= 400:
-            return ProviderTestResult(
-                ok=False,
-                model=None,
-                tool_calling_ok=False,
-                error=f"HTTP {response.status_code}: {response.text[:500]}",
-            )
+            error = f"HTTP {response.status_code}: {response.text[:500]}"
+            return ProviderTestResult(ok=False, model=None, tool_calling_ok=False, error=error)
         data = response.json()
+        response_json = json.dumps(data)
         model = data.get("model")
         choices = data.get("choices") or []
         tool_calling_ok = False
@@ -253,10 +267,28 @@ async def test_provider_connection(
             tool_calling_ok = bool(message.get("tool_calls"))
         return ProviderTestResult(ok=True, model=model, tool_calling_ok=tool_calling_ok, error=None)
     except httpx.HTTPError as exc:
-        return ProviderTestResult(ok=False, model=None, tool_calling_ok=False, error=str(exc))
+        error = str(exc)
+        return ProviderTestResult(ok=False, model=None, tool_calling_ok=False, error=error)
     finally:
         if owns_client:
             await http_client.aclose()
+        if session is not None:
+            await write_audit_log(
+                session,
+                settings=settings,
+                context=AuditContext(
+                    feature=AUDIT_FEATURE_TEST,
+                    provider_id=row.id,
+                    model=model or row.default_model,
+                ),
+                request_json=json.dumps(payload),
+                response_json=response_json,
+                status_code=status_code,
+                error=error,
+                duration_ms=int((time.monotonic() - start) * 1000),
+                prompt_tokens=None,
+                completion_tokens=None,
+            )
 
 
 __all__ = [

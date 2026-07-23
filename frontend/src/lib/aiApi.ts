@@ -25,6 +25,7 @@ export type AiSettingsOut = {
   operation_mode: OperationMode;
   disclosure_default_text: string;
   global_max_replies_per_hour: number | null;
+  audit_retention_days: number;
 };
 
 export type AiSettingsUpdate = Partial<AiSettingsOut>;
@@ -234,6 +235,68 @@ export type AiAclCreate = {
 
 export type AiAclUpdate = Partial<AiAclCreate>;
 
+// ── LLM-Request-Audit ──────────────────────────────────────────────────
+
+export type AuditFeature = "draft" | "summary" | "auto_reply" | "vision" | "test";
+export type AuditRequestStatus = "ok" | "error";
+
+export type AiAuditLogListItemOut = {
+  id: number;
+  ts: string;
+  run_id: string | null;
+  provider_id: number | null;
+  provider_name: string;
+  model: string;
+  feature: AuditFeature;
+  ticket_id: number | null;
+  queue_id: number | null;
+  acting_user_id: number | null;
+  trigger: string | null;
+  status_code: number | null;
+  error: string | null;
+  duration_ms: number;
+  prompt_tokens: number | null;
+  completion_tokens: number | null;
+  pii_counts: Record<string, number> | null;
+};
+
+export type AiAuditLogDetailOut = AiAuditLogListItemOut & {
+  request_json: string;
+  response_json: string | null;
+};
+
+export type AiAuditLogPageOut = {
+  items: AiAuditLogListItemOut[];
+  total: number;
+  page: number;
+  page_size: number;
+};
+
+export type AiAuditLogStatsOut = {
+  total_requests: number;
+  total_prompt_tokens: number;
+  total_completion_tokens: number;
+  error_rate: number;
+  per_day: { date: string; count: number }[];
+  top_model: string | null;
+};
+
+export type AiAuditLogFilterParams = {
+  from?: string;
+  to?: string;
+  provider_id?: number;
+  feature?: AuditFeature;
+  ticket?: string;
+  status?: AuditRequestStatus;
+};
+
+export type AiAuditLogListParams = AiAuditLogFilterParams & {
+  page?: number;
+  page_size?: number;
+};
+
+export type PiiRevealOut = { mapping: Record<string, string> };
+
 /** Wraps a plain array endpoint into the `AdminPage` shape the shared admin table components expect. */
 function asPage<T>(items: T[]): AdminPage<T> {
   return { items, total: items.length, page: 1, page_size: Math.max(items.length, 1) };
@@ -350,5 +413,41 @@ export const aiApi = {
   },
   deleteAcl(id: number | string, signal?: AbortSignal) {
     return api.request<void>("DELETE", `/api/v1/admin/ai/acl/${id}`, { signal });
+  },
+
+  listAuditLog(params: AiAuditLogListParams = {}, signal?: AbortSignal) {
+    return api.request<AiAuditLogPageOut>("GET", "/api/v1/admin/ai/audit", {
+      query: {
+        from: params.from,
+        to: params.to,
+        provider_id: params.provider_id,
+        feature: params.feature,
+        ticket: params.ticket,
+        status: params.status,
+        page: params.page,
+        page_size: params.page_size,
+      },
+      signal,
+    });
+  },
+  getAuditLogStats(params: AiAuditLogFilterParams = {}, signal?: AbortSignal) {
+    return api.request<AiAuditLogStatsOut>("GET", "/api/v1/admin/ai/audit/stats", {
+      query: {
+        from: params.from,
+        to: params.to,
+        provider_id: params.provider_id,
+        feature: params.feature,
+        ticket: params.ticket,
+      },
+      signal,
+    });
+  },
+  getAuditLogEntry(id: number | string, signal?: AbortSignal) {
+    return api.request<AiAuditLogDetailOut>("GET", `/api/v1/admin/ai/audit/${id}`, { signal });
+  },
+  revealAuditPii(id: number | string, signal?: AbortSignal) {
+    return api.request<PiiRevealOut>("POST", `/api/v1/admin/ai/audit/${id}/reveal-pii`, {
+      signal,
+    });
   },
 };

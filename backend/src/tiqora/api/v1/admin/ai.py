@@ -24,6 +24,7 @@ from tiqora.ai import policies as ai_policies
 from tiqora.ai import providers as ai_providers
 from tiqora.ai import usage as ai_usage
 from tiqora.ai.acl import AiAclValidationError
+from tiqora.ai.audit import DEFAULT_RETENTION_DAYS
 from tiqora.ai.gate import AiGateError, get_operation_mode, set_operation_mode
 from tiqora.ai.models import TiqoraMcpClient
 from tiqora.ai.policies import QueuePolicyValidationError
@@ -53,9 +54,11 @@ from tiqora.api.v1.admin.ai_schemas import (
 from tiqora.api.v1.admin.deps import AdminUser
 from tiqora.config import get_settings
 from tiqora.domain.settings_store import (
+    KEY_AI_AUDIT_RETENTION_DAYS,
     KEY_AI_DISCLOSURE_DEFAULT,
     KEY_AI_GLOBAL_REPLIES_PER_HOUR,
     get_setting,
+    get_setting_int,
     set_setting,
 )
 
@@ -78,10 +81,14 @@ async def get_ai_settings(admin: AdminUser, session: DbSession) -> AiSettingsOut
     disclosure = await get_setting(session, KEY_AI_DISCLOSURE_DEFAULT) or ""
     global_cap_raw = await get_setting(session, KEY_AI_GLOBAL_REPLIES_PER_HOUR)
     global_cap = int(global_cap_raw) if global_cap_raw else None
+    audit_retention_days = await get_setting_int(
+        session, KEY_AI_AUDIT_RETENTION_DAYS, DEFAULT_RETENTION_DAYS
+    )
     return AiSettingsOut(
         operation_mode=mode,  # type: ignore[arg-type]
         disclosure_default_text=disclosure,
         global_max_replies_per_hour=global_cap,
+        audit_retention_days=audit_retention_days,
     )
 
 
@@ -103,6 +110,8 @@ async def put_ai_settings(
         await set_setting(
             session, KEY_AI_GLOBAL_REPLIES_PER_HOUR, str(body.global_max_replies_per_hour)
         )
+    if body.audit_retention_days is not None:
+        await set_setting(session, KEY_AI_AUDIT_RETENTION_DAYS, str(body.audit_retention_days))
     return await get_ai_settings(admin, session)
 
 
@@ -191,7 +200,9 @@ async def test_llm_provider(
     row = await ai_providers.get_provider(session, provider_id)
     if row is None:
         raise _not_found("Provider", provider_id)
-    result = await ai_providers.test_provider_connection(row, settings=get_settings())
+    result = await ai_providers.test_provider_connection(
+        row, settings=get_settings(), session=session
+    )
     return LlmProviderTestOut(
         ok=result.ok, model=result.model, tool_calling_ok=result.tool_calling_ok, error=result.error
     )

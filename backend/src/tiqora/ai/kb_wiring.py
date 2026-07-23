@@ -10,12 +10,14 @@ bundle/search/get-article seams the same way.
 from __future__ import annotations
 
 from collections.abc import Awaitable, Callable
+from dataclasses import replace
 from typing import Any
 
 import structlog
 from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from tiqora.ai.audit import AuditContext, AuditingLlmClient
 from tiqora.ai.listfields import parse_int_list, parse_str_list
 from tiqora.ai.llm import LlmClient, OpenAiCompatLlmClient
 from tiqora.ai.models import TiqoraAiQueuePolicy
@@ -63,7 +65,11 @@ async def build_llm_client(
 
 
 async def build_vision_llm_factory(
-    session: AsyncSession, settings: Settings, vision_provider_id: int | None
+    session: AsyncSession,
+    settings: Settings,
+    vision_provider_id: int | None,
+    *,
+    audit: AuditContext | None = None,
 ) -> Callable[[], LlmClient] | None:
     """Resolve ``vision_provider_id`` into a sync ``() -> LlmClient`` factory
     for the attachment vision pre-pass (:mod:`tiqora.ai.attachment_context`).
@@ -72,6 +78,11 @@ async def build_vision_llm_factory(
     provider row is gone, or it does not have ``supports_vision`` set — the
     caller treats this as "images are ignored for this run", matching the
     documented "NULL = Bilder werden ignoriert" policy semantics.
+
+    When ``audit`` is given, every call made through the returned client is
+    written to ``tiqora_ai_audit_log`` with ``feature="vision"`` (see
+    :mod:`tiqora.ai.audit`) — image data-URLs are never persisted, only a
+    byte-count placeholder.
     """
     if vision_provider_id is None:
         return None
@@ -83,9 +94,22 @@ async def build_vision_llm_factory(
     )
 
     def _factory() -> LlmClient:
-        return OpenAiCompatLlmClient(
+        client: LlmClient = OpenAiCompatLlmClient(
             base_url=provider.base_url, api_key=api_key, model=provider.default_model
         )
+        if audit is not None:
+            client = AuditingLlmClient(
+                client,
+                settings=settings,
+                context=replace(
+                    audit,
+                    feature="vision",
+                    provider_id=provider.id,
+                    model=provider.default_model,
+                ),
+                session=session,
+            )
+        return client
 
     return _factory
 

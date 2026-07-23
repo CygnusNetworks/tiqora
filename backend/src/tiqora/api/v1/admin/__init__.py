@@ -11,6 +11,7 @@ from fastapi import APIRouter
 
 from tiqora.api.v1.admin import (
     ai,
+    ai_audit,
     api_keys,
     attachments,
     auth_config,
@@ -62,5 +63,6 @@ admin_router.include_router(daemons.router)
 admin_router.include_router(placeholder_variables.queue_variables_router)
 admin_router.include_router(placeholder_variables.customer_fields_router)
 admin_router.include_router(ai.router)
+admin_router.include_router(ai_audit.router)
 
 __all__ = ["admin_router"]
