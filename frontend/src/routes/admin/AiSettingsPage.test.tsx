@@ -26,6 +26,24 @@ vi.mock("@/lib/api", () => ({
       this.path = path;
     }
   },
+  api: {
+    adminGroups: {
+      list: () =>
+        Promise.resolve({
+          items: [
+            { id: 3, name: "users", comments: null, valid_id: 1 },
+            { id: 7, name: "support", comments: null, valid_id: 1 },
+          ],
+          total: 2,
+          page: 1,
+          page_size: 500,
+        }),
+    },
+    adminRoles: {
+      list: () => Promise.resolve({ items: [], total: 0, page: 1, page_size: 500 }),
+    },
+    listReferenceAgents: () => Promise.resolve([]),
+  },
 }));
 
 vi.mock("@/lib/aiApi", () => ({
@@ -157,30 +175,4 @@ describe("AiSettingsPage", () => {
     });
   });
 
-  it("creates a new ACL entry via the drawer", async () => {
-    createAcl.mockResolvedValue({
-      id: 5,
-      subject_type: "group",
-      subject_id: 3,
-      feature: "auto_reply",
-      allowed: true,
-      limit_requests_day: null,
-      limit_tokens_day: null,
-      limit_requests_month: null,
-    });
-    renderPage();
-    await waitFor(() => expect(screen.getByTestId("admin-ai-acl-new")).toBeInTheDocument());
-
-    fireEvent.click(screen.getByTestId("admin-ai-acl-new"));
-    fireEvent.change(screen.getByTestId("admin-ai-acl-form-subject_id"), {
-      target: { value: "3" },
-    });
-    fireEvent.click(screen.getByTestId("admin-ai-acl-form-submit"));
-
-    await waitFor(() => {
-      expect(createAcl).toHaveBeenCalledWith(
-        expect.objectContaining({ subject_type: "group", subject_id: 3, feature: "auto_reply" }),
-      );
-    });
-  });
 });

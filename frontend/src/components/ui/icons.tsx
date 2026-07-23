@@ -199,6 +199,32 @@ export function ServerIcon(props: IconProps) {
 
 /** Filled presence/status dot. Unlike the outline icons it uses a fill so a
  * small size still reads as a solid signal; size via `className`. */
+export function SparkIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8L12 3Z" />
+      <path d="M18.5 15.5l.7 2 2 .7-2 .7-.7 2-.7-2-2-.7 2-.7.7-2Z" />
+    </Icon>
+  );
+}
+
+export function HomeIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M4 10.5 12 4l8 6.5" />
+      <path d="M6 9.5V20h12V9.5" />
+    </Icon>
+  );
+}
+
+export function ChevronLeftIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M14 6l-6 6 6 6" />
+    </Icon>
+  );
+}
+
 export function DotIcon(props: IconProps) {
   return (
     <svg
