@@ -4057,6 +4057,83 @@
         }
       }
     },
+    "/api/v1/tickets/{ticket_id}/articles/{article_id}": {
+      "delete": {
+        "tags": [
+          "tickets"
+        ],
+        "summary": "Delete Article Endpoint",
+        "description": "Hard-delete an internal note. Requires ``rw``.\n\nCustomer-visible or non-Internal-channel articles are never deletable and\nreturn HTTP 409 instead.",
+        "operationId": "delete_article_endpoint_api_v1_tickets__ticket_id__articles__article_id__delete",
+        "parameters": [
+          {
+            "name": "ticket_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Ticket Id"
+            }
+          },
+          {
+            "name": "article_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Article Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "tiqora_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/tickets/{ticket_id}/links": {
       "get": {
         "tags": [
@@ -27872,6 +27949,11 @@
               }
             ],
             "title": "Accepted Article Id"
+          },
+          "create_time": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Create Time"
           }
         },
         "type": "object",
@@ -27884,7 +27966,8 @@
           "based_on_article_id",
           "status",
           "source",
-          "accepted_article_id"
+          "accepted_article_id",
+          "create_time"
         ],
         "title": "AiDraftOut"
       },
@@ -28941,6 +29024,18 @@
               }
             ],
             "title": "Last Summary Upto Article Id"
+          },
+          "summary_created_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Summary Created At"
           }
         },
         "type": "object",
@@ -28951,7 +29046,8 @@
           "operation_mode_ready",
           "drafts",
           "summary_body",
-          "last_summary_upto_article_id"
+          "last_summary_upto_article_id",
+          "summary_created_at"
         ],
         "title": "AiStateOut"
       },

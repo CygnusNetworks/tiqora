@@ -24,6 +24,7 @@ export function ArticleMasterDetail({
   noteOpen,
   onNoteOpenChange,
   canNote = true,
+  canDelete = false,
   descending,
   onToggleDescending,
 }: {
@@ -35,6 +36,8 @@ export function ArticleMasterDetail({
   onNoteOpenChange?: (open: boolean) => void;
   /** Whether the agent may reply / add notes (``note`` permission). */
   canNote?: boolean;
+  /** Whether the agent may delete internal notes (``rw`` permission). */
+  canDelete?: boolean;
   /** Controlled sort direction (shared with the ticket-zoom ⋮ menu's
    * "Sortierung" entry). Uncontrolled + localStorage-backed when omitted. */
   descending?: boolean;
@@ -96,12 +99,19 @@ export function ArticleMasterDetail({
       </div>
 
       {view === "split" ? (
-        <ArticleSplitView ticketId={ticketId} canNote={canNote} locale={locale} state={state} />
+        <ArticleSplitView
+          ticketId={ticketId}
+          canNote={canNote}
+          canDelete={canDelete}
+          locale={locale}
+          state={state}
+        />
       ) : (
         <ArticleConversationView
           ticketId={ticketId}
           articles={state.chronological}
           canNote={canNote}
+          canDelete={canDelete}
           locale={locale}
         />
       )}

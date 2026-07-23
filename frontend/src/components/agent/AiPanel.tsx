@@ -4,6 +4,8 @@ import { useTranslation } from "react-i18next";
 import { api, ApiError } from "@/lib/api";
 import { ticketAiApi, type AiDraftOut } from "@/lib/ticketAiApi";
 import { articleSortKey } from "@/lib/article";
+import { formatDateTime } from "@/lib/format";
+import { cn } from "@/lib/cn";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import { Spinner } from "@/components/ui/Spinner";
@@ -20,8 +22,58 @@ import { ReplyDialog } from "./ReplyDialog";
  * Sibling to `ProcessWidget` in `TicketZoomPage`; matches its panel chrome
  * (`rounded-lg border border-hairline bg-surface p-4`).
  */
+
+/** Max articles rendered as individual coverage dots; beyond that the
+ * indicator degrades to a plain "n/m" fraction to avoid a dot wall. */
+const MAX_COVERAGE_DOTS = 12;
+
+/** Coverage of the current summary over the ticket's articles: filled dots
+ * are summarized, the outline dots arrived later. */
+function CoverageDots({ covered, total }: { covered: number; total: number }) {
+  if (total === 0) return null;
+  if (total > MAX_COVERAGE_DOTS) {
+    return (
+      <span className="text-[11px] tabular-nums text-muted" data-testid="ai-summary-coverage">
+        {covered}/{total}
+      </span>
+    );
+  }
+  return (
+    <span
+      className="inline-flex items-center gap-1"
+      data-testid="ai-summary-coverage"
+      aria-label={`${covered}/${total}`}
+    >
+      {Array.from({ length: total }, (_, i) => (
+        <span
+          key={i}
+          className={cn(
+            "h-1.5 w-1.5 rounded-full",
+            i < covered ? "bg-accent" : "border border-muted/60",
+          )}
+        />
+      ))}
+    </span>
+  );
+}
+
+function DraftKindIcon({ kind }: { kind: string }) {
+  const clarify = kind === "clarify";
+  return (
+    <span
+      aria-hidden
+      className={cn(
+        "flex h-7 w-7 flex-none items-center justify-center rounded-md text-sm",
+        clarify ? "bg-escalation/15 text-escalation" : "bg-accent-dim text-accent",
+      )}
+    >
+      {clarify ? "?" : "↩"}
+    </span>
+  );
+}
+
 export function AiPanel({ ticketId, canNote }: { ticketId: number; canNote: boolean }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const queryClient = useQueryClient();
   const { confirm, dialog: confirmDialog } = useConfirm();
   const [expandedDraftId, setExpandedDraftId] = useState<number | null>(null);
@@ -32,13 +84,14 @@ export function AiPanel({ ticketId, canNote }: { ticketId: number; canNote: bool
     queryFn: ({ signal }) => ticketAiApi.getState(ticketId, signal),
   });
 
-  // Fallback reply target when a draft has no based_on_article_id — shares
-  // the query key with TicketHeaderActions/ArticleMasterDetail so this never
-  // triggers a second request.
+  // Shares the query key with TicketHeaderActions/ArticleMasterDetail, so in
+  // the zoom page this is a cache hit, not a second request. Used for the
+  // coverage indicator and as reply-target fallback for drafts without
+  // based_on_article_id.
   const articlesQ = useQuery({
     queryKey: ["tickets", ticketId, "articles"],
     queryFn: () => api.listArticles(ticketId),
-    enabled: Boolean(replyDraft) && replyDraft?.based_on_article_id == null,
+    enabled: Boolean(stateQ.data?.summary_available) || Boolean(replyDraft),
   });
 
   const draftMutation = useMutation({
@@ -68,6 +121,7 @@ export function AiPanel({ ticketId, canNote }: { ticketId: number; canNote: bool
   if (!state.manual_assist_available && !state.summary_available) return null;
 
   const openDrafts = state.drafts.filter((d) => d.status === "open");
+  const locale = i18n.language;
 
   const mapRunError = (error: unknown): string => {
     if (error instanceof ApiError) {
@@ -79,9 +133,15 @@ export function AiPanel({ ticketId, canNote }: { ticketId: number; canNote: bool
     return t("ticket.ai.errorGeneric");
   };
 
+  const articles = articlesQ.data ?? [];
+  const upto = state.last_summary_upto_article_id;
+  const coveredCount = upto == null ? 0 : articles.filter((a) => a.id <= upto).length;
+  const staleCount = upto == null ? 0 : articles.filter((a) => a.id > upto).length;
+  const hasSummary = state.summary_body != null;
+
   const replyArticleId =
     replyDraft?.based_on_article_id ??
-    [...(articlesQ.data ?? [])].sort((a, b) => articleSortKey(b) - articleSortKey(a))[0]?.id ??
+    [...articles].sort((a, b) => articleSortKey(b) - articleSortKey(a))[0]?.id ??
     null;
 
   return (
@@ -104,22 +164,45 @@ export function AiPanel({ ticketId, canNote }: { ticketId: number; canNote: bool
               disabled={!state.can_summarize || summarizeMutation.isPending}
               onClick={() => summarizeMutation.mutate()}
             >
-              {summarizeMutation.isPending ? <Spinner className="h-3.5 w-3.5" /> : t("ticket.ai.summarizeButton")}
+              {summarizeMutation.isPending ? (
+                <Spinner className="h-3.5 w-3.5" />
+              ) : hasSummary ? (
+                t("ticket.ai.refreshButton")
+              ) : (
+                t("ticket.ai.summarizeButton")
+              )}
             </Button>
           </div>
-          {state.summary_body ? (
-            <div>
+
+          {hasSummary ? (
+            <div className="space-y-2">
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
+                {staleCount > 0 ? (
+                  <Badge tone="warn" data-testid="ai-summary-stale">
+                    {t("ticket.ai.summaryStale", { count: staleCount })}
+                  </Badge>
+                ) : (
+                  <Badge tone="success" data-testid="ai-summary-current">
+                    {t("ticket.ai.summaryCurrent")}
+                  </Badge>
+                )}
+                {articles.length > 0 && (
+                  <CoverageDots covered={coveredCount} total={articles.length} />
+                )}
+                {state.summary_created_at && (
+                  <span className="text-[11px] text-muted" data-testid="ai-summary-created-at">
+                    {t("ticket.ai.summaryCreatedAt", {
+                      dateTime: formatDateTime(state.summary_created_at, locale),
+                    })}
+                  </span>
+                )}
+              </div>
               <p
                 className="whitespace-pre-wrap text-sm text-ink"
                 data-testid="ai-panel-summary-body"
               >
                 {state.summary_body}
               </p>
-              {state.last_summary_upto_article_id != null && (
-                <p className="mt-1 text-[11px] text-muted">
-                  {t("ticket.ai.summaryAsOf", { articleId: state.last_summary_upto_article_id })}
-                </p>
-              )}
             </div>
           ) : (
             <p className="text-sm text-muted" data-testid="ai-panel-summary-empty">
@@ -180,41 +263,41 @@ export function AiPanel({ ticketId, canNote }: { ticketId: number; canNote: bool
                 return (
                   <li
                     key={draft.id}
-                    className="space-y-1.5 rounded border border-hairline p-2"
+                    className="space-y-2 rounded-md border border-hairline bg-surface-subtle p-3"
                     data-testid={`ai-panel-draft-${draft.id}`}
                   >
                     <div className="flex flex-wrap items-center justify-between gap-2">
-                      <div className="flex items-center gap-1.5">
-                        <Badge tone={draft.kind === "clarify" ? "warn" : "accent"}>
-                          {t(`ticket.ai.draftKind.${draft.kind}`, { defaultValue: draft.kind })}
-                        </Badge>
-                        <Badge tone="muted">
-                          {t(`ticket.ai.draftSource.${draft.source}`, { defaultValue: draft.source })}
-                        </Badge>
-                        {draft.based_on_article_id != null && (
-                          <span className="text-[11px] text-muted">
-                            {t("ticket.ai.basedOnArticle", { articleId: draft.based_on_article_id })}
-                          </span>
-                        )}
+                      <div className="flex min-w-0 items-center gap-2.5">
+                        <DraftKindIcon kind={draft.kind} />
+                        <div className="min-w-0">
+                          <div className="text-[13px] font-semibold text-ink">
+                            {t(`ticket.ai.draftTitle.${draft.kind}`, {
+                              defaultValue: t(`ticket.ai.draftKind.${draft.kind}`, {
+                                defaultValue: draft.kind,
+                              }),
+                            })}
+                          </div>
+                          <div
+                            className="truncate text-[11px] text-muted"
+                            data-testid={`ai-panel-draft-meta-${draft.id}`}
+                          >
+                            {formatDateTime(draft.create_time, locale)}
+                            {" · "}
+                            {t(`ticket.ai.draftSource.${draft.source}`, {
+                              defaultValue: draft.source,
+                            })}
+                            {draft.based_on_article_id != null && (
+                              <>
+                                {" · "}
+                                {t("ticket.ai.basedOnArticle", {
+                                  articleId: draft.based_on_article_id,
+                                })}
+                              </>
+                            )}
+                          </div>
+                        </div>
                       </div>
                       <div className="flex items-center gap-1.5">
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          data-testid={`ai-panel-draft-toggle-${draft.id}`}
-                          onClick={() => setExpandedDraftId(expanded ? null : draft.id)}
-                        >
-                          {expanded ? t("ticket.ai.collapse") : t("ticket.ai.expand")}
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="primary"
-                          data-testid={`ai-panel-draft-use-${draft.id}`}
-                          disabled={!canNote}
-                          onClick={() => setReplyDraft(draft)}
-                        >
-                          {t("ticket.ai.useDraft")}
-                        </Button>
                         <Button
                           size="sm"
                           variant="ghost"
@@ -231,16 +314,34 @@ export function AiPanel({ ticketId, canNote }: { ticketId: number; canNote: bool
                         >
                           {t("ticket.ai.discardDraft")}
                         </Button>
+                        <Button
+                          size="sm"
+                          variant="primary"
+                          data-testid={`ai-panel-draft-use-${draft.id}`}
+                          disabled={!canNote}
+                          onClick={() => setReplyDraft(draft)}
+                        >
+                          {t("ticket.ai.useDraft")}
+                        </Button>
                       </div>
                     </div>
-                    {expanded && (
-                      <p
-                        className="whitespace-pre-wrap text-sm text-ink"
-                        data-testid={`ai-panel-draft-body-${draft.id}`}
-                      >
-                        {draft.body}
-                      </p>
-                    )}
+                    <p
+                      className={cn(
+                        "whitespace-pre-wrap text-[13px] text-ink",
+                        !expanded && "line-clamp-2",
+                      )}
+                      data-testid={`ai-panel-draft-body-${draft.id}`}
+                    >
+                      {draft.body}
+                    </p>
+                    <button
+                      type="button"
+                      className="text-[11px] font-medium text-accent hover:underline"
+                      data-testid={`ai-panel-draft-toggle-${draft.id}`}
+                      onClick={() => setExpandedDraftId(expanded ? null : draft.id)}
+                    >
+                      {expanded ? t("ticket.ai.collapse") : t("ticket.ai.expand")}
+                    </button>
                   </li>
                 );
               })}

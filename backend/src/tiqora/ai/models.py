@@ -395,6 +395,9 @@ class TiqoraAiTicketState(TiqoraBase):
     summary_body: Mapped[str | None] = mapped_column(Text, nullable=True)
     last_summary_upto_article_id: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
     last_summary_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    # When summary_body was (re)generated — distinct from last_run_at, which
+    # also moves on runs that leave the summary untouched (up_to_date checks).
+    summary_created_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     auto_reply_count: Mapped[int] = mapped_column(
         Integer, nullable=False, default=0, server_default="0"
     )
