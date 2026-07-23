@@ -98,6 +98,14 @@ PROMPT_PART_FILE = "file"
 PROMPT_PART_NOTE = "note"
 PROMPT_PART_KINDS = frozenset({PROMPT_PART_FILE, PROMPT_PART_NOTE})
 
+# tiqora_ai_queue_policy.summary_detail (tiqora.ai.summary system-prompt
+# verbosity) — "standard" reproduces the pre-existing prompt/behaviour
+# exactly; "detailed" asks for longer paragraphs and a 3-5 sentence
+# per-document summary instead of 1-2.
+DETAIL_STANDARD = "standard"
+DETAIL_DETAILED = "detailed"
+SUMMARY_DETAIL_MODES = frozenset({DETAIL_STANDARD, DETAIL_DETAILED})
+
 # tiqora_ai_acl.subject_type
 ACL_SUBJECT_GROUP = "group"
 ACL_SUBJECT_ROLE = "role"
@@ -295,6 +303,13 @@ class TiqoraAiQueuePolicy(TiqoraBase):
     pii_masking: Mapped[bool] = mapped_column(
         Boolean, nullable=False, default=True, server_default=true()
     )
+    # spaCy NER (de+en) additionally feeds person names it finds in the raw
+    # article/attachment text into the same name-masking path as
+    # collect_known_names — only takes effect when pii_masking is also on
+    # (see tiqora.ai.ner, tiqora.ai.context.collect_known_names).
+    pii_ner_enabled: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=True, server_default=true()
+    )
     identity_mode: Mapped[str] = mapped_column(
         String(30), nullable=False, default=IDENTITY_TICKET_CUSTOMER_ID
     )
@@ -320,6 +335,12 @@ class TiqoraAiQueuePolicy(TiqoraBase):
     # ticket_state_type names. NULL/blank = default ["open"] (reopen allowed,
     # never close); an explicit "[]" disables state changes entirely.
     allowed_state_types: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    # tiqora.ai.summary system-prompt verbosity — see DETAIL_STANDARD/
+    # DETAIL_DETAILED above.
+    summary_detail: Mapped[str] = mapped_column(
+        String(12), nullable=False, default=DETAIL_STANDARD, server_default=DETAIL_STANDARD
+    )
 
     valid_id: Mapped[int] = mapped_column(
         SmallInteger, nullable=False, default=1, server_default="1"

@@ -16,6 +16,7 @@ import { PickerField } from "@/components/admin/PickerField";
 import { PromptPartsSection } from "@/components/admin/PromptPartsSection";
 import { EscalationRuleTester } from "@/components/admin/EscalationRuleTester";
 import { HelpPopover } from "@/components/ui/HelpPopover";
+import { SelectField } from "@/components/ui/SelectField";
 import { TagInput } from "@/components/ui/TagInput";
 import { Tabs, type TabItem } from "@/components/ui/Tabs";
 import { Button } from "@/components/ui/Button";
@@ -54,6 +55,7 @@ type FormState = {
   kb_tags: string;
   kb_category_ids: string;
   mcp_client_ids: Set<number>;
+  summary_detail: "standard" | "detailed";
   summary_article_threshold: string;
   summary_char_threshold: string;
   summary_incremental_min_articles: string;
@@ -66,6 +68,7 @@ type FormState = {
   ai_disclosure_enabled: boolean;
   ai_disclosure_text: string;
   pii_masking: boolean;
+  pii_ner_enabled: boolean;
   identity_mode: IdentityMode;
   clarify_schema_json: string;
   ignored_senders: string;
@@ -96,6 +99,7 @@ function emptyForm(queueId: number): FormState {
     kb_tags: "",
     kb_category_ids: "",
     mcp_client_ids: new Set(),
+    summary_detail: "standard",
     summary_article_threshold: "10",
     summary_char_threshold: "20000",
     summary_incremental_min_articles: "2",
@@ -108,6 +112,7 @@ function emptyForm(queueId: number): FormState {
     ai_disclosure_enabled: false,
     ai_disclosure_text: "",
     pii_masking: true,
+    pii_ner_enabled: true,
     identity_mode: "ticket_customer_id",
     clarify_schema_json: "",
     ignored_senders: "",
@@ -173,6 +178,7 @@ function toForm(row: AiQueuePolicyOut): FormState {
         .map(Number)
         .filter((n) => Number.isFinite(n)),
     ),
+    summary_detail: row.summary_detail,
     summary_article_threshold: row.summary_article_threshold != null ? String(row.summary_article_threshold) : "",
     summary_char_threshold: row.summary_char_threshold != null ? String(row.summary_char_threshold) : "",
     summary_incremental_min_articles:
@@ -187,6 +193,7 @@ function toForm(row: AiQueuePolicyOut): FormState {
     ai_disclosure_enabled: row.ai_disclosure_enabled,
     ai_disclosure_text: row.ai_disclosure_text ?? "",
     pii_masking: row.pii_masking,
+    pii_ner_enabled: row.pii_ner_enabled,
     identity_mode: row.identity_mode,
     clarify_schema_json: row.clarify_schema_json ?? "",
     ignored_senders: sendersRawToLines(row.ignored_senders),
@@ -433,6 +440,7 @@ function AiQueuePolicyEditor({ policyId }: { policyId?: number }) {
     kb_tags: f.kb_tags.trim() || null,
     kb_category_ids: f.kb_category_ids.trim() || null,
     mcp_client_ids: f.mcp_client_ids.size > 0 ? Array.from(f.mcp_client_ids).join(",") : null,
+    summary_detail: f.summary_detail,
     summary_article_threshold: numOrNull(f.summary_article_threshold),
     summary_char_threshold: numOrNull(f.summary_char_threshold),
     summary_incremental_min_articles: numOrNull(f.summary_incremental_min_articles),
@@ -445,6 +453,7 @@ function AiQueuePolicyEditor({ policyId }: { policyId?: number }) {
     ai_disclosure_enabled: f.ai_disclosure_enabled,
     ai_disclosure_text: f.ai_disclosure_text.trim() || null,
     pii_masking: f.pii_masking,
+    pii_ner_enabled: f.pii_ner_enabled,
     identity_mode: f.identity_mode,
     clarify_schema_json: f.clarify_schema_json.trim() || null,
     ignored_senders: linesToSendersRaw(f.ignored_senders),
@@ -830,6 +839,23 @@ function AiQueuePolicyEditor({ policyId }: { policyId?: number }) {
               disabled={!form.enabled_summary}
               className={cn("grid gap-4 sm:grid-cols-2", !form.enabled_summary && "opacity-50")}
             >
+              <label className="block text-sm sm:col-span-2">
+                <FieldLabel
+                  text={t("admin.ai.queues.summaryDetail")}
+                  help={t("admin.help.aiQueue.summaryDetail")}
+                  defaultHint={t("admin.ai.queues.summaryDetailLevel.standard")}
+                  testId="admin-ai-queue-help-summary_detail"
+                />
+                <SelectField
+                  items={[
+                    { value: "standard", label: t("admin.ai.queues.summaryDetailLevel.standard") },
+                    { value: "detailed", label: t("admin.ai.queues.summaryDetailLevel.detailed") },
+                  ]}
+                  value={form.summary_detail}
+                  onChange={(v) => setField("summary_detail", v as "standard" | "detailed")}
+                  testId="admin-ai-queue-form-summary_detail"
+                />
+              </label>
               <label className="block text-sm">
                 <FieldLabel
                   text={t("admin.ai.queues.summaryArticleThreshold")}
@@ -1194,6 +1220,20 @@ function AiQueuePolicyEditor({ policyId }: { policyId?: number }) {
               {t("admin.ai.queues.piiMasking")}
               <HelpPopover title={t("admin.ai.queues.piiMasking")} testId="admin-ai-queue-help-pii_masking">
                 {t("admin.help.aiQueue.piiMasking")}
+              </HelpPopover>
+            </label>
+            <label className="flex items-center gap-2 text-sm text-ink sm:col-span-2">
+              <input
+                type="checkbox"
+                data-testid="admin-ai-queue-form-pii_ner_enabled"
+                checked={form.pii_ner_enabled}
+                disabled={!form.pii_masking}
+                onChange={(e) => setField("pii_ner_enabled", e.target.checked)}
+                className="rounded border-hairline"
+              />
+              {t("admin.ai.queues.piiNer")}
+              <HelpPopover title={t("admin.ai.queues.piiNer")} testId="admin-ai-queue-help-pii_ner_enabled">
+                {t("admin.help.aiQueue.piiNer")}
               </HelpPopover>
             </label>
             <label className="block text-sm sm:col-span-2">
