@@ -18,6 +18,11 @@ export type AiDraftKind = "reply" | "clarify";
 export type AiDraftStatus = "open" | "accepted" | "discarded";
 export type AiDraftSource = "auto" | "manual";
 
+export type AiToolTraceOut = {
+  name: string;
+  content: string;
+};
+
 export type AiDraftOut = {
   id: number;
   ticket_id: number;
@@ -29,6 +34,7 @@ export type AiDraftOut = {
   source: string;
   accepted_article_id: number | null;
   create_time: string;
+  tool_trace: AiToolTraceOut[];
 };
 
 export type AiStateOut = {

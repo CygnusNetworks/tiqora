@@ -310,6 +310,52 @@ export type AiAuditLogListParams = AiAuditLogFilterParams & {
 
 export type PiiRevealOut = { mapping: Record<string, string> };
 
+export type PromptPartKind = "file" | "note";
+
+export type AiPromptPartOut = {
+  id: number;
+  policy_id: number;
+  kind: PromptPartKind;
+  title: string;
+  content: string;
+  position: number;
+  enabled: boolean;
+  create_time: string;
+  change_time: string;
+};
+
+export type AiPromptPartCreate = {
+  kind: PromptPartKind;
+  title: string;
+  content: string;
+};
+
+export type AiPromptPartUpdate = {
+  title?: string;
+  content?: string;
+  enabled?: boolean;
+};
+
+export type EscalationTestIn = {
+  rules_json: string;
+  tool: string;
+  sample_json: string;
+};
+
+export type EscalationHitOut = {
+  rule_index: number;
+  tool: string;
+  field: string | null;
+  match: string;
+  value: string;
+};
+
+export type EscalationTestOut = {
+  valid: boolean;
+  error?: string | null;
+  hit?: EscalationHitOut | null;
+};
+
 /** Wraps a plain array endpoint into the `AdminPage` shape the shared admin table components expect. */
 function asPage<T>(items: T[]): AdminPage<T> {
   return { items, total: items.length, page: 1, page_size: Math.max(items.length, 1) };
@@ -399,6 +445,53 @@ export const aiApi = {
   },
   deleteQueuePolicy(id: number | string, signal?: AbortSignal) {
     return api.request<void>("DELETE", `/api/v1/admin/ai/queue-policies/${id}`, { signal });
+  },
+
+  listPromptParts(policyId: number | string, signal?: AbortSignal) {
+    return api.request<AiPromptPartOut[]>(
+      "GET",
+      `/api/v1/admin/ai/queues/${policyId}/prompt-parts`,
+      { signal },
+    );
+  },
+  createPromptPart(policyId: number | string, body: AiPromptPartCreate, signal?: AbortSignal) {
+    return api.request<AiPromptPartOut>(
+      "POST",
+      `/api/v1/admin/ai/queues/${policyId}/prompt-parts`,
+      { body, signal },
+    );
+  },
+  updatePromptPart(
+    policyId: number | string,
+    partId: number,
+    body: AiPromptPartUpdate,
+    signal?: AbortSignal,
+  ) {
+    return api.request<AiPromptPartOut>(
+      "PUT",
+      `/api/v1/admin/ai/queues/${policyId}/prompt-parts/${partId}`,
+      { body, signal },
+    );
+  },
+  deletePromptPart(policyId: number | string, partId: number, signal?: AbortSignal) {
+    return api.request<void>(
+      "DELETE",
+      `/api/v1/admin/ai/queues/${policyId}/prompt-parts/${partId}`,
+      { signal },
+    );
+  },
+  testEscalationRules(body: EscalationTestIn, signal?: AbortSignal) {
+    return api.request<EscalationTestOut>("POST", "/api/v1/admin/ai/escalation-test", {
+      body,
+      signal,
+    });
+  },
+  reorderPromptParts(policyId: number | string, orderedIds: number[], signal?: AbortSignal) {
+    return api.request<AiPromptPartOut[]>(
+      "PUT",
+      `/api/v1/admin/ai/queues/${policyId}/prompt-parts/reorder`,
+      { body: { ordered_ids: orderedIds }, signal },
+    );
   },
 
   listUsage(params: AiUsageListParams = {}, signal?: AbortSignal) {
