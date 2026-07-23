@@ -25621,6 +25621,497 @@
         }
       }
     },
+    "/api/v1/admin/ai/queues/{policy_id}/prompt-parts": {
+      "get": {
+        "tags": [
+          "admin:ai"
+        ],
+        "summary": "List Prompt Parts Route",
+        "operationId": "list_prompt_parts_route_api_v1_admin_ai_queues__policy_id__prompt_parts_get",
+        "parameters": [
+          {
+            "name": "policy_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Policy Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "tiqora_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/AiPromptPartOut"
+                  },
+                  "title": "Response List Prompt Parts Route Api V1 Admin Ai Queues  Policy Id  Prompt Parts Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "admin:ai"
+        ],
+        "summary": "Create Prompt Part Route",
+        "operationId": "create_prompt_part_route_api_v1_admin_ai_queues__policy_id__prompt_parts_post",
+        "parameters": [
+          {
+            "name": "policy_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Policy Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "tiqora_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AiPromptPartCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AiPromptPartOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/ai/queues/{policy_id}/prompt-parts/reorder": {
+      "put": {
+        "tags": [
+          "admin:ai"
+        ],
+        "summary": "Reorder Prompt Parts Route",
+        "operationId": "reorder_prompt_parts_route_api_v1_admin_ai_queues__policy_id__prompt_parts_reorder_put",
+        "parameters": [
+          {
+            "name": "policy_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Policy Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "tiqora_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AiPromptPartReorder"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/AiPromptPartOut"
+                  },
+                  "title": "Response Reorder Prompt Parts Route Api V1 Admin Ai Queues  Policy Id  Prompt Parts Reorder Put"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/ai/queues/{policy_id}/prompt-parts/{part_id}": {
+      "put": {
+        "tags": [
+          "admin:ai"
+        ],
+        "summary": "Update Prompt Part Route",
+        "operationId": "update_prompt_part_route_api_v1_admin_ai_queues__policy_id__prompt_parts__part_id__put",
+        "parameters": [
+          {
+            "name": "policy_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Policy Id"
+            }
+          },
+          {
+            "name": "part_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Part Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "tiqora_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AiPromptPartUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AiPromptPartOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "admin:ai"
+        ],
+        "summary": "Delete Prompt Part Route",
+        "operationId": "delete_prompt_part_route_api_v1_admin_ai_queues__policy_id__prompt_parts__part_id__delete",
+        "parameters": [
+          {
+            "name": "policy_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Policy Id"
+            }
+          },
+          {
+            "name": "part_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Part Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "tiqora_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/ai/escalation-test": {
+      "post": {
+        "tags": [
+          "admin:ai"
+        ],
+        "summary": "Escalation Test Route",
+        "description": "Dry-run a sample tool result against escalation rules (plan block 6).\n\nPure function of the request body \u2014 nothing is read from or written to\nthe database; validation and matching reuse :mod:`tiqora.ai.escalation`\nexactly as the runtime guard does.",
+        "operationId": "escalation_test_route_api_v1_admin_ai_escalation_test_post",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "tiqora_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EscalationTestIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EscalationTestOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/admin/ai/usage": {
       "get": {
         "tags": [
@@ -28511,6 +29002,13 @@
             "type": "string",
             "format": "date-time",
             "title": "Create Time"
+          },
+          "tool_trace": {
+            "items": {
+              "$ref": "#/components/schemas/AiToolTraceOut"
+            },
+            "type": "array",
+            "title": "Tool Trace"
           }
         },
         "type": "object",
@@ -28524,7 +29022,8 @@
           "status",
           "source",
           "accepted_article_id",
-          "create_time"
+          "create_time",
+          "tool_trace"
         ],
         "title": "AiDraftOut"
       },
@@ -28573,6 +29072,147 @@
           "status"
         ],
         "title": "AiDraftRequestOut"
+      },
+      "AiPromptPartCreate": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "file",
+              "note"
+            ],
+            "title": "Kind"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "content": {
+            "type": "string",
+            "title": "Content"
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind",
+          "title",
+          "content"
+        ],
+        "title": "AiPromptPartCreate"
+      },
+      "AiPromptPartOut": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "policy_id": {
+            "type": "integer",
+            "title": "Policy Id"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "file",
+              "note"
+            ],
+            "title": "Kind"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "content": {
+            "type": "string",
+            "title": "Content"
+          },
+          "position": {
+            "type": "integer",
+            "title": "Position"
+          },
+          "enabled": {
+            "type": "boolean",
+            "title": "Enabled"
+          },
+          "create_time": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Create Time"
+          },
+          "change_time": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Change Time"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "policy_id",
+          "kind",
+          "title",
+          "content",
+          "position",
+          "enabled",
+          "create_time",
+          "change_time"
+        ],
+        "title": "AiPromptPartOut"
+      },
+      "AiPromptPartReorder": {
+        "properties": {
+          "ordered_ids": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "title": "Ordered Ids"
+          }
+        },
+        "type": "object",
+        "required": [
+          "ordered_ids"
+        ],
+        "title": "AiPromptPartReorder"
+      },
+      "AiPromptPartUpdate": {
+        "properties": {
+          "title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          },
+          "content": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Content"
+          },
+          "enabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Enabled"
+          }
+        },
+        "type": "object",
+        "title": "AiPromptPartUpdate"
       },
       "AiQueuePolicyCreate": {
         "properties": {
@@ -29853,6 +30493,24 @@
           "status"
         ],
         "title": "AiSummarizeOut"
+      },
+      "AiToolTraceOut": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "content": {
+            "type": "string",
+            "title": "Content"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "content"
+        ],
+        "title": "AiToolTraceOut"
       },
       "AiUsageOut": {
         "properties": {
@@ -34383,6 +35041,104 @@
         "type": "object",
         "title": "ErasureSelectorIn",
         "description": "Combinable AND filter for customer_user resolution."
+      },
+      "EscalationHitOut": {
+        "properties": {
+          "rule_index": {
+            "type": "integer",
+            "title": "Rule Index"
+          },
+          "tool": {
+            "type": "string",
+            "title": "Tool"
+          },
+          "field": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Field"
+          },
+          "match": {
+            "type": "string",
+            "title": "Match"
+          },
+          "value": {
+            "type": "string",
+            "title": "Value"
+          }
+        },
+        "type": "object",
+        "required": [
+          "rule_index",
+          "tool",
+          "field",
+          "match",
+          "value"
+        ],
+        "title": "EscalationHitOut"
+      },
+      "EscalationTestIn": {
+        "properties": {
+          "rules_json": {
+            "type": "string",
+            "title": "Rules Json"
+          },
+          "tool": {
+            "type": "string",
+            "title": "Tool"
+          },
+          "sample_json": {
+            "type": "string",
+            "title": "Sample Json"
+          }
+        },
+        "type": "object",
+        "required": [
+          "rules_json",
+          "tool",
+          "sample_json"
+        ],
+        "title": "EscalationTestIn",
+        "description": "Dry-run input for the escalation-rule tester (nothing is persisted).\n\n``rules_json`` is the same JSON-array text the policy editor holds in its\n``escalation_rules`` field; ``sample_json`` is a sample raw tool result."
+      },
+      "EscalationTestOut": {
+        "properties": {
+          "valid": {
+            "type": "boolean",
+            "title": "Valid"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "hit": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/EscalationHitOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "valid"
+        ],
+        "title": "EscalationTestOut"
       },
       "FollowUpPossibleOut": {
         "properties": {

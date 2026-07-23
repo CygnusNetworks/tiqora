@@ -93,6 +93,11 @@ SOURCE_AUTO = "auto"
 SOURCE_MANUAL = "manual"
 ARTICLE_ORIGIN_SOURCES = frozenset({SOURCE_AUTO, "manual_accept"})
 
+# tiqora_ai_prompt_part.kind
+PROMPT_PART_FILE = "file"
+PROMPT_PART_NOTE = "note"
+PROMPT_PART_KINDS = frozenset({PROMPT_PART_FILE, PROMPT_PART_NOTE})
+
 # tiqora_ai_acl.subject_type
 ACL_SUBJECT_GROUP = "group"
 ACL_SUBJECT_ROLE = "role"
@@ -322,6 +327,41 @@ class TiqoraAiQueuePolicy(TiqoraBase):
     change_time: Mapped[datetime] = mapped_column(
         DateTime, nullable=False, server_default=func.now()
     )
+
+
+class TiqoraAiPromptPart(TiqoraBase):
+    """An ordered, enable-able system-prompt fragment attached to a queue
+    policy ("Prompt-Bausteine"). The effective system prompt sent to the
+    model is ``policy.system_prompt`` followed by every *enabled* part's
+    ``content``, in ``position`` order — see
+    ``tiqora.ai.runtime._build_system_prompt``. ``kind`` is metadata only
+    (``file`` vs. free-form ``note``); both are stored and rendered the
+    same way.
+    """
+
+    __tablename__ = "tiqora_ai_prompt_part"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True, nullable=False)
+    policy_id: Mapped[int] = mapped_column(
+        ForeignKey("tiqora_ai_queue_policy.id", ondelete="CASCADE"), nullable=False
+    )
+    kind: Mapped[str] = mapped_column(String(10), nullable=False, default=PROMPT_PART_NOTE)
+    title: Mapped[str] = mapped_column(String(200), nullable=False)
+    content: Mapped[str] = mapped_column(Text, nullable=False)
+    position: Mapped[int] = mapped_column(Integer, nullable=False)
+    enabled: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=True, server_default=true()
+    )
+    create_by: Mapped[int] = mapped_column(Integer, nullable=False)
+    create_time: Mapped[datetime] = mapped_column(
+        DateTime, nullable=False, server_default=func.now()
+    )
+    change_by: Mapped[int] = mapped_column(Integer, nullable=False)
+    change_time: Mapped[datetime] = mapped_column(
+        DateTime, nullable=False, server_default=func.now()
+    )
+
+    __table_args__ = (Index("ix_tiqora_ai_prompt_part_policy_position", "policy_id", "position"),)
 
 
 class TiqoraAiDraft(TiqoraBase):

@@ -55,13 +55,14 @@ from tiqora.ai.models import (
     SOURCE_AUTO,
     SOURCE_MANUAL,
     TiqoraAiArticleOrigin,
+    TiqoraAiPromptPart,
     TiqoraAiQueuePolicy,
     TiqoraAiTicketState,
     TiqoraMcpClient,
     TiqoraMcpToolPolicy,
 )
 from tiqora.ai.pii import PiiMapper
-from tiqora.ai.policies import get_queue_policy_by_queue
+from tiqora.ai.policies import get_queue_policy_by_queue, load_prompt_parts
 from tiqora.ai.reply_language import LANGUAGE_PROFILES, detect_reply_language
 from tiqora.ai.tools import (
     McpToolSpec,
@@ -222,8 +223,11 @@ def _build_system_prompt(
     trigger: str,
     kind_hint: str | None,
     reply_language_binding: bool = False,
+    prompt_parts: list[TiqoraAiPromptPart] | None = None,
 ) -> str:
     parts = [policy.system_prompt or ""]
+    ordered_parts = sorted(prompt_parts or [], key=lambda p: p.position)
+    parts.extend(p.content for p in ordered_parts if p.enabled)
     if trigger == TRIGGER_MANUAL:
         parts.append(
             "You are assisting a human agent (Manual Assist). Whatever you propose via "
@@ -373,6 +377,7 @@ async def run_ticket_agent(
         policy = await get_queue_policy_by_queue(session, ticket.queue_id)
         if policy is None:
             raise PolicyDisabledError(f"No AI policy configured for queue {ticket.queue_id}")
+        prompt_parts = await load_prompt_parts(session, policy.id)
 
         feature = FEATURE_MANUAL_ASSIST if trigger == TRIGGER_MANUAL else FEATURE_AUTO_REPLY
         if trigger == TRIGGER_MANUAL and not policy.enabled_manual_assist:
@@ -444,6 +449,7 @@ async def run_ticket_agent(
             trigger=trigger,
             kind_hint=kind_hint,
             reply_language_binding=reply_language_line is not None,
+            prompt_parts=prompt_parts,
         )
         user_message = _build_user_message(
             ticket,

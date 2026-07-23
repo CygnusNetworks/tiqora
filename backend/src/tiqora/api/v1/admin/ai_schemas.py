@@ -12,6 +12,7 @@ OperationMode = Literal["parallel", "tiqora_primary"]
 ProviderKind = Literal["openai_compat", "anthropic"]
 McpTransport = Literal["streamable_http"]
 Autonomy = Literal["off", "clarify_only", "full"]
+PromptPartKind = Literal["file", "note"]
 IdentityMode = Literal["ticket_customer_id", "clarify_schema", "off"]
 ReplyLanguageMode = Literal["off", "fixed", "auto"]
 AclSubjectType = Literal["group", "role", "user"]
@@ -272,6 +273,72 @@ class AiQueuePolicyUpdate(BaseModel):
     reply_language_default: str | None = None
     allowed_state_types: str | None = None
     valid_id: int | None = None
+
+
+# ---------------------------------------------------------------------------
+# Prompt parts ("Prompt-Bausteine")
+# ---------------------------------------------------------------------------
+
+
+class AiPromptPartOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    policy_id: int
+    kind: PromptPartKind
+    title: str
+    content: str
+    position: int
+    enabled: bool
+    create_time: datetime
+    change_time: datetime
+
+
+class AiPromptPartCreate(BaseModel):
+    kind: PromptPartKind
+    title: str
+    content: str
+
+
+class AiPromptPartUpdate(BaseModel):
+    title: str | None = None
+    content: str | None = None
+    enabled: bool | None = None
+
+
+class AiPromptPartReorder(BaseModel):
+    ordered_ids: list[int]
+
+
+# ---------------------------------------------------------------------------
+# Escalation rule tester
+# ---------------------------------------------------------------------------
+
+
+class EscalationTestIn(BaseModel):
+    """Dry-run input for the escalation-rule tester (nothing is persisted).
+
+    ``rules_json`` is the same JSON-array text the policy editor holds in its
+    ``escalation_rules`` field; ``sample_json`` is a sample raw tool result.
+    """
+
+    rules_json: str
+    tool: str
+    sample_json: str
+
+
+class EscalationHitOut(BaseModel):
+    rule_index: int
+    tool: str
+    field: str | None
+    match: str
+    value: str
+
+
+class EscalationTestOut(BaseModel):
+    valid: bool
+    error: str | None = None
+    hit: EscalationHitOut | None = None
 
 
 # ---------------------------------------------------------------------------

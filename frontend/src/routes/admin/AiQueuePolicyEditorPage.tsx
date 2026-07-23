@@ -13,6 +13,8 @@ import {
   type ReplyLanguageMode,
 } from "@/lib/aiApi";
 import { PickerField } from "@/components/admin/PickerField";
+import { PromptPartsSection } from "@/components/admin/PromptPartsSection";
+import { EscalationRuleTester } from "@/components/admin/EscalationRuleTester";
 import { HelpPopover } from "@/components/ui/HelpPopover";
 import { TagInput } from "@/components/ui/TagInput";
 import { Tabs, type TabItem } from "@/components/ui/Tabs";
@@ -652,6 +654,8 @@ function AiQueuePolicyEditor({ policyId }: { policyId?: number }) {
               )}
             </div>
 
+            {isEdit && policyId != null && <PromptPartsSection policyId={policyId} />}
+
             <label className="block text-sm">
               <FieldLabel
                 text={t("admin.ai.providers.title")}
@@ -1171,6 +1175,7 @@ function AiQueuePolicyEditor({ policyId }: { policyId?: number }) {
                     {jsonErrors.escalation}
                   </p>
                 )}
+                <EscalationRuleTester rulesJson={form.escalation_rules} />
               </div>
             </fieldset>
           </div>

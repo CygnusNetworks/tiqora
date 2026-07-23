@@ -14,6 +14,7 @@ see ``tiqora.ai.gate`` and ``tiqora.ai.policies`` module docstrings.
 
 from __future__ import annotations
 
+import json
 from datetime import datetime
 
 from fastapi import APIRouter, HTTPException, Query, status
@@ -25,14 +26,19 @@ from tiqora.ai import providers as ai_providers
 from tiqora.ai import usage as ai_usage
 from tiqora.ai.acl import AiAclValidationError
 from tiqora.ai.audit import DEFAULT_RETENTION_DAYS
+from tiqora.ai.escalation import EscalationRuleError, check_escalation, validate_escalation_rules
 from tiqora.ai.gate import AiGateError, get_operation_mode, set_operation_mode
-from tiqora.ai.models import TiqoraMcpClient
-from tiqora.ai.policies import QueuePolicyValidationError
+from tiqora.ai.models import TiqoraAiPromptPart, TiqoraMcpClient
+from tiqora.ai.policies import PromptPartValidationError, QueuePolicyValidationError
 from tiqora.api.deps import DbSession
 from tiqora.api.v1.admin.ai_schemas import (
     AiAclCreate,
     AiAclOut,
     AiAclUpdate,
+    AiPromptPartCreate,
+    AiPromptPartOut,
+    AiPromptPartReorder,
+    AiPromptPartUpdate,
     AiQueuePolicyCreate,
     AiQueuePolicyOut,
     AiQueuePolicyUpdate,
@@ -40,6 +46,9 @@ from tiqora.api.v1.admin.ai_schemas import (
     AiSettingsUpdate,
     AiUsageOut,
     AiUsagePageOut,
+    EscalationHitOut,
+    EscalationTestIn,
+    EscalationTestOut,
     LlmProviderCreate,
     LlmProviderOut,
     LlmProviderTestOut,
@@ -363,6 +372,153 @@ async def delete_queue_policy_route(policy_id: int, admin: AdminUser, session: D
     if row is None:
         raise _not_found("Queue policy", policy_id)
     await ai_policies.delete_queue_policy(session, row)
+
+
+# ---------------------------------------------------------------------------
+# Queue policy prompt parts ("Prompt-Bausteine")
+# ---------------------------------------------------------------------------
+
+
+async def _get_policy_or_404(session: DbSession, policy_id: int) -> None:
+    row = await ai_policies.get_queue_policy(session, policy_id)
+    if row is None:
+        raise _not_found("Queue policy", policy_id)
+
+
+async def _get_prompt_part_or_404(
+    session: DbSession, policy_id: int, part_id: int
+) -> TiqoraAiPromptPart:
+    row = await ai_policies.get_prompt_part(session, part_id)
+    if row is None or row.policy_id != policy_id:
+        raise _not_found("Prompt part", part_id)
+    return row
+
+
+@router.get("/queues/{policy_id}/prompt-parts", response_model=list[AiPromptPartOut])
+async def list_prompt_parts_route(
+    policy_id: int, admin: AdminUser, session: DbSession
+) -> list[AiPromptPartOut]:
+    _ = admin
+    await _get_policy_or_404(session, policy_id)
+    rows = await ai_policies.load_prompt_parts(session, policy_id)
+    return [AiPromptPartOut.model_validate(r) for r in rows]
+
+
+@router.post(
+    "/queues/{policy_id}/prompt-parts",
+    response_model=AiPromptPartOut,
+    status_code=status.HTTP_201_CREATED,
+)
+async def create_prompt_part_route(
+    policy_id: int, body: AiPromptPartCreate, admin: AdminUser, session: DbSession
+) -> AiPromptPartOut:
+    await _get_policy_or_404(session, policy_id)
+    try:
+        row = await ai_policies.create_prompt_part(
+            session,
+            change_by=admin.id,
+            policy_id=policy_id,
+            kind=body.kind,
+            title=body.title,
+            content=body.content,
+        )
+    except PromptPartValidationError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
+        ) from exc
+    return AiPromptPartOut.model_validate(row)
+
+
+@router.put("/queues/{policy_id}/prompt-parts/reorder", response_model=list[AiPromptPartOut])
+async def reorder_prompt_parts_route(
+    policy_id: int, body: AiPromptPartReorder, admin: AdminUser, session: DbSession
+) -> list[AiPromptPartOut]:
+    await _get_policy_or_404(session, policy_id)
+    try:
+        rows = await ai_policies.reorder_prompt_parts(
+            session, policy_id=policy_id, change_by=admin.id, ordered_ids=body.ordered_ids
+        )
+    except PromptPartValidationError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
+        ) from exc
+    return [AiPromptPartOut.model_validate(r) for r in rows]
+
+
+@router.put("/queues/{policy_id}/prompt-parts/{part_id}", response_model=AiPromptPartOut)
+async def update_prompt_part_route(
+    policy_id: int,
+    part_id: int,
+    body: AiPromptPartUpdate,
+    admin: AdminUser,
+    session: DbSession,
+) -> AiPromptPartOut:
+    await _get_policy_or_404(session, policy_id)
+    row = await _get_prompt_part_or_404(session, policy_id, part_id)
+    try:
+        updated = await ai_policies.update_prompt_part(
+            session, row, change_by=admin.id, **body.model_dump(exclude_unset=True)
+        )
+    except PromptPartValidationError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
+        ) from exc
+    return AiPromptPartOut.model_validate(updated)
+
+
+@router.delete("/queues/{policy_id}/prompt-parts/{part_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_prompt_part_route(
+    policy_id: int, part_id: int, admin: AdminUser, session: DbSession
+) -> None:
+    _ = admin
+    await _get_policy_or_404(session, policy_id)
+    row = await _get_prompt_part_or_404(session, policy_id, part_id)
+    await ai_policies.delete_prompt_part(session, row)
+
+
+# ---------------------------------------------------------------------------
+# Escalation rule tester
+# ---------------------------------------------------------------------------
+
+
+@router.post("/escalation-test", response_model=EscalationTestOut)
+async def escalation_test_route(body: EscalationTestIn, admin: AdminUser) -> EscalationTestOut:
+    """Dry-run a sample tool result against escalation rules (plan block 6).
+
+    Pure function of the request body — nothing is read from or written to
+    the database; validation and matching reuse :mod:`tiqora.ai.escalation`
+    exactly as the runtime guard does.
+    """
+    _ = admin
+    try:
+        rules = json.loads(body.rules_json) if body.rules_json.strip() else []
+    except ValueError as exc:
+        return EscalationTestOut(valid=False, error=f"rules_json: {exc}")
+    if not isinstance(rules, list):
+        return EscalationTestOut(valid=False, error="rules_json: expected a JSON array")
+    try:
+        validate_escalation_rules(rules)
+    except EscalationRuleError as exc:
+        return EscalationTestOut(valid=False, error=str(exc))
+
+    try:
+        sample = json.loads(body.sample_json) if body.sample_json.strip() else None
+    except ValueError as exc:
+        return EscalationTestOut(valid=True, error=f"sample_json: {exc}")
+
+    hit = check_escalation(rules, tool_full_name=body.tool, raw_result=sample)
+    return EscalationTestOut(
+        valid=True,
+        hit=EscalationHitOut(
+            rule_index=hit.rule_index,
+            tool=hit.tool,
+            field=hit.field,
+            match=hit.match,
+            value=hit.value,
+        )
+        if hit
+        else None,
+    )
 
 
 # ---------------------------------------------------------------------------

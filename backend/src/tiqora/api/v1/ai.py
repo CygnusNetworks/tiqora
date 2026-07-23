@@ -10,6 +10,7 @@ posting a reply/note on that queue).
 
 from __future__ import annotations
 
+import json
 import uuid
 from datetime import datetime
 
@@ -54,6 +55,11 @@ logger = structlog.get_logger(__name__)
 router = APIRouter(prefix="/tickets/{ticket_id}/ai", tags=["ai"])
 
 
+class AiToolTraceOut(BaseModel):
+    name: str
+    content: str
+
+
 class AiDraftOut(BaseModel):
     id: int
     ticket_id: int
@@ -65,6 +71,7 @@ class AiDraftOut(BaseModel):
     source: str
     accepted_article_id: int | None
     create_time: datetime
+    tool_trace: list[AiToolTraceOut]
 
 
 class AiStateOut(BaseModel):
@@ -91,8 +98,39 @@ class AiDraftRequestOut(BaseModel):
     notes: str | None = None
 
 
+def parse_tool_trace(raw: str | None) -> list[AiToolTraceOut]:
+    """Parse the stored tool-message trace of a draft into display items.
+
+    The trace is the list of ``role == "tool"`` wire messages recorded when
+    the draft was created (see :mod:`tiqora.ai.runtime`). It is shown to the
+    *agent* alongside the draft — it must never become part of the article
+    body a customer could see (the accept flow only ever uses the body the
+    agent submits). Malformed/legacy payloads degrade to an empty list.
+    """
+    if not raw:
+        return []
+    try:
+        items = json.loads(raw)
+    except ValueError:
+        return []
+    if not isinstance(items, list):
+        return []
+    out: list[AiToolTraceOut] = []
+    for item in items:
+        if not isinstance(item, dict):
+            continue
+        content = item.get("content")
+        if not isinstance(content, str):
+            continue
+        name = item.get("name")
+        out.append(AiToolTraceOut(name=name if isinstance(name, str) else "tool", content=content))
+    return out
+
+
 def _draft_out(draft: object) -> AiDraftOut:
-    return AiDraftOut.model_validate(draft, from_attributes=True)
+    fields = {f: getattr(draft, f) for f in AiDraftOut.model_fields if f != "tool_trace"}
+    fields["tool_trace"] = parse_tool_trace(getattr(draft, "tool_trace_json", None))
+    return AiDraftOut.model_validate(fields)
 
 
 def _map_run_error(exc: AgentRunError) -> HTTPException:

@@ -376,6 +376,8 @@
         "manual": "Manuell"
       },
       "basedOnArticle": "Basiert auf Artikel #{{articleId}}",
+      "toolTrace_one": "Tool-Ergebnisse (1)",
+      "toolTrace_other": "Tool-Ergebnisse ({{count}})",
       "expand": "Aufklappen",
       "collapse": "Zuklappen",
       "useDraft": "Als Antwort übernehmen",
@@ -866,6 +868,37 @@
           "rawRequest": "Anfrage",
           "rawResponse": "Antwort"
         }
+      },
+      "promptParts": {
+        "title": "Prompt-Bausteine",
+        "addNote": "＋ Notiz",
+        "addFiles": "＋ Markdown-Datei(en)",
+        "empty": "Noch keine Bausteine — der Basis-Prompt wird allein verwendet.",
+        "noteTitlePlaceholder": "Titel der Notiz",
+        "noteTextPlaceholder": "Kurze Anweisung oder Klarstellung…",
+        "noteSave": "Notiz hinzufügen",
+        "charCount": "{{formatted}} Zeichen",
+        "enabled": "aktiv",
+        "moveUp": "Nach oben",
+        "moveDown": "Nach unten",
+        "deleteTitle": "Baustein löschen",
+        "deleteConfirm": "„{{title}}“ wirklich löschen?",
+        "fileTooLarge": "{{name}}: Datei zu groß (max. 256 KB).",
+        "fileBinary": "{{name}}: Datei scheint binär zu sein — nur Text-/Markdown-Dateien werden unterstützt.",
+        "edit": "Bearbeiten",
+        "save": "Speichern",
+        "genericError": "Aktion fehlgeschlagen — bitte erneut versuchen."
+      },
+      "escalationTester": {
+        "title": "Regel-Tester",
+        "toolPlaceholder": "Tool-Name, z. B. netadmin:diagnose_connection",
+        "samplePlaceholder": "Beispiel-Tool-Ergebnis als JSON, z. B. {\"lock_code\": \"COPYR\"}",
+        "run": "Testen",
+        "invalid": "Regeln ungültig",
+        "hit": "Treffer — Eskalation",
+        "noHit": "Kein Treffer",
+        "hitDetail": "Regel #{{index}} · Feld: {{field}} · Wert: {{value}}",
+        "requestError": "Test fehlgeschlagen — bitte erneut versuchen."
       }
     },
     "help": {
@@ -986,7 +1019,9 @@
         "audit": {
           "overview": "Jeder LLM-Chat-Completion-Aufruf (Hauptmodell, Vision-Vorverarbeitung, Provider-Verbindungstest) wird hier protokolliert — erfolgreich oder fehlgeschlagen, mit dem exakten Payload nach PII-Maskierung. Roh-Payloads und die PII-Zuordnung sind nur in der Detailansicht sichtbar; das Aufdecken wird selbst protokolliert.",
           "retention": "Audit-Einträge, die älter als diese Anzahl Tage sind, werden täglich automatisch gelöscht. Bereich: 1–365 Tage."
-        }
+        },
+        "promptParts": "Der effektive System-Prompt wird aus dem Basis-Prompt und den aktiven Bausteinen in der angezeigten Reihenfolge zusammengesetzt (Basis zuerst, dann von oben nach unten). Notizen eignen sich für kleine Klarstellungen, die sich schnell ergänzen, deaktivieren oder wieder entfernen lassen, ohne die große Prompt-Datei anzufassen.",
+        "escalationTester": "Prüft die oben stehenden Regeln gegen ein Beispiel-Tool-Ergebnis, ohne etwas zu speichern — exakt dieselbe Logik wie der Laufzeit-Guard vor dem autonomen Versand. „Treffer“ bedeutet: Der autonome Versand würde gestoppt und eskaliert."
       },
       "gdpr": {
         "mode": "„Anonymisieren“ entfernt personenbezogene Daten, behält aber Ticket-Datensätze und -Historie (referenzielle Integrität bleibt erhalten). „Löschen“ entfernt den Kundendatensatz vollständig; Ticketdaten werden nur mitgelöscht, wenn die Checkbox unten gesetzt ist.",

@@ -15,7 +15,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from typing import Any
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from tiqora.ai.escalation import EscalationRuleError, validate_escalation_rules
@@ -24,9 +24,11 @@ from tiqora.ai.models import (
     AUTONOMY_MODES,
     FEATURE_AUTO_REPLY,
     IDENTITY_MODES,
+    PROMPT_PART_KINDS,
     REPLY_LANGUAGE_AUTO,
     REPLY_LANGUAGE_FIXED,
     REPLY_LANGUAGE_MODES,
+    TiqoraAiPromptPart,
     TiqoraAiQueuePolicy,
     TiqoraLlmProvider,
 )
@@ -58,6 +60,134 @@ async def get_queue_policy_by_queue(
             select(TiqoraAiQueuePolicy).where(TiqoraAiQueuePolicy.queue_id == queue_id)
         )
     ).scalar_one_or_none()
+
+
+async def load_prompt_parts(session: AsyncSession, policy_id: int) -> list[TiqoraAiPromptPart]:
+    """All prompt parts for ``policy_id`` (enabled and disabled), ordered by
+    ``position``. Callers filter for ``enabled`` where that matters (the
+    runtime's effective-prompt composition); the admin CRUD/reorder views
+    need the full set."""
+    rows = (
+        (
+            await session.execute(
+                select(TiqoraAiPromptPart)
+                .where(TiqoraAiPromptPart.policy_id == policy_id)
+                .order_by(TiqoraAiPromptPart.position)
+            )
+        )
+        .scalars()
+        .all()
+    )
+    return list(rows)
+
+
+class PromptPartValidationError(ValueError):
+    """Raised for 422-shaped prompt-part input errors (bad ``kind``, content
+    too large, reorder id-set mismatch)."""
+
+
+PROMPT_PART_CONTENT_MAX_LEN = 262_144  # 256 KB
+
+
+def _validate_prompt_part_fields(*, kind: str | None, content: str | None) -> None:
+    if kind is not None and kind not in PROMPT_PART_KINDS:
+        raise PromptPartValidationError(
+            f"Invalid kind: {kind!r} (expected one of {sorted(PROMPT_PART_KINDS)})"
+        )
+    if content is not None and len(content) > PROMPT_PART_CONTENT_MAX_LEN:
+        raise PromptPartValidationError(
+            f"content exceeds the maximum length of {PROMPT_PART_CONTENT_MAX_LEN} characters"
+        )
+
+
+async def create_prompt_part(
+    session: AsyncSession,
+    *,
+    change_by: int,
+    policy_id: int,
+    kind: str,
+    title: str,
+    content: str,
+) -> TiqoraAiPromptPart:
+    """Appends a new part at the end (``max(position) + 1``, or ``0`` if the
+    policy has no parts yet)."""
+    _validate_prompt_part_fields(kind=kind, content=content)
+    max_position = (
+        await session.execute(
+            select(func.max(TiqoraAiPromptPart.position)).where(
+                TiqoraAiPromptPart.policy_id == policy_id
+            )
+        )
+    ).scalar_one_or_none()
+    row = TiqoraAiPromptPart(
+        policy_id=policy_id,
+        kind=kind,
+        title=title,
+        content=content,
+        position=(max_position + 1) if max_position is not None else 0,
+        create_by=change_by,
+        change_by=change_by,
+    )
+    session.add(row)
+    await session.commit()
+    await session.refresh(row)
+    return row
+
+
+async def get_prompt_part(session: AsyncSession, part_id: int) -> TiqoraAiPromptPart | None:
+    return await session.get(TiqoraAiPromptPart, part_id)
+
+
+async def update_prompt_part(
+    session: AsyncSession,
+    row: TiqoraAiPromptPart,
+    *,
+    change_by: int,
+    **fields: Any,
+) -> TiqoraAiPromptPart:
+    """Partial update (title/content/enabled). ``fields`` keys must be model
+    attribute names; only keys present are applied."""
+    _validate_prompt_part_fields(
+        kind=fields.get("kind"),
+        content=fields.get("content"),
+    )
+    for key, value in fields.items():
+        if hasattr(row, key):
+            setattr(row, key, value)
+    row.change_by = change_by
+    row.change_time = datetime.now(UTC).replace(tzinfo=None)
+    await session.commit()
+    await session.refresh(row)
+    return row
+
+
+async def delete_prompt_part(session: AsyncSession, row: TiqoraAiPromptPart) -> None:
+    await session.delete(row)
+    await session.commit()
+
+
+async def reorder_prompt_parts(
+    session: AsyncSession, *, policy_id: int, change_by: int, ordered_ids: list[int]
+) -> list[TiqoraAiPromptPart]:
+    """Re-assigns ``position`` 0..N-1 following ``ordered_ids``. ``ordered_ids``
+    must be exactly the set of existing part ids for ``policy_id`` (any
+    mismatch — missing, extra, or duplicate ids — raises)."""
+    rows = await load_prompt_parts(session, policy_id)
+    existing_ids = {row.id for row in rows}
+    if len(ordered_ids) != len(set(ordered_ids)) or set(ordered_ids) != existing_ids:
+        raise PromptPartValidationError(
+            "reorder ids must be exactly the set of existing prompt part ids "
+            f"for policy {policy_id} (no duplicates, no missing/extra ids)"
+        )
+    by_id = {row.id: row for row in rows}
+    now = datetime.now(UTC).replace(tzinfo=None)
+    for position, part_id in enumerate(ordered_ids):
+        part = by_id[part_id]
+        part.position = position
+        part.change_by = change_by
+        part.change_time = now
+    await session.commit()
+    return await load_prompt_parts(session, policy_id)
 
 
 def _validate_escalation_rules_json(raw: str | None) -> None:
@@ -313,11 +443,19 @@ async def delete_queue_policy(session: AsyncSession, row: TiqoraAiQueuePolicy) -
 
 
 __all__ = [
+    "PROMPT_PART_CONTENT_MAX_LEN",
+    "PromptPartValidationError",
     "QueuePolicyValidationError",
+    "create_prompt_part",
     "create_queue_policy",
+    "delete_prompt_part",
     "delete_queue_policy",
+    "get_prompt_part",
     "get_queue_policy",
     "get_queue_policy_by_queue",
     "list_queue_policies",
+    "load_prompt_parts",
+    "reorder_prompt_parts",
+    "update_prompt_part",
     "update_queue_policy",
 ]

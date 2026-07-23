@@ -24,7 +24,14 @@ from tiqora.ai.gate import (
     set_operation_mode,
 )
 from tiqora.ai.llm import LlmMessage, LlmResponse, LlmUsage, ToolCall
-from tiqora.ai.models import AUTONOMY_CLARIFY_ONLY, AUTONOMY_FULL, AUTONOMY_OFF, TiqoraAiTicketState
+from tiqora.ai.models import (
+    AUTONOMY_CLARIFY_ONLY,
+    AUTONOMY_FULL,
+    AUTONOMY_OFF,
+    TiqoraAiPromptPart,
+    TiqoraAiQueuePolicy,
+    TiqoraAiTicketState,
+)
 from tiqora.ai.pii import PiiMapper
 from tiqora.ai.runtime import (
     TRIGGER_AUTO,
@@ -34,6 +41,7 @@ from tiqora.ai.runtime import (
     AgentRunError,
     LockHeldError,
     PolicyDisabledError,
+    _build_system_prompt,
     _build_user_message,
     _map_customer_message,
     run_ticket_agent,
@@ -173,6 +181,72 @@ def test_user_message_omits_reply_language_line_by_default() -> None:
     ticket = _snapshot()
     msg = _build_user_message(ticket, [], pii=PiiMapper(), mask=False, kb_bundle=None)
     assert "Reply language" not in msg
+
+
+# ---------------------------------------------------------------------------
+# System prompt composition ("Prompt-Bausteine")
+# ---------------------------------------------------------------------------
+
+
+def _policy(
+    system_prompt: str = "Base prompt.", autonomy: str = AUTONOMY_OFF
+) -> TiqoraAiQueuePolicy:
+    return TiqoraAiQueuePolicy(system_prompt=system_prompt, autonomy=autonomy)
+
+
+def _part(content: str, *, position: int, enabled: bool = True) -> TiqoraAiPromptPart:
+    return TiqoraAiPromptPart(
+        kind="note", title=f"part-{position}", content=content, position=position, enabled=enabled
+    )
+
+
+def test_system_prompt_without_parts_is_unchanged_regression() -> None:
+    """Policies without any prompt parts must produce exactly today's prompt
+    (base + trigger appendix) — parts are purely additive."""
+    policy = _policy()
+    prompt_no_parts = _build_system_prompt(policy, trigger=TRIGGER_MANUAL, kind_hint=None)
+    prompt_empty_list = _build_system_prompt(
+        policy, trigger=TRIGGER_MANUAL, kind_hint=None, prompt_parts=[]
+    )
+    assert prompt_no_parts == prompt_empty_list
+    assert prompt_no_parts.startswith("Base prompt.")
+
+
+def test_system_prompt_appends_enabled_parts_in_position_order() -> None:
+    policy = _policy()
+    parts = [
+        _part("Second part content", position=1),
+        _part("First part content", position=0),
+    ]
+    prompt = _build_system_prompt(
+        policy, trigger=TRIGGER_MANUAL, kind_hint=None, prompt_parts=parts
+    )
+    base_idx = prompt.index("Base prompt.")
+    first_idx = prompt.index("First part content")
+    second_idx = prompt.index("Second part content")
+    assert base_idx < first_idx < second_idx
+
+
+def test_system_prompt_excludes_disabled_parts() -> None:
+    policy = _policy()
+    parts = [
+        _part("Enabled content", position=0, enabled=True),
+        _part("Disabled content", position=1, enabled=False),
+    ]
+    prompt = _build_system_prompt(
+        policy, trigger=TRIGGER_MANUAL, kind_hint=None, prompt_parts=parts
+    )
+    assert "Enabled content" in prompt
+    assert "Disabled content" not in prompt
+
+
+def test_system_prompt_parts_come_before_trigger_appendix() -> None:
+    policy = _policy(autonomy=AUTONOMY_FULL)
+    parts = [_part("My custom instructions", position=0)]
+    prompt = _build_system_prompt(policy, trigger=TRIGGER_AUTO, kind_hint=None, prompt_parts=parts)
+    part_idx = prompt.index("My custom instructions")
+    appendix_idx = prompt.index("write as if you are the final responder")
+    assert part_idx < appendix_idx
 
 
 # ---------------------------------------------------------------------------
@@ -1178,5 +1252,123 @@ async def test_small_real_image_skipped_as_tracking_pixel(mariadb_znuny_url: str
         assert llm.last_user_message is not None
         assert "Bild-Anhang" not in llm.last_user_message
         assert "Should never be called" not in llm.last_user_message
+    finally:
+        await engine.dispose()
+
+
+# ---------------------------------------------------------------------------
+# DB integration: prompt parts flow through run_ticket_agent
+# ---------------------------------------------------------------------------
+
+
+def _last_system_message(llm: ScriptedLlm) -> str | None:
+    return next(
+        (m.content for m in reversed(llm.last_messages) if m.role == "system"),  # type: ignore[misc]
+        None,
+    )
+
+
+async def test_run_ticket_agent_composes_system_prompt_from_enabled_parts_in_order(
+    mariadb_znuny_url: str,
+) -> None:
+    seed = _seed_ticket(mariadb_znuny_url, ns=17)
+    engine = create_async_engine(_mysql_async(mariadb_znuny_url))
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    settings = get_settings()
+    try:
+        async with factory() as session:
+            await _setup_policy(session, seed=seed, autonomy=AUTONOMY_FULL)
+            policy = await ai_policies.get_queue_policy_by_queue(session, seed["queue_id"])
+            assert policy is not None
+            # Appended in creation order (position = max(position) + 1), so
+            # "First" must be created before "Second" to land at position 0.
+            await ai_policies.create_prompt_part(
+                session,
+                change_by=1,
+                policy_id=policy.id,
+                kind="note",
+                title="First",
+                content="First prompt part content.",
+            )
+            await ai_policies.create_prompt_part(
+                session,
+                change_by=1,
+                policy_id=policy.id,
+                kind="note",
+                title="Second",
+                content="Second prompt part content.",
+            )
+            # This third part gets position 2 and is then disabled — it must
+            # be excluded from the composed prompt entirely.
+            disabled_part = await ai_policies.create_prompt_part(
+                session,
+                change_by=1,
+                policy_id=policy.id,
+                kind="note",
+                title="Disabled",
+                content="Disabled prompt part content.",
+            )
+            await ai_policies.update_prompt_part(session, disabled_part, change_by=1, enabled=False)
+
+        llm = ScriptedLlm([_propose_response("reply", "Here is the answer.")])
+        async with factory() as session:
+            result = await run_ticket_agent(
+                session,
+                settings=settings,
+                llm=llm,
+                ticket_id=seed["ticket_id"],
+                trigger=TRIGGER_MANUAL,
+                acting_user_id=seed["agent_id"],
+                run_id="run-17",
+            )
+        assert result.status in ("drafted", "sent")
+
+        system_message = _last_system_message(llm)
+        assert system_message is not None
+        assert "You are a helpful support agent." in system_message
+        assert "Disabled prompt part content." not in system_message
+        base_idx = system_message.index("You are a helpful support agent.")
+        first_idx = system_message.index("First prompt part content.")
+        second_idx = system_message.index("Second prompt part content.")
+        assert base_idx < first_idx < second_idx
+    finally:
+        await engine.dispose()
+
+
+async def test_run_ticket_agent_system_prompt_unchanged_without_prompt_parts(
+    mariadb_znuny_url: str,
+) -> None:
+    """Regression: a policy with no prompt parts must produce the exact same
+    system message as before this feature existed."""
+    seed = _seed_ticket(mariadb_znuny_url, ns=18)
+    engine = create_async_engine(_mysql_async(mariadb_znuny_url))
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    settings = get_settings()
+    try:
+        async with factory() as session:
+            await _setup_policy(session, seed=seed, autonomy=AUTONOMY_FULL)
+
+        llm = ScriptedLlm([_propose_response("reply", "Here is the answer.")])
+        async with factory() as session:
+            await run_ticket_agent(
+                session,
+                settings=settings,
+                llm=llm,
+                ticket_id=seed["ticket_id"],
+                trigger=TRIGGER_MANUAL,
+                acting_user_id=seed["agent_id"],
+                run_id="run-18",
+            )
+
+        system_message = _last_system_message(llm)
+        assert system_message is not None
+        expected = _build_system_prompt(
+            TiqoraAiQueuePolicy(
+                system_prompt="You are a helpful support agent.", autonomy=AUTONOMY_FULL
+            ),
+            trigger=TRIGGER_MANUAL,
+            kind_hint=None,
+        )
+        assert system_message == expected
     finally:
         await engine.dispose()

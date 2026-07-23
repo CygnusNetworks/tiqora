@@ -215,6 +215,45 @@ describe("AiPanel", () => {
     expect(discardDraft).not.toHaveBeenCalled();
   });
 
+  it("shows a collapsible tool trace on drafts that have one", async () => {
+    getState.mockResolvedValue({
+      ...baseState,
+      manual_assist_available: true,
+      drafts: [
+        {
+          ...baseDraft,
+          id: 11,
+          kind: "reply",
+          body: "Draft body",
+          source: "manual",
+          tool_trace: [
+            { name: "kb_search", content: "3 Treffer zu VPN" },
+            { name: "get_ticket", content: "{...}" },
+          ],
+        },
+        { ...baseDraft, id: 12, kind: "reply", body: "No trace", source: "auto", tool_trace: [] },
+      ],
+    });
+
+    wrap(<AiPanel ticketId={1} canNote />);
+
+    await waitFor(() => expect(screen.getByTestId("ai-panel-draft-11")).toBeTruthy());
+    // Draft without trace entries gets no toggle at all.
+    expect(screen.queryByTestId("ai-panel-draft-trace-toggle-12")).toBeNull();
+
+    const toggle = screen.getByTestId("ai-panel-draft-trace-toggle-11");
+    expect(toggle.textContent).toContain("(2)");
+    expect(screen.queryByTestId("ai-panel-draft-trace-11")).toBeNull();
+
+    fireEvent.click(toggle);
+    const trace = screen.getByTestId("ai-panel-draft-trace-11");
+    expect(trace.textContent).toContain("kb_search");
+    expect(trace.textContent).toContain("3 Treffer zu VPN");
+
+    fireEvent.click(toggle);
+    expect(screen.queryByTestId("ai-panel-draft-trace-11")).toBeNull();
+  });
+
   it("opens the reply editor prefilled with the draft body and sends with ai_draft_id", async () => {
     getState.mockResolvedValue({
       ...baseState,
