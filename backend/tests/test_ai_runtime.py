@@ -17,6 +17,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 
 from tiqora.ai import policies as ai_policies
 from tiqora.ai.acl import create_acl
+from tiqora.ai.context import ArticleSnapshot, TicketSnapshot
 from tiqora.ai.gate import (
     OPERATION_MODE_PARALLEL,
     OPERATION_MODE_TIQORA_PRIMARY,
@@ -24,6 +25,7 @@ from tiqora.ai.gate import (
 )
 from tiqora.ai.llm import LlmMessage, LlmResponse, LlmUsage, ToolCall
 from tiqora.ai.models import AUTONOMY_CLARIFY_ONLY, AUTONOMY_FULL, AUTONOMY_OFF, TiqoraAiTicketState
+from tiqora.ai.pii import PiiMapper
 from tiqora.ai.runtime import (
     TRIGGER_AUTO,
     TRIGGER_MANUAL,
@@ -32,6 +34,7 @@ from tiqora.ai.runtime import (
     AgentRunError,
     LockHeldError,
     PolicyDisabledError,
+    _build_user_message,
     _map_customer_message,
     run_ticket_agent,
 )
@@ -79,6 +82,97 @@ def test_autonomy_matrix_auto_full_always_sends() -> None:
     for kind in ("reply", "clarify"):
         result = _map_customer_message(trigger=TRIGGER_AUTO, autonomy=AUTONOMY_FULL, kind=kind)
         assert result == "send"
+
+
+# ---------------------------------------------------------------------------
+# Pure unit tests: ticket header + article subject rendering (plan block 1)
+# ---------------------------------------------------------------------------
+
+
+def _snapshot(**overrides: Any) -> TicketSnapshot:
+    defaults: dict[str, Any] = dict(
+        ticket_id=123,
+        queue_id=1,
+        customer_id="CUST1",
+        title="Help please",
+        ticket_number="2024060112345",
+        state_name="open",
+        state_type="open",
+        queue_name="Support",
+        customer_user_id="cust1@example.com",
+    )
+    defaults.update(overrides)
+    return TicketSnapshot(**defaults)
+
+
+def test_user_message_header_contains_set_fields() -> None:
+    ticket = _snapshot()
+    msg = _build_user_message(ticket, [], pii=PiiMapper(), mask=False, kb_bundle=None)
+    assert "Ticket #123 (number 2024060112345): Help please" in msg
+    assert "Queue: Support | State: open (open)" in msg
+    assert "CustomerID: CUST1 | CustomerUser: cust1@example.com" in msg
+
+
+def test_user_message_header_shows_not_set_for_empty_customer_fields() -> None:
+    ticket = _snapshot(customer_id=None, customer_user_id=None)
+    msg = _build_user_message(ticket, [], pii=PiiMapper(), mask=False, kb_bundle=None)
+    assert "CustomerID: not set | CustomerUser: not set" in msg
+
+
+def test_user_message_header_customer_id_never_masked() -> None:
+    ticket = _snapshot(customer_id="CUST1")
+    pii = PiiMapper(never_mask={"CUST1"})
+    msg = _build_user_message(ticket, [], pii=pii, mask=True, kb_bundle=None)
+    assert "CustomerID: CUST1" in msg
+
+
+def test_user_message_includes_article_subject_line() -> None:
+    ticket = _snapshot()
+    article = ArticleSnapshot(
+        id=1,
+        sender_type="customer",
+        is_visible_for_customer=True,
+        subject="Broken widget",
+        body="It does not work.",
+        from_address="customer@example.com",
+        is_ai_origin=False,
+    )
+    msg = _build_user_message(ticket, [article], pii=PiiMapper(), mask=False, kb_bundle=None)
+    assert "Subject: Broken widget" in msg
+
+
+def test_user_message_omits_subject_line_when_absent() -> None:
+    ticket = _snapshot()
+    article = ArticleSnapshot(
+        id=1,
+        sender_type="customer",
+        is_visible_for_customer=True,
+        subject=None,
+        body="It does not work.",
+        from_address="customer@example.com",
+        is_ai_origin=False,
+    )
+    msg = _build_user_message(ticket, [article], pii=PiiMapper(), mask=False, kb_bundle=None)
+    assert "Subject:" not in msg
+
+
+def test_user_message_includes_reply_language_line_when_given() -> None:
+    ticket = _snapshot()
+    msg = _build_user_message(
+        ticket,
+        [],
+        pii=PiiMapper(),
+        mask=False,
+        kb_bundle=None,
+        reply_language_line="Reply language (binding): de",
+    )
+    assert "Reply language (binding): de" in msg
+
+
+def test_user_message_omits_reply_language_line_by_default() -> None:
+    ticket = _snapshot()
+    msg = _build_user_message(ticket, [], pii=PiiMapper(), mask=False, kb_bundle=None)
+    assert "Reply language" not in msg
 
 
 # ---------------------------------------------------------------------------

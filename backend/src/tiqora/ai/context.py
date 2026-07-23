@@ -25,6 +25,11 @@ class TicketSnapshot:
     queue_id: int
     customer_id: str | None
     title: str
+    ticket_number: str = ""
+    state_name: str = ""
+    state_type: str = ""
+    queue_name: str = ""
+    customer_user_id: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -59,7 +64,15 @@ async def ticket_snapshot(session: AsyncSession, ticket_id: int) -> TicketSnapsh
     row = (
         (
             await session.execute(
-                text("SELECT id, queue_id, customer_id, title FROM ticket WHERE id = :tid LIMIT 1"),
+                text(
+                    "SELECT t.id, t.queue_id, t.customer_id, t.customer_user_id, t.title, t.tn,"
+                    " ts.name AS state_name, tst.name AS state_type, q.name AS queue_name"
+                    " FROM ticket t"
+                    " JOIN ticket_state ts ON ts.id = t.ticket_state_id"
+                    " JOIN ticket_state_type tst ON tst.id = ts.type_id"
+                    " JOIN queue q ON q.id = t.queue_id"
+                    " WHERE t.id = :tid LIMIT 1"
+                ),
                 {"tid": ticket_id},
             )
         )
@@ -72,7 +85,31 @@ async def ticket_snapshot(session: AsyncSession, ticket_id: int) -> TicketSnapsh
         ticket_id=int(row["id"]),
         queue_id=int(row["queue_id"]),
         customer_id=row["customer_id"],
+        customer_user_id=row["customer_user_id"],
         title=row["title"] or "",
+        ticket_number=row["tn"] or "",
+        state_name=row["state_name"] or "",
+        state_type=row["state_type"] or "",
+        queue_name=row["queue_name"] or "",
+    )
+
+
+def render_ticket_header(ticket: TicketSnapshot) -> str:
+    """Structured metadata header rendered ahead of the article text — same
+    format for both the agent runtime (:mod:`tiqora.ai.runtime`) and the
+    summary service (:mod:`tiqora.ai.summary`), so the model never sees two
+    divergent conventions. Never passed through :meth:`PiiMapper.mask` — the
+    ticket number/queue/state are not PII, and CustomerID/CustomerUser are
+    deliberately shown unmasked (they are needed verbatim for tool calls and
+    are already exempted via ``PiiMapper(never_mask=...)``)."""
+    customer_id = ticket.customer_id or "not set"
+    customer_user_id = ticket.customer_user_id or "not set"
+    return "\n".join(
+        (
+            f"Ticket #{ticket.ticket_id} (number {ticket.ticket_number}): {ticket.title}",
+            f"Queue: {ticket.queue_name} | State: {ticket.state_name} ({ticket.state_type})",
+            f"CustomerID: {customer_id} | CustomerUser: {customer_user_id}",
+        )
     )
 
 
@@ -213,14 +250,30 @@ async def latest_customer_article_id(session: AsyncSession, ticket_id: int) -> i
     return int(row[0]) if row else None
 
 
+async def article_from_address(session: AsyncSession, article_id: int) -> str | None:
+    """The raw ``article_data_mime.a_from`` header for one article (may be
+    ``"Name <mail@x>"`` — callers that need a bare address should parse it,
+    e.g. via :mod:`email.utils.parseaddr`, same as the sender-blocklist
+    matcher in :mod:`tiqora.ai.senders`)."""
+    row = (
+        await session.execute(
+            text("SELECT a_from FROM article_data_mime WHERE article_id = :aid LIMIT 1"),
+            {"aid": article_id},
+        )
+    ).first()
+    return str(row[0]) if row and row[0] is not None else None
+
+
 __all__ = [
     "ArticleSnapshot",
     "AttachmentSnapshot",
     "TicketNotFoundError",
     "TicketSnapshot",
+    "article_from_address",
     "get_or_create_state",
     "latest_customer_article_id",
     "load_articles",
     "load_attachment_content",
+    "render_ticket_header",
     "ticket_snapshot",
 ]

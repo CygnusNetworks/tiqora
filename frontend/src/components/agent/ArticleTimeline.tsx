@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { api, type ArticleListItem } from "@/lib/api";
 import { formatDateTime, formatBytes } from "@/lib/format";
+import { fileTypeInfo } from "@/lib/filetype";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Spinner } from "@/components/ui/Spinner";
@@ -457,21 +458,33 @@ export function AttachmentList({
   const real = items.filter((a) => !a.inline);
   const inline = items.filter((a) => a.inline);
 
-  const renderItem = (a: (typeof items)[number]) => (
-    <li key={a.id}>
-      <a
-        className="inline-flex items-center gap-2 text-xs text-accent hover:underline"
-        href={api.attachmentDownloadUrl(ticketId, articleId, a.id, true)}
-        download={a.filename ?? undefined}
-        data-testid={`attachment-${a.id}`}
-      >
-        <span>{a.filename || `attachment-${a.id}`}</span>
-        <span className="text-muted">
-          {formatBytes(a.content_size)} · {a.content_type || "—"}
-        </span>
-      </a>
-    </li>
-  );
+  const renderItem = (a: (typeof items)[number]) => {
+    const type = fileTypeInfo(a.content_type, a.filename);
+    return (
+      <li key={a.id}>
+        <a
+          className="group inline-flex max-w-full items-center gap-2 text-xs"
+          href={api.attachmentDownloadUrl(ticketId, articleId, a.id, true)}
+          download={a.filename ?? undefined}
+          // Raw MIME stays reachable for the curious — as a tooltip, not
+          // as list clutter.
+          title={a.content_type ?? undefined}
+          data-testid={`attachment-${a.id}`}
+        >
+          <span
+            className={`inline-flex h-5 min-w-[2.4rem] shrink-0 items-center justify-center rounded px-1 text-[10px] font-bold tracking-wide ${type.className}`}
+            data-testid={`attachment-type-${a.id}`}
+          >
+            {type.label}
+          </span>
+          <span className="truncate font-medium text-ink group-hover:text-accent group-hover:underline">
+            {a.filename || `attachment-${a.id}`}
+          </span>
+          <span className="shrink-0 tabular-nums text-muted">{formatBytes(a.content_size)}</span>
+        </a>
+      </li>
+    );
+  };
 
   if (real.length === 0 && inline.length === 0) return null;
 

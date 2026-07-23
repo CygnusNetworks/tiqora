@@ -87,6 +87,12 @@ const samplePolicy = {
   pii_masking: true,
   identity_mode: "ticket_customer_id",
   clarify_schema_json: null,
+  ignored_senders: null,
+  ignore_senders_manual: false,
+  reply_language_mode: "off",
+  reply_language_fixed: null,
+  reply_language_default: null,
+  allowed_state_types: null,
   valid_id: 1,
   create_time: "2026-07-01T00:00:00Z",
   change_time: "2026-07-01T00:00:00Z",
@@ -174,7 +180,9 @@ describe("AiQueuePolicyEditorPage", () => {
 
     // Sample policy has manual assist ON — fields are enabled; switch it off to verify gating.
     fireEvent.click(screen.getByTestId("admin-ai-queue-form-enabled_manual_assist"));
-    expect(screen.getByTestId("admin-ai-queue-form-kb_tags")).toBeDisabled();
+    // kb_tags is a TagInput now — the fieldset's disabled state lands on its
+    // inner text input, not the wrapper div.
+    expect(screen.getByTestId("admin-ai-queue-form-kb_tags-input")).toBeDisabled();
   });
 
   it("opens the create page pre-filled with defaults, incl. the sole provider", async () => {
