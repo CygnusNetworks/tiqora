@@ -49,6 +49,8 @@ class AuditLogListItemOut(BaseModel):
     prompt_tokens: int | None
     completion_tokens: int | None
     pii_counts: dict[str, int] | None = None
+    cost: float | None = None
+    cost_currency: str | None = None
 
 
 def _pii_counts_out(row: TiqoraAiAuditLog) -> dict[str, int] | None:
@@ -71,6 +73,8 @@ class AuditLogStatsOut(BaseModel):
     error_rate: float
     per_day: list[dict[str, object]]
     top_model: str | None
+    total_cost: float | None
+    cost_currency: str | None
 
 
 class PiiRevealOut(BaseModel):
@@ -124,10 +128,12 @@ async def list_ai_audit_log(
         page=page,
         page_size=page_size,
     )
+    prices = await ai_audit.load_provider_prices(session, [r.provider_id for r in result.items])
     items = []
     for r in result.items:
         item = AuditLogListItemOut.model_validate(r)
         item.pii_counts = _pii_counts_out(r)
+        item.cost, item.cost_currency = ai_audit.compute_entry_cost(r, prices)
         items.append(item)
     return AuditLogPageOut(items=items, total=result.total, page=page, page_size=page_size)
 
@@ -152,6 +158,8 @@ async def ai_audit_log_stats(
             error_rate=0.0,
             per_day=[],
             top_model=None,
+            total_cost=None,
+            cost_currency=None,
         )
     stats = await ai_audit.audit_log_stats(
         session,
@@ -168,6 +176,8 @@ async def ai_audit_log_stats(
         error_rate=stats.error_rate,
         per_day=stats.per_day,
         top_model=stats.top_model,
+        total_cost=stats.total_cost,
+        cost_currency=stats.cost_currency,
     )
 
 
@@ -181,6 +191,8 @@ async def get_ai_audit_log_entry(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Audit entry not found")
     data = AuditLogDetailOut.model_validate(row)
     data.pii_counts = _pii_counts_out(row)
+    prices = await ai_audit.load_provider_prices(session, [row.provider_id])
+    data.cost, data.cost_currency = ai_audit.compute_entry_cost(row, prices)
     return data
 
 

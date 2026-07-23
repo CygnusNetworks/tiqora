@@ -123,6 +123,14 @@ async def discard_draft(
     return row
 
 
+async def delete_draft(session: AsyncSession, row: TiqoraAiDraft) -> None:
+    """Hard-delete a draft row, regardless of status — admin cleanup only,
+    never called from the normal draft lifecycle (create/discard/accept
+    above), which never removes rows."""
+    await session.delete(row)
+    await session.commit()
+
+
 async def mark_accepted(
     session: AsyncSession, draft_id: int, *, article_id: int, actor_user_id: int
 ) -> TiqoraAiDraft | None:
@@ -149,6 +157,7 @@ __all__ = [
     "DraftNotFound",
     "DraftStateError",
     "create_draft",
+    "delete_draft",
     "discard_draft",
     "get_draft",
     "list_for_ticket",

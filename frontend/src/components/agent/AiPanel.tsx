@@ -2,6 +2,8 @@ import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { api, ApiError } from "@/lib/api";
+import { aiApi } from "@/lib/aiApi";
+import { useAuth } from "@/auth/AuthContext";
 import { ticketAiApi, type AiDraftOut } from "@/lib/ticketAiApi";
 import { articleSortKey } from "@/lib/article";
 import { formatDateTime } from "@/lib/format";
@@ -75,6 +77,8 @@ function DraftKindIcon({ kind }: { kind: string }) {
 export function AiPanel({ ticketId, canNote }: { ticketId: number; canNote: boolean }) {
   const { t, i18n } = useTranslation();
   const queryClient = useQueryClient();
+  const { user } = useAuth();
+  const isAdmin = Boolean(user?.is_admin);
   const { confirm, dialog: confirmDialog } = useConfirm();
   const [expandedDraftId, setExpandedDraftId] = useState<number | null>(null);
   const [openTraceId, setOpenTraceId] = useState<number | null>(null);
@@ -111,6 +115,13 @@ export function AiPanel({ ticketId, canNote }: { ticketId: number; canNote: bool
 
   const discardMutation = useMutation({
     mutationFn: (draftId: number) => ticketAiApi.discardDraft(ticketId, draftId),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["tickets", ticketId, "ai"] });
+    },
+  });
+
+  const adminDeleteMutation = useMutation({
+    mutationFn: (draftId: number) => aiApi.adminDeleteDraft(draftId),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["tickets", ticketId, "ai"] });
     },
@@ -299,6 +310,25 @@ export function AiPanel({ ticketId, canNote }: { ticketId: number; canNote: bool
                         </div>
                       </div>
                       <div className="flex items-center gap-1.5">
+                        {isAdmin && (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            data-testid={`ai-panel-draft-admin-delete-${draft.id}`}
+                            disabled={adminDeleteMutation.isPending}
+                            title={t("ticket.ai.adminDeleteDraftHint")}
+                            onClick={async () => {
+                              const ok = await confirm({
+                                title: t("ticket.ai.adminDeleteDraft"),
+                                message: t("ticket.ai.adminDeleteConfirm"),
+                                variant: "danger",
+                              });
+                              if (ok) adminDeleteMutation.mutate(draft.id);
+                            }}
+                          >
+                            {t("ticket.ai.adminDeleteDraft")}
+                          </Button>
+                        )}
                         <Button
                           size="sm"
                           variant="ghost"

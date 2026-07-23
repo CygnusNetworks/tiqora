@@ -19,6 +19,7 @@ from sqlalchemy import create_engine, select, text
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 from tiqora.ai import acl as ai_acl
+from tiqora.ai import drafts as ai_drafts
 from tiqora.ai import mcp as ai_mcp
 from tiqora.ai import policies as ai_policies
 from tiqora.ai import providers as ai_providers
@@ -250,6 +251,96 @@ async def test_provider_test_connection_mocked_tool_calling(mariadb_znuny_url: s
             await client2.aclose()
             assert result2.ok is False
             assert "401" in (result2.error or "")
+    finally:
+        await engine.dispose()
+        get_settings.cache_clear()
+
+
+async def test_provider_price_fields_roundtrip_and_validation(mariadb_znuny_url: str) -> None:
+    _ensure_tiqora_tables(mariadb_znuny_url)
+    get_settings.cache_clear()
+    engine = create_async_engine(_mysql_async(mariadb_znuny_url))
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    try:
+        async with factory() as session:
+            created = await admin_ai.create_llm_provider(
+                LlmProviderCreate(
+                    name="priced-89501",
+                    kind="openai_compat",
+                    base_url="https://api.example/v1",
+                    default_model="model-a",
+                    price_input_per_1m=1.5,
+                    price_output_per_1m=6.0,
+                    price_currency="USD",
+                ),
+                _root_user(),
+                session,
+            )
+            assert created.price_input_per_1m == 1.5
+            assert created.price_output_per_1m == 6.0
+            assert created.price_currency == "USD"
+
+            updated = await admin_ai.update_llm_provider(
+                created.id,
+                LlmProviderUpdate(price_input_per_1m=2.0, price_currency="EUR"),
+                _root_user(),
+                session,
+            )
+            assert updated.price_input_per_1m == 2.0
+            assert updated.price_output_per_1m == 6.0  # untouched
+            assert updated.price_currency == "EUR"
+
+            # A provider without any pricing configured still round-trips as None.
+            bare = await admin_ai.create_llm_provider(
+                LlmProviderCreate(
+                    name="unpriced-89502",
+                    kind="openai_compat",
+                    base_url="https://api.example/v1",
+                    default_model="model-b",
+                ),
+                _root_user(),
+                session,
+            )
+            assert bare.price_input_per_1m is None
+            assert bare.price_output_per_1m is None
+            assert bare.price_currency is None
+
+            with pytest.raises(HTTPException) as exc_info:
+                await admin_ai.create_llm_provider(
+                    LlmProviderCreate(
+                        name="bad-currency-89503",
+                        kind="openai_compat",
+                        base_url="https://api.example/v1",
+                        default_model="model-c",
+                        price_currency="usd",
+                    ),
+                    _root_user(),
+                    session,
+                )
+            assert exc_info.value.status_code == 422
+
+            with pytest.raises(HTTPException) as exc_info:
+                await admin_ai.create_llm_provider(
+                    LlmProviderCreate(
+                        name="negative-price-89504",
+                        kind="openai_compat",
+                        base_url="https://api.example/v1",
+                        default_model="model-d",
+                        price_input_per_1m=-1.0,
+                    ),
+                    _root_user(),
+                    session,
+                )
+            assert exc_info.value.status_code == 422
+
+            with pytest.raises(HTTPException) as exc_info:
+                await admin_ai.update_llm_provider(
+                    created.id,
+                    LlmProviderUpdate(price_currency="EURO"),
+                    _root_user(),
+                    session,
+                )
+            assert exc_info.value.status_code == 422
     finally:
         await engine.dispose()
         get_settings.cache_clear()
@@ -625,5 +716,42 @@ async def test_acl_crud_and_validation(mariadb_znuny_url: str) -> None:
                     999_999, AiAclUpdate(allowed=False), _root_user(), session
                 )
             assert exc_info2.value.status_code == 404
+    finally:
+        await engine.dispose()
+
+
+# ---------------------------------------------------------------------------
+# Drafts (admin hard-delete)
+# ---------------------------------------------------------------------------
+
+
+async def test_admin_delete_draft_removes_row_and_404s(mariadb_znuny_url: str) -> None:
+    _ensure_tiqora_tables(mariadb_znuny_url)
+    engine = create_async_engine(_mysql_async(mariadb_znuny_url))
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    try:
+        async with factory() as session:
+            draft = await ai_drafts.create_draft(
+                session,
+                ticket_id=89505,
+                queue_id=1,
+                kind="reply",
+                body="Draft to be deleted",
+                actor_user_id=1,
+                source="manual",
+            )
+            # Hard-delete works regardless of status — accept it first.
+            accepted = await ai_drafts.mark_accepted(
+                session, draft.id, article_id=89506, actor_user_id=1
+            )
+            assert accepted is not None
+
+            deleted_ok = await admin_ai.delete_ai_draft(draft.id, _root_user(), session)
+            assert deleted_ok is None
+            assert await ai_drafts.get_draft(session, draft.id) is None
+
+            with pytest.raises(HTTPException) as exc_info:
+                await admin_ai.delete_ai_draft(999_999, _root_user(), session)
+            assert exc_info.value.status_code == 404
     finally:
         await engine.dispose()

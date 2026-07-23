@@ -28,6 +28,7 @@ from tiqora.ai.models import (
     AUTONOMY_CLARIFY_ONLY,
     AUTONOMY_FULL,
     AUTONOMY_OFF,
+    REPLY_LANGUAGE_AUTO,
     TiqoraAiPromptPart,
     TiqoraAiQueuePolicy,
     TiqoraAiTicketState,
@@ -44,6 +45,7 @@ from tiqora.ai.runtime import (
     _build_system_prompt,
     _build_user_message,
     _map_customer_message,
+    _resolve_reply_language_line,
     run_ticket_agent,
 )
 from tiqora.config import get_settings
@@ -181,6 +183,64 @@ def test_user_message_omits_reply_language_line_by_default() -> None:
     ticket = _snapshot()
     msg = _build_user_message(ticket, [], pii=PiiMapper(), mask=False, kb_bundle=None)
     assert "Reply language" not in msg
+
+
+# ---------------------------------------------------------------------------
+# _resolve_reply_language_line: auto mode without a configured default (prod
+# bug — replying in the queue's implicit language although the customer
+# wrote in a different one, plan block 3 / detect_reply_language_detailed).
+# ---------------------------------------------------------------------------
+
+
+def _customer_article(body: str) -> ArticleSnapshot:
+    return ArticleSnapshot(
+        id=1,
+        sender_type="customer",
+        is_visible_for_customer=True,
+        subject=None,
+        body=body,
+        from_address="customer@example.com",
+        is_ai_origin=False,
+    )
+
+
+def test_resolve_reply_language_auto_without_default_uses_detection_above_min_score() -> None:
+    policy = TiqoraAiQueuePolicy(
+        system_prompt="",
+        autonomy=AUTONOMY_OFF,
+        reply_language_mode=REPLY_LANGUAGE_AUTO,
+        reply_language_default=None,
+    )
+    ticket = _snapshot(title="Connection issue on my line")
+    articles = [
+        _customer_article("Hello, my connection has not worked since this morning, please help.")
+    ]
+    line = _resolve_reply_language_line(policy, ticket, articles)
+    assert line == "Reply language (binding): en"
+
+
+def test_resolve_reply_language_auto_without_default_and_below_min_score_yields_no_line() -> None:
+    policy = TiqoraAiQueuePolicy(
+        system_prompt="",
+        autonomy=AUTONOMY_OFF,
+        reply_language_mode=REPLY_LANGUAGE_AUTO,
+        reply_language_default=None,
+    )
+    ticket = _snapshot(title="z75363")
+    articles = [_customer_article("z75363")]
+    assert _resolve_reply_language_line(policy, ticket, articles) is None
+
+
+def test_resolve_reply_language_auto_with_default_still_uses_it_as_fallback() -> None:
+    policy = TiqoraAiQueuePolicy(
+        system_prompt="",
+        autonomy=AUTONOMY_OFF,
+        reply_language_mode=REPLY_LANGUAGE_AUTO,
+        reply_language_default="de",
+    )
+    ticket = _snapshot(title="z75363")
+    articles = [_customer_article("z75363")]
+    assert _resolve_reply_language_line(policy, ticket, articles) == "Reply language (binding): de"
 
 
 # ---------------------------------------------------------------------------

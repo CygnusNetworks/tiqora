@@ -20,6 +20,7 @@ from datetime import datetime
 from fastapi import APIRouter, HTTPException, Query, status
 
 from tiqora.ai import acl as ai_acl
+from tiqora.ai import drafts as ai_drafts
 from tiqora.ai import mcp as ai_mcp
 from tiqora.ai import policies as ai_policies
 from tiqora.ai import providers as ai_providers
@@ -141,21 +142,29 @@ async def create_llm_provider(
     body: LlmProviderCreate, admin: AdminUser, session: DbSession
 ) -> LlmProviderOut:
     settings = get_settings()
-    row = await ai_providers.create_provider(
-        session,
-        settings=settings,
-        change_by=admin.id,
-        name=body.name,
-        kind=body.kind,
-        base_url=body.base_url,
-        default_model=body.default_model,
-        api_key=body.api_key,
-        extra_json=body.extra_json,
-        supports_tools=body.supports_tools,
-        supports_streaming=body.supports_streaming,
-        eu_hosted=body.eu_hosted,
-        supports_vision=body.supports_vision,
-    )
+    try:
+        row = await ai_providers.create_provider(
+            session,
+            settings=settings,
+            change_by=admin.id,
+            name=body.name,
+            kind=body.kind,
+            base_url=body.base_url,
+            default_model=body.default_model,
+            api_key=body.api_key,
+            extra_json=body.extra_json,
+            supports_tools=body.supports_tools,
+            supports_streaming=body.supports_streaming,
+            eu_hosted=body.eu_hosted,
+            supports_vision=body.supports_vision,
+            price_input_per_1m=body.price_input_per_1m,
+            price_output_per_1m=body.price_output_per_1m,
+            price_currency=body.price_currency,
+        )
+    except ai_providers.ProviderValidationError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
+        ) from exc
     return LlmProviderOut.model_validate(ai_providers.provider_to_public_dict(row))
 
 
@@ -167,13 +176,18 @@ async def update_llm_provider(
     if row is None:
         raise _not_found("Provider", provider_id)
     settings = get_settings()
-    updated = await ai_providers.update_provider(
-        session,
-        row,
-        settings=settings,
-        change_by=admin.id,
-        **body.model_dump(exclude_unset=True),
-    )
+    try:
+        updated = await ai_providers.update_provider(
+            session,
+            row,
+            settings=settings,
+            change_by=admin.id,
+            **body.model_dump(exclude_unset=True),
+        )
+    except ai_providers.ProviderValidationError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
+        ) from exc
     return LlmProviderOut.model_validate(ai_providers.provider_to_public_dict(updated))
 
 
@@ -605,3 +619,19 @@ async def delete_ai_acl(acl_id: int, admin: AdminUser, session: DbSession) -> No
     if row is None:
         raise _not_found("ACL entry", acl_id)
     await ai_acl.delete_acl(session, row)
+
+
+# ---------------------------------------------------------------------------
+# Drafts (admin cleanup)
+# ---------------------------------------------------------------------------
+
+
+@router.delete("/drafts/{draft_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_ai_draft(draft_id: int, admin: AdminUser, session: DbSession) -> None:
+    """Hard-delete a draft, any status — admin cleanup, not part of the
+    normal lifecycle (see ``tiqora.ai.drafts`` module docstring)."""
+    _ = admin
+    row = await ai_drafts.get_draft(session, draft_id)
+    if row is None:
+        raise _not_found("Draft", draft_id)
+    await ai_drafts.delete_draft(session, row)

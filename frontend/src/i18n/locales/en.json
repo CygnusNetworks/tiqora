@@ -387,7 +387,10 @@
       "errorForbidden": "You don't have permission to use this AI feature.",
       "errorRateLimited": "Limit reached — please try again later.",
       "errorDisabled": "This AI feature is currently disabled.",
-      "errorGeneric": "Something went wrong. Please try again."
+      "errorGeneric": "Something went wrong. Please try again.",
+      "adminDeleteDraft": "Delete permanently",
+      "adminDeleteDraftHint": "Admin: permanently delete this draft from the database",
+      "adminDeleteConfirm": "Permanently delete this AI draft? This cannot be undone."
     },
     "toolbar": {
       "print": "Print",
@@ -439,7 +442,12 @@
       "customerLastName": "Last name",
       "customerLoginConflict": "This login already exists. Choose a different login, or assign the existing customer via search instead."
     },
-    "inlineAttachments": "Embedded images ({{count}})"
+    "inlineAttachments": "Embedded images ({{count}})",
+    "list": {
+      "attachments_one": "1 attachment",
+      "attachments_other": "{{count}} attachments",
+      "hasSummary": "AI summary available"
+    }
   },
   "search": {
     "title": "Search",
@@ -663,7 +671,12 @@
         "apiKey": "API key",
         "apiKeySetHelp": "An API key is stored. Leave empty to keep it.",
         "apiKeyHelp": "Stored encrypted and never shown again.",
-        "deleteConfirm": "Really delete provider \"{{name}}\"?"
+        "deleteConfirm": "Really delete provider \"{{name}}\"?",
+        "price": "Price (1M tokens)",
+        "priceInput": "Price input per 1M tokens",
+        "priceOutput": "Price output per 1M tokens",
+        "priceCurrency": "Currency",
+        "priceHelp": "Cost per 1M tokens (input/output) in the given currency — used for cost calculation in the LLM audit."
       },
       "mcp": {
         "title": "MCP clients",
@@ -801,7 +814,9 @@
           "requests": "Requests",
           "tokens": "Tokens total",
           "errorRate": "Error rate",
-          "topModel": "Top model"
+          "topModel": "Top model",
+          "cost": "Cost",
+          "costUnavailable": "No prices configured or mixed currencies"
         },
         "period": "Period",
         "periodToday": "Today",
@@ -834,7 +849,8 @@
           "tokens": "Tokens (in/out)",
           "duration": "Duration",
           "pii": "PII",
-          "status": "Status"
+          "status": "Status",
+          "cost": "Cost"
         },
         "retention": "Rows are kept for {{count}} days.",
         "retentionChange": "Change",

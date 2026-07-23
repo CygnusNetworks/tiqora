@@ -23,8 +23,10 @@ from tiqora.ai.audit import (
     PiiRevealError,
     audit_log_stats,
     cleanup_audit_log,
+    compute_entry_cost,
     get_audit_log_entry,
     list_audit_log,
+    load_provider_prices,
     reveal_pii,
     write_audit_log,
 )
@@ -273,18 +275,23 @@ async def _write_row(
     error: str | None = None,
     ts_override: datetime | None = None,
     pii_mapping: dict[str, str] | None = None,
+    provider_id: int | None = None,
+    prompt_tokens: int = 1,
+    completion_tokens: int = 1,
 ) -> None:
     await write_audit_log(
         session,
         settings=settings,
-        context=AuditContext(feature=feature, run_id=run_id, ticket_id=ticket_id),
+        context=AuditContext(
+            feature=feature, run_id=run_id, ticket_id=ticket_id, provider_id=provider_id
+        ),
         request_json='{"messages": []}',
         response_json=None if error else '{"content": "ok"}',
         status_code=None if error else 200,
         error=error,
         duration_ms=5,
-        prompt_tokens=1,
-        completion_tokens=1,
+        prompt_tokens=prompt_tokens,
+        completion_tokens=completion_tokens,
         pii_mapping=pii_mapping,
     )
     if ts_override is not None:
@@ -443,5 +450,189 @@ async def test_cleanup_deletes_only_rows_past_retention(mariadb_znuny_url: str) 
             )
             assert f"{run_prefix}-old" not in remaining
             assert f"{run_prefix}-recent" in remaining
+    finally:
+        await engine.dispose()
+
+
+# ---------------------------------------------------------------------------
+# Cost (token pricing on the provider)
+# ---------------------------------------------------------------------------
+
+
+async def test_list_cost_uses_bulk_loaded_provider_prices(mariadb_znuny_url: str) -> None:
+    run_prefix = "audit-cost-89520"
+    _cleanup_audit_rows(mariadb_znuny_url, run_id_prefix=run_prefix)
+    engine = create_async_engine(_mysql_async(mariadb_znuny_url))
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    settings = get_settings()
+    try:
+        async with factory() as session:
+            priced = await ai_providers.create_provider(
+                session,
+                settings=settings,
+                change_by=1,
+                name=f"{run_prefix}-priced",
+                kind="openai_compat",
+                base_url="https://api.example/v1",
+                default_model="model-a",
+                api_key=None,
+                extra_json=None,
+                supports_tools=True,
+                supports_streaming=True,
+                eu_hosted=False,
+                price_input_per_1m=2.0,
+                price_output_per_1m=4.0,
+                price_currency="USD",
+            )
+            unpriced = await ai_providers.create_provider(
+                session,
+                settings=settings,
+                change_by=1,
+                name=f"{run_prefix}-unpriced",
+                kind="openai_compat",
+                base_url="https://api.example/v1",
+                default_model="model-b",
+                api_key=None,
+                extra_json=None,
+                supports_tools=True,
+                supports_streaming=True,
+                eu_hosted=False,
+            )
+            await _write_row(
+                session,
+                settings=settings,
+                run_id=f"{run_prefix}-priced",
+                feature=f"{run_prefix}-feature",
+                provider_id=priced.id,
+                prompt_tokens=1_000_000,
+                completion_tokens=500_000,
+            )
+            await _write_row(
+                session,
+                settings=settings,
+                run_id=f"{run_prefix}-unpriced",
+                feature=f"{run_prefix}-feature",
+                provider_id=unpriced.id,
+                prompt_tokens=1_000_000,
+                completion_tokens=500_000,
+            )
+
+        async with factory() as session:
+            page = await list_audit_log(
+                session, feature=f"{run_prefix}-feature", page=1, page_size=50
+            )
+            by_run_id = {r.run_id: r for r in page.items}
+            priced_row = by_run_id[f"{run_prefix}-priced"]
+            unpriced_row = by_run_id[f"{run_prefix}-unpriced"]
+
+            prices = await load_provider_prices(session, [r.provider_id for r in page.items])
+            priced_cost, priced_currency = compute_entry_cost(priced_row, prices)
+            assert priced_cost == pytest.approx(2.0 + 2.0)
+            assert priced_currency == "USD"
+
+            unpriced_cost, unpriced_currency = compute_entry_cost(unpriced_row, prices)
+            assert unpriced_cost is None
+            assert unpriced_currency is None
+    finally:
+        await engine.dispose()
+
+
+async def test_stats_total_cost_single_currency_vs_mixed(mariadb_znuny_url: str) -> None:
+    run_prefix = "audit-cost-89521"
+    _cleanup_audit_rows(mariadb_znuny_url, run_id_prefix=run_prefix)
+    engine = create_async_engine(_mysql_async(mariadb_znuny_url))
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    settings = get_settings()
+    try:
+        async with factory() as session:
+            usd_a = await ai_providers.create_provider(
+                session,
+                settings=settings,
+                change_by=1,
+                name=f"{run_prefix}-usd-a",
+                kind="openai_compat",
+                base_url="https://api.example/v1",
+                default_model="model-a",
+                api_key=None,
+                extra_json=None,
+                supports_tools=True,
+                supports_streaming=True,
+                eu_hosted=False,
+                price_input_per_1m=1.0,
+                price_output_per_1m=1.0,
+                price_currency="USD",
+            )
+            usd_b = await ai_providers.create_provider(
+                session,
+                settings=settings,
+                change_by=1,
+                name=f"{run_prefix}-usd-b",
+                kind="openai_compat",
+                base_url="https://api.example/v1",
+                default_model="model-b",
+                api_key=None,
+                extra_json=None,
+                supports_tools=True,
+                supports_streaming=True,
+                eu_hosted=False,
+                price_input_per_1m=1.0,
+                price_output_per_1m=1.0,
+                price_currency="USD",
+            )
+            await _write_row(
+                session,
+                settings=settings,
+                run_id=f"{run_prefix}-a1",
+                feature=f"{run_prefix}-feature",
+                provider_id=usd_a.id,
+                prompt_tokens=1_000_000,
+                completion_tokens=0,
+            )
+            await _write_row(
+                session,
+                settings=settings,
+                run_id=f"{run_prefix}-b1",
+                feature=f"{run_prefix}-feature",
+                provider_id=usd_b.id,
+                prompt_tokens=1_000_000,
+                completion_tokens=0,
+            )
+
+        async with factory() as session:
+            stats = await audit_log_stats(session, feature=f"{run_prefix}-feature")
+            assert stats.total_cost == pytest.approx(2.0)
+            assert stats.cost_currency == "USD"
+
+            eur = await ai_providers.create_provider(
+                session,
+                settings=settings,
+                change_by=1,
+                name=f"{run_prefix}-eur",
+                kind="openai_compat",
+                base_url="https://api.example/v1",
+                default_model="model-c",
+                api_key=None,
+                extra_json=None,
+                supports_tools=True,
+                supports_streaming=True,
+                eu_hosted=True,
+                price_input_per_1m=1.0,
+                price_output_per_1m=1.0,
+                price_currency="EUR",
+            )
+            await _write_row(
+                session,
+                settings=settings,
+                run_id=f"{run_prefix}-c1",
+                feature=f"{run_prefix}-feature",
+                provider_id=eur.id,
+                prompt_tokens=1_000_000,
+                completion_tokens=0,
+            )
+
+        async with factory() as session:
+            mixed_stats = await audit_log_stats(session, feature=f"{run_prefix}-feature")
+            assert mixed_stats.total_cost is None
+            assert mixed_stats.cost_currency is None
     finally:
         await engine.dispose()

@@ -133,6 +133,13 @@ export function AiProvidersPage() {
     setDrawerOpen(true);
   };
 
+  const priceOrNull = (v: unknown): number | null => {
+    const s = String(v ?? "").trim();
+    if (!s) return null;
+    const n = Number(s.replace(",", "."));
+    return Number.isFinite(n) && n >= 0 ? n : null;
+  };
+
   const handleSubmit = async (values: FieldValues) => {
     setFormError(null);
     const base: LlmProviderCreate = {
@@ -144,6 +151,9 @@ export function AiProvidersPage() {
       supports_streaming: Boolean(values.supports_streaming),
       eu_hosted: Boolean(values.eu_hosted),
       supports_vision: Boolean(values.supports_vision),
+      price_input_per_1m: priceOrNull(values.price_input_per_1m),
+      price_output_per_1m: priceOrNull(values.price_output_per_1m),
+      price_currency: String(values.price_currency ?? "").trim().toUpperCase() || null,
     };
     const apiKey = typeof values.api_key === "string" ? values.api_key.trim() : "";
     try {
@@ -178,6 +188,16 @@ export function AiProvidersPage() {
       header: t("admin.ai.providers.defaultModel"),
       mono: true,
       render: (r) => r.default_model,
+    },
+    {
+      key: "price",
+      header: t("admin.ai.providers.price"),
+      mono: true,
+      render: (r) => {
+        if (r.price_input_per_1m == null && r.price_output_per_1m == null) return "—";
+        const cur = r.price_currency ?? "";
+        return `${r.price_input_per_1m ?? 0} / ${r.price_output_per_1m ?? 0} ${cur}`.trim();
+      },
     },
     {
       key: "flags",
@@ -259,6 +279,23 @@ export function AiProvidersPage() {
       helpText: editing?.has_api_key
         ? t("admin.ai.providers.apiKeySetHelp")
         : t("admin.ai.providers.apiKeyHelp"),
+    },
+    {
+      name: "price_input_per_1m",
+      label: t("admin.ai.providers.priceInput"),
+      type: "number",
+      helpText: t("admin.ai.providers.priceHelp"),
+    },
+    {
+      name: "price_output_per_1m",
+      label: t("admin.ai.providers.priceOutput"),
+      type: "number",
+    },
+    {
+      name: "price_currency",
+      label: t("admin.ai.providers.priceCurrency"),
+      type: "text",
+      placeholder: "EUR",
     },
     { name: "supports_tools", label: t("admin.ai.providers.flagTools"), type: "checkbox" },
     { name: "supports_streaming", label: t("admin.ai.providers.flagStreaming"), type: "checkbox" },

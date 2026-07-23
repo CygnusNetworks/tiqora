@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import json
 import time
+from collections.abc import Iterable
 from dataclasses import dataclass, replace
 from datetime import UTC, datetime, timedelta
 from typing import Any
@@ -325,6 +326,51 @@ async def list_audit_log(
     return AuditLogPage(items=list(rows), total=int(total))
 
 
+async def load_provider_prices(
+    session: AsyncSession, provider_ids: Iterable[int | None]
+) -> dict[int, tuple[float | None, float | None, str | None]]:
+    """Bulk-load ``(price_input_per_1m, price_output_per_1m, price_currency)``
+    for a set of provider ids — one query for a whole page/result set, never
+    one query per row."""
+    ids = {i for i in provider_ids if i is not None}
+    if not ids:
+        return {}
+    rows = (
+        await session.execute(
+            select(
+                TiqoraLlmProvider.id,
+                TiqoraLlmProvider.price_input_per_1m,
+                TiqoraLlmProvider.price_output_per_1m,
+                TiqoraLlmProvider.price_currency,
+            ).where(TiqoraLlmProvider.id.in_(ids))
+        )
+    ).all()
+    return {r[0]: (r[1], r[2], r[3]) for r in rows}
+
+
+def compute_entry_cost(
+    entry: TiqoraAiAuditLog,
+    prices: dict[int, tuple[float | None, float | None, str | None]],
+) -> tuple[float | None, str | None]:
+    """``(cost, currency)`` for one audit row given a bulk-loaded price map
+    (see :func:`load_provider_prices`). ``(None, None)`` when the row has no
+    provider, the provider is unknown, or neither price component is set."""
+    if entry.provider_id is None:
+        return None, None
+    price = prices.get(entry.provider_id)
+    if price is None:
+        return None, None
+    price_input, price_output, currency = price
+    if price_input is None and price_output is None:
+        return None, None
+    cost = 0.0
+    if price_input is not None:
+        cost += (entry.prompt_tokens or 0) * price_input / 1_000_000
+    if price_output is not None:
+        cost += (entry.completion_tokens or 0) * price_output / 1_000_000
+    return cost, currency
+
+
 @dataclass(frozen=True, slots=True)
 class AuditLogStats:
     total_requests: int
@@ -333,6 +379,8 @@ class AuditLogStats:
     error_rate: float
     per_day: list[dict[str, Any]]
     top_model: str | None
+    total_cost: float | None
+    cost_currency: str | None
 
 
 async def audit_log_stats(
@@ -394,6 +442,8 @@ async def audit_log_stats(
     ).first()
     top_model = top_model_row[0] if top_model_row else None
 
+    total_cost, cost_currency = await _audit_log_cost_totals(session, filters=filters)
+
     return AuditLogStats(
         total_requests=int(total),
         total_prompt_tokens=int(prompt_sum),
@@ -401,7 +451,61 @@ async def audit_log_stats(
         error_rate=(int(errors) / int(total)) if total else 0.0,
         per_day=per_day,
         top_model=top_model,
+        total_cost=total_cost,
+        cost_currency=cost_currency,
     )
+
+
+async def _audit_log_cost_totals(
+    session: AsyncSession, *, filters: list[Any]
+) -> tuple[float | None, str | None]:
+    """Total cost across all rows matching ``filters`` (not just one page),
+    grouped by provider so each provider's tokens are priced with its own
+    rates. ``total_cost`` is only ever a number when every provider that
+    contributed tokens has pricing configured *and* they all share the same
+    currency — otherwise ``(None, None)``, since summing mismatched
+    currencies (or partially-unpriced usage) would silently misrepresent the
+    total."""
+    per_provider = (
+        await session.execute(
+            select(
+                TiqoraAiAuditLog.provider_id,
+                func.coalesce(func.sum(TiqoraAiAuditLog.prompt_tokens), 0),
+                func.coalesce(func.sum(TiqoraAiAuditLog.completion_tokens), 0),
+            )
+            .where(*filters, TiqoraAiAuditLog.provider_id.is_not(None))
+            .group_by(TiqoraAiAuditLog.provider_id)
+        )
+    ).all()
+    if not per_provider:
+        return None, None
+
+    prices = await load_provider_prices(session, [r[0] for r in per_provider])
+    total = 0.0
+    currencies: set[str | None] = set()
+    priced_any = False
+    for provider_id, prompt_sum, completion_sum in per_provider:
+        price = prices.get(provider_id)
+        if price is None:
+            continue
+        price_input, price_output, currency = price
+        if price_input is None and price_output is None:
+            continue
+        cost = 0.0
+        if price_input is not None:
+            cost += int(prompt_sum) * price_input / 1_000_000
+        if price_output is not None:
+            cost += int(completion_sum) * price_output / 1_000_000
+        total += cost
+        currencies.add(currency)
+        priced_any = True
+
+    if not priced_any or len(currencies) != 1:
+        return None, None
+    (currency,) = currencies
+    if currency is None:
+        return None, None
+    return total, currency
 
 
 async def get_audit_log_entry(session: AsyncSession, entry_id: int) -> TiqoraAiAuditLog | None:
@@ -480,8 +584,10 @@ __all__ = [
     "PiiRevealError",
     "audit_log_stats",
     "cleanup_audit_log",
+    "compute_entry_cost",
     "get_audit_log_entry",
     "list_audit_log",
+    "load_provider_prices",
     "reveal_pii",
     "write_audit_log",
 ]

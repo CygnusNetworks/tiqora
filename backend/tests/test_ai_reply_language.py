@@ -3,7 +3,11 @@ no DB/network."""
 
 from __future__ import annotations
 
-from tiqora.ai.reply_language import LANGUAGE_PROFILES, detect_reply_language
+from tiqora.ai.reply_language import (
+    LANGUAGE_PROFILES,
+    detect_reply_language,
+    detect_reply_language_detailed,
+)
 
 
 def test_english_title_and_id_body_detected_as_english() -> None:
@@ -58,3 +62,34 @@ def test_unknown_candidate_language_is_ignored() -> None:
         default="de",
     )
     assert lang == "de"
+
+
+def test_detailed_english_text_without_default_reaches_min_score() -> None:
+    # No configured default (mirrors runtime's "auto without a
+    # reply_language_default" case): a clearly English text still yields a
+    # trustworthy (non-fallback) "en" detection.
+    detection = detect_reply_language_detailed(
+        "Connection issue on my line",
+        "Hello, my connection has not been working since this morning, please help.",
+        candidates=list(LANGUAGE_PROFILES),
+        default="",
+    )
+    assert detection.language == "en"
+    assert detection.used_fallback is False
+
+
+def test_detailed_gibberish_below_min_score_falls_back() -> None:
+    detection = detect_reply_language_detailed(
+        "z75363", "z75363", candidates=list(LANGUAGE_PROFILES), default=""
+    )
+    assert detection.used_fallback is True
+    assert detection.language == ""
+
+
+def test_detailed_empty_text_reports_fallback() -> None:
+    detection = detect_reply_language_detailed(
+        None, None, candidates=list(LANGUAGE_PROFILES), default="en"
+    )
+    assert detection.used_fallback is True
+    assert detection.language == "en"
+    assert detection.score == 0

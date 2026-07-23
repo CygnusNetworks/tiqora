@@ -131,6 +131,13 @@ class TicketListItem(BaseModel):
     """Raw ``From`` header of the ticket's first article — a display fallback
     for the queue list when no customer is assigned. ``None`` if the ticket
     has no articles (or that article has no MIME row)."""
+    attachment_count: int = 0
+    """Number of "real" (non-body-part, non-inline-image) attachments across
+    all of the ticket's articles. Used by the agent queue view to show a
+    paperclip badge."""
+    has_ai_summary: bool = False
+    """True when ``tiqora_ai_ticket_state.summary_body`` is set for this
+    ticket — used by the agent queue view to show an AI-summary badge."""
     create_time: datetime
     change_time: datetime
     age_seconds: int | None = None

@@ -43,6 +43,9 @@ export type LlmProviderOut = {
   supports_streaming: boolean;
   eu_hosted: boolean;
   supports_vision: boolean;
+  price_input_per_1m: number | null;
+  price_output_per_1m: number | null;
+  price_currency: string | null;
   valid_id: number;
   create_time: string;
   change_time: string;
@@ -59,6 +62,9 @@ export type LlmProviderCreate = {
   supports_streaming?: boolean;
   eu_hosted?: boolean;
   supports_vision?: boolean;
+  price_input_per_1m?: number | null;
+  price_output_per_1m?: number | null;
+  price_currency?: string | null;
 };
 
 export type LlmProviderUpdate = Partial<LlmProviderCreate> & { valid_id?: number };
@@ -271,6 +277,8 @@ export type AiAuditLogListItemOut = {
   prompt_tokens: number | null;
   completion_tokens: number | null;
   pii_counts: Record<string, number> | null;
+  cost: number | null;
+  cost_currency: string | null;
 };
 
 export type AiAuditLogDetailOut = AiAuditLogListItemOut & {
@@ -292,6 +300,8 @@ export type AiAuditLogStatsOut = {
   error_rate: number;
   per_day: { date: string; count: number }[];
   top_model: string | null;
+  total_cost: number | null;
+  cost_currency: string | null;
 };
 
 export type AiAuditLogFilterParams = {
@@ -479,6 +489,11 @@ export const aiApi = {
       `/api/v1/admin/ai/queues/${policyId}/prompt-parts/${partId}`,
       { signal },
     );
+  },
+  /** Admin-only hard delete of an AI draft (any status) — distinct from the
+   * agent-side discard, which only flips an open draft to `discarded`. */
+  adminDeleteDraft(draftId: number, signal?: AbortSignal) {
+    return api.request<void>("DELETE", `/api/v1/admin/ai/drafts/${draftId}`, { signal });
   },
   testEscalationRules(body: EscalationTestIn, signal?: AbortSignal) {
     return api.request<EscalationTestOut>("POST", "/api/v1/admin/ai/escalation-test", {

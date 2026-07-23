@@ -89,6 +89,30 @@ function tokensLabel(n: number): string {
   return String(n);
 }
 
+/** Cost display: real currency formatting for 3-letter ISO codes, plain
+ * number + suffix otherwise. Sub-cent amounts keep 4 fraction digits so
+ * small per-request costs don't collapse to 0,00. */
+function formatCost(value: number, currency: string | null, locale: string): string {
+  const digits = value !== 0 && Math.abs(value) < 0.01 ? 4 : 2;
+  if (currency && /^[A-Z]{3}$/.test(currency)) {
+    try {
+      return new Intl.NumberFormat(locale, {
+        style: "currency",
+        currency,
+        minimumFractionDigits: digits,
+        maximumFractionDigits: digits,
+      }).format(value);
+    } catch {
+      // fall through to plain formatting for unknown codes
+    }
+  }
+  const num = new Intl.NumberFormat(locale, {
+    minimumFractionDigits: digits,
+    maximumFractionDigits: digits,
+  }).format(value);
+  return currency ? `${num} ${currency}` : num;
+}
+
 function StatCard({
   label,
   value,
@@ -687,6 +711,10 @@ export function AiAuditPage() {
   const total = listQ.data?.total ?? 0;
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const stats = statsQ.data;
+  const statsCost = {
+    total: stats?.total_cost ?? null,
+    currency: stats?.cost_currency ?? null,
+  };
 
   return (
     <div className="flex flex-col gap-4" data-testid="ai-audit-page">
@@ -700,7 +728,7 @@ export function AiAuditPage() {
         <p className="mt-1 text-sm text-muted">{t("admin.ai.audit.subtitle")}</p>
       </div>
 
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
         <StatCard
           label={t("admin.ai.audit.stat.requests")}
           value={stats ? String(stats.total_requests) : "…"}
@@ -717,6 +745,20 @@ export function AiAuditPage() {
               : undefined
           }
           testId="ai-audit-stat-tokens"
+        />
+        <StatCard
+          label={t("admin.ai.audit.stat.cost")}
+          value={
+            stats
+              ? statsCost.total != null
+                ? formatCost(statsCost.total, statsCost.currency, locale)
+                : "—"
+              : "…"
+          }
+          hint={
+            stats && statsCost.total == null ? t("admin.ai.audit.stat.costUnavailable") : undefined
+          }
+          testId="ai-audit-stat-cost"
         />
         <StatCard
           label={t("admin.ai.audit.stat.errorRate")}
@@ -899,6 +941,7 @@ export function AiAuditPage() {
                 <th className="px-3 py-2 font-medium">{t("admin.ai.audit.table.feature")}</th>
                 <th className="px-3 py-2 font-medium">{t("admin.ai.audit.table.ticket")}</th>
                 <th className="px-3 py-2 font-medium">{t("admin.ai.audit.table.tokens")}</th>
+                <th className="px-3 py-2 font-medium">{t("admin.ai.audit.table.cost")}</th>
                 <th className="px-3 py-2 font-medium">{t("admin.ai.audit.table.duration")}</th>
                 <th className="px-3 py-2 font-medium">{t("admin.ai.audit.table.pii")}</th>
                 <th className="px-3 py-2 font-medium">{t("admin.ai.audit.table.status")}</th>
@@ -942,6 +985,12 @@ export function AiAuditPage() {
                     </td>
                     <td className="whitespace-nowrap px-3 py-2 font-mono text-xs text-muted">
                       {row.prompt_tokens ?? 0} / {row.completion_tokens ?? 0}
+                    </td>
+                    <td
+                      className="whitespace-nowrap px-3 py-2 font-mono text-xs text-muted"
+                      data-testid={`ai-audit-row-${row.id}-cost`}
+                    >
+                      {row.cost != null ? formatCost(row.cost, row.cost_currency, locale) : "—"}
                     </td>
                     <td className="whitespace-nowrap px-3 py-2 font-mono text-xs text-muted">
                       {row.duration_ms} ms

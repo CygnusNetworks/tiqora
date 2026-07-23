@@ -6,12 +6,13 @@ import i18n from "@/i18n";
 import { ApiError } from "@/lib/api";
 import { AiPanel } from "./AiPanel";
 
-const { getState, requestDraft, summarize, discardDraft, listArticles, createArticle, getReplyDraft, listTemplates } =
+const { getState, requestDraft, summarize, discardDraft, adminDeleteDraft, listArticles, createArticle, getReplyDraft, listTemplates } =
   vi.hoisted(() => ({
     getState: vi.fn(),
     requestDraft: vi.fn(),
     summarize: vi.fn(),
     discardDraft: vi.fn(),
+    adminDeleteDraft: vi.fn(),
     listArticles: vi.fn(),
     createArticle: vi.fn(),
     getReplyDraft: vi.fn(),
@@ -24,6 +25,23 @@ vi.mock("@/lib/ticketAiApi", async () => {
     ...actual,
     ticketAiApi: { getState, requestDraft, summarize, discardDraft },
   };
+});
+
+const { mockUser } = vi.hoisted(() => ({
+  mockUser: { current: { id: 42, login: "agent", is_admin: false } as {
+    id: number;
+    login: string;
+    is_admin: boolean;
+  } },
+}));
+
+vi.mock("@/auth/AuthContext", () => ({
+  useAuth: () => ({ user: mockUser.current }),
+}));
+
+vi.mock("@/lib/aiApi", async () => {
+  const actual = await vi.importActual<typeof import("@/lib/aiApi")>("@/lib/aiApi");
+  return { ...actual, aiApi: { ...actual.aiApi, adminDeleteDraft: adminDeleteDraft } };
 });
 
 vi.mock("@/lib/api", async () => {
@@ -213,6 +231,30 @@ describe("AiPanel", () => {
     fireEvent.click(screen.getByTestId("confirm-dialog-cancel"));
 
     expect(discardDraft).not.toHaveBeenCalled();
+  });
+
+  it("shows the admin hard-delete button only for admins and calls the admin API", async () => {
+    getState.mockResolvedValue({
+      ...baseState,
+      manual_assist_available: true,
+      drafts: [{ ...baseDraft, id: 21, kind: "reply", body: "Draft", source: "auto", tool_trace: [] }],
+    });
+    adminDeleteDraft.mockResolvedValue(undefined);
+
+    mockUser.current = { id: 42, login: "agent", is_admin: false };
+    const { unmount } = wrap(<AiPanel ticketId={1} canNote />);
+    await waitFor(() => expect(screen.getByTestId("ai-panel-draft-21")).toBeTruthy());
+    expect(screen.queryByTestId("ai-panel-draft-admin-delete-21")).toBeNull();
+    unmount();
+
+    mockUser.current = { id: 1, login: "root@localhost", is_admin: true };
+    wrap(<AiPanel ticketId={1} canNote />);
+    await waitFor(() => expect(screen.getByTestId("ai-panel-draft-admin-delete-21")).toBeTruthy());
+    fireEvent.click(screen.getByTestId("ai-panel-draft-admin-delete-21"));
+    await screen.findByTestId("confirm-dialog");
+    fireEvent.click(screen.getByTestId("confirm-dialog-confirm"));
+    await waitFor(() => expect(adminDeleteDraft).toHaveBeenCalledWith(21));
+    mockUser.current = { id: 42, login: "agent", is_admin: false };
   });
 
   it("shows a collapsible tool trace on drafts that have one", async () => {

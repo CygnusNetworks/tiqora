@@ -159,6 +159,11 @@ class TiqoraLlmProvider(TiqoraBase):
     supports_vision: Mapped[bool] = mapped_column(
         Boolean, nullable=False, default=False, server_default=false()
     )
+    # Token pricing (per 1M tokens), all optional — see
+    # ``tiqora.ai.usage.record_usage`` for how these feed ``cost_hint``.
+    price_input_per_1m: Mapped[float | None] = mapped_column(Float, nullable=True)
+    price_output_per_1m: Mapped[float | None] = mapped_column(Float, nullable=True)
+    price_currency: Mapped[str | None] = mapped_column(String(3), nullable=True)
     valid_id: Mapped[int] = mapped_column(
         SmallInteger, nullable=False, default=1, server_default="1"
     )

@@ -2,17 +2,21 @@
 
 from __future__ import annotations
 
+import logging
 import time
 from collections.abc import AsyncGenerator
 from typing import Any
 
 import yaml
 from sqlalchemy import Select, and_, func, or_, select
+from sqlalchemy.exc import DBAPIError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from tiqora.ai.models import TiqoraAiTicketState
 from tiqora.db.legacy.article import (
     Article,
     ArticleDataMime,
+    ArticleDataMimeAttachment,
     ArticleSenderType,
 )
 from tiqora.db.legacy.dynamic_field import DynamicField, DynamicFieldValue
@@ -53,6 +57,8 @@ from tiqora.domain.subject_hook import load_subject_config
 from tiqora.permissions.engine import PERMISSION_KEYS, PermissionEngine
 from tiqora.storage.backend import AttachmentContent, AttachmentMeta, DbMimeStorage
 
+logger = logging.getLogger(__name__)
+
 #: Named ``state_type`` query-param views resolved to one-or-more
 #: ``ticket_state_type.name`` values. Mirrors Znuny's
 #: ``Ticket::ViewableStateType`` sysconfig (new + open + pending reminder +
@@ -86,8 +92,17 @@ def _is_body_part_attachment(a: AttachmentMeta) -> bool:
 
 
 def _is_inline_attachment(a: AttachmentMeta) -> bool:
-    """cid:-referenced parts of the HTML body (signature logos etc.)."""
-    return bool(a.content_id) or (a.disposition or "").lower() == "inline"
+    """cid:-referenced or disposition=inline **image** parts of the HTML body
+    (signature logos etc.). A ``content_id``/``inline`` disposition alone is
+    not enough — mail clients also attach non-image documents (PDFs, Office
+    files) with a Content-ID or ``inline`` disposition, and those must still
+    show up as regular attachments rather than being folded into the
+    collapsed "inline images" section."""
+    is_marked_inline = bool(a.content_id) or (a.disposition or "").lower() == "inline"
+    if not is_marked_inline:
+        return False
+    ctype = (a.content_type or "").split(";", 1)[0].strip().lower()
+    return ctype.startswith("image/")
 
 
 class TicketAccessDenied(Exception):
@@ -146,7 +161,12 @@ class TicketService:
         }
 
     def _to_list_item(
-        self, t: Ticket, maps: dict[str, Any], first_from_by_ticket: dict[int, str] | None = None
+        self,
+        t: Ticket,
+        maps: dict[str, Any],
+        first_from_by_ticket: dict[int, str] | None = None,
+        attachment_count_by_ticket: dict[int, int] | None = None,
+        ai_summary_ticket_ids: set[int] | None = None,
     ) -> TicketListItem:
         owner = maps["user"].get(t.user_id)
         return TicketListItem(
@@ -168,6 +188,8 @@ class TicketService:
             customer_id=t.customer_id,
             customer_user_id=t.customer_user_id,
             first_from=(first_from_by_ticket or {}).get(t.id),
+            attachment_count=(attachment_count_by_ticket or {}).get(t.id, 0),
+            has_ai_summary=t.id in (ai_summary_ticket_ids or set()),
             create_time=t.create_time,
             change_time=t.change_time,
             age_seconds=age_seconds(t.create_time),
@@ -289,8 +311,20 @@ class TicketService:
         result = await self._session.execute(ordered.offset(offset).limit(min(limit, 200)))
         tickets = list(result.scalars().all())
         maps = await self._lookup_maps()
-        first_from_by_ticket = await self._first_article_from_by_ticket([t.id for t in tickets])
-        items = [self._to_list_item(t, maps, first_from_by_ticket) for t in tickets]
+        ticket_ids = [t.id for t in tickets]
+        first_from_by_ticket = await self._first_article_from_by_ticket(ticket_ids)
+        attachment_count_by_ticket = await self._attachment_counts_by_ticket(ticket_ids)
+        ai_summary_ticket_ids = await self._ai_summary_ticket_ids(ticket_ids)
+        items = [
+            self._to_list_item(
+                t,
+                maps,
+                first_from_by_ticket,
+                attachment_count_by_ticket,
+                ai_summary_ticket_ids,
+            )
+            for t in tickets
+        ]
         return PaginatedTickets(items=items, total=total, offset=offset, limit=limit)
 
     async def _first_article_from_by_ticket(self, ticket_ids: list[int]) -> dict[int, str]:
@@ -317,6 +351,68 @@ class TicketService:
             .join(ArticleDataMime, ArticleDataMime.article_id == Article.id)
         )
         return {ticket_id: a_from for ticket_id, a_from in rows.all() if a_from}
+
+    async def _attachment_counts_by_ticket(self, ticket_ids: list[int]) -> dict[int, int]:
+        """Count of "real" attachments per ticket, one bulk query for the page.
+
+        SQL approximation of :func:`_is_body_part_attachment` /
+        :func:`_is_inline_attachment`: excludes rows with a ``content_id``,
+        rows with ``disposition='inline'``, and the ``file-1``/``file-2``/
+        ``file-1.html`` body-part pseudo-attachments. A slight mismatch
+        against the Python-side filters (e.g. non-image inline-tagged
+        documents count as real here in both) is acceptable — this powers a
+        list-view badge, not the ticket zoom's attachment panel.
+        """
+        if not ticket_ids:
+            return {}
+        rows = await self._session.execute(
+            select(Article.ticket_id, func.count(ArticleDataMimeAttachment.id))
+            .select_from(ArticleDataMimeAttachment)
+            .join(Article, Article.id == ArticleDataMimeAttachment.article_id)
+            .where(
+                Article.ticket_id.in_(ticket_ids),
+                or_(
+                    ArticleDataMimeAttachment.content_id.is_(None),
+                    ArticleDataMimeAttachment.content_id == "",
+                ),
+                func.lower(func.coalesce(ArticleDataMimeAttachment.disposition, "")) != "inline",
+                ~and_(
+                    ArticleDataMimeAttachment.filename.in_(("file-1", "file-2", "file-1.html")),
+                    or_(
+                        ArticleDataMimeAttachment.content_type.like("text/plain%"),
+                        ArticleDataMimeAttachment.content_type.like("text/html%"),
+                    ),
+                ),
+            )
+            .group_by(Article.ticket_id)
+        )
+        return {ticket_id: int(count) for ticket_id, count in rows.all()}
+
+    async def _ai_summary_ticket_ids(self, ticket_ids: list[int]) -> set[int]:
+        """Ids (of the page's tickets) that have an AI summary, one bulk query.
+
+        The ``tiqora_ai_ticket_state`` table may not exist in Znuny-only
+        fixtures/deployments (Tiqora tables are created lazily by the ai
+        worker) — treat a missing-table error as "no summaries" rather than
+        failing the whole ticket list.
+        """
+        if not ticket_ids:
+            return set()
+        try:
+            rows = await self._session.execute(
+                select(TiqoraAiTicketState.ticket_id).where(
+                    TiqoraAiTicketState.ticket_id.in_(ticket_ids),
+                    TiqoraAiTicketState.summary_body.is_not(None),
+                )
+            )
+            return set(rows.scalars().all())
+        except DBAPIError:
+            logger.debug(
+                "tiqora_ai_ticket_state query failed (table missing?) — treating as no summaries",
+                exc_info=True,
+            )
+            await self._session.rollback()
+            return set()
 
     async def iter_tickets_for_export(
         self,
