@@ -11,12 +11,14 @@ const {
   listAttachments,
   getReplyDraft,
   listTemplates,
+  deleteArticle,
 } = vi.hoisted(() => ({
   listArticles: vi.fn(),
   getArticleBody: vi.fn(),
   listAttachments: vi.fn(),
   getReplyDraft: vi.fn(),
   listTemplates: vi.fn(),
+  deleteArticle: vi.fn(),
 }));
 
 vi.mock("@/lib/api", async () => {
@@ -29,6 +31,7 @@ vi.mock("@/lib/api", async () => {
       listAttachments,
       getReplyDraft,
       listTemplates,
+      deleteArticle,
       listQueues: vi.fn().mockResolvedValue([]),
       createArticle: vi.fn().mockResolvedValue({ id: 999 }),
       forwardArticle: vi.fn(),
@@ -173,6 +176,7 @@ describe("ArticleMasterDetail", () => {
       signature_is_html: false,
     });
     listTemplates.mockReset().mockResolvedValue([]);
+    deleteArticle.mockReset().mockResolvedValue(undefined);
   });
 
   it("renders one row per article with a preview and defaults to the newest selected", async () => {
@@ -291,6 +295,7 @@ describe("ArticleMasterDetail view switching (split vs. conversation)", () => {
       signature_is_html: false,
     });
     listTemplates.mockReset().mockResolvedValue([]);
+    deleteArticle.mockReset().mockResolvedValue(undefined);
   });
 
   it("auto-selects the split view for an email-dominant ticket, with the Auto badge shown", async () => {
@@ -397,5 +402,81 @@ describe("ArticleMasterDetail view switching (split vs. conversation)", () => {
     fireEvent.click(within(bubble).getByTitle("Reply"));
     expect(await screen.findByTestId("reply-dialog")).toBeInTheDocument();
     await waitFor(() => expect(getReplyDraft).toHaveBeenCalledWith(8, 11, false));
+  });
+});
+
+describe("ArticleMasterDetail — delete internal note", () => {
+  beforeEach(() => {
+    window.localStorage.clear();
+    listArticles.mockReset().mockResolvedValue(ARTICLES);
+    getArticleBody.mockReset().mockImplementation((_ticketId: number, articleId: number) =>
+      Promise.resolve({ article_id: articleId, content_type: "text/plain", ...BODIES[articleId] }),
+    );
+    listAttachments.mockReset().mockResolvedValue([]);
+    listTemplates.mockReset().mockResolvedValue([]);
+    deleteArticle.mockReset().mockResolvedValue(undefined);
+  });
+
+  // ARTICLES (ticket 7): article 3 is the internal note (channel 3, not
+  // customer-visible) and is selected by default in the split reader pane
+  // (newest-first). Article 2 is a customer-visible email.
+
+  it("hides the delete action for an internal note when canDelete is false", async () => {
+    wrap(<ArticleMasterDetail ticketId={7} />);
+    await screen.findByTestId("article-list-item-3");
+    fireEvent.click(screen.getByRole("button", { name: "More" }));
+    expect(screen.queryByTestId("article-delete-3")).toBeNull();
+  });
+
+  it("shows the delete action for an internal note when canDelete is true and deletes after confirm", async () => {
+    wrap(<ArticleMasterDetail ticketId={7} canDelete />);
+    await screen.findByTestId("article-list-item-3");
+    fireEvent.click(screen.getByRole("button", { name: "More" }));
+    fireEvent.click(screen.getByTestId("article-delete-3"));
+
+    const dialog = await screen.findByTestId("confirm-dialog");
+    fireEvent.click(within(dialog).getByTestId("confirm-dialog-confirm"));
+
+    await waitFor(() => expect(deleteArticle).toHaveBeenCalledWith(7, 3));
+    // Success invalidates the articles query — a refetch follows the initial load.
+    await waitFor(() => expect(listArticles.mock.calls.length).toBeGreaterThanOrEqual(2));
+  });
+
+  it("does not offer delete for a customer-visible article even when canDelete is true", async () => {
+    wrap(<ArticleMasterDetail ticketId={7} canDelete />);
+    await screen.findByTestId("article-list-item-3");
+    fireEvent.click(screen.getByTestId("article-list-item-2"));
+    fireEvent.click(screen.getByRole("button", { name: "More" }));
+    expect(screen.queryByTestId("article-delete-2")).toBeNull();
+  });
+
+  it("shows an error message when delete fails with 409 (not an internal note)", async () => {
+    const { ApiError } = await vi.importActual<typeof import("@/lib/api")>("@/lib/api");
+    deleteArticle.mockRejectedValue(
+      new ApiError(409, "Only internal notes can be deleted", "/api/v1/tickets/7/articles/3"),
+    );
+    wrap(<ArticleMasterDetail ticketId={7} canDelete />);
+    await screen.findByTestId("article-list-item-3");
+    fireEvent.click(screen.getByRole("button", { name: "More" }));
+    fireEvent.click(screen.getByTestId("article-delete-3"));
+
+    const dialog = await screen.findByTestId("confirm-dialog");
+    fireEvent.click(within(dialog).getByTestId("confirm-dialog-confirm"));
+
+    expect(await screen.findByTestId("article-delete-error-3")).toHaveTextContent(
+      "Only internal notes not visible to the customer can be deleted.",
+    );
+  });
+
+  it("offers delete for an internal note pill in the conversation view", async () => {
+    wrap(<ArticleMasterDetail ticketId={7} canDelete />);
+    fireEvent.click(await screen.findByTestId("article-view-tab-conversation"));
+    const pill = await screen.findByTestId("conversation-note-3");
+    fireEvent.click(within(pill).getByTestId("article-delete-3"));
+
+    const dialog = await screen.findByTestId("confirm-dialog");
+    fireEvent.click(within(dialog).getByTestId("confirm-dialog-confirm"));
+
+    await waitFor(() => expect(deleteArticle).toHaveBeenCalledWith(7, 3));
   });
 });

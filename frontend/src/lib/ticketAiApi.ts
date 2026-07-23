@@ -28,6 +28,7 @@ export type AiDraftOut = {
   status: string;
   source: string;
   accepted_article_id: number | null;
+  create_time: string;
 };
 
 export type AiStateOut = {
@@ -38,6 +39,7 @@ export type AiStateOut = {
   drafts: AiDraftOut[];
   summary_body: string | null;
   last_summary_upto_article_id: number | null;
+  summary_created_at: string | null;
 };
 
 export type AiSummarizeOut = {

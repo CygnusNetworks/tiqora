@@ -38,6 +38,7 @@ from tiqora.domain.ticket_service import (
 )
 from tiqora.domain.ticket_write_service import (
     ArticleIn,
+    ArticleNotDeletable,
     InvalidInput,
     TicketIn,
     TicketWriteService,
@@ -154,6 +155,8 @@ def _map_exc(exc: Exception) -> HTTPException:
         return HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden")
     if isinstance(exc, InvalidInput):
         return HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc))
+    if isinstance(exc, ArticleNotDeletable):
+        return HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc))
     if isinstance(exc, OutboundMailError):
         return HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
@@ -822,6 +825,27 @@ async def split_article_endpoint(
     except (WriteAccessDenied, WriteNotFound, InvalidInput) as exc:
         raise _map_exc(exc) from exc
     return TicketCreateResponse(ticket_id=new_id)
+
+
+@router.delete("/{ticket_id}/articles/{article_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_article_endpoint(
+    ticket_id: int,
+    article_id: int,
+    user: CurrentUser,
+    session: DbSession,
+    settings: AppSettings,
+) -> None:
+    """Hard-delete an internal note. Requires ``rw``.
+
+    Customer-visible or non-Internal-channel articles are never deletable and
+    return HTTP 409 instead.
+    """
+    svc = _write_service(session, settings)
+    try:
+        async with session.begin():
+            await svc.delete_article(user.id, ticket_id, article_id)
+    except (WriteAccessDenied, WriteNotFound, ArticleNotDeletable) as exc:
+        raise _map_exc(exc) from exc
 
 
 @router.get("/{ticket_id}/links", response_model=list[TicketLinkTargetOut])

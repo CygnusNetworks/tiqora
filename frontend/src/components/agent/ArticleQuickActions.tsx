@@ -1,10 +1,12 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { ArticleListItem } from "@/lib/api";
+import { isInternalNote } from "@/lib/articleChannel";
 import { Button } from "@/components/ui/Button";
 import { Menu, MenuItem } from "@/components/ui/Menu";
 import { ReplyDialog } from "./ReplyDialog";
 import { BounceDialog, ForwardDialog, SplitDialog } from "./ArticleActionDialogs";
+import { useDeleteArticleNote } from "./useDeleteArticleNote";
 
 /**
  * Reply / reply-all / forward as buttons; the less-common bounce/split
@@ -17,12 +19,16 @@ export function ArticleQuickActions({
   ticketId,
   article,
   canNote,
+  canDelete = false,
   replyTestId,
   compact = false,
 }: {
   ticketId: number;
   article: ArticleListItem;
   canNote: boolean;
+  /** Whether the agent may delete this article (``rw`` permission). Delete
+   * is only ever offered for internal, non-customer-visible notes. */
+  canDelete?: boolean;
   /** Testid for the primary reply button (split pane needs a stable one). */
   replyTestId?: string;
   /** Icon-only buttons for the conversation view's hover island. */
@@ -35,6 +41,8 @@ export function ArticleQuickActions({
   const hasMultipleRecipients =
     (article.to_address ?? "").includes(",") || Boolean(article.to_address && article.from_address);
   const noPerm = t("ticket.toolbar.noPermission");
+  const showDelete = canDelete && isInternalNote(article);
+  const del = useDeleteArticleNote(ticketId, article.id);
 
   return (
     <div className="flex flex-wrap items-center gap-1.5" data-testid={`article-actions-${article.id}`}>
@@ -81,7 +89,22 @@ export function ArticleQuickActions({
       >
         <MenuItem onSelect={() => setDialog("bounce")}>{t("ticket.bounce")}</MenuItem>
         <MenuItem onSelect={() => setDialog("split")}>{t("ticket.split")}</MenuItem>
+        {showDelete && (
+          <MenuItem
+            danger
+            testId={`article-delete-${article.id}`}
+            onSelect={() => void del.requestDelete()}
+          >
+            {t("ticket.deleteNote")}
+          </MenuItem>
+        )}
       </Menu>
+      {del.errorMessage && (
+        <p className="text-xs text-danger" data-testid={`article-delete-error-${article.id}`}>
+          {del.errorMessage}
+        </p>
+      )}
+      {showDelete && del.dialog}
 
       {canNote && (
         <ReplyDialog
