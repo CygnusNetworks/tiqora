@@ -44,6 +44,7 @@ from tiqora.ai.context import (
     TicketNotFoundError,
     get_or_create_state,
     load_articles,
+    render_ticket_header,
     ticket_snapshot,
 )
 from tiqora.ai.kb_wiring import build_vision_llm_factory
@@ -117,9 +118,14 @@ def _render_articles(
         attach_text = (attachment_blocks or {}).get(a.id)
         if attach_text:
             body = f"{body}\n\n{attach_text}" if body else attach_text
+        subject_line = f"Subject: {a.subject}" if a.subject else None
         if mask:
             body = pii.mask(body)
+            if subject_line:
+                subject_line = pii.mask(subject_line)
         lines.append(f"--- article {a.id} [{_label(a)}] ---")
+        if subject_line:
+            lines.append(subject_line)
         lines.append(body)
         lines.append("")
     return "\n".join(lines)
@@ -219,7 +225,8 @@ async def summarize_ticket(
             upto_article_id=state.last_summary_upto_article_id,
         )
 
-    pii = PiiMapper(never_mask={ticket.customer_id} if ticket.customer_id else None)
+    never_mask = {v for v in (ticket.customer_id, ticket.customer_user_id) if v}
+    pii = PiiMapper(never_mask=never_mask or None)
     mask = bool(policy.pii_masking)
 
     audit_context = AuditContext(
@@ -255,10 +262,11 @@ async def summarize_ticket(
         pii_mapper=pii,
     )
 
+    header = render_ticket_header(ticket)
     has_previous = state.summary_body is not None and state.last_summary_upto_article_id is not None
     if has_previous:
         user_message = (
-            f"Ticket #{ticket.ticket_id}: {ticket.title}\n\n"
+            f"{header}\n\n"
             f"--- previous summary ---\n{state.summary_body}\n\n"
             "--- new articles since then ---\n"
             + _render_articles(
@@ -267,7 +275,7 @@ async def summarize_ticket(
         )
     else:
         user_message = (
-            f"Ticket #{ticket.ticket_id}: {ticket.title}\n\n"
+            f"{header}\n\n"
             "--- full conversation ---\n"
             f"{_render_articles(articles, pii=pii, mask=mask, attachment_blocks=attachment_blocks)}"
         )

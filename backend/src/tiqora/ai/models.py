@@ -64,6 +64,16 @@ IDENTITY_CLARIFY_SCHEMA = "clarify_schema"
 IDENTITY_OFF = "off"
 IDENTITY_MODES = frozenset({IDENTITY_TICKET_CUSTOMER_ID, IDENTITY_CLARIFY_SCHEMA, IDENTITY_OFF})
 
+# tiqora_ai_queue_policy.reply_language_mode
+REPLY_LANGUAGE_OFF = "off"
+REPLY_LANGUAGE_FIXED = "fixed"
+REPLY_LANGUAGE_AUTO = "auto"
+REPLY_LANGUAGE_MODES = frozenset({REPLY_LANGUAGE_OFF, REPLY_LANGUAGE_FIXED, REPLY_LANGUAGE_AUTO})
+
+# tiqora_ai_queue_policy.allowed_state_types default (plan block 5) — applied
+# when the column is NULL/blank, see tiqora.ai.tools.resolve_allowed_state_types.
+DEFAULT_ALLOWED_STATE_TYPES = ("open",)
+
 # tiqora_ai_draft.kind
 DRAFT_KIND_REPLY = "reply"
 DRAFT_KIND_CLARIFY = "clarify"
@@ -279,6 +289,27 @@ class TiqoraAiQueuePolicy(TiqoraBase):
         String(30), nullable=False, default=IDENTITY_TICKET_CUSTOMER_ID
     )
     clarify_schema_json: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    # Sender blocklist (plan block 2) — JSON array of exact addresses or
+    # "*@domain" globs (see tiqora.ai.senders.matches_ignored). NULL/empty =
+    # no blocklist.
+    ignored_senders: Mapped[str | None] = mapped_column(Text, nullable=True)
+    ignore_senders_manual: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default=false()
+    )
+
+    # Reply language (plan block 3) — see tiqora.ai.reply_language. "off"
+    # (default) reproduces today's behaviour (no binding language line).
+    reply_language_mode: Mapped[str] = mapped_column(
+        String(10), nullable=False, default=REPLY_LANGUAGE_OFF, server_default=REPLY_LANGUAGE_OFF
+    )
+    reply_language_fixed: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    reply_language_default: Mapped[str | None] = mapped_column(String(20), nullable=True)
+
+    # update_ticket_fields state-change guard (plan block 5) — JSON array of
+    # ticket_state_type names. NULL/blank = default ["open"] (reopen allowed,
+    # never close); an explicit "[]" disables state changes entirely.
+    allowed_state_types: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     valid_id: Mapped[int] = mapped_column(
         SmallInteger, nullable=False, default=1, server_default="1"

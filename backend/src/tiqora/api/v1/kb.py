@@ -29,6 +29,7 @@ from tiqora.kb.schemas import (
     KbSearchResponse,
     KnowledgeArticle,
     KnowledgeBundle,
+    TagOut,
 )
 from tiqora.kb.service import KbForbidden, KbNotFound, KbService
 
@@ -155,11 +156,25 @@ async def list_articles(
     settings: AppSettings,
     category_id: int | None = Query(default=None),
     state: str | None = Query(default=None),
-    tag: str | None = Query(default=None),
+    tag: str | None = Query(default=None, description="Tag name, or comma-separated list (OR)"),
 ) -> list[ArticleSummary]:
     svc = KbService(session, settings)
     rows = await svc.list_articles(category_id=category_id, state=state, tag=tag, user_id=user.id)
-    return [ArticleSummary.model_validate(r, from_attributes=True) for r in rows]
+    tags_by_article = await svc.tags_for_articles([r.id for r in rows])
+    return [
+        ArticleSummary.model_validate(r, from_attributes=True).model_copy(
+            update={"tags": tags_by_article.get(r.id, [])}
+        )
+        for r in rows
+    ]
+
+
+@router.get("/tags", response_model=list[TagOut])
+async def list_tags(user: CurrentUser, session: DbSession, settings: AppSettings) -> list[TagOut]:
+    """All KB tags with the count of articles visible to the caller."""
+    svc = KbService(session, settings)
+    pairs = await svc.list_tags(user.id)
+    return [TagOut(name=name, article_count=count) for name, count in pairs]
 
 
 @router.get("/knowledge", response_model=KnowledgeBundle)

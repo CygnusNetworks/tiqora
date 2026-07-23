@@ -68,6 +68,7 @@ export {
   type ArticleSummary,
   type ArticleVersionOut,
   type AssignableGroup,
+  type KbTagOut,
   type KbAttachmentOut,
   type KnowledgeArticle,
   type KnowledgeBundle,

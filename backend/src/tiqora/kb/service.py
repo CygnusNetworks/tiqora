@@ -25,7 +25,7 @@ from typing import Any
 
 from meilisearch_python_sdk import AsyncClient
 from meilisearch_python_sdk.models.settings import MeilisearchSettings
-from sqlalchemy import delete, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from tiqora.config import Settings
@@ -293,13 +293,15 @@ class KbService:
         if state is not None:
             stmt = stmt.where(TiqoraKbArticle.state == state)
         if tag is not None:
-            stmt = stmt.where(
-                TiqoraKbArticle.id.in_(
-                    select(TiqoraKbArticleTag.article_id)
-                    .join(TiqoraKbTag, TiqoraKbTag.id == TiqoraKbArticleTag.tag_id)
-                    .where(TiqoraKbTag.name == tag)
+            tag_names = [t.strip() for t in tag.split(",") if t.strip()]
+            if tag_names:
+                stmt = stmt.where(
+                    TiqoraKbArticle.id.in_(
+                        select(TiqoraKbArticleTag.article_id)
+                        .join(TiqoraKbTag, TiqoraKbTag.id == TiqoraKbArticleTag.tag_id)
+                        .where(TiqoraKbTag.name.in_(tag_names))
+                    )
                 )
-            )
         stmt = stmt.order_by(TiqoraKbArticle.change_time.desc())
         rows = list((await self._session.execute(stmt)).scalars().all())
         if user_id is None:
@@ -434,6 +436,28 @@ class KbService:
                 out.append((row, await self.get_tags(row.id)))
         return out
 
+    async def list_tags(self, user_id: int) -> list[tuple[str, int]]:
+        """All tag names with the count of ``user_id``-visible articles carrying each.
+
+        Every tag is returned (even ones with zero visible articles, so an
+        autocomplete can still offer them), sorted by name. The count uses
+        the same category-ACL rule as ``list_articles``/``get_knowledge``.
+        """
+        allowed = await self._readable_category_ids(user_id)
+        rows = await self._session.execute(
+            select(TiqoraKbTag.name, func.count(TiqoraKbArticle.id))
+            .select_from(TiqoraKbTag)
+            .outerjoin(TiqoraKbArticleTag, TiqoraKbArticleTag.tag_id == TiqoraKbTag.id)
+            .outerjoin(
+                TiqoraKbArticle,
+                (TiqoraKbArticle.id == TiqoraKbArticleTag.article_id)
+                & (TiqoraKbArticle.category_id.in_(allowed)),
+            )
+            .group_by(TiqoraKbTag.name)
+            .order_by(TiqoraKbTag.name)
+        )
+        return [(name, count) for name, count in rows.all()]
+
     async def get_tags(self, article_id: int) -> list[str]:
         rows = await self._session.execute(
             select(TiqoraKbTag.name)
@@ -442,6 +466,21 @@ class KbService:
             .order_by(TiqoraKbTag.name)
         )
         return [r[0] for r in rows.all()]
+
+    async def tags_for_articles(self, article_ids: list[int]) -> dict[int, list[str]]:
+        """Tag names per article in one query (list rendering, no N+1)."""
+        if not article_ids:
+            return {}
+        rows = await self._session.execute(
+            select(TiqoraKbArticleTag.article_id, TiqoraKbTag.name)
+            .join(TiqoraKbTag, TiqoraKbTag.id == TiqoraKbArticleTag.tag_id)
+            .where(TiqoraKbArticleTag.article_id.in_(article_ids))
+            .order_by(TiqoraKbTag.name)
+        )
+        out: dict[int, list[str]] = {}
+        for article_id, name in rows.all():
+            out.setdefault(article_id, []).append(name)
+        return out
 
     async def set_tags(self, article_id: int, tag_names: list[str]) -> None:
         await self._session.execute(

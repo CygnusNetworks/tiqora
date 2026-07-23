@@ -3,6 +3,8 @@ import { useTranslation } from "react-i18next";
 import { Dialog } from "@/components/ui/Dialog";
 import { Button } from "@/components/ui/Button";
 import { HelpPopover } from "@/components/ui/HelpPopover";
+import { SelectMenu } from "@/components/ui/SelectMenu";
+import { ChevronDownIcon } from "@/components/ui/icons";
 import { cn } from "@/lib/cn";
 
 export type FieldOption = { value: string | number; label: string };
@@ -255,26 +257,40 @@ export function CrudDrawer({
             className={`${baseInputClass} ${borderClass} ${fontClass}`}
           />
         ) : f.type === "select" ? (
-          <select
-            id={id}
-            data-testid={id}
-            value={value == null ? "" : String(value)}
-            aria-invalid={invalid || undefined}
-            onChange={(e) => {
-              const opt = f.options?.find((o) => String(o.value) === e.target.value);
-              setField(f.name, opt ? opt.value : e.target.value);
+          <SelectMenu
+            items={(f.options ?? []).map((o) => ({ value: String(o.value), label: o.label }))}
+            value={value == null ? null : String(value)}
+            onSelect={(v) => {
+              const opt = f.options?.find((o) => String(o.value) === v);
+              setField(f.name, opt ? opt.value : v);
             }}
-            className={`${baseInputClass} ${borderClass} ${fontClass}`}
-          >
-            <option value="" disabled>
-              {t("admin.form.selectPlaceholder")}
-            </option>
-            {f.options?.map((o) => (
-              <option key={o.value} value={o.value}>
-                {o.label}
-              </option>
-            ))}
-          </select>
+            placeholder={t("admin.form.selectPlaceholder")}
+            panelTestId={`${id}-menu`}
+            trigger={({ open, ref, toggleProps }) => {
+              const selected = f.options?.find((o) => String(o.value) === String(value ?? ""));
+              return (
+                <button
+                  ref={ref}
+                  type="button"
+                  id={id}
+                  data-testid={id}
+                  aria-invalid={invalid || undefined}
+                  {...toggleProps}
+                  className={`${baseInputClass} ${borderClass} ${fontClass} flex items-center justify-between gap-2 text-left`}
+                >
+                  <span className={cn("truncate", !selected && "text-muted")}>
+                    {selected?.label ?? t("admin.form.selectPlaceholder")}
+                  </span>
+                  <ChevronDownIcon
+                    className={cn(
+                      "shrink-0 text-muted transition-transform duration-150",
+                      open && "rotate-180",
+                    )}
+                  />
+                </button>
+              );
+            }}
+          />
         ) : f.type === "custom" && f.render ? (
           f.render(value, (v) => setField(f.name, v), values)
         ) : null}

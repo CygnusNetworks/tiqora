@@ -13,6 +13,7 @@ ProviderKind = Literal["openai_compat", "anthropic"]
 McpTransport = Literal["streamable_http"]
 Autonomy = Literal["off", "clarify_only", "full"]
 IdentityMode = Literal["ticket_customer_id", "clarify_schema", "off"]
+ReplyLanguageMode = Literal["off", "fixed", "auto"]
 AclSubjectType = Literal["group", "role", "user"]
 AclFeature = Literal["summary", "auto_reply", "manual_assist", "mcp"]
 
@@ -188,6 +189,12 @@ class AiQueuePolicyOut(BaseModel):
     pii_masking: bool
     identity_mode: IdentityMode
     clarify_schema_json: str | None
+    ignored_senders: str | None
+    ignore_senders_manual: bool
+    reply_language_mode: ReplyLanguageMode
+    reply_language_fixed: str | None
+    reply_language_default: str | None
+    allowed_state_types: str | None
     valid_id: int
     create_time: datetime
     change_time: datetime
@@ -222,6 +229,12 @@ class AiQueuePolicyCreate(BaseModel):
     pii_masking: bool = True
     identity_mode: IdentityMode = "ticket_customer_id"
     clarify_schema_json: str | None = None
+    ignored_senders: str | None = None
+    ignore_senders_manual: bool = False
+    reply_language_mode: ReplyLanguageMode = "off"
+    reply_language_fixed: str | None = None
+    reply_language_default: str | None = None
+    allowed_state_types: str | None = None
 
 
 class AiQueuePolicyUpdate(BaseModel):
@@ -252,6 +265,12 @@ class AiQueuePolicyUpdate(BaseModel):
     pii_masking: bool | None = None
     identity_mode: IdentityMode | None = None
     clarify_schema_json: str | None = None
+    ignored_senders: str | None = None
+    ignore_senders_manual: bool | None = None
+    reply_language_mode: ReplyLanguageMode | None = None
+    reply_language_fixed: str | None = None
+    reply_language_default: str | None = None
+    allowed_state_types: str | None = None
     valid_id: int | None = None
 
 

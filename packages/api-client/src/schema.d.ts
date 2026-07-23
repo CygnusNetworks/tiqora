@@ -1543,6 +1543,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/kb/tags": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Tags
+         * @description All KB tags with the count of articles visible to the caller.
+         */
+        get: operations["list_tags_api_v1_kb_tags_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/kb/knowledge": {
         parameters: {
             query?: never;
@@ -5062,6 +5082,25 @@ export interface components {
             identity_mode: "ticket_customer_id" | "clarify_schema" | "off";
             /** Clarify Schema Json */
             clarify_schema_json?: string | null;
+            /** Ignored Senders */
+            ignored_senders?: string | null;
+            /**
+             * Ignore Senders Manual
+             * @default false
+             */
+            ignore_senders_manual: boolean;
+            /**
+             * Reply Language Mode
+             * @default off
+             * @enum {string}
+             */
+            reply_language_mode: "off" | "fixed" | "auto";
+            /** Reply Language Fixed */
+            reply_language_fixed?: string | null;
+            /** Reply Language Default */
+            reply_language_default?: string | null;
+            /** Allowed State Types */
+            allowed_state_types?: string | null;
         };
         /** AiQueuePolicyOut */
         AiQueuePolicyOut: {
@@ -5129,6 +5168,21 @@ export interface components {
             identity_mode: "ticket_customer_id" | "clarify_schema" | "off";
             /** Clarify Schema Json */
             clarify_schema_json: string | null;
+            /** Ignored Senders */
+            ignored_senders: string | null;
+            /** Ignore Senders Manual */
+            ignore_senders_manual: boolean;
+            /**
+             * Reply Language Mode
+             * @enum {string}
+             */
+            reply_language_mode: "off" | "fixed" | "auto";
+            /** Reply Language Fixed */
+            reply_language_fixed: string | null;
+            /** Reply Language Default */
+            reply_language_default: string | null;
+            /** Allowed State Types */
+            allowed_state_types: string | null;
             /** Valid Id */
             valid_id: number;
             /**
@@ -5198,6 +5252,18 @@ export interface components {
             identity_mode?: ("ticket_customer_id" | "clarify_schema" | "off") | null;
             /** Clarify Schema Json */
             clarify_schema_json?: string | null;
+            /** Ignored Senders */
+            ignored_senders?: string | null;
+            /** Ignore Senders Manual */
+            ignore_senders_manual?: boolean | null;
+            /** Reply Language Mode */
+            reply_language_mode?: ("off" | "fixed" | "auto") | null;
+            /** Reply Language Fixed */
+            reply_language_fixed?: string | null;
+            /** Reply Language Default */
+            reply_language_default?: string | null;
+            /** Allowed State Types */
+            allowed_state_types?: string | null;
             /** Valid Id */
             valid_id?: number | null;
         };
@@ -5649,6 +5715,8 @@ export interface components {
              * Format: date-time
              */
             change_time: string;
+            /** Tags */
+            tags?: string[];
         };
         /** ArticleUpdateIn */
         ArticleUpdateIn: {
@@ -8996,6 +9064,16 @@ export interface components {
         TOTPStatusOut: {
             /** Enabled */
             enabled: boolean;
+        };
+        /**
+         * TagOut
+         * @description A KB tag with the count of articles visible to the requesting user.
+         */
+        TagOut: {
+            /** Name */
+            name: string;
+            /** Article Count */
+            article_count: number;
         };
         /**
          * TemplateAttachmentsReplace
@@ -12673,6 +12751,7 @@ export interface operations {
             query?: {
                 category_id?: number | null;
                 state?: string | null;
+                /** @description Tag name, or comma-separated list (OR) */
                 tag?: string | null;
             };
             header?: {
@@ -12729,6 +12808,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ArticleOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_tags_api_v1_kb_tags_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TagOut"][];
                 };
             };
             /** @description Validation Error */
