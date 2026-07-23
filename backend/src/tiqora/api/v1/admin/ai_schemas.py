@@ -15,6 +15,7 @@ Autonomy = Literal["off", "clarify_only", "full"]
 PromptPartKind = Literal["file", "note"]
 IdentityMode = Literal["ticket_customer_id", "clarify_schema", "off"]
 ReplyLanguageMode = Literal["off", "fixed", "auto"]
+SummaryDetail = Literal["standard", "detailed"]
 AclSubjectType = Literal["group", "role", "user"]
 AclFeature = Literal["summary", "auto_reply", "manual_assist", "mcp"]
 
@@ -197,6 +198,7 @@ class AiQueuePolicyOut(BaseModel):
     ai_disclosure_enabled: bool
     ai_disclosure_text: str | None
     pii_masking: bool
+    pii_ner_enabled: bool
     identity_mode: IdentityMode
     clarify_schema_json: str | None
     ignored_senders: str | None
@@ -205,6 +207,7 @@ class AiQueuePolicyOut(BaseModel):
     reply_language_fixed: str | None
     reply_language_default: str | None
     allowed_state_types: str | None
+    summary_detail: SummaryDetail
     valid_id: int
     create_time: datetime
     change_time: datetime
@@ -237,6 +240,7 @@ class AiQueuePolicyCreate(BaseModel):
     ai_disclosure_enabled: bool = False
     ai_disclosure_text: str | None = None
     pii_masking: bool = True
+    pii_ner_enabled: bool = True
     identity_mode: IdentityMode = "ticket_customer_id"
     clarify_schema_json: str | None = None
     ignored_senders: str | None = None
@@ -245,6 +249,7 @@ class AiQueuePolicyCreate(BaseModel):
     reply_language_fixed: str | None = None
     reply_language_default: str | None = None
     allowed_state_types: str | None = None
+    summary_detail: SummaryDetail = "standard"
 
 
 class AiQueuePolicyUpdate(BaseModel):
@@ -273,6 +278,7 @@ class AiQueuePolicyUpdate(BaseModel):
     ai_disclosure_enabled: bool | None = None
     ai_disclosure_text: str | None = None
     pii_masking: bool | None = None
+    pii_ner_enabled: bool | None = None
     identity_mode: IdentityMode | None = None
     clarify_schema_json: str | None = None
     ignored_senders: str | None = None
@@ -281,6 +287,7 @@ class AiQueuePolicyUpdate(BaseModel):
     reply_language_fixed: str | None = None
     reply_language_default: str | None = None
     allowed_state_types: str | None = None
+    summary_detail: SummaryDetail | None = None
     valid_id: int | None = None
 
 

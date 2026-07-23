@@ -19,8 +19,10 @@ from tiqora.ai import providers as ai_providers
 from tiqora.ai.gate import OPERATION_MODE_TIQORA_PRIMARY, set_operation_mode
 from tiqora.ai.llm import LlmMessage, LlmResponse, LlmUsage
 from tiqora.ai.models import TiqoraAiTicketState
+from tiqora.ai.policies import QueuePolicyValidationError
 from tiqora.ai.summary import (
     _SYSTEM_PROMPT,
+    _SYSTEM_PROMPT_DETAILED,
     STATUS_UP_TO_DATE,
     STATUS_UPDATED,
     TRIGGER_AUTO,
@@ -55,6 +57,13 @@ def test_system_prompt_requires_paragraph_structure_and_document_section() -> No
     assert "Dokumente:" in _SYSTEM_PROMPT
 
 
+def test_detailed_prompt_asks_for_3_to_5_sentence_document_summaries() -> None:
+    assert "3-5 sentence" in _SYSTEM_PROMPT_DETAILED
+    assert "Dokumente:" in _SYSTEM_PROMPT_DETAILED
+    # "standard" behaviour must stay byte-identical to before this change.
+    assert _SYSTEM_PROMPT_DETAILED != _SYSTEM_PROMPT
+
+
 class ScriptedLlm:
     """Returns one scripted plain-text :class:`LlmResponse` per call, in order."""
 
@@ -62,6 +71,7 @@ class ScriptedLlm:
         self._contents = list(contents)
         self.calls = 0
         self.last_user_message: str | None = None
+        self.last_system_message: str | None = None
 
     async def chat(
         self,
@@ -75,6 +85,9 @@ class ScriptedLlm:
         self.calls += 1
         self.last_user_message = next(
             (m.content for m in reversed(messages) if m.role == "user"), None
+        )
+        self.last_system_message = next(
+            (m.content for m in reversed(messages) if m.role == "system"), None
         )
         content = self._contents.pop(0)
         return LlmResponse(content=content, usage=LlmUsage(prompt_tokens=12, completion_tokens=6))
@@ -272,6 +285,9 @@ async def _setup_policy(
     summary_incremental_min_chars: int | None = None,
     summary_article_threshold: int | None = None,
     summary_char_threshold: int | None = None,
+    summary_detail: str = "standard",
+    pii_masking: bool = False,
+    pii_ner_enabled: bool = True,
 ) -> None:
     await set_operation_mode(session, OPERATION_MODE_TIQORA_PRIMARY)
     provider = await ai_providers.create_provider(
@@ -294,11 +310,13 @@ async def _setup_policy(
         queue_id=seed["queue_id"],
         enabled_summary=enabled_summary,
         llm_provider_id=provider.id,
-        pii_masking=False,
+        pii_masking=pii_masking,
+        pii_ner_enabled=pii_ner_enabled,
         summary_incremental_min_articles=summary_incremental_min_articles,
         summary_incremental_min_chars=summary_incremental_min_chars,
         summary_article_threshold=summary_article_threshold,
         summary_char_threshold=summary_char_threshold,
+        summary_detail=summary_detail,
     )
 
 
@@ -768,5 +786,115 @@ async def test_document_attachment_text_appears_in_summary_prompt(mariadb_znuny_
         assert llm.last_user_message is not None
         assert "Vertragsnummer: XY-987" in llm.last_user_message
         assert "[Anhang: vertrag.txt]" in llm.last_user_message
+    finally:
+        await engine.dispose()
+
+
+async def test_summary_detail_standard_sends_unchanged_system_prompt(
+    mariadb_znuny_url: str,
+) -> None:
+    seed = _seed_ticket(mariadb_znuny_url, ns=13)
+    _add_article(
+        mariadb_znuny_url, ticket_id=seed["ticket_id"], sender_type="customer", body="Help!"
+    )
+    engine = create_async_engine(_mysql_async(mariadb_znuny_url))
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    try:
+        async with factory() as session:
+            await _setup_policy(session, seed=seed, summary_detail="standard")
+
+        llm = ScriptedLlm(["ok"])
+        async with factory() as session:
+            await summarize_ticket(
+                session,
+                llm=llm,
+                ticket_id=seed["ticket_id"],
+                trigger=TRIGGER_MANUAL,
+                acting_user_id=seed["agent_id"],
+            )
+        assert llm.last_system_message == _SYSTEM_PROMPT
+    finally:
+        await engine.dispose()
+
+
+async def test_summary_detail_detailed_sends_detailed_system_prompt(
+    mariadb_znuny_url: str,
+) -> None:
+    seed = _seed_ticket(mariadb_znuny_url, ns=14)
+    _add_article(
+        mariadb_znuny_url, ticket_id=seed["ticket_id"], sender_type="customer", body="Help!"
+    )
+    engine = create_async_engine(_mysql_async(mariadb_znuny_url))
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    try:
+        async with factory() as session:
+            await _setup_policy(session, seed=seed, summary_detail="detailed")
+
+        llm = ScriptedLlm(["ok"])
+        async with factory() as session:
+            await summarize_ticket(
+                session,
+                llm=llm,
+                ticket_id=seed["ticket_id"],
+                trigger=TRIGGER_MANUAL,
+                acting_user_id=seed["agent_id"],
+            )
+        assert llm.last_system_message == _SYSTEM_PROMPT_DETAILED
+    finally:
+        await engine.dispose()
+
+
+async def test_invalid_summary_detail_rejected_at_policy_creation(
+    mariadb_znuny_url: str,
+) -> None:
+    seed = _seed_ticket(mariadb_znuny_url, ns=15)
+    engine = create_async_engine(_mysql_async(mariadb_znuny_url))
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    try:
+        async with factory() as session:
+            await set_operation_mode(session, OPERATION_MODE_TIQORA_PRIMARY)
+            with pytest.raises(QueuePolicyValidationError):
+                await ai_policies.create_queue_policy(
+                    session,
+                    change_by=1,
+                    queue_id=seed["queue_id"],
+                    summary_detail="verbose",
+                )
+    finally:
+        await engine.dispose()
+
+
+async def test_pii_ner_enabled_masks_third_party_name_mentioned_in_body(
+    mariadb_znuny_url: str,
+) -> None:
+    """A name that appears only in the article body (not in a From-header or
+    customer_user record) must still be masked when pii_masking + NER are
+    both on — the runtime/summary-shared collect_known_names(extra_texts=...)
+    path (tiqora.ai.context.ner_source_texts) is what makes this possible."""
+    seed = _seed_ticket(mariadb_znuny_url, ns=16)
+    _add_article(
+        mariadb_znuny_url,
+        ticket_id=seed["ticket_id"],
+        sender_type="customer",
+        body="Bitte sprechen Sie mit Rasmus Müller in unserer Buchhaltung dazu.",
+    )
+    engine = create_async_engine(_mysql_async(mariadb_znuny_url))
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    try:
+        async with factory() as session:
+            await _setup_policy(session, seed=seed, pii_masking=True, pii_ner_enabled=True)
+
+        llm = ScriptedLlm(["ok"])
+        async with factory() as session:
+            await summarize_ticket(
+                session,
+                llm=llm,
+                ticket_id=seed["ticket_id"],
+                trigger=TRIGGER_MANUAL,
+                acting_user_id=seed["agent_id"],
+            )
+        assert llm.last_user_message is not None
+        assert "Rasmus Müller" not in llm.last_user_message
+        assert "[NAME_" in llm.last_user_message
     finally:
         await engine.dispose()

@@ -481,6 +481,44 @@ async def test_queue_policy_create_validation(mariadb_znuny_url: str) -> None:
         await engine.dispose()
 
 
+async def test_queue_policy_ner_and_summary_detail_roundtrip_and_validation(
+    mariadb_znuny_url: str,
+) -> None:
+    _ensure_tiqora_tables(mariadb_znuny_url)
+    engine = create_async_engine(_mysql_async(mariadb_znuny_url))
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    try:
+        async with factory() as session:
+            created = await admin_ai.create_queue_policy_route(
+                AiQueuePolicyCreate(queue_id=90501, pii_ner_enabled=False),
+                _root_user(),
+                session,
+            )
+            # Both new fields default sensibly even when unset.
+            assert created.pii_ner_enabled is False
+            assert created.summary_detail == "standard"
+
+            updated = await admin_ai.update_queue_policy_route(
+                created.id,
+                AiQueuePolicyUpdate(pii_ner_enabled=True, summary_detail="detailed"),
+                _root_user(),
+                session,
+            )
+            assert updated.pii_ner_enabled is True
+            assert updated.summary_detail == "detailed"
+
+            # Invalid summary_detail is rejected by the service layer even
+            # though pydantic's Literal already blocks it at the API
+            # boundary — same defense-in-depth pattern as autonomy/reply
+            # language mode above.
+            with pytest.raises(ai_policies.QueuePolicyValidationError):
+                await ai_policies.update_queue_policy(
+                    session, created, change_by=1, summary_detail="verbose"
+                )
+    finally:
+        await engine.dispose()
+
+
 async def test_queue_policy_gate_enforcement_409_then_ok_then_regression(
     mariadb_znuny_url: str,
 ) -> None:

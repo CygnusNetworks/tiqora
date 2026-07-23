@@ -45,6 +45,12 @@ dependencies = [
     "python-docx>=1.1",
     "openpyxl>=3.1",
     "odfpy>=1.4",
+    # NER-based person-name detection feeding PII masking (tiqora.ai.ner) —
+    # runs inside the agent runtime/summary render path, must ship in the
+    # prod image, not just the dev group.
+    "spacy>=3.8,<3.9",
+    "de_core_news_sm @ https://github.com/explosion/spacy-models/releases/download/de_core_news_sm-3.8.0/de_core_news_sm-3.8.0-py3-none-any.whl",
+    "en_core_web_sm @ https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.8.0/en_core_web_sm-3.8.0-py3-none-any.whl",
 ]
 
 [project.optional-dependencies]
@@ -74,6 +80,11 @@ tiqora-mcp = "tiqora.mcp_server.__main__:run_mcp"
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
+
+[tool.hatch.metadata]
+# de_core_news_sm / en_core_web_sm ship as direct-URL wheel dependencies
+# (spaCy models are not on PyPI) — see tiqora.ai.ner.
+allow-direct-references = true
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/tiqora"]

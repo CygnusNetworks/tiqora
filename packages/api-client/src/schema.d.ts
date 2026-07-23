@@ -5231,6 +5231,11 @@ export interface components {
              */
             pii_masking: boolean;
             /**
+             * Pii Ner Enabled
+             * @default true
+             */
+            pii_ner_enabled: boolean;
+            /**
              * Identity Mode
              * @default ticket_customer_id
              * @enum {string}
@@ -5257,6 +5262,12 @@ export interface components {
             reply_language_default?: string | null;
             /** Allowed State Types */
             allowed_state_types?: string | null;
+            /**
+             * Summary Detail
+             * @default standard
+             * @enum {string}
+             */
+            summary_detail: "standard" | "detailed";
         };
         /** AiQueuePolicyOut */
         AiQueuePolicyOut: {
@@ -5317,6 +5328,8 @@ export interface components {
             ai_disclosure_text: string | null;
             /** Pii Masking */
             pii_masking: boolean;
+            /** Pii Ner Enabled */
+            pii_ner_enabled: boolean;
             /**
              * Identity Mode
              * @enum {string}
@@ -5339,6 +5352,11 @@ export interface components {
             reply_language_default: string | null;
             /** Allowed State Types */
             allowed_state_types: string | null;
+            /**
+             * Summary Detail
+             * @enum {string}
+             */
+            summary_detail: "standard" | "detailed";
             /** Valid Id */
             valid_id: number;
             /**
@@ -5404,6 +5422,8 @@ export interface components {
             ai_disclosure_text?: string | null;
             /** Pii Masking */
             pii_masking?: boolean | null;
+            /** Pii Ner Enabled */
+            pii_ner_enabled?: boolean | null;
             /** Identity Mode */
             identity_mode?: ("ticket_customer_id" | "clarify_schema" | "off") | null;
             /** Clarify Schema Json */
@@ -5420,6 +5440,8 @@ export interface components {
             reply_language_default?: string | null;
             /** Allowed State Types */
             allowed_state_types?: string | null;
+            /** Summary Detail */
+            summary_detail?: ("standard" | "detailed") | null;
             /** Valid Id */
             valid_id?: number | null;
         };

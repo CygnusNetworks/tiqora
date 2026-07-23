@@ -36,6 +36,7 @@ from tiqora.ai.context import (
     get_or_create_state,
     latest_customer_article_id,
     load_articles,
+    ner_source_texts,
     render_ticket_header,
     ticket_snapshot,
 )
@@ -453,7 +454,12 @@ async def run_ticket_agent(
         )
 
         never_mask = {v for v in (ticket.customer_id, ticket.customer_user_id) if v}
-        known_names = await collect_known_names(session, ticket, articles)
+        ner_texts = (
+            ner_source_texts(articles, attachment_context.blocks)
+            if policy.pii_masking and policy.pii_ner_enabled
+            else None
+        )
+        known_names = await collect_known_names(session, ticket, articles, extra_texts=ner_texts)
         pii = PiiMapper(never_mask=never_mask or None, known_names=known_names or None)
         llm = AuditingLlmClient(
             llm, settings=settings, context=audit_context, session=session, pii_mapper=pii
