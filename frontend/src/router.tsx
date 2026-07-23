@@ -92,6 +92,7 @@ import {
   AiQueuePolicyEditPage,
 } from "@/routes/admin/AiQueuePolicyEditorPage";
 import { AiAuditPage } from "@/routes/admin/AiAuditPage";
+import { AiAclPage } from "@/routes/admin/AiAclPage";
 
 const rootRoute = createRootRoute({
   component: () => <Outlet />,
@@ -661,6 +662,12 @@ const adminAiAuditRoute = createRoute({
   component: AiAuditPage,
 });
 
+const adminAiAclRoute = createRoute({
+  getParentRoute: () => adminLayoutRoute,
+  path: "/ai/acl",
+  component: AiAclPage,
+});
+
 const catchAllRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "$",
@@ -745,6 +752,7 @@ const routeTree = rootRoute.addChildren([
     adminAiQueueNewRoute,
     adminAiQueueEditRoute,
     adminAiAuditRoute,
+    adminAiAclRoute,
   ]),
   catchAllRoute,
 ]);

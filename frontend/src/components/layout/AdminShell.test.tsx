@@ -60,17 +60,37 @@ async function renderShell(initialPath = "/admin") {
 }
 
 describe("AdminShell", () => {
-  it("renders all 5 domain groups with every registered admin page as a nav entry", async () => {
-    await renderShell();
-    expect(screen.getByTestId("admin-sidebar-nav")).toBeInTheDocument();
-    for (const page of ADMIN_PAGES) {
-      expect(screen.getByTestId(`admin-nav-${page.slug}`)).toBeInTheDocument();
+  it("renders the icon rail with one button per group and only the active group's pages", async () => {
+    await renderShell("/admin/queues");
+    expect(screen.getByTestId("admin-nav-rail")).toBeInTheDocument();
+    for (const group of ["access", "tickets", "communication", "ai", "automation", "system"]) {
+      expect(screen.getByTestId(`admin-rail-${group}`)).toBeInTheDocument();
     }
-    expect(screen.getByText(i18n.t("admin.group.access"))).toBeInTheDocument();
-    expect(screen.getByText(i18n.t("admin.group.tickets"))).toBeInTheDocument();
-    expect(screen.getByText(i18n.t("admin.group.communication"))).toBeInTheDocument();
-    expect(screen.getByText(i18n.t("admin.group.automation"))).toBeInTheDocument();
-    expect(screen.getByText(i18n.t("admin.group.system"))).toBeInTheDocument();
+    // Route /admin/queues belongs to "tickets": its pages are listed …
+    expect(screen.getByTestId("admin-nav-queues")).toBeInTheDocument();
+    expect(screen.getByTestId("admin-nav-states")).toBeInTheDocument();
+    // … while other groups' pages are not rendered in the context column.
+    expect(screen.queryByTestId("admin-nav-users")).toBeNull();
+    expect(screen.getByTestId("admin-rail-tickets").getAttribute("aria-pressed")).toBe("true");
+  });
+
+  it("switches the context column when another rail group is clicked", async () => {
+    await renderShell("/admin/queues");
+    fireEvent.click(screen.getByTestId("admin-rail-ai"));
+    expect(screen.getByTestId("admin-nav-ai-queues")).toBeInTheDocument();
+    expect(screen.getByTestId("admin-nav-ai-acl")).toBeInTheDocument();
+    expect(screen.queryByTestId("admin-nav-queues")).toBeNull();
+  });
+
+  it("collapses and re-expands the context column", async () => {
+    await renderShell("/admin/queues");
+    expect(screen.getByTestId("admin-nav-context")).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("admin-nav-collapse"));
+    expect(screen.queryByTestId("admin-nav-context")).toBeNull();
+    // Clicking a rail group re-opens the column.
+    fireEvent.click(screen.getByTestId("admin-rail-access"));
+    expect(screen.getByTestId("admin-nav-context")).toBeInTheDocument();
+    localStorage.removeItem("tiqora.admin.nav.collapsed");
   });
 
   it("marks the current route's nav entry active", async () => {
@@ -79,11 +99,19 @@ describe("AdminShell", () => {
     expect(link.className).toContain("text-accent");
   });
 
+  it("keeps every registered admin page reachable via the mobile nav", async () => {
+    await renderShell();
+    fireEvent.click(screen.getByTestId("admin-sidebar-toggle"));
+    for (const page of ADMIN_PAGES) {
+      expect(screen.getByTestId(`admin-nav-mobile-${page.slug}`)).toBeInTheDocument();
+    }
+  });
+
   it("opens the command palette from the sidebar search trigger", async () => {
     await renderShell();
     expect(screen.queryByTestId("admin-search-input")).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByTestId("admin-search-trigger"));
+    fireEvent.click(screen.getAllByTestId("admin-search-trigger")[0]);
 
     expect(screen.getByTestId("admin-search-input")).toBeInTheDocument();
   });

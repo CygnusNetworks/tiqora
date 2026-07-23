@@ -305,6 +305,25 @@ function AiQueuePolicyEditor({ policyId }: { policyId?: number }) {
     queryKey: ["kb", "tags"],
     queryFn: ({ signal }) => api.listKbTags(signal),
   });
+  const kbCategoriesQ = useQuery({
+    queryKey: ["kb", "categories"],
+    queryFn: ({ signal }) => api.listKbCategories(signal),
+  });
+
+  // kb_category_ids stays a CSV string on the wire (tolerant backend parsing);
+  // the UI works on the parsed id set.
+  const selectedKbCategoryIds = new Set(
+    (form?.kb_category_ids ?? "")
+      .split(",")
+      .map((s) => Number(s.trim()))
+      .filter((n) => Number.isFinite(n) && n > 0),
+  );
+  const toggleKbCategory = (id: number) => {
+    const next = new Set(selectedKbCategoryIds);
+    if (next.has(id)) next.delete(id);
+    else next.add(id);
+    setField("kb_category_ids", Array.from(next).sort((a, b) => a - b).join(","));
+  };
 
   const editingRow = useMemo(
     () => (isEdit ? (policiesQ.data?.items ?? []).find((p) => p.id === policyId) ?? null : null),
@@ -763,20 +782,38 @@ function AiQueuePolicyEditor({ policyId }: { policyId?: number }) {
                   placeholder={t("admin.ai.queues.kbTagsPlaceholder")}
                 />
               </label>
-              <label className="block text-sm">
+              <div className="block text-sm">
                 <FieldLabel
-                  text={t("admin.ai.queues.kbCategoryIds")}
+                  text={t("admin.ai.queues.kbCategories")}
                   help={t("admin.help.aiQueue.kbCategoryIds")}
                   testId="admin-ai-queue-help-kb_category_ids"
                 />
-                <input
+                <div
+                  className="flex flex-wrap gap-2"
                   data-testid="admin-ai-queue-form-kb_category_ids"
-                  value={form.kb_category_ids}
-                  onChange={(e) => setField("kb_category_ids", e.target.value)}
-                  placeholder="1,2,3"
-                  className={inputClass}
-                />
-              </label>
+                >
+                  {(kbCategoriesQ.data ?? []).map((c) => (
+                    <label
+                      key={c.id}
+                      className="flex items-center gap-1.5 rounded-md border border-hairline bg-surface-subtle px-2 py-1.5 text-xs text-ink"
+                    >
+                      <input
+                        type="checkbox"
+                        data-testid={`admin-ai-queue-form-kb-category-${c.id}`}
+                        checked={selectedKbCategoryIds.has(c.id)}
+                        onChange={() => toggleKbCategory(c.id)}
+                        className="rounded border-hairline"
+                      />
+                      {c.name}
+                    </label>
+                  ))}
+                  {(kbCategoriesQ.data?.length ?? 0) === 0 && (
+                    <span className="text-xs text-muted">
+                      {t("admin.ai.queues.kbCategoriesEmpty")}
+                    </span>
+                  )}
+                </div>
+              </div>
               <div className="sm:col-span-2">
                 <div className="mb-1 flex items-center gap-1.5">
                   <FieldLabel
@@ -921,45 +958,8 @@ function AiQueuePolicyEditor({ policyId }: { policyId?: number }) {
                 />
               </label>
             </fieldset>
-          </div>
-        )}
 
-        {tab === "auto" && (
-          <div className="space-y-4">
-            <div className="space-y-2 border-b border-hairline pb-4">
-              <FieldLabel
-                text={t("admin.ai.queues.ignoredSenders")}
-                help={t("admin.help.aiQueue.ignoredSenders")}
-                testId="admin-ai-queue-help-ignored_senders"
-              />
-              <textarea
-                data-testid="admin-ai-queue-form-ignored_senders"
-                value={form.ignored_senders}
-                onChange={(e) => setField("ignored_senders", e.target.value)}
-                placeholder={t("admin.ai.queues.ignoredSendersPlaceholder")}
-                rows={3}
-                spellCheck={false}
-                className={cn(inputClass, "font-mono text-xs")}
-              />
-              <label className="flex items-center gap-2 text-sm text-ink">
-                <input
-                  type="checkbox"
-                  data-testid="admin-ai-queue-form-ignore_senders_manual"
-                  checked={form.ignore_senders_manual}
-                  onChange={(e) => setField("ignore_senders_manual", e.target.checked)}
-                  className="rounded border-hairline"
-                />
-                {t("admin.ai.queues.ignoreSendersManual")}
-                <HelpPopover
-                  title={t("admin.ai.queues.ignoreSendersManual")}
-                  testId="admin-ai-queue-help-ignore_senders_manual"
-                >
-                  {t("admin.help.aiQueue.ignoreSendersManual")}
-                </HelpPopover>
-              </label>
-            </div>
-
-            <div className="grid gap-4 border-b border-hairline pb-4 sm:grid-cols-2">
+            <div className="grid gap-4 rounded-lg border border-hairline p-3 sm:grid-cols-2">
               <label className="block text-sm">
                 <FieldLabel
                   text={t("admin.ai.queues.replyLanguageMode.label")}
@@ -1010,6 +1010,43 @@ function AiQueuePolicyEditor({ policyId }: { policyId?: number }) {
                   />
                 </label>
               )}
+            </div>
+          </div>
+        )}
+
+        {tab === "auto" && (
+          <div className="space-y-4">
+            <div className="space-y-2 border-b border-hairline pb-4">
+              <FieldLabel
+                text={t("admin.ai.queues.ignoredSenders")}
+                help={t("admin.help.aiQueue.ignoredSenders")}
+                testId="admin-ai-queue-help-ignored_senders"
+              />
+              <textarea
+                data-testid="admin-ai-queue-form-ignored_senders"
+                value={form.ignored_senders}
+                onChange={(e) => setField("ignored_senders", e.target.value)}
+                placeholder={t("admin.ai.queues.ignoredSendersPlaceholder")}
+                rows={3}
+                spellCheck={false}
+                className={cn(inputClass, "font-mono text-xs")}
+              />
+              <label className="flex items-center gap-2 text-sm text-ink">
+                <input
+                  type="checkbox"
+                  data-testid="admin-ai-queue-form-ignore_senders_manual"
+                  checked={form.ignore_senders_manual}
+                  onChange={(e) => setField("ignore_senders_manual", e.target.checked)}
+                  className="rounded border-hairline"
+                />
+                {t("admin.ai.queues.ignoreSendersManual")}
+                <HelpPopover
+                  title={t("admin.ai.queues.ignoreSendersManual")}
+                  testId="admin-ai-queue-help-ignore_senders_manual"
+                >
+                  {t("admin.help.aiQueue.ignoreSendersManual")}
+                </HelpPopover>
+              </label>
             </div>
 
             {!gateOpen && (
