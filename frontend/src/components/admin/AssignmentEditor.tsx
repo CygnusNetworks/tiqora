@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { Spinner } from "@/components/ui/Spinner";
 import { cn } from "@/lib/cn";
+import type { AdminValidFilter } from "@/lib/api";
 
 export type Id = number | string;
 
@@ -59,6 +60,8 @@ export interface AssignmentConfig<A, B> {
   ) => Promise<Record<string, number>>;
 }
 
+const VALID_FILTERS: AdminValidFilter[] = ["valid", "invalid", "all"];
+
 function idKey(id: Id): string {
   return String(id);
 }
@@ -93,6 +96,10 @@ export function AssignmentEditor<A, B>({ config }: { config: AssignmentConfig<A,
   const [anchorFilter, setAnchorFilter] = useState("");
   const [counterpartFilter, setCounterpartFilter] = useState("");
   const [savedFlash, setSavedFlash] = useState(false);
+  // Gültigkeit filter for both lists — defaults to hiding invalid entities,
+  // same UI/param convention as AdminResourcePage. Only rendered when at
+  // least one side actually carries validity info.
+  const [validFilter, setValidFilter] = useState<AdminValidFilter>("valid");
 
   const debouncedAnchorFilter = useDebouncedValue(anchorFilter, 300);
   const debouncedCounterpartFilter = useDebouncedValue(counterpartFilter, 300);
@@ -378,8 +385,9 @@ export function AssignmentEditor<A, B>({ config }: { config: AssignmentConfig<A,
       ? (counterpartsSearchQ.data ?? [])
       : (counterpartsClientQ.data ?? []);
     const targetIds = pool
-      .map((item) => counterpartSide.getId(item))
-      .filter((cId) => !assignedIdSet.has(idKey(cId)));
+      .filter((item) => !assignedIdSet.has(idKey(counterpartSide.getId(item))))
+      .filter((item) => passesValidFilter(counterpartSide, item, false))
+      .map((item) => counterpartSide.getId(item));
     if (targetIds.length === 0) return;
     bulkM.mutate({ mode: "all", targetIds });
   };
@@ -415,6 +423,23 @@ export function AssignmentEditor<A, B>({ config }: { config: AssignmentConfig<A,
     [],
   );
 
+  const showValidFilter = Boolean(anchorSide.isValid) || Boolean(counterpartSide.isValid);
+
+  /**
+   * Applies the Gültigkeit filter. Already-assigned counterparts always pass
+   * (so admins can still see and unassign now-invalid entries); everything
+   * else is filtered by `validFilter`.
+   */
+  const passesValidFilter = useCallback(
+    (side: AssignmentSide<unknown>, item: unknown, assigned: boolean): boolean => {
+      if (assigned || !side.isValid) return true;
+      const valid = side.isValid(item) !== false;
+      if (validFilter === "all") return true;
+      return validFilter === "valid" ? valid : !valid;
+    },
+    [validFilter],
+  );
+
   // Master list rows.
   const filteredAnchors = useMemo(() => {
     let anchors: unknown[];
@@ -431,6 +456,7 @@ export function AssignmentEditor<A, B>({ config }: { config: AssignmentConfig<A,
         });
       }
     }
+    anchors = anchors.filter((item) => passesValidFilter(anchorSide, item, false));
     return sortValidFirst(anchorSide, anchors);
   }, [
     anchorServerSearch,
@@ -439,6 +465,7 @@ export function AssignmentEditor<A, B>({ config }: { config: AssignmentConfig<A,
     anchorFilter,
     anchorSide,
     sortValidFirst,
+    passesValidFilter,
   ]);
 
   // Counterpart checklist rows (client-filter mode).
@@ -452,8 +479,18 @@ export function AssignmentEditor<A, B>({ config }: { config: AssignmentConfig<A,
         return label.includes(q) || sub.includes(q);
       });
     }
+    list = list.filter((item) =>
+      passesValidFilter(counterpartSide, item, assignedIdSet.has(idKey(counterpartSide.getId(item)))),
+    );
     return sortValidFirst(counterpartSide, list);
-  }, [counterpartsClientQ.data, counterpartFilter, counterpartSide, sortValidFirst]);
+  }, [
+    counterpartsClientQ.data,
+    counterpartFilter,
+    counterpartSide,
+    sortValidFirst,
+    passesValidFilter,
+    assignedIdSet,
+  ]);
 
   // Counterpart checklist: assigned always + search hits (deduped).
   const counterpartServerRows = useMemo(() => {
@@ -462,9 +499,9 @@ export function AssignmentEditor<A, B>({ config }: { config: AssignmentConfig<A,
     const assignedKeys = new Set(
       assigned.map((item) => idKey(counterpartSide.getId(item))),
     );
-    const searchHits = (counterpartsSearchQ.data ?? []).filter(
-      (item) => !assignedKeys.has(idKey(counterpartSide.getId(item))),
-    );
+    const searchHits = (counterpartsSearchQ.data ?? [])
+      .filter((item) => !assignedKeys.has(idKey(counterpartSide.getId(item))))
+      .filter((item) => passesValidFilter(counterpartSide, item, false));
     // Keep assigned block first; valid-first within each block.
     return [
       ...sortValidFirst(counterpartSide, assigned),
@@ -476,11 +513,16 @@ export function AssignmentEditor<A, B>({ config }: { config: AssignmentConfig<A,
     counterpartsSearchQ.data,
     counterpartSide,
     sortValidFirst,
+    passesValidFilter,
   ]);
 
-  const counterpartsForBulkCount = counterpartServerSearch
-    ? (counterpartsSearchQ.data ?? []).length
-    : (counterpartsClientQ.data ?? []).length;
+  const counterpartsForBulkCount = (
+    counterpartServerSearch ? (counterpartsSearchQ.data ?? []) : (counterpartsClientQ.data ?? [])
+  ).filter(
+    (item) =>
+      !assignedIdSet.has(idKey(counterpartSide.getId(item))) &&
+      passesValidFilter(counterpartSide, item, false),
+  ).length;
 
   /** Prefer bulk loadCounts; fall back to per-anchor cache after selection. */
   const anchorCount = (anchorId: Id): number | null => {
@@ -585,44 +627,74 @@ export function AssignmentEditor<A, B>({ config }: { config: AssignmentConfig<A,
         <p className="mt-1 text-sm text-muted">{t(config.subtitleKey)}</p>
       </div>
 
-      {/* Direction toggle */}
-      <div
-        role="tablist"
-        aria-label={t("admin.assignmentEditor.directionBy", {
-          side: t(config.sideA.labelKey),
-        })}
-        className="inline-flex max-w-full flex-wrap rounded-lg border border-hairline bg-surface p-0.5"
-      >
-        <button
-          type="button"
-          role="tab"
-          aria-selected={direction === "a"}
-          data-testid={`${config.testId}-direction-a`}
-          onClick={() => switchDirection("a")}
-          className={cn(
-            "rounded-md px-3 py-1.5 text-sm font-medium transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent",
-            direction === "a"
-              ? "bg-accent text-accent-ink"
-              : "text-muted hover:text-ink",
-          )}
+      <div className="flex flex-wrap items-center gap-2">
+        {/* Direction toggle */}
+        <div
+          role="tablist"
+          aria-label={t("admin.assignmentEditor.directionBy", {
+            side: t(config.sideA.labelKey),
+          })}
+          className="inline-flex max-w-full flex-wrap rounded-lg border border-hairline bg-surface p-0.5"
         >
-          {t("admin.assignmentEditor.directionBy", { side: t(config.sideA.labelKey) })}
-        </button>
-        <button
-          type="button"
-          role="tab"
-          aria-selected={direction === "b"}
-          data-testid={`${config.testId}-direction-b`}
-          onClick={() => switchDirection("b")}
-          className={cn(
-            "rounded-md px-3 py-1.5 text-sm font-medium transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent",
-            direction === "b"
-              ? "bg-accent text-accent-ink"
-              : "text-muted hover:text-ink",
-          )}
-        >
-          {t("admin.assignmentEditor.directionBy", { side: t(config.sideB.labelKey) })}
-        </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={direction === "a"}
+            data-testid={`${config.testId}-direction-a`}
+            onClick={() => switchDirection("a")}
+            className={cn(
+              "rounded-md px-3 py-1.5 text-sm font-medium transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent",
+              direction === "a"
+                ? "bg-accent text-accent-ink"
+                : "text-muted hover:text-ink",
+            )}
+          >
+            {t("admin.assignmentEditor.directionBy", { side: t(config.sideA.labelKey) })}
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={direction === "b"}
+            data-testid={`${config.testId}-direction-b`}
+            onClick={() => switchDirection("b")}
+            className={cn(
+              "rounded-md px-3 py-1.5 text-sm font-medium transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent",
+              direction === "b"
+                ? "bg-accent text-accent-ink"
+                : "text-muted hover:text-ink",
+            )}
+          >
+            {t("admin.assignmentEditor.directionBy", { side: t(config.sideB.labelKey) })}
+          </button>
+        </div>
+
+        {/* Gültigkeit filter — same convention as AdminResourcePage */}
+        {showValidFilter && (
+          <div
+            className="inline-flex rounded-lg border border-hairline bg-surface p-0.5"
+            role="group"
+            aria-label={t("admin.filter.label")}
+            data-testid={`${config.testId}-valid-filter`}
+          >
+            {VALID_FILTERS.map((f) => (
+              <button
+                key={f}
+                type="button"
+                aria-pressed={validFilter === f}
+                data-testid={`${config.testId}-valid-${f}`}
+                onClick={() => setValidFilter(f)}
+                className={cn(
+                  "rounded-md px-3 py-1 text-xs font-medium transition-colors",
+                  validFilter === f
+                    ? "bg-accent text-white"
+                    : "text-muted hover:bg-surface-subtle hover:text-ink",
+                )}
+              >
+                {t(`admin.filter.${f}`)}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       <div className="grid gap-4 md:grid-cols-2">
