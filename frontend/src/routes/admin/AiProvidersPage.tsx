@@ -11,7 +11,11 @@ import {
   type ProviderKind,
 } from "@/lib/aiApi";
 import { DataTable, type DataTableColumn } from "@/components/admin/DataTable";
-import { CrudDrawer, type FieldDef, type FieldValues } from "@/components/admin/CrudDrawer";
+import {
+  CrudDrawer,
+  type FieldDef,
+  type FieldValues,
+} from "@/components/admin/CrudDrawer";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import { Spinner } from "@/components/ui/Spinner";
@@ -33,6 +37,9 @@ function toFormValues(row: LlmProviderOut | null): FieldValues {
         supports_streaming: row.supports_streaming,
         eu_hosted: row.eu_hosted,
         supports_vision: row.supports_vision,
+        price_input_per_1m: row.price_input_per_1m ?? "",
+        price_output_per_1m: row.price_output_per_1m ?? "",
+        price_currency: row.price_currency ?? "",
       }
     : {
         name: "",
@@ -44,6 +51,9 @@ function toFormValues(row: LlmProviderOut | null): FieldValues {
         supports_streaming: true,
         eu_hosted: false,
         supports_vision: false,
+        price_input_per_1m: "",
+        price_output_per_1m: "",
+        price_currency: "",
       };
 }
 
@@ -55,7 +65,9 @@ export function AiProvidersPage() {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [editing, setEditing] = useState<LlmProviderOut | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
-  const [testResults, setTestResults] = useState<Record<number, LlmProviderTestOut>>({});
+  const [testResults, setTestResults] = useState<
+    Record<number, LlmProviderTestOut>
+  >({});
   const [testingId, setTestingId] = useState<number | null>(null);
   const [duplicatingId, setDuplicatingId] = useState<number | null>(null);
   const [duplicateError, setDuplicateError] = useState<string | null>(null);
@@ -118,7 +130,8 @@ export function AiProvidersPage() {
       // model right away (typical case: several models, same provider/key).
       openEdit(copy);
     },
-    onError: (err) => setDuplicateError(err instanceof ApiError ? err.message : String(err)),
+    onError: (err) =>
+      setDuplicateError(err instanceof ApiError ? err.message : String(err)),
     onSettled: () => setDuplicatingId(null),
   });
 
@@ -153,9 +166,13 @@ export function AiProvidersPage() {
       supports_vision: Boolean(values.supports_vision),
       price_input_per_1m: priceOrNull(values.price_input_per_1m),
       price_output_per_1m: priceOrNull(values.price_output_per_1m),
-      price_currency: String(values.price_currency ?? "").trim().toUpperCase() || null,
+      price_currency:
+        String(values.price_currency ?? "")
+          .trim()
+          .toUpperCase() || null,
     };
-    const apiKey = typeof values.api_key === "string" ? values.api_key.trim() : "";
+    const apiKey =
+      typeof values.api_key === "string" ? values.api_key.trim() : "";
     try {
       if (editing) {
         const body: LlmProviderUpdate = { ...base };
@@ -165,13 +182,19 @@ export function AiProvidersPage() {
         await createM.mutateAsync({ ...base, api_key: apiKey || null });
       }
     } catch (err) {
-      setFormError(err instanceof ApiError ? err.message : t("admin.form.genericError"));
+      setFormError(
+        err instanceof ApiError ? err.message : t("admin.form.genericError"),
+      );
       throw err;
     }
   };
 
   const columns: DataTableColumn<LlmProviderOut>[] = [
-    { key: "name", header: t("admin.ai.providers.name"), render: (r) => r.name },
+    {
+      key: "name",
+      header: t("admin.ai.providers.name"),
+      render: (r) => r.name,
+    },
     {
       key: "kind",
       header: t("admin.ai.providers.kind"),
@@ -194,7 +217,8 @@ export function AiProvidersPage() {
       header: t("admin.ai.providers.price"),
       mono: true,
       render: (r) => {
-        if (r.price_input_per_1m == null && r.price_output_per_1m == null) return "—";
+        if (r.price_input_per_1m == null && r.price_output_per_1m == null)
+          return "—";
         const cur = r.price_currency ?? "";
         return `${r.price_input_per_1m ?? 0} / ${r.price_output_per_1m ?? 0} ${cur}`.trim();
       },
@@ -204,10 +228,18 @@ export function AiProvidersPage() {
       header: t("admin.ai.providers.flags"),
       render: (r) => (
         <div className="flex flex-wrap gap-1">
-          {r.supports_tools && <Badge tone="accent">{t("admin.ai.providers.flagTools")}</Badge>}
-          {r.supports_vision && <Badge tone="accent">{t("admin.ai.providers.flagVision")}</Badge>}
-          {r.eu_hosted && <Badge tone="success">{t("admin.ai.providers.flagEu")}</Badge>}
-          {r.has_api_key && <Badge tone="muted">{t("admin.ai.providers.hasKey")}</Badge>}
+          {r.supports_tools && (
+            <Badge tone="accent">{t("admin.ai.providers.flagTools")}</Badge>
+          )}
+          {r.supports_vision && (
+            <Badge tone="accent">{t("admin.ai.providers.flagVision")}</Badge>
+          )}
+          {r.eu_hosted && (
+            <Badge tone="success">{t("admin.ai.providers.flagEu")}</Badge>
+          )}
+          {r.has_api_key && (
+            <Badge tone="muted">{t("admin.ai.providers.hasKey")}</Badge>
+          )}
         </div>
       ),
     },
@@ -225,7 +257,11 @@ export function AiProvidersPage() {
               data-testid={`admin-ai-provider-test-${r.id}`}
               onClick={() => testM.mutate(r.id)}
             >
-              {testingId === r.id ? <Spinner className="h-3 w-3" /> : t("admin.ai.providers.testAction")}
+              {testingId === r.id ? (
+                <Spinner className="h-3 w-3" />
+              ) : (
+                t("admin.ai.providers.testAction")
+              )}
             </Button>
             <Button
               size="sm"
@@ -257,15 +293,28 @@ export function AiProvidersPage() {
   ];
 
   const fields: FieldDef[] = [
-    { name: "name", label: t("admin.ai.providers.name"), type: "text", required: true },
+    {
+      name: "name",
+      label: t("admin.ai.providers.name"),
+      type: "text",
+      required: true,
+    },
     {
       name: "kind",
       label: t("admin.ai.providers.kind"),
       type: "select",
       required: true,
-      options: PROVIDER_KINDS.map((k) => ({ value: k, label: t(`admin.ai.providers.kindLabel.${k}`) })),
+      options: PROVIDER_KINDS.map((k) => ({
+        value: k,
+        label: t(`admin.ai.providers.kindLabel.${k}`),
+      })),
     },
-    { name: "base_url", label: t("admin.ai.providers.baseUrl"), type: "text", required: true },
+    {
+      name: "base_url",
+      label: t("admin.ai.providers.baseUrl"),
+      type: "text",
+      required: true,
+    },
     {
       name: "default_model",
       label: t("admin.ai.providers.defaultModel"),
@@ -294,12 +343,28 @@ export function AiProvidersPage() {
     {
       name: "price_currency",
       label: t("admin.ai.providers.priceCurrency"),
-      type: "text",
-      placeholder: "EUR",
+      type: "select",
+      options: [
+        { value: "", label: t("admin.ai.providers.priceCurrencyNone") },
+        { value: "EUR", label: "EUR" },
+        { value: "USD", label: "USD" },
+      ],
     },
-    { name: "supports_tools", label: t("admin.ai.providers.flagTools"), type: "checkbox" },
-    { name: "supports_streaming", label: t("admin.ai.providers.flagStreaming"), type: "checkbox" },
-    { name: "eu_hosted", label: t("admin.ai.providers.flagEu"), type: "checkbox" },
+    {
+      name: "supports_tools",
+      label: t("admin.ai.providers.flagTools"),
+      type: "checkbox",
+    },
+    {
+      name: "supports_streaming",
+      label: t("admin.ai.providers.flagStreaming"),
+      type: "checkbox",
+    },
+    {
+      name: "eu_hosted",
+      label: t("admin.ai.providers.flagEu"),
+      type: "checkbox",
+    },
     {
       name: "supports_vision",
       label: t("admin.ai.providers.flagVision"),
@@ -326,9 +391,14 @@ export function AiProvidersPage() {
           <PlusIcon className="text-[16px]" />
         </Button>
       </div>
-      <p className="text-xs text-muted">{t("admin.ai.providers.description")}</p>
+      <p className="text-xs text-muted">
+        {t("admin.ai.providers.description")}
+      </p>
       {duplicateError && (
-        <p className="text-sm text-danger" data-testid="admin-ai-providers-duplicate-error">
+        <p
+          className="text-sm text-danger"
+          data-testid="admin-ai-providers-duplicate-error"
+        >
           {duplicateError}
         </p>
       )}
@@ -356,7 +426,9 @@ export function AiProvidersPage() {
         onClose={() => setDrawerOpen(false)}
         title={
           editing
-            ? t("admin.form.editTitle", { title: t("admin.ai.providers.title") })
+            ? t("admin.form.editTitle", {
+                title: t("admin.ai.providers.title"),
+              })
             : t("admin.ai.providers.new")
         }
         fields={fields}

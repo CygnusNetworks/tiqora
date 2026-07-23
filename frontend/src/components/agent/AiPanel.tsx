@@ -4,7 +4,11 @@ import { useTranslation } from "react-i18next";
 import { api, ApiError } from "@/lib/api";
 import { aiApi } from "@/lib/aiApi";
 import { useAuth } from "@/auth/AuthContext";
-import { ticketAiApi, type AiDraftOut } from "@/lib/ticketAiApi";
+import {
+  ticketAiApi,
+  type AiDraftOut,
+  type SummaryDetail,
+} from "@/lib/ticketAiApi";
 import { articleSortKey } from "@/lib/article";
 import { formatDateTime } from "@/lib/format";
 import { cn } from "@/lib/cn";
@@ -12,6 +16,7 @@ import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import { Spinner } from "@/components/ui/Spinner";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
+import { SelectMenu } from "@/components/ui/SelectMenu";
 import { HelpPopover } from "@/components/ui/HelpPopover";
 import { ReplyDialog } from "./ReplyDialog";
 
@@ -29,13 +34,18 @@ import { ReplyDialog } from "./ReplyDialog";
  * indicator degrades to a plain "n/m" fraction to avoid a dot wall. */
 const MAX_COVERAGE_DOTS = 12;
 
+const SUMMARY_DETAILS: SummaryDetail[] = ["standard", "detailed"];
+
 /** Coverage of the current summary over the ticket's articles: filled dots
  * are summarized, the outline dots arrived later. */
 function CoverageDots({ covered, total }: { covered: number; total: number }) {
   if (total === 0) return null;
   if (total > MAX_COVERAGE_DOTS) {
     return (
-      <span className="text-[11px] tabular-nums text-muted" data-testid="ai-summary-coverage">
+      <span
+        className="text-[11px] tabular-nums text-muted"
+        data-testid="ai-summary-coverage"
+      >
         {covered}/{total}
       </span>
     );
@@ -66,7 +76,9 @@ function DraftKindIcon({ kind }: { kind: string }) {
       aria-hidden
       className={cn(
         "flex h-7 w-7 flex-none items-center justify-center rounded-md text-sm",
-        clarify ? "bg-escalation/15 text-escalation" : "bg-accent-dim text-accent",
+        clarify
+          ? "bg-escalation/15 text-escalation"
+          : "bg-accent-dim text-accent",
       )}
     >
       {clarify ? "?" : "↩"}
@@ -74,7 +86,13 @@ function DraftKindIcon({ kind }: { kind: string }) {
   );
 }
 
-export function AiPanel({ ticketId, canNote }: { ticketId: number; canNote: boolean }) {
+export function AiPanel({
+  ticketId,
+  canNote,
+}: {
+  ticketId: number;
+  canNote: boolean;
+}) {
   const { t, i18n } = useTranslation();
   const queryClient = useQueryClient();
   const { user } = useAuth();
@@ -83,6 +101,7 @@ export function AiPanel({ ticketId, canNote }: { ticketId: number; canNote: bool
   const [expandedDraftId, setExpandedDraftId] = useState<number | null>(null);
   const [openTraceId, setOpenTraceId] = useState<number | null>(null);
   const [replyDraft, setReplyDraft] = useState<AiDraftOut | null>(null);
+  const [summaryDetail, setSummaryDetail] = useState<SummaryDetail>("standard");
 
   const stateQ = useQuery({
     queryKey: ["tickets", ticketId, "ai"],
@@ -102,28 +121,47 @@ export function AiPanel({ ticketId, canNote }: { ticketId: number; canNote: bool
   const draftMutation = useMutation({
     mutationFn: () => ticketAiApi.requestDraft(ticketId),
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ["tickets", ticketId, "ai"] });
+      void queryClient.invalidateQueries({
+        queryKey: ["tickets", ticketId, "ai"],
+      });
     },
   });
 
   const summarizeMutation = useMutation({
-    mutationFn: () => ticketAiApi.summarize(ticketId),
+    mutationFn: (detail: SummaryDetail) =>
+      ticketAiApi.summarize(ticketId, detail),
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ["tickets", ticketId, "ai"] });
+      void queryClient.invalidateQueries({
+        queryKey: ["tickets", ticketId, "ai"],
+      });
     },
   });
 
   const discardMutation = useMutation({
-    mutationFn: (draftId: number) => ticketAiApi.discardDraft(ticketId, draftId),
+    mutationFn: (draftId: number) =>
+      ticketAiApi.discardDraft(ticketId, draftId),
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ["tickets", ticketId, "ai"] });
+      void queryClient.invalidateQueries({
+        queryKey: ["tickets", ticketId, "ai"],
+      });
     },
   });
 
   const adminDeleteMutation = useMutation({
     mutationFn: (draftId: number) => aiApi.adminDeleteDraft(draftId),
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ["tickets", ticketId, "ai"] });
+      void queryClient.invalidateQueries({
+        queryKey: ["tickets", ticketId, "ai"],
+      });
+    },
+  });
+
+  const adminDeleteSummaryMutation = useMutation({
+    mutationFn: () => aiApi.adminDeleteSummary(ticketId),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({
+        queryKey: ["tickets", ticketId, "ai"],
+      });
     },
   });
 
@@ -133,6 +171,10 @@ export function AiPanel({ ticketId, canNote }: { ticketId: number; canNote: bool
   if (!state.manual_assist_available && !state.summary_available) return null;
 
   const openDrafts = state.drafts.filter((d) => d.status === "open");
+  // Admins additionally see non-open drafts (accepted/discarded/superseded)
+  // so they can hard-delete them — the reason the delete option was
+  // previously "invisible" for old drafts.
+  const visibleDrafts = isAdmin ? state.drafts : openDrafts;
   const locale = i18n.language;
 
   const mapRunError = (error: unknown): string => {
@@ -140,51 +182,117 @@ export function AiPanel({ ticketId, canNote }: { ticketId: number; canNote: bool
       if (error.status === 423) return t("ticket.ai.errorLocked");
       if (error.status === 403) return t("ticket.ai.errorForbidden");
       if (error.status === 429) return t("ticket.ai.errorRateLimited");
-      if (error.status === 409) return error.message || t("ticket.ai.errorDisabled");
+      if (error.status === 409)
+        return error.message || t("ticket.ai.errorDisabled");
     }
     return t("ticket.ai.errorGeneric");
   };
 
   const articles = articlesQ.data ?? [];
   const upto = state.last_summary_upto_article_id;
-  const coveredCount = upto == null ? 0 : articles.filter((a) => a.id <= upto).length;
-  const staleCount = upto == null ? 0 : articles.filter((a) => a.id > upto).length;
+  const coveredCount =
+    upto == null ? 0 : articles.filter((a) => a.id <= upto).length;
+  const staleCount =
+    upto == null ? 0 : articles.filter((a) => a.id > upto).length;
   const hasSummary = state.summary_body != null;
 
   const replyArticleId =
     replyDraft?.based_on_article_id ??
-    [...articles].sort((a, b) => articleSortKey(b) - articleSortKey(a))[0]?.id ??
+    [...articles].sort((a, b) => articleSortKey(b) - articleSortKey(a))[0]
+      ?.id ??
     null;
 
   return (
-    <div className="space-y-3 rounded-lg border border-hairline bg-surface p-4" data-testid="ai-panel">
-      <h2 className="font-display text-sm font-semibold text-ink">{t("ticket.ai.title")}</h2>
+    <div
+      className="space-y-3 rounded-lg border border-hairline bg-surface p-4"
+      data-testid="ai-panel"
+    >
+      <h2 className="font-display text-sm font-semibold text-ink">
+        {t("ticket.ai.title")}
+      </h2>
 
       {state.summary_available && (
         <div className="space-y-2" data-testid="ai-panel-summary">
           <div className="flex items-center justify-between gap-2">
             <span className="inline-flex items-center gap-1.5 text-xs uppercase tracking-wide text-muted">
               {t("ticket.ai.summaryLabel")}
-              <HelpPopover title={t("ticket.ai.summaryLabel")} testId="ai-panel-help-summary">
+              <HelpPopover
+                title={t("ticket.ai.summaryLabel")}
+                testId="ai-panel-help-summary"
+              >
                 {t("ticket.ai.help.summary")}
               </HelpPopover>
             </span>
-            <Button
-              size="sm"
-              variant="secondary"
-              data-testid="ai-panel-summarize-button"
-              disabled={!state.can_summarize || summarizeMutation.isPending}
-              onClick={() => summarizeMutation.mutate()}
-            >
-              {summarizeMutation.isPending ? (
-                <Spinner className="h-3.5 w-3.5" />
-              ) : hasSummary ? (
-                t("ticket.ai.refreshButton")
-              ) : (
-                t("ticket.ai.summarizeButton")
+            <div className="flex items-center gap-1.5">
+              {isAdmin && hasSummary && (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  data-testid="ai-panel-summary-admin-delete"
+                  disabled={adminDeleteSummaryMutation.isPending}
+                  title={t("ticket.ai.adminDeleteSummaryHint")}
+                  onClick={async () => {
+                    const ok = await confirm({
+                      title: t("ticket.ai.adminDeleteSummary"),
+                      message: t("ticket.ai.adminDeleteSummaryConfirm"),
+                      variant: "danger",
+                    });
+                    if (ok) adminDeleteSummaryMutation.mutate();
+                  }}
+                >
+                  {t("ticket.ai.adminDeleteSummary")}
+                </Button>
               )}
-            </Button>
+              <SelectMenu
+                items={SUMMARY_DETAILS.map((d) => ({
+                  value: d,
+                  label: t(`ticket.ai.detail.${d}`),
+                }))}
+                value={summaryDetail}
+                onSelect={(v) => setSummaryDetail(v)}
+                panelTestId="ai-panel-summary-detail"
+                trigger={({ ref, toggleProps }) => (
+                  <button
+                    type="button"
+                    ref={ref}
+                    {...toggleProps}
+                    data-testid="ai-panel-summary-detail-trigger"
+                    disabled={
+                      !state.can_summarize || summarizeMutation.isPending
+                    }
+                    title={t("ticket.ai.detailLabel")}
+                    className="inline-flex items-center gap-1 rounded-md border border-hairline bg-surface-subtle px-2 py-1 text-xs text-muted transition-colors hover:text-ink disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {t(`ticket.ai.detail.${summaryDetail}`)}
+                    <span aria-hidden>▾</span>
+                  </button>
+                )}
+              />
+              <Button
+                size="sm"
+                variant="secondary"
+                data-testid="ai-panel-summarize-button"
+                disabled={!state.can_summarize || summarizeMutation.isPending}
+                onClick={() => summarizeMutation.mutate(summaryDetail)}
+              >
+                {summarizeMutation.isPending ? (
+                  <Spinner className="h-3.5 w-3.5" />
+                ) : hasSummary ? (
+                  t("ticket.ai.refreshButton")
+                ) : (
+                  t("ticket.ai.summarizeButton")
+                )}
+              </Button>
+            </div>
           </div>
+          {adminDeleteSummaryMutation.isError && (
+            <p
+              className="text-xs text-danger"
+              data-testid="ai-panel-summary-admin-delete-error"
+            >
+              {mapRunError(adminDeleteSummaryMutation.error)}
+            </p>
+          )}
 
           {hasSummary ? (
             <div className="space-y-2">
@@ -199,12 +307,21 @@ export function AiPanel({ ticketId, canNote }: { ticketId: number; canNote: bool
                   </Badge>
                 )}
                 {articles.length > 0 && (
-                  <CoverageDots covered={coveredCount} total={articles.length} />
+                  <CoverageDots
+                    covered={coveredCount}
+                    total={articles.length}
+                  />
                 )}
                 {state.summary_created_at && (
-                  <span className="text-[11px] text-muted" data-testid="ai-summary-created-at">
+                  <span
+                    className="text-[11px] text-muted"
+                    data-testid="ai-summary-created-at"
+                  >
                     {t("ticket.ai.summaryCreatedAt", {
-                      dateTime: formatDateTime(state.summary_created_at, locale),
+                      dateTime: formatDateTime(
+                        state.summary_created_at,
+                        locale,
+                      ),
                     })}
                   </span>
                 )}
@@ -217,17 +334,27 @@ export function AiPanel({ ticketId, canNote }: { ticketId: number; canNote: bool
               </p>
             </div>
           ) : (
-            <p className="text-sm text-muted" data-testid="ai-panel-summary-empty">
+            <p
+              className="text-sm text-muted"
+              data-testid="ai-panel-summary-empty"
+            >
               {t("ticket.ai.summaryEmpty")}
             </p>
           )}
-          {summarizeMutation.isSuccess && summarizeMutation.data.status === "up_to_date" && (
-            <p className="text-xs text-muted" data-testid="ai-panel-summary-uptodate">
-              {t("ticket.ai.summaryUpToDate")}
-            </p>
-          )}
+          {summarizeMutation.isSuccess &&
+            summarizeMutation.data.status === "up_to_date" && (
+              <p
+                className="text-xs text-muted"
+                data-testid="ai-panel-summary-uptodate"
+              >
+                {t("ticket.ai.summaryUpToDate")}
+              </p>
+            )}
           {summarizeMutation.isError && (
-            <p className="text-xs text-danger" data-testid="ai-panel-summary-error">
+            <p
+              className="text-xs text-danger"
+              data-testid="ai-panel-summary-error"
+            >
               {mapRunError(summarizeMutation.error)}
             </p>
           )}
@@ -239,11 +366,16 @@ export function AiPanel({ ticketId, canNote }: { ticketId: number; canNote: bool
           <div className="flex items-center justify-between gap-2">
             <span className="inline-flex items-center gap-1.5 text-xs uppercase tracking-wide text-muted">
               {t("ticket.ai.draftsLabel")}
-              <HelpPopover title={t("ticket.ai.draftsLabel")} testId="ai-panel-help-drafts">
+              <HelpPopover
+                title={t("ticket.ai.draftsLabel")}
+                testId="ai-panel-help-drafts"
+              >
                 {t("ticket.ai.help.drafts")}
               </HelpPopover>
             </span>
-            <span title={!canNote ? t("ticket.toolbar.noPermission") : undefined}>
+            <span
+              title={!canNote ? t("ticket.toolbar.noPermission") : undefined}
+            >
               <Button
                 size="sm"
                 variant="secondary"
@@ -251,27 +383,40 @@ export function AiPanel({ ticketId, canNote }: { ticketId: number; canNote: bool
                 disabled={!canNote || draftMutation.isPending}
                 onClick={() => draftMutation.mutate()}
               >
-                {draftMutation.isPending ? <Spinner className="h-3.5 w-3.5" /> : t("ticket.ai.createDraftButton")}
+                {draftMutation.isPending ? (
+                  <Spinner className="h-3.5 w-3.5" />
+                ) : (
+                  t("ticket.ai.createDraftButton")
+                )}
               </Button>
             </span>
           </div>
           {draftMutation.isPending && (
-            <p className="text-xs text-muted">{t("ticket.ai.createDraftHint")}</p>
+            <p className="text-xs text-muted">
+              {t("ticket.ai.createDraftHint")}
+            </p>
           )}
           {draftMutation.isError && (
-            <p className="text-xs text-danger" data-testid="ai-panel-draft-error">
+            <p
+              className="text-xs text-danger"
+              data-testid="ai-panel-draft-error"
+            >
               {mapRunError(draftMutation.error)}
             </p>
           )}
 
-          {openDrafts.length === 0 ? (
-            <p className="text-sm text-muted" data-testid="ai-panel-drafts-empty">
+          {visibleDrafts.length === 0 ? (
+            <p
+              className="text-sm text-muted"
+              data-testid="ai-panel-drafts-empty"
+            >
               {t("ticket.ai.draftsEmpty")}
             </p>
           ) : (
             <ul className="space-y-2">
-              {openDrafts.map((draft) => {
+              {visibleDrafts.map((draft) => {
                 const expanded = expandedDraftId === draft.id;
+                const isOpen = draft.status === "open";
                 return (
                   <li
                     key={draft.id}
@@ -284,9 +429,12 @@ export function AiPanel({ ticketId, canNote }: { ticketId: number; canNote: bool
                         <div className="min-w-0">
                           <div className="text-[13px] font-semibold text-ink">
                             {t(`ticket.ai.draftTitle.${draft.kind}`, {
-                              defaultValue: t(`ticket.ai.draftKind.${draft.kind}`, {
-                                defaultValue: draft.kind,
-                              }),
+                              defaultValue: t(
+                                `ticket.ai.draftKind.${draft.kind}`,
+                                {
+                                  defaultValue: draft.kind,
+                                },
+                              ),
                             })}
                           </div>
                           <div
@@ -310,6 +458,16 @@ export function AiPanel({ ticketId, canNote }: { ticketId: number; canNote: bool
                         </div>
                       </div>
                       <div className="flex items-center gap-1.5">
+                        {!isOpen && (
+                          <Badge
+                            tone="muted"
+                            data-testid={`ai-panel-draft-status-${draft.id}`}
+                          >
+                            {t(`ticket.ai.draftStatus.${draft.status}`, {
+                              defaultValue: draft.status,
+                            })}
+                          </Badge>
+                        )}
                         {isAdmin && (
                           <Button
                             size="sm"
@@ -329,31 +487,35 @@ export function AiPanel({ ticketId, canNote }: { ticketId: number; canNote: bool
                             {t("ticket.ai.adminDeleteDraft")}
                           </Button>
                         )}
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          data-testid={`ai-panel-draft-discard-${draft.id}`}
-                          disabled={discardMutation.isPending}
-                          onClick={async () => {
-                            const ok = await confirm({
-                              title: t("ticket.ai.discardDraft"),
-                              message: t("ticket.ai.discardConfirm"),
-                              variant: "danger",
-                            });
-                            if (ok) discardMutation.mutate(draft.id);
-                          }}
-                        >
-                          {t("ticket.ai.discardDraft")}
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="primary"
-                          data-testid={`ai-panel-draft-use-${draft.id}`}
-                          disabled={!canNote}
-                          onClick={() => setReplyDraft(draft)}
-                        >
-                          {t("ticket.ai.useDraft")}
-                        </Button>
+                        {isOpen && (
+                          <>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              data-testid={`ai-panel-draft-discard-${draft.id}`}
+                              disabled={discardMutation.isPending}
+                              onClick={async () => {
+                                const ok = await confirm({
+                                  title: t("ticket.ai.discardDraft"),
+                                  message: t("ticket.ai.discardConfirm"),
+                                  variant: "danger",
+                                });
+                                if (ok) discardMutation.mutate(draft.id);
+                              }}
+                            >
+                              {t("ticket.ai.discardDraft")}
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="primary"
+                              data-testid={`ai-panel-draft-use-${draft.id}`}
+                              disabled={!canNote}
+                              onClick={() => setReplyDraft(draft)}
+                            >
+                              {t("ticket.ai.useDraft")}
+                            </Button>
+                          </>
+                        )}
                       </div>
                     </div>
                     <p
@@ -370,9 +532,13 @@ export function AiPanel({ ticketId, canNote }: { ticketId: number; canNote: bool
                         type="button"
                         className="text-[11px] font-medium text-accent hover:underline"
                         data-testid={`ai-panel-draft-toggle-${draft.id}`}
-                        onClick={() => setExpandedDraftId(expanded ? null : draft.id)}
+                        onClick={() =>
+                          setExpandedDraftId(expanded ? null : draft.id)
+                        }
                       >
-                        {expanded ? t("ticket.ai.collapse") : t("ticket.ai.expand")}
+                        {expanded
+                          ? t("ticket.ai.collapse")
+                          : t("ticket.ai.expand")}
                       </button>
                       {draft.tool_trace?.length > 0 && (
                         <button
@@ -381,11 +547,18 @@ export function AiPanel({ ticketId, canNote }: { ticketId: number; canNote: bool
                           data-testid={`ai-panel-draft-trace-toggle-${draft.id}`}
                           aria-expanded={openTraceId === draft.id}
                           onClick={() =>
-                            setOpenTraceId(openTraceId === draft.id ? null : draft.id)
+                            setOpenTraceId(
+                              openTraceId === draft.id ? null : draft.id,
+                            )
                           }
                         >
-                          {t("ticket.ai.toolTrace", { count: draft.tool_trace.length })}
-                          <span aria-hidden> {openTraceId === draft.id ? "▾" : "▸"}</span>
+                          {t("ticket.ai.toolTrace", {
+                            count: draft.tool_trace.length,
+                          })}
+                          <span aria-hidden>
+                            {" "}
+                            {openTraceId === draft.id ? "▾" : "▸"}
+                          </span>
                         </button>
                       )}
                     </div>
@@ -412,7 +585,10 @@ export function AiPanel({ ticketId, canNote }: { ticketId: number; canNote: bool
             </ul>
           )}
           {discardMutation.isError && (
-            <p className="text-xs text-danger" data-testid="ai-panel-discard-error">
+            <p
+              className="text-xs text-danger"
+              data-testid="ai-panel-discard-error"
+            >
               {mapRunError(discardMutation.error)}
             </p>
           )}
@@ -426,7 +602,11 @@ export function AiPanel({ ticketId, canNote }: { ticketId: number; canNote: bool
           replyAll={false}
           open
           onClose={() => setReplyDraft(null)}
-          initialDraft={{ id: replyDraft.id, subject: replyDraft.subject, body: replyDraft.body }}
+          initialDraft={{
+            id: replyDraft.id,
+            subject: replyDraft.subject,
+            body: replyDraft.body,
+          }}
         />
       )}
 
