@@ -390,7 +390,20 @@
       "errorGeneric": "Etwas ist schiefgelaufen. Bitte erneut versuchen.",
       "adminDeleteDraft": "Endgültig löschen",
       "adminDeleteDraftHint": "Admin: Entwurf endgültig aus der Datenbank löschen",
-      "adminDeleteConfirm": "Diesen KI-Entwurf endgültig löschen? Das kann nicht rückgängig gemacht werden."
+      "adminDeleteConfirm": "Diesen KI-Entwurf endgültig löschen? Das kann nicht rückgängig gemacht werden.",
+      "detailLabel": "Umfang",
+      "detail": {
+        "standard": "Standard",
+        "detailed": "Ausführlich"
+      },
+      "adminDeleteSummary": "Zusammenfassung löschen",
+      "adminDeleteSummaryHint": "Admin: gespeicherte KI-Zusammenfassung löschen — der nächste Lauf beginnt von vorn",
+      "adminDeleteSummaryConfirm": "Die gespeicherte KI-Zusammenfassung dieses Tickets endgültig löschen? Der nächste Lauf fasst das Ticket komplett neu zusammen.",
+      "draftStatus": {
+        "accepted": "Übernommen",
+        "discarded": "Verworfen",
+        "superseded": "Ersetzt"
+      }
     },
     "toolbar": {
       "print": "Drucken",
@@ -678,7 +691,8 @@
         "priceInput": "Preis Input je 1M Token",
         "priceOutput": "Preis Output je 1M Token",
         "priceCurrency": "Währung",
-        "priceHelp": "Kosten je 1 Mio. Token (Input/Output) in der angegebenen Währung — Basis für die Kostenberechnung im LLM-Audit."
+        "priceHelp": "Kosten je 1 Mio. Token (Input/Output) in der angegebenen Währung — Basis für die Kostenberechnung im LLM-Audit.",
+        "priceCurrencyNone": "— keine —"
       },
       "mcp": {
         "title": "MCP-Clients",
@@ -727,7 +741,8 @@
           "summary": "Zusammenfassungs-Schwellenwerte",
           "caps": "Limits",
           "disclosure": "Kennzeichnung & Datenschutz",
-          "identity": "Identität"
+          "identity": "Identität",
+          "language": "Sprache"
         },
         "modelOverride": "Modell-Override",
         "visionProvider": "Vision-Modell (Bilder)",
@@ -793,6 +808,11 @@
         },
         "replyLanguageFixed": "Feste Sprache",
         "replyLanguageDefault": "Rückfallsprache",
+        "replyLanguageNone": "Keine Vorgabe",
+        "replyLanguage": {
+          "de": "Deutsch",
+          "en": "Englisch"
+        },
         "allowedStateTypes": "Erlaubte Status-Typen",
         "piiNer": "Personennamen automatisch erkennen (NER)",
         "summaryDetail": "Umfang der Zusammenfassung",

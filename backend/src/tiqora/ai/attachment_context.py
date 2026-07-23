@@ -109,7 +109,10 @@ async def build_attachment_context(
         for att in article.attachments:
             if att.id in doc_blocks:
                 filename, text = doc_blocks[att.id]
-                ordered_pairs.append((article.id, f"[Anhang: {filename}]", text))
+                # Character count in the label lets the summary prompt scale
+                # its per-document summary with the document's actual size.
+                label = f"[Anhang: {filename} — ca. {len(text)} Zeichen]"
+                ordered_pairs.append((article.id, label, text))
             elif att.id in image_blocks:
                 filename, description = image_blocks[att.id]
                 label = f"[Bild-Anhang: {filename} — Beschreibung durch Vision-Modell]"
