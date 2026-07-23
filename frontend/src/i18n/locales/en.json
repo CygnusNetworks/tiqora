@@ -590,7 +590,8 @@
       "tickets": "Tickets & workflow",
       "communication": "Communication & templates",
       "automation": "Automation",
-      "system": "System & operations"
+      "system": "System & operations",
+      "ai": "Artificial intelligence"
     },
     "ai": {
       "settings": {
@@ -636,7 +637,8 @@
         "limits": "Limits",
         "limitRequestsDay": "Limit requests/day",
         "limitTokensDay": "Limit tokens/day",
-        "limitRequestsMonth": "Limit requests/month"
+        "limitRequestsMonth": "Limit requests/month",
+        "subjectMismatch": "Please re-select the subject — the selection does not match the chosen type."
       },
       "feature": {
         "summary": "Summary",
@@ -797,7 +799,9 @@
         "summaryDetailLevel": {
           "standard": "Standard",
           "detailed": "Detailed"
-        }
+        },
+        "kbCategories": "KB categories",
+        "kbCategoriesEmpty": "No categories available."
       },
       "usage": {
         "title": "Usage",
@@ -1095,7 +1099,9 @@
       "aiProviders": "AI providers",
       "aiMcp": "AI MCP clients",
       "aiQueues": "AI queue policies",
-      "aiAudit": "AI request audit"
+      "aiAudit": "AI request audit",
+      "aiAcl": "Access & limits",
+      "collapse": "Collapse navigation"
     },
     "table": {
       "id": "ID",
@@ -1911,7 +1917,8 @@
       "aiProviders": "Manage and test LLM providers (OpenAI-compatible, Anthropic).",
       "aiMcp": "Manage MCP servers as tool sources for the AI and enable tools.",
       "aiQueues": "Configure AI behavior per queue: autonomy, caps, escalation.",
-      "aiAudit": "Full audit of every LLM request/response, with PII reveal."
+      "aiAudit": "Full audit of every LLM request/response, with PII reveal.",
+      "aiAcl": "AI permissions and quotas per group, role, or agent."
     }
   },
   "kb": {

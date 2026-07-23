@@ -590,7 +590,8 @@
       "tickets": "Tickets & Workflow",
       "communication": "Kommunikation & Vorlagen",
       "automation": "Automatisierung",
-      "system": "System & Betrieb"
+      "system": "System & Betrieb",
+      "ai": "Künstliche Intelligenz"
     },
     "ai": {
       "settings": {
@@ -636,7 +637,8 @@
         "limits": "Limits",
         "limitRequestsDay": "Limit Requests/Tag",
         "limitTokensDay": "Limit Tokens/Tag",
-        "limitRequestsMonth": "Limit Requests/Monat"
+        "limitRequestsMonth": "Limit Requests/Monat",
+        "subjectMismatch": "Bitte Subjekt neu auswählen — die Auswahl passt nicht zum gewählten Typ."
       },
       "feature": {
         "summary": "Zusammenfassung",
@@ -797,7 +799,9 @@
         "summaryDetailLevel": {
           "standard": "Standard",
           "detailed": "Ausführlich"
-        }
+        },
+        "kbCategories": "KB-Kategorien",
+        "kbCategoriesEmpty": "Keine Kategorien vorhanden."
       },
       "usage": {
         "title": "Nutzung",
@@ -1095,7 +1099,9 @@
       "aiProviders": "KI-Provider",
       "aiMcp": "KI-MCP-Clients",
       "aiQueues": "KI-Queue-Policies",
-      "aiAudit": "KI-Anfrage-Audit"
+      "aiAudit": "KI-Anfrage-Audit",
+      "aiAcl": "Zugriff & Limits",
+      "collapse": "Navigation einklappen"
     },
     "table": {
       "id": "ID",
@@ -1911,7 +1917,8 @@
       "aiProviders": "LLM-Provider (OpenAI-kompatibel, Anthropic) verwalten und testen.",
       "aiMcp": "MCP-Server als Werkzeugquellen für die KI verwalten und Tools freigeben.",
       "aiQueues": "KI-Verhalten je Queue konfigurieren: Autonomie, Limits, Eskalation.",
-      "aiAudit": "Vollständiges Audit aller LLM-Anfragen/-Antworten, mit PII-Aufdeckung."
+      "aiAudit": "Vollständiges Audit aller LLM-Anfragen/-Antworten, mit PII-Aufdeckung.",
+      "aiAcl": "KI-Berechtigungen und Kontingente je Gruppe, Rolle oder Agent."
     }
   },
   "kb": {

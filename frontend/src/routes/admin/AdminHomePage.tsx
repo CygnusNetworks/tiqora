@@ -5,7 +5,7 @@ import { useTranslation } from "react-i18next";
 import { api } from "@/lib/api";
 import { statusColor } from "@/lib/daemonStatus";
 import { AdminCommandPalette } from "@/components/admin/AdminCommandPalette";
-import { SearchIcon, UsersIcon, TicketIcon, MailIcon, BoltIcon, ServerIcon } from "@/components/ui/icons";
+import { SearchIcon, UsersIcon, TicketIcon, MailIcon, BoltIcon, ServerIcon, SparkIcon } from "@/components/ui/icons";
 import { ADMIN_PAGE_GROUPS, adminPagesByGroup, type AdminPageGroup } from "@/lib/adminSearch";
 import { cn } from "@/lib/cn";
 
@@ -13,6 +13,7 @@ const GROUP_META: Record<AdminPageGroup, { titleKey: string; Icon: typeof UsersI
   access: { titleKey: "admin.group.access", Icon: UsersIcon },
   tickets: { titleKey: "admin.group.tickets", Icon: TicketIcon },
   communication: { titleKey: "admin.group.communication", Icon: MailIcon },
+  ai: { titleKey: "admin.group.ai", Icon: SparkIcon },
   automation: { titleKey: "admin.group.automation", Icon: BoltIcon },
   system: { titleKey: "admin.group.system", Icon: ServerIcon },
 };

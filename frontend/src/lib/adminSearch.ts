@@ -6,7 +6,7 @@
  * from this registry so the three stay in sync automatically.
  */
 
-export type AdminPageGroup = "access" | "tickets" | "communication" | "automation" | "system";
+export type AdminPageGroup = "access" | "tickets" | "communication" | "ai" | "automation" | "system";
 
 export type AdminPageEntry = {
   /** Also used as the React key and in `admin-nav-<slug>` / `admin-search-result-<slug>` testids. */
@@ -23,6 +23,7 @@ export const ADMIN_PAGE_GROUPS: AdminPageGroup[] = [
   "access",
   "tickets",
   "communication",
+  "ai",
   "automation",
   "system",
 ];
@@ -304,7 +305,7 @@ export const ADMIN_PAGES: AdminPageEntry[] = [
   {
     slug: "ai",
     route: "/admin/ai",
-    group: "automation",
+    group: "ai",
     nameKey: "admin.nav.ai",
     descriptionKey: "admin.pageDescriptions.ai",
     keywords: ["ki", "ai", "llm", "assistent", "autoreply", "einstellungen"],
@@ -312,7 +313,7 @@ export const ADMIN_PAGES: AdminPageEntry[] = [
   {
     slug: "ai-providers",
     route: "/admin/ai/providers",
-    group: "automation",
+    group: "ai",
     nameKey: "admin.nav.aiProviders",
     descriptionKey: "admin.pageDescriptions.aiProviders",
     keywords: ["ki", "llm", "provider", "openai", "anthropic", "modell"],
@@ -320,7 +321,7 @@ export const ADMIN_PAGES: AdminPageEntry[] = [
   {
     slug: "ai-mcp",
     route: "/admin/ai/mcp",
-    group: "automation",
+    group: "ai",
     nameKey: "admin.nav.aiMcp",
     descriptionKey: "admin.pageDescriptions.aiMcp",
     keywords: ["mcp", "tools", "werkzeuge", "model context protocol"],
@@ -328,7 +329,7 @@ export const ADMIN_PAGES: AdminPageEntry[] = [
   {
     slug: "ai-queues",
     route: "/admin/ai/queues",
-    group: "automation",
+    group: "ai",
     nameKey: "admin.nav.aiQueues",
     descriptionKey: "admin.pageDescriptions.aiQueues",
     keywords: ["ki", "queue", "autonomie", "eskalation", "policy"],
@@ -336,10 +337,18 @@ export const ADMIN_PAGES: AdminPageEntry[] = [
   {
     slug: "ai-audit",
     route: "/admin/ai/audit",
-    group: "automation",
+    group: "ai",
     nameKey: "admin.nav.aiAudit",
     descriptionKey: "admin.pageDescriptions.aiAudit",
     keywords: ["ki", "audit", "protokoll", "log", "llm", "pii", "anfragen"],
+  },
+  {
+    slug: "ai-acl",
+    route: "/admin/ai/acl",
+    group: "ai",
+    nameKey: "admin.nav.aiAcl",
+    descriptionKey: "admin.pageDescriptions.aiAcl",
+    keywords: ["ki", "acl", "zugriff", "limits", "budget", "berechtigung", "kontingent"],
   },
 
   // ── System & Betrieb ─────────────────────────────────────────────────
