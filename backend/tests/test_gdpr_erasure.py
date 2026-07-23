@@ -1719,6 +1719,25 @@ def test_explicitly_mapped_kinds_still_use_faker() -> None:
     assert out is not None and out.isalpha()
 
 
+def test_reserve_avoids_existing_unique_values() -> None:
+    """`reserve` keeps unique-kind replacements away from values that already
+    exist in the target table (cross-run collision, e.g. two erasure runs
+    both drawing the same Faker company name for `customer_company.name`)."""
+    first_draw = ValueMapper(seed=11).map_value("Acme Mime", "company")
+    assert first_draw is not None
+
+    mapper = ValueMapper(seed=11)
+    mapper.reserve("company", [first_draw, None, ""])
+    redraw = mapper.map_value("Acme Mime", "company")
+    assert redraw is not None
+    assert redraw != first_draw
+
+    # Deterministic: same seed + same reservations → same redraw.
+    mapper2 = ValueMapper(seed=11)
+    mapper2.reserve("company", [first_draw])
+    assert mapper2.map_value("Acme Mime", "company") == redraw
+
+
 # ---------------------------------------------------------------------------
 # FIX 2: length-capping helpers (shared by preview + apply)
 # ---------------------------------------------------------------------------

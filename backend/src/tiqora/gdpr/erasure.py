@@ -1133,6 +1133,17 @@ async def run_erasure(
         cu_max_lengths = await column_max_lengths(session, "customer_user")
         co_max_lengths = await column_max_lengths(session, "customer_company")
         att_max_lengths = await column_max_lengths(session, "article_data_mime_attachment")
+        # Replacements for UNIQUE columns must not collide with values already
+        # present in the DB (e.g. from an earlier erasure run with a different
+        # seed drawing the same Faker company name) — reserve them up front.
+        mapper.reserve(
+            "company",
+            (await session.execute(text("SELECT name FROM customer_company"))).scalars(),
+        )
+        mapper.reserve(
+            "login",
+            (await session.execute(text("SELECT login FROM customer_user"))).scalars(),
+        )
         customers = (
             (
                 await session.execute(

@@ -28,7 +28,7 @@ from __future__ import annotations
 import hashlib
 import re
 import string
-from collections.abc import Iterator, Sequence
+from collections.abc import Iterable, Iterator, Sequence
 from dataclasses import dataclass, field
 from email.errors import MessageError
 from email.message import Message
@@ -171,6 +171,21 @@ class ValueMapper:
             else:
                 out_chars.append(ch)
         return "".join(out_chars)
+
+    def reserve(self, kind: str, values: Iterable[str | None]) -> None:
+        """Mark *values* as already taken for a unique-column *kind*.
+
+        Uniqueness inside one run is guaranteed via ``_used``, but a
+        replacement can still collide with a value that already exists in the
+        target table from an earlier run (observed: two erasure runs against
+        the same DB both drawing "Brown Ltd" for ``customer_company.name``,
+        violating its UNIQUE key). Callers preload the column's current
+        values here so ``map_value`` re-draws past them.
+        """
+        pool = self._used.setdefault(kind, set())
+        for v in values:
+            if v:
+                pool.add(str(v))
 
     def map_value(self, original: str | None, kind: str) -> str | None:
         if not original:
