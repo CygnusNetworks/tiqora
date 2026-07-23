@@ -791,7 +791,13 @@
         },
         "replyLanguageFixed": "Feste Sprache",
         "replyLanguageDefault": "Rückfallsprache",
-        "allowedStateTypes": "Erlaubte Status-Typen"
+        "allowedStateTypes": "Erlaubte Status-Typen",
+        "piiNer": "Personennamen automatisch erkennen (NER)",
+        "summaryDetail": "Umfang der Zusammenfassung",
+        "summaryDetailLevel": {
+          "standard": "Standard",
+          "detailed": "Ausführlich"
+        }
       },
       "usage": {
         "title": "Nutzung",
@@ -951,7 +957,9 @@
         "replyLanguageMode": "Steuert, ob dem Modell eine verbindliche Antwortsprache vorgegeben wird: „Aus“ = heutiges Verhalten (keine Vorgabe), „Fest“ = immer die angegebene Sprache, „Automatisch“ = Erkennung aus Betreff + letztem Kundenartikel, mit konfigurierter Rückfallsprache bei zu kurzem/uneindeutigem Text.",
         "replyLanguageFixed": "BCP-47-Sprachcode (z. B. \"de\", \"en\"), der bei Modus „Fest“ immer als Antwortsprache vorgegeben wird.",
         "replyLanguageDefault": "BCP-47-Sprachcode, auf den bei Modus „Automatisch“ zurückgefallen wird, wenn der Text keiner der bekannten Sprachprofile eindeutig zugeordnet werden kann.",
-        "allowedStateTypes": "Kommagetrennte Liste erlaubter Znuny-Status-Typen (z. B. \"open\" oder \"open,pending reminder\"), auf die die KI ein Ticket per update_ticket_fields setzen darf — geprüft für sowohl Status-Name als auch Status-ID. Leer = Standard nur \"open\" (Wiedereröffnen erlaubt, nie schließen); eine leere Liste \"[]\" deaktiviert Statusänderungen komplett."
+        "allowedStateTypes": "Kommagetrennte Liste erlaubter Znuny-Status-Typen (z. B. \"open\" oder \"open,pending reminder\"), auf die die KI ein Ticket per update_ticket_fields setzen darf — geprüft für sowohl Status-Name als auch Status-ID. Leer = Standard nur \"open\" (Wiedereröffnen erlaubt, nie schließen); eine leere Liste \"[]\" deaktiviert Statusänderungen komplett.",
+        "piiNer": "Erkennt Personennamen im Text per spaCy-NER (Deutsch + Englisch) und maskiert sie als [NAME_n], bevor der Inhalt den LLM-Provider erreicht — zusätzlich zu Kundenname und Absendern. Nur aktiv, wenn PII-Maskierung eingeschaltet ist. False Positives sind unkritisch (nur mehr Maskierung).",
+        "summaryDetail": "Standard: kompakte Absätze, 1–2 Sätze je beigefügtem Dokument. Ausführlich: gründlichere Absätze und 3–5 Sätze je Dokument — sinnvoll bei Queues mit vielen PDF-Anhängen."
       },
       "common": {
         "validId": "Gültig/Ungültig ist ein weicher Löschstatus: „Ungültig“ blendet den Eintrag aus Auswahllisten für neue Datensätze aus, ohne bestehende Verknüpfungen (z. B. Tickets, Zuordnungen) zu löschen. Ein echtes Löschen ist nicht vorgesehen."

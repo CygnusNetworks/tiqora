@@ -28,6 +28,7 @@ from tiqora.ai.models import (
     REPLY_LANGUAGE_AUTO,
     REPLY_LANGUAGE_FIXED,
     REPLY_LANGUAGE_MODES,
+    SUMMARY_DETAIL_MODES,
     TiqoraAiPromptPart,
     TiqoraAiQueuePolicy,
     TiqoraLlmProvider,
@@ -217,6 +218,7 @@ def _validate_fields(
     reply_language_mode: str | None,
     reply_language_fixed: str | None,
     reply_language_default: str | None,
+    summary_detail: str | None,
 ) -> None:
     if autonomy is not None and autonomy not in AUTONOMY_MODES:
         raise QueuePolicyValidationError(
@@ -247,6 +249,11 @@ def _validate_fields(
     if reply_language_mode == REPLY_LANGUAGE_AUTO and not reply_language_default:
         raise QueuePolicyValidationError(
             "reply_language_mode=auto requires reply_language_default to be set"
+        )
+    if summary_detail is not None and summary_detail not in SUMMARY_DETAIL_MODES:
+        raise QueuePolicyValidationError(
+            f"Invalid summary_detail: {summary_detail!r} "
+            f"(expected one of {sorted(SUMMARY_DETAIL_MODES)})"
         )
 
 
@@ -312,6 +319,7 @@ async def create_queue_policy(
     ai_disclosure_enabled: bool = False,
     ai_disclosure_text: str | None = None,
     pii_masking: bool = True,
+    pii_ner_enabled: bool = True,
     identity_mode: str = "ticket_customer_id",
     clarify_schema_json: str | None = None,
     ignored_senders: str | None = None,
@@ -320,6 +328,7 @@ async def create_queue_policy(
     reply_language_fixed: str | None = None,
     reply_language_default: str | None = None,
     allowed_state_types: str | None = None,
+    summary_detail: str = "standard",
 ) -> TiqoraAiQueuePolicy:
     _validate_fields(
         autonomy=autonomy,
@@ -330,6 +339,7 @@ async def create_queue_policy(
         reply_language_mode=reply_language_mode,
         reply_language_fixed=reply_language_fixed,
         reply_language_default=reply_language_default,
+        summary_detail=summary_detail,
     )
     _validate_escalation_rules_json(escalation_rules)
     await _validate_vision_provider(session, vision_provider_id)
@@ -368,6 +378,7 @@ async def create_queue_policy(
         ai_disclosure_enabled=ai_disclosure_enabled,
         ai_disclosure_text=ai_disclosure_text,
         pii_masking=pii_masking,
+        pii_ner_enabled=pii_ner_enabled,
         identity_mode=identity_mode,
         clarify_schema_json=clarify_schema_json,
         ignored_senders=ignored_senders,
@@ -376,6 +387,7 @@ async def create_queue_policy(
         reply_language_fixed=reply_language_fixed,
         reply_language_default=reply_language_default,
         allowed_state_types=allowed_state_types,
+        summary_detail=summary_detail,
         create_by=change_by,
         change_by=change_by,
     )
@@ -404,6 +416,7 @@ async def update_queue_policy(
     effective_reply_language_default = fields.get(
         "reply_language_default", row.reply_language_default
     )
+    effective_summary_detail = fields.get("summary_detail", row.summary_detail)
 
     _validate_fields(
         autonomy=effective_autonomy,
@@ -414,6 +427,7 @@ async def update_queue_policy(
         reply_language_mode=effective_reply_language_mode,
         reply_language_fixed=effective_reply_language_fixed,
         reply_language_default=effective_reply_language_default,
+        summary_detail=effective_summary_detail,
     )
     if "escalation_rules" in fields:
         _validate_escalation_rules_json(fields.get("escalation_rules"))

@@ -29514,6 +29514,11 @@
             "title": "Pii Masking",
             "default": true
           },
+          "pii_ner_enabled": {
+            "type": "boolean",
+            "title": "Pii Ner Enabled",
+            "default": true
+          },
           "identity_mode": {
             "type": "string",
             "enum": [
@@ -29593,6 +29598,15 @@
               }
             ],
             "title": "Allowed State Types"
+          },
+          "summary_detail": {
+            "type": "string",
+            "enum": [
+              "standard",
+              "detailed"
+            ],
+            "title": "Summary Detail",
+            "default": "standard"
           }
         },
         "type": "object",
@@ -29828,6 +29842,10 @@
             "type": "boolean",
             "title": "Pii Masking"
           },
+          "pii_ner_enabled": {
+            "type": "boolean",
+            "title": "Pii Ner Enabled"
+          },
           "identity_mode": {
             "type": "string",
             "enum": [
@@ -29905,6 +29923,14 @@
             ],
             "title": "Allowed State Types"
           },
+          "summary_detail": {
+            "type": "string",
+            "enum": [
+              "standard",
+              "detailed"
+            ],
+            "title": "Summary Detail"
+          },
           "valid_id": {
             "type": "integer",
             "title": "Valid Id"
@@ -29949,6 +29975,7 @@
           "ai_disclosure_enabled",
           "ai_disclosure_text",
           "pii_masking",
+          "pii_ner_enabled",
           "identity_mode",
           "clarify_schema_json",
           "ignored_senders",
@@ -29957,6 +29984,7 @@
           "reply_language_fixed",
           "reply_language_default",
           "allowed_state_types",
+          "summary_detail",
           "valid_id",
           "create_time",
           "change_time"
@@ -30245,6 +30273,17 @@
             ],
             "title": "Pii Masking"
           },
+          "pii_ner_enabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pii Ner Enabled"
+          },
           "identity_mode": {
             "anyOf": [
               {
@@ -30342,6 +30381,21 @@
               }
             ],
             "title": "Allowed State Types"
+          },
+          "summary_detail": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "standard",
+                  "detailed"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Summary Detail"
           },
           "valid_id": {
             "anyOf": [

@@ -45,12 +45,13 @@ from tiqora.ai.context import (
     collect_known_names,
     get_or_create_state,
     load_articles,
+    ner_source_texts,
     render_ticket_header,
     ticket_snapshot,
 )
 from tiqora.ai.kb_wiring import build_vision_llm_factory
 from tiqora.ai.llm import LlmClient, LlmMessage
-from tiqora.ai.models import FEATURE_SUMMARY, TiqoraAiQueuePolicy
+from tiqora.ai.models import DETAIL_DETAILED, FEATURE_SUMMARY, TiqoraAiQueuePolicy
 from tiqora.ai.pii import PiiMapper
 from tiqora.ai.policies import get_queue_policy_by_queue
 from tiqora.config import Settings, get_settings
@@ -82,6 +83,34 @@ _SYSTEM_PROMPT = (
     "Output ONLY the updated summary text - no preamble, no meta-commentary "
     "about what you changed."
 )
+
+# "detailed" (tiqora_ai_queue_policy.summary_detail) — same structure as
+# _SYSTEM_PROMPT, but paragraphs may run longer/more thorough and each
+# document gets a 3-5 sentence summary instead of 1-2.
+_SYSTEM_PROMPT_DETAILED = (
+    "You maintain a thorough, agent-facing internal summary of a support "
+    "ticket. Given the previous summary (if any) and the article(s) since "
+    "then, write an updated summary as plain text, structured into "
+    "paragraphs separated by a blank line, in this order: (1) current "
+    "status, (2) key facts/identifiers, (3) what the customer wants, (4) "
+    "what has already been tried, (5) open action items. Each paragraph may "
+    "be longer and more thorough than a bare-bones summary - cover all "
+    "relevant detail rather than compressing to the shortest possible "
+    "wording - but still do not use headings, bullet points, or markdown "
+    "formatting.\n\n"
+    "If the input contains one or more attachment blocks labeled "
+    "'[Anhang: <filename>]' with extracted document text, add one further "
+    "paragraph starting with 'Dokumente:' followed by one line per "
+    "document: the filename, then a 3-5 sentence summary covering that "
+    "document's key contents. Omit this paragraph entirely when no document "
+    "attachments are present in the input.\n\n"
+    "Output ONLY the updated summary text - no preamble, no meta-commentary "
+    "about what you changed."
+)
+
+
+def _system_prompt_for_detail(detail: str) -> str:
+    return _SYSTEM_PROMPT_DETAILED if detail == DETAIL_DETAILED else _SYSTEM_PROMPT
 
 
 class SummaryError(Exception):
@@ -236,9 +265,6 @@ async def summarize_ticket(
             upto_article_id=state.last_summary_upto_article_id,
         )
 
-    never_mask = {v for v in (ticket.customer_id, ticket.customer_user_id) if v}
-    known_names = await collect_known_names(session, ticket, articles)
-    pii = PiiMapper(never_mask=never_mask or None, known_names=known_names or None)
     mask = bool(policy.pii_masking)
 
     audit_context = AuditContext(
@@ -265,6 +291,15 @@ async def summarize_ticket(
         vision_llm_factory=effective_vision_factory,
     )
     attachment_blocks = attachment_context.blocks
+
+    never_mask = {v for v in (ticket.customer_id, ticket.customer_user_id) if v}
+    ner_texts = (
+        ner_source_texts(articles, attachment_blocks)
+        if policy.pii_masking and policy.pii_ner_enabled
+        else None
+    )
+    known_names = await collect_known_names(session, ticket, articles, extra_texts=ner_texts)
+    pii = PiiMapper(never_mask=never_mask or None, known_names=known_names or None)
 
     llm = AuditingLlmClient(
         llm,
@@ -293,7 +328,7 @@ async def summarize_ticket(
         )
 
     messages = [
-        LlmMessage(role="system", content=_SYSTEM_PROMPT),
+        LlmMessage(role="system", content=_system_prompt_for_detail(policy.summary_detail)),
         LlmMessage(role="user", content=user_message),
     ]
     response = await llm.chat(messages=messages, tools=None)

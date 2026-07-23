@@ -145,6 +145,7 @@ export type AiQueuePolicyOut = {
   ai_disclosure_enabled: boolean;
   ai_disclosure_text: string | null;
   pii_masking: boolean;
+  pii_ner_enabled: boolean;
   identity_mode: IdentityMode;
   clarify_schema_json: string | null;
   ignored_senders: string | null;
@@ -153,6 +154,7 @@ export type AiQueuePolicyOut = {
   reply_language_fixed: string | null;
   reply_language_default: string | null;
   allowed_state_types: string | null;
+  summary_detail: "standard" | "detailed";
   valid_id: number;
   create_time: string;
   change_time: string;
@@ -185,6 +187,8 @@ export type AiQueuePolicyCreate = {
   ai_disclosure_enabled?: boolean;
   ai_disclosure_text?: string | null;
   pii_masking?: boolean;
+  pii_ner_enabled?: boolean;
+  summary_detail?: "standard" | "detailed";
   identity_mode?: IdentityMode;
   clarify_schema_json?: string | null;
   ignored_senders?: string | null;

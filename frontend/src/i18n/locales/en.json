@@ -791,7 +791,13 @@
         },
         "replyLanguageFixed": "Fixed language",
         "replyLanguageDefault": "Fallback language",
-        "allowedStateTypes": "Allowed state types"
+        "allowedStateTypes": "Allowed state types",
+        "piiNer": "Detect person names automatically (NER)",
+        "summaryDetail": "Summary detail level",
+        "summaryDetailLevel": {
+          "standard": "Standard",
+          "detailed": "Detailed"
+        }
       },
       "usage": {
         "title": "Usage",
@@ -951,7 +957,9 @@
         "replyLanguageMode": "Controls whether the model is given a binding reply language: \"Off\" = today's behaviour (no directive), \"Fixed\" = always the configured language, \"Auto\" = detected from the subject + latest customer article, falling back to the configured default when the text is too short/ambiguous.",
         "replyLanguageFixed": "BCP-47 language code (e.g. \"de\", \"en\") always used as the binding reply language in \"Fixed\" mode.",
         "replyLanguageDefault": "BCP-47 language code used in \"Auto\" mode when the text cannot be confidently matched to a known language profile.",
-        "allowedStateTypes": "Comma-separated list of allowed Znuny state types (e.g. \"open\" or \"open,pending reminder\") the AI may set a ticket to via update_ticket_fields — enforced for both the state name and the numeric state id. Empty = default \"open\" only (reopening allowed, never closing); an explicit empty list \"[]\" disables state changes entirely."
+        "allowedStateTypes": "Comma-separated list of allowed Znuny state types (e.g. \"open\" or \"open,pending reminder\") the AI may set a ticket to via update_ticket_fields — enforced for both the state name and the numeric state id. Empty = default \"open\" only (reopening allowed, never closing); an explicit empty list \"[]\" disables state changes entirely.",
+        "piiNer": "Detects person names in text via spaCy NER (German + English) and masks them as [NAME_n] before content reaches the LLM provider — in addition to customer name and senders. Only active when PII masking is on. False positives are harmless (just more masking).",
+        "summaryDetail": "Standard: compact paragraphs, 1–2 sentences per attached document. Detailed: more thorough paragraphs and 3–5 sentences per document — useful for queues with many PDF attachments."
       },
       "common": {
         "validId": "Valid/invalid is a soft-delete flag: marking an entry invalid hides it from pickers for new records without deleting existing references (e.g. tickets, assignments). There is no hard delete."

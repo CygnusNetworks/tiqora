@@ -307,21 +307,54 @@ def display_name_tokens(from_header: str | None) -> list[str]:
 
 
 async def collect_known_names(
-    session: AsyncSession, ticket: TicketSnapshot, articles: list[ArticleSnapshot]
+    session: AsyncSession,
+    ticket: TicketSnapshot,
+    articles: list[ArticleSnapshot],
+    *,
+    extra_texts: list[str] | None = None,
 ) -> list[str]:
     """PII name-masking candidates (plan §3.7 gap): the ticket's
     customer_user first/last name plus display-name tokens parsed from every
     article's ``From:`` header. Purely additive/defensive — any piece that
     can't be resolved simply yields fewer candidates, never an error, so a
     ticket with no customer_user match or no From headers behaves exactly
-    like today (no name masking)."""
+    like today (no name masking).
+
+    ``extra_texts`` (optional) is run through
+    :func:`tiqora.ai.ner.extract_person_names` and the results are merged in
+    — the caller (runtime/summary) passes the *raw* article/attachment text
+    here when the queue policy has ``pii_ner_enabled`` on, so third-party
+    names mentioned in the body (not just From-headers) are also masked. NER
+    must see unmasked text, so this always runs before
+    :class:`tiqora.ai.pii.PiiMapper` construction.
+    """
     first, last = await customer_user_name(session, ticket.customer_user_id)
     names = [n for n in (first, last) if n]
     if first and last:
         names.append(f"{first} {last}")
     for article in articles:
         names.extend(display_name_tokens(article.from_address))
+    if extra_texts:
+        from tiqora.ai.ner import extract_person_names
+
+        for text_block in extra_texts:
+            names.extend(extract_person_names(text_block))
     return names
+
+
+def ner_source_texts(
+    articles: list[ArticleSnapshot], attachment_blocks: dict[int, str] | None = None
+) -> list[str]:
+    """Raw text blocks to feed :func:`tiqora.ai.ner.extract_person_names` via
+    :func:`collect_known_names`'s ``extra_texts`` — every article body plus
+    any rendered attachment block (document text / vision description),
+    i.e. exactly the text the masking pass itself will see, before masking.
+    Shared by :mod:`tiqora.ai.runtime` and :mod:`tiqora.ai.summary` so both
+    NER-feed the same content."""
+    texts = [a.body for a in articles if a.body]
+    if attachment_blocks:
+        texts.extend(attachment_blocks.values())
+    return texts
 
 
 __all__ = [
@@ -337,6 +370,7 @@ __all__ = [
     "latest_customer_article_id",
     "load_articles",
     "load_attachment_content",
+    "ner_source_texts",
     "render_ticket_header",
     "ticket_snapshot",
 ]
