@@ -53,7 +53,8 @@
     "showAllQueues": "Alle anzeigen",
     "showActiveQueues": "Aktive anzeigen",
     "queueSearch": "Queues filtern…",
-    "noQueueMatch": "Keine passenden Queues."
+    "noQueueMatch": "Keine passenden Queues.",
+    "templates": "Vorlagen"
   },
   "common": {
     "prev": "Zurück",
@@ -64,7 +65,9 @@
     "close": "Schließen",
     "confirm": "Bestätigen",
     "cancel": "Abbrechen",
-    "help": "Hilfe"
+    "help": "Hilfe",
+    "edit": "Bearbeiten",
+    "save": "Speichern"
   },
   "auth": {
     "login": "Anmelden",
@@ -1330,7 +1333,14 @@
       "usage": "Verwendung",
       "inQueues": "in {{count}} Queues",
       "inQueues_one": "in {{count}} Queue",
-      "inQueues_other": "in {{count}} Queues"
+      "inQueues_other": "in {{count}} Queues",
+      "editors": "Editoren",
+      "editorsTitle": "Wer darf „{{name}}“ bearbeiten",
+      "editorsHint": "Editier-Rechte an Berechtigungsgruppen (Mitglieder mit rw) und an einzelne Agenten vergeben. Keine Auswahl = nur Admins.",
+      "editorGroups": "Gruppen (rw)",
+      "editorGroupsHint": "Mitglieder mit rw auf diesen Gruppen dürfen bearbeiten.",
+      "editorUsers": "Einzelne Agenten",
+      "editorUsersFilter": "Agenten filtern…"
     },
     "variables": {
       "title": "Verfügbare Variablen",
@@ -1469,7 +1479,15 @@
       "every": "alle",
       "olderThan": "älter als {{duration}}",
       "newerThan": "neuer als {{duration}}",
-      "weekdaysShort": ["So", "Mo", "Di", "Mi", "Do", "Fr", "Sa"],
+      "weekdaysShort": [
+        "So",
+        "Mo",
+        "Di",
+        "Mi",
+        "Do",
+        "Fr",
+        "Sa"
+      ],
       "keyLabel": {
         "StateIDs": "Status",
         "QueueIDs": "Queue",
@@ -2221,5 +2239,18 @@
       "articleBody": "Text",
       "fieldFallbackNote": "Texteingabe (kein spezielles Widget für diesen Feldtyp)."
     }
+  },
+  "agentTemplates": {
+    "title": "Vorlagen",
+    "subtitle": "Bearbeite die Standard-Vorlagen, für die du freigeschaltet bist.",
+    "deniedTitle": "Kein Vorlagen-Zugriff",
+    "deniedBody": "Du hast keine Berechtigung, Vorlagen zu bearbeiten.",
+    "empty": "Dir sind noch keine Vorlagen freigegeben.",
+    "name": "Name",
+    "type": "Typ",
+    "comment": "Kommentar",
+    "body": "Text",
+    "editTitle": "„{{name}}“ bearbeiten",
+    "saveError": "Vorlage konnte nicht gespeichert werden."
   }
 }

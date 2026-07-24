@@ -155,6 +155,8 @@ export type SignatureUpdate = Schemas["SignatureUpdate"];
 export type StandardTemplateOut = Schemas["StandardTemplateOut"];
 export type StandardTemplateCreate = Schemas["StandardTemplateCreate"];
 export type StandardTemplateUpdate = Schemas["StandardTemplateUpdate"];
+export type TemplateEditorsOut = Schemas["TemplateEditorsOut"];
+export type TemplateEditorsUpdate = Schemas["TemplateEditorsUpdate"];
 // Hand-written (do not regenerate schema.d.ts): standard_attachment master +
 // template/attachment + customer-user/group assignment editors.
 export type StandardAttachmentOut = {
@@ -1652,6 +1654,46 @@ export class ApiClient {
     return this.adminCrud<StandardTemplateOut, StandardTemplateCreate, StandardTemplateUpdate>(
       "/api/v1/admin/templates",
     );
+  }
+
+  /** Per-template edit-ACL (which groups + users may edit it). Admin only. */
+  getTemplateEditors(templateId: number, signal?: AbortSignal) {
+    return this.request<TemplateEditorsOut>(
+      "GET",
+      `/api/v1/admin/templates/${templateId}/editors`,
+      { signal },
+    );
+  }
+
+  setTemplateEditors(templateId: number, body: TemplateEditorsUpdate, signal?: AbortSignal) {
+    return this.request<TemplateEditorsOut>(
+      "PUT",
+      `/api/v1/admin/templates/${templateId}/editors`,
+      { body, signal },
+    );
+  }
+
+  /** Agent-facing template editing — only templates the caller is granted. */
+  get agentTemplates() {
+    const base = "/api/v1/templates";
+    return {
+      list: (params?: AdminListParams, signal?: AbortSignal) =>
+        this.request<AdminPage<StandardTemplateOut>>("GET", base, {
+          query: {
+            page: params?.page,
+            page_size: params?.pageSize,
+            valid: params?.valid,
+            search: params?.search,
+            sort: params?.sort,
+            order: params?.order,
+          },
+          signal,
+        }),
+      get: (id: number, signal?: AbortSignal) =>
+        this.request<StandardTemplateOut>("GET", `${base}/${id}`, { signal }),
+      update: (id: number, body: StandardTemplateUpdate, signal?: AbortSignal) =>
+        this.request<StandardTemplateOut>("PATCH", `${base}/${id}`, { body, signal }),
+    };
   }
 
   listQueueTemplates(queueId: number, signal?: AbortSignal) {
