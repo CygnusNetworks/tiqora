@@ -16,7 +16,7 @@ import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import { Spinner } from "@/components/ui/Spinner";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
-import { SelectMenu } from "@/components/ui/SelectMenu";
+import { Menu, MenuItem } from "@/components/ui/Menu";
 import { HelpPopover } from "@/components/ui/HelpPopover";
 import { ReplyDialog } from "./ReplyDialog";
 
@@ -66,6 +66,183 @@ function CoverageDots({ covered, total }: { covered: number; total: number }) {
         />
       ))}
     </span>
+  );
+}
+
+/** Best-effort JSON parse of a tool result — objects/arrays render
+ * structured, everything else falls back to (unescaped) text. */
+function parseToolContent(content: string): unknown | null {
+  try {
+    const v = JSON.parse(content) as unknown;
+    return typeof v === "object" && v !== null ? v : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Literal "\n" sequences from double-encoded tool output become real
+ * newlines; content that already has real newlines is left untouched. */
+function unescapeToolText(content: string): string {
+  if (content.includes("\n") || !content.includes("\\n")) return content;
+  return content
+    .replace(/\\r\\n/g, "\n")
+    .replace(/\\n/g, "\n")
+    .replace(/\\t/g, "  ");
+}
+
+function JsonPretty({ value, depth = 0 }: { value: unknown; depth?: number }) {
+  const pad = "  ".repeat(depth + 1);
+  const closePad = "  ".repeat(depth);
+  if (Array.isArray(value)) {
+    if (value.length === 0) return <span>[]</span>;
+    return (
+      <>
+        {"[\n"}
+        {value.map((v, i) => (
+          <span key={i}>
+            {pad}
+            <JsonPretty value={v} depth={depth + 1} />
+            {i < value.length - 1 ? "," : ""}
+            {"\n"}
+          </span>
+        ))}
+        {closePad}]
+      </>
+    );
+  }
+  if (typeof value === "object" && value !== null) {
+    const entries = Object.entries(value as Record<string, unknown>);
+    if (entries.length === 0) return <span>{"{}"}</span>;
+    return (
+      <>
+        {"{\n"}
+        {entries.map(([k, v], i) => (
+          <span key={k}>
+            {pad}
+            <span className="text-purple">"{k}"</span>
+            {": "}
+            <JsonPretty value={v} depth={depth + 1} />
+            {i < entries.length - 1 ? "," : ""}
+            {"\n"}
+          </span>
+        ))}
+        {closePad}
+        {"}"}
+      </>
+    );
+  }
+  if (typeof value === "string")
+    return <span className="text-green">"{value}"</span>;
+  if (typeof value === "number" || typeof value === "boolean")
+    return <span className="text-escalation">{String(value)}</span>;
+  return <span className="text-muted">null</span>;
+}
+
+/** Scalar-only values render as a key/value grid (V1 look); as soon as a
+ * value nests, the whole result falls back to pretty-printed JSON with
+ * syntax colours (V2 look). Non-JSON content renders as unescaped text. */
+function ToolResultBody({ content }: { content: string }) {
+  const parsed = parseToolContent(content);
+  if (parsed === null) {
+    return (
+      <p className="whitespace-pre-wrap break-words font-mono text-[11px] leading-relaxed text-ink/90">
+        {unescapeToolText(content)}
+      </p>
+    );
+  }
+  const entries = Array.isArray(parsed)
+    ? null
+    : Object.entries(parsed as Record<string, unknown>);
+  const flat =
+    entries !== null &&
+    entries.every(
+      ([, v]) =>
+        v === null ||
+        typeof v !== "object" ||
+        (Array.isArray(v) &&
+          v.every((x) => typeof x !== "object" || x === null)),
+    );
+  if (entries !== null && flat) {
+    return (
+      <dl className="grid grid-cols-[minmax(6rem,max-content)_1fr] gap-x-4 gap-y-1 overflow-x-auto text-[12px]">
+        {entries.map(([k, v]) => (
+          <div key={k} className="contents">
+            <dt className="pt-px font-mono text-[11px] text-muted">{k}</dt>
+            <dd className="m-0 min-w-0">
+              {Array.isArray(v) ? (
+                <span className="flex flex-wrap gap-1">
+                  {v.map((item, i) => (
+                    <span
+                      key={i}
+                      className="rounded-full bg-accent-dim px-2 py-px text-[11px] font-medium text-accent"
+                    >
+                      {String(item)}
+                    </span>
+                  ))}
+                </span>
+              ) : typeof v === "string" ? (
+                <span className="whitespace-pre-wrap break-words text-ink">
+                  {v}
+                </span>
+              ) : (
+                <span className="font-mono text-ink">{String(v)}</span>
+              )}
+            </dd>
+          </div>
+        ))}
+      </dl>
+    );
+  }
+  return (
+    <pre className="overflow-x-auto rounded bg-surface p-2 font-mono text-[11px] leading-relaxed text-ink/90">
+      <JsonPretty value={parsed} />
+    </pre>
+  );
+}
+
+/** One collapsible card per tool call (admin-only view). */
+function ToolTraceCard({
+  name,
+  content,
+  testId,
+}: {
+  name: string;
+  content: string;
+  testId: string;
+}) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="overflow-hidden rounded-md border border-hairline">
+      <button
+        type="button"
+        aria-expanded={open}
+        data-testid={testId}
+        onClick={() => setOpen((o) => !o)}
+        className="flex w-full items-center gap-2 bg-surface-subtle px-2.5 py-1.5 text-left transition-colors hover:bg-surface"
+      >
+        <span
+          aria-hidden
+          className="h-1.5 w-1.5 flex-none rounded-full bg-green"
+        />
+        <span className="font-mono text-[11px] font-semibold text-ink">
+          {name}
+        </span>
+        <span
+          aria-hidden
+          className={cn(
+            "ml-auto text-[10px] text-muted transition-transform",
+            open && "rotate-90",
+          )}
+        >
+          ▶
+        </span>
+      </button>
+      {open && (
+        <div className="px-2.5 py-2" data-testid={`${testId}-body`}>
+          <ToolResultBody content={content} />
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -224,53 +401,35 @@ export function AiPanel({
               </HelpPopover>
             </span>
             <div className="flex items-center gap-1.5">
-              {isAdmin && hasSummary && (
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  data-testid="ai-panel-summary-admin-delete"
-                  disabled={adminDeleteSummaryMutation.isPending}
-                  title={t("ticket.ai.adminDeleteSummaryHint")}
-                  onClick={async () => {
-                    const ok = await confirm({
-                      title: t("ticket.ai.adminDeleteSummary"),
-                      message: t("ticket.ai.adminDeleteSummaryConfirm"),
-                      variant: "danger",
-                    });
-                    if (ok) adminDeleteSummaryMutation.mutate();
-                  }}
-                >
-                  {t("ticket.ai.adminDeleteSummary")}
-                </Button>
-              )}
-              <SelectMenu
-                items={SUMMARY_DETAILS.map((d) => ({
-                  value: d,
-                  label: t(`ticket.ai.detail.${d}`),
-                }))}
-                value={summaryDetail}
-                onSelect={(v) => setSummaryDetail(v)}
-                panelTestId="ai-panel-summary-detail"
-                trigger={({ ref, toggleProps }) => (
+              <div
+                role="group"
+                aria-label={t("ticket.ai.detailLabel")}
+                className="inline-flex rounded-lg border border-hairline bg-surface p-0.5"
+              >
+                {SUMMARY_DETAILS.map((d) => (
                   <button
+                    key={d}
                     type="button"
-                    ref={ref}
-                    {...toggleProps}
-                    data-testid="ai-panel-summary-detail-trigger"
+                    aria-pressed={summaryDetail === d}
+                    data-testid={`ai-panel-summary-detail-${d}`}
                     disabled={
                       !state.can_summarize || summarizeMutation.isPending
                     }
-                    title={t("ticket.ai.detailLabel")}
-                    className="inline-flex items-center gap-1 rounded-md border border-hairline bg-surface-subtle px-2 py-1 text-xs text-muted transition-colors hover:text-ink disabled:cursor-not-allowed disabled:opacity-50"
+                    onClick={() => setSummaryDetail(d)}
+                    className={cn(
+                      "rounded-md px-2.5 py-0.5 text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50",
+                      summaryDetail === d
+                        ? "bg-accent text-accent-ink"
+                        : "text-muted hover:bg-surface-subtle hover:text-ink",
+                    )}
                   >
-                    {t(`ticket.ai.detail.${summaryDetail}`)}
-                    <span aria-hidden>▾</span>
+                    {t(`ticket.ai.detail.${d}`)}
                   </button>
-                )}
-              />
+                ))}
+              </div>
               <Button
                 size="sm"
-                variant="secondary"
+                variant="primary"
                 data-testid="ai-panel-summarize-button"
                 disabled={!state.can_summarize || summarizeMutation.isPending}
                 onClick={() => summarizeMutation.mutate(summaryDetail)}
@@ -283,6 +442,40 @@ export function AiPanel({
                   t("ticket.ai.summarizeButton")
                 )}
               </Button>
+              {isAdmin && hasSummary && (
+                <Menu
+                  panelTestId="ai-panel-summary-menu"
+                  trigger={({ ref, toggleProps }) => (
+                    <button
+                      type="button"
+                      ref={ref}
+                      {...toggleProps}
+                      data-testid="ai-panel-summary-menu-trigger"
+                      title={t("ticket.ai.moreActions")}
+                      className="rounded-md px-1.5 py-1 text-sm leading-none text-muted transition-colors hover:bg-surface-subtle hover:text-ink"
+                    >
+                      ⋯
+                    </button>
+                  )}
+                >
+                  <MenuItem
+                    danger
+                    testId="ai-panel-summary-admin-delete"
+                    onSelect={() => {
+                      void (async () => {
+                        const ok = await confirm({
+                          title: t("ticket.ai.adminDeleteSummary"),
+                          message: t("ticket.ai.adminDeleteSummaryConfirm"),
+                          variant: "danger",
+                        });
+                        if (ok) adminDeleteSummaryMutation.mutate();
+                      })();
+                    }}
+                  >
+                    {t("ticket.ai.adminDeleteSummary")}
+                  </MenuItem>
+                </Menu>
+              )}
             </div>
           </div>
           {adminDeleteSummaryMutation.isError && (
@@ -540,7 +733,7 @@ export function AiPanel({
                           ? t("ticket.ai.collapse")
                           : t("ticket.ai.expand")}
                       </button>
-                      {draft.tool_trace?.length > 0 && (
+                      {isAdmin && draft.tool_trace?.length > 0 && (
                         <button
                           type="button"
                           className="text-[11px] font-medium text-muted hover:text-ink hover:underline"
@@ -562,19 +755,18 @@ export function AiPanel({
                         </button>
                       )}
                     </div>
-                    {openTraceId === draft.id && (
+                    {isAdmin && openTraceId === draft.id && (
                       <ul
-                        className="space-y-1.5 border-l-2 border-hairline pl-2.5"
+                        className="space-y-1.5"
                         data-testid={`ai-panel-draft-trace-${draft.id}`}
                       >
                         {draft.tool_trace.map((step, i) => (
-                          <li key={i} className="space-y-0.5">
-                            <div className="font-mono text-[11px] font-medium text-muted">
-                              {step.name}
-                            </div>
-                            <pre className="max-h-40 overflow-auto whitespace-pre-wrap break-words rounded bg-surface p-1.5 font-mono text-[11px] leading-snug text-ink/80">
-                              {step.content}
-                            </pre>
+                          <li key={i}>
+                            <ToolTraceCard
+                              name={step.name}
+                              content={step.content}
+                              testId={`ai-panel-draft-trace-step-${draft.id}-${i}`}
+                            />
                           </li>
                         ))}
                       </ul>
