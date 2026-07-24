@@ -24,7 +24,7 @@ from tiqora.ai import drafts as draft_service
 from tiqora.ai import usage as usage_service
 from tiqora.ai.acl import AclLimitExceededError as AiAclLimitExceededError
 from tiqora.ai.acl import check_feature_access, check_feature_limits
-from tiqora.ai.attachment_context import build_attachment_context
+from tiqora.ai.attachment_context import build_attachment_context, mask_attachment_block
 from tiqora.ai.audit import FEATURE_AUTO_REPLY as AUDIT_FEATURE_AUTO_REPLY
 from tiqora.ai.audit import FEATURE_DRAFT as AUDIT_FEATURE_DRAFT
 from tiqora.ai.audit import AuditContext, AuditingLlmClient
@@ -315,14 +315,18 @@ def _build_user_message(
         if a.is_ai_origin:
             label += " (AI, previous own action)"
         body = a.body or ""
-        attach_text = (attachment_blocks or {}).get(a.id)
-        if attach_text:
-            body = f"{body}\n\n{attach_text}" if body else attach_text
         subject_line = f"Subject: {a.subject}" if a.subject else None
         if mask:
             body = pii.mask(body)
             if subject_line:
                 subject_line = pii.mask(subject_line)
+        attach_text = (attachment_blocks or {}).get(a.id)
+        if attach_text:
+            # Masked separately so the "[Anhang: …]" label lines stay intact
+            # (see mask_attachment_block).
+            if mask:
+                attach_text = mask_attachment_block(pii, attach_text)
+            body = f"{body}\n\n{attach_text}" if body else attach_text
         # Untrusted content delimiter (plan §3.8) — the article body is
         # customer/agent free text, never instructions to the model.
         lines.append(f"--- article {a.id} [{label}] ---")

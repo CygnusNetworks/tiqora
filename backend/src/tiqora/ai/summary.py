@@ -36,7 +36,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from tiqora.ai import usage as usage_service
 from tiqora.ai.acl import AclLimitExceededError as AiAclLimitExceededError
 from tiqora.ai.acl import check_feature_access, check_feature_limits
-from tiqora.ai.attachment_context import build_attachment_context
+from tiqora.ai.attachment_context import build_attachment_context, mask_attachment_block
 from tiqora.ai.audit import FEATURE_SUMMARY as AUDIT_FEATURE_SUMMARY
 from tiqora.ai.audit import AuditContext, AuditingLlmClient
 from tiqora.ai.context import (
@@ -87,6 +87,13 @@ _SYSTEM_PROMPT = (
     "(under ~2000 characters), 3-5 sentences for longer ones. Omit this "
     "paragraph entirely when no document attachments are present in the "
     "input.\n\n"
+    "The input starts with a ticket metadata header (ticket number, queue, "
+    "state, customer). That header is context only - the agent reading the "
+    "summary already sees all of it in the UI. Never restate state, queue "
+    "name, ticket number, customer address, or submission metadata in the "
+    "summary; write 'der Kunde'/'the customer' instead of the address, and "
+    "mention an identifier only when it is itself what the conversation is "
+    "about.\n\n"
     "Output ONLY the updated summary text - no preamble, no meta-commentary "
     "about what you changed."
 )
@@ -113,6 +120,13 @@ _SYSTEM_PROMPT_DETAILED = (
     "sentences, up to a full paragraph for long documents (over ~10000 "
     "characters). Omit this paragraph entirely when no document attachments "
     "are present in the input.\n\n"
+    "The input starts with a ticket metadata header (ticket number, queue, "
+    "state, customer). That header is context only - the agent reading the "
+    "summary already sees all of it in the UI. Never restate state, queue "
+    "name, ticket number, customer address, or submission metadata in the "
+    "summary; write 'der Kunde'/'the customer' instead of the address, and "
+    "mention an identifier only when it is itself what the conversation is "
+    "about.\n\n"
     "Output ONLY the updated summary text - no preamble, no meta-commentary "
     "about what you changed."
 )
@@ -164,14 +178,18 @@ def _render_articles(
     lines: list[str] = []
     for a in articles:
         body = a.body or ""
-        attach_text = (attachment_blocks or {}).get(a.id)
-        if attach_text:
-            body = f"{body}\n\n{attach_text}" if body else attach_text
         subject_line = f"Subject: {a.subject}" if a.subject else None
         if mask:
             body = pii.mask(body)
             if subject_line:
                 subject_line = pii.mask(subject_line)
+        attach_text = (attachment_blocks or {}).get(a.id)
+        if attach_text:
+            # Masked separately so the "[Anhang: …]" label lines the system
+            # prompt keys on stay intact (see mask_attachment_block).
+            if mask:
+                attach_text = mask_attachment_block(pii, attach_text)
+            body = f"{body}\n\n{attach_text}" if body else attach_text
         lines.append(f"--- article {a.id} [{_label(a)}] ---")
         if subject_line:
             lines.append(subject_line)
