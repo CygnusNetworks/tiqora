@@ -40,6 +40,17 @@ test.describe("admin users", () => {
     await expect(editedRow.getByText("Invalid")).toBeVisible();
   });
 
+  test("resets a user's 2FA from the row menu", async ({ page }) => {
+    await page.goto("/admin/users");
+    const row = page.locator('[data-testid^="admin-row-"]', { hasText: "agent" });
+    await row.getByTestId(/admin-row-menu-trigger-/).click();
+    await page.getByTestId("admin-row-reset2fa-1").click();
+    // Confirmation guards the destructive reset.
+    await expect(page.getByTestId("confirm-dialog")).toBeVisible();
+    await page.getByTestId("confirm-dialog-confirm").click();
+    await expect(page.getByTestId("confirm-dialog")).not.toBeVisible();
+  });
+
   test("requires the required fields before submitting", async ({ page }) => {
     await page.goto("/admin/users");
     await page.getByTestId("admin-new-button").click();

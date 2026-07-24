@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import {
   keepPreviousData,
   useMutation,
@@ -88,6 +88,11 @@ export type AdminResourcePageProps<Out, Create, Update> = {
    * `valid_id`. Default off.
    */
   statusSortable?: boolean;
+  /**
+   * Resource-specific extra entries for each row's ⋯ menu (e.g. "reset 2FA" on
+   * users). Return `<MenuItem>`s or `null`; rendered after edit/deactivate.
+   */
+  rowActions?: (row: Out) => ReactNode;
 };
 
 const defaultIsRowValid = (row: unknown): boolean =>
@@ -190,6 +195,7 @@ export function AdminResourcePage<Out, Create, Update>({
   allPageSize = DEFAULT_ALL_PAGE_SIZE,
   sortable = false,
   statusSortable = false,
+  rowActions,
 }: AdminResourcePageProps<Out, Create, Update>) {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
@@ -615,6 +621,7 @@ export function AdminResourcePage<Out, Create, Update>({
         onEdit={openEdit}
         onDeactivate={(row) => deactivateM.mutate(idOf(row))}
         onActivate={(row) => activateM.mutate(idOf(row))}
+        extraRowActions={rowActions}
         selection={
           bulkEnabled
             ? {
