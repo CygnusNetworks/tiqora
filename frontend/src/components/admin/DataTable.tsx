@@ -1,7 +1,6 @@
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
-import { Badge } from "@/components/ui/Badge";
-import { Button } from "@/components/ui/Button";
+import { Menu, MenuItem, MenuSeparator } from "@/components/ui/Menu";
 import { Spinner } from "@/components/ui/Spinner";
 import { cn } from "@/lib/cn";
 
@@ -212,7 +211,7 @@ export function DataTable<T>({
 
   return (
     <div
-      className="overflow-x-auto rounded-lg border border-hairline bg-surface"
+      className="overflow-x-auto rounded-xl border border-hairline bg-surface"
       data-testid={testId}
     >
       <table className="w-full min-w-[640px] border-collapse text-left text-sm">
@@ -328,66 +327,81 @@ export function DataTable<T>({
                 ))}
                 {isRowValid && (
                   <td className="py-1 pr-2">
-                    <Badge tone={valid ? "success" : "muted"}>
+                    <span className="inline-flex items-center gap-2 text-xs text-muted">
+                      <span
+                        className={cn(
+                          "h-1.5 w-1.5 shrink-0 rounded-full",
+                          valid ? "bg-green" : "bg-muted",
+                        )}
+                      />
                       {valid ? t("admin.table.valid") : t("admin.table.invalid")}
-                    </Badge>
+                    </span>
                   </td>
                 )}
                 {hasActions && (
                   <td className="py-1 pr-4 text-right">
-                    <div className="inline-flex items-center gap-1.5">
-                      {onEdit && (
-                        <Button
-                          size="sm"
-                          variant="secondary"
-                          data-testid={`admin-row-edit-${id}`}
-                          onClick={() => onEdit(row)}
-                        >
-                          <span className="inline-flex items-center gap-1">
-                            <EditIcon />
-                            {t("admin.table.edit")}
-                          </span>
-                        </Button>
-                      )}
-                      {onDeactivate && valid && (
-                        <Button
-                          size="sm"
-                          variant="danger"
-                          data-testid={`admin-row-deactivate-${id}`}
-                          onClick={() => onDeactivate(row)}
-                        >
-                          <span className="inline-flex items-center gap-1">
-                            <DeactivateIcon />
-                            {t("admin.table.deactivate")}
-                          </span>
-                        </Button>
-                      )}
-                      {onActivate && !valid && (
-                        <Button
-                          size="sm"
-                          variant="secondary"
-                          data-testid={`admin-row-activate-${id}`}
-                          onClick={() => onActivate(row)}
-                        >
-                          <span className="inline-flex items-center gap-1">
-                            <ActivateIcon />
-                            {t("admin.table.activate")}
-                          </span>
-                        </Button>
-                      )}
-                      {onDelete && (
-                        <Button
-                          size="sm"
-                          variant="danger"
-                          data-testid={`admin-row-delete-${id}`}
-                          onClick={() => onDelete(row)}
-                        >
-                          <span className="inline-flex items-center gap-1">
-                            <DeleteIcon />
-                            {t("admin.table.delete")}
-                          </span>
-                        </Button>
-                      )}
+                    <div className="inline-flex justify-end">
+                      <Menu
+                        panelTestId={`admin-row-menu-${id}`}
+                        trigger={({ ref, toggleProps }) => (
+                          <button
+                            type="button"
+                            ref={ref}
+                            {...toggleProps}
+                            data-testid={`admin-row-menu-trigger-${id}`}
+                            title={t("admin.table.actions")}
+                            className="rounded-md px-1.5 py-1 text-sm leading-none text-muted transition-colors hover:bg-surface-subtle hover:text-ink"
+                          >
+                            ⋯
+                          </button>
+                        )}
+                      >
+                        {onEdit && (
+                          <MenuItem testId={`admin-row-edit-${id}`} onSelect={() => onEdit(row)}>
+                            <span className="inline-flex items-center gap-2">
+                              <EditIcon />
+                              {t("admin.table.edit")}
+                            </span>
+                          </MenuItem>
+                        )}
+                        {onDeactivate && valid && (
+                          <MenuItem
+                            testId={`admin-row-deactivate-${id}`}
+                            onSelect={() => onDeactivate(row)}
+                          >
+                            <span className="inline-flex items-center gap-2">
+                              <DeactivateIcon />
+                              {t("admin.table.deactivate")}
+                            </span>
+                          </MenuItem>
+                        )}
+                        {onActivate && !valid && (
+                          <MenuItem
+                            testId={`admin-row-activate-${id}`}
+                            onSelect={() => onActivate(row)}
+                          >
+                            <span className="inline-flex items-center gap-2">
+                              <ActivateIcon />
+                              {t("admin.table.activate")}
+                            </span>
+                          </MenuItem>
+                        )}
+                        {onDelete && (
+                          <>
+                            {(onEdit || onDeactivate || onActivate) && <MenuSeparator />}
+                            <MenuItem
+                              danger
+                              testId={`admin-row-delete-${id}`}
+                              onSelect={() => onDelete(row)}
+                            >
+                              <span className="inline-flex items-center gap-2">
+                                <DeleteIcon />
+                                {t("admin.table.delete")}
+                              </span>
+                            </MenuItem>
+                          </>
+                        )}
+                      </Menu>
                     </div>
                   </td>
                 )}
