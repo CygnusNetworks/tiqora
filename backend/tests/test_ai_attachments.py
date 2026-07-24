@@ -188,3 +188,32 @@ def test_apply_budget_caps_total_and_marks_skipped() -> None:
 
 def test_apply_budget_default_is_50k() -> None:
     assert DEFAULT_RUN_BUDGET_CHARS == 50_000
+
+
+def test_mask_attachment_block_keeps_labels_verbatim() -> None:
+    """The summary prompts key on the literal '[Anhang: …]' label shape — a
+    known name that happens to match inside the label (e.g. NER once tagged
+    the capitalized noun 'Anhang' itself as a person) must not rewrite it."""
+    from tiqora.ai.attachment_context import mask_attachment_block
+    from tiqora.ai.pii import PiiMapper
+
+    pii = PiiMapper(known_names=["Anhang", "Marie Knoblich"])
+    block = (
+        "[Anhang: 2.SK_Anhang_2_Aenderungsantraege.pdf — ca. 9396 Zeichen]\n"
+        "Marie Knoblich stellt den Antrag, siehe Anhang.\n"
+        "Kontakt: marie@example.com\n"
+        "[Bild-Anhang: foto.jpg — Beschreibung durch Vision-Modell]\n"
+        "Ein Foto von Marie Knoblich.\n"
+        "[Anhang übersprungen: budget]"
+    )
+    masked = mask_attachment_block(pii, block)
+    lines = masked.splitlines()
+    assert lines[0] == "[Anhang: 2.SK_Anhang_2_Aenderungsantraege.pdf — ca. 9396 Zeichen]"
+    assert lines[3] == "[Bild-Anhang: foto.jpg — Beschreibung durch Vision-Modell]"
+    assert lines[5] == "[Anhang übersprungen: budget]"
+    # Content between labels IS masked.
+    assert "Marie Knoblich" not in lines[1]
+    assert "[NAME_" in lines[1]
+    assert "marie@example.com" not in masked
+    assert "[EMAIL_" in masked
+    assert "Marie Knoblich" not in lines[4]

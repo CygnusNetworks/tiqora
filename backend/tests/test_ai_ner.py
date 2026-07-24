@@ -60,3 +60,41 @@ def test_extract_person_names_latency_on_large_text(capsys: object) -> None:
     elapsed = time.perf_counter() - start
     print(f"extract_person_names on {len(text)} chars took {elapsed:.3f}s")
     assert names  # sanity: still finds names in the large text
+
+
+def test_plausible_person_name_filters() -> None:
+    from tiqora.ai.ner import _plausible_person_name
+
+    # Multi-token proper names pass without context.
+    assert _plausible_person_name("Marie Knoblich", "")
+    assert _plausible_person_name("Alexander von Humboldt", "")
+    # Lowercase-initial candidates never pass.
+    assert not _plausible_person_name("der", "der Bewohner")
+    assert not _plausible_person_name("von Humboldt", "")
+    # Lone capitalized tokens (German nouns!) need an honorific context.
+    assert not _plausible_person_name("Vertrauensstudenten", "Die Vertrauensstudenten tagten.")
+    assert not _plausible_person_name("Benachteiligung", "Eine Benachteiligung der Senioren.")
+    assert _plausible_person_name("Knoblich", "Frau Knoblich hat angerufen.")
+    assert _plausible_person_name("Meyer", "Sehr geehrter Herr Meyer,")
+    assert _plausible_person_name("Weber", "Herrn Dr. Weber wurde mitgeteilt")
+
+
+def test_extract_person_names_skips_capitalized_common_nouns() -> None:
+    text = (
+        "Die Vertrauensstudenten und Vertrauensstudentinnen vertreten die "
+        "Bewohner. Die Benachteiligung der Senioren wurde besprochen. "
+        "Marie Knoblich hat das Protokoll geschrieben."
+    )
+    names = extract_person_names(text)
+    assert "Marie Knoblich" in names
+    noise = (
+        "Vertrauensstudenten",
+        "Vertrauensstudentinnen",
+        "Bewohner",
+        "Benachteiligung",
+        "Senioren",
+        "der",
+        "die",
+    )
+    for word in noise:
+        assert word not in names

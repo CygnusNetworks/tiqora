@@ -104,3 +104,26 @@ def test_known_names_empty_behaves_like_before() -> None:
     mapper = PiiMapper(known_names=None)
     text = "Anna Meyer called about her invoice."
     assert mapper.mask(text) == text
+
+
+def test_display_name_tokens_skips_functional_mailbox_labels() -> None:
+    """A display name that just mirrors the address local part is a mailbox
+    label ("Vertrauensstudenten <vertrauensstudenten@web.de>"), not a person
+    — masking it would shred that word everywhere in the ticket text."""
+    from tiqora.ai.context import display_name_tokens
+
+    assert display_name_tokens("Vertrauensstudenten <vertrauensstudenten@web.de>") == []
+    # Multi-word display names are always kept, even when they mirror the
+    # local part — that shape is a real person, not a mailbox label.
+    assert display_name_tokens("Anna Meyer <anna.meyer@web.de>") == [
+        "Anna Meyer",
+        "Anna",
+        "Meyer",
+    ]
+    # A real person whose display name differs from the local part is kept.
+    assert display_name_tokens("Anna-Lena Meyer <a.meyer@example.com>") == [
+        "Anna-Lena Meyer",
+        "Anna-Lena",
+        "Meyer",
+    ]
+    assert display_name_tokens(None) == []

@@ -18,6 +18,7 @@ building the LLM prompt.
 
 from __future__ import annotations
 
+import re
 from collections.abc import Callable
 from dataclasses import dataclass, field
 
@@ -26,6 +27,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from tiqora.ai.attachments import apply_budget, extract_attachment_text, is_image
 from tiqora.ai.context import ArticleSnapshot, load_attachment_content
 from tiqora.ai.llm import LlmClient, LlmUsage
+from tiqora.ai.pii import PiiMapper
 from tiqora.ai.vision import describe_images
 
 # Sync on purpose: the caller already resolved the vision provider row (a DB
@@ -38,6 +40,34 @@ VisionLlmFactory = Callable[[], LlmClient]
 # before spending a vision call. Inline images (signature logos etc.) are
 # already filtered upstream in tiqora.ai.context regardless of size.
 _MIN_IMAGE_BYTES = 5 * 1024
+
+
+# Block label lines as rendered below / in tiqora.ai.attachments — the
+# summary prompts key on the literal "[Anhang: <filename> — ca. <n> Zeichen]"
+# shape, so PII masking must never rewrite them.
+_BLOCK_LABEL_RE = re.compile(r"^\[(?:Anhang: |Bild-Anhang: |Anhang übersprungen)")
+
+
+def mask_attachment_block(pii: PiiMapper, block: str) -> str:
+    """PII-mask an attachment render block while keeping its label lines
+    (``[Anhang: …]`` / ``[Bild-Anhang: …]``) byte-identical. Content between
+    labels is masked chunk-wise so multi-line patterns still match."""
+    out: list[str] = []
+    chunk: list[str] = []
+
+    def flush() -> None:
+        if chunk:
+            out.append(pii.mask("\n".join(chunk)))
+            chunk.clear()
+
+    for line in block.splitlines():
+        if _BLOCK_LABEL_RE.match(line):
+            flush()
+            out.append(line)
+        else:
+            chunk.append(line)
+    flush()
+    return "\n".join(out)
 
 
 @dataclass(frozen=True, slots=True)
@@ -134,4 +164,9 @@ async def build_attachment_context(
     return AttachmentContextResult(blocks=blocks, vision_usage=vision_usage)
 
 
-__all__ = ["AttachmentContextResult", "VisionLlmFactory", "build_attachment_context"]
+__all__ = [
+    "AttachmentContextResult",
+    "VisionLlmFactory",
+    "build_attachment_context",
+    "mask_attachment_block",
+]

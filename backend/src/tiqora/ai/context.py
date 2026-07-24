@@ -297,11 +297,25 @@ def display_name_tokens(from_header: str | None) -> list[str]:
     part (e.g. ``"Anna-Lena Meyer"`` and its individual tokens from
     ``"Anna-Lena Meyer <a.meyer@example.com>"``). Mirrors the address-only
     extraction in :mod:`tiqora.ai.senders`, which only needs the bare
-    address and discards the display name entirely."""
+    address and discards the display name entirely.
+
+    A *single-word* display name that merely repeats the address's local
+    part (``"Vertrauensstudenten <vertrauensstudenten@web.de>"``) is a
+    functional mailbox label, not a person — masking it would shred every
+    occurrence of that word in the ticket text, so it yields no candidates.
+    Multi-word display names ("Anna Meyer <anna.meyer@…>") are always kept."""
     if not from_header:
         return []
-    display_name = parseaddr(from_header)[0].strip()
+    display_name, address = parseaddr(from_header)
+    display_name = display_name.strip()
     if not display_name:
+        return []
+    local_part = address.split("@", 1)[0] if address else ""
+    if (
+        local_part
+        and len(_NAME_SPLIT_RE.split(display_name)) == 1
+        and display_name.lower() == local_part.lower()
+    ):
         return []
     return [display_name, *(p for p in _NAME_SPLIT_RE.split(display_name) if p)]
 
