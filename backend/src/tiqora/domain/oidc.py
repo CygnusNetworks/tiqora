@@ -22,7 +22,7 @@ import httpx
 from authlib.integrations.httpx_client import AsyncOAuth2Client
 
 from tiqora.config import Settings
-from tiqora.security.outbound import OutboundURLError, pin_outbound_url, validate_outbound_url
+from tiqora.security.outbound import OutboundURLError, pin_outbound_url
 
 
 class OIDCError(Exception):
@@ -36,13 +36,6 @@ def _safe_get_url(url: str) -> tuple[str, dict[str, str], dict[str, str]]:
     except OutboundURLError as exc:
         raise OIDCError(f"outbound URL rejected: {exc}") from exc
     return pinned.request_url, pinned.request_headers(), pinned.request_extensions()
-
-
-def _validate_endpoint(url: str, *, kind: str) -> None:
-    try:
-        validate_outbound_url(url)
-    except OutboundURLError as exc:
-        raise OIDCError(f"{kind} rejected: {exc}") from exc
 
 
 class OIDCService:
@@ -85,51 +78,61 @@ class OIDCService:
         token_endpoint = disc.get("token_endpoint")
         if not token_endpoint or not isinstance(token_endpoint, str):
             raise OIDCError("provider discovery is missing token_endpoint")
-        _validate_endpoint(token_endpoint, kind="token_endpoint")
 
-        client = AsyncOAuth2Client(
-            client_id=self._settings.oidc_client_id,
-            client_secret=self._settings.oidc_client_secret,
-            redirect_uri=self._settings.oidc_redirect_uri,
-            transport=self._transport,
-        )
+        # Pin the token POST exactly like userinfo — connect by resolved IP with
+        # fixed Host/SNI — so a compromised issuer can't rebind DNS to an
+        # internal address between validation and connect (security review, DNS
+        # rebinding). client_secret_basic is the OAuth2/OIDC default.
+        token_url, token_headers, token_ext = _safe_get_url(token_endpoint)
         try:
-            try:
-                token = await client.fetch_token(
-                    token_endpoint, code=code, grant_type="authorization_code"
+            form = {
+                "grant_type": "authorization_code",
+                "code": code,
+                "redirect_uri": self._settings.oidc_redirect_uri,
+            }
+            post_headers = dict(token_headers)
+            post_headers["Content-Type"] = "application/x-www-form-urlencoded"
+            async with httpx.AsyncClient(
+                transport=self._transport, follow_redirects=False
+            ) as token_client:
+                token_resp = await token_client.post(
+                    token_url,
+                    data=form,
+                    headers=post_headers,
+                    extensions=token_ext,
+                    auth=(
+                        self._settings.oidc_client_id,
+                        self._settings.oidc_client_secret,
+                    ),
                 )
-            except Exception as exc:  # noqa: BLE001 — normalize provider errors
-                raise OIDCError(f"token exchange failed: {exc}") from exc
+                token_resp.raise_for_status()
+                token = token_resp.json()
+        except (httpx.HTTPError, ValueError) as exc:  # normalize provider errors
+            raise OIDCError(f"token exchange failed: {exc}") from exc
 
-            userinfo_endpoint = disc.get("userinfo_endpoint")
-            if userinfo_endpoint:
-                if not isinstance(userinfo_endpoint, str):
-                    raise OIDCError("provider discovery has invalid userinfo_endpoint")
-                request_url, headers, extensions = _safe_get_url(userinfo_endpoint)
-                try:
-                    # Prefer pinned GET over authlib client so SNI/Host stay correct.
-                    async with httpx.AsyncClient(
-                        transport=self._transport, follow_redirects=False
-                    ) as raw:
-                        # Forward bearer token from the exchange when present.
-                        auth_headers = dict(headers)
-                        access = token.get("access_token") if isinstance(token, dict) else None
-                        if access:
-                            auth_headers["Authorization"] = f"Bearer {access}"
-                        resp = await raw.get(
-                            request_url, headers=auth_headers, extensions=extensions
-                        )
-                        resp.raise_for_status()
-                except httpx.HTTPError as exc:
-                    raise OIDCError(f"userinfo request failed: {exc}") from exc
-                claims: dict[str, Any] = resp.json()
-                return claims
+        userinfo_endpoint = disc.get("userinfo_endpoint")
+        if userinfo_endpoint:
+            if not isinstance(userinfo_endpoint, str):
+                raise OIDCError("provider discovery has invalid userinfo_endpoint")
+            request_url, headers, extensions = _safe_get_url(userinfo_endpoint)
+            try:
+                async with httpx.AsyncClient(
+                    transport=self._transport, follow_redirects=False
+                ) as raw:
+                    auth_headers = dict(headers)
+                    access = token.get("access_token") if isinstance(token, dict) else None
+                    if access:
+                        auth_headers["Authorization"] = f"Bearer {access}"
+                    resp = await raw.get(request_url, headers=auth_headers, extensions=extensions)
+                    resp.raise_for_status()
+            except httpx.HTTPError as exc:
+                raise OIDCError(f"userinfo request failed: {exc}") from exc
+            claims: dict[str, Any] = resp.json()
+            return claims
 
-            # No userinfo endpoint advertised: fall back to whatever the
-            # token response itself carries (some minimal test providers).
-            claims_fallback = token.get("userinfo") if isinstance(token, dict) else None
-            if isinstance(claims_fallback, dict):
-                return claims_fallback
-            raise OIDCError("provider has no userinfo_endpoint and returned no claims")
-        finally:
-            await client.aclose()
+        # No userinfo endpoint advertised: fall back to whatever the token
+        # response itself carries (some minimal test providers).
+        claims_fallback = token.get("userinfo") if isinstance(token, dict) else None
+        if isinstance(claims_fallback, dict):
+            return claims_fallback
+        raise OIDCError("provider has no userinfo_endpoint and returned no claims")
