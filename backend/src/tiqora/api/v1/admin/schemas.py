@@ -488,6 +488,18 @@ class QueueTemplateAssignment(BaseModel):
     standard_template_id: int
 
 
+class TemplateEditorsOut(BaseModel):
+    """Who may edit a Standard Template (per-template ACL: groups + users)."""
+
+    group_ids: list[int]
+    user_ids: list[int]
+
+
+class TemplateEditorsUpdate(BaseModel):
+    group_ids: list[int] = []
+    user_ids: list[int] = []
+
+
 # ---------------------------------------------------------------------------
 # Standard attachments (+ template assignment)
 # ---------------------------------------------------------------------------
