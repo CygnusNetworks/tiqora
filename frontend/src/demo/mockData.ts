@@ -181,6 +181,70 @@ const ticketAiState = {
   summary_created_at: "2026-07-10T10:06:00Z",
 };
 
+// A second AI scenario (ticket 101) showcasing MCP tool use: the assistant
+// pulled live readings from a monitoring MCP server and grounded its draft in
+// them. The tool_trace `content` is JSON so the panel renders it as a compact
+// key/value table (arrays become pill badges).
+const ticketAiSummaryMcp =
+  "The monitoring integration flagged web-prod-03 with sustained high load and slow " +
+  "HTTP responses since 08:41. Live metrics pulled through the monitoring MCP server " +
+  "confirm CPU at 94%, a 15-minute load average of 11.8, and memory at 88%, with three " +
+  "alerts currently firing (CPUHigh, HTTPLatencyP95, and DiskWillFill on /var). The " +
+  "assistant grounded its customer reply in those live readings rather than guessing.\n\n" +
+  "Open point: confirm whether the traffic spike is organic before scaling out versus " +
+  "rolling back this morning's deploy.";
+
+const ticketAiDraftsMcp = [
+  {
+    id: 9101, ticket_id: 101, kind: "reply",
+    subject: "Re: Portal is slow this morning",
+    body:
+      "Hi,\n\nThanks for flagging this. Our monitoring confirms one of the web nodes " +
+      "(web-prod-03) is under heavy load right now — CPU around 94% and elevated request " +
+      "latency since 08:41. We're shifting traffic off that node and adding capacity; you " +
+      "should see response times recover within the next few minutes. We'll follow up here " +
+      "once it's fully stable.\n\nBest regards,\nOperations",
+    based_on_article_id: 600, status: "open", source: "auto",
+    accepted_article_id: null, create_time: "2026-07-10T08:52:00Z",
+    tool_trace: [
+      {
+        name: "monitoring.get_host_metrics",
+        content: JSON.stringify({
+          host: "web-prod-03",
+          cpu_pct: 94,
+          load_avg_15m: 11.8,
+          mem_used_pct: 88,
+          swap_used_pct: 37,
+          uptime: "42d 6h",
+        }),
+      },
+      {
+        name: "monitoring.list_active_alerts",
+        content: JSON.stringify({
+          host: "web-prod-03",
+          firing: [
+            "CPUHigh 94% > 85% (12m)",
+            "HTTPLatencyP95 2.4s > 1s",
+            "DiskWillFill /var ~6h",
+          ],
+          since: "2026-07-10T08:41:00Z",
+        }),
+      },
+    ],
+  },
+];
+
+const ticketAiStateMcp = {
+  manual_assist_available: true,
+  summary_available: true,
+  can_summarize: true,
+  operation_mode_ready: true,
+  drafts: ticketAiDraftsMcp,
+  summary_body: ticketAiSummaryMcp,
+  last_summary_upto_article_id: 600,
+  summary_created_at: "2026-07-10T08:51:00Z",
+};
+
 // Admin AI config so the demo's AI settings/providers pages look provisioned
 // (rather than an empty "not configured" state).
 const aiSettings = {
@@ -352,7 +416,10 @@ export function resolveData(path: string, method: string): unknown | undefined {
   if (p.match(/\/api\/v1\/tickets\/\d+\/ai\/drafts\/\d+\/discard$/) && method === "POST") return {};
   if (p.match(/\/api\/v1\/tickets\/\d+\/ai\/draft$/) && method === "POST")
     return { status: "ok", draft_id: 9001, article_id: 500 };
-  if (p.match(/\/api\/v1\/tickets\/\d+\/ai$/) && method === "GET") return ticketAiState;
+  if (p.match(/\/api\/v1\/tickets\/\d+\/ai$/) && method === "GET") {
+    const tid = Number(p.split("/").slice(-2)[0]);
+    return tid === 101 ? ticketAiStateMcp : ticketAiState;
+  }
   if (p.match(/\/api\/v1\/tickets\/\d+$/) && method === "GET") return ticketDetail;
   if (p.endsWith("/api/v1/agents/online")) return onlineAgents;
   if (p.endsWith("/api/v1/agents/presence/ping") && method === "POST") return {};

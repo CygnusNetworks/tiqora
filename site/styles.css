@@ -282,6 +282,7 @@ section {
 }
 
 .shot {
+  position: relative;
   background: var(--surface);
   border: 1px solid var(--hairline);
   border-radius: var(--radius);
@@ -428,24 +429,36 @@ footer {
   }
 }
 
-/* Screenshot gallery light/dark switch */
+/* Per-screenshot light/dark switch — one on each shot, all kept in sync.
+   Sits as a compact overlay in the top-right corner of the image. */
 .shot-toggle {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 2;
   display: inline-flex;
   gap: 2px;
-  margin-top: 18px;
-  padding: 3px;
+  padding: 2px;
   border: 1px solid var(--hairline);
   border-radius: 999px;
-  background: var(--surface);
+  background: color-mix(in srgb, var(--surface) 80%, transparent);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  opacity: 0.82;
+  transition: opacity 0.12s ease;
+}
+.shot:hover .shot-toggle,
+.shot-toggle:focus-within {
+  opacity: 1;
 }
 .shot-toggle button {
   appearance: none;
   border: 0;
   cursor: pointer;
-  padding: 6px 18px;
+  padding: 4px 12px;
   border-radius: 999px;
   font: inherit;
-  font-size: 0.85rem;
+  font-size: 0.72rem;
   font-weight: 600;
   color: var(--muted);
   background: transparent;
