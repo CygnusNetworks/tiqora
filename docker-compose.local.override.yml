@@ -1,0 +1,86 @@
+# Hot-reload overlay for the full local stack. Layer it on top of the base:
+#
+#   docker compose -f docker-compose.local.yml -f docker-compose.local.override.yml up -d
+#
+#   • Frontend (Vite HMR):  http://localhost:5173   ← edit frontend/src → instant
+#   • Backend (--reload):   http://localhost:8000    ← edit backend/src → auto-restart
+#
+# The backend source is bind-mounted; the image already sets
+# PYTHONPATH=/app/backend/src, so uvicorn --reload imports the live code. The
+# frontend runs a Node/Vite container that proxies /api to the compose backend.
+# Do frontend work against :5173 (HMR); :8000 still serves the built SPA.
+#
+# Workers/MCP don't auto-reload — they get the mounted source too, so a
+#   docker compose -f … -f … restart tiqora-worker tiqora-ai-worker tiqora-mcp
+# picks up backend changes without an image rebuild.
+
+services:
+  tiqora-api:
+    # Bypass entrypoint.sh (migrations already ran via init) and serve with
+    # auto-reload straight from the mounted source.
+    # `python -m uvicorn` (not the `uvicorn` console script): the image copies
+    # the venv from a different build path, so the script's shebang is broken —
+    # invoking via python uses the correct interpreter.
+    entrypoint:
+      - python
+      - -m
+      - uvicorn
+      - tiqora.api.app:create_app
+      - --factory
+      - --reload
+      - --reload-dir
+      - /app/backend/src
+      - --host
+      - 0.0.0.0
+      - --port
+      - "8000"
+    # Clear the base service's `command: ["api"]`, else it's appended as a stray
+    # uvicorn arg.
+    command: []
+    volumes:
+      - ./backend/src:/app/backend/src
+
+  tiqora-worker:
+    volumes:
+      - ./backend/src:/app/backend/src
+
+  tiqora-ai-worker:
+    volumes:
+      - ./backend/src:/app/backend/src
+
+  tiqora-mcp:
+    volumes:
+      - ./backend/src:/app/backend/src
+
+  frontend-dev:
+    image: node:20-bookworm-slim
+    container_name: tiqora-local-frontend-dev
+    working_dir: /repo
+    # corepack pins pnpm from package.json#packageManager. node_modules live in
+    # named volumes (Linux binaries) so the host's macOS install isn't reused.
+    command:
+      - sh
+      - -c
+      - >-
+        corepack enable &&
+        pnpm install --frozen-lockfile &&
+        pnpm --filter @tiqora/api-client build &&
+        pnpm --filter tiqora-frontend dev --host 0.0.0.0 --port 5173
+    environment:
+      VITE_PROXY_TARGET: http://tiqora-api:8000
+      VITE_USE_POLLING: "1"
+    volumes:
+      - ./:/repo
+      - tiqora_local_root_node_modules:/repo/node_modules
+      - tiqora_local_fe_node_modules:/repo/frontend/node_modules
+      - tiqora_local_apiclient_node_modules:/repo/packages/api-client/node_modules
+    ports:
+      - "127.0.0.1:5173:5173"
+    depends_on:
+      tiqora-api:
+        condition: service_started
+
+volumes:
+  tiqora_local_root_node_modules:
+  tiqora_local_fe_node_modules:
+  tiqora_local_apiclient_node_modules:

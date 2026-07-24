@@ -19,9 +19,8 @@
 # service + DATABASE_URL for postgres:16 if you prefer.
 #
 # Runs as its own compose project (`tiqora-local`) with its own containers and
-# volumes, so it never collides with docker-compose.dev.yml. It is a standalone
-# alternative to that infra-only stack — don't run both at once (Mailpit shares
-# host ports 8025/1025).
+# volumes, and uses non-default host ports where needed, so it can run
+# alongside docker-compose.dev.yml without collisions.
 
 name: tiqora-local
 
@@ -91,33 +90,43 @@ services:
   mailpit:
     image: axllent/mailpit:latest
     container_name: tiqora-local-mailpit
+    # Host ports 1026/8026 (not the Mailpit defaults 1025/8025) so this stack
+    # can run alongside docker-compose.dev.yml's Mailpit without clashing. The
+    # app still reaches it in-network at mailpit:1025.
     ports:
-      - "127.0.0.1:1025:1025" # SMTP (point outbound mail here via /admin/mail-outbound)
-      - "127.0.0.1:8025:8025" # Web UI
+      - "127.0.0.1:1026:1025" # SMTP (point outbound mail here via /admin/mail-outbound)
+      - "127.0.0.1:8026:8025" # Web UI
     environment:
       MP_SMTP_AUTH_ACCEPT_ANY: 1
       MP_SMTP_AUTH_ALLOW_INSECURE: 1
 
-  # One-shot: load Znuny base schema → tiqora migrations → admin password →
-  # seed fake customers/tickets, then exit. App services wait for it.
+  # One-shot: load Znuny base schema → tiqora migrations → admin password, then
+  # seed fake customers/tickets ONCE. Runs on every `up` (the app services gate
+  # on it completing), so it must be idempotent: `bootstrap` (no --seed) is
+  # safe to repeat, and the seed is guarded by a sentinel in a named volume so
+  # a second run doesn't duplicate the fixed-RNG data (which would fail).
   init:
     <<: *app-build
     container_name: tiqora-local-init
     restart: "no"
-    entrypoint: ["python", "-m", "tiqora.main"]
+    # Root so the one-shot can write the seed sentinel into the (root-owned)
+    # named volume; the app image otherwise runs as a non-root user.
+    user: root
+    entrypoint: ["sh", "-c"]
     command:
-      - bootstrap
-      - --admin-password
-      - admin
-      - --seed
-      - --customers
-      - "12"
-      - --tickets
-      - "40"
-      - --seed-value
-      - "42"
+      - >-
+        python -m tiqora.main bootstrap --admin-password admin &&
+        if [ ! -f /seed-state/.seeded ]; then
+          echo "Seeding fake customers/tickets…" &&
+          python -m tiqora.main dev seed --customers 12 --tickets 40 --seed 42 &&
+          touch /seed-state/.seeded;
+        else
+          echo "Already seeded — skipping (rm the tiqora_local_seed volume to re-seed).";
+        fi
     environment:
       <<: *app-env
+    volumes:
+      - tiqora_local_seed:/seed-state
     depends_on:
       mariadb:
         condition: service_healthy
@@ -185,3 +194,4 @@ volumes:
   tiqora_local_mariadb:
   tiqora_local_redis:
   tiqora_local_meili:
+  tiqora_local_seed:
