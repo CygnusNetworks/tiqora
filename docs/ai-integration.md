@@ -357,3 +357,13 @@ Any auto-sent article (queue autonomy allowing it) can carry a disclosure
 footer identifying it as AI-generated, enabled per queue
 (`ai_disclosure_enabled`) with either a queue-specific text or the global
 default (`ai.disclosure.default_text`).
+
+### Audit log
+
+Every LLM call (drafts, summaries, auto-reply, and the vision pre-pass) is
+written to `tiqora_ai_audit_log` and browsable at **`/admin/ai/audit`** — with
+the rendered prompt/response and a PII-inspection view so an operator can see
+exactly what left the building (and that masking worked) without digging through
+provider logs. Retention is trimmed by the `ai_audit_cleanup` daemon task. The
+per-request HTTP timeout for a chat completion is `TIQORA_LLM_TIMEOUT` (default
+`180.0` s) — raise it if long detailed summaries surface `LlmTimeoutError`.
