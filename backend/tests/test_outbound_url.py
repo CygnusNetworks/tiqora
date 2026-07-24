@@ -112,3 +112,20 @@ def test_is_blocked_ip_helpers() -> None:
     assert is_blocked_ip(ipaddress.ip_address("fe80::1"))
     assert not is_blocked_ip(ipaddress.ip_address("8.8.8.8"))
     assert not is_blocked_ip(ipaddress.ip_address("1.1.1.1"))
+
+
+def test_allow_private_permits_rfc1918_but_blocks_metadata_and_loopback() -> None:
+    import ipaddress as _ip
+
+    from tiqora.security.outbound import is_blocked_ip
+
+    # allow_private=True: RFC1918 / ULA permitted (self-hosted LLM/MCP)...
+    assert is_blocked_ip(_ip.ip_address("10.0.0.5"), allow_private=True) is False
+    assert is_blocked_ip(_ip.ip_address("192.168.1.10"), allow_private=True) is False
+    assert is_blocked_ip(_ip.ip_address("fd00::1"), allow_private=True) is False
+    # ...but loopback, link-local and the cloud-metadata IP stay blocked.
+    assert is_blocked_ip(_ip.ip_address("127.0.0.1"), allow_private=True) is True
+    assert is_blocked_ip(_ip.ip_address("169.254.169.254"), allow_private=True) is True
+    assert is_blocked_ip(_ip.ip_address("::1"), allow_private=True) is True
+    # Default (allow_private=False) still blocks RFC1918.
+    assert is_blocked_ip(_ip.ip_address("10.0.0.5")) is True

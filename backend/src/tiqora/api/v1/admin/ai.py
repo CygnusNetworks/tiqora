@@ -18,6 +18,7 @@ import json
 from datetime import datetime
 
 from fastapi import APIRouter, HTTPException, Query, status
+from starlette.concurrency import run_in_threadpool
 
 from tiqora.ai import acl as ai_acl
 from tiqora.ai import drafts as ai_drafts
@@ -72,12 +73,37 @@ from tiqora.domain.settings_store import (
     get_setting_int,
     set_setting,
 )
+from tiqora.security.outbound import OutboundURLError, validate_outbound_url
 
 router = APIRouter(prefix="/ai", tags=["admin:ai"])
 
 
 def _not_found(what: str, ident: object) -> HTTPException:
     return HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"{what} not found: {ident}")
+
+
+async def _reject_ssrf_url(url: str | None) -> None:
+    """Block LLM-provider/MCP egress URLs that resolve to loopback/link-local/
+    cloud-metadata addresses (security review M2). RFC1918 private targets are
+    *allowed* — self-hosted models and internal MCP servers legitimately live
+    there. A host that cannot be resolved at write time is not rejected (typo /
+    offline registry); the sharp block is on a resolved-to-forbidden IP."""
+    if not url:
+        return
+    try:
+        await run_in_threadpool(
+            lambda: validate_outbound_url(url, allow_private_networks=True)
+        )
+    except OutboundURLError as exc:
+        msg = str(exc)
+        # Only a *resolution* failure is tolerated (typo / offline registry);
+        # blocked addresses, bad schemes, userinfo, empty URLs are rejected.
+        if "cannot resolve host" in msg or "no addresses resolved" in msg:
+            return
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"URL not allowed (SSRF guard): {exc}",
+        ) from exc
 
 
 # ---------------------------------------------------------------------------
@@ -143,6 +169,7 @@ async def create_llm_provider(
     body: LlmProviderCreate, admin: AdminUser, session: DbSession
 ) -> LlmProviderOut:
     settings = get_settings()
+    await _reject_ssrf_url(body.base_url)
     try:
         row = await ai_providers.create_provider(
             session,
@@ -177,6 +204,7 @@ async def update_llm_provider(
     if row is None:
         raise _not_found("Provider", provider_id)
     settings = get_settings()
+    await _reject_ssrf_url(body.base_url)
     try:
         updated = await ai_providers.update_provider(
             session,
@@ -249,6 +277,7 @@ async def create_mcp_client_route(
     body: McpClientCreate, admin: AdminUser, session: DbSession
 ) -> McpClientOut:
     settings = get_settings()
+    await _reject_ssrf_url(body.url)
     row = await ai_mcp.create_mcp_client(
         session,
         settings=settings,
@@ -274,6 +303,7 @@ async def update_mcp_client_route(
 ) -> McpClientOut:
     row = await _get_mcp_client_or_404(session, client_id)
     settings = get_settings()
+    await _reject_ssrf_url(body.url)
     updated = await ai_mcp.update_mcp_client(
         session,
         row,
