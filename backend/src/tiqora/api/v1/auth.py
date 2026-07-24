@@ -5,9 +5,10 @@ from __future__ import annotations
 import base64
 import secrets
 from typing import Annotated, Any
+from urllib.parse import quote
 
 import structlog
-from fastapi import APIRouter, Depends, Header, HTTPException, Request, Response, status
+from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request, Response, status
 from fastapi.responses import RedirectResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -93,6 +94,28 @@ def _clear_session_cookie(response: Response, settings: AppSettings) -> None:
         httponly=True,
         samesite=settings.session_cookie_samesite,  # type: ignore[arg-type]
     )
+
+
+def _safe_next(next_path: str | None, *, default: str = "/") -> str:
+    """Same-site absolute path only — reject protocol-relative (``//evil``),
+    backslash tricks (``/\\evil``) and anything carrying a scheme/host, so the
+    post-SSO redirect can never be turned into an open redirect."""
+    if (
+        isinstance(next_path, str)
+        and next_path.startswith("/")
+        and not next_path.startswith("//")
+        and not next_path.startswith("/\\")
+    ):
+        return next_path
+    return default
+
+
+def _sso_failure_redirect(safe_next: str) -> RedirectResponse:
+    """Land a failed browser SSO handshake on the login page (not a bare 401,
+    which would trigger a native Negotiate popup / retry loop). ``sso_error=1``
+    also stops the login page from auto-retrying SSO."""
+    target = f"/login?sso_error=1&next={quote(safe_next, safe='')}"
+    return RedirectResponse(url=target, status_code=status.HTTP_302_FOUND)
 
 
 def _rate_limit_http_exception(decision: object) -> HTTPException:
@@ -569,16 +592,25 @@ async def spnego(
     settings: AppSettings,
     session: DbSession,
     authorization: Annotated[str | None, Header()] = None,
+    next: Annotated[str | None, Query()] = None,
 ) -> RedirectResponse:
-    """Kerberos/SPNEGO handshake. On success, 302 to SPA root with a full session.
+    """Kerberos/SPNEGO handshake. On success, 302 back to ``next`` (a same-site
+    path, default ``/``) with a full session — this lets an expired-session
+    agent re-auth transparently and land back on the page they were on.
 
     Per-agent ``sso_eligible`` must be true. SSO is the strong factor — 2FA
-    is skipped even when the agent has TOTP enrolled.
+    is skipped even when the agent has TOTP enrolled. A failed handshake
+    (expired/absent ticket) redirects to the login page instead of returning a
+    bare 401, so the browser never shows a native Negotiate popup.
     """
+    safe_next = _safe_next(next)
+
     if not settings.spnego_enabled:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="SPNEGO is not enabled")
 
     if not authorization or not authorization.startswith("Negotiate "):
+        # First leg: challenge the browser. It re-sends the same URL (query
+        # string, so ``next`` survives) with the ticket.
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Negotiate token required",
@@ -596,13 +628,10 @@ async def spnego(
     service = SpnegoService(settings)
     try:
         principal = await service.accept(token_bytes)
-    except SpnegoAuthFailed as exc:
-        # Bad/expired token or keytab mismatch → authentication failed, re-challenge.
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail=str(exc),
-            headers={"WWW-Authenticate": "Negotiate"},
-        ) from exc
+    except SpnegoAuthFailed:
+        # Ticket bad/expired/keytab mismatch: the browser already tried its
+        # ticket, so re-challenging would loop/popup — fall back to login.
+        return _sso_failure_redirect(safe_next)
     except SpnegoUnavailable as exc:
         raise HTTPException(status_code=status.HTTP_501_NOT_IMPLEMENTED, detail=str(exc)) from exc
 
@@ -624,6 +653,6 @@ async def spnego(
 
     # SSO is the strong factor — skip TOTP/pending entirely; issue a full session.
     token = await auth.create_session(user)
-    redirect = RedirectResponse(url="/", status_code=status.HTTP_302_FOUND)
+    redirect = RedirectResponse(url=safe_next, status_code=status.HTTP_302_FOUND)
     _set_session_cookie(redirect, settings, token)
     return redirect

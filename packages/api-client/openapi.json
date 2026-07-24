@@ -972,9 +972,25 @@
           "auth"
         ],
         "summary": "Spnego",
-        "description": "Kerberos/SPNEGO handshake. On success, 302 to SPA root with a full session.\n\nPer-agent ``sso_eligible`` must be true. SSO is the strong factor \u2014 2FA\nis skipped even when the agent has TOTP enrolled.",
+        "description": "Kerberos/SPNEGO handshake. On success, 302 back to ``next`` (a same-site\npath, default ``/``) with a full session \u2014 this lets an expired-session\nagent re-auth transparently and land back on the page they were on.\n\nPer-agent ``sso_eligible`` must be true. SSO is the strong factor \u2014 2FA\nis skipped even when the agent has TOTP enrolled. A failed handshake\n(expired/absent ticket) redirects to the login page instead of returning a\nbare 401, so the browser never shows a native Negotiate popup.",
         "operationId": "spnego_api_v1_auth_spnego_get",
         "parameters": [
+          {
+            "name": "next",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Next"
+            }
+          },
           {
             "name": "authorization",
             "in": "header",
