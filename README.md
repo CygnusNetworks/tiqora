@@ -32,6 +32,13 @@ not a fork of Znuny — no Znuny source code is included or redistributed.
   you explicitly take schema ownership).
 - **AI-ready ticket search** — Meilisearch indexing plus an **MCP server** so AI agents
   act with the same ACLs as humans.
+- **AI agent assistance** — per-queue policies drive **draft replies**, **state-only
+  ticket summaries** (document- and attachment-aware), and an optional **autonomous
+  auto-reply** worker. Attachments get text extraction plus a **vision pre-pass** for
+  images; sensitive data is **PII-masked (spaCy NER)** before any LLM call; every
+  request lands in an **audit log** with per-subject ACLs and token/request limits.
+  Bring your own OpenAI-compatible or Anthropic providers. Gated by the operation mode
+  so nothing autonomous runs during parallel operation.
 - **GDPR tooling** — anonymization, retention jobs, and audit trails in admin.
 - **Modern design** — dark/light themes, EN + DE i18n, compact cobalt design system.
 - **No Perl application stack** — Python FastAPI + React throughout Tiqora itself
@@ -39,7 +46,8 @@ not a fork of Znuny — no Znuny source code is included or redistributed.
 - **Customer portal & knowledge base** — self-service tickets and Markdown KB.
 - **Integration-friendly** — REST `/api/v1`, GenericInterface REST/SOAP compatibility,
   webhooks, channel plugins (email, SMS, WhatsApp, phone/CTI).
-- **Modern auth** — legacy password hashes, OIDC, LDAP/AD, Kerberos/SPNEGO, TOTP, passkeys.
+- **Modern auth** — legacy password hashes, OIDC, LDAP/AD, Kerberos/SPNEGO (with
+  **seamless re-auth** when a session expires), enforceable TOTP, and passkeys.
 
 ## Live product site & demo
 
@@ -85,6 +93,7 @@ VITE_BASE=/tiqora/demo/ pnpm --filter tiqora-frontend build:demo
 | Ticket write path + Znuny invariants | Golden-master tested against Znuny 6.5 behaviour |
 | GenericInterface compatibility | TicketCreate/Update/Get/Search, SessionCreate; REST + SOAP |
 | MCP tools | `ticket_*`, customer lookup, KB — see [docs/ai-integration.md](./docs/ai-integration.md) |
+| AI assistance subsystem | Draft replies, summaries, auto-reply worker, attachment/vision, PII masking, per-subject ACL & audit — `/admin/ai/*`, [docs/ai-integration.md](./docs/ai-integration.md) |
 | Daemon takeover (mail, escalation, notify, GA) | Per-function flags, off by default |
 | Calendar / appointments | Month/week/agenda UI; reuses Znuny `calendar*` tables |
 | Process management (BPM) | Reuses Znuny `pm_*` tables — [docs/process-management.md](./docs/process-management.md) |
