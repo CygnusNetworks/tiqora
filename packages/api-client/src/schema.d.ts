@@ -350,10 +350,14 @@ export interface paths {
         };
         /**
          * Spnego
-         * @description Kerberos/SPNEGO handshake. On success, 302 to SPA root with a full session.
+         * @description Kerberos/SPNEGO handshake. On success, 302 back to ``next`` (a same-site
+         *     path, default ``/``) with a full session — this lets an expired-session
+         *     agent re-auth transparently and land back on the page they were on.
          *
          *     Per-agent ``sso_eligible`` must be true. SSO is the strong factor — 2FA
-         *     is skipped even when the agent has TOTP enrolled.
+         *     is skipped even when the agent has TOTP enrolled. A failed handshake
+         *     (expired/absent ticket) redirects to the login page instead of returning a
+         *     bare 401, so the browser never shows a native Negotiate popup.
          */
         get: operations["spnego_api_v1_auth_spnego_get"];
         put?: never;
@@ -10523,7 +10527,9 @@ export interface operations {
     };
     spnego_api_v1_auth_spnego_get: {
         parameters: {
-            query?: never;
+            query?: {
+                next?: string | null;
+            };
             header?: {
                 authorization?: string | null;
             };
