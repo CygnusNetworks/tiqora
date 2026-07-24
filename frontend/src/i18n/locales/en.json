@@ -1,7 +1,7 @@
 {
   "app": {
     "name": "Tiqora",
-    "tagline": "Modern ticket system — Znuny/OTRS 6.5 compatible",
+    "tagline": "Self-hosted ticketing with built-in AI assistance",
     "beta": "Beta"
   },
   "notifications": {
