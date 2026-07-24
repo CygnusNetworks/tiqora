@@ -931,6 +931,16 @@
           "tabRaw": "Raw JSON",
           "rawRequest": "Request",
           "rawResponse": "Response"
+        },
+        "pdf": {
+          "export": "Export PDF",
+          "masked": "PII masked",
+          "revealed": "Personal data included",
+          "generated": "Generated",
+          "feature": "Feature",
+          "provider": "Provider · Model",
+          "status": "Status",
+          "willIncludePii": "PDF will include personal data"
         }
       },
       "promptParts": {
