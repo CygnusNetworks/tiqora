@@ -143,12 +143,9 @@ describe("QueuesPage", () => {
       expect(screen.getByText("Support")).toBeInTheDocument();
     });
 
-    // Open the edit drawer via the row action (same pattern as other admin pages).
-    const editBtn =
-      screen.queryByTestId("admin-row-edit-7") ??
-      screen.queryByRole("button", { name: /edit|bearbeiten/i });
-    expect(editBtn).toBeTruthy();
-    fireEvent.click(editBtn!);
+    // Open the edit drawer via the row's ⋯ menu (same pattern as other admin pages).
+    fireEvent.click(screen.getByTestId("admin-row-menu-trigger-7"));
+    fireEvent.click(await screen.findByTestId("admin-row-edit-7"));
 
     await waitFor(() => {
       expect(screen.getByTestId("admin-form-group_id")).toBeInTheDocument();

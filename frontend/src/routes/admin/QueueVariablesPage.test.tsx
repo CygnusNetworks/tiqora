@@ -197,7 +197,8 @@ describe("QueueVariablesPage", () => {
     renderPage();
     await waitFor(() => expect(screen.getByText("Domain")).toBeInTheDocument());
 
-    fireEvent.click(screen.getByTestId("admin-row-deactivate-10"));
+    fireEvent.click(screen.getByTestId("admin-row-menu-trigger-10"));
+    fireEvent.click(await screen.findByTestId("admin-row-deactivate-10"));
 
     await waitFor(() => {
       expect(deactivate).toHaveBeenCalledWith(10);
