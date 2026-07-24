@@ -43,32 +43,44 @@ def _default_resolve(hostname: str, port: int) -> list[str]:
     return ips
 
 
-def is_blocked_ip(ip: ipaddress.IPv4Address | ipaddress.IPv6Address) -> bool:
+def is_blocked_ip(
+    ip: ipaddress.IPv4Address | ipaddress.IPv6Address, *, allow_private: bool = False
+) -> bool:
     """Return True if *ip* must not be contacted by server-side clients.
 
     Blocks loopback, link-local (incl. cloud metadata ``169.254.169.254``),
     RFC1918 private, IPv6 unique-local, unspecified, and multicast.
+
+    ``allow_private=True`` permits RFC1918 / IPv6-ULA targets (used for
+    admin-configured egress like self-hosted LLM providers or internal MCP
+    servers) while STILL blocking loopback, link-local/metadata, unspecified,
+    multicast and reserved — the sharp SSRF targets.
     """
     # Mapped IPv4-in-IPv6 (::ffff:x.x.x.x) — evaluate the embedded v4 address.
     if isinstance(ip, ipaddress.IPv6Address) and ip.ipv4_mapped is not None:
         ip = ip.ipv4_mapped
 
-    return bool(
+    always_blocked = bool(
         ip.is_loopback
         or ip.is_link_local
-        or ip.is_private
         or ip.is_multicast
         or ip.is_unspecified
         or ip.is_reserved
     )
+    if always_blocked:
+        return True
+    # RFC1918 / ULA: blocked by default, permitted when allow_private is set.
+    return bool(ip.is_private) and not allow_private
 
 
-def _check_ip_string(raw: str) -> ipaddress.IPv4Address | ipaddress.IPv6Address:
+def _check_ip_string(
+    raw: str, *, allow_private: bool = False
+) -> ipaddress.IPv4Address | ipaddress.IPv6Address:
     try:
         ip = ipaddress.ip_address(raw)
     except ValueError as exc:
         raise OutboundURLError(f"invalid IP address {raw!r}") from exc
-    if is_blocked_ip(ip):
+    if is_blocked_ip(ip, allow_private=allow_private):
         raise OutboundURLError(f"blocked address {ip}")
     return ip
 
@@ -124,6 +136,7 @@ def pin_outbound_url(
     *,
     require_https: bool = False,
     resolver: HostResolver | None = None,
+    allow_private_networks: bool = False,
 ) -> PinnedOutboundURL:
     """Validate *url* and return a :class:`PinnedOutboundURL` for safe egress.
 
@@ -165,14 +178,14 @@ def pin_outbound_url(
         literal = None
 
     if literal is not None:
-        if is_blocked_ip(literal):
+        if is_blocked_ip(literal, allow_private=allow_private_networks):
             raise OutboundURLError(f"blocked address {literal}")
         pinned_ip = str(literal)
     else:
         resolved = resolve(hostname, port)
         checked: list[str] = []
         for raw in resolved:
-            ip = _check_ip_string(raw)
+            ip = _check_ip_string(raw, allow_private=allow_private_networks)
             checked.append(str(ip))
         # Prefer IPv4 for broader reachability; fall back to first address.
         pinned_ip = next((a for a in checked if ":" not in a), checked[0])
@@ -192,12 +205,20 @@ def validate_outbound_url(
     *,
     require_https: bool = False,
     resolver: HostResolver | None = None,
+    allow_private_networks: bool = False,
 ) -> None:
     """Validate *url* for server-side egress; raise :class:`OutboundURLError` if unsafe.
 
     Resolves the host and rejects the URL when any A/AAAA record is loopback,
     link-local, private (RFC1918), unique-local, unspecified, or multicast.
+    With ``allow_private_networks=True``, RFC1918/ULA are permitted (self-hosted
+    LLM/MCP egress) while loopback/link-local/metadata stay blocked.
     Does not perform the HTTP request — call :func:`pin_outbound_url` when the
     pinned connect IP is needed for the client.
     """
-    pin_outbound_url(url, require_https=require_https, resolver=resolver)
+    pin_outbound_url(
+        url,
+        require_https=require_https,
+        resolver=resolver,
+        allow_private_networks=allow_private_networks,
+    )
