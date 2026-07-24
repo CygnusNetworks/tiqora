@@ -63,6 +63,28 @@ TOOL_ESCALATE_TO_HUMAN = "escalate_to_human"
 TOOL_KB_SEARCH = "kb_search"
 TOOL_KB_GET_ARTICLE = "kb_get_article"
 
+# Argument keys an MCP tool call may NOT carry — they would let a prompt-injected
+# model retarget the tool at a foreign ticket/customer/user (security review H2).
+# Compared after stripping non-alphanumerics and lowercasing.
+_MCP_FORBIDDEN_ARG_KEYS = frozenset(
+    {
+        "ticketid",
+        "ticketnumber",
+        "ticketnr",
+        "customerid",
+        "customeruserid",
+        "customeruserlogin",
+        "userid",
+        "userlogin",
+        "ownerid",
+        "agentid",
+    }
+)
+
+
+def _norm_arg_key(key: str) -> str:
+    return "".join(ch for ch in str(key).lower() if ch.isalnum())
+
 LOCAL_TOOL_NAMES = frozenset(
     {
         TOOL_PROPOSE_CUSTOMER_MESSAGE,
@@ -557,6 +579,18 @@ class ToolExecutor:
         return ToolOutcome(name=TOOL_KB_GET_ARTICLE, content_for_model=content, raw_result=result)
 
     async def _call_mcp(self, spec: McpToolSpec, arguments: dict[str, Any]) -> ToolOutcome:
+        # Ticket-pinning boundary (security review H2): MCP tools get an
+        # unconstrained argument schema, so a prompt-injected ticket/attachment
+        # could make the model call an MCP tool with a *foreign* ticket/customer
+        # id and exfiltrate cross-ticket data. The current ticket is always known
+        # server-side, so the model must not be able to name a scope by id — any
+        # such argument fails the call closed.
+        for key in arguments:
+            if _norm_arg_key(key) in _MCP_FORBIDDEN_ARG_KEYS:
+                raise ToolArgumentError(
+                    f"MCP tool argument '{key}' is not allowed — a tool call may not "
+                    "target a ticket, customer or user by id."
+                )
         unmasked_args = {
             k: (self._pii.unmask(v) if isinstance(v, str) else v) for k, v in arguments.items()
         }
