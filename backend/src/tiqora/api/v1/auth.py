@@ -25,7 +25,7 @@ from tiqora.domain.auth import AuthenticatedUser, AuthService, user_to_dict
 from tiqora.domain.auth_config import AuthConfigService
 from tiqora.domain.auth_ldap import LdapAuthService
 from tiqora.domain.oidc import OIDCError, OIDCService
-from tiqora.domain.passkey import two_factor_enabled, webauthn_enabled
+from tiqora.domain.passkey import webauthn_enabled
 from tiqora.domain.schemas import (
     AuthMethodsOut,
     LoginRequest,
@@ -154,10 +154,17 @@ async def login(
             detail="Invalid credentials",
         )
     await limiter.reset(login=body.login, ip=ip)
-    if await two_factor_enabled(totp, webauthn, user.id):
+    totp_enrolled = await totp.is_enabled(user.id)
+    passkey_enrolled = await webauthn.has_passkey(user.id)
+    if totp_enrolled or passkey_enrolled:
         pending_token = await auth.create_pending_session(user)
         _set_session_cookie(response, settings, pending_token)
-        return LoginResponse(user=None, pending_2fa=True)
+        return LoginResponse(
+            user=None,
+            pending_2fa=True,
+            totp_enrolled=totp_enrolled,
+            passkey_enrolled=passkey_enrolled,
+        )
     auth_config = AuthConfigService(session)
     if await auth_config.effective_enforce(user.id):
         # Forced enrollment: restricted ENROLL session only reaches enroll/
