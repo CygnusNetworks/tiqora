@@ -367,7 +367,7 @@
       },
       "summaryUpToDate": "Bereits aktuell — keine neuen Artikel seit der letzten Zusammenfassung.",
       "draftsLabel": "Entwürfe",
-      "createDraftButton": "KI-Entwurf erstellen",
+      "createDraftButton": "Entwurf erstellen",
       "createDraftHint": "Dies kann bis zu einer Minute dauern…",
       "draftsEmpty": "Noch keine KI-Entwürfe.",
       "draftKind": {

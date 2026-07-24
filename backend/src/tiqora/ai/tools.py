@@ -333,6 +333,7 @@ class ToolExecutor:
         kb_search_fn: KbSearchFn | None = None,
         kb_get_article_fn: KbGetArticleFn | None = None,
         allowed_state_types_raw: str | None = None,
+        mask_results: bool = True,
     ) -> None:
         self._session = session
         self._sysconfig = sysconfig
@@ -345,6 +346,11 @@ class ToolExecutor:
         self._kb_search_fn = kb_search_fn
         self._kb_get_article_fn = kb_get_article_fn
         self._allowed_state_types = resolve_allowed_state_types(allowed_state_types_raw)
+        # Mirrors the queue policy's pii_masking flag: with masking off, tool
+        # results reach the model verbatim (before this flag, results were
+        # ALWAYS pattern-masked — timestamps etc. got shredded even on
+        # queues with PII masking disabled).
+        self._mask_results = mask_results
 
     async def execute(self, name: str, arguments: dict[str, Any]) -> ToolOutcome:
         if not self._registry.is_known(name):
@@ -533,7 +539,9 @@ class ToolExecutor:
         if self._kb_search_fn is None:
             return ToolOutcome(name=TOOL_KB_SEARCH, content_for_model="[]")
         results = await self._kb_search_fn(self._pii.unmask(query), limit=5)
-        content = self._pii.mask(json.dumps(results, default=str))
+        content = json.dumps(results, default=str)
+        if self._mask_results:
+            content = self._pii.mask(content)
         return ToolOutcome(name=TOOL_KB_SEARCH, content_for_model=content, raw_result=results)
 
     async def _kb_get_article(self, arguments: dict[str, Any]) -> ToolOutcome:
@@ -543,7 +551,9 @@ class ToolExecutor:
         if self._kb_get_article_fn is None:
             return ToolOutcome(name=TOOL_KB_GET_ARTICLE, content_for_model="null")
         result = await self._kb_get_article_fn(int(article_id))
-        content = self._pii.mask(json.dumps(result, default=str))
+        content = json.dumps(result, default=str)
+        if self._mask_results:
+            content = self._pii.mask(content)
         return ToolOutcome(name=TOOL_KB_GET_ARTICLE, content_for_model=content, raw_result=result)
 
     async def _call_mcp(self, spec: McpToolSpec, arguments: dict[str, Any]) -> ToolOutcome:
@@ -570,7 +580,9 @@ class ToolExecutor:
                 escalate_reason=f"Escalation rule matched for tool {spec.full_name}",
                 raw_result=raw_result,
             )
-        content = self._pii.mask(json.dumps(raw_result, default=str))
+        content = json.dumps(raw_result, default=str)
+        if self._mask_results:
+            content = self._pii.mask(content)
         return ToolOutcome(name=spec.full_name, content_for_model=content, raw_result=raw_result)
 
 
