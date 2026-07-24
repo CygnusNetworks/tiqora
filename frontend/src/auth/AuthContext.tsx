@@ -23,6 +23,12 @@ type AuthContextValue = {
   /** True right after login()/verifyTotp() when a TOTP code is still required. */
   pending2fa: boolean;
   /**
+   * Which second factors the agent mid-login actually has enrolled — the
+   * login page only offers those. `null` outside a pending-2FA step (and as
+   * a defensive fallback the page then treats both as available).
+   */
+  pendingFactors: { totp: boolean; passkey: boolean } | null;
+  /**
    * True when login() returned must_enroll_2fa — the agent has a restricted
    * ENROLL session and must finish TOTP setup before a full session is issued.
    */
@@ -54,6 +60,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const queryClient = useQueryClient();
   const [bootstrapped, setBootstrapped] = useState(false);
   const [pending2fa, setPending2fa] = useState(false);
+  const [pendingFactors, setPendingFactors] = useState<{
+    totp: boolean;
+    passkey: boolean;
+  } | null>(null);
   const [mustEnroll2fa, setMustEnroll2fa] = useState(false);
 
   const meQuery = useQuery({
@@ -81,6 +91,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const res = await api.login({ login: loginName, password });
       if (res.pending_2fa) {
         setPending2fa(true);
+        setPendingFactors({
+          totp: Boolean(res.totp_enrolled),
+          passkey: Boolean(res.passkey_enrolled),
+        });
         setMustEnroll2fa(false);
         return;
       }
@@ -101,6 +115,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     async (code: string) => {
       const res = await api.totpVerify({ code });
       setPending2fa(false);
+      setPendingFactors(null);
       setMustEnroll2fa(false);
       queryClient.setQueryData(["auth", "me"], res.user);
       await queryClient.invalidateQueries({ queryKey: ["auth", "me"] });
@@ -117,6 +132,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       credential: credential as unknown as Record<string, unknown>,
     });
     setPending2fa(false);
+    setPendingFactors(null);
     setMustEnroll2fa(false);
     queryClient.setQueryData(["auth", "me"], res.user);
     await queryClient.invalidateQueries({ queryKey: ["auth", "me"] });
@@ -139,7 +155,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     async (name?: string | null) => {
       const options = await api.passkeyRegisterBegin();
       const credential = await startRegistration({
-        optionsJSON: options as unknown as PublicKeyCredentialCreationOptionsJSON,
+        optionsJSON:
+          options as unknown as PublicKeyCredentialCreationOptionsJSON,
       });
       await api.passkeyRegisterFinish({
         credential: credential as unknown as Record<string, unknown>,
@@ -161,6 +178,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       /* ignore network errors on logout */
     }
     setPending2fa(false);
+    setPendingFactors(null);
     setMustEnroll2fa(false);
     queryClient.setQueryData(["auth", "me"], null);
     queryClient.clear();
@@ -176,6 +194,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       isLoading: !bootstrapped || meQuery.isLoading,
       isAuthenticated: Boolean(meQuery.data),
       pending2fa,
+      pendingFactors,
       mustEnroll2fa,
       login,
       verifyTotp,
@@ -190,6 +209,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       meQuery.isLoading,
       bootstrapped,
       pending2fa,
+      pendingFactors,
       mustEnroll2fa,
       login,
       verifyTotp,

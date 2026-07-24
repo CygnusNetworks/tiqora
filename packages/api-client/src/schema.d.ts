@@ -7622,10 +7622,20 @@ export interface components {
              */
             must_enroll_2fa: boolean;
             /**
+             * Passkey Enrolled
+             * @default false
+             */
+            passkey_enrolled: boolean;
+            /**
              * Pending 2Fa
              * @default false
              */
             pending_2fa: boolean;
+            /**
+             * Totp Enrolled
+             * @default false
+             */
+            totp_enrolled: boolean;
             user?: components["schemas"]["UserMe"] | null;
         };
         /** MailLogOut */

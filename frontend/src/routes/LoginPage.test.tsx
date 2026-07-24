@@ -17,6 +17,7 @@ const spnegoLoginUrl = vi.fn(() => "/api/v1/auth/spnego");
 const oidcLoginUrl = vi.fn(() => "/api/v1/auth/oidc/login");
 
 let pending2fa = false;
+let pendingFactors: { totp: boolean; passkey: boolean } | null = null;
 let mustEnroll2fa = false;
 let isAuthenticated = false;
 let isLoading = false;
@@ -35,6 +36,7 @@ vi.mock("@/auth/AuthContext", () => ({
     completeEnroll2fa,
     completeEnrollPasskey,
     pending2fa,
+    pendingFactors,
     mustEnroll2fa,
     isAuthenticated,
     isLoading,
@@ -89,6 +91,7 @@ describe("LoginPage", () => {
     authMethods.mockReset();
     totpEnroll.mockReset();
     pending2fa = false;
+    pendingFactors = null;
     mustEnroll2fa = false;
     isAuthenticated = false;
     isLoading = false;
@@ -140,7 +143,10 @@ describe("LoginPage", () => {
 
   it("renders forced enrollment step and completes on confirm", async () => {
     mustEnroll2fa = true;
-    totpEnroll.mockResolvedValue({ secret: "JBSWY3DPEHPK3PXP", provisioning_uri: "otpauth://x" });
+    totpEnroll.mockResolvedValue({
+      secret: "JBSWY3DPEHPK3PXP",
+      provisioning_uri: "otpauth://x",
+    });
     completeEnroll2fa.mockResolvedValue(undefined);
 
     renderPage();
@@ -149,7 +155,9 @@ describe("LoginPage", () => {
       expect(totpEnroll).toHaveBeenCalled();
       expect(screen.getByTestId("must-enroll-step")).toBeInTheDocument();
     });
-    expect(screen.getByTestId("must-enroll-secret")).toHaveTextContent("JBSWY3DPEHPK3PXP");
+    expect(screen.getByTestId("must-enroll-secret")).toHaveTextContent(
+      "JBSWY3DPEHPK3PXP",
+    );
     expect(screen.getByTestId("must-enroll-hint")).toBeInTheDocument();
 
     fireEvent.change(screen.getByTestId("must-enroll-code"), {
@@ -174,7 +182,10 @@ describe("LoginPage", () => {
       ldap: false,
       webauthn: true,
     });
-    totpEnroll.mockResolvedValue({ secret: "JBSWY3DPEHPK3PXP", provisioning_uri: "otpauth://x" });
+    totpEnroll.mockResolvedValue({
+      secret: "JBSWY3DPEHPK3PXP",
+      provisioning_uri: "otpauth://x",
+    });
     completeEnrollPasskey.mockResolvedValue(undefined);
 
     renderPage();
@@ -229,12 +240,62 @@ describe("LoginPage", () => {
     expect(screen.queryByTestId("passkey-login")).not.toBeInTheDocument();
   });
 
+  it("offers only TOTP when the agent has no passkey enrolled", async () => {
+    pending2fa = true;
+    pendingFactors = { totp: true, passkey: false };
+    authMethods.mockResolvedValue({
+      password: true,
+      oidc: false,
+      spnego: false,
+      ldap: false,
+      webauthn: true,
+    });
+
+    renderPage();
+
+    await waitFor(() => {
+      expect(screen.getByTestId("totp-form")).toBeInTheDocument();
+    });
+    expect(screen.queryByTestId("passkey-login")).not.toBeInTheDocument();
+  });
+
+  it("offers only the passkey when the agent has no TOTP enrolled", async () => {
+    pending2fa = true;
+    pendingFactors = { totp: false, passkey: true };
+    authMethods.mockResolvedValue({
+      password: true,
+      oidc: false,
+      spnego: false,
+      ldap: false,
+      webauthn: true,
+    });
+    verifyPasskey.mockResolvedValue(undefined);
+
+    renderPage();
+
+    await waitFor(() => {
+      expect(screen.getByTestId("passkey-login")).toBeInTheDocument();
+    });
+    expect(screen.queryByTestId("totp-form")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId("passkey-login"));
+    await waitFor(() => {
+      expect(verifyPasskey).toHaveBeenCalled();
+    });
+  });
+
   it("submits password login", async () => {
     login.mockResolvedValue(undefined);
     renderPage();
-    await waitFor(() => expect(screen.getByTestId("login-form")).toBeInTheDocument());
-    fireEvent.change(screen.getByTestId("login-username"), { target: { value: "agent" } });
-    fireEvent.change(screen.getByTestId("login-password"), { target: { value: "secret" } });
+    await waitFor(() =>
+      expect(screen.getByTestId("login-form")).toBeInTheDocument(),
+    );
+    fireEvent.change(screen.getByTestId("login-username"), {
+      target: { value: "agent" },
+    });
+    fireEvent.change(screen.getByTestId("login-password"), {
+      target: { value: "secret" },
+    });
     fireEvent.submit(screen.getByTestId("login-form"));
     await waitFor(() => expect(login).toHaveBeenCalledWith("agent", "secret"));
   });

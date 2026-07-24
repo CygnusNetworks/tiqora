@@ -87,6 +87,10 @@ class LoginResponse(BaseModel):
     # Password login only: agent must complete TOTP enrollment before a full
     # session is issued (per-agent enforce_2fa or global auth.totp.enforce_all).
     must_enroll_2fa: bool = False
+    # Which second factors THIS agent actually has enrolled — the login page
+    # only offers those (only meaningful when pending_2fa is true).
+    totp_enrolled: bool = False
+    passkey_enrolled: bool = False
 
 
 class QueueCounts(BaseModel):

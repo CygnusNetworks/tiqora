@@ -7,7 +7,10 @@ import { Button } from "@/components/ui/Button";
 import { Spinner } from "@/components/ui/Spinner";
 
 function browserSupportsWebAuthn(): boolean {
-  return typeof window !== "undefined" && typeof window.PublicKeyCredential !== "undefined";
+  return (
+    typeof window !== "undefined" &&
+    typeof window.PublicKeyCredential !== "undefined"
+  );
 }
 
 /** Same-site absolute path only — reject protocol-relative (`//evil`) and `/\evil`. */
@@ -29,6 +32,7 @@ export function LoginPage() {
     completeEnroll2fa,
     completeEnrollPasskey,
     pending2fa,
+    pendingFactors,
     mustEnroll2fa,
     isAuthenticated,
     isLoading,
@@ -75,12 +79,20 @@ export function LoginPage() {
       const next = isSafeNextPath(search.next) ? search.next : "/agent";
       void navigate({ to: next });
     }
-  }, [isLoading, isAuthenticated, mustEnroll2fa, pending2fa, search.next, navigate]);
+  }, [
+    isLoading,
+    isAuthenticated,
+    mustEnroll2fa,
+    pending2fa,
+    search.next,
+    navigate,
+  ]);
 
   // Auto-start TOTP enrollment when forced into must-enroll mode (unless the
   // agent is mid passkey registration as the alternative path).
   useEffect(() => {
-    if (!mustEnroll2fa || enrollSecret || enrollStarting || passkeyEnrolling) return;
+    if (!mustEnroll2fa || enrollSecret || enrollStarting || passkeyEnrolling)
+      return;
     setEnrollStarting(true);
     setEnrollError(null);
     api
@@ -144,7 +156,10 @@ export function LoginPage() {
       await verifyPasskey();
       await goNext();
     } catch (err) {
-      if (err instanceof ApiError && (err.status === 401 || err.status === 400)) {
+      if (
+        err instanceof ApiError &&
+        (err.status === 401 || err.status === 400)
+      ) {
         setError(t("auth.passkeyInvalid"));
       } else {
         setError(t("auth.passkeyFailed"));
@@ -183,10 +198,12 @@ export function LoginPage() {
     }
   };
 
-  const showPasskeyLogin =
-    webauthnEnabled && browserSupportsWebAuthn();
-  const showPasskeyEnroll =
-    webauthnEnabled && browserSupportsWebAuthn();
+  // Only offer the factors this agent actually has enrolled (login response
+  // flags); older/absent flags degrade to "offer both" so nobody locks out.
+  const totpAvailable = pendingFactors ? pendingFactors.totp : true;
+  const passkeyEnrolled = pendingFactors ? pendingFactors.passkey : true;
+  const showPasskeyLogin = passkeyEnrolled && webauthnEnabled;
+  const showPasskeyEnroll = webauthnEnabled && browserSupportsWebAuthn();
 
   if (mustEnroll2fa) {
     return (
@@ -195,7 +212,10 @@ export function LoginPage() {
           <h1 className="text-center font-display text-2xl font-bold tracking-tight text-ink">
             {t("auth.mustEnroll.title")}
           </h1>
-          <p className="mt-1.5 text-center text-sm text-muted" data-testid="must-enroll-hint">
+          <p
+            className="mt-1.5 text-center text-sm text-muted"
+            data-testid="must-enroll-hint"
+          >
             {t("auth.mustEnroll.hint")}
           </p>
 
@@ -219,7 +239,10 @@ export function LoginPage() {
               />
               <p className="text-xs text-muted">
                 {t("security.secretLabel")}{" "}
-                <code data-testid="must-enroll-secret" className="font-mono text-ink">
+                <code
+                  data-testid="must-enroll-secret"
+                  className="font-mono text-ink"
+                >
                   {enrollSecret}
                 </code>
               </p>
@@ -229,7 +252,9 @@ export function LoginPage() {
                 data-testid="must-enroll-form"
               >
                 <label className="block text-sm">
-                  <span className="mb-1 block text-muted">{t("security.confirmCode")}</span>
+                  <span className="mb-1 block text-muted">
+                    {t("security.confirmCode")}
+                  </span>
                   <input
                     data-testid="must-enroll-code"
                     inputMode="numeric"
@@ -256,7 +281,11 @@ export function LoginPage() {
                   disabled={submitting}
                   data-testid="must-enroll-submit"
                 >
-                  {submitting && !passkeyEnrolling ? <Spinner /> : t("security.confirmButton")}
+                  {submitting && !passkeyEnrolling ? (
+                    <Spinner />
+                  ) : (
+                    t("security.confirmButton")
+                  )}
                 </Button>
               </form>
 
@@ -287,7 +316,11 @@ export function LoginPage() {
           )}
 
           {enrollError && !enrollSecret && (
-            <p className="mt-4 text-sm text-danger" role="alert" data-testid="must-enroll-error">
+            <p
+              className="mt-4 text-sm text-danger"
+              role="alert"
+              data-testid="must-enroll-error"
+            >
               {enrollError}
             </p>
           )}
@@ -301,54 +334,84 @@ export function LoginPage() {
       <div className="flex min-h-screen flex-col items-center justify-center bg-bg px-4">
         <div className="w-full max-w-sm rounded-xl border border-hairline bg-surface p-8">
           <h1 className="text-center font-display text-2xl font-bold tracking-tight text-ink">
-            {t("auth.totpTitle")}
+            {totpAvailable ? t("auth.totpTitle") : t("auth.passkeyTitle")}
           </h1>
-          <p className="mt-1.5 text-center text-sm text-muted">{t("auth.totpHint")}</p>
-          <form
-            onSubmit={(e) => void onVerifyTotp(e)}
-            className="mt-7 space-y-4"
-            data-testid="totp-form"
-          >
-            <label className="block text-sm">
-              <span className="mb-1 block text-muted">{t("auth.totpCode")}</span>
-              <input
-                data-testid="totp-code"
-                name="code"
-                inputMode="numeric"
-                autoComplete="one-time-code"
-                required
-                value={totpCode}
-                onChange={(e) => setTotpCode(e.target.value)}
-                className="w-full rounded-md border border-hairline bg-surface-subtle px-3 py-2 text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent focus:border-accent"
-              />
-            </label>
-            {error && (
-              <p className="text-sm text-danger" data-testid="totp-error" role="alert">
-                {error}
-              </p>
-            )}
-            <Button
-              type="submit"
-              variant="primary"
-              className="w-full"
-              disabled={submitting}
-              data-testid="totp-submit"
+          <p className="mt-1.5 text-center text-sm text-muted">
+            {totpAvailable ? t("auth.totpHint") : t("auth.passkeyOnlyHint")}
+          </p>
+          {totpAvailable && (
+            <form
+              onSubmit={(e) => void onVerifyTotp(e)}
+              className="mt-7 space-y-4"
+              data-testid="totp-form"
             >
-              {submitting ? <Spinner /> : t("auth.totpVerify")}
-            </Button>
-          </form>
+              <label className="block text-sm">
+                <span className="mb-1 block text-muted">
+                  {t("auth.totpCode")}
+                </span>
+                <input
+                  data-testid="totp-code"
+                  name="code"
+                  inputMode="numeric"
+                  autoComplete="one-time-code"
+                  required
+                  value={totpCode}
+                  onChange={(e) => setTotpCode(e.target.value)}
+                  className="w-full rounded-md border border-hairline bg-surface-subtle px-3 py-2 text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent focus:border-accent"
+                />
+              </label>
+              {error && (
+                <p
+                  className="text-sm text-danger"
+                  data-testid="totp-error"
+                  role="alert"
+                >
+                  {error}
+                </p>
+              )}
+              <Button
+                type="submit"
+                variant="primary"
+                className="w-full"
+                disabled={submitting}
+                data-testid="totp-submit"
+              >
+                {submitting ? <Spinner /> : t("auth.totpVerify")}
+              </Button>
+            </form>
+          )}
 
           {showPasskeyLogin && (
             <>
-              <div className="my-4 flex items-center gap-3 text-xs text-muted">
-                <span className="h-px flex-1 bg-hairline" />
-                {t("auth.or")}
-                <span className="h-px flex-1 bg-hairline" />
-              </div>
+              {totpAvailable && (
+                <div className="my-4 flex items-center gap-3 text-xs text-muted">
+                  <span className="h-px flex-1 bg-hairline" />
+                  {t("auth.or")}
+                  <span className="h-px flex-1 bg-hairline" />
+                </div>
+              )}
+              {!browserSupportsWebAuthn() && !totpAvailable && (
+                <p
+                  className="mt-4 text-sm text-danger"
+                  role="alert"
+                  data-testid="passkey-unsupported"
+                >
+                  {t("auth.passkeyUnsupported")}
+                </p>
+              )}
+              {error && !totpAvailable && (
+                <p
+                  className="mt-4 text-sm text-danger"
+                  data-testid="passkey-error"
+                  role="alert"
+                >
+                  {error}
+                </p>
+              )}
               <Button
                 type="button"
-                variant="secondary"
-                className="w-full"
+                variant={totpAvailable ? "secondary" : "primary"}
+                className={totpAvailable ? "w-full" : "mt-6 w-full"}
                 disabled={submitting}
                 data-testid="passkey-login"
                 onClick={() => void onVerifyPasskey()}
@@ -368,11 +431,19 @@ export function LoginPage() {
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-bg px-4">
       <div className="w-full max-w-sm rounded-xl border border-hairline bg-surface p-8">
-        <img src="/logo.svg" alt="" width={36} height={36} className="mx-auto mb-3" />
+        <img
+          src="/logo.svg"
+          alt=""
+          width={36}
+          height={36}
+          className="mx-auto mb-3"
+        />
         <h1 className="text-center font-display text-2xl font-bold tracking-tight text-ink">
           {t("app.name")}
         </h1>
-        <p className="mt-1.5 text-center text-sm text-muted">{t("auth.signIn")}</p>
+        <p className="mt-1.5 text-center text-sm text-muted">
+          {t("auth.signIn")}
+        </p>
         {ssoError && (
           <p
             className="mt-3 rounded-md border border-danger/30 bg-danger/10 px-3 py-2 text-sm text-danger"
@@ -413,7 +484,11 @@ export function LoginPage() {
             />
           </label>
           {error && (
-            <p className="text-sm text-danger" data-testid="login-error" role="alert">
+            <p
+              className="text-sm text-danger"
+              data-testid="login-error"
+              role="alert"
+            >
               {error}
             </p>
           )}
