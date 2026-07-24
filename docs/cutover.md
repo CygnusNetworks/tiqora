@@ -33,6 +33,38 @@ Before starting *any* stage below:
 - [ ] Prometheus/Grafana dashboards for the golden signals below are set up
       and someone is watching them during the cutover window.
 - [ ] A maintenance window is scheduled and stakeholders notified.
+- [ ] Security-hardening backlog reviewed (see next section) — accepted or
+      resolved before going production-primary.
+
+---
+
+## 0b. Security hardening backlog (pre-production)
+
+Deferred items from the full security review (2026-07). None blocks parallel
+operation; review and accept or resolve before Tiqora becomes the primary,
+internet-facing system.
+
+- [ ] **Encryption-key blast radius (review M5).** One Fernet key, derived from
+      `TIQORA_SECRET_KEY`, protects LLM provider API keys, MCP auth tokens **and**
+      the audit log's `pii_map_enc` de-anonymization maps. A `TIQORA_SECRET_KEY`
+      leak retroactively exposes all of them for the audit-retention window.
+      *Follow-up:* move secrets to an external KMS or introduce per-purpose keys
+      with a rotation story. Note: a code-side key-derivation change requires a
+      **re-encryption migration** of existing ciphertext — plan it, don't hot-swap.
+      Interim mitigations: keep `TIQORA_SECRET_KEY` in a secrets manager (not env
+      files/backups), and lower `ai_audit_retention_days`.
+- [ ] **AI ACL limits are soft (review M6).** `limit_requests_day` /
+      `limit_tokens_day` / `limit_requests_month` are checked before a run and
+      recorded after, so concurrent requests can race slightly past the cap. It's
+      a cost guardrail, not an authz boundary. *Follow-up (only if hard caps are
+      required):* atomic reserve-and-check (DB reservation row or Redis counter)
+      in `tiqora.ai.acl.check_feature_limits`.
+- [ ] **PII masking covers structured identifiers + detected names only
+      (review, informational).** Addresses, IBANs, order/reference numbers and
+      free-text sensitive data are not masked before reaching the LLM provider
+      (and the audit log). Size this residual risk with stakeholders; prefer
+      EU-hosted providers and per-queue `pii_masking` where data sensitivity is
+      high.
 
 ---
 
