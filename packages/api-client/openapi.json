@@ -8680,9 +8680,19 @@
             "title": "Must Enroll 2Fa",
             "type": "boolean"
           },
+          "passkey_enrolled": {
+            "default": false,
+            "title": "Passkey Enrolled",
+            "type": "boolean"
+          },
           "pending_2fa": {
             "default": false,
             "title": "Pending 2Fa",
+            "type": "boolean"
+          },
+          "totp_enrolled": {
+            "default": false,
+            "title": "Totp Enrolled",
             "type": "boolean"
           },
           "user": {
