@@ -179,9 +179,9 @@ async def get_current_user_or_enroll(
     if resolved is None and authorization and authorization.lower().startswith("bearer "):
         raw = authorization[7:].strip()
         if raw:
+            # Bearer is API-keys only — do NOT accept a session token here
+            # (security review L-5; matches the hardened get_current_user).
             resolved = await auth.resolve_api_key(raw)
-            if resolved is None:
-                resolved = await auth.resolve_session(raw)
 
     await session.rollback()
 

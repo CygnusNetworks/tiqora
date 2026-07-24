@@ -133,6 +133,12 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         response = await call_next(request)
         response.headers.setdefault("X-Content-Type-Options", "nosniff")
         response.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
+        # HSTS in production (harmless if a TLS-terminating proxy also sets it;
+        # omitted in dev so plain-HTTP local runs aren't pinned to HTTPS).
+        if cfg.is_production:
+            response.headers.setdefault(
+                "Strict-Transport-Security", "max-age=31536000; includeSubDomains"
+            )
         response.headers.setdefault(
             "Permissions-Policy",
             "geolocation=(), camera=(), microphone=()",

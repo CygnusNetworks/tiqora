@@ -245,8 +245,21 @@ async def totp_verify(
     if pending is None:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="No pending session")
     user_id, _login = pending
+    # Throttle second-factor guessing (security review M-1): 6-digit codes are
+    # brute-forceable once the password is known, so cap wrong attempts too.
+    redis_client = await get_redis(request)
+    limiter = AuthRateLimiter(redis_client, settings)
+    ip = client_ip(request)
+    rl_key = f"2fa:{_login}"
+    pre = await limiter.check(login=rl_key, ip=ip)
+    if not pre.allowed:
+        raise _rate_limit_http_exception(pre)
     if not await totp.verify(user_id, body.code):
+        locked = await limiter.record_failure(login=rl_key, ip=ip)
+        if locked is not None:
+            raise _rate_limit_http_exception(locked)
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid TOTP code")
+    await limiter.reset(login=rl_key, ip=ip)
     promoted = await auth.promote_pending_session(token)
     if promoted is None:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Session expired")
@@ -479,16 +492,28 @@ async def passkey_authenticate_finish(
     if pending is None:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="No pending session")
     user_id, _login = pending
+    # Same second-factor throttle as TOTP (security review M-1).
+    redis_client = await get_redis(request)
+    limiter = AuthRateLimiter(redis_client, settings)
+    ip = client_ip(request)
+    rl_key = f"2fa:{_login}"
+    pre = await limiter.check(login=rl_key, ip=ip)
+    if not pre.allowed:
+        raise _rate_limit_http_exception(pre)
     row = await webauthn.finish_authentication(
         user_id=user_id,
         session_token=token,
         credential=body.credential,
     )
     if row is None:
+        locked = await limiter.record_failure(login=rl_key, ip=ip)
+        if locked is not None:
+            raise _rate_limit_http_exception(locked)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid or expired passkey assertion",
         )
+    await limiter.reset(login=rl_key, ip=ip)
     promoted = await auth.promote_pending_session(token)
     if promoted is None:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Session expired")
@@ -563,6 +588,13 @@ async def oidc_callback(
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail=f"No local user matches SSO identity '{login_value}'",
+        )
+
+    # Per-account SSO gate, consistent with the SPNEGO path (security review L-1).
+    if not (await AuthConfigService(session).get(user.id)).sso_eligible:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="SSO not enabled for this account",
         )
 
     # Best-effort Google/OIDC profile picture (userinfo ``picture`` claim).

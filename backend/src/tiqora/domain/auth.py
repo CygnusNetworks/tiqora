@@ -19,6 +19,12 @@ from tiqora.znuny.password import hash_password, is_weak_scheme, needs_rehash, v
 
 SESSION_KEY_PREFIX = "tiqora:session:"
 SESSION_AVATAR_KEY_PREFIX = "tiqora:session:avatar:"
+SESSION_BORN_KEY_PREFIX = "tiqora:session:born:"
+
+# A never-matching bcrypt hash so authentication does the same bcrypt work for a
+# non-existent login as for a wrong password — closes the username-enumeration
+# timing side channel (security review L-3).
+_DECOY_PW_HASH = hash_password(secrets.token_urlsafe(24))
 
 
 def _utcnow() -> datetime:
@@ -45,8 +51,10 @@ class SessionStore:
     def __init__(self, client: redis.Redis, settings: Settings) -> None:
         self._client = client
         self._ttl = settings.session_ttl_seconds
+        self._absolute_ttl = getattr(settings, "session_absolute_ttl_seconds", 43200)
         self._prefix = SESSION_KEY_PREFIX
         self._avatar_prefix = SESSION_AVATAR_KEY_PREFIX
+        self._born_prefix = SESSION_BORN_KEY_PREFIX
 
     def _key(self, token: str) -> str:
         return f"{self._prefix}{token}"
@@ -54,15 +62,26 @@ class SessionStore:
     def _avatar_key(self, token: str) -> str:
         return f"{self._avatar_prefix}{token}"
 
+    def _born_key(self, token: str) -> str:
+        return f"{self._born_prefix}{token}"
+
     async def create(self, user_id: int, login: str, *, avatar_url: str | None = None) -> str:
         token = secrets.token_urlsafe(32)
         payload = f"{user_id}:{login}"
         await self._client.set(self._key(token), payload, ex=self._ttl)
+        # Absolute-lifetime marker: fixed TTL, never renewed by touch(), so the
+        # session dies session_absolute_ttl_seconds after creation regardless of
+        # activity (L-2).
+        await self._client.set(self._born_key(token), "1", ex=self._absolute_ttl)
         if avatar_url:
             await self._client.set(self._avatar_key(token), avatar_url, ex=self._ttl)
         return token
 
     async def get(self, token: str) -> tuple[int, str] | None:
+        # Absolute-lifetime gate: once the (non-renewed) born marker has expired,
+        # the session is dead even if the sliding key was kept warm.
+        if not await self._client.get(self._born_key(token)):
+            return None
         raw = await self._client.get(self._key(token))
         if raw is None:
             return None
@@ -89,7 +108,9 @@ class SessionStore:
         await self._client.expire(self._avatar_key(token), self._ttl)
 
     async def delete(self, token: str) -> None:
-        await self._client.delete(self._key(token), self._avatar_key(token))
+        await self._client.delete(
+            self._key(token), self._avatar_key(token), self._born_key(token)
+        )
 
     async def create_pending(self, user_id: int, login: str, ttl_seconds: int) -> str:
         """Create a short-lived 'pending 2FA' session (not resolvable by :meth:`get`).
@@ -235,6 +256,8 @@ class AuthService:
         )
         user = result.scalar_one_or_none()
         if user is None:
+            # Equalize timing vs. the wrong-password path (L-3).
+            verify_password(password, _DECOY_PW_HASH)
             return None
         stored = user.pw or ""
         reject_weak = bool(getattr(self._settings, "password_reject_weak_hashes", False))
