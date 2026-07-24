@@ -9,9 +9,12 @@ import { PickerField } from "@/components/admin/PickerField";
 import { Tabs } from "@/components/ui/Tabs";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
+import { Menu, MenuItem, MenuSeparator } from "@/components/ui/Menu";
+import { Spinner } from "@/components/ui/Spinner";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
 import { PlusIcon } from "@/components/ui/icons";
 import { formatDateTime } from "@/lib/format";
+import { cn } from "@/lib/cn";
 
 const POLICIES_KEY = ["admin", "ai", "queue-policies"] as const;
 const QUEUES_KEY = ["admin", "ai", "reference-queues"] as const;
@@ -87,37 +90,99 @@ export function AiQueuePoliciesPage() {
   const goToEditor = (row: AiQueuePolicyOut) =>
     void navigate({ to: "/admin/ai/queues/$policyId", params: { policyId: String(row.id) } });
 
-  const columns: DataTableColumn<AiQueuePolicyOut>[] = [
-    {
-      key: "queue",
-      header: t("admin.ai.queues.queue"),
-      render: (r) => queueNameById.get(r.queue_id) ?? `#${r.queue_id}`,
-    },
-    {
-      key: "features",
-      header: t("admin.ai.queues.features"),
-      render: (r) => (
-        <div className="flex flex-wrap gap-1">
-          {r.enabled_manual_assist && <Badge tone="accent">{t("admin.ai.feature.manual_assist")}</Badge>}
-          {r.enabled_summary && <Badge tone="accent">{t("admin.ai.feature.summary")}</Badge>}
-          {r.enabled_auto_reply && <Badge tone="warn">{t("admin.ai.feature.auto_reply")}</Badge>}
-          {!r.enabled_manual_assist && !r.enabled_summary && !r.enabled_auto_reply && (
-            <span className="text-muted">—</span>
-          )}
+  const handleDelete = async (row: AiQueuePolicyOut) => {
+    const ok = await confirm({
+      title: t("admin.ai.queues.title"),
+      message: t("admin.ai.queues.deleteConfirm"),
+      variant: "danger",
+    });
+    if (ok) deleteM.mutate(row.id);
+  };
+
+  // Two-line row matching the provider list: status dot + queue + autonomy on
+  // top, provider (mono) below, feature chips right, actions in the ⋯-menu.
+  const renderPolicyRow = (r: AiQueuePolicyOut) => {
+    const hasFeature = r.enabled_manual_assist || r.enabled_summary || r.enabled_auto_reply;
+    return (
+      <div key={r.id} className="border-t border-hairline first:border-t-0">
+        <div
+          role="button"
+          tabIndex={0}
+          data-testid={`admin-ai-queue-row-${r.id}`}
+          onClick={() => goToEditor(r)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              goToEditor(r);
+            }
+          }}
+          className="grid cursor-pointer grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 px-3.5 py-2.5 transition-colors hover:bg-surface-subtle md:grid-cols-[minmax(0,1fr)_auto_auto]"
+        >
+          <div className="flex min-w-0 items-center gap-2.5">
+            <span
+              className={cn(
+                "h-1.5 w-1.5 shrink-0 rounded-full",
+                r.valid_id === 1 ? "bg-green" : "bg-muted",
+              )}
+              title={r.valid_id === 1 ? t("admin.table.valid") : t("admin.table.invalid")}
+            />
+            <span className="truncate text-sm font-medium text-ink">
+              {queueNameById.get(r.queue_id) ?? `#${r.queue_id}`}
+            </span>
+            <span className="shrink-0 text-xs text-muted">
+              {t("admin.ai.queues.autonomy.label")}: {t(`admin.ai.queues.autonomy.${r.autonomy}`)}
+            </span>
+          </div>
+          <div className="col-start-1 row-start-2 flex min-w-0 items-baseline gap-3 pl-4">
+            <span className="truncate font-mono text-xs text-muted">
+              {providerName(r.llm_provider_id)}
+            </span>
+          </div>
+          <div className="row-span-2 hidden flex-wrap items-center justify-end gap-1 md:flex">
+            {r.enabled_manual_assist && (
+              <Badge tone="accent">{t("admin.ai.feature.manual_assist")}</Badge>
+            )}
+            {r.enabled_summary && <Badge tone="accent">{t("admin.ai.feature.summary")}</Badge>}
+            {r.enabled_auto_reply && <Badge tone="warn">{t("admin.ai.feature.auto_reply")}</Badge>}
+            {!hasFeature && <Badge tone="muted">{t("admin.ai.queues.noFeatures")}</Badge>}
+          </div>
+          <div
+            className="col-start-2 row-span-2 md:col-start-3"
+            onClick={(e) => e.stopPropagation()}
+            onKeyDown={(e) => e.stopPropagation()}
+          >
+            <Menu
+              panelTestId={`admin-ai-queue-menu-${r.id}`}
+              trigger={({ ref, toggleProps }) => (
+                <button
+                  type="button"
+                  ref={ref}
+                  {...toggleProps}
+                  data-testid={`admin-ai-queue-menu-trigger-${r.id}`}
+                  title={t("admin.table.actions")}
+                  className="rounded-md px-1.5 py-1 text-sm leading-none text-muted transition-colors hover:bg-surface-subtle hover:text-ink"
+                >
+                  ⋯
+                </button>
+              )}
+            >
+              <MenuItem testId={`admin-ai-queue-edit-${r.id}`} onSelect={() => goToEditor(r)}>
+                {t("admin.table.edit")}
+              </MenuItem>
+              <MenuSeparator />
+              <MenuItem
+                danger
+                testId={`admin-row-delete-${r.id}`}
+                onSelect={() => void handleDelete(r)}
+              >
+                {t("admin.table.delete")}
+              </MenuItem>
+            </Menu>
+          </div>
         </div>
-      ),
-    },
-    {
-      key: "autonomy",
-      header: t("admin.ai.queues.autonomy.label"),
-      render: (r) => t(`admin.ai.queues.autonomy.${r.autonomy}`),
-    },
-    {
-      key: "provider",
-      header: t("admin.ai.providers.title"),
-      render: (r) => providerName(r.llm_provider_id),
-    },
-  ];
+      </div>
+    );
+  };
 
   const usageQueueItems = useMemo(
     () => [
@@ -193,23 +258,20 @@ export function AiQueuePoliciesPage() {
       />
 
       {listTab === "policies" ? (
-        <DataTable
-          columns={columns}
-          rows={policiesQ.data?.items ?? []}
-          rowKey={(r) => r.id}
-          isLoading={policiesQ.isLoading}
-          isRowValid={(r) => r.valid_id === 1}
-          onEdit={goToEditor}
-          onDelete={async (row) => {
-            const ok = await confirm({
-              title: t("admin.ai.queues.title"),
-              message: t("admin.ai.queues.deleteConfirm"),
-              variant: "danger",
-            });
-            if (ok) deleteM.mutate(row.id);
-          }}
-          testId="admin-ai-queues-table"
-        />
+        <div
+          className="rounded-xl border border-hairline bg-surface"
+          data-testid="admin-ai-queues-table"
+        >
+          {policiesQ.isLoading ? (
+            <div className="flex justify-center p-6">
+              <Spinner />
+            </div>
+          ) : (policiesQ.data?.items.length ?? 0) === 0 ? (
+            <p className="p-4 text-sm text-muted">{t("admin.table.empty")}</p>
+          ) : (
+            (policiesQ.data?.items ?? []).map(renderPolicyRow)
+          )}
+        </div>
       ) : (
         <div className="space-y-3 rounded-lg border border-hairline bg-surface p-4">
           <div className="flex flex-wrap items-center gap-2">

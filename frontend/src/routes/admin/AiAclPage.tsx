@@ -10,10 +10,12 @@ import {
 } from "@/lib/aiApi";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
-import { DataTable, type DataTableColumn } from "@/components/admin/DataTable";
+import { Menu, MenuItem, MenuSeparator } from "@/components/ui/Menu";
+import { Spinner } from "@/components/ui/Spinner";
 import { CrudDrawer, type FieldDef, type FieldValues } from "@/components/admin/CrudDrawer";
 import { SelectField } from "@/components/ui/SelectField";
 import { PlusIcon } from "@/components/ui/icons";
+import { cn } from "@/lib/cn";
 
 const ACL_KEY = ["admin", "ai", "acl"] as const;
 
@@ -166,41 +168,90 @@ export function AiAclPage() {
     }
   };
 
-  const aclColumns: DataTableColumn<AiAclOut>[] = [
-    {
-      key: "subject",
-      header: t("admin.ai.acl.subject"),
-      render: (r) =>
-        `${t(`admin.ai.acl.subjectType.${r.subject_type}`)}: ${subjectLabel(r.subject_type, r.subject_id)}`,
-    },
-    {
-      key: "feature",
-      header: t("admin.ai.acl.feature"),
-      render: (r) => t(`admin.ai.feature.${r.feature}`),
-    },
-    {
-      key: "allowed",
-      header: t("admin.ai.acl.allowed"),
-      render: (r) => (
-        <Badge tone={r.allowed ? "success" : "danger"}>
-          {r.allowed ? t("admin.ai.acl.allowedYes") : t("admin.ai.acl.allowedNo")}
-        </Badge>
-      ),
-    },
-    {
-      key: "limits",
-      header: t("admin.ai.acl.limits"),
-      mono: true,
-      render: (r) =>
-        [
-          r.limit_requests_day != null ? `${r.limit_requests_day}/d req` : null,
-          r.limit_tokens_day != null ? `${r.limit_tokens_day}/d tok` : null,
-          r.limit_requests_month != null ? `${r.limit_requests_month}/mo req` : null,
-        ]
-          .filter(Boolean)
-          .join(" · ") || "—",
-    },
-  ];
+  const limitSummary = (r: AiAclOut) =>
+    [
+      r.limit_requests_day != null ? `${r.limit_requests_day}/d req` : null,
+      r.limit_tokens_day != null ? `${r.limit_tokens_day}/d tok` : null,
+      r.limit_requests_month != null ? `${r.limit_requests_month}/mo req` : null,
+    ]
+      .filter(Boolean)
+      .join(" · ") || t("admin.ai.acl.noLimits");
+
+  // Two-line provider-style row: allow-dot + subject + feature on top, limits
+  // (mono) below, allowed/denied badge right, edit/delete in the ⋯-menu.
+  const renderAclRow = (r: AiAclOut) => (
+    <div key={r.id} className="border-t border-hairline first:border-t-0">
+      <div
+        role="button"
+        tabIndex={0}
+        data-testid={`admin-ai-acl-row-${r.id}`}
+        onClick={() => openAclEdit(r)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            openAclEdit(r);
+          }
+        }}
+        className="grid cursor-pointer grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 px-3.5 py-2.5 transition-colors hover:bg-surface-subtle md:grid-cols-[minmax(0,1fr)_auto_auto]"
+      >
+        <div className="flex min-w-0 items-center gap-2.5">
+          <span
+            className={cn(
+              "h-1.5 w-1.5 shrink-0 rounded-full",
+              r.allowed ? "bg-green" : "bg-danger",
+            )}
+            title={r.allowed ? t("admin.ai.acl.allowedYes") : t("admin.ai.acl.allowedNo")}
+          />
+          <span className="truncate text-sm font-medium text-ink">
+            {t(`admin.ai.acl.subjectType.${r.subject_type}`)}:{" "}
+            {subjectLabel(r.subject_type, r.subject_id)}
+          </span>
+          <span className="shrink-0 text-xs text-muted">{t(`admin.ai.feature.${r.feature}`)}</span>
+        </div>
+        <div className="col-start-1 row-start-2 flex min-w-0 items-baseline gap-3 pl-4">
+          <span className="truncate font-mono text-xs text-muted">{limitSummary(r)}</span>
+        </div>
+        <div className="row-span-2 hidden items-center justify-end md:flex">
+          <Badge tone={r.allowed ? "success" : "danger"}>
+            {r.allowed ? t("admin.ai.acl.allowedYes") : t("admin.ai.acl.allowedNo")}
+          </Badge>
+        </div>
+        <div
+          className="col-start-2 row-span-2 md:col-start-3"
+          onClick={(e) => e.stopPropagation()}
+          onKeyDown={(e) => e.stopPropagation()}
+        >
+          <Menu
+            panelTestId={`admin-ai-acl-menu-${r.id}`}
+            trigger={({ ref, toggleProps }) => (
+              <button
+                type="button"
+                ref={ref}
+                {...toggleProps}
+                data-testid={`admin-ai-acl-menu-trigger-${r.id}`}
+                title={t("admin.table.actions")}
+                className="rounded-md px-1.5 py-1 text-sm leading-none text-muted transition-colors hover:bg-surface-subtle hover:text-ink"
+              >
+                ⋯
+              </button>
+            )}
+          >
+            <MenuItem testId={`admin-ai-acl-edit-${r.id}`} onSelect={() => openAclEdit(r)}>
+              {t("admin.table.edit")}
+            </MenuItem>
+            <MenuSeparator />
+            <MenuItem
+              danger
+              testId={`admin-row-delete-${r.id}`}
+              onSelect={() => deleteAclM.mutate(r.id)}
+            >
+              {t("admin.table.delete")}
+            </MenuItem>
+          </Menu>
+        </div>
+      </div>
+    </div>
+  );
 
   const aclFields: FieldDef[] = [
     {
@@ -258,15 +309,20 @@ export function AiAclPage() {
           <PlusIcon className="text-[16px]" />
         </Button>
       </div>
-      <DataTable
-        columns={aclColumns}
-        rows={aclQ.data ?? []}
-        rowKey={(r) => r.id}
-        isLoading={aclQ.isLoading}
-        onEdit={openAclEdit}
-        onDelete={(row) => deleteAclM.mutate(row.id)}
-        testId="admin-ai-acl-table"
-      />
+      <div
+        className="rounded-xl border border-hairline bg-surface"
+        data-testid="admin-ai-acl-table"
+      >
+        {aclQ.isLoading ? (
+          <div className="flex justify-center p-6">
+            <Spinner />
+          </div>
+        ) : (aclQ.data?.length ?? 0) === 0 ? (
+          <p className="p-4 text-sm text-muted">{t("admin.table.empty")}</p>
+        ) : (
+          (aclQ.data ?? []).map(renderAclRow)
+        )}
+      </div>
 
       <CrudDrawer
         open={aclDrawerOpen}

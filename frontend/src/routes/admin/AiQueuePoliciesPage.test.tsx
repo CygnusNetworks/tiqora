@@ -120,10 +120,13 @@ describe("AiQueuePoliciesPage", () => {
     });
   });
 
-  it("navigates to the editor when clicking a row's edit action", async () => {
+  it("navigates to the editor from the row's ⋯ edit action", async () => {
     renderPage();
-    await waitFor(() => expect(screen.getByTestId("admin-row-edit-1")).toBeInTheDocument());
-    fireEvent.click(screen.getByTestId("admin-row-edit-1"));
+    await waitFor(() =>
+      expect(screen.getByTestId("admin-ai-queue-menu-trigger-1")).toBeInTheDocument(),
+    );
+    fireEvent.click(screen.getByTestId("admin-ai-queue-menu-trigger-1"));
+    fireEvent.click(await screen.findByTestId("admin-ai-queue-edit-1"));
 
     expect(navigate).toHaveBeenCalledWith({
       to: "/admin/ai/queues/$policyId",
@@ -142,9 +145,12 @@ describe("AiQueuePoliciesPage", () => {
   it("deletes a policy only after confirming in the ConfirmDialog", async () => {
     deleteQueuePolicy.mockResolvedValue(undefined);
     renderPage();
-    await waitFor(() => expect(screen.getByTestId("admin-row-delete-1")).toBeInTheDocument());
+    await waitFor(() =>
+      expect(screen.getByTestId("admin-ai-queue-menu-trigger-1")).toBeInTheDocument(),
+    );
 
-    fireEvent.click(screen.getByTestId("admin-row-delete-1"));
+    fireEvent.click(screen.getByTestId("admin-ai-queue-menu-trigger-1"));
+    fireEvent.click(await screen.findByTestId("admin-row-delete-1"));
     await screen.findByTestId("confirm-dialog");
     expect(deleteQueuePolicy).not.toHaveBeenCalled();
 
