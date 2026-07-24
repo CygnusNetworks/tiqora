@@ -66,6 +66,19 @@ test("agent screenshots", async ({ page }) => {
   ] as const) {
     await shot(page, route, name);
   }
+  // AI assist panel (summary + drafts) — a focused element shot of the panel
+  // on the ticket zoom (best-effort).
+  try {
+    await page.goto("/agent/tickets/100", { waitUntil: "domcontentloaded" });
+    await page.waitForLoadState("networkidle").catch(() => undefined);
+    const ai = page.getByTestId("ai-panel");
+    await ai.waitFor({ state: "visible", timeout: 5000 });
+    await ai.scrollIntoViewIfNeeded();
+    await page.waitForTimeout(400);
+    await ai.screenshot({ path: `${OUT}/agent-ai-assist.png` });
+  } catch (err) {
+    console.warn("screenshot 'agent-ai-assist' failed:", err);
+  }
   // User menu open (best-effort — never fail the run over it)
   try {
     await page.goto("/agent", { waitUntil: "domcontentloaded" });

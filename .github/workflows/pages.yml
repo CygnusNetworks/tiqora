@@ -52,8 +52,8 @@ jobs:
 
           # Screenshots used by the landing gallery
           for f in \
-            agent-dashboard.png agent-ticket-zoom.png agent-queues.png \
-            agent-stats.png agent-search.png agent-kb.png \
+            agent-dashboard.png agent-ai-assist.png agent-ticket-zoom.png \
+            agent-queues.png agent-stats.png agent-search.png agent-kb.png \
             admin-queues.png admin-gdpr.png portal.png
           do
             cp "docs/images/$f" "_site/assets/screenshots/$f"
