@@ -33,10 +33,11 @@ from fastapi import APIRouter, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from tiqora.api.deps import CurrentUser, DbSession
-from tiqora.domain.ticket_write_service import TicketNotFound as WriteTicketNotFound
 from tiqora.domain.ticket_write_service import (
+    InvalidInput,
     _ticket_must_exist,  # noqa: PLC2701 -- deliberate reuse
 )
+from tiqora.domain.ticket_write_service import TicketNotFound as WriteTicketNotFound
 from tiqora.permissions.engine import PermissionEngine
 from tiqora.process.config import ActivityDialogConfig, ActivityDialogFieldConfig
 from tiqora.process.engine import start_process, submit_activity_dialog
@@ -48,6 +49,7 @@ from tiqora.process.exceptions import (
     RequiredFieldMissing,
     TicketAlreadyInProcess,
     TicketNotInProcess,
+    UnresolvedFieldValue,
 )
 from tiqora.process.graph import ProcessRepository
 from tiqora.process.schemas import (
@@ -76,9 +78,26 @@ def _map_exc(exc: Exception) -> HTTPException:
         return HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(exc))
     if isinstance(exc, (TicketAlreadyInProcess, TicketNotInProcess, ActivityDialogNotAvailable)):
         return HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc))
-    if isinstance(exc, RequiredFieldMissing):
+    if isinstance(exc, (RequiredFieldMissing, UnresolvedFieldValue, InvalidInput)):
         return HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
     return HTTPException(status_code=500, detail="Internal error")
+
+
+# Every engine/write-service error that maps to a defined HTTP status above.
+# Both mutating endpoints catch this single tuple so a newly-raised process
+# exception can never be handled by one endpoint but escape another as a 500.
+_MAPPED_ERRORS: tuple[type[Exception], ...] = (
+    WriteTicketNotFound,
+    ProcessPermissionDenied,
+    ProcessNotFound,
+    ActivityDialogNotFound,
+    ActivityDialogNotAvailable,
+    TicketAlreadyInProcess,
+    TicketNotInProcess,
+    RequiredFieldMissing,
+    UnresolvedFieldValue,
+    InvalidInput,
+)
 
 
 async def _assert_ticket_permission(
@@ -236,12 +255,7 @@ async def start_ticket_process(
                 user_id=user.id,
                 sysconfig=sysconfig,
             )
-    except (
-        WriteTicketNotFound,
-        ProcessPermissionDenied,
-        ProcessNotFound,
-        TicketAlreadyInProcess,
-    ) as exc:
+    except _MAPPED_ERRORS as exc:
         raise _map_exc(exc) from exc
     return await _ticket_process_state_out(session, ticket_id)
 
@@ -271,15 +285,7 @@ async def submit_ticket_activity_dialog(
                 user_id=user.id,
                 sysconfig=sysconfig,
             )
-    except (
-        WriteTicketNotFound,
-        ProcessPermissionDenied,
-        ProcessNotFound,
-        TicketNotInProcess,
-        ActivityDialogNotFound,
-        ActivityDialogNotAvailable,
-        RequiredFieldMissing,
-    ) as exc:
+    except _MAPPED_ERRORS as exc:
         raise _map_exc(exc) from exc
 
     state = await _ticket_process_state_out(session, ticket_id)

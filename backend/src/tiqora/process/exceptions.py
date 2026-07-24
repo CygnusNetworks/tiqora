@@ -47,3 +47,11 @@ class RequiredFieldMissing(Exception):
 class ProcessPermissionDenied(Exception):
     """The acting user lacks the activity dialog's configured ``Permission``
     on the ticket's queue."""
+
+
+class UnresolvedFieldValue(Exception):
+    """A submitted activity-dialog field value (Queue/State/Priority/Owner/
+    Responsible) could not be resolved to an id — neither by name lookup nor
+    as a literal numeric id. Previously this was silently ignored (the field
+    change was skipped with no error), which let a typo'd value fail to
+    apply without any feedback to the caller."""

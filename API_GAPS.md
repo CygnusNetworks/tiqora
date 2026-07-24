@@ -6,6 +6,134 @@ Auth/Permissions. Keine Code-Änderungen in diesem Dokument — reine Bestandsau
 
 ---
 
+## 0. ✅ 2026-07-24 — MCP-Mutation-Tools: Queue-Permission-Check nachgerüstet (Minimal-Fix)
+
+**Status: gefixt (Minimal-Gate), vollständiger Umbau auf `TicketWriteService` weiterhin offen —
+siehe „Was noch fehlt" unten.**
+
+**Verifizierter Befund** (im Rahmen einer Test-Coverage-Runde entdeckt, Code gelesen bis
+auf Zeilenebene, nicht nur Doku): Die „Permission-Pfad"-Spalte in §6 unten war für die
+folgenden 10 MCP-Tools **irreführend** — sie behauptete einen Check, der beim Lesen des
+damaligen Codes nicht existierte:
+
+`ticket_reply`, `ticket_note`, `ticket_update_state`, `ticket_update_queue`,
+`ticket_update_priority`, `ticket_update_owner`, `ticket_set_title`, `ticket_set_customer`,
+`ticket_set_dynamic_field`, `ticket_lock`, `ticket_unlock`
+
+**Root Cause:** `tiqora.domain.ticket_write_service` hat zwei Schichten:
+
+1. Modul-Funktionen (`add_article()`, `change_state()`, `assign_owner()`, …) — reine
+   Schreiblogik, **kein** Permission-Check.
+2. Klasse `TicketWriteService` (dieselbe Datei, ab `class TicketWriteService`) — dünner
+   Wrapper, der vor jedem Aufruf `self._assert(user_id, queue_id, key)` bzw.
+   `self._assert_rw(...)` aufruft (`PermissionEngine.check`) und danach die Modul-Funktion
+   aufruft. **Das ist der einzige Ort, an dem die Queue/Group-Permission tatsächlich
+   geprüft wird.**
+
+Die REST-Ticket-Endpunkte (`api/v1/tickets.py`) gehen über `TicketWriteService` — dort
+funktioniert der Check wie in §4 beschrieben. Die zehn oben genannten MCP-Tools rufen
+aber direkt die Modul-Funktionen auf (siehe z. B. `mcp_server/server.py` um Zeile 762/851
+/887/923/961/etc.), **nicht** über `TicketWriteService`. Das `except (..., TicketAccessDenied,
+...)` in diesen Tools ist toter Code — die Exception kann von diesem Call-Pfad nie geworfen
+werden.
+
+**Auswirkung (vor dem Fix unten):** Jeder Agent mit einer gültigen MCP-API-Key-Session konnte
+per `ticket_reply`, `ticket_update_owner`, `ticket_lock` usw. **jedes Ticket in jeder Queue**
+mutieren — unabhängig von seinen Group/Role-Rechten. Das untergrub genau das Modell, das §4
+als Sicherheitsbasis beschreibt („Alle Checks laufen über denselben `PermissionEngine`" — das
+stimmte für REST/UI, nicht für diese 10 MCP-Tools). Seit dem Minimal-Fix unten ist der Check
+wieder in Kraft, nur eben als eigener Gate statt über `TicketWriteService`.
+
+**Zwei zusätzlich gefundene, bereits gefixte Robustheitsbugs** (nicht mehr offen, hier nur
+zur Einordnung): `add_article()` prüfte vorher nicht, ob das Ticket existiert (roher
+FK-`IntegrityError`/`ToolError`-Crash statt `{"error": ...}`), und `assign_owner()`/
+`assign_responsible()` validierten die neue Owner/Responsible-User-ID nicht (gleicher
+Crash). Beide sind per `_ticket_must_exist()`/`_user_login()`-Härtung behoben
+(`ticket_write_service.py`) — das war ein reiner Robustheits-Fix ohne Permission-Bezug.
+
+### Was gemacht wurde (2026-07-24, Minimal-Fix)
+
+Statt die 11 Tools auf `TicketWriteService` umzustellen (Risiko: siehe „Was noch fehlt"
+Punkt 2 unten), wurde ein **expliziter Permission-Gate direkt in `mcp_server/server.py`**
+ergänzt, ohne die rohen Modul-Funktions-Aufrufe anzutasten:
+
+- Neuer Helper `_assert_queue_permission(session, *, ticket_id, user_id, key)` (lädt das
+  Ticket via `_ticket_must_exist`, prüft `PermissionEngine.check(user_id, queue_id, key)`,
+  wirft `TicketAccessDenied` — von den bestehenden `except`-Klauseln bereits abgefangen).
+- Aufgerufen am Anfang jedes `async with session.begin():`-Blocks in `ticket_reply`/
+  `ticket_note` (Key `"note"`), `ticket_update_state`/`ticket_set_title`/
+  `ticket_set_customer`/`ticket_set_dynamic_field`/`ticket_lock`/`ticket_unlock` (Key
+  `"rw"`), `ticket_update_queue` (Key `"move_into"`, auf der Quell-Queue — Znuny-Konvention;
+  **Ziel-Queue-Check per Nachtrag 2026-07-24 ergänzt, s. u.**),
+  `ticket_update_priority` (Key `"priority"`), `ticket_update_owner` (Key `"owner"`).
+- `ticket_create` bekam einen eigenen Inline-Check (`PermissionEngine.check(user_id,
+  queue_id, "create")`), da hier noch kein Ticket existiert.
+- Neuer Regressionstest `test_mcp_mutation_tools_deny_agent_without_queue_permission` in
+  `backend/tests/test_mcp_server.py`: erstellt ein Ticket als `AGENT_FULL_ID`, versucht dann
+  alle 11 Mutation-Tools + `ticket_create` als `AGENT_NONE_ID` (keinerlei Group-Permissions)
+  und prüft, dass jedes Tool `{"error": ...}` liefert statt zu mutieren — inkl. Assertion,
+  dass der Ticket-Titel danach unverändert ist.
+- Volle Backend-Suite lief danach ohne neue Regressionen (nur die bekannten 6
+  Migration-Gate-Failures + Ressourcen-Flakiness bei parallelen Testcontainern).
+
+### Was noch fehlt (bewusst nicht in diesem Fix)
+
+1. **Sauberer Umbau auf `TicketWriteService`** statt des Inline-Gates — die Klasse hat für
+   so gut wie jede Operation bereits eine geprüfte Methode (`add_article`, `move_queue`,
+   `change_state`, `change_priority`, `change_title`, `set_customer`, `assign_owner`,
+   `assign_responsible`, `lock_ticket`, `unlock_ticket`, `update_dynamic_field`) — der
+   Inline-Gate ist funktional gleichwertig für die Permission-Frage, dupliziert aber die
+   Check-Logik statt sie zu teilen. Sauberer, aber größerer Diff.
+2. **`ticket_reply`/`ticket_note` → `TicketWriteService.add_article`:** Diese Methode hat
+   einen Sonderfall — bei `channel == "email" and sender_type == "agent"` ruft sie
+   `deliver_agent_email_reply()` auf und **verschickt eine echte E-Mail über SMTP**. Der
+   aktuelle MCP-`ticket_reply`-Pfad (rohe `add_article()`, weiterhin unverändert) tut das
+   **nicht** — er schreibt nur den Artikel lokal. Ob ein per MCP/Agent ausgelöster Reply
+   tatsächlich eine E-Mail raussenden soll (wie ein menschlicher Agent es täte) oder bewusst
+   lokal bleibt (Draft-artig), ist eine **Produktentscheidung**, keine rein technische —
+   deshalb wurde hier bewusst NUR der Permission-Check ergänzt, nicht auf die Service-Klasse
+   umgestellt (das hätte das SMTP-Verhalten stillschweigend geändert).
+3. **`ticket_update_owner`'s `lock: bool` Parameter:** Die rohe `assign_owner()`-Funktion
+   unterstützt `lock=True/False`, die `TicketWriteService.assign_owner()`-Methode aktuell
+   nicht (kein `lock`-Parameter) — relevant erst, wenn Punkt 1 umgesetzt wird.
+4. **Nach einem etwaigen Umbau auf Punkt 1:** §6-Tabelle unten aktualisieren (die
+   „Permission-Pfad"-Spalte ist seit diesem Fix wieder korrekt, sollte aber bei einer
+   Migration auf `TicketWriteService` nochmal gegengelesen werden).
+
+**Priorität für Punkt 1–3:** Niedriger als der ursprüngliche Fund — die Sicherheitslücke
+selbst (kein Permission-Check) ist geschlossen; es geht nur noch um Code-Duplizierung
+(Inline-Gate vs. Service-Klasse) und die separate SMTP-Produktentscheidung.
+
+### Nachtrag (2026-07-24, Review-Folgefix)
+
+Ein High-Effort-Code-Review derselben Änderung fand zwei Lücken im Minimal-Gate oben,
+beide gefixt:
+
+- **`ticket_update_queue` prüfte `move_into` nur auf der Quell-Queue.** Damit konnte ein
+  Agent ein Ticket in eine Ziel-Queue schieben, auf die er keinerlei Rechte hat (Znuny
+  baut die Move-Ziel-Liste tatsächlich aus den `move_into`-Queues des Agenten — die
+  **Ziel**-Queue muss also ebenfalls geprüft werden). Jetzt wird `move_into` zusätzlich
+  auf der Ziel-`queue_id` geprüft. Regressionstest
+  `test_mcp_update_queue_denies_unpermitted_destination` in
+  `backend/tests/test_mcp_server.py`. Dieselbe Quell-only-Asymmetrie bestand auch in
+  `TicketWriteService.move_queue` (REST-`PATCH /api/v1/tickets/{id}`-Move-Pfad) und wurde
+  dort gleich mitgefixt (Existenz- + `move_into`-Ziel-Check in der Methode; Regressionstest
+  `test_move_into_requires_destination_permission` in `test_ticket_acl_permissions.py`,
+  MariaDB + Postgres).
+- **`ticket_create` meldete eine nicht existierende Queue als „Access denied".**
+  `PermissionEngine.check` liefert für eine unbekannte Queue dasselbe `False` wie für eine
+  verweigerte — ein Tippfehler in der `queue_id` sah für den (LLM-)Aufrufer wie ein
+  Rechteproblem aus. Neuer Helper `_assert_raw_queue_permission(session, *, queue_id,
+  user_id, key)` prüft erst Existenz (`_queue_name()` → `InvalidInput` „No queue with
+  id=…"), dann Permission; genutzt von `ticket_create` und der neuen
+  Ziel-Queue-Prüfung in `ticket_update_queue`. Der Inline-`PermissionEngine.check` in
+  `ticket_create` ist damit ersetzt.
+
+Punkt 1–3 unter „Was noch fehlt" bleiben unverändert offen (der `TicketWriteService`-Umbau
+samt SMTP-Produktentscheidung ist von diesem Folgefix unberührt).
+
+---
+
 ## 1. Kurzfassung
 
 | Bereich | Bewertung |
@@ -243,6 +371,12 @@ getrennt und aktuell gehalten werden.
 | 24 | `kb_publish_article` | `POST …/publish` | publish |
 | 25 | `customer_lookup` | customer lookup | nur Auth |
 
+> **Hinweis (2026-07-24, siehe §0):** Die „Permission-Pfad"-Spalte für #4–#15 war zwischen
+> Doku und tatsächlichem Code auseinandergelaufen (kein Check statt der behaupteten
+> Write-Service-Prüfung) — seit dem Minimal-Fix in §0 stimmt sie wieder, mechanisch aber über
+> ein eigenes `_assert_queue_permission`-Gate in `mcp_server.py`, nicht über `TicketWriteService`
+> selbst (Refactor auf Letzteres bleibt offen).
+
 ### Doc-Drift (MCP-Tool-Listen)
 
 | Dokument | Stand 2026-07-21 |
@@ -294,6 +428,7 @@ MCP deckt den **Kern-Triage-Pfad** ab (search/get/create/reply/note + state/queu
 |---|---|---|---|
 | **P0** | API-Key create/list/revoke fehlt (API + idealerweise UI) | REST, MCP, Docs | Admin-Router z. B. `/api/v1/admin/api-keys`; Klartext nur einmal bei Create; Revoke = `valid=false` |
 | ~~**P0**~~ ✅ | Docs behaupteten Key-Management existiert | Docs | **Done 2026-07-21** — jetzt tatsächlich implementiert; Bootstrap via UI/CLI (§3) |
+| ~~**P0**~~ ✅ | 11 MCP-Mutation-Tools (`ticket_reply/note/update_*/set_*/lock/unlock/create`) hatten **keinen** Queue-Permission-Check | MCP | **Done 2026-07-24** — Minimal-Gate `_assert_queue_permission` je Tool ergänzt, Regressionstest `test_mcp_mutation_tools_deny_agent_without_queue_permission`; sauberer Umbau auf `TicketWriteService` bleibt P2-Folgearbeit (§0) |
 | **P1** | MCP Reference-Tools (queues/states/priorities/agents) | MCP | **Done 2026-07-21** — `list_queues`/`list_states`/`list_priorities`/`list_agents` |
 | **P1** | MCP: DF, title, customer, lock | MCP | **Done 2026-07-21** — `ticket_set_*` + lock/unlock |
 | **P1** | MCP-Tool-Tabellen in Docs auf 15 Tools | Docs | **Done 2026-07-21** — docs synced to 25 tools |
