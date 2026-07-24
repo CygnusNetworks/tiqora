@@ -52,18 +52,27 @@ class CustomerSessionStore:
     def __init__(self, client: redis.Redis, settings: Settings) -> None:
         self._client = client
         self._ttl = settings.session_ttl_seconds
+        self._absolute_ttl = getattr(settings, "session_absolute_ttl_seconds", 43200)
         self._prefix = CUSTOMER_SESSION_KEY_PREFIX
+        self._born_prefix = f"{CUSTOMER_SESSION_KEY_PREFIX}born:"
 
     def _key(self, token: str) -> str:
         return f"{self._prefix}{token}"
+
+    def _born_key(self, token: str) -> str:
+        return f"{self._born_prefix}{token}"
 
     async def create(self, customer_id: int, login: str) -> str:
         token = secrets.token_urlsafe(32)
         payload = f"{customer_id}:{login}"
         await self._client.set(self._key(token), payload, ex=self._ttl)
+        # Absolute-lifetime marker, never renewed by touch() (security review L-2).
+        await self._client.set(self._born_key(token), "1", ex=self._absolute_ttl)
         return token
 
     async def get(self, token: str) -> tuple[int, str] | None:
+        if not await self._client.get(self._born_key(token)):
+            return None
         raw = await self._client.get(self._key(token))
         if raw is None:
             return None
@@ -80,7 +89,7 @@ class CustomerSessionStore:
         await self._client.expire(self._key(token), self._ttl)
 
     async def delete(self, token: str) -> None:
-        await self._client.delete(self._key(token))
+        await self._client.delete(self._key(token), self._born_key(token))
 
 
 class CustomerAuthService:

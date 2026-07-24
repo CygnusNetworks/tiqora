@@ -56,8 +56,9 @@ class _FakeRedis:
     async def expire(self, key: str, ttl: int) -> None:
         pass
 
-    async def delete(self, key: str) -> None:
-        self._store.pop(key, None)
+    async def delete(self, *keys: str) -> None:
+        for key in keys:
+            self._store.pop(key, None)
 
 
 class _FakeSettings:
