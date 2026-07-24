@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta
       name="description"
-      content="Tiqora — modern self-hosted helpdesk. Znuny/OTRS 6.5 database-compatible, with a first-class web UI, AI-ready search, GDPR tools, and parallel operation."
+      content="Tiqora — modern self-hosted helpdesk with AI-assisted drafts, summaries &amp; auto-replies. Znuny/OTRS 6.5 database-compatible, with a first-class web UI, GDPR tools, and parallel operation."
     />
     <meta name="theme-color" content="#0e1015" />
     <link rel="icon" type="image/svg+xml" href="./assets/favicon.svg" />
@@ -42,8 +42,9 @@
           <h1>Modern helpdesk. Znuny/OTRS-compatible.</h1>
           <p class="lede">
             Tiqora is a clean-room reimplementation of a ticket system that speaks the
-            Znuny&nbsp;/&nbsp;OTRS&nbsp;6.5 database — with a first-class web UI, AI-ready
-            search, and a path to run alongside your existing instance.
+            Znuny&nbsp;/&nbsp;OTRS&nbsp;6.5 database — with a first-class web UI,
+            AI-assisted replies &amp; summaries, and a path to run alongside your existing
+            instance.
           </p>
           <div class="btn-row">
             <a class="btn btn-primary" href="./demo/">Try the live demo</a>
@@ -91,6 +92,16 @@
               </p>
             </article>
             <article class="feature">
+              <div class="icon">✎</div>
+              <h3>AI agent assistance</h3>
+              <p>
+                Per-queue policies drive draft replies, ticket summaries, and optional
+                autonomous auto-replies — with attachment &amp; image analysis, PII
+                masking before every LLM call, and a full audit log. Bring your own
+                OpenAI-compatible or Anthropic models.
+              </p>
+            </article>
+            <article class="feature">
               <div class="icon">GD</div>
               <h3>GDPR tooling</h3>
               <p>
@@ -134,8 +145,8 @@
               <div class="icon">🔒</div>
               <h3>Modern authentication</h3>
               <p>
-                Legacy password hashes, OIDC, LDAP/AD, Kerberos/SPNEGO, TOTP, and
-                passkeys — feature-flagged as you need them.
+                Legacy password hashes, OIDC, LDAP/AD, Kerberos/SPNEGO with seamless
+                re-auth, enforceable TOTP, and passkeys — feature-flagged as you need them.
               </p>
             </article>
           </div>
