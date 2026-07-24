@@ -40,6 +40,8 @@ test.describe("knowledge base editor", () => {
     await page.goto("/agent/kb/new");
     await expect(page.getByTestId("kb-editor-page")).toBeVisible();
     await page.getByTestId("kb-form-title").fill("New FAQ entry");
+    // The slug input is auto-derived and hidden until you opt into editing it.
+    await page.getByTestId("kb-form-slug-toggle").click();
     await page.getByTestId("kb-form-slug").fill("new-faq-entry");
     await page.getByTestId("kb-form-content").fill("# New FAQ\n\nAnswer text.");
     await page.getByTestId("kb-form-submit").click();

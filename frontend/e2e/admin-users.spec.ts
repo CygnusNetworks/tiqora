@@ -22,9 +22,11 @@ test.describe("admin users", () => {
     await expect(page.getByTestId("admin-form")).not.toBeVisible();
     await expect(page.getByText("Bob Builder")).toBeVisible();
 
-    // Edit
+    // Edit — row actions now live behind a ⋯ menu; the menu items render in a
+    // portal, so click them off the page (only one menu is open at a time).
     const newRow = page.locator('[data-testid^="admin-row-"]', { hasText: "Bob Builder" });
-    await newRow.getByTestId(/admin-row-edit-/).click();
+    await newRow.getByTestId(/admin-row-menu-trigger-/).click();
+    await page.getByTestId(/admin-row-edit-/).click();
     await expect(page.getByTestId("admin-form-first_name")).toHaveValue("Bob");
     await page.getByTestId("admin-form-first_name").fill("Robert");
     await page.getByTestId("admin-form-submit").click();
@@ -33,7 +35,8 @@ test.describe("admin users", () => {
 
     // Deactivate
     const editedRow = page.locator('[data-testid^="admin-row-"]', { hasText: "Robert Builder" });
-    await editedRow.getByTestId(/admin-row-deactivate-/).click();
+    await editedRow.getByTestId(/admin-row-menu-trigger-/).click();
+    await page.getByTestId(/admin-row-deactivate-/).click();
     await expect(editedRow.getByText("Invalid")).toBeVisible();
   });
 

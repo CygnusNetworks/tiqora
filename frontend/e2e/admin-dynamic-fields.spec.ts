@@ -16,7 +16,11 @@ test.describe("admin dynamic fields", () => {
     await page.getByTestId("dynamic-field-name").fill("Priority Bucket");
     await page.getByTestId("dynamic-field-label").fill("Priority bucket");
     await page.getByTestId("dynamic-field-order").fill("2");
-    await page.getByTestId("dynamic-field-type").selectOption("Dropdown");
+    // `dynamic-field-type` is a custom SelectField (portal listbox), not a
+    // native <select>: open the trigger and pick the option.
+    await page.getByTestId("dynamic-field-type").click();
+    // force: the portal's entrance animation briefly fails the stability check.
+    await page.getByTestId("dynamic-field-type-menu-option-Dropdown").click({ force: true });
 
     await expect(page.getByTestId("dynamic-field-config-select")).toBeVisible();
     await page.getByTestId("dynamic-field-option-add").click();
@@ -37,7 +41,11 @@ test.describe("admin dynamic fields", () => {
     await page.getByTestId("dynamic-field-name").fill("Empty Dropdown");
     await page.getByTestId("dynamic-field-label").fill("Empty dropdown");
     await page.getByTestId("dynamic-field-order").fill("3");
-    await page.getByTestId("dynamic-field-type").selectOption("Dropdown");
+    // `dynamic-field-type` is a custom SelectField (portal listbox), not a
+    // native <select>: open the trigger and pick the option.
+    await page.getByTestId("dynamic-field-type").click();
+    // force: the portal's entrance animation briefly fails the stability check.
+    await page.getByTestId("dynamic-field-type-menu-option-Dropdown").click({ force: true });
     await page.getByTestId("dynamic-field-form-submit").click();
     await expect(page.getByTestId("dynamic-field-form")).toBeVisible();
     await expect(page.getByText("Add at least one option.")).toBeVisible();

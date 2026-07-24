@@ -12,11 +12,15 @@ test.describe("ticket process widget", () => {
     page,
   }) => {
     await page.goto("/agent/tickets/100");
-    await expect(page.getByTestId("process-widget")).toBeVisible();
-    await expect(page.getByTestId("process-widget-inactive")).toBeVisible();
-
-    await page.getByTestId("process-widget-start-button").click();
-    await page.getByTestId("process-start-select").selectOption("Process-1");
+    await expect(page.getByTestId("ticket-zoom")).toBeVisible();
+    // Ticket 100 starts outside any process; the start trigger lives in the
+    // ticket-zoom ⋯ overflow menu (the inline affordance was removed).
+    await page.getByTestId("ticket-zoom-overflow-trigger").click();
+    await page.getByTestId("overflow-start-process").click();
+    // `process-start-select` is a custom SelectField, not a native <select>;
+    // force the option click past the portal's entrance animation.
+    await page.getByTestId("process-start-select").click();
+    await page.getByTestId("process-start-select-menu-option-Process-1").click({ force: true });
     await page.getByTestId("process-start-submit").click();
 
     await expect(page.getByTestId("process-widget-activity-name")).toHaveText("Collect info");

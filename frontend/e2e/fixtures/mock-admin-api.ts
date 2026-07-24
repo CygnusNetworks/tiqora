@@ -9,6 +9,17 @@ async function json(route: Route, status: number, body: unknown) {
   });
 }
 
+/**
+ * Admin list endpoints return a paginated envelope (`Page[Out]` on the
+ * backend) — `AdminResourcePage` reads `.items`/`.total`. Wrap the in-memory
+ * arrays so the tables render rows. Non-paginated admin GETs (system
+ * addresses, ACL, generic-agent jobs, membership sub-resources) stay bare
+ * arrays via the catch-all below.
+ */
+function pageOf<T>(items: T[]) {
+  return { items, total: items.length, page: 1, page_size: items.length || 25 };
+}
+
 function initialUsers() {
   return [
     {
@@ -114,7 +125,7 @@ export async function mockAdminApi(page: Page) {
 
     // Users
     if (path.endsWith("/api/v1/admin/users") && method === "GET") {
-      await json(route, 200, users);
+      await json(route, 200, pageOf(users));
       return;
     }
     if (path.endsWith("/api/v1/admin/users") && method === "POST") {
@@ -150,13 +161,13 @@ export async function mockAdminApi(page: Page) {
 
     // Groups
     if (path.endsWith("/api/v1/admin/groups") && method === "GET") {
-      await json(route, 200, groups);
+      await json(route, 200, pageOf(groups));
       return;
     }
 
     // Queues
     if (path.endsWith("/api/v1/admin/queues") && method === "GET") {
-      await json(route, 200, queues);
+      await json(route, 200, pageOf(queues));
       return;
     }
     if (path.endsWith("/api/v1/admin/queues") && method === "POST") {
@@ -191,7 +202,7 @@ export async function mockAdminApi(page: Page) {
 
     // Dynamic fields
     if (path.endsWith("/api/v1/admin/dynamic-fields") && method === "GET") {
-      await json(route, 200, dynamicFields);
+      await json(route, 200, pageOf(dynamicFields));
       return;
     }
     if (path.endsWith("/api/v1/admin/dynamic-fields") && method === "POST") {
@@ -224,10 +235,32 @@ export async function mockAdminApi(page: Page) {
       return;
     }
 
+    // Reference data feeding the queue form's required selects. System
+    // addresses and follow-up-possible are bare arrays; salutations and
+    // signatures are paginated like the other admin resources.
+    if (path.endsWith("/api/v1/admin/system-addresses") && method === "GET") {
+      await json(route, 200, [
+        { id: 1, value: "support@example.com", realname: "Support", valid_id: 1 },
+      ]);
+      return;
+    }
+    if (path.endsWith("/api/v1/admin/follow-up-possible") && method === "GET") {
+      await json(route, 200, [{ id: 1, name: "possible" }]);
+      return;
+    }
+    if (path.endsWith("/api/v1/admin/salutations") && method === "GET") {
+      await json(route, 200, pageOf([{ id: 1, name: "Standard salutation", valid_id: 1 }]));
+      return;
+    }
+    if (path.endsWith("/api/v1/admin/signatures") && method === "GET") {
+      await json(route, 200, pageOf([{ id: 1, name: "Standard signature", valid_id: 1 }]));
+      return;
+    }
+
     // Everything else under /admin (roles, states, priorities, customers,
-    // templates, salutations, signatures, auto-responses, postmaster
-    // filters, acl, generic agent jobs) — default to an empty list for GET
-    // so unrelated admin pages render without error in these focused specs.
+    // templates, auto-responses, postmaster filters, acl, generic agent jobs)
+    // — default to an empty list for GET so unrelated admin pages render
+    // without error in these focused specs.
     if (method === "GET") {
       await json(route, 200, []);
       return;
