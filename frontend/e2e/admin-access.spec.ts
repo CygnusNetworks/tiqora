@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { mockAdminApi, loginAsAgent } from "./fixtures/mock-admin-api";
+import { mockAdminApi } from "./fixtures/mock-admin-api";
 
 test.describe("admin access guard", () => {
   test("renders access denied when /me reports is_admin=false", async ({ page }) => {
@@ -42,7 +42,10 @@ test.describe("admin access guard", () => {
       });
     });
 
-    await loginAsAgent(page);
+    // No form login here: /me already reports an authenticated (non-admin)
+    // session, and LoginPage now auto-redirects an authenticated visitor away
+    // from /login — which would race loginAsAgent's form fill. Navigate
+    // straight to the admin area; RequireAdmin must render access-denied.
     await page.goto("/admin/users");
     await expect(page.getByTestId("admin-access-denied")).toBeVisible();
   });
