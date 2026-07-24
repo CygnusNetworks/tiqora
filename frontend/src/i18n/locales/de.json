@@ -392,6 +392,7 @@
       "adminDeleteDraftHint": "Admin: Entwurf endgültig aus der Datenbank löschen",
       "adminDeleteConfirm": "Diesen KI-Entwurf endgültig löschen? Das kann nicht rückgängig gemacht werden.",
       "detailLabel": "Umfang",
+      "moreActions": "Weitere Aktionen",
       "detail": {
         "standard": "Standard",
         "detailed": "Ausführlich"
