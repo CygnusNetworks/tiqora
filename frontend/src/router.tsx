@@ -16,6 +16,7 @@ import { KbArticlePage as AgentKbArticlePage } from "@/routes/agent/KbArticlePag
 import { SecurityPage } from "@/routes/agent/SecurityPage";
 import { SettingsPage } from "@/routes/agent/SettingsPage";
 import { CalendarPage } from "@/routes/agent/CalendarPage";
+import { TemplatesPage as AgentTemplatesPage } from "@/routes/agent/TemplatesPage";
 import {
   NewTicketPage as AgentNewTicketPage,
   type NewTicketSearch,
@@ -280,6 +281,12 @@ const agentCalendarRoute = createRoute({
   getParentRoute: () => agentLayoutRoute,
   path: "/calendar",
   component: CalendarPage,
+});
+
+const agentTemplatesRoute = createRoute({
+  getParentRoute: () => agentLayoutRoute,
+  path: "/templates",
+  component: AgentTemplatesPage,
 });
 
 // /portal/login: mounts its own CustomerAuthProvider (a separate session from
@@ -694,6 +701,7 @@ const routeTree = rootRoute.addChildren([
     agentSettingsRoute,
     agentStatsRoute,
     agentCalendarRoute,
+    agentTemplatesRoute,
   ]),
   portalLoginRoute,
   portalLayoutRoute.addChildren([

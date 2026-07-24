@@ -37,6 +37,10 @@ vi.mock("@/components/agent/AccountMenu", () => ({
   AccountMenu: () => <div data-testid="account-menu-stub" />,
 }));
 
+vi.mock("@/auth/AuthContext", () => ({
+  useAuth: () => ({ user: { id: 1, login: "agent", can_edit_templates: false } }),
+}));
+
 const { listQueues, myTicketCounts } = vi.hoisted(() => ({
   listQueues: vi.fn(),
   myTicketCounts: vi.fn(),
