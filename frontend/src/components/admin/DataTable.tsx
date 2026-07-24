@@ -33,7 +33,8 @@ export type DataTableColumn<T> = {
 
 export type DataTableSelection = {
   selected: Set<string | number>;
-  onToggle: (id: string | number) => void;
+  /** ``range`` (Shift held) extends the selection from the last-toggled row. */
+  onToggle: (id: string | number, range?: boolean) => void;
   onToggleAll: () => void;
   allSelected: boolean;
   someSelected: boolean;
@@ -302,7 +303,11 @@ export function DataTable<T>({
                     <input
                       type="checkbox"
                       checked={selection.selected.has(id)}
-                      onChange={() => selection.onToggle(id)}
+                      // onClick carries shiftKey (onChange does not) — needed
+                      // for Shift-click range selection; onChange stays a no-op
+                      // so the controlled checkbox doesn't warn.
+                      onClick={(e) => selection.onToggle(id, e.shiftKey)}
+                      onChange={() => {}}
                       data-testid={`admin-row-select-${id}`}
                       aria-label={t("admin.bulk.selectRow")}
                       className="rounded border-hairline text-accent focus:ring-accent"
