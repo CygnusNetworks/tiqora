@@ -354,6 +354,7 @@
       "summaryLabel": "Zusammenfassung",
       "summarizeButton": "Zusammenfassen",
       "summaryEmpty": "Noch keine Zusammenfassung.",
+      "documentsSection": "Dokumente",
       "summaryAsOf": "Stand: Artikel #{{articleId}}",
       "refreshButton": "Aktualisieren",
       "summaryCurrent": "Aktuell",

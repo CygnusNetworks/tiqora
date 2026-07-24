@@ -156,6 +156,42 @@ def _system_prompt_for_detail(detail: str) -> str:
 _ATTACH_SIZE_RE = re.compile(r"^\[Anhang: (.+?) — ca\. (\d+) Zeichen\]", re.MULTILINE)
 
 
+def _collect_docs(
+    rendered_articles: list[ArticleSnapshot],
+    attachment_blocks: dict[int, str],
+) -> list[tuple[str, int]]:
+    """The (filename, char-count) pairs of every attachment block that will be
+    summarized this run — shared by the length guidance and the completion
+    budget so both see the same set of documents."""
+    docs: list[tuple[str, int]] = []
+    for a in rendered_articles:
+        block = attachment_blocks.get(a.id)
+        if block:
+            docs.extend((m.group(1), int(m.group(2))) for m in _ATTACH_SIZE_RE.finditer(block))
+    return docs
+
+
+def _completion_budget(
+    docs: list[tuple[str, int]],
+    *,
+    detail: str,
+) -> int:
+    """max_tokens for the summary completion.
+
+    The LLM client defaults to 1024 (:class:`tiqora.ai.llm.LlmClient`), which
+    truncated real detailed summaries mid-sentence once several documents each
+    demanded their own multi-sentence 'Dokumente:' entry (run
+    172949646fd8492a9d85ebf64d3dfa4d). We ask the model for that depth, so we
+    must also grant the tokens to produce it: a base budget for the
+    conversation part plus a per-document allowance, deeper in detailed mode.
+    """
+    detailed = detail == DETAIL_DETAILED
+    base = 1500 if detailed else 1024
+    per_doc = 700 if detailed else 300
+    ceiling = 8000 if detailed else 4000
+    return min(base + per_doc * len(docs), ceiling)
+
+
 def _length_guidance(
     rendered_articles: list[ArticleSnapshot],
     attachment_blocks: dict[int, str],
@@ -170,11 +206,7 @@ def _length_guidance(
     run steers them far more reliably.
     """
     mail_chars = sum(len(a.body or "") for a in rendered_articles)
-    docs: list[tuple[str, int]] = []
-    for a in rendered_articles:
-        block = attachment_blocks.get(a.id)
-        if block:
-            docs.extend((m.group(1), int(m.group(2))) for m in _ATTACH_SIZE_RE.finditer(block))
+    docs = _collect_docs(rendered_articles, attachment_blocks)
 
     lines = ["--- length guidance (computed for this run) ---"]
     if mail_chars < 1500:
@@ -443,7 +475,12 @@ async def summarize_ticket(
         LlmMessage(role="system", content=system_prompt),
         LlmMessage(role="user", content=user_message),
     ]
-    response = await llm.chat(messages=messages, tools=None)
+    docs = _collect_docs(rendered_articles, attachment_blocks)
+    response = await llm.chat(
+        messages=messages,
+        tools=None,
+        max_tokens=_completion_budget(docs, detail=effective_detail),
+    )
 
     upto_article_id = new_articles[-1].id
 

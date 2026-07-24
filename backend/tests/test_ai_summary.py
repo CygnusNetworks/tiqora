@@ -976,3 +976,26 @@ def test_length_guidance_scales_mail_and_documents() -> None:
 
     long_mail = _length_guidance([art(1, "x" * 7000)], {}, detail="standard")
     assert "as many paragraphs" in long_mail
+
+
+def test_completion_budget_grows_with_docs_and_detail() -> None:
+    from tiqora.ai.summary import _completion_budget
+
+    no_docs: list[tuple[str, int]] = []
+    three_docs = [("a.pdf", 3000), ("b.pdf", 3000), ("c.pdf", 3000)]
+
+    # No documents: at least the plain-conversation default, detailed a bit more.
+    assert _completion_budget(no_docs, detail="standard") == 1024
+    assert _completion_budget(no_docs, detail="detailed") == 1500
+
+    # Each document raises the budget, more steeply in detailed mode — this is
+    # what stops the multi-document "Dokumente:" block from truncating.
+    assert _completion_budget(three_docs, detail="standard") > 1024
+    assert _completion_budget(three_docs, detail="detailed") > _completion_budget(
+        three_docs, detail="standard"
+    )
+
+    # Bounded so a pathological attachment count can't demand an absurd budget.
+    many = [("f.pdf", 3000)] * 50
+    assert _completion_budget(many, detail="standard") == 4000
+    assert _completion_budget(many, detail="detailed") == 8000

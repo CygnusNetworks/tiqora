@@ -20,6 +20,7 @@ import { Menu, MenuItem } from "@/components/ui/Menu";
 import { HelpPopover } from "@/components/ui/HelpPopover";
 import { ToolTraceCard } from "@/components/ai/ToolResultView";
 import { ReplyDialog } from "./ReplyDialog";
+import { SummaryText } from "./SummaryText";
 
 /**
  * AI panel for the ticket zoom page (plan §3.4 Drafts, §3.5 Summary,
@@ -343,12 +344,10 @@ export function AiPanel({
                   </span>
                 )}
               </div>
-              <p
-                className="whitespace-pre-wrap text-sm text-ink"
-                data-testid="ai-panel-summary-body"
-              >
-                {state.summary_body}
-              </p>
+              <SummaryText
+                body={state.summary_body ?? ""}
+                testId="ai-panel-summary-body"
+              />
             </div>
           ) : (
             <p
@@ -489,7 +488,7 @@ export function AiPanel({
                           <>
                             <Button
                               size="sm"
-                              variant="ghost"
+                              variant="secondary"
                               data-testid={`ai-panel-draft-discard-${draft.id}`}
                               disabled={discardMutation.isPending}
                               onClick={async () => {

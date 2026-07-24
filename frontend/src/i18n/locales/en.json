@@ -354,6 +354,7 @@
       "summaryLabel": "Summary",
       "summarizeButton": "Summarize",
       "summaryEmpty": "No summary yet.",
+      "documentsSection": "Documents",
       "summaryAsOf": "As of article #{{articleId}}",
       "refreshButton": "Refresh",
       "summaryCurrent": "Current",
