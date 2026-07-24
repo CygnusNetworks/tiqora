@@ -6,6 +6,8 @@
 [![Znuny 6.5 DB](https://img.shields.io/badge/Znuny%2FOTRS-6.5%20DB%20compatible-5B8CFF)](./docs/compatibility.md)
 [![Docker](https://img.shields.io/badge/Docker-ready-2496ED?logo=docker&logoColor=white)](./docs/deploy/docker-compose.md)
 [![Live site](https://img.shields.io/badge/Live-demo%20%26%20product%20site-5B8CFF)](https://cygnusnetworks.github.io/tiqora/)
+[![Backend coverage](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/CygnusNetworks/tiqora/badges/backend-coverage.json)](./backend)
+[![Frontend coverage](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/CygnusNetworks/tiqora/badges/frontend-coverage.json)](./frontend)
 
 > **Still under active development.** Production use is not yet recommended.
 > APIs, schema conventions, and operational behaviour may still change.

@@ -70,6 +70,8 @@ from tiqora.domain.ticket_write_service import (
     TicketAccessDenied,
     TicketIn,
     TicketNotFound,
+    _queue_name,  # noqa: PLC2701 -- deliberate reuse, see _assert_queue_permission
+    _ticket_must_exist,  # noqa: PLC2701 -- deliberate reuse, see _assert_queue_permission
     add_article,
     assign_owner,
     change_priority,
@@ -221,6 +223,51 @@ def _get_state() -> McpState:
     if _mcp_state is None:
         raise RuntimeError("MCP server not initialised")
     return _mcp_state
+
+
+async def _assert_queue_permission(
+    session: AsyncSession, *, ticket_id: int, user_id: int, key: str
+) -> None:
+    """Raise ``TicketNotFound``/``TicketAccessDenied`` unless *user_id* holds
+    *key* on *ticket_id*'s queue.
+
+    These MCP ticket-mutation tools call the raw ``ticket_write_service``
+    module functions directly rather than through the ``TicketWriteService``
+    class (whose methods run this same check internally via
+    ``self._assert``/``self._assert_rw``) — see API_GAPS.md §0 for the full
+    writeup of why, and the follow-up needed to fold this into a proper
+    ``TicketWriteService`` migration. This is the minimal permission gate so
+    these tools can't mutate a ticket in a queue the caller has no rights
+    on, without touching the raw functions themselves (in particular,
+    without routing ``ticket_reply``/``ticket_note`` through
+    ``TicketWriteService.add_article``, which would additionally trigger a
+    real outbound SMTP send for agent email replies — a behaviour change
+    that needs its own product decision, not a silent side effect of a
+    permission fix).
+    """
+    t = await _ticket_must_exist(session, ticket_id)
+    await _assert_raw_queue_permission(
+        session, queue_id=int(t["queue_id"]), user_id=user_id, key=key
+    )
+
+
+async def _assert_raw_queue_permission(
+    session: AsyncSession, *, queue_id: int, user_id: int, key: str
+) -> None:
+    """Existence-then-permission gate for a raw queue id (not a ticket's own
+    queue). Used where the queue is supplied directly by the caller — ticket
+    creation and the *destination* of a move.
+
+    Validates the queue exists first (``InvalidInput`` -> a "no such queue"
+    error the caller can act on) before checking the permission, so a typo'd
+    queue id is never reported as a misleading "access denied":
+    ``PermissionEngine.check`` returns ``False`` indistinguishably for both a
+    denied and a nonexistent queue.
+    """
+    await _queue_name(session, queue_id)  # raises InvalidInput if the queue does not exist
+    pe = PermissionEngine(session)
+    if not await pe.check(user_id, queue_id, key):
+        raise TicketAccessDenied(f"user {user_id} lacks {key!r} on queue {queue_id}")
 
 
 # ---------------------------------------------------------------------------
@@ -705,6 +752,9 @@ async def ticket_create(
         sysconfig = state.sysconfig()
         try:
             async with session.begin():
+                await _assert_raw_queue_permission(
+                    session, queue_id=queue_id, user_id=user_id, key="create"
+                )
                 ticket_id = await create_ticket(
                     session, state.session_factory, sysconfig, params=ticket_in, user_id=user_id
                 )
@@ -752,6 +802,9 @@ async def ticket_reply(
         sysconfig = state.sysconfig()
         try:
             async with session.begin():
+                await _assert_queue_permission(
+                    session, ticket_id=ticket_id, user_id=user_id, key="note"
+                )
                 article_in = ArticleIn(
                     sender_type="agent",
                     is_visible_for_customer=is_visible_for_customer,
@@ -805,6 +858,9 @@ async def ticket_note(
         sysconfig = state.sysconfig()
         try:
             async with session.begin():
+                await _assert_queue_permission(
+                    session, ticket_id=ticket_id, user_id=user_id, key="note"
+                )
                 article_in = ArticleIn(
                     sender_type="agent",
                     is_visible_for_customer=is_visible_for_customer,
@@ -848,6 +904,9 @@ async def ticket_update_state(
         sysconfig = state.sysconfig()
         try:
             async with session.begin():
+                await _assert_queue_permission(
+                    session, ticket_id=ticket_id, user_id=user_id, key="rw"
+                )
                 await change_state(
                     session,
                     ticket_id=ticket_id,
@@ -884,6 +943,16 @@ async def ticket_update_queue(
         sysconfig = state.sysconfig()
         try:
             async with session.begin():
+                # Znuny: moving requires 'move_into' on the SOURCE queue and on
+                # the DESTINATION queue (Znuny builds the move-target list from
+                # the queues the agent holds 'move_into' on) — otherwise an
+                # agent could push tickets into queues they have no rights on.
+                await _assert_queue_permission(
+                    session, ticket_id=ticket_id, user_id=user_id, key="move_into"
+                )
+                await _assert_raw_queue_permission(
+                    session, queue_id=queue_id, user_id=user_id, key="move_into"
+                )
                 await move_queue(
                     session,
                     ticket_id=ticket_id,
@@ -920,6 +989,9 @@ async def ticket_update_priority(
         sysconfig = state.sysconfig()
         try:
             async with session.begin():
+                await _assert_queue_permission(
+                    session, ticket_id=ticket_id, user_id=user_id, key="priority"
+                )
                 await change_priority(
                     session,
                     ticket_id=ticket_id,
@@ -958,6 +1030,9 @@ async def ticket_update_owner(
         sysconfig = state.sysconfig()
         try:
             async with session.begin():
+                await _assert_queue_permission(
+                    session, ticket_id=ticket_id, user_id=user_id, key="owner"
+                )
                 await assign_owner(
                     session,
                     ticket_id=ticket_id,
@@ -994,6 +1069,9 @@ async def ticket_set_title(
     async with state.session_factory() as session:
         try:
             async with session.begin():
+                await _assert_queue_permission(
+                    session, ticket_id=ticket_id, user_id=user_id, key="rw"
+                )
                 await change_title(session, ticket_id=ticket_id, new_title=title, user_id=user_id)
             return {"ok": True, "ticket_id": ticket_id, "title": title[:255]}
         except (TicketNotFound, TicketAccessDenied, InvalidInput) as e:
@@ -1020,6 +1098,9 @@ async def ticket_set_customer(
     async with state.session_factory() as session:
         try:
             async with session.begin():
+                await _assert_queue_permission(
+                    session, ticket_id=ticket_id, user_id=user_id, key="rw"
+                )
                 await set_customer(
                     session,
                     ticket_id=ticket_id,
@@ -1063,6 +1144,9 @@ async def ticket_set_dynamic_field(
     async with state.session_factory() as session:
         try:
             async with session.begin():
+                await _assert_queue_permission(
+                    session, ticket_id=ticket_id, user_id=user_id, key="rw"
+                )
                 field_id = (
                     await session.execute(
                         text(
@@ -1113,6 +1197,9 @@ async def ticket_lock(
         sysconfig = state.sysconfig()
         try:
             async with session.begin():
+                await _assert_queue_permission(
+                    session, ticket_id=ticket_id, user_id=user_id, key="rw"
+                )
                 await lock_ticket(
                     session, ticket_id=ticket_id, user_id=user_id, sysconfig=sysconfig
                 )
@@ -1138,6 +1225,9 @@ async def ticket_unlock(
         sysconfig = state.sysconfig()
         try:
             async with session.begin():
+                await _assert_queue_permission(
+                    session, ticket_id=ticket_id, user_id=user_id, key="rw"
+                )
                 await unlock_ticket(
                     session, ticket_id=ticket_id, user_id=user_id, sysconfig=sysconfig
                 )

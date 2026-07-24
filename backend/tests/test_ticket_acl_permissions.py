@@ -32,7 +32,14 @@ _UID_OWNER = 9202
 _UID_RW = 9203
 _UID_RO = 9204
 _GROUP = 9230
+# Second group the rw agent holds NO permission on — its queue is an
+# unpermitted move destination (regression: move only checked the source).
+_GROUP_OTHER = 9231
 _QUEUE = 9200
+# Valid move target: same group as _QUEUE, so the rw agent may move into it.
+_QUEUE_SAME = 9209
+# Restricted move target: in _GROUP_OTHER, the rw agent may not move into it.
+_QUEUE_OTHER = 9210
 _TICKET = 9270
 _LOGIN_PRIO = "acl.agent.priority"
 _LOGIN_OWNER = "acl.agent.owner"
@@ -68,10 +75,14 @@ def _seed(sync_url: str) -> dict[str, Any]:
             {"t": _TICKET},
         )
         conn.execute(text("DELETE FROM ticket WHERE id = :t"), {"t": _TICKET})
-        conn.execute(text("DELETE FROM queue WHERE id = :q"), {"q": _QUEUE})
+        conn.execute(
+            text("DELETE FROM queue WHERE id IN (:q, :qs, :qo)"),
+            {"q": _QUEUE, "qs": _QUEUE_SAME, "qo": _QUEUE_OTHER},
+        )
         conn.execute(
             text(
-                "DELETE FROM group_user WHERE user_id IN (:u1, :u2, :u3, :u4, :u5) OR group_id = :g"
+                "DELETE FROM group_user WHERE user_id IN (:u1, :u2, :u3, :u4, :u5)"
+                " OR group_id IN (:g, :go)"
             ),
             {
                 "u1": _UID_PRIO,
@@ -80,9 +91,13 @@ def _seed(sync_url: str) -> dict[str, Any]:
                 "u4": _UID_RO,
                 "u5": _UID_TARGET,
                 "g": _GROUP,
+                "go": _GROUP_OTHER,
             },
         )
-        conn.execute(text("DELETE FROM permission_groups WHERE id = :g"), {"g": _GROUP})
+        conn.execute(
+            text("DELETE FROM permission_groups WHERE id IN (:g, :go)"),
+            {"g": _GROUP, "go": _GROUP_OTHER},
+        )
         conn.execute(
             text("DELETE FROM users WHERE id IN (:u1, :u2, :u3, :u4, :u5)"),
             {
@@ -121,6 +136,16 @@ def _seed(sync_url: str) -> dict[str, Any]:
                 """
             ),
             {"id": _GROUP, "t": NOW},
+        )
+        conn.execute(
+            text(
+                """
+                INSERT INTO permission_groups (id, name, valid_id,
+                    create_time, create_by, change_time, change_by)
+                VALUES (:id, 'acl-grp-other', 1, :t, 1, :t, 1)
+                """
+            ),
+            {"id": _GROUP_OTHER, "t": NOW},
         )
 
         # priority-only: ro (read ticket) + priority
@@ -182,6 +207,22 @@ def _seed(sync_url: str) -> dict[str, Any]:
             ),
             {"id": _QUEUE, "gid": _GROUP, "t": NOW},
         )
+        # A valid move target (same group) and a restricted one (other group).
+        for qid, name, gid in (
+            (_QUEUE_SAME, "AclQueueSame", _GROUP),
+            (_QUEUE_OTHER, "AclQueueOther", _GROUP_OTHER),
+        ):
+            conn.execute(
+                text(
+                    """
+                    INSERT INTO queue (id, name, group_id, system_address_id, salutation_id,
+                        signature_id, follow_up_id, follow_up_lock, valid_id,
+                        create_time, create_by, change_time, change_by)
+                    VALUES (:id, :name, :gid, 1, 1, 1, 1, 0, 1, :t, 1, :t, 1)
+                    """
+                ),
+                {"id": qid, "name": name, "gid": gid, "t": NOW},
+            )
 
         # priority_id 3 = "3 normal" (Znuny default); state 4 = open
         conn.execute(
@@ -204,6 +245,8 @@ def _seed(sync_url: str) -> dict[str, Any]:
     return {
         "ticket": _TICKET,
         "queue": _QUEUE,
+        "queue_same": _QUEUE_SAME,
+        "queue_other": _QUEUE_OTHER,
         "uid_prio": _UID_PRIO,
         "uid_owner": _UID_OWNER,
         "uid_rw": _UID_RW,
@@ -266,6 +309,20 @@ async def _ticket_owner(sync_url: str, ticket_id: int) -> int:
         row = (
             await conn.execute(
                 text("SELECT user_id FROM ticket WHERE id = :id"),
+                {"id": ticket_id},
+            )
+        ).first()
+    await engine.dispose()
+    assert row is not None
+    return int(row[0])
+
+
+async def _ticket_queue(sync_url: str, ticket_id: int) -> int:
+    engine = create_async_engine(_to_async_url(sync_url))
+    async with engine.connect() as conn:
+        row = (
+            await conn.execute(
+                text("SELECT queue_id FROM ticket WHERE id = :id"),
                 {"id": ticket_id},
             )
         ).first()
@@ -375,6 +432,41 @@ async def test_rw_agent_all_mutations_and_permissions_object(
         perms = body["permissions"]
         for key in ("ro", "move_into", "create", "note", "owner", "priority", "rw"):
             assert perms[key] is True, key
+    finally:
+        await client.aclose()
+        await engine.dispose()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("url_fixture", ["mariadb_znuny_url", "postgres_znuny_url"])
+async def test_move_into_requires_destination_permission(
+    url_fixture: str, request: pytest.FixtureRequest
+) -> None:
+    """Moving a ticket requires ``move_into`` on the DESTINATION queue, not
+    only the source. The rw agent may move the ticket into another queue in
+    its own group, but a move into a queue in a group it has no rights on is
+    denied (403) and the ticket stays put — regression for the source-only
+    gate in ``TicketWriteService.move_queue``."""
+    sync_url: str = request.getfixturevalue(url_fixture)
+    ids = _seed(sync_url)
+    client, engine = await _client_for(sync_url, ids["uid_rw"], ids["login_rw"])
+    try:
+        # Allowed: destination in the same group the rw agent holds rw on.
+        r = await client.patch(
+            f"/api/v1/tickets/{ids['ticket']}",
+            json={"queue_id": ids["queue_same"]},
+        )
+        assert r.status_code == 204, r.text
+        assert await _ticket_queue(sync_url, ids["ticket"]) == ids["queue_same"]
+
+        # Denied: destination in a group the rw agent has no permission on.
+        r = await client.patch(
+            f"/api/v1/tickets/{ids['ticket']}",
+            json={"queue_id": ids["queue_other"]},
+        )
+        assert r.status_code == 403, r.text
+        # Ticket did not move.
+        assert await _ticket_queue(sync_url, ids["ticket"]) == ids["queue_same"]
     finally:
         await client.aclose()
         await engine.dispose()
