@@ -7,14 +7,16 @@ per-login counters. Disable with ``TIQORA_AUTH_RATE_LIMIT_ENABLED=0`` for tests.
 
 from __future__ import annotations
 
+import ipaddress
 import secrets
 import time
+from collections.abc import Iterable
 from dataclasses import dataclass
 from typing import Any
 
 import structlog
 
-from tiqora.config import Settings
+from tiqora.config import Settings, get_settings
 
 logger = structlog.get_logger(__name__)
 
@@ -182,9 +184,48 @@ class AuthRateLimiter:
         return ttl
 
 
-def client_ip(request: Any) -> str:
-    """Best-effort client IP for rate-limit keys (no trusted-proxy chain)."""
+def _ip_in_any(ip_str: str, cidrs: Iterable[str]) -> bool:
+    try:
+        ip = ipaddress.ip_address(ip_str)
+    except ValueError:
+        return False
+    for c in cidrs:
+        try:
+            if "/" in c:
+                if ip in ipaddress.ip_network(c, strict=False):
+                    return True
+            elif ip == ipaddress.ip_address(c):
+                return True
+        except ValueError:
+            continue
+    return False
+
+
+def client_ip(request: Any, trusted_proxies: Iterable[str] | None = None) -> str:
+    """Client IP for rate-limit keys.
+
+    By default the direct socket peer is used (X-Forwarded-For is NOT trusted, to
+    avoid spoofed lockout keys). When ``TIQORA_TRUSTED_PROXIES`` lists the reverse
+    proxy and the peer matches it, the rightmost non-proxy XFF entry is used so
+    per-IP login lockout keys on the real client rather than the shared proxy IP
+    (security review L-4).
+    """
+    if trusted_proxies is None:
+        try:
+            trusted_proxies = get_settings().trusted_proxies
+        except Exception:  # noqa: BLE001 — never let IP derivation break a request
+            trusted_proxies = []
     client = getattr(request, "client", None)
-    if client is not None and getattr(client, "host", None):
-        return str(client.host)
-    return "unknown"
+    peer = str(getattr(client, "host", "") or "") if client is not None else ""
+    proxies = list(trusted_proxies or [])
+    if peer and proxies and _ip_in_any(peer, proxies):
+        headers = getattr(request, "headers", None)
+        xff = headers.get("x-forwarded-for") if headers is not None else None
+        if xff:
+            parts = [p.strip() for p in str(xff).split(",") if p.strip()]
+            for candidate in reversed(parts):
+                if not _ip_in_any(candidate, proxies):
+                    return candidate
+            if parts:
+                return parts[0]
+    return peer or "unknown"

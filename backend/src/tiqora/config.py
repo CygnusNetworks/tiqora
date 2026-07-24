@@ -101,6 +101,14 @@ class Settings(BaseSettings):
         default=3600,
         validation_alias="TIQORA_SESSION_TTL",
     )
+    # Absolute maximum session age, independent of the sliding TTL above: a
+    # session is killed this long after creation even if continuously active, so
+    # a stolen token cannot be kept alive forever by periodic requests (security
+    # review L-2). SSO/Kerberos agents re-auth transparently; others log in again.
+    session_absolute_ttl_seconds: int = Field(
+        default=43200,  # 12h
+        validation_alias="TIQORA_SESSION_ABSOLUTE_TTL",
+    )
     # Default False for local/dev HTTP; flipped to True in production when
     # TIQORA_SESSION_COOKIE_SECURE is unset (see _default_session_cookie_secure).
     session_cookie_secure: bool = Field(
@@ -111,6 +119,11 @@ class Settings(BaseSettings):
         default="lax",
         validation_alias="TIQORA_SESSION_COOKIE_SAMESITE",
     )
+    # Comma-separated proxy IPs/CIDRs whose X-Forwarded-For may be trusted for
+    # rate-limit client-IP derivation (security review L-4). Empty (default) =
+    # use the direct socket peer only; set to your reverse proxy so per-IP login
+    # lockout keys on the real client, not the shared proxy IP.
+    trusted_proxies_raw: str = Field(default="", validation_alias="TIQORA_TRUSTED_PROXIES")
 
     # Prometheus /metrics on the public app port. Keep True so existing internal
     # scrapes and tests keep working; set TIQORA_METRICS_ENABLED=0 when the app
@@ -364,6 +377,10 @@ class Settings(BaseSettings):
     def is_production(self) -> bool:
         return self.environment == "production"
 
+    @property
+    def trusted_proxies(self) -> list[str]:
+        return [p.strip() for p in self.trusted_proxies_raw.split(",") if p.strip()]
+
     @model_validator(mode="after")
     def _default_session_cookie_secure(self) -> Self:
         """Default Secure cookies in production when the env var is unset.
@@ -374,6 +391,16 @@ class Settings(BaseSettings):
         """
         if "session_cookie_secure" not in self.model_fields_set:
             object.__setattr__(self, "session_cookie_secure", self.is_production)
+        return self
+
+    @model_validator(mode="after")
+    def _default_csp_enforce(self) -> Self:
+        """Enforce the SPA CSP in production when the env var is unset (security
+        review M3 — report-only leaves the primary XSS backstop inert). The built
+        SPA has no inline scripts, so enforcing is safe; operators can still set
+        ``TIQORA_CSP_ENFORCE=0`` explicitly if a custom deployment needs it."""
+        if "csp_enforce" not in self.model_fields_set:
+            object.__setattr__(self, "csp_enforce", self.is_production)
         return self
 
     def validate_production(self) -> None:
