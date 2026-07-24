@@ -536,20 +536,6 @@ export function AdminResourcePage<Out, Create, Update>({
           )}
         </div>
         <div className="flex items-center gap-2">
-          <span
-            data-testid="admin-list-count"
-            data-state={refreshBusy ? "busy" : refreshSuccess ? "success" : "neutral"}
-            className={cn(
-              "inline-flex items-center gap-1 rounded-full px-2 py-1 font-mono text-xs tabular-nums transition-colors",
-              refreshBusy && "bg-accent-dim text-accent",
-              !refreshBusy && refreshSuccess && "bg-green/15 text-green",
-              !refreshBusy && !refreshSuccess && "text-muted",
-            )}
-          >
-            {refreshBusy && <Spinner className="h-3 w-3" />}
-            {!refreshBusy && refreshSuccess && <CheckIcon className="text-[13px]" />}
-            {refreshBusy ? t("admin.list.refreshing") : countText}
-          </span>
           <label className="inline-flex items-center gap-1.5 text-xs text-muted">
             {t("admin.pagination.pageSize")}
             <SelectField
@@ -579,6 +565,47 @@ export function AdminResourcePage<Out, Create, Update>({
         </div>
       )}
 
+      {/* Result count + pagination sit together directly above the table. */}
+      <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted">
+        <span
+          data-testid="admin-list-count"
+          data-state={refreshBusy ? "busy" : refreshSuccess ? "success" : "neutral"}
+          className={cn(
+            "inline-flex items-center gap-1 rounded-full px-2 py-1 font-mono text-xs tabular-nums transition-colors",
+            refreshBusy && "bg-accent-dim text-accent",
+            !refreshBusy && refreshSuccess && "bg-green/15 text-green",
+            !refreshBusy && !refreshSuccess && "text-muted",
+          )}
+        >
+          {refreshBusy && <Spinner className="h-3 w-3" />}
+          {!refreshBusy && refreshSuccess && <CheckIcon className="text-[13px]" />}
+          {refreshBusy ? t("admin.list.refreshing") : countText}
+        </span>
+        <div className="inline-flex items-center gap-2">
+          <Button
+            size="sm"
+            variant="secondary"
+            disabled={page <= 1}
+            data-testid="admin-page-prev"
+            onClick={() => setPage((p) => Math.max(1, p - 1))}
+          >
+            {t("admin.pagination.prev")}
+          </Button>
+          <span data-testid="admin-page-indicator">
+            {t("admin.pagination.page", { page, total: totalPages })}
+          </span>
+          <Button
+            size="sm"
+            variant="secondary"
+            disabled={page >= totalPages}
+            data-testid="admin-page-next"
+            onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+          >
+            {t("admin.pagination.next")}
+          </Button>
+        </div>
+      </div>
+
       <DataTable
         columns={columns}
         rows={rows}
@@ -605,32 +632,6 @@ export function AdminResourcePage<Out, Create, Update>({
         busy={refreshBusy}
         testId={`admin-${resourceKey}-table`}
       />
-
-      <div className="flex flex-wrap items-center justify-end gap-2 text-xs text-muted">
-        <div className="inline-flex items-center gap-2">
-          <Button
-            size="sm"
-            variant="secondary"
-            disabled={page <= 1}
-            data-testid="admin-page-prev"
-            onClick={() => setPage((p) => Math.max(1, p - 1))}
-          >
-            {t("admin.pagination.prev")}
-          </Button>
-          <span data-testid="admin-page-indicator">
-            {t("admin.pagination.page", { page, total: totalPages })}
-          </span>
-          <Button
-            size="sm"
-            variant="secondary"
-            disabled={page >= totalPages}
-            data-testid="admin-page-next"
-            onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-          >
-            {t("admin.pagination.next")}
-          </Button>
-        </div>
-      </div>
 
       {bulkEnabled && (selected.size > 0 || bulkStatus !== null) && bulkActions && (
         <div
