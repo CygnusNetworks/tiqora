@@ -90,6 +90,9 @@ describe("LoginPage", () => {
     completeEnrollPasskey.mockReset();
     authMethods.mockReset();
     totpEnroll.mockReset();
+    spnegoLoginUrl.mockClear();
+    oidcLoginUrl.mockClear();
+    localStorage.clear();
     pending2fa = false;
     pendingFactors = null;
     mustEnroll2fa = false;
@@ -123,6 +126,57 @@ describe("LoginPage", () => {
       expect(screen.getByTestId("kerberos-login")).toBeInTheDocument();
     });
     expect(screen.queryByTestId("sso-login")).not.toBeInTheDocument();
+  });
+
+  // jsdom's `location.assign` is non-configurable, so swap the whole object
+  // for a stub that records the redirect, and restore it afterwards.
+  function stubLocationAssign(): { assign: ReturnType<typeof vi.fn>; restore: () => void } {
+    const original = window.location;
+    const assign = vi.fn();
+    Object.defineProperty(window, "location", {
+      configurable: true,
+      value: { ...window.location, assign },
+    });
+    return {
+      assign,
+      restore: () => Object.defineProperty(window, "location", { configurable: true, value: original }),
+    };
+  }
+
+  it("auto re-auths an expired SPNEGO session back into the Kerberos handshake", async () => {
+    localStorage.setItem("tiqora-login-method", "spnego");
+    authMethods.mockResolvedValue({
+      password: true,
+      oidc: false,
+      spnego: true,
+      ldap: false,
+      webauthn: false,
+    });
+    searchParams = { next: "/agent/tickets" };
+    const loc = stubLocationAssign();
+    renderPage();
+    await waitFor(() => expect(spnegoLoginUrl).toHaveBeenCalled());
+    expect(loc.assign).toHaveBeenCalledWith("/api/v1/auth/spnego");
+    loc.restore();
+  });
+
+  it("does NOT auto re-auth a password session to Kerberos on expiry", async () => {
+    localStorage.setItem("tiqora-login-method", "password");
+    authMethods.mockResolvedValue({
+      password: true,
+      oidc: false,
+      spnego: true,
+      ldap: false,
+      webauthn: false,
+    });
+    searchParams = { next: "/agent/tickets" };
+    const loc = stubLocationAssign();
+    renderPage();
+    // The normal form renders and the Kerberos handshake is never triggered.
+    await screen.findByTestId("login-submit");
+    expect(spnegoLoginUrl).not.toHaveBeenCalled();
+    expect(loc.assign).not.toHaveBeenCalled();
+    loc.restore();
   });
 
   it("hides Kerberos button when spnego is false", async () => {

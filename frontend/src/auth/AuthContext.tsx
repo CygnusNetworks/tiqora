@@ -15,6 +15,7 @@ import {
   type PublicKeyCredentialRequestOptionsJSON,
 } from "@simplewebauthn/browser";
 import { api, ApiError, type UserMe } from "@/lib/api";
+import { clearLoginMethod, rememberLoginMethod } from "@/lib/loginMethod";
 
 type AuthContextValue = {
   user: UserMe | null;
@@ -89,6 +90,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const login = useCallback(
     async (loginName: string, password: string) => {
       const res = await api.login({ login: loginName, password });
+      // Password accepted (any 2FA is a follow-up factor) — remember this so an
+      // expired session sends the agent back to the form, not the Kerberos flow.
+      rememberLoginMethod("password");
       if (res.pending_2fa) {
         setPending2fa(true);
         setPendingFactors({
@@ -180,6 +184,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setPending2fa(false);
     setPendingFactors(null);
     setMustEnroll2fa(false);
+    // An explicit sign-out clears the remembered method so the next person on a
+    // shared machine isn't silently re-authed into the previous agent's flow.
+    clearLoginMethod();
     queryClient.setQueryData(["auth", "me"], null);
     queryClient.clear();
   }, [queryClient]);

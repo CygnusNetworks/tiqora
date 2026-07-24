@@ -3,6 +3,7 @@ import { useNavigate, useSearch } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "@/auth/AuthContext";
 import { logoUrl } from "@/lib/assets";
+import { getLoginMethod, rememberLoginMethod } from "@/lib/loginMethod";
 import { api, ApiError } from "@/lib/api";
 import { Button } from "@/components/ui/Button";
 import { Spinner } from "@/components/ui/Spinner";
@@ -102,7 +103,12 @@ export function LoginPage() {
     if (isLoading || isAuthenticated || pending2fa || mustEnroll2fa) return;
     if (ssoErrorFlag || !spnegoEnabled) return;
     if (!isSafeNextPath(search.next)) return;
+    // Only silently re-auth via Kerberos if THIS browser's expired session was
+    // itself started with SPNEGO. A password (or OIDC/LDAP) agent must see the
+    // normal form instead of being bounced into the Kerberos handshake.
+    if (getLoginMethod() !== "spnego") return;
     autoSsoTriggered.current = true;
+    rememberLoginMethod("spnego");
     window.location.assign(api.spnegoLoginUrl(search.next));
   }, [
     isLoading,
@@ -543,6 +549,7 @@ export function LoginPage() {
                   className="w-full"
                   data-testid="kerberos-login"
                   onClick={() => {
+                    rememberLoginMethod("spnego");
                     window.location.assign(api.spnegoLoginUrl());
                   }}
                 >
@@ -556,6 +563,7 @@ export function LoginPage() {
                   className="w-full"
                   data-testid="sso-login"
                   onClick={() => {
+                    rememberLoginMethod("oidc");
                     window.location.assign(api.oidcLoginUrl());
                   }}
                 >
