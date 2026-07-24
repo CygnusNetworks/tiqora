@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
 import { useCustomerAuth } from "@/auth/CustomerAuthContext";
+import { logoUrl } from "@/lib/assets";
 import { useTheme } from "@/themes/theme";
 import { Button } from "@/components/ui/Button";
 
@@ -26,7 +27,7 @@ export function PortalShell({ children }: { children: ReactNode }) {
             className="flex min-w-0 items-center gap-2"
             data-testid="portal-home-link"
           >
-            <img src="/logo.svg" alt="" width={24} height={24} className="rounded" />
+            <img src={logoUrl} alt="" width={24} height={24} className="rounded" />
             <span className="flex flex-col leading-tight">
               <span className="font-display text-lg font-bold tracking-tight text-ink">
                 {t("app.name")}

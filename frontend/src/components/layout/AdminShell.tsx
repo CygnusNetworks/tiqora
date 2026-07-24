@@ -2,6 +2,7 @@ import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/Button";
+import { logoUrl } from "@/lib/assets";
 import { AccountMenu } from "@/components/agent/AccountMenu";
 import { AdminCommandPalette } from "@/components/admin/AdminCommandPalette";
 import {
@@ -332,7 +333,7 @@ export function AdminShell({ children }: { children: ReactNode }) {
             className="flex shrink-0 items-center gap-2 font-display text-lg font-bold tracking-tight text-ink"
           >
             <img
-              src="/logo.svg"
+              src={logoUrl}
               alt=""
               width={22}
               height={22}

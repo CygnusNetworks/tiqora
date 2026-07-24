@@ -158,10 +158,14 @@
           <div class="section-head">
             <h2>See it in action</h2>
             <p>Agent workspace, ticket zoom, reporting, admin, privacy tools, and portal.</p>
+            <div class="shot-toggle" role="group" aria-label="Screenshot theme">
+              <button type="button" data-theme-btn="light" class="is-active">Light</button>
+              <button type="button" data-theme-btn="dark">Dark</button>
+            </div>
           </div>
           <div class="shots">
             <figure class="shot shot-wide">
-              <img
+              <img data-shot="agent-dashboard"
                 src="./assets/screenshots/agent-dashboard.png"
                 alt="Tiqora agent dashboard"
                 width="1440"
@@ -171,7 +175,7 @@
               <figcaption>Agent dashboard — open work, queues, and presence at a glance</figcaption>
             </figure>
             <figure class="shot shot-wide">
-              <img
+              <img data-shot="agent-ai-assist"
                 src="./assets/screenshots/agent-ai-assist.png"
                 alt="AI assist panel with ticket summary and reply drafts"
                 width="992"
@@ -181,7 +185,7 @@
               <figcaption>AI assist — state-only ticket summary and reviewable reply/clarification drafts, self-hosted</figcaption>
             </figure>
             <figure class="shot">
-              <img
+              <img data-shot="agent-ticket-zoom"
                 src="./assets/screenshots/agent-ticket-zoom.png"
                 alt="Ticket zoom view"
                 width="1440"
@@ -191,7 +195,7 @@
               <figcaption>Ticket zoom with permission-aware actions</figcaption>
             </figure>
             <figure class="shot">
-              <img
+              <img data-shot="agent-queues"
                 src="./assets/screenshots/agent-queues.png"
                 alt="Queue view"
                 width="1440"
@@ -201,7 +205,7 @@
               <figcaption>Queue list with filters and bulk actions</figcaption>
             </figure>
             <figure class="shot">
-              <img
+              <img data-shot="agent-stats"
                 src="./assets/screenshots/agent-stats.png"
                 alt="Reporting and SLA"
                 width="1440"
@@ -211,7 +215,7 @@
               <figcaption>Reporting &amp; SLA</figcaption>
             </figure>
             <figure class="shot">
-              <img
+              <img data-shot="agent-search"
                 src="./assets/screenshots/agent-search.png"
                 alt="Ticket search"
                 width="1440"
@@ -221,7 +225,7 @@
               <figcaption>Full-text ticket search</figcaption>
             </figure>
             <figure class="shot">
-              <img
+              <img data-shot="admin-queues"
                 src="./assets/screenshots/admin-queues.png"
                 alt="Admin queues"
                 width="1440"
@@ -231,7 +235,7 @@
               <figcaption>Admin — queues and configuration</figcaption>
             </figure>
             <figure class="shot">
-              <img
+              <img data-shot="admin-gdpr"
                 src="./assets/screenshots/admin-gdpr.png"
                 alt="GDPR tools"
                 width="1440"
@@ -241,7 +245,7 @@
               <figcaption>Privacy / GDPR erasure tooling</figcaption>
             </figure>
             <figure class="shot">
-              <img
+              <img data-shot="portal"
                 src="./assets/screenshots/portal.png"
                 alt="Customer portal"
                 width="1440"
@@ -251,7 +255,7 @@
               <figcaption>Customer portal</figcaption>
             </figure>
             <figure class="shot">
-              <img
+              <img data-shot="agent-kb"
                 src="./assets/screenshots/agent-kb.png"
                 alt="Knowledge base"
                 width="1440"
@@ -341,5 +345,32 @@
         </p>
       </div>
     </footer>
+    <script>
+      // Screenshot gallery light/dark switch: swaps every `[data-shot]` image
+      // between `NAME.png` and `NAME-dark.png`. Defaults to the visitor's OS
+      // theme; no-JS visitors keep the light `src` in the markup.
+      (function () {
+        var imgs = document.querySelectorAll("img[data-shot]");
+        var btns = document.querySelectorAll("[data-theme-btn]");
+        function apply(theme) {
+          imgs.forEach(function (img) {
+            var base = img.getAttribute("data-shot");
+            img.src =
+              "./assets/screenshots/" + base + (theme === "dark" ? "-dark" : "") + ".png";
+          });
+          btns.forEach(function (b) {
+            b.classList.toggle("is-active", b.getAttribute("data-theme-btn") === theme);
+          });
+        }
+        btns.forEach(function (b) {
+          b.addEventListener("click", function () {
+            apply(b.getAttribute("data-theme-btn"));
+          });
+        });
+        var prefersDark =
+          window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
+        apply(prefersDark ? "dark" : "light");
+      })();
+    </script>
   </body>
 </html>

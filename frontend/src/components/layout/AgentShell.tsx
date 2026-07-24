@@ -3,6 +3,7 @@ import { Link, useLocation, useNavigate } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { api, type QueueNode } from "@/lib/api";
+import { logoUrl } from "@/lib/assets";
 import { flattenQueues } from "@/components/agent/QueueTree";
 import { Button } from "@/components/ui/Button";
 import { ShortcutHelp } from "@/components/agent/ShortcutHelp";
@@ -319,7 +320,7 @@ function SidebarBody({ onNavigate }: { onNavigate?: () => void }) {
         className="flex items-center gap-2.5 px-2 pb-4 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent"
         data-testid="agent-brand-link"
       >
-        <img src="/logo.svg" alt="" width={26} height={26} className="rounded-md" />
+        <img src={logoUrl} alt="" width={26} height={26} className="rounded-md" />
         <span className="font-display text-[15px] font-bold tracking-tight text-ink">
           {t("app.name")}
         </span>
@@ -580,7 +581,7 @@ export function AgentShell({ children }: { children: ReactNode }) {
               to="/agent"
               className="flex items-center gap-2 font-display text-[15px] font-bold tracking-tight text-ink"
             >
-              <img src="/logo.svg" alt="" width={20} height={20} className="rounded" />
+              <img src={logoUrl} alt="" width={20} height={20} className="rounded" />
               {t("app.name")}
               <BetaPill />
             </Link>

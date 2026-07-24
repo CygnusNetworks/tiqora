@@ -51,12 +51,14 @@ jobs:
           cp frontend/public/logo.svg frontend/public/logo-wordmark.svg frontend/public/favicon.svg _site/assets/
 
           # Screenshots used by the landing gallery
+          # Both light and dark variants (the landing gallery has a switch).
           for f in \
-            agent-dashboard.png agent-ai-assist.png agent-ticket-zoom.png \
-            agent-queues.png agent-stats.png agent-search.png agent-kb.png \
-            admin-queues.png admin-gdpr.png portal.png
+            agent-dashboard agent-ai-assist agent-ticket-zoom \
+            agent-queues agent-stats agent-search agent-kb \
+            admin-queues admin-gdpr portal
           do
-            cp "docs/images/$f" "_site/assets/screenshots/$f"
+            cp "docs/images/$f.png" "_site/assets/screenshots/$f.png"
+            cp "docs/images/$f-dark.png" "_site/assets/screenshots/$f-dark.png"
           done
 
           # Interactive demo under /demo/

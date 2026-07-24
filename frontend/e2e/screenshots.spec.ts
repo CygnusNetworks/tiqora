@@ -13,6 +13,9 @@ import { mockRich, loginAsAgentRich } from "./fixtures/rich-mock";
 
 const OUT = "../docs/images";
 const THEME = process.env.THEME === "dark" ? "dark" : "light";
+// Dark shots land beside the light ones with a `-dark` suffix so the site can
+// swap between the two (`THEME=dark SCREENSHOTS=1 …` to regenerate them).
+const SUFFIX = THEME === "dark" ? "-dark" : "";
 const LANG = process.env.LANG_UI || "en";
 
 test.skip(!process.env.SCREENSHOTS, "screenshot generator — set SCREENSHOTS=1 to run");
@@ -46,7 +49,7 @@ async function shot(page: Page, route: string, name: string) {
     await page.goto(route, { waitUntil: "domcontentloaded" });
     await page.waitForLoadState("networkidle").catch(() => undefined);
     await page.waitForTimeout(700);
-    await page.screenshot({ path: `${OUT}/${name}.png`, fullPage: false });
+    await page.screenshot({ path: `${OUT}/${name}${SUFFIX}.png`, fullPage: false });
   } catch (err) {
     console.warn(`screenshot "${name}" (${route}) failed:`, err);
   }
@@ -75,7 +78,7 @@ test("agent screenshots", async ({ page }) => {
     await ai.waitFor({ state: "visible", timeout: 5000 });
     await ai.scrollIntoViewIfNeeded();
     await page.waitForTimeout(400);
-    await ai.screenshot({ path: `${OUT}/agent-ai-assist.png` });
+    await ai.screenshot({ path: `${OUT}/agent-ai-assist${SUFFIX}.png` });
   } catch (err) {
     console.warn("screenshot 'agent-ai-assist' failed:", err);
   }
@@ -87,7 +90,7 @@ test("agent screenshots", async ({ page }) => {
     await page.locator('[data-testid="account-menu-trigger"]:visible').first().click();
     await page.getByTestId("account-menu").waitFor({ state: "visible", timeout: 3000 });
     await page.waitForTimeout(400);
-    await page.screenshot({ path: `${OUT}/user-menu.png`, fullPage: false });
+    await page.screenshot({ path: `${OUT}/user-menu${SUFFIX}.png`, fullPage: false });
   } catch {
     /* ignore */
   }
