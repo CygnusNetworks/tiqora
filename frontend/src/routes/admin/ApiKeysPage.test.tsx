@@ -120,7 +120,8 @@ describe("ApiKeysPage", () => {
     await waitFor(() => expect(screen.getByText("CI token")).toBeInTheDocument());
 
     expect(screen.queryByTestId("admin-api-keys-delete-10")).not.toBeInTheDocument();
-    fireEvent.click(screen.getByTestId("admin-row-delete-10"));
+    fireEvent.click(screen.getByTestId("admin-row-menu-trigger-10"));
+    fireEvent.click(await screen.findByTestId("admin-row-delete-10"));
 
     await screen.findByTestId("confirm-dialog");
     fireEvent.click(screen.getByTestId("confirm-dialog-confirm"));
