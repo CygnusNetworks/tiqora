@@ -13,6 +13,7 @@ from tiqora.ai.tools import (
     TOOL_ESCALATE_TO_HUMAN,
     TOOL_PROPOSE_CUSTOMER_MESSAGE,
     McpToolSpec,
+    ToolArgumentError,
     ToolExecutor,
     ToolRegistry,
     UnknownToolError,
@@ -99,6 +100,39 @@ async def test_executor_rejects_mutating_mcp_tool_when_not_full_autonomy() -> No
     )
     with pytest.raises(UnknownToolError):
         await executor.execute(spec.full_name, {})
+
+
+@pytest.mark.asyncio
+async def test_mcp_call_rejects_scoping_id_arguments() -> None:
+    """H2: a prompt-injected model must not retarget an MCP tool at another
+    ticket/customer by passing an id argument — the call fails closed and the
+    MCP server is never contacted."""
+    called: list[dict] = []
+
+    async def _spy_caller(url, token, tool, args):  # noqa: ANN001
+        called.append(args)
+        return {"ok": True}
+
+    spec = _mcp_spec(mutating=False)
+    registry = ToolRegistry(autonomy=AUTONOMY_OFF, mcp_tools=[spec])
+    executor = ToolExecutor(
+        session=None,  # type: ignore[arg-type]
+        sysconfig=None,  # type: ignore[arg-type]
+        registry=registry,
+        ticket_id=1,
+        acting_user_id=1,
+        pii=PiiMapper(),
+        escalation_rules=None,
+        mcp_caller=_spy_caller,
+    )
+    for bad in ({"ticket_id": 999}, {"customerID": "OTHER"}, {"user_id": 5}):
+        with pytest.raises(ToolArgumentError):
+            await executor.execute(spec.full_name, bad)
+    assert called == []  # MCP server never reached
+
+    # A benign, non-identifying argument still goes through.
+    await executor.execute(spec.full_name, {"query": "status"})
+    assert called == [{"query": "status"}]
 
 
 # ---------------------------------------------------------------------------
