@@ -67,10 +67,10 @@ are the code defaults, not necessarily sane production values.
 | Variable | Default | Notes |
 |---|---|---|
 | `TIQORA_SESSION_COOKIE` | `tiqora_session` | Agent session cookie name. |
-| `TIQORA_SESSION_TTL` | `86400` (seconds) | |
+| `TIQORA_SESSION_TTL` | `3600` (seconds = 1h) | **Sliding** TTL: renewed on every authenticated request, so it is effectively the maximum idle time before logout. SSO/Kerberos agents re-authenticate transparently on expiry, so a short value is low-friction for them. Raise for password-only setups if 1h idle logout is too aggressive. |
 | `TIQORA_SESSION_COOKIE_SECURE` | `false` in non-production; **`true` when `TIQORA_ENV=production` and the var is unset** | Override explicitly if needed. Always use Secure cookies behind HTTPS. |
 | `TIQORA_SESSION_COOKIE_SAMESITE` | `lax` | |
-| `TIQORA_CUSTOMER_SESSION_COOKIE` | `tiqora_customer_session` | Separate cookie for the customer portal; reuses the TTL/secure/samesite settings above. |
+| `TIQORA_CUSTOMER_SESSION_COOKIE` | `tiqora_customer_session` | Separate cookie for the customer portal; reuses the same TTL/secure/samesite settings above (so `TIQORA_SESSION_TTL` also governs portal sessions). |
 
 ### Znuny-write poller / indexing
 

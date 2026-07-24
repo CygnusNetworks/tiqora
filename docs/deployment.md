@@ -45,8 +45,10 @@ and never commit real credentials.
 | `TIQORA_SECRET_KEY` | random 32+ bytes | Cookie/session material |
 | `TIQORA_LOG_LEVEL` | `INFO` | |
 | `TIQORA_CORS_ORIGINS` | `https://helpdesk.example.com` | Comma-separated |
+| `TIQORA_SESSION_TTL` | `3600` | Session lifetime in seconds (1h). **Sliding** — renewed on every authenticated request, so effectively the max idle time. SSO/Kerberos agents re-auth transparently on expiry. Also governs customer-portal sessions. |
 | `TIQORA_TOTP_PENDING_TTL` | `300` | Seconds a pending-2FA session stays valid |
 | `TIQORA_TOTP_ISSUER` | `Tiqora` | Shown in authenticator apps |
+| `TIQORA_LLM_TIMEOUT` | `180.0` | Per-request HTTP timeout for one LLM chat completion (seconds). Detailed multi-document summaries can run long; raise if you see `LlmTimeoutError`. |
 | `TIQORA_WEBHOOK_MAX_ATTEMPTS` | `3` | Delivery retries with exponential backoff |
 | `TIQORA_WEBHOOK_TIMEOUT` | `10.0` | Per-attempt HTTP timeout (seconds) |
 
@@ -129,6 +131,17 @@ Manual verification against a real MIT Kerberos KDC:
    `KRB5_KTNAME` unset (gssapi silently fails to find credentials), SPN
    mismatch (the keytab principal must match the hostname the browser sees),
    and agents not flagged `sso_eligible`.
+
+**Seamless re-auth on session expiry.** When an agent's (sliding, 1h) session
+expires, the SPA sends them to `/login?next=<current path>`; if SPNEGO is
+enabled the login page immediately redirects into
+`GET /api/v1/auth/spnego?next=<path>`, which re-runs the Negotiate handshake and
+302s back to the original page. As long as the Kerberos ticket is still valid the
+agent notices nothing. A failed handshake (expired/absent ticket) falls back to
+`/login?sso_error=1` — no bare `401`, so the browser never shows a native
+credential popup. **SSO is the strong factor**: TOTP/passkey 2FA (including
+forced enrollment) is skipped for SSO logins; 2FA enforcement only applies to the
+password login path.
 
 ## LDAP / Active Directory configuration
 
