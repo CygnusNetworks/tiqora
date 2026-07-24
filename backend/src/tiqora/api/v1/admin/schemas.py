@@ -764,10 +764,16 @@ class AclOut(BaseModel):
 
 
 class GenericAgentJobOut(BaseModel):
-    """Grouped by ``job_name`` (key/value rows per Znuny ``generic_agent_jobs``)."""
+    """Grouped by ``job_name`` (key/value rows per Znuny ``generic_agent_jobs``).
+
+    ``settings`` keeps each ``job_key`` mapped to the *list* of its row values:
+    Znuny stores repeated keys (one ``ScheduleDays`` row per weekday, one
+    ``StateIDs`` row per state, …), so collapsing to a single value would drop
+    all but the last — breaking any schedule/criteria decode on the client.
+    """
 
     job_name: str
-    settings: dict[str, str | None]
+    settings: dict[str, list[str]]
 
 
 # ---------------------------------------------------------------------------

@@ -137,7 +137,15 @@ export function AiSettingsPage() {
         <h2 className="font-display text-sm font-semibold text-ink">
           {t("admin.ai.settings.operationMode")}
         </h2>
-        <p className="text-xs text-muted">{t("admin.ai.settings.operationModeHint")}</p>
+        <div
+          className="flex items-start gap-2.5 rounded-lg border border-accent/40 bg-accent/10 p-3 text-sm"
+          data-testid="admin-ai-mode-hint"
+        >
+          <span aria-hidden className="mt-px shrink-0 text-accent">
+            ℹ
+          </span>
+          <span className="text-ink">{t("admin.ai.settings.operationModeHint")}</span>
+        </div>
         <div
           className="inline-flex rounded-lg border border-hairline bg-surface p-0.5"
           role="group"
