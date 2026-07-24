@@ -73,20 +73,43 @@ describe("AiMcpClientsPage", () => {
     listMcpToolPolicies.mockReset();
     updateMcpToolPolicy.mockReset();
 
-    listMcpClients.mockResolvedValue({ items: [sampleClient], total: 1, page: 1, page_size: 1 });
+    listMcpClients.mockResolvedValue({
+      items: [sampleClient],
+      total: 1,
+      page: 1,
+      page_size: 1,
+    });
     listMcpToolPolicies.mockResolvedValue([
-      { id: 1, mcp_client_id: 1, tool_name: "kb_search", enabled: false, mutating: false, description_snapshot: "Search the KB" },
+      {
+        id: 1,
+        mcp_client_id: 1,
+        tool_name: "kb_search",
+        enabled: false,
+        mutating: false,
+        description_snapshot: "Search the KB",
+      },
     ]);
   });
 
-  it("runs discover and renders the resulting tool list", async () => {
-    discoverMcpTools.mockResolvedValue({ tool_names: ["kb_search"], added: ["kb_search"], removed: [] });
+  it("runs discover via the ⋯-menu and renders the resulting tool list", async () => {
+    discoverMcpTools.mockResolvedValue({
+      tool_names: ["kb_search"],
+      added: ["kb_search"],
+      removed: [],
+    });
     renderPage();
-    await waitFor(() => expect(screen.getByTestId("admin-ai-mcp-discover-1")).toBeInTheDocument());
+    await waitFor(() =>
+      expect(
+        screen.getByTestId("admin-ai-mcp-menu-trigger-1"),
+      ).toBeInTheDocument(),
+    );
 
-    fireEvent.click(screen.getByTestId("admin-ai-mcp-discover-1"));
+    fireEvent.click(screen.getByTestId("admin-ai-mcp-menu-trigger-1"));
+    fireEvent.click(await screen.findByTestId("admin-ai-mcp-discover-1"));
     await waitFor(() => {
-      expect(screen.getByTestId("admin-ai-mcp-discover-result-1").textContent).toMatch(/1/);
+      expect(
+        screen.getByTestId("admin-ai-mcp-discover-result-1").textContent,
+      ).toMatch(/1/);
     });
     await waitFor(() => {
       expect(screen.getByTestId("admin-ai-mcp-tools-1")).toBeInTheDocument();
@@ -104,25 +127,38 @@ describe("AiMcpClientsPage", () => {
       description_snapshot: "Search the KB",
     });
     renderPage();
-    await waitFor(() => expect(screen.getByTestId("admin-ai-mcp-toggle-1")).toBeInTheDocument());
+    await waitFor(() =>
+      expect(screen.getByTestId("admin-ai-mcp-toggle-1")).toBeInTheDocument(),
+    );
     fireEvent.click(screen.getByTestId("admin-ai-mcp-toggle-1"));
 
     await waitFor(() => {
-      expect(screen.getByTestId("admin-ai-mcp-tool-enabled-1-kb_search")).toBeInTheDocument();
+      expect(
+        screen.getByTestId("admin-ai-mcp-tool-enabled-1-kb_search"),
+      ).toBeInTheDocument();
     });
-    fireEvent.click(screen.getByTestId("admin-ai-mcp-tool-enabled-1-kb_search"));
+    fireEvent.click(
+      screen.getByTestId("admin-ai-mcp-tool-enabled-1-kb_search"),
+    );
 
     await waitFor(() => {
-      expect(updateMcpToolPolicy).toHaveBeenCalledWith(1, "kb_search", { enabled: true });
+      expect(updateMcpToolPolicy).toHaveBeenCalledWith(1, "kb_search", {
+        enabled: true,
+      });
     });
   });
 
-  it("deletes a client only after confirming in the ConfirmDialog", async () => {
+  it("deletes a client via the ⋯-menu only after confirming", async () => {
     deleteMcpClient.mockResolvedValue(undefined);
     renderPage();
-    await waitFor(() => expect(screen.getByTestId("admin-ai-mcp-delete-1")).toBeInTheDocument());
+    await waitFor(() =>
+      expect(
+        screen.getByTestId("admin-ai-mcp-menu-trigger-1"),
+      ).toBeInTheDocument(),
+    );
 
-    fireEvent.click(screen.getByTestId("admin-ai-mcp-delete-1"));
+    fireEvent.click(screen.getByTestId("admin-ai-mcp-menu-trigger-1"));
+    fireEvent.click(await screen.findByTestId("admin-ai-mcp-delete-1"));
     await screen.findByTestId("confirm-dialog");
     expect(deleteMcpClient).not.toHaveBeenCalled();
 
@@ -131,12 +167,20 @@ describe("AiMcpClientsPage", () => {
   });
 
   it("creates a client via the drawer", async () => {
-    createMcpClient.mockResolvedValue({ ...sampleClient, id: 2, name: "New client" });
+    createMcpClient.mockResolvedValue({
+      ...sampleClient,
+      id: 2,
+      name: "New client",
+    });
     renderPage();
-    await waitFor(() => expect(screen.getByTestId("admin-ai-mcp-new")).toBeInTheDocument());
+    await waitFor(() =>
+      expect(screen.getByTestId("admin-ai-mcp-new")).toBeInTheDocument(),
+    );
 
     fireEvent.click(screen.getByTestId("admin-ai-mcp-new"));
-    fireEvent.change(screen.getByTestId("admin-ai-mcp-form-name"), { target: { value: "New client" } });
+    fireEvent.change(screen.getByTestId("admin-ai-mcp-form-name"), {
+      target: { value: "New client" },
+    });
     fireEvent.change(screen.getByTestId("admin-ai-mcp-form-url"), {
       target: { value: "https://example.com/mcp" },
     });
@@ -144,7 +188,10 @@ describe("AiMcpClientsPage", () => {
 
     await waitFor(() => {
       expect(createMcpClient).toHaveBeenCalledWith(
-        expect.objectContaining({ name: "New client", url: "https://example.com/mcp" }),
+        expect.objectContaining({
+          name: "New client",
+          url: "https://example.com/mcp",
+        }),
       );
     });
   });

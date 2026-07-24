@@ -717,7 +717,8 @@
         "toolsLoading": "Tools werden geladen…",
         "noTools": "Noch keine Tools entdeckt.",
         "mutating": "Mutierend",
-        "enabled": "Aktiv"
+        "enabled": "Aktiv",
+        "mutatingGateHint": "Wird der KI nur im Autonomie-Modus „Voll“ angeboten."
       },
       "queues": {
         "title": "Queue-KI-Policies",

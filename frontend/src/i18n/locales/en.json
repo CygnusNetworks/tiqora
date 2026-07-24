@@ -717,7 +717,8 @@
         "toolsLoading": "Loading tools…",
         "noTools": "No tools discovered yet.",
         "mutating": "Mutating",
-        "enabled": "Enabled"
+        "enabled": "Enabled",
+        "mutatingGateHint": "Only offered to the AI in “full” autonomy mode."
       },
       "queues": {
         "title": "Queue AI policies",

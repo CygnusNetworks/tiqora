@@ -9,14 +9,61 @@ import {
   type McpClientUpdate,
   type McpDiscoverOut,
 } from "@/lib/aiApi";
-import { CrudDrawer, type FieldDef, type FieldValues } from "@/components/admin/CrudDrawer";
+import {
+  CrudDrawer,
+  type FieldDef,
+  type FieldValues,
+} from "@/components/admin/CrudDrawer";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import { Spinner } from "@/components/ui/Spinner";
+import { Menu, MenuItem, MenuSeparator } from "@/components/ui/Menu";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
 import { PlusIcon, ChevronDownIcon } from "@/components/ui/icons";
 import { formatDateTime } from "@/lib/format";
 import { cn } from "@/lib/cn";
+
+/** Small on/off switch — replaces the bare checkboxes in the tool list.
+ * `warn` renders the on-state amber (the mutating flag is a caution, not a
+ * feature). Click semantics match the old checkbox: fires with the new value. */
+function ToolSwitch({
+  checked,
+  onChange,
+  label,
+  warn,
+  testId,
+}: {
+  checked: boolean;
+  onChange: (next: boolean) => void;
+  label: string;
+  warn?: boolean;
+  testId: string;
+}) {
+  return (
+    <span className="flex items-center gap-1.5 text-xs text-muted">
+      {label}
+      <button
+        type="button"
+        role="switch"
+        aria-checked={checked}
+        aria-label={label}
+        data-testid={testId}
+        onClick={() => onChange(!checked)}
+        className={cn(
+          "relative h-[17px] w-[30px] shrink-0 rounded-full transition-colors",
+          checked ? (warn ? "bg-amber" : "bg-green") : "bg-hairline",
+        )}
+      >
+        <span
+          className={cn(
+            "absolute top-0.5 h-[13px] w-[13px] rounded-full bg-surface shadow transition-all",
+            checked ? "left-[15px]" : "left-0.5",
+          )}
+        />
+      </button>
+    </span>
+  );
+}
 
 const QUERY_KEY = ["admin", "ai", "mcp-clients"] as const;
 
@@ -57,45 +104,58 @@ function ClientTools({ clientId }: { clientId: number }) {
 
   const tools = toolsQ.data ?? [];
   if (tools.length === 0) {
-    return <p className="p-2 text-xs text-muted">{t("admin.ai.mcp.noTools")}</p>;
+    return (
+      <p className="p-2 text-xs text-muted">{t("admin.ai.mcp.noTools")}</p>
+    );
   }
 
   return (
-    <ul className="divide-y divide-hairline" data-testid={`admin-ai-mcp-tools-${clientId}`}>
+    <ul
+      className="divide-y divide-hairline"
+      data-testid={`admin-ai-mcp-tools-${clientId}`}
+    >
       {tools.map((tool) => (
-        <li key={tool.id} className="flex flex-wrap items-center justify-between gap-2 px-2 py-2">
-          <div className="min-w-0">
-            <p className="font-mono text-xs text-ink">{tool.tool_name}</p>
-            {tool.description_snapshot && (
-              <p className="max-w-md truncate text-xs text-muted">{tool.description_snapshot}</p>
-            )}
-          </div>
-          <div className="flex items-center gap-3">
-            <label className="flex items-center gap-1.5 text-xs text-muted">
-              <input
-                type="checkbox"
-                data-testid={`admin-ai-mcp-tool-mutating-${clientId}-${tool.tool_name}`}
+        <li key={tool.id} className="px-3 py-2 pl-8">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="min-w-0">
+              <p className="font-mono text-xs text-ink">{tool.tool_name}</p>
+              {tool.description_snapshot && (
+                <p className="max-w-md truncate text-xs text-muted">
+                  {tool.description_snapshot}
+                </p>
+              )}
+            </div>
+            <div className="flex items-center gap-4">
+              <ToolSwitch
                 checked={tool.mutating}
-                onChange={(e) =>
-                  toggleM.mutate({ toolName: tool.tool_name, patch: { mutating: e.target.checked } })
+                warn
+                label={t("admin.ai.mcp.mutating")}
+                testId={`admin-ai-mcp-tool-mutating-${clientId}-${tool.tool_name}`}
+                onChange={(next) =>
+                  toggleM.mutate({
+                    toolName: tool.tool_name,
+                    patch: { mutating: next },
+                  })
                 }
-                className="rounded border-hairline"
               />
-              {t("admin.ai.mcp.mutating")}
-            </label>
-            <label className="flex items-center gap-1.5 text-xs text-ink">
-              <input
-                type="checkbox"
-                data-testid={`admin-ai-mcp-tool-enabled-${clientId}-${tool.tool_name}`}
+              <ToolSwitch
                 checked={tool.enabled}
-                onChange={(e) =>
-                  toggleM.mutate({ toolName: tool.tool_name, patch: { enabled: e.target.checked } })
+                label={t("admin.ai.mcp.enabled")}
+                testId={`admin-ai-mcp-tool-enabled-${clientId}-${tool.tool_name}`}
+                onChange={(next) =>
+                  toggleM.mutate({
+                    toolName: tool.tool_name,
+                    patch: { enabled: next },
+                  })
                 }
-                className="rounded border-hairline"
               />
-              {t("admin.ai.mcp.enabled")}
-            </label>
+            </div>
           </div>
+          {tool.mutating && tool.enabled && (
+            <p className="mt-1 text-xs text-amber">
+              {t("admin.ai.mcp.mutatingGateHint")}
+            </p>
+          )}
         </li>
       ))}
     </ul>
@@ -112,7 +172,9 @@ export function AiMcpClientsPage() {
   const [editing, setEditing] = useState<McpClientOut | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
   const [expanded, setExpanded] = useState<Set<number>>(new Set());
-  const [discoverResult, setDiscoverResult] = useState<Record<number, McpDiscoverOut | string>>({});
+  const [discoverResult, setDiscoverResult] = useState<
+    Record<number, McpDiscoverOut | string>
+  >({});
   const [discoveringId, setDiscoveringId] = useState<number | null>(null);
 
   const listQ = useQuery({
@@ -150,7 +212,9 @@ export function AiMcpClientsPage() {
     onSuccess: async (result, id) => {
       setDiscoverResult((r) => ({ ...r, [id]: result }));
       setExpanded((s) => new Set(s).add(id));
-      await qc.invalidateQueries({ queryKey: ["admin", "ai", "mcp-clients", id, "tools"] });
+      await qc.invalidateQueries({
+        queryKey: ["admin", "ai", "mcp-clients", id, "tools"],
+      });
       await invalidate();
     },
     onError: (err, id) =>
@@ -174,8 +238,12 @@ export function AiMcpClientsPage() {
 
   const handleSubmit = async (values: FieldValues) => {
     setFormError(null);
-    const base = { name: String(values.name ?? ""), url: String(values.url ?? "") };
-    const token = typeof values.auth_token === "string" ? values.auth_token.trim() : "";
+    const base = {
+      name: String(values.name ?? ""),
+      url: String(values.url ?? ""),
+    };
+    const token =
+      typeof values.auth_token === "string" ? values.auth_token.trim() : "";
     try {
       if (editing) {
         const body: McpClientUpdate = { ...base };
@@ -185,13 +253,20 @@ export function AiMcpClientsPage() {
         await createM.mutateAsync({ ...base, auth_token: token || null });
       }
     } catch (err) {
-      setFormError(err instanceof ApiError ? err.message : t("admin.form.genericError"));
+      setFormError(
+        err instanceof ApiError ? err.message : t("admin.form.genericError"),
+      );
       throw err;
     }
   };
 
   const fields: FieldDef[] = [
-    { name: "name", label: t("admin.ai.mcp.name"), type: "text", required: true },
+    {
+      name: "name",
+      label: t("admin.ai.mcp.name"),
+      type: "text",
+      required: true,
+    },
     { name: "url", label: t("admin.ai.mcp.url"), type: "text", required: true },
     {
       name: "auth_token",
@@ -208,7 +283,9 @@ export function AiMcpClientsPage() {
   return (
     <div className="space-y-3 p-4" data-testid="admin-ai-mcp-page">
       <div className="flex items-center justify-between gap-3">
-        <h1 className="font-display text-xl font-semibold text-ink">{t("admin.ai.mcp.title")}</h1>
+        <h1 className="font-display text-xl font-semibold text-ink">
+          {t("admin.ai.mcp.title")}
+        </h1>
         <Button
           variant="primary"
           size="sm"
@@ -254,57 +331,107 @@ export function AiMcpClientsPage() {
                       })
                     }
                   >
-                    <ChevronDownIcon className={cn("shrink-0 transition-transform", isOpen && "rotate-180")} />
+                    <ChevronDownIcon
+                      className={cn(
+                        "shrink-0 transition-transform",
+                        isOpen && "rotate-180",
+                      )}
+                    />
+                    <span
+                      className={cn(
+                        "h-1.5 w-1.5 shrink-0 rounded-full",
+                        c.valid_id === 1 ? "bg-green" : "bg-muted",
+                      )}
+                      title={
+                        c.valid_id === 1
+                          ? t("admin.table.valid")
+                          : t("admin.table.invalid")
+                      }
+                    />
                     <div className="min-w-0">
-                      <p className="truncate font-medium text-ink">{c.name}</p>
-                      <p className="truncate font-mono text-xs text-muted">{c.url}</p>
+                      <p className="flex items-center gap-2 truncate font-medium text-ink">
+                        {c.name}
+                        {c.has_auth_token && (
+                          <Badge tone="muted">
+                            {t("admin.ai.mcp.hasToken")}
+                          </Badge>
+                        )}
+                      </p>
+                      <p className="truncate font-mono text-xs text-muted">
+                        {c.url}
+                      </p>
                     </div>
                   </button>
-                  <div className="flex flex-wrap items-center gap-2 text-xs text-muted">
-                    {c.valid_id !== 1 && <Badge tone="muted">{t("admin.table.invalid")}</Badge>}
-                    {c.has_auth_token && <Badge tone="muted">{t("admin.ai.mcp.hasToken")}</Badge>}
-                    <span data-testid={`admin-ai-mcp-last-discovered-${c.id}`}>
+                  <div className="flex items-center gap-2 text-xs text-muted">
+                    <span
+                      className="whitespace-nowrap"
+                      data-testid={`admin-ai-mcp-last-discovered-${c.id}`}
+                    >
                       {c.last_discovered_at
                         ? t("admin.ai.mcp.lastDiscovered", {
                             date: formatDateTime(c.last_discovered_at, locale),
                           })
                         : t("admin.ai.mcp.neverDiscovered")}
                     </span>
-                    <Button
-                      size="sm"
-                      variant="secondary"
-                      disabled={discoveringId === c.id}
-                      data-testid={`admin-ai-mcp-discover-${c.id}`}
-                      onClick={() => discoverM.mutate(c.id)}
-                    >
-                      {discoveringId === c.id ? (
-                        <Spinner className="h-3 w-3" />
-                      ) : (
-                        t("admin.ai.mcp.discover")
+                    <Menu
+                      panelTestId={`admin-ai-mcp-menu-${c.id}`}
+                      trigger={({ ref, toggleProps }) => (
+                        <button
+                          type="button"
+                          ref={ref}
+                          {...toggleProps}
+                          data-testid={`admin-ai-mcp-menu-trigger-${c.id}`}
+                          title={t("admin.table.actions")}
+                          className="rounded-md px-1.5 py-1 text-sm leading-none text-muted transition-colors hover:bg-surface-subtle hover:text-ink"
+                        >
+                          ⋯
+                        </button>
                       )}
-                    </Button>
-                    <Button size="sm" variant="secondary" onClick={() => openEdit(c)}>
-                      {t("admin.table.edit")}
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="danger"
-                      data-testid={`admin-ai-mcp-delete-${c.id}`}
-                      onClick={async () => {
-                        const ok = await confirm({
-                          title: t("admin.ai.mcp.title"),
-                          message: t("admin.ai.mcp.deleteConfirm", { name: c.name }),
-                          variant: "danger",
-                        });
-                        if (ok) deleteM.mutate(c.id);
-                      }}
                     >
-                      {t("admin.table.delete")}
-                    </Button>
+                      <MenuItem
+                        testId={`admin-ai-mcp-edit-${c.id}`}
+                        onSelect={() => openEdit(c)}
+                      >
+                        {t("admin.table.edit")}
+                      </MenuItem>
+                      <MenuItem
+                        testId={`admin-ai-mcp-discover-${c.id}`}
+                        onSelect={() => discoverM.mutate(c.id)}
+                      >
+                        {t("admin.ai.mcp.discover")}
+                      </MenuItem>
+                      <MenuSeparator />
+                      <MenuItem
+                        danger
+                        testId={`admin-ai-mcp-delete-${c.id}`}
+                        onSelect={() =>
+                          void (async () => {
+                            const ok = await confirm({
+                              title: t("admin.ai.mcp.title"),
+                              message: t("admin.ai.mcp.deleteConfirm", {
+                                name: c.name,
+                              }),
+                              variant: "danger",
+                            });
+                            if (ok) deleteM.mutate(c.id);
+                          })()
+                        }
+                      >
+                        {t("admin.table.delete")}
+                      </MenuItem>
+                    </Menu>
                   </div>
                 </div>
+                {discoveringId === c.id && (
+                  <div className="flex items-center gap-2 border-t border-dashed border-hairline px-3 py-1.5 text-xs text-muted">
+                    <Spinner className="h-3 w-3" /> {t("admin.ai.mcp.discover")}
+                    …
+                  </div>
+                )}
                 {typeof result === "string" && (
-                  <p className="border-t border-hairline px-3 py-1.5 text-xs text-danger">{result}</p>
+                  <p className="border-t border-hairline px-3 py-1.5 text-xs text-danger">
+                    {result}
+                  </p>
                 )}
                 {result && typeof result !== "string" && (
                   <p
@@ -333,7 +460,9 @@ export function AiMcpClientsPage() {
         open={drawerOpen}
         onClose={() => setDrawerOpen(false)}
         title={
-          editing ? t("admin.form.editTitle", { title: t("admin.ai.mcp.title") }) : t("admin.ai.mcp.new")
+          editing
+            ? t("admin.form.editTitle", { title: t("admin.ai.mcp.title") })
+            : t("admin.ai.mcp.new")
         }
         fields={fields}
         mode={editing ? "edit" : "create"}
