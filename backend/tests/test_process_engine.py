@@ -15,15 +15,47 @@ Follows the same ``mariadb_znuny_url`` fixture / ``_seed_tiqora_tables`` /
 from __future__ import annotations
 
 import contextlib
+from collections.abc import AsyncIterator
 from dataclasses import dataclass
 from typing import Any
 
 import pytest
 from sqlalchemy import text
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+from sqlalchemy.ext.asyncio import (
+    AsyncEngine,
+    AsyncSession,
+    async_sessionmaker,
+    create_async_engine,
+)
 
 from tiqora.domain.ticket_write_service import TicketIn, create_ticket
-from tiqora.process.engine import start_process, submit_activity_dialog
+from tiqora.process.config import (
+    ActivityDialogConfig,
+    ActivityDialogFieldConfig,
+    TransitionActionConfig,
+)
+from tiqora.process.engine import (
+    _action_ticket_article_create,
+    _action_ticket_lock_set,
+    _action_ticket_owner_set,
+    _action_ticket_priority_set,
+    _action_ticket_queue_set,
+    _action_ticket_responsible_set,
+    _action_ticket_state_set,
+    _action_ticket_title_set,
+    _apply_dialog_field_changes,
+    execute_transition_action,
+    start_process,
+    submit_activity_dialog,
+)
+from tiqora.process.exceptions import (
+    ActivityDialogNotAvailable,
+    ActivityDialogNotFound,
+    ProcessPermissionDenied,
+    RequiredFieldMissing,
+    TicketNotInProcess,
+    UnresolvedFieldValue,
+)
 from tiqora.process.ticket_state import get_ticket_process_state
 from tiqora.znuny.sysconfig import SysConfig
 
@@ -179,7 +211,7 @@ async def test_start_process_and_submit_activity_dialog_advances_activity(
     mariadb_znuny_url: str,
 ) -> None:
     url = _mysql_async(mariadb_znuny_url)
-    engine = create_async_engine(url)
+    engine = _track_engine(create_async_engine(url))
     factory = async_sessionmaker(engine, expire_on_commit=False)
     sysconfig = _make_sysconfig()
 
@@ -400,7 +432,7 @@ async def test_transition_with_matching_condition_advances_and_applies_action(
     the ticket advances to the target activity.
     """
     url = _mysql_async(mariadb_znuny_url)
-    engine = create_async_engine(url)
+    engine = _track_engine(create_async_engine(url))
     factory = async_sessionmaker(engine, expire_on_commit=False)
     sysconfig = _make_sysconfig()
 
@@ -459,7 +491,7 @@ async def test_transition_with_non_matching_condition_stays_on_same_activity(
     and no transition is reported as matched.
     """
     url = _mysql_async(mariadb_znuny_url)
-    engine = create_async_engine(url)
+    engine = _track_engine(create_async_engine(url))
     factory = async_sessionmaker(engine, expire_on_commit=False)
     sysconfig = _make_sysconfig()
 
@@ -639,7 +671,7 @@ async def test_unsupported_transition_action_module_is_skipped_and_reported(
     unsupported action does not abort the whole submission).
     """
     url = _mysql_async(mariadb_znuny_url)
-    engine = create_async_engine(url)
+    engine = _track_engine(create_async_engine(url))
     factory = async_sessionmaker(engine, expire_on_commit=False)
     sysconfig = _make_sysconfig()
 
@@ -671,3 +703,641 @@ async def test_unsupported_transition_action_module_is_skipped_and_reported(
     assert result.activity_changed is True
     assert result.new_activity_entity_id == UNSUP_ACTIVITY_B
     assert result.unsupported_actions == ["TicketSLASet"]
+
+
+# ---------------------------------------------------------------------------
+# _action_ticket_*_set executors: error/edge branches (unresolvable
+# name/id, missing required Config key) — not just the happy path.
+# ---------------------------------------------------------------------------
+
+
+# Async engines own a connection pool; created and left undisposed they leak
+# idle DB connections against the shared testcontainer for the life of the
+# process. Each test registers its engine(s) here and the autouse fixture
+# below disposes them at teardown — inside the test's own event loop, so a
+# module-scoped shared engine (which would straddle the function-scoped
+# asyncio loops) is deliberately avoided.
+_ENGINES_TO_DISPOSE: list[AsyncEngine] = []
+
+
+def _track_engine(engine: AsyncEngine) -> AsyncEngine:
+    _ENGINES_TO_DISPOSE.append(engine)
+    return engine
+
+
+@pytest.fixture(autouse=True)
+async def _dispose_test_engines() -> AsyncIterator[None]:
+    yield
+    while _ENGINES_TO_DISPOSE:
+        await _ENGINES_TO_DISPOSE.pop().dispose()
+
+
+def _make_sysconfig_and_factory(url: str) -> tuple[async_sessionmaker[AsyncSession], SysConfig]:
+    engine = _track_engine(create_async_engine(_mysql_async(url)))
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    return factory, _make_sysconfig()
+
+
+@pytest.mark.db
+async def test_action_ticket_state_set_unknown_state_name_raises(mariadb_znuny_url: str) -> None:
+    factory, sysconfig = _make_sysconfig_and_factory(mariadb_znuny_url)
+    async with factory() as session:
+        await _seed_tiqora_tables(session)
+    ticket_id = await _make_ticket(factory, sysconfig)
+
+    async with factory() as session, session.begin():
+        with pytest.raises(RequiredFieldMissing):
+            await _action_ticket_state_set(
+                session, {"State": "no-such-state-xyz"}, ticket_id, 1, sysconfig
+            )
+
+
+@pytest.mark.db
+async def test_action_ticket_state_set_missing_config_raises(mariadb_znuny_url: str) -> None:
+    factory, sysconfig = _make_sysconfig_and_factory(mariadb_znuny_url)
+    async with factory() as session:
+        await _seed_tiqora_tables(session)
+    ticket_id = await _make_ticket(factory, sysconfig)
+
+    async with factory() as session, session.begin():
+        with pytest.raises(RequiredFieldMissing):
+            await _action_ticket_state_set(session, {}, ticket_id, 1, sysconfig)
+
+
+@pytest.mark.db
+async def test_action_ticket_queue_set_unknown_queue_raises(mariadb_znuny_url: str) -> None:
+    factory, sysconfig = _make_sysconfig_and_factory(mariadb_znuny_url)
+    async with factory() as session:
+        await _seed_tiqora_tables(session)
+    ticket_id = await _make_ticket(factory, sysconfig)
+
+    async with factory() as session, session.begin():
+        with pytest.raises(RequiredFieldMissing):
+            await _action_ticket_queue_set(
+                session, {"Queue": "no-such-queue-xyz"}, ticket_id, 1, sysconfig
+            )
+
+
+@pytest.mark.db
+async def test_action_ticket_owner_set_unknown_owner_raises(mariadb_znuny_url: str) -> None:
+    factory, sysconfig = _make_sysconfig_and_factory(mariadb_znuny_url)
+    async with factory() as session:
+        await _seed_tiqora_tables(session)
+    ticket_id = await _make_ticket(factory, sysconfig)
+
+    async with factory() as session, session.begin():
+        with pytest.raises(RequiredFieldMissing):
+            await _action_ticket_owner_set(
+                session, {"Owner": "no-such-user-xyz"}, ticket_id, 1, sysconfig
+            )
+
+
+@pytest.mark.db
+async def test_action_ticket_priority_set_unknown_priority_raises(mariadb_znuny_url: str) -> None:
+    factory, sysconfig = _make_sysconfig_and_factory(mariadb_znuny_url)
+    async with factory() as session:
+        await _seed_tiqora_tables(session)
+    ticket_id = await _make_ticket(factory, sysconfig)
+
+    async with factory() as session, session.begin():
+        with pytest.raises(RequiredFieldMissing):
+            await _action_ticket_priority_set(
+                session, {"Priority": "no-such-priority-xyz"}, ticket_id, 1, sysconfig
+            )
+
+
+@pytest.mark.db
+async def test_action_ticket_title_set_missing_title_raises(mariadb_znuny_url: str) -> None:
+    factory, sysconfig = _make_sysconfig_and_factory(mariadb_znuny_url)
+    async with factory() as session:
+        await _seed_tiqora_tables(session)
+    ticket_id = await _make_ticket(factory, sysconfig)
+
+    async with factory() as session, session.begin():
+        with pytest.raises(RequiredFieldMissing):
+            await _action_ticket_title_set(session, {}, ticket_id, 1, sysconfig)
+
+
+@pytest.mark.db
+async def test_action_ticket_title_set_empty_title_raises(mariadb_znuny_url: str) -> None:
+    factory, sysconfig = _make_sysconfig_and_factory(mariadb_znuny_url)
+    async with factory() as session:
+        await _seed_tiqora_tables(session)
+    ticket_id = await _make_ticket(factory, sysconfig)
+
+    async with factory() as session, session.begin():
+        with pytest.raises(RequiredFieldMissing):
+            await _action_ticket_title_set(session, {"Title": ""}, ticket_id, 1, sysconfig)
+
+
+@pytest.mark.db
+async def test_action_ticket_responsible_set_unknown_responsible_raises(
+    mariadb_znuny_url: str,
+) -> None:
+    factory, sysconfig = _make_sysconfig_and_factory(mariadb_znuny_url)
+    async with factory() as session:
+        await _seed_tiqora_tables(session)
+    ticket_id = await _make_ticket(factory, sysconfig)
+
+    async with factory() as session, session.begin():
+        with pytest.raises(RequiredFieldMissing):
+            await _action_ticket_responsible_set(
+                session, {"Responsible": "no-such-user-xyz"}, ticket_id, 1, sysconfig
+            )
+
+
+@pytest.mark.db
+async def test_action_ticket_lock_set_missing_config_raises(mariadb_znuny_url: str) -> None:
+    factory, sysconfig = _make_sysconfig_and_factory(mariadb_znuny_url)
+    async with factory() as session:
+        await _seed_tiqora_tables(session)
+    ticket_id = await _make_ticket(factory, sysconfig)
+
+    async with factory() as session, session.begin():
+        with pytest.raises(RequiredFieldMissing):
+            await _action_ticket_lock_set(session, {}, ticket_id, 1, sysconfig)
+
+
+@pytest.mark.db
+async def test_action_ticket_lock_set_lock_id_resolves_lock_convention(
+    mariadb_znuny_url: str,
+) -> None:
+    """LockID=2 (Znuny convention) means "lock", not "unlock" — exercises the
+    ``LockID`` numeric branch instead of the ``Lock`` string branch already
+    covered by the happy-path DB test above.
+    """
+    factory, sysconfig = _make_sysconfig_and_factory(mariadb_znuny_url)
+    async with factory() as session:
+        await _seed_tiqora_tables(session)
+    ticket_id = await _make_ticket(factory, sysconfig)
+
+    async with factory() as session, session.begin():
+        await _action_ticket_lock_set(session, {"LockID": 2}, ticket_id, 1, sysconfig)
+
+    async with factory() as session:
+        lock_id = (
+            await session.execute(
+                text("SELECT ticket_lock_id FROM ticket WHERE id = :tid"), {"tid": ticket_id}
+            )
+        ).scalar_one()
+        assert lock_id == 2
+
+
+@pytest.mark.db
+async def test_action_ticket_article_create_missing_sender_type_raises(
+    mariadb_znuny_url: str,
+) -> None:
+    factory, sysconfig = _make_sysconfig_and_factory(mariadb_znuny_url)
+    async with factory() as session:
+        await _seed_tiqora_tables(session)
+    ticket_id = await _make_ticket(factory, sysconfig)
+
+    async with factory() as session, session.begin():
+        with pytest.raises(RequiredFieldMissing):
+            await _action_ticket_article_create(session, {"Body": "hello"}, ticket_id, 1, sysconfig)
+
+
+@pytest.mark.db
+async def test_execute_transition_action_propagates_required_field_missing(
+    mariadb_znuny_url: str,
+) -> None:
+    """``execute_transition_action`` dispatch (not just the handler directly)
+    lets a handler's RequiredFieldMissing propagate to the caller.
+    """
+    factory, sysconfig = _make_sysconfig_and_factory(mariadb_znuny_url)
+    async with factory() as session:
+        await _seed_tiqora_tables(session)
+    ticket_id = await _make_ticket(factory, sysconfig)
+
+    action = TransitionActionConfig(
+        module="Kernel::System::ProcessManagement::TransitionAction::TicketStateSet",
+        config={},
+    )
+    async with factory() as session, session.begin():
+        with pytest.raises(RequiredFieldMissing):
+            await execute_transition_action(
+                session,
+                action=action,
+                ticket_id=ticket_id,
+                process_entity_id="Process-irrelevant",
+                activity_entity_id="Activity-irrelevant",
+                transition_entity_id="Transition-irrelevant",
+                user_id=1,
+                sysconfig=sysconfig,
+            )
+
+
+# ---------------------------------------------------------------------------
+# _apply_dialog_field_changes: called directly (no process needed) to
+# exercise the Article-bundle and DynamicField_ branches.
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.db
+async def test_apply_dialog_field_changes_creates_article_when_present(
+    mariadb_znuny_url: str,
+) -> None:
+    factory, sysconfig = _make_sysconfig_and_factory(mariadb_znuny_url)
+    async with factory() as session:
+        await _seed_tiqora_tables(session)
+    ticket_id = await _make_ticket(factory, sysconfig)
+
+    dialog_config = ActivityDialogConfig(
+        fields={"Article": ActivityDialogFieldConfig(config={"CommunicationChannel": "Internal"})}
+    )
+
+    async with factory() as session, session.begin():
+        await _apply_dialog_field_changes(
+            session,
+            dialog_config=dialog_config,
+            field_values={"Subject": "Edge case subject", "Body": "Edge case body"},
+            ticket_id=ticket_id,
+            user_id=1,
+            sysconfig=sysconfig,
+        )
+
+    async with factory() as session:
+        subjects = (
+            (
+                await session.execute(
+                    text(
+                        "SELECT a_subject FROM article_data_mime adm"
+                        " JOIN article a ON a.id = adm.article_id WHERE a.ticket_id = :tid"
+                    ),
+                    {"tid": ticket_id},
+                )
+            )
+            .scalars()
+            .all()
+        )
+        assert "Edge case subject" in subjects
+
+
+@pytest.mark.db
+async def test_apply_dialog_field_changes_applies_dynamic_field(mariadb_znuny_url: str) -> None:
+    factory, sysconfig = _make_sysconfig_and_factory(mariadb_znuny_url)
+    async with factory() as session:
+        await _seed_tiqora_tables(session)
+        await session.execute(
+            text(
+                "INSERT INTO dynamic_field (id, internal_field, name, label, field_order,"
+                " field_type, object_type, valid_id, create_time, create_by, change_time,"
+                " change_by) VALUES (9101, 0, 'TiqoraEngineEdgeField', 'Edge Field', 500,"
+                " 'Text', 'Ticket', 1, current_timestamp, 1, current_timestamp, 1)"
+            )
+        )
+        await session.commit()
+    ticket_id = await _make_ticket(factory, sysconfig)
+
+    dialog_config = ActivityDialogConfig()
+
+    async with factory() as session, session.begin():
+        await _apply_dialog_field_changes(
+            session,
+            dialog_config=dialog_config,
+            field_values={"DynamicField_TiqoraEngineEdgeField": "edge-value"},
+            ticket_id=ticket_id,
+            user_id=1,
+            sysconfig=sysconfig,
+        )
+
+    async with factory() as session:
+        value = (
+            await session.execute(
+                text("SELECT value_text FROM dynamic_field_value WHERE field_id = 9101")
+            )
+        ).scalar_one()
+        assert value == "edge-value"
+
+
+@pytest.mark.db
+async def test_apply_dialog_field_changes_unresolvable_queue_raises(
+    mariadb_znuny_url: str,
+) -> None:
+    """A dialog field value that names a queue which doesn't resolve to any
+    known Queue now raises ``UnresolvedFieldValue`` instead of being
+    silently ignored (fixed — previously the ticket's queue was left
+    unchanged with no error surfaced to the caller)."""
+    factory, sysconfig = _make_sysconfig_and_factory(mariadb_znuny_url)
+    async with factory() as session:
+        await _seed_tiqora_tables(session)
+    ticket_id = await _make_ticket(factory, sysconfig)
+
+    async with factory() as session:
+        before_queue_id = (
+            await session.execute(
+                text("SELECT queue_id FROM ticket WHERE id = :tid"), {"tid": ticket_id}
+            )
+        ).scalar_one()
+
+    dialog_config = ActivityDialogConfig()
+    async with factory() as session, session.begin():
+        with pytest.raises(UnresolvedFieldValue, match="Queue"):
+            await _apply_dialog_field_changes(
+                session,
+                dialog_config=dialog_config,
+                field_values={"Queue": "no-such-queue-xyz"},
+                ticket_id=ticket_id,
+                user_id=1,
+                sysconfig=sysconfig,
+            )
+
+    async with factory() as session:
+        after_queue_id = (
+            await session.execute(
+                text("SELECT queue_id FROM ticket WHERE id = :tid"), {"tid": ticket_id}
+            )
+        ).scalar_one()
+        assert after_queue_id == before_queue_id
+
+
+@pytest.mark.db
+async def test_apply_dialog_field_changes_skips_blank_optional_fields(
+    mariadb_znuny_url: str,
+) -> None:
+    """A blank ("") value for an optional Queue/State/Priority/Owner/Responsible
+    field is skipped, not treated as unresolvable. The frontend seeds every
+    declared field with "" and submits them unfiltered, so a dialog whose
+    optional fields the agent left empty must still submit (regression: this
+    used to raise ``UnresolvedFieldValue`` -> HTTP 400 on every such submit)."""
+    factory, sysconfig = _make_sysconfig_and_factory(mariadb_znuny_url)
+    async with factory() as session:
+        await _seed_tiqora_tables(session)
+    ticket_id = await _make_ticket(factory, sysconfig)
+
+    async with factory() as session:
+        before = (
+            await session.execute(
+                text("SELECT queue_id, ticket_state_id FROM ticket WHERE id = :tid"),
+                {"tid": ticket_id},
+            )
+        ).one()
+
+    dialog_config = ActivityDialogConfig()
+    async with factory() as session, session.begin():
+        # No exception despite the blank State/Owner/Responsible values.
+        await _apply_dialog_field_changes(
+            session,
+            dialog_config=dialog_config,
+            field_values={"State": "", "Owner": "", "Responsible": "", "Title": "Renamed"},
+            ticket_id=ticket_id,
+            user_id=1,
+            sysconfig=sysconfig,
+        )
+
+    async with factory() as session:
+        after = (
+            await session.execute(
+                text("SELECT queue_id, ticket_state_id, title FROM ticket WHERE id = :tid"),
+                {"tid": ticket_id},
+            )
+        ).one()
+    # Blank fields left the ticket untouched; the one non-blank field applied.
+    assert after[0] == before[0]
+    assert after[1] == before[1]
+    assert after[2] == "Renamed"
+
+
+# ---------------------------------------------------------------------------
+# submit_activity_dialog: validation/error branches
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.db
+async def test_submit_activity_dialog_ticket_not_in_process_raises(mariadb_znuny_url: str) -> None:
+    factory, sysconfig = _make_sysconfig_and_factory(mariadb_znuny_url)
+    async with factory() as session:
+        await _seed_tiqora_tables(session)
+    ticket_id = await _make_ticket(factory, sysconfig)
+
+    async with factory() as session, session.begin():
+        with pytest.raises(TicketNotInProcess):
+            await submit_activity_dialog(
+                session,
+                ticket_id=ticket_id,
+                activity_dialog_entity_id="ActivityDialog-whatever",
+                field_values={},
+                user_id=1,
+                sysconfig=sysconfig,
+            )
+
+
+@dataclass(frozen=True)
+class _EdgeProcessIds:
+    process: str
+    activity_a: str
+    dialog_1: str
+    dialog_perm: str
+    dialog_orphan: str
+
+
+async def _seed_edge_process(session: AsyncSession, *, suffix: str) -> _EdgeProcessIds:
+    """Seed a fresh dialog-edge-case process namespaced by *suffix* — the DB
+    fixture is session-scoped, so each caller needs its own unique entity ids
+    to avoid a duplicate-key collision (see ``_seed_cond_process`` above).
+    """
+    ids = _EdgeProcessIds(
+        process=f"Process-testedge-{suffix}",
+        activity_a=f"Activity-edge-a-{suffix}",
+        dialog_1=f"ActivityDialog-edge-ad1-{suffix}",
+        dialog_perm=f"ActivityDialog-edge-adperm-{suffix}",
+        dialog_orphan=f"ActivityDialog-edge-adorphan-{suffix}",
+    )
+    process_config_yaml = f"""
+Description: Test process for dialog edge cases
+StartActivity: {ids.activity_a}
+StartActivityDialog: {ids.dialog_1}
+Path:
+  {ids.activity_a}: {{}}
+"""
+    activity_a_config_yaml = f"""
+ActivityDialog:
+  '1': {ids.dialog_1}
+  '2': {ids.dialog_perm}
+"""
+    dialog_1_config_yaml = """
+DescriptionShort: Edge dialog with a required field
+FieldOrder:
+- Title
+Fields:
+  Title:
+    Display: '1'
+Interface:
+- AgentInterface
+Permission: ''
+"""
+    # 'bogus_perm' is not one of PermissionEngine.PERMISSION_KEYS, so
+    # PermissionEngine.check() always returns False for it — deterministically
+    # exercises the ProcessPermissionDenied branch without seeding group_user rows.
+    dialog_perm_config_yaml = """
+DescriptionShort: Edge dialog requiring an unsatisfiable permission
+FieldOrder: []
+Fields: {}
+Interface:
+- AgentInterface
+Permission: bogus_perm
+"""
+    dialog_orphan_config_yaml = """
+DescriptionShort: Edge dialog not referenced by any activity
+FieldOrder: []
+Fields: {}
+Interface:
+- AgentInterface
+Permission: ''
+"""
+
+    now = "current_timestamp"
+    await session.execute(
+        text(
+            "INSERT INTO pm_process (entity_id, name, state_entity_id, layout, config,"
+            f" create_time, create_by, change_time, change_by)"
+            f" VALUES (:eid, :name, 'S1', '{{}}', :cfg, {now}, 1, {now}, 1)"
+        ),
+        {"eid": ids.process, "name": "Test Process Edge", "cfg": process_config_yaml},
+    )
+    await session.execute(
+        text(
+            "INSERT INTO pm_activity (entity_id, name, config,"
+            f" create_time, create_by, change_time, change_by)"
+            f" VALUES (:eid, :name, :cfg, {now}, 1, {now}, 1)"
+        ),
+        {"eid": ids.activity_a, "name": "Activity Edge A", "cfg": activity_a_config_yaml},
+    )
+    for eid, name, cfg in (
+        (ids.dialog_1, "Edge Dialog 1", dialog_1_config_yaml),
+        (ids.dialog_perm, "Edge Dialog Perm", dialog_perm_config_yaml),
+        (ids.dialog_orphan, "Edge Dialog Orphan", dialog_orphan_config_yaml),
+    ):
+        await session.execute(
+            text(
+                "INSERT INTO pm_activity_dialog (entity_id, name, config,"
+                f" create_time, create_by, change_time, change_by)"
+                f" VALUES (:eid, :name, :cfg, {now}, 1, {now}, 1)"
+            ),
+            {"eid": eid, "name": name, "cfg": cfg},
+        )
+    await session.commit()
+    return ids
+
+
+@pytest.mark.db
+async def test_submit_activity_dialog_missing_required_field_raises(mariadb_znuny_url: str) -> None:
+    factory, sysconfig = _make_sysconfig_and_factory(mariadb_znuny_url)
+    async with factory() as session:
+        await _seed_tiqora_tables(session)
+        ids = await _seed_edge_process(session, suffix="reqfield")
+    ticket_id = await _make_ticket(factory, sysconfig)
+
+    async with factory() as session, session.begin():
+        await start_process(
+            session,
+            ticket_id=ticket_id,
+            process_entity_id=ids.process,
+            user_id=1,
+            sysconfig=sysconfig,
+        )
+
+    async with factory() as session, session.begin():
+        with pytest.raises(RequiredFieldMissing):
+            await submit_activity_dialog(
+                session,
+                ticket_id=ticket_id,
+                activity_dialog_entity_id=ids.dialog_1,
+                field_values={},
+                user_id=1,
+                sysconfig=sysconfig,
+            )
+
+
+@pytest.mark.db
+async def test_submit_activity_dialog_unknown_dialog_id_raises_not_found(
+    mariadb_znuny_url: str,
+) -> None:
+    factory, sysconfig = _make_sysconfig_and_factory(mariadb_znuny_url)
+    async with factory() as session:
+        await _seed_tiqora_tables(session)
+        ids = await _seed_edge_process(session, suffix="notfound")
+    ticket_id = await _make_ticket(factory, sysconfig)
+
+    async with factory() as session, session.begin():
+        await start_process(
+            session,
+            ticket_id=ticket_id,
+            process_entity_id=ids.process,
+            user_id=1,
+            sysconfig=sysconfig,
+        )
+
+    async with factory() as session, session.begin():
+        with pytest.raises(ActivityDialogNotFound):
+            await submit_activity_dialog(
+                session,
+                ticket_id=ticket_id,
+                activity_dialog_entity_id="ActivityDialog-does-not-exist-anywhere",
+                field_values={},
+                user_id=1,
+                sysconfig=sysconfig,
+            )
+
+
+@pytest.mark.db
+async def test_submit_activity_dialog_dialog_not_offered_by_activity_raises_not_available(
+    mariadb_znuny_url: str,
+) -> None:
+    """The dialog exists in pm_activity_dialog, but the ticket's current
+    activity does not list it under its ``ActivityDialog`` config.
+    """
+    factory, sysconfig = _make_sysconfig_and_factory(mariadb_znuny_url)
+    async with factory() as session:
+        await _seed_tiqora_tables(session)
+        ids = await _seed_edge_process(session, suffix="notavail")
+    ticket_id = await _make_ticket(factory, sysconfig)
+
+    async with factory() as session, session.begin():
+        await start_process(
+            session,
+            ticket_id=ticket_id,
+            process_entity_id=ids.process,
+            user_id=1,
+            sysconfig=sysconfig,
+        )
+
+    async with factory() as session, session.begin():
+        with pytest.raises(ActivityDialogNotAvailable):
+            await submit_activity_dialog(
+                session,
+                ticket_id=ticket_id,
+                activity_dialog_entity_id=ids.dialog_orphan,
+                field_values={},
+                user_id=1,
+                sysconfig=sysconfig,
+            )
+
+
+@pytest.mark.db
+async def test_submit_activity_dialog_permission_denied_raises(mariadb_znuny_url: str) -> None:
+    factory, sysconfig = _make_sysconfig_and_factory(mariadb_znuny_url)
+    async with factory() as session:
+        await _seed_tiqora_tables(session)
+        ids = await _seed_edge_process(session, suffix="permdenied")
+    ticket_id = await _make_ticket(factory, sysconfig)
+
+    async with factory() as session, session.begin():
+        await start_process(
+            session,
+            ticket_id=ticket_id,
+            process_entity_id=ids.process,
+            user_id=1,
+            sysconfig=sysconfig,
+        )
+
+    async with factory() as session, session.begin():
+        with pytest.raises(ProcessPermissionDenied):
+            await submit_activity_dialog(
+                session,
+                ticket_id=ticket_id,
+                activity_dialog_entity_id=ids.dialog_perm,
+                field_values={},
+                user_id=1,
+                sysconfig=sysconfig,
+            )
