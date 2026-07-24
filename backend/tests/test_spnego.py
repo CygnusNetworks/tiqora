@@ -308,3 +308,76 @@ async def test_spnego_unknown_principal_403(
         assert "No local user" in resp.json()["detail"]
     finally:
         await engine.dispose()
+
+
+def test_safe_next_only_allows_same_site_paths() -> None:
+    from tiqora.api.v1.auth import _safe_next
+
+    assert _safe_next("/agent/tickets/5") == "/agent/tickets/5"
+    # Anything not a plain same-site absolute path falls back to "/".
+    assert _safe_next(None) == "/"
+    assert _safe_next("") == "/"
+    assert _safe_next("//evil.example") == "/"
+    assert _safe_next("/\\evil.example") == "/"
+    assert _safe_next("https://evil.example") == "/"
+    assert _safe_next("agent") == "/"
+
+
+@pytest.mark.asyncio
+@pytest.mark.db
+@pytest.mark.parametrize("url_fixture", ["mariadb_znuny_url", "postgres_znuny_url"])
+async def test_spnego_success_redirects_to_next(
+    url_fixture: str, request: pytest.FixtureRequest, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A valid handshake returns the agent to the page they came from."""
+    sync_url: str = request.getfixturevalue(url_fixture)
+    user_id = _seed_spnego_user(sync_url, login="alice")
+
+    engine_setup = create_async_engine(_to_async_url(sync_url))
+    factory = async_sessionmaker(engine_setup, class_=AsyncSession, expire_on_commit=False)
+    async with factory() as session:
+        await AuthConfigService(session).set(user_id, sso_eligible=True)
+    await engine_setup.dispose()
+
+    client, engine, _redis = await _spnego_client(sync_url, monkeypatch)
+    token = base64.b64encode(b"client-token").decode("ascii")
+    try:
+        async with client:
+            resp = await client.get(
+                "/api/v1/auth/spnego?next=/agent/tickets/5",
+                headers={"Authorization": f"Negotiate {token}"},
+            )
+        assert resp.status_code == 302
+        assert resp.headers.get("location") == "/agent/tickets/5"
+    finally:
+        await engine.dispose()
+
+
+@pytest.mark.asyncio
+@pytest.mark.db
+@pytest.mark.parametrize("url_fixture", ["mariadb_znuny_url", "postgres_znuny_url"])
+async def test_spnego_auth_failure_redirects_to_login(
+    url_fixture: str, request: pytest.FixtureRequest, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A failed handshake lands on /login (not a bare 401) and preserves next."""
+    sync_url: str = request.getfixturevalue(url_fixture)
+    client, engine, _redis = await _spnego_client(sync_url, monkeypatch)
+
+    async def _raise(self: SpnegoService, token: bytes) -> str:
+        raise spnego_module.SpnegoAuthFailed("bad ticket")
+
+    monkeypatch.setattr(spnego_module.SpnegoService, "accept", _raise)
+
+    token = base64.b64encode(b"client-token").decode("ascii")
+    try:
+        async with client:
+            resp = await client.get(
+                "/api/v1/auth/spnego?next=/agent/tickets/5",
+                headers={"Authorization": f"Negotiate {token}"},
+            )
+        assert resp.status_code == 302
+        location = resp.headers.get("location", "")
+        assert location.startswith("/login?sso_error=1")
+        assert "next=%2Fagent%2Ftickets%2F5" in location
+    finally:
+        await engine.dispose()

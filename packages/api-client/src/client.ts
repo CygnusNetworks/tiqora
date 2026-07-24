@@ -1951,9 +1951,11 @@ export class ApiClient {
     };
   }
 
-  /** Browser-navigates for Kerberos/SPNEGO; not a fetch (redirect flow). */
-  spnegoLoginUrl(): string {
-    return "/api/v1/auth/spnego";
+  /** Browser-navigates for Kerberos/SPNEGO; not a fetch (redirect flow).
+   * `next` is a same-site path to return to after a successful handshake. */
+  spnegoLoginUrl(next?: string): string {
+    const base = "/api/v1/auth/spnego";
+    return next ? `${base}?next=${encodeURIComponent(next)}` : base;
   }
 
   testMailOutbound(body: MailOutboundTestIn = {}, signal?: AbortSignal) {

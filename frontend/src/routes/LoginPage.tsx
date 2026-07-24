@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { useNavigate, useSearch } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "@/auth/AuthContext";
@@ -86,6 +86,31 @@ export function LoginPage() {
     pending2fa,
     search.next,
     navigate,
+  ]);
+
+  // Seamless SSO re-auth: when an expired session bounced the agent here (a
+  // `next` target is present) and Kerberos/SPNEGO is available, redirect
+  // straight into the handshake so a valid ticket lands them back where they
+  // were — no visible login step. `sso_error` (set by a failed handshake) and
+  // the ref both prevent an auto-retry loop; a plain visit to /login (no
+  // `next`) still shows the normal form with the Kerberos button.
+  const ssoErrorFlag = search.sso_error === "1" || search.sso_error === "true";
+  const autoSsoTriggered = useRef(false);
+  useEffect(() => {
+    if (autoSsoTriggered.current) return;
+    if (isLoading || isAuthenticated || pending2fa || mustEnroll2fa) return;
+    if (ssoErrorFlag || !spnegoEnabled) return;
+    if (!isSafeNextPath(search.next)) return;
+    autoSsoTriggered.current = true;
+    window.location.assign(api.spnegoLoginUrl(search.next));
+  }, [
+    isLoading,
+    isAuthenticated,
+    pending2fa,
+    mustEnroll2fa,
+    ssoErrorFlag,
+    spnegoEnabled,
+    search.next,
   ]);
 
   // Auto-start TOTP enrollment when forced into must-enroll mode (unless the
@@ -426,7 +451,7 @@ export function LoginPage() {
   }
 
   const showSsoDivider = oidcEnabled || spnegoEnabled;
-  const ssoError = search.sso_error === "1" || search.sso_error === "true";
+  const ssoError = ssoErrorFlag;
 
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-bg px-4">
