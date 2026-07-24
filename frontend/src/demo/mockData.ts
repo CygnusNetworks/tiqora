@@ -124,6 +124,89 @@ const bodies: Record<number, unknown> = {
   502: { article_id: 502, content_type: "text/plain", is_html: false, body: "Assigned to Level 2 — likely the fuser unit. Ordered a replacement, ETA tomorrow." },
 };
 
+// AI subsystem (state-only summary + drafts) for the demo ticket. Static,
+// fabricated content so the public demo showcases the assistant end-to-end
+// without a live LLM: a coverage-tracked summary and two open drafts (an
+// auto-generated reply plus a manual clarification), each with a tool trace.
+const ticketAiSummary =
+  "Jane Doe reported that the main printer on floor 2 (building A) has been offline " +
+  "since this morning — a blinking amber light, no response, and several colleagues " +
+  "unable to print. IT reset the print spooler and pushed a firmware update, then " +
+  "asked Jane to retry. Level 2 suspects a failing fuser unit and has already ordered " +
+  "a replacement (ETA tomorrow) as a fallback.\n\n" +
+  "Open point: awaiting Jane's confirmation that printing works after the firmware " +
+  "update before closing the ticket or swapping the hardware.\n\n" +
+  "Dokumente:\n" +
+  "- printer-error-log.txt — spooler restart and firmware-update trace\n" +
+  "- floor2-printer-photo.jpg — amber status light on the device";
+
+const ticketAiDrafts = [
+  {
+    id: 9001, ticket_id: 100, kind: "reply",
+    subject: "Re: Printer offline in building A",
+    body:
+      "Hi Jane,\n\nThanks for your patience. We've reset the print spooler and installed " +
+      "a firmware update on the floor 2 printer. Could you try printing again and let us " +
+      "know whether the amber light has cleared?\n\nIf it's still offline, we already have " +
+      "a replacement fuser unit on the way (arriving tomorrow) and will swap it first thing.\n\n" +
+      "Best regards,\nIT Support",
+    based_on_article_id: 500, status: "open", source: "auto",
+    accepted_article_id: null, create_time: "2026-07-10T10:07:00Z",
+    tool_trace: [
+      { name: "kb.search", content: 'Matched KB article "Printer shows amber light / offline" — fuser-unit troubleshooting and spooler-reset steps.' },
+      { name: "ticket.history", content: "Firmware update pushed at 10:02; Level 2 ordered a replacement fuser unit (ETA +1 day)." },
+    ],
+  },
+  {
+    id: 9002, ticket_id: 100, kind: "clarify",
+    subject: null,
+    body:
+      "To narrow this down before the replacement part arrives: after the firmware update, " +
+      "does the printer show any error code on its display, or only the blinking amber light? " +
+      "A quick photo of the panel would help us confirm whether it's the fuser unit.",
+    based_on_article_id: 500, status: "open", source: "manual",
+    accepted_article_id: null, create_time: "2026-07-10T10:09:00Z",
+    tool_trace: [],
+  },
+];
+
+const ticketAiState = {
+  manual_assist_available: true,
+  summary_available: true,
+  can_summarize: true,
+  operation_mode_ready: true,
+  drafts: ticketAiDrafts,
+  summary_body: ticketAiSummary,
+  last_summary_upto_article_id: 502,
+  summary_created_at: "2026-07-10T10:06:00Z",
+};
+
+// Admin AI config so the demo's AI settings/providers pages look provisioned
+// (rather than an empty "not configured" state).
+const aiSettings = {
+  operation_mode: "tiqora_primary",
+  disclosure_default_text:
+    "This reply was drafted with AI assistance and reviewed by a support agent.",
+  global_max_replies_per_hour: 60,
+  audit_retention_days: 90,
+};
+const aiProviders = [
+  {
+    id: 1, name: "OpenAI (GPT-4o)", kind: "openai_compat", base_url: "https://api.openai.com/v1",
+    default_model: "gpt-4o", has_api_key: true, extra_json: null, supports_tools: true,
+    supports_streaming: true, eu_hosted: false, supports_vision: true,
+    price_input_per_1m: 2.5, price_output_per_1m: 10, price_currency: "USD",
+    valid_id: 1, create_time: t0, change_time: t0,
+  },
+  {
+    id: 2, name: "Anthropic (Claude Sonnet)", kind: "anthropic", base_url: "https://api.anthropic.com",
+    default_model: "claude-sonnet-4", has_api_key: true, extra_json: null, supports_tools: true,
+    supports_streaming: true, eu_hosted: false, supports_vision: true,
+    price_input_per_1m: 3, price_output_per_1m: 15, price_currency: "USD",
+    valid_id: 1, create_time: t0, change_time: t0,
+  },
+];
+
 const searchHits = {
   query: "server", estimated_total: 4,
   hits: ticketItems.slice(0, 4).map((t) => ({ id: t.id, tn: t.tn, title: t.title, queue_id: t.queue_id, queue_name: t.queue_name, state: t.state, state_type: t.state_type, priority: t.priority, owner_login: t.owner_login, customer_user_id: t.customer_user_id, create_time: t.create_time, excerpt: "…matched on the ticket subject and latest article…" })),
@@ -262,6 +345,14 @@ export function resolveData(path: string, method: string): unknown | undefined {
   if (p.match(/\/api\/v1\/tickets\/\d+\/history$/)) return historyEntries;
   if (p.match(/\/api\/v1\/tickets\/\d+\/presence/)) return method === "GET" ? [] : {};
   if (p.match(/\/api\/v1\/tickets\/\d+\/attachments/) || p.match(/attachments/)) return [];
+  // AI subsystem (summary + drafts). The POST endpoints report success; the
+  // panel then refetches state, which serves the fabricated summary/drafts.
+  if (p.match(/\/api\/v1\/tickets\/\d+\/ai\/summarize$/) && method === "POST")
+    return { status: "ok", summary_body: ticketAiSummary, upto_article_id: 502 };
+  if (p.match(/\/api\/v1\/tickets\/\d+\/ai\/drafts\/\d+\/discard$/) && method === "POST") return {};
+  if (p.match(/\/api\/v1\/tickets\/\d+\/ai\/draft$/) && method === "POST")
+    return { status: "ok", draft_id: 9001, article_id: 500 };
+  if (p.match(/\/api\/v1\/tickets\/\d+\/ai$/) && method === "GET") return ticketAiState;
   if (p.match(/\/api\/v1\/tickets\/\d+$/) && method === "GET") return ticketDetail;
   if (p.endsWith("/api/v1/agents/online")) return onlineAgents;
   if (p.endsWith("/api/v1/agents/presence/ping") && method === "POST") return {};
@@ -298,6 +389,10 @@ export function resolveData(path: string, method: string): unknown | undefined {
   if (p.endsWith("/admin/customer-users")) return page(adminCustomerUsers);
   if (p.endsWith("/admin/customer-companies")) return page(adminCustomerCompanies);
   if (p.endsWith("/admin/gdpr/jobs")) return page([]);
+  // Admin — AI subsystem (settings object + provider list); other AI lists
+  // (queue policies, MCP clients) fall through to the empty-array default.
+  if (p.endsWith("/admin/ai/settings")) return aiSettings;
+  if (p.endsWith("/admin/ai/providers") && method === "GET") return aiProviders;
   // Everything else under /admin (aux lookups: system-addresses, salutations,
   // signatures, states, priorities, …) → bare array so `.map` consumers work.
   if (p.includes("/admin/") && method === "GET") return [];
