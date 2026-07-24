@@ -50,6 +50,9 @@ jobs:
           cp site/index.html site/styles.css _site/
           cp frontend/public/logo.svg frontend/public/logo-wordmark.svg frontend/public/favicon.svg _site/assets/
 
+          # Sample AI-audit export PDF (masked; placeholder tokens only, no real PII)
+          cp site/ai-audit-sample.pdf _site/assets/ai-audit-sample.pdf
+
           # Screenshots used by the landing gallery
           # Both light and dark variants (the landing gallery has a switch).
           for f in \

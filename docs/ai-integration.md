@@ -387,3 +387,22 @@ exactly what left the building (and that masking worked) without digging through
 provider logs. Retention is trimmed by the `ai_audit_cleanup` daemon task. The
 per-request HTTP timeout for a chat completion is `TIQORA_LLM_TIMEOUT` (default
 `180.0` s) — raise it if long detailed summaries surface `LlmTimeoutError`.
+
+#### PDF export
+
+Any single audit entry can be exported to a PDF from its detail drawer
+(**Export PDF**) — a styled, self-contained document with the request metadata
+table and role-coloured message blocks (system / user / response), laid out to
+match the on-screen view. The export follows the drawer's **PII toggle**:
+
+- **Masked (default):** placeholder tokens (`[PERSON_1]`, `[EMAIL_1]`, …) are
+  kept exactly as they were sent to the provider, and the PDF carries a grey
+  “PII masked” badge. This is the safe artefact to hand to auditors or attach to
+  a ticket.
+- **Revealed:** only offered when PII masking was active for that request (so the
+  original values are recoverable). Choosing it un-masks the tokens back to the
+  real values, and the PDF is stamped with a red “Personal data included”
+  warning. A red notice in the drawer flags this before you export.
+
+The document is produced client-side via the browser's print-to-PDF (no server
+dependency and no copy of the un-masked data leaves the operator's machine).
