@@ -6,12 +6,12 @@ import csv
 from collections.abc import AsyncGenerator
 from datetime import datetime
 from typing import Any
-from urllib.parse import quote
 
 from fastapi import APIRouter, HTTPException, Query, status
 from fastapi.responses import Response, StreamingResponse
 from pydantic import BaseModel, Field
 
+from tiqora.api.attachment_response import safe_attachment_response
 from tiqora.api.deps import AppSettings, CurrentUser, DbSession
 from tiqora.channels.email.outbound_reply import OutboundMailError
 from tiqora.db.engine import get_session_factory
@@ -441,20 +441,15 @@ def _attachment_response(
     *,
     force_download: bool = False,
 ) -> Response:
-    ct = (content_type or "application/octet-stream").split(";", 1)[0].strip()
-    disp_kind = (
-        "attachment"
-        if force_download
-        else ("inline" if (disposition or "").lower() == "inline" else "attachment")
+    # Central safe delivery: neutralizes active types (html/svg/xml), restricts
+    # inline to raster images, sandboxes the response, sanitizes the filename.
+    return safe_attachment_response(
+        content_bytes,
+        content_type,
+        filename,
+        disposition,
+        force_download=force_download,
     )
-    headers: dict[str, str] = {}
-    if filename:
-        headers["Content-Disposition"] = (
-            f"{disp_kind}; filename=\"{filename}\"; filename*=UTF-8''{quote(filename)}"
-        )
-    else:
-        headers["Content-Disposition"] = disp_kind
-    return Response(content=content_bytes, media_type=ct, headers=headers)
 
 
 # Register by-cid before numeric attachment_id so "by-cid" is not captured as id.

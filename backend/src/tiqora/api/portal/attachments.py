@@ -8,11 +8,10 @@ the uploaded file(s).
 
 from __future__ import annotations
 
-from urllib.parse import quote
-
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile, status
 from fastapi.responses import Response
 
+from tiqora.api.attachment_response import safe_attachment_response
 from tiqora.api.portal.deps import CurrentCustomer, PortalService
 from tiqora.domain.portal_ticket_service import (
     PortalFollowUpRejected,
@@ -22,6 +21,9 @@ from tiqora.domain.portal_ticket_service import (
 from tiqora.domain.schemas import PortalAttachmentUploadResponse
 
 router = APIRouter(prefix="/tickets", tags=["portal-attachments"])
+
+# Cap a single portal upload so a customer can't exhaust memory with one request.
+_MAX_UPLOAD_BYTES = 25 * 1024 * 1024  # 25 MiB
 
 
 def _map_exc(exc: Exception) -> HTTPException:
@@ -50,6 +52,11 @@ async def upload_attachment(
     note: str = Form(default=""),
 ) -> PortalAttachmentUploadResponse:
     content = await file.read()
+    if len(content) > _MAX_UPLOAD_BYTES:
+        raise HTTPException(
+            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            detail=f"Attachment exceeds the {_MAX_UPLOAD_BYTES // (1024 * 1024)} MiB limit",
+        )
     body = note or f"(attachment: {file.filename or 'file'})"
     try:
         article_id, _reopened = await svc.reply(
@@ -90,16 +97,11 @@ async def download_attachment_by_cid(
         content = await svc.get_attachment_by_cid(customer, ticket_id, article_id, content_id)
     except (PortalTicketNotFound, PortalTicketAccessDenied) as exc:
         raise _map_exc(exc) from exc
-    ct = (content.meta.content_type or "application/octet-stream").split(";", 1)[0].strip()
-    filename = content.meta.filename
-    headers: dict[str, str] = {}
-    if filename:
-        headers["Content-Disposition"] = (
-            f"inline; filename=\"{filename}\"; filename*=UTF-8''{quote(filename)}"
-        )
-    else:
-        headers["Content-Disposition"] = "inline"
-    return Response(content=content.content, media_type=ct, headers=headers)
+    # Inline is honored only for raster images; active types are neutralized and
+    # the response is sandboxed (see safe_attachment_response).
+    return safe_attachment_response(
+        content.content, content.meta.content_type, content.meta.filename, "inline"
+    )
 
 
 @router.get("/{ticket_id}/attachments/{attachment_id}")
@@ -113,13 +115,10 @@ async def download_attachment(
         content = await svc.get_attachment(customer, ticket_id, attachment_id)
     except (PortalTicketNotFound, PortalTicketAccessDenied) as exc:
         raise _map_exc(exc) from exc
-    ct = (content.meta.content_type or "application/octet-stream").split(";", 1)[0].strip()
-    filename = content.meta.filename
-    headers: dict[str, str] = {}
-    if filename:
-        headers["Content-Disposition"] = (
-            f"attachment; filename=\"{filename}\"; filename*=UTF-8''{quote(filename)}"
-        )
-    else:
-        headers["Content-Disposition"] = "attachment"
-    return Response(content=content.content, media_type=ct, headers=headers)
+    return safe_attachment_response(
+        content.content,
+        content.meta.content_type,
+        content.meta.filename,
+        "attachment",
+        force_download=True,
+    )
