@@ -1882,11 +1882,16 @@ class TicketWriteService:
         *,
         queue_id: int,
         title: str | None = None,
+        priority_id: int | None = None,
+        state_id: int | None = None,
+        customer_id: str | None = None,
+        customer_user_id: str | None = None,
     ) -> int:
         """Create a new ticket seeded from an existing article; link the two.
 
-        Returns the new ticket id. Requires ``rw`` on the source ticket and
-        ``create`` on the target queue.
+        ``priority_id``/``state_id``/``customer_*`` override the source ticket's
+        values when given (else inherited). Returns the new ticket id. Requires
+        ``rw`` on the source ticket and ``create`` on the target queue.
         """
         src = await _ticket_must_exist(self._session, ticket_id)
         await self._assert_rw(user_id, int(src["queue_id"]))
@@ -1913,6 +1918,16 @@ class TicketWriteService:
             channel="note",
         )
         new_title = title or str(src.get("title") or mime[0] or "Split ticket")
+        # A new customer is only applied when the user actually picked one
+        # (customer_user_id present); otherwise inherit the source customer.
+        new_customer_id: str | None
+        new_customer_user_id: str | None
+        if customer_user_id is not None:
+            new_customer_id = customer_id
+            new_customer_user_id = customer_user_id
+        else:
+            new_customer_id = src.get("customer_id")
+            new_customer_user_id = src.get("customer_user_id")
         new_ticket_id = await create_ticket(
             self._session,
             self._factory,
@@ -1920,11 +1935,13 @@ class TicketWriteService:
             params=TicketIn(
                 title=new_title,
                 queue_id=queue_id,
-                state_id=int(src["ticket_state_id"]),
-                priority_id=int(src["ticket_priority_id"]),
+                state_id=state_id if state_id is not None else int(src["ticket_state_id"]),
+                priority_id=priority_id
+                if priority_id is not None
+                else int(src["ticket_priority_id"]),
                 owner_id=user_id,
-                customer_id=src.get("customer_id"),
-                customer_user_id=src.get("customer_user_id"),
+                customer_id=new_customer_id,
+                customer_user_id=new_customer_user_id,
                 article=seeded,
             ),
             user_id=user_id,

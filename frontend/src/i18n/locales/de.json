@@ -312,7 +312,14 @@
     "replyAll": "Allen antworten",
     "forward": "Weiterleiten",
     "bounce": "Umleiten",
-    "split": "Teilen",
+    "split": {
+      "priority": "Priorität",
+      "state": "Status",
+      "customer": "Kunde",
+      "changeCustomer": "Ändern",
+      "customerSearch": "Kunde suchen (Login/Name)…",
+      "customerInherit": "Vom Ursprungsticket übernommen"
+    },
     "deleteNote": "Notiz löschen",
     "deleteNoteConfirm": "Diese interne Notiz löschen? Dies kann nicht rückgängig gemacht werden.",
     "deleteNoteConfirmButton": "Löschen",

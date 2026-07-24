@@ -307,6 +307,25 @@ async def test_ticket_zoom(url_fixture: str, request: pytest.FixtureRequest) -> 
         links = await svc.list_links(ids["agent"], ids["ticket"])
         assert any(link["other_ticket_id"] == new_ticket_id for link in links)
 
+        # Split with priority/state overrides → applied to the new ticket
+        # (priority 1 / state 1 differ from the seeded source values).
+        override_id = await svc.split_article(
+            ids["agent"],
+            ids["ticket"],
+            ids["article"],
+            queue_id=ids["queue"],
+            title="Split override",
+            priority_id=1,
+            state_id=1,
+        )
+        ov = (
+            await session.execute(
+                text("SELECT ticket_priority_id, ticket_state_id FROM ticket WHERE id = :id"),
+                {"id": override_id},
+            )
+        ).first()
+        assert ov is not None and int(ov[0]) == 1 and int(ov[1]) == 1
+
     async with factory() as session:
         # Forward/Bounce history types present.
         rows = (
