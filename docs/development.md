@@ -74,6 +74,22 @@ up again. This uses MariaDB to match production; the seed data are real database
 rows (via `tiqora bootstrap --seed`), **not** the frontend MSW mocks used for
 screenshots/the public demo.
 
+### Hot-reload in the container stack
+
+To iterate without rebuilding the image, layer the override on top:
+
+```bash
+docker compose -f docker-compose.local.yml -f docker-compose.local.override.yml up -d
+# Frontend (Vite HMR): http://localhost:5173   ← edit frontend/src → instant
+# Backend (--reload):  http://localhost:8000    ← edit backend/src → auto-restart
+```
+
+It bind-mounts `backend/src` and runs the API under `uvicorn --reload`, and adds a
+Node/Vite dev container that proxies `/api` to the compose backend. Do frontend work
+against **:5173** (HMR); **:8000** still serves the built SPA. Workers/MCP get the mounted
+source too, so `restart tiqora-worker tiqora-ai-worker tiqora-mcp` picks up backend changes
+without an image rebuild.
+
 ## Backend
 
 ```bash
