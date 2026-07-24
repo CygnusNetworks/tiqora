@@ -395,7 +395,7 @@ export function AiPanel({
             >
               <Button
                 size="sm"
-                variant="secondary"
+                variant="primary"
                 data-testid="ai-panel-create-draft-button"
                 disabled={!canNote || draftMutation.isPending}
                 onClick={() => draftMutation.mutate()}
@@ -501,7 +501,12 @@ export function AiPanel({
                                 if (ok) discardMutation.mutate(draft.id);
                               }}
                             >
-                              {t("ticket.ai.discardDraft")}
+                              {discardMutation.isPending &&
+                              discardMutation.variables === draft.id ? (
+                                <Spinner className="h-3.5 w-3.5" />
+                              ) : (
+                                t("ticket.ai.discardDraft")
+                              )}
                             </Button>
                             <Button
                               size="sm"

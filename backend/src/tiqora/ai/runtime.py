@@ -505,6 +505,7 @@ async def run_ticket_agent(
             kb_search_fn=kb_search_fn,
             kb_get_article_fn=kb_get_article_fn,
             allowed_state_types_raw=policy.allowed_state_types,
+            mask_results=bool(policy.pii_masking),
         )
 
         messages: list[LlmMessage] = [
