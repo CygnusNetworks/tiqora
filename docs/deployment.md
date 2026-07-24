@@ -47,6 +47,10 @@ and never commit real credentials.
 | `TIQORA_LOG_LEVEL` | `INFO` | |
 | `TIQORA_CORS_ORIGINS` | `https://helpdesk.example.com` | Comma-separated |
 | `TIQORA_SESSION_TTL` | `3600` | Session lifetime in seconds (1h). **Sliding** — renewed on every authenticated request, so effectively the max idle time. SSO/Kerberos agents re-auth transparently on expiry. Also governs customer-portal sessions. |
+| `TIQORA_SESSION_ABSOLUTE_TTL` | `43200` | Absolute max session age (12h), independent of the sliding TTL — a session is killed this long after creation even if continuously active, so a stolen token can't be kept alive forever. |
+| `TIQORA_TRUSTED_PROXIES` | *(empty)* | Comma-separated reverse-proxy IPs/CIDRs whose `X-Forwarded-For` may be trusted for rate-limit client-IP derivation. Set to your proxy so per-IP login lockout keys on the real client, not the shared proxy IP. |
+| `TIQORA_CSP_ENFORCE` | `false` (dev) / **`true` (production)** | Enforce the SPA Content-Security-Policy. Auto-enabled in production; set `0` to keep report-only. |
+| `TIQORA_CRYPTO_SMIME_CA_PATH` | *(empty)* | CA bundle for S/MIME chain validation. Without it, inbound S/MIME signatures are reported `signed_untrusted` (valid signature, untrusted signer) rather than `verified`. |
 | `TIQORA_TOTP_PENDING_TTL` | `300` | Seconds a pending-2FA session stays valid |
 | `TIQORA_TOTP_ISSUER` | `Tiqora` | Shown in authenticator apps |
 | `TIQORA_LLM_TIMEOUT` | `180.0` | Per-request HTTP timeout for one LLM chat completion (seconds). Detailed multi-document summaries can run long; raise if you see `LlmTimeoutError`. |
