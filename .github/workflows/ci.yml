@@ -84,8 +84,22 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y --no-install-recommends gnupg
       - name: Install dependencies
         run: uv sync --extra dev --extra crypto
+      # Coverage instrumentation adds wall time to every run; only release
+      # tags consume the artifact (coverage-badges job), so plain pytest runs
+      # on PRs/main and the instrumented variant runs only on v* tags.
       - name: Pytest
+        if: ${{ !startsWith(github.ref, 'refs/tags/v') }}
         run: uv run pytest -q
+      - name: Pytest (with coverage, for release-tag badge)
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: uv run pytest -q --cov=tiqora --cov-report=json:coverage.json
+      - name: Upload coverage (for release-tag badge)
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-coverage
+          path: backend/coverage.json
+          retention-days: 7
 
   backend-test-mariadb:
     name: Backend tests (mariadb)
@@ -158,8 +172,22 @@ jobs:
         run: pnpm --filter tiqora-frontend lint
       - name: Typecheck + build
         run: pnpm --filter tiqora-frontend build
+      # v8 coverage instrumentation eats into vitest's per-test timeout margin
+      # on every run, but only release tags consume the artifact — so run
+      # plain vitest on PRs/main and the instrumented variant only on v* tags.
       - name: Vitest
+        if: ${{ !startsWith(github.ref, 'refs/tags/v') }}
         run: pnpm --filter tiqora-frontend test
+      - name: Vitest (with coverage, for release-tag badge)
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: pnpm --filter tiqora-frontend test:coverage
+      - name: Upload coverage (for release-tag badge)
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-coverage
+          path: frontend/coverage/coverage-summary.json
+          retention-days: 7
       # Playwright e2e only on release tags (hard fail). Everyday PR/main skips
       # saves ~4–5 min of runner time (install + full e2e suite).
       - name: Install Playwright Chromium
@@ -168,3 +196,82 @@ jobs:
       - name: Playwright e2e (mocked API)
         if: startsWith(github.ref, 'refs/tags/v')
         run: pnpm --filter tiqora-frontend e2e
+
+  coverage-badges:
+    name: Publish coverage badges
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [backend-test-postgres, frontend]
+    runs-on: ubuntu-latest
+    # Serialise badge publishes so two release tags built close together don't
+    # race the push to the badges branch (the workflow-level concurrency group
+    # is keyed on github.ref, which differs per tag and so wouldn't serialise).
+    concurrency:
+      group: coverage-badges
+      cancel-in-progress: false
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: backend-coverage
+          path: cov/backend
+      - uses: actions/download-artifact@v4
+        with:
+          name: frontend-coverage
+          path: cov/frontend
+      - name: Build badge JSON
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/badges
+
+          badge_color() {
+            # $1 = coverage percent (integer)
+            if [ "$1" -ge 80 ]; then echo "brightgreen"
+            elif [ "$1" -ge 60 ]; then echo "yellow"
+            else echo "red"
+            fi
+          }
+
+          backend_pct=$(python3 -c "import json; print(round(json.load(open('cov/backend/coverage.json'))['totals']['percent_covered']))")
+          frontend_pct=$(node -e "console.log(Math.round(require('./cov/frontend/coverage-summary.json').total.lines.pct))")
+
+          for pair in "backend:$backend_pct" "frontend:$frontend_pct"; do
+            name="${pair%%:*}"
+            pct="${pair##*:}"
+            color=$(badge_color "$pct")
+            cat > "/tmp/badges/${name}-coverage.json" <<JSON
+          {"schemaVersion":1,"label":"${name} coverage","message":"${pct}%","color":"${color}"}
+          JSON
+          done
+
+          cat /tmp/badges/backend-coverage.json
+          cat /tmp/badges/frontend-coverage.json
+      - name: Publish to badges branch
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          # Distinguish "badges branch doesn't exist yet" (first run — an
+          # orphan branch is correct) from a transient fetch failure. The old
+          # `git fetch ... 2>/dev/null || git checkout --orphan` silently
+          # turned any network blip into an orphan branch whose unforced push
+          # was then rejected non-fast-forward, failing the release job.
+          if git ls-remote --exit-code origin badges >/dev/null; then
+            git fetch origin badges
+            git checkout badges
+          else
+            git checkout --orphan badges
+            git rm -rf . >/dev/null 2>&1 || true
+          fi
+
+          cp /tmp/badges/backend-coverage.json /tmp/badges/frontend-coverage.json .
+
+          git add backend-coverage.json frontend-coverage.json
+          if git diff --cached --quiet; then
+            echo "No badge changes."
+          else
+            git commit -m "chore: update coverage badges for ${GITHUB_REF_NAME}"
+            git push origin badges
+          fi
