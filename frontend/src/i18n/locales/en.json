@@ -392,6 +392,7 @@
       "adminDeleteDraftHint": "Admin: permanently delete this draft from the database",
       "adminDeleteConfirm": "Permanently delete this AI draft? This cannot be undone.",
       "detailLabel": "Scope",
+      "moreActions": "More actions",
       "detail": {
         "standard": "Standard",
         "detailed": "Detailed"

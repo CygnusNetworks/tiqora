@@ -412,6 +412,10 @@ describe("AiPanel", () => {
     mockUser.current = { id: 1, login: "root@localhost", is_admin: true };
     wrap(<AiPanel ticketId={1} canNote />);
     await waitFor(() =>
+      expect(screen.getByTestId("ai-panel-summary-menu-trigger")).toBeTruthy(),
+    );
+    fireEvent.click(screen.getByTestId("ai-panel-summary-menu-trigger"));
+    await waitFor(() =>
       expect(screen.getByTestId("ai-panel-summary-admin-delete")).toBeTruthy(),
     );
     fireEvent.click(screen.getByTestId("ai-panel-summary-admin-delete"));
@@ -419,6 +423,31 @@ describe("AiPanel", () => {
     fireEvent.click(screen.getByTestId("confirm-dialog-confirm"));
     await waitFor(() => expect(adminDeleteSummary).toHaveBeenCalledWith(1));
     mockUser.current = { id: 42, login: "agent", is_admin: false };
+  });
+
+  it("summarizes with the detail chosen in the segment control", async () => {
+    getState.mockResolvedValue({
+      ...baseState,
+      summary_available: true,
+      can_summarize: true,
+      summary_body: null,
+    });
+    summarize.mockResolvedValue({
+      status: "updated",
+      summary_body: "New",
+      upto_article_id: 5,
+    });
+
+    wrap(<AiPanel ticketId={1} canNote />);
+
+    await waitFor(() =>
+      expect(
+        screen.getByTestId("ai-panel-summary-detail-detailed"),
+      ).toBeTruthy(),
+    );
+    fireEvent.click(screen.getByTestId("ai-panel-summary-detail-detailed"));
+    fireEvent.click(screen.getByTestId("ai-panel-summarize-button"));
+    await waitFor(() => expect(summarize).toHaveBeenCalledWith(1, "detailed"));
   });
 
   it("shows a collapsible tool trace on drafts that have one", async () => {
@@ -448,8 +477,17 @@ describe("AiPanel", () => {
       ],
     });
 
-    wrap(<AiPanel ticketId={1} canNote />);
+    // Non-admins never see the trace toggle.
+    mockUser.current = { id: 42, login: "agent", is_admin: false };
+    const { unmount } = wrap(<AiPanel ticketId={1} canNote />);
+    await waitFor(() =>
+      expect(screen.getByTestId("ai-panel-draft-11")).toBeTruthy(),
+    );
+    expect(screen.queryByTestId("ai-panel-draft-trace-toggle-11")).toBeNull();
+    unmount();
 
+    mockUser.current = { id: 1, login: "root@localhost", is_admin: true };
+    wrap(<AiPanel ticketId={1} canNote />);
     await waitFor(() =>
       expect(screen.getByTestId("ai-panel-draft-11")).toBeTruthy(),
     );
@@ -463,10 +501,56 @@ describe("AiPanel", () => {
     fireEvent.click(toggle);
     const trace = screen.getByTestId("ai-panel-draft-trace-11");
     expect(trace.textContent).toContain("kb_search");
-    expect(trace.textContent).toContain("3 Treffer zu VPN");
+    // Result content lives behind the per-tool card header.
+    expect(trace.textContent).not.toContain("3 Treffer zu VPN");
+    fireEvent.click(screen.getByTestId("ai-panel-draft-trace-step-11-0"));
+    expect(
+      screen.getByTestId("ai-panel-draft-trace-step-11-0-body").textContent,
+    ).toContain("3 Treffer zu VPN");
 
     fireEvent.click(toggle);
     expect(screen.queryByTestId("ai-panel-draft-trace-11")).toBeNull();
+    mockUser.current = { id: 42, login: "agent", is_admin: false };
+  });
+
+  it("renders JSON tool results as a key/value grid with real newlines", async () => {
+    getState.mockResolvedValue({
+      ...baseState,
+      manual_assist_available: true,
+      drafts: [
+        {
+          ...baseDraft,
+          id: 13,
+          kind: "reply",
+          body: "Draft",
+          source: "auto",
+          tool_trace: [
+            {
+              name: "get_network_status",
+              content:
+                '{"status": "disruption", "affected_services": ["Internet", "IPTV"], "message": "Zeile 1\\nZeile 2"}',
+            },
+          ],
+        },
+      ],
+    });
+
+    mockUser.current = { id: 1, login: "root@localhost", is_admin: true };
+    wrap(<AiPanel ticketId={1} canNote />);
+    await waitFor(() =>
+      expect(screen.getByTestId("ai-panel-draft-trace-toggle-13")).toBeTruthy(),
+    );
+    fireEvent.click(screen.getByTestId("ai-panel-draft-trace-toggle-13"));
+    fireEvent.click(screen.getByTestId("ai-panel-draft-trace-step-13-0"));
+    const body = screen.getByTestId("ai-panel-draft-trace-step-13-0-body");
+    // Key/value grid: keys and values present, no raw JSON braces or \n escapes.
+    expect(body.textContent).toContain("status");
+    expect(body.textContent).toContain("disruption");
+    expect(body.textContent).toContain("Internet");
+    expect(body.textContent).toContain("Zeile 1\nZeile 2");
+    expect(body.textContent).not.toContain("\\n");
+    expect(body.textContent).not.toContain("{");
+    mockUser.current = { id: 42, login: "agent", is_admin: false };
   });
 
   it("opens the reply editor prefilled with the draft body and sends with ai_draft_id", async () => {
