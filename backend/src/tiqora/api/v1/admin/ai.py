@@ -91,9 +91,7 @@ async def _reject_ssrf_url(url: str | None) -> None:
     if not url:
         return
     try:
-        await run_in_threadpool(
-            lambda: validate_outbound_url(url, allow_private_networks=True)
-        )
+        await run_in_threadpool(lambda: validate_outbound_url(url, allow_private_networks=True))
     except OutboundURLError as exc:
         msg = str(exc)
         # Only a *resolution* failure is tolerated (typo / offline registry);

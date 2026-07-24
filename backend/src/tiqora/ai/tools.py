@@ -85,6 +85,7 @@ _MCP_FORBIDDEN_ARG_KEYS = frozenset(
 def _norm_arg_key(key: str) -> str:
     return "".join(ch for ch in str(key).lower() if ch.isalnum())
 
+
 LOCAL_TOOL_NAMES = frozenset(
     {
         TOOL_PROPOSE_CUSTOMER_MESSAGE,
