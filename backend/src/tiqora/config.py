@@ -359,6 +359,11 @@ class Settings(BaseSettings):
     crypto_smime_private_dir: str = Field(
         default="", validation_alias="TIQORA_CRYPTO_SMIME_PRIVATE_DIR"
     )
+    # CA bundle for S/MIME chain validation. Without it, inbound S/MIME
+    # signatures are checked cryptographically but the signer is UNTRUSTED
+    # (self-signed passes) — such messages are reported "signed_untrusted", not
+    # "verified" (security review M4).
+    crypto_smime_ca_path: str = Field(default="", validation_alias="TIQORA_CRYPTO_SMIME_CA_PATH")
     crypto_openssl_bin: str = Field(default="openssl", validation_alias="TIQORA_CRYPTO_OPENSSL_BIN")
 
     @property

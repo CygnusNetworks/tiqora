@@ -106,8 +106,17 @@ def _process_smime(raw: bytes, settings: Settings) -> tuple[str | None, CryptoIn
         return None, CryptoInboundResult("smime", "not_present", "no pkcs7-mime content-type")
     engine = SmimeEngine(openssl_bin=settings.crypto_openssl_bin)
     try:
-        verify = engine.verify(raw, ca_path=None)
-        status = "verified" if verify.valid else "verify_failed"
+        ca_path = settings.crypto_smime_ca_path or None
+        verify = engine.verify(raw, ca_path=ca_path)
+        # "verified" ONLY when the chain was validated against a trust root;
+        # a valid-but-untrusted (self-signed) signature is "signed_untrusted"
+        # so agents don't see a spoofable trust badge (M4).
+        if verify.chain_trusted:
+            status = "verified"
+        elif verify.valid:
+            status = "signed_untrusted"
+        else:
+            status = "verify_failed"
         return None, CryptoInboundResult("smime", status, verify.detail)
     except (CryptoError, CryptoUnavailableError) as exc:
         return None, CryptoInboundResult("smime", "error", str(exc))

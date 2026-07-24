@@ -14,6 +14,7 @@ store layout (see docs/crypto.md for the trade-off).
 
 from __future__ import annotations
 
+import os
 import re
 from dataclasses import dataclass
 from pathlib import Path
@@ -76,8 +77,15 @@ class SmimeKeyStore:
             if self._private_dir is None:
                 raise CryptoError("S/MIME private-key directory is not configured")
             self._private_dir.mkdir(parents=True, exist_ok=True)
+            self._private_dir.chmod(0o700)
             key_path = self._private_dir / f"{basename}.key"
-            key_path.write_bytes(key_pem)
+            # Create the key file with 0600 from the start — no world/group-
+            # readable window between write and chmod (security review M4).
+            fd = os.open(key_path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+            try:
+                os.write(fd, key_pem)
+            finally:
+                os.close(fd)
             key_path.chmod(0o600)
         return SmimeKeyPaths(cert_path=cert_path, key_path=key_path)
 

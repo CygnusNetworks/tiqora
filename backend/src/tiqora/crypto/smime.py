@@ -29,6 +29,11 @@ _TIMEOUT_SECONDS = 30
 class SmimeVerifyResult:
     valid: bool
     detail: str
+    # True only when the signature was checked against a real CA trust root
+    # (``ca_path`` given). Without it (``-noverify``) the signature is
+    # cryptographically valid but the SIGNER IS UNTRUSTED — a self-signed cert
+    # bearing the victim's address also passes (security review M4).
+    chain_trusted: bool = False
 
 
 @dataclass(frozen=True)
@@ -104,5 +109,7 @@ class SmimeEngine:
         args += ["-CAfile", ca_path] if ca_path else ["-noverify"]
         proc = self._run(args, data)
         return SmimeVerifyResult(
-            valid=proc.returncode == 0, detail=proc.stderr.decode("utf-8", "replace")
+            valid=proc.returncode == 0,
+            detail=proc.stderr.decode("utf-8", "replace"),
+            chain_trusted=bool(ca_path) and proc.returncode == 0,
         )
