@@ -12,6 +12,7 @@ built frontend static assets. Process role is selected at start:
 |---|---|
 | `api` (default) | FastAPI (uvicorn) |
 | `worker` | taskiq worker |
+| `ai-worker` | AI subsystem loop (auto-reply + auto-summary), isolated from the main worker; inert unless `operation_mode=tiqora_primary` and `daemon.ai_worker.enabled` |
 | `mcp` | FastMCP server |
 
 Registry targets (CI):

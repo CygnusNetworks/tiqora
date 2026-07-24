@@ -200,9 +200,20 @@ Each of the following moves to Tiqora independently:
 | Notifications | NotificationEvent | notification engine |
 | GenericAgent | GenericAgent | GA executor |
 | Auto-responses | AutoResponse | auto-response job |
+| AI auto-reply / auto-summary | *(n/a — new capability)* | `ai-worker` |
 
 Flags must be **mutually exclusive** with the Znuny side for each function to
 avoid double-send or double-escalation.
+
+**The AI subsystem is gated more strictly.** Autonomous AI (the `ai-worker`:
+auto-reply and the auto-summary scan) requires **both** `operation_mode =
+tiqora_primary` **and** `daemon.ai_worker.enabled` — so during parallel
+operation (`operation_mode = parallel`, the default) it stays inert no matter
+what, and no automated customer reply can ever go out from Tiqora while Znuny
+still owns the mailbox. Manual, human-gated AI (drafts and on-demand summaries)
+is *not* gated by the operation mode — an agent can use it during parallel
+operation because nothing is sent without explicit human action. See
+[ai-integration.md](ai-integration.md) §5 (Readiness-Gate).
 
 **Preferred switch: Admin → Dienste** (`/admin/daemons`) toggles every
 `daemon.*.enabled` flag and admin-overridable interval listed below, and

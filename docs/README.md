@@ -33,7 +33,7 @@
 | [api/openapi.json](api/openapi.json) | Generated OpenAPI schema (exhaustive; also served live at `GET /openapi.json`) |
 | [api/compat.md](api/compat.md) | `/znuny-compat` GenericInterface emulation — quick pointer into [compatibility.md](compatibility.md) |
 | [api/mcp.md](api/mcp.md) | MCP server: transport, auth, tool list, prompt-injection warning |
-| [ai-integration.md](ai-integration.md) | Webhook payload schema, MCP as the primary AI interface, recommended agent patterns |
+| [ai-integration.md](ai-integration.md) | Webhook schema, MCP interface, external agent patterns, and the **built-in AI subsystem** (§5: providers, per-queue policies, drafts, summaries, auto-reply, PII masking, audit) |
 
 ## Znuny parallel operation and migration
 

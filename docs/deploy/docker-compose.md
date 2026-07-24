@@ -17,6 +17,7 @@ cp docker-compose.example.yml docker-compose.yml
 | `meilisearch` | `getmeili/meilisearch:v1.11` | Ticket + knowledge-base full-text search index. |
 | `tiqora-api` | `ghcr.io/cygnusnetworks/tiqora:latest` (`command: ["api"]`) | The FastAPI HTTP server (`/api/v1`, `/api/portal`, `/znuny-compat`) **and the web UI (SPA) at `/`** — one image ships backend + frontend. Port `8000`. Set `TIQORA_SERVE_FRONTEND=0` to disable and front the UI with a separate static host. |
 | `tiqora-worker` | same image (`command: ["worker"]`) | Background poller: Znuny-write detection, search indexing, webhooks, daemon takeovers (postmaster/escalation/notifications/GenericAgent). No exposed port. |
+| `tiqora-ai-worker` | same image (`command: ["ai-worker"]`) | Runs the AI subsystem (auto-reply worker, auto-summary scan) in its **own** process so a hung LLM call never stalls postmaster/outbox/indexing. Inert until `operation_mode=tiqora_primary` **and** `daemon.ai_worker.enabled`. No exposed port. |
 | `tiqora-mcp` | same image (`command: ["mcp"]`) | The MCP server for AI/LLM integrations (see [`../api/mcp.md`](../api/mcp.md)). Port `8001`. |
 | `mailpit` (optional, commented out) | `axllent/mailpit` | SMTP catch-all for non-production environments — never enable against a mailbox real customers use. |
 
@@ -24,9 +25,9 @@ The image is published to both `ghcr.io/cygnusnetworks/tiqora` and
 `docker.io/cygnusnetworks/tiqora` (Docker Hub mirror); either works, pick
 whichever your registry access/pull-through cache prefers.
 
-Note that `tiqora-api`, `tiqora-worker`, and `tiqora-mcp` are the **same
-image** running different entrypoint subcommands — there is one artifact to
-pull and version, not three.
+Note that `tiqora-api`, `tiqora-worker`, `tiqora-ai-worker`, and `tiqora-mcp`
+are the **same image** running different entrypoint subcommands — there is one
+artifact to pull and version, not four.
 
 ## Environment variable reference
 
@@ -78,6 +79,17 @@ are the code defaults, not necessarily sane production values.
 |---|---|---|
 | `TIQORA_POLLER_INTERVAL` | `15` (seconds) | How often the worker checks for Znuny-side writes during parallel operation. |
 | `TIQORA_INDEX_BATCH_SIZE` | `500` | Rows per Meilisearch indexing batch. |
+
+### AI subsystem
+
+Most AI configuration is data, not env: LLM providers, MCP clients, per-queue
+policies, ACL/limits and the operation-mode gate are all managed in admin
+(`/admin/ai/*`) and stored in `tiqora_*` tables. The env knobs are:
+
+| Variable | Default | Notes |
+|---|---|---|
+| `TIQORA_LLM_TIMEOUT` | `180.0` (seconds) | Per-request HTTP timeout for one LLM chat completion; also used by the attachment vision pre-pass. Detailed multi-document summaries can run long — raise if you see `LlmTimeoutError`. |
+| `TIQORA_AI_WORKER_HEARTBEAT_FILE` | *(unset)* | Optional liveness file the `ai-worker` process touches each loop (for container healthchecks / monitoring). |
 
 ### Schema ownership (parallel-operation gate)
 

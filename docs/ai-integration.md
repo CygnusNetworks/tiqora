@@ -223,6 +223,26 @@ process (`tiqora-ai-worker`, `tiqora.ai.worker`), never inside the main
 takeover worker, so a slow/hung LLM call can never affect postmaster/outbox/
 indexing.
 
+### Providers, MCP clients, and PII masking
+
+Two admin-managed building blocks sit under the per-queue policies:
+
+- **LLM providers** (`tiqora_llm_provider`, `/admin/ai/providers`) — one row per
+  usable model: kind (`openai_compat` or `anthropic`), base URL, model, an
+  encrypted API key (`TIQORA_SECRET_KEY`), capability flags (tools/streaming/
+  vision/EU-hosted) and optional pricing. A queue policy references a provider by
+  id; a separate `vision_provider_id` can point at a vision-capable model for the
+  attachment pre-pass.
+- **MCP clients** (`/admin/ai/mcp-clients`) — external MCP servers registered as
+  tool sources the built-in agent may call, subject to the same ACLs.
+
+**PII masking** is a pipeline step, not an afterthought: when a queue policy has
+`pii_masking` on, article bodies (and extracted attachment text) are run through
+a masker (`tiqora.ai.pii`, regex + optional spaCy NER for names) that replaces
+emails, phone numbers, IPs, IDs and detected names with stable placeholders
+**before** anything is sent to the LLM, then un-masked on the way back for
+storage/display. `never_mask` protects the ticket's own customer identifiers.
+
 ### Readiness-Gate
 
 The gate (`tiqora.ai.gate`) only applies to **auto-reply** — a deliberate

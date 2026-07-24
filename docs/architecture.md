@@ -22,9 +22,10 @@ full design rationale, see [specs/2026-07-19-tiqora-design.md](./specs/2026-07-1
 |---|---|---|
 | `tiqora-api` | `api` | HTTP: agent/portal/admin BFF, `/api/v1`, compat routes, `/health`, `/ready`, `/metrics` |
 | `tiqora-worker` | `worker` | taskiq consumers: indexer, mailer, pollers, postmaster/escalation/GA (feature-flagged) |
+| `tiqora-ai-worker` | `ai-worker` | AI subsystem loop: auto-reply worker + auto-summary scan, isolated so a hung LLM call never stalls the main worker. Inert unless `operation_mode=tiqora_primary` and `daemon.ai_worker.enabled` |
 | `tiqora-mcp` | `mcp` | FastMCP over SSE; imports `domain/` directly (no second business layer) |
 
-All three share the same container image with a switchable entrypoint.
+All four share the same container image with a switchable entrypoint.
 
 ## Logical layers
 
@@ -146,14 +147,22 @@ Key endpoints: `/auth/login|me|logout`, `/queues`, `/tickets`,
   All `gssapi` calls run in an executor (it's a sync, C-extension-backed
   library). Feature-flagged off by default (`TIQORA_SPNEGO_ENABLED`); returns
   `501` if `gssapi` isn't installed. Principal's primary part maps to
-  `users.login`.
+  `users.login`; the agent must also be flagged `sso_eligible`.
+- **Seamless SSO re-auth**: because sessions are short and sliding, an expired
+  session bounces the SPA to `/login?next=<path>`; if SPNEGO is enabled the
+  login page redirects into `/api/v1/auth/spnego?next=<path>`, which re-runs the
+  Negotiate handshake and 302s back to the original page — invisible while the
+  Kerberos ticket is valid. A failed handshake redirects to
+  `/login?sso_error=1&next=…` (never a bare `401`, so no native browser popup).
 - **TOTP 2FA** (pyotp, per-user opt-in): `tiqora_user_totp` stores a
   Fernet-encrypted secret (key derived from `TIQORA_SECRET_KEY`). After a
-  successful password/SSO/SPNEGO login for a user with TOTP enabled, the
-  session is created in a **pending-2FA state** — tagged so it is invisible
+  successful **password** login for a user with TOTP (or a passkey) enrolled,
+  the session is created in a **pending-2FA state** — tagged so it is invisible
   to the normal session-resolve path (`get_current_user`) and cannot touch
   any other endpoint. `POST /api/v1/auth/totp/verify` (±1 step / ~90s
-  window) promotes it to a full session. `GET /api/v1/auth/totp/enroll/qr`
+  window) promotes it to a full session. **SSO/SPNEGO is the strong factor and
+  skips 2FA entirely** (including enforced enrollment) — the `effective_enforce`
+  gate applies only to the password path. `GET /api/v1/auth/totp/enroll/qr`
   renders the pending enrollment's `otpauth://` URI as an `image/svg+xml` QR
   code (`qrcode` lib, SVG factory — no `PIL` dependency); the agent security
   page (`/agent/security`) consumes it as a plain cookie-authenticated
@@ -171,6 +180,31 @@ Key endpoints: `/auth/login|me|logout`, `/queues`, `/tickets`,
   the Perl module). Simplified vs. Znuny: no `Die`/`UserSuffix`/
   `UserLowerCase`/per-directory charset knobs.
 - Planned: GenericInterface SessionIDs against Znuny `sessions`.
+
+### AI subsystem (`tiqora.ai.*`)
+
+An optional, admin-configured LLM layer, all under the same permission engine
+as UI/REST. Admin manages **LLM providers** (`tiqora_llm_provider` — OpenAI-
+compatible or Anthropic, credentials encrypted with `TIQORA_SECRET_KEY`),
+**MCP clients** (external MCP servers exposed to the agent as tools), and
+**per-queue policies** (`tiqora_ai_queue_policy`: which features are on, the
+autonomy level, provider/model, PII-masking, budgets) at `/admin/ai/*`. Three
+features run off those policies:
+
+- **Drafts / manual assist** — an agent-triggered draft reply the agent must
+  explicitly accept; drafts are their own records, never articles.
+- **Summaries** — state-only ticket summaries (`tiqora_ai_ticket_state`),
+  standard or detailed, document- and attachment-aware (text extraction + a
+  vision pre-pass for images).
+- **Auto-reply** — the isolated `ai-worker` autonomously answers customer
+  articles within the queue's autonomy/caps/budget.
+
+Cross-cutting: sensitive data is **PII-masked (spaCy NER)** before any LLM call;
+every request is written to an **audit log** (`/admin/ai/audit`) with a PII-
+inspection view; per-subject **ACL and token/request limits** live in
+`tiqora_ai_acl`. The whole subsystem is gated by the **operation mode** — nothing
+autonomous runs until `tiqora_primary` (see [parallel-operation.md](parallel-operation.md)
+and [ai-integration.md](ai-integration.md) §5).
 
 ### Webhooks
 

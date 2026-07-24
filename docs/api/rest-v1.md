@@ -195,9 +195,10 @@ Dynamic field *values* are set via the ticket `PATCH` endpoint's
 (create/edit the fields themselves) are an admin resource: `GET/POST/PATCH
 /api/v1/admin/dynamic-fields`.
 
-## Drafts
+## Compose-box drafts (autosave)
 
-Per-ticket, per-action reply/note drafts (autosave for the compose box):
+Per-ticket, per-action reply/note drafts — the compose box's own autosave, **not**
+the AI subsystem (see "AI assist" below):
 
 ```sh
 curl -b cookies.txt "$TIQORA_URL/api/v1/tickets/4711/drafts"
@@ -208,6 +209,30 @@ curl -b cookies.txt -X PUT "$TIQORA_URL/api/v1/tickets/4711/drafts/reply" \
 
 curl -b cookies.txt -X DELETE "$TIQORA_URL/api/v1/tickets/4711/drafts/reply"
 ```
+
+## AI assist (per ticket)
+
+Draft replies and summaries from the built-in AI subsystem (gated by the queue's
+AI policy + ACL; see [`../ai-integration.md`](../ai-integration.md) §5). AI drafts
+are their own entity, distinct from the compose-box autosave above.
+
+```sh
+# Current AI state for a ticket (summary + open drafts + what's enabled)
+curl -b cookies.txt "$TIQORA_URL/api/v1/tickets/4711/ai"
+
+# Generate an AI draft reply (agent reviews/accepts before anything is sent)
+curl -b cookies.txt -X POST "$TIQORA_URL/api/v1/tickets/4711/ai/draft"
+
+# (Re)generate the ticket summary; ?detail=standard|detailed
+curl -b cookies.txt -X POST "$TIQORA_URL/api/v1/tickets/4711/ai/summarize"
+
+# Discard an AI draft
+curl -b cookies.txt -X POST "$TIQORA_URL/api/v1/tickets/4711/ai/drafts/42/discard"
+```
+
+Admin-side AI configuration (providers, MCP clients, per-queue policies, ACL, and
+the request audit log) lives under `/api/v1/admin/ai/*` — see the generated
+[OpenAPI schema](openapi.json).
 
 ## Knowledge base
 
