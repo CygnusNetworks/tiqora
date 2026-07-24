@@ -34,6 +34,14 @@ jobs:
       MULTIARCH: ${{ (startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.multiarch)) && 'true' || 'false' }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          # Full history + tags so `git describe` can compute the tag distance.
+          fetch-depth: 0
+
+      - name: Compute version string
+        id: version
+        run: |
+          echo "describe=$(git describe --tags --long --always 2>/dev/null || git rev-parse --short HEAD)" >> "$GITHUB_OUTPUT"
 
       - name: Determine platforms
         id: platforms
@@ -101,7 +109,7 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           build-args: |
-            VITE_APP_VERSION=${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || '' }}
+            VITE_APP_VERSION=${{ steps.version.outputs.describe }}
             VITE_GIT_SHA=${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
