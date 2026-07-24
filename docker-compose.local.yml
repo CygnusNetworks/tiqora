@@ -1,0 +1,187 @@
+# Tiqora — full local dev stack, everything in containers.
+#
+#   docker compose -f docker-compose.local.yml up --build -d
+#   → open http://localhost:8000  (login: root@localhost / admin)
+#
+# Builds the app image from THIS checkout (backend + SPA) so you can test
+# changes locally without pushing anywhere. The `init` service bootstraps a
+# fresh MariaDB (Znuny base schema → tiqora migrations → admin password) and
+# seeds fake customers/tickets, then exits; the app services start after it.
+#
+# Apply code changes:   docker compose -f docker-compose.local.yml up --build -d
+# Re-seed from scratch:  docker compose -f docker-compose.local.yml down -v && … up --build -d
+#
+# This is the "run the whole thing" option. For fast hot-reload backend/frontend
+# work, use docker-compose.dev.yml (infra only) + `uv run` / `pnpm dev` on the
+# host instead — see docs/development.md.
+#
+# MariaDB is used here to match production (Znuny 6.5 on MariaDB). Swap the db
+# service + DATABASE_URL for postgres:16 if you prefer.
+#
+# Runs as its own compose project (`tiqora-local`) with its own containers and
+# volumes, so it never collides with docker-compose.dev.yml. It is a standalone
+# alternative to that infra-only stack — don't run both at once (Mailpit shares
+# host ports 8025/1025).
+
+name: tiqora-local
+
+x-app-env: &app-env
+  DATABASE_URL: mysql+aiomysql://tiqora:tiqora@mariadb:3306/tiqora
+  REDIS_URL: redis://redis:6379/0
+  MEILI_URL: http://meilisearch:7700
+  MEILI_MASTER_KEY: tiqora-dev-master-key
+  TIQORA_SECRET_KEY: dev-secret-not-for-production-change-me
+  TIQORA_ENV: development
+  TIQORA_LOG_LEVEL: INFO
+  # Local HTTP — no TLS, so session cookies must not be Secure-only.
+  TIQORA_SESSION_COOKIE_SECURE: "false"
+  TIQORA_CORS_ORIGINS: http://localhost:8000
+
+x-app-build: &app-build
+  build:
+    context: .
+  image: tiqora-local:dev
+
+services:
+  mariadb:
+    image: mariadb:10.11
+    container_name: tiqora-local-mariadb
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: tiqora
+      MYSQL_USER: tiqora
+      MYSQL_PASSWORD: tiqora
+    volumes:
+      - tiqora_local_mariadb:/var/lib/mysql
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 10s
+      timeout: 5s
+      retries: 15
+
+  redis:
+    image: redis:7-alpine
+    container_name: tiqora-local-redis
+    volumes:
+      - tiqora_local_redis:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+
+  meilisearch:
+    image: getmeili/meilisearch:v1.11
+    container_name: tiqora-local-meilisearch
+    environment:
+      MEILI_ENV: development
+      MEILI_MASTER_KEY: tiqora-dev-master-key
+      MEILI_NO_ANALYTICS: "true"
+    volumes:
+      - tiqora_local_meili:/meili_data
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:7700/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  mailpit:
+    image: axllent/mailpit:latest
+    container_name: tiqora-local-mailpit
+    ports:
+      - "127.0.0.1:1025:1025" # SMTP (point outbound mail here via /admin/mail-outbound)
+      - "127.0.0.1:8025:8025" # Web UI
+    environment:
+      MP_SMTP_AUTH_ACCEPT_ANY: 1
+      MP_SMTP_AUTH_ALLOW_INSECURE: 1
+
+  # One-shot: load Znuny base schema → tiqora migrations → admin password →
+  # seed fake customers/tickets, then exit. App services wait for it.
+  init:
+    <<: *app-build
+    container_name: tiqora-local-init
+    restart: "no"
+    entrypoint: ["python", "-m", "tiqora.main"]
+    command:
+      - bootstrap
+      - --admin-password
+      - admin
+      - --seed
+      - --customers
+      - "12"
+      - --tickets
+      - "40"
+      - --seed-value
+      - "42"
+    environment:
+      <<: *app-env
+    depends_on:
+      mariadb:
+        condition: service_healthy
+
+  tiqora-api:
+    <<: *app-build
+    container_name: tiqora-local-api
+    restart: unless-stopped
+    command: ["api"]
+    environment:
+      <<: *app-env
+      # init already migrated; skip the entrypoint's migrate step to start faster.
+      TIQORA_RUN_MIGRATIONS: "0"
+    ports:
+      - "127.0.0.1:8000:8000"
+    depends_on:
+      init:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+      meilisearch:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health')"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
+  tiqora-worker:
+    <<: *app-build
+    container_name: tiqora-local-worker
+    restart: unless-stopped
+    command: ["worker"]
+    environment:
+      <<: *app-env
+    depends_on:
+      tiqora-api:
+        condition: service_started
+
+  tiqora-ai-worker:
+    <<: *app-build
+    container_name: tiqora-local-ai-worker
+    restart: unless-stopped
+    command: ["ai-worker"]
+    environment:
+      <<: *app-env
+    depends_on:
+      tiqora-api:
+        condition: service_started
+
+  tiqora-mcp:
+    <<: *app-build
+    container_name: tiqora-local-mcp
+    restart: unless-stopped
+    command: ["mcp"]
+    environment:
+      <<: *app-env
+    ports:
+      - "127.0.0.1:8001:8001"
+    depends_on:
+      tiqora-api:
+        condition: service_started
+
+volumes:
+  tiqora_local_mariadb:
+  tiqora_local_redis:
+  tiqora_local_meili:
