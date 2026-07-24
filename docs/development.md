@@ -45,6 +45,35 @@ Services:
 
 Both databases are started so you can switch `DATABASE_URL` for dual-stack work.
 
+`docker-compose.dev.yml` starts infrastructure only — you run the Tiqora
+processes on the host (below) for fast hot-reload.
+
+## Full stack in containers (no host toolchain)
+
+When you just want the whole thing running — e.g. to test a change end-to-end
+without pushing anywhere — use the full-stack compose. It builds the app image
+(backend + SPA) from your checkout, brings up MariaDB/Redis/Meilisearch/Mailpit,
+then a one-shot `init` service loads the Znuny base schema, runs the tiqora
+migrations, sets the admin password, and seeds fake customers/tickets:
+
+```bash
+docker compose -f docker-compose.local.yml up --build -d
+# open http://localhost:8000   (login: root@localhost / admin)
+```
+
+| Thing | Where |
+|---|---|
+| Web UI + API | http://localhost:8000 |
+| MCP server | http://localhost:8001 |
+| Mailpit (caught mail) | http://localhost:8025 |
+| Admin login | `root@localhost` / `admin` |
+
+Apply code changes by re-running `up --build -d`. To wipe the DB and re-seed
+from scratch: `docker compose -f docker-compose.local.yml down -v` then bring it
+up again. This uses MariaDB to match production; the seed data are real database
+rows (via `tiqora bootstrap --seed`), **not** the frontend MSW mocks used for
+screenshots/the public demo.
+
 ## Backend
 
 ```bash
