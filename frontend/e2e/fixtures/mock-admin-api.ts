@@ -235,6 +235,12 @@ export async function mockAdminApi(page: Page) {
       return;
     }
 
+    // Per-user 2FA reset (also reachable from the users list's ⋯ menu).
+    if (/\/api\/v1\/admin\/auth-config\/\d+\/reset-2fa$/.test(path) && method === "POST") {
+      await route.fulfill({ status: 204, body: "" });
+      return;
+    }
+
     // Reference data feeding the queue form's required selects. System
     // addresses and follow-up-possible are bare arrays; salutations and
     // signatures are paginated like the other admin resources.

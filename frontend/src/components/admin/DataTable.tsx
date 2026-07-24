@@ -51,6 +51,13 @@ export type DataTableProps<T> = {
   onActivate?: (row: T) => void;
   /** Permanently remove a row (hard delete, unlike onDeactivate's soft revoke). Shown for every row. */
   onDelete?: (row: T) => void;
+  /**
+   * Extra resource-specific entries for the row ⋯ menu (e.g. "reset 2FA" on
+   * users). Rendered after edit/deactivate and before the delete separator —
+   * return `<MenuItem>`s (or a fragment of them), or `null` for rows with no
+   * extra actions.
+   */
+  extraRowActions?: (row: T) => ReactNode;
   /** True for a row whose valid_id !== 1 (or equivalent) — renders the invalid Badge. */
   isRowValid?: (row: T) => boolean;
   /** Opt-in leading checkbox column for bulk selection. */
@@ -194,6 +201,7 @@ export function DataTable<T>({
   onDeactivate,
   onActivate,
   onDelete,
+  extraRowActions,
   isRowValid,
   selection,
   sort,
@@ -203,7 +211,7 @@ export function DataTable<T>({
   testId = "admin-data-table",
 }: DataTableProps<T>) {
   const { t } = useTranslation();
-  const hasActions = Boolean(onEdit || onDeactivate || onActivate || onDelete);
+  const hasActions = Boolean(onEdit || onDeactivate || onActivate || onDelete || extraRowActions);
   const hasSelection = Boolean(selection);
   const sortEnabled = Boolean(onSortChange);
   const colCount =
@@ -386,6 +394,7 @@ export function DataTable<T>({
                             </span>
                           </MenuItem>
                         )}
+                        {extraRowActions?.(row)}
                         {onDelete && (
                           <>
                             {(onEdit || onDeactivate || onActivate) && <MenuSeparator />}

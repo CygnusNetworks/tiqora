@@ -1,13 +1,38 @@
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
+import { useMutation } from "@tanstack/react-query";
 import { api, type UserOut, type UserCreate, type UserUpdate } from "@/lib/api";
 import { AdminResourcePage } from "@/components/admin/AdminResourcePage";
 import type { FieldDef, FieldValues } from "@/components/admin/CrudDrawer";
 import type { DataTableColumn } from "@/components/admin/DataTable";
+import { MenuItem } from "@/components/ui/Menu";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { formatDateTime } from "@/lib/format";
+
+function ShieldIcon() {
+  return (
+    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" aria-hidden="true">
+      <path
+        d="M12 3 5 6v5c0 4.2 2.9 7.6 7 9 4.1-1.4 7-4.8 7-9V6l-7-3Z"
+        stroke="currentColor"
+        strokeWidth="1.7"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
 
 export function UsersPage() {
   const { t, i18n } = useTranslation();
   const locale = i18n.language?.startsWith("de") ? "de" : "en";
+
+  // Per-user 2FA reset — same endpoint as the dedicated auth-config page, but
+  // reachable straight from the user list. A confirmation guards the reset.
+  const [reset2faTarget, setReset2faTarget] = useState<UserOut | null>(null);
+  const resetM = useMutation({
+    mutationFn: (userId: number) => api.adminAuthConfig.reset2fa(userId),
+    onSuccess: () => setReset2faTarget(null),
+  });
 
   const columns: DataTableColumn<UserOut>[] = [
     { key: "id", header: t("admin.table.id"), mono: true, render: (r) => r.id },
@@ -49,6 +74,7 @@ export function UsersPage() {
   ];
 
   return (
+    <>
     <AdminResourcePage
       resourceKey="users"
       title={t("admin.users.title_plural")}
@@ -57,6 +83,17 @@ export function UsersPage() {
       idOf={(r) => r.id}
       columns={columns}
       fields={fields}
+      rowActions={(row) => (
+        <MenuItem
+          testId={`admin-row-reset2fa-${row.id}`}
+          onSelect={() => setReset2faTarget(row)}
+        >
+          <span className="inline-flex items-center gap-2">
+            <ShieldIcon />
+            {t("admin.authConfig.reset2fa")}
+          </span>
+        </MenuItem>
+      )}
       toFormValues={(row) =>
         row
           ? {
@@ -86,5 +123,20 @@ export function UsersPage() {
         ...(v.password ? { password: v.password as string } : {}),
       })}
     />
+    <ConfirmDialog
+      open={reset2faTarget !== null}
+      variant="danger"
+      title={t("admin.authConfig.resetConfirmTitle")}
+      message={t("admin.authConfig.resetConfirmBody", {
+        login: reset2faTarget?.login ?? "",
+      })}
+      confirmLabel={t("admin.authConfig.reset2fa")}
+      pending={resetM.isPending}
+      onConfirm={() => {
+        if (reset2faTarget) resetM.mutate(reset2faTarget.id);
+      }}
+      onCancel={() => setReset2faTarget(null)}
+    />
+    </>
   );
 }
