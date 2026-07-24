@@ -84,6 +84,10 @@ docker-data/
 .uv/
 uv.lock.bak
 .justfile.local
+# rtk (token-optimizer) project-local filter config
+.rtk/
+# Node V8 compile-cache runtime artifact (arch-specific)
+v8-compile-cache-0/
 
 # --- Generated / runtime ---
 _site/          # local assemble of product site + demo (CI artifact only)

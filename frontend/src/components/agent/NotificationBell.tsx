@@ -121,24 +121,44 @@ export function NotificationToaster() {
   const navigate = useNavigate();
   const { items } = useNotifications();
   const [toasts, setToasts] = useState<NotificationItem[]>([]);
-  const lastSeenId = useRef<string | null>(null);
+  // `undefined` = first effect run not yet seen; `null` = initialised on an
+  // empty store; a string = id of the last head item we've reacted to.
+  const lastSeenId = useRef<string | null | undefined>(undefined);
+  const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
 
   useEffect(() => {
     const top = items[0];
-    if (!top) return;
-    if (lastSeenId.current === null) {
-      // First render — adopt current head without toasting existing items.
-      lastSeenId.current = top.id;
+    if (lastSeenId.current === undefined) {
+      // First effect run — adopt whatever's already at the head (if any)
+      // without toasting it, so a reload doesn't replay old items. Recording
+      // the baseline even when the store starts empty (null) ensures the
+      // *next* arriving item is genuinely new and gets toasted, rather than
+      // being silently adopted as the new baseline.
+      lastSeenId.current = top?.id ?? null;
       return;
     }
+    if (!top) return;
     if (top.id === lastSeenId.current) return;
     lastSeenId.current = top.id;
+    const { id } = top;
     setToasts((cur) => [top, ...cur].slice(0, 3));
+    // Each toast owns an independent auto-dismiss timer. This must NOT be
+    // torn down when the next notification arrives (a later effect run),
+    // otherwise every toast but the most recent would linger forever.
     const timer = setTimeout(() => {
-      setToasts((cur) => cur.filter((tt) => tt.id !== top.id));
+      setToasts((cur) => cur.filter((tt) => tt.id !== id));
+      timers.current = timers.current.filter((handle) => handle !== timer);
     }, 5000);
-    return () => clearTimeout(timer);
+    timers.current.push(timer);
   }, [items]);
+
+  // Clear any still-pending auto-dismiss timers on unmount.
+  useEffect(
+    () => () => {
+      for (const handle of timers.current) clearTimeout(handle);
+    },
+    [],
+  );
 
   if (toasts.length === 0) return null;
 
