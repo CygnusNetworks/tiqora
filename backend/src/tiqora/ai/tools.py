@@ -128,6 +128,33 @@ async def _default_mcp_call(
         return await client.call_tool(tool_name, arguments)
 
 
+def _mcp_result_payload(raw: Any) -> Any:
+    """Normalize a fastmcp ``CallToolResult`` into plain data before it is
+    JSON-serialized for the model/trace — ``json.dumps(raw, default=str)``
+    on the result object itself would store its repr
+    (``"content=[TextContent(...)］"``), which neither the model nor the UI
+    formatter can read. Duck-typed so test fakes returning dicts/lists/str
+    pass through untouched."""
+    if raw is None or isinstance(raw, (dict, list, str, int, float, bool)):
+        return raw
+    structured = getattr(raw, "structured_content", None)
+    if isinstance(structured, (dict, list)):
+        return structured
+    data = getattr(raw, "data", None)
+    if isinstance(data, (dict, list, str, int, float, bool)):
+        return data
+    content = getattr(raw, "content", None)
+    if isinstance(content, list):
+        texts = [t for t in (getattr(part, "text", None) for part in content) if t]
+        if texts:
+            joined = "\n".join(texts)
+            try:
+                return json.loads(joined)
+            except ValueError:
+                return joined
+    return str(raw)
+
+
 def _local_tool_schemas(*, kb_enabled: bool) -> list[dict[str, Any]]:
     schemas: list[dict[str, Any]] = [
         {
@@ -523,8 +550,8 @@ class ToolExecutor:
         unmasked_args = {
             k: (self._pii.unmask(v) if isinstance(v, str) else v) for k, v in arguments.items()
         }
-        raw_result = await self._mcp_caller(
-            spec.client_url, spec.auth_token, spec.tool_name, unmasked_args
+        raw_result = _mcp_result_payload(
+            await self._mcp_caller(spec.client_url, spec.auth_token, spec.tool_name, unmasked_args)
         )
         hit = check_escalation(
             self._escalation_rules, tool_full_name=spec.full_name, raw_result=raw_result

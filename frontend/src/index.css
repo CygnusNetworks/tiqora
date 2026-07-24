@@ -161,6 +161,28 @@ h3 {
   animation: admin-list-progress-slide 1.1s ease-in-out infinite;
 }
 
+/* One-shot entrance for audit rows arriving via background refetch: brief
+   slide-in with an accent tint that fades back to transparent. */
+@keyframes audit-row-in {
+  0% {
+    opacity: 0;
+    transform: translateY(-4px);
+    background-color: var(--color-accent-dim);
+  }
+  55% {
+    opacity: 1;
+    transform: translateY(0);
+    background-color: var(--color-accent-dim);
+  }
+  100% {
+    background-color: transparent;
+  }
+}
+
+.animate-audit-row-in {
+  animation: audit-row-in 1.4s ease-out;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

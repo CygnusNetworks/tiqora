@@ -1,4 +1,4 @@
-import { useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
@@ -17,6 +17,7 @@ import { SelectMenu, type SelectMenuItem } from "@/components/ui/SelectMenu";
 import { Tabs } from "@/components/ui/Tabs";
 import { HelpPopover } from "@/components/ui/HelpPopover";
 import { ChevronDownIcon } from "@/components/ui/icons";
+import { ToolResultBody } from "@/components/ai/ToolResultView";
 import { formatDateTime } from "@/lib/format";
 import { cn } from "@/lib/cn";
 
@@ -29,7 +30,10 @@ type PeriodPreset = "today" | "7d" | "30d" | "custom";
 
 type WireMessage = {
   role: string;
-  content?: string | Array<{ type: string; text?: string; image_url?: { url?: string } }> | null;
+  content?:
+    | string
+    | Array<{ type: string; text?: string; image_url?: { url?: string } }>
+    | null;
   tool_calls?: Array<{
     id?: string;
     name?: string;
@@ -75,8 +79,14 @@ function daysAgoIso(days: number): string {
   return d.toISOString();
 }
 
-function statusTone(row: { status_code: number | null; error: string | null }): "success" | "danger" {
-  return row.error != null || (row.status_code != null && row.status_code >= 400) ? "danger" : "success";
+function statusTone(row: {
+  status_code: number | null;
+  error: string | null;
+}): "success" | "danger" {
+  return row.error != null ||
+    (row.status_code != null && row.status_code >= 400)
+    ? "danger"
+    : "success";
 }
 
 function featureTone(feature: AuditFeature): "accent" | "muted" {
@@ -92,7 +102,11 @@ function tokensLabel(n: number): string {
 /** Cost display: real currency formatting for 3-letter ISO codes, plain
  * number + suffix otherwise. Sub-cent amounts keep 4 fraction digits so
  * small per-request costs don't collapse to 0,00. */
-function formatCost(value: number, currency: string | null, locale: string): string {
+function formatCost(
+  value: number,
+  currency: string | null,
+  locale: string,
+): string {
   const digits = value !== 0 && Math.abs(value) < 0.01 ? 4 : 2;
   if (currency && /^[A-Z]{3}$/.test(currency)) {
     try {
@@ -127,8 +141,13 @@ function StatCard({
   testId: string;
 }) {
   return (
-    <div className="rounded-lg border border-hairline bg-surface p-4" data-testid={testId}>
-      <p className="truncate text-xs uppercase tracking-wide text-muted">{label}</p>
+    <div
+      className="rounded-lg border border-hairline bg-surface p-4"
+      data-testid={testId}
+    >
+      <p className="truncate text-xs uppercase tracking-wide text-muted">
+        {label}
+      </p>
       <p
         className={cn(
           "mt-2 font-mono text-2xl font-semibold tabular-nums",
@@ -142,7 +161,11 @@ function StatCard({
   );
 }
 
-function PerDayChart({ perDay }: { perDay: { date: string; count: number }[] }) {
+function PerDayChart({
+  perDay,
+}: {
+  perDay: { date: string; count: number }[];
+}) {
   const { i18n } = useTranslation();
   const locale = i18n.language?.startsWith("de") ? "de" : "en";
   if (perDay.length === 0) return null;
@@ -153,13 +176,20 @@ function PerDayChart({ perDay }: { perDay: { date: string; count: number }[] }) 
       data-testid="ai-audit-chart"
     >
       {perDay.map((d) => (
-        <div key={d.date} className="flex flex-1 flex-col items-center justify-end gap-1" title={`${d.date}: ${d.count}`}>
+        <div
+          key={d.date}
+          className="flex flex-1 flex-col items-center justify-end gap-1"
+          title={`${d.date}: ${d.count}`}
+        >
           <div
             className="w-full rounded-t bg-accent/60"
             style={{ height: `${Math.max(4, (d.count / max) * 100)}%` }}
           />
           <span className="truncate text-[9px] text-muted">
-            {new Date(d.date).toLocaleDateString(locale, { day: "2-digit", month: "2-digit" })}
+            {new Date(d.date).toLocaleDateString(locale, {
+              day: "2-digit",
+              month: "2-digit",
+            })}
           </span>
         </div>
       ))}
@@ -167,7 +197,10 @@ function PerDayChart({ perDay }: { perDay: { date: string; count: number }[] }) 
   );
 }
 
-function renderHighlightedText(text: string, piiMap: Record<string, string> | null): ReactNode[] {
+function renderHighlightedText(
+  text: string,
+  piiMap: Record<string, string> | null,
+): ReactNode[] {
   const parts: ReactNode[] = [];
   let lastIndex = 0;
   const re = new RegExp(PII_TOKEN_RE.source, "g");
@@ -182,7 +215,8 @@ function renderHighlightedText(text: string, piiMap: Record<string, string> | nu
         key={`pii-${i++}-${match.index}`}
         className={cn(
           "rounded bg-fuchsia-300/15 px-0.5 text-fuchsia-600 dark:text-fuchsia-300",
-          revealed != null && "underline decoration-dashed decoration-fuchsia-500",
+          revealed != null &&
+            "underline decoration-dashed decoration-fuchsia-500",
         )}
         title={revealed != null ? token : undefined}
       >
@@ -195,11 +229,18 @@ function renderHighlightedText(text: string, piiMap: Record<string, string> | nu
   return parts;
 }
 
-function CollapsibleText({ text, piiMap }: { text: string; piiMap: Record<string, string> | null }) {
+function CollapsibleText({
+  text,
+  piiMap,
+}: {
+  text: string;
+  piiMap: Record<string, string> | null;
+}) {
   const { t } = useTranslation();
   const [expanded, setExpanded] = useState(false);
   const isLong = text.length > LONG_TEXT_THRESHOLD;
-  const shown = isLong && !expanded ? `${text.slice(0, LONG_TEXT_THRESHOLD)}…` : text;
+  const shown =
+    isLong && !expanded ? `${text.slice(0, LONG_TEXT_THRESHOLD)}…` : text;
   return (
     <div className="whitespace-pre-wrap break-words text-sm text-ink">
       {renderHighlightedText(shown, piiMap)}
@@ -209,7 +250,9 @@ function CollapsibleText({ text, piiMap }: { text: string; piiMap: Record<string
           className="ml-1 text-xs font-medium text-accent hover:underline"
           onClick={() => setExpanded((e) => !e)}
         >
-          {expanded ? t("admin.ai.audit.detail.collapse") : t("admin.ai.audit.detail.showFull")}
+          {expanded
+            ? t("admin.ai.audit.detail.collapse")
+            : t("admin.ai.audit.detail.showFull")}
         </button>
       )}
     </div>
@@ -223,9 +266,22 @@ const ROLE_STYLES: Record<string, string> = {
   tool: "border-amber/35 bg-amber/10",
 };
 
-function MessageBlock({ role, label, children }: { role: string; label?: string; children: ReactNode }) {
+function MessageBlock({
+  role,
+  label,
+  children,
+}: {
+  role: string;
+  label?: string;
+  children: ReactNode;
+}) {
   return (
-    <div className={cn("rounded-lg border p-3", ROLE_STYLES[role] ?? ROLE_STYLES.system)}>
+    <div
+      className={cn(
+        "rounded-lg border p-3",
+        ROLE_STYLES[role] ?? ROLE_STYLES.system,
+      )}
+    >
       <div className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted">
         {label ?? role}
       </div>
@@ -290,33 +346,51 @@ function MessagesTab({
             role={m.role}
             label={m.name ? `${m.role} (${m.name})` : undefined}
           >
-            {contentText && <CollapsibleText text={contentText} piiMap={piiMap} />}
+            {contentText &&
+              (m.role === "tool" ? (
+                // Formatted tool result (key/value grid / pretty JSON) — the
+                // PII token hover-reveal is traded for readability here;
+                // tokens still show literally inside the values.
+                <ToolResultBody content={contentText} />
+              ) : (
+                <CollapsibleText text={contentText} piiMap={piiMap} />
+              ))}
             {toolCallsText && (
               <pre className="mt-1 whitespace-pre-wrap break-words font-mono text-xs text-amber">
                 {toolCallsText}
               </pre>
             )}
             {!contentText && !toolCallsText && (
-              <span className="text-xs text-muted">{t("admin.ai.audit.detail.empty")}</span>
+              <span className="text-xs text-muted">
+                {t("admin.ai.audit.detail.empty")}
+              </span>
             )}
           </MessageBlock>
         );
       })}
 
       {parsedResponse && (
-        <MessageBlock role="assistant" label={t("admin.ai.audit.detail.response")}>
-          {parsedResponse.content && <CollapsibleText text={parsedResponse.content} piiMap={piiMap} />}
-          {parsedResponse.tool_calls && parsedResponse.tool_calls.length > 0 && (
-            <pre className="mt-1 whitespace-pre-wrap break-words font-mono text-xs text-amber">
-              {formatToolCalls(parsedResponse.tool_calls)}
-            </pre>
+        <MessageBlock
+          role="assistant"
+          label={t("admin.ai.audit.detail.response")}
+        >
+          {parsedResponse.content && (
+            <CollapsibleText text={parsedResponse.content} piiMap={piiMap} />
           )}
+          {parsedResponse.tool_calls &&
+            parsedResponse.tool_calls.length > 0 && (
+              <pre className="mt-1 whitespace-pre-wrap break-words font-mono text-xs text-amber">
+                {formatToolCalls(parsedResponse.tool_calls)}
+              </pre>
+            )}
         </MessageBlock>
       )}
 
       {entry.error && (
         <MessageBlock role="error" label={t("admin.ai.audit.detail.error")}>
-          <p className="whitespace-pre-wrap break-words text-sm text-danger">{entry.error}</p>
+          <p className="whitespace-pre-wrap break-words text-sm text-danger">
+            {entry.error}
+          </p>
         </MessageBlock>
       )}
     </div>
@@ -333,7 +407,15 @@ function downloadJson(filename: string, content: string) {
   URL.revokeObjectURL(url);
 }
 
-function RawJsonBox({ label, raw, testId }: { label: string; raw: string | null; testId: string }) {
+function RawJsonBox({
+  label,
+  raw,
+  testId,
+}: {
+  label: string;
+  raw: string | null;
+  testId: string;
+}) {
   const { t } = useTranslation();
   const pretty = useMemo(() => {
     if (!raw) return null;
@@ -342,13 +424,17 @@ function RawJsonBox({ label, raw, testId }: { label: string; raw: string | null;
   }, [raw]);
 
   if (pretty == null) {
-    return <p className="text-xs text-muted">{t("admin.ai.audit.detail.empty")}</p>;
+    return (
+      <p className="text-xs text-muted">{t("admin.ai.audit.detail.empty")}</p>
+    );
   }
 
   return (
     <div className="space-y-1.5">
       <div className="flex items-center justify-between">
-        <span className="text-xs font-medium uppercase tracking-wide text-muted">{label}</span>
+        <span className="text-xs font-medium uppercase tracking-wide text-muted">
+          {label}
+        </span>
         <div className="flex gap-1.5">
           <Button
             variant="ghost"
@@ -391,16 +477,24 @@ function PiiSummaryChip({ counts }: { counts: Record<string, number> | null }) {
   if (!counts || Object.keys(counts).length === 0) return null;
   const total = Object.values(counts).reduce((a, b) => a + b, 0);
   const parts = Object.entries(counts).map(
-    ([kind, n]) => `${n} ${t(PII_KIND_LABEL_KEYS[kind] ?? "admin.ai.audit.piiKind.OTHER", { kind })}`,
+    ([kind, n]) =>
+      `${n} ${t(PII_KIND_LABEL_KEYS[kind] ?? "admin.ai.audit.piiKind.OTHER", { kind })}`,
   );
   return (
     <Badge tone="warn" data-testid="ai-audit-pii-summary">
-      {t("admin.ai.audit.detail.piiSummary", { count: total })}: {parts.join(" · ")}
+      {t("admin.ai.audit.detail.piiSummary", { count: total })}:{" "}
+      {parts.join(" · ")}
     </Badge>
   );
 }
 
-function AuditDetailDrawer({ entryId, onClose }: { entryId: number; onClose: () => void }) {
+function AuditDetailDrawer({
+  entryId,
+  onClose,
+}: {
+  entryId: number;
+  onClose: () => void;
+}) {
   const { t, i18n } = useTranslation();
   const locale = i18n.language?.startsWith("de") ? "de" : "en";
   const [tab, setTab] = useState<"messages" | "raw">("messages");
@@ -421,8 +515,12 @@ function AuditDetailDrawer({ entryId, onClose }: { entryId: number; onClose: () 
   });
 
   const entry = detailQ.data;
-  const parsedRequest = entry ? safeParse<ParsedRequest>(entry.request_json) : null;
-  const parsedResponse = entry ? safeParse<ParsedResponse>(entry.response_json) : null;
+  const parsedRequest = entry
+    ? safeParse<ParsedRequest>(entry.request_json)
+    : null;
+  const parsedResponse = entry
+    ? safeParse<ParsedResponse>(entry.response_json)
+    : null;
 
   return (
     <div
@@ -439,7 +537,12 @@ function AuditDetailDrawer({ entryId, onClose }: { entryId: number; onClose: () 
           <h2 className="font-display text-base font-semibold text-ink">
             {t("admin.ai.audit.detail.title")} #{entryId}
           </h2>
-          <Button variant="ghost" size="sm" onClick={onClose} data-testid="ai-audit-drawer-close">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={onClose}
+            data-testid="ai-audit-drawer-close"
+          >
             ✕
           </Button>
         </div>
@@ -453,15 +556,21 @@ function AuditDetailDrawer({ entryId, onClose }: { entryId: number; onClose: () 
             <div className="flex flex-wrap items-center gap-1.5">
               <Badge tone={featureTone(entry.feature)}>{entry.feature}</Badge>
               <Badge tone={statusTone(entry)}>
-                {entry.status_code ?? (entry.error ? t("admin.ai.audit.error") : "—")}
+                {entry.status_code ??
+                  (entry.error ? t("admin.ai.audit.error") : "—")}
               </Badge>
-              {entry.provider_name && <Badge tone="muted">{entry.provider_name}</Badge>}
+              {entry.provider_name && (
+                <Badge tone="muted">{entry.provider_name}</Badge>
+              )}
               {entry.model && <Badge tone="muted">{entry.model}</Badge>}
               <PiiSummaryChip counts={entry.pii_counts} />
             </div>
 
             <dl className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-sm">
-              <DetailRow label={t("admin.ai.audit.table.time")} value={formatDateTime(entry.ts, locale)} />
+              <DetailRow
+                label={t("admin.ai.audit.table.time")}
+                value={formatDateTime(entry.ts, locale)}
+              />
               <DetailRow
                 label={t("admin.ai.audit.table.ticket")}
                 value={
@@ -478,8 +587,15 @@ function AuditDetailDrawer({ entryId, onClose }: { entryId: number; onClose: () 
                   )
                 }
               />
-              <DetailRow label={t("admin.ai.audit.detail.runId")} value={entry.run_id ?? "—"} mono />
-              <DetailRow label={t("admin.ai.audit.detail.trigger")} value={entry.trigger ?? "—"} />
+              <DetailRow
+                label={t("admin.ai.audit.detail.runId")}
+                value={entry.run_id ?? "—"}
+                mono
+              />
+              <DetailRow
+                label={t("admin.ai.audit.detail.trigger")}
+                value={entry.trigger ?? "—"}
+              />
               <DetailRow
                 label={t("admin.ai.audit.table.tokens")}
                 value={`${entry.prompt_tokens ?? 0} / ${entry.completion_tokens ?? 0}`}
@@ -513,12 +629,17 @@ function AuditDetailDrawer({ entryId, onClose }: { entryId: number; onClose: () 
               </label>
             )}
             {revealMutation.isError && (
-              <p className="text-xs text-danger">{t("admin.ai.audit.detail.revealPiiError")}</p>
+              <p className="text-xs text-danger">
+                {t("admin.ai.audit.detail.revealPiiError")}
+              </p>
             )}
 
             <Tabs
               items={[
-                { id: "messages", label: t("admin.ai.audit.detail.tabMessages") },
+                {
+                  id: "messages",
+                  label: t("admin.ai.audit.detail.tabMessages"),
+                },
                 { id: "raw", label: t("admin.ai.audit.detail.tabRaw") },
               ]}
               value={tab}
@@ -553,11 +674,23 @@ function AuditDetailDrawer({ entryId, onClose }: { entryId: number; onClose: () 
   );
 }
 
-function DetailRow({ label, value, mono }: { label: string; value: ReactNode; mono?: boolean }) {
+function DetailRow({
+  label,
+  value,
+  mono,
+}: {
+  label: string;
+  value: ReactNode;
+  mono?: boolean;
+}) {
   return (
     <>
-      <dt className="text-xs font-medium uppercase tracking-wide text-muted">{label}</dt>
-      <dd className={cn("break-all text-ink", mono && "font-mono text-xs")}>{value}</dd>
+      <dt className="text-xs font-medium uppercase tracking-wide text-muted">
+        {label}
+      </dt>
+      <dd className={cn("break-all text-ink", mono && "font-mono text-xs")}>
+        {value}
+      </dd>
     </>
   );
 }
@@ -574,7 +707,8 @@ function RetentionFooter() {
   });
 
   const saveMutation = useMutation({
-    mutationFn: (days: number) => aiApi.putSettings({ audit_retention_days: days }),
+    mutationFn: (days: number) =>
+      aiApi.putSettings({ audit_retention_days: days }),
     onSuccess: () => {
       setEditing(false);
       void qc.invalidateQueries({ queryKey: ["admin", "ai", "settings"] });
@@ -584,7 +718,10 @@ function RetentionFooter() {
   const days = settingsQ.data?.audit_retention_days;
 
   return (
-    <div className="flex items-center gap-2 text-xs text-muted" data-testid="ai-audit-retention">
+    <div
+      className="flex items-center gap-2 text-xs text-muted"
+      data-testid="ai-audit-retention"
+    >
       {editing ? (
         <>
           <span>{t("admin.ai.audit.retentionEdit")}</span>
@@ -613,7 +750,9 @@ function RetentionFooter() {
       ) : (
         <>
           <span>
-            {days != null ? t("admin.ai.audit.retention", { count: days }) : "…"}
+            {days != null
+              ? t("admin.ai.audit.retention", { count: days })
+              : "…"}
           </span>
           <button
             type="button"
@@ -662,7 +801,10 @@ export function AiAuditPage() {
             : customFrom
               ? new Date(customFrom).toISOString()
               : undefined;
-    const to = preset === "custom" && customTo ? new Date(customTo).toISOString() : undefined;
+    const to =
+      preset === "custom" && customTo
+        ? new Date(customTo).toISOString()
+        : undefined;
     return {
       from,
       to,
@@ -675,8 +817,29 @@ export function AiAuditPage() {
 
   const listQ = useQuery({
     queryKey: [...QUERY_KEY, "list", filters, page],
-    queryFn: ({ signal }) => aiApi.listAuditLog({ ...filters, page, page_size: PAGE_SIZE }, signal),
+    queryFn: ({ signal }) =>
+      aiApi.listAuditLog({ ...filters, page, page_size: PAGE_SIZE }, signal),
+    // New requests keep arriving while the admin watches — poll the first
+    // page (visible tabs only, react-query default) instead of requiring a
+    // manual reload; fresh rows animate in (see newIds below).
+    refetchInterval: page === 1 ? 15_000 : false,
   });
+
+  // Rows that arrived through a background refetch get a one-shot entrance
+  // animation. Tracks the highest id ever seen; only ids above it count as
+  // "new" (paging back and forth does not re-animate old rows).
+  const prevMaxIdRef = useRef<number | null>(null);
+  const [newIds, setNewIds] = useState<ReadonlySet<number>>(new Set());
+  useEffect(() => {
+    const ids = (listQ.data?.items ?? []).map((i) => i.id);
+    if (ids.length === 0) return;
+    const maxId = Math.max(...ids);
+    const prev = prevMaxIdRef.current;
+    if (prev != null && maxId > prev && page === 1) {
+      setNewIds(new Set(ids.filter((id) => id > prev)));
+    }
+    prevMaxIdRef.current = Math.max(prev ?? 0, maxId);
+  }, [listQ.data, page]);
 
   const statsQ = useQuery({
     queryKey: [...QUERY_KEY, "stats", filters],
@@ -691,7 +854,10 @@ export function AiAuditPage() {
   ];
   const providerItems: SelectMenuItem<number | "">[] = [
     { value: "", label: t("admin.ai.audit.allProviders") },
-    ...((providersQ.data?.items ?? []).map((p) => ({ value: p.id, label: p.name }))),
+    ...(providersQ.data?.items ?? []).map((p) => ({
+      value: p.id,
+      label: p.name,
+    })),
   ];
   const featureItems: SelectMenuItem<AuditFeature | "">[] = [
     { value: "", label: t("admin.ai.audit.allFeatures") },
@@ -721,11 +887,16 @@ export function AiAuditPage() {
       <div>
         <h1 className="flex items-center gap-1.5 font-display text-xl font-semibold text-ink">
           {t("admin.ai.audit.title")}
-          <HelpPopover title={t("admin.ai.audit.title")} testId="ai-audit-help-title">
+          <HelpPopover
+            title={t("admin.ai.audit.title")}
+            testId="ai-audit-help-title"
+          >
             {t("admin.help.ai.audit.overview")}
           </HelpPopover>
         </h1>
-        <p className="mt-1 text-sm text-muted">{t("admin.ai.audit.subtitle")}</p>
+        <p className="mt-1 text-sm text-muted">
+          {t("admin.ai.audit.subtitle")}
+        </p>
       </div>
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
@@ -737,7 +908,11 @@ export function AiAuditPage() {
         <StatCard
           label={t("admin.ai.audit.stat.tokens")}
           value={
-            stats ? tokensLabel(stats.total_prompt_tokens + stats.total_completion_tokens) : "…"
+            stats
+              ? tokensLabel(
+                  stats.total_prompt_tokens + stats.total_completion_tokens,
+                )
+              : "…"
           }
           hint={
             stats
@@ -756,7 +931,9 @@ export function AiAuditPage() {
               : "…"
           }
           hint={
-            stats && statsCost.total == null ? t("admin.ai.audit.stat.costUnavailable") : undefined
+            stats && statsCost.total == null
+              ? t("admin.ai.audit.stat.costUnavailable")
+              : undefined
           }
           testId="ai-audit-stat-cost"
         />
@@ -773,7 +950,9 @@ export function AiAuditPage() {
         />
       </div>
 
-      {stats && stats.per_day.length > 0 && <PerDayChart perDay={stats.per_day} />}
+      {stats && stats.per_day.length > 0 && (
+        <PerDayChart perDay={stats.per_day} />
+      )}
 
       <div
         className="flex flex-wrap items-end gap-2 rounded border border-hairline bg-surface p-3"
@@ -797,8 +976,15 @@ export function AiAuditPage() {
                 {...toggleProps}
                 className="flex min-w-[9rem] items-center justify-between gap-2 rounded border border-hairline bg-surface px-2 py-1.5 text-sm text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent"
               >
-                <span>{presetItems.find((i) => i.value === preset)?.label}</span>
-                <ChevronDownIcon className={cn("shrink-0 text-muted transition-transform duration-150", open && "rotate-180")} />
+                <span>
+                  {presetItems.find((i) => i.value === preset)?.label}
+                </span>
+                <ChevronDownIcon
+                  className={cn(
+                    "shrink-0 text-muted transition-transform duration-150",
+                    open && "rotate-180",
+                  )}
+                />
               </button>
             )}
           />
@@ -854,7 +1040,12 @@ export function AiAuditPage() {
                 <span className="truncate">
                   {providerItems.find((i) => i.value === providerId)?.label}
                 </span>
-                <ChevronDownIcon className={cn("shrink-0 text-muted transition-transform duration-150", open && "rotate-180")} />
+                <ChevronDownIcon
+                  className={cn(
+                    "shrink-0 text-muted transition-transform duration-150",
+                    open && "rotate-180",
+                  )}
+                />
               </button>
             )}
           />
@@ -877,8 +1068,15 @@ export function AiAuditPage() {
                 {...toggleProps}
                 className="flex min-w-[9rem] items-center justify-between gap-2 rounded border border-hairline bg-surface px-2 py-1.5 text-sm text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent"
               >
-                <span>{featureItems.find((i) => i.value === feature)?.label}</span>
-                <ChevronDownIcon className={cn("shrink-0 text-muted transition-transform duration-150", open && "rotate-180")} />
+                <span>
+                  {featureItems.find((i) => i.value === feature)?.label}
+                </span>
+                <ChevronDownIcon
+                  className={cn(
+                    "shrink-0 text-muted transition-transform duration-150",
+                    open && "rotate-180",
+                  )}
+                />
               </button>
             )}
           />
@@ -901,8 +1099,15 @@ export function AiAuditPage() {
                 {...toggleProps}
                 className="flex min-w-[8rem] items-center justify-between gap-2 rounded border border-hairline bg-surface px-2 py-1.5 text-sm text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent"
               >
-                <span>{statusItems.find((i) => i.value === status)?.label}</span>
-                <ChevronDownIcon className={cn("shrink-0 text-muted transition-transform duration-150", open && "rotate-180")} />
+                <span>
+                  {statusItems.find((i) => i.value === status)?.label}
+                </span>
+                <ChevronDownIcon
+                  className={cn(
+                    "shrink-0 text-muted transition-transform duration-150",
+                    open && "rotate-180",
+                  )}
+                />
               </button>
             )}
           />
@@ -933,18 +1138,39 @@ export function AiAuditPage() {
             {t("admin.ai.audit.empty")}
           </p>
         ) : (
-          <table className="w-full min-w-[64rem] text-left text-sm" data-testid="ai-audit-table">
+          <table
+            className="w-full min-w-[64rem] text-left text-sm"
+            data-testid="ai-audit-table"
+          >
             <thead className="border-b border-hairline bg-surface-subtle text-xs uppercase tracking-wide text-muted">
               <tr>
-                <th className="px-3 py-2 font-medium">{t("admin.ai.audit.table.time")}</th>
-                <th className="px-3 py-2 font-medium">{t("admin.ai.audit.table.provider")}</th>
-                <th className="px-3 py-2 font-medium">{t("admin.ai.audit.table.feature")}</th>
-                <th className="px-3 py-2 font-medium">{t("admin.ai.audit.table.ticket")}</th>
-                <th className="px-3 py-2 font-medium">{t("admin.ai.audit.table.tokens")}</th>
-                <th className="px-3 py-2 font-medium">{t("admin.ai.audit.table.cost")}</th>
-                <th className="px-3 py-2 font-medium">{t("admin.ai.audit.table.duration")}</th>
-                <th className="px-3 py-2 font-medium">{t("admin.ai.audit.table.pii")}</th>
-                <th className="px-3 py-2 font-medium">{t("admin.ai.audit.table.status")}</th>
+                <th className="px-3 py-2 font-medium">
+                  {t("admin.ai.audit.table.time")}
+                </th>
+                <th className="px-3 py-2 font-medium">
+                  {t("admin.ai.audit.table.provider")}
+                </th>
+                <th className="px-3 py-2 font-medium">
+                  {t("admin.ai.audit.table.feature")}
+                </th>
+                <th className="px-3 py-2 font-medium">
+                  {t("admin.ai.audit.table.ticket")}
+                </th>
+                <th className="px-3 py-2 font-medium">
+                  {t("admin.ai.audit.table.tokens")}
+                </th>
+                <th className="px-3 py-2 font-medium">
+                  {t("admin.ai.audit.table.cost")}
+                </th>
+                <th className="px-3 py-2 font-medium">
+                  {t("admin.ai.audit.table.duration")}
+                </th>
+                <th className="px-3 py-2 font-medium">
+                  {t("admin.ai.audit.table.pii")}
+                </th>
+                <th className="px-3 py-2 font-medium">
+                  {t("admin.ai.audit.table.status")}
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -956,18 +1182,25 @@ export function AiAuditPage() {
                   <tr
                     key={row.id}
                     data-testid={`ai-audit-row-${row.id}`}
-                    className="cursor-pointer border-b border-hairline last:border-0 hover:bg-surface-subtle"
+                    className={cn(
+                      "cursor-pointer border-b border-hairline last:border-0 hover:bg-surface-subtle",
+                      newIds.has(row.id) && "animate-audit-row-in",
+                    )}
                     onClick={() => setSelectedId(row.id)}
                   >
                     <td className="whitespace-nowrap px-3 py-2 font-mono text-xs text-muted">
                       {formatDateTime(row.ts, locale)}
                     </td>
                     <td className="max-w-[10rem] truncate px-3 py-2 text-xs">
-                      <span className="text-ink">{row.provider_name || "—"}</span>
+                      <span className="text-ink">
+                        {row.provider_name || "—"}
+                      </span>
                       <span className="text-muted"> / {row.model || "—"}</span>
                     </td>
                     <td className="px-3 py-2">
-                      <Badge tone={featureTone(row.feature)}>{row.feature}</Badge>
+                      <Badge tone={featureTone(row.feature)}>
+                        {row.feature}
+                      </Badge>
                     </td>
                     <td className="px-3 py-2">
                       {row.ticket_id != null ? (
@@ -990,14 +1223,19 @@ export function AiAuditPage() {
                       className="whitespace-nowrap px-3 py-2 font-mono text-xs text-muted"
                       data-testid={`ai-audit-row-${row.id}-cost`}
                     >
-                      {row.cost != null ? formatCost(row.cost, row.cost_currency, locale) : "—"}
+                      {row.cost != null
+                        ? formatCost(row.cost, row.cost_currency, locale)
+                        : "—"}
                     </td>
                     <td className="whitespace-nowrap px-3 py-2 font-mono text-xs text-muted">
                       {row.duration_ms} ms
                     </td>
                     <td className="px-3 py-2">
                       {piiTotal > 0 ? (
-                        <Badge tone="warn" data-testid={`ai-audit-row-${row.id}-pii`}>
+                        <Badge
+                          tone="warn"
+                          data-testid={`ai-audit-row-${row.id}-pii`}
+                        >
                           {piiTotal}
                         </Badge>
                       ) : (
@@ -1005,7 +1243,9 @@ export function AiAuditPage() {
                       )}
                     </td>
                     <td className="px-3 py-2">
-                      <Badge tone={statusTone(row)}>{row.status_code ?? t("admin.ai.audit.error")}</Badge>
+                      <Badge tone={statusTone(row)}>
+                        {row.status_code ?? t("admin.ai.audit.error")}
+                      </Badge>
                     </td>
                   </tr>
                 );
@@ -1048,13 +1288,19 @@ export function AiAuditPage() {
 
       <div className="flex items-center gap-1.5">
         <RetentionFooter />
-        <HelpPopover title={t("admin.ai.audit.retentionChange")} testId="ai-audit-help-retention">
+        <HelpPopover
+          title={t("admin.ai.audit.retentionChange")}
+          testId="ai-audit-help-retention"
+        >
           {t("admin.help.ai.audit.retention")}
         </HelpPopover>
       </div>
 
       {selectedId != null && (
-        <AuditDetailDrawer entryId={selectedId} onClose={() => setSelectedId(null)} />
+        <AuditDetailDrawer
+          entryId={selectedId}
+          onClose={() => setSelectedId(null)}
+        />
       )}
     </div>
   );
