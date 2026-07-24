@@ -61,6 +61,7 @@ async def build_llm_client(
         base_url=provider.base_url,
         api_key=api_key,
         model=model_override or provider.default_model,
+        timeout_seconds=settings.llm_timeout_seconds,
     )
 
 
@@ -95,7 +96,10 @@ async def build_vision_llm_factory(
 
     def _factory() -> LlmClient:
         client: LlmClient = OpenAiCompatLlmClient(
-            base_url=provider.base_url, api_key=api_key, model=provider.default_model
+            base_url=provider.base_url,
+            api_key=api_key,
+            model=provider.default_model,
+            timeout_seconds=settings.llm_timeout_seconds,
         )
         if audit is not None:
             client = AuditingLlmClient(
