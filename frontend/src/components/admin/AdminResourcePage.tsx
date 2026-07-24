@@ -209,6 +209,8 @@ export function AdminResourcePage<Out, Create, Update>({
     sortable && sortState.sort ? sortState.order : undefined;
 
   const [selected, setSelected] = useState<Set<string | number>>(() => new Set());
+  // Anchor for Shift-click range selection: the last row toggled on its own.
+  const rangeAnchorRef = useRef<string | number | null>(null);
   const bulkEnabled = Boolean(bulkActions && bulkActions.length > 0);
   // Key of the currently-running bulk action, or null when idle.
   const [bulkBusy, setBulkBusy] = useState<string | null>(null);
@@ -233,6 +235,7 @@ export function AdminResourcePage<Out, Create, Update>({
   // Drop selection when the list context changes (filter / search / page size / sort).
   useEffect(() => {
     setSelected(new Set());
+    rangeAnchorRef.current = null;
   }, [valid, search, pageSize, sort, order]);
 
   const listQ = useQuery({
@@ -379,13 +382,33 @@ export function AdminResourcePage<Out, Create, Update>({
     setPage(1);
   };
 
-  const toggleRow = (id: string | number) => {
+  const toggleRow = (id: string | number, range = false) => {
+    const targetIndex = pageIds.indexOf(id);
+    const anchor = rangeAnchorRef.current;
+    const anchorIndex = anchor != null ? pageIds.indexOf(anchor) : -1;
+
+    // Shift-click with a valid anchor on the same page: select the whole
+    // contiguous span between anchor and target (add, never toggle off —
+    // matching the familiar file-list / spreadsheet behaviour).
+    if (range && targetIndex !== -1 && anchorIndex !== -1) {
+      const [lo, hi] =
+        anchorIndex <= targetIndex ? [anchorIndex, targetIndex] : [targetIndex, anchorIndex];
+      setSelected((prev) => {
+        const next = new Set(prev);
+        for (let i = lo; i <= hi; i += 1) next.add(pageIds[i]);
+        return next;
+      });
+      rangeAnchorRef.current = id;
+      return;
+    }
+
     setSelected((prev) => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id);
       else next.add(id);
       return next;
     });
+    rangeAnchorRef.current = id;
   };
 
   const toggleAllOnPage = () => {

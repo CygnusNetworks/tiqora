@@ -168,6 +168,32 @@ describe("AdminResourcePage", () => {
     expect(screen.getByTestId("admin-bulk-status").textContent).toMatch(/2/);
   });
 
+  it("extends the selection to a contiguous range on Shift-click", async () => {
+    const run = vi.fn().mockResolvedValue(undefined);
+    renderPage(
+      { bulkActions: [{ key: "valid", label: "Set valid", run }] },
+      makeChunkedListMock(5),
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId("admin-row-select-2")).toBeInTheDocument();
+    });
+
+    // Anchor on row 2, then Shift-click row 4 → rows 2, 3, 4 all selected.
+    fireEvent.click(screen.getByTestId("admin-row-select-2"));
+    fireEvent.click(screen.getByTestId("admin-row-select-4"), { shiftKey: true });
+
+    const bar = await screen.findByTestId("admin-bulk-bar");
+    expect(within(bar).getByTestId("admin-bulk-count").textContent).toMatch(/3/);
+
+    fireEvent.click(screen.getByTestId("admin-bulk-action-valid"));
+    await waitFor(() => expect(run).toHaveBeenCalledTimes(1));
+    const ids = (run.mock.calls[0][0] as Array<number | string>)
+      .map(Number)
+      .sort((a, b) => a - b);
+    expect(ids).toEqual([2, 3, 4]);
+  });
+
   it("shows busy state (disabled buttons + spinner) while a bulk action runs", async () => {
     let resolveRun!: (value: void) => void;
     const run = vi.fn().mockImplementation(
