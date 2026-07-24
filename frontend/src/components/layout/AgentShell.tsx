@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { api, type QueueNode } from "@/lib/api";
 import { logoUrl } from "@/lib/assets";
+import { useAuth } from "@/auth/AuthContext";
 import { flattenQueues } from "@/components/agent/QueueTree";
 import { Button } from "@/components/ui/Button";
 import { ShortcutHelp } from "@/components/agent/ShortcutHelp";
@@ -285,6 +286,7 @@ function QueueNavSection({
 
 function SidebarBody({ onNavigate }: { onNavigate?: () => void }) {
   const { t } = useTranslation();
+  const { user } = useAuth();
 
   const queuesQ = useQuery({
     queryKey: ["queues"],
@@ -383,6 +385,14 @@ function SidebarBody({ onNavigate }: { onNavigate?: () => void }) {
             testId="agent-nav-kb-categories"
             onNavigate={onNavigate}
           />
+          {user?.can_edit_templates && (
+            <NavItem
+              to="/agent/templates"
+              label={t("sidebar.templates")}
+              testId="agent-nav-templates"
+              onNavigate={onNavigate}
+            />
+          )}
         </NavGroup>
 
         <NavGroup

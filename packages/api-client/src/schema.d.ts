@@ -1455,6 +1455,44 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/templates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Editable Templates
+         * @description Templates the calling agent is allowed to edit.
+         */
+        get: operations["list_editable_templates_api_v1_templates_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/templates/{template_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Template */
+        get: operations["get_template_api_v1_templates__template_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Update Template */
+        patch: operations["update_template_api_v1_templates__template_id__patch"];
+        trace?: never;
+    };
     "/api/v1/search": {
         parameters: {
             query?: never;
@@ -2959,6 +2997,30 @@ export interface paths {
         head?: never;
         /** Update Template */
         patch: operations["update_template_api_v1_admin_templates__template_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/admin/templates/{template_id}/editors": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Template Editors
+         * @description Groups + users granted edit rights on this template (admin view).
+         */
+        get: operations["get_template_editors_api_v1_admin_templates__template_id__editors_get"];
+        /**
+         * Set Template Editors
+         * @description Replace who may edit this template. Empty lists = admin-only again.
+         */
+        put: operations["set_template_editors_api_v1_admin_templates__template_id__editors_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/api/v1/admin/queues/{queue_id}/templates": {
@@ -9384,6 +9446,29 @@ export interface components {
             /** Attachment Ids */
             attachment_ids: number[];
         };
+        /**
+         * TemplateEditorsOut
+         * @description Who may edit a Standard Template (per-template ACL: groups + users).
+         */
+        TemplateEditorsOut: {
+            /** Group Ids */
+            group_ids: number[];
+            /** User Ids */
+            user_ids: number[];
+        };
+        /** TemplateEditorsUpdate */
+        TemplateEditorsUpdate: {
+            /**
+             * Group Ids
+             * @default []
+             */
+            group_ids: number[];
+            /**
+             * User Ids
+             * @default []
+             */
+            user_ids: number[];
+        };
         /** TemplateOut */
         TemplateOut: {
             /** Id */
@@ -9819,6 +9904,11 @@ export interface components {
              * @default false
              */
             is_admin: boolean;
+            /**
+             * Can Edit Templates
+             * @default false
+             */
+            can_edit_templates: boolean;
         };
         /** UserOut */
         UserOut: {
@@ -12813,6 +12903,119 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ComposeContextOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_editable_templates_api_v1_templates_get: {
+        parameters: {
+            query?: {
+                page?: number;
+                page_size?: number;
+                valid?: "valid" | "invalid" | "all";
+                sort?: string | null;
+                order?: "asc" | "desc";
+            };
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Page_StandardTemplateOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_template_api_v1_templates__template_id__get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                template_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StandardTemplateOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_template_api_v1_templates__template_id__patch: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                template_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StandardTemplateUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StandardTemplateOut"];
                 };
             };
             /** @description Validation Error */
@@ -17387,6 +17590,80 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["StandardTemplateOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_template_editors_api_v1_admin_templates__template_id__editors_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                template_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TemplateEditorsOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_template_editors_api_v1_admin_templates__template_id__editors_put: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                template_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TemplateEditorsUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TemplateEditorsOut"];
                 };
             };
             /** @description Validation Error */

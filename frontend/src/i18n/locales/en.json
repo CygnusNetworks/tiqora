@@ -53,7 +53,8 @@
     "showAllQueues": "Show all",
     "showActiveQueues": "Show active",
     "queueSearch": "Filter queues…",
-    "noQueueMatch": "No queues match."
+    "noQueueMatch": "No queues match.",
+    "templates": "Templates"
   },
   "common": {
     "prev": "Previous",
@@ -64,7 +65,9 @@
     "close": "Close",
     "confirm": "Confirm",
     "cancel": "Cancel",
-    "help": "Help"
+    "help": "Help",
+    "edit": "Edit",
+    "save": "Save"
   },
   "auth": {
     "login": "Sign in",
@@ -1330,7 +1333,14 @@
       "usage": "Usage",
       "inQueues": "in {{count}} queues",
       "inQueues_one": "in {{count}} queue",
-      "inQueues_other": "in {{count}} queues"
+      "inQueues_other": "in {{count}} queues",
+      "editors": "Editors",
+      "editorsTitle": "Who may edit “{{name}}”",
+      "editorsHint": "Grant edit rights to permission groups (members with rw) and to individual agents. No selection = admins only.",
+      "editorGroups": "Groups (rw)",
+      "editorGroupsHint": "Members holding rw on these groups may edit.",
+      "editorUsers": "Individual agents",
+      "editorUsersFilter": "Filter agents…"
     },
     "variables": {
       "title": "Available variables",
@@ -1469,7 +1479,15 @@
       "every": "every",
       "olderThan": "older than {{duration}}",
       "newerThan": "newer than {{duration}}",
-      "weekdaysShort": ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"],
+      "weekdaysShort": [
+        "Sun",
+        "Mon",
+        "Tue",
+        "Wed",
+        "Thu",
+        "Fri",
+        "Sat"
+      ],
       "keyLabel": {
         "StateIDs": "State",
         "QueueIDs": "Queue",
@@ -2221,5 +2239,18 @@
       "articleBody": "Body",
       "fieldFallbackNote": "Plain text input (no dedicated widget for this field type)."
     }
+  },
+  "agentTemplates": {
+    "title": "Templates",
+    "subtitle": "Edit the standard templates you've been granted.",
+    "deniedTitle": "No template access",
+    "deniedBody": "You don't have permission to edit templates.",
+    "empty": "No templates are shared with you yet.",
+    "name": "Name",
+    "type": "Type",
+    "comment": "Comment",
+    "body": "Body",
+    "editTitle": "Edit “{{name}}”",
+    "saveError": "Could not save the template."
   }
 }
