@@ -617,7 +617,7 @@
         "loadError": "Settings could not be loaded.",
         "saved": "Saved.",
         "saveError": "Save failed.",
-        "parallelBanner": "AI inactive — parallel operation. AI features require \"Tiqora only\" (tiqora_primary) mode.",
+        "parallelBanner": "Parallel operation: autonomous AI features (e.g. automatic replies) are locked — summaries and human-approved drafts work normally. Full autonomy requires \"Tiqora only\" (tiqora_primary) mode.",
         "statProviders": "LLM providers",
         "statMcp": "MCP clients",
         "statActivePolicies": "Active queue policies",

@@ -10,7 +10,6 @@ import {
   type LlmProviderUpdate,
   type ProviderKind,
 } from "@/lib/aiApi";
-import { DataTable, type DataTableColumn } from "@/components/admin/DataTable";
 import {
   CrudDrawer,
   type FieldDef,
@@ -19,8 +18,10 @@ import {
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import { Spinner } from "@/components/ui/Spinner";
+import { Menu, MenuItem, MenuSeparator } from "@/components/ui/Menu";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
 import { PlusIcon } from "@/components/ui/icons";
+import { cn } from "@/lib/cn";
 
 const QUERY_KEY = ["admin", "ai", "providers"] as const;
 const PROVIDER_KINDS: ProviderKind[] = ["openai_compat", "anthropic"];
@@ -189,108 +190,158 @@ export function AiProvidersPage() {
     }
   };
 
-  const columns: DataTableColumn<LlmProviderOut>[] = [
-    {
-      key: "name",
-      header: t("admin.ai.providers.name"),
-      render: (r) => r.name,
-    },
-    {
-      key: "kind",
-      header: t("admin.ai.providers.kind"),
-      render: (r) => t(`admin.ai.providers.kindLabel.${r.kind}`),
-    },
-    {
-      key: "base_url",
-      header: t("admin.ai.providers.baseUrl"),
-      mono: true,
-      render: (r) => r.base_url,
-    },
-    {
-      key: "default_model",
-      header: t("admin.ai.providers.defaultModel"),
-      mono: true,
-      render: (r) => r.default_model,
-    },
-    {
-      key: "price",
-      header: t("admin.ai.providers.price"),
-      mono: true,
-      render: (r) => {
-        if (r.price_input_per_1m == null && r.price_output_per_1m == null)
-          return "—";
-        const cur = r.price_currency ?? "";
-        return `${r.price_input_per_1m ?? 0} / ${r.price_output_per_1m ?? 0} ${cur}`.trim();
-      },
-    },
-    {
-      key: "flags",
-      header: t("admin.ai.providers.flags"),
-      render: (r) => (
-        <div className="flex flex-wrap gap-1">
-          {r.supports_tools && (
-            <Badge tone="accent">{t("admin.ai.providers.flagTools")}</Badge>
-          )}
-          {r.supports_vision && (
-            <Badge tone="accent">{t("admin.ai.providers.flagVision")}</Badge>
-          )}
-          {r.eu_hosted && (
-            <Badge tone="success">{t("admin.ai.providers.flagEu")}</Badge>
-          )}
-          {r.has_api_key && (
-            <Badge tone="muted">{t("admin.ai.providers.hasKey")}</Badge>
-          )}
-        </div>
-      ),
-    },
-    {
-      key: "test",
-      header: t("admin.ai.providers.test"),
-      render: (r) => {
-        const result = testResults[r.id];
-        return (
-          <div className="flex items-center gap-2">
-            <Button
-              size="sm"
-              variant="secondary"
-              disabled={testingId === r.id}
-              data-testid={`admin-ai-provider-test-${r.id}`}
-              onClick={() => testM.mutate(r.id)}
-            >
-              {testingId === r.id ? (
-                <Spinner className="h-3 w-3" />
-              ) : (
-                t("admin.ai.providers.testAction")
+  const handleDelete = async (row: LlmProviderOut) => {
+    const ok = await confirm({
+      title: t("admin.ai.providers.title"),
+      message: t("admin.ai.providers.deleteConfirm", { name: row.name }),
+      variant: "danger",
+    });
+    if (ok) deleteM.mutate(row.id);
+  };
+
+  const renderPrice = (r: LlmProviderOut): string | null => {
+    if (r.price_input_per_1m == null && r.price_output_per_1m == null)
+      return null;
+    const cur = r.price_currency ?? "";
+    return `${r.price_input_per_1m ?? 0} / ${r.price_output_per_1m ?? 0} ${cur}`.trim();
+  };
+
+  // Two-line row instead of a wide table: name/kind + status dot on top,
+  // model + price below; feature chips right; every action in the ⋯-menu
+  // (row click = edit). The base URL lives only in the edit drawer — with
+  // several models of the same vendor it is identical anyway.
+  const renderRow = (r: LlmProviderOut) => {
+    const result = testResults[r.id];
+    const price = renderPrice(r);
+    return (
+      <div key={r.id} className="border-t border-hairline first:border-t-0">
+        <div
+          role="button"
+          tabIndex={0}
+          data-testid={`admin-ai-provider-row-${r.id}`}
+          onClick={() => openEdit(r)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              openEdit(r);
+            }
+          }}
+          className="grid cursor-pointer grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 px-3.5 py-2.5 transition-colors hover:bg-surface-subtle md:grid-cols-[minmax(0,1fr)_auto_auto]"
+        >
+          <div className="flex min-w-0 items-center gap-2.5">
+            <span
+              className={cn(
+                "h-1.5 w-1.5 shrink-0 rounded-full",
+                r.valid_id === 1 ? "bg-green" : "bg-muted",
               )}
-            </Button>
-            <Button
-              size="sm"
-              variant="secondary"
-              disabled={duplicatingId === r.id}
-              data-testid={`admin-ai-provider-duplicate-${r.id}`}
-              onClick={() => duplicateM.mutate(r.id)}
-            >
-              {duplicatingId === r.id ? (
-                <Spinner className="h-3 w-3" />
-              ) : (
-                t("admin.ai.providers.duplicateAction")
-              )}
-            </Button>
-            {result && (
+              title={
+                r.valid_id === 1
+                  ? t("admin.table.valid")
+                  : t("admin.table.invalid")
+              }
+            />
+            <span className="truncate text-sm font-medium text-ink">
+              {r.name}
+            </span>
+            <span className="shrink-0 text-xs text-muted">
+              {t(`admin.ai.providers.kindLabel.${r.kind}`)}
+            </span>
+          </div>
+          <div className="col-start-1 row-start-2 flex min-w-0 items-baseline gap-3 pl-4">
+            <span className="truncate font-mono text-xs text-muted">
+              {r.default_model}
+            </span>
+            {price && (
               <span
-                className={`text-xs ${result.ok ? "text-green" : "text-danger"}`}
+                className="shrink-0 font-mono text-[11px] text-muted"
+                title={t("admin.ai.providers.price")}
+              >
+                {price}
+              </span>
+            )}
+          </div>
+          <div className="row-span-2 hidden flex-wrap items-center justify-end gap-1 md:flex">
+            {r.supports_tools && (
+              <Badge tone="accent">{t("admin.ai.providers.flagTools")}</Badge>
+            )}
+            {r.supports_vision && (
+              <Badge tone="accent">{t("admin.ai.providers.flagVision")}</Badge>
+            )}
+            {r.eu_hosted && (
+              <Badge tone="success">{t("admin.ai.providers.flagEu")}</Badge>
+            )}
+            {r.has_api_key && (
+              <Badge tone="muted">{t("admin.ai.providers.hasKey")}</Badge>
+            )}
+          </div>
+          <div
+            className="col-start-2 row-span-2 md:col-start-3"
+            onClick={(e) => e.stopPropagation()}
+            onKeyDown={(e) => e.stopPropagation()}
+          >
+            <Menu
+              panelTestId={`admin-ai-provider-menu-${r.id}`}
+              trigger={({ ref, toggleProps }) => (
+                <button
+                  type="button"
+                  ref={ref}
+                  {...toggleProps}
+                  data-testid={`admin-ai-provider-menu-trigger-${r.id}`}
+                  title={t("admin.table.actions")}
+                  className="rounded-md px-1.5 py-1 text-sm leading-none text-muted transition-colors hover:bg-surface-subtle hover:text-ink"
+                >
+                  ⋯
+                </button>
+              )}
+            >
+              <MenuItem
+                testId={`admin-ai-provider-edit-${r.id}`}
+                onSelect={() => openEdit(r)}
+              >
+                {t("admin.table.edit")}
+              </MenuItem>
+              <MenuItem
+                testId={`admin-ai-provider-test-${r.id}`}
+                onSelect={() => testM.mutate(r.id)}
+              >
+                {t("admin.ai.providers.testAction")}
+              </MenuItem>
+              <MenuItem
+                testId={`admin-ai-provider-duplicate-${r.id}`}
+                onSelect={() => duplicateM.mutate(r.id)}
+              >
+                {t("admin.ai.providers.duplicateAction")}
+              </MenuItem>
+              <MenuSeparator />
+              <MenuItem
+                danger
+                testId={`admin-row-delete-${r.id}`}
+                onSelect={() => void handleDelete(r)}
+              >
+                {t("admin.table.delete")}
+              </MenuItem>
+            </Menu>
+          </div>
+        </div>
+        {(testingId === r.id || duplicatingId === r.id || result) && (
+          <div className="flex items-baseline gap-2 border-t border-dashed border-hairline bg-surface-subtle/60 px-3.5 py-2 pl-8 text-xs">
+            {testingId === r.id || duplicatingId === r.id ? (
+              <Spinner className="h-3 w-3 self-center" />
+            ) : result ? (
+              <span
+                className={result.ok ? "text-green" : "text-danger"}
                 data-testid={`admin-ai-provider-test-result-${r.id}`}
               >
                 {result.ok
                   ? `${t("admin.ai.providers.testOk")} (${result.model ?? "?"})`
                   : `${t("admin.ai.providers.testFail")}: ${result.error ?? ""}`}
               </span>
-            )}
+            ) : null}
           </div>
-        );
-      },
-    },
-  ];
+        )}
+      </div>
+    );
+  };
 
   const fields: FieldDef[] = [
     {
@@ -403,23 +454,20 @@ export function AiProvidersPage() {
         </p>
       )}
 
-      <DataTable
-        columns={columns}
-        rows={listQ.data?.items ?? []}
-        rowKey={(r) => r.id}
-        isLoading={listQ.isLoading}
-        isRowValid={(r) => r.valid_id === 1}
-        onEdit={openEdit}
-        onDelete={async (row) => {
-          const ok = await confirm({
-            title: t("admin.ai.providers.title"),
-            message: t("admin.ai.providers.deleteConfirm", { name: row.name }),
-            variant: "danger",
-          });
-          if (ok) deleteM.mutate(row.id);
-        }}
-        testId="admin-ai-providers-table"
-      />
+      <div
+        className="rounded-xl border border-hairline bg-surface"
+        data-testid="admin-ai-providers-table"
+      >
+        {listQ.isLoading ? (
+          <div className="flex justify-center p-6">
+            <Spinner />
+          </div>
+        ) : (listQ.data?.items.length ?? 0) === 0 ? (
+          <p className="p-4 text-sm text-muted">{t("admin.table.empty")}</p>
+        ) : (
+          listQ.data?.items.map(renderRow)
+        )}
+      </div>
 
       <CrudDrawer
         open={drawerOpen}
