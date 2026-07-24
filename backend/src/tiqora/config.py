@@ -91,8 +91,14 @@ class Settings(BaseSettings):
         default="tiqora_session",
         validation_alias="TIQORA_SESSION_COOKIE",
     )
+    # Sliding TTL: every authenticated request renews it (see
+    # SessionStore.touch), so this is the max idle time before logout. 1h keeps
+    # exposure short; SSO/Kerberos agents re-auth transparently on expiry (the
+    # frontend bounces a 401 through /auth/spnego?next=…). Override per
+    # deployment via TIQORA_SESSION_TTL. NOTE: the customer portal reuses this
+    # same value (see customer_session_cookie_name below / CustomerSessionStore).
     session_ttl_seconds: int = Field(
-        default=86400,
+        default=3600,
         validation_alias="TIQORA_SESSION_TTL",
     )
     # Default False for local/dev HTTP; flipped to True in production when
@@ -121,6 +127,15 @@ class Settings(BaseSettings):
     customer_session_cookie_name: str = Field(
         default="tiqora_customer_session",
         validation_alias="TIQORA_CUSTOMER_SESSION_COOKIE",
+    )
+
+    # LLM HTTP timeout (seconds) for one chat completion. Summaries in detailed
+    # mode over several large documents generate a lot of tokens and routinely
+    # blew past the old hard-coded 60s (LlmTimeoutError). Raise per deployment
+    # via TIQORA_LLM_TIMEOUT; the vision pre-pass reuses the same value.
+    llm_timeout_seconds: float = Field(
+        default=180.0,
+        validation_alias="TIQORA_LLM_TIMEOUT",
     )
 
     # Znuny-write poller
