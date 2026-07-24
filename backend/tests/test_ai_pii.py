@@ -127,3 +127,16 @@ def test_display_name_tokens_skips_functional_mailbox_labels() -> None:
         "Meyer",
     ]
     assert display_name_tokens(None) == []
+
+
+def test_timestamps_are_not_masked_as_ipv6() -> None:
+    """Clock times inside ISO timestamps satisfy the loose IPv6 group shape
+    ("07:53:55") — they must survive unmasked (run c4fb84d4)."""
+    mapper = PiiMapper()
+    text = '{"checked_at": "2026-07-24T07:53:55+00:00", "at": "09:05"}'
+    assert mapper.mask(text) == text
+    # Real IPv6 addresses are still masked.
+    masked = mapper.mask("Server fe80::1 and 2001:db8:0:1:1:1:1:1 down")
+    assert "fe80::1" not in masked
+    assert "2001:db8:0:1:1:1:1:1" not in masked
+    assert "[IPV6_" in masked

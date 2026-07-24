@@ -939,3 +939,40 @@ async def test_pii_ner_enabled_masks_third_party_name_mentioned_in_body(
         assert "[NAME_" in llm.last_user_message
     finally:
         await engine.dispose()
+
+
+def test_length_guidance_scales_mail_and_documents() -> None:
+    from tiqora.ai.context import ArticleSnapshot
+    from tiqora.ai.summary import _length_guidance
+
+    def art(article_id: int, body: str) -> ArticleSnapshot:
+        return ArticleSnapshot(
+            id=article_id,
+            sender_type="customer",
+            is_visible_for_customer=True,
+            subject=None,
+            body=body,
+            from_address=None,
+            is_ai_origin=False,
+            attachments=(),
+        )
+
+    blocks = {
+        1: (
+            "[Anhang: protokoll.pdf — ca. 20012 Zeichen]\nText...\n"
+            "[Anhang: anwesende.pdf — ca. 639 Zeichen]\nNamen..."
+        )
+    }
+    short_std = _length_guidance([art(1, "Hallo, siehe Anhang.")], blocks, detail="standard")
+    assert "AT MOST 3 sentences" in short_std
+    assert "protokoll.pdf" in short_std and "4-6 sentences" in short_std
+    assert "anwesende.pdf" in short_std and "1-2 sentences" in short_std
+    assert "MOST of your output" not in short_std
+
+    short_det = _length_guidance([art(1, "Hallo, siehe Anhang.")], blocks, detail="detailed")
+    assert "AT MOST 3 sentences" in short_det
+    assert "MOST of your output" in short_det
+    assert "6-10 sentences" in short_det
+
+    long_mail = _length_guidance([art(1, "x" * 7000)], {}, detail="standard")
+    assert "as many paragraphs" in long_mail

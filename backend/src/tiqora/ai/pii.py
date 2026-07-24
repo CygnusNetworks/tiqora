@@ -44,6 +44,16 @@ _PHONE_RE = re.compile(r"(?<!\w)(\+?\d[\d\s()./-]{6,}\d)(?!\w)")
 _DATE_LIKE_RE = re.compile(r"\A\d{1,2}[./]\s?\d{1,2}[./]\s?\d{2,4}\Z|\A\d{4}-\d{2}-\d{2}\Z")
 
 
+# Clock times ("07:53:55" inside "2026-07-24T07:53:55+00:00") satisfy the
+# loose IPv6 group shape — an IPV6 candidate that looks like a time of day
+# is rejected so timestamps survive unmasked.
+_TIME_LIKE_RE = re.compile(r"\A:?\d{1,2}(:\d{2}){1,2}\Z")
+
+
+def _validate_ipv6(value: str) -> bool:
+    return not _TIME_LIKE_RE.match(value.strip())
+
+
 def _validate_phone(value: str) -> bool:
     """A PHONE candidate is only masked when it has enough digits to plausibly
     be a phone number AND is not shaped like a date."""
@@ -58,7 +68,7 @@ def _validate_phone(value: str) -> bool:
 _PATTERNS: tuple[tuple[str, re.Pattern[str], Callable[[str], bool] | None], ...] = (
     ("EMAIL", _EMAIL_RE, None),
     ("MAC", _MAC_RE, None),
-    ("IPV6", _IPV6_RE, None),
+    ("IPV6", _IPV6_RE, _validate_ipv6),
     ("IPV4", _IPV4_RE, None),
     ("PHONE", _PHONE_RE, _validate_phone),
 )

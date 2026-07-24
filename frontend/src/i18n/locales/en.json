@@ -367,7 +367,7 @@
       },
       "summaryUpToDate": "Already up to date — no new articles since the last summary.",
       "draftsLabel": "Drafts",
-      "createDraftButton": "Create AI draft",
+      "createDraftButton": "Create draft",
       "createDraftHint": "This can take up to a minute…",
       "draftsEmpty": "No AI drafts yet.",
       "draftKind": {

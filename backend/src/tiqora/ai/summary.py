@@ -25,6 +25,7 @@ Tiqora — so in practice auto-summary has no effect until then anyway.
 from __future__ import annotations
 
 import hashlib
+import re
 import uuid
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -150,6 +151,63 @@ _SYSTEM_PROMPT_DETAILED = (
 
 def _system_prompt_for_detail(detail: str) -> str:
     return _SYSTEM_PROMPT_DETAILED if detail == DETAIL_DETAILED else _SYSTEM_PROMPT
+
+
+_ATTACH_SIZE_RE = re.compile(r"^\[Anhang: (.+?) — ca\. (\d+) Zeichen\]", re.MULTILINE)
+
+
+def _length_guidance(
+    rendered_articles: list[ArticleSnapshot],
+    attachment_blocks: dict[int, str],
+    *,
+    detail: str,
+) -> str:
+    """Concrete, computed length instructions appended to the user message.
+
+    The generic prose in the system prompt is not enough for mid-size models
+    (observed: short mails summarized at length while large documents got one
+    sentence, runs 13563f69/49a074d1) — spelling out the actual numbers per
+    run steers them far more reliably.
+    """
+    mail_chars = sum(len(a.body or "") for a in rendered_articles)
+    docs: list[tuple[str, int]] = []
+    for a in rendered_articles:
+        block = attachment_blocks.get(a.id)
+        if block:
+            docs.extend((m.group(1), int(m.group(2))) for m in _ATTACH_SIZE_RE.finditer(block))
+
+    lines = ["--- length guidance (computed for this run) ---"]
+    if mail_chars < 1500:
+        lines.append(
+            f"The mail text is short (~{mail_chars} characters): cover the "
+            "conversation in AT MOST 3 sentences total."
+        )
+    elif mail_chars < 6000:
+        lines.append(
+            f"The mail text is moderate (~{mail_chars} characters): cover the "
+            "conversation in at most 5 sentences total."
+        )
+    else:
+        lines.append(
+            f"The mail text is long (~{mail_chars} characters): use as many "
+            "paragraphs for the conversation as it genuinely needs."
+        )
+    if docs:
+        detailed = detail == DETAIL_DETAILED
+        if detailed:
+            lines.append(
+                "The documents are the main content of this ticket - dedicate "
+                "MOST of your output to the 'Dokumente:' paragraph."
+            )
+        for filename, size in docs:
+            if size < 2000:
+                depth = "1-2 sentences"
+            elif detailed:
+                depth = "a full paragraph of at least 6-10 sentences with concrete contents"
+            else:
+                depth = "4-6 sentences"
+            lines.append(f"Document '{filename}' (~{size} characters): summarize it in {depth}.")
+    return "\n".join(lines)
 
 
 class SummaryError(Exception):
@@ -357,8 +415,10 @@ async def summarize_ticket(
     )
 
     header = render_ticket_header(ticket)
+    effective_detail = detail or policy.summary_detail
     has_previous = state.summary_body is not None and state.last_summary_upto_article_id is not None
     if has_previous:
+        rendered_articles = new_articles
         user_message = (
             f"{header}\n\n"
             f"--- previous summary ---\n{state.summary_body}\n\n"
@@ -368,13 +428,17 @@ async def summarize_ticket(
             )
         )
     else:
+        rendered_articles = articles
         user_message = (
             f"{header}\n\n"
             "--- full conversation ---\n"
             f"{_render_articles(articles, pii=pii, mask=mask, attachment_blocks=attachment_blocks)}"
         )
+    user_message += "\n\n" + _length_guidance(
+        rendered_articles, attachment_blocks, detail=effective_detail
+    )
 
-    system_prompt = _system_prompt_for_detail(detail or policy.summary_detail)
+    system_prompt = _system_prompt_for_detail(effective_detail)
     messages = [
         LlmMessage(role="system", content=system_prompt),
         LlmMessage(role="user", content=user_message),
