@@ -222,7 +222,9 @@ async def _user_login(session: AsyncSession, user_id: int) -> str:
             text("SELECT login FROM users WHERE id = :uid LIMIT 1"), {"uid": user_id}
         )
     ).first()
-    return str(row[0]) if row else "unknown"
+    if row is None:
+        raise InvalidInput(f"Unknown user id: {user_id!r}")
+    return str(row[0])
 
 
 async def _sender_type_id(session: AsyncSession, name: str) -> int:
@@ -441,6 +443,7 @@ async def add_article(
     - Writes history (AddNote / PhoneCallAgent / EmailAgent)
     - Emits ArticleCreate outbox event
     """
+    await _ticket_must_exist(session, ticket_id)
     sender_type_id = await _sender_type_id(session, article.sender_type)
 
     # Agent notes arrive without a From header (unlike email replies, which
@@ -1656,8 +1659,16 @@ class TicketWriteService:
 
     async def move_queue(self, user_id: int, ticket_id: int, new_queue_id: int) -> None:
         t = await _ticket_must_exist(self._session, ticket_id)
-        # Znuny: move requires ``move_into`` on the SOURCE queue.
+        # Znuny: move requires ``move_into`` on the SOURCE queue and on the
+        # DESTINATION queue — Znuny builds the move-target list from the queues
+        # the agent holds ``move_into`` on, so without the destination check an
+        # agent could push tickets into queues they have no rights on. Validate
+        # the destination exists first (``InvalidInput`` -> "no such queue")
+        # before the permission check, so a bad queue id is never reported as a
+        # misleading "access denied".
         await self._assert(user_id, int(t["queue_id"]), "move_into")
+        await _queue_name(self._session, new_queue_id)
+        await self._assert(user_id, new_queue_id, "move_into")
         await move_queue(
             self._session,
             ticket_id=ticket_id,

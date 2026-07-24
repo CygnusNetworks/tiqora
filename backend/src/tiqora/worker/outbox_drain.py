@@ -50,7 +50,7 @@ async def drain_outbox(
             await session.execute(
                 text(
                     "SELECT id, event_type, ticket_id, payload FROM tiqora_event_outbox"
-                    " WHERE processed = 0 ORDER BY id ASC LIMIT :n"
+                    " WHERE processed = false ORDER BY id ASC LIMIT :n"
                 ),
                 {"n": _BATCH_SIZE},
             )
@@ -92,7 +92,7 @@ async def drain_outbox(
     in_clause = ",".join(str(i) for i in row_ids)
     async with factory() as session, session.begin():
         await session.execute(
-            text(f"UPDATE tiqora_event_outbox SET processed = 1 WHERE id IN ({in_clause})")
+            text(f"UPDATE tiqora_event_outbox SET processed = true WHERE id IN ({in_clause})")
         )
 
     logger.info("outbox_drain", processed=len(row_ids), ticket_ids=len(ticket_ids))

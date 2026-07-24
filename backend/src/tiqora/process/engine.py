@@ -103,6 +103,7 @@ from tiqora.process.exceptions import (
     RequiredFieldMissing,
     TicketAlreadyInProcess,
     TicketNotInProcess,
+    UnresolvedFieldValue,
 )
 from tiqora.process.graph import ProcessRepository
 from tiqora.process.ticket_state import (
@@ -725,6 +726,38 @@ def _is_present(field_name: str, field_values: dict[str, Any]) -> bool:
     return True
 
 
+async def _resolve_dialog_field_id(
+    session: AsyncSession,
+    *,
+    field: str,
+    kind: str,
+    raw: Any,
+    resolver: Callable[[AsyncSession, str | None, int | None], Awaitable[int | None]],
+) -> int | None:
+    """Resolve one submitted activity-dialog field value to an entity id.
+
+    Returns ``None`` when *raw* is blank — the field was left empty and must
+    be skipped, mirroring the old ``if <id> is not None`` guards so an
+    optional field the agent never filled does not abort the whole submit.
+    (The frontend seeds every declared field with ``""``, so blank optional
+    fields reach here on essentially every submit.)
+
+    A non-blank value that resolves neither by name nor as a numeric id
+    raises :class:`UnresolvedFieldValue` (mapped to HTTP 400 by the caller).
+    """
+    text_value = str(raw).strip()
+    if not text_value:
+        return None
+    resolved = await resolver(session, text_value, None)
+    if resolved is None and text_value.isdigit():
+        resolved = int(text_value)
+    if resolved is None:
+        raise UnresolvedFieldValue(
+            f"activity dialog field {field!r}: could not resolve {raw!r} to a {kind}"
+        )
+    return resolved
+
+
 async def _apply_dialog_field_changes(
     session: AsyncSession,
     *,
@@ -735,13 +768,18 @@ async def _apply_dialog_field_changes(
     sysconfig: SysConfig,
 ) -> None:
     """Apply submitted field_values to the ticket, per the field names the
-    dialog config declares. Only fields actually present in ``field_values``
-    are applied — the required/optional check already ran in the caller.
+    dialog config declares. Only fields actually present (and non-blank) in
+    ``field_values`` are applied — the required/optional check already ran in
+    the caller.
     """
     if "Queue" in field_values:
-        queue_id = await _resolve_queue_id(session, str(field_values["Queue"]), None)
-        if queue_id is None and str(field_values["Queue"]).isdigit():
-            queue_id = int(field_values["Queue"])
+        queue_id = await _resolve_dialog_field_id(
+            session,
+            field="Queue",
+            kind="queue id",
+            raw=field_values["Queue"],
+            resolver=_resolve_queue_id,
+        )
         if queue_id is not None:
             await move_queue(
                 session,
@@ -752,9 +790,13 @@ async def _apply_dialog_field_changes(
             )
 
     if "State" in field_values:
-        state_id = await _resolve_state_id(session, str(field_values["State"]), None)
-        if state_id is None and str(field_values["State"]).isdigit():
-            state_id = int(field_values["State"])
+        state_id = await _resolve_dialog_field_id(
+            session,
+            field="State",
+            kind="state id",
+            raw=field_values["State"],
+            resolver=_resolve_state_id,
+        )
         if state_id is not None:
             await change_state(
                 session,
@@ -765,9 +807,13 @@ async def _apply_dialog_field_changes(
             )
 
     if "Priority" in field_values:
-        priority_id = await _resolve_priority_id(session, str(field_values["Priority"]), None)
-        if priority_id is None and str(field_values["Priority"]).isdigit():
-            priority_id = int(field_values["Priority"])
+        priority_id = await _resolve_dialog_field_id(
+            session,
+            field="Priority",
+            kind="priority id",
+            raw=field_values["Priority"],
+            resolver=_resolve_priority_id,
+        )
         if priority_id is not None:
             await change_priority(
                 session,
@@ -783,9 +829,13 @@ async def _apply_dialog_field_changes(
         )
 
     if "Owner" in field_values:
-        owner_id = await _resolve_user_id(session, str(field_values["Owner"]), None)
-        if owner_id is None and str(field_values["Owner"]).isdigit():
-            owner_id = int(field_values["Owner"])
+        owner_id = await _resolve_dialog_field_id(
+            session,
+            field="Owner",
+            kind="user id",
+            raw=field_values["Owner"],
+            resolver=_resolve_user_id,
+        )
         if owner_id is not None:
             await assign_owner(
                 session,
@@ -796,9 +846,13 @@ async def _apply_dialog_field_changes(
             )
 
     if "Responsible" in field_values:
-        responsible_id = await _resolve_user_id(session, str(field_values["Responsible"]), None)
-        if responsible_id is None and str(field_values["Responsible"]).isdigit():
-            responsible_id = int(field_values["Responsible"])
+        responsible_id = await _resolve_dialog_field_id(
+            session,
+            field="Responsible",
+            kind="user id",
+            raw=field_values["Responsible"],
+            resolver=_resolve_user_id,
+        )
         if responsible_id is not None:
             await assign_responsible(
                 session, ticket_id=ticket_id, new_responsible_id=responsible_id, user_id=user_id
