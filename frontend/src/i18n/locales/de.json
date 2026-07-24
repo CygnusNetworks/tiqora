@@ -931,6 +931,16 @@
           "tabRaw": "Roh-JSON",
           "rawRequest": "Anfrage",
           "rawResponse": "Antwort"
+        },
+        "pdf": {
+          "export": "PDF exportieren",
+          "masked": "PII maskiert",
+          "revealed": "Personenbezogene Daten enthalten",
+          "generated": "Erstellt",
+          "feature": "Funktion",
+          "provider": "Provider · Modell",
+          "status": "Status",
+          "willIncludePii": "PDF enthält personenbezogene Daten"
         }
       },
       "promptParts": {
