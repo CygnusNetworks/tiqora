@@ -108,9 +108,7 @@ class SessionStore:
         await self._client.expire(self._avatar_key(token), self._ttl)
 
     async def delete(self, token: str) -> None:
-        await self._client.delete(
-            self._key(token), self._avatar_key(token), self._born_key(token)
-        )
+        await self._client.delete(self._key(token), self._avatar_key(token), self._born_key(token))
 
     async def create_pending(self, user_id: int, login: str, ttl_seconds: int) -> str:
         """Create a short-lived 'pending 2FA' session (not resolvable by :meth:`get`).
