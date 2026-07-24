@@ -125,3 +125,57 @@ def test_resolve_allowed_state_types_parses_json_array() -> None:
 
 def test_resolve_allowed_state_types_parses_csv() -> None:
     assert resolve_allowed_state_types("open, closed") == ["open", "closed"]
+
+
+class _FakeTextContent:
+    def __init__(self, text: str) -> None:
+        self.type = "text"
+        self.text = text
+
+
+class _FakeCallToolResult:
+    """Shape-compatible stand-in for fastmcp's CallToolResult."""
+
+    def __init__(
+        self,
+        *,
+        content: list[_FakeTextContent] | None = None,
+        structured_content: object = None,
+        data: object = None,
+    ) -> None:
+        self.content = content or []
+        self.structured_content = structured_content
+        self.data = data
+
+
+def test_mcp_result_payload_prefers_structured_content() -> None:
+    from tiqora.ai.tools import _mcp_result_payload
+
+    raw = _FakeCallToolResult(
+        content=[_FakeTextContent('{"status": "ok"}')],
+        structured_content={"status": "disruption", "eta": "20:00"},
+    )
+    assert _mcp_result_payload(raw) == {"status": "disruption", "eta": "20:00"}
+
+
+def test_mcp_result_payload_parses_json_text_parts() -> None:
+    from tiqora.ai.tools import _mcp_result_payload
+
+    raw = _FakeCallToolResult(content=[_FakeTextContent('{"status": "ok", "n": 3}')])
+    assert _mcp_result_payload(raw) == {"status": "ok", "n": 3}
+
+
+def test_mcp_result_payload_joins_plain_text_parts() -> None:
+    from tiqora.ai.tools import _mcp_result_payload
+
+    raw = _FakeCallToolResult(content=[_FakeTextContent("Zeile 1"), _FakeTextContent("Zeile 2")])
+    assert _mcp_result_payload(raw) == "Zeile 1\nZeile 2"
+
+
+def test_mcp_result_payload_passes_plain_data_through() -> None:
+    from tiqora.ai.tools import _mcp_result_payload
+
+    assert _mcp_result_payload({"a": 1}) == {"a": 1}
+    assert _mcp_result_payload([1, 2]) == [1, 2]
+    assert _mcp_result_payload("text") == "text"
+    assert _mcp_result_payload(None) is None

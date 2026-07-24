@@ -52,17 +52,26 @@ def test_system_prompt_requires_paragraph_structure_and_document_section() -> No
     assert "what the customer wants" in _SYSTEM_PROMPT
     assert "already been tried" in _SYSTEM_PROMPT
     assert "open action items" in _SYSTEM_PROMPT
-    assert "do not use headings, bullet points, or" in _SYSTEM_PROMPT
+    assert "Do not use headings, bullet points, or" in _SYSTEM_PROMPT
     assert "[Anhang: <filename> — ca. <n> Zeichen]" in _SYSTEM_PROMPT
-    assert "scaled to its stated size" in _SYSTEM_PROMPT
+    # Conversation part scales with mail-text length; docs are mandatory.
+    assert "Scale the conversation part" in _SYSTEM_PROMPT
+    assert "2-4 sentences" in _SYSTEM_PROMPT
+    assert "never omit it" in _SYSTEM_PROMPT
+    assert "at least 4-6 sentences" in _SYSTEM_PROMPT
+    assert "carry that paragraph over unchanged" in _SYSTEM_PROMPT
     assert "Dokumente:" in _SYSTEM_PROMPT
 
 
-def test_detailed_prompt_asks_for_size_scaled_document_summaries() -> None:
-    assert "3-5 sentences" in _SYSTEM_PROMPT_DETAILED
-    assert "scaled to its stated size" in _SYSTEM_PROMPT_DETAILED
+def test_detailed_prompt_deepens_documents_not_short_mails() -> None:
+    # The detailed switch primarily affects documents; short mail threads
+    # still collapse (user requirement: "Ausführlich" must not grow the
+    # summary of a short mail).
+    assert "2-4 sentences" in _SYSTEM_PROMPT_DETAILED
+    assert "full paragraph per document" in _SYSTEM_PROMPT_DETAILED
+    assert "never omit it" in _SYSTEM_PROMPT_DETAILED
+    assert "carry that paragraph over unchanged" in _SYSTEM_PROMPT_DETAILED
     assert "Dokumente:" in _SYSTEM_PROMPT_DETAILED
-    # "standard" behaviour must stay byte-identical to before this change.
     assert _SYSTEM_PROMPT_DETAILED != _SYSTEM_PROMPT
 
 

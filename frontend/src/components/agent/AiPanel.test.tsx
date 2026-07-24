@@ -337,11 +337,15 @@ describe("AiPanel", () => {
     await waitFor(() =>
       expect(screen.getByTestId("ai-panel-draft-21")).toBeTruthy(),
     );
-    expect(screen.queryByTestId("ai-panel-draft-admin-delete-21")).toBeNull();
+    expect(screen.queryByTestId("ai-panel-draft-menu-trigger-21")).toBeNull();
     unmount();
 
     mockUser.current = { id: 1, login: "root@localhost", is_admin: true };
     wrap(<AiPanel ticketId={1} canNote />);
+    await waitFor(() =>
+      expect(screen.getByTestId("ai-panel-draft-menu-trigger-21")).toBeTruthy(),
+    );
+    fireEvent.click(screen.getByTestId("ai-panel-draft-menu-trigger-21"));
     await waitFor(() =>
       expect(screen.getByTestId("ai-panel-draft-admin-delete-21")).toBeTruthy(),
     );
@@ -383,7 +387,7 @@ describe("AiPanel", () => {
       expect(screen.getByTestId("ai-panel-draft-30")).toBeTruthy(),
     );
     expect(screen.getByTestId("ai-panel-draft-status-30")).toBeTruthy();
-    expect(screen.getByTestId("ai-panel-draft-admin-delete-30")).toBeTruthy();
+    expect(screen.getByTestId("ai-panel-draft-menu-trigger-30")).toBeTruthy();
     // Discard/use only make sense for open drafts.
     expect(screen.queryByTestId("ai-panel-draft-discard-30")).toBeNull();
     expect(screen.queryByTestId("ai-panel-draft-use-30")).toBeNull();
