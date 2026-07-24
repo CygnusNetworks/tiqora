@@ -18,6 +18,7 @@ from tiqora.api.v1 import (
     reference,
     search,
     stats,
+    templates,
     tickets,
 )
 from tiqora.api.v1.admin import admin_router
@@ -33,6 +34,7 @@ api_v1_router.include_router(process.router)
 api_v1_router.include_router(events.router)
 api_v1_router.include_router(customers.router)
 api_v1_router.include_router(reference.router)
+api_v1_router.include_router(templates.router)
 api_v1_router.include_router(search.router)
 api_v1_router.include_router(kb.router)
 api_v1_router.include_router(channels_sms.router)

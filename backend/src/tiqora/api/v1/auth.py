@@ -46,6 +46,7 @@ from tiqora.domain.spnego import (
     SpnegoUnavailable,
     principal_to_login,
 )
+from tiqora.domain.template_permission import TemplatePermissionService
 from tiqora.domain.totp_qr import totp_qr_svg
 from tiqora.permissions.engine import PermissionEngine
 from tiqora.security.ratelimit import AuthRateLimiter, client_ip
@@ -70,6 +71,7 @@ async def _user_me(
     if extra:
         data.update(extra)
     data["is_admin"] = await pe.is_admin(user.id)
+    data["can_edit_templates"] = await TemplatePermissionService(session).can_edit_any(user.id)
     return UserMe(**data)
 
 

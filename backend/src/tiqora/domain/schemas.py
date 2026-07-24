@@ -24,6 +24,10 @@ class UserMe(BaseModel):
     # (see ``PermissionEngine.is_admin``). Used by the agent UI to show
     # admin navigation without probing an admin endpoint.
     is_admin: bool = False
+    # True when the agent may edit at least one Standard Template (admin, or a
+    # per-template grant to them / a group they hold ``rw`` on). Drives the
+    # agent "Templates" nav item.
+    can_edit_templates: bool = False
 
 
 class LoginRequest(BaseModel):

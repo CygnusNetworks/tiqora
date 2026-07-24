@@ -42,6 +42,8 @@ from tiqora.api.v1.admin.schemas import (
     StandardTemplateOut,
     StandardTemplateUpdate,
     TemplateAttachmentsReplace,
+    TemplateEditorsOut,
+    TemplateEditorsUpdate,
 )
 from tiqora.db.legacy.queue import (
     Queue,
@@ -52,6 +54,7 @@ from tiqora.db.legacy.queue import (
     StandardTemplate,
     StandardTemplateAttachment,
 )
+from tiqora.domain.template_permission import TemplatePermissionService
 
 router = APIRouter(tags=["admin:templates"])
 
@@ -239,6 +242,33 @@ async def get_template(template_id: int, admin: AdminUser, session: DbSession) -
     if row is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Template not found")
     return row
+
+
+@router.get("/templates/{template_id}/editors", response_model=TemplateEditorsOut)
+async def get_template_editors(
+    template_id: int, admin: AdminUser, session: DbSession
+) -> TemplateEditorsOut:
+    """Groups + users granted edit rights on this template (admin view)."""
+    _ = admin
+    if await session.get(StandardTemplate, template_id) is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Template not found")
+    group_ids, user_ids = await TemplatePermissionService(session).get_editors(template_id)
+    return TemplateEditorsOut(group_ids=group_ids, user_ids=user_ids)
+
+
+@router.put("/templates/{template_id}/editors", response_model=TemplateEditorsOut)
+async def set_template_editors(
+    template_id: int, body: TemplateEditorsUpdate, admin: AdminUser, session: DbSession
+) -> TemplateEditorsOut:
+    """Replace who may edit this template. Empty lists = admin-only again."""
+    _ = admin
+    if await session.get(StandardTemplate, template_id) is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Template not found")
+    svc = TemplatePermissionService(session)
+    await svc.set_editors(template_id, body.group_ids, body.user_ids)
+    await session.commit()
+    group_ids, user_ids = await svc.get_editors(template_id)
+    return TemplateEditorsOut(group_ids=group_ids, user_ids=user_ids)
 
 
 @router.post("/templates", response_model=StandardTemplateOut, status_code=status.HTTP_201_CREATED)

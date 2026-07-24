@@ -531,3 +531,35 @@ class TiqoraGdprBackup(TiqoraBase):
         Index("ix_tiqora_gdpr_backup_job_id", "job_id"),
         Index("ix_tiqora_gdpr_backup_created", "created"),
     )
+
+
+class TiqoraStandardTemplateGroup(TiqoraBase):
+    """Many-to-many standard_template <-> permission_group edit-ACL.
+
+    A row grants edit rights on the template to members holding ``rw`` on the
+    group. A template with **no** rows here (and no user grants) stays
+    admin-only. Soft-joins ``standard_template.id`` / ``permission_groups.id``
+    (no FK — parallel operation stays additive ``tiqora_*`` only).
+    """
+
+    __tablename__ = "tiqora_standard_template_group"
+
+    standard_template_id: Mapped[int] = mapped_column(Integer, primary_key=True, nullable=False)
+    permission_group_id: Mapped[int] = mapped_column(Integer, primary_key=True, nullable=False)
+
+    __table_args__ = (Index("ix_tiqora_standard_template_group_group", "permission_group_id"),)
+
+
+class TiqoraStandardTemplateUser(TiqoraBase):
+    """Many-to-many standard_template <-> user edit-ACL (individual grants).
+
+    A row grants edit rights on the template to that specific agent. Soft-joins
+    ``standard_template.id`` / ``users.id`` (no FK).
+    """
+
+    __tablename__ = "tiqora_standard_template_user"
+
+    standard_template_id: Mapped[int] = mapped_column(Integer, primary_key=True, nullable=False)
+    user_id: Mapped[int] = mapped_column(Integer, primary_key=True, nullable=False)
+
+    __table_args__ = (Index("ix_tiqora_standard_template_user_user", "user_id"),)
