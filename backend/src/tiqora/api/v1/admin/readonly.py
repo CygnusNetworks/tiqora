@@ -88,9 +88,9 @@ async def list_generic_agent_jobs(admin: AdminUser, session: DbSession) -> list[
     result = await session.execute(
         select(GenericAgentJobs).order_by(GenericAgentJobs.job_name, GenericAgentJobs.job_key)
     )
-    grouped: dict[str, dict[str, str | None]] = defaultdict(dict)
+    grouped: dict[str, dict[str, list[str]]] = defaultdict(lambda: defaultdict(list))
     for row in result.scalars().all():
-        grouped[row.job_name][row.job_key] = row.job_value
+        grouped[row.job_name][row.job_key].append(row.job_value or "")
     return [
         GenericAgentJobOut(job_name=name, settings=settings) for name, settings in grouped.items()
     ]
@@ -107,5 +107,7 @@ async def get_generic_agent_job(
     rows = list(result.scalars().all())
     if not rows:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Job not found")
-    settings = {r.job_key: r.job_value for r in rows}
-    return GenericAgentJobOut(job_name=job_name, settings=settings)
+    settings: dict[str, list[str]] = defaultdict(list)
+    for r in rows:
+        settings[r.job_key].append(r.job_value or "")
+    return GenericAgentJobOut(job_name=job_name, settings=dict(settings))
