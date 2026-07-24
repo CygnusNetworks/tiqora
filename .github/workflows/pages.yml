@@ -53,7 +53,7 @@ jobs:
           # Screenshots used by the landing gallery
           # Both light and dark variants (the landing gallery has a switch).
           for f in \
-            agent-dashboard agent-ai-assist agent-ticket-zoom \
+            agent-dashboard agent-ai-assist agent-ai-mcp agent-ticket-zoom \
             agent-queues agent-stats agent-search agent-kb \
             admin-queues admin-gdpr portal
           do
