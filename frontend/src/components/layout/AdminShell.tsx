@@ -37,6 +37,16 @@ const GROUP_META: Record<
 
 const NAV_COLLAPSED_KEY = "tiqora.admin.nav.collapsed";
 
+/** Routes that are a path-prefix of ANOTHER nav route (e.g. `/admin/ai` vs
+ * `/admin/ai/queues`) must match exactly — otherwise their link lights up
+ * for every sibling page beneath them. All other links keep prefix matching
+ * so detail routes (`/admin/ai/queues/5`) still highlight their list page. */
+const EXACT_ACTIVE_ROUTES = new Set(
+  ADMIN_PAGES.filter((p) =>
+    ADMIN_PAGES.some((q) => q.route !== p.route && q.route.startsWith(`${p.route}/`)),
+  ).map((p) => p.route),
+);
+
 /** Group of the admin page whose route is the longest prefix of *pathname*
  * — `/admin/ai/queues/5` resolves to the `ai-queues` page, not `ai`. */
 function groupForPath(pathname: string): AdminPageGroup | null {
@@ -186,6 +196,7 @@ function ContextColumn({
               to={page.route}
               data-testid={`admin-nav-${page.slug}`}
               onClick={onNavigate}
+              activeOptions={{ exact: EXACT_ACTIVE_ROUTES.has(page.route) }}
               className="flex items-center rounded-lg px-2.5 py-[7px] text-[13.5px] text-ink transition-colors duration-100 hover:bg-surface-subtle focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent"
               activeProps={{
                 className:
@@ -230,6 +241,7 @@ function MobileNav({
                     to={page.route}
                     data-testid={`admin-nav-mobile-${page.slug}`}
                     onClick={onNavigate}
+                    activeOptions={{ exact: EXACT_ACTIVE_ROUTES.has(page.route) }}
                     className="flex items-center gap-2 rounded-lg px-2.5 py-[7px] text-[13.5px] text-ink transition-colors duration-100 hover:bg-surface-subtle"
                     activeProps={{
                       className:
