@@ -617,7 +617,7 @@
         "loadError": "Einstellungen konnten nicht geladen werden.",
         "saved": "Gespeichert.",
         "saveError": "Speichern fehlgeschlagen.",
-        "parallelBanner": "KI inaktiv — Parallelbetrieb. KI-Funktionen erfordern den Modus „Nur Tiqora“ (tiqora_primary).",
+        "parallelBanner": "Parallelbetrieb: Autonome KI-Funktionen (z. B. automatische Antworten) sind gesperrt — Zusammenfassungen und Entwürfe mit Freigabe funktionieren normal. Vollautonomie erfordert den Modus „Nur Tiqora“ (tiqora_primary).",
         "statProviders": "LLM-Provider",
         "statMcp": "MCP-Clients",
         "statActivePolicies": "Aktive Queue-Policies",
