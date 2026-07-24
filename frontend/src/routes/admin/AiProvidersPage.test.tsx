@@ -75,7 +75,12 @@ describe("AiProvidersPage", () => {
     testProvider.mockReset();
     duplicateProvider.mockReset();
 
-    listProviders.mockResolvedValue({ items: [sampleProvider], total: 1, page: 1, page_size: 1 });
+    listProviders.mockResolvedValue({
+      items: [sampleProvider],
+      total: 1,
+      page: 1,
+      page_size: 1,
+    });
   });
 
   it("renders the provider list and never shows the api_key value", async () => {
@@ -87,9 +92,15 @@ describe("AiProvidersPage", () => {
   });
 
   it("creates a provider via the drawer", async () => {
-    createProvider.mockResolvedValue({ ...sampleProvider, id: 2, name: "OpenAI" });
+    createProvider.mockResolvedValue({
+      ...sampleProvider,
+      id: 2,
+      name: "OpenAI",
+    });
     renderPage();
-    await waitFor(() => expect(screen.getByTestId("admin-ai-providers-new")).toBeInTheDocument());
+    await waitFor(() =>
+      expect(screen.getByTestId("admin-ai-providers-new")).toBeInTheDocument(),
+    );
 
     fireEvent.click(screen.getByTestId("admin-ai-providers-new"));
     fireEvent.change(screen.getByTestId("admin-ai-provider-form-name"), {
@@ -98,9 +109,12 @@ describe("AiProvidersPage", () => {
     fireEvent.change(screen.getByTestId("admin-ai-provider-form-base_url"), {
       target: { value: "https://api.openai.com/v1" },
     });
-    fireEvent.change(screen.getByTestId("admin-ai-provider-form-default_model"), {
-      target: { value: "gpt-4.1" },
-    });
+    fireEvent.change(
+      screen.getByTestId("admin-ai-provider-form-default_model"),
+      {
+        target: { value: "gpt-4.1" },
+      },
+    );
     fireEvent.click(screen.getByTestId("admin-ai-provider-form-submit"));
 
     await waitFor(() => {
@@ -114,12 +128,17 @@ describe("AiProvidersPage", () => {
     });
   });
 
-  it("deletes a provider only after confirming in the ConfirmDialog", async () => {
+  it("deletes a provider via the ⋯-menu only after confirming", async () => {
     deleteProvider.mockResolvedValue(undefined);
     renderPage();
-    await waitFor(() => expect(screen.getByTestId("admin-row-delete-1")).toBeInTheDocument());
+    await waitFor(() =>
+      expect(
+        screen.getByTestId("admin-ai-provider-menu-trigger-1"),
+      ).toBeInTheDocument(),
+    );
 
-    fireEvent.click(screen.getByTestId("admin-row-delete-1"));
+    fireEvent.click(screen.getByTestId("admin-ai-provider-menu-trigger-1"));
+    fireEvent.click(await screen.findByTestId("admin-row-delete-1"));
     await screen.findByTestId("confirm-dialog");
     expect(deleteProvider).not.toHaveBeenCalled();
 
@@ -127,31 +146,66 @@ describe("AiProvidersPage", () => {
     await waitFor(() => expect(deleteProvider).toHaveBeenCalledWith(1));
   });
 
-  it("shows the test result after clicking the test button", async () => {
-    testProvider.mockResolvedValue({ ok: true, model: "llama-3.3-70b", tool_calling_ok: true, error: null });
+  it("opens the edit drawer when the row is clicked", async () => {
     renderPage();
-    await waitFor(() => expect(screen.getByTestId("admin-ai-provider-test-1")).toBeInTheDocument());
+    await waitFor(() =>
+      expect(screen.getByTestId("admin-ai-provider-row-1")).toBeInTheDocument(),
+    );
+    fireEvent.click(screen.getByTestId("admin-ai-provider-row-1"));
+    await waitFor(() =>
+      expect(screen.getByTestId("admin-ai-provider-form-name")).toHaveValue(
+        "Nebius",
+      ),
+    );
+  });
 
-    fireEvent.click(screen.getByTestId("admin-ai-provider-test-1"));
+  it("shows the test result after testing via the ⋯-menu", async () => {
+    testProvider.mockResolvedValue({
+      ok: true,
+      model: "llama-3.3-70b",
+      tool_calling_ok: true,
+      error: null,
+    });
+    renderPage();
+    await waitFor(() =>
+      expect(
+        screen.getByTestId("admin-ai-provider-menu-trigger-1"),
+      ).toBeInTheDocument(),
+    );
+
+    fireEvent.click(screen.getByTestId("admin-ai-provider-menu-trigger-1"));
+    fireEvent.click(await screen.findByTestId("admin-ai-provider-test-1"));
     await waitFor(() => {
-      expect(screen.getByTestId("admin-ai-provider-test-result-1").textContent).toMatch(/llama-3.3-70b/);
+      expect(
+        screen.getByTestId("admin-ai-provider-test-result-1").textContent,
+      ).toMatch(/llama-3.3-70b/);
     });
   });
 
-  it("duplicates a provider and opens the edit dialog for the copy", async () => {
+  it("duplicates a provider via the ⋯-menu and opens the edit dialog for the copy", async () => {
     const copy = { ...sampleProvider, id: 2, name: "Nebius (Kopie)" };
     duplicateProvider.mockResolvedValue(copy);
-    listProviders.mockResolvedValue({ items: [sampleProvider], total: 1, page: 1, page_size: 1 });
+    listProviders.mockResolvedValue({
+      items: [sampleProvider],
+      total: 1,
+      page: 1,
+      page_size: 1,
+    });
     renderPage();
     await waitFor(() =>
-      expect(screen.getByTestId("admin-ai-provider-duplicate-1")).toBeInTheDocument(),
+      expect(
+        screen.getByTestId("admin-ai-provider-menu-trigger-1"),
+      ).toBeInTheDocument(),
     );
 
-    fireEvent.click(screen.getByTestId("admin-ai-provider-duplicate-1"));
+    fireEvent.click(screen.getByTestId("admin-ai-provider-menu-trigger-1"));
+    fireEvent.click(await screen.findByTestId("admin-ai-provider-duplicate-1"));
     await waitFor(() => expect(duplicateProvider).toHaveBeenCalledWith(1));
 
     await waitFor(() =>
-      expect(screen.getByTestId("admin-ai-provider-form-name")).toHaveValue("Nebius (Kopie)"),
+      expect(screen.getByTestId("admin-ai-provider-form-name")).toHaveValue(
+        "Nebius (Kopie)",
+      ),
     );
   });
 });
