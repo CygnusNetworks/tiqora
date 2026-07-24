@@ -14,19 +14,20 @@ test.describe("ticket zoom", () => {
     await expect(page.getByTestId("ticket-zoom")).toBeVisible();
     await expect(page.getByTestId("ticket-header")).toContainText("Printer");
 
-    // Expand first article
-    await page.getByTestId("article-500").getByRole("button").first().click();
+    // Email ticket → split (master/detail) view by default: open the first
+    // article from the list into the reader pane.
+    await page.getByTestId("article-list-item-500").click();
 
     await expect(page.getByTestId("article-body-html")).toBeVisible();
     await expect(page.getByTestId("article-body-iframe")).toBeVisible();
     await expect(page.getByTestId("external-images-banner")).toBeVisible();
-    await expect(page.getByTestId("attachment-list")).toBeVisible();
     await expect(page.getByTestId("attachment-900")).toContainText(
       "screenshot.png",
     );
 
-    // History tab
-    await page.getByRole("tab", { name: /history|historie/i }).click();
+    // History moved into the ticket-zoom ⋯ overflow menu.
+    await page.getByTestId("ticket-zoom-overflow-trigger").click();
+    await page.getByTestId("overflow-tab-history").click();
     await expect(page.getByTestId("history-table")).toBeVisible();
   });
 });

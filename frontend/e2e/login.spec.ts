@@ -24,7 +24,9 @@ test.describe("login flow", () => {
     await page.getByTestId("login-submit").click();
     await page.waitForURL(/\/agent/);
     await expect(page.getByTestId("dashboard")).toBeVisible();
-    await expect(page.getByTestId("current-user")).toContainText("Ada");
+    // The identity hook is rendered in both the mobile and desktop header
+    // (responsive), so scope to the first match.
+    await expect(page.getByTestId("current-user").first()).toContainText("Ada");
   });
 
   test("redirects unauthenticated /agent to login", async ({ page }) => {
