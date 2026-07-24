@@ -306,6 +306,12 @@ class BounceRequest(BaseModel):
 class SplitRequest(BaseModel):
     queue_id: int
     title: str | None = None
+    # Optional overrides for the new ticket; each falls back to the source
+    # ticket's value when omitted. customer_id/customer_user_id are set together.
+    priority_id: int | None = None
+    state_id: int | None = None
+    customer_id: str | None = None
+    customer_user_id: str | None = None
 
 
 class CustomerUserOut(BaseModel):

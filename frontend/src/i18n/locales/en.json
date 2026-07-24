@@ -312,7 +312,14 @@
     "replyAll": "Reply all",
     "forward": "Forward",
     "bounce": "Bounce",
-    "split": "Split",
+    "split": {
+      "priority": "Priority",
+      "state": "State",
+      "customer": "Customer",
+      "changeCustomer": "Change",
+      "customerSearch": "Search customer (login/name)…",
+      "customerInherit": "Inherited from source ticket"
+    },
     "deleteNote": "Delete note",
     "deleteNoteConfirm": "Delete this internal note? This cannot be undone.",
     "deleteNoteConfirmButton": "Delete",

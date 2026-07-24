@@ -9141,6 +9141,14 @@ export interface components {
             queue_id: number;
             /** Title */
             title?: string | null;
+            /** Priority Id */
+            priority_id?: number | null;
+            /** State Id */
+            state_id?: number | null;
+            /** Customer Id */
+            customer_id?: string | null;
+            /** Customer User Id */
+            customer_user_id?: string | null;
         };
         /** StandardAttachmentCreate */
         StandardAttachmentCreate: {

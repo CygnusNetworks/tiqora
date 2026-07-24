@@ -815,7 +815,15 @@ async def split_article_endpoint(
     try:
         async with session.begin():
             new_id = await svc.split_article(
-                user.id, ticket_id, article_id, queue_id=body.queue_id, title=body.title
+                user.id,
+                ticket_id,
+                article_id,
+                queue_id=body.queue_id,
+                title=body.title,
+                priority_id=body.priority_id,
+                state_id=body.state_id,
+                customer_id=body.customer_id,
+                customer_user_id=body.customer_user_id,
             )
     except (WriteAccessDenied, WriteNotFound, InvalidInput) as exc:
         raise _map_exc(exc) from exc
