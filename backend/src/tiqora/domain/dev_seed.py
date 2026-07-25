@@ -21,6 +21,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from tiqora.db.legacy.customer import CustomerCompany, CustomerUser
 from tiqora.db.legacy.queue import Queue
 from tiqora.db.legacy.ticket import TicketPriority, TicketState
+from tiqora.domain.dev_seed_content import SCENARIOS, SeedScenario
 from tiqora.domain.ticket_write_service import ArticleIn, TicketIn, TicketWriteService
 from tiqora.permissions.engine import PermissionEngine
 from tiqora.znuny.sysconfig import SysConfig
@@ -106,6 +107,9 @@ async def seed_database(
             raise SeedError(
                 "No ticket states/priorities found — seeding assumes an initialized Znuny schema."
             )
+        priority_id_by_name = dict(
+            (await session.execute(select(TicketPriority.name, TicketPriority.id))).all()
+        )
 
     run_ns = uuid.uuid4().hex[:8]
     now = datetime.now(UTC).replace(tzinfo=None)
@@ -155,12 +159,46 @@ async def seed_database(
                 customer_users_created += 1
             customer_logins_by_company[customer_id] = logins
 
+    # Curated realistic scenarios (dev_seed_content.SCENARIOS) drive ticket
+    # title + article thread content; shuffled with the same seeded `random`
+    # module so the whole run stays deterministic. Cycling past the pool
+    # (--tickets > len(SCENARIOS)) reuses scenarios, with a "(case N)" title
+    # suffix so repeated tickets stay visually distinct in ticket lists.
+    scenario_order = list(SCENARIOS)
+    random.shuffle(scenario_order)
+
+    def _article_in(
+        scenario: SeedScenario, index: int, sender_type: str, visible: bool, body: str
+    ) -> ArticleIn:
+        if index == 0:
+            subject = scenario.title
+        elif visible:
+            subject = f"Re: {scenario.title}"
+        else:
+            subject = "Internal note"
+        return ArticleIn(
+            sender_type=sender_type,
+            is_visible_for_customer=visible,
+            subject=subject,
+            body=body,
+            # Channel stays "note" (-> Internal) regardless of sender/visibility,
+            # same as before this module existed: an agent-authored "email"
+            # article would route through TicketWriteService.add_article's real
+            # SMTP delivery path (see outbound_reply.deliver_agent_email_reply),
+            # which seeding must never trigger.
+            channel="note",
+        )
+
     tickets_created = 0
     articles_created = 0
-    for _ in range(tickets):
+    for i in range(tickets):
+        scenario = scenario_order[i % len(scenario_order)]
+        cycle_num = i // len(scenario_order)
+        title = scenario.title if cycle_num == 0 else f"{scenario.title} (case {cycle_num + 1})"
+
         queue_id = random.choice(queue_ids)
         state_id = random.choice(state_ids)
-        priority_id = random.choice(priority_ids)
+        priority_id = priority_id_by_name.get(scenario.priority_hint) or random.choice(priority_ids)
         ticket_customer_id: str | None = None
         ticket_customer_login: str | None = None
         if customer_ids:
@@ -168,13 +206,9 @@ async def seed_database(
             logins = customer_logins_by_company.get(ticket_customer_id) or []
             ticket_customer_login = random.choice(logins) if logins else None
 
-        n_articles = random.randint(1, 4)
-        first_article = ArticleIn(
-            sender_type="agent",
-            is_visible_for_customer=True,
-            subject=fake.sentence(nb_words=5).rstrip("."),
-            body=fake.paragraph(nb_sentences=3),
-            channel="note",
+        thread = scenario.articles
+        first_article = _article_in(
+            scenario, 0, thread[0].sender_type, thread[0].is_visible_for_customer, thread[0].body
         )
 
         async with session_factory() as session:
@@ -184,7 +218,7 @@ async def seed_database(
                 ticket_id = await svc.create_ticket(
                     agent_user_id,
                     TicketIn(
-                        title=fake.sentence(nb_words=6).rstrip("."),
+                        title=title,
                         queue_id=queue_id,
                         state_id=state_id,
                         priority_id=priority_id,
@@ -192,22 +226,23 @@ async def seed_database(
                         customer_id=ticket_customer_id,
                         customer_user_id=ticket_customer_login,
                         article=first_article,
+                        dynamic_fields={"Category": [scenario.category]},
                     ),
                 )
             tickets_created += 1
             articles_created += 1
 
-            for _ in range(n_articles - 1):
+            for j, article in enumerate(thread[1:], start=1):
                 async with session.begin():
                     await svc.add_article(
                         agent_user_id,
                         ticket_id,
-                        ArticleIn(
-                            sender_type="agent",
-                            is_visible_for_customer=True,
-                            subject=fake.sentence(nb_words=5).rstrip("."),
-                            body=fake.paragraph(nb_sentences=3),
-                            channel="note",
+                        _article_in(
+                            scenario,
+                            j,
+                            article.sender_type,
+                            article.is_visible_for_customer,
+                            article.body,
                         ),
                     )
                 articles_created += 1

@@ -272,6 +272,11 @@ workflow dispatch where available). Before tagging a release:
    cd frontend && pnpm build
    SCREENSHOTS=1 pnpm exec playwright test screenshots --project=chromium
    ```
+   **AI audit sample PDF** (`site/ai-audit-sample.pdf`, if `buildAuditPdfHtml`
+   in `frontend/src/routes/admin/auditPdf.ts` changed):
+   ```bash
+   cd frontend && AUDIT_SAMPLE=1 pnpm exec playwright test e2e/audit-sample.spec.ts --project=chromium
+   ```
 2. **OpenAPI + typed client** (if REST models/routes changed):
    ```bash
    cd backend && uv run tiqora openapi -o ../docs/api/openapi.json
