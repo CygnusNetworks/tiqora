@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import random
 import shutil
 import subprocess
 import warnings
@@ -207,8 +208,35 @@ def pytest_configure(config: pytest.Config) -> None:
     )
 
 
+def _shuffle_module_order(items: list[pytest.Item]) -> None:
+    """Randomise the order of test *files*, keeping each file's order intact.
+
+    Set ``TIQORA_SHUFFLE_MODULES=<seed>`` to enable (the nightly workflow does).
+
+    This is deliberately not pytest-randomly or pytest-random-order: both
+    shuffle tests *within* a file as well. ``--random-order-bucket=module``
+    sounds like it does what we want but only guarantees that a test does not
+    leave its module -- inside the module it still reorders. That contradicts
+    the isolation contract: state is restored *between* modules, so within a
+    file the author owns the ids and may legitimately build on the previous
+    test. Shuffling there reports those intentional dependencies as failures
+    and buries the cross-module signal we are actually looking for.
+    """
+    seed = os.environ.get("TIQORA_SHUFFLE_MODULES")
+    if not seed:
+        return
+    groups: dict[str, list[pytest.Item]] = {}
+    for item in items:
+        groups.setdefault(item.nodeid.partition("::")[0], []).append(item)
+    order = list(groups)
+    random.Random(seed).shuffle(order)
+    items[:] = [item for module in order for item in groups[module]]
+    print(f"\nModule order shuffled with TIQORA_SHUFFLE_MODULES={seed}")
+
+
 def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item]) -> None:
     """Skip db/search-marked tests when Docker is not available (unless forced)."""
+    _shuffle_module_order(items)
     if os.environ.get("TIQORA_FORCE_DB_TESTS") == "1":
         return
     if docker_available():
