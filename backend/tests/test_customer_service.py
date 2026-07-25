@@ -3,10 +3,12 @@ customer_user/customer_company lookup used for ticket display."""
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from datetime import UTC, datetime
 
 import pytest
-from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
+from sqlalchemy import delete
+from sqlalchemy.ext.asyncio import AsyncEngine, async_sessionmaker, create_async_engine
 
 from tiqora.db.legacy.customer import CustomerCompany, CustomerUser
 from tiqora.domain.customer_service import CustomerService
@@ -20,6 +22,25 @@ def _mysql_async(url: str) -> str:
 
 def _now() -> datetime:
     return datetime.now(UTC).replace(tzinfo=None)
+
+
+async def _cleanup(
+    engine: AsyncEngine, *, logins: Sequence[str] = (), companies: Sequence[str] = ()
+) -> None:
+    """Drop this file's seed rows.
+
+    The DB container is session-scoped, so committed rows outlive the test and
+    leak into every later file. ``customer_id="no-such-company"`` in particular
+    is test_gdpr_erasure.py's negative-control sentinel — leaving it behind
+    turns that test's ``count == 0`` into ``count == 1``.
+    """
+    async with engine.begin() as conn:
+        if logins:
+            await conn.execute(delete(CustomerUser).where(CustomerUser.login.in_(list(logins))))
+        if companies:
+            await conn.execute(
+                delete(CustomerCompany).where(CustomerCompany.customer_id.in_(list(companies)))
+            )
 
 
 async def test_get_by_login_returns_none_when_missing(mariadb_znuny_url: str) -> None:
@@ -69,6 +90,7 @@ async def test_get_by_login_without_company(mariadb_znuny_url: str) -> None:
             assert result.phone == "+1 555 0100"
             assert result.company_name is None
     finally:
+        await _cleanup(engine, logins=["jdoe"])
         await engine.dispose()
 
 
@@ -111,6 +133,7 @@ async def test_get_by_login_resolves_company_name(mariadb_znuny_url: str) -> Non
             assert result.customer_id == "acme"
             assert result.company_name == "Acme Corp"
     finally:
+        await _cleanup(engine, logins=["wcoyote"], companies=["acme"])
         await engine.dispose()
 
 
@@ -146,4 +169,5 @@ async def test_get_by_login_missing_company_leaves_company_name_none(
             assert result is not None
             assert result.company_name is None
     finally:
+        await _cleanup(engine, logins=["orphan"])
         await engine.dispose()
