@@ -65,6 +65,16 @@ VITE_BASE=/tiqora/demo/ pnpm --filter tiqora-frontend build:demo
 
 ## Screenshots
 
+### AI assistance
+
+![AI assist](./docs/images/agent-ai-assist.png)
+<sub>AI assist — state-only ticket summary and reviewable reply/clarification drafts, self-hosted</sub>
+
+![AI assist + MCP](./docs/images/agent-ai-mcp.png)
+<sub>AI assist + MCP — the draft is grounded in live results pulled from an MCP monitoring server (host metrics, active alerts)</sub>
+
+### Agent workspace
+
 | Agent dashboard | Ticket zoom |
 |---|---|
 | ![Agent dashboard](./docs/images/agent-dashboard.png) | ![Ticket zoom](./docs/images/agent-ticket-zoom.png) |
@@ -77,13 +87,37 @@ VITE_BASE=/tiqora/demo/ pnpm --filter tiqora-frontend build:demo
 |---|---|
 | ![Reporting](./docs/images/agent-stats.png) | ![Knowledge base](./docs/images/agent-kb.png) |
 
-| Admin — queues | Privacy / GDPR |
+| Calendar | Security |
 |---|---|
-| ![Admin queues](./docs/images/admin-queues.png) | ![GDPR](./docs/images/admin-gdpr.png) |
+| ![Calendar](./docs/images/agent-calendar.png) | ![Security](./docs/images/agent-security.png) |
 
-| Authentication / 2FA | Customer portal |
+### Administration
+
+| Admin — queues | Admin — users |
 |---|---|
-| ![2FA administration](./docs/images/admin-2fa.png) | ![Customer portal](./docs/images/portal.png) |
+| ![Admin queues](./docs/images/admin-queues.png) | ![Admin users](./docs/images/admin-users.png) |
+
+| Admin — groups | Admin — role/group mapping |
+|---|---|
+| ![Admin groups](./docs/images/admin-groups.png) | ![Admin role groups](./docs/images/admin-role-groups.png) |
+
+| Admin — customer users | Admin — customer user groups |
+|---|---|
+| ![Admin customer users](./docs/images/admin-customer-users.png) | ![Admin customer user groups](./docs/images/admin-customer-user-groups.png) |
+
+| Admin — dynamic fields | Privacy / GDPR |
+|---|---|
+| ![Admin dynamic fields](./docs/images/admin-dynamic-fields.png) | ![GDPR](./docs/images/admin-gdpr.png) |
+
+| Authentication / 2FA |
+|---|
+| ![2FA administration](./docs/images/admin-2fa.png) |
+
+### Authentication & portal
+
+| Login | User menu | Customer portal |
+|---|---|---|
+| ![Login](./docs/images/login.png) | ![User menu](./docs/images/user-menu.png) | ![Customer portal](./docs/images/portal.png) |
 
 <sub>Generated with `SCREENSHOTS=1 pnpm exec playwright test screenshots`
 (`e2e/fixtures/rich-mock.ts`) — no backend required. Use `THEME=dark` / `LANG_UI=de` for variants.</sub>

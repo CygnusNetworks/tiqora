@@ -16,8 +16,8 @@ def add_dev_subparser(sub: argparse._SubParsersAction) -> None:  # type: ignore[
         "seed",
         help="Seed fake customers/tickets/articles through TicketWriteService",
     )
-    seed_p.add_argument("--customers", type=int, default=10, help="Number of customer companies")
-    seed_p.add_argument("--tickets", type=int, default=20, help="Number of tickets")
+    seed_p.add_argument("--customers", type=int, default=12, help="Number of customer companies")
+    seed_p.add_argument("--tickets", type=int, default=60, help="Number of tickets")
     seed_p.add_argument(
         "--seed", type=int, default=None, help="RNG seed for reproducible fake data"
     )
