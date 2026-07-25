@@ -35,43 +35,31 @@ jobs:
       - name: Mypy
         run: uv run mypy src/tiqora
 
-  # Separate jobs so each matrix cell only boots the DB it needs (GHA cannot
-  # conditionally enable services per matrix value).
-  backend-test-postgres:
-    name: Backend tests (postgres)
+  # One job runs the whole suite. Both dialects are covered *within* a single
+  # run: tests/conftest.py starts its own MariaDB and Postgres testcontainers
+  # and parametrises the DB tests over both (162 mariadb + 152 postgres cells).
+  # This used to be two near-identical jobs each running `pytest -q` over all
+  # 1260 tests, so the split re-ran the entire suite -- including the 552 pure
+  # unit tests -- for no extra coverage.
+  backend-test:
+    name: Backend tests
     runs-on: ubuntu-latest
     defaults:
       run:
         working-directory: backend
-    services:
-      postgres:
-        image: postgres:16
-        env:
-          POSTGRES_USER: tiqora
-          POSTGRES_PASSWORD: tiqora
-          POSTGRES_DB: tiqora
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd "pg_isready -U tiqora -d tiqora"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 10
-      redis:
-        image: redis:7-alpine
-        ports:
-          - 6379:6379
-        options: >-
-          --health-cmd "redis-cli ping"
-          --health-interval 10s
-          --health-timeout 3s
-          --health-retries 10
+    # No `services:` block. The suite is self-sufficient: DB and search tests
+    # start their own testcontainers, the three files that touch DATABASE_URL
+    # set it themselves from that container's URL, and Redis is faked
+    # in-process. MEILI_URL never had a service behind it either -- the search
+    # tests boot getmeili/meilisearch themselves -- but the settings object
+    # wants the vars present, so they stay.
     env:
-      DATABASE_URL: postgresql+asyncpg://tiqora:tiqora@localhost:5432/tiqora
-      REDIS_URL: redis://localhost:6379/0
       MEILI_URL: http://localhost:7700
       MEILI_MASTER_KEY: tiqora-dev-master-key
       TIQORA_ENV: test
+      # Fail if a module that is not in tests/db_leak_baseline.txt commits
+      # rows without deleting them. Locally this is a warning instead.
+      TIQORA_STRICT_DB_LEAKS: "1"
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v5
@@ -100,57 +88,6 @@ jobs:
           name: backend-coverage
           path: backend/coverage.json
           retention-days: 7
-
-  backend-test-mariadb:
-    name: Backend tests (mariadb)
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: backend
-    services:
-      mariadb:
-        image: mariadb:10.11
-        env:
-          MYSQL_ROOT_PASSWORD: root
-          MYSQL_DATABASE: tiqora
-          MYSQL_USER: tiqora
-          MYSQL_PASSWORD: tiqora
-        ports:
-          - 3306:3306
-        options: >-
-          --health-cmd "healthcheck.sh --connect --innodb_initialized"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 10
-      redis:
-        image: redis:7-alpine
-        ports:
-          - 6379:6379
-        options: >-
-          --health-cmd "redis-cli ping"
-          --health-interval 10s
-          --health-timeout 3s
-          --health-retries 10
-    env:
-      DATABASE_URL: mysql+aiomysql://tiqora:tiqora@localhost:3306/tiqora
-      REDIS_URL: redis://localhost:6379/0
-      MEILI_URL: http://localhost:7700
-      MEILI_MASTER_KEY: tiqora-dev-master-key
-      TIQORA_ENV: test
-    steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v5
-        with:
-          enable-cache: true
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-      - name: Install crypto tooling (gpg for PGP tests; openssl is preinstalled)
-        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends gnupg
-      - name: Install dependencies
-        run: uv sync --extra dev --extra crypto
-      - name: Pytest
-        run: uv run pytest -q
 
   frontend:
     name: Frontend (lint, build, vitest)
@@ -200,7 +137,7 @@ jobs:
   coverage-badges:
     name: Publish coverage badges
     if: startsWith(github.ref, 'refs/tags/v')
-    needs: [backend-test-postgres, frontend]
+    needs: [backend-test, frontend]
     runs-on: ubuntu-latest
     # Serialise badge publishes so two release tags built close together don't
     # race the push to the badges branch (the workflow-level concurrency group

@@ -5,8 +5,10 @@ from __future__ import annotations
 import os
 import shutil
 import subprocess
+import warnings
 from collections.abc import Generator
 from dataclasses import dataclass
+from functools import cache
 from pathlib import Path
 
 import pytest
@@ -91,21 +93,33 @@ def _take_snapshot(sync_url: str, dialect: str) -> None:
         engine.dispose()
 
 
-def _restore(snap: _Snapshot) -> None:
+def _restore(snap: _Snapshot) -> str | None:
     """Return the container to its pristine post-seed state.
 
     Tables created after the snapshot (``tiqora_*`` from ``create_all`` or from
     an Alembic upgrade a test ran) are emptied but kept -- recreating them is
     the individual test's job.
+
+    Returns a description of the rows the module left behind, or None if it
+    cleaned up after itself. The restore repairs the damage either way; the
+    report exists so a leak is attributed to the module that caused it instead
+    of surfacing weeks later as an FK error in somebody else's DELETE.
     """
     engine = create_engine(snap.sync_url)
     quote = (lambda t: f"`{t}`") if snap.dialect == "mysql" else (lambda t: f'"{t}"')
+    leaked: list[str] = []
     try:
         with engine.begin() as conn:
             _set_fk_enforcement(conn, snap.dialect, enabled=False)
             try:
                 for table in inspect(engine).get_table_names():
-                    conn.execute(text(f"DELETE FROM {quote(table)}"))
+                    # DELETE reports how many rows were actually there, so the
+                    # leak check costs no extra round trip. A table created by
+                    # the module itself is not in the snapshot -- expect 0.
+                    expected = len(snap.rows.get(table, ()))
+                    actual = conn.execute(text(f"DELETE FROM {quote(table)}")).rowcount
+                    if actual != expected:
+                        leaked.append(f"{table} {actual - expected:+d}")
                 for table, rows in snap.rows.items():
                     if not rows:
                         continue
@@ -118,19 +132,52 @@ def _restore(snap: _Snapshot) -> None:
                 _set_fk_enforcement(conn, snap.dialect, enabled=True)
     finally:
         engine.dispose()
+    return ", ".join(sorted(leaked)) if leaked else None
+
+
+@cache
+def _leak_baseline() -> frozenset[str]:
+    """Modules grandfathered into leaking, from ``db_leak_baseline.txt``."""
+    path = Path(__file__).parent / "db_leak_baseline.txt"
+    return frozenset(
+        line.strip()
+        for line in path.read_text().splitlines()
+        if line.strip() and not line.startswith("#")
+    )
 
 
 @pytest.fixture(autouse=True, scope="module")
-def _restore_db_between_modules() -> Generator[None, None, None]:
+def _restore_db_between_modules(request: pytest.FixtureRequest) -> Generator[None, None, None]:
     """Undo whatever the module wrote, for every container that is running.
 
     Deliberately does *not* depend on the container fixtures -- requesting them
     here would start Docker for pure-unit modules too. It only acts on
     containers some earlier test already brought up.
+
+    Under ``TIQORA_STRICT_DB_LEAKS=1`` (CI sets it) a leak from a module that
+    is not in ``db_leak_baseline.txt`` fails the run. The 91 modules already on
+    that baseline only warn -- the convention they were written under was never
+    enforced, so retrofitting cleanup everywhere is its own project. The point
+    of the ratchet is that no *new* module joins them.
     """
     yield
+    strict = os.environ.get("TIQORA_STRICT_DB_LEAKS") == "1"
+    module = request.node.name
     for snap in _SNAPSHOTS.values():
-        _restore(snap)
+        leaked = _restore(snap)
+        if leaked is None:
+            continue
+        msg = (
+            f"{module} left rows behind in {snap.dialect} ({leaked}). The "
+            f"restore cleaned them up, but the module should delete what it "
+            f"commits so it also passes when run on its own."
+        )
+        if strict and module not in _leak_baseline():
+            raise AssertionError(
+                f"{msg} If this is genuinely unavoidable, add it to "
+                f"tests/db_leak_baseline.txt with a reason."
+            )
+        warnings.warn(msg, stacklevel=1)
 
 
 def docker_available() -> bool:
