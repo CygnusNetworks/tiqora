@@ -327,7 +327,11 @@ async def test_queue_ticket_detail_attachment_permissions(
         ts = TicketService(session)
         listed = await ts.list_tickets(ids["reader"], queue_id=ids["queue"])
         assert listed.total >= 1
-        assert listed.items[0].tn == "20240601000001"
+        # Default sort is age/desc. Both seeded tickets share ``NOW`` as
+        # create_time, so the id tie-break decides: 501 ("20240601000002")
+        # before 500. Previously this asserted 500 and only passed because the
+        # untied ORDER BY happened to return rows in physical order.
+        assert listed.items[0].tn == "20240601000002"
 
         # first_from: ticket 500 has one article (a_from='alice@example.com'),
         # ticket 501 has none — must surface as None, not an error.

@@ -61,16 +61,23 @@ def _seed(
 ) -> dict[str, Any]:
     """Seed queue + auto_response + queue_auto_response + one ticket.
 
-    ``ns`` keeps ids in a private 92xx band so this file's tests do not
-    collide with each other or with test_agent_email_outbound.py's 91xx band.
+    ``ns`` keeps ids in a private 94xx band so this file's tests do not
+    collide with each other or with another file's seed rows. The DB container
+    is session-scoped and this helper does not tear its rows down, so an
+    overlapping band leaves FK children (queue_auto_response, article,
+    ticket_history) that make the other file's ``DELETE FROM queue|ticket``
+    fail. Bands in use: 90xx ai_agent_policy_fields, 91xx agent_email_outbound,
+    92xx placeholder_resolution_db + ticket_acl_permissions, 93xx mail_log,
+    94xx (this file), 95xx poller, 96xx ai_runtime, 97xx ai_summary,
+    98xx ai_auto_worker.
     """
-    group_id = 9230 + ns
-    queue_id = 9200 + ns
-    ticket_id = 9270 + ns
-    sa_id = 9200 + ns
-    ar_id = 9200 + ns
-    tn = f"20240601920{ns:03d}"
-    queue_name = f"AutoRespQueue92{ns}"
+    group_id = 9430 + ns
+    queue_id = 9400 + ns
+    ticket_id = 9470 + ns
+    sa_id = 9400 + ns
+    ar_id = 9400 + ns
+    tn = f"20240601940{ns:03d}"
+    queue_name = f"AutoRespQueue94{ns}"
 
     engine = create_engine(sync_url)
     with engine.begin() as conn:
@@ -87,7 +94,7 @@ def _seed(
                 " create_time, create_by, change_time, change_by)"
                 " VALUES (:id, :name, 1, :t, 1, :t, 1)"
             ),
-            {"id": group_id, "name": f"autoresp-grp-92{ns}", "t": NOW},
+            {"id": group_id, "name": f"autoresp-grp-94{ns}", "t": NOW},
         )
         conn.execute(
             text(
@@ -146,11 +153,11 @@ def _seed(
             {
                 "id": ticket_id,
                 "tn": tn,
-                "title": f"Autoresponse ticket 92{ns}",
+                "title": f"Autoresponse ticket 94{ns}",
                 "qid": queue_id,
                 "sid": state_id,
-                "cid": f"CUST92{ns}",
-                "cuid": f"cust92{ns}@example.com",
+                "cid": f"CUST94{ns}",
+                "cuid": f"cust94{ns}@example.com",
                 "t": NOW,
             },
         )
@@ -159,7 +166,7 @@ def _seed(
         "queue": queue_id,
         "ticket": ticket_id,
         "tn": tn,
-        "customer_email": f"cust92{ns}@example.com",
+        "customer_email": f"cust94{ns}@example.com",
         "support_email": f"autoresp{ns}@example.com",
         "ns": ns,
     }
