@@ -1,0 +1,78 @@
+name: Nightly (random test order)
+
+# The suite runs in a fixed alphabetical order, and the DB testcontainers are
+# session-scoped, so any test that depends on what an earlier test left behind
+# passes every time -- until an unrelated PR adds a file that sorts in between.
+# That is exactly how 32 tests broke at once in July 2026.
+#
+# This job shuffles the order on purpose so order-dependence surfaces as a
+# nightly failure with a reproducible seed, rather than as a merge-day
+# surprise. Deliberately NOT part of the PR gate: a shuffled run can fail for
+# reasons a PR author did not cause, and a gate that is red for someone else's
+# reason gets ignored.
+#
+# Shuffles MODULE order only (--random-order-bucket=module), keeping the order
+# of tests within a file. That matches the isolation contract in conftest.py:
+# state is restored between modules, and within a file the author controls the
+# ids and may deliberately build on the previous test. Shuffling inside a file
+# would report those intentional dependencies as failures and drown the signal.
+#
+# EXPECT THIS TO BE RED until the known order-dependent tests are fixed: as of
+# 2026-07-25 a shuffled run fails ~6 tests (test_placeholder_resolution_db,
+# test_escalation_sweep, test_admin_api, test_gdpr_erasure, test_generic_agent)
+# that pass in alphabetical order. They are pre-existing latent bugs this job
+# was added to surface, not regressions from it.
+#
+# To reproduce a failure locally, take the seed pytest printed in the log:
+#   uv run --with pytest-random-order pytest -q --random-order \
+#     --random-order-bucket=module --random-order-seed=<seed>
+
+on:
+  schedule:
+    # 03:17 UTC -- off the hour, so it does not queue behind everyone else's
+    # midnight cron on the shared runner pool.
+    - cron: "17 3 * * *"
+  workflow_dispatch:
+    inputs:
+      seed:
+        description: "Fixed seed to reproduce a previous failure (blank = random)"
+        type: string
+        default: ""
+
+concurrency:
+  group: nightly-random-order
+  cancel-in-progress: true
+
+jobs:
+  random-order:
+    name: Backend tests (shuffled)
+    runs-on: ubuntu-latest
+    # A shuffled run can expose a hang that the ordered run never hits.
+    timeout-minutes: 45
+    defaults:
+      run:
+        working-directory: backend
+    env:
+      MEILI_URL: http://localhost:7700
+      MEILI_MASTER_KEY: tiqora-dev-master-key
+      TIQORA_ENV: test
+      TIQORA_STRICT_DB_LEAKS: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install crypto tooling (gpg for PGP tests; openssl is preinstalled)
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends gnupg
+      - name: Install dependencies
+        run: uv sync --extra dev --extra crypto
+      # pytest-random-order is pulled in only here, via --with, so the normal
+      # suite keeps its deterministic order and PR runs stay reproducible.
+      - name: Pytest (shuffled module order)
+        run: |
+          uv run --with pytest-random-order pytest -q \
+            --random-order --random-order-bucket=module \
+            ${{ inputs.seed && format('--random-order-seed={0}', inputs.seed) || '' }}

@@ -57,6 +57,9 @@ jobs:
       MEILI_URL: http://localhost:7700
       MEILI_MASTER_KEY: tiqora-dev-master-key
       TIQORA_ENV: test
+      # Fail if a module that is not in tests/db_leak_baseline.txt commits
+      # rows without deleting them. Locally this is a warning instead.
+      TIQORA_STRICT_DB_LEAKS: "1"
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v5
