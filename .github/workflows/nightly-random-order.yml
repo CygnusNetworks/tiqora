@@ -11,21 +11,19 @@ name: Nightly (random test order)
 # reasons a PR author did not cause, and a gate that is red for someone else's
 # reason gets ignored.
 #
-# Shuffles MODULE order only (--random-order-bucket=module), keeping the order
-# of tests within a file. That matches the isolation contract in conftest.py:
-# state is restored between modules, and within a file the author controls the
-# ids and may deliberately build on the previous test. Shuffling inside a file
-# would report those intentional dependencies as failures and drown the signal.
+# Shuffles the order of test FILES only, keeping each file's own order intact
+# (TIQORA_SHUFFLE_MODULES, implemented in tests/conftest.py). That matches the
+# isolation contract: state is restored between modules, so within a file the
+# author controls the ids and may deliberately build on the previous test.
 #
-# EXPECT THIS TO BE RED until the known order-dependent tests are fixed: as of
-# 2026-07-25 a shuffled run fails ~6 tests (test_placeholder_resolution_db,
-# test_escalation_sweep, test_admin_api, test_gdpr_erasure, test_generic_agent)
-# that pass in alphabetical order. They are pre-existing latent bugs this job
-# was added to surface, not regressions from it.
+# Neither pytest-randomly nor pytest-random-order can express this.
+# --random-order-bucket=module reads like it does, but it only guarantees that
+# a test does not leave its module -- inside the module it still reorders, and
+# the resulting intra-file failures bury the cross-module signal.
 #
-# To reproduce a failure locally, take the seed pytest printed in the log:
-#   uv run --with pytest-random-order pytest -q --random-order \
-#     --random-order-bucket=module --random-order-seed=<seed>
+# To reproduce a failure locally, take the seed from the log line
+# "Module order shuffled with TIQORA_SHUFFLE_MODULES=<seed>":
+#   TIQORA_SHUFFLE_MODULES=<seed> uv run pytest -q
 
 on:
   schedule:
@@ -69,10 +67,9 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y --no-install-recommends gnupg
       - name: Install dependencies
         run: uv sync --extra dev --extra crypto
-      # pytest-random-order is pulled in only here, via --with, so the normal
-      # suite keeps its deterministic order and PR runs stay reproducible.
+      # The seed defaults to the run id: different every night, and printed in
+      # the log so a failure can be replayed exactly.
       - name: Pytest (shuffled module order)
-        run: |
-          uv run --with pytest-random-order pytest -q \
-            --random-order --random-order-bucket=module \
-            ${{ inputs.seed && format('--random-order-seed={0}', inputs.seed) || '' }}
+        env:
+          TIQORA_SHUFFLE_MODULES: ${{ inputs.seed || github.run_id }}
+        run: uv run pytest -q
