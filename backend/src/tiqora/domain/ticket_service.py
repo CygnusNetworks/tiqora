@@ -277,9 +277,13 @@ class TicketService:
         self, stmt: Select[tuple[Ticket]], sort: str, order: str
     ) -> Select[tuple[Ticket]]:
         sort_col = self._SORT_COLUMNS.get(sort, Ticket.create_time)
+        # ``Ticket.id`` breaks ties. None of the sort columns is unique -- two
+        # tickets created in the same second sort arbitrarily, and since the
+        # listing is paginated with OFFSET/LIMIT an arbitrary order lets a row
+        # be skipped on one page and repeated on the next.
         if order.lower() == "asc":
-            return stmt.order_by(sort_col.asc())
-        return stmt.order_by(sort_col.desc())
+            return stmt.order_by(sort_col.asc(), Ticket.id.asc())
+        return stmt.order_by(sort_col.desc(), Ticket.id.desc())
 
     async def list_tickets(
         self,
