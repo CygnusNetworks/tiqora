@@ -26,27 +26,30 @@ pytestmark = pytest.mark.db
 
 NOW = datetime(2024, 7, 1, 12, 0, 0)
 
-# Dedicated id block — avoid collisions with zoom (73xx/84xx), read_api (20x), etc.
-_UID_PRIO = 9201
-_UID_OWNER = 9202
-_UID_RW = 9203
-_UID_RO = 9204
-_GROUP = 9230
+# Dedicated id block in the 99xx band — 92xx belongs to
+# test_placeholder_resolution_db.py. The DB container is session-scoped and
+# neither file tears its seed rows down, so an overlapping band breaks the
+# other's FK-ordered cleanup. Also avoids zoom (73xx/84xx), read_api (20x).
+_UID_PRIO = 9901
+_UID_OWNER = 9902
+_UID_RW = 9903
+_UID_RO = 9904
+_GROUP = 9930
 # Second group the rw agent holds NO permission on — its queue is an
 # unpermitted move destination (regression: move only checked the source).
-_GROUP_OTHER = 9231
-_QUEUE = 9200
+_GROUP_OTHER = 9931
+_QUEUE = 9900
 # Valid move target: same group as _QUEUE, so the rw agent may move into it.
-_QUEUE_SAME = 9209
+_QUEUE_SAME = 9909
 # Restricted move target: in _GROUP_OTHER, the rw agent may not move into it.
-_QUEUE_OTHER = 9210
-_TICKET = 9270
+_QUEUE_OTHER = 9910
+_TICKET = 9970
 _LOGIN_PRIO = "acl.agent.priority"
 _LOGIN_OWNER = "acl.agent.owner"
 _LOGIN_RW = "acl.agent.rw"
 _LOGIN_RO = "acl.agent.ro"
 # Second agent used as an assignable owner target (must differ from ticket owner).
-_UID_TARGET = 9205
+_UID_TARGET = 9905
 _LOGIN_TARGET = "acl.agent.target"
 
 
@@ -234,7 +237,7 @@ def _seed(sync_url: str) -> dict[str, Any]:
                     escalation_update_time, escalation_response_time,
                     escalation_solution_time, archive_flag,
                     create_time, create_by, change_time, change_by)
-                VALUES (:id, '20240701920001', 'ACL Test Ticket', :qid, 1, 1,
+                VALUES (:id, '20240701990001', 'ACL Test Ticket', :qid, 1, 1,
                     :owner, 1, 3, 4, 'ACLCUST', 'acl.cust@example.com',
                     0, 0, 0, 0, 0, 0, 0, :t, 1, :t, 1)
                 """

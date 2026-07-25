@@ -48,12 +48,18 @@ def _to_async_url(sync_url: str) -> str:
 
 
 def _seed_queue_and_ticket(sync_url: str, *, ns: int) -> dict[str, int | str]:
-    """Seed one isolated group/queue/ticket in a private 93xx id band."""
-    group_id = 9330 + ns
-    queue_id = 9300 + ns
-    ticket_id = 9370 + ns
-    tn = f"20240601930{ns:03d}"
-    queue_name = f"PollerQueue93{ns}"
+    """Seed one isolated group/queue/ticket in a private 95xx id band.
+
+    93xx belongs to test_mail_log.py; the DB container is session-scoped and
+    this helper leaves its rows behind, so an overlapping band breaks the
+    other file's FK-ordered cleanup. See test_autoresponse.py for the
+    band registry.
+    """
+    group_id = 9530 + ns
+    queue_id = 9500 + ns
+    ticket_id = 9570 + ns
+    tn = f"20240601950{ns:03d}"
+    queue_name = f"PollerQueue95{ns}"
 
     engine = create_engine(sync_url)
     with engine.begin() as conn:
@@ -67,7 +73,7 @@ def _seed_queue_and_ticket(sync_url: str, *, ns: int) -> dict[str, int | str]:
                 " create_time, create_by, change_time, change_by)"
                 " VALUES (:id, :name, 1, :t, 1, :t, 1)"
             ),
-            {"id": group_id, "name": f"poller-grp-93{ns}", "t": NOW},
+            {"id": group_id, "name": f"poller-grp-95{ns}", "t": NOW},
         )
         conn.execute(
             text(
@@ -92,10 +98,10 @@ def _seed_queue_and_ticket(sync_url: str, *, ns: int) -> dict[str, int | str]:
             {
                 "id": ticket_id,
                 "tn": tn,
-                "title": f"Poller ticket 93{ns}",
+                "title": f"Poller ticket 95{ns}",
                 "qid": queue_id,
-                "cid": f"CUST93{ns}",
-                "cuid": f"cust93{ns}@example.com",
+                "cid": f"CUST95{ns}",
+                "cuid": f"cust95{ns}@example.com",
                 "t": NOW,
             },
         )
