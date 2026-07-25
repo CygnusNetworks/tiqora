@@ -13,6 +13,7 @@ from collections.abc import Generator
 import pytest
 from sqlalchemy import create_engine, text
 
+from tests._schema_reset import reset_tiqora_schema
 from tiqora.cli.bootstrap import add_bootstrap_subparser, run_bootstrap
 from tiqora.config import get_settings
 from tiqora.znuny.password import verify_password
@@ -215,23 +216,6 @@ def test_bootstrap_empty_postgres(empty_postgres_url: str) -> None:
         engine.dispose()
 
 
-def _drop_tiqora_tables(sync_url: str) -> None:
-    """Reset tiqora_* so migrate upgrade is deterministic on shared fixtures."""
-    from sqlalchemy import inspect
-
-    is_mysql = "mysql" in sync_url
-    engine = create_engine(sync_url)
-    tables = [n for n in inspect(engine).get_table_names() if n.startswith("tiqora_")]
-    with engine.begin() as conn:
-        if is_mysql:
-            conn.execute(text("SET FOREIGN_KEY_CHECKS=0"))
-        for tbl in tables:
-            conn.execute(text(f"DROP TABLE IF EXISTS {tbl}{'' if is_mysql else ' CASCADE'}"))
-        if is_mysql:
-            conn.execute(text("SET FOREIGN_KEY_CHECKS=1"))
-    engine.dispose()
-
-
 @pytest.mark.db
 def test_bootstrap_skip_schema_on_populated_fixture(postgres_znuny_url: str) -> None:
     """When users already exist, bootstrap skips base schema and still migrates + sets pw.
@@ -241,7 +225,7 @@ def test_bootstrap_skip_schema_on_populated_fixture(postgres_znuny_url: str) -> 
     """
     password = "AlreadyPopulated1!"
     sync_url = _sync_url(postgres_znuny_url)
-    _drop_tiqora_tables(sync_url)
+    reset_tiqora_schema(sync_url)
 
     old_url = os.environ.get("DATABASE_URL")
     old_flag = os.environ.get("TIQORA_SCHEMA_OWNERSHIP")
