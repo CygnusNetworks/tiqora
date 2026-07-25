@@ -82,16 +82,16 @@ test("agent screenshots", async ({ page }) => {
   } catch (err) {
     console.warn("screenshot 'agent-ai-assist' failed:", err);
   }
-  // AI assist with MCP tool results (ticket 101 — server-monitoring scenario):
+  // AI assist with MCP tool results (ticket 108 — server-monitoring scenario):
   // expand the draft body, reveal the tool trace, and open each MCP result card
   // so the live monitoring readings show in the shot.
   try {
-    await page.goto("/agent/tickets/101", { waitUntil: "domcontentloaded" });
+    await page.goto("/agent/tickets/108", { waitUntil: "domcontentloaded" });
     await page.waitForLoadState("networkidle").catch(() => undefined);
     const ai = page.getByTestId("ai-panel");
     await ai.waitFor({ state: "visible", timeout: 5000 });
     await page.getByTestId("ai-panel-draft-toggle-9101").click().catch(() => undefined);
-    await page.getByTestId("ai-panel-draft-trace-toggle-9101").click();
+    await page.getByTestId("ai-panel-draft-trace-toggle-9101").click().catch(() => undefined);
     for (const i of [0, 1]) {
       await page
         .getByTestId(`ai-panel-draft-trace-step-9101-${i}`)
