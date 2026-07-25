@@ -78,7 +78,14 @@ const OWNERS = [
   { owner_id: 3, owner_login: "cmorris", owner_name: "Chris Morris" },
 ];
 
+// Tickets flagged for the queue-row icons (paperclip / ✦ AI summary). Kept to
+// roughly a third of the 14 tickets so the icons read as a natural subset
+// rather than decorating every row.
+const ATTACHMENT_TICKET_IDS = new Set([100, 101, 103, 111, 113]);
+const AI_SUMMARY_TICKET_IDS = new Set([100, 105, 108]);
+
 const ticketItems = SUBJECTS.map((title, i) => {
+  const id = 100 + i;
   const c = CUSTOMERS[i % CUSTOMERS.length];
   const s = STATES[i % STATES.length];
   const p = PRIOS[(i * 3) % PRIOS.length];
@@ -86,43 +93,314 @@ const ticketItems = SUBJECTS.map((title, i) => {
   const o = OWNERS[i % OWNERS.length];
   const day = 10 + (i % 12);
   return {
-    id: 100 + i, tn: `2026070${String(1000 + i)}`, title,
+    id, tn: `2026070${String(1000 + i)}`, title,
     ...q, ...s, ...p, lock_id: 1, lock: "unlock", ...o,
     customer_id: c.cid, customer_user_id: c.login,
     create_time: `2026-07-${String(day).padStart(2, "0")}T09:12:00Z`,
     change_time: `2026-07-${String(Math.min(day + 2, 21)).padStart(2, "0")}T14:30:00Z`,
     age_seconds: (22 - day) * 86400, escalation_time: i % 5 === 0 ? 3600 : 0,
     escalation_response_time: 0, escalation_update_time: 0, escalation_solution_time: 0, until_time: 0,
+    attachment_count: ATTACHMENT_TICKET_IDS.has(id) ? (id === 100 || id === 113 ? 2 : 1) : 0,
+    has_ai_summary: AI_SUMMARY_TICKET_IDS.has(id),
   };
 });
 const tickets = { items: ticketItems, total: ticketItems.length, offset: 0, limit: 50 };
+const ticketById = new Map(ticketItems.map((t) => [t.id, t]));
 
-const ticketDetail = {
-  ...ticketItems[0], type_id: 1, service_id: null, sla_id: null, responsible_user_id: 2,
-  archive_flag: 0, create_by: 10, change_by: 1,
-  dynamic_fields: [
-    { name: "Category", label: "Category", field_type: "Dropdown", values: ["Hardware"] },
-    { name: "Impact", label: "Impact", field_type: "Dropdown", values: ["High"] },
-  ],
+function ticketDetailFor(id: number) {
+  const item = ticketById.get(id) ?? ticketItems[0];
+  return {
+    ...item, type_id: 1, service_id: null, sla_id: null, responsible_user_id: 2,
+    archive_flag: 0, create_by: 10, change_by: 1,
+    dynamic_fields: [
+      { name: "Category", label: "Category", field_type: "Dropdown", values: ["Hardware"] },
+      { name: "Impact", label: "Impact", field_type: "Dropdown", values: ["High"] },
+    ],
+  };
+}
+
+// ── Per-ticket article threads ──────────────────────────────────────────────
+// Each ticket (100-113) gets its own short, realistic thread instead of every
+// ticket silently reusing ticket 100's printer thread. Article ids are
+// namespaced per ticket (500 + (ticketId-100)*10 .. +9) so they never collide.
+type ArticleSpec = {
+  day: number; hm: string; sender: "customer" | "agent";
+  visible?: boolean; subject: string; from: string; to: string;
+  body: string; isHtml?: boolean; channel?: number;
+  attachments?: { filename: string; content_type: string; content_size: string }[];
 };
-const articles = [
-  { id: 500, ticket_id: 100, sender_type: "customer", sender_type_id: 3, communication_channel_id: 1,
-    is_visible_for_customer: true, create_time: "2026-07-10T09:12:00Z", create_by: 10,
-    subject: "Printer offline in building A", from_address: "j.doe@acme.example", to_address: "support@example.com",
-    content_type: "text/html", incoming_time: 1720602720 },
-  { id: 501, ticket_id: 100, sender_type: "agent", sender_type_id: 1, communication_channel_id: 1,
-    is_visible_for_customer: true, create_time: "2026-07-10T10:02:00Z", create_by: 1,
-    subject: "Re: Printer offline in building A", from_address: "support@example.com", to_address: "j.doe@acme.example",
-    content_type: "text/html", incoming_time: 1720605720 },
-  { id: 502, ticket_id: 100, sender_type: "agent", sender_type_id: 1, communication_channel_id: 3,
-    is_visible_for_customer: false, create_time: "2026-07-10T10:05:00Z", create_by: 1,
-    subject: "Internal note", from_address: "aturner", to_address: "", content_type: "text/plain", incoming_time: 1720605900 },
-];
-const bodies: Record<number, unknown> = {
-  500: { article_id: 500, content_type: "text/html", is_html: true, body: "<p>Hi team, the main printer on floor 2 (building A) is offline since this morning. It shows a blinking amber light and won't respond. Several people can't print. Could you take a look?</p><p>Thanks,<br>Jane</p>" },
-  501: { article_id: 501, content_type: "text/html", is_html: true, body: "<p>Hi Jane,</p><p>Thanks for reporting. We've reset the print spooler and pushed a firmware update. Could you try again and let us know?</p><p>Best,<br>Alex — IT Support</p>" },
-  502: { article_id: 502, content_type: "text/plain", is_html: false, body: "Assigned to Level 2 — likely the fuser unit. Ordered a replacement, ETA tomorrow." },
-};
+
+function baseArticleId(ticketId: number) {
+  return 500 + (ticketId - 100) * 10;
+}
+
+const articlesByTicket: Record<number, unknown[]> = {};
+const bodiesById: Record<number, unknown> = {};
+const attachmentsByArticle: Record<number, unknown[]> = {};
+
+function registerThread(ticketId: number, specs: ArticleSpec[]) {
+  const base = baseArticleId(ticketId);
+  articlesByTicket[ticketId] = specs.map((a, idx) => {
+    const id = base + idx;
+    const create_time = `2026-07-${String(a.day).padStart(2, "0")}T${a.hm}:00Z`;
+    const isHtml = a.isHtml ?? true;
+    bodiesById[id] = {
+      article_id: id, content_type: isHtml ? "text/html" : "text/plain", is_html: isHtml,
+      body: a.body,
+    };
+    if (a.attachments) {
+      attachmentsByArticle[id] = a.attachments.map((att, ai) => ({
+        id: id * 10 + ai, article_id: id, filename: att.filename, content_type: att.content_type,
+        content_size: att.content_size, content_id: null, disposition: "attachment", inline: false,
+      }));
+    }
+    return {
+      id, ticket_id: ticketId, sender_type: a.sender, sender_type_id: a.sender === "customer" ? 3 : 1,
+      communication_channel_id: a.channel ?? 1, is_visible_for_customer: a.visible ?? true,
+      create_time, create_by: a.sender === "customer" ? 10 : 1,
+      subject: a.subject, from_address: a.from, to_address: a.to,
+      content_type: isHtml ? "text/html" : "text/plain",
+      incoming_time: Math.floor(Date.parse(create_time) / 1000),
+    };
+  });
+  return articlesByTicket[ticketId];
+}
+
+const html = (...paragraphs: string[]) => paragraphs.map((p) => `<p>${p}</p>`).join("");
+
+registerThread(100, [
+  { day: 10, hm: "09:12", sender: "customer", subject: "Printer offline in building A",
+    from: "j.doe@acme.example", to: "support@example.com",
+    body: html(
+      "Hi team, the main printer on floor 2 (building A) is offline since this morning. It shows a blinking amber light and won't respond. Several people can't print. Could you take a look?",
+      "Thanks,<br>Jane",
+    ),
+    attachments: [{ filename: "floor2-printer-photo.jpg", content_type: "image/jpeg", content_size: "184320" }] },
+  { day: 10, hm: "10:02", sender: "agent", subject: "Re: Printer offline in building A",
+    from: "support@example.com", to: "j.doe@acme.example",
+    body: html(
+      "Hi Jane,",
+      "Thanks for reporting. We've reset the print spooler and pushed a firmware update. Could you try again and let us know?",
+      "Best,<br>Alex — IT Support",
+    ),
+    attachments: [{ filename: "printer-error-log.txt", content_type: "text/plain", content_size: "4096" }] },
+  { day: 10, hm: "10:05", sender: "agent", visible: false, channel: 3, isHtml: false,
+    subject: "Internal note", from: "aturner", to: "",
+    body: "Assigned to Level 2 — likely the fuser unit. Ordered a replacement, ETA tomorrow." },
+]);
+
+registerThread(101, [
+  { day: 11, hm: "09:12", sender: "customer", subject: "VPN access request",
+    from: "m.reed@acme.example", to: "support@example.com",
+    body: html(
+      "Hi team, I'm working from home this week and need VPN access to reach the internal file server and our ticketing system. My manager approved this by email (forwarding separately) — I should be added to the 'Engineering' VPN group. I'm on a company-issued MacBook.",
+      "Thanks,<br>Marcus",
+    ) },
+  { day: 11, hm: "10:30", sender: "agent", subject: "Re: VPN access request",
+    from: "support@example.com", to: "m.reed@acme.example",
+    body: html(
+      "Hi Marcus,",
+      "I've added your account to the Engineering VPN group and generated a client profile — see the attached configuration file. Import it into the GlobalProtect client and let us know if the connection succeeds.",
+      "One note: our VPN policy requires MFA on first connect, so have your authenticator app ready.",
+      "Best,<br>Bianca — IT Support",
+    ),
+    attachments: [{ filename: "vpn-client-config.ovpn", content_type: "application/octet-stream", content_size: "2048" }] },
+  { day: 11, hm: "10:32", sender: "agent", visible: false, channel: 3, isHtml: false,
+    subject: "Internal note", from: "bshah", to: "",
+    body: "Approved by manager per forwarded email (see ticket history). Added to AD group VPN-Engineering." },
+]);
+
+registerThread(102, [
+  { day: 12, hm: "09:12", sender: "customer", subject: "Cannot log into portal",
+    from: "s.patel@northwind.example", to: "support@example.com",
+    body: html(
+      "I keep getting \"Invalid credentials\" when logging into the customer portal, even after resetting my password twice. Other pages on our site work fine, just the portal login.",
+      "Regards,<br>Sara",
+    ) },
+  { day: 12, hm: "10:15", sender: "agent", subject: "Re: Cannot log into portal",
+    from: "support@example.com", to: "s.patel@northwind.example",
+    body: html(
+      "Hi Sara,",
+      "Found it — your account had a leftover lock from too many failed attempts before the password resets took effect. I've cleared the lock and confirmed you can log in now with your latest password. Let us know if it happens again.",
+      "Best,<br>Chris — IT Support",
+    ) },
+]);
+
+registerThread(103, [
+  { day: 13, hm: "09:12", sender: "customer", subject: "Invoice discrepancy for March",
+    from: "l.gomez@northwind.example", to: "support@example.com",
+    body: html(
+      "Hello, I'm reviewing our March invoice (INV-2026-0317) and the line item for \"Additional user licenses\" shows 12 seats, but per our contract we only added 8 additional seats in March. Could someone check billing on this? I've attached a copy of the invoice with the discrepancy highlighted.",
+      "Regards,<br>Luis Gomez<br>Northwind Traders",
+    ),
+    attachments: [{ filename: "invoice-march-2026.pdf", content_type: "application/pdf", content_size: "98304" }] },
+  { day: 13, hm: "11:40", sender: "agent", subject: "Re: Invoice discrepancy for March",
+    from: "support@example.com", to: "l.gomez@northwind.example",
+    body: html(
+      "Hi Luis,",
+      "Thanks for flagging this — you're right, there's a discrepancy. Looking at our provisioning log, 4 of those seats were added under a separate trial that should have been billed at $0 during the trial period. I'm issuing a credit note for the difference and will forward it within 2 business days.",
+      "Apologies for the confusion.",
+      "Best,<br>Alex — Billing Support",
+    ) },
+]);
+
+registerThread(104, [
+  { day: 14, hm: "09:12", sender: "customer", subject: "New laptop provisioning",
+    from: "k.wu@globex.example", to: "support@example.com",
+    body: html(
+      "Hi, we have a new hire starting Monday (Priya Shah, Marketing) and she'll need a standard laptop provisioned with the usual software bundle plus Adobe Creative Cloud. Could you get one ready and shipped to our Austin office?",
+    ) },
+  { day: 14, hm: "13:20", sender: "agent", subject: "Re: New laptop provisioning",
+    from: "support@example.com", to: "k.wu@globex.example",
+    body: html(
+      "Hi Karen,",
+      "Happy to help. I've queued a standard MacBook Air build with the marketing software bundle and added an Adobe Creative Cloud license. It'll ship to Austin by Thursday with tracking sent to you directly.",
+      "Let us know if she needs anything else set up before day one.",
+      "Best,<br>Bianca — IT Support",
+    ) },
+]);
+
+registerThread(105, [
+  { day: 15, hm: "08:41", sender: "customer", subject: "Email delivery delayed",
+    from: "t.hall@initech.example", to: "support@example.com",
+    body: html(
+      "Hi, several of our staff have reported that outbound emails to external clients are taking 20-30 minutes to arrive today, sometimes longer. Internal mail seems fine. Can you check if there's an issue with the mail relay?",
+    ) },
+  { day: 15, hm: "09:30", sender: "agent", visible: false, channel: 3, isHtml: false,
+    subject: "Internal note", from: "cmorris", to: "",
+    body: "Outbound queue on mail-relay-02 backed up ~09:15 after a burst of large attachments from a marketing send. Throttled the job and draining the backlog; monitoring queue depth." },
+  { day: 15, hm: "10:05", sender: "agent", subject: "Re: Email delivery delayed",
+    from: "support@example.com", to: "t.hall@initech.example",
+    body: html(
+      "Hi Tom,",
+      "Thanks for reporting — we saw the same delay on our end. The outbound queue on mail-relay-02 backed up around 09:15 due to a burst of large attachments from a marketing send. We've throttled that job and drained the backlog; delivery times are back to normal.",
+      "We'll keep an eye on it and follow up if it recurs.",
+      "Best,<br>Chris — IT Support",
+    ) },
+]);
+
+registerThread(106, [
+  { day: 16, hm: "09:12", sender: "customer", subject: "Password reset for shared mailbox",
+    from: "j.doe@acme.example", to: "support@example.com",
+    body: html(
+      "Hi, could someone reset the password for the shared \"orders@acme.example\" mailbox? A few of us use it and nobody remembers the current password after the last rotation.",
+    ) },
+  { day: 16, hm: "09:50", sender: "agent", subject: "Re: Password reset for shared mailbox",
+    from: "support@example.com", to: "j.doe@acme.example",
+    body: html(
+      "Hi Jane,",
+      "Done — I've reset the password for orders@acme.example and sent the new credentials to you and Marcus separately via our secure notes link (expires in 24h). Please update it in Outlook for anyone with delegated access.",
+      "Best,<br>Alex — IT Support",
+    ) },
+]);
+
+registerThread(107, [
+  { day: 17, hm: "09:12", sender: "customer", subject: "Website contact form broken",
+    from: "m.reed@acme.example", to: "support@example.com",
+    body: html(
+      "The contact form on our marketing site (acme.example/contact) isn't sending submissions — customers report clicking Send and nothing happens, no confirmation page either. Can someone take a look? This is costing us leads.",
+    ) },
+  { day: 17, hm: "12:05", sender: "agent", subject: "Re: Website contact form broken",
+    from: "support@example.com", to: "m.reed@acme.example",
+    body: html(
+      "Hi Marcus,",
+      "Found it — the form's submit endpoint was pointing at an SSL certificate that expired yesterday. I've renewed the cert and confirmed a test submission goes through and lands in the sales inbox. Could you double-check on your end as well?",
+      "Best,<br>Bianca — IT Support",
+    ) },
+]);
+
+registerThread(108, [
+  { day: 18, hm: "08:41", sender: "customer", subject: "Slow database queries",
+    from: "s.patel@northwind.example", to: "support@example.com",
+    body: html(
+      "Hi, our portal has been noticeably slow since this morning — pages that usually load instantly are taking 5-10 seconds, and a couple of colleagues got timeout errors. Is something wrong on your end?",
+    ) },
+  { day: 18, hm: "08:50", sender: "agent", visible: false, channel: 3, isHtml: false,
+    subject: "Internal note", from: "cmorris", to: "",
+    body: "Monitoring alert fired for web-prod-03: CPU 94%, HTTP latency p95 2.4s, correlates with the slow queries reported by the customer. Investigating; no customer reply sent yet pending root cause." },
+]);
+
+registerThread(109, [
+  { day: 19, hm: "09:12", sender: "customer", subject: "Request: additional license seats",
+    from: "l.gomez@northwind.example", to: "support@example.com",
+    body: html(
+      "We're onboarding three new analysts next month and will need three additional seats on our reporting license. Can you add these to our current subscription and let me know the updated invoice amount?",
+    ) },
+  { day: 19, hm: "11:00", sender: "agent", subject: "Re: Request: additional license seats",
+    from: "support@example.com", to: "l.gomez@northwind.example",
+    body: html(
+      "Hi Luis,",
+      "Added three seats to your reporting license, effective immediately. The prorated charge for this billing cycle will show as a separate line on next month's invoice; going forward it's part of the recurring total.",
+      "Best,<br>Alex — Billing Support",
+    ) },
+]);
+
+registerThread(110, [
+  { day: 20, hm: "09:12", sender: "customer", subject: "Two-factor app not accepting codes",
+    from: "k.wu@globex.example", to: "support@example.com",
+    body: html(
+      "My authenticator app stopped working — it's generating codes that the portal rejects as invalid. I didn't change phones or reinstall anything. I'm locked out of my account now.",
+    ) },
+  { day: 20, hm: "09:45", sender: "agent", subject: "Re: Two-factor app not accepting codes",
+    from: "support@example.com", to: "k.wu@globex.example",
+    body: html(
+      "Hi Karen,",
+      "This usually means the phone's clock drifted out of sync with our server, which throws off the time-based codes. I've reset your 2FA enrollment — please re-scan the QR code we're sending to your registered email, and check that \"Set time automatically\" is enabled on your phone.",
+      "Best,<br>Bianca — IT Support",
+    ) },
+]);
+
+registerThread(111, [
+  { day: 21, hm: "09:12", sender: "customer", subject: "Onboarding new starter",
+    from: "t.hall@initech.example", to: "support@example.com",
+    body: html(
+      "New starter Priya Nair joins us next Monday in Finance. Could you provision accounts (email, VPN, finance system access) and send me the checklist so I can confirm everything's ready before her first day? I've attached our standard onboarding checklist for reference.",
+    ),
+    attachments: [{ filename: "onboarding-checklist.docx", content_type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document", content_size: "31744" }] },
+  { day: 21, hm: "14:00", sender: "agent", subject: "Re: Onboarding new starter",
+    from: "support@example.com", to: "t.hall@initech.example",
+    body: html(
+      "Hi Tom,",
+      "All set — email and VPN accounts are provisioned, and I've submitted the finance-system access request to that team (usually a 1-day turnaround).",
+      "Best,<br>Chris — IT Support",
+    ) },
+]);
+
+registerThread(112, [
+  { day: 10, hm: "09:12", sender: "customer", subject: "Firewall rule change request",
+    from: "j.doe@acme.example", to: "support@example.com",
+    body: html(
+      "We need a firewall rule opened to allow our new analytics vendor (203.0.113.44) to reach our reporting API on port 8443. Can this go through change control this week?",
+    ) },
+  { day: 10, hm: "15:30", sender: "agent", subject: "Re: Firewall rule change request",
+    from: "support@example.com", to: "j.doe@acme.example",
+    body: html(
+      "Hi Jane,",
+      "Submitted through change control and scheduled for tonight's maintenance window. I'll open 203.0.113.44 to port 8443 on the reporting API only, restricted to that single source IP. You'll get a confirmation once it's live and tested.",
+      "Best,<br>Alex — IT Support",
+    ) },
+]);
+
+registerThread(113, [
+  { day: 11, hm: "06:05", sender: "agent", visible: false, channel: 3, isHtml: false,
+    subject: "Internal note", from: "bshah", to: "",
+    body: "Nightly backup job for file-server-02 failed at 02:14 with error \"target volume unreachable\". Retried automatically at 03:00 — failed again. Escalating for manual review.",
+    attachments: [{ filename: "backup-error-screenshot.png", content_type: "image/png", content_size: "62208" }] },
+  { day: 11, hm: "09:00", sender: "customer", subject: "Backup job failed overnight",
+    from: "m.reed@acme.example", to: "support@example.com",
+    body: html(
+      "Just noticed the automated alert about last night's backup failure for file-server-02 — can you confirm nothing was actually lost and that tonight's run will succeed?",
+    ) },
+  { day: 11, hm: "10:00", sender: "agent", subject: "Re: Backup job failed overnight",
+    from: "support@example.com", to: "m.reed@acme.example",
+    body: html(
+      "Hi Marcus,",
+      "Confirmed no data loss — this was a backup job failure, not a storage issue. The target NAS had a stale mount after last week's network maintenance; we've remounted it and run a manual backup successfully just now. Tonight's scheduled job should complete normally.",
+      "Attached is the job log from last night for your records.",
+      "Best,<br>Bianca — IT Support",
+    ),
+    attachments: [{ filename: "backup-job-log.txt", content_type: "text/plain", content_size: "12288" }] },
+]);
 
 // AI subsystem (state-only summary + drafts) for the demo ticket. Static,
 // fabricated content so the public demo showcases the assistant end-to-end
@@ -181,31 +459,32 @@ const ticketAiState = {
   summary_created_at: "2026-07-10T10:06:00Z",
 };
 
-// A second AI scenario (ticket 101) showcasing MCP tool use: the assistant
-// pulled live readings from a monitoring MCP server and grounded its draft in
-// them. The tool_trace `content` is JSON so the panel renders it as a compact
-// key/value table (arrays become pill badges).
+// A second AI scenario (ticket 108, "Slow database queries") showcasing MCP
+// tool use: the assistant pulled live readings from a monitoring MCP server
+// and grounded its draft in them. The tool_trace `content` is JSON so the
+// panel renders it as a compact key/value table (arrays become pill badges).
 const ticketAiSummaryMcp =
   "The monitoring integration flagged web-prod-03 with sustained high load and slow " +
-  "HTTP responses since 08:41. Live metrics pulled through the monitoring MCP server " +
-  "confirm CPU at 94%, a 15-minute load average of 11.8, and memory at 88%, with three " +
-  "alerts currently firing (CPUHigh, HTTPLatencyP95, and DiskWillFill on /var). The " +
-  "assistant grounded its customer reply in those live readings rather than guessing.\n\n" +
+  "HTTP responses since 08:41, matching the query slowness Sara Patel reported. Live " +
+  "metrics pulled through the monitoring MCP server confirm CPU at 94%, a 15-minute " +
+  "load average of 11.8, and memory at 88%, with three alerts currently firing " +
+  "(CPUHigh, HTTPLatencyP95, and DiskWillFill on /var). The assistant grounded its " +
+  "customer reply in those live readings rather than guessing.\n\n" +
   "Open point: confirm whether the traffic spike is organic before scaling out versus " +
   "rolling back this morning's deploy.";
 
 const ticketAiDraftsMcp = [
   {
-    id: 9101, ticket_id: 101, kind: "reply",
-    subject: "Re: Portal is slow this morning",
+    id: 9101, ticket_id: 108, kind: "reply",
+    subject: "Re: Slow database queries",
     body:
-      "Hi,\n\nThanks for flagging this. Our monitoring confirms one of the web nodes " +
+      "Hi Sara,\n\nThanks for flagging this. Our monitoring confirms one of the web nodes " +
       "(web-prod-03) is under heavy load right now — CPU around 94% and elevated request " +
       "latency since 08:41. We're shifting traffic off that node and adding capacity; you " +
       "should see response times recover within the next few minutes. We'll follow up here " +
       "once it's fully stable.\n\nBest regards,\nOperations",
-    based_on_article_id: 600, status: "open", source: "auto",
-    accepted_article_id: null, create_time: "2026-07-10T08:52:00Z",
+    based_on_article_id: baseArticleId(108), status: "open", source: "auto",
+    accepted_article_id: null, create_time: "2026-07-18T08:52:00Z",
     tool_trace: [
       {
         name: "monitoring.get_host_metrics",
@@ -227,7 +506,7 @@ const ticketAiDraftsMcp = [
             "HTTPLatencyP95 2.4s > 1s",
             "DiskWillFill /var ~6h",
           ],
-          since: "2026-07-10T08:41:00Z",
+          since: "2026-07-18T08:41:00Z",
         }),
       },
     ],
@@ -241,8 +520,66 @@ const ticketAiStateMcp = {
   operation_mode_ready: true,
   drafts: ticketAiDraftsMcp,
   summary_body: ticketAiSummaryMcp,
-  last_summary_upto_article_id: 600,
-  summary_created_at: "2026-07-10T08:51:00Z",
+  last_summary_upto_article_id: baseArticleId(108) + 1,
+  summary_created_at: "2026-07-18T08:51:00Z",
+};
+
+// A third AI scenario (ticket 105, "Email delivery delayed"): a lighter-weight
+// summary built purely from ticket history (no MCP tool calls), showing the
+// assistant can summarize without external grounding.
+const ticketAiSummaryMail =
+  "Tom Hall reported outbound email delays of 20-30 minutes to external recipients, " +
+  "starting around 08:41. IT traced it to the outbound queue on mail-relay-02 " +
+  "backing up after a burst of large attachments from a marketing send, throttled " +
+  "the job, and drained the backlog; delivery times are back to normal.\n\n" +
+  "Open point: none — reply confirming the fix is ready to send.";
+
+const ticketAiDraftsMail = [
+  {
+    id: 9201, ticket_id: 105, kind: "reply",
+    subject: "Re: Email delivery delayed",
+    body:
+      "Hi Tom,\n\nThanks for reporting — we saw the same delay on our end. The outbound " +
+      "queue on mail-relay-02 backed up around 09:15 due to a burst of large attachments " +
+      "from a marketing send. We've throttled that job and drained the backlog; delivery " +
+      "times are back to normal.\n\nWe'll keep an eye on it and follow up if it recurs.\n\n" +
+      "Best regards,\nIT Support",
+    based_on_article_id: baseArticleId(105), status: "open", source: "auto",
+    accepted_article_id: null, create_time: "2026-07-15T09:35:00Z",
+    tool_trace: [
+      { name: "ticket.history", content: "Internal note at 09:30 confirms mail-relay-02 queue backlog identified and job throttled." },
+    ],
+  },
+];
+
+const ticketAiStateMail = {
+  manual_assist_available: true,
+  summary_available: true,
+  can_summarize: true,
+  operation_mode_ready: true,
+  drafts: ticketAiDraftsMail,
+  summary_body: ticketAiSummaryMail,
+  last_summary_upto_article_id: baseArticleId(105) + 1,
+  summary_created_at: "2026-07-15T09:34:00Z",
+};
+
+// Tickets without a designated AI scenario: manual assist only, no summary
+// yet generated — this is what backs the ✦ icon's absence in the queue row.
+const ticketAiStateUnavailable = {
+  manual_assist_available: true,
+  summary_available: false,
+  can_summarize: true,
+  operation_mode_ready: true,
+  drafts: [],
+  summary_body: null,
+  last_summary_upto_article_id: null,
+  summary_created_at: null,
+};
+
+const aiStateByTicket: Record<number, unknown> = {
+  100: ticketAiState,
+  105: ticketAiStateMail,
+  108: ticketAiStateMcp,
 };
 
 // Admin AI config so the demo's AI settings/providers pages look provisioned
@@ -404,8 +741,9 @@ export function resolveData(path: string, method: string): unknown | undefined {
   if (p.endsWith("/api/v1/queues")) return agentQueues;
   if (p.endsWith("/api/v1/tickets/dashboard-summary")) return { my_open: 9, my_new: 3, unowned_new: 5, escalated: 6 };
   if (p.endsWith("/api/v1/tickets") && method === "GET") return tickets;
-  if (p.match(/\/api\/v1\/tickets\/\d+\/articles\/\d+\/body$/)) { const id = Number(p.split("/").slice(-2)[0]); return bodies[id] ?? bodies[500]; }
-  if (p.match(/\/api\/v1\/tickets\/\d+\/articles$/)) return articles;
+  if (p.match(/\/api\/v1\/tickets\/\d+\/articles\/\d+\/body$/)) { const id = Number(p.split("/").slice(-2)[0]); return bodiesById[id] ?? bodiesById[500]; }
+  if (p.match(/\/api\/v1\/tickets\/\d+\/articles\/\d+\/attachments/)) { const aid = Number(p.split("/").slice(-2)[0]); return attachmentsByArticle[aid] ?? []; }
+  if (p.match(/\/api\/v1\/tickets\/\d+\/articles$/)) { const tid = Number(p.split("/").slice(-2)[0]); return articlesByTicket[tid] ?? []; }
   if (p.match(/\/api\/v1\/tickets\/\d+\/history$/)) return historyEntries;
   if (p.match(/\/api\/v1\/tickets\/\d+\/presence/)) return method === "GET" ? [] : {};
   if (p.match(/\/api\/v1\/tickets\/\d+\/attachments/) || p.match(/attachments/)) return [];
@@ -418,9 +756,9 @@ export function resolveData(path: string, method: string): unknown | undefined {
     return { status: "ok", draft_id: 9001, article_id: 500 };
   if (p.match(/\/api\/v1\/tickets\/\d+\/ai$/) && method === "GET") {
     const tid = Number(p.split("/").slice(-2)[0]);
-    return tid === 101 ? ticketAiStateMcp : ticketAiState;
+    return aiStateByTicket[tid] ?? ticketAiStateUnavailable;
   }
-  if (p.match(/\/api\/v1\/tickets\/\d+$/) && method === "GET") return ticketDetail;
+  if (p.match(/\/api\/v1\/tickets\/\d+$/) && method === "GET") { const tid = Number(p.split("/").pop()); return ticketDetailFor(tid); }
   if (p.endsWith("/api/v1/agents/online")) return onlineAgents;
   if (p.endsWith("/api/v1/agents/presence/ping") && method === "POST") return {};
   if (p.endsWith("/api/v1/search")) return searchHits;

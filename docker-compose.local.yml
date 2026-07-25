@@ -118,7 +118,7 @@ services:
         python -m tiqora.main bootstrap --admin-password admin &&
         if [ ! -f /seed-state/.seeded ]; then
           echo "Seeding fake customers/tickets…" &&
-          python -m tiqora.main dev seed --customers 12 --tickets 40 --seed 42 &&
+          python -m tiqora.main dev seed --customers 12 --tickets 60 --seed 42 &&
           touch /seed-state/.seeded;
         else
           echo "Already seeded — skipping (rm the tiqora_local_seed volume to re-seed).";
