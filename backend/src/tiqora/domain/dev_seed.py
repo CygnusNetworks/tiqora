@@ -107,9 +107,10 @@ async def seed_database(
             raise SeedError(
                 "No ticket states/priorities found — seeding assumes an initialized Znuny schema."
             )
-        priority_id_by_name = dict(
-            (await session.execute(select(TicketPriority.name, TicketPriority.id))).all()
-        )
+        priority_id_by_name: dict[str, int] = {
+            row[0]: row[1]
+            for row in (await session.execute(select(TicketPriority.name, TicketPriority.id))).all()
+        }
 
     run_ns = uuid.uuid4().hex[:8]
     now = datetime.now(UTC).replace(tzinfo=None)
@@ -198,7 +199,10 @@ async def seed_database(
 
         queue_id = random.choice(queue_ids)
         state_id = random.choice(state_ids)
-        priority_id = priority_id_by_name.get(scenario.priority_hint) or random.choice(priority_ids)
+        hinted_priority = (
+            priority_id_by_name.get(scenario.priority_hint) if scenario.priority_hint else None
+        )
+        priority_id = hinted_priority or random.choice(priority_ids)
         ticket_customer_id: str | None = None
         ticket_customer_login: str | None = None
         if customer_ids:
