@@ -7,6 +7,7 @@ import { getLoginMethod, rememberLoginMethod } from "@/lib/loginMethod";
 import { api, ApiError } from "@/lib/api";
 import { Button } from "@/components/ui/Button";
 import { Spinner } from "@/components/ui/Spinner";
+import { OtpInput } from "@/components/ui/OtpInput";
 
 function browserSupportsWebAuthn(): boolean {
   return (
@@ -163,12 +164,12 @@ export function LoginPage() {
     }
   };
 
-  const onVerifyTotp = async (e: FormEvent) => {
-    e.preventDefault();
+  const runVerifyTotp = async (code: string) => {
+    if (submitting) return;
     setError(null);
     setSubmitting(true);
     try {
-      await verifyTotp(totpCode);
+      await verifyTotp(code);
       await goNext();
     } catch (err) {
       if (err instanceof ApiError && err.status === 401) {
@@ -179,6 +180,11 @@ export function LoginPage() {
     } finally {
       setSubmitting(false);
     }
+  };
+
+  const onVerifyTotp = async (e: FormEvent) => {
+    e.preventDefault();
+    await runVerifyTotp(totpCode);
   };
 
   const onVerifyPasskey = async () => {
@@ -201,18 +207,23 @@ export function LoginPage() {
     }
   };
 
-  const onConfirmEnroll = async (e: FormEvent) => {
-    e.preventDefault();
+  const runConfirmEnroll = async (code: string) => {
+    if (submitting) return;
     setEnrollError(null);
     setSubmitting(true);
     try {
-      await completeEnroll2fa(enrollCode);
+      await completeEnroll2fa(code);
       await goNext();
     } catch {
       setEnrollError(t("auth.mustEnroll.confirmError"));
     } finally {
       setSubmitting(false);
     }
+  };
+
+  const onConfirmEnroll = async (e: FormEvent) => {
+    e.preventDefault();
+    await runConfirmEnroll(enrollCode);
   };
 
   const onEnrollPasskey = async () => {
@@ -283,29 +294,31 @@ export function LoginPage() {
                 className="space-y-3"
                 data-testid="must-enroll-form"
               >
-                <label className="block text-sm">
-                  <span className="mb-1 block text-muted">
+                <div className="text-sm">
+                  <span className="mb-2 block text-muted">
                     {t("security.confirmCode")}
                   </span>
-                  <input
+                  <OtpInput
                     data-testid="must-enroll-code"
-                    inputMode="numeric"
-                    autoComplete="one-time-code"
+                    aria-label={t("security.confirmCode")}
                     required
+                    autoFocus
                     value={enrollCode}
-                    onChange={(e) => setEnrollCode(e.target.value)}
-                    className="w-full rounded-md border border-hairline bg-surface-subtle px-3 py-2 text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent focus:border-accent"
+                    onChange={(v) => {
+                      setEnrollError(null);
+                      setEnrollCode(v);
+                    }}
+                    onComplete={(code) => void runConfirmEnroll(code)}
+                    status={
+                      submitting && !passkeyEnrolling
+                        ? "verifying"
+                        : enrollError
+                          ? "error"
+                          : "idle"
+                    }
+                    statusMessage={enrollError}
                   />
-                </label>
-                {enrollError && (
-                  <p
-                    className="text-sm text-danger"
-                    role="alert"
-                    data-testid="must-enroll-error"
-                  >
-                    {enrollError}
-                  </p>
-                )}
+                </div>
                 <Button
                   type="submit"
                   variant="primary"
@@ -377,30 +390,26 @@ export function LoginPage() {
               className="mt-7 space-y-4"
               data-testid="totp-form"
             >
-              <label className="block text-sm">
-                <span className="mb-1 block text-muted">
+              <div className="text-sm">
+                <span className="mb-2 block text-muted">
                   {t("auth.totpCode")}
                 </span>
-                <input
+                <OtpInput
                   data-testid="totp-code"
                   name="code"
-                  inputMode="numeric"
-                  autoComplete="one-time-code"
+                  aria-label={t("auth.totpCode")}
                   required
+                  autoFocus
                   value={totpCode}
-                  onChange={(e) => setTotpCode(e.target.value)}
-                  className="w-full rounded-md border border-hairline bg-surface-subtle px-3 py-2 text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent focus:border-accent"
+                  onChange={(v) => {
+                    setError(null);
+                    setTotpCode(v);
+                  }}
+                  onComplete={(code) => void runVerifyTotp(code)}
+                  status={submitting ? "verifying" : error ? "error" : "idle"}
+                  statusMessage={error}
                 />
-              </label>
-              {error && (
-                <p
-                  className="text-sm text-danger"
-                  data-testid="totp-error"
-                  role="alert"
-                >
-                  {error}
-                </p>
-              )}
+              </div>
               <Button
                 type="submit"
                 variant="primary"
