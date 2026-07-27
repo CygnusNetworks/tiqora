@@ -232,6 +232,27 @@ streams (no aggressive idle kills).
 - Redis: sessions are disposable; job queues should use durable Redis config
   once workers are critical path.
 
+### Meilisearch document-schema changes
+
+When filterable/sortable fields are **added to indexed documents** (not only
+index settings), `ensure_index()` alone is not enough: it updates Meili
+settings but does **not** rewrite existing documents. Documents written
+before the change lack the new fields, so filters on those fields silently
+return zero hits.
+
+**After deploy of such a change, run a full rebuild:**
+
+```bash
+# full rebuild (do not resume a partial watermark)
+tiqora index rebuild --no-resume
+```
+
+Known examples:
+
+| Change | Fields | Rebuild required? |
+|--------|--------|-------------------|
+| Faceted date filters (search facets PR) | `created_ts`, `changed_ts` on ticket docs | **Yes** — date filters exclude pre-change docs until rebuild |
+
 ## Security checklist (draft)
 
 - [ ] TLS everywhere
