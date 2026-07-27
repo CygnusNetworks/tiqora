@@ -43,6 +43,10 @@ class Settings(BaseSettings):
     # empty in plain local builds. Purely informational — never gates behaviour.
     git_sha: str = Field(default="", validation_alias="TIQORA_GIT_SHA")
     build_time: str = Field(default="", validation_alias="TIQORA_BUILD_TIME")
+    # System-Info container probe: which docker-compose project's containers to
+    # show. Empty → auto-detect from the API container's own compose label, so
+    # on a shared host only Tiqora's own stack appears, not every container.
+    docker_project: str = Field(default="", validation_alias="TIQORA_DOCKER_PROJECT")
     log_level: str = Field(default="INFO", validation_alias="TIQORA_LOG_LEVEL")
     secret_key: str = Field(
         default=DEFAULT_SECRET_KEY,
