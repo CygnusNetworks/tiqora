@@ -505,7 +505,12 @@
       "from": "Von",
       "to": "Bis",
       "paletteHint": "Tippen für Live-Treffer – queue:, besitzer:, status:, kunde: werden zu Filtern.",
-      "viewAll": "Alle Ergebnisse anzeigen"
+      "viewAll": "Alle Ergebnisse anzeigen",
+      "noQueueMatch": "Keine Queue für „{{frag}}“",
+      "noOwnerMatch": "Kein Besitzer für „{{frag}}“",
+      "noCustomerMatch": "Kein Kunde für „{{frag}}“",
+      "customerHint": "Kundennummer oder Name eingeben (mind. 2 Zeichen)",
+      "loading": "Suche…"
     },
     "presets": {
       "label": "Zeitraum",

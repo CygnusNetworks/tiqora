@@ -505,7 +505,12 @@
       "from": "From",
       "to": "To",
       "paletteHint": "Type for live results – queue:, owner:, status:, customer: become filters.",
-      "viewAll": "Show all results"
+      "viewAll": "Show all results",
+      "noQueueMatch": "No queue matching “{{frag}}”",
+      "noOwnerMatch": "No owner matching “{{frag}}”",
+      "noCustomerMatch": "No customer matching “{{frag}}”",
+      "customerHint": "Type a customer number or name (min. 2 characters)",
+      "loading": "Searching…"
     },
     "presets": {
       "label": "Time range",

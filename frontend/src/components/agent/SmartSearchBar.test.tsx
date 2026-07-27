@@ -125,4 +125,58 @@ describe("SmartSearchBar", () => {
     });
     expect(screen.getByTestId("smart-chip-customer")).toHaveTextContent("Marcus Laschinski · z26111");
   });
+
+  it("clears the input after picking a queue (no residual 'queue' free text)", () => {
+    const onQueryChange = vi.fn();
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(
+      <QueryClientProvider client={qc}>
+        <I18nextProvider i18n={i18n}>
+          <SmartSearchBar
+            values={EMPTY}
+            queues={QUEUES}
+            agents={AGENTS}
+            onPatch={vi.fn()}
+            onSubmitQuery={vi.fn()}
+            onQueryChange={onQueryChange}
+          />
+        </I18nextProvider>
+      </QueryClientProvider>,
+    );
+    const input = screen.getByTestId("search-input");
+    fireEvent.focus(input);
+    // Partial key must not become free-text query.
+    fireEvent.change(input, { target: { value: "queue" } });
+    expect(onQueryChange).not.toHaveBeenCalled();
+    fireEvent.change(input, { target: { value: "queue:sto" } });
+    fireEvent.mouseDown(screen.getByTestId("smart-suggest-queue-7"));
+    expect(input).toHaveValue("");
+  });
+
+  it("auto-commits a unique queue match on trailing space", () => {
+    const { onPatch } = renderBar(EMPTY);
+    const input = screen.getByTestId("search-input");
+    fireEvent.focus(input);
+    fireEvent.change(input, { target: { value: "queue:stoerungen " } });
+    expect(onPatch).toHaveBeenCalledWith({ queue_id: [7] });
+    expect(input).toHaveValue("");
+  });
+
+  it("does not submit raw queue:… as fulltext when there is no match", () => {
+    const { onSubmit } = renderBar(EMPTY);
+    const input = screen.getByTestId("search-input");
+    fireEvent.focus(input);
+    fireEvent.change(input, { target: { value: "queue:does-not-exist" } });
+    fireEvent.keyDown(input, { key: "Enter" });
+    expect(onSubmit).not.toHaveBeenCalled();
+  });
+
+  it("shows queue suggestions while typing queue:frag", () => {
+    renderBar(EMPTY);
+    const input = screen.getByTestId("search-input");
+    fireEvent.focus(input);
+    fireEvent.change(input, { target: { value: "queue:sto" } });
+    expect(screen.getByTestId("smart-search-suggest")).toBeInTheDocument();
+    expect(screen.getByTestId("smart-suggest-queue-7")).toHaveTextContent("stoerungen");
+  });
 });
