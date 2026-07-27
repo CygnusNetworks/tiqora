@@ -1638,6 +1638,7 @@
       "description": "The whole installation's health at a glance — version, services, datastores, containers and load. For diagnostics and support.",
       "loadError": "Could not load system information.",
       "unavailable": "Not available.",
+      "notConfigured": "Not set up",
       "overall": {
         "ok": "All systems operational",
         "degraded": "Operating with limitations",
@@ -1693,13 +1694,17 @@
       },
       "containers": {
         "since": "since",
-        "restarts": "Restarts"
+        "restarts": "Restarts",
+        "engine": "Docker engine",
+        "running": "{{count}}/{{total}} running",
+        "notConfiguredHint": "Docker socket not mounted — opt-in not enabled."
       },
       "host": {
         "cpu": "CPU",
         "memory": "Memory",
         "disk": "Disk",
-        "cores": "{{count}} cores · load {{load}}"
+        "cores": "{{count}} cores · load {{load}}",
+        "notConfiguredHint": "psutil not installed — host metrics unavailable."
       }
     },
     "daemons": {
