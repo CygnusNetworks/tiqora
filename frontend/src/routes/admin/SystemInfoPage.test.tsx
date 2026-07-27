@@ -15,6 +15,11 @@ vi.mock("@/lib/api", () => ({
 }));
 
 function sysinfo(overrides: Partial<SystemInfoOut> = {}): SystemInfoOut {
+  // Keep the poller's last success recent relative to *now*: statusColor()
+  // marks an interval service amber once it is older than 3× its interval
+  // (45s here), so a fixed wall-clock timestamp makes the "all green" case
+  // flip to amber as real time passes. Anchor it to Date.now() instead.
+  const recentIso = new Date(Date.now() - 5_000).toISOString();
   return {
     app: {
       name: "Tiqora",
@@ -37,8 +42,8 @@ function sysinfo(overrides: Partial<SystemInfoOut> = {}): SystemInfoOut {
         interval_seconds: 15,
         interval_overridden: false,
         daily_at: null,
-        last_run_at: "2026-07-27T11:59:55+00:00",
-        last_ok_at: "2026-07-27T11:59:55+00:00",
+        last_run_at: recentIso,
+        last_ok_at: recentIso,
         last_error: null,
         last_result: null,
       },
