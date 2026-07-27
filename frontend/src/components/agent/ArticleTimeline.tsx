@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { api, type ArticleListItem } from "@/lib/api";
@@ -300,6 +300,8 @@ export function ArticleComposer({
 }) {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
+  const rootRef = useRef<HTMLDivElement>(null);
+  const bodyRef = useRef<HTMLTextAreaElement>(null);
   const [openLocal, setOpenLocal] = useState(false);
   const controlled = openProp !== undefined;
   const open = controlled ? openProp : openLocal;
@@ -321,6 +323,17 @@ export function ArticleComposer({
     // Only re-snapshot on open transition; articles changing later is the
     // stale-warning signal, not a re-baseline.
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
+
+  // Header "+ Notiz" / ⋮ menu open the composer at the bottom of a potentially
+  // long article list — without scroll+focus it looks like a dead button.
+  useEffect(() => {
+    if (!open) return;
+    rootRef.current?.scrollIntoView?.({ behavior: "smooth", block: "nearest" });
+    const frame = window.requestAnimationFrame(() => {
+      bodyRef.current?.focus();
+    });
+    return () => window.cancelAnimationFrame(frame);
   }, [open]);
 
   const sendMutation = useMutation({
@@ -364,7 +377,11 @@ export function ArticleComposer({
   const staleWarning = maxArticleId(articles) > openedAtMaxId;
 
   return (
-    <div className="space-y-2 rounded-lg border border-hairline bg-surface p-3" data-testid="article-composer">
+    <div
+      ref={rootRef}
+      className="space-y-2 rounded-lg border border-hairline bg-surface p-3"
+      data-testid="article-composer"
+    >
       {staleWarning && (
         <p
           className="rounded border border-escalation/30 bg-escalation/15 px-2 py-1 text-xs text-escalation"
@@ -382,6 +399,7 @@ export function ArticleComposer({
         className="w-full rounded border border-hairline bg-surface px-2 py-1.5 text-sm text-ink placeholder:text-muted focus:outline-none focus:ring-1 focus:ring-accent"
       />
       <textarea
+        ref={bodyRef}
         value={body}
         onChange={(e) => setBody(e.target.value)}
         placeholder={t("ticket.composerBodyPlaceholder")}

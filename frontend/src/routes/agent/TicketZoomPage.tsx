@@ -146,7 +146,10 @@ export function TicketZoomPage() {
         ticket={ticketQ.data}
         overflowMenu={overflowMenu}
         canNote={canNote}
-        onOpenNote={() => setNoteOpen(true)}
+        onOpenNote={() => {
+          setTab("articles");
+          setNoteOpen(true);
+        }}
       />
       <ProcessWidget
         ticketId={ticketId}
