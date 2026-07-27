@@ -218,8 +218,7 @@ def validate_mcp_arguments_against_schema(
     unknown = [k for k in arguments if k not in allowed]
     if unknown:
         raise ToolArgumentError(
-            f"MCP tool argument(s) not in schema: {sorted(unknown)} "
-            f"(allowed: {sorted(allowed)})"
+            f"MCP tool argument(s) not in schema: {sorted(unknown)} (allowed: {sorted(allowed)})"
         )
     required = parameters_schema.get("required")
     if isinstance(required, list):
@@ -228,7 +227,9 @@ def validate_mcp_arguments_against_schema(
             raise ToolArgumentError(f"MCP tool missing required argument(s): {sorted(missing)}")
 
 
-def _local_tool_schemas(*, capabilities: AgentCapabilities, kb_enabled: bool) -> list[dict[str, Any]]:
+def _local_tool_schemas(
+    *, capabilities: AgentCapabilities, kb_enabled: bool
+) -> list[dict[str, Any]]:
     schemas: list[dict[str, Any]] = []
     if capabilities.propose_message:
         schemas.append(
@@ -386,9 +387,7 @@ class ToolRegistry:
         return out
 
     def build_schemas(self) -> list[dict[str, Any]]:
-        schemas = _local_tool_schemas(
-            capabilities=self._capabilities, kb_enabled=self._kb_enabled
-        )
+        schemas = _local_tool_schemas(capabilities=self._capabilities, kb_enabled=self._kb_enabled)
         for name, spec in self._callable_mcp_tools().items():
             params: dict[str, Any]
             if isinstance(spec.parameters_schema, dict) and spec.parameters_schema:

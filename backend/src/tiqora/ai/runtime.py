@@ -28,6 +28,7 @@ from tiqora.ai.attachment_context import build_attachment_context, mask_attachme
 from tiqora.ai.audit import FEATURE_AUTO_REPLY as AUDIT_FEATURE_AUTO_REPLY
 from tiqora.ai.audit import FEATURE_DRAFT as AUDIT_FEATURE_DRAFT
 from tiqora.ai.audit import AuditContext, AuditingLlmClient
+from tiqora.ai.capabilities import resolve_capabilities
 from tiqora.ai.context import (
     ArticleSnapshot,
     TicketNotFoundError,
@@ -40,7 +41,6 @@ from tiqora.ai.context import (
     render_ticket_header,
     ticket_snapshot,
 )
-from tiqora.ai.capabilities import resolve_capabilities
 from tiqora.ai.gate import AiGateError, require_feature_allowed
 from tiqora.ai.kb_wiring import build_vision_llm_factory
 from tiqora.ai.listfields import parse_int_list

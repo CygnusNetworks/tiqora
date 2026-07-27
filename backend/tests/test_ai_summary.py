@@ -23,13 +23,13 @@ from tiqora.ai.policies import QueuePolicyValidationError
 from tiqora.ai.summary import (
     _SYSTEM_PROMPT,
     _SYSTEM_PROMPT_DETAILED,
-    _system_prompt_for_detail,
     STATUS_UP_TO_DATE,
     STATUS_UPDATED,
     TRIGGER_AUTO,
     TRIGGER_MANUAL,
     SummaryAclDeniedError,
     SummaryPolicyDisabledError,
+    _system_prompt_for_detail,
     auto_summary_due,
     summarize_ticket,
 )
