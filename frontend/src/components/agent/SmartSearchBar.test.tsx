@@ -3,7 +3,8 @@ import { render, screen, fireEvent } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { I18nextProvider } from "react-i18next";
 import i18n from "@/i18n";
-import { SmartSearchBar, type SmartSearchValues } from "./SmartSearchBar";
+import { SmartSearchBar } from "./SmartSearchBar";
+import type { SmartSearchValues } from "./smartSearch";
 
 const customerQuickSearch = vi.fn();
 vi.mock("@/lib/api", () => ({

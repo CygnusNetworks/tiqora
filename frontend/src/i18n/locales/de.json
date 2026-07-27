@@ -503,7 +503,9 @@
       "filterHint": "Filter",
       "dateHint": "Datum als TT.MM.JJJJ",
       "from": "Von",
-      "to": "Bis"
+      "to": "Bis",
+      "paletteHint": "Tippen für Live-Treffer – queue:, besitzer:, status:, kunde: werden zu Filtern.",
+      "viewAll": "Alle Ergebnisse anzeigen"
     },
     "presets": {
       "label": "Zeitraum",

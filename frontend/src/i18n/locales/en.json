@@ -503,7 +503,9 @@
       "filterHint": "Filter",
       "dateHint": "Date as YYYY-MM-DD",
       "from": "From",
-      "to": "To"
+      "to": "To",
+      "paletteHint": "Type for live results – queue:, owner:, status:, customer: become filters.",
+      "viewAll": "Show all results"
     },
     "presets": {
       "label": "Time range",
