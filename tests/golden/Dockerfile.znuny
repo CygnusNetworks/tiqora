@@ -95,8 +95,23 @@ COPY tests/golden/znuny-entrypoint.sh /usr/local/bin/znuny-entrypoint.sh
 COPY tests/golden/Config.pm.tmpl /opt/otrs/Kernel/Config.pm.tmpl
 RUN chmod +x /usr/local/bin/znuny-entrypoint.sh
 
-# Apache include: ScriptAlias is usually /otrs/ or /znuny/ depending on release.
+# Apache + perl-startup: Znuny 7.x ships /opt/znuny paths; we always install at /opt/otrs.
+# Rewrite install root and normalize ScriptAlias to /otrs/ so one healthcheck + GI URL works.
 RUN set -e; \
+    for f in /opt/otrs/scripts/apache2-httpd.include.conf \
+             /opt/otrs/scripts/apache2-httpd-mp1-or-mp2.include.conf \
+             /opt/otrs/scripts/apache2-perl-startup.pl \
+             /opt/otrs/scripts/apache2-httpd-plack-proxy.conf; do \
+      [ -f "$f" ] || continue; \
+      sed -i \
+        -e 's|/opt/znuny|/opt/otrs|g' \
+        -e 's|ScriptAlias /znuny/|ScriptAlias /otrs/|g' \
+        -e 's|Alias /znuny-web/|Alias /otrs-web/|g' \
+        -e 's|<Location /znuny>|<Location /otrs>|g' \
+        -e 's|<Location /znuny/|<Location /otrs/|g' \
+        -e 's|ErrorDocument 403 /znuny/|ErrorDocument 403 /otrs/|g' \
+        "$f"; \
+    done; \
     INC=""; \
     for f in /opt/otrs/scripts/apache2-httpd.include.conf \
              /opt/otrs/scripts/apache2-httpd-mp1-or-mp2.include.conf; do \
@@ -106,7 +121,20 @@ RUN set -e; \
       cp "$INC" /etc/apache2/conf-available/znuny.conf; \
       a2enconf znuny; \
     fi; \
-    a2enmod perl headers deflate filter || true
+    a2enmod perl headers deflate filter || true; \
+    # Stable path for GenericTicketConnectorREST (location varies by release).
+    mkdir -p /opt/otrs/var/webservices/examples; \
+    DEST=/opt/otrs/var/webservices/examples/GenericTicketConnectorREST.yml; \
+    if [ ! -f "$DEST" ]; then \
+      for src in \
+        /opt/otrs/scripts/test/sample/Webservice/GenericTicketConnectorREST.yml \
+        /opt/otrs/scripts/test/sample/webservice/GenericTicketConnectorREST.yml; do \
+        if [ -f "$src" ]; then cp "$src" "$DEST"; break; fi; \
+      done; \
+    fi; \
+    # ServerName quiet + apache can start without DNS
+    printf 'ServerName znuny.golden.local\n' > /etc/apache2/conf-available/servername.conf; \
+    a2enconf servername || true
 
 WORKDIR /opt/otrs
 EXPOSE 80

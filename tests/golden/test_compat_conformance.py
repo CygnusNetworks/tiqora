@@ -24,6 +24,10 @@ ZNUNY_BASE_URL = "http://127.0.0.1:8180"
 ZNUNY_REST_BASE = f"{ZNUNY_BASE_URL}/otrs/nph-genericinterface.pl/Webservice/{WEBSERVICE_NAME}"
 
 
+# Dockerfile.znuny normalizes this path for all peers (6.0–7.3 sample locations vary).
+_WEBSERVICE_YML = "/opt/otrs/var/webservices/examples/GenericTicketConnectorREST.yml"
+
+
 @pytest.fixture(scope="module", autouse=True)
 def _ensure_webservice() -> None:
     """Import the shipped sample REST webservice once per module run.
@@ -35,7 +39,7 @@ def _ensure_webservice() -> None:
         znuny_console(
             "Admin::WebService::Add",
             f"--name={WEBSERVICE_NAME}",
-            "--source-path=/opt/otrs/var/webservices/examples/GenericTicketConnectorREST.yml",
+            f"--source-path={_WEBSERVICE_YML}",
         )
 
 
