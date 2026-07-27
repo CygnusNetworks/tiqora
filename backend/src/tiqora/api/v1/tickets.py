@@ -24,6 +24,7 @@ from tiqora.domain.schemas import (
     HistoryEntry,
     PaginatedTickets,
     ReplyDraftOut,
+    SimilarTicketsOut,
     SplitRequest,
     TemplateOut,
     TicketDetail,
@@ -31,6 +32,7 @@ from tiqora.domain.schemas import (
     TicketLinkTargetOut,
     TicketListItem,
 )
+from tiqora.domain.search import SearchIndexService
 from tiqora.domain.ticket_service import (
     TicketAccessDenied,
     TicketNotFound,
@@ -384,6 +386,38 @@ async def get_ticket(
         return await TicketService(session).get_ticket(user.id, ticket_id)
     except (TicketNotFound, TicketAccessDenied) as exc:
         raise _map_exc(exc) from exc
+
+
+@router.get("/{ticket_id}/similar", response_model=SimilarTicketsOut)
+async def get_similar_tickets(
+    ticket_id: int,
+    user: CurrentUser,
+    session: DbSession,
+    settings: AppSettings,
+) -> SimilarTicketsOut:
+    """Keyword-similar closed tickets (Meili rank; embedding blend later)."""
+    try:
+        ticket = await TicketService(session).get_ticket(user.id, ticket_id)
+    except (TicketNotFound, TicketAccessDenied) as exc:
+        raise _map_exc(exc) from exc
+
+    svc = SearchIndexService(session, settings)
+    try:
+        # Prefer the indexed document's latest excerpt when present; fall back
+        # to title-only if the ticket is not (yet) in Meili.
+        doc = await svc.build_document(ticket_id)
+        excerpt = None
+        if doc is not None:
+            raw_excerpt = doc.get("latest_article_excerpt")
+            excerpt = str(raw_excerpt) if raw_excerpt else None
+        return await svc.find_similar(
+            user.id,
+            ticket_id,
+            title=ticket.title,
+            excerpt=excerpt,
+        )
+    finally:
+        await svc.close()
 
 
 @router.get("/{ticket_id}/articles", response_model=list[ArticleListItem])

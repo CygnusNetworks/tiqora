@@ -475,6 +475,11 @@
       "attachments_one": "1 attachment",
       "attachments_other": "{{count}} attachments",
       "hasSummary": "AI summary available"
+    },
+    "similar": {
+      "title": "Similar tickets",
+      "empty": "No similar closed tickets found.",
+      "loadError": "Could not load similar tickets."
     }
   },
   "search": {
@@ -486,7 +491,24 @@
     "results": "{{total}} results for “{{query}}”",
     "noResults": "No matching tickets.",
     "groupTickets": "Tickets",
-    "groupKb": "Knowledge base"
+    "groupKb": "Knowledge base",
+    "filters": {
+      "title": "Filters",
+      "clear": "Clear",
+      "queue": "Queue",
+      "owner": "Owner",
+      "ownerAll": "Any owner",
+      "customer": "Customer",
+      "customerPlaceholder": "Company or contact…",
+      "createdFrom": "Created from",
+      "createdTo": "Created to",
+      "state": {
+        "new": "New",
+        "open": "Open",
+        "pending": "Pending",
+        "closed": "Closed"
+      }
+    }
   },
   "account": {
     "menu": "Account menu",

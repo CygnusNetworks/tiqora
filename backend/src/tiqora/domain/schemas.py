@@ -345,6 +345,24 @@ class SearchResponse(BaseModel):
     query: str
     hits: list[SearchHit]
     estimated_total: int
+    facets: dict[str, dict[str, int]] = Field(default_factory=dict)
+    """Facet distribution keyed by facet name (queue_id, state_type, owner_id,
+    customer_id), each mapping the facet value (stringified) to hit count."""
+
+
+class SimilarTicketItem(BaseModel):
+    """One similar closed ticket (keyword rank v1; score ready for embedding blend)."""
+
+    id: int
+    tn: str | None = None
+    title: str | None = None
+    state: str | None = None
+    queue_name: str | None = None
+    score: float = 0.0
+
+
+class SimilarTicketsOut(BaseModel):
+    items: list[SimilarTicketItem]
 
 
 # ---------------------------------------------------------------------------
