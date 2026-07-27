@@ -134,9 +134,10 @@ class Settings(BaseSettings):
     # lockout keys on the real client, not the shared proxy IP.
     trusted_proxies_raw: str = Field(default="", validation_alias="TIQORA_TRUSTED_PROXIES")
 
-    # Prometheus /metrics on the public app port. Keep True so existing internal
-    # scrapes and tests keep working; set TIQORA_METRICS_ENABLED=0 when the app
-    # port is internet-facing and metrics are scraped only via a private path.
+    # Prometheus /metrics on the public app port. Default True outside production
+    # so local scrapes and tests keep working. In production the default flips to
+    # False unless TIQORA_METRICS_ENABLED is set explicitly (unauthenticated
+    # metrics on an internet-facing port are an insecure default).
     metrics_enabled: bool = Field(default=True, validation_alias="TIQORA_METRICS_ENABLED")
 
     # App-level Content-Security-Policy for the SPA. Report-only by default so a
@@ -440,6 +441,15 @@ class Settings(BaseSettings):
             object.__setattr__(self, "csp_enforce", self.is_production)
         return self
 
+    @model_validator(mode="after")
+    def _default_metrics_enabled(self) -> Self:
+        """Disable unauthenticated /metrics in production when the env var is
+        unset. Operators that scrape on the app port can set
+        ``TIQORA_METRICS_ENABLED=1`` explicitly (prefer a private scrape path)."""
+        if "metrics_enabled" not in self.model_fields_set and self.is_production:
+            object.__setattr__(self, "metrics_enabled", False)
+        return self
+
     def validate_production(self) -> None:
         """Hard-fail on unsafe production settings; no-op outside production.
 
@@ -485,6 +495,13 @@ class Settings(BaseSettings):
                 "MEILI_MASTER_KEY is a known development/default value. "
                 "Set a unique production master key shared only with Meilisearch "
                 "and Tiqora (e.g. `openssl rand -hex 32`)."
+            )
+
+        if not self.session_cookie_secure:
+            errors.append(
+                "TIQORA_SESSION_COOKIE_SECURE=false is not allowed in production "
+                "(session cookies would be sent over cleartext HTTP). Terminate "
+                "TLS at the edge and leave Secure cookies enabled."
             )
 
         if errors:

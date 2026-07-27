@@ -23,10 +23,21 @@ from __future__ import annotations
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from tiqora.crypto.secret import decrypt_secret, encrypt_secret
 from tiqora.domain.settings_store import get_setting, get_setting_bool
-from tiqora.domain.ticket_write_service import TicketIn, create_ticket
+from tiqora.domain.ticket_write_service import (
+    TicketAccessDenied,
+    TicketIn,
+    TicketNotFound,
+    _ticket_must_exist,
+    create_ticket,
+)
+from tiqora.permissions.engine import PermissionEngine
 from tiqora.znuny.followup import detect_followup
 from tiqora.znuny.sysconfig import SysConfig
+
+# Fernet tokens always start with this prefix (urlsafe base64 of version byte).
+_FERNET_PREFIX = "gAAAAA"
 
 
 def setting_key(channel: str, name: str) -> str:
@@ -38,11 +49,56 @@ async def channel_enabled(session: AsyncSession, channel: str) -> bool:
     return await get_setting_bool(session, setting_key(channel, "enabled"), False)
 
 
+def _maybe_decrypt_channel_value(value: str, secret_key: str | None) -> str:
+    """Decrypt Fernet-at-rest channel secrets; leave plaintext legacy values as-is."""
+    if secret_key and value.startswith(_FERNET_PREFIX):
+        dec = decrypt_secret(secret_key, value)
+        if dec is not None:
+            return dec
+    return value
+
+
+def encrypt_channel_secret(secret_key: str, plaintext: str) -> str:
+    """Encrypt a channel credential for storage in ``tiqora_settings``."""
+    return encrypt_secret(secret_key, plaintext)
+
+
 async def channel_setting(
     session: AsyncSession, channel: str, name: str, default: str | None = None
 ) -> str | None:
+    """Read a channel config value.
+
+    Secret-shaped values written via the admin API are Fernet-encrypted at rest.
+    Values that look like Fernet tokens are decrypted with the app secret;
+    legacy plaintext rows remain readable without migration.
+    """
     value = await get_setting(session, setting_key(channel, name))
-    return value if value not in (None, "") else default
+    if value in (None, ""):
+        return default
+    try:
+        from tiqora.config import get_settings
+
+        secret_key = get_settings().secret_key
+    except Exception:  # noqa: BLE001 — never break reads if settings unavailable
+        secret_key = None
+    return _maybe_decrypt_channel_value(value, secret_key)
+
+
+async def assert_ticket_note_permission(
+    session: AsyncSession, *, user_id: int, ticket_id: int
+) -> None:
+    """Require queue ``note`` permission on *ticket_id* (agent channel outbound).
+
+    Raises :class:`TicketNotFound` or :class:`TicketAccessDenied` so HTTP handlers
+    can map to 404/403. Mirrors :meth:`TicketWriteService.add_article` ACL.
+    """
+    try:
+        t = await _ticket_must_exist(session, ticket_id)
+    except TicketNotFound:
+        raise
+    pe = PermissionEngine(session)
+    if not await pe.check(user_id, int(t["queue_id"]), "note"):
+        raise TicketAccessDenied(f"user {user_id} lacks note on ticket {ticket_id}")
 
 
 async def _lookup_id(session: AsyncSession, table: str, name_col: str, value: str) -> int | None:

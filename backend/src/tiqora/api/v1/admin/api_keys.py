@@ -18,6 +18,25 @@ from tiqora.domain.auth import generate_api_key, hash_api_key
 
 router = APIRouter(prefix="/api-keys", tags=["admin:api-keys"])
 
+_ALLOWED_SCOPES = frozenset({"read", "write", "mcp", "*"})
+
+
+def _normalize_scopes(raw: str | None) -> str | None:
+    """Normalize comma-separated scopes; reject unknown tokens."""
+    if raw is None:
+        return None
+    parts = [p.strip().lower() for p in raw.split(",") if p.strip()]
+    if not parts:
+        return None
+    unknown = set(parts) - _ALLOWED_SCOPES
+    if unknown:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"Unknown API key scope(s): {sorted(unknown)}. "
+            f"Allowed: {sorted(_ALLOWED_SCOPES)}",
+        )
+    return ",".join(sorted(set(parts)))
+
 
 def _naive_utc(value: datetime | None) -> datetime | None:
     """Store DateTime columns as naive UTC (matches ``_utcnow`` / server default)."""
@@ -63,6 +82,7 @@ async def create_api_key(body: ApiKeyCreate, admin: AdminUser, session: DbSessio
         )
     raw = generate_api_key()
     ts = now()
+    scopes = _normalize_scopes(body.scopes)
     row = TiqoraApiKey(
         name=body.name,
         key_hash=hash_api_key(raw),
@@ -71,6 +91,7 @@ async def create_api_key(body: ApiKeyCreate, admin: AdminUser, session: DbSessio
         created=ts,
         expires_at=_naive_utc(body.expires_at),
         created_by=admin.id,
+        scopes=scopes,
     )
     session.add(row)
     await session.commit()
@@ -84,6 +105,7 @@ async def create_api_key(body: ApiKeyCreate, admin: AdminUser, session: DbSessio
         expires_at=row.expires_at,
         last_used_at=row.last_used_at,
         created_by=row.created_by,
+        scopes=row.scopes,
         key=raw,
     )
 
@@ -99,6 +121,8 @@ async def update_api_key(
     updates = body.model_dump(exclude_unset=True)
     if "expires_at" in updates:
         updates["expires_at"] = _naive_utc(updates["expires_at"])
+    if "scopes" in updates:
+        updates["scopes"] = _normalize_scopes(updates["scopes"])
     for field, value in updates.items():
         setattr(row, field, value)
     await session.commit()

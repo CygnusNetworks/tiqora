@@ -112,6 +112,18 @@ async def get_current_user(
             headers={"WWW-Authenticate": "Bearer"},
         )
 
+    # API-key scope gate: non-empty scopes without write/* cannot mutate.
+    scopes = resolved.api_key_scopes
+    if (
+        scopes is not None
+        and request.method.upper() not in ("GET", "HEAD", "OPTIONS")
+        and not (scopes & {"write", "*"})
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="API key lacks write scope",
+        )
+
     if token_for_state is not None:
         request.state.session_token = token_for_state
 

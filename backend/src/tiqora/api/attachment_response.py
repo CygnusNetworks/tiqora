@@ -87,7 +87,7 @@ def safe_attachment_response(
     if filename:
         safe = _sanitize_filename(filename)
         headers["Content-Disposition"] = (
-            f"{disp_kind}; filename=\"{safe}\"; filename*=UTF-8''{quote(filename)}"
+            f"{disp_kind}; filename=\"{safe}\"; filename*=UTF-8''{quote(safe)}"
         )
     else:
         headers["Content-Disposition"] = disp_kind
