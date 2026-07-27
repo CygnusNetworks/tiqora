@@ -44,15 +44,62 @@ async def get_priority(priority_id: int, admin: AdminUser, session: DbSession) -
 async def create_priority(
     body: PriorityCreate, admin: AdminUser, session: DbSession
 ) -> TicketPriority:
+    from tiqora.db.legacy.profile import default_color_for_write
+
     ts = now()
-    priority = TicketPriority(
-        **body.model_dump(),
-        create_time=ts,
-        create_by=admin.id,
-        change_time=ts,
-        change_by=admin.id,
-    )
-    session.add(priority)
+    data = body.model_dump()
+    color = default_color_for_write()
+    if color is None:
+        priority = TicketPriority(
+            **data,
+            create_time=ts,
+            create_by=admin.id,
+            change_time=ts,
+            change_by=admin.id,
+        )
+        session.add(priority)
+    else:
+        # Znuny 7.0+: ticket_priority.color is NOT NULL and not on the 6.5 ORM
+        # baseline. Insert via Core with an explicit default color.
+        from sqlalchemy import text
+
+        params = {
+            **data,
+            "create_time": ts,
+            "create_by": admin.id,
+            "change_time": ts,
+            "change_by": admin.id,
+            "color": color,
+        }
+        try:
+            dialect = session.get_bind().dialect.name
+        except Exception:  # noqa: BLE001
+            dialect = ""
+        if dialect in {"postgresql", "postgres"}:
+            priority_id = (
+                await session.execute(
+                    text(
+                        "INSERT INTO ticket_priority "
+                        "(name, valid_id, create_time, create_by, change_time, change_by, color) "
+                        "VALUES (:name, :valid_id, :create_time, :create_by, :change_time, "
+                        ":change_by, :color) RETURNING id"
+                    ),
+                    params,
+                )
+            ).scalar_one()
+        else:
+            await session.execute(
+                text(
+                    "INSERT INTO ticket_priority "
+                    "(name, valid_id, create_time, create_by, change_time, change_by, color) "
+                    "VALUES (:name, :valid_id, :create_time, :create_by, :change_time, "
+                    ":change_by, :color)"
+                ),
+                params,
+            )
+            priority_id = (await session.execute(text("SELECT LAST_INSERT_ID()"))).scalar_one()
+        priority = await session.get(TicketPriority, priority_id)
+        assert priority is not None
     await invalidate_znuny_cache_types(session, PRIORITY_CACHE_TYPES)
     await session.commit()
     await session.refresh(priority)

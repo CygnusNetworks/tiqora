@@ -61,9 +61,22 @@ class FetchResult:
 
 
 async def list_valid_mail_accounts(session: AsyncSession) -> list[MailAccount]:
-    """Return all ``valid_id = 1`` mail accounts (Znuny only polls valid ones)."""
+    """Return all ``valid_id = 1`` mail accounts (Znuny only polls valid ones).
+
+    On OTRS/Znuny 6.0–6.2 the ``authentication_type`` / ``oauth2_token_config_id``
+    columns are absent — :func:`mail_account_load_options` omits them from the
+    SELECT when the runtime schema profile says so.
+    """
+    from tiqora.db.legacy.profile import mail_account_load_options
+
     rows = (
-        (await session.execute(select(MailAccount).where(MailAccount.valid_id == 1)))
+        (
+            await session.execute(
+                select(MailAccount)
+                .where(MailAccount.valid_id == 1)
+                .options(*mail_account_load_options())
+            )
+        )
         .scalars()
         .all()
     )

@@ -3,7 +3,7 @@
 [![License: AGPL-3.0](https://img.shields.io/badge/License-AGPL--3.0-blue.svg)](./LICENSE)
 [![Python 3.12+](https://img.shields.io/badge/Python-3.12%2B-3776AB?logo=python&logoColor=white)](./backend)
 [![React + TypeScript](https://img.shields.io/badge/React-TypeScript-61DAFB?logo=react&logoColor=black)](./frontend)
-[![Znuny 6.5 DB](https://img.shields.io/badge/Znuny%2FOTRS-6.5%20DB%20compatible-5B8CFF)](./docs/compatibility.md)
+[![Znuny/OTRS 6.0–7.3 DB](https://img.shields.io/badge/Znuny%2FOTRS-6.0--7.3%20DB-5B8CFF)](./docs/parallel-operation.md)
 [![Docker](https://img.shields.io/badge/Docker-ready-2496ED?logo=docker&logoColor=white)](./docs/deploy/docker-compose.md)
 [![Live site](https://img.shields.io/badge/Live-demo%20%26%20product%20site-5B8CFF)](https://cygnusnetworks.github.io/tiqora/)
 [![Backend coverage](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/CygnusNetworks/tiqora/badges/backend-coverage.json)](./backend)
@@ -29,9 +29,10 @@ not a fork of Znuny — no Znuny source code is included or redistributed.
 
 - **Modern web UI** — agent workspace, admin console, and customer portal that feel
   like a current product, not a 2000s helpdesk skin.
-- **Znuny / OTRS 6.5 database compatibility** — same core tables; **parallel operation**
-  on one shared database is a first-class path (additive `tiqora_*` tables only until
-  you explicitly take schema ownership).
+- **Znuny / OTRS 6.0–7.3 database compatibility** — same core ticket tables; a runtime
+  schema profile detects the peer tier (primary target **Znuny 6.5**). **Parallel
+  operation** on one shared database is a first-class path (additive `tiqora_*` tables
+  only until you explicitly take schema ownership).
 - **AI-ready ticket search** — Meilisearch indexing plus an **MCP server** so AI agents
   act with the same ACLs as humans.
 - **AI agent assistance** — per-queue policies drive **draft replies**, **state-only
@@ -372,7 +373,9 @@ Full index: **[docs/README.md](./docs/README.md)**
 
 ## Compatibility statement
 
-- **Target**: Znuny / OTRS **6.5** database schema (MariaDB/MySQL and PostgreSQL).
+- **Target**: OTRS/Znuny **6.0–7.3** database schema (MariaDB/MySQL and PostgreSQL);
+  primary golden path **Znuny 6.5**. Unknown schemas refuse to start unless overridden
+  (`TIQORA_ALLOW_UNKNOWN_LEGACY_SCHEMA` / `TIQORA_LEGACY_SCHEMA_PROFILE=znuny-6.5`).
 - **Behaviour**: Ticket numbering, history name formats, escalation columns, and
   search-index flags must remain readable and writable by a co-running Znuny 6.5
   instance during parallel operation.

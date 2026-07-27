@@ -6704,6 +6704,16 @@
             ],
             "title": "Latency Ms"
           },
+          "legacy_schema": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LegacySchemaOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "size_bytes": {
             "anyOf": [
               {
@@ -8582,6 +8592,65 @@
           "articles"
         ],
         "title": "KnowledgeBundle",
+        "type": "object"
+      },
+      "LegacySchemaOut": {
+        "description": "Detected OTRS/Znuny schema profile for the connected database.\n\nSee ``tiqora.db.legacy.profile`` / multi-version support matrix\n(version ids such as ``znuny-6.5``, OTRS/Znuny 6.0\u20137.3). Surfaced on the\nadmin System-Info page so operators can see which peer schema Tiqora\nadapted to.",
+        "properties": {
+          "dialect": {
+            "title": "Dialect",
+            "type": "string"
+          },
+          "groups_table": {
+            "title": "Groups Table",
+            "type": "string"
+          },
+          "junction_tables_have_surrogate_id": {
+            "title": "Junction Tables Have Surrogate Id",
+            "type": "boolean"
+          },
+          "known": {
+            "title": "Known",
+            "type": "boolean"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "mail_account_has_oauth": {
+            "title": "Mail Account Has Oauth",
+            "type": "boolean"
+          },
+          "profile_id": {
+            "title": "Profile Id",
+            "type": "string"
+          },
+          "source": {
+            "title": "Source",
+            "type": "string"
+          },
+          "state_priority_has_color": {
+            "title": "State Priority Has Color",
+            "type": "boolean"
+          },
+          "supported": {
+            "title": "Supported",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "profile_id",
+          "label",
+          "known",
+          "supported",
+          "groups_table",
+          "mail_account_has_oauth",
+          "state_priority_has_color",
+          "junction_tables_have_surrogate_id",
+          "dialect",
+          "source"
+        ],
+        "title": "LegacySchemaOut",
         "type": "object"
       },
       "LlmProviderCreate": {

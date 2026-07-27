@@ -79,6 +79,12 @@ async def test_get_system_info_aggregate(mariadb_znuny_url: str) -> None:
             assert out.datastores.database.connected is True
             assert out.datastores.database.dialect == "mysql"
             assert out.datastores.database.latency_ms is not None
+            # OTRS/Znuny schema profile (Znuny 6.5 fixture).
+            legacy = out.datastores.database.legacy_schema
+            assert legacy is not None
+            assert legacy.known is True
+            assert legacy.groups_table == "permission_groups"
+            assert legacy.profile_id == "znuny-6.5"
 
             # Redis degrades gracefully (stub raises).
             assert out.datastores.redis.connected is False

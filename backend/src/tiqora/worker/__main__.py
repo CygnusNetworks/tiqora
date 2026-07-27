@@ -194,6 +194,44 @@ async def _run_all_loops(stop: asyncio.Event) -> None:
     )
 
 
+async def _ensure_legacy_schema_at_worker_start() -> None:
+    """Refuse to run the worker against an unknown OTRS/Znuny schema."""
+    settings = get_settings()
+    if not settings.legacy_schema_check_enabled:
+        return
+    from tiqora.db.legacy.profile import (
+        UnsupportedLegacySchemaError,
+        ensure_legacy_schema_supported,
+    )
+
+    dialect_hint = (
+        "postgresql" if settings.is_postgres else "mysql" if settings.is_mysql else "unknown"
+    )
+    factory = get_session_factory()
+    try:
+        async with factory() as session:
+            profile = await ensure_legacy_schema_supported(
+                session,
+                allow_unknown=settings.allow_unknown_legacy_schema,
+                profile_override=settings.legacy_schema_profile,
+                dialect_hint=dialect_hint,
+            )
+        logger.info(
+            "legacy_schema_ready",
+            profile_id=profile.profile_id.value,
+            label=profile.label,
+            groups_table=profile.groups_table,
+        )
+    except UnsupportedLegacySchemaError:
+        raise
+    except Exception as exc:  # noqa: BLE001
+        # Mirror API behaviour: connection failures are logged; unknown schemas
+        # already re-raised above. A worker without a DB cannot do useful work
+        # either, but we keep the soft-skip so local dev without a peer DB can
+        # still start the process (ticks will fail independently).
+        logger.warning("legacy_schema_check_skipped", error=str(exc))
+
+
 def run_worker() -> None:
     """Start the background worker (poller, daemon takeover loops, heartbeat)."""
     settings = get_settings()
@@ -213,6 +251,7 @@ def run_worker() -> None:
 
     logger.info("tiqora_worker_starting", redis_url=settings.redis_url)
     try:
+        loop.run_until_complete(_ensure_legacy_schema_at_worker_start())
         loop.run_until_complete(_run_all_loops(stop))
     finally:
         loop.close()

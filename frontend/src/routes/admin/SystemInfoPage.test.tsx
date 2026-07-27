@@ -50,6 +50,18 @@ function sysinfo(overrides: Partial<SystemInfoOut> = {}): SystemInfoOut {
         version: "PostgreSQL 16.3",
         latency_ms: 0.4,
         size_bytes: 1_900_000_000,
+        legacy_schema: {
+          profile_id: "znuny-6.5",
+          label: "Znuny 6.5",
+          known: true,
+          supported: true,
+          groups_table: "permission_groups",
+          mail_account_has_oauth: true,
+          state_priority_has_color: false,
+          junction_tables_have_surrogate_id: false,
+          dialect: "postgresql",
+          source: "detected",
+        },
       },
       redis: {
         connected: true,
@@ -109,6 +121,10 @@ describe("SystemInfoPage", () => {
     expect(screen.getByText("docker-virt6")).toBeInTheDocument();
     // Datastore index doc counts rendered (locale-agnostic thousands separator).
     expect(screen.getByText(/4[.,]217/)).toBeInTheDocument();
+    // Legacy OTRS/Znuny schema tier shown on the DB card.
+    const legacy = screen.getByTestId("system-legacy-schema");
+    expect(legacy).toHaveAttribute("data-profile", "znuny-6.5");
+    expect(legacy).toHaveTextContent("Znuny 6.5");
   });
 
   it("degrades gracefully when containers and host are unavailable", async () => {

@@ -391,6 +391,7 @@ export function SystemInfoPage() {
 function DatastoresCards({ datastores }: { datastores: Datastores }) {
   const { t } = useTranslation();
   const { database: db, redis, search } = datastores;
+  const legacy = db.legacy_schema;
   return (
     <div className="grid gap-4 sm:grid-cols-3">
       <Card className="space-y-3">
@@ -415,6 +416,30 @@ function DatastoresCards({ datastores }: { datastores: Datastores }) {
             value={db.latency_ms != null ? `${db.latency_ms} ms` : "—"}
           />
         </div>
+        {legacy ? (
+          <div
+            className="space-y-1 border-t border-hairline pt-3"
+            data-testid="system-legacy-schema"
+            data-profile={legacy.profile_id}
+          >
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-xs text-muted">{t("admin.systemInfo.db.legacySchema")}</span>
+              <Chip color={legacy.supported ? "green" : "amber"}>
+                {legacy.label}
+                <span className="font-mono opacity-70"> · {legacy.profile_id}</span>
+              </Chip>
+            </div>
+            <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] text-muted">
+              <span>
+                {t("admin.systemInfo.db.groupsTable")}:{" "}
+                <span className="font-mono text-ink">{legacy.groups_table}</span>
+              </span>
+              <span>
+                {t("admin.systemInfo.db.schemaSource")}: {legacy.source}
+              </span>
+            </div>
+          </div>
+        ) : null}
       </Card>
 
       <Card className="space-y-3">
