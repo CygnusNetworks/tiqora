@@ -9,11 +9,11 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from tiqora.ai.tools import (
+    LOCAL_TOOL_NAMES,
     TOOL_ADD_INTERNAL_NOTE,
     TOOL_ESCALATE_TO_HUMAN,
     TOOL_PROPOSE_CUSTOMER_MESSAGE,
     TOOL_UPDATE_TICKET_FIELDS,
-    LOCAL_TOOL_NAMES,
 )
 
 
