@@ -1268,6 +1268,7 @@ async def test_mcp_resolve_api_key_rejects_unknown_and_revoked(
             "ALTER TABLE tiqora_api_key ADD COLUMN last_used_at DATETIME NULL",
             "ALTER TABLE tiqora_api_key ADD COLUMN name VARCHAR(200) NULL",
             "ALTER TABLE tiqora_api_key ADD COLUMN created_by INT NULL",
+            "ALTER TABLE tiqora_api_key ADD COLUMN scopes VARCHAR(200) NULL",
         ):
             with contextlib.suppress(Exception):
                 await session.execute(text(ddl))
@@ -1290,12 +1291,12 @@ async def test_mcp_resolve_api_key_rejects_unknown_and_revoked(
 
     try:
         # Never-issued key -> no matching row.
-        unknown_uid = await _resolve_api_key(state.session_factory, "tiqora_never_issued_key_xyz")
-        assert unknown_uid is None
+        unknown = await _resolve_api_key(state.session_factory, "tiqora_never_issued_key_xyz")
+        assert unknown is None
 
         # Revoked key (valid=False) -> excluded by the query's valid.is_(True) filter.
-        revoked_uid = await _resolve_api_key(state.session_factory, raw_revoked)
-        assert revoked_uid is None
+        revoked = await _resolve_api_key(state.session_factory, raw_revoked)
+        assert revoked is None
     finally:
         await state.aclose()
 
@@ -1311,6 +1312,7 @@ async def test_mcp_resolve_api_key_rejects_invalid_user(mcp_mariadb: dict[str, A
             "ALTER TABLE tiqora_api_key ADD COLUMN last_used_at DATETIME NULL",
             "ALTER TABLE tiqora_api_key ADD COLUMN name VARCHAR(200) NULL",
             "ALTER TABLE tiqora_api_key ADD COLUMN created_by INT NULL",
+            "ALTER TABLE tiqora_api_key ADD COLUMN scopes VARCHAR(200) NULL",
         ):
             with contextlib.suppress(Exception):
                 await session.execute(text(ddl))
@@ -1344,8 +1346,8 @@ async def test_mcp_resolve_api_key_rejects_invalid_user(mcp_mariadb: dict[str, A
         )
 
     try:
-        uid = await _resolve_api_key(state.session_factory, raw_key)
-        assert uid is None
+        resolved = await _resolve_api_key(state.session_factory, raw_key)
+        assert resolved is None
     finally:
         await state.aclose()
 
@@ -1362,6 +1364,7 @@ async def test_mcp_resolve_api_key_rejects_expired(mcp_mariadb: dict[str, Any]) 
             "ALTER TABLE tiqora_api_key ADD COLUMN last_used_at DATETIME NULL",
             "ALTER TABLE tiqora_api_key ADD COLUMN name VARCHAR(200) NULL",
             "ALTER TABLE tiqora_api_key ADD COLUMN created_by INT NULL",
+            "ALTER TABLE tiqora_api_key ADD COLUMN scopes VARCHAR(200) NULL",
         ):
             with contextlib.suppress(Exception):
                 await session.execute(text(ddl))
@@ -1394,11 +1397,14 @@ async def test_mcp_resolve_api_key_rejects_expired(mcp_mariadb: dict[str, Any]) 
         )
 
     try:
-        uid = await _resolve_api_key(state.session_factory, raw_ok)
+        resolved = await _resolve_api_key(state.session_factory, raw_ok)
+        assert resolved is not None
+        uid, scopes = resolved
         assert uid == AGENT_FULL_ID
+        assert scopes is None  # unrestricted key
 
-        expired_uid = await _resolve_api_key(state.session_factory, raw_expired)
-        assert expired_uid is None
+        expired = await _resolve_api_key(state.session_factory, raw_expired)
+        assert expired is None
 
         async with state.session_factory() as session:
             row = (

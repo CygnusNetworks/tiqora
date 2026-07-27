@@ -104,12 +104,34 @@ class _FakeRedis:
 
 
 def _build_app(fake_redis: _FakeRedis) -> Any:
+    from unittest.mock import AsyncMock, MagicMock, patch
+
     from tiqora.api.app import create_app
+    from tiqora.api.deps import get_db
 
     app = create_app(Settings(environment="test"))
     app.dependency_overrides[get_current_user] = lambda: _FAKE_USER
     app.dependency_overrides[get_redis] = lambda: fake_redis
+
+    async def _fake_db() -> Any:
+        yield MagicMock()
+
+    app.dependency_overrides[get_db] = _fake_db
+    # Presence ACL is asserted via TicketService; unit tests without a peer DB
+    # stub it open so Redis behaviour can be exercised in isolation.
+    patcher = patch(
+        "tiqora.api.v1.events.TicketService._assert_ticket_ro",
+        new=AsyncMock(return_value=MagicMock()),
+    )
+    patcher.start()
+    app.state._presence_acl_patcher = patcher  # type: ignore[attr-defined]
     return app
+
+
+def _stop_presence_patch(app: Any) -> None:
+    patcher = getattr(app.state, "_presence_acl_patcher", None)
+    if patcher is not None:
+        patcher.stop()
 
 
 @pytest.mark.asyncio
@@ -120,18 +142,21 @@ async def test_presence_roundtrip_sets_ttl_and_publishes() -> None:
     app = _build_app(fake_redis)
     transport = ASGITransport(app=app)
 
-    async with AsyncClient(transport=transport, base_url="http://test") as client:
-        resp = await client.post("/api/v1/tickets/42/presence", json={"mode": "viewing"})
-        assert resp.status_code == 204
+    try:
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            resp = await client.post("/api/v1/tickets/42/presence", json={"mode": "viewing"})
+            assert resp.status_code == 204
 
-        key = "tiqora:presence:42:7"
-        assert key in fake_redis.ttls
-        assert fake_redis.ttls[key] == 30
+            key = "tiqora:presence:42:7"
+            assert key in fake_redis.ttls
+            assert fake_redis.ttls[key] == 30
 
-        resp2 = await client.get("/api/v1/tickets/42/presence")
-        assert resp2.status_code == 200
-        body = resp2.json()
-        assert body == [{"user_id": 7, "name": "Ada Agent", "mode": "viewing"}]
+            resp2 = await client.get("/api/v1/tickets/42/presence")
+            assert resp2.status_code == 200
+            body = resp2.json()
+            assert body == [{"user_id": 7, "name": "Ada Agent", "mode": "viewing"}]
+    finally:
+        _stop_presence_patch(app)
 
     # presence write also publishes a presence_changed marker for SSE subscribers
     assert fake_redis.published
@@ -149,10 +174,13 @@ async def test_presence_empty_when_no_viewers() -> None:
     app = _build_app(fake_redis)
     transport = ASGITransport(app=app)
 
-    async with AsyncClient(transport=transport, base_url="http://test") as client:
-        resp = await client.get("/api/v1/tickets/999/presence")
-        assert resp.status_code == 200
-        assert resp.json() == []
+    try:
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            resp = await client.get("/api/v1/tickets/999/presence")
+            assert resp.status_code == 200
+            assert resp.json() == []
+    finally:
+        _stop_presence_patch(app)
 
 
 class _FakeRequest:

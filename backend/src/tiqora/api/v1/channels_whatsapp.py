@@ -23,6 +23,7 @@ from tiqora.channels.whatsapp.service import (
     verify_webhook_signature,
 )
 from tiqora.db.engine import get_session_factory
+from tiqora.domain.ticket_write_service import TicketAccessDenied, TicketNotFound
 from tiqora.znuny.sysconfig import SysConfig
 
 logger = structlog.get_logger(__name__)
@@ -97,6 +98,14 @@ async def receive_webhook(
     return WhatsAppWebhookResponse(processed=len(results))
 
 
+def _map_ticket_acl(exc: Exception) -> HTTPException:
+    if isinstance(exc, TicketNotFound):
+        return HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Ticket not found")
+    if isinstance(exc, TicketAccessDenied):
+        return HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
+    raise exc  # pragma: no cover
+
+
 @router.post("/send", response_model=WhatsAppSendResponse)
 async def send_text(
     body: WhatsAppSendTextRequest, user: CurrentUser, session: DbSession
@@ -108,15 +117,18 @@ async def send_text(
             status_code=status.HTTP_409_CONFLICT, detail="WhatsApp gateway not configured"
         )
     sysconfig = SysConfig(session)
-    article_id = await send_outbound_text(
-        session,
-        sysconfig,
-        gateway,
-        ticket_id=body.ticket_id,
-        to=body.to,
-        body=body.body,
-        user_id=user.id,
-    )
+    try:
+        article_id = await send_outbound_text(
+            session,
+            sysconfig,
+            gateway,
+            ticket_id=body.ticket_id,
+            to=body.to,
+            body=body.body,
+            user_id=user.id,
+        )
+    except (TicketNotFound, TicketAccessDenied) as exc:
+        raise _map_ticket_acl(exc) from exc
     await session.commit()
     return WhatsAppSendResponse(article_id=article_id)
 
@@ -132,15 +144,18 @@ async def send_template(
             status_code=status.HTTP_409_CONFLICT, detail="WhatsApp gateway not configured"
         )
     sysconfig = SysConfig(session)
-    article_id = await send_outbound_template(
-        session,
-        sysconfig,
-        gateway,
-        ticket_id=body.ticket_id,
-        to=body.to,
-        template_name=body.template_name,
-        language_code=body.language_code,
-        user_id=user.id,
-    )
+    try:
+        article_id = await send_outbound_template(
+            session,
+            sysconfig,
+            gateway,
+            ticket_id=body.ticket_id,
+            to=body.to,
+            template_name=body.template_name,
+            language_code=body.language_code,
+            user_id=user.id,
+        )
+    except (TicketNotFound, TicketAccessDenied) as exc:
+        raise _map_ticket_acl(exc) from exc
     await session.commit()
     return WhatsAppSendResponse(article_id=article_id)

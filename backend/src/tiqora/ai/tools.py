@@ -147,6 +147,13 @@ async def _default_mcp_call(
 ) -> Any:
     from fastmcp import Client
 
+    from tiqora.security.outbound import OutboundURLError, validate_outbound_url
+
+    try:
+        validate_outbound_url(url, allow_private_networks=True)
+    except OutboundURLError as exc:
+        raise RuntimeError(f"MCP URL rejected: {exc}") from exc
+
     async with Client(url, auth=auth_token, timeout=30.0) as client:
         return await client.call_tool(tool_name, arguments)
 

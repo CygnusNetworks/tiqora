@@ -16,6 +16,7 @@ from typing import Any
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from tiqora.channels.common import (
+    assert_ticket_note_permission,
     channel_setting,
     ensure_channel_row,
     resolve_customer_by_phone,
@@ -176,6 +177,7 @@ async def send_outbound_text(
     body: str,
     user_id: int,
 ) -> int:
+    await assert_ticket_note_permission(session, user_id=user_id, ticket_id=ticket_id)
     article = ArticleIn(
         sender_type="agent",
         is_visible_for_customer=True,
@@ -203,6 +205,7 @@ async def send_outbound_template(
     language_code: str,
     user_id: int,
 ) -> int:
+    await assert_ticket_note_permission(session, user_id=user_id, ticket_id=ticket_id)
     article = ArticleIn(
         sender_type="agent",
         is_visible_for_customer=True,

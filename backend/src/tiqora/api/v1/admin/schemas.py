@@ -839,18 +839,22 @@ class ApiKeyOut(BaseModel):
     expires_at: datetime | None
     last_used_at: datetime | None
     created_by: int | None
+    # Comma-separated: read, write, mcp. Null/empty = unrestricted.
+    scopes: str | None = None
 
 
 class ApiKeyCreate(BaseModel):
     name: str
     user_id: int
     expires_at: datetime | None = None
+    scopes: str | None = None
 
 
 class ApiKeyUpdate(BaseModel):
     name: str | None = None
     valid: bool | None = None
     expires_at: datetime | None = None
+    scopes: str | None = None
 
 
 class ApiKeyCreated(ApiKeyOut):

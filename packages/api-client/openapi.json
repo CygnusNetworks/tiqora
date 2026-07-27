@@ -2539,6 +2539,17 @@
             "title": "Name",
             "type": "string"
           },
+          "scopes": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scopes"
+          },
           "user_id": {
             "title": "User Id",
             "type": "integer"
@@ -2605,6 +2616,17 @@
           "name": {
             "title": "Name",
             "type": "string"
+          },
+          "scopes": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scopes"
           },
           "user_id": {
             "title": "User Id",
@@ -2680,6 +2702,17 @@
             "title": "Name",
             "type": "string"
           },
+          "scopes": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scopes"
+          },
           "user_id": {
             "title": "User Id",
             "type": "integer"
@@ -2726,6 +2759,17 @@
               }
             ],
             "title": "Name"
+          },
+          "scopes": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scopes"
           },
           "valid": {
             "anyOf": [

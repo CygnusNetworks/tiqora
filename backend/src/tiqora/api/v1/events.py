@@ -42,12 +42,13 @@ from typing import Annotated, Literal
 
 import redis.asyncio as redis
 import structlog
-from fastapi import APIRouter, Depends, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
 from tiqora.api.deps import CurrentUser, DbSession, get_redis
 from tiqora.domain.queue_service import QueueService
+from tiqora.domain.ticket_service import TicketAccessDenied, TicketNotFound, TicketService
 from tiqora.events.pubsub import TIQORA_EVENTS_CHANNEL, publish_presence_changed
 
 logger = structlog.get_logger(__name__)
@@ -174,14 +175,28 @@ class PresenceEntry(BaseModel):
     mode: str
 
 
+async def _require_ticket_ro(session: DbSession, user: CurrentUser, ticket_id: int) -> None:
+    """Same ACL as ticket zoom: ticket must exist and agent needs queue ``ro``."""
+    try:
+        await TicketService(session)._assert_ticket_ro(user.id, ticket_id)
+    except TicketNotFound as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Ticket not found"
+        ) from exc
+    except TicketAccessDenied as exc:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied") from exc
+
+
 @router.post("/tickets/{ticket_id}/presence", status_code=status.HTTP_204_NO_CONTENT)
 async def set_presence(
     ticket_id: int,
     body: PresenceIn,
     user: CurrentUser,
+    session: DbSession,
     redis_client: RedisDep,
 ) -> None:
     """Record that ``user`` is viewing/composing on ``ticket_id`` (30s TTL)."""
+    await _require_ticket_ro(session, user, ticket_id)
     name = f"{user.first_name} {user.last_name}".strip() or user.login
     payload = json.dumps({"user_id": user.id, "name": name, "mode": body.mode})
     await redis_client.set(_presence_key(ticket_id, user.id), payload, ex=PRESENCE_TTL_SECONDS)
@@ -192,10 +207,11 @@ async def set_presence(
 async def get_presence(
     ticket_id: int,
     user: CurrentUser,
+    session: DbSession,
     redis_client: RedisDep,
 ) -> list[PresenceEntry]:
     """Current viewers/composers on ``ticket_id`` (expired entries drop out via TTL)."""
-    del user
+    await _require_ticket_ro(session, user, ticket_id)
     entries: list[PresenceEntry] = []
     pattern = f"{PRESENCE_KEY_PREFIX}{ticket_id}:*"
     async for key in redis_client.scan_iter(match=pattern):

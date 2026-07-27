@@ -5720,6 +5720,8 @@ export interface components {
             expires_at?: string | null;
             /** Name */
             name: string;
+            /** Scopes */
+            scopes?: string | null;
             /** User Id */
             user_id: number;
         };
@@ -5748,6 +5750,8 @@ export interface components {
             last_used_at: string | null;
             /** Name */
             name: string;
+            /** Scopes */
+            scopes?: string | null;
             /** User Id */
             user_id: number;
             /** Valid */
@@ -5773,6 +5777,8 @@ export interface components {
             last_used_at: string | null;
             /** Name */
             name: string;
+            /** Scopes */
+            scopes?: string | null;
             /** User Id */
             user_id: number;
             /** Valid */
@@ -5784,6 +5790,8 @@ export interface components {
             expires_at?: string | null;
             /** Name */
             name?: string | null;
+            /** Scopes */
+            scopes?: string | null;
             /** Valid */
             valid?: boolean | null;
         };

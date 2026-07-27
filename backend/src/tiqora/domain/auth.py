@@ -43,6 +43,10 @@ class AuthenticatedUser:
     auth_method: str  # "session" | "api_key" | "sso" | "ldap" | "spnego"
     email: str | None = None
     avatar_url: str | None = None
+    # None = unrestricted (session or unscoped API key). Non-empty frozenset
+    # limits the key (read / write / mcp). write implies HTTP mutations; read
+    # alone is GET/HEAD/OPTIONS only.
+    api_key_scopes: frozenset[str] | None = None
 
 
 class SessionStore:
@@ -191,6 +195,14 @@ def hash_api_key(raw_key: str) -> str:
 def generate_api_key() -> str:
     """Return a new opaque API key (caller stores the hash only)."""
     return f"tiqora_{secrets.token_urlsafe(32)}"
+
+
+def parse_api_key_scopes(raw: str | None) -> frozenset[str] | None:
+    """Parse scopes column; None/empty means unrestricted."""
+    if raw is None:
+        return None
+    parts = {p.strip().lower() for p in raw.split(",") if p.strip()}
+    return frozenset(parts) if parts else None
 
 
 class AuthService:
@@ -402,13 +414,26 @@ class AuthService:
         user = user_result.scalar_one_or_none()
         if user is None:
             return None
+        scopes = parse_api_key_scopes(getattr(row, "scopes", None))
         # Stamp last_used_at; auth must not fail if the metadata write fails.
         try:
             row.last_used_at = now
             await self._session.commit()
         except Exception:  # noqa: BLE001 — non-fatal metadata stamp
             await self._session.rollback()
-        return await self._user_from_row(user, auth_method="api_key")
+        resolved = await self._user_from_row(user, auth_method="api_key")
+        if scopes is None:
+            return resolved
+        return AuthenticatedUser(
+            id=resolved.id,
+            login=resolved.login,
+            first_name=resolved.first_name,
+            last_name=resolved.last_name,
+            auth_method=resolved.auth_method,
+            email=resolved.email,
+            avatar_url=resolved.avatar_url,
+            api_key_scopes=scopes,
+        )
 
     async def get_user_by_id(self, user_id: int) -> AuthenticatedUser | None:
         result = await self._session.execute(
