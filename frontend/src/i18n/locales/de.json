@@ -1701,7 +1701,10 @@
         "connected": "verbunden",
         "disconnected": "getrennt",
         "size": "Größe",
-        "latency": "Latenz"
+        "latency": "Latenz",
+        "legacySchema": "OTRS/Znuny-Schema",
+        "groupsTable": "Gruppen-Tabelle",
+        "schemaSource": "Quelle"
       },
       "redis": {
         "memory": "Speicher",

@@ -33,7 +33,7 @@ Tiqora reads and writes the **same** Znuny tables Znuny itself uses:
 There is **no** Tiqora-specific migration and no schema divergence: a
 process authored in Znuny's admin UI works unmodified in Tiqora, and
 (subject to the scope limits below) a process authored via direct DB/YAML
-insertion is visible to a running Znuny 6.5 instance too. This mirrors the
+insertion is visible to a co-running OTRS/Znuny peer (6.0–7.3) too. This mirrors the
 approach used for `calendar` (see `docs/architecture.md`).
 
 ## Ticket <-> process linkage

@@ -3,7 +3,7 @@
 [![License: AGPL-3.0](https://img.shields.io/badge/License-AGPL--3.0-blue.svg)](./LICENSE)
 [![Python 3.12+](https://img.shields.io/badge/Python-3.12%2B-3776AB?logo=python&logoColor=white)](./backend)
 [![React + TypeScript](https://img.shields.io/badge/React-TypeScript-61DAFB?logo=react&logoColor=black)](./frontend)
-[![Znuny 6.5 DB](https://img.shields.io/badge/Znuny%2FOTRS-6.5%20DB%20compatible-5B8CFF)](./docs/compatibility.md)
+[![Znuny/OTRS 6.0–7.3 DB](https://img.shields.io/badge/Znuny%2FOTRS-6.0--7.3%20DB-5B8CFF)](./docs/parallel-operation.md)
 [![Docker](https://img.shields.io/badge/Docker-ready-2496ED?logo=docker&logoColor=white)](./docs/deploy/docker-compose.md)
 [![Live site](https://img.shields.io/badge/Live-demo%20%26%20product%20site-5B8CFF)](https://cygnusnetworks.github.io/tiqora/)
 [![Backend coverage](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/CygnusNetworks/tiqora/badges/backend-coverage.json)](./backend)
@@ -12,9 +12,10 @@
 > **Still under active development.** Production use is not yet recommended.
 > APIs, schema conventions, and operational behaviour may still change.
 
-**Tiqora** is a modern, self-hosted ticket / helpdesk system that is **database-compatible
-with Znuny / OTRS 6.5**. It is a clean-room reimplementation (Python FastAPI + React),
-not a fork of Znuny — no Znuny source code is included or redistributed.
+**Tiqora** is a modern, self-hosted ticket / helpdesk system that is
+**database-compatible with OTRS 6.0.x and Znuny 6.0–7.3** (MariaDB/MySQL and
+PostgreSQL). It is a clean-room reimplementation (Python FastAPI + React), not a
+fork of Znuny — no Znuny source code is included or redistributed.
 
 | | |
 |---|---|
@@ -29,9 +30,12 @@ not a fork of Znuny — no Znuny source code is included or redistributed.
 
 - **Modern web UI** — agent workspace, admin console, and customer portal that feel
   like a current product, not a 2000s helpdesk skin.
-- **Znuny / OTRS 6.5 database compatibility** — same core tables; **parallel operation**
-  on one shared database is a first-class path (additive `tiqora_*` tables only until
-  you explicitly take schema ownership).
+- **Znuny / OTRS 6.0–7.3 database compatibility** — same core ticket tables; a
+  runtime schema profile detects the peer (see
+  [docs/support-matrix.md](./docs/support-matrix.md)). **Parallel operation** on
+  one shared database is a first-class path (additive `tiqora_*` tables only until
+  you explicitly take schema ownership). Preferred peer LTS: **Znuny 6.5** or
+  **7.3**.
 - **AI-ready ticket search** — Meilisearch indexing plus an **MCP server** so AI agents
   act with the same ACLs as humans.
 - **AI agent assistance** — per-queue policies drive **draft replies**, **state-only
@@ -126,7 +130,7 @@ VITE_BASE=/tiqora/demo/ pnpm --filter tiqora-frontend build:demo
 
 | Area | Notes |
 |---|---|
-| Ticket write path + Znuny invariants | Golden-master tested against Znuny 6.5 behaviour |
+| Ticket write path + Znuny invariants | Golden-master multi-peer matrix (OTRS/Znuny 6.0–7.3) |
 | GenericInterface compatibility | TicketCreate/Update/Get/Search, SessionCreate; REST + SOAP |
 | MCP tools | `ticket_*`, customer lookup, KB — see [docs/ai-integration.md](./docs/ai-integration.md) |
 | AI assistance subsystem | Draft replies, summaries, auto-reply worker, attachment/vision, PII masking, per-subject ACL & audit — `/admin/ai/*`, [docs/ai-integration.md](./docs/ai-integration.md) |
@@ -163,13 +167,13 @@ VITE_BASE=/tiqora/demo/ pnpm --filter tiqora-frontend build:demo
               └───────────┬───────────────────┬─────────────┘
                           │                   │
            ┌──────────────▼──────┐   ┌────────▼────────┐
-           │  Znuny 6.5 tables   │   │  tiqora_* tables│
-           │  (read/write, no    │   │  (Alembic chain │
+           │  OTRS/Znuny tables  │   │  tiqora_* tables│
+           │  (6.0–7.3; R/W, no  │   │  (Alembic chain │
            │   schema changes)   │   │   versions_tiqora)│
            └──────────┬──────────┘   └────────┬────────┘
                       │                       │
          ┌────────────▼──────────┐            │
-         │  Znuny instance       │            │
+         │  Peer instance        │            │
          │  (optional parallel)  │◄── cache invalidation via TiqoraSync OPM
          └───────────────────────┘
                       │
@@ -201,7 +205,7 @@ flowchart TB
     Meili[(Meilisearch)]
   end
 
-  Znuny[Znuny 6.5 instance]
+  Znuny[OTRS/Znuny 6.0–7.3 peer]
 
   AgentUI --> API
   Portal --> API
@@ -256,7 +260,7 @@ See [docs/parallel-operation.md](./docs/parallel-operation.md) for the full inva
 | Path | When | Doc |
 |---|---|---|
 | **Fresh standalone** | Empty database, no Znuny — greenfield install via `tiqora bootstrap` | [docs/guide/fresh-install.md](./docs/guide/fresh-install.md) |
-| **Parallel to Znuny** | Co-run with an existing Znuny 6.5 database (same schema, additive `tiqora_*` only) | [docs/parallel-operation.md](./docs/parallel-operation.md), [docs/guide/znuny-to-tiqora.md](./docs/guide/znuny-to-tiqora.md) |
+| **Parallel to Znuny** | Co-run with an existing OTRS/Znuny **6.0–7.3** database (additive `tiqora_*` only) | [docs/support-matrix.md](./docs/support-matrix.md), [docs/parallel-operation.md](./docs/parallel-operation.md), [docs/guide/znuny-to-tiqora.md](./docs/guide/znuny-to-tiqora.md) |
 | **Migrate away** | After parallel operation: schema ownership, cutover checklist | [docs/cutover.md](./docs/cutover.md) |
 
 ## Quick start (development)
@@ -332,10 +336,11 @@ make lint
 ## Status
 
 Core functionality is implemented and covered by automated tests, including
-golden-master checks against Znuny 6.5 behaviour. The product is still under
-active development: production cutover against a live Znuny estate has not been
-performed with this codebase, and APIs may still change. Schema ownership defaults
-**off** and requires an explicit operator action — see [docs/cutover.md](./docs/cutover.md).
+schema-matrix (Layer A) and multi-peer golden-master (Layer B) checks for
+OTRS/Znuny **6.0–7.3**. The product is still under active development: production
+cutover against a live Znuny estate has not been performed with this codebase,
+and APIs may still change. Schema ownership defaults **off** and requires an
+explicit operator action — see [docs/cutover.md](./docs/cutover.md).
 
 ## Documentation
 
@@ -347,7 +352,7 @@ Full index: **[docs/README.md](./docs/README.md)**
 |---|---|
 | [docs/guide/znuny-to-tiqora.md](./docs/guide/znuny-to-tiqora.md) | Operator playbook: run alongside Znuny, then migrate onto Tiqora |
 | [docs/deploy/docker-compose.md](./docs/deploy/docker-compose.md) | Docker Compose deployment — services, env vars, reverse proxy |
-| [docs/deployment.md](./docs/deployment.md) · [docs/parallel-operation.md](./docs/parallel-operation.md) · [docs/cutover.md](./docs/cutover.md) | Deployment notes, parallel-operation invariants, cutover runbook |
+| [docs/support-matrix.md](./docs/support-matrix.md) · [docs/parallel-operation.md](./docs/parallel-operation.md) · [docs/cutover.md](./docs/cutover.md) | Peer support matrix, parallel-op invariants, cutover runbook |
 | [docs/development.md](./docs/development.md) · [docs/testing.md](./docs/testing.md) | Local dev, seeding/anonymizing, test suites |
 
 **API & integrations**
@@ -372,12 +377,17 @@ Full index: **[docs/README.md](./docs/README.md)**
 
 ## Compatibility statement
 
-- **Target**: Znuny / OTRS **6.5** database schema (MariaDB/MySQL and PostgreSQL).
+- **Target**: OTRS **6.0.x** and Znuny **6.0–7.3** database schemas (MariaDB/MySQL
+  and PostgreSQL). Full matrix: [docs/support-matrix.md](./docs/support-matrix.md).
+  Preferred LTS peers: **Znuny 6.5** or **7.3**. Unknown schemas refuse to start
+  unless overridden (`TIQORA_ALLOW_UNKNOWN_LEGACY_SCHEMA` /
+  `TIQORA_LEGACY_SCHEMA_PROFILE=<profile_id>`).
 - **Behaviour**: Ticket numbering, history name formats, escalation columns, and
-  search-index flags must remain readable and writable by a co-running Znuny 6.5
-  instance during parallel operation.
-- **Code**: Tiqora is an independent implementation. The Znuny reference tree
-  (`znuny-6.5.22/`, tarball) is **gitignored** and never copied into this repository.
+  search-index flags must remain readable and writable by a co-running peer during
+  parallel operation (golden-validated across the multi-peer matrix).
+- **Code**: Tiqora is an independent implementation. Local peer release trees
+  (`znuny-6.5.22/`, `znuny-7.3.5/`, …) are **gitignored** and never published in
+  this repository.
 
 ## Contributing
 

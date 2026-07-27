@@ -1,6 +1,9 @@
-"""Hand-written SQLAlchemy models for Znuny 6.5 tables (Phase 0+).
+"""Hand-written SQLAlchemy models for Znuny / OTRS legacy tables (Phase 0+).
 
-These map the shared Znuny schema for parallel operation. They use a separate
+Baseline mapping is Znuny **6.5**. At process start,
+:mod:`tiqora.db.legacy.profile` probes the live schema (version ids such as ``znuny-6.5``,
+OTRS/Znuny 6.0–7.3) and adapts bindings (e.g. ``groups`` vs
+``permission_groups``, optional mail OAuth columns). Models use a separate
 MetaData instance and must never be managed by Alembic.
 """
 
@@ -45,6 +48,26 @@ from tiqora.db.legacy.misc import (  # noqa: F401
     LinkType,
     Mention,
     TimeAccounting,
+)
+from tiqora.db.legacy.profile import (  # noqa: F401
+    ALL_SCHEMA_PROFILES,
+    DEFAULT_STATE_PRIORITY_COLOR,
+    RELEASE_SCHEMA_PROFILES,
+    LegacySchemaProfile,
+    SchemaProfileId,
+    UnsupportedLegacySchemaError,
+    apply_legacy_schema_profile,
+    default_color_for_write,
+    detect_legacy_schema_profile,
+    ensure_legacy_schema_supported,
+    get_legacy_schema_profile,
+    groups_table_name,
+    groups_table_sql,
+    insert_row_with_color,
+    is_db_unavailable,
+    mail_account_load_options,
+    profile_for_id,
+    quote_ident,
 )
 from tiqora.db.legacy.queue import (  # noqa: F401
     AutoResponse,
@@ -97,6 +120,24 @@ __all__ = [
     "LegacyBase",
     "LegacyDateTime",
     "legacy_metadata",
+    "ALL_SCHEMA_PROFILES",
+    "LegacySchemaProfile",
+    "RELEASE_SCHEMA_PROFILES",
+    "SchemaProfileId",
+    "UnsupportedLegacySchemaError",
+    "DEFAULT_STATE_PRIORITY_COLOR",
+    "apply_legacy_schema_profile",
+    "default_color_for_write",
+    "detect_legacy_schema_profile",
+    "ensure_legacy_schema_supported",
+    "get_legacy_schema_profile",
+    "groups_table_name",
+    "groups_table_sql",
+    "insert_row_with_color",
+    "is_db_unavailable",
+    "mail_account_load_options",
+    "profile_for_id",
+    "quote_ident",
     "Ticket",
     "TicketHistory",
     "TicketHistoryType",

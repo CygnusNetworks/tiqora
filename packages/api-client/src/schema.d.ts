@@ -7059,6 +7059,7 @@ export interface components {
             dialect: string;
             /** Latency Ms */
             latency_ms?: number | null;
+            legacy_schema?: components["schemas"]["LegacySchemaOut"] | null;
             /** Size Bytes */
             size_bytes?: number | null;
             /** Version */
@@ -7767,6 +7768,37 @@ export interface components {
             tags?: string[];
             /** Total */
             total: number;
+        };
+        /**
+         * LegacySchemaOut
+         * @description Detected OTRS/Znuny schema profile for the connected database.
+         *
+         *     See ``tiqora.db.legacy.profile`` / multi-version support matrix
+         *     (version ids such as ``znuny-6.5``, OTRS/Znuny 6.0–7.3). Surfaced on the
+         *     admin System-Info page so operators can see which peer schema Tiqora
+         *     adapted to.
+         */
+        LegacySchemaOut: {
+            /** Dialect */
+            dialect: string;
+            /** Groups Table */
+            groups_table: string;
+            /** Junction Tables Have Surrogate Id */
+            junction_tables_have_surrogate_id: boolean;
+            /** Known */
+            known: boolean;
+            /** Label */
+            label: string;
+            /** Mail Account Has Oauth */
+            mail_account_has_oauth: boolean;
+            /** Profile Id */
+            profile_id: string;
+            /** Source */
+            source: string;
+            /** State Priority Has Color */
+            state_priority_has_color: boolean;
+            /** Supported */
+            supported: boolean;
         };
         /** LlmProviderCreate */
         LlmProviderCreate: {
