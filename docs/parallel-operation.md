@@ -9,6 +9,11 @@ coherent.
 engines, TiqoraSync Framework tags, validation evidence). Preferred production
 peers: **Znuny 6.5 LTS** or **7.3 LTS**.
 
+**Support floor is 6.0** — including Centuran ((OTRS)) CE 6.0.x (same schema
+as OTRS CE 6.0 → profile `otrs-znuny-6.0`). OTRS **5.x and older**, **OTOBO**,
+and commercial OTRS are out of scope for parallel-op; upgrade or evaluate
+separately per the matrix.
+
 ## Multi-version schema profile
 
 At process start (API + worker), Tiqora probes `INFORMATION_SCHEMA` and classifies
@@ -16,7 +21,7 @@ the live peer schema into a **version-keyed profile id**:
 
 | Profile id | Peer product (fresh DDL) | Decisive markers |
 |------------|--------------------------|------------------|
-| `otrs-znuny-6.0` | OTRS 6.0 / Znuny 6.0 | table `groups` (not `permission_groups`) |
+| `otrs-znuny-6.0` | OTRS 6.0 / Centuran CE 6.0 / Znuny 6.0 | table `groups` (not `permission_groups`) |
 | `znuny-6.1` | Znuny 6.1 | `permission_groups`, no mail OAuth |
 | `znuny-6.2` | Znuny 6.2 | + `acl_ticket_attribute_relations` |
 | `znuny-6.3` | Znuny 6.3 | `mail_account.authentication_type` |
