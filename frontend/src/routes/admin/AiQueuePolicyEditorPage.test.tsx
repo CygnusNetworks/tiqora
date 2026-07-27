@@ -93,6 +93,9 @@ const samplePolicy = {
   reply_language_fixed: null,
   reply_language_default: null,
   allowed_state_types: null,
+  capabilities_json: null,
+  summary_detail: "standard",
+  pii_ner_enabled: true,
   valid_id: 1,
   create_time: "2026-07-01T00:00:00Z",
   change_time: "2026-07-01T00:00:00Z",
@@ -149,6 +152,8 @@ describe("AiQueuePolicyEditorPage", () => {
       operation_mode: "tiqora_primary",
       disclosure_default_text: "",
       global_max_replies_per_hour: null,
+      audit_retention_days: 30,
+      auto_reply_paused: false,
     });
   });
 
@@ -262,6 +267,8 @@ describe("AiQueuePolicyEditorPage", () => {
       operation_mode: "parallel",
       disclosure_default_text: "",
       global_max_replies_per_hour: null,
+      audit_retention_days: 30,
+      auto_reply_paused: false,
     });
     renderEdit();
     await waitFor(() => expect(screen.getByTestId("admin-ai-queue-form-system_prompt")).toBeInTheDocument());
@@ -283,6 +290,8 @@ describe("AiQueuePolicyEditorPage", () => {
       operation_mode: "parallel",
       disclosure_default_text: "",
       global_max_replies_per_hour: null,
+      audit_retention_days: 30,
+      auto_reply_paused: false,
     });
     renderEdit();
     await waitFor(() => expect(screen.getByTestId("admin-ai-queue-form-system_prompt")).toBeInTheDocument());

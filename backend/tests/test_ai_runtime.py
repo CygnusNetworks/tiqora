@@ -261,15 +261,19 @@ def _part(content: str, *, position: int, enabled: bool = True) -> TiqoraAiPromp
 
 
 def test_system_prompt_without_parts_is_unchanged_regression() -> None:
-    """Policies without any prompt parts must produce exactly today's prompt
-    (base + trigger appendix) — parts are purely additive."""
+    """Policies without any prompt parts must produce the same prompt for
+    None vs empty parts list (parts are purely additive). The kernel
+    untrusted-content block always leads the system prompt."""
+    from tiqora.ai.prompt_safety import UNTRUSTED_CONTENT_SYSTEM_BLOCK
+
     policy = _policy()
     prompt_no_parts = _build_system_prompt(policy, trigger=TRIGGER_MANUAL, kind_hint=None)
     prompt_empty_list = _build_system_prompt(
         policy, trigger=TRIGGER_MANUAL, kind_hint=None, prompt_parts=[]
     )
     assert prompt_no_parts == prompt_empty_list
-    assert prompt_no_parts.startswith("Base prompt.")
+    assert prompt_no_parts.startswith(UNTRUSTED_CONTENT_SYSTEM_BLOCK)
+    assert "Base prompt." in prompt_no_parts
 
 
 def test_system_prompt_appends_enabled_parts_in_position_order() -> None:
