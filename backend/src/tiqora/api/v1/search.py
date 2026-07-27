@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+from datetime import UTC, date, datetime, time
+from typing import Annotated
+
 from fastapi import APIRouter, Query
 
 from tiqora.api.deps import AppSettings, CurrentUser, DbSession
@@ -9,6 +12,14 @@ from tiqora.domain.schemas import SearchResponse
 from tiqora.domain.search import SearchIndexService
 
 router = APIRouter(prefix="/search", tags=["search"])
+
+
+def _day_start_ts(value: date) -> int:
+    return int(datetime.combine(value, time.min, tzinfo=UTC).timestamp())
+
+
+def _day_end_ts(value: date) -> int:
+    return int(datetime.combine(value, time.max, tzinfo=UTC).timestamp())
 
 
 @router.get("", response_model=SearchResponse)
@@ -19,9 +30,26 @@ async def search(
     q: str = Query(..., min_length=1),
     offset: int = Query(0, ge=0),
     limit: int = Query(20, ge=1, le=100),
+    queue_id: Annotated[list[int] | None, Query()] = None,
+    state_type: Annotated[list[str] | None, Query()] = None,
+    owner_id: int | None = Query(None),
+    customer_id: str | None = Query(None),
+    created_from: Annotated[date | None, Query(description="ISO date, e.g. 2026-07-01")] = None,
+    created_to: Annotated[date | None, Query(description="ISO date, e.g. 2026-07-31")] = None,
 ) -> SearchResponse:
     svc = SearchIndexService(session, settings)
     try:
-        return await svc.search(user.id, q, limit=limit, offset=offset)
+        return await svc.search(
+            user.id,
+            q,
+            limit=limit,
+            offset=offset,
+            queue_ids=queue_id,
+            state_types=state_type,
+            owner_id=owner_id,
+            customer_id=customer_id,
+            created_from=_day_start_ts(created_from) if created_from else None,
+            created_to=_day_end_ts(created_to) if created_to else None,
+        )
     finally:
         await svc.close()

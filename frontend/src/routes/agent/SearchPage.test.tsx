@@ -10,6 +10,9 @@ let searchParams: { q?: string; offset?: number } = { q: "xss" };
 
 const search = vi.fn();
 const searchKb = vi.fn();
+const listReferenceQueues = vi.fn();
+const listReferenceAgents = vi.fn();
+const customerQuickSearch = vi.fn();
 
 vi.mock("@tanstack/react-router", () => ({
   useNavigate: () => navigate,
@@ -41,6 +44,9 @@ vi.mock("@/lib/api", () => ({
   api: {
     search: (...args: unknown[]) => search(...args),
     searchKb: (...args: unknown[]) => searchKb(...args),
+    listReferenceQueues: (...args: unknown[]) => listReferenceQueues(...args),
+    listReferenceAgents: (...args: unknown[]) => listReferenceAgents(...args),
+    customerQuickSearch: (...args: unknown[]) => customerQuickSearch(...args),
   },
 }));
 
@@ -62,6 +68,9 @@ describe("SearchPage XSS", () => {
     navigate.mockReset();
     search.mockReset();
     searchKb.mockReset();
+    listReferenceQueues.mockReset().mockResolvedValue([]);
+    listReferenceAgents.mockReset().mockResolvedValue([]);
+    customerQuickSearch.mockReset().mockResolvedValue({ companies: [], contacts: [] });
     searchParams = { q: "xss" };
     searchKb.mockResolvedValue({ hits: [], estimated_total: 0, query: "xss" });
   });
@@ -71,6 +80,7 @@ describe("SearchPage XSS", () => {
     search.mockResolvedValue({
       query: "xss",
       estimated_total: 1,
+      facets: {},
       hits: [
         {
           id: 99,
@@ -116,6 +126,7 @@ describe("SearchPage XSS", () => {
     search.mockResolvedValue({
       query: "printer",
       estimated_total: 1,
+      facets: { state_type: { open: 1 }, queue_id: { "1": 1 } },
       hits: [
         {
           id: 1,

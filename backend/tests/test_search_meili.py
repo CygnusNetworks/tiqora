@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Generator
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Any
 
 import pytest
@@ -220,6 +220,318 @@ async def test_backfill_search_and_permission_filter(
             denied = await svc.search(ids["outsider"], "UniqueZebraWidget", limit=10)
             assert denied.estimated_total == 0
             assert denied.hits == []
+        finally:
+            await svc.close()
+
+    await engine.dispose()
+
+
+@pytest.mark.asyncio
+async def test_search_facets_and_filters(
+    postgres_znuny_url: str,
+    meili_url: str,
+) -> None:
+    ids = _seed_search(postgres_znuny_url)
+    async_url = _to_async_url(postgres_znuny_url)
+    engine = create_async_engine(async_url)
+    factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+
+    settings = Settings(
+        meili_url=meili_url,
+        meili_master_key="test-master-key",
+        meili_tickets_index="tickets_test",
+        database_url=async_url,
+    )
+
+    result = await rebuild_index(
+        settings=settings,
+        session_factory=factory,
+        batch_size=100,
+        resume=False,
+    )
+    assert result["total_indexed"] >= 1
+
+    sync_engine = create_engine(postgres_znuny_url)
+    with sync_engine.connect() as conn:
+        actual_state_type = conn.execute(
+            text(
+                """
+                SELECT tst.name FROM ticket t
+                JOIN ticket_state ts ON ts.id = t.ticket_state_id
+                JOIN ticket_state_type tst ON tst.id = ts.type_id
+                WHERE t.id = :tid
+                """
+            ),
+            {"tid": ids["ticket"]},
+        ).scalar_one()
+    sync_engine.dispose()
+
+    async with factory() as session:
+        svc = SearchIndexService(session, settings)
+        try:
+            # Facet distribution is returned alongside hits.
+            hits = await svc.search(ids["agent"], "UniqueZebraWidget", limit=10)
+            assert "queue_id" in hits.facets
+            assert hits.facets["queue_id"].get(str(ids["queue"])) == 1
+
+            # A caller-supplied queue filter is intersected with, never widens,
+            # the mandatory permission filter: an allowed queue still matches...
+            allowed_match = await svc.search(
+                ids["agent"],
+                "UniqueZebraWidget",
+                limit=10,
+                queue_ids=[ids["queue"]],
+            )
+            assert allowed_match.estimated_total == 1
+
+            # ...but a queue the agent has no permission on yields nothing, even
+            # though it's a syntactically valid queue filter on its own.
+            disallowed_match = await svc.search(
+                ids["agent"],
+                "UniqueZebraWidget",
+                limit=10,
+                queue_ids=[ids["queue"] + 1],
+            )
+            assert disallowed_match.estimated_total == 0
+
+            # state_type filter: matching value returns the hit, mismatched
+            # value excludes it.
+            match_state = await svc.search(
+                ids["agent"],
+                "UniqueZebraWidget",
+                limit=10,
+                state_types=[actual_state_type],
+            )
+            assert match_state.estimated_total == 1
+
+            no_match_state = await svc.search(
+                ids["agent"],
+                "UniqueZebraWidget",
+                limit=10,
+                state_types=["not-a-real-state-type"],
+            )
+            assert no_match_state.estimated_total == 0
+
+            # created_ts range filter: the ticket was seeded at NOW (naive, UTC
+            # per Znuny convention — see domain.search._dt_ts).
+            now_ts = int(NOW.replace(tzinfo=UTC).timestamp())
+            in_range_from = now_ts - 3600
+            in_range_to = now_ts + 3600
+            in_range = await svc.search(
+                ids["agent"],
+                "UniqueZebraWidget",
+                limit=10,
+                created_from=in_range_from,
+                created_to=in_range_to,
+            )
+            assert in_range.estimated_total == 1
+
+            out_of_range = await svc.search(
+                ids["agent"],
+                "UniqueZebraWidget",
+                limit=10,
+                created_from=in_range_to,
+            )
+            assert out_of_range.estimated_total == 0
+
+            # owner_id / customer_id filters.
+            owner_match = await svc.search(
+                ids["agent"], "UniqueZebraWidget", limit=10, owner_id=ids["agent"]
+            )
+            assert owner_match.estimated_total == 1
+
+            customer_match = await svc.search(
+                ids["agent"], "UniqueZebraWidget", limit=10, customer_id="C"
+            )
+            assert customer_match.estimated_total == 1
+
+            customer_no_match = await svc.search(
+                ids["agent"], "UniqueZebraWidget", limit=10, customer_id="not-c"
+            )
+            assert customer_no_match.estimated_total == 0
+        finally:
+            await svc.close()
+
+    await engine.dispose()
+
+
+def _seed_similar(sync_url: str) -> dict[str, Any]:
+    """Two closed tickets sharing a distinctive phrase + one open twin."""
+    engine = create_engine(sync_url)
+    pw = hash_password("secret")
+    with engine.begin() as conn:
+        TiqoraBase.metadata.create_all(conn)
+        conn.execute(text("DELETE FROM article_data_mime WHERE id IN (910, 911, 912)"))
+        conn.execute(text("DELETE FROM article WHERE id IN (910, 911, 912)"))
+        conn.execute(text("DELETE FROM ticket WHERE id IN (910, 911, 912)"))
+        conn.execute(text("DELETE FROM queue WHERE id = 310"))
+        conn.execute(
+            text("DELETE FROM group_user WHERE user_id IN (310, 311) OR group_id = 31"),
+        )
+        conn.execute(text("DELETE FROM permission_groups WHERE id = 31"))
+        conn.execute(text("DELETE FROM users WHERE id IN (310, 311)"))
+        conn.execute(
+            text(
+                """
+                INSERT INTO users (id, login, pw, first_name, last_name, valid_id,
+                                  create_time, create_by, change_time, change_by)
+                VALUES (310, 'similar.agent', :pw, 'S', 'A', 1, :t, 1, :t, 1)
+                """
+            ),
+            {"pw": pw, "t": NOW},
+        )
+        conn.execute(
+            text(
+                """
+                INSERT INTO users (id, login, pw, first_name, last_name, valid_id,
+                                  create_time, create_by, change_time, change_by)
+                VALUES (311, 'similar.outsider', :pw, 'O', 'U', 1, :t, 1, :t, 1)
+                """
+            ),
+            {"pw": pw, "t": NOW},
+        )
+        conn.execute(
+            text(
+                """
+                INSERT INTO permission_groups
+                (id, name, valid_id, create_time, create_by, change_time, change_by)
+                VALUES (31, 'similar-g', 1, :t, 1, :t, 1)
+                """
+            ),
+            {"t": NOW},
+        )
+        conn.execute(
+            text(
+                """
+                INSERT INTO group_user
+                (user_id, group_id, permission_key,
+                 create_time, create_by, change_time, change_by)
+                VALUES (310, 31, 'ro', :t, 1, :t, 1)
+                """
+            ),
+            {"t": NOW},
+        )
+        conn.execute(
+            text(
+                """
+                INSERT INTO queue (
+                    id, name, group_id, system_address_id, salutation_id, signature_id,
+                    follow_up_id, follow_up_lock, valid_id,
+                    create_time, create_by, change_time, change_by
+                ) VALUES (310, 'SimilarQ', 31, 1, 1, 1, 1, 0, 1, :t, 1, :t, 1)
+                """
+            ),
+            {"t": NOW},
+        )
+        # ticket_state 2 = closed successful (type closed); 4 = open
+        for tid, tn, title, state_id, art_id in (
+            (910, "20240601910910", "PurpleNimbus VPN disconnect loop", 2, 910),
+            (911, "20240601910911", "PurpleNimbus VPN disconnect again", 2, 911),
+            (912, "20240601910912", "PurpleNimbus VPN disconnect open twin", 4, 912),
+        ):
+            conn.execute(
+                text(
+                    """
+                    INSERT INTO ticket (
+                        id, tn, title, queue_id, ticket_lock_id, type_id,
+                        user_id, responsible_user_id, ticket_priority_id, ticket_state_id,
+                        customer_id, customer_user_id,
+                        timeout, until_time, escalation_time, escalation_update_time,
+                        escalation_response_time, escalation_solution_time, archive_flag,
+                        create_time, create_by, change_time, change_by
+                    ) VALUES (
+                        :tid, :tn, :title, 310, 1, 1,
+                        310, 1, 3, :state_id, 'C', 'c@x.com',
+                        0, 0, 0, 0, 0, 0, 0, :t, 1, :t, 1
+                    )
+                    """
+                ),
+                {"tid": tid, "tn": tn, "title": title, "state_id": state_id, "t": NOW},
+            )
+            conn.execute(
+                text(
+                    """
+                    INSERT INTO article (
+                        id, ticket_id, article_sender_type_id, communication_channel_id,
+                        is_visible_for_customer, search_index_needs_rebuild,
+                        create_time, create_by, change_time, change_by
+                    ) VALUES (:aid, :tid, 3, 1, 1, 0, :t, 1, :t, 1)
+                    """
+                ),
+                {"aid": art_id, "tid": tid, "t": NOW},
+            )
+            conn.execute(
+                text(
+                    """
+                    INSERT INTO article_data_mime (
+                        id, article_id, a_subject, a_content_type, a_body, incoming_time,
+                        create_time, create_by, change_time, change_by
+                    ) VALUES (
+                        :aid, :aid, 'subj', 'text/plain',
+                        'body PurpleNimbus VPN details', 0, :t, 1, :t, 1
+                    )
+                    """
+                ),
+                {"aid": art_id, "t": NOW},
+            )
+    engine.dispose()
+    return {
+        "agent": 310,
+        "outsider": 311,
+        "source": 910,
+        "closed_peer": 911,
+        "open_twin": 912,
+        "queue": 310,
+    }
+
+
+@pytest.mark.asyncio
+async def test_find_similar_closed_keyword(
+    postgres_znuny_url: str,
+    meili_url: str,
+) -> None:
+    ids = _seed_similar(postgres_znuny_url)
+    async_url = _to_async_url(postgres_znuny_url)
+    engine = create_async_engine(async_url)
+    factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+
+    settings = Settings(
+        meili_url=meili_url,
+        meili_master_key="test-master-key",
+        meili_tickets_index="tickets_similar_test",
+        database_url=async_url,
+    )
+
+    result = await rebuild_index(
+        settings=settings,
+        session_factory=factory,
+        batch_size=100,
+        resume=False,
+    )
+    assert result["total_indexed"] >= 3
+
+    async with factory() as session:
+        svc = SearchIndexService(session, settings)
+        try:
+            similar = await svc.find_similar(
+                ids["agent"],
+                ids["source"],
+                title="PurpleNimbus VPN disconnect loop",
+                excerpt="body PurpleNimbus VPN details",
+            )
+            peer_ids = {item.id for item in similar.items}
+            assert ids["closed_peer"] in peer_ids
+            # Source excluded.
+            assert ids["source"] not in peer_ids
+            # Open twin must not appear (state_type = closed only).
+            assert ids["open_twin"] not in peer_ids
+
+            denied = await svc.find_similar(
+                ids["outsider"],
+                ids["source"],
+                title="PurpleNimbus VPN disconnect loop",
+            )
+            assert denied.items == []
         finally:
             await svc.close()
 
