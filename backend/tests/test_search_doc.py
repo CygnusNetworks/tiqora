@@ -2,10 +2,15 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import UTC, datetime
 
 from tiqora.db.legacy.ticket import Ticket
-from tiqora.domain.search import build_ticket_document
+from tiqora.domain.schemas import SimilarTicketItem
+from tiqora.domain.search import (
+    build_similar_query,
+    build_ticket_document,
+    rank_similar_keyword,
+)
 
 
 def test_build_ticket_document_shape() -> None:
@@ -59,3 +64,29 @@ def test_build_ticket_document_shape() -> None:
     assert doc["dynamic_fields"]["Process"] == "HW"
     assert doc["created"] is not None
     assert doc["changed"] is not None
+    assert doc["created_ts"] == int(datetime(2024, 7, 19, 10, 0, 0, tzinfo=UTC).timestamp())
+    assert doc["changed_ts"] == int(datetime(2024, 7, 19, 11, 0, 0, tzinfo=UTC).timestamp())
+
+
+def test_build_similar_query_joins_and_trims() -> None:
+    assert build_similar_query("  Hello  ", "  world  ") == "Hello world"
+    assert build_similar_query(None, None) == ""
+    assert build_similar_query("", "  ") == ""
+    long = "x" * 600
+    assert len(build_similar_query(long, None)) == 500
+
+
+def test_rank_similar_keyword_excludes_source_and_caps() -> None:
+    cands = [
+        SimilarTicketItem(id=1, tn="A", title="a", score=0.9),
+        SimilarTicketItem(id=2, tn="B", title="b", score=0.8),
+        SimilarTicketItem(id=3, tn="C", title="c", score=0.7),
+        SimilarTicketItem(id=4, tn="D", title="d", score=0.6),
+        SimilarTicketItem(id=5, tn="E", title="e", score=0.5),
+        SimilarTicketItem(id=6, tn="F", title="f", score=0.4),
+        SimilarTicketItem(id=7, tn="G", title="g", score=0.3),
+    ]
+    ranked = rank_similar_keyword(cands, exclude_id=1, limit=5)
+    assert [r.id for r in ranked] == [2, 3, 4, 5, 6]
+    # Source not present even if it would fit under limit.
+    assert all(r.id != 1 for r in ranked)

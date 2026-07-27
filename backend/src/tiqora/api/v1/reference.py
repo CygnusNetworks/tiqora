@@ -20,6 +20,7 @@ from tiqora.db.legacy.customer import CustomerUser
 from tiqora.db.legacy.queue import Queue
 from tiqora.db.legacy.ticket import TicketPriority, TicketState, TicketStateType
 from tiqora.db.legacy.user import Users
+from tiqora.domain.customer_service import CustomerService
 from tiqora.domain.ticket_write_service import InvalidInput
 from tiqora.permissions.engine import PermissionEngine
 from tiqora.znuny.sysconfig import SysConfig
@@ -57,6 +58,25 @@ class CustomerRefOut(BaseModel):
 class QueueRefOut(BaseModel):
     id: int
     name: str
+
+
+class CustomerCompanyRefOut(BaseModel):
+    customer_id: str
+    name: str
+
+
+class CustomerContactRefOut(BaseModel):
+    login: str
+    email: str
+    first_name: str
+    last_name: str
+    customer_id: str
+    company_name: str | None = None
+
+
+class CustomerSearchOut(BaseModel):
+    companies: list[CustomerCompanyRefOut]
+    contacts: list[CustomerContactRefOut]
 
 
 class ComposeContextOut(BaseModel):
@@ -144,6 +164,42 @@ async def search_customers(
         )
         for c in rows
     ]
+
+
+@router.get("/customer-search", response_model=CustomerSearchOut)
+async def customer_search(
+    user: CurrentUser,
+    session: DbSession,
+    q: str = Query(
+        "", description="Substring matched against company name/id or contact login/email/name"
+    ),
+    limit: int = Query(10, ge=1, le=25),
+) -> CustomerSearchOut:
+    """Quick search across customer companies and contacts.
+
+    Distinct from ``/customers`` (contact-only picker for ticket assignment):
+    this also matches companies and resolves each returned contact's company
+    name via a single follow-up query (no N+1). Below a 2-character query,
+    returns empty results.
+    """
+    _ = user
+    companies, contacts = await CustomerService(session).quick_search(q, limit)
+    return CustomerSearchOut(
+        companies=[
+            CustomerCompanyRefOut(customer_id=c.customer_id, name=c.name) for c in companies
+        ],
+        contacts=[
+            CustomerContactRefOut(
+                login=c.login,
+                email=c.email,
+                first_name=c.first_name,
+                last_name=c.last_name,
+                customer_id=c.customer_id,
+                company_name=c.company_name,
+            )
+            for c in contacts
+        ],
+    )
 
 
 @router.get("/queues", response_model=list[QueueRefOut])
