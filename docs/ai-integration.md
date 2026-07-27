@@ -212,6 +212,25 @@ This warning applies to every recommended pattern in section 3 — triage,
 draft-reply, and KB-answer agents all ingest customer-controlled text by
 design.
 
+### Built-in agent defenses (Tiqora runtime)
+
+The in-repo agent (`tiqora.ai.runtime` / `tiqora.ai.tools`) enforces these
+boundaries server-side (prompt text alone is never the control plane):
+
+| Defense | Where |
+|---|---|
+| Hard untrusted-content system block + article delimiters | `prompt_safety`, `_build_user_message` |
+| No `send` tool; draft/send mapped by autonomy + Manual-always-draft | `_map_customer_message` |
+| Capabilities derived from autonomy (optional `capabilities_json`) | `capabilities.py`, `ToolRegistry` |
+| Ticket-pinned tools; model cannot pass foreign ticket/customer ids | `ToolExecutor` |
+| MCP server injects `_tiqora_ticket_id` / customer context | `_call_mcp` |
+| MCP arg schema validation from discovery + scope-key blacklist | `parameters_snapshot`, H2 keys |
+| Untrusted prefix on KB/MCP tool results | `with_untrusted_tool_prefix` |
+| Output guards on `propose_customer_message` (size/links/secrets) | `output_guards.py` |
+| Escalation-rule guard on raw MCP results | `escalation.py` |
+| Global auto-reply kill-switch (`ai.auto_reply.paused`) | `gate.py`, Admin AI settings |
+| Tool-chain alerts logged + stored on usage `extra_json` | `tool_chain.py` |
+
 ---
 
 ## 5. Built-in AI agent (`tiqora.ai.*`)

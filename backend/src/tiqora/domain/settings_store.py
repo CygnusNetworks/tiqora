@@ -94,6 +94,10 @@ KEY_AI_OUTBOX_WATERMARK = "daemon.ai_worker.outbox_watermark"
 # admin-editable within [1, 365] (tiqora.ai.audit.MIN/MAX_RETENTION_DAYS).
 KEY_AI_AUDIT_RETENTION_DAYS = "ai.audit.retention_days"
 KEY_AI_AUDIT_CLEANUP_ENABLED = "daemon.ai_audit_cleanup.enabled"
+# Global kill-switch for auto-reply (plan #10). Independent of
+# system.operation_mode: when true, every auto-reply run is blocked even in
+# tiqora_primary. Manual assist and summaries are unaffected.
+KEY_AI_AUTO_REPLY_PAUSED = "ai.auto_reply.paused"
 
 
 async def get_setting_bool(session: AsyncSession, key: str, default: bool = False) -> bool:
