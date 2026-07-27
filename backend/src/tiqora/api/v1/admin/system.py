@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import os
 import platform
 import socket as _socket
 import time
@@ -175,24 +176,63 @@ async def _search_status(cfg: Settings) -> SearchStatusOut:
             await client.aclose()
 
 
-def _collect_containers_sync() -> ContainersOut:
-    """Blocking docker probe — run via ``asyncio.to_thread``."""
+#: Default docker socket path — its presence tells us the opt-in is set up.
+_DOCKER_SOCK = "/var/run/docker.sock"
+
+
+def _docker_configured() -> bool:
+    """Whether the docker opt-in is even set up (socket mounted or DOCKER_HOST)."""
+    return bool(os.environ.get("DOCKER_HOST")) or os.path.exists(_DOCKER_SOCK)
+
+
+#: docker-compose stamps every container it manages with this label.
+_COMPOSE_PROJECT_LABEL = "com.docker.compose.project"
+
+
+def _own_compose_project(client: object) -> str | None:
+    """Read this container's own compose-project label, so the probe can scope
+    itself to Tiqora's stack instead of every container on a shared host."""
+    with contextlib.suppress(Exception):
+        me = client.containers.get(_socket.gethostname())  # type: ignore[attr-defined]
+        return (me.labels or {}).get(_COMPOSE_PROJECT_LABEL)
+    return None
+
+
+def _collect_containers_sync(project_override: str = "") -> ContainersOut:
+    """Blocking docker probe — run via ``asyncio.to_thread``.
+
+    Only containers of *our* docker-compose project are returned: on a shared
+    host (e.g. next to the Znuny stack) listing every container would leak
+    unrelated services into Tiqora's admin view. The project is taken from
+    ``project_override`` (``TIQORA_DOCKER_PROJECT``) or auto-detected from this
+    container's own compose label; if neither is available (bare ``docker run``
+    / local dev) the probe falls back to listing everything.
+    """
     try:
         import docker
     except ImportError:
-        return ContainersOut(available=False, reason="docker SDK nicht installiert")
+        # SDK absent → opt-in not set up, not an error.
+        return ContainersOut(available=False, configured=False)
+
+    if not _docker_configured():
+        # No socket mounted / no DOCKER_HOST → the feature simply isn't enabled.
+        return ContainersOut(available=False, configured=False)
 
     try:
         client = docker.from_env()
     except Exception as exc:  # noqa: BLE001
-        return ContainersOut(
-            available=False,
-            reason=f"Docker-Socket nicht erreichbar (nicht gemountet?): {exc}",
-        )
+        return ContainersOut(available=False, reason=f"Docker-Socket nicht erreichbar: {exc}")
+
+    engine_version: str | None = None
+    with contextlib.suppress(Exception):
+        engine_version = client.version().get("Version")
+
+    project = project_override.strip() or _own_compose_project(client)
+    list_filters = {"label": f"{_COMPOSE_PROJECT_LABEL}={project}"} if project else None
 
     items: list[ContainerOut] = []
     try:
-        for c in client.containers.list(all=True):
+        for c in client.containers.list(all=True, filters=list_filters):
             attrs = c.attrs or {}
             state = attrs.get("State", {}) or {}
             image_tags = getattr(c.image, "tags", None) or []
@@ -221,7 +261,7 @@ def _collect_containers_sync() -> ContainersOut:
             client.close()
 
     items.sort(key=lambda i: i.name)
-    return ContainersOut(available=True, items=items)
+    return ContainersOut(available=True, engine_version=engine_version, items=items)
 
 
 def _collect_host_sync() -> HostOut:
@@ -229,7 +269,8 @@ def _collect_host_sync() -> HostOut:
     try:
         import psutil
     except ImportError:
-        return HostOut(available=False, reason="psutil nicht installiert")
+        # Optional dependency absent → opt-in not set up, not an error.
+        return HostOut(available=False, configured=False)
 
     try:
         vm = psutil.virtual_memory()
@@ -271,7 +312,7 @@ async def get_system_info(
         _db_status(session, cfg),
         _redis_status(redis_client),
         _search_status(cfg),
-        asyncio.to_thread(_collect_containers_sync),
+        asyncio.to_thread(_collect_containers_sync, cfg.docker_project),
         asyncio.to_thread(_collect_host_sync),
     )
 

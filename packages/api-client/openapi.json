@@ -5400,11 +5400,27 @@
         "type": "object"
       },
       "ContainersOut": {
-        "description": "Degrades gracefully: ``available`` is false with a ``reason`` when the\ndocker SDK is missing or the socket is not mounted.",
+        "description": "Degrades gracefully: ``available`` is false when the docker SDK is\nmissing or the socket is not mounted.\n\n``configured`` separates \"opt-in simply not set up\" (no socket mounted /\nSDK absent \u2192 a neutral note) from an actual error while talking to a\npresent daemon (``reason`` set \u2192 surfaced as a problem).",
         "properties": {
           "available": {
             "title": "Available",
             "type": "boolean"
+          },
+          "configured": {
+            "default": true,
+            "title": "Configured",
+            "type": "boolean"
+          },
+          "engine_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Engine Version"
           },
           "items": {
             "items": {
@@ -8253,10 +8269,15 @@
         "type": "object"
       },
       "HostOut": {
-        "description": "Host resource utilisation via psutil. Degrades gracefully (``available``\nfalse + ``reason``) when psutil is not installed.",
+        "description": "Host resource utilisation via psutil. Degrades gracefully when psutil is\nnot installed (``available`` false, ``configured`` false \u2192 neutral note).",
         "properties": {
           "available": {
             "title": "Available",
+            "type": "boolean"
+          },
+          "configured": {
+            "default": true,
+            "title": "Configured",
             "type": "boolean"
           },
           "cpu_count": {
@@ -16161,7 +16182,7 @@
   "info": {
     "description": "Tiqora ticket system API.",
     "title": "Tiqora",
-    "version": "0.1.0"
+    "version": "0.2.2"
   },
   "openapi": "3.1.0",
   "paths": {
