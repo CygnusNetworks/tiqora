@@ -5731,12 +5731,12 @@ export interface components {
         ApiKeyCreate: {
             /** Name */
             name: string;
-            /** Scopes */
-            scopes?: string | null;
             /** User Id */
             user_id: number;
             /** Expires At */
             expires_at?: string | null;
+            /** Scopes */
+            scopes?: string | null;
         };
         /**
          * ApiKeyCreated
@@ -5750,8 +5750,6 @@ export interface components {
             id: number;
             /** Name */
             name: string;
-            /** Scopes */
-            scopes?: string | null;
             /** User Id */
             user_id: number;
             /** Valid */
@@ -5767,6 +5765,8 @@ export interface components {
             last_used_at: string | null;
             /** Created By */
             created_by: number | null;
+            /** Scopes */
+            scopes?: string | null;
             /** Key */
             key: string;
         };
@@ -5779,8 +5779,6 @@ export interface components {
             id: number;
             /** Name */
             name: string;
-            /** Scopes */
-            scopes?: string | null;
             /** User Id */
             user_id: number;
             /** Valid */
@@ -5796,17 +5794,19 @@ export interface components {
             last_used_at: string | null;
             /** Created By */
             created_by: number | null;
+            /** Scopes */
+            scopes?: string | null;
         };
         /** ApiKeyUpdate */
         ApiKeyUpdate: {
             /** Name */
             name?: string | null;
-            /** Scopes */
-            scopes?: string | null;
             /** Valid */
             valid?: boolean | null;
             /** Expires At */
             expires_at?: string | null;
+            /** Scopes */
+            scopes?: string | null;
         };
         /**
          * AppInfoOut
