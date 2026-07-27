@@ -88,10 +88,93 @@ async def test_get_system_info_aggregate(mariadb_znuny_url: str) -> None:
             assert isinstance(out.containers.available, bool)
             assert isinstance(out.containers.items, list)
             assert isinstance(out.host.available, bool)
-            # When a section is unavailable it must explain why.
+            # When a section is unavailable it either isn't set up
+            # (configured=False) or explains the error (reason set).
             if not out.containers.available:
-                assert out.containers.reason
+                assert out.containers.reason or out.containers.configured is False
             if not out.host.available:
-                assert out.host.reason
+                assert out.host.reason or out.host.configured is False
     finally:
         await engine.dispose()
+
+
+class _FakeContainer:
+    def __init__(self, name: str, labels: dict[str, str]) -> None:
+        self.name = name
+        self.labels = labels
+        self.status = "running"
+        self.attrs: dict[str, object] = {"State": {}}
+        self.image = type("Img", (), {"tags": ["img:latest"], "short_id": "abc"})()
+
+
+class _FakeContainers:
+    def __init__(self, me: _FakeContainer, all_items: list[_FakeContainer]) -> None:
+        self._me = me
+        self._all = all_items
+        self.last_filters: dict[str, str] | None = None
+
+    def get(self, _ident: str) -> _FakeContainer:
+        return self._me
+
+    def list(self, all: bool = False, filters: dict[str, str] | None = None):  # noqa: A002
+        self.last_filters = filters
+        if not filters:
+            return self._all
+        label = filters["label"]
+        key, _, value = label.partition("=")
+        return [c for c in self._all if c.labels.get(key) == value]
+
+
+class _FakeDockerClient:
+    def __init__(self, containers: _FakeContainers) -> None:
+        self.containers = containers
+
+    def version(self) -> dict[str, str]:
+        return {"Version": "27.0.0"}
+
+    def close(self) -> None:
+        pass
+
+
+def test_containers_probe_scopes_to_own_compose_project(monkeypatch: pytest.MonkeyPatch) -> None:
+    """On a shared host, only the API container's own compose project shows."""
+    label = "com.docker.compose.project"
+    me = _FakeContainer("tiqora-api", {label: "tiqora"})
+    others = [
+        me,
+        _FakeContainer("tiqora-worker", {label: "tiqora"}),
+        _FakeContainer("znuny-web", {label: "otrs65"}),
+        _FakeContainer("random-thing", {}),
+    ]
+    fake_containers = _FakeContainers(me, others)
+    fake_client = _FakeDockerClient(fake_containers)
+
+    # Pretend the opt-in is set up and hand the probe our fake docker client.
+    monkeypatch.setattr(admin_system, "_docker_configured", lambda: True)
+    fake_docker = type("M", (), {"from_env": staticmethod(lambda: fake_client)})
+    monkeypatch.setitem(__import__("sys").modules, "docker", fake_docker)
+
+    out = admin_system._collect_containers_sync()
+
+    assert out.available is True
+    assert out.engine_version == "27.0.0"
+    # Self-detected project=tiqora → only the two tiqora containers, not znuny/random.
+    assert fake_containers.last_filters == {"label": f"{label}=tiqora"}
+    names = {c.name for c in out.items}
+    assert names == {"tiqora-api", "tiqora-worker"}
+
+
+def test_containers_probe_env_override_wins(monkeypatch: pytest.MonkeyPatch) -> None:
+    """TIQORA_DOCKER_PROJECT overrides auto-detection."""
+    label = "com.docker.compose.project"
+    me = _FakeContainer("tiqora-api", {label: "tiqora"})
+    fake_containers = _FakeContainers(me, [me])
+    monkeypatch.setattr(admin_system, "_docker_configured", lambda: True)
+    fake_docker = type(
+        "M", (), {"from_env": staticmethod(lambda: _FakeDockerClient(fake_containers))}
+    )
+    monkeypatch.setitem(__import__("sys").modules, "docker", fake_docker)
+
+    admin_system._collect_containers_sync("custom-project")
+
+    assert fake_containers.last_filters == {"label": f"{label}=custom-project"}

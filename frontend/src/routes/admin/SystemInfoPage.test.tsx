@@ -18,7 +18,7 @@ function sysinfo(overrides: Partial<SystemInfoOut> = {}): SystemInfoOut {
   return {
     app: {
       name: "Tiqora",
-      version: "0.1.0",
+      version: "v0.2.2",
       git_sha: "abc1234",
       build_time: null,
       environment: "production",
@@ -67,8 +67,8 @@ function sysinfo(overrides: Partial<SystemInfoOut> = {}): SystemInfoOut {
         database_size_bytes: 92_000_000,
       },
     },
-    containers: { available: false, reason: "Docker-Socket nicht gemountet", items: [] },
-    host: { available: false, reason: "psutil nicht installiert" },
+    containers: { available: false, configured: false, reason: null, items: [] },
+    host: { available: false, configured: false, reason: null },
     ...overrides,
   };
 }
@@ -111,7 +111,7 @@ describe("SystemInfoPage", () => {
     expect(screen.getByText(/4[.,]217/)).toBeInTheDocument();
   });
 
-  it("degrades gracefully when containers and host are unavailable", async () => {
+  it("shows a neutral 'not set up' note when the docker/psutil opt-ins are off", async () => {
     getSystemInfo.mockResolvedValue(sysinfo());
 
     renderPage();
@@ -120,8 +120,36 @@ describe("SystemInfoPage", () => {
       expect(screen.getByTestId("system-overall")).toBeInTheDocument();
     });
 
-    expect(screen.getByText("Docker-Socket nicht gemountet")).toBeInTheDocument();
-    expect(screen.getByText("psutil nicht installiert")).toBeInTheDocument();
+    // Both optional sections render the calm "not set up" note + their hints,
+    // not a raw error.
+    expect(
+      screen.getAllByText(i18n.t("admin.systemInfo.notConfigured")).length,
+    ).toBeGreaterThanOrEqual(2);
+    expect(
+      screen.getByText(i18n.t("admin.systemInfo.containers.notConfiguredHint")),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(i18n.t("admin.systemInfo.host.notConfiguredHint")),
+    ).toBeInTheDocument();
+  });
+
+  it("shows the raw reason when a present docker daemon errors", async () => {
+    getSystemInfo.mockResolvedValue(
+      sysinfo({
+        containers: {
+          available: false,
+          configured: true,
+          reason: "Docker-Socket nicht erreichbar: boom",
+          items: [],
+        },
+      }),
+    );
+
+    renderPage();
+
+    await waitFor(() => {
+      expect(screen.getByText("Docker-Socket nicht erreichbar: boom")).toBeInTheDocument();
+    });
   });
 
   it("marks overall status red when a datastore is down", async () => {
