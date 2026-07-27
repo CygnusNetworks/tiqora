@@ -1,136 +1,94 @@
 # API / MCP Coverage & Auth Gaps
 
-Stand: Analyse des Codes und der generierten OpenAPI (`packages/api-client/openapi.json`,
-`docs/api/openapi.json`) gegen MCP (`backend/src/tiqora/mcp_server/server.py`) und
-Auth/Permissions. Keine Code-Änderungen in diesem Dokument — reine Bestandsaufnahme.
+**Stand: 2026-07-27** — Status-Dokument zu REST/OpenAPI, MCP und Auth/Permissions.
+Analyse gegen Code (`backend/src/tiqora/…`) und OpenAPI (`packages/api-client/openapi.json`,
+`docs/api/openapi.json`).
+
+| Ampel | Bedeutung |
+|---|---|
+| ✅ Done | Implementiert und (soweit vermerkt) getestet |
+| 🟡 Open | Noch offen, aber kein Betriebsblocker |
+| ⏸ Deferred | Bewusst zurückgestellt / Design-Entscheidung |
 
 ---
 
-## 0. ✅ 2026-07-24 — MCP-Mutation-Tools: Queue-Permission-Check nachgerüstet (Minimal-Fix)
+## Status-Übersicht (aktuell)
 
-**Status: gefixt (Minimal-Gate), vollständiger Umbau auf `TicketWriteService` weiterhin offen —
-siehe „Was noch fehlt" unten.**
+### ✅ Geschlossen (P0 / P1)
 
-**Verifizierter Befund** (im Rahmen einer Test-Coverage-Runde entdeckt, Code gelesen bis
-auf Zeilenebene, nicht nur Doku): Die „Permission-Pfad"-Spalte in §6 unten war für die
-folgenden 10 MCP-Tools **irreführend** — sie behauptete einen Check, der beim Lesen des
-damaligen Codes nicht existierte:
+| Gap | Erledigt | Kurz |
+|---|---|---|
+| API-Key create / list / revoke / delete | 2026-07-21 | Admin REST `POST/GET/PATCH/DELETE /api/v1/admin/api-keys`, Admin-UI „API-Schlüssel“, CLI `tiqora api-key …` |
+| Key-Metadaten `expires_at` / `last_used_at` / `created_by` | 2026-07-21 | Schema + Resolve in REST und MCP; Expiry-Check; `last_used_at`-Stamp |
+| Grobe Key-Scopes `read` / `write` / `mcp` / `*` | später | Spalte `scopes`; REST blockt Mutationen ohne `write`/`*`; MCP braucht `mcp`/`write`/`*` (NULL/leer = unrestricted) |
+| Docs behaupteten Key-Management, Code hatte keins | 2026-07-21 | Docs und Code aligned |
+| MCP Reference-Tools | 2026-07-21 | `list_queues`, `list_states`, `list_priorities`, `list_agents` |
+| MCP Write-Felder | 2026-07-21 | `ticket_set_title/customer/dynamic_field`, `ticket_lock`/`unlock` |
+| MCP TN-Lookup | 2026-07-21 | `ticket_get_by_number` |
+| MCP-Doc-Katalog (25 Tools) | 2026-07-21 | `docs/api/mcp.md`, `docs/ai-integration.md`, … |
+| MCP-Mutation ohne Queue-Permission | 2026-07-24 | Minimal-Gate `_assert_queue_permission` + Regressionstests |
+| `ticket_update_queue` nur Quell-`move_into` | 2026-07-24 | Auch Ziel-Queue; gleicher Fix in `TicketWriteService.move_queue` (REST) |
+| `ticket_create` „Access denied“ bei unbekannter Queue | 2026-07-24 | Existenz vor Permission (`_assert_raw_queue_permission`) |
+| Znuny-ACL-Runtime vs. Doku | 2026-07-21 | Bewusst **group/role only** dokumentiert (Design-Doc + hier) |
 
-`ticket_reply`, `ticket_note`, `ticket_update_state`, `ticket_update_queue`,
+### 🟡 Noch offen
+
+| Prio | Gap | Surface | Kommentar |
+|---|---|---|---|
+| **P2** | MCP-Mutationen auf `TicketWriteService` umbauen | MCP | Inline-Gate ist sicher, dupliziert aber Check-Logik |
+| **P2** | MCP `ticket_reply` / SMTP-Delivery | MCP / Produkt | Rohe `add_article()` sendet keine Mail; Service-Pfad würde SMTP triggern — Produktentscheidung |
+| **P2** | `TicketWriteService.assign_owner` ohne `lock=`-Parameter | Domain | Relevant erst nach Umbau auf die Service-Klasse |
+| **P2** | MCP history / merge / link | MCP | Domain/REST vorhanden; im MCP nicht exponiert |
+| **P2** | MCP Tool-Allowlist pro Key | Schema + MCP | Defense-in-depth neben Group/Role und groben Scopes |
+| **P2** | Rate-Limit pro Key | Auth | Nicht implementiert |
+| **P3** | ACL Editor, GenericAgent / Postmaster Write | Admin REST | Explizit deferred (read-only Listen ok) |
+| **P3** | Session-Bearer auf MCP (nur Dev) | MCP | Optional; Prod eher nicht |
+
+### ⏸ Deferred (Design)
+
+| Thema | Entscheidung |
+|---|---|
+| Znuny-ACL-Runtime (`acl.config_match` / `config_change`) | Runtime bleibt **group/role only**. Admin `GET /api/v1/admin/acl` read-only. Neu öffnen nur bei Produktbedarf für State/Queue/Field-Filtering wie in Znuny. |
+| Feingranulare OAuth-Scopes (`tickets:write`, …) | Nicht vorgesehen. Rechte = Group/Role des gebundenen Users; Keys haben nur grobe Surface-Scopes (`read`/`write`/`mcp`/`*`). |
+
+---
+
+## 0. Historie — MCP-Permission-Minimal-Fix (2026-07-24)
+
+**Status: Sicherheitslücke geschlossen.** Sauberer Umbau auf `TicketWriteService` bleibt P2
+(siehe „Noch offen“ oben).
+
+### Befund (vor dem Fix)
+
+Die Tools `ticket_reply`, `ticket_note`, `ticket_update_state`, `ticket_update_queue`,
 `ticket_update_priority`, `ticket_update_owner`, `ticket_set_title`, `ticket_set_customer`,
-`ticket_set_dynamic_field`, `ticket_lock`, `ticket_unlock`
+`ticket_set_dynamic_field`, `ticket_lock`, `ticket_unlock` (plus `ticket_create`) riefen die
+**Modul-Funktionen** in `ticket_write_service.py` direkt auf — ohne
+`PermissionEngine.check`. REST geht über die Klasse `TicketWriteService`, die vor jedem
+Write `_assert` / `_assert_rw` aufruft. Folge: Jeder Agent mit gültigem MCP-API-Key konnte
+jedes Ticket in jeder Queue mutieren.
 
-**Root Cause:** `tiqora.domain.ticket_write_service` hat zwei Schichten:
+### Was gemacht wurde
 
-1. Modul-Funktionen (`add_article()`, `change_state()`, `assign_owner()`, …) — reine
-   Schreiblogik, **kein** Permission-Check.
-2. Klasse `TicketWriteService` (dieselbe Datei, ab `class TicketWriteService`) — dünner
-   Wrapper, der vor jedem Aufruf `self._assert(user_id, queue_id, key)` bzw.
-   `self._assert_rw(...)` aufruft (`PermissionEngine.check`) und danach die Modul-Funktion
-   aufruft. **Das ist der einzige Ort, an dem die Queue/Group-Permission tatsächlich
-   geprüft wird.**
+- Helper `_assert_queue_permission` / `_assert_raw_queue_permission` in
+  `mcp_server/server.py` (Ticket laden → `PermissionEngine.check` → `TicketAccessDenied`).
+- Keys: `note` (reply/note), `rw` (state/title/customer/DF/lock/unlock), `move_into`
+  (Queue-Move, **Quelle und Ziel**), `priority`, `owner`, `create` (Create).
+- Regression: `test_mcp_mutation_tools_deny_agent_without_queue_permission`,
+  `test_mcp_update_queue_denies_unpermitted_destination`; REST:
+  `test_move_into_requires_destination_permission`.
+- Robustheit (bereits mit erledigt): `_ticket_must_exist` / Owner-User-Validierung in den
+  Modul-Funktionen (kein roher FK-Crash mehr).
 
-Die REST-Ticket-Endpunkte (`api/v1/tickets.py`) gehen über `TicketWriteService` — dort
-funktioniert der Check wie in §4 beschrieben. Die zehn oben genannten MCP-Tools rufen
-aber direkt die Modul-Funktionen auf (siehe z. B. `mcp_server/server.py` um Zeile 762/851
-/887/923/961/etc.), **nicht** über `TicketWriteService`. Das `except (..., TicketAccessDenied,
-...)` in diesen Tools ist toter Code — die Exception kann von diesem Call-Pfad nie geworfen
-werden.
+### Was bewusst *nicht* im Fix steckt
 
-**Auswirkung (vor dem Fix unten):** Jeder Agent mit einer gültigen MCP-API-Key-Session konnte
-per `ticket_reply`, `ticket_update_owner`, `ticket_lock` usw. **jedes Ticket in jeder Queue**
-mutieren — unabhängig von seinen Group/Role-Rechten. Das untergrub genau das Modell, das §4
-als Sicherheitsbasis beschreibt („Alle Checks laufen über denselben `PermissionEngine`" — das
-stimmte für REST/UI, nicht für diese 10 MCP-Tools). Seit dem Minimal-Fix unten ist der Check
-wieder in Kraft, nur eben als eigener Gate statt über `TicketWriteService`.
-
-**Zwei zusätzlich gefundene, bereits gefixte Robustheitsbugs** (nicht mehr offen, hier nur
-zur Einordnung): `add_article()` prüfte vorher nicht, ob das Ticket existiert (roher
-FK-`IntegrityError`/`ToolError`-Crash statt `{"error": ...}`), und `assign_owner()`/
-`assign_responsible()` validierten die neue Owner/Responsible-User-ID nicht (gleicher
-Crash). Beide sind per `_ticket_must_exist()`/`_user_login()`-Härtung behoben
-(`ticket_write_service.py`) — das war ein reiner Robustheits-Fix ohne Permission-Bezug.
-
-### Was gemacht wurde (2026-07-24, Minimal-Fix)
-
-Statt die 11 Tools auf `TicketWriteService` umzustellen (Risiko: siehe „Was noch fehlt"
-Punkt 2 unten), wurde ein **expliziter Permission-Gate direkt in `mcp_server/server.py`**
-ergänzt, ohne die rohen Modul-Funktions-Aufrufe anzutasten:
-
-- Neuer Helper `_assert_queue_permission(session, *, ticket_id, user_id, key)` (lädt das
-  Ticket via `_ticket_must_exist`, prüft `PermissionEngine.check(user_id, queue_id, key)`,
-  wirft `TicketAccessDenied` — von den bestehenden `except`-Klauseln bereits abgefangen).
-- Aufgerufen am Anfang jedes `async with session.begin():`-Blocks in `ticket_reply`/
-  `ticket_note` (Key `"note"`), `ticket_update_state`/`ticket_set_title`/
-  `ticket_set_customer`/`ticket_set_dynamic_field`/`ticket_lock`/`ticket_unlock` (Key
-  `"rw"`), `ticket_update_queue` (Key `"move_into"`, auf der Quell-Queue — Znuny-Konvention;
-  **Ziel-Queue-Check per Nachtrag 2026-07-24 ergänzt, s. u.**),
-  `ticket_update_priority` (Key `"priority"`), `ticket_update_owner` (Key `"owner"`).
-- `ticket_create` bekam einen eigenen Inline-Check (`PermissionEngine.check(user_id,
-  queue_id, "create")`), da hier noch kein Ticket existiert.
-- Neuer Regressionstest `test_mcp_mutation_tools_deny_agent_without_queue_permission` in
-  `backend/tests/test_mcp_server.py`: erstellt ein Ticket als `AGENT_FULL_ID`, versucht dann
-  alle 11 Mutation-Tools + `ticket_create` als `AGENT_NONE_ID` (keinerlei Group-Permissions)
-  und prüft, dass jedes Tool `{"error": ...}` liefert statt zu mutieren — inkl. Assertion,
-  dass der Ticket-Titel danach unverändert ist.
-- Volle Backend-Suite lief danach ohne neue Regressionen (nur die bekannten 6
-  Migration-Gate-Failures + Ressourcen-Flakiness bei parallelen Testcontainern).
-
-### Was noch fehlt (bewusst nicht in diesem Fix)
-
-1. **Sauberer Umbau auf `TicketWriteService`** statt des Inline-Gates — die Klasse hat für
-   so gut wie jede Operation bereits eine geprüfte Methode (`add_article`, `move_queue`,
-   `change_state`, `change_priority`, `change_title`, `set_customer`, `assign_owner`,
-   `assign_responsible`, `lock_ticket`, `unlock_ticket`, `update_dynamic_field`) — der
-   Inline-Gate ist funktional gleichwertig für die Permission-Frage, dupliziert aber die
-   Check-Logik statt sie zu teilen. Sauberer, aber größerer Diff.
-2. **`ticket_reply`/`ticket_note` → `TicketWriteService.add_article`:** Diese Methode hat
-   einen Sonderfall — bei `channel == "email" and sender_type == "agent"` ruft sie
-   `deliver_agent_email_reply()` auf und **verschickt eine echte E-Mail über SMTP**. Der
-   aktuelle MCP-`ticket_reply`-Pfad (rohe `add_article()`, weiterhin unverändert) tut das
-   **nicht** — er schreibt nur den Artikel lokal. Ob ein per MCP/Agent ausgelöster Reply
-   tatsächlich eine E-Mail raussenden soll (wie ein menschlicher Agent es täte) oder bewusst
-   lokal bleibt (Draft-artig), ist eine **Produktentscheidung**, keine rein technische —
-   deshalb wurde hier bewusst NUR der Permission-Check ergänzt, nicht auf die Service-Klasse
-   umgestellt (das hätte das SMTP-Verhalten stillschweigend geändert).
-3. **`ticket_update_owner`'s `lock: bool` Parameter:** Die rohe `assign_owner()`-Funktion
-   unterstützt `lock=True/False`, die `TicketWriteService.assign_owner()`-Methode aktuell
-   nicht (kein `lock`-Parameter) — relevant erst, wenn Punkt 1 umgesetzt wird.
-4. **Nach einem etwaigen Umbau auf Punkt 1:** §6-Tabelle unten aktualisieren (die
-   „Permission-Pfad"-Spalte ist seit diesem Fix wieder korrekt, sollte aber bei einer
-   Migration auf `TicketWriteService` nochmal gegengelesen werden).
-
-**Priorität für Punkt 1–3:** Niedriger als der ursprüngliche Fund — die Sicherheitslücke
-selbst (kein Permission-Check) ist geschlossen; es geht nur noch um Code-Duplizierung
-(Inline-Gate vs. Service-Klasse) und die separate SMTP-Produktentscheidung.
-
-### Nachtrag (2026-07-24, Review-Folgefix)
-
-Ein High-Effort-Code-Review derselben Änderung fand zwei Lücken im Minimal-Gate oben,
-beide gefixt:
-
-- **`ticket_update_queue` prüfte `move_into` nur auf der Quell-Queue.** Damit konnte ein
-  Agent ein Ticket in eine Ziel-Queue schieben, auf die er keinerlei Rechte hat (Znuny
-  baut die Move-Ziel-Liste tatsächlich aus den `move_into`-Queues des Agenten — die
-  **Ziel**-Queue muss also ebenfalls geprüft werden). Jetzt wird `move_into` zusätzlich
-  auf der Ziel-`queue_id` geprüft. Regressionstest
-  `test_mcp_update_queue_denies_unpermitted_destination` in
-  `backend/tests/test_mcp_server.py`. Dieselbe Quell-only-Asymmetrie bestand auch in
-  `TicketWriteService.move_queue` (REST-`PATCH /api/v1/tickets/{id}`-Move-Pfad) und wurde
-  dort gleich mitgefixt (Existenz- + `move_into`-Ziel-Check in der Methode; Regressionstest
-  `test_move_into_requires_destination_permission` in `test_ticket_acl_permissions.py`,
-  MariaDB + Postgres).
-- **`ticket_create` meldete eine nicht existierende Queue als „Access denied".**
-  `PermissionEngine.check` liefert für eine unbekannte Queue dasselbe `False` wie für eine
-  verweigerte — ein Tippfehler in der `queue_id` sah für den (LLM-)Aufrufer wie ein
-  Rechteproblem aus. Neuer Helper `_assert_raw_queue_permission(session, *, queue_id,
-  user_id, key)` prüft erst Existenz (`_queue_name()` → `InvalidInput` „No queue with
-  id=…"), dann Permission; genutzt von `ticket_create` und der neuen
-  Ziel-Queue-Prüfung in `ticket_update_queue`. Der Inline-`PermissionEngine.check` in
-  `ticket_create` ist damit ersetzt.
-
-Punkt 1–3 unter „Was noch fehlt" bleiben unverändert offen (der `TicketWriteService`-Umbau
-samt SMTP-Produktentscheidung ist von diesem Folgefix unberührt).
+1. **Umbau auf `TicketWriteService`** — funktional gleichwertig für Permissions, teilt die
+   Check-Logik; größerer Diff.
+2. **`ticket_reply` → `TicketWriteService.add_article`:** Bei
+   `channel == "email" and sender_type == "agent"` würde das `deliver_agent_email_reply()`
+   und echte SMTP-Zustellung auslösen. MCP schreibt heute nur lokal. Ob Agent-Replies
+   mailsenden sollen, ist eine **Produktentscheidung**.
+3. **`assign_owner(lock=…)`** — Modul-Funktion hat `lock`, Service-Methode aktuell nicht.
 
 ---
 
@@ -138,15 +96,14 @@ samt SMTP-Produktentscheidung ist von diesem Folgefix unberührt).
 
 | Bereich | Bewertung |
 |---|---|
-| REST `/api/v1` + Portal + Compat (OpenAPI) | Breit abgedeckt (~238 Operations, ~164 Paths). Für Agent-UI, Admin und Portal weitgehend vollständig. |
-| MCP als AI-Subset | Sinnvolles Design (Tickets + KB + Customer Lookup + Reference + Write-Felder). **25 Tools** im Code; Docs synced 2026-07-21. |
-| Auth-Modell (Key → User → Group/Role) | Znuny-kompatibel und nachvollziehbar. Keine OAuth-Scopes auf dem Key. |
-| **API-Key-Lifecycle** | ✅ **Gelöst 2026-07-21:** Admin-Router `POST/GET/PATCH/DELETE /api/v1/admin/api-keys`, Admin-UI „API-Schlüssel“ und CLI `tiqora api-key …`; Schema um `expires_at`/`last_used_at`/`created_by` erweitert; REST- und MCP-Resolve prüfen Expiry. |
-| Znuny-ACL-Runtime | Admin nur read-only; `PermissionEngine` wertet **keine** `acl`-Regeln aus — nur Group/Role. **2026-07-21 bewusst als „group/role only“ dokumentiert** (siehe §4). |
+| REST `/api/v1` + Portal + Compat (OpenAPI) | Breit abgedeckt (~238 Operations). Agent-UI, Admin, Portal weitgehend vollständig. |
+| MCP als AI-Subset | Sinnvolles Design. **25 Tools** (Tickets + KB + Customer + Reference + Write-Felder). Mutation-Tools mit Queue-Permission-Gate. |
+| Auth-Modell | Key → User → Group/Role (`PermissionEngine`). Zusätzlich grobe Key-Scopes `read`/`write`/`mcp`/`*`. Keine feingranularen OAuth-Scopes. |
+| **API-Key-Lifecycle** | ✅ Admin-API, UI, CLI; Expiry + last_used + created_by + scopes. |
+| Znuny-ACL-Runtime | ⏸ group/role only (bewusst); Admin ACL read-only. |
 
-**Ursprünglicher Hauptbefund (behoben):** API-Keys ließen sich nur per manuellem SQL erzeugen —
-MCP/Bearer-Auth war operativ blockiert. Seit 2026-07-21 vollständiger Lifecycle über Admin-API,
-UI und CLI; der SQL-Workaround unten ist nur noch historisch.
+**Ehemaliger Hauptblocker (behoben):** Keys nur per manuellem SQL → MCP/Bearer operativ
+blockiert. Seit 2026-07-21 vollständiger Lifecycle.
 
 ---
 
@@ -154,26 +111,28 @@ UI und CLI; der SQL-Workaround unten ist nur noch historisch.
 
 | Surface | Prefix / Prozess | Auth |
 |---|---|---|
-| Agent/Admin REST | `/api/v1` (Port 8000) | Session-Cookie **oder** `Authorization: Bearer <api-key>` **oder** Bearer = Session-Token |
+| Agent/Admin REST | `/api/v1` (Port 8000) | Session-Cookie **oder** `Authorization: Bearer tiqora_…` (API-Key) |
 | Customer Portal | `/api/portal` | Eigenes Customer-Session-Cookie |
 | Compat | `/znuny-compat` | Znuny-`SessionID` **oder** Bearer API-Key |
-| MCP | eigener Prozess, Port 8001, Mount `/mcp` | **nur** `Authorization: Bearer <api-key>` (streamable-HTTP) |
+| MCP | Port 8001, Mount `/mcp` | **nur** `Authorization: Bearer <api-key>` (streamable-HTTP) |
 | Health/Metrics | `/health`, `/ready`, `/metrics` | unauthentifiziert |
 
 ### REST (`tiqora.api.deps.get_current_user`)
 
 1. Cookie `tiqora_session` (Name konfigurierbar) → `AuthService.resolve_session`
-2. sonst `Authorization: Bearer …` → zuerst `resolve_api_key`, bei Misserfolg `resolve_session`
-   (Session-as-Bearer für CLI/Dev-Komfort)
+2. sonst `Authorization: Bearer …` **nur** wenn der Token mit `tiqora_` beginnt →
+   `resolve_api_key` (Session-as-Bearer für die volle `/api/v1`-Fläche wurde aus
+   Sicherheitsgründen entfernt)
+3. API-Key-Scope-Gate: non-GET ohne `write`/`*` → 403
 
 ### MCP (`TiqoraBearerAuth`)
 
-1. Header `Authorization: Bearer <raw_key>` Pflicht (außer GET-Pfade, die auf `/sse` enden — Probe)
-2. `SHA-256(raw_key)` Lookup in `tiqora_api_key` mit `valid = true`
-3. `user_id` muss auf `users` mit `valid_id = 1` zeigen
-4. `request.state.user_id` für alle Tools
-
-MCP akzeptiert **keine** Session-Tokens (strenger als REST — für Produktion sinnvoll).
+1. Header `Authorization: Bearer <raw_key>` Pflicht (außer GET-Pfade auf `/sse` — Probe)
+2. `SHA-256(raw_key)` Lookup in `tiqora_api_key` mit `valid = true`, Expiry prüfen,
+   `last_used_at` stempeln
+3. `user_id` → `users` mit `valid_id = 1`
+4. Scope: Key braucht `mcp`, `write` oder `*` (oder `scopes` NULL/leer = unrestricted)
+5. `request.state.user_id` für alle Tools
 
 Quellen: `backend/src/tiqora/api/deps.py`, `backend/src/tiqora/domain/auth.py`,
 `backend/src/tiqora/mcp_server/server.py`.
@@ -189,129 +148,84 @@ Quellen: `backend/src/tiqora/api/deps.py`, `backend/src/tiqora/domain/auth.py`,
 | `id` | PK |
 | `name` | Anzeigename (z. B. „mcp-triage-bot“) |
 | `key_hash` | SHA-256 Hex des Klartext-Keys (nie Klartext speichern) |
-| `user_id` | Agent-User (`users.id`) — Principal für alle Rechte |
+| `user_id` | Agent-User (`users.id`) — Principal für Group/Role-Rechte |
 | `valid` | Soft-Revoke |
 | `created` | Zeitstempel |
+| `expires_at` | optionales Ablaufdatum (REST + MCP prüfen) |
+| `last_used_at` | letzter erfolgreicher Resolve |
+| `created_by` | Admin-User, der den Key ausgestellt hat |
+| `scopes` | optional: comma-separated `read`, `write`, `mcp`, `*`; NULL/leer = unrestricted |
 
-Migration: `backend/alembic/versions_tiqora/20260719_0001_api_key_and_settings.py`.  
-Model: `tiqora.db.tiqora.models.TiqoraApiKey`.
+Model: `tiqora.db.tiqora.models.TiqoraApiKey`.  
+Admin-Router: `tiqora.api.v1.admin.api_keys`.  
+CLI: `tiqora.cli.api_key` (`tiqora api-key create|list|revoke|delete`).
 
-Hilfsfunktionen in `domain/auth.py` (existieren, werden aber von keinem Route/CLI aufgerufen):
-
-- `generate_api_key()` → `tiqora_<token_urlsafe(32)>`
-- `hash_api_key(raw)` → SHA-256 Hex
-- `AuthService.resolve_api_key(raw)` → `AuthenticatedUser` mit `auth_method="api_key"`
-
-### Was die Docs behaupten (falsch)
-
-- `docs/api/README.md`: Keys „Issued/revoked via the admin API (`/api/v1/admin/*` — API key management)“
-- `docs/api/rest-v1.md`: „issue one via the admin API“
-- `docs/api/mcp.md` / `docs/ai-integration.md`: „keys are issued/revoked via the admin API“
-
-### Was im Code wirklich da ist
+### Lifecycle (Soll = Ist)
 
 | Mechanismus | Status |
 |---|---|
-| Tabelle + Resolve (REST + MCP) | ✅ (MCP-Resolve prüft seit 2026-07-21 auch `expires_at`) |
-| `POST/GET/PATCH/DELETE /api/v1/admin/api-keys` | ✅ **Done 2026-07-21** — Router + OpenAPI; Klartext einmalig bei Create, Revoke = `PATCH valid=false`, DELETE = hard remove |
-| Frontend Admin-UI | ✅ **Done 2026-07-21** — Seite „API-Schlüssel“ (One-Time-Key + Copy, Agent-Picker, Revoke/Delete) |
-| CLI (`tiqora api-key create/list/revoke/delete`) | ✅ **Done 2026-07-21** — Headless-Bootstrap ohne HTTP |
-| Aufruf von `generate_api_key` außerhalb Tests/Def | ✅ (Admin-Router + CLI) |
+| Tabelle + Resolve (REST + MCP) | ✅ inkl. Expiry + last_used |
+| `POST/GET/PATCH/DELETE /api/v1/admin/api-keys` | ✅ Klartext einmalig bei Create; Revoke = `PATCH valid=false`; DELETE = hard remove |
+| Frontend Admin-UI | ✅ Seite „API-Schlüssel“ (`/admin/api-keys`) |
+| CLI | ✅ Headless-Bootstrap (`tiqora api-key create --user … --name …`) |
+| Scopes anlegen/ändern | ✅ Admin-API (`scopes` in Create/Update); UI/CLI können Scopes noch nicht setzen (NULL = unrestricted) |
 
-### Bootstrap (Soll-Zustand seit 2026-07-21)
+### Bootstrap
 
-Regulär: Admin-UI „API-Schlüssel“ **oder** `tiqora api-key create --user <id> --name <name>`
-(Klartext wird genau einmal ausgegeben). Widerruf: `PATCH valid=false` (UI/API) bzw.
-`tiqora api-key revoke <id>`. Die folgenden SQL-Workarounds sind nur noch historisch/für
-Notfälle relevant:
+1. Service-User mit minimalen Groups/Roles anlegen.
+2. Key ausstellen: Admin-UI **oder** `tiqora api-key create --user <id> --name <name>`
+   **oder** `POST /api/v1/admin/api-keys` (Klartext genau einmal).
+3. Widerruf: UI/API `PATCH valid=false` bzw. `tiqora api-key revoke <id>`.
 
-**A) Manuelles SQL** (Fallback, nicht mehr nötig):
-
-```sql
--- Klartext-Key z.B. tiqora_… einmalig erzeugen (Python: generate_api_key()),
--- nur den Hash speichern:
-INSERT INTO tiqora_api_key (name, key_hash, user_id, valid)
-VALUES (
-  'mcp-triage-bot',
-  SHA2('tiqora_YOUR_RAW_KEY_HERE', 256),  -- MySQL/MariaDB; sonst SHA-256 Hex von außen
-  42,  -- users.id eines dedizierten Service-Accounts
-  1
-);
-```
-
-**B) REST mit Session-Bearer** (nur REST, nicht MCP): nach Login Session-Token als
-`Authorization: Bearer` nutzen — in `get_current_user` vorgesehen, **nicht** für MCP.
-
-**C) Widerruf:** `UPDATE tiqora_api_key SET valid = 0 WHERE id = …` (kein Endpoint).
-
-### Schema-Hinweis
-
-Model/Migration: Spalte `name`. Manche Tests legen eine DDL mit `label` an — Drift, kein
-Produktionspfad.
+SQL-Insert mit Hash ist nur noch Notfall-Fallback, kein Normalweg.
 
 ---
 
 ## 4. Scopes und ACLs
 
-### Keine OAuth-Scopes auf dem Key
+### Zwei Ebenen (kein Widerspruch)
 
-Ein API-Key ist **kein** Client mit eigenen Scopes. Er ist ein Bearer, der einen **Agent-User**
-repräsentiert. Alle Checks laufen über denselben `PermissionEngine` wie UI und REST.
+1. **Key-Scopes (grob, Surface):** `read` | `write` | `mcp` | `*`
+   - REST: Mutationen brauchen `write` oder `*`
+   - MCP: Tool-Calls brauchen `mcp`, `write` oder `*`
+   - NULL/leer: unrestricted (volle Rechte des Users)
+2. **Group/Role (fein, Znuny-kompatibel):** `PermissionEngine` auf Queue-Groups
+   - Keys: `ro`, `move_into`, `create`, `note`, `owner`, `priority`, `rw`
+   - `rw` impliziert alle Keys der Group
+   - Admin: Membership in Group **namens** `admin` mit `rw`
 
-### Effektive Rechte = Group/Role des Users
+Ein API-Key ist **kein** OAuth-Client mit Resource-Scopes. Er repräsentiert einen
+**Agent-User**; die Queue-Rechte kommen von diesem User. Die Key-Scopes schränken nur
+ein, *welche API-Fläche* der Key überhaupt ansprechen darf.
 
-`tiqora.permissions.engine.PermissionEngine`:
+### „Scope the key“ in der Praxis
 
-- Direct: `group_user` mit `permission_key` ∈  
-  `{ro, move_into, create, note, owner, priority, rw}`
-- Indirekt: `role_user` → `group_role` (`permission_value = 1`)
-- `rw` auf einer Group impliziert alle Keys dieser Group
-- Admin: Membership in Group **namens** `admin` mit `rw` (kein separates `is_admin`-Flag)
-
-Queues hängen an Groups (`queue.group_id`). Ticket-RO/RW-Checks sind queue-/group-basiert.
-
-### „Scope the key“ in der Praxis (empfohlen)
-
-1. Dedizierten Service-User anlegen (nicht den persönlichen Admin-Account teilen).
-2. Nur die benötigten Groups/Roles zuweisen  
-   (`/api/v1/admin/users/{id}/groups`, `/roles`, Admin-UI).
-3. API-Key an diesen `user_id` binden (sobald Issue-API existiert; bis dahin SQL).
-4. Key pro Automation; bei Kompromittierung: `valid = 0` + neu ausstellen.
-
-Das ist **sinnvoll** für ein Znuny-kompatibles System: Rechte leben in der bekannten
-Group/Role-Matrix, nicht in einer zweiten parallelen Scope-Sprache.
+1. Dedizierten Service-User anlegen (nicht den persönlichen Admin teilen).
+2. Nur benötigte Groups/Roles zuweisen (`/api/v1/admin/users/{id}/groups`, …).
+3. API-Key an diesen `user_id` binden; optional `scopes=mcp` (oder `write`) setzen.
+4. Key pro Automation; bei Kompromittierung: `valid=false` + neu ausstellen.
 
 ### Was *nicht* gilt
 
 | Erwartung | Realität |
 |---|---|
-| Key-Scopes wie `tickets:write`, `kb:read` | Existieren nicht |
-| MCP-Tool-Allowlist pro Key | Existieren nicht — jeder Tool-Call, den der User darf |
-| Znuny-ACL (`acl.config_match` / `config_change`) filtert States/Queues in UI | **Nicht** in Runtime-PermissionEngine; Admin nur `GET /api/v1/admin/acl` (read-only, Editing deferred in `admin/readonly.py`) |
-| Expiry / `last_used` / Rate-Limit pro Key | Schema + REST/MCP resolve seit P0/P1 (siehe Gap-Matrix); Rate-Limit weiterhin nicht |
-
-Design-Doc (`docs/specs/2026-07-19-tiqora-design.md`) spricht von „group/role + ACL“; implementiert
-ist Group/Role. Znuny-ACL-Auswertung ist eine Lücke relativ zur Design-Ambition, nicht relativ
-zum aktuellen MCP-Scope (der Group/Role bewusst teilt).
-
-**2026-07-21 — ACL-Runtime reviewed and consciously deferred:** Runtime remains
-**group/role only**. Znuny `acl` (`config_match` / `config_change`) is not evaluated
-at request time. Documented explicitly in the design doc under „Further design
-decisions“ (PermissionEngine runtime note). Not scheduled as a bugfix; re-open
-only if product needs Znuny-ACL parity for state/queue/field filtering.
+| Feingranulare Scopes wie `tickets:write`, `kb:read` | Existieren nicht |
+| MCP-Tool-Allowlist pro Key | Existieren nicht — jeder Tool-Call, den User + Key-Scope erlauben |
+| Znuny-ACL filtert States/Queues zur Laufzeit | **Nicht** in `PermissionEngine`; Admin nur read-only |
+| Rate-Limit pro Key | Nicht implementiert |
 
 ---
 
 ## 5. OpenAPI-Abdeckung
 
-Quellen: `packages/api-client/openapi.json` (auch Snapshot unter `docs/api/openapi.json`).  
+Quellen: `packages/api-client/openapi.json` (Snapshot auch unter `docs/api/openapi.json`).  
 Regenerieren: `cd backend && uv run tiqora openapi -o ../docs/api/openapi.json`.
 
 ### Verteilung (~238 Operations)
 
 | Bereich | ca. Ops | Inhalt |
 |---|---|---|
-| Admin | ~111 | Users, Groups, Roles, Queues, States, Priorities, DF, Customers, Webhooks, Mail, Templates, … |
+| Admin | ~111 | Users, Groups, Roles, Queues, States, Priorities, DF, Customers, Webhooks, Mail, Templates, API-Keys, … |
 | Tickets | ~27 | CRUD/PATCH, Articles, Attachments, Merge, Links, Drafts, History, Presence, Export CSV |
 | KB | ~19 | Articles, Categories, Search, Publish, Attachments, Knowledge bundle |
 | Portal | ~14 | Customer tickets + KB |
@@ -323,19 +237,17 @@ Regenerieren: `cd backend && uv run tiqora openapi -o ../docs/api/openapi.json`.
 | Process | ~6 | BPM start/submit/state |
 | Reference / Search / Queues / Events | wenige | Lookup-Listen, globale Suche, SSE |
 
-### OpenAPI-Lücken (fehlende Routes, nicht nur Doku)
+### OpenAPI-Lücken
 
-| Gap | Schwere | Kommentar |
+| Gap | Status | Kommentar |
 |---|---|---|
-| ~~API-Key CRUD~~ | ✅ Done 2026-07-21 | `POST/GET/PATCH/DELETE /api/v1/admin/api-keys` in OpenAPI |
-| ACL Write/Editor | P2 | Explizit deferred; Runtime-Eval ebenfalls fehlend |
-| GenericAgent / Postmaster Write | P2 | Nur List/Detail |
-| ~~Key-Metadaten (expires, last_used, created_by)~~ | ✅ Done 2026-07-21 | Spalten + REST/MCP-Expiry-Prüfung + `last_used_at`-Stamp |
-| MCP-Tool-Katalog in OpenAPI | n/a | MCP spricht kein OpenAPI (bewusst); Katalog nur manuell in Docs |
+| API-Key CRUD | ✅ Done | inkl. scopes / expires |
+| Key-Metadaten | ✅ Done | |
+| ACL Write/Editor | ⏸ P3 | Runtime-Eval ebenfalls deferred |
+| GenericAgent / Postmaster Write | ⏸ P3 | Nur List/Detail |
+| MCP-Tool-Katalog in OpenAPI | n/a | MCP spricht kein OpenAPI (bewusst); Katalog in Docs |
 
-Ansonsten deckt OpenAPI die implementierte Agent-/Admin-/Portal-Oberfläche gut ab. MCP ist
-**kein** REST und erscheint nicht in der Spec — das ist korrekt, muss aber in der Doku
-getrennt und aktuell gehalten werden.
+MCP erscheint **nicht** in der OpenAPI-Spec — korrekt; Doku getrennt halten.
 
 ---
 
@@ -343,23 +255,23 @@ getrennt und aktuell gehalten werden.
 
 ### Implementierte Tools (25) — Source of Truth: `mcp_server/server.py`
 
-| # | MCP Tool | Entspricht grob REST | Permission-Pfad |
+| # | MCP Tool | Entspricht grob REST | Permission-Pfad (Ist) |
 |---|---|---|---|
 | 1 | `ticket_search` | `GET /api/v1/search` / Ticket-Liste | Groups mit `ro` → erlaubte Queues |
 | 2 | `ticket_get` | Ticket + Articles + DF als Markdown | `ro` auf Ticket-Queue-Group |
-| 3 | `ticket_get_by_number` | wie `ticket_get`, Lookup per `tn` | `ro` auf Ticket-Queue-Group |
-| 4 | `ticket_create` | `POST /api/v1/tickets` | `create` via `ticket_write_service` |
-| 5 | `ticket_reply` | `POST …/articles` (customer-visible) | `note` / write service |
-| 6 | `ticket_note` | intern Note | wie reply |
-| 7 | `ticket_update_state` | `PATCH` `state_id` | write service |
-| 8 | `ticket_update_queue` | `PATCH` `queue_id` | `move_into` |
+| 3 | `ticket_get_by_number` | wie `ticket_get`, Lookup per `tn` | `ro` |
+| 4 | `ticket_create` | `POST /api/v1/tickets` | `create` via `_assert_raw_queue_permission` |
+| 5 | `ticket_reply` | `POST …/articles` (customer-visible) | `note` via `_assert_queue_permission` |
+| 6 | `ticket_note` | intern Note | `note` |
+| 7 | `ticket_update_state` | `PATCH` `state_id` | `rw` |
+| 8 | `ticket_update_queue` | `PATCH` `queue_id` | `move_into` Quelle **und** Ziel |
 | 9 | `ticket_update_priority` | `PATCH` `priority_id` | `priority` |
 | 10 | `ticket_update_owner` | `PATCH` `owner_id` | `owner` |
-| 11 | `ticket_set_title` | `PATCH` `title` | write service |
-| 12 | `ticket_set_customer` | `PATCH` customer fields | write service |
-| 13 | `ticket_set_dynamic_field` | `PATCH` DF | write service; error if field missing |
-| 14 | `ticket_lock` | `PATCH` lock | write service |
-| 15 | `ticket_unlock` | `PATCH` unlock | write service |
+| 11 | `ticket_set_title` | `PATCH` `title` | `rw` |
+| 12 | `ticket_set_customer` | `PATCH` customer fields | `rw` |
+| 13 | `ticket_set_dynamic_field` | `PATCH` DF | `rw` |
+| 14 | `ticket_lock` | `PATCH` lock | `rw` |
+| 15 | `ticket_unlock` | `PATCH` unlock | `rw` |
 | 16 | `list_queues` | `GET /api/v1/reference/queues` | Groups mit `ro`/`rw` |
 | 17 | `list_states` | `GET /api/v1/reference/states` | Auth only (global) |
 | 18 | `list_priorities` | `GET /api/v1/reference/priorities` | Auth only (global) |
@@ -371,81 +283,73 @@ getrennt und aktuell gehalten werden.
 | 24 | `kb_publish_article` | `POST …/publish` | publish |
 | 25 | `customer_lookup` | customer lookup | nur Auth |
 
-> **Hinweis (2026-07-24, siehe §0):** Die „Permission-Pfad"-Spalte für #4–#15 war zwischen
-> Doku und tatsächlichem Code auseinandergelaufen (kein Check statt der behaupteten
-> Write-Service-Prüfung) — seit dem Minimal-Fix in §0 stimmt sie wieder, mechanisch aber über
-> ein eigenes `_assert_queue_permission`-Gate in `mcp_server.py`, nicht über `TicketWriteService`
-> selbst (Refactor auf Letzteres bleibt offen).
+> Mutation-Tools #4–#15 nutzen **nicht** `TicketWriteService`, sondern Modul-Funktionen +
+> explizites Queue-Permission-Gate in `mcp_server/server.py`. Refactor auf die
+> Service-Klasse: P2 (siehe Status-Übersicht).
 
-### Doc-Drift (MCP-Tool-Listen)
+### Docs
 
-| Dokument | Stand 2026-07-21 |
+| Dokument | Stand |
 |---|---|
-| `docs/api/mcp.md`, `docs/ai-integration.md`, `docs/architecture.md` | Synced to **25 tools** (grouped inventories) |
+| `docs/api/mcp.md`, `docs/ai-integration.md`, `docs/architecture.md` | Synced auf **25 tools** |
 
 ### MCP bewusst *nicht* gespiegelt (OK)
 
 Admin-CRUD, Portal, Calendar, Process/BPM, Stats/CSV, Channel-Gateways, SSE Events,
 Compat/SOAP, GDPR/Crypto-CLI — gehören an REST bzw. Ops, nicht an LLM-Tools.
 
-### Hoher Nutzen, fehlt im MCP (obwohl Domain/REST da)
+### Noch nicht im MCP (Domain/REST vorhanden)
 
-| Fähigkeit | Domain/REST | Warum für Agents |
+| Fähigkeit | Domain/REST | Nutzen für Agents |
 |---|---|---|
-| **Reference:** Queues, States, Priorities, Agents | `GET /api/v1/queues`, `/reference/*` | Updates brauchen IDs; Agent hat kein Discovery-Tool |
-| Dynamic Fields setzen | `update_dynamic_field` / PATCH | Triage (Kategorie etc.) |
-| Title / Customer setzen | `change_title`, `set_customer` | Nach Create/Korrektur |
-| Lock / Unlock | ja | oft mit Owner |
-| Responsible | `assign_responsible` | |
 | History | `GET …/history` | „Was ist passiert?“ |
-| Merge / Link | ja | Dedup |
-| Lookup per Ticketnummer (`tn`) | Search teilweise | Menschen sprechen TN, nicht `ticket_id` |
+| Merge / Link | ja | Dedup, Verknüpfung |
+| Responsible | `assign_responsible` | oft parallel zu Owner |
 | Attachments (Meta/Download) | REST | Kontext |
+| Watch / Archive / Forward / Bounce | write service | seltener |
 
-### Write-Service vs. MCP (Auszug)
-
-In `ticket_write_service` vorhanden, im MCP **nicht** exponiert:
-
-`change_title`, `set_customer`, `assign_responsible`, `lock_ticket` / `unlock_ticket`,
-`watch_ticket` / `unwatch_ticket`, `archive_ticket`, `update_dynamic_field`, `merge_tickets`,
-`link_tickets`, `forward_article`, `bounce_article`.
-
-MCP deckt den **Kern-Triage-Pfad** ab (search/get/create/reply/note + state/queue/priority/owner
-+ KB), nicht den vollen Agent-Workflow der UI.
+Bereits erledigt (früher hier gelistet): Reference-Listen, DF/Title/Customer, Lock/Unlock,
+TN-Lookup.
 
 ### MCP Qualitäts-/Sicherheitsnotizen
 
 - Viele Tools liefern `{"error": "…"}` statt Exception — Clients müssen den Body prüfen.
 - `customer_lookup`: jeder authentifizierte Agent sieht Customer-Stammdaten (kein Group-Filter).
 - GET `…/sse` ohne Auth (FastMCP-Probe) — prüfen, dass darüber keine Tool-Daten leaken.
-- Keine Audit-Spalte „dieser Call kam von MCP/Key X“ jenseits normaler History (`create_by` = User).
+- Keine separate Audit-Spalte „Call kam von MCP/Key X“ jenseits normaler History
+  (`create_by` = User).
 
 ---
 
-## 7. Gap-Matrix (Priorität)
+## 7. Gap-Matrix
 
-| Prio | Gap | Betroffene Surface | Empfehlung |
+| Prio | Gap | Surface | Status |
 |---|---|---|---|
-| **P0** | API-Key create/list/revoke fehlt (API + idealerweise UI) | REST, MCP, Docs | Admin-Router z. B. `/api/v1/admin/api-keys`; Klartext nur einmal bei Create; Revoke = `valid=false` |
-| ~~**P0**~~ ✅ | Docs behaupteten Key-Management existiert | Docs | **Done 2026-07-21** — jetzt tatsächlich implementiert; Bootstrap via UI/CLI (§3) |
-| ~~**P0**~~ ✅ | 11 MCP-Mutation-Tools (`ticket_reply/note/update_*/set_*/lock/unlock/create`) hatten **keinen** Queue-Permission-Check | MCP | **Done 2026-07-24** — Minimal-Gate `_assert_queue_permission` je Tool ergänzt, Regressionstest `test_mcp_mutation_tools_deny_agent_without_queue_permission`; sauberer Umbau auf `TicketWriteService` bleibt P2-Folgearbeit (§0) |
-| **P1** | MCP Reference-Tools (queues/states/priorities/agents) | MCP | **Done 2026-07-21** — `list_queues`/`list_states`/`list_priorities`/`list_agents` |
-| **P1** | MCP: DF, title, customer, lock | MCP | **Done 2026-07-21** — `ticket_set_*` + lock/unlock |
-| **P1** | MCP-Tool-Tabellen in Docs auf 15 Tools | Docs | **Done 2026-07-21** — docs synced to 25 tools |
-| **P2** | Key `expires_at` / `last_used_at` | Schema + Auth | **Mostly done (P0 batch + MCP resolver parity 2026-07-21)** |
-| **P2** | Optional: MCP Tool-Allowlist pro Key | Schema + MCP middleware | Defense-in-depth neben Group-ACLs |
-| **P2** | Znuny-ACL Runtime **oder** Design/Doku „group/role only“ | Permissions | **Doku/Decision 2026-07-21: group/role only** (see §4 remark + design-doc note); runtime ACL deferred |
-| **P2** | MCP history / merge / link / tn-lookup | MCP | TN-lookup **done** (`ticket_get_by_number`); history/merge/link still open |
-| **P3** | GenericAgent / Postmaster Write, ACL Editor | Admin REST | Explizit deferred ok, solange kommuniziert |
-| **P3** | Session-Bearer auch auf MCP (nur Dev) | MCP | Optional; Prod eher nicht |
+| ~~P0~~ | API-Key create/list/revoke (+ UI/CLI) | REST, MCP, Docs | ✅ 2026-07-21 |
+| ~~P0~~ | Docs vs. fehlendes Key-Management | Docs | ✅ 2026-07-21 |
+| ~~P0~~ | 11 MCP-Mutation-Tools ohne Queue-Permission | MCP | ✅ 2026-07-24 Minimal-Gate + Tests |
+| ~~P1~~ | MCP Reference-Tools | MCP | ✅ 2026-07-21 |
+| ~~P1~~ | MCP DF / title / customer / lock | MCP | ✅ 2026-07-21 |
+| ~~P1~~ | MCP-Docs auf 25 Tools | Docs | ✅ 2026-07-21 |
+| ~~P1~~ | Key `expires_at` / `last_used_at` (+ MCP-Resolve-Parity) | Schema + Auth | ✅ 2026-07-21 |
+| ~~P2~~ | Doku/Decision „group/role only“ (Znuny-ACL) | Permissions | ✅ 2026-07-21 deferred + dokumentiert |
+| ~~P2~~ | MCP TN-lookup | MCP | ✅ `ticket_get_by_number` |
+| **P2** | MCP → `TicketWriteService` (Code-Duplikat) | MCP | 🟡 offen |
+| **P2** | MCP reply SMTP-Produktentscheidung | MCP | 🟡 offen |
+| **P2** | MCP history / merge / link | MCP | 🟡 offen |
+| **P2** | Tool-Allowlist pro Key | Schema + MCP | 🟡 optional |
+| **P2** | Rate-Limit pro Key | Auth | 🟡 offen |
+| **P3** | GenericAgent / Postmaster Write, ACL Editor | Admin REST | ⏸ deferred |
+| **P3** | Session-Bearer auf MCP (nur Dev) | MCP | ⏸ optional |
+| **P3** | Scopes in Admin-UI / CLI setzen | UI, CLI | 🟡 API kann’s; UI/CLI noch unrestricted-default |
 
 ---
 
-## 8. Wie man sich am MCP Server anmeldet (Soll-Zustand)
+## 8. MCP-Anmeldung (aktueller Soll-Zustand)
 
 ```text
 1. Service-User mit minimalen Groups/Roles anlegen
-2. API-Key ausstellen (heute: SQL/Hash; Soll: Admin-API)
+2. API-Key ausstellen (Admin-UI / Admin-API / tiqora api-key create)
 3. tiqora-mcp auf Port 8001, Reverse-Proxy mit:
    - Buffering aus, HTTP/1.1, lange Read-Timeouts
    - Trailing slash /mcp/ beachten
@@ -454,7 +358,7 @@ MCP deckt den **Kern-Triage-Pfad** ab (search/get/create/reply/note + state/queu
    URL:  https://mcp.tickets.example.com/mcp/
    Header: Authorization: Bearer tiqora_…
 
-5. Tools laufen als dieser User → PermissionEngine
+5. Tools laufen als dieser User → PermissionEngine (+ Key-Scope mcp/write/*)
 ```
 
 Smoke-Test (aus `docs/api/mcp.md`):
@@ -469,32 +373,33 @@ curl -i "$TIQORA_MCP_URL/mcp/" \
 
 ---
 
-## 9. Gesamturteil: sinnvoll?
+## 9. Gesamturteil
 
-**Ja, mit einer harten Lücke im Lifecycle.**
+**Ja — für den dokumentierten AI-Triage-Pfad ist die Oberfläche rund.**
 
-- **REST/OpenAPI:** Produktseitig stimmig; Admin-lastig, aber das spiegelt das Feature-Set.
-- **MCP als schmale AI-Oberfläche:** Richtig — volle Admin-Parity wäre gefährlich und unnötig.
-  Ticket + KB decken die dokumentierten Patterns (Triage, Draft-Note, KB-Answer) ab.
-- **Auth = Key bound to user + Group/Role:** Richtig für Znuny-Kompatibilität und Least Privilege.
-  Keine parallelen OAuth-Scopes zu erfinden ist gut — **sofern** Service-Accounts sauber
-  provisioniert werden.
-- **Was fehlt, damit es „rund“ ist:**
-  1. Key-Management (P0)
-  2. MCP Reference-Discovery + ein paar Write-Felder (P1)
-  3. Doc-Sync und ehrliche Aussage zu Znuny-ACL-Runtime (P1/P2)
+- **REST/OpenAPI:** Produktseitig stimmig; Admin-lastig, spiegelt das Feature-Set.
+- **MCP:** Schmale AI-Oberfläche (25 Tools) mit Queue-Permission-Gate und Key-Scopes.
+  Volle Admin-Parity wäre gefährlich und unnötig.
+- **Auth:** Key bound to user + Group/Role (+ optionale Surface-Scopes) passt zu
+  Znuny-Kompatibilität und Least Privilege.
+- **Was noch „nice to have“ ist (kein Blocker):**
+  1. MCP-Mutationen über `TicketWriteService` (Clean Code + SMTP-Produktfrage)
+  2. history / merge / link (und ggf. responsible) im MCP
+  3. Optionale Tool-Allowlist / Rate-Limit pro Key
+  4. Scopes in UI/CLI sichtbar setzen
 
 ---
 
-## 10. Empfohlene nächste Schritte (Umsetzung, nicht Teil dieses Docs)
+## 10. Empfohlene nächste Schritte (optional)
 
-1. **Admin API Keys:** `POST` (returns raw key once), `GET` list, `PATCH`/`DELETE` revoke; optional
-   Admin-UI-Seite.
-2. **CLI-Fallback:** `tiqora api-key create --user … --name …` für Headless-Deployments.
-3. **Docs:** Key-Bootstrap, MCP 15 Tools, „scopes = user groups“, ACL-Runtime-Status.
-4. **MCP P1-Tools:** `list_queues`, `list_states`, `list_priorities`, `list_agents`,
-   `ticket_update_fields` (title/customer/DF/lock) oder einzelne Tools.
-5. Schema-Erweiterung Keys: `expires_at`, `last_used_at`, optional `created_by`.
+1. **P2 Code:** MCP-Mutation-Tools auf `TicketWriteService` migrieren *nach*
+   Produktentscheidung zu SMTP bei `ticket_reply`.
+2. **P2 MCP-Erweiterung:** `ticket_history`, merge/link (und ggf. `assign_responsible`)
+   nur wenn Agents die Workflows brauchen.
+3. **P2 Hardening:** Rate-Limit pro Key; optional Tool-Allowlist.
+4. **P3 UX:** Scopes + Expiry in Admin-UI/CLI explizit setzbar (API kann das schon).
+5. **Nicht planen,** solange kein Produktbedarf: Znuny-ACL-Runtime, feingranulare
+   OAuth-Scopes, Session-Bearer auf MCP in Prod.
 
 ---
 
@@ -503,12 +408,15 @@ curl -i "$TIQORA_MCP_URL/mcp/" \
 | Thema | Pfad |
 |---|---|
 | MCP Server | `backend/src/tiqora/mcp_server/server.py` |
-| API-Key Model | `backend/src/tiqora/db/tiqora/models.py` |
+| API-Key Model | `backend/src/tiqora/db/tiqora/models.py` (`TiqoraApiKey`) |
 | Key generate/hash/resolve | `backend/src/tiqora/domain/auth.py` |
-| REST Auth | `backend/src/tiqora/api/deps.py` |
+| Admin API Keys | `backend/src/tiqora/api/v1/admin/api_keys.py` |
+| CLI API Keys | `backend/src/tiqora/cli/api_key.py` |
+| REST Auth + Scope-Gate | `backend/src/tiqora/api/deps.py` |
 | Permissions | `backend/src/tiqora/permissions/engine.py` |
 | Ticket Writes | `backend/src/tiqora/domain/ticket_write_service.py` |
 | Admin ACL read-only | `backend/src/tiqora/api/v1/admin/readonly.py` |
 | OpenAPI | `packages/api-client/openapi.json`, `docs/api/openapi.json` |
 | MCP Docs | `docs/api/mcp.md`, `docs/ai-integration.md` |
 | API Overview | `docs/api/README.md`, `docs/api/rest-v1.md` |
+| Admin-UI Keys | `frontend/src/routes/admin/ApiKeysPage.tsx` |
