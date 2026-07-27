@@ -300,15 +300,29 @@ async def test_provider_connection(
         payload["tools"] = _TEST_TOOL_SCHEMA
 
     url = row.base_url.rstrip("/") + "/chat/completions"
+    from tiqora.security.outbound import OutboundURLError, pin_outbound_url
+
+    try:
+        pinned = pin_outbound_url(url, allow_private_networks=True)
+    except OutboundURLError as exc:
+        return ProviderTestResult(
+            ok=False, model=None, tool_calling_ok=False, error=f"outbound URL rejected: {exc}"
+        )
+    headers = pinned.request_headers(headers)
+    extensions = pinned.request_extensions()
     owns_client = client is None
-    http_client = client or httpx.AsyncClient(timeout=_TEST_TIMEOUT_SECONDS)
+    http_client = client or httpx.AsyncClient(
+        timeout=_TEST_TIMEOUT_SECONDS, follow_redirects=False
+    )
     start = time.monotonic()
     status_code: int | None = None
     error: str | None = None
     response_json: str | None = None
     model: str | None = None
     try:
-        response = await http_client.post(url, headers=headers, json=payload)
+        response = await http_client.post(
+            pinned.request_url, headers=headers, json=payload, extensions=extensions
+        )
         status_code = response.status_code
         if response.status_code >= 400:
             error = f"HTTP {response.status_code}: {response.text[:500]}"

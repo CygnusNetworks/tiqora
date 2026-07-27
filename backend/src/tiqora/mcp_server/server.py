@@ -138,32 +138,52 @@ class TiqoraBearerAuth(BaseHTTPMiddleware):
     """Validate Authorization: Bearer <tiqora_api_key> and inject user_id."""
 
     async def dispatch(self, request: Request, call_next: Any) -> Any:
-        # SSE / MCP negotiation probes that don't carry auth
-        if request.method == "GET" and request.url.path.endswith("/sse"):
-            return await call_next(request)
-
+        # Every MCP surface (including SSE stream establishment) requires a
+        # valid Bearer API key — unauthenticated /sse was a resource-abuse
+        # and negotiation surface without a principal.
         auth = request.headers.get("Authorization", "")
         if not auth.lower().startswith("bearer "):
             return JSONResponse({"error": "Unauthorized"}, status_code=401)
 
         raw_key = auth[7:].strip()
+        # Align with REST: only opaque tiqora_* API keys, never session tokens.
+        if not raw_key.startswith("tiqora_"):
+            return JSONResponse({"error": "Unauthorized"}, status_code=401)
+
         state = _mcp_state
         if state is None:
             return JSONResponse({"error": "Server not ready"}, status_code=503)
 
-        user_id = await _resolve_api_key(state.session_factory, raw_key)
-        if user_id is None:
+        resolved = await _resolve_api_key(state.session_factory, raw_key)
+        if resolved is None:
             return JSONResponse({"error": "Unauthorized"}, status_code=401)
 
+        user_id, scopes = resolved
+        # Scoped keys without mcp/write may not open the MCP server.
+        if scopes is not None and not (scopes & {"mcp", "write", "*"}):
+            return JSONResponse({"error": "Forbidden: API key lacks mcp scope"}, status_code=403)
+
         request.state.user_id = user_id
+        request.state.api_key_scopes = scopes
         return await call_next(request)
 
 
-async def _resolve_api_key(factory: async_sessionmaker[AsyncSession], raw_key: str) -> int | None:
-    """Resolve tiqora_api_key to user_id via SHA-256 hash lookup.
+def _parse_api_key_scopes(raw: str | None) -> frozenset[str] | None:
+    """Return scope set, or None for unrestricted (empty/null scopes column)."""
+    if raw is None:
+        return None
+    parts = {p.strip().lower() for p in raw.split(",") if p.strip()}
+    return frozenset(parts) if parts else None
+
+
+async def _resolve_api_key(
+    factory: async_sessionmaker[AsyncSession], raw_key: str
+) -> tuple[int, frozenset[str] | None] | None:
+    """Resolve tiqora_api_key to (user_id, scopes) via SHA-256 hash lookup.
 
     Parity with ``domain.auth.AuthService.resolve_api_key``: reject expired keys
     and stamp ``last_used_at`` (non-fatal if the metadata write fails).
+    ``scopes`` is None when the key is unrestricted (legacy / empty column).
     """
     key_hash = hashlib.sha256(raw_key.encode("utf-8")).hexdigest()
     async with factory() as session:
@@ -185,13 +205,14 @@ async def _resolve_api_key(factory: async_sessionmaker[AsyncSession], raw_key: s
         ).scalar_one_or_none()
         if user is None:
             return None
+        scopes = _parse_api_key_scopes(getattr(row, "scopes", None))
         # Stamp last_used_at; auth must not fail if the metadata write fails.
         try:
             row.last_used_at = now
             await session.commit()
         except Exception:  # noqa: BLE001 — non-fatal metadata stamp
             await session.rollback()
-        return user.id
+        return user.id, scopes
 
 
 # ---------------------------------------------------------------------------

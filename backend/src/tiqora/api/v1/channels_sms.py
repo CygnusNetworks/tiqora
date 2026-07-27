@@ -21,6 +21,7 @@ from tiqora.channels.sms.service import (
     verify_inbound_secret,
 )
 from tiqora.db.engine import get_session_factory
+from tiqora.domain.ticket_write_service import TicketAccessDenied, TicketNotFound
 from tiqora.znuny.sysconfig import SysConfig
 
 router = APIRouter(prefix="/channels/sms", tags=["channels:sms"])
@@ -94,14 +95,21 @@ async def send_sms(body: SmsSendRequest, user: CurrentUser, session: DbSession) 
             status_code=status.HTTP_409_CONFLICT, detail="SMS outbound gateway not configured"
         )
     sysconfig = SysConfig(session)
-    article_id = await send_outbound_sms(
-        session,
-        sysconfig,
-        gateway,
-        ticket_id=body.ticket_id,
-        to_number=body.to_number,
-        body=body.body,
-        user_id=user.id,
-    )
+    try:
+        article_id = await send_outbound_sms(
+            session,
+            sysconfig,
+            gateway,
+            ticket_id=body.ticket_id,
+            to_number=body.to_number,
+            body=body.body,
+            user_id=user.id,
+        )
+    except TicketNotFound as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Ticket not found"
+        ) from exc
+    except TicketAccessDenied as exc:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied") from exc
     await session.commit()
     return SmsSendResponse(article_id=article_id)

@@ -148,6 +148,16 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     # Production-only hard fail on weak secrets / debug / wildcard CORS / etc.
     # No-op in development and test so defaults remain usable.
     cfg.validate_production()
+    if cfg.is_production and not cfg.password_reject_weak_hashes:
+        # Parallel-op with Znuny may still need weak verifiers until a rehash
+        # campaign; refuse-weak is opt-in so we only warn at boot.
+        logger.warning(
+            "password_reject_weak_hashes_disabled",
+            hint=(
+                "Set TIQORA_PASSWORD_REJECT_WEAK_HASHES=1 after migrating agents "
+                "to BCRYPT (rehash-on-login is already on by default)."
+            ),
+        )
 
     is_prod = cfg.is_production
     app = FastAPI(

@@ -156,6 +156,15 @@ async def _fetch_tools_live(mcp_url: str, auth_token: str | None) -> list[Discov
     tests can monkeypatch it without touching network/fastmcp."""
     from fastmcp import Client
 
+    from tiqora.security.outbound import OutboundURLError, validate_outbound_url
+
+    # Re-validate at call time (admin write alone is not enough vs rebinding).
+    # full IP-pin through fastmcp Client is not available; block bad hosts now.
+    try:
+        validate_outbound_url(mcp_url, allow_private_networks=True)
+    except OutboundURLError as exc:
+        raise RuntimeError(f"MCP URL rejected: {exc}") from exc
+
     async with Client(mcp_url, auth=auth_token, timeout=_DISCOVER_TIMEOUT_SECONDS) as client:
         tools = await client.list_tools()
     return list(tools)

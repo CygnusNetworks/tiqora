@@ -98,11 +98,27 @@ def test_session_cookie_secure_defaults_false_outside_production() -> None:
     assert s2.session_cookie_secure is False
 
 
-def test_session_cookie_secure_overridable_in_production() -> None:
+def test_session_cookie_secure_true_accepted_in_production() -> None:
+    s = Settings(**_safe_production_kwargs(session_cookie_secure=True))
+    assert s.session_cookie_secure is True
+    s.validate_production()  # must not raise
+
+
+def test_session_cookie_secure_false_rejected_in_production() -> None:
     s = Settings(**_safe_production_kwargs(session_cookie_secure=False))
     assert s.session_cookie_secure is False
-    s2 = Settings(**_safe_production_kwargs(session_cookie_secure=True))
-    assert s2.session_cookie_secure is True
+    with pytest.raises(ProductionConfigError, match="SESSION_COOKIE_SECURE"):
+        s.validate_production()
+
+
+def test_metrics_disabled_by_default_in_production() -> None:
+    s = Settings(**_safe_production_kwargs())
+    assert s.metrics_enabled is False
+
+
+def test_metrics_can_be_enabled_explicitly_in_production() -> None:
+    s = Settings(**_safe_production_kwargs(metrics_enabled=True))
+    assert s.metrics_enabled is True
 
 
 def test_docs_disabled_in_production() -> None:

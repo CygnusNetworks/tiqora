@@ -4,6 +4,8 @@ used by ``test_admin_api.py``."""
 
 from __future__ import annotations
 
+from typing import Any
+
 import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
@@ -51,6 +53,12 @@ async def test_list_channels_defaults_disabled_and_no_config(mariadb_znuny_url: 
         await engine.dispose()
 
 
+def _settings() -> Any:
+    from tiqora.config import Settings
+
+    return Settings(environment="test", secret_key="test-secret-key-for-channel-encrypt-32")
+
+
 async def test_update_channel_enable_and_set_config(mariadb_znuny_url: str) -> None:
     _ensure_tiqora_tables(mariadb_znuny_url)
     engine = create_async_engine(_mysql_async(mariadb_znuny_url))
@@ -68,11 +76,21 @@ async def test_update_channel_enable_and_set_config(mariadb_znuny_url: str) -> N
                 ),
                 _root_user(),
                 session,
+                _settings(),
             )
             assert updated.enabled is True
             assert updated.config["outbound_webhook_url"] == "https://gw.example.com/send"
             # Secret-shaped keys are masked on read.
             assert updated.config["inbound_shared_secret"] == "********"
+
+            # At rest the secret must be Fernet-encrypted, not plaintext.
+            from tiqora.channels.common import setting_key
+            from tiqora.domain.settings_store import get_setting
+
+            stored = await get_setting(session, setting_key("sms", "inbound_shared_secret"))
+            assert stored is not None
+            assert stored != "s3cret"
+            assert stored.startswith("gAAAA")
 
             fetched = await admin_channels.get_channel("sms", _root_user(), session)
             assert fetched.enabled is True
@@ -95,6 +113,7 @@ async def test_update_channel_rejects_unknown_key(mariadb_znuny_url: str) -> Non
                     admin_channels.ChannelConfigUpdate(config={"not_a_real_key": "x"}),
                     _root_user(),
                     session,
+                    _settings(),
                 )
             assert exc_info.value.status_code == 422
     finally:

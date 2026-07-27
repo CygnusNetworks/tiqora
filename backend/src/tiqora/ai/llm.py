@@ -17,6 +17,8 @@ from typing import Any, Protocol
 
 import httpx
 
+from tiqora.security.outbound import OutboundURLError, pin_outbound_url
+
 _DEFAULT_TIMEOUT_SECONDS = 60.0
 
 
@@ -179,11 +181,27 @@ class OpenAiCompatLlmClient:
             if tool_choice is not None:
                 payload["tool_choice"] = tool_choice
 
-        client = self._client or httpx.AsyncClient(timeout=self._timeout_seconds)
+        url = f"{self._base_url}/chat/completions"
+        # Re-pin at call time (admin write-time validation alone is not enough
+        # against DNS rebinding / later private resolution). Self-hosted LLMs
+        # may live on RFC1918; loopback/link-local/metadata stay blocked.
+        try:
+            pinned = pin_outbound_url(url, allow_private_networks=True)
+        except OutboundURLError as exc:
+            raise LlmError(f"outbound URL rejected: {exc}") from exc
+        headers = pinned.request_headers(headers)
+        extensions = pinned.request_extensions()
+
+        client = self._client or httpx.AsyncClient(
+            timeout=self._timeout_seconds, follow_redirects=False
+        )
         try:
             try:
                 response = await client.post(
-                    f"{self._base_url}/chat/completions", headers=headers, json=payload
+                    pinned.request_url,
+                    headers=headers,
+                    json=payload,
+                    extensions=extensions,
                 )
             except httpx.TimeoutException as exc:
                 raise LlmTimeoutError(str(exc)) from exc

@@ -17,9 +17,9 @@ from typing import Final
 from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel
 
-from tiqora.api.deps import DbSession
+from tiqora.api.deps import AppSettings, DbSession
 from tiqora.api.v1.admin.deps import AdminUser
-from tiqora.channels.common import channel_enabled, setting_key
+from tiqora.channels.common import channel_enabled, encrypt_channel_secret, setting_key
 from tiqora.domain.settings_store import get_setting, set_setting
 
 router = APIRouter(prefix="/channels", tags=["admin:channels"])
@@ -52,6 +52,8 @@ CHANNEL_CONFIG_KEYS: Final[dict[str, set[str]]] = {
 }
 
 _SECRET_KEY_MARKERS: Final[tuple[str, ...]] = ("secret", "token")
+# Placeholder returned on GET for secret keys; writing it back must not rotate.
+_SECRET_MASK: Final[str] = "********"
 
 
 def _is_secret_key(key: str) -> bool:
@@ -85,7 +87,7 @@ async def _read_config(session: DbSession, channel: str) -> ChannelConfigOut:
     for key in sorted(keys):
         value = await get_setting(session, setting_key(channel, key))
         if value and _is_secret_key(key):
-            value = "********"
+            value = _SECRET_MASK
         config[key] = value
     return ChannelConfigOut(channel=channel, enabled=enabled, config=config)
 
@@ -104,7 +106,11 @@ async def get_channel(channel: str, admin: AdminUser, session: DbSession) -> Cha
 
 @router.put("/{channel}", response_model=ChannelConfigOut)
 async def update_channel(
-    channel: str, body: ChannelConfigUpdate, admin: AdminUser, session: DbSession
+    channel: str,
+    body: ChannelConfigUpdate,
+    admin: AdminUser,
+    session: DbSession,
+    settings: AppSettings,
 ) -> ChannelConfigOut:
     _ = admin
     allowed_keys = _require_known_channel(channel)
@@ -119,6 +125,12 @@ async def update_channel(
     if body.enabled is not None:
         await set_setting(session, setting_key(channel, "enabled"), "1" if body.enabled else "0")
     for key, value in body.config.items():
+        if _is_secret_key(key):
+            # Ignore empty / masked writes so a re-save of the GET form does not
+            # wipe or re-encrypt a placeholder.
+            if value in ("", _SECRET_MASK):
+                continue
+            value = encrypt_channel_secret(settings.secret_key, value)
         await set_setting(session, setting_key(channel, key), value)
 
     return await _read_config(session, channel)
