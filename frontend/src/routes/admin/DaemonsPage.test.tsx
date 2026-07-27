@@ -104,6 +104,11 @@ describe("DaemonsPage", () => {
     expect(screen.getByTestId("daemon-row-postmaster")).toBeInTheDocument();
     expect(screen.getByTestId("daemon-toggle-postmaster")).not.toBeChecked();
     expect(screen.getByTestId("daemon-toggle-postmaster")).not.toBeDisabled();
+    // Disabled service: Aktiv carries config; status is "—" not "Deaktiviert".
+    const postmasterStatus = screen.getByTestId("daemon-status-postmaster");
+    expect(postmasterStatus).toHaveAttribute("data-status", "grey");
+    expect(postmasterStatus).toHaveTextContent("—");
+    expect(postmasterStatus).not.toHaveTextContent(i18n.t("admin.daemons.status.grey"));
 
     expect(screen.getByTestId("daemon-row-gdpr_retention")).toBeInTheDocument();
     expect(screen.getByText(/03:00/)).toBeInTheDocument();

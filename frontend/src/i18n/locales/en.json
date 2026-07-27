@@ -1700,6 +1700,9 @@
       },
       "services": {
         "service": "Service",
+        "enabled": "Enabled",
+        "enabledOn": "On",
+        "enabledOff": "Off",
         "status": "Status",
         "lastOk": "Last success",
         "message": "Message"

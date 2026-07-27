@@ -119,8 +119,10 @@ describe("SystemInfoPage", () => {
 
     // All green → overall status green.
     expect(screen.getByTestId("system-overall")).toHaveAttribute("data-status", "green");
-    // Service row present with a status chip.
-    expect(screen.getByTestId("system-service-poller")).toBeInTheDocument();
+    // Service row present with a status chip (mobile card + desktop table row).
+    expect(screen.getAllByTestId("system-service-poller").length).toBeGreaterThanOrEqual(1);
+    // Enabled flag is its own column/badge (not buried in last_result).
+    expect(screen.getAllByText(i18n.t("admin.systemInfo.services.enabledOn")).length).toBeGreaterThanOrEqual(1);
     // App build provenance surfaced.
     expect(screen.getByText("abc1234")).toBeInTheDocument();
     expect(screen.getByText("docker-virt6")).toBeInTheDocument();
@@ -171,6 +173,25 @@ describe("SystemInfoPage", () => {
     await waitFor(() => {
       expect(screen.getByText("Docker-Socket nicht erreichbar: boom")).toBeInTheDocument();
     });
+  });
+
+  it("shows an Inaktiv badge when a service is disabled, without a Deaktiviert status label", async () => {
+    const base = sysinfo();
+    getSystemInfo.mockResolvedValue({
+      ...base,
+      services: [{ ...base.services[0], enabled: false }],
+    });
+
+    renderPage();
+
+    await waitFor(() => {
+      expect(screen.getAllByTestId("system-service-poller").length).toBeGreaterThanOrEqual(1);
+    });
+    expect(
+      screen.getAllByText(i18n.t("admin.systemInfo.services.enabledOff")).length,
+    ).toBeGreaterThanOrEqual(1);
+    // Runtime status must not restate "disabled" — Aktiv owns that signal.
+    expect(screen.queryByText(i18n.t("admin.daemons.status.grey"))).not.toBeInTheDocument();
   });
 
   it("marks overall status red when a datastore is down", async () => {
