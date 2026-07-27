@@ -311,9 +311,7 @@ async def test_provider_connection(
     headers = pinned.request_headers(headers)
     extensions = pinned.request_extensions()
     owns_client = client is None
-    http_client = client or httpx.AsyncClient(
-        timeout=_TEST_TIMEOUT_SECONDS, follow_redirects=False
-    )
+    http_client = client or httpx.AsyncClient(timeout=_TEST_TIMEOUT_SECONDS, follow_redirects=False)
     start = time.monotonic()
     status_code: int | None = None
     error: str | None = None
