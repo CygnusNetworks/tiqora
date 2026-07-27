@@ -405,7 +405,9 @@ class SearchIndexService:
         client = await self._get_client()
         index = client.index(self._settings.meili_tickets_index)
         try:
-            doc = await index.get_document(ticket_id)
+            # Meili primary keys are strings in the SDK typing, even when the
+            # document field is numeric.
+            doc = await index.get_document(str(ticket_id))
         except MeilisearchApiError:
             # 404 document_not_found (and rare transient API errors): treat as miss.
             return None
