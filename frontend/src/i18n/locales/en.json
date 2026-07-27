@@ -69,6 +69,10 @@
     "edit": "Edit",
     "save": "Save"
   },
+  "otp": {
+    "verifying": "Verifying…",
+    "success": "Verified"
+  },
   "auth": {
     "login": "Sign in",
     "logout": "Sign out",

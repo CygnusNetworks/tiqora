@@ -69,6 +69,10 @@
     "edit": "Bearbeiten",
     "save": "Speichern"
   },
+  "otp": {
+    "verifying": "Prüfe Code…",
+    "success": "Verifiziert"
+  },
   "auth": {
     "login": "Anmelden",
     "logout": "Abmelden",
