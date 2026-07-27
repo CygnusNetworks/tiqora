@@ -377,9 +377,7 @@ async def _resolve_lock_id(session: AsyncSession, name: str | None, id_: int | N
         return None
     row = (
         await session.execute(
-            text(
-                "SELECT id FROM ticket_lock_type WHERE name = :n AND valid_id = 1 LIMIT 1"
-            ),
+            text("SELECT id FROM ticket_lock_type WHERE name = :n AND valid_id = 1 LIMIT 1"),
             {"n": name},
         )
     ).first()
@@ -490,9 +488,7 @@ async def _agent_in_group(session: AsyncSession, user_id: int, group_name: str) 
         return False
     row = (
         await session.execute(
-            text(
-                "SELECT id FROM permission_groups WHERE name = :n AND valid_id = 1 LIMIT 1"
-            ),
+            text("SELECT id FROM permission_groups WHERE name = :n AND valid_id = 1 LIMIT 1"),
             {"n": group_name},
         )
     ).first()
@@ -513,9 +509,7 @@ def _like_pattern(val: Any) -> str:
     return str(val).replace("*", "%")
 
 
-async def _set_user_preference(
-    session: AsyncSession, user_id: int, key: str, value: str
-) -> None:
+async def _set_user_preference(session: AsyncSession, user_id: int, key: str, value: str) -> None:
     """Upsert a user_preferences row (value stored as UTF-8 bytes)."""
     raw = value.encode("utf-8")
     existing = (
@@ -749,10 +743,7 @@ async def op_session_get(
     # Prefer Znuny sessions table (full key dump).
     rows = (
         await session.execute(
-            text(
-                "SELECT data_key, data_value, serialized FROM sessions"
-                " WHERE session_id = :sid"
-            ),
+            text("SELECT data_key, data_value, serialized FROM sessions WHERE session_id = :sid"),
             {"sid": session_id},
         )
     ).fetchall()
@@ -812,7 +803,9 @@ async def op_session_remove(
         text("DELETE FROM sessions WHERE session_id = :sid"),
         {"sid": session_id},
     )
-    if del_result.rowcount and del_result.rowcount > 0:
+    # CursorResult.rowcount is not on the generic Result type stub.
+    deleted_rows = int(getattr(del_result, "rowcount", 0) or 0)
+    if deleted_rows > 0:
         removed = True
         await session.commit()
 
@@ -907,9 +900,7 @@ async def op_ticket_create(
         lock_id = 1  # unlock
 
     type_id = await _resolve_type_id(session, ticket.get("Type"), ticket.get("TypeID"))
-    service_id = await _resolve_service_id(
-        session, ticket.get("Service"), ticket.get("ServiceID")
-    )
+    service_id = await _resolve_service_id(session, ticket.get("Service"), ticket.get("ServiceID"))
     sla_id = await _resolve_sla_id(session, ticket.get("SLA"), ticket.get("SLAID"))
     pending_time = _parse_pending_time(ticket.get("PendingTime"))
 
@@ -1658,9 +1649,7 @@ async def _load_articles_gi(
         return []
 
     # Map sender_type_id → name for filter + response
-    st_rows = (
-        await session.execute(text("SELECT id, name FROM article_sender_type"))
-    ).fetchall()
+    st_rows = (await session.execute(text("SELECT id, name FROM article_sender_type"))).fetchall()
     st_name_by_id = {int(r[0]): str(r[1]).lower() for r in st_rows}
 
     if sender_type_filter:
@@ -1985,14 +1974,14 @@ async def op_ticket_search(
             type_ids.add(int(tid))
     if data.get("Types"):
         for tname in _to_list(data["Types"]):
-            row = (
+            type_row = (
                 await session.execute(
                     text("SELECT id FROM ticket_type WHERE name = :n AND valid_id = 1 LIMIT 1"),
                     {"n": tname},
                 )
             ).first()
-            if row:
-                type_ids.add(int(row[0]))
+            if type_row:
+                type_ids.add(int(type_row[0]))
     if type_ids:
         tl = list(type_ids)
         ph = ",".join(f":ty{i}" for i in range(len(tl)))
@@ -2383,19 +2372,23 @@ async def op_ticket_history_get(
             )
 
         rows = (
-            await session.execute(
-                text(
-                    "SELECT th.ticket_id, th.article_id, th.name, th.create_by, th.create_time,"
-                    " tht.name AS history_type, th.queue_id, th.owner_id, th.priority_id,"
-                    " th.state_id, th.history_type_id, th.type_id"
-                    " FROM ticket_history th"
-                    " JOIN ticket_history_type tht ON tht.id = th.history_type_id"
-                    " WHERE th.ticket_id = :tid"
-                    " ORDER BY th.id ASC"
-                ),
-                {"tid": tid},
+            (
+                await session.execute(
+                    text(
+                        "SELECT th.ticket_id, th.article_id, th.name, th.create_by, th.create_time,"
+                        " tht.name AS history_type, th.queue_id, th.owner_id, th.priority_id,"
+                        " th.state_id, th.history_type_id, th.type_id"
+                        " FROM ticket_history th"
+                        " JOIN ticket_history_type tht ON tht.id = th.history_type_id"
+                        " WHERE th.ticket_id = :tid"
+                        " ORDER BY th.id ASC"
+                    ),
+                    {"tid": tid},
+                )
             )
-        ).mappings().all()
+            .mappings()
+            .all()
+        )
 
         lines: list[dict[str, Any]] = []
         for r in rows:
@@ -2465,20 +2458,24 @@ async def op_time_accounting_get(
     end = data["TimeAccountingEnd"]
 
     rows = (
-        await session.execute(
-            text(
-                "SELECT t.id AS ticket_id, t.tn, t.customer_id, t.title,"
-                " ta.time_unit, ta.create_time, q.name AS queue_name"
-                " FROM time_accounting ta"
-                " JOIN ticket t ON t.id = ta.ticket_id"
-                " LEFT JOIN queue q ON q.id = t.queue_id"
-                " WHERE ta.create_by = :uid"
-                " AND ta.create_time BETWEEN :start AND :end"
-                " ORDER BY ta.create_time ASC, t.id ASC"
-            ),
-            {"uid": target_id, "start": start, "end": end},
+        (
+            await session.execute(
+                text(
+                    "SELECT t.id AS ticket_id, t.tn, t.customer_id, t.title,"
+                    " ta.time_unit, ta.create_time, q.name AS queue_name"
+                    " FROM time_accounting ta"
+                    " JOIN ticket t ON t.id = ta.ticket_id"
+                    " LEFT JOIN queue q ON q.id = t.queue_id"
+                    " WHERE ta.create_by = :uid"
+                    " AND ta.create_time BETWEEN :start AND :end"
+                    " ORDER BY ta.create_time ASC, t.id ASC"
+                ),
+                {"uid": target_id, "start": start, "end": end},
+            )
         )
-    ).mappings().all()
+        .mappings()
+        .all()
+    )
 
     entries = [
         {
