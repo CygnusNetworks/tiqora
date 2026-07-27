@@ -1,7 +1,7 @@
 """AI security hardening: MCP parameters_snapshot + capabilities_json.
 
-Revision ID: 20260727_0026
-Revises: 20260724_0025
+Revision ID: 20260727_0027
+Revises: 20260727_0026
 Create Date: 2026-07-27
 
 ``tiqora_mcp_tool_policy.parameters_snapshot`` stores the discovered MCP
@@ -18,8 +18,8 @@ from collections.abc import Sequence
 import sqlalchemy as sa
 from alembic import op
 
-revision: str = "20260727_0026"
-down_revision: str | None = "20260724_0025"
+revision: str = "20260727_0027"
+down_revision: str | None = "20260727_0026"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
