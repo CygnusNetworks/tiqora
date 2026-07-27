@@ -58,7 +58,7 @@ async function renderShell() {
       </AgentShell>
     ),
   });
-  const childPaths = ["/agent", "/agent/queues", "/agent/kb", "/agent/kb/categories", "/agent/calendar", "/agent/stats", "/agent/search"];
+  const childPaths = ["/agent", "/agent/queues", "/agent/kb", "/agent/calendar", "/agent/stats", "/agent/search"];
   const childRoutes = childPaths.map((path) =>
     createRoute({
       getParentRoute: () => rootRoute,
@@ -121,16 +121,16 @@ describe("AgentShell sidebar", () => {
   it("persists collapsed state across remounts", async () => {
     await renderShell();
     await screen.findByTestId("agent-sidebar-nav");
-    fireEvent.click(screen.getByTestId("sidebar-group-reports-toggle"));
+    fireEvent.click(screen.getByTestId("sidebar-group-insights-toggle"));
     await waitFor(() =>
-      expect(screen.getByTestId("sidebar-group-reports-toggle")).toHaveAttribute(
+      expect(screen.getByTestId("sidebar-group-insights-toggle")).toHaveAttribute(
         "aria-expanded",
         "false",
       ),
     );
 
     await renderShell();
-    const toggles = await screen.findAllByTestId("sidebar-group-reports-toggle");
+    const toggles = await screen.findAllByTestId("sidebar-group-insights-toggle");
     // Two AgentShell instances are now mounted (desktop aside from each
     // render); the freshly-mounted one reads the persisted collapsed state.
     expect(toggles.at(-1)).toHaveAttribute("aria-expanded", "false");
