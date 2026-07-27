@@ -222,8 +222,8 @@ export function DataTable<T>({
       className="overflow-x-auto rounded-xl border border-hairline bg-surface"
       data-testid={testId}
     >
-      <table className="w-full min-w-[640px] border-collapse text-left text-sm">
-        <thead>
+      <table className="block w-full border-collapse text-left text-sm md:table md:min-w-[640px]">
+        <thead className="hidden md:table-header-group">
           <tr className="border-b border-hairline bg-surface-subtle text-xs uppercase tracking-wide text-muted">
             {hasSelection && selection && (
               <th className="w-10 py-1.5 pl-3 pr-1 font-medium">
@@ -280,18 +280,27 @@ export function DataTable<T>({
         </thead>
         <tbody
           data-state={busy ? "busy" : undefined}
-          className={cn(busy && "pointer-events-none opacity-45 transition-opacity duration-150")}
+          className={cn(
+            "block space-y-2 p-2 md:table-row-group md:space-y-0 md:p-0",
+            busy && "pointer-events-none opacity-45 transition-opacity duration-150",
+          )}
         >
           {isLoading && rows.length === 0 && (
-            <tr>
-              <td colSpan={colCount} className="px-3 py-8 text-center text-muted">
+            <tr className="block md:table-row">
+              <td
+                colSpan={colCount}
+                className="block px-3 py-8 text-center text-muted md:table-cell"
+              >
                 <Spinner className="mx-auto" />
               </td>
             </tr>
           )}
           {!isLoading && rows.length === 0 && (
-            <tr>
-              <td colSpan={colCount} className="px-3 py-8 text-center text-muted">
+            <tr className="block md:table-row">
+              <td
+                colSpan={colCount}
+                className="block px-3 py-8 text-center text-muted md:table-cell"
+              >
                 {emptyLabel ?? t("admin.table.empty")}
               </td>
             </tr>
@@ -303,10 +312,13 @@ export function DataTable<T>({
               <tr
                 key={id}
                 data-testid={`admin-row-${id}`}
-                className="h-10 border-b border-hairline transition-colors duration-100 hover:bg-surface-subtle last:border-b-0"
+                className="block rounded-lg border border-hairline p-1 transition-colors duration-100 hover:bg-surface-subtle md:h-10 md:table-row md:rounded-none md:border-0 md:border-b md:border-hairline md:p-0 md:last:border-b-0"
               >
                 {hasSelection && selection && (
-                  <td className="py-1 pl-3 pr-1">
+                  <td
+                    data-label={t("admin.bulk.selectRow")}
+                    className="flex items-center gap-2 px-2 pt-1.5 pb-0.5 before:text-[10.5px] before:font-medium before:uppercase before:tracking-wide before:text-muted before:content-[attr(data-label)] md:table-cell md:px-0 md:py-1 md:pl-3 md:pr-1 md:before:content-none"
+                  >
                     <input
                       type="checkbox"
                       checked={selection.selected.has(id)}
@@ -324,8 +336,13 @@ export function DataTable<T>({
                 {columns.map((col) => (
                   <td
                     key={col.key}
+                    data-label={col.header}
                     className={cn(
-                      "py-1 pl-4 pr-2 text-xs",
+                      // Mobile: label/value row with the column header as a
+                      // pseudo-element label.
+                      "flex items-center justify-between gap-4 px-2 py-1 text-xs before:shrink-0 before:font-medium before:uppercase before:tracking-wide before:text-[10.5px] before:text-muted before:content-[attr(data-label)]",
+                      // Desktop: restore the original table cell exactly.
+                      "md:table-cell md:px-0 md:py-1 md:pl-4 md:pr-2 md:before:content-none",
                       col.mono && "font-mono text-muted",
                       col.className,
                     )}
@@ -334,7 +351,10 @@ export function DataTable<T>({
                   </td>
                 ))}
                 {isRowValid && (
-                  <td className="py-1 pr-2">
+                  <td
+                    data-label={t("admin.table.status")}
+                    className="flex items-center justify-between gap-4 px-2 py-1 before:shrink-0 before:text-[10.5px] before:font-medium before:uppercase before:tracking-wide before:text-muted before:content-[attr(data-label)] md:table-cell md:px-0 md:py-1 md:pr-2 md:before:content-none"
+                  >
                     <span className="inline-flex items-center gap-2 text-xs text-muted">
                       <span
                         className={cn(
@@ -347,7 +367,7 @@ export function DataTable<T>({
                   </td>
                 )}
                 {hasActions && (
-                  <td className="py-1 pr-4 text-right">
+                  <td className="flex items-center justify-end px-2 pt-0.5 pb-1.5 md:table-cell md:px-0 md:py-1 md:pr-4 md:text-right">
                     <div className="inline-flex justify-end">
                       <Menu
                         panelTestId={`admin-row-menu-${id}`}

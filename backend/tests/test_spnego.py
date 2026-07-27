@@ -117,6 +117,49 @@ async def test_spnego_endpoint_501_when_gssapi_missing(monkeypatch: pytest.Monke
 
 
 @pytest.mark.asyncio
+async def test_spnego_first_leg_json_when_accept_json() -> None:
+    """API/JSON clients keep the raw 401 JSON body + WWW-Authenticate header."""
+    from httpx import ASGITransport, AsyncClient
+
+    from tiqora.api.app import create_app
+
+    settings = Settings(spnego_enabled=True)
+    app = create_app(settings)
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        resp = await client.get("/api/v1/auth/spnego", headers={"Accept": "application/json"})
+    assert resp.status_code == 401
+    assert resp.headers.get("www-authenticate") == "Negotiate"
+    assert "application/json" in resp.headers.get("content-type", "")
+    assert resp.json() == {"detail": "Negotiate token required"}
+
+
+@pytest.mark.asyncio
+async def test_spnego_first_leg_html_when_accept_html() -> None:
+    """Browser navigations get a themed HTML page (still 401 + WWW-Authenticate)."""
+    from httpx import ASGITransport, AsyncClient
+
+    from tiqora.api.app import create_app
+
+    settings = Settings(spnego_enabled=True)
+    app = create_app(settings)
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        resp = await client.get(
+            "/api/v1/auth/spnego?next=/agent/tickets/5",
+            headers={"Accept": "text/html,application/xhtml+xml"},
+        )
+    assert resp.status_code == 401
+    assert resp.headers.get("www-authenticate") == "Negotiate"
+    assert "text/html" in resp.headers.get("content-type", "")
+    body = resp.text
+    assert "/login?sso_error=1" in body
+    assert "next=%2Fagent%2Ftickets%2F5" in body
+    # meta-refresh nudges an SPNEGO-incapable browser to the login page.
+    assert 'http-equiv="refresh"' in body
+
+
+@pytest.mark.asyncio
 async def test_spnego_endpoint_404_when_disabled() -> None:
     from httpx import ASGITransport, AsyncClient
 

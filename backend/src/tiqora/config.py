@@ -38,6 +38,11 @@ class Settings(BaseSettings):
     app_name: str = "Tiqora"
     environment: str = Field(default="development", validation_alias="TIQORA_ENV")
     debug: bool = Field(default=False, validation_alias="TIQORA_DEBUG")
+    # Build provenance surfaced on the admin System-Info page. Set by CI at image
+    # build time (same values the frontend gets via VITE_GIT_SHA / VITE_APP_VERSION);
+    # empty in plain local builds. Purely informational — never gates behaviour.
+    git_sha: str = Field(default="", validation_alias="TIQORA_GIT_SHA")
+    build_time: str = Field(default="", validation_alias="TIQORA_BUILD_TIME")
     log_level: str = Field(default="INFO", validation_alias="TIQORA_LOG_LEVEL")
     secret_key: str = Field(
         default=DEFAULT_SECRET_KEY,
