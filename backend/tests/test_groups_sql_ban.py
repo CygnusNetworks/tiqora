@@ -124,6 +124,4 @@ def test_ban_regex_catches_alias_and_qualified_forms() -> None:
     assert _code_portion('x = "permission_groups"  # FROM permission_groups') == (
         'x = "permission_groups"  '
     )
-    assert not _SQL_USE.search(
-        _code_portion('x = "permission_groups"  # FROM permission_groups')
-    )
+    assert not _SQL_USE.search(_code_portion('x = "permission_groups"  # FROM permission_groups'))

@@ -316,9 +316,7 @@ def _set_admin_mysql(
         conn.close()
 
 
-def _set_admin_pg(
-    url: str, login: str, pw_hash: str, now: datetime, *, groups_table: str
-) -> int:
+def _set_admin_pg(url: str, login: str, pw_hash: str, now: datetime, *, groups_table: str) -> int:
     import psycopg2
 
     from tiqora.db.legacy.profile import quote_ident

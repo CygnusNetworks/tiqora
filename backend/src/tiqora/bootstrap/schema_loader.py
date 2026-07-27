@@ -53,9 +53,7 @@ def legacy_schema_fixture_root() -> Path:
     alt = Path.cwd() / "tests" / "fixtures" / "legacy-schema"
     if alt.is_dir():
         return alt
-    raise FileNotFoundError(
-        f"legacy-schema fixtures not found (tried {candidate} and {alt})"
-    )
+    raise FileNotFoundError(f"legacy-schema fixtures not found (tried {candidate} and {alt})")
 
 
 def legacy_schema_dir(profile_id: str) -> Path:
@@ -63,9 +61,7 @@ def legacy_schema_dir(profile_id: str) -> Path:
     root = legacy_schema_fixture_root()
     path = root / profile_id
     if not path.is_dir():
-        raise FileNotFoundError(
-            f"No fixture directory for profile {profile_id!r} under {root}"
-        )
+        raise FileNotFoundError(f"No fixture directory for profile {profile_id!r} under {root}")
     return path
 
 

@@ -224,10 +224,15 @@ def reset_legacy_schema_profile() -> None:
     # Restore groups table name to the 6.5 baseline so later tests see a
     # clean slate even if a previous test applied otrs-znuny-6.0.
     try:
+        from typing import cast
+
+        from sqlalchemy import Table
+
         from tiqora.db.legacy.user import PermissionGroups
 
-        if PermissionGroups.__table__.name != "permission_groups":
-            PermissionGroups.__table__.name = "permission_groups"
+        table = cast(Table, PermissionGroups.__table__)
+        if table.name != "permission_groups":
+            table.name = "permission_groups"
             PermissionGroups.__tablename__ = "permission_groups"
     except Exception as exc:  # noqa: BLE001 — import / metadata edge in teardown
         logger.warning("legacy_schema_profile_reset_partial", error=str(exc))
@@ -408,9 +413,7 @@ def profile_for_id(
             known=False,
         )
 
-    groups_table = (
-        "groups" if profile_id is SchemaProfileId.OTRS_ZNUNY_6_0 else "permission_groups"
-    )
+    groups_table = "groups" if profile_id is SchemaProfileId.OTRS_ZNUNY_6_0 else "permission_groups"
     mail_oauth = profile_id in {
         SchemaProfileId.ZNUNY_6_3,
         SchemaProfileId.ZNUNY_6_4,
@@ -499,10 +502,7 @@ def _sync_list_tables(conn: Connection) -> set[str]:
     dialect = conn.dialect.name
     if dialect in {"mysql", "mariadb"}:
         rows = conn.execute(
-            text(
-                "SELECT table_name FROM information_schema.tables "
-                "WHERE table_schema = DATABASE()"
-            )
+            text("SELECT table_name FROM information_schema.tables WHERE table_schema = DATABASE()")
         )
     else:
         rows = conn.execute(
@@ -584,9 +584,13 @@ def apply_legacy_schema_profile(profile: LegacySchemaProfile) -> None:
     global _cached_profile, _adapters_applied
     _cached_profile = profile
 
+    from typing import cast
+
+    from sqlalchemy import Table
+
     from tiqora.db.legacy.user import PermissionGroups
 
-    table = PermissionGroups.__table__
+    table = cast(Table, PermissionGroups.__table__)
     if table.name != profile.groups_table:
         logger.info(
             "legacy_groups_table_rebind",
@@ -678,9 +682,7 @@ async def insert_row_with_color(
 
     bind = session.get_bind()
     if bind is None:
-        raise RuntimeError(
-            f"session has no bind; cannot INSERT into {table_name!r} with color"
-        )
+        raise RuntimeError(f"session has no bind; cannot INSERT into {table_name!r} with color")
     dialect = bind.dialect.name
     if not dialect:
         raise RuntimeError(
@@ -698,7 +700,8 @@ async def insert_row_with_color(
         return int(result.scalar_one())
 
     result = await session.execute(stmt)
-    pk = result.inserted_primary_key
+    # Async Result typing omits inserted_primary_key; present on Core inserts.
+    pk = getattr(result, "inserted_primary_key", None)
     if pk and pk[0] is not None:
         return int(pk[0])
     # MariaDB/MySQL: Core usually fills inserted_primary_key; last resort.
@@ -753,9 +756,8 @@ def is_db_unavailable(exc: BaseException) -> bool:
 
     for attr in ("orig", "__cause__", "__context__"):
         inner = getattr(exc, attr, None)
-        if isinstance(inner, BaseException) and inner is not exc:
-            if is_db_unavailable(inner):
-                return True
+        if isinstance(inner, BaseException) and inner is not exc and is_db_unavailable(inner):
+            return True
     return False
 
 

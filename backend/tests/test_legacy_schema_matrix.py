@@ -81,9 +81,7 @@ def _wipe_mysql(url: str) -> None:
     try:
         with conn.cursor() as cur:
             cur.execute(f"DROP DATABASE IF EXISTS `{db}`")
-            cur.execute(
-                f"CREATE DATABASE `{db}` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci"
-            )
+            cur.execute(f"CREATE DATABASE `{db}` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci")
     finally:
         conn.close()
 
@@ -280,7 +278,7 @@ def _assert_profile_cell(sync_url: str, profile_id: str, dialect: str) -> None:
     if detected.state_priority_has_color:
 
         async def _color_writes() -> tuple[int, int]:
-            from datetime import datetime, timezone
+            from datetime import UTC, datetime
 
             from tiqora.db.legacy.profile import (
                 default_color_for_write,
@@ -289,7 +287,7 @@ def _assert_profile_cell(sync_url: str, profile_id: str, dialect: str) -> None:
 
             eng = create_async_engine(async_url)
             factory = async_sessionmaker(eng, expire_on_commit=False)
-            ts = datetime.now(timezone.utc).replace(tzinfo=None)
+            ts = datetime.now(UTC).replace(tzinfo=None)
             color = default_color_for_write()
             assert color is not None
             try:
