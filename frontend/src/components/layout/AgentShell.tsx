@@ -373,16 +373,13 @@ function SidebarBody({ onNavigate }: { onNavigate?: () => void }) {
           collapsed={!!collapsedGroups.knowledge}
           onToggle={() => toggleGroup("knowledge")}
         >
+          {/* Knowledge base and its categories now live on one tabbed page; the
+              category management is the "Kategorien" tab of /agent/kb, so the
+              sidebar needs a single entry here. */}
           <NavItem
             to="/agent/kb"
             label={t("sidebar.knowledgeBase")}
             testId="agent-nav-kb"
-            onNavigate={onNavigate}
-          />
-          <NavItem
-            to="/agent/kb/categories"
-            label={t("sidebar.kbCategories")}
-            testId="agent-nav-kb-categories"
             onNavigate={onNavigate}
           />
           {user?.can_edit_templates && (
@@ -395,11 +392,13 @@ function SidebarBody({ onNavigate }: { onNavigate?: () => void }) {
           )}
         </NavGroup>
 
+        {/* Calendar and reports were each a full section wrapping a single
+            link; merged into one "Insights" group. */}
         <NavGroup
-          id="calendar"
-          title={t("sidebar.calendar")}
-          collapsed={!!collapsedGroups.calendar}
-          onToggle={() => toggleGroup("calendar")}
+          id="insights"
+          title={t("sidebar.insights")}
+          collapsed={!!collapsedGroups.insights}
+          onToggle={() => toggleGroup("insights")}
         >
           <NavItem
             to="/agent/calendar"
@@ -407,14 +406,6 @@ function SidebarBody({ onNavigate }: { onNavigate?: () => void }) {
             testId="agent-nav-calendar"
             onNavigate={onNavigate}
           />
-        </NavGroup>
-
-        <NavGroup
-          id="reports"
-          title={t("sidebar.reports")}
-          collapsed={!!collapsedGroups.reports}
-          onToggle={() => toggleGroup("reports")}
-        >
           <NavItem
             to="/agent/stats"
             label={t("sidebar.stats")}

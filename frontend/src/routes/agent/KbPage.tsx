@@ -1,12 +1,14 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link, useNavigate, useSearch } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
 import { api } from "@/lib/api";
 import { CategoryTree } from "@/components/agent/CategoryTree";
+import { KbCategoriesPanel } from "@/components/agent/KbCategoriesPanel";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Spinner } from "@/components/ui/Spinner";
+import { Tabs, type TabItem } from "@/components/ui/Tabs";
 import { SelectMenu, type SelectMenuItem } from "@/components/ui/SelectMenu";
 import { ChevronDownIcon } from "@/components/ui/icons";
 import { formatDateTime } from "@/lib/format";
@@ -15,6 +17,8 @@ import { cn } from "@/lib/cn";
 const STATE_FILTERS = ["all", "draft", "review", "published", "archived"] as const;
 type StateFilter = (typeof STATE_FILTERS)[number];
 
+export type KbTab = "articles" | "categories";
+
 const STATE_TONE: Record<string, "muted" | "accent" | "success" | "warn"> = {
   draft: "muted",
   review: "warn",
@@ -22,7 +26,15 @@ const STATE_TONE: Record<string, "muted" | "accent" | "success" | "warn"> = {
   archived: "muted",
 };
 
-export type KbSearch = { category_id?: number; state?: StateFilter; tag?: string };
+export type KbSearch = {
+  category_id?: number;
+  state?: StateFilter;
+  tag?: string;
+  /** Which top-level tab is active; "articles" is the default (omitted). */
+  tab?: KbTab;
+  /** Deep-link: open the create-category drawer on the categories tab. */
+  new?: boolean;
+};
 
 /** How many tag pills the filter bar shows before collapsing behind "more". */
 const TAG_BAR_LIMIT = 12;
@@ -33,6 +45,7 @@ export function KbPage() {
   const search = useSearch({ from: "/agent/kb" }) as KbSearch;
   const [drawerOpen, setDrawerOpen] = useState(false);
 
+  const tab: KbTab = search.tab ?? "articles";
   const categoryId = search.category_id ?? null;
   const state = search.state ?? "all";
   const activeTags = useMemo(
@@ -47,6 +60,21 @@ export function KbPage() {
       replace: true,
     });
   };
+
+  const tabItems: TabItem[] = [
+    { id: "articles", label: t("kb.tabArticles") },
+    { id: "categories", label: t("kb.tabCategories") },
+  ];
+
+  const openCategoriesCreate = () => setSearch({ tab: "categories", new: true });
+
+  // The `new` deep-link is consumed once by the categories panel on mount; the
+  // panel's mount effect runs before this one, so stripping `new` here doesn't
+  // close the just-opened drawer, but does stop a later remount from reopening it.
+  useEffect(() => {
+    if (search.new) setSearch({ new: undefined });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [search.new]);
 
   const categoriesQ = useQuery({
     queryKey: ["kb", "categories"],
@@ -121,7 +149,7 @@ export function KbPage() {
         variant="secondary"
         size="sm"
         data-testid="kb-first-category"
-        onClick={() => void navigate({ to: "/agent/kb/categories", search: { new: true } })}
+        onClick={openCategoriesCreate}
       >
         {t("kb.createFirstCategory")}
       </Button>
@@ -137,38 +165,44 @@ export function KbPage() {
           setDrawerOpen(false);
         }}
       />
-      <Link
-        to="/agent/kb/categories"
+      <button
+        type="button"
         data-testid="kb-manage-categories"
-        className="mt-2 block px-2 text-xs text-muted hover:text-accent hover:underline"
+        onClick={() => {
+          setSearch({ tab: "categories" });
+          setDrawerOpen(false);
+        }}
+        className="mt-2 block px-2 text-left text-xs text-muted hover:text-accent hover:underline"
       >
         {t("kb.manageCategories")}
-      </Link>
+      </button>
     </>
   );
 
   return (
     <div className="relative flex min-h-0 flex-1" data-testid="kb-page">
-      <aside className="hidden w-56 shrink-0 overflow-y-auto border-r border-hairline bg-surface p-2 md:block lg:w-64">
-        <div className="mb-2 flex items-center justify-between px-2">
-          <h2 className="text-xs font-semibold uppercase tracking-wide text-muted">
-            {t("kb.sidebar")}
-          </h2>
-          <button
-            type="button"
-            data-testid="kb-new-category"
-            title={t("kb.newCategory")}
-            aria-label={t("kb.newCategory")}
-            onClick={() => void navigate({ to: "/agent/kb/categories", search: { new: true } })}
-            className="flex h-5 w-5 items-center justify-center rounded border border-hairline text-sm leading-none text-muted hover:border-accent hover:text-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent"
-          >
-            +
-          </button>
-        </div>
-        {sidebarBody}
-      </aside>
+      {tab === "articles" && (
+        <aside className="hidden w-56 shrink-0 overflow-y-auto border-r border-hairline bg-surface p-2 md:block lg:w-64">
+          <div className="mb-2 flex items-center justify-between px-2">
+            <h2 className="text-xs font-semibold uppercase tracking-wide text-muted">
+              {t("kb.sidebar")}
+            </h2>
+            <button
+              type="button"
+              data-testid="kb-new-category"
+              title={t("kb.newCategory")}
+              aria-label={t("kb.newCategory")}
+              onClick={openCategoriesCreate}
+              className="flex h-5 w-5 items-center justify-center rounded border border-hairline text-sm leading-none text-muted hover:border-accent hover:text-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent"
+            >
+              +
+            </button>
+          </div>
+          {sidebarBody}
+        </aside>
+      )}
 
-      {drawerOpen && (
+      {tab === "articles" && drawerOpen && (
         <div className="fixed inset-0 z-30 md:hidden">
           <button
             type="button"
@@ -192,50 +226,64 @@ export function KbPage() {
 
       <div className="min-w-0 flex-1 space-y-3 p-3">
         <div className="flex flex-wrap items-center gap-2">
-          <Button
-            variant="secondary"
-            size="sm"
-            className="md:hidden"
-            onClick={() => setDrawerOpen(true)}
-            data-testid="kb-drawer-toggle"
-          >
-            {t("kb.sidebar")}
-          </Button>
+          {tab === "articles" && (
+            <Button
+              variant="secondary"
+              size="sm"
+              className="md:hidden"
+              onClick={() => setDrawerOpen(true)}
+              data-testid="kb-drawer-toggle"
+            >
+              {t("kb.sidebar")}
+            </Button>
+          )}
           <h1 className="font-display text-lg font-semibold text-ink">
             {t("kb.title")}
           </h1>
-          <div className="ml-auto flex flex-wrap items-center gap-2">
-            <SelectMenu
-              items={stateFilterItems}
-              value={state}
-              onSelect={(v) => setSearch({ state: v })}
-              panelTestId="kb-state-filter-panel"
-              trigger={({ open, ref, toggleProps }) => (
-                <button
-                  ref={ref}
-                  type="button"
-                  data-testid="kb-state-filter"
-                  {...toggleProps}
-                  className="flex min-w-[9rem] items-center justify-between gap-2 rounded-md border border-hairline bg-surface px-2 py-1.5 text-sm text-ink hover:bg-surface-subtle focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent"
-                >
-                  <span>{t(`kb.state.${state}`)}</span>
-                  <ChevronDownIcon
-                    className={cn("text-muted transition-transform duration-150", open && "rotate-180")}
-                  />
-                </button>
-              )}
-            />
-            <Button
-              variant="primary"
-              size="sm"
-              data-testid="kb-new-article"
-              onClick={() => void navigate({ to: "/agent/kb/new" })}
-            >
-              {t("kb.newArticle")}
-            </Button>
-          </div>
+          <Tabs
+            items={tabItems}
+            value={tab}
+            onChange={(id) => setSearch({ tab: id === "articles" ? undefined : (id as KbTab) })}
+            className="ml-1"
+          />
+          {tab === "articles" && (
+            <div className="ml-auto flex flex-wrap items-center gap-2">
+              <SelectMenu
+                items={stateFilterItems}
+                value={state}
+                onSelect={(v) => setSearch({ state: v })}
+                panelTestId="kb-state-filter-panel"
+                trigger={({ open, ref, toggleProps }) => (
+                  <button
+                    ref={ref}
+                    type="button"
+                    data-testid="kb-state-filter"
+                    {...toggleProps}
+                    className="flex min-w-[9rem] items-center justify-between gap-2 rounded-md border border-hairline bg-surface px-2 py-1.5 text-sm text-ink hover:bg-surface-subtle focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent"
+                  >
+                    <span>{t(`kb.state.${state}`)}</span>
+                    <ChevronDownIcon
+                      className={cn("text-muted transition-transform duration-150", open && "rotate-180")}
+                    />
+                  </button>
+                )}
+              />
+              <Button
+                variant="primary"
+                size="sm"
+                data-testid="kb-new-article"
+                onClick={() => void navigate({ to: "/agent/kb/new" })}
+              >
+                {t("kb.newArticle")}
+              </Button>
+            </div>
+          )}
         </div>
 
+        {tab === "categories" ? (
+          <KbCategoriesPanel initialCreate={!!search.new} />
+        ) : (
+        <>
         {(tagsQ.data ?? []).length > 0 && (
           <div className="flex flex-wrap items-center gap-1.5" data-testid="kb-tag-bar">
             {tagBar.visible.map((tg) => {
@@ -287,9 +335,7 @@ export function KbPage() {
                 <Button
                   variant="secondary"
                   size="sm"
-                  onClick={() =>
-                    void navigate({ to: "/agent/kb/categories", search: { new: true } })
-                  }
+                  onClick={openCategoriesCreate}
                 >
                   {t("kb.createFirstCategory")}
                 </Button>
@@ -347,6 +393,8 @@ export function KbPage() {
               </li>
             ))}
           </ul>
+        )}
+        </>
         )}
       </div>
     </div>

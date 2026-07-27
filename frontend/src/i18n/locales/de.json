@@ -43,18 +43,19 @@
     "myTickets": "Meine Tickets",
     "watched": "Beobachtet",
     "queues": "Queues",
-    "knowledge": "Wissen",
+    "knowledge": "Knowledge",
     "knowledgeBase": "Knowledge Base",
     "kbCategories": "Kategorien",
     "toggle": "Navigation umschalten",
-    "reports": "Berichte",
-    "stats": "Statistiken",
+    "insights": "Insights",
+    "reports": "Reports",
+    "stats": "Reports",
     "calendar": "Kalender",
     "showAllQueues": "Alle anzeigen",
     "showActiveQueues": "Aktive anzeigen",
     "queueSearch": "Queues filtern…",
     "noQueueMatch": "Keine passenden Queues.",
-    "templates": "Vorlagen"
+    "templates": "Templates"
   },
   "common": {
     "prev": "Zurück",
@@ -2100,6 +2101,8 @@
   },
   "kb": {
     "title": "Wissensdatenbank",
+    "tabArticles": "Artikel",
+    "tabCategories": "Kategorien",
     "sidebar": "Kategorien",
     "tagBarMore": "mehr…",
     "tagBarLess": "weniger",
