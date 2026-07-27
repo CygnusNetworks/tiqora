@@ -39,17 +39,21 @@ Profile detection IDs: see `docs/parallel-operation.md` and
 
 TiqoraSync multi-framework install: `packages/znuny-addon/TiqoraSync/install/README.md`.
 
-Multi-peer golden roadmap: `tests/golden/peers.yaml` and
+Multi-peer golden toolkit: `tests/golden/peers.yaml` and
 `tests/golden/README-multi-peer.md`.
 
-## Layer B — golden-master (real Znuny peer vs Tiqora)
+## Layer B — golden-master (real peer container vs Tiqora)
 
 The **golden-master suite** in `tests/golden/` goes one step further and runs
-a REAL Znuny 6.5.22 container against the SAME MariaDB database Tiqora uses,
-then diffs the resulting rows/JSON directly.
+a **real** OTRS/Znuny peer container against the SAME MariaDB database Tiqora
+uses, then diffs the resulting rows/JSON directly.
 
-This is heavy (a real Apache+mod_perl+Znuny container) and **opt-in** — it
-does not run as part of `just test` / the normal CI pipeline.
+This is heavy (Apache+mod_perl+peer source tree) and **manual / opt-in** —
+it does not run as part of `just test`, PR CI, or any nightly schedule.
+
+Default peer is **Znuny 6.5.22** (`GOLDEN_PEER=znuny-6.5`). Further peers
+(6.0–7.3) are selected via `GOLDEN_PEER` once the matching release tree is
+present under the repo root (see `peers.yaml`).
 
 ## What gets validated
 
@@ -63,30 +67,41 @@ does not run as part of `just test` / the normal CI pipeline.
 
 ## Infrastructure
 
-`tests/golden/Dockerfile.znuny` builds a Znuny 6.5.22 image from the
-vendored source tree (`znuny-6.5.22/` at the repo root) — **no official
-`znuny/znuny` image exists on Docker Hub**, so this is a from-source build:
-Debian bookworm-slim + apache2 + mod_perl + the exact Perl module package
-set `bin/otrs.CheckModules.pl --package-list` reports for a MySQL-backed
-install. `tests/golden/znuny-entrypoint.sh` renders `Kernel/Config.pm` from
-env vars, waits for MariaDB, loads the schema in the known-good installer
-order on first boot (`schema.mysql.sql` → `initial_insert.mysql.sql` →
-`schema-post.mysql.sql` — see docs/parallel-operation.md "Foreign keys and
-orphans"), fixes permissions, and starts Apache in the foreground.
+`tests/golden/Dockerfile.znuny` builds a peer image from a release tree
+(`SOURCE_DIR` build-arg, default `znuny-6.5.22/`) — **no official
+`znuny/znuny` image exists on Docker Hub**. Layout inside the image is always
+`/opt/otrs`; Console is auto-detected (`znuny.Console.pl` /
+`otrs.Console.pl`). `tests/golden/znuny-entrypoint.sh` renders
+`Kernel/Config.pm` from env vars, waits for MariaDB, loads schema on first
+boot (`schema` / `otrs-schema` + `initial_insert` + `schema-post` — see
+docs/parallel-operation.md), fixes permissions (incl. `var/tmp` for
+FileStorable), and starts Apache in the foreground.
 
-`tests/golden/docker-compose.golden.yml` starts MariaDB 10.11 (port 3307 on
-the host, to not collide with `docker-compose.dev.yml`'s 3306) and the Znuny
-container (port 8180) on a shared network.
+`tests/golden/docker-compose.golden.yml` starts MariaDB 10.11 (host port
+3307) and the peer container (host port 8180). Compose project name is
+`tiqora-golden-<peer>` (dots → hyphens, e.g. `tiqora-golden-znuny-6-5`)
+so multi-peer stacks stay isolated (one peer at a time on those host
+ports).
+
+`tests/golden/peer_env.py` resolves `GOLDEN_PEER` → source path, compose
+project, DB URLs.
 
 ## Running locally
 
 ```sh
-just golden-up      # build + start MariaDB + Znuny (first boot loads schema, can take minutes)
-just golden-seed     # seed admin agent, queue, customer user via Znuny console commands
-GOLDEN=1 just golden-test   # run the golden-master pytest suite
-just golden-down     # stop (keeps the DB volume)
-just golden-clean    # stop and drop the DB volume
+just golden-up              # build + start MariaDB + default peer (znuny-6.5)
+just golden-seed            # seed admin agent, queue, customer user
+just golden-test            # GOLDEN=1 pytest -m golden
+just golden-down            # stop (keeps the DB volume)
+just golden-clean           # stop and drop the DB volume
+
+GOLDEN_PEER=znuny-6.5 just golden-run   # up + seed + test + clean
+just golden-all-peers                   # sequential matrix for every peer with source on disk
+just golden-peers-ready                 # which peers have a release tree present
 ```
+
+Place release trees as real directories at the paths in `peers.yaml` (Docker
+`COPY` rejects external symlinks). Trees are gitignored (`/znuny-*/`).
 
 Tiqora itself is **not started** by `golden-up` — point your local Tiqora
 `DATABASE_URL` at the same MariaDB
@@ -99,14 +114,21 @@ process).
 The suite is skipped by default; set `GOLDEN=1` to un-skip
 (`tests/golden/conftest.py`), matching the `db`/`search` marker pattern used
 by `backend/tests/conftest.py` for testcontainers-based tests.
+`just golden-test` sets `GOLDEN=1` for you.
 
 ## CI
 
-A manual-only (`workflow_dispatch`) job, `.github/workflows/golden.yml`, runs
-the same `just golden-up && just golden-seed && GOLDEN=1 just golden-test`
-sequence. It is **not** wired into the on-push pipeline — building and
-booting a full Znuny container on every push would be prohibitively slow for
-day-to-day CI turnaround.
+`.github/workflows/golden.yml` is **workflow_dispatch only** (no push, no
+nightly):
+
+| Input | Default | Meaning |
+|-------|---------|---------|
+| `peer` | `znuny-6.5` | Single peer id from `peers.yaml` |
+| `run_all` | `false` | Sequential run of every peer with source present |
+
+The runner must already have the release tree(s); otherwise the job fails
+the source check. The usual full multi-peer path is local
+`just golden-all-peers`.
 
 ## Extending the suite
 

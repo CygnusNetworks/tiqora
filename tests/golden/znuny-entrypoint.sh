@@ -1,11 +1,9 @@
 #!/bin/bash
-# Entrypoint for the golden-master Znuny 6.5.22 container.
+# Entrypoint for multi-peer golden OTRS/Znuny containers.
 #
 # - Renders Kernel/Config.pm from the template + env vars.
-# - Waits for MariaDB.
-# - On first boot (tables missing): loads schema.mysql.sql,
-#   initial_insert.mysql.sql, schema-post.mysql.sql in that known-good order
-#   (see docs/parallel-operation.md "Foreign keys and orphans").
+# - Waits for MariaDB; first boot loads schema (auto-detects otrs-* vs plain names).
+# - Console via /opt/otrs/bin/console.pl (symlink set at image build).
 # - Fixes permissions and starts Apache (mod_perl) in the foreground.
 set -euo pipefail
 
@@ -17,6 +15,14 @@ set -euo pipefail
 : "${DB_ROOT_PASSWORD:=root}"
 : "${ZNUNY_FQDN:=znuny.golden.local}"
 : "${ZNUNY_SYSTEM_ID:=10}"
+: "${GOLDEN_PEER:=znuny-6.5}"
+
+INSTALL=/opt/otrs
+CONSOLE_PL="${INSTALL}/bin/console.pl"
+SETPERM_PL="${INSTALL}/bin/SetPermissions.pl"
+DB_DIR="${INSTALL}/scripts/database"
+
+echo "[znuny-entrypoint] peer=${GOLDEN_PEER} install=${INSTALL}"
 
 echo "[znuny-entrypoint] rendering Kernel/Config.pm"
 sed \
@@ -26,8 +32,8 @@ sed \
     -e "s/__DB_PASSWORD__/${DB_PASSWORD}/" \
     -e "s/__FQDN__/${ZNUNY_FQDN}/" \
     -e "s/__SYSTEM_ID__/${ZNUNY_SYSTEM_ID}/" \
-    /opt/otrs/Kernel/Config.pm.tmpl > /opt/otrs/Kernel/Config.pm
-chown otrs:otrs /opt/otrs/Kernel/Config.pm
+    "${INSTALL}/Kernel/Config.pm.tmpl" > "${INSTALL}/Kernel/Config.pm"
+chown otrs:otrs "${INSTALL}/Kernel/Config.pm"
 
 echo "[znuny-entrypoint] waiting for MariaDB at ${DB_HOST}:${DB_PORT}"
 for _ in $(seq 1 60); do
@@ -49,33 +55,54 @@ SQL
 TABLE_COUNT=$(mysql -h "$DB_HOST" -P "$DB_PORT" -u "$DB_USER" -p"$DB_PASSWORD" -N -B \
     -e "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='${DB_NAME}' AND table_name='ticket'")
 
+_schema_file() {
+    local base="$1"
+    if [ -f "${DB_DIR}/${base}.mysql.sql" ]; then
+        echo "${DB_DIR}/${base}.mysql.sql"
+    elif [ -f "${DB_DIR}/otrs-${base}.mysql.sql" ]; then
+        echo "${DB_DIR}/otrs-${base}.mysql.sql"
+    else
+        echo ""
+    fi
+}
+
 if [ "$TABLE_COUNT" -eq 0 ]; then
     echo "[znuny-entrypoint] loading schema (first boot)"
-    mysql -h "$DB_HOST" -P "$DB_PORT" -u "$DB_USER" -p"$DB_PASSWORD" "$DB_NAME" < /opt/otrs/scripts/database/schema.mysql.sql
-    mysql -h "$DB_HOST" -P "$DB_PORT" -u "$DB_USER" -p"$DB_PASSWORD" "$DB_NAME" < /opt/otrs/scripts/database/initial_insert.mysql.sql
-    mysql -h "$DB_HOST" -P "$DB_PORT" -u "$DB_USER" -p"$DB_PASSWORD" "$DB_NAME" < /opt/otrs/scripts/database/schema-post.mysql.sql
+    S=$(_schema_file schema)
+    I=$(_schema_file initial_insert)
+    P=$(_schema_file schema-post)
+    if [ -z "$S" ] || [ -z "$I" ] || [ -z "$P" ]; then
+        echo "[znuny-entrypoint] ERROR: missing schema SQL under ${DB_DIR}" >&2
+        ls -la "${DB_DIR}" >&2 || true
+        exit 1
+    fi
+    echo "[znuny-entrypoint] using $(basename "$S"), $(basename "$I"), $(basename "$P")"
+    mysql -h "$DB_HOST" -P "$DB_PORT" -u "$DB_USER" -p"$DB_PASSWORD" "$DB_NAME" < "$S"
+    mysql -h "$DB_HOST" -P "$DB_PORT" -u "$DB_USER" -p"$DB_PASSWORD" "$DB_NAME" < "$I"
+    mysql -h "$DB_HOST" -P "$DB_PORT" -u "$DB_USER" -p"$DB_PASSWORD" "$DB_NAME" < "$P"
     echo "[znuny-entrypoint] schema loaded"
 else
     echo "[znuny-entrypoint] schema already present, skipping load"
 fi
 
 echo "[znuny-entrypoint] fixing permissions"
-perl /opt/otrs/bin/otrs.SetPermissions.pl --otrs-user=otrs --web-group=www-data || true
-# FileStorable cache creates nested dirs under var/tmp at runtime; ensure the
-# otrs user can always mkdir there (apache/www-data may have left root-owned
-# paths after first boot / seed).
-mkdir -p /opt/otrs/var/tmp /opt/otrs/var/log
-chown -R otrs:otrs /opt/otrs/var/tmp /opt/otrs/var/log
-chmod -R ug+rwX /opt/otrs/var/tmp /opt/otrs/var/log
+if [ -x "$SETPERM_PL" ] || [ -f "$SETPERM_PL" ]; then
+    perl "$SETPERM_PL" --otrs-user=otrs --web-group=www-data 2>/dev/null \
+        || perl "$SETPERM_PL" --znuny-user=otrs --web-group=www-data 2>/dev/null \
+        || true
+fi
+# FileStorable cache creates nested dirs under var/tmp at runtime.
+mkdir -p "${INSTALL}/var/tmp" "${INSTALL}/var/log"
+chown -R otrs:otrs "${INSTALL}/var/tmp" "${INSTALL}/var/log"
+chmod -R ug+rwX "${INSTALL}/var/tmp" "${INSTALL}/var/log"
 
-echo "[znuny-entrypoint] running SetPackageList / rebuild config cache"
-su -s /bin/bash otrs -c "perl /opt/otrs/bin/otrs.Console.pl Maint::Config::Rebuild" || true
+echo "[znuny-entrypoint] rebuild config cache"
+su -s /bin/bash otrs -c "perl ${CONSOLE_PL} Maint::Config::Rebuild" || true
 
 if [ "${1:-}" = "console" ]; then
     shift
-    # Re-assert tmp ownership before each console invocation (seed/tests).
-    chown -R otrs:otrs /opt/otrs/var/tmp 2>/dev/null || true
-    exec su -s /bin/bash otrs -c "perl /opt/otrs/bin/otrs.Console.pl $*"
+    chown -R otrs:otrs "${INSTALL}/var/tmp" 2>/dev/null || true
+    exec su -s /bin/bash otrs -c "perl ${CONSOLE_PL} $*"
 fi
 
 echo "[znuny-entrypoint] starting apache2"
