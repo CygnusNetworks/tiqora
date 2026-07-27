@@ -123,13 +123,29 @@ services:
       # until enabled. Prod SPN: HTTP/tiqora.cygnusnetworks.de@CYGNUSNETWORKS.DE
       # TIQORA_SPNEGO_ENABLED: "true"
       # KRB5_KTNAME: /etc/tiqora/tiqora.keytab
-    # volumes:
-    #   # Service keytab (read-only). Export from KDC for the SPN above.
-    #   - ./secrets/tiqora.keytab:/etc/tiqora/tiqora.keytab:ro
-    #   # Optional: for a pure acceptor, krb5.conf is usually not required
-    #   # (ticket is decrypted with the keytab; no KDC round-trip). A
-    #   # `default_realm = CYGNUSNETWORKS.DE` can still help.
-    #   - ./secrets/krb5.conf:/etc/krb5.conf:ro
+      # Build provenance shown on the admin System-Info page (Admin → System-Info).
+      # CI passes these at image build time; set here to display them at runtime.
+      # TIQORA_GIT_SHA: ${TIQORA_GIT_SHA:-}
+      # TIQORA_BUILD_TIME: ${TIQORA_BUILD_TIME:-}
+    volumes:
+      # Docker socket for the admin System-Info page's container/healthcheck view.
+      # WITHOUT this mount the page still works — the "Container" section just
+      # reports "socket not mounted" and everything else (versions, services,
+      # datastores, host load) is unaffected. The System-Info code only READS
+      # (list containers + inspect health); it never mutates.
+      # SECURITY: a raw docker.sock is effectively root on the host. The ":ro"
+      # bind only makes the socket *file* read-only, NOT the Docker API — a
+      # compromised api container could still control Docker. For a hardened
+      # deployment, put a read-only socket proxy (e.g. tecnativa/docker-socket-proxy
+      # with CONTAINERS=1 and everything else 0) in front and point DOCKER_HOST at
+      # it instead of bind-mounting the socket directly.
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      # Service keytab (read-only). Export from KDC for the SPN above.
+      # - ./secrets/tiqora.keytab:/etc/tiqora/tiqora.keytab:ro
+      # Optional: for a pure acceptor, krb5.conf is usually not required
+      # (ticket is decrypted with the keytab; no KDC round-trip). A
+      # `default_realm = CYGNUSNETWORKS.DE` can still help.
+      # - ./secrets/krb5.conf:/etc/krb5.conf:ro
     ports:
       - "127.0.0.1:8000:8000"
     depends_on:

@@ -124,6 +124,7 @@ export type {
   DaemonServiceOut,
   DaemonListOut,
   DaemonUpdate,
+  SystemInfoOut,
   MailSecurity,
   MailAuthType,
   MailOutboundOut,

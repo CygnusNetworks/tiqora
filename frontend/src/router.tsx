@@ -71,6 +71,7 @@ import { MailOutboundPage } from "@/routes/admin/MailOutboundPage";
 import { MailLogPage } from "@/routes/admin/MailLogPage";
 import { SubjectConfigPage } from "@/routes/admin/SubjectConfigPage";
 import { DaemonsPage } from "@/routes/admin/DaemonsPage";
+import { SystemInfoPage } from "@/routes/admin/SystemInfoPage";
 import { PostmasterFiltersPage } from "@/routes/admin/PostmasterFiltersPage";
 import { PostmasterFilterDetailPage } from "@/routes/admin/PostmasterFilterDetailPage";
 import { AclPage } from "@/routes/admin/AclPage";
@@ -621,6 +622,12 @@ const adminDaemonsRoute = createRoute({
   component: DaemonsPage,
 });
 
+const adminSystemRoute = createRoute({
+  getParentRoute: () => adminLayoutRoute,
+  path: "/system",
+  component: SystemInfoPage,
+});
+
 const adminProcessDetailRoute = createRoute({
   getParentRoute: () => adminLayoutRoute,
   path: "/processes/$processEntityId",
@@ -753,6 +760,7 @@ const routeTree = rootRoute.addChildren([
     adminCustomerFieldsRoute,
     adminGdprRoute,
     adminDaemonsRoute,
+    adminSystemRoute,
     adminAiRoute,
     adminAiProvidersRoute,
     adminAiMcpRoute,

@@ -4,12 +4,13 @@ from __future__ import annotations
 
 import base64
 import secrets
+from html import escape as html_escape
 from typing import Annotated, Any
 from urllib.parse import quote
 
 import structlog
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request, Response, status
-from fastapi.responses import RedirectResponse
+from fastapi.responses import HTMLResponse, RedirectResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from tiqora.api.deps import (
@@ -118,6 +119,93 @@ def _sso_failure_redirect(safe_next: str) -> RedirectResponse:
     also stops the login page from auto-retrying SSO."""
     target = f"/login?sso_error=1&next={quote(safe_next, safe='')}"
     return RedirectResponse(url=target, status_code=status.HTTP_302_FOUND)
+
+
+def _wants_html(request: Request) -> bool:
+    """True for a real browser navigation (``Accept: text/html``). API clients
+    and tests send ``application/json`` (or no ``Accept``), and keep the JSON
+    error body so nothing downstream breaks."""
+    accept = request.headers.get("accept", "")
+    return "text/html" in accept.lower()
+
+
+def _spnego_html_error(
+    status_code: int,
+    title: str,
+    message: str,
+    *,
+    next_path: str,
+    extra_headers: dict[str, str] | None = None,
+    auto_redirect: bool = False,
+) -> HTMLResponse:
+    """A self-contained, themed HTML error page for the SPNEGO endpoint.
+
+    Shown only to browsers (see ``_wants_html``); API clients get JSON. All CSS
+    is inline and there are no external resources, so it is CSP-safe. Bilingual
+    (German primary, English secondary). When ``auto_redirect`` is set, a
+    ``meta http-equiv=refresh`` sends a browser that cannot complete SPNEGO to
+    the login page after a short delay — harmless for a browser that *can*
+    complete SPNEGO, since it acts on the 401 + ``WWW-Authenticate`` and never
+    renders this body.
+    """
+    login_url = f"/login?sso_error=1&next={quote(next_path, safe='')}"
+    login_attr = html_escape(login_url, quote=True)
+    meta_refresh = (
+        f'<meta http-equiv="refresh" content="3;url={login_attr}">' if auto_redirect else ""
+    )
+    page = f"""<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+{meta_refresh}
+<title>{html_escape(title)}</title>
+<style>
+  :root {{
+    --bg: #f3f5fa; --surface: #ffffff; --ink: #1a1f2c; --muted: #66708a;
+    --hairline: #e1e5ef; --accent: #3b6be8;
+  }}
+  @media (prefers-color-scheme: dark) {{
+    :root {{
+      --bg: #0e1015; --surface: #151821; --ink: #e7eaf2; --muted: #8891a3;
+      --hairline: #242a38; --accent: #5b8cff;
+    }}
+  }}
+  * {{ box-sizing: border-box; }}
+  html, body {{ height: 100%; margin: 0; }}
+  body {{
+    background: var(--bg); color: var(--ink);
+    font-family: "Inter","Segoe UI",system-ui,sans-serif;
+    display: flex; align-items: center; justify-content: center;
+    min-height: 100vh; padding: 24px; line-height: 1.55;
+  }}
+  .card {{
+    background: var(--surface); border: 1px solid var(--hairline);
+    border-radius: 14px; max-width: 440px; width: 100%;
+    padding: 32px 32px 28px; box-shadow: 0 8px 30px rgba(0,0,0,.08);
+  }}
+  h1 {{ font-size: 20px; margin: 0 0 12px; font-weight: 650; }}
+  p {{ margin: 0 0 14px; color: var(--ink); }}
+  p.en {{ font-size: 13px; color: var(--muted); }}
+  a.btn {{
+    display: inline-block; margin-top: 6px; padding: 11px 20px;
+    background: var(--accent); color: #fff; text-decoration: none;
+    border-radius: 9px; font-weight: 600; font-size: 15px;
+  }}
+  a.btn:hover {{ filter: brightness(1.06); }}
+</style>
+</head>
+<body>
+  <main class="card">
+    <h1>{html_escape(title)}</h1>
+    <p>{html_escape(message)}</p>
+    <p class="en">Automatic single sign-on could not be completed (for example an
+      expired Kerberos ticket). Please sign in with your password to continue.</p>
+    <a class="btn" href="{login_attr}">Zur Anmeldung / Go to login</a>
+  </main>
+</body>
+</html>"""
+    return HTMLResponse(content=page, status_code=status_code, headers=extra_headers)
 
 
 def _rate_limit_http_exception(decision: object) -> HTTPException:
@@ -619,15 +707,16 @@ async def oidc_callback(
 # ---------------------------------------------------------------------------
 
 
-@router.get("/spnego")
+@router.get("/spnego", response_model=None)
 async def spnego(
+    request: Request,
     response: Response,
     auth: Annotated[AuthService, Depends(get_auth_service)],
     settings: AppSettings,
     session: DbSession,
     authorization: Annotated[str | None, Header()] = None,
     next: Annotated[str | None, Query()] = None,
-) -> RedirectResponse:
+) -> RedirectResponse | HTMLResponse:
     """Kerberos/SPNEGO handshake. On success, 302 back to ``next`` (a same-site
     path, default ``/``) with a full session — this lets an expired-session
     agent re-auth transparently and land back on the page they were on.
@@ -638,13 +727,36 @@ async def spnego(
     bare 401, so the browser never shows a native Negotiate popup.
     """
     safe_next = _safe_next(next)
+    wants_html = _wants_html(request)
 
     if not settings.spnego_enabled:
+        if wants_html:
+            return _spnego_html_error(
+                status.HTTP_404_NOT_FOUND,
+                "Single sign-on nicht verfügbar",
+                "Die automatische Kerberos-Anmeldung ist auf diesem Server nicht aktiviert.",
+                next_path=safe_next,
+                auto_redirect=True,
+            )
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="SPNEGO is not enabled")
 
     if not authorization or not authorization.startswith("Negotiate "):
         # First leg: challenge the browser. It re-sends the same URL (query
         # string, so ``next`` survives) with the ticket.
+        if wants_html:
+            # A browser that CAN do SPNEGO acts on the 401 + WWW-Authenticate
+            # and never renders this body; one that CAN'T sees the page and is
+            # nudged to /login by the meta-refresh. The header must stay so
+            # SPNEGO-capable browsers keep negotiating.
+            return _spnego_html_error(
+                status.HTTP_401_UNAUTHORIZED,
+                "Anmeldung wird fortgesetzt …",
+                "Ihre automatische Kerberos-Anmeldung wird geprüft. Falls das nicht "
+                "funktioniert, werden Sie gleich zur Anmeldeseite weitergeleitet.",
+                next_path=safe_next,
+                extra_headers={"WWW-Authenticate": "Negotiate"},
+                auto_redirect=True,
+            )
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Negotiate token required",
@@ -655,6 +767,14 @@ async def spnego(
     try:
         token_bytes = base64.b64decode(raw_token)
     except (ValueError, TypeError) as exc:
+        if wants_html:
+            return _spnego_html_error(
+                status.HTTP_400_BAD_REQUEST,
+                "Anmeldung fehlgeschlagen",
+                "Das Anmelde-Token war ungültig. Bitte melden Sie sich mit Ihrem Passwort an.",
+                next_path=safe_next,
+                auto_redirect=True,
+            )
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST, detail="Malformed Negotiate token"
         ) from exc
@@ -667,11 +787,29 @@ async def spnego(
         # ticket, so re-challenging would loop/popup — fall back to login.
         return _sso_failure_redirect(safe_next)
     except SpnegoUnavailable as exc:
+        if wants_html:
+            return _spnego_html_error(
+                status.HTTP_501_NOT_IMPLEMENTED,
+                "Single sign-on nicht verfügbar",
+                "Die automatische Anmeldung ist auf diesem Server nicht verfügbar. "
+                "Bitte melden Sie sich mit Ihrem Passwort an.",
+                next_path=safe_next,
+                auto_redirect=True,
+            )
         raise HTTPException(status_code=status.HTTP_501_NOT_IMPLEMENTED, detail=str(exc)) from exc
 
     login_value = principal_to_login(principal)
     user = await auth.get_user_by_login(login_value, auth_method="spnego")
     if user is None:
+        if wants_html:
+            return _spnego_html_error(
+                status.HTTP_403_FORBIDDEN,
+                "Kein passendes Konto",
+                "Zu Ihrer Kerberos-Kennung existiert kein Konto. Bitte melden Sie "
+                "sich mit Ihrem Passwort an.",
+                next_path=safe_next,
+                auto_redirect=True,
+            )
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail=f"No local user matches Kerberos principal '{principal}'",
@@ -680,6 +818,15 @@ async def spnego(
     auth_config = AuthConfigService(session)
     cfg = await auth_config.get(user.id)
     if not cfg.sso_eligible:
+        if wants_html:
+            return _spnego_html_error(
+                status.HTTP_403_FORBIDDEN,
+                "Single sign-on nicht aktiviert",
+                "Für Ihr Konto ist die automatische Anmeldung nicht aktiviert. "
+                "Bitte melden Sie sich mit Ihrem Passwort an.",
+                next_path=safe_next,
+                auto_redirect=True,
+            )
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="SSO not enabled for this account",

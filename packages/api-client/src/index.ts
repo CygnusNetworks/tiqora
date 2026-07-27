@@ -147,6 +147,7 @@ export {
   type DaemonServiceOut,
   type DaemonListOut,
   type DaemonUpdate,
+  type SystemInfoOut,
   type MailSecurity,
   type MailAuthType,
   type MailOutboundOut,

@@ -1143,6 +1143,7 @@
       "authConfig": "Authentifizierung / 2FA",
       "gdpr": "Datenschutz / DSGVO",
       "daemons": "Dienste",
+      "systemInfo": "System-Info",
       "ai": "Einstellungen",
       "aiProviders": "Provider",
       "aiMcp": "MCP-Clients",
@@ -1627,6 +1628,75 @@
       "resetToZnuny": "Znuny-Werte wiederherstellen",
       "loadError": "Einstellungen konnten nicht geladen werden."
     },
+    "systemInfo": {
+      "title": "System-Info",
+      "description": "Gesamtzustand der Installation auf einen Blick — Version, Dienste, Datenspeicher, Container und Auslastung. Für Diagnose und Support.",
+      "loadError": "System-Informationen konnten nicht geladen werden.",
+      "unavailable": "Nicht verfügbar.",
+      "overall": {
+        "ok": "Alle Systeme betriebsbereit",
+        "degraded": "Betrieb mit Einschränkungen",
+        "error": "Störung erkannt",
+        "uptime": "Uptime {{duration}}"
+      },
+      "sections": {
+        "app": "Anwendung & Build",
+        "services": "Hintergrund-Dienste",
+        "datastores": "Datenspeicher & Suche",
+        "containers": "Container",
+        "host": "Host-Auslastung"
+      },
+      "tier": {
+        "live": "Live",
+        "optin": "Opt-in",
+        "dockerSocket": "Docker-Socket",
+        "psutil": "psutil"
+      },
+      "app": {
+        "product": "Produkt",
+        "version": "Version",
+        "gitSha": "Git-Commit",
+        "buildTime": "Build",
+        "environment": "Umgebung",
+        "python": "Python",
+        "hostname": "Host",
+        "uptime": "API-Uptime",
+        "serverTime": "Serverzeit"
+      },
+      "services": {
+        "service": "Dienst",
+        "status": "Status",
+        "lastOk": "Letzter Erfolg",
+        "message": "Meldung"
+      },
+      "db": {
+        "connected": "verbunden",
+        "disconnected": "getrennt",
+        "size": "Größe",
+        "latency": "Latenz"
+      },
+      "redis": {
+        "memory": "Speicher",
+        "clients": "Clients"
+      },
+      "search": {
+        "available": "verfügbar",
+        "tickets": "Tickets",
+        "kb": "Wissensdb",
+        "indexSize": "Index-Größe",
+        "unavailable": "nicht erreichbar"
+      },
+      "containers": {
+        "since": "seit",
+        "restarts": "Neustarts"
+      },
+      "host": {
+        "cpu": "CPU",
+        "memory": "Arbeitsspeicher",
+        "disk": "Festplatte",
+        "cores": "{{count}} Kerne · Load {{load}}"
+      }
+    },
     "daemons": {
       "title": "Dienste",
       "description": "Periodische Hintergrunddienste des Tiqora-Workers: Aktivierung, Intervall und Laufzeit-Status.",
@@ -2012,6 +2082,7 @@
       "webhooks": "Ausgehende Webhooks für Ticket-Ereignisse verwalten.",
       "apiKeys": "API-Schlüssel für externe Integrationen verwalten.",
       "daemons": "Status und Intervalle der Hintergrunddienste steuern.",
+      "systemInfo": "Gesamtüberblick: Version, Dienste, Datenspeicher, Container und Auslastung.",
       "gdpr": "DSGVO-Anfragen: Auskunft, Anonymisierung und Löschung mit Backup.",
       "mailLog": "Ein- und ausgehende E-Mail-Zustellversuche einsehen.",
       "customerFields": "Platzhalter-Variablen für Kundenbenutzer pflegen.",
