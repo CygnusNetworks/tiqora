@@ -41,9 +41,10 @@ class TiqoraApiKey(TiqoraBase):
     expires_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     last_used_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     created_by: Mapped[int | None] = mapped_column(Integer, nullable=True)
-    # Comma-separated scope tokens: read, write, mcp. NULL/empty = unrestricted
-    # (full agent privileges of the linked user). write implies read for HTTP.
-    scopes: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    # Comma-separated scope tokens: legacy read/write/mcp/* plus area RO/RW
+    # (e.g. tickets:ro,kb:rw). NULL/empty = unrestricted (full agent privileges
+    # of the linked user). See tiqora.domain.api_key_scopes.
+    scopes: Mapped[str | None] = mapped_column(String(500), nullable=True)
 
 
 class TiqoraSettings(TiqoraBase):

@@ -730,6 +730,11 @@
             "title": "Body",
             "type": "string"
           },
+          "create_time": {
+            "format": "date-time",
+            "title": "Create Time",
+            "type": "string"
+          },
           "id": {
             "title": "Id",
             "type": "integer"
@@ -760,6 +765,13 @@
           "ticket_id": {
             "title": "Ticket Id",
             "type": "integer"
+          },
+          "tool_trace": {
+            "items": {
+              "$ref": "#/components/schemas/AiToolTraceOut"
+            },
+            "title": "Tool Trace",
+            "type": "array"
           }
         },
         "required": [
@@ -771,7 +783,9 @@
           "based_on_article_id",
           "status",
           "source",
-          "accepted_article_id"
+          "accepted_article_id",
+          "create_time",
+          "tool_trace"
         ],
         "title": "AiDraftOut",
         "type": "object"
@@ -822,6 +836,147 @@
         "title": "AiDraftRequestOut",
         "type": "object"
       },
+      "AiPromptPartCreate": {
+        "properties": {
+          "content": {
+            "title": "Content",
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "file",
+              "note"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "title",
+          "content"
+        ],
+        "title": "AiPromptPartCreate",
+        "type": "object"
+      },
+      "AiPromptPartOut": {
+        "properties": {
+          "change_time": {
+            "format": "date-time",
+            "title": "Change Time",
+            "type": "string"
+          },
+          "content": {
+            "title": "Content",
+            "type": "string"
+          },
+          "create_time": {
+            "format": "date-time",
+            "title": "Create Time",
+            "type": "string"
+          },
+          "enabled": {
+            "title": "Enabled",
+            "type": "boolean"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "kind": {
+            "enum": [
+              "file",
+              "note"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "policy_id": {
+            "title": "Policy Id",
+            "type": "integer"
+          },
+          "position": {
+            "title": "Position",
+            "type": "integer"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "policy_id",
+          "kind",
+          "title",
+          "content",
+          "position",
+          "enabled",
+          "create_time",
+          "change_time"
+        ],
+        "title": "AiPromptPartOut",
+        "type": "object"
+      },
+      "AiPromptPartReorder": {
+        "properties": {
+          "ordered_ids": {
+            "items": {
+              "type": "integer"
+            },
+            "title": "Ordered Ids",
+            "type": "array"
+          }
+        },
+        "required": [
+          "ordered_ids"
+        ],
+        "title": "AiPromptPartReorder",
+        "type": "object"
+      },
+      "AiPromptPartUpdate": {
+        "properties": {
+          "content": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Content"
+          },
+          "enabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Enabled"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          }
+        },
+        "title": "AiPromptPartUpdate",
+        "type": "object"
+      },
       "AiQueuePolicyCreate": {
         "properties": {
           "ai_disclosure_enabled": {
@@ -839,6 +994,17 @@
               }
             ],
             "title": "Ai Disclosure Text"
+          },
+          "allowed_state_types": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Allowed State Types"
           },
           "autonomy": {
             "default": "off",
@@ -860,6 +1026,17 @@
               }
             ],
             "title": "Budget Tokens Day"
+          },
+          "capabilities_json": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Capabilities Json"
           },
           "clarify_schema_json": {
             "anyOf": [
@@ -907,6 +1084,22 @@
             ],
             "title": "Identity Mode",
             "type": "string"
+          },
+          "ignore_senders_manual": {
+            "default": false,
+            "title": "Ignore Senders Manual",
+            "type": "boolean"
+          },
+          "ignored_senders": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ignored Senders"
           },
           "kb_category_ids": {
             "anyOf": [
@@ -1000,9 +1193,46 @@
             "title": "Pii Masking",
             "type": "boolean"
           },
+          "pii_ner_enabled": {
+            "default": true,
+            "title": "Pii Ner Enabled",
+            "type": "boolean"
+          },
           "queue_id": {
             "title": "Queue Id",
             "type": "integer"
+          },
+          "reply_language_default": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reply Language Default"
+          },
+          "reply_language_fixed": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reply Language Fixed"
+          },
+          "reply_language_mode": {
+            "default": "off",
+            "enum": [
+              "off",
+              "fixed",
+              "auto"
+            ],
+            "title": "Reply Language Mode",
+            "type": "string"
           },
           "service_user_id": {
             "anyOf": [
@@ -1036,6 +1266,15 @@
               }
             ],
             "title": "Summary Char Threshold"
+          },
+          "summary_detail": {
+            "default": "standard",
+            "enum": [
+              "standard",
+              "detailed"
+            ],
+            "title": "Summary Detail",
+            "type": "string"
           },
           "summary_incremental_min_articles": {
             "anyOf": [
@@ -1099,6 +1338,17 @@
             ],
             "title": "Ai Disclosure Text"
           },
+          "allowed_state_types": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Allowed State Types"
+          },
           "autonomy": {
             "enum": [
               "off",
@@ -1118,6 +1368,17 @@
               }
             ],
             "title": "Budget Tokens Day"
+          },
+          "capabilities_json": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Capabilities Json"
           },
           "change_time": {
             "format": "date-time",
@@ -1175,6 +1436,21 @@
             ],
             "title": "Identity Mode",
             "type": "string"
+          },
+          "ignore_senders_manual": {
+            "title": "Ignore Senders Manual",
+            "type": "boolean"
+          },
+          "ignored_senders": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ignored Senders"
           },
           "kb_category_ids": {
             "anyOf": [
@@ -1265,9 +1541,44 @@
             "title": "Pii Masking",
             "type": "boolean"
           },
+          "pii_ner_enabled": {
+            "title": "Pii Ner Enabled",
+            "type": "boolean"
+          },
           "queue_id": {
             "title": "Queue Id",
             "type": "integer"
+          },
+          "reply_language_default": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reply Language Default"
+          },
+          "reply_language_fixed": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reply Language Fixed"
+          },
+          "reply_language_mode": {
+            "enum": [
+              "off",
+              "fixed",
+              "auto"
+            ],
+            "title": "Reply Language Mode",
+            "type": "string"
           },
           "service_user_id": {
             "anyOf": [
@@ -1301,6 +1612,14 @@
               }
             ],
             "title": "Summary Char Threshold"
+          },
+          "summary_detail": {
+            "enum": [
+              "standard",
+              "detailed"
+            ],
+            "title": "Summary Detail",
+            "type": "string"
           },
           "summary_incremental_min_articles": {
             "anyOf": [
@@ -1372,8 +1691,16 @@
           "ai_disclosure_enabled",
           "ai_disclosure_text",
           "pii_masking",
+          "pii_ner_enabled",
           "identity_mode",
           "clarify_schema_json",
+          "ignored_senders",
+          "ignore_senders_manual",
+          "reply_language_mode",
+          "reply_language_fixed",
+          "reply_language_default",
+          "allowed_state_types",
+          "summary_detail",
           "valid_id",
           "create_time",
           "change_time"
@@ -1405,6 +1732,17 @@
             ],
             "title": "Ai Disclosure Text"
           },
+          "allowed_state_types": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Allowed State Types"
+          },
           "autonomy": {
             "anyOf": [
               {
@@ -1431,6 +1769,17 @@
               }
             ],
             "title": "Budget Tokens Day"
+          },
+          "capabilities_json": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Capabilities Json"
           },
           "clarify_schema_json": {
             "anyOf": [
@@ -1502,6 +1851,28 @@
               }
             ],
             "title": "Identity Mode"
+          },
+          "ignore_senders_manual": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ignore Senders Manual"
+          },
+          "ignored_senders": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ignored Senders"
           },
           "kb_category_ids": {
             "anyOf": [
@@ -1613,6 +1984,55 @@
             ],
             "title": "Pii Masking"
           },
+          "pii_ner_enabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pii Ner Enabled"
+          },
+          "reply_language_default": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reply Language Default"
+          },
+          "reply_language_fixed": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reply Language Fixed"
+          },
+          "reply_language_mode": {
+            "anyOf": [
+              {
+                "enum": [
+                  "off",
+                  "fixed",
+                  "auto"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reply Language Mode"
+          },
           "service_user_id": {
             "anyOf": [
               {
@@ -1645,6 +2065,21 @@
               }
             ],
             "title": "Summary Char Threshold"
+          },
+          "summary_detail": {
+            "anyOf": [
+              {
+                "enum": [
+                  "standard",
+                  "detailed"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Summary Detail"
           },
           "summary_incremental_min_articles": {
             "anyOf": [
@@ -1707,6 +2142,15 @@
       },
       "AiSettingsOut": {
         "properties": {
+          "audit_retention_days": {
+            "title": "Audit Retention Days",
+            "type": "integer"
+          },
+          "auto_reply_paused": {
+            "default": false,
+            "title": "Auto Reply Paused",
+            "type": "boolean"
+          },
           "disclosure_default_text": {
             "title": "Disclosure Default Text",
             "type": "string"
@@ -1734,13 +2178,38 @@
         "required": [
           "operation_mode",
           "disclosure_default_text",
-          "global_max_replies_per_hour"
+          "global_max_replies_per_hour",
+          "audit_retention_days"
         ],
         "title": "AiSettingsOut",
         "type": "object"
       },
       "AiSettingsUpdate": {
         "properties": {
+          "audit_retention_days": {
+            "anyOf": [
+              {
+                "maximum": 365.0,
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Audit Retention Days"
+          },
+          "auto_reply_paused": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Auto Reply Paused"
+          },
           "disclosure_default_text": {
             "anyOf": [
               {
@@ -1829,6 +2298,18 @@
               }
             ],
             "title": "Summary Body"
+          },
+          "summary_created_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Summary Created At"
           }
         },
         "required": [
@@ -1838,9 +2319,32 @@
           "operation_mode_ready",
           "drafts",
           "summary_body",
-          "last_summary_upto_article_id"
+          "last_summary_upto_article_id",
+          "summary_created_at"
         ],
         "title": "AiStateOut",
+        "type": "object"
+      },
+      "AiSummarizeIn": {
+        "description": "Per-run scope choice \u2014 the agent picks it in the ticket's AI panel;\n``None`` falls back to the queue policy's ``summary_detail``.",
+        "properties": {
+          "detail": {
+            "anyOf": [
+              {
+                "enum": [
+                  "standard",
+                  "detailed"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Detail"
+          }
+        },
+        "title": "AiSummarizeIn",
         "type": "object"
       },
       "AiSummarizeOut": {
@@ -1876,6 +2380,24 @@
           "status"
         ],
         "title": "AiSummarizeOut",
+        "type": "object"
+      },
+      "AiToolTraceOut": {
+        "properties": {
+          "content": {
+            "title": "Content",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "content"
+        ],
+        "title": "AiToolTraceOut",
         "type": "object"
       },
       "AiUsageOut": {
@@ -2066,6 +2588,17 @@
             "title": "Name",
             "type": "string"
           },
+          "scopes": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scopes"
+          },
           "user_id": {
             "title": "User Id",
             "type": "integer"
@@ -2132,6 +2665,17 @@
           "name": {
             "title": "Name",
             "type": "string"
+          },
+          "scopes": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scopes"
           },
           "user_id": {
             "title": "User Id",
@@ -2207,6 +2751,17 @@
             "title": "Name",
             "type": "string"
           },
+          "scopes": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scopes"
+          },
           "user_id": {
             "title": "User Id",
             "type": "integer"
@@ -2254,6 +2809,17 @@
             ],
             "title": "Name"
           },
+          "scopes": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scopes"
+          },
           "valid": {
             "anyOf": [
               {
@@ -2267,6 +2833,79 @@
           }
         },
         "title": "ApiKeyUpdate",
+        "type": "object"
+      },
+      "AppInfoOut": {
+        "description": "Application identity and build provenance.",
+        "properties": {
+          "build_time": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Build Time"
+          },
+          "environment": {
+            "title": "Environment",
+            "type": "string"
+          },
+          "git_sha": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Git Sha"
+          },
+          "hostname": {
+            "title": "Hostname",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "python_version": {
+            "title": "Python Version",
+            "type": "string"
+          },
+          "server_time": {
+            "format": "date-time",
+            "title": "Server Time",
+            "type": "string"
+          },
+          "started_at": {
+            "format": "date-time",
+            "title": "Started At",
+            "type": "string"
+          },
+          "uptime_seconds": {
+            "title": "Uptime Seconds",
+            "type": "number"
+          },
+          "version": {
+            "title": "Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "version",
+          "environment",
+          "python_version",
+          "hostname",
+          "server_time",
+          "started_at",
+          "uptime_seconds"
+        ],
+        "title": "AppInfoOut",
         "type": "object"
       },
       "AppointmentIn": {
@@ -3103,6 +3742,13 @@
             "title": "State",
             "type": "string"
           },
+          "tags": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Tags",
+            "type": "array"
+          },
           "title": {
             "title": "Title",
             "type": "string"
@@ -3408,6 +4054,517 @@
           "content_type"
         ],
         "title": "AttachmentRefOut",
+        "type": "object"
+      },
+      "AuditLogDetailOut": {
+        "properties": {
+          "acting_user_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Acting User Id"
+          },
+          "completion_tokens": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Completion Tokens"
+          },
+          "cost": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cost"
+          },
+          "cost_currency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cost Currency"
+          },
+          "duration_ms": {
+            "title": "Duration Ms",
+            "type": "integer"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "feature": {
+            "title": "Feature",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "model": {
+            "title": "Model",
+            "type": "string"
+          },
+          "pii_counts": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "integer"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pii Counts"
+          },
+          "prompt_tokens": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Prompt Tokens"
+          },
+          "provider_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Provider Id"
+          },
+          "provider_name": {
+            "title": "Provider Name",
+            "type": "string"
+          },
+          "queue_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Queue Id"
+          },
+          "request_json": {
+            "title": "Request Json",
+            "type": "string"
+          },
+          "response_json": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Response Json"
+          },
+          "run_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Run Id"
+          },
+          "status_code": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status Code"
+          },
+          "ticket_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ticket Id"
+          },
+          "trigger": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Trigger"
+          },
+          "ts": {
+            "format": "date-time",
+            "title": "Ts",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "ts",
+          "run_id",
+          "provider_id",
+          "provider_name",
+          "model",
+          "feature",
+          "ticket_id",
+          "queue_id",
+          "acting_user_id",
+          "trigger",
+          "status_code",
+          "error",
+          "duration_ms",
+          "prompt_tokens",
+          "completion_tokens",
+          "request_json",
+          "response_json"
+        ],
+        "title": "AuditLogDetailOut",
+        "type": "object"
+      },
+      "AuditLogListItemOut": {
+        "properties": {
+          "acting_user_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Acting User Id"
+          },
+          "completion_tokens": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Completion Tokens"
+          },
+          "cost": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cost"
+          },
+          "cost_currency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cost Currency"
+          },
+          "duration_ms": {
+            "title": "Duration Ms",
+            "type": "integer"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "feature": {
+            "title": "Feature",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "model": {
+            "title": "Model",
+            "type": "string"
+          },
+          "pii_counts": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "integer"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pii Counts"
+          },
+          "prompt_tokens": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Prompt Tokens"
+          },
+          "provider_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Provider Id"
+          },
+          "provider_name": {
+            "title": "Provider Name",
+            "type": "string"
+          },
+          "queue_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Queue Id"
+          },
+          "run_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Run Id"
+          },
+          "status_code": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status Code"
+          },
+          "ticket_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ticket Id"
+          },
+          "trigger": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Trigger"
+          },
+          "ts": {
+            "format": "date-time",
+            "title": "Ts",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "ts",
+          "run_id",
+          "provider_id",
+          "provider_name",
+          "model",
+          "feature",
+          "ticket_id",
+          "queue_id",
+          "acting_user_id",
+          "trigger",
+          "status_code",
+          "error",
+          "duration_ms",
+          "prompt_tokens",
+          "completion_tokens"
+        ],
+        "title": "AuditLogListItemOut",
+        "type": "object"
+      },
+      "AuditLogPageOut": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/AuditLogListItemOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "page": {
+            "title": "Page",
+            "type": "integer"
+          },
+          "page_size": {
+            "title": "Page Size",
+            "type": "integer"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "items",
+          "total",
+          "page",
+          "page_size"
+        ],
+        "title": "AuditLogPageOut",
+        "type": "object"
+      },
+      "AuditLogStatsOut": {
+        "properties": {
+          "cost_currency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cost Currency"
+          },
+          "error_rate": {
+            "title": "Error Rate",
+            "type": "number"
+          },
+          "per_day": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Per Day",
+            "type": "array"
+          },
+          "top_model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Top Model"
+          },
+          "total_completion_tokens": {
+            "title": "Total Completion Tokens",
+            "type": "integer"
+          },
+          "total_cost": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total Cost"
+          },
+          "total_prompt_tokens": {
+            "title": "Total Prompt Tokens",
+            "type": "integer"
+          },
+          "total_requests": {
+            "title": "Total Requests",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "total_requests",
+          "total_prompt_tokens",
+          "total_completion_tokens",
+          "error_rate",
+          "per_day",
+          "top_model",
+          "total_cost",
+          "cost_currency"
+        ],
+        "title": "AuditLogStatsOut",
         "type": "object"
       },
       "AuthConfigAgentOut": {
@@ -4277,6 +5434,112 @@
         "title": "ComposeContextOut",
         "type": "object"
       },
+      "ContainerOut": {
+        "description": "One Docker container as reported by the daemon (via the mounted socket).",
+        "properties": {
+          "health": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Health"
+          },
+          "image": {
+            "title": "Image",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "restart_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Restart Count"
+          },
+          "started_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Started At"
+          },
+          "state": {
+            "title": "State",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "image",
+          "state"
+        ],
+        "title": "ContainerOut",
+        "type": "object"
+      },
+      "ContainersOut": {
+        "description": "Degrades gracefully: ``available`` is false when the docker SDK is\nmissing or the socket is not mounted.\n\n``configured`` separates \"opt-in simply not set up\" (no socket mounted /\nSDK absent \u2192 a neutral note) from an actual error while talking to a\npresent daemon (``reason`` set \u2192 surfaced as a problem).",
+        "properties": {
+          "available": {
+            "title": "Available",
+            "type": "boolean"
+          },
+          "configured": {
+            "default": true,
+            "title": "Configured",
+            "type": "boolean"
+          },
+          "engine_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Engine Version"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ContainerOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          }
+        },
+        "required": [
+          "available"
+        ],
+        "title": "ContainersOut",
+        "type": "object"
+      },
       "CustomerCompanyCreate": {
         "properties": {
           "city": {
@@ -4487,6 +5750,24 @@
         "title": "CustomerCompanyOut",
         "type": "object"
       },
+      "CustomerCompanyRefOut": {
+        "properties": {
+          "customer_id": {
+            "title": "Customer Id",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "customer_id",
+          "name"
+        ],
+        "title": "CustomerCompanyRefOut",
+        "type": "object"
+      },
       "CustomerCompanyUpdate": {
         "properties": {
           "city": {
@@ -4581,6 +5862,50 @@
         "title": "CustomerCompanyUpdate",
         "type": "object"
       },
+      "CustomerContactRefOut": {
+        "properties": {
+          "company_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Company Name"
+          },
+          "customer_id": {
+            "title": "Customer Id",
+            "type": "string"
+          },
+          "email": {
+            "title": "Email",
+            "type": "string"
+          },
+          "first_name": {
+            "title": "First Name",
+            "type": "string"
+          },
+          "last_name": {
+            "title": "Last Name",
+            "type": "string"
+          },
+          "login": {
+            "title": "Login",
+            "type": "string"
+          }
+        },
+        "required": [
+          "login",
+          "email",
+          "first_name",
+          "last_name",
+          "customer_id"
+        ],
+        "title": "CustomerContactRefOut",
+        "type": "object"
+      },
       "CustomerLoginResponse": {
         "properties": {
           "customer": {
@@ -4657,6 +5982,30 @@
           "full_name"
         ],
         "title": "CustomerRefOut",
+        "type": "object"
+      },
+      "CustomerSearchOut": {
+        "properties": {
+          "companies": {
+            "items": {
+              "$ref": "#/components/schemas/CustomerCompanyRefOut"
+            },
+            "title": "Companies",
+            "type": "array"
+          },
+          "contacts": {
+            "items": {
+              "$ref": "#/components/schemas/CustomerContactRefOut"
+            },
+            "title": "Contacts",
+            "type": "array"
+          }
+        },
+        "required": [
+          "companies",
+          "contacts"
+        ],
+        "title": "CustomerSearchOut",
         "type": "object"
       },
       "CustomerUserAdminCreate": {
@@ -5508,6 +6857,88 @@
         "title": "DashboardSummary",
         "type": "object"
       },
+      "DatastoresOut": {
+        "properties": {
+          "database": {
+            "$ref": "#/components/schemas/DbStatusOut"
+          },
+          "redis": {
+            "$ref": "#/components/schemas/RedisStatusOut"
+          },
+          "search": {
+            "$ref": "#/components/schemas/SearchStatusOut"
+          }
+        },
+        "required": [
+          "database",
+          "redis",
+          "search"
+        ],
+        "title": "DatastoresOut",
+        "type": "object"
+      },
+      "DbStatusOut": {
+        "description": "PostgreSQL/MariaDB connectivity and size probe (best-effort).",
+        "properties": {
+          "connected": {
+            "title": "Connected",
+            "type": "boolean"
+          },
+          "dialect": {
+            "title": "Dialect",
+            "type": "string"
+          },
+          "latency_ms": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Latency Ms"
+          },
+          "legacy_schema": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LegacySchemaOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "size_bytes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Size Bytes"
+          },
+          "version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Version"
+          }
+        },
+        "required": [
+          "dialect",
+          "connected"
+        ],
+        "title": "DbStatusOut",
+        "type": "object"
+      },
       "DimensionCountOut": {
         "properties": {
           "count": {
@@ -5956,6 +7387,104 @@
           }
         },
         "title": "ErasureSelectorIn",
+        "type": "object"
+      },
+      "EscalationHitOut": {
+        "properties": {
+          "field": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Field"
+          },
+          "match": {
+            "title": "Match",
+            "type": "string"
+          },
+          "rule_index": {
+            "title": "Rule Index",
+            "type": "integer"
+          },
+          "tool": {
+            "title": "Tool",
+            "type": "string"
+          },
+          "value": {
+            "title": "Value",
+            "type": "string"
+          }
+        },
+        "required": [
+          "rule_index",
+          "tool",
+          "field",
+          "match",
+          "value"
+        ],
+        "title": "EscalationHitOut",
+        "type": "object"
+      },
+      "EscalationTestIn": {
+        "description": "Dry-run input for the escalation-rule tester (nothing is persisted).\n\n``rules_json`` is the same JSON-array text the policy editor holds in its\n``escalation_rules`` field; ``sample_json`` is a sample raw tool result.",
+        "properties": {
+          "rules_json": {
+            "title": "Rules Json",
+            "type": "string"
+          },
+          "sample_json": {
+            "title": "Sample Json",
+            "type": "string"
+          },
+          "tool": {
+            "title": "Tool",
+            "type": "string"
+          }
+        },
+        "required": [
+          "rules_json",
+          "tool",
+          "sample_json"
+        ],
+        "title": "EscalationTestIn",
+        "type": "object"
+      },
+      "EscalationTestOut": {
+        "properties": {
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "hit": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/EscalationHitOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "valid": {
+            "title": "Valid",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "valid"
+        ],
+        "title": "EscalationTestOut",
         "type": "object"
       },
       "FollowUpPossibleOut": {
@@ -6621,7 +8150,7 @@
         "type": "object"
       },
       "GenericAgentJobOut": {
-        "description": "Grouped by ``job_name`` (key/value rows per Znuny ``generic_agent_jobs``).",
+        "description": "Grouped by ``job_name`` (key/value rows per Znuny ``generic_agent_jobs``).\n\n``settings`` keeps each ``job_key`` mapped to the *list* of its row values:\nZnuny stores repeated keys (one ``ScheduleDays`` row per weekday, one\n``StateIDs`` row per state, \u2026), so collapsing to a single value would drop\nall but the last \u2014 breaking any schedule/criteria decode on the client.",
         "properties": {
           "job_name": {
             "title": "Job Name",
@@ -6629,14 +8158,10 @@
           },
           "settings": {
             "additionalProperties": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ]
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
             },
             "title": "Settings",
             "type": "object"
@@ -6932,6 +8457,149 @@
         "title": "HistoryEntry",
         "type": "object"
       },
+      "HostOut": {
+        "description": "Host resource utilisation via psutil. Degrades gracefully when psutil is\nnot installed (``available`` false, ``configured`` false \u2192 neutral note).",
+        "properties": {
+          "available": {
+            "title": "Available",
+            "type": "boolean"
+          },
+          "configured": {
+            "default": true,
+            "title": "Configured",
+            "type": "boolean"
+          },
+          "cpu_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cpu Count"
+          },
+          "cpu_percent": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cpu Percent"
+          },
+          "disk_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Disk Path"
+          },
+          "disk_percent": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Disk Percent"
+          },
+          "disk_total_bytes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Disk Total Bytes"
+          },
+          "disk_used_bytes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Disk Used Bytes"
+          },
+          "load_avg": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "number"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Load Avg"
+          },
+          "memory_percent": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Memory Percent"
+          },
+          "memory_total_bytes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Memory Total Bytes"
+          },
+          "memory_used_bytes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Memory Used Bytes"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          }
+        },
+        "required": [
+          "available"
+        ],
+        "title": "HostOut",
+        "type": "object"
+      },
       "KbSearchHit": {
         "properties": {
           "anchor": {
@@ -7126,6 +8794,65 @@
         "title": "KnowledgeBundle",
         "type": "object"
       },
+      "LegacySchemaOut": {
+        "description": "Detected OTRS/Znuny schema profile for the connected database.\n\nSee ``tiqora.db.legacy.profile`` / multi-version support matrix\n(version ids such as ``znuny-6.5``, OTRS/Znuny 6.0\u20137.3). Surfaced on the\nadmin System-Info page so operators can see which peer schema Tiqora\nadapted to.",
+        "properties": {
+          "dialect": {
+            "title": "Dialect",
+            "type": "string"
+          },
+          "groups_table": {
+            "title": "Groups Table",
+            "type": "string"
+          },
+          "junction_tables_have_surrogate_id": {
+            "title": "Junction Tables Have Surrogate Id",
+            "type": "boolean"
+          },
+          "known": {
+            "title": "Known",
+            "type": "boolean"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "mail_account_has_oauth": {
+            "title": "Mail Account Has Oauth",
+            "type": "boolean"
+          },
+          "profile_id": {
+            "title": "Profile Id",
+            "type": "string"
+          },
+          "source": {
+            "title": "Source",
+            "type": "string"
+          },
+          "state_priority_has_color": {
+            "title": "State Priority Has Color",
+            "type": "boolean"
+          },
+          "supported": {
+            "title": "Supported",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "profile_id",
+          "label",
+          "known",
+          "supported",
+          "groups_table",
+          "mail_account_has_oauth",
+          "state_priority_has_color",
+          "junction_tables_have_surrogate_id",
+          "dialect",
+          "source"
+        ],
+        "title": "LegacySchemaOut",
+        "type": "object"
+      },
       "LlmProviderCreate": {
         "properties": {
           "api_key": {
@@ -7175,6 +8902,39 @@
           "name": {
             "title": "Name",
             "type": "string"
+          },
+          "price_currency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Price Currency"
+          },
+          "price_input_per_1m": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Price Input Per 1M"
+          },
+          "price_output_per_1m": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Price Output Per 1M"
           },
           "supports_streaming": {
             "default": true,
@@ -7255,6 +9015,39 @@
             "title": "Name",
             "type": "string"
           },
+          "price_currency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Price Currency"
+          },
+          "price_input_per_1m": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Price Input Per 1M"
+          },
+          "price_output_per_1m": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Price Output Per 1M"
+          },
           "supports_streaming": {
             "title": "Supports Streaming",
             "type": "boolean"
@@ -7284,6 +9077,9 @@
           "supports_streaming",
           "eu_hosted",
           "supports_vision",
+          "price_input_per_1m",
+          "price_output_per_1m",
+          "price_currency",
           "valid_id",
           "create_time",
           "change_time"
@@ -7416,6 +9212,39 @@
             ],
             "title": "Name"
           },
+          "price_currency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Price Currency"
+          },
+          "price_input_per_1m": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Price Input Per 1M"
+          },
+          "price_output_per_1m": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Price Output Per 1M"
+          },
           "supports_streaming": {
             "anyOf": [
               {
@@ -7489,9 +9318,19 @@
             "title": "Must Enroll 2Fa",
             "type": "boolean"
           },
+          "passkey_enrolled": {
+            "default": false,
+            "title": "Passkey Enrolled",
+            "type": "boolean"
+          },
           "pending_2fa": {
             "default": false,
             "title": "Pending 2Fa",
+            "type": "boolean"
+          },
+          "totp_enrolled": {
+            "default": false,
+            "title": "Totp Enrolled",
             "type": "boolean"
           },
           "user": {
@@ -8111,6 +9950,17 @@
           "mutating": {
             "title": "Mutating",
             "type": "boolean"
+          },
+          "parameters_snapshot": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parameters Snapshot"
           },
           "tool_name": {
             "title": "Tool Name",
@@ -9368,6 +11218,22 @@
           "value"
         ],
         "title": "PhysicalQueueVariableOut",
+        "type": "object"
+      },
+      "PiiRevealOut": {
+        "properties": {
+          "mapping": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Mapping",
+            "type": "object"
+          }
+        },
+        "required": [
+          "mapping"
+        ],
+        "title": "PiiRevealOut",
         "type": "object"
       },
       "PlaceholderFieldCreate": {
@@ -10965,6 +12831,63 @@
         "title": "RecurrenceIn",
         "type": "object"
       },
+      "RedisStatusOut": {
+        "properties": {
+          "clients": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Clients"
+          },
+          "connected": {
+            "title": "Connected",
+            "type": "boolean"
+          },
+          "latency_ms": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Latency Ms"
+          },
+          "used_memory_bytes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Used Memory Bytes"
+          },
+          "version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Version"
+          }
+        },
+        "required": [
+          "connected"
+        ],
+        "title": "RedisStatusOut",
+        "type": "object"
+      },
       "ReplyDraftOut": {
         "description": "Prefilled reply/reply-all draft for one article (see quoting.py).",
         "properties": {
@@ -11520,6 +13443,17 @@
             "title": "Estimated Total",
             "type": "integer"
           },
+          "facets": {
+            "additionalProperties": {
+              "additionalProperties": {
+                "type": "integer"
+              },
+              "type": "object"
+            },
+            "description": "Facet distribution for UI-consumed facets (queue_id, state_type); values are string keys \u2192 hit counts.",
+            "title": "Facets",
+            "type": "object"
+          },
           "hits": {
             "items": {
               "$ref": "#/components/schemas/SearchHit"
@@ -11538,6 +13472,75 @@
           "estimated_total"
         ],
         "title": "SearchResponse",
+        "type": "object"
+      },
+      "SearchStatusOut": {
+        "description": "Meilisearch health + index document counts (best-effort).",
+        "properties": {
+          "available": {
+            "title": "Available",
+            "type": "boolean"
+          },
+          "database_size_bytes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Database Size Bytes"
+          },
+          "kb_docs": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Kb Docs"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "tickets_docs": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tickets Docs"
+          },
+          "version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Version"
+          }
+        },
+        "required": [
+          "available"
+        ],
+        "title": "SearchStatusOut",
         "type": "object"
       },
       "SignatureOut": {
@@ -11724,6 +13727,85 @@
         "title": "SignatureWrite",
         "type": "object"
       },
+      "SimilarTicketItem": {
+        "description": "One similar closed ticket (keyword rank v1; score ready for embedding blend).",
+        "properties": {
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "queue_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Queue Name"
+          },
+          "score": {
+            "default": 0.0,
+            "title": "Score",
+            "type": "number"
+          },
+          "state": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "State"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          },
+          "tn": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tn"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "title": "SimilarTicketItem",
+        "type": "object"
+      },
+      "SimilarTicketsOut": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/SimilarTicketItem"
+            },
+            "title": "Items",
+            "type": "array"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "SimilarTicketsOut",
+        "type": "object"
+      },
       "SlaStatsOut": {
         "properties": {
           "escalated": {
@@ -11863,9 +13945,53 @@
       },
       "SplitRequest": {
         "properties": {
+          "customer_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Customer Id"
+          },
+          "customer_user_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Customer User Id"
+          },
+          "priority_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Priority Id"
+          },
           "queue_id": {
             "title": "Queue Id",
             "type": "integer"
+          },
+          "state_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "State Id"
           },
           "title": {
             "anyOf": [
@@ -12703,6 +14829,39 @@
         "title": "SystemAddressOut",
         "type": "object"
       },
+      "SystemInfoOut": {
+        "description": "Everything the admin System-Info page renders in one payload.",
+        "properties": {
+          "app": {
+            "$ref": "#/components/schemas/AppInfoOut"
+          },
+          "containers": {
+            "$ref": "#/components/schemas/ContainersOut"
+          },
+          "datastores": {
+            "$ref": "#/components/schemas/DatastoresOut"
+          },
+          "host": {
+            "$ref": "#/components/schemas/HostOut"
+          },
+          "services": {
+            "items": {
+              "$ref": "#/components/schemas/DaemonServiceOut"
+            },
+            "title": "Services",
+            "type": "array"
+          }
+        },
+        "required": [
+          "app",
+          "services",
+          "datastores",
+          "containers",
+          "host"
+        ],
+        "title": "SystemInfoOut",
+        "type": "object"
+      },
       "TOTPCodeIn": {
         "properties": {
           "code": {
@@ -12747,6 +14906,25 @@
         "title": "TOTPStatusOut",
         "type": "object"
       },
+      "TagOut": {
+        "description": "A KB tag with the count of articles visible to the requesting user.",
+        "properties": {
+          "article_count": {
+            "title": "Article Count",
+            "type": "integer"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "article_count"
+        ],
+        "title": "TagOut",
+        "type": "object"
+      },
       "TemplateAttachmentsReplace": {
         "description": "Full replacement set of attachments for a standard template.",
         "properties": {
@@ -12762,6 +14940,53 @@
           "attachment_ids"
         ],
         "title": "TemplateAttachmentsReplace",
+        "type": "object"
+      },
+      "TemplateEditorsOut": {
+        "description": "Who may edit a Standard Template (per-template ACL: groups + users).",
+        "properties": {
+          "group_ids": {
+            "items": {
+              "type": "integer"
+            },
+            "title": "Group Ids",
+            "type": "array"
+          },
+          "user_ids": {
+            "items": {
+              "type": "integer"
+            },
+            "title": "User Ids",
+            "type": "array"
+          }
+        },
+        "required": [
+          "group_ids",
+          "user_ids"
+        ],
+        "title": "TemplateEditorsOut",
+        "type": "object"
+      },
+      "TemplateEditorsUpdate": {
+        "properties": {
+          "group_ids": {
+            "default": [],
+            "items": {
+              "type": "integer"
+            },
+            "title": "Group Ids",
+            "type": "array"
+          },
+          "user_ids": {
+            "default": [],
+            "items": {
+              "type": "integer"
+            },
+            "title": "User Ids",
+            "type": "array"
+          }
+        },
+        "title": "TemplateEditorsUpdate",
         "type": "object"
       },
       "TemplateOut": {
@@ -12959,6 +15184,11 @@
             "title": "Archive Flag",
             "type": "integer"
           },
+          "attachment_count": {
+            "default": 0,
+            "title": "Attachment Count",
+            "type": "integer"
+          },
           "can_write": {
             "default": false,
             "title": "Can Write",
@@ -13055,6 +15285,11 @@
               }
             ],
             "title": "First From"
+          },
+          "has_ai_summary": {
+            "default": false,
+            "title": "Has Ai Summary",
+            "type": "boolean"
           },
           "id": {
             "title": "Id",
@@ -13359,6 +15594,11 @@
             ],
             "title": "Age Seconds"
           },
+          "attachment_count": {
+            "default": 0,
+            "title": "Attachment Count",
+            "type": "integer"
+          },
           "change_time": {
             "format": "date-time",
             "title": "Change Time",
@@ -13421,6 +15661,11 @@
               }
             ],
             "title": "First From"
+          },
+          "has_ai_summary": {
+            "default": false,
+            "title": "Has Ai Summary",
+            "type": "boolean"
           },
           "id": {
             "title": "Id",
@@ -13802,6 +16047,11 @@
               }
             ],
             "title": "Avatar Url"
+          },
+          "can_edit_templates": {
+            "default": false,
+            "title": "Can Edit Templates",
+            "type": "boolean"
           },
           "email": {
             "anyOf": [
@@ -14281,7 +16531,7 @@
   "info": {
     "description": "Tiqora ticket system API.",
     "title": "Tiqora",
-    "version": "0.1.0"
+    "version": "0.2.2"
   },
   "openapi": "3.1.0",
   "paths": {
@@ -15598,6 +17848,635 @@
         ]
       }
     },
+    "/api/v1/admin/ai/audit": {
+      "get": {
+        "operationId": "list_ai_audit_log_api_v1_admin_ai_audit_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "from",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "From"
+            }
+          },
+          {
+            "in": "query",
+            "name": "to",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "To"
+            }
+          },
+          {
+            "in": "query",
+            "name": "provider_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Provider Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "feature",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Feature"
+            }
+          },
+          {
+            "in": "query",
+            "name": "ticket",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Ticket"
+            }
+          },
+          {
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "ok",
+                    "error"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status"
+            }
+          },
+          {
+            "in": "query",
+            "name": "page",
+            "required": false,
+            "schema": {
+              "default": 1,
+              "minimum": 1,
+              "title": "Page",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "page_size",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 500,
+              "minimum": 1,
+              "title": "Page Size",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuditLogPageOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Ai Audit Log",
+        "tags": [
+          "admin:ai-audit"
+        ]
+      }
+    },
+    "/api/v1/admin/ai/audit/stats": {
+      "get": {
+        "operationId": "ai_audit_log_stats_api_v1_admin_ai_audit_stats_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "from",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "From"
+            }
+          },
+          {
+            "in": "query",
+            "name": "to",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "To"
+            }
+          },
+          {
+            "in": "query",
+            "name": "provider_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Provider Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "feature",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Feature"
+            }
+          },
+          {
+            "in": "query",
+            "name": "ticket",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Ticket"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuditLogStatsOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Ai Audit Log Stats",
+        "tags": [
+          "admin:ai-audit"
+        ]
+      }
+    },
+    "/api/v1/admin/ai/audit/{entry_id}": {
+      "get": {
+        "operationId": "get_ai_audit_log_entry_api_v1_admin_ai_audit__entry_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "entry_id",
+            "required": true,
+            "schema": {
+              "title": "Entry Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuditLogDetailOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Ai Audit Log Entry",
+        "tags": [
+          "admin:ai-audit"
+        ]
+      }
+    },
+    "/api/v1/admin/ai/audit/{entry_id}/reveal-pii": {
+      "post": {
+        "operationId": "reveal_ai_audit_pii_api_v1_admin_ai_audit__entry_id__reveal_pii_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "entry_id",
+            "required": true,
+            "schema": {
+              "title": "Entry Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PiiRevealOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Reveal Ai Audit Pii",
+        "tags": [
+          "admin:ai-audit"
+        ]
+      }
+    },
+    "/api/v1/admin/ai/drafts/{draft_id}": {
+      "delete": {
+        "description": "Hard-delete a draft, any status \u2014 admin cleanup, not part of the\nnormal lifecycle (see ``tiqora.ai.drafts`` module docstring).",
+        "operationId": "delete_ai_draft_api_v1_admin_ai_drafts__draft_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "draft_id",
+            "required": true,
+            "schema": {
+              "title": "Draft Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Ai Draft",
+        "tags": [
+          "admin:ai"
+        ]
+      }
+    },
+    "/api/v1/admin/ai/escalation-test": {
+      "post": {
+        "description": "Dry-run a sample tool result against escalation rules (plan block 6).\n\nPure function of the request body \u2014 nothing is read from or written to\nthe database; validation and matching reuse :mod:`tiqora.ai.escalation`\nexactly as the runtime guard does.",
+        "operationId": "escalation_test_route_api_v1_admin_ai_escalation_test_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EscalationTestIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EscalationTestOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Escalation Test Route",
+        "tags": [
+          "admin:ai"
+        ]
+      }
+    },
     "/api/v1/admin/ai/mcp-clients": {
       "get": {
         "operationId": "list_mcp_clients_route_api_v1_admin_ai_mcp_clients_get",
@@ -16864,6 +19743,421 @@
         ]
       }
     },
+    "/api/v1/admin/ai/queues/{policy_id}/prompt-parts": {
+      "get": {
+        "operationId": "list_prompt_parts_route_api_v1_admin_ai_queues__policy_id__prompt_parts_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "policy_id",
+            "required": true,
+            "schema": {
+              "title": "Policy Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/AiPromptPartOut"
+                  },
+                  "title": "Response List Prompt Parts Route Api V1 Admin Ai Queues  Policy Id  Prompt Parts Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Prompt Parts Route",
+        "tags": [
+          "admin:ai"
+        ]
+      },
+      "post": {
+        "operationId": "create_prompt_part_route_api_v1_admin_ai_queues__policy_id__prompt_parts_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "policy_id",
+            "required": true,
+            "schema": {
+              "title": "Policy Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AiPromptPartCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AiPromptPartOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Prompt Part Route",
+        "tags": [
+          "admin:ai"
+        ]
+      }
+    },
+    "/api/v1/admin/ai/queues/{policy_id}/prompt-parts/reorder": {
+      "put": {
+        "operationId": "reorder_prompt_parts_route_api_v1_admin_ai_queues__policy_id__prompt_parts_reorder_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "policy_id",
+            "required": true,
+            "schema": {
+              "title": "Policy Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AiPromptPartReorder"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/AiPromptPartOut"
+                  },
+                  "title": "Response Reorder Prompt Parts Route Api V1 Admin Ai Queues  Policy Id  Prompt Parts Reorder Put",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Reorder Prompt Parts Route",
+        "tags": [
+          "admin:ai"
+        ]
+      }
+    },
+    "/api/v1/admin/ai/queues/{policy_id}/prompt-parts/{part_id}": {
+      "delete": {
+        "operationId": "delete_prompt_part_route_api_v1_admin_ai_queues__policy_id__prompt_parts__part_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "policy_id",
+            "required": true,
+            "schema": {
+              "title": "Policy Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "part_id",
+            "required": true,
+            "schema": {
+              "title": "Part Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Prompt Part Route",
+        "tags": [
+          "admin:ai"
+        ]
+      },
+      "put": {
+        "operationId": "update_prompt_part_route_api_v1_admin_ai_queues__policy_id__prompt_parts__part_id__put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "policy_id",
+            "required": true,
+            "schema": {
+              "title": "Policy Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "part_id",
+            "required": true,
+            "schema": {
+              "title": "Part Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AiPromptPartUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AiPromptPartOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Prompt Part Route",
+        "tags": [
+          "admin:ai"
+        ]
+      }
+    },
     "/api/v1/admin/ai/settings": {
       "get": {
         "operationId": "get_ai_settings_api_v1_admin_ai_settings_get",
@@ -16997,6 +20291,74 @@
           }
         },
         "summary": "Put Ai Settings",
+        "tags": [
+          "admin:ai"
+        ]
+      }
+    },
+    "/api/v1/admin/ai/summaries/{ticket_id}": {
+      "delete": {
+        "description": "Drop a ticket's stored AI summary (state-only, see\n``tiqora.ai.summary`` module docstring) \u2014 admin cleanup; the next\nsummarize run starts from scratch.",
+        "operationId": "delete_ai_summary_api_v1_admin_ai_summaries__ticket_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "ticket_id",
+            "required": true,
+            "schema": {
+              "title": "Ticket Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Ai Summary",
         "tags": [
           "admin:ai"
         ]
@@ -28820,6 +32182,71 @@
         ]
       }
     },
+    "/api/v1/admin/system": {
+      "get": {
+        "operationId": "get_system_info_api_v1_admin_system_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SystemInfoOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get System Info",
+        "tags": [
+          "admin:system"
+        ]
+      }
+    },
     "/api/v1/admin/system-addresses": {
       "get": {
         "description": "Valid system addresses for queue / auto-response From pickers.",
@@ -29550,6 +32977,164 @@
           }
         },
         "summary": "Replace Template Attachments",
+        "tags": [
+          "admin:templates"
+        ]
+      }
+    },
+    "/api/v1/admin/templates/{template_id}/editors": {
+      "get": {
+        "description": "Groups + users granted edit rights on this template (admin view).",
+        "operationId": "get_template_editors_api_v1_admin_templates__template_id__editors_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "template_id",
+            "required": true,
+            "schema": {
+              "title": "Template Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TemplateEditorsOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Template Editors",
+        "tags": [
+          "admin:templates"
+        ]
+      },
+      "put": {
+        "description": "Replace who may edit this template. Empty lists = admin-only again.",
+        "operationId": "set_template_editors_api_v1_admin_templates__template_id__editors_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "template_id",
+            "required": true,
+            "schema": {
+              "title": "Template Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TemplateEditorsUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TemplateEditorsOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Set Template Editors",
         "tags": [
           "admin:templates"
         ]
@@ -31746,9 +35331,25 @@
     },
     "/api/v1/auth/spnego": {
       "get": {
-        "description": "Kerberos/SPNEGO handshake. On success, 302 to SPA root with a full session.\n\nPer-agent ``sso_eligible`` must be true. SSO is the strong factor \u2014 2FA\nis skipped even when the agent has TOTP enrolled.",
+        "description": "Kerberos/SPNEGO handshake. On success, 302 back to ``next`` (a same-site\npath, default ``/``) with a full session \u2014 this lets an expired-session\nagent re-auth transparently and land back on the page they were on.\n\nPer-agent ``sso_eligible`` must be true. SSO is the strong factor \u2014 2FA\nis skipped even when the agent has TOTP enrolled. A failed handshake\n(expired/absent ticket) redirects to the login page instead of returning a\nbare 401, so the browser never shows a native Negotiate popup.",
         "operationId": "spnego_api_v1_auth_spnego_get",
         "parameters": [
+          {
+            "in": "query",
+            "name": "next",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Next"
+            }
+          },
           {
             "in": "header",
             "name": "authorization",
@@ -33836,6 +37437,7 @@
             }
           },
           {
+            "description": "Tag name, or comma-separated list (OR)",
             "in": "query",
             "name": "tag",
             "required": false,
@@ -33848,6 +37450,7 @@
                   "type": "null"
                 }
               ],
+              "description": "Tag name, or comma-separated list (OR)",
               "title": "Tag"
             }
           },
@@ -35335,6 +38938,76 @@
         ]
       }
     },
+    "/api/v1/kb/tags": {
+      "get": {
+        "description": "All KB tags with the count of articles visible to the caller.",
+        "operationId": "list_tags_api_v1_kb_tags_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/TagOut"
+                  },
+                  "title": "Response List Tags Api V1 Kb Tags Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Tags",
+        "tags": [
+          "kb"
+        ]
+      }
+    },
     "/api/v1/process/": {
       "get": {
         "operationId": "list_processes_api_v1_process__get",
@@ -36012,6 +39685,96 @@
         ]
       }
     },
+    "/api/v1/reference/customer-search": {
+      "get": {
+        "description": "Quick search across customer companies and contacts.\n\nDistinct from ``/customers`` (contact-only picker for ticket assignment):\nthis also matches companies and resolves each returned contact's company\nname via a single follow-up query (no N+1). Below a 2-character query,\nreturns empty results.",
+        "operationId": "customer_search_api_v1_reference_customer_search_get",
+        "parameters": [
+          {
+            "description": "Substring matched against company name/id or contact login/email/name",
+            "in": "query",
+            "name": "q",
+            "required": false,
+            "schema": {
+              "default": "",
+              "description": "Substring matched against company name/id or contact login/email/name",
+              "title": "Q",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 10,
+              "maximum": 25,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CustomerSearchOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Customer Search",
+        "tags": [
+          "reference"
+        ]
+      }
+    },
     "/api/v1/reference/customers": {
       "get": {
         "description": "Search valid customer users for the customer-assignment picker.",
@@ -36361,6 +40124,131 @@
               "minimum": 1,
               "title": "Limit",
               "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "queue_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "items": {
+                    "type": "integer"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Queue Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "state_type",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "State Type"
+            }
+          },
+          {
+            "in": "query",
+            "name": "owner_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Owner Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "customer_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Customer Id"
+            }
+          },
+          {
+            "description": "ISO date, e.g. 2026-07-01",
+            "in": "query",
+            "name": "created_from",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "ISO date, e.g. 2026-07-01",
+              "title": "Created From"
+            }
+          },
+          {
+            "description": "ISO date, e.g. 2026-07-31",
+            "in": "query",
+            "name": "created_to",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "ISO date, e.g. 2026-07-31",
+              "title": "Created To"
+            }
+          },
+          {
+            "description": "Result ordering.",
+            "in": "query",
+            "name": "sort",
+            "required": false,
+            "schema": {
+              "default": "changed_desc",
+              "description": "Result ordering.",
+              "enum": [
+                "changed_desc",
+                "created_desc",
+                "created_asc"
+              ],
+              "title": "Sort",
+              "type": "string"
             }
           },
           {
@@ -38300,6 +42188,296 @@
         ]
       }
     },
+    "/api/v1/templates": {
+      "get": {
+        "description": "Templates the calling agent is allowed to edit.",
+        "operationId": "list_editable_templates_api_v1_templates_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "page",
+            "required": false,
+            "schema": {
+              "default": 1,
+              "minimum": 1,
+              "title": "Page",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "page_size",
+            "required": false,
+            "schema": {
+              "default": 25,
+              "maximum": 500,
+              "minimum": 1,
+              "title": "Page Size",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "valid",
+            "required": false,
+            "schema": {
+              "default": "valid",
+              "enum": [
+                "valid",
+                "invalid",
+                "all"
+              ],
+              "title": "Valid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "sort",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Sort"
+            }
+          },
+          {
+            "in": "query",
+            "name": "order",
+            "required": false,
+            "schema": {
+              "default": "asc",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "title": "Order",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_StandardTemplateOut_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Editable Templates",
+        "tags": [
+          "templates"
+        ]
+      }
+    },
+    "/api/v1/templates/{template_id}": {
+      "get": {
+        "operationId": "get_template_api_v1_templates__template_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "template_id",
+            "required": true,
+            "schema": {
+              "title": "Template Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StandardTemplateOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Template",
+        "tags": [
+          "templates"
+        ]
+      },
+      "patch": {
+        "operationId": "update_template_api_v1_templates__template_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "template_id",
+            "required": true,
+            "schema": {
+              "title": "Template Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StandardTemplateUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StandardTemplateOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Template",
+        "tags": [
+          "templates"
+        ]
+      }
+    },
     "/api/v1/tickets": {
       "get": {
         "operationId": "list_tickets_api_v1_tickets_get",
@@ -39342,6 +43520,23 @@
             }
           }
         ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/AiSummarizeIn"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Body"
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
             "content": {
@@ -39526,6 +43721,83 @@
           }
         },
         "summary": "Create Article",
+        "tags": [
+          "tickets"
+        ]
+      }
+    },
+    "/api/v1/tickets/{ticket_id}/articles/{article_id}": {
+      "delete": {
+        "description": "Hard-delete an internal note. Requires ``rw``.\n\nCustomer-visible or non-Internal-channel articles are never deletable and\nreturn HTTP 409 instead.",
+        "operationId": "delete_article_endpoint_api_v1_tickets__ticket_id__articles__article_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "ticket_id",
+            "required": true,
+            "schema": {
+              "title": "Ticket Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "article_id",
+            "required": true,
+            "schema": {
+              "title": "Article Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Article Endpoint",
         "tags": [
           "tickets"
         ]
@@ -40996,6 +45268,81 @@
         ]
       }
     },
+    "/api/v1/tickets/{ticket_id}/similar": {
+      "get": {
+        "description": "Keyword-similar closed tickets (Meili rank; embedding blend later).",
+        "operationId": "get_similar_tickets_api_v1_tickets__ticket_id__similar_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "ticket_id",
+            "required": true,
+            "schema": {
+              "title": "Ticket Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SimilarTicketsOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Similar Tickets",
+        "tags": [
+          "tickets"
+        ]
+      }
+    },
     "/api/v1/tickets/{ticket_id}/templates": {
       "get": {
         "description": "Response templates (template_type='Answer') for the ticket's queue.",
@@ -41145,6 +45492,25 @@
         ]
       }
     },
+    "/znuny-compat/OutOfOffice": {
+      "post": {
+        "operationId": "canonical_out_of_office_znuny_compat_OutOfOffice_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Canonical Out Of Office",
+        "tags": [
+          "znuny-compat"
+        ]
+      }
+    },
     "/znuny-compat/Session": {
       "post": {
         "operationId": "canonical_session_create_znuny_compat_Session_post",
@@ -41164,6 +45530,84 @@
         ]
       }
     },
+    "/znuny-compat/Session/{session_id}": {
+      "delete": {
+        "operationId": "canonical_session_remove_znuny_compat_Session__session_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "title": "Session Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Canonical Session Remove",
+        "tags": [
+          "znuny-compat"
+        ]
+      },
+      "get": {
+        "operationId": "canonical_session_get_znuny_compat_Session__session_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "title": "Session Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Canonical Session Get",
+        "tags": [
+          "znuny-compat"
+        ]
+      }
+    },
     "/znuny-compat/Ticket": {
       "post": {
         "operationId": "canonical_ticket_create_znuny_compat_Ticket_post",
@@ -41178,6 +45622,46 @@
           }
         },
         "summary": "Canonical Ticket Create",
+        "tags": [
+          "znuny-compat"
+        ]
+      }
+    },
+    "/znuny-compat/Ticket/History/{ticket_id}": {
+      "get": {
+        "operationId": "canonical_ticket_history_get_znuny_compat_Ticket_History__ticket_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "ticket_id",
+            "required": true,
+            "schema": {
+              "title": "Ticket Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Canonical Ticket History Get",
         "tags": [
           "znuny-compat"
         ]
@@ -41275,6 +45759,25 @@
           }
         },
         "summary": "Canonical Ticket Search",
+        "tags": [
+          "znuny-compat"
+        ]
+      }
+    },
+    "/znuny-compat/TimeAccountingGet": {
+      "get": {
+        "operationId": "canonical_time_accounting_get_znuny_compat_TimeAccountingGet_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Canonical Time Accounting Get",
         "tags": [
           "znuny-compat"
         ]

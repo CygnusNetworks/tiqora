@@ -20,7 +20,7 @@ Analyse gegen Code (`backend/src/tiqora/…`) und OpenAPI (`packages/api-client/
 |---|---|---|
 | API-Key create / list / revoke / delete | 2026-07-21 | Admin REST `POST/GET/PATCH/DELETE /api/v1/admin/api-keys`, Admin-UI „API-Schlüssel“, CLI `tiqora api-key …` |
 | Key-Metadaten `expires_at` / `last_used_at` / `created_by` | 2026-07-21 | Schema + Resolve in REST und MCP; Expiry-Check; `last_used_at`-Stamp |
-| Grobe Key-Scopes `read` / `write` / `mcp` / `*` | später | Spalte `scopes`; REST blockt Mutationen ohne `write`/`*`; MCP braucht `mcp`/`write`/`*` (NULL/leer = unrestricted) |
+| Key-Scopes: Area RO/RW + Legacy `read`/`write`/`mcp`/`*` | 2026-07-28 | Spalte `scopes`; REST path+method Gate; MCP `mcp:ro`/`mcp:rw`; Admin-UI + CLI |
 | Docs behaupteten Key-Management, Code hatte keins | 2026-07-21 | Docs und Code aligned |
 | MCP Reference-Tools | 2026-07-21 | `list_queues`, `list_states`, `list_priorities`, `list_agents` |
 | MCP Write-Felder | 2026-07-21 | `ticket_set_title/customer/dynamic_field`, `ticket_lock`/`unlock` |
@@ -49,7 +49,7 @@ Analyse gegen Code (`backend/src/tiqora/…`) und OpenAPI (`packages/api-client/
 | Thema | Entscheidung |
 |---|---|
 | Znuny-ACL-Runtime (`acl.config_match` / `config_change`) | Runtime bleibt **group/role only**. Admin `GET /api/v1/admin/acl` read-only. Neu öffnen nur bei Produktbedarf für State/Queue/Field-Filtering wie in Znuny. |
-| Feingranulare OAuth-Scopes (`tickets:write`, …) | Nicht vorgesehen. Rechte = Group/Role des gebundenen Users; Keys haben nur grobe Surface-Scopes (`read`/`write`/`mcp`/`*`). |
+| OAuth2 Resource-Scopes | Nicht vorgesehen. Keys nutzen Area-RO/RW (`tickets:ro`/`tickets:rw`, …) plus Queue/Group des gebundenen Users — kein OAuth-Client-Modell. |
 
 ---
 
@@ -168,7 +168,7 @@ CLI: `tiqora.cli.api_key` (`tiqora api-key create|list|revoke|delete`).
 | `POST/GET/PATCH/DELETE /api/v1/admin/api-keys` | ✅ Klartext einmalig bei Create; Revoke = `PATCH valid=false`; DELETE = hard remove |
 | Frontend Admin-UI | ✅ Seite „API-Schlüssel“ (`/admin/api-keys`) |
 | CLI | ✅ Headless-Bootstrap (`tiqora api-key create --user … --name …`) |
-| Scopes anlegen/ändern | ✅ Admin-API (`scopes` in Create/Update); UI/CLI können Scopes noch nicht setzen (NULL = unrestricted) |
+| Scopes anlegen/ändern | ✅ Admin-API + UI (unbeschränkt / nur lesen / Area-Matrix) + CLI (`--scopes`, `--read-only`) |
 
 ### Bootstrap
 
@@ -185,7 +185,7 @@ SQL-Insert mit Hash ist nur noch Notfall-Fallback, kein Normalweg.
 
 ### Zwei Ebenen (kein Widerspruch)
 
-1. **Key-Scopes (grob, Surface):** `read` | `write` | `mcp` | `*`
+1. **Key-Scopes (Surface + Area):** legacy `read` | `write` | `mcp` | `*` plus `area:ro` / `area:rw`
    - REST: Mutationen brauchen `write` oder `*`
    - MCP: Tool-Calls brauchen `mcp`, `write` oder `*`
    - NULL/leer: unrestricted (volle Rechte des Users)
@@ -341,7 +341,7 @@ TN-Lookup.
 | **P2** | Rate-Limit pro Key | Auth | 🟡 offen |
 | **P3** | GenericAgent / Postmaster Write, ACL Editor | Admin REST | ⏸ deferred |
 | **P3** | Session-Bearer auf MCP (nur Dev) | MCP | ⏸ optional |
-| **P3** | Scopes in Admin-UI / CLI setzen | UI, CLI | 🟡 API kann’s; UI/CLI noch unrestricted-default |
+| ~~P3~~ | Scopes in Admin-UI / CLI setzen | UI, CLI | ✅ Area RO/RW + read-only preset (2026-07-28) |
 
 ---
 

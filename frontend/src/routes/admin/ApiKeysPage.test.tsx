@@ -154,7 +154,55 @@ describe("ApiKeysPage", () => {
       name: "New key",
       user_id: 2,
       expires_at: null,
+      scopes: null,
     });
+  });
+
+  it("creates a read-only key sending all-area :ro scopes", async () => {
+    createKey.mockResolvedValue({ ...unboundedKey, id: 99, key: "plaintext-key" });
+    renderPage();
+    await waitFor(() => expect(screen.getByText("CI token")).toBeInTheDocument());
+
+    fireEvent.click(screen.getByTestId("admin-api-keys-new"));
+    await waitFor(() => expect(screen.getByTestId("admin-api-keys-form")).toBeInTheDocument());
+
+    fireEvent.change(screen.getByTestId("admin-api-keys-form-name"), {
+      target: { value: "RO key" },
+    });
+    fireEvent.click(screen.getByTestId("admin-api-keys-form-user_id"));
+    fireEvent.click(await screen.findByTestId("admin-api-keys-form-user-panel-option-1"));
+    fireEvent.click(screen.getByTestId("admin-api-keys-form-scope-mode-read_only"));
+    fireEvent.click(screen.getByTestId("admin-api-keys-form-submit"));
+
+    await waitFor(() => expect(createKey).toHaveBeenCalledTimes(1));
+    const body = createKey.mock.calls[0][0] as { scopes: string };
+    expect(body.scopes).toContain("tickets:ro");
+    expect(body.scopes).toContain("kb:ro");
+    expect(body.scopes).not.toContain(":rw");
+  });
+
+  it("creates a custom-scoped key with tickets RW and kb RO", async () => {
+    createKey.mockResolvedValue({ ...unboundedKey, id: 99, key: "plaintext-key" });
+    renderPage();
+    await waitFor(() => expect(screen.getByText("CI token")).toBeInTheDocument());
+
+    fireEvent.click(screen.getByTestId("admin-api-keys-new"));
+    await waitFor(() => expect(screen.getByTestId("admin-api-keys-form")).toBeInTheDocument());
+
+    fireEvent.change(screen.getByTestId("admin-api-keys-form-name"), {
+      target: { value: "Custom key" },
+    });
+    fireEvent.click(screen.getByTestId("admin-api-keys-form-user_id"));
+    fireEvent.click(await screen.findByTestId("admin-api-keys-form-user-panel-option-1"));
+    fireEvent.click(screen.getByTestId("admin-api-keys-form-scope-mode-custom"));
+    fireEvent.click(screen.getByTestId("admin-api-keys-form-scope-tickets-rw"));
+    fireEvent.click(screen.getByTestId("admin-api-keys-form-scope-kb-ro"));
+    fireEvent.click(screen.getByTestId("admin-api-keys-form-submit"));
+
+    await waitFor(() => expect(createKey).toHaveBeenCalledTimes(1));
+    const body = createKey.mock.calls[0][0] as { scopes: string };
+    expect(body.scopes).toContain("tickets:rw");
+    expect(body.scopes).toContain("kb:ro");
   });
 
   it("creates a key with the '30 Tage' preset sending expires_at ~30 days out", async () => {
@@ -206,6 +254,7 @@ describe("ApiKeysPage", () => {
       name: "New key",
       user_id: 1,
       expires_at: "2027-01-01T23:59:59.000Z",
+      scopes: null,
     });
   });
 });

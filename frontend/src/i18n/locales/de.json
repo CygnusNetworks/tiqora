@@ -1614,7 +1614,7 @@
       "expiryPreviewUnlimited": "Unbegrenzt gültig",
       "expiryPreviewLabel": "Läuft ab: {{date}}",
       "empty": "Keine API-Schlüssel vorhanden.",
-      "hint": "Schlüssel werden nur einmal im Klartext angezeigt. Widerruf setzt „gültig“ auf nein; Löschen entfernt den Eintrag dauerhaft.",
+      "hint": "Schlüssel werden nur einmal im Klartext angezeigt. Widerruf setzt „gültig“ auf nein; Löschen entfernt den Eintrag dauerhaft. Scopes begrenzen die API-Bereiche (Queue-Rechte kommen weiterhin vom gebundenen Benutzer).",
       "delete": "Löschen",
       "deleteConfirm": "API-Schlüssel „{{name}}“ dauerhaft löschen?",
       "revokeConfirm": "API-Schlüssel „{{name}}“ widerrufen?",
@@ -1622,7 +1622,32 @@
       "onceWarning": "Wird nur einmal angezeigt — jetzt kopieren und sicher speichern.",
       "onceHint": "Der Klartext-Schlüssel kann später nicht erneut abgerufen werden.",
       "copy": "Kopieren",
-      "copied": "Kopiert"
+      "copied": "Kopiert",
+      "scopes": "Zugriff",
+      "scopesUnrestricted": "Unbeschränkt",
+      "scopesReadOnly": "Nur lesen",
+      "scopesCustom": "Benutzerdefiniert",
+      "scopesHelp": "Unbeschränkt nutzt die vollen Agentenrechte des gebundenen Benutzers. Nur lesen erlaubt GET in allen Bereichen. Benutzerdefiniert wählt RO oder RW pro API-Bereich.",
+      "scopesArea": "Bereich",
+      "scopesOff": "Aus",
+      "scopesRo": "RO",
+      "scopesRw": "RW",
+      "scopesCustomEmpty": "Mindestens einen Bereich wählen oder auf unbeschränkt umstellen.",
+      "areas": {
+        "tickets": "Tickets / Queues / Suche",
+        "customers": "Kunden",
+        "kb": "Wissensdatenbank",
+        "calendar": "Kalender",
+        "stats": "Statistik",
+        "ai": "KI-Assistenz",
+        "process": "Prozesse",
+        "channels": "Kanäle",
+        "events": "Events / SSE",
+        "agents": "Agenten",
+        "admin": "Admin-API",
+        "mcp": "MCP-Server",
+        "compat": "Znuny GenericInterface"
+      }
     },
     "processes": {
       "title_plural": "Prozesse",
@@ -1823,6 +1848,10 @@
         "gdpr_erasure_purge": {
           "name": "DSGVO-Löschbereinigung",
           "description": "Abgelaufene Lösch-Backups täglich entfernen."
+        },
+        "ai_worker": {
+          "name": "KI-Worker",
+          "description": "Verarbeitet KI-Aufgaben (Auto-Draft, Auto-Reply, Escalation) im Hintergrund."
         },
         "ai_audit_cleanup": {
           "name": "KI-Audit-Bereinigung",

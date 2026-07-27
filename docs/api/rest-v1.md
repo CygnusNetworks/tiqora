@@ -32,7 +32,13 @@ via the admin API or the CLI:
 curl -b cookies.txt -X POST "$TIQORA_URL/api/v1/admin/api-keys" \
   -H 'Content-Type: application/json' \
   -d '{"name": "ci-bot", "user_id": 1}'
-# → 201 with {"id": …, "key": "tiq_…", …}  (raw key shown only once)
+# → 201 with {"id": …, "key": "tiqora_…", …}  (raw key shown only once)
+
+# Read-only key (all areas :ro) or custom area scopes (CSV):
+# -d '{"name": "ro-bot", "user_id": 1, "scopes": "tickets:ro,kb:ro,mcp:ro"}'
+# -d '{"name": "writer", "user_id": 1, "scopes": "tickets:rw,customers:ro"}'
+# Null/empty scopes = unrestricted (full agent privileges of the bound user).
+# Legacy tokens still work: read | write | mcp | *
 
 curl -b cookies.txt "$TIQORA_URL/api/v1/admin/api-keys"
 curl -b cookies.txt -X PATCH "$TIQORA_URL/api/v1/admin/api-keys/42" \

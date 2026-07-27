@@ -198,11 +198,14 @@ def generate_api_key() -> str:
 
 
 def parse_api_key_scopes(raw: str | None) -> frozenset[str] | None:
-    """Parse scopes column; None/empty means unrestricted."""
-    if raw is None:
-        return None
-    parts = {p.strip().lower() for p in raw.split(",") if p.strip()}
-    return frozenset(parts) if parts else None
+    """Parse scopes column; None/empty means unrestricted.
+
+    Implementation lives in :mod:`tiqora.domain.api_key_scopes` (area RO/RW +
+    legacy ``read``/``write``/``mcp``/``*`` tokens).
+    """
+    from tiqora.domain.api_key_scopes import parse_api_key_scopes as _parse
+
+    return _parse(raw)
 
 
 class AuthService:

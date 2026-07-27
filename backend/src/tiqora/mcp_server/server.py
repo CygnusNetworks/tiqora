@@ -46,6 +46,7 @@ from __future__ import annotations
 import hashlib
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from contextvars import ContextVar
 from datetime import datetime
 from typing import Any
 
@@ -64,6 +65,7 @@ from tiqora.db.legacy.queue import Queue
 from tiqora.db.legacy.ticket import TicketPriority, TicketState, TicketStateType
 from tiqora.db.legacy.user import Users
 from tiqora.db.tiqora.models import TiqoraApiKey
+from tiqora.domain.api_key_scopes import mcp_scopes_allow_write
 from tiqora.domain.ticket_write_service import (
     ArticleIn,
     InvalidInput,
@@ -94,6 +96,12 @@ logger = structlog.get_logger(__name__)
 
 # Znuny's "valid" list id — 1 == valid (same as api/v1/reference.py).
 _VALID = 1
+
+# Set by auth middleware for the duration of each MCP request so mutation
+# helpers can enforce mcp:rw without threading Context through every call.
+_current_api_key_scopes: ContextVar[frozenset[str] | None] = ContextVar(
+    "mcp_api_key_scopes", default=None
+)
 
 
 def _utcnow() -> datetime:
@@ -159,21 +167,26 @@ class TiqoraBearerAuth(BaseHTTPMiddleware):
             return JSONResponse({"error": "Unauthorized"}, status_code=401)
 
         user_id, scopes = resolved
-        # Scoped keys without mcp/write may not open the MCP server.
-        if scopes is not None and not (scopes & {"mcp", "write", "*"}):
+        # Scoped keys need mcp:ro/mcp:rw (or legacy mcp/write/*).
+        from tiqora.domain.api_key_scopes import mcp_scopes_allow_connect
+
+        if not mcp_scopes_allow_connect(scopes):
             return JSONResponse({"error": "Forbidden: API key lacks mcp scope"}, status_code=403)
 
         request.state.user_id = user_id
         request.state.api_key_scopes = scopes
-        return await call_next(request)
+        token = _current_api_key_scopes.set(scopes)
+        try:
+            return await call_next(request)
+        finally:
+            _current_api_key_scopes.reset(token)
 
 
 def _parse_api_key_scopes(raw: str | None) -> frozenset[str] | None:
     """Return scope set, or None for unrestricted (empty/null scopes column)."""
-    if raw is None:
-        return None
-    parts = {p.strip().lower() for p in raw.split(",") if p.strip()}
-    return frozenset(parts) if parts else None
+    from tiqora.domain.api_key_scopes import parse_api_key_scopes
+
+    return parse_api_key_scopes(raw)
 
 
 async def _resolve_api_key(
@@ -246,6 +259,12 @@ def _get_state() -> McpState:
     return _mcp_state
 
 
+def _assert_mcp_write_scope() -> None:
+    """Raise ``TicketAccessDenied`` when the key is mcp:ro-only."""
+    if not mcp_scopes_allow_write(_current_api_key_scopes.get()):
+        raise TicketAccessDenied("API key lacks mcp:rw scope")
+
+
 async def _assert_queue_permission(
     session: AsyncSession, *, ticket_id: int, user_id: int, key: str
 ) -> None:
@@ -266,6 +285,7 @@ async def _assert_queue_permission(
     that needs its own product decision, not a silent side effect of a
     permission fix).
     """
+    # mcp:rw is also enforced inside _assert_raw_queue_permission.
     t = await _ticket_must_exist(session, ticket_id)
     await _assert_raw_queue_permission(
         session, queue_id=int(t["queue_id"]), user_id=user_id, key=key
@@ -285,6 +305,7 @@ async def _assert_raw_queue_permission(
     ``PermissionEngine.check`` returns ``False`` indistinguishably for both a
     denied and a nonexistent queue.
     """
+    _assert_mcp_write_scope()
     await _queue_name(session, queue_id)  # raises InvalidInput if the queue does not exist
     pe = PermissionEngine(session)
     if not await pe.check(user_id, queue_id, key):
@@ -1527,6 +1548,10 @@ async def kb_upsert_article(
         state: Lifecycle state (draft/review/published/archived).
     """
     user_id = _get_user_id(ctx)
+    try:
+        _assert_mcp_write_scope()
+    except TicketAccessDenied as exc:
+        return {"error": str(exc)}
     state_obj = _get_state()
 
     async with state_obj.session_factory() as session:
@@ -1600,6 +1625,10 @@ async def kb_publish_article(
         article_id: The KB article id to publish.
     """
     user_id = _get_user_id(ctx)
+    try:
+        _assert_mcp_write_scope()
+    except TicketAccessDenied as exc:
+        return {"error": str(exc)}
     state_obj = _get_state()
 
     async with state_obj.session_factory() as session:

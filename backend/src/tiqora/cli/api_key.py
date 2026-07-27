@@ -11,6 +11,11 @@ from sqlalchemy import select
 from tiqora.db.engine import get_session_factory
 from tiqora.db.legacy.user import Users
 from tiqora.db.tiqora.models import TiqoraApiKey
+from tiqora.domain.api_key_scopes import (
+    InvalidApiKeyScopeError,
+    all_areas_read_only_scopes,
+    normalize_scopes,
+)
 from tiqora.domain.auth import generate_api_key, hash_api_key
 
 
@@ -25,6 +30,19 @@ def add_api_key_subparser(sub: argparse._SubParsersAction) -> None:  # type: ign
         "--expires",
         default=None,
         help="Optional hard expiry as ISO-8601 (e.g. 2027-01-01T00:00:00)",
+    )
+    create_p.add_argument(
+        "--scopes",
+        default=None,
+        help=(
+            "Comma-separated scopes: legacy read/write/mcp/* and/or "
+            "area:ro|area:rw (e.g. tickets:rw,kb:ro,mcp:ro). Empty = unrestricted."
+        ),
+    )
+    create_p.add_argument(
+        "--read-only",
+        action="store_true",
+        help="Shortcut: all catalog areas as :ro (overrides --scopes)",
     )
     create_p.set_defaults(func=_cmd_create)
 
@@ -62,8 +80,21 @@ def _parse_expires(raw: str | None) -> datetime | None:
     return value
 
 
+def _resolve_scopes(args: argparse.Namespace) -> str | None:
+    if getattr(args, "read_only", False):
+        return all_areas_read_only_scopes()
+    raw = getattr(args, "scopes", None)
+    if raw is None:
+        return None
+    try:
+        return normalize_scopes(raw)
+    except InvalidApiKeyScopeError as exc:
+        raise SystemExit(f"ERROR: {exc}") from exc
+
+
 async def _cmd_create(args: argparse.Namespace) -> int:
     expires_at = _parse_expires(args.expires)
+    scopes = _resolve_scopes(args)
     factory = get_session_factory()
     async with factory() as session:
         user = (
@@ -84,11 +115,15 @@ async def _cmd_create(args: argparse.Namespace) -> int:
             created=datetime.utcnow(),  # noqa: DTZ003 — naive UTC matches DB columns
             expires_at=expires_at,
             created_by=None,
+            scopes=scopes,
         )
         session.add(row)
         await session.commit()
         await session.refresh(row)
-        print(f"Created API key id={row.id} name={row.name!r} user_id={row.user_id}")  # noqa: T201
+        print(  # noqa: T201
+            f"Created API key id={row.id} name={row.name!r} user_id={row.user_id} "
+            f"scopes={row.scopes!r}"
+        )
         print(raw)  # noqa: T201
         print(  # noqa: T201
             "NOTE: This plaintext key will not be shown again. Store it securely.",
@@ -109,13 +144,14 @@ async def _cmd_list(args: argparse.Namespace) -> int:
             return 0
         print(  # noqa: T201
             f"{'id':>6}  {'valid':5}  {'user_id':>8}  {'created':19}  "
-            f"{'last_used_at':19}  {'expires_at':19}  name"
+            f"{'last_used_at':19}  {'expires_at':19}  scopes  name"
         )
         for row in rows:
+            scopes = row.scopes if row.scopes else "*"
             print(  # noqa: T201
                 f"{row.id:6d}  {str(row.valid):5}  {row.user_id:8d}  "
                 f"{_fmt_dt(row.created):19}  {_fmt_dt(row.last_used_at):19}  "
-                f"{_fmt_dt(row.expires_at):19}  {row.name}"
+                f"{_fmt_dt(row.expires_at):19}  {scopes}  {row.name}"
             )
     return 0
 
