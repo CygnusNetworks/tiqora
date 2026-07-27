@@ -1,5 +1,5 @@
-import { useEffect, useState, type FormEvent, type ReactNode } from "react";
-import { Link, useLocation, useNavigate } from "@tanstack/react-router";
+import { useEffect, useState, type ReactNode } from "react";
+import { Link, useLocation } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { api, type QueueNode } from "@/lib/api";
@@ -329,10 +329,6 @@ function SidebarBody({ onNavigate }: { onNavigate?: () => void }) {
         <BetaPill />
       </Link>
 
-      <div className="px-0.5 pb-4">
-        <SidebarSearch />
-      </div>
-
       <nav className="flex-1 space-y-2 overflow-y-auto" data-testid="agent-sidebar-nav">
         <NavGroup
           id="workspace"
@@ -429,41 +425,6 @@ function SidebarBody({ onNavigate }: { onNavigate?: () => void }) {
   );
 }
 
-function SidebarSearch() {
-  const { t } = useTranslation();
-  const [q, setQ] = useState("");
-  const navigate = useNavigate();
-
-  const onSearch = (e: FormEvent) => {
-    e.preventDefault();
-    const term = q.trim();
-    if (!term) return;
-    void navigate({ to: "/agent/search", search: { q: term } });
-  };
-
-  return (
-    <form onSubmit={onSearch}>
-      <label htmlFor="agent-search" className="sr-only">
-        {t("search.title")}
-      </label>
-      <div className="flex items-center justify-between gap-2 rounded-lg border border-hairline bg-surface-subtle px-3 py-2 text-muted focus-within:border-accent">
-        <input
-          id="agent-search"
-          data-testid="header-search"
-          type="search"
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-          placeholder={t("search.commandHint")}
-          className="w-full min-w-0 bg-transparent text-[12.5px] text-ink placeholder:text-muted focus:outline-none"
-        />
-        <span className="shrink-0 rounded border border-hairline px-1.5 py-0.5 font-mono text-[10.5px]">
-          ⌘K
-        </span>
-      </div>
-    </form>
-  );
-}
-
 /** Ghost icon button used for the header's help toggle — 32px square, matching
  * the notification bell so the cluster reads as one row of controls. */
 function HeaderIconButton({
@@ -530,10 +491,6 @@ export function AgentShell({ children }: { children: ReactNode }) {
       if (e.key === "?") {
         e.preventDefault();
         setHelpOpen(true);
-      }
-      if (e.key === "/") {
-        e.preventDefault();
-        document.getElementById("agent-search")?.focus();
       }
     };
     window.addEventListener("keydown", onKey);

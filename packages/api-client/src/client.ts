@@ -1369,6 +1369,8 @@ export class ApiClient {
       created_from?: string;
       /** ISO date ``YYYY-MM-DD`` (inclusive day end UTC). */
       created_to?: string;
+      /** Result ordering. Defaults to ``changed_desc`` (most recently touched). */
+      sort?: "changed_desc" | "created_desc" | "created_asc";
     },
     signal?: AbortSignal,
   ) {

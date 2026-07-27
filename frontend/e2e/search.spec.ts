@@ -11,8 +11,11 @@ test.describe("search", () => {
     page,
   }) => {
     await page.goto("/agent");
-    await page.getByTestId("header-search").fill("printer");
-    await page.getByTestId("header-search").press("Enter");
+    // CommandSearch renders in both the desktop and mobile header; target the
+    // one visible at the current viewport.
+    await page.locator('[data-testid="command-search-trigger"]:visible').click();
+    await page.getByTestId("command-search-input").fill("printer");
+    await page.getByTestId("command-search-input").press("Enter");
     await page.waitForURL(/\/agent\/search\?.*q=printer/);
     await expect(page.getByTestId("search-page")).toBeVisible();
     await expect(page.getByTestId("search-results")).toBeVisible();

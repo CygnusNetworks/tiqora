@@ -30,6 +30,17 @@ from tiqora.domain.schemas import (
     SimilarTicketsOut,
 )
 
+# User-selectable result ordering. Keys are the API-facing enum values; values
+# are Meilisearch sort expressions. Only fields declared in ``sortable_attributes``
+# (changed, created) may appear here — an allowlist so the sort string can never
+# be caller-injected. "changed_desc" is the default (most-recently-touched first).
+SORT_OPTIONS: dict[str, list[str]] = {
+    "changed_desc": ["changed:desc"],
+    "created_desc": ["created:desc"],
+    "created_asc": ["created:asc"],
+}
+_DEFAULT_SORT = "changed_desc"
+
 # Similar-tickets v1: pull a wider Meili window then rank down to the public top-N.
 _SIMILAR_CANDIDATE_LIMIT = 20
 _SIMILAR_RESULT_LIMIT = 5
@@ -327,6 +338,7 @@ class SearchIndexService:
         customer_id: str | None = None,
         created_from: int | None = None,
         created_to: int | None = None,
+        sort: str = _DEFAULT_SORT,
     ) -> SearchResponse:
         allowed = await QueueService(self._session).allowed_queue_ids(user_id, "ro")
         if not allowed:
@@ -362,7 +374,7 @@ class SearchIndexService:
             facets=["queue_id", "state_type"],
             limit=min(limit, 100),
             offset=offset,
-            sort=["changed:desc"],
+            sort=SORT_OPTIONS.get(sort, SORT_OPTIONS[_DEFAULT_SORT]),
         )
         facets: dict[str, dict[str, int]] = {
             name: {str(k): v for k, v in dist.items()}

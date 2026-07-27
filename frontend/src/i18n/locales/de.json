@@ -497,6 +497,28 @@
     "noResults": "Keine passenden Tickets.",
     "groupTickets": "Tickets",
     "groupKb": "Wissensdatenbank",
+    "smart": {
+      "placeholder": "Suchen – oder queue:, besitzer:, status:, kunde:, von:, bis: …",
+      "fulltext": "„{{text}}“ als Volltext suchen",
+      "filterHint": "Filter",
+      "dateHint": "Datum als TT.MM.JJJJ",
+      "from": "Von",
+      "to": "Bis"
+    },
+    "presets": {
+      "label": "Zeitraum",
+      "all": "Alle",
+      "today": "Heute",
+      "d7": "7 Tage",
+      "d30": "30 Tage",
+      "d90": "90 Tage"
+    },
+    "sort": {
+      "label": "Sortierung",
+      "changed_desc": "Zuletzt geändert",
+      "created_desc": "Neueste zuerst",
+      "created_asc": "Älteste zuerst"
+    },
     "filters": {
       "title": "Filter",
       "clear": "Zurücksetzen",
