@@ -126,9 +126,7 @@ def _wipe_mysql(url: str) -> None:
     try:
         with conn.cursor() as cur:
             cur.execute(f"DROP DATABASE IF EXISTS `{db}`")
-            cur.execute(
-                f"CREATE DATABASE `{db}` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci"
-            )
+            cur.execute(f"CREATE DATABASE `{db}` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci")
     finally:
         conn.close()
 
@@ -246,9 +244,7 @@ def _assert_profile_conformance(sync_url: str, profile_id: str, dialect: str) ->
                 model_cat = _model_category(col.type)
                 db_cat = _db_category(db_col["type"])
                 if not _compatible(model_cat, db_cat):
-                    errors.append(
-                        f"{physical}.{col.name}: type model={model_cat} db={db_cat}"
-                    )
+                    errors.append(f"{physical}.{col.name}: type model={model_cat} db={db_cat}")
 
             # 7.0+: color present in DB even though not on baseline models
             if (
