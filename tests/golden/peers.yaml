@@ -1,0 +1,63 @@
+# Golden Layer-B peer definitions (real OTRS/Znuny container vs Tiqora).
+# Layer A (DDL-only) lives under backend/tests/fixtures/legacy-schema/.
+#
+# Default peer remains znuny-6.5.22. Other peers are opt-in via
+# GOLDEN_PEER=<id> once source trees / images are available locally.
+#
+# Status:
+#   ready     — Dockerfile + compose path exercised in CI (manual golden.yml)
+#   scaffold  — docs + env hooks present; full peer image not yet in default CI
+
+peers:
+  znuny-6.5:
+    status: ready
+    product: Znuny
+    version: "6.5.22"
+    framework: "6.5.x"
+    source_dir: znuny-6.5.22   # repo root, gitignored vendored tree
+    install_home: /opt/otrs    # historical path in Dockerfile.znuny
+    console: bin/otrs.Console.pl
+    schema_profile: znuny-6.5
+    notes: Primary golden anchor (history, TN interleaving, escalation, compat).
+
+  otrs-6.0:
+    status: scaffold
+    product: OTRS
+    version: "6.0.x"
+    framework: "6.0.x"
+    source_dir: otrs-6.0       # operator-supplied
+    install_home: /opt/otrs
+    console: bin/otrs.Console.pl
+    schema_profile: otrs-znuny-6.0
+    notes: Required for formal 6.0 parallel-op GA claim (Wave 1 Layer B).
+
+  znuny-6.3:
+    status: scaffold
+    product: Znuny
+    version: "6.3.x"
+    framework: "6.3.x"
+    source_dir: znuny-6.3.4
+    install_home: /opt/znuny
+    console: bin/znuny.Console.pl
+    schema_profile: znuny-6.3
+
+  znuny-7.0:
+    status: scaffold
+    product: Znuny
+    version: "7.0.x"
+    framework: "7.0.x"
+    source_dir: znuny-7.0
+    install_home: /opt/znuny
+    console: bin/znuny.Console.pl
+    schema_profile: znuny-7.0
+
+  znuny-7.3:
+    status: scaffold
+    product: Znuny
+    version: "7.3.x"
+    framework: "7.3.x"
+    source_dir: znuny-7.3
+    install_home: /opt/znuny
+    console: bin/znuny.Console.pl
+    schema_profile: znuny-7.3
+    notes: Primary 7.x golden target after Layer A green.

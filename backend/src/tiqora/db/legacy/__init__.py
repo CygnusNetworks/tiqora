@@ -50,6 +50,8 @@ from tiqora.db.legacy.misc import (  # noqa: F401
     TimeAccounting,
 )
 from tiqora.db.legacy.profile import (  # noqa: F401
+    ALL_SCHEMA_PROFILES,
+    RELEASE_SCHEMA_PROFILES,
     LegacySchemaProfile,
     SchemaProfileId,
     UnsupportedLegacySchemaError,
@@ -59,8 +61,10 @@ from tiqora.db.legacy.profile import (  # noqa: F401
     ensure_legacy_schema_supported,
     get_legacy_schema_profile,
     groups_table_name,
+    groups_table_sql,
     mail_account_load_options,
     profile_for_id,
+    quote_ident,
 )
 from tiqora.db.legacy.queue import (  # noqa: F401
     AutoResponse,
@@ -113,7 +117,9 @@ __all__ = [
     "LegacyBase",
     "LegacyDateTime",
     "legacy_metadata",
+    "ALL_SCHEMA_PROFILES",
     "LegacySchemaProfile",
+    "RELEASE_SCHEMA_PROFILES",
     "SchemaProfileId",
     "UnsupportedLegacySchemaError",
     "apply_legacy_schema_profile",
@@ -122,8 +128,10 @@ __all__ = [
     "ensure_legacy_schema_supported",
     "get_legacy_schema_profile",
     "groups_table_name",
+    "groups_table_sql",
     "mail_account_load_options",
     "profile_for_id",
+    "quote_ident",
     "Ticket",
     "TicketHistory",
     "TicketHistoryType",
