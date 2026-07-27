@@ -6,6 +6,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 from meilisearch_python_sdk import AsyncClient
+from meilisearch_python_sdk.errors import MeilisearchApiError
 from meilisearch_python_sdk.models.settings import MeilisearchSettings
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -346,14 +347,19 @@ class SearchIndexService:
             filters.append(f"owner_id = {int(owner_id)}")
         if customer_id:
             filters.append(f"customer_id = '{_meili_escape_string(customer_id)}'")
+        # Date filters require created_ts on documents. Documents indexed before
+        # that field was added lack it and are excluded (silent empty results)
+        # until `tiqora index rebuild --no-resume`. See docs/deployment.md.
         if created_from is not None:
             filters.append(f"created_ts >= {int(created_from)}")
         if created_to is not None:
             filters.append(f"created_ts <= {int(created_to)}")
+        # Only facets the agent UI consumes. owner_id/customer_id are high-cardinality
+        # and unused in the filter bar counts — requesting them bloats every response.
         result = await index.search(
             query,
             filter=" AND ".join(filters),
-            facets=["queue_id", "state_type", "owner_id", "customer_id"],
+            facets=["queue_id", "state_type"],
             limit=min(limit, 100),
             offset=offset,
             sort=["changed:desc"],
@@ -388,6 +394,24 @@ class SearchIndexService:
             estimated_total=int(result.estimated_total_hits or len(hits)),
             facets=facets,
         )
+
+    async def get_indexed_document(self, ticket_id: int) -> dict[str, Any] | None:
+        """Return the Meili document for *ticket_id*, or ``None`` if missing.
+
+        Prefer this over :meth:`build_document` for read paths that only need
+        fields already in the index (e.g. similar-ticket excerpt) — no SQL fan-out.
+        """
+        await self.ensure_index()
+        client = await self._get_client()
+        index = client.index(self._settings.meili_tickets_index)
+        try:
+            doc = await index.get_document(ticket_id)
+        except MeilisearchApiError:
+            # 404 document_not_found (and rare transient API errors): treat as miss.
+            return None
+        if doc is None:
+            return None
+        return doc if isinstance(doc, dict) else dict(doc)
 
     async def find_similar(
         self,

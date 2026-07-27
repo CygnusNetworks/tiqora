@@ -403,10 +403,10 @@ async def get_similar_tickets(
 
     svc = SearchIndexService(session, settings)
     try:
-        # Prefer the indexed document's latest excerpt when present; fall back
-        # to title-only if the ticket is not (yet) in Meili.
-        doc = await svc.build_document(ticket_id)
+        # Read excerpt from the existing Meili doc (cheap); title-only fallback
+        # if the ticket is not indexed yet. Avoids build_document SQL fan-out.
         excerpt = None
+        doc = await svc.get_indexed_document(ticket_id)
         if doc is not None:
             raw_excerpt = doc.get("latest_article_excerpt")
             excerpt = str(raw_excerpt) if raw_excerpt else None

@@ -19,6 +19,8 @@ export type SearchSearch = {
   state_type?: string[];
   owner_id?: number;
   customer_id?: string;
+  /** Display label for the active customer chip (not sent to the API). */
+  customer_label?: string;
   /** ISO date YYYY-MM-DD */
   created_from?: string;
   /** ISO date YYYY-MM-DD */
@@ -85,6 +87,7 @@ export function SearchPage() {
   const stateTypes = search.state_type ?? [];
   const ownerId = search.owner_id;
   const customerId = search.customer_id;
+  const customerLabel = search.customer_label;
   const createdFrom = search.created_from;
   const createdTo = search.created_to;
 
@@ -105,7 +108,11 @@ export function SearchPage() {
         if (next.queue_id && next.queue_id.length === 0) delete next.queue_id;
         if (next.state_type && next.state_type.length === 0) delete next.state_type;
         if (next.owner_id === undefined || next.owner_id === null) delete next.owner_id;
-        if (!next.customer_id) delete next.customer_id;
+        if (!next.customer_id) {
+          delete next.customer_id;
+          delete next.customer_label;
+        }
+        if (!next.customer_label) delete next.customer_label;
         if (!next.created_from) delete next.created_from;
         if (!next.created_to) delete next.created_to;
         if (!next.q) delete next.q;
@@ -379,15 +386,20 @@ export function SearchPage() {
             <p className="text-[11px] font-medium text-muted">{t("search.filters.customer")}</p>
             {customerId ? (
               <div className="flex items-center gap-2 rounded-md border border-hairline bg-surface-subtle px-3 py-1.5 text-sm">
-                <span className="truncate font-medium text-ink" data-testid="search-filter-customer-value">
-                  {customerId}
+                <span className="min-w-0 truncate font-medium text-ink" data-testid="search-filter-customer-value">
+                  {customerLabel || customerId}
                 </span>
+                {customerLabel && customerLabel !== customerId && (
+                  <span className="shrink-0 text-xs text-muted" data-testid="search-filter-customer-id">
+                    {customerId}
+                  </span>
+                )}
                 <button
                   type="button"
-                  className="ml-auto text-xs text-accent hover:underline"
+                  className="ml-auto shrink-0 text-xs text-accent hover:underline"
                   onClick={() => {
                     setCustomerQuery("");
-                    patchSearch({ customer_id: undefined });
+                    patchSearch({ customer_id: undefined, customer_label: undefined });
                   }}
                   data-testid="search-filter-customer-clear"
                 >
@@ -417,7 +429,10 @@ export function SearchPage() {
                           className="flex w-full flex-col px-3 py-1.5 text-left text-sm hover:bg-surface-subtle"
                           onClick={() => {
                             setCustomerQuery("");
-                            patchSearch({ customer_id: c.customer_id });
+                            patchSearch({
+                              customer_id: c.customer_id,
+                              customer_label: c.name,
+                            });
                           }}
                           data-testid={`search-filter-customer-company-${c.customer_id}`}
                         >
@@ -426,27 +441,36 @@ export function SearchPage() {
                         </button>
                       </li>
                     ))}
-                    {(customerSearchQ.data?.contacts ?? []).map((c) => (
-                      <li key={`ct-${c.login}`}>
-                        <button
-                          type="button"
-                          className="flex w-full flex-col px-3 py-1.5 text-left text-sm hover:bg-surface-subtle"
-                          onClick={() => {
-                            setCustomerQuery("");
-                            patchSearch({ customer_id: c.customer_id });
-                          }}
-                          data-testid={`search-filter-customer-contact-${c.login}`}
-                        >
-                          <span className="font-medium text-ink">
-                            {c.first_name} {c.last_name}
-                          </span>
-                          <span className="text-xs text-muted">
-                            {c.email}
-                            {c.company_name ? ` · ${c.company_name}` : ""}
-                          </span>
-                        </button>
-                      </li>
-                    ))}
+                    {(customerSearchQ.data?.contacts ?? []).map((c) => {
+                      const name = `${c.first_name} ${c.last_name}`.trim();
+                      const label = c.company_name
+                        ? `${name || c.login} · ${c.company_name}`
+                        : name || c.login || c.customer_id;
+                      return (
+                        <li key={`ct-${c.login}`}>
+                          <button
+                            type="button"
+                            className="flex w-full flex-col px-3 py-1.5 text-left text-sm hover:bg-surface-subtle"
+                            onClick={() => {
+                              setCustomerQuery("");
+                              patchSearch({
+                                customer_id: c.customer_id,
+                                customer_label: label,
+                              });
+                            }}
+                            data-testid={`search-filter-customer-contact-${c.login}`}
+                          >
+                            <span className="font-medium text-ink">
+                              {c.first_name} {c.last_name}
+                            </span>
+                            <span className="text-xs text-muted">
+                              {c.email}
+                              {c.company_name ? ` · ${c.company_name}` : ""}
+                            </span>
+                          </button>
+                        </li>
+                      );
+                    })}
                   </ul>
                 ) : null}
               </div>
