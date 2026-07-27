@@ -65,6 +65,7 @@ present under the repo root (see `peers.yaml`).
 | `ticket_history` row name-format parity | `test_history_diff.py` |
 | Escalation column math + zero-on-close | `test_escalation.py` |
 | GenericInterface compat conformance (SessionCreate/TicketSearch/StateType/empty-search) | `test_compat_conformance.py` |
+| Compat ops unit/DB (Session\*, Ticket\*, HistoryGet, Owner/Sort, SOAP) | `backend/tests/test_compat_*.py` |
 | `DateChecksum` ticket-number checksum digit | `test_date_checksum.py` |
 
 ## Infrastructure

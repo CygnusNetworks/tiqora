@@ -13,18 +13,23 @@ Tiqora's `/znuny-compat` surface emulates the operations those clients
 actually use, so you can repoint traffic at Tiqora and migrate integrations
 to the native `/api/v1` (or MCP) at your own pace.
 
-## Supported operations (V1)
+## Supported operations
 
 | Operation | Purpose |
 |---|---|
 | `SessionCreate` | Authenticate; returns a `SessionID` |
+| `SessionGet` | Return session key/value data |
+| `SessionRemove` / `SessionDelete` | Invalidate a session |
 | `TicketCreate` | Create a ticket (+ optional article) |
 | `TicketUpdate` | Update fields / add an article |
 | `TicketGet` | Fetch ticket(s) with articles |
 | `TicketSearch` | Search by criteria |
+| `TicketHistoryGet` | Ticket history lines (agent) |
+| `TimeAccountingGet` | Accounted time for a user/date range |
+| `OutOfOffice` | Set agent out-of-office prefs (admin) |
 
 Both the REST-style (`HTTP::REST`) and SOAP (`HTTP::SOAP`) GenericInterface
-transports are emulated for these 5 operations — see
+transports are emulated for these operations — see
 [SOAP transport](#soap-transport) below. Full details, gotchas, and known
 deviations: [`../compatibility.md`](../compatibility.md).
 
@@ -45,10 +50,15 @@ webservice configured:
 | Method | Path | Operation |
 |---|---|---|
 | POST | `/znuny-compat/Session` | SessionCreate |
+| GET | `/znuny-compat/Session/{session_id}` | SessionGet |
+| DELETE | `/znuny-compat/Session/{session_id}` | SessionRemove |
 | POST | `/znuny-compat/Ticket` | TicketCreate |
 | GET | `/znuny-compat/Ticket/{ticket_id}` | TicketGet |
 | PATCH | `/znuny-compat/Ticket/{ticket_id}` | TicketUpdate |
 | GET | `/znuny-compat/TicketSearch` | TicketSearch |
+| GET | `/znuny-compat/Ticket/History/{ticket_id}` | TicketHistoryGet |
+| GET | `/znuny-compat/TimeAccountingGet` | TimeAccountingGet |
+| POST | `/znuny-compat/OutOfOffice` | OutOfOffice |
 
 This means operators can keep the exact webservice URL paths their
 integrators already call, pointed at Tiqora after a reverse-proxy cutover —
@@ -93,7 +103,7 @@ POST /znuny-compat/WebserviceID/{id}
 
 The operation is dispatched from the SOAP Body wrapper element (e.g.
 `<TicketGet>...</TicketGet>`), not the URL — one endpoint per webservice
-handles all 5 operations, matching Znuny's own `HTTP::SOAP` transport.
+handles all supported operations, matching Znuny's own `HTTP::SOAP` transport.
 Auth (`UserLogin`/`Password`, `CustomerUserLogin`/`Password`, or
 `SessionID`) is passed as elements inside the operation wrapper, same as
 REST body params. See
@@ -115,11 +125,14 @@ doesn't serve one either).
 
 ## What is not emulated
 
-- The full GenericInterface provider/consumer framework and SOAP envelopes.
-- Custom operations only available as Znuny packages.
-- Package Manager remote install.
-- `TicketHistoryGet`, `TimeAccountingGet` (return HTTP 501).
+Short list — full tables with rationale live in
+[`../compatibility.md#what-is-not-emulated-and-why`](../compatibility.md#what-is-not-emulated-and-why):
 
-See [`../compatibility.md`](../compatibility.md) for the complete,
-up-to-date list including known uncertainties and golden-master validation
-notes.
+- Requester/outbound GenericInterface (Provider only)
+- Custom OPM operations; Package Manager
+- `ArticleSend` / notification override flags on TicketCreate·Update
+- Multi-article payloads (first article only); `TimeUnit` accounting rows
+- Several TicketSearch edge filters and full HistoryTicketGet-style TA queue snapshots
+
+See [`../compatibility.md`](../compatibility.md) for parameter-level gaps,
+session dual-store behaviour, and golden-master coverage notes.

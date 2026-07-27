@@ -7,15 +7,20 @@ GenericInterface operations most integrators use (behaviour aligned with the
 (OpenAPI). Compat exists so existing scripts, middleware, and third-party tools
 can migrate gradually.
 
-## Scope (V1)
+## Scope
 
 | Operation | Purpose |
 |---|---|
 | `SessionCreate` | Authenticate; return SessionID usable with subsequent calls |
+| `SessionGet` | Return SessionData key/value list for a SessionID |
+| `SessionRemove` / `SessionDelete` | Invalidate a SessionID (Znuny `sessions` + Tiqora Redis) |
 | `TicketCreate` | Create ticket (+ optional article) |
 | `TicketUpdate` | Update fields / add article |
 | `TicketGet` | Fetch ticket(s) with articles |
 | `TicketSearch` | Search by criteria |
+| `TicketHistoryGet` | Agent-only ticket history dump |
+| `TimeAccountingGet` | Accounted time rows (`time_accounting`) for a user/date range |
+| `OutOfOffice` | Set agent out-of-office preferences (admin group) |
 
 Both transports Znuny documents for these operations are supported:
 the REST-style `HTTP::REST` connector, and `HTTP::SOAP` (see
@@ -49,8 +54,8 @@ These issues appear in real Znuny deployments and must not regress:
 | Error shape | Error codes/messages should stay parseable by common clients |
 | Empty search | Empty result sets return the same structure as Znuny (not HTTP 404) |
 
-Golden-behaviour tests (16 in `tests/test_compat_operations.py`) cover
-all five operations including the gotchas above with seeded MariaDB data.
+Golden-behaviour tests in `tests/test_compat_operations.py` cover the
+core operations including the gotchas above with seeded MariaDB data.
 
 ## Implemented routes
 
@@ -59,10 +64,15 @@ all five operations including the gotchas above with seeded MariaDB data.
 | Method | Path | Operation |
 |--------|------|-----------|
 | POST | `/znuny-compat/Session` | SessionCreate |
+| GET | `/znuny-compat/Session/{session_id}` | SessionGet |
+| DELETE | `/znuny-compat/Session/{session_id}` | SessionRemove |
 | POST | `/znuny-compat/Ticket` | TicketCreate |
 | GET | `/znuny-compat/Ticket/{ticket_id}` | TicketGet |
 | PATCH | `/znuny-compat/Ticket/{ticket_id}` | TicketUpdate |
 | GET | `/znuny-compat/TicketSearch` | TicketSearch |
+| GET | `/znuny-compat/Ticket/History/{ticket_id}` | TicketHistoryGet |
+| GET | `/znuny-compat/TimeAccountingGet` | TimeAccountingGet |
+| POST | `/znuny-compat/OutOfOffice` | OutOfOffice |
 | POST | `/znuny-compat/admin/reload` | Re-mount dynamic routes (auth required) |
 
 ### Dynamic routes (from `gi_webservice_config`)
@@ -75,7 +85,7 @@ On startup, Tiqora reads all valid `gi_webservice_config` rows, YAML-parses
 /znuny-compat/WebserviceID/{webservice_id}{route}
 ```
 
-Unsupported operation types (not in the 5-op set above) return HTTP 501.
+Unsupported operation types (not in the supported set above) return HTTP 501.
 Znuny `:VariableName` path segments are converted to FastAPI `{VariableName}`.
 
 Query-string AND JSON body parameters are merged (body wins on collision),
@@ -94,8 +104,7 @@ Znuny's `HTTP::SOAP` GenericInterface transport
 (`Kernel/GenericInterface/Transport/HTTP/SOAP.pm`) is emulated by
 `api/compat/soap.py` (codec) + the same routes/dispatch table in
 `api/compat/router.py` — SOAP requests go through the *identical*
-`op_session_create` / `op_ticket_create` / `op_ticket_update` / `op_ticket_get`
-/ `op_ticket_search` handlers as REST; only the wire format differs.
+operation handlers as REST; only the wire format differs.
 
 ### Endpoints
 
@@ -106,7 +115,7 @@ Znuny's `HTTP::SOAP` GenericInterface transport
 | POST | `/znuny-compat/WebserviceID/{id}` | Same, addressed by numeric ID |
 
 Unlike REST, SOAP has **no per-operation route mapping** in Znuny — a single
-endpoint per webservice accepts any of the 5 supported operations. The
+endpoint per webservice accepts any of the supported operations. The
 operation is dispatched from the **SOAP Body wrapper element's local name**
 (namespace-prefix agnostic), matching Znuny's
 `$Operation = (sort keys %{$Body})[0]` (`SOAP.pm`). The `SOAPAction` HTTP
@@ -214,17 +223,53 @@ Both forms are supported in Tiqora for convenience.
 4. **OIDC / Kerberos** — UI and `/api/v1`; not required for basic
    GenericInterface parity.
 
-## What is not emulated
+## What is not emulated (and why)
 
-- Full GenericInterface provider/consumer framework (e.g. Requester-side
-  outbound SOAP/REST calls — only the Provider/server side is emulated)
-- Arbitrary custom operations registered only as Znuny packages
-- Package Manager remote install
-- TicketHistoryGet, TimeAccountingGet (return 501)
-- WSDL auto-serving (Znuny doesn't serve one either — see
-  [SOAP transport](#soap-transport))
+Compat is a **Provider-side bridge** for the GenericTicketConnector surface
+and a few core ops — not a reimplementation of Znuny’s entire GenericInterface
+framework. Items below are intentionally incomplete or out of scope.
 
-Integrators needing those should migrate to `/api/v1` or MCP.
+### Out of scope (product / architecture)
+
+| Gap | Why deferred |
+|-----|----------------|
+| Requester / outbound invokers (Tiqora calling external SOAP/REST) | Only the **server** side is emulated; outbound is a separate subsystem |
+| Custom OPM operations (e.g. CMDB `ConfigItem*`) | Installation-specific; no stable core wire contract |
+| Package Manager remote install | Deploy/admin concern, not ticket integrator wire |
+| WSDL auto-serving | Znuny does not serve one either — see [SOAP transport](#soap-transport) |
+
+### TicketCreate / TicketUpdate — deferred side-effects
+
+| Gap | Why deferred |
+|-----|----------------|
+| `ArticleSend` (real outbound email on create/update) | Needs SMTP, loop protection, signatures, auto-response; half-emulation would mislead integrators |
+| Notification overrides (`NoAgentNotify`, `ForceNotificationToUserID`, …) | Bound to the notification event stack; incorrect stubs look like “no mail was sent” bugs |
+| `TimeUnit` → `time_accounting` row on article | Small follow-up; table exists, not yet wired on the compat article path |
+| Multiple `Article` entries per request | Znuny accepts an array; Tiqora uses the **first** element only |
+| AutoResponseType / HistoryType overrides / AppendSignatureToBody | Niche; tight coupling to Znuny mail/history semantics |
+
+### TicketGet / Search / Session / TimeAccounting — partial fidelity
+
+| Gap | Why deferred / current behaviour |
+|-----|-----------------------------------|
+| `HTMLBodyAsAttachment` | Flag accepted; no separate HTML-body attachment synthesis |
+| Article-level DynamicFields on TicketGet | Ticket DFs yes; per-article DFs not loaded |
+| TimeAccounting queue “as of entry date” | Znuny uses HistoryTicketGet snapshot; we return the ticket’s **current** queue name |
+| SessionCreate writes only Redis (not Znuny `sessions` rows) | Avoid dual-writer races in parallel-op; SessionGet/auth still **read** both stores |
+| Session TTL / `UserLastRequest` | Still not enforced — see [Known limitations](#known-limitations-compat-layer) |
+| TicketSearch: Created\* filters, TicketFlag/ArticleFlag/Mention, attachment filename search, Result=COUNT | Low traffic on GenericTicketConnector; core filters (queue/state/owner/MIME/sort/DF ops) are in |
+| OutOfOffice CSV bulk (`OutOfOfficeEntriesCSVString`) | JSON `OutOfOfficeEntries` list is implemented; CSV path is bulk-admin only |
+
+### Golden-master coverage
+
+DB/unit tests cover SessionGet/Remove, TicketHistoryGet, OwnerIDs/SortBy, and
+the original five ops. Peer golden (`tests/golden/test_compat_conformance.py`)
+still focuses on SessionCreate / TicketSearch / StateType / empty-search —
+not every new op. Treat production soak against real Znuny GI as required
+before cutover of history/time-accounting/OutOfOffice clients.
+
+Integrators needing full Znuny behaviour for deferred items should keep
+traffic on Znuny GI or migrate to `/api/v1` / MCP.
 
 ## Migration guidance
 
@@ -254,12 +299,13 @@ MariaDB and validated:
   from the `sessions` table but does not check `UserLastRequest` or TTL. Expired
   but un-purged sessions will still authenticate. Mitigated: Znuny’s session
   cleanup daemon removes stale rows; a future release can add TTL checks.
-- **CustomerUserLogin auth**: Customer users authenticated via compat ops are
-  mapped to `user_id=1` (system) internally since they have no Znuny agent ID.
-  This means all compat customer writes appear as system-initiated in history.
-  A later revision will address this with a proper customer principal.
-- **DynamicField_X search**: Only `Equals` and `Like` operators are implemented;
-  `GreaterThan`, `SmallerThan`, `GreaterThanEquals`, `SmallerThanEquals` are not.
+- **CustomerUserLogin auth**: Customer principals use sentinel `user_id=0` for
+  ACL (never elevated to root/agent). Ticket/article writes still attribute
+  `create_by` via the portal system user (`PORTAL_SYSTEM_USER_ID`, typically
+  root) so history remains agent-shaped in the legacy schema.
+- **DynamicField_X search**: `Equals`, `Like`, `GreaterThan`, `SmallerThan`,
+  `GreaterThanEquals`, `SmallerThanEquals` are implemented (numeric compare
+  when the value is numeric; otherwise string compare).
 - **Attachment storage**: Attachments are stored inline in `article_data_mime_attachment`
   (DB storage), not offloaded to a file backend. For large attachments this may
   be a performance concern.
