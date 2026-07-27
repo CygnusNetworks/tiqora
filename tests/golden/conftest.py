@@ -1,7 +1,7 @@
 """Shared fixtures for the golden-master suite.
 
-These tests compare a REAL Znuny 6.5.22 (running in
-``tests/golden/docker-compose.golden.yml``) against Tiqora on the SAME
+These tests compare a REAL OTRS/Znuny peer container (default Znuny 6.5.22;
+select with ``GOLDEN_PEER`` — see ``peers.yaml``) against Tiqora on the SAME
 MariaDB database. They are opt-in and require:
 
 - Docker running locally with the golden stack up (``just golden-up`` +

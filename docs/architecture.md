@@ -6,7 +6,8 @@ full design rationale, see [specs/2026-07-19-tiqora-design.md](./specs/2026-07-1
 
 ## Goals
 
-1. **Modern stack** — FastAPI + React, while remaining Znuny 6.5 DB-compatible.
+1. **Modern stack** — FastAPI + React, while remaining OTRS/Znuny **6.0–7.3**
+   DB-compatible ([support-matrix.md](support-matrix.md)).
 2. **Parallel operation** — Run alongside Znuny on one shared database without
    altering Znuny tables until an explicit schema-ownership cutover.
 3. **Single permission plane** — UI, REST (`/api/v1`), GenericInterface compat,
@@ -332,7 +333,8 @@ plus a CSV-downloadable agent-workload table.
 `api/v1/calendar.py` (`/api/v1/calendar/*`). Reuses Znuny's **existing**
 schema — `calendar`, `calendar_appointment`, `calendar_appointment_ticket`
 (mapped in `db/legacy/calendar.py`) — verbatim, so rows written by Tiqora are
-visible unmodified to a running Znuny 6.5 and vice versa. `calendar_id` reuses
+visible unmodified to a co-running OTRS/Znuny peer (6.0–7.3) and vice versa.
+`calendar_id` reuses
 the same `permission_groups` table as queues, so `PermissionEngine.
 groups_for_permission()` gates calendar/appointment access exactly like queue
 access (`ro` to view, `rw` to create/edit/delete); `calendar_appointment_
