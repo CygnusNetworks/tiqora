@@ -176,6 +176,29 @@ class Settings(BaseSettings):
         validation_alias="TIQORA_SCHEMA_OWNERSHIP",
     )
 
+    # Legacy OTRS/Znuny schema profile (multi-version support, 6.0–7.3).
+    # Empty = auto-detect from INFORMATION_SCHEMA at process start.
+    # Set to a version id (e.g. znuny-6.5, otrs-znuny-6.0) to force a known
+    # profile (tests / operator override). Letter tiers are not accepted.
+    legacy_schema_profile: str = Field(
+        default="",
+        validation_alias="TIQORA_LEGACY_SCHEMA_PROFILE",
+    )
+    # When true, an unrecognised live schema does not abort startup (logged
+    # as error). Default false — refuse unknown schemas so a Znuny 8 / custom
+    # dump cannot silently 500 later. See tiqora.db.legacy.profile.
+    allow_unknown_legacy_schema: bool = Field(
+        default=False,
+        validation_alias="TIQORA_ALLOW_UNKNOWN_LEGACY_SCHEMA",
+    )
+    # Master switch for the startup schema gate. Tests that boot create_app
+    # without a real Znuny DB set this false (or rely on connection failure
+    # soft-skip). Production must leave it true.
+    legacy_schema_check_enabled: bool = Field(
+        default=True,
+        validation_alias="TIQORA_LEGACY_SCHEMA_CHECK",
+    )
+
     # OIDC / SSO (Phase 3c). No auto-provisioning in v1: the mapped claim
     # must match an existing, valid `users.login` row or the login is rejected.
     oidc_enabled: bool = Field(default=False, validation_alias="TIQORA_OIDC_ENABLED")

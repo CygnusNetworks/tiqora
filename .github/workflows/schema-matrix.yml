@@ -1,0 +1,44 @@
+name: Schema matrix (multi-version OTRS/Znuny DDL)
+
+# Layer A release tests: real upstream DDL fixtures for release anchors on
+# MariaDB and PostgreSQL. Not part of every PR (cost); runs on release tags
+# and on demand. See docs/testing.md and backend/tests/fixtures/legacy-schema/.
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch: {}
+  schedule:
+    # Nightly 03:15 UTC — catch fixture/ORM drift early
+    - cron: "15 3 * * *"
+
+concurrency:
+  group: schema-matrix-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  schema-matrix:
+    name: Layer A schema matrix
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    defaults:
+      run:
+        working-directory: backend
+    env:
+      TIQORA_ENV: test
+      TIQORA_FORCE_DB_TESTS: "1"
+      SCHEMA_MATRIX: "1"
+      # Nightly / schedule runs the full minor set; tags keep release anchors only.
+      SCHEMA_MATRIX_FULL: ${{ github.event_name == 'schedule' && '1' || '0' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install dependencies
+        run: uv sync --extra dev
+      - name: Pytest schema_matrix (+ profile conformance)
+        run: uv run pytest -q -m schema_matrix

@@ -38,6 +38,46 @@ def schema_dir() -> Path:
     return Path(str(root))
 
 
+def legacy_schema_fixture_root() -> Path:
+    """Root of multi-version Layer-A fixtures (``tests/fixtures/legacy-schema``).
+
+    Resolves relative to this source tree (tests live next to ``src/tiqora``).
+    Not shipped in the wheel — only used by the test suite / CI.
+    """
+    # backend/src/tiqora/bootstrap/schema_loader.py → backend/tests/fixtures/legacy-schema
+    here = Path(__file__).resolve()
+    candidate = here.parents[3] / "tests" / "fixtures" / "legacy-schema"
+    if candidate.is_dir():
+        return candidate
+    # Fallback when cwd is backend/
+    alt = Path.cwd() / "tests" / "fixtures" / "legacy-schema"
+    if alt.is_dir():
+        return alt
+    raise FileNotFoundError(f"legacy-schema fixtures not found (tried {candidate} and {alt})")
+
+
+def legacy_schema_dir(profile_id: str) -> Path:
+    """Return the directory with the six DDL files for *profile_id*."""
+    root = legacy_schema_fixture_root()
+    path = root / profile_id
+    if not path.is_dir():
+        raise FileNotFoundError(f"No fixture directory for profile {profile_id!r} under {root}")
+    return path
+
+
+def load_legacy_schema(container_url: str, profile_id: str, *, dialect: Dialect) -> None:
+    """Load ``schema → initial_insert → schema-post`` for a multi-version profile."""
+    d = legacy_schema_dir(profile_id)
+    if dialect == "mysql":
+        load_sql_mysql(container_url, d / "schema.mysql.sql")
+        load_sql_mysql(container_url, d / "initial_insert.mysql.sql")
+        load_sql_mysql(container_url, d / "schema-post.mysql.sql")
+        return
+    load_sql_postgres(container_url, d / "schema.postgresql.sql")
+    load_sql_postgres(container_url, d / "initial_insert.postgresql.sql")
+    load_sql_postgres(container_url, d / "schema-post.postgresql.sql")
+
+
 def detect_dialect(database_url: str) -> Dialect:
     """Infer SQL dialect from a SQLAlchemy (or plain) database URL."""
     lower = database_url.lower()
