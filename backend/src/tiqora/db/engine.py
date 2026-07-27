@@ -2,6 +2,7 @@
 
 from collections.abc import AsyncGenerator
 from functools import lru_cache
+from typing import Any
 
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,
@@ -26,7 +27,7 @@ def _normalize_url(url: str) -> str:
     return url
 
 
-def _utc_connect_args(url: str) -> dict:
+def _utc_connect_args(url: str) -> dict[str, Any]:
     """Force every DB connection's session timezone to UTC.
 
     Znuny's contract is that all stored timestamps are UTC (``OTRSTimeZone`` =
