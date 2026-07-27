@@ -1143,6 +1143,7 @@
       "authConfig": "Authentication / 2FA",
       "gdpr": "Privacy / GDPR",
       "daemons": "Services",
+      "systemInfo": "System info",
       "ai": "Settings",
       "aiProviders": "Providers",
       "aiMcp": "MCP clients",
@@ -1627,6 +1628,75 @@
       "resetToZnuny": "Reset to Znuny values",
       "loadError": "Failed to load settings."
     },
+    "systemInfo": {
+      "title": "System info",
+      "description": "The whole installation's health at a glance — version, services, datastores, containers and load. For diagnostics and support.",
+      "loadError": "Could not load system information.",
+      "unavailable": "Not available.",
+      "overall": {
+        "ok": "All systems operational",
+        "degraded": "Operating with limitations",
+        "error": "Problem detected",
+        "uptime": "Uptime {{duration}}"
+      },
+      "sections": {
+        "app": "Application & build",
+        "services": "Background services",
+        "datastores": "Datastores & search",
+        "containers": "Containers",
+        "host": "Host load"
+      },
+      "tier": {
+        "live": "Live",
+        "optin": "Opt-in",
+        "dockerSocket": "Docker socket",
+        "psutil": "psutil"
+      },
+      "app": {
+        "product": "Product",
+        "version": "Version",
+        "gitSha": "Git commit",
+        "buildTime": "Build",
+        "environment": "Environment",
+        "python": "Python",
+        "hostname": "Host",
+        "uptime": "API uptime",
+        "serverTime": "Server time"
+      },
+      "services": {
+        "service": "Service",
+        "status": "Status",
+        "lastOk": "Last success",
+        "message": "Message"
+      },
+      "db": {
+        "connected": "connected",
+        "disconnected": "disconnected",
+        "size": "Size",
+        "latency": "Latency"
+      },
+      "redis": {
+        "memory": "Memory",
+        "clients": "Clients"
+      },
+      "search": {
+        "available": "available",
+        "tickets": "Tickets",
+        "kb": "Knowledge base",
+        "indexSize": "Index size",
+        "unavailable": "unreachable"
+      },
+      "containers": {
+        "since": "since",
+        "restarts": "Restarts"
+      },
+      "host": {
+        "cpu": "CPU",
+        "memory": "Memory",
+        "disk": "Disk",
+        "cores": "{{count}} cores · load {{load}}"
+      }
+    },
     "daemons": {
       "title": "Services",
       "description": "Periodic background services run by the Tiqora worker: enable/disable, interval, and live run status.",
@@ -2012,6 +2082,7 @@
       "webhooks": "Manage outbound webhooks for ticket events.",
       "apiKeys": "Manage API keys for external integrations.",
       "daemons": "Control the status and intervals of background daemons.",
+      "systemInfo": "Whole-install overview: version, services, datastores, containers and load.",
       "gdpr": "GDPR requests: access, anonymization and deletion with backup.",
       "mailLog": "Review inbound and outbound email delivery attempts.",
       "customerFields": "Maintain placeholder variables for customer users.",

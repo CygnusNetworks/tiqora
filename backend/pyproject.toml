@@ -21,6 +21,11 @@ dependencies = [
     "passlib[bcrypt]>=1.7.4",
     "httpx>=0.28.0",
     "prometheus-client>=0.21.0",
+    # Admin System-Info page: host resource metrics (psutil) and the Docker
+    # daemon probe (docker SDK). Both degrade gracefully if unavailable at
+    # runtime, but ship in the prod image so the page is fully populated.
+    "psutil>=6.0.0",
+    "docker>=7.1.0",
     "pyyaml>=6.0.3",
     "bcrypt>=5.0.0",
     "nh3>=0.3.6",
@@ -141,6 +146,10 @@ module = [
     "odf.*",
     "openpyxl",
     "openpyxl.*",
+    "docker",
+    "docker.*",
+    "psutil",
+    "psutil.*",
 ]
 ignore_missing_imports = true
 

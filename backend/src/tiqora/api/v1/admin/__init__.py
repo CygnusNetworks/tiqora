@@ -32,6 +32,7 @@ from tiqora.api.v1.admin import (
     roles,
     states,
     subject_config,
+    system,
     templates,
     users,
     webhooks,
@@ -60,6 +61,7 @@ admin_router.include_router(mail_log.router)
 admin_router.include_router(gdpr.router)
 admin_router.include_router(subject_config.router)
 admin_router.include_router(daemons.router)
+admin_router.include_router(system.router)
 admin_router.include_router(placeholder_variables.queue_variables_router)
 admin_router.include_router(placeholder_variables.customer_fields_router)
 admin_router.include_router(ai.router)

@@ -1185,3 +1185,106 @@ class DaemonUpdate(BaseModel):
 
     enabled: bool | None = None
     interval_seconds: int | None = None
+
+
+# ---------------------------------------------------------------------------
+# System info — admin "System-Info" page (api/v1/admin/system.py)
+# ---------------------------------------------------------------------------
+
+
+class AppInfoOut(BaseModel):
+    """Application identity and build provenance."""
+
+    name: str
+    version: str
+    git_sha: str | None = None
+    build_time: str | None = None
+    environment: str
+    python_version: str
+    hostname: str
+    server_time: datetime
+    started_at: datetime
+    uptime_seconds: float
+
+
+class DbStatusOut(BaseModel):
+    """PostgreSQL/MariaDB connectivity and size probe (best-effort)."""
+
+    dialect: str
+    connected: bool
+    version: str | None = None
+    latency_ms: float | None = None
+    size_bytes: int | None = None
+
+
+class RedisStatusOut(BaseModel):
+    connected: bool
+    version: str | None = None
+    used_memory_bytes: int | None = None
+    clients: int | None = None
+    latency_ms: float | None = None
+
+
+class SearchStatusOut(BaseModel):
+    """Meilisearch health + index document counts (best-effort)."""
+
+    available: bool
+    reason: str | None = None
+    version: str | None = None
+    tickets_docs: int | None = None
+    kb_docs: int | None = None
+    database_size_bytes: int | None = None
+
+
+class DatastoresOut(BaseModel):
+    database: DbStatusOut
+    redis: RedisStatusOut
+    search: SearchStatusOut
+
+
+class ContainerOut(BaseModel):
+    """One Docker container as reported by the daemon (via the mounted socket)."""
+
+    name: str
+    image: str
+    state: str  # running / exited / created / ...
+    health: str | None = None  # healthy / unhealthy / starting / None
+    started_at: datetime | None = None
+    restart_count: int | None = None
+
+
+class ContainersOut(BaseModel):
+    """Degrades gracefully: ``available`` is false with a ``reason`` when the
+    docker SDK is missing or the socket is not mounted."""
+
+    available: bool
+    reason: str | None = None
+    items: list[ContainerOut] = Field(default_factory=list)
+
+
+class HostOut(BaseModel):
+    """Host resource utilisation via psutil. Degrades gracefully (``available``
+    false + ``reason``) when psutil is not installed."""
+
+    available: bool
+    reason: str | None = None
+    cpu_percent: float | None = None
+    cpu_count: int | None = None
+    load_avg: list[float] | None = None
+    memory_total_bytes: int | None = None
+    memory_used_bytes: int | None = None
+    memory_percent: float | None = None
+    disk_path: str | None = None
+    disk_total_bytes: int | None = None
+    disk_used_bytes: int | None = None
+    disk_percent: float | None = None
+
+
+class SystemInfoOut(BaseModel):
+    """Everything the admin System-Info page renders in one payload."""
+
+    app: AppInfoOut
+    services: list[DaemonServiceOut]
+    datastores: DatastoresOut
+    containers: ContainersOut
+    host: HostOut

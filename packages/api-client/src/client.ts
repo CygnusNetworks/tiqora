@@ -234,6 +234,7 @@ export type PlaceholderFieldCreate = Schemas["PlaceholderFieldCreate"];
 export type PlaceholderFieldUpdate = Schemas["PlaceholderFieldUpdate"];
 export type DaemonServiceOut = Schemas["DaemonServiceOut"];
 export type DaemonListOut = Schemas["DaemonListOut"];
+export type SystemInfoOut = Schemas["SystemInfoOut"];
 export type DaemonUpdate = Schemas["DaemonUpdate"];
 // Hand-written until openapi.json is regenerated (schemas also appear there).
 export type MailSecurity = "none" | "starttls" | "ssl";
@@ -1967,6 +1968,11 @@ export class ApiClient {
       body,
       signal,
     });
+  }
+
+  /** "System-Info" — installation-wide status aggregate (admin). */
+  getSystemInfo(signal?: AbortSignal) {
+    return this.request<SystemInfoOut>("GET", "/api/v1/admin/system", { signal });
   }
 
   /** Per-agent SSO eligibility + 2FA enforcement (admin). */
