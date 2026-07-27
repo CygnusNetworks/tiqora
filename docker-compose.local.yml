@@ -15,7 +15,7 @@
 # work, use docker-compose.dev.yml (infra only) + `uv run` / `pnpm dev` on the
 # host instead — see docs/development.md.
 #
-# MariaDB is used here to match production (Znuny 6.5 on MariaDB). Swap the db
+# MariaDB is used here to match typical peer production (OTRS/Znuny 6.0–7.3 on MariaDB). Swap the db
 # service + DATABASE_URL for postgres:16 if you prefer.
 #
 # Runs as its own compose project (`tiqora-local`) with its own containers and

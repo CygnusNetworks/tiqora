@@ -1,10 +1,12 @@
 # Tiqora — Licensing Notice
 
 Tiqora is an **independent reimplementation** of a ticket system compatible
-with OTRS/Znuny **6.0–7.3** database schemas and Znuny 6.5 APIs (primary
-golden path). It contains no copied Znuny or OTRS application code.
-Compatibility was achieved by studying the behaviour of the GPL-3.0-licensed
-Znuny source code and reimplementing it in Python/TypeScript.
+with **OTRS 6.0.x and Znuny 6.0–7.3** database schemas (MariaDB/MySQL and
+PostgreSQL) and GenericInterface-style APIs validated across that range. It
+contains no copied Znuny or OTRS application code. Compatibility was achieved
+by studying the behaviour of the GPL-3.0-licensed Znuny source code and
+reimplementing it in Python/TypeScript. See
+[docs/support-matrix.md](./docs/support-matrix.md).
 
 ## Licence overview
 

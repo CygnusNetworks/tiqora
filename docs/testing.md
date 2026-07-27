@@ -32,7 +32,9 @@ SCHEMA_MATRIX=1 SCHEMA_MATRIX_FULL=1 uv run pytest -q -m schema_matrix  # all fi
 ```
 
 Day-to-day `pytest -q` / PR CI still use the single **Znuny 6.5** bootstrap
-schema under `tiqora.bootstrap.schema` for hundreds of `db` tests.
+schema under `tiqora.bootstrap.schema` for hundreds of `db` tests (fast
+default). Multi-version DDL coverage is opt-in via `-m schema_matrix`
+([support-matrix.md](support-matrix.md)).
 
 Profile detection IDs: see `docs/parallel-operation.md` and
 `tiqora.db.legacy.profile.SchemaProfileId`.

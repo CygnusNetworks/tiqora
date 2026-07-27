@@ -1,7 +1,7 @@
 # Fresh install (greenfield)
 
 This runbook covers a **standalone Tiqora install on an empty database** — no
-existing Znuny instance. If you already run Znuny 6.5 and want to co-exist or
+existing OTRS/Znuny instance. If you already run Znuny/OTRS (6.0–7.3) and want to co-exist or
 migrate, use [znuny-to-tiqora.md](znuny-to-tiqora.md) and
 [parallel-operation.md](../parallel-operation.md) instead.
 
@@ -9,7 +9,9 @@ migrate, use [znuny-to-tiqora.md](znuny-to-tiqora.md) and
 
 On an empty database, `tiqora bootstrap`:
 
-1. Loads the **Znuny 6.5 base schema** in installer order
+1. Loads the **Znuny 6.5 base schema** in installer order (greenfield
+   bootstrap baseline; parallel-op against other peer versions is separate —
+   see [support-matrix.md](../support-matrix.md))
    (`schema` → `initial_insert` → `schema-post`). The SQL ships as package data
    under `tiqora/bootstrap/schema/` (GPL-3.0 upstream artefacts).
 2. Runs the **tiqora Alembic chain** only (`versions_tiqora` → `tiqora_*` tables).

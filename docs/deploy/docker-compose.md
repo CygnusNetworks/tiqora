@@ -240,13 +240,14 @@ docker compose run --rm tiqora-api \
   tiqora bootstrap --admin-password '…' --seed
 ```
 
-`tiqora bootstrap` loads the Znuny 6.5 base schema (installer order), applies
+`tiqora bootstrap` loads the Znuny 6.5 base schema for greenfield installs
+(installer order; multi-version parallel-op peers: [support-matrix.md](../support-matrix.md)), applies
 the tiqora Alembic chain (`tiqora_*` only), and sets the admin password. The
 API entrypoint’s automatic `tiqora migrate upgrade` alone is **not** enough
 for greenfield: it never creates Znuny tables or the seeded `root@localhost`
 user. Full runbook: [`../guide/fresh-install.md`](../guide/fresh-install.md).
 
-For a **parallel-operation deployment against an existing Znuny 6.5 database**
+For a **parallel-operation deployment against an existing OTRS/Znuny 6.0–7.3 database**
 (see [`../guide/znuny-to-tiqora.md`](../guide/znuny-to-tiqora.md)):
 
 1. Remove (or never enable) the bundled `postgres`/`mariadb` service in your
