@@ -23,8 +23,11 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 
 from tiqora.api.compat.operations import (
     op_session_create,
+    op_session_get,
+    op_session_remove,
     op_ticket_create,
     op_ticket_get,
+    op_ticket_history_get,
     op_ticket_search,
     op_ticket_update,
 )
@@ -70,8 +73,13 @@ class _FakeRedis:
     async def expire(self, key: str, ttl: int) -> None:
         pass
 
-    async def delete(self, key: str) -> None:
-        self._store.pop(key, None)
+    async def delete(self, *keys: str) -> int:
+        n = 0
+        for key in keys:
+            if key in self._store:
+                del self._store[key]
+                n += 1
+        return n
 
 
 class _FakeSettings:
@@ -333,6 +341,55 @@ async def test_session_create_missing_params(compat_mariadb: dict[str, Any]) -> 
 
     assert "Error" in result
     assert result["Error"]["ErrorCode"] == "SessionCreate.MissingParameter"
+    await engine.dispose()
+
+
+@pytest.mark.db
+async def test_session_get_and_remove_roundtrip(compat_mariadb: dict[str, Any]) -> None:
+    """SessionGet returns SessionData; SessionRemove invalidates the SessionID."""
+    engine = create_async_engine(compat_mariadb["async_url"])
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    store = _make_session_store()
+
+    async with factory() as session:
+        created = await op_session_create(
+            {"UserLogin": "compat.agent", "Password": "testpass"},
+            session,
+            store,
+        )
+        assert "SessionID" in created, created
+        sid = created["SessionID"]
+
+        got = await op_session_get({"SessionID": sid}, session, store)
+        assert "SessionData" in got, got
+        keys = {e["Key"]: e["Value"] for e in got["SessionData"]}
+        assert keys.get("UserLogin") == "compat.agent"
+        assert keys.get("UserType") == "User"
+
+        removed = await op_session_remove({"SessionID": sid}, session, store)
+        assert removed.get("Success") == 1, removed
+
+        after = await op_session_get({"SessionID": sid}, session, store)
+        assert "Error" in after
+        assert after["Error"]["ErrorCode"] == "SessionGet.SessionInvalid"
+
+    await engine.dispose()
+
+
+@pytest.mark.db
+async def test_session_get_legacy_sessions_table(compat_mariadb: dict[str, Any]) -> None:
+    """SessionGet can read a Znuny sessions-table entry."""
+    engine = create_async_engine(compat_mariadb["async_url"])
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    store = _make_session_store()
+
+    async with factory() as session:
+        got = await op_session_get({"SessionID": "TESTSESSIONID123"}, session, store)
+        assert "SessionData" in got, got
+        keys = {e["Key"] for e in got["SessionData"]}
+        assert "UserLogin" in keys
+        assert "UserPw" not in keys  # filtered
+
     await engine.dispose()
 
 
@@ -1134,6 +1191,87 @@ async def test_customer_ticket_create_forces_own_identity(
         assert row is not None
         assert row[0] == "cust.user1"
         assert row[1] == "CUST1"
+
+    await engine.dispose()
+
+
+@pytest.mark.db
+async def test_ticket_history_get_and_search_owner_sort(
+    compat_mariadb: dict[str, Any],
+) -> None:
+    """TicketHistoryGet returns history lines; TicketSearch OwnerIDs + SortBy work."""
+    engine = create_async_engine(compat_mariadb["async_url"])
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    store = _make_session_store()
+    sysconfig = _make_sysconfig()
+
+    async with factory() as session:
+        await _create_tiqora_tables(session)
+        created = await op_ticket_create(
+            {
+                "UserLogin": "compat.agent",
+                "Password": "testpass",
+                "Ticket": {
+                    "Title": "History target",
+                    "QueueID": compat_mariadb["queue_id"],
+                    "StateID": compat_mariadb["state_id"],
+                    "PriorityID": compat_mariadb["priority_id"],
+                    "OwnerID": 300,
+                },
+            },
+            session,
+            factory,
+            store,
+            sysconfig,
+        )
+        assert "TicketID" in created, created
+        tid = int(created["TicketID"])
+
+        hist = await op_ticket_history_get(
+            {
+                "UserLogin": "compat.agent",
+                "Password": "testpass",
+                "TicketID": tid,
+            },
+            session,
+            store,
+        )
+        assert "TicketHistory" in hist, hist
+        assert hist["TicketHistory"][0]["TicketID"] == tid
+        assert isinstance(hist["TicketHistory"][0]["History"], list)
+        assert len(hist["TicketHistory"][0]["History"]) >= 1
+
+        search = await op_ticket_search(
+            {
+                "UserLogin": "compat.agent",
+                "Password": "testpass",
+                "OwnerIDs": [300],
+                "QueueIDs": [compat_mariadb["queue_id"]],
+                "SortBy": "TicketNumber",
+                "OrderBy": "Up",
+                "Limit": 50,
+            },
+            session,
+            store,
+        )
+        assert "TicketID" in search, search
+        assert tid in search["TicketID"]
+
+        # TicketGet Extended + Owner field
+        got = await op_ticket_get(
+            {
+                "UserLogin": "compat.agent",
+                "Password": "testpass",
+                "TicketID": tid,
+                "Extended": 1,
+            },
+            session,
+            store,
+        )
+        assert "Ticket" in got, got
+        t = got["Ticket"][0]
+        assert t.get("Owner") == "compat.agent"
+        assert "EscalationTime" in t
 
     await engine.dispose()
 
