@@ -352,24 +352,8 @@ export const ADMIN_PAGES: AdminPageEntry[] = [
   },
 
   // ── System & Betrieb ─────────────────────────────────────────────────
-  {
-    slug: "daemons",
-    route: "/admin/daemons",
-    group: "system",
-    nameKey: "admin.nav.daemons",
-    descriptionKey: "admin.pageDescriptions.daemons",
-    keywords: [
-      "daemon",
-      "cron",
-      "postmaster",
-      "eskalation",
-      "imap",
-      "hintergrund",
-      "worker",
-      "dienste",
-      "services",
-    ],
-  },
+  // System-Info (overview) before Dienste (control) so operators land on
+  // the health board first.
   {
     slug: "system",
     route: "/admin/system",
@@ -390,6 +374,24 @@ export const ADMIN_PAGES: AdminPageEntry[] = [
       "speicher",
       "diagnose",
       "übersicht",
+    ],
+  },
+  {
+    slug: "daemons",
+    route: "/admin/daemons",
+    group: "system",
+    nameKey: "admin.nav.daemons",
+    descriptionKey: "admin.pageDescriptions.daemons",
+    keywords: [
+      "daemon",
+      "cron",
+      "postmaster",
+      "eskalation",
+      "imap",
+      "hintergrund",
+      "worker",
+      "dienste",
+      "services",
     ],
   },
   {

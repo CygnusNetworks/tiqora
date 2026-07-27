@@ -141,16 +141,26 @@ export function DaemonsPage() {
                   data-testid={`daemon-row-${svc.slug}`}
                 >
                   <td className="px-3 py-2 align-top">
+                    {/*
+                      Status is runtime health only. When disabled, Aktiv already
+                      carries the config state — don't also label status "Deaktiviert".
+                    */}
                     <span
                       className="inline-flex items-center gap-1.5"
                       data-testid={`daemon-status-${svc.slug}`}
                       data-status={color}
-                      title={svc.last_error ?? undefined}
+                      title={svc.enabled ? (svc.last_error ?? undefined) : undefined}
                     >
-                      <span className={`h-2.5 w-2.5 rounded-full ${DOT_CLASS[color]}`} />
-                      {t(`admin.daemons.status.${color}`)}
+                      {svc.enabled ? (
+                        <>
+                          <span className={`h-2.5 w-2.5 rounded-full ${DOT_CLASS[color]}`} />
+                          {t(`admin.daemons.status.${color}`)}
+                        </>
+                      ) : (
+                        <span className="text-muted">—</span>
+                      )}
                     </span>
-                    {svc.last_error ? (
+                    {svc.enabled && svc.last_error ? (
                       <p className="mt-1 max-w-xs truncate text-xs text-danger">{svc.last_error}</p>
                     ) : null}
                   </td>
