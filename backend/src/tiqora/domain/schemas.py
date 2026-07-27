@@ -2,10 +2,35 @@
 
 from __future__ import annotations
 
-from datetime import datetime
-from typing import Any
+from datetime import UTC, datetime
+from typing import Annotated, Any
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, PlainSerializer, WithJsonSchema
+
+
+def _serialize_as_utc(value: datetime) -> str:
+    """Serialize a DB datetime as a UTC-aware ISO string.
+
+    Znuny stores all timestamps in UTC (``OTRSTimeZone`` = UTC) and aiomysql
+    returns them *naive*. Emitting them without an offset makes the frontend's
+    ``new Date("YYYY-MM-DDTHH:MM:SS")`` parse them as **browser-local** time,
+    shifting every displayed timestamp earlier by the local UTC offset (−2h in
+    CEST, −1h in CET). Tagging them UTC here (``…+00:00``) lets the frontend
+    render the correct instant in the viewer's timezone.
+    """
+    aware = value.replace(tzinfo=UTC) if value.tzinfo is None else value.astimezone(UTC)
+    return aware.isoformat()
+
+
+# Use for every DB-sourced datetime on the read path. ``when_used="json"`` keeps
+# ``model_dump(mode="python")`` returning a real ``datetime`` for internal callers.
+UtcDateTime = Annotated[
+    datetime,
+    PlainSerializer(_serialize_as_utc, return_type=str, when_used="json"),
+    # Keep the OpenAPI type as a date-time string (the serialized value still is
+    # one) so the generated client / openapi.json stay unchanged.
+    WithJsonSchema({"type": "string", "format": "date-time"}),
+]
 
 
 class UserMe(BaseModel):
@@ -146,8 +171,8 @@ class TicketListItem(BaseModel):
     has_ai_summary: bool = False
     """True when ``tiqora_ai_ticket_state.summary_body`` is set for this
     ticket — used by the agent queue view to show an AI-summary badge."""
-    create_time: datetime
-    change_time: datetime
+    create_time: UtcDateTime
+    change_time: UtcDateTime
     age_seconds: int | None = None
     escalation_time: int = 0
     escalation_response_time: int = 0
@@ -207,7 +232,7 @@ class ArticleListItem(BaseModel):
     sender_type_id: int
     communication_channel_id: int
     is_visible_for_customer: bool
-    create_time: datetime
+    create_time: UtcDateTime
     create_by: int
     subject: str | None = None
     from_address: str | None = None
@@ -245,7 +270,7 @@ class HistoryEntry(BaseModel):
     history_type: str | None = None
     article_id: int | None = None
     owner_id: int
-    create_time: datetime
+    create_time: UtcDateTime
     create_by: int
     create_by_login: str | None = None
 
