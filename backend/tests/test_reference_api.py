@@ -42,6 +42,7 @@ def _seed(sync_url: str) -> dict[str, Any]:
         conn.execute(
             text("DELETE FROM customer_user WHERE login LIKE 'ref.cust.%'"),
         )
+        conn.execute(text("DELETE FROM customer_company WHERE customer_id LIKE 'REFCUST%'"))
         conn.execute(text("DELETE FROM queue WHERE id = :id"), {"id": ids["queue_id"]})
         conn.execute(text("DELETE FROM signature WHERE id = :id"), {"id": ids["signature_id"]})
         conn.execute(
@@ -79,6 +80,33 @@ def _seed(sync_url: str) -> dict[str, Any]:
                     """
                 ),
                 {"login": login, "email": email, "cust": cust, "valid": valid, "t": NOW},
+            )
+        # Distinct first/last name contact for the "first last" combined-match case.
+        conn.execute(
+            text(
+                """
+                INSERT INTO customer_user (login, email, customer_id, first_name,
+                                           last_name, valid_id,
+                                           create_time, create_by, change_time, change_by)
+                VALUES ('ref.cust.fullname', 'ada@ref.example', 'REFCUST', 'Ada', 'Lovelace', 1,
+                        :t, 1, :t, 1)
+                """
+            ),
+            {"t": NOW},
+        )
+        for cust, name, valid in (
+            ("REFCUST", "Ref Search Corp", 1),
+            ("REFCUST-INVALID", "Ref Invalid Corp", 2),
+        ):
+            conn.execute(
+                text(
+                    """
+                    INSERT INTO customer_company (customer_id, name, valid_id,
+                                                  create_time, create_by, change_time, change_by)
+                    VALUES (:cust, :name, :valid, :t, 1, :t, 1)
+                    """
+                ),
+                {"cust": cust, "name": name, "valid": valid, "t": NOW},
             )
         conn.execute(
             text(
@@ -216,6 +244,79 @@ async def test_reference_customers_search(mariadb_znuny_url: str) -> None:
     assert "ref.cust.match" in logins
     assert "ref.cust.other" not in logins
     assert "ref.cust.invalid" not in logins
+
+
+@pytest.mark.asyncio
+async def test_reference_customer_search_matches_company_name(mariadb_znuny_url: str) -> None:
+    ids = _seed(mariadb_znuny_url)
+    client, engine = await _client_for(mariadb_znuny_url, ids)
+    async with client:
+        resp = await client.get("/api/v1/reference/customer-search", params={"q": "Search Corp"})
+    await engine.dispose()
+    assert resp.status_code == 200
+    body = resp.json()
+    company_ids = {c["customer_id"] for c in body["companies"]}
+    assert "REFCUST" in company_ids
+    assert "REFCUST-INVALID" not in company_ids
+
+
+@pytest.mark.asyncio
+async def test_reference_customer_search_matches_contact_email(mariadb_znuny_url: str) -> None:
+    ids = _seed(mariadb_znuny_url)
+    client, engine = await _client_for(mariadb_znuny_url, ids)
+    async with client:
+        resp = await client.get("/api/v1/reference/customer-search", params={"q": "ref.cust.match"})
+    await engine.dispose()
+    assert resp.status_code == 200
+    body = resp.json()
+    contacts = {c["login"]: c for c in body["contacts"]}
+    assert "ref.cust.match" in contacts
+    assert "ref.cust.other" not in contacts
+    assert "ref.cust.invalid" not in contacts
+    # Company name resolved via the follow-up IN query, no N+1.
+    assert contacts["ref.cust.match"]["company_name"] == "Ref Search Corp"
+
+
+@pytest.mark.asyncio
+async def test_reference_customer_search_matches_first_last_name(mariadb_znuny_url: str) -> None:
+    ids = _seed(mariadb_znuny_url)
+    client, engine = await _client_for(mariadb_znuny_url, ids)
+    async with client:
+        resp = await client.get("/api/v1/reference/customer-search", params={"q": "Ada Lovelace"})
+    await engine.dispose()
+    assert resp.status_code == 200
+    body = resp.json()
+    logins = {c["login"] for c in body["contacts"]}
+    assert "ref.cust.fullname" in logins
+
+
+@pytest.mark.asyncio
+async def test_reference_customer_search_short_query_returns_empty(
+    mariadb_znuny_url: str,
+) -> None:
+    ids = _seed(mariadb_znuny_url)
+    client, engine = await _client_for(mariadb_znuny_url, ids)
+    async with client:
+        resp = await client.get("/api/v1/reference/customer-search", params={"q": "R"})
+    await engine.dispose()
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body == {"companies": [], "contacts": []}
+
+
+@pytest.mark.asyncio
+async def test_reference_customer_search_limit_caps_results(mariadb_znuny_url: str) -> None:
+    ids = _seed(mariadb_znuny_url)
+    client, engine = await _client_for(mariadb_znuny_url, ids)
+    async with client:
+        resp = await client.get(
+            "/api/v1/reference/customer-search",
+            params={"q": "ref.cust", "limit": 1},
+        )
+    await engine.dispose()
+    assert resp.status_code == 200
+    body = resp.json()
+    assert len(body["contacts"]) == 1
 
 
 @pytest.mark.asyncio

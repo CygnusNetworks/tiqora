@@ -5641,6 +5641,24 @@
         "title": "CustomerCompanyOut",
         "type": "object"
       },
+      "CustomerCompanyRefOut": {
+        "properties": {
+          "customer_id": {
+            "title": "Customer Id",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "customer_id",
+          "name"
+        ],
+        "title": "CustomerCompanyRefOut",
+        "type": "object"
+      },
       "CustomerCompanyUpdate": {
         "properties": {
           "city": {
@@ -5735,6 +5753,50 @@
         "title": "CustomerCompanyUpdate",
         "type": "object"
       },
+      "CustomerContactRefOut": {
+        "properties": {
+          "company_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Company Name"
+          },
+          "customer_id": {
+            "title": "Customer Id",
+            "type": "string"
+          },
+          "email": {
+            "title": "Email",
+            "type": "string"
+          },
+          "first_name": {
+            "title": "First Name",
+            "type": "string"
+          },
+          "last_name": {
+            "title": "Last Name",
+            "type": "string"
+          },
+          "login": {
+            "title": "Login",
+            "type": "string"
+          }
+        },
+        "required": [
+          "login",
+          "email",
+          "first_name",
+          "last_name",
+          "customer_id"
+        ],
+        "title": "CustomerContactRefOut",
+        "type": "object"
+      },
       "CustomerLoginResponse": {
         "properties": {
           "customer": {
@@ -5811,6 +5873,30 @@
           "full_name"
         ],
         "title": "CustomerRefOut",
+        "type": "object"
+      },
+      "CustomerSearchOut": {
+        "properties": {
+          "companies": {
+            "items": {
+              "$ref": "#/components/schemas/CustomerCompanyRefOut"
+            },
+            "title": "Companies",
+            "type": "array"
+          },
+          "contacts": {
+            "items": {
+              "$ref": "#/components/schemas/CustomerContactRefOut"
+            },
+            "title": "Contacts",
+            "type": "array"
+          }
+        },
+        "required": [
+          "companies",
+          "contacts"
+        ],
+        "title": "CustomerSearchOut",
         "type": "object"
       },
       "CustomerUserAdminCreate": {
@@ -13163,6 +13249,16 @@
             "title": "Estimated Total",
             "type": "integer"
           },
+          "facets": {
+            "additionalProperties": {
+              "additionalProperties": {
+                "type": "integer"
+              },
+              "type": "object"
+            },
+            "title": "Facets",
+            "type": "object"
+          },
           "hits": {
             "items": {
               "$ref": "#/components/schemas/SearchHit"
@@ -13434,6 +13530,85 @@
           "text"
         ],
         "title": "SignatureWrite",
+        "type": "object"
+      },
+      "SimilarTicketItem": {
+        "description": "One similar closed ticket (keyword rank v1; score ready for embedding blend).",
+        "properties": {
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "queue_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Queue Name"
+          },
+          "score": {
+            "default": 0.0,
+            "title": "Score",
+            "type": "number"
+          },
+          "state": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "State"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          },
+          "tn": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tn"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "title": "SimilarTicketItem",
+        "type": "object"
+      },
+      "SimilarTicketsOut": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/SimilarTicketItem"
+            },
+            "title": "Items",
+            "type": "array"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "SimilarTicketsOut",
         "type": "object"
       },
       "SlaStatsOut": {
@@ -39315,6 +39490,96 @@
         ]
       }
     },
+    "/api/v1/reference/customer-search": {
+      "get": {
+        "description": "Quick search across customer companies and contacts.\n\nDistinct from ``/customers`` (contact-only picker for ticket assignment):\nthis also matches companies and resolves each returned contact's company\nname via a single follow-up query (no N+1). Below a 2-character query,\nreturns empty results.",
+        "operationId": "customer_search_api_v1_reference_customer_search_get",
+        "parameters": [
+          {
+            "description": "Substring matched against company name/id or contact login/email/name",
+            "in": "query",
+            "name": "q",
+            "required": false,
+            "schema": {
+              "default": "",
+              "description": "Substring matched against company name/id or contact login/email/name",
+              "title": "Q",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 10,
+              "maximum": 25,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CustomerSearchOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Customer Search",
+        "tags": [
+          "reference"
+        ]
+      }
+    },
     "/api/v1/reference/customers": {
       "get": {
         "description": "Search valid customer users for the customer-assignment picker.",
@@ -39664,6 +39929,114 @@
               "minimum": 1,
               "title": "Limit",
               "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "queue_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "items": {
+                    "type": "integer"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Queue Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "state_type",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "State Type"
+            }
+          },
+          {
+            "in": "query",
+            "name": "owner_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Owner Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "customer_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Customer Id"
+            }
+          },
+          {
+            "description": "ISO date, e.g. 2026-07-01",
+            "in": "query",
+            "name": "created_from",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "ISO date, e.g. 2026-07-01",
+              "title": "Created From"
+            }
+          },
+          {
+            "description": "ISO date, e.g. 2026-07-31",
+            "in": "query",
+            "name": "created_to",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "ISO date, e.g. 2026-07-31",
+              "title": "Created To"
             }
           },
           {
@@ -44680,6 +45053,81 @@
         "summary": "Set Presence",
         "tags": [
           "events"
+        ]
+      }
+    },
+    "/api/v1/tickets/{ticket_id}/similar": {
+      "get": {
+        "description": "Keyword-similar closed tickets (Meili rank; embedding blend later).",
+        "operationId": "get_similar_tickets_api_v1_tickets__ticket_id__similar_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "ticket_id",
+            "required": true,
+            "schema": {
+              "title": "Ticket Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SimilarTicketsOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Similar Tickets",
+        "tags": [
+          "tickets"
         ]
       }
     },

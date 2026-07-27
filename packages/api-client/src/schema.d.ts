@@ -3862,6 +3862,31 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/reference/customer-search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Customer Search
+         * @description Quick search across customer companies and contacts.
+         *
+         *     Distinct from ``/customers`` (contact-only picker for ticket assignment):
+         *     this also matches companies and resolves each returned contact's company
+         *     name via a single follow-up query (no N+1). Below a 2-character query,
+         *     returns empty results.
+         */
+        get: operations["customer_search_api_v1_reference_customer_search_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/reference/customers": {
         parameters: {
             query?: never;
@@ -4705,6 +4730,26 @@ export interface paths {
          * @description Record that ``user`` is viewing/composing on ``ticket_id`` (30s TTL).
          */
         post: operations["set_presence_api_v1_tickets__ticket_id__presence_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tickets/{ticket_id}/similar": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Similar Tickets
+         * @description Keyword-similar closed tickets (Meili rank; embedding blend later).
+         */
+        get: operations["get_similar_tickets_api_v1_tickets__ticket_id__similar_get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -6666,6 +6711,13 @@ export interface components {
             /** Zip */
             zip: string | null;
         };
+        /** CustomerCompanyRefOut */
+        CustomerCompanyRefOut: {
+            /** Customer Id */
+            customer_id: string;
+            /** Name */
+            name: string;
+        };
         /** CustomerCompanyUpdate */
         CustomerCompanyUpdate: {
             /** City */
@@ -6684,6 +6736,21 @@ export interface components {
             valid_id?: number | null;
             /** Zip */
             zip?: string | null;
+        };
+        /** CustomerContactRefOut */
+        CustomerContactRefOut: {
+            /** Company Name */
+            company_name?: string | null;
+            /** Customer Id */
+            customer_id: string;
+            /** Email */
+            email: string;
+            /** First Name */
+            first_name: string;
+            /** Last Name */
+            last_name: string;
+            /** Login */
+            login: string;
         };
         /** CustomerLoginResponse */
         CustomerLoginResponse: {
@@ -6714,6 +6781,13 @@ export interface components {
             full_name: string;
             /** Login */
             login: string;
+        };
+        /** CustomerSearchOut */
+        CustomerSearchOut: {
+            /** Companies */
+            companies: components["schemas"]["CustomerCompanyRefOut"][];
+            /** Contacts */
+            contacts: components["schemas"]["CustomerContactRefOut"][];
         };
         /** CustomerUserAdminCreate */
         CustomerUserAdminCreate: {
@@ -9179,6 +9253,12 @@ export interface components {
         SearchResponse: {
             /** Estimated Total */
             estimated_total: number;
+            /** Facets */
+            facets?: {
+                [key: string]: {
+                    [key: string]: number;
+                };
+            };
             /** Hits */
             hits: components["schemas"]["SearchHit"][];
             /** Query */
@@ -9249,6 +9329,32 @@ export interface components {
              * @default 1
              */
             valid_id: number;
+        };
+        /**
+         * SimilarTicketItem
+         * @description One similar closed ticket (keyword rank v1; score ready for embedding blend).
+         */
+        SimilarTicketItem: {
+            /** Id */
+            id: number;
+            /** Queue Name */
+            queue_name?: string | null;
+            /**
+             * Score
+             * @default 0
+             */
+            score: number;
+            /** State */
+            state?: string | null;
+            /** Title */
+            title?: string | null;
+            /** Tn */
+            tn?: string | null;
+        };
+        /** SimilarTicketsOut */
+        SimilarTicketsOut: {
+            /** Items */
+            items: components["schemas"]["SimilarTicketItem"][];
         };
         /** SlaStatsOut */
         SlaStatsOut: {
@@ -20712,6 +20818,43 @@ export interface operations {
             };
         };
     };
+    customer_search_api_v1_reference_customer_search_get: {
+        parameters: {
+            query?: {
+                /** @description Substring matched against company name/id or contact login/email/name */
+                q?: string;
+                limit?: number;
+            };
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustomerSearchOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     search_customers_api_v1_reference_customers_get: {
         parameters: {
             query?: {
@@ -20857,6 +21000,14 @@ export interface operations {
                 q: string;
                 offset?: number;
                 limit?: number;
+                queue_id?: number[] | null;
+                state_type?: string[] | null;
+                owner_id?: number | null;
+                customer_id?: string | null;
+                /** @description ISO date, e.g. 2026-07-01 */
+                created_from?: string | null;
+                /** @description ISO date, e.g. 2026-07-31 */
+                created_to?: string | null;
             };
             header?: {
                 authorization?: string | null;
@@ -22585,6 +22736,41 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_similar_tickets_api_v1_tickets__ticket_id__similar_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                ticket_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SimilarTicketsOut"];
+                };
             };
             /** @description Validation Error */
             422: {
