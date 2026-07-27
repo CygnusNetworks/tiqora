@@ -23,6 +23,17 @@ export function CommandSearch() {
       if ((e.metaKey || e.ctrlKey) && (e.key === "k" || e.key === "K")) {
         e.preventDefault();
         setOpen(true);
+        return;
+      }
+      // "/" opens the palette too (legacy shortcut), unless typing in a field.
+      if (e.key === "/" && !e.metaKey && !e.ctrlKey && !e.altKey) {
+        const el = e.target as HTMLElement | null;
+        const tag = el?.tagName;
+        if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || el?.isContentEditable) {
+          return;
+        }
+        e.preventDefault();
+        setOpen(true);
       }
     };
     window.addEventListener("keydown", onKey);

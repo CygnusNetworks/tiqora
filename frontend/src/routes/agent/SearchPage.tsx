@@ -9,6 +9,7 @@ import { Spinner } from "@/components/ui/Spinner";
 import { Badge } from "@/components/ui/Badge";
 import { SelectMenu, type SelectMenuItem } from "@/components/ui/SelectMenu";
 import { PriorityChip, StateChip } from "@/components/ui/StatusChip";
+import { SmartSearchBar } from "@/components/agent/SmartSearchBar";
 
 export type SearchSearch = {
   q?: string;
@@ -25,9 +26,29 @@ export type SearchSearch = {
   created_from?: string;
   /** ISO date YYYY-MM-DD */
   created_to?: string;
+  /** Result ordering; defaults to changed_desc. */
+  sort?: "changed_desc" | "created_desc" | "created_asc";
 };
 
 const STATE_TYPES = ["new", "open", "pending", "closed"] as const;
+const SORT_ORDERS = ["changed_desc", "created_desc", "created_asc"] as const;
+const DEFAULT_SORT = "changed_desc";
+
+/** ISO date (YYYY-MM-DD) for N days before today, local calendar. */
+function isoDaysAgo(days: number): string {
+  const d = new Date();
+  d.setDate(d.getDate() - days);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+/** Preset ranges for the quick chips. `days: null` = clear the range (all time). */
+const RANGE_PRESETS: { key: string; days: number | null }[] = [
+  { key: "all", days: null },
+  { key: "today", days: 0 },
+  { key: "d7", days: 7 },
+  { key: "d30", days: 30 },
+  { key: "d90", days: 90 },
+];
 
 function useDebouncedValue<T>(value: T, delayMs: number): T {
   const [debounced, setDebounced] = useState(value);
@@ -90,6 +111,7 @@ export function SearchPage() {
   const customerLabel = search.customer_label;
   const createdFrom = search.created_from;
   const createdTo = search.created_to;
+  const sort = search.sort ?? DEFAULT_SORT;
 
   const [customerQuery, setCustomerQuery] = useState("");
   const debouncedCustomerQuery = useDebouncedValue(customerQuery, 250);
@@ -115,6 +137,7 @@ export function SearchPage() {
         if (!next.customer_label) delete next.customer_label;
         if (!next.created_from) delete next.created_from;
         if (!next.created_to) delete next.created_to;
+        if (!next.sort || next.sort === DEFAULT_SORT) delete next.sort;
         if (!next.q) delete next.q;
         if (!next.offset) delete next.offset;
         return next;
@@ -148,6 +171,7 @@ export function SearchPage() {
       customerId,
       createdFrom,
       createdTo,
+      sort,
     ],
     queryFn: ({ signal }) =>
       api.search(
@@ -161,6 +185,7 @@ export function SearchPage() {
           customer_id: customerId,
           created_from: createdFrom,
           created_to: createdTo,
+          sort,
         },
         signal,
       ),
@@ -236,33 +261,94 @@ export function SearchPage() {
     patchSearch({ state_type: next });
   };
 
+  const applyRangePreset = (days: number | null) => {
+    if (days === null) {
+      patchSearch({ created_from: undefined, created_to: undefined });
+    } else {
+      patchSearch({ created_from: isoDaysAgo(days), created_to: isoDaysAgo(0) });
+    }
+  };
+
+  // Which preset (if any) matches the active range. "all" when no range is set.
+  const activeRangeKey =
+    !createdFrom && !createdTo
+      ? "all"
+      : (RANGE_PRESETS.find((p) => p.days !== null && createdFrom === isoDaysAgo(p.days))?.key ??
+        null);
+
   return (
-    <div className="mx-auto w-full max-w-4xl space-y-4 px-4 py-6" data-testid="search-page">
+    <div className="mx-auto w-full max-w-5xl space-y-4 px-4 py-6" data-testid="search-page">
       <h1 className="font-display text-xl font-semibold text-ink">{t("search.title")}</h1>
-      <form
-        onSubmit={(e) => {
-          e.preventDefault();
-          const fd = new FormData(e.currentTarget);
-          const term = String(fd.get("q") || "").trim();
-          patchSearch({ q: term, offset: 0 });
+
+      <SmartSearchBar
+        values={{
+          q,
+          queueIds,
+          stateTypes,
+          ownerId,
+          customerId,
+          customerLabel,
+          createdFrom,
+          createdTo,
         }}
-        className="flex gap-2"
-      >
-        <input
-          name="q"
-          defaultValue={q}
-          data-testid="search-input"
-          placeholder={t("search.placeholder")}
-          className="flex-1 rounded-md border border-hairline bg-surface px-3 py-2 text-sm text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent focus:border-accent"
-        />
-        <button
-          type="submit"
-          className="rounded-md bg-accent px-4 py-2 text-sm font-medium text-accent-ink transition-colors duration-100 hover:opacity-90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent"
-          data-testid="search-submit"
-        >
-          {t("search.submit")}
-        </button>
-      </form>
+        queues={(queuesQ.data ?? []).map((qu) => ({ id: qu.id, name: qu.name }))}
+        agents={(agentsQ.data ?? []).map((a) => ({
+          id: a.id,
+          full_name: a.full_name,
+          login: a.login,
+        }))}
+        onPatch={patchSearch}
+        onSubmitQuery={(term) => patchSearch({ q: term, offset: 0 })}
+      />
+
+      {/* Quick time-range presets + result ordering. */}
+      <div className="flex flex-wrap items-center gap-2" data-testid="search-controls">
+        <span className="text-[11px] font-semibold uppercase tracking-wide text-muted">
+          {t("search.presets.label")}
+        </span>
+        {RANGE_PRESETS.map((p) => {
+          const active = activeRangeKey === p.key;
+          return (
+            <button
+              key={p.key}
+              type="button"
+              onClick={() => applyRangePreset(p.days)}
+              aria-pressed={active}
+              data-testid={`search-preset-${p.key}`}
+              className={
+                active
+                  ? "rounded-full border border-accent bg-accent-dim px-2.5 py-1 text-xs font-medium text-accent"
+                  : "rounded-full border border-hairline bg-surface-subtle px-2.5 py-1 text-xs text-ink hover:border-accent/50"
+              }
+            >
+              {t(`search.presets.${p.key}`)}
+            </button>
+          );
+        })}
+        <div className="ml-auto flex items-center gap-2">
+          <label
+            htmlFor="search-sort"
+            className="text-[11px] font-semibold uppercase tracking-wide text-muted"
+          >
+            {t("search.sort.label")}
+          </label>
+          <select
+            id="search-sort"
+            value={sort}
+            onChange={(e) =>
+              patchSearch({ sort: e.target.value as SearchSearch["sort"] })
+            }
+            data-testid="search-sort"
+            className="rounded-md border border-hairline bg-surface px-2.5 py-1 text-xs text-ink focus:border-accent focus:outline-none"
+          >
+            {SORT_ORDERS.map((o) => (
+              <option key={o} value={o}>
+                {t(`search.sort.${o}`)}
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
 
       <div
         className="space-y-3 rounded-lg border border-hairline bg-surface p-3"

@@ -497,6 +497,28 @@
     "noResults": "No matching tickets.",
     "groupTickets": "Tickets",
     "groupKb": "Knowledge base",
+    "smart": {
+      "placeholder": "Search – or queue:, owner:, status:, customer:, from:, to: …",
+      "fulltext": "Search “{{text}}” as full text",
+      "filterHint": "Filter",
+      "dateHint": "Date as YYYY-MM-DD",
+      "from": "From",
+      "to": "To"
+    },
+    "presets": {
+      "label": "Time range",
+      "all": "All",
+      "today": "Today",
+      "d7": "7 days",
+      "d30": "30 days",
+      "d90": "90 days"
+    },
+    "sort": {
+      "label": "Sort",
+      "changed_desc": "Recently changed",
+      "created_desc": "Newest first",
+      "created_asc": "Oldest first"
+    },
     "filters": {
       "title": "Filters",
       "clear": "Clear",

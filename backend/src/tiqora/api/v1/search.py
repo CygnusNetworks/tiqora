@@ -3,13 +3,16 @@
 from __future__ import annotations
 
 from datetime import UTC, date, datetime, time
-from typing import Annotated
+from typing import Annotated, Literal
 
 from fastapi import APIRouter, Query
 
 from tiqora.api.deps import AppSettings, CurrentUser, DbSession
 from tiqora.domain.schemas import SearchResponse
 from tiqora.domain.search import SearchIndexService
+
+# Keep in sync with ``tiqora.domain.search.SORT_OPTIONS``.
+SortOrder = Literal["changed_desc", "created_desc", "created_asc"]
 
 router = APIRouter(prefix="/search", tags=["search"])
 
@@ -36,6 +39,7 @@ async def search(
     customer_id: str | None = Query(None),
     created_from: Annotated[date | None, Query(description="ISO date, e.g. 2026-07-01")] = None,
     created_to: Annotated[date | None, Query(description="ISO date, e.g. 2026-07-31")] = None,
+    sort: Annotated[SortOrder, Query(description="Result ordering.")] = "changed_desc",
 ) -> SearchResponse:
     svc = SearchIndexService(session, settings)
     try:
@@ -50,6 +54,7 @@ async def search(
             customer_id=customer_id,
             created_from=_day_start_ts(created_from) if created_from else None,
             created_to=_day_end_ts(created_to) if created_to else None,
+            sort=sort,
         )
     finally:
         await svc.close()
