@@ -213,7 +213,7 @@ async def _load_mcp_tools(
             .all()
         )
         for tp in policies:
-            params_schema: dict | None = None
+            params_schema: dict[str, Any] | None = None
             if tp.parameters_snapshot:
                 try:
                     parsed = json.loads(tp.parameters_snapshot)
