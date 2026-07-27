@@ -1,9 +1,11 @@
 # GenericInterface compatibility layer
 
-Tiqora exposes a **compatibility surface** that emulates the Znuny 6.5
-GenericInterface operations most integrators use. The native API is always
-`/api/v1` (OpenAPI). Compat exists so existing scripts, middleware, and
-third-party tools can migrate gradually.
+Tiqora exposes a **compatibility surface** that emulates the Znuny/OTRS
+GenericInterface operations most integrators use (behaviour aligned with the
+6.x/7.x wire surface; peer DB support is **6.0–7.3** — see
+[support-matrix.md](support-matrix.md)). The native API is always `/api/v1`
+(OpenAPI). Compat exists so existing scripts, middleware, and third-party tools
+can migrate gradually.
 
 ## Scope (V1)
 
@@ -234,7 +236,8 @@ Integrators needing those should migrate to `/api/v1` or MCP.
 ## Golden-master validation (2026-07-19)
 
 The golden-master suite (`tests/golden/`, see docs/testing.md) runs a REAL
-Znuny 6.5.22 container on the same MariaDB and validated:
+peer container (default Znuny 6.5.22; multi-peer matrix 6.0–7.3) on the same
+MariaDB and validated:
 
 - SessionCreate / TicketSearch / empty-search wire shapes against Znuny's
   shipped `GenericTicketConnectorREST` webservice.

@@ -1,0 +1,100 @@
+# Golden Layer-B peers — real OTRS/Znuny container vs Tiqora on shared MariaDB.
+# Manual only (local + workflow_dispatch). No nightly / no PR gate.
+#
+# Usage:
+#   GOLDEN_PEER=znuny-6.5 just golden-up
+#   GOLDEN_PEER=znuny-6.5 just golden-seed
+#   GOLDEN_PEER=znuny-6.5 just golden-test
+#   just golden-all-peers   # sequential, all peers with source present
+#
+# source_dir is relative to the repo root and gitignored. Place/copy the
+# matching release tree there before golden-up (Docker COPY cannot use
+# external symlinks).
+
+default: znuny-6.5
+
+peers:
+  otrs-znuny-6.0:
+    product: OTRS/Znuny
+    version: "6.0.45"
+    framework: "6.0.x"
+    source_dir: znuny-6.0.45
+    # Inside the image we always install under /opt/otrs for a single Dockerfile.
+    install_home: /opt/otrs
+    schema_profile: otrs-znuny-6.0
+    notes: Hardest adapter (table groups). Source often from 6.0.45 tarball.
+
+  znuny-6.1:
+    product: Znuny
+    version: "6.1.2"
+    framework: "6.1.x"
+    source_dir: znuny-6.1.2
+    install_home: /opt/otrs
+    schema_profile: znuny-6.1
+
+  znuny-6.2:
+    product: Znuny
+    version: "6.2.2"
+    framework: "6.2.x"
+    source_dir: znuny-6.2.2
+    install_home: /opt/otrs
+    schema_profile: znuny-6.2
+
+  znuny-6.3:
+    product: Znuny
+    version: "6.3.4"
+    framework: "6.3.x"
+    source_dir: znuny-6.3.4
+    install_home: /opt/otrs
+    schema_profile: znuny-6.3
+
+  znuny-6.4:
+    product: Znuny
+    version: "6.4.5"
+    framework: "6.4.x"
+    source_dir: znuny-6.4.5
+    install_home: /opt/otrs
+    schema_profile: znuny-6.4
+
+  znuny-6.5:
+    product: Znuny
+    version: "6.5.22"
+    framework: "6.5.x"
+    source_dir: znuny-6.5.22
+    install_home: /opt/otrs
+    schema_profile: znuny-6.5
+    notes: Primary peer — history, TN interleaving, escalation, compat.
+
+  znuny-7.0:
+    product: Znuny
+    version: "7.0.19"
+    framework: "7.0.x"
+    source_dir: znuny-7.0.19
+    install_home: /opt/otrs
+    schema_profile: znuny-7.0
+    notes: State/priority color NOT NULL on writes.
+
+  znuny-7.1:
+    product: Znuny
+    version: "7.1.7"
+    framework: "7.1.x"
+    source_dir: znuny-7.1.7
+    install_home: /opt/otrs
+    schema_profile: znuny-7.1
+
+  znuny-7.2:
+    product: Znuny
+    version: "7.2.3"
+    framework: "7.2.x"
+    source_dir: znuny-7.2.3
+    install_home: /opt/otrs
+    schema_profile: znuny-7.2
+
+  znuny-7.3:
+    product: Znuny
+    version: "7.3.5"
+    framework: "7.3.x"
+    source_dir: znuny-7.3.5
+    install_home: /opt/otrs
+    schema_profile: znuny-7.3
+    notes: Newest 7.x golden target.

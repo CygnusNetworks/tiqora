@@ -12,6 +12,11 @@ design adaptation for the repository.
 
 ## Context
 
+> **Note (2026-07):** Product support is **OTRS/Znuny 6.0–7.3** — see
+> [support-matrix.md](../support-matrix.md). The design text below was written
+> when the primary target was Znuny 6.5; treat version-specific claims as
+> historical unless updated elsewhere.
+
 Znuny 6.5 (Perl, ~122 database tables) is to be replaced by a modern
 implementation: Python/FastAPI backend, React frontend with theming, MCP server,
 channel plugin architecture, and later AI agents.

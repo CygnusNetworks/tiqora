@@ -1,18 +1,34 @@
-name: Golden-master (real Znuny vs Tiqora)
+name: Golden-master (real peer vs Tiqora)
 
-# Manual-only: building and booting a full Znuny 6.5.22 container (from
-# source, no official image exists) is heavy and not needed for day-to-day
-# CI turnaround. Run from the Actions tab when validating a change that
-# touches ticket numbering, ticket_history formats, escalation math, or the
-# compat GenericInterface layer. See docs/testing.md.
+# Manual multi-peer toolkit only — no nightly, no PR gate.
+# Building a full OTRS/Znuny container from source is heavy; run from the
+# Actions tab when validating ticket numbering, history formats, escalation,
+# or the GenericInterface compat layer. See docs/testing.md and
+# tests/golden/README-multi-peer.md.
+#
+# Peer source trees (gitignored, e.g. znuny-6.5.22/) must exist in the
+# workspace for the chosen peer(s). On GHA runners that usually means the
+# default peer only works if a prior step or cache supplies the tree; local
+# `just golden-all-peers` is the primary full-matrix path.
 on:
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      peer:
+        description: "Peer id from tests/golden/peers.yaml (ignored when run_all)"
+        required: false
+        default: "znuny-6.5"
+        type: string
+      run_all:
+        description: "Run every peer whose source_dir is present (sequential)"
+        required: false
+        default: false
+        type: boolean
 
 jobs:
   golden:
-    name: Golden-master suite
+    name: Golden-master (${{ inputs.run_all && 'all ready peers' || inputs.peer }})
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 180
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v5
@@ -24,20 +40,98 @@ jobs:
       - name: Install backend dependencies
         working-directory: backend
         run: uv sync --extra dev
-      - name: Build + start golden stack
+      - name: List peers / readiness
         run: |
-          docker compose -f tests/golden/docker-compose.golden.yml up -d --build --wait
-      - name: Seed baseline fixtures
-        run: bash tests/golden/seed.sh
-      - name: Run golden-master suite
-        working-directory: backend
+          echo "All peers:"
+          python3 tests/golden/peer_env.py --list
+          echo "Ready (source present):"
+          python3 tests/golden/peer_env.py --list-ready || true
+      - name: Single peer — check source
+        if: ${{ !inputs.run_all }}
+        run: python3 tests/golden/peer_env.py --check "${{ inputs.peer }}"
+      - name: Single peer — build + seed + test
+        if: ${{ !inputs.run_all }}
         env:
-          GOLDEN: "1"
-          GOLDEN_DB_URL: "mysql+pymysql://znuny:znuny@127.0.0.1:3307/znuny"
-        run: uv run pytest -q -m golden ../tests/golden
-      - name: Dump Znuny container logs on failure
-        if: failure()
-        run: docker compose -f tests/golden/docker-compose.golden.yml logs znuny mariadb
+          GOLDEN_PEER: ${{ inputs.peer }}
+        run: |
+          set -euo pipefail
+          eval "$(python3 tests/golden/peer_env.py "${GOLDEN_PEER}")"
+          export GOLDEN_PEER GOLDEN_SOURCE_DIR GOLDEN_COMPOSE_PROJECT
+          export GOLDEN_DB_URL GOLDEN_DB_ASYNC_URL
+          echo "peer=${GOLDEN_PEER} project=${GOLDEN_COMPOSE_PROJECT} source=${GOLDEN_SOURCE_DIR}"
+          docker compose -p "${GOLDEN_COMPOSE_PROJECT}" \
+            -f tests/golden/docker-compose.golden.yml up -d --build --wait
+          docker compose -p "${GOLDEN_COMPOSE_PROJECT}" \
+            -f tests/golden/docker-compose.golden.yml exec -T znuny \
+            /usr/local/bin/znuny-entrypoint.sh console Maint::Config::Rebuild
+          bash tests/golden/seed.sh
+          (
+            cd backend
+            GOLDEN=1 \
+              GOLDEN_PEER="${GOLDEN_PEER}" \
+              GOLDEN_COMPOSE_PROJECT="${GOLDEN_COMPOSE_PROJECT}" \
+              GOLDEN_DB_URL="${GOLDEN_DB_URL}" \
+              uv run pytest -q -m golden ../tests/golden
+          )
+      - name: All ready peers — sequential matrix
+        if: ${{ inputs.run_all }}
+        run: |
+          set -euo pipefail
+          peers=()
+          while IFS= read -r peer; do
+            [ -n "${peer}" ] && peers+=("${peer}")
+          done < <(python3 tests/golden/peer_env.py --list-ready)
+          if [ "${#peers[@]}" -eq 0 ]; then
+            echo "ERROR: no peers with source present on the runner." >&2
+            echo "Place release trees at paths from peers.yaml (see README-multi-peer.md)." >&2
+            exit 1
+          fi
+          echo "Running sequential golden for: ${peers[*]}"
+          failed=()
+          for peer in "${peers[@]}"; do
+            echo ""
+            echo "======== GOLDEN peer=${peer} ========"
+            eval "$(python3 tests/golden/peer_env.py "${peer}")"
+            export GOLDEN_PEER GOLDEN_SOURCE_DIR GOLDEN_COMPOSE_PROJECT
+            export GOLDEN_DB_URL GOLDEN_DB_ASYNC_URL
+            if docker compose -p "${GOLDEN_COMPOSE_PROJECT}" \
+                 -f tests/golden/docker-compose.golden.yml up -d --build --wait \
+              && docker compose -p "${GOLDEN_COMPOSE_PROJECT}" \
+                 -f tests/golden/docker-compose.golden.yml exec -T znuny \
+                 /usr/local/bin/znuny-entrypoint.sh console Maint::Config::Rebuild \
+              && bash tests/golden/seed.sh \
+              && (cd backend && GOLDEN=1 \
+                    GOLDEN_PEER="${GOLDEN_PEER}" \
+                    GOLDEN_COMPOSE_PROJECT="${GOLDEN_COMPOSE_PROJECT}" \
+                    GOLDEN_DB_URL="${GOLDEN_DB_URL}" \
+                    uv run pytest -q -m golden ../tests/golden); then
+              echo "OK ${peer}"
+            else
+              echo "FAIL ${peer}" >&2
+              failed+=("${peer}")
+              docker compose -p "${GOLDEN_COMPOSE_PROJECT}" \
+                -f tests/golden/docker-compose.golden.yml logs znuny mariadb || true
+            fi
+            docker compose -p "${GOLDEN_COMPOSE_PROJECT}" \
+              -f tests/golden/docker-compose.golden.yml down -v || true
+          done
+          if [ "${#failed[@]}" -gt 0 ]; then
+            echo "Failed peers: ${failed[*]}" >&2
+            exit 1
+          fi
+      - name: Dump peer container logs on failure
+        if: ${{ failure() && !inputs.run_all }}
+        env:
+          GOLDEN_PEER: ${{ inputs.peer }}
+        run: |
+          eval "$(python3 tests/golden/peer_env.py "${GOLDEN_PEER}")"
+          docker compose -p "${GOLDEN_COMPOSE_PROJECT}" \
+            -f tests/golden/docker-compose.golden.yml logs znuny mariadb || true
       - name: Tear down
-        if: always()
-        run: docker compose -f tests/golden/docker-compose.golden.yml down -v
+        if: ${{ always() && !inputs.run_all }}
+        env:
+          GOLDEN_PEER: ${{ inputs.peer }}
+        run: |
+          eval "$(python3 tests/golden/peer_env.py "${GOLDEN_PEER}")" || true
+          docker compose -p "${GOLDEN_COMPOSE_PROJECT:-tiqora-golden-znuny-6-5}" \
+            -f tests/golden/docker-compose.golden.yml down -v || true

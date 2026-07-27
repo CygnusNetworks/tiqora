@@ -194,6 +194,58 @@ async def _run_all_loops(stop: asyncio.Event) -> None:
     )
 
 
+async def _ensure_legacy_schema_at_worker_start() -> None:
+    """Refuse to run the worker against an unknown OTRS/Znuny schema."""
+    settings = get_settings()
+    if not settings.legacy_schema_check_enabled:
+        return
+    from tiqora.db.legacy.profile import (
+        UnsupportedLegacySchemaError,
+        ensure_legacy_schema_supported,
+    )
+
+    dialect_hint = (
+        "postgresql" if settings.is_postgres else "mysql" if settings.is_mysql else "unknown"
+    )
+    factory = get_session_factory()
+    try:
+        async with factory() as session:
+            profile = await ensure_legacy_schema_supported(
+                session,
+                allow_unknown=settings.allow_unknown_legacy_schema,
+                profile_override=settings.legacy_schema_profile,
+                dialect_hint=dialect_hint,
+            )
+        logger.info(
+            "legacy_schema_ready",
+            profile_id=profile.profile_id.value,
+            label=profile.label,
+            groups_table=profile.groups_table,
+        )
+    except UnsupportedLegacySchemaError:
+        raise
+    except Exception as exc:  # noqa: BLE001 — classified below
+        from tiqora.db.legacy.profile import is_db_unavailable
+
+        # Mirror API: soft-skip only when the peer DB is unreachable (local
+        # dev without a stack). Detection bugs on a reachable DB re-raise so
+        # we never run with profile=None and wrong groups/color adapters.
+        if is_db_unavailable(exc):
+            logger.warning(
+                "legacy_schema_check_skipped",
+                error=str(exc),
+                reason="db_unavailable",
+            )
+            return
+        logger.error(
+            "legacy_schema_detection_failed",
+            error=str(exc),
+            error_type=type(exc).__name__,
+            exc_info=True,
+        )
+        raise
+
+
 def run_worker() -> None:
     """Start the background worker (poller, daemon takeover loops, heartbeat)."""
     settings = get_settings()
@@ -213,6 +265,7 @@ def run_worker() -> None:
 
     logger.info("tiqora_worker_starting", redis_url=settings.redis_url)
     try:
+        loop.run_until_complete(_ensure_legacy_schema_at_worker_start())
         loop.run_until_complete(_run_all_loops(stop))
     finally:
         loop.close()

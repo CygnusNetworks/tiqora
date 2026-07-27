@@ -1,8 +1,59 @@
 # Parallel operation with Znuny
 
-Tiqora V1 is designed to run **alongside Znuny 6.5 on the same database**.
-This document lists the behavioural invariants Tiqora must honour so that both
-systems remain coherent.
+Tiqora V1 is designed to run **alongside an OTRS/Znuny database** —
+**OTRS 6.0.x and Znuny 6.0–7.3** (MariaDB/MySQL and PostgreSQL). This document
+lists the behavioural invariants Tiqora must honour so that both systems remain
+coherent.
+
+**Canonical matrix:** [support-matrix.md](support-matrix.md) (profiles,
+engines, TiqoraSync Framework tags, validation evidence). Preferred production
+peers: **Znuny 6.5 LTS** or **7.3 LTS**.
+
+## Multi-version schema profile
+
+At process start (API + worker), Tiqora probes `INFORMATION_SCHEMA` and classifies
+the live peer schema into a **version-keyed profile id**:
+
+| Profile id | Peer product (fresh DDL) | Decisive markers |
+|------------|--------------------------|------------------|
+| `otrs-znuny-6.0` | OTRS 6.0 / Znuny 6.0 | table `groups` (not `permission_groups`) |
+| `znuny-6.1` | Znuny 6.1 | `permission_groups`, no mail OAuth |
+| `znuny-6.2` | Znuny 6.2 | + `acl_ticket_attribute_relations` |
+| `znuny-6.3` | Znuny 6.3 | `mail_account.authentication_type` |
+| `znuny-6.4` / **`znuny-6.5`** | Znuny 6.4 / 6.5 | `mention` / `smime_keys` (6.4≈6.5 → detected as `znuny-6.5`) |
+| `znuny-7.0` | Znuny 7.0 | `ticket_state.color` / `ticket_priority.color` |
+| `znuny-7.1` | Znuny 7.1 | surrogate `id` on junction tables (e.g. `group_user`) |
+| `znuny-7.2` | Znuny 7.2 | `article_color`, … |
+| `znuny-7.3` | Znuny 7.3 | `sendmail_config` |
+
+Implementation: `tiqora.db.legacy.profile.LegacySchemaProfile` / `SchemaProfileId`.
+
+- **Unknown schemas refuse to start** (hard fail) so a Znuny 8 / heavily custom
+  dump cannot silently 500 later. Override with
+  `TIQORA_ALLOW_UNKNOWN_LEGACY_SCHEMA=1` (unsupported) or force a known profile with
+  `TIQORA_LEGACY_SCHEMA_PROFILE=znuny-6.5` (version ids only — no letter tiers).
+  Disable the gate entirely with `TIQORA_LEGACY_SCHEMA_CHECK=0` (tests only).
+- **Startup soft-skip** applies only when the peer DB is **unreachable**
+  (`is_db_unavailable`: connection refused / timeout / DNS). Detection bugs on a
+  reachable DB re-raise so the process never boots with `profile=None` and the
+  wrong `groups` table or missing color default.
+- **Groups table rebind** (`PermissionGroups.__table__.name`) is process-global
+  and applied once at startup — intentional for single-process deploy; tests call
+  `reset_legacy_schema_profile()`.
+- **Znuny 7.0+ color**: admin state/priority creates inject
+  `DEFAULT_STATE_PRIORITY_COLOR` (`#FFFFFF`) because the API does not yet accept
+  a client colour. Intentional minimal support — recolour later in UI if needed.
+- The detected profile is shown on **Admin → System info** (database card).
+- Preferred path when possible: upgrade the peer to **6.5 or 7.3 LTS**, then
+  parallel-op. Multi-version support is a bridge for sites that cannot upgrade yet.
+- Full matrix (profiles, engines, validation): [support-matrix.md](support-matrix.md).
+- **Layer A release tests** (`-m schema_matrix`) load real upstream DDLs for
+  release anchors on MariaDB and PostgreSQL, including a color INSERT smoke on
+  7.x — see [testing.md](testing.md).
+- **TiqoraSync** OPM declares Framework `6.0.x`–`7.3.x` (install paths
+  `/opt/otrs` vs `/opt/znuny` — see `packages/znuny-addon/TiqoraSync/install/README.md`).
+- **Layer B golden** multi-peer matrix (manual): `tests/golden/peers.yaml` +
+  `just golden-all-peers` (6.0–7.3 validated).
 
 ## Ground rules
 
@@ -80,12 +131,14 @@ Znuny parsers depend on exact shape.
 - Regression tests compare history rows against a golden Znuny write for the
   same logical action.
 
-**Golden-master validated (2026-07-19)** against a real Znuny 6.5.22 container
+**Golden-master validated** against real peer containers (multi-peer matrix
+6.0–7.3 on MariaDB; default local peer Znuny 6.5.22). History parity
 (`tests/golden/test_history_diff.py`): the full create → state → move →
-priority → owner → note → close lifecycle now produces byte-identical
-normalized history rows. Four divergences were found and fixed in the process
-(CustomerUpdate row on TicketCreate, SetPendingTime `%%00-00-00 00:00` reset on
-every non-pending state change, TicketOwnerSet same-owner no-op without
+priority → owner → note → close lifecycle produces matching normalized
+history rows (with documented peer-specific optional types such as
+`SetPendingTime` on older 6.x). Earlier divergences fixed in the process
+included CustomerUpdate on TicketCreate, SetPendingTime `%%00-00-00 00:00`
+reset on non-pending state changes, TicketOwnerSet same-owner no-op without
 auto-lock, and the Misc "Reset of unlock time." row on agent article
 creation). Ticket-number counter interleaving, DateChecksum checksum digits,
 and escalation columns (incl. zero-on-close) are golden-validated too — see

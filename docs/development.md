@@ -10,7 +10,9 @@
 | just (optional) | Task runner; Makefile is equivalent |
 | Git | Branch `main` |
 
-The Znuny reference tree may live at `znuny-6.5.22/` (gitignored). Do **not**
+Peer release trees for golden Layer B may live at the repo root as
+`znuny-6.5.22/`, `znuny-7.3.5/`, … (gitignored). Multi-version support:
+[support-matrix.md](support-matrix.md). Do **not**
 copy Znuny code into packages.
 
 ## Clone and layout

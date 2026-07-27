@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta
       name="description"
-      content="Tiqora — modern self-hosted helpdesk with AI-assisted drafts, summaries &amp; auto-replies. Znuny/OTRS 6.5 database-compatible, with a first-class web UI, GDPR tools, and parallel operation."
+      content="Tiqora — modern self-hosted helpdesk with AI-assisted drafts, summaries &amp; auto-replies. OTRS/Znuny 6.0–7.3 database-compatible, with a first-class web UI, GDPR tools, and parallel operation."
     />
     <meta name="theme-color" content="#0e1015" />
     <link rel="icon" type="image/svg+xml" href="./assets/favicon.svg" />
@@ -27,6 +27,7 @@
         </a>
         <ul class="nav-links">
           <li><a href="#features">Features</a></li>
+          <li><a href="#compatibility">Compatibility</a></li>
           <li><a href="#screenshots">Screenshots</a></li>
           <li><a href="#paths">Get started</a></li>
           <li><a href="https://github.com/CygnusNetworks/tiqora">GitHub</a></li>
@@ -42,9 +43,9 @@
           <h1>Modern helpdesk. Znuny/OTRS-compatible.</h1>
           <p class="lede">
             Tiqora is a clean-room reimplementation of a ticket system that speaks the
-            Znuny&nbsp;/&nbsp;OTRS&nbsp;6.5 database — with a first-class web UI,
-            AI-assisted replies &amp; summaries, and a path to run alongside your existing
-            instance.
+            OTRS&nbsp;/&nbsp;Znuny&nbsp;<strong>6.0–7.3</strong> database — with a
+            first-class web UI, AI-assisted replies &amp; summaries, and a path to run
+            alongside your existing instance.
           </p>
           <div class="btn-row">
             <a class="btn btn-primary" href="./demo/">Try the live demo</a>
@@ -77,10 +78,12 @@
             </article>
             <article class="feature">
               <div class="icon">DB</div>
-              <h3>Znuny/OTRS DB compatible</h3>
+              <h3>OTRS/Znuny 6.0–7.3 DB compatible</h3>
               <p>
-                Works with the Znuny&nbsp;6.5 schema on PostgreSQL or MariaDB/MySQL.
-                Parallel operation on the same database is supported.
+                Runtime schema profile adapts to peers from OTRS&nbsp;6.0 through
+                Znuny&nbsp;7.3 on MariaDB/MySQL and PostgreSQL. Parallel operation
+                on the same database is first-class.
+                <a href="#compatibility">See matrix ↓</a>
               </p>
             </article>
             <article class="feature">
@@ -153,6 +156,63 @@
                 re-auth, enforceable TOTP, and passkeys — feature-flagged as you need them.
               </p>
             </article>
+          </div>
+        </div>
+      </section>
+
+      <section id="compatibility">
+        <div class="wrap">
+          <div class="section-head">
+            <h2>Compatibility matrix</h2>
+            <p>
+              Supported peer databases for parallel operation. Preferred LTS:
+              <strong>Znuny 6.5</strong> or <strong>7.3</strong>. Full details in
+              <a href="https://github.com/CygnusNetworks/tiqora/blob/main/docs/support-matrix.md">docs/support-matrix.md</a>.
+            </p>
+          </div>
+          <div class="matrix-wrap">
+            <table class="matrix">
+              <thead>
+                <tr>
+                  <th>Peer product</th>
+                  <th>Profile</th>
+                  <th>Parallel-op</th>
+                  <th>Notes</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>OTRS 6.0.x / Znuny 6.0</td>
+                  <td><code>otrs-znuny-6.0</code></td>
+                  <td><span class="badge badge-ok">Yes</span></td>
+                  <td>Table <code>groups</code> (hardest adapter)</td>
+                </tr>
+                <tr>
+                  <td>Znuny 6.1 – 6.4</td>
+                  <td><code>znuny-6.1</code> … <code>6.4</code></td>
+                  <td><span class="badge badge-ok">Yes</span></td>
+                  <td>Optional mail OAuth / tables per minor</td>
+                </tr>
+                <tr>
+                  <td>Znuny 6.5</td>
+                  <td><code>znuny-6.5</code></td>
+                  <td><span class="badge badge-ok">Yes</span></td>
+                  <td>Baseline · preferred LTS</td>
+                </tr>
+                <tr>
+                  <td>Znuny 7.0 – 7.3</td>
+                  <td><code>znuny-7.0</code> … <code>7.3</code></td>
+                  <td><span class="badge badge-ok">Yes</span></td>
+                  <td>State/priority colour (7.0+); preferred 7.x LTS: 7.3</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="chips" aria-label="Engines and validation" style="margin-top:1.5rem">
+            <span class="chip">MariaDB / MySQL · full matrix</span>
+            <span class="chip">PostgreSQL · schema matrix</span>
+            <span class="chip">TiqoraSync 6.0.x–7.3.x</span>
+            <span class="chip">Layer A + B golden validated</span>
           </div>
         </div>
       </section>
@@ -339,8 +399,9 @@
             <article class="card">
               <h3>Parallel to Znuny</h3>
               <p>
-                Share one Znuny&nbsp;6.5 database. Additive <code>tiqora_*</code> tables
-                only — no Znuny schema changes until you choose ownership.
+                Share one OTRS/Znuny&nbsp;6.0–7.3 database. Additive
+                <code>tiqora_*</code> tables only — no peer schema changes until you
+                choose ownership.
               </p>
             </article>
             <article class="card">

@@ -1,7 +1,7 @@
 """Shared fixtures for the golden-master suite.
 
-These tests compare a REAL Znuny 6.5.22 (running in
-``tests/golden/docker-compose.golden.yml``) against Tiqora on the SAME
+These tests compare a REAL OTRS/Znuny peer container (default Znuny 6.5.22;
+select with ``GOLDEN_PEER`` — see ``peers.yaml``) against Tiqora on the SAME
 MariaDB database. They are opt-in and require:
 
 - Docker running locally with the golden stack up (``just golden-up`` +
@@ -86,9 +86,46 @@ def golden_conn(golden_pymysql_dsn: dict[str, object]) -> Generator[pymysql.Conn
         conn.close()
 
 
+@pytest_asyncio.fixture(scope="session")
+async def _golden_legacy_profile(golden_db_url: str) -> None:
+    """Detect + apply schema profile once per golden session (groups table, …).
+
+    Production app/worker call ``ensure_legacy_schema_supported`` at startup.
+    Golden tests talk to the peer DB directly and must do the same so
+    otrs-znuny-6.0 rebinds ``permission_groups`` → ``groups``.
+    """
+    from tiqora.db.legacy.profile import (
+        ensure_legacy_schema_supported,
+        reset_legacy_schema_profile,
+    )
+
+    async_url = golden_db_url.replace("mysql+pymysql://", "mysql+aiomysql://")
+    engine = create_async_engine(async_url, pool_pre_ping=True)
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    try:
+        override = os.environ.get("GOLDEN_SCHEMA_PROFILE", "").strip()
+        async with factory() as session:
+            profile = await ensure_legacy_schema_supported(
+                session,
+                allow_unknown=True,
+                profile_override=override or os.environ.get("GOLDEN_PEER", ""),
+                dialect_hint="mysql",
+            )
+        print(
+            f"[golden] legacy schema profile={profile.profile_id.value} "
+            f"groups_table={profile.groups_table} source={profile.source}"
+        )
+    finally:
+        await engine.dispose()
+
+    yield
+    reset_legacy_schema_profile()
+
+
 @pytest_asyncio.fixture()
 async def golden_session_factory(
     golden_db_url: str,
+    _golden_legacy_profile: None,
 ) -> Generator[async_sessionmaker[AsyncSession], None, None]:
     """Async SQLAlchemy session factory pointed at the shared golden DB.
 

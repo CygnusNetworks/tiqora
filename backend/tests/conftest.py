@@ -206,6 +206,10 @@ def pytest_configure(config: pytest.Config) -> None:
         "markers",
         "search: integration tests that require Meilisearch (testcontainers)",
     )
+    config.addinivalue_line(
+        "markers",
+        "schema_matrix: multi-version OTRS/Znuny DDL Layer A (release anchors × MariaDB/Postgres)",
+    )
 
 
 def _shuffle_module_order(items: list[pytest.Item]) -> None:
@@ -235,8 +239,19 @@ def _shuffle_module_order(items: list[pytest.Item]) -> None:
 
 
 def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item]) -> None:
-    """Skip db/search-marked tests when Docker is not available (unless forced)."""
+    """Skip heavy markers unless their env flag / Docker is available."""
     _shuffle_module_order(items)
+
+    # Layer A multi-version schema matrix is opt-in (release tags / nightly /
+    # local SCHEMA_MATRIX=1). Keeps PR ``pytest -q`` on the Znuny 6.5 fixture.
+    if os.environ.get("SCHEMA_MATRIX") != "1":
+        skip_matrix = pytest.mark.skip(
+            reason="schema_matrix opt-in: set SCHEMA_MATRIX=1 (see docs/testing.md)"
+        )
+        for item in items:
+            if "schema_matrix" in item.keywords:
+                item.add_marker(skip_matrix)
+
     if os.environ.get("TIQORA_FORCE_DB_TESTS") == "1":
         return
     if docker_available():

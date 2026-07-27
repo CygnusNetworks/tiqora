@@ -215,19 +215,44 @@ def _run_migrations(database_url: str) -> None:
         get_settings.cache_clear()
 
 
+def _bind_legacy_groups_table(sync_url: str, dialect: str) -> str:
+    """Detect schema profile and return the live groups table name (quoted later)."""
+    from sqlalchemy import create_engine
+
+    from tiqora.db.legacy.profile import (
+        apply_legacy_schema_profile,
+        detect_legacy_schema_profile_sync,
+        groups_table_name,
+    )
+
+    engine = create_engine(sync_url)
+    try:
+        with engine.connect() as conn:
+            profile = detect_legacy_schema_profile_sync(conn)
+        apply_legacy_schema_profile(profile)
+    finally:
+        engine.dispose()
+    return groups_table_name()
+
+
 def _set_admin_password(database_url: str, login: str, password: str) -> int:
     """Hash *password* and UPDATE users.pw for *login*; ensure admin group rw."""
     dialect = detect_dialect(database_url)
     sync = _sync_url(database_url)
     pw_hash = hash_password(password)
     now = datetime.now(UTC).replace(tzinfo=None)
+    groups = _bind_legacy_groups_table(sync, dialect)
     if dialect == "mysql":
-        return _set_admin_mysql(sync, login, pw_hash, now)
-    return _set_admin_pg(sync, login, pw_hash, now)
+        return _set_admin_mysql(sync, login, pw_hash, now, groups_table=groups)
+    return _set_admin_pg(sync, login, pw_hash, now, groups_table=groups)
 
 
-def _set_admin_mysql(url: str, login: str, pw_hash: str, now: datetime) -> int:
+def _set_admin_mysql(
+    url: str, login: str, pw_hash: str, now: datetime, *, groups_table: str
+) -> int:
     import pymysql
+
+    from tiqora.db.legacy.profile import quote_ident
 
     raw = url
     for prefix in ("mysql+pymysql://", "mysql+aiomysql://", "mariadb+pymysql://"):
@@ -235,6 +260,7 @@ def _set_admin_mysql(url: str, login: str, pw_hash: str, now: datetime) -> int:
             raw = "mysql://" + raw[len(prefix) :]
             break
     parsed = urlparse(raw)
+    gt = quote_ident(groups_table, dialect="mysql")
     conn = pymysql.connect(
         host=parsed.hostname or "127.0.0.1",
         port=parsed.port or 3306,
@@ -260,13 +286,13 @@ def _set_admin_mysql(url: str, login: str, pw_hash: str, now: datetime) -> int:
                 (pw_hash, now, user_id, user_id),
             )
             cur.execute(
-                "SELECT id FROM permission_groups WHERE name = %s LIMIT 1",
+                f"SELECT id FROM {gt} WHERE name = %s LIMIT 1",
                 ("admin",),
             )
             g_row = cur.fetchone()
             if not g_row:
                 print(  # noqa: T201
-                    "ERROR: permission_groups row name='admin' not found",
+                    f"ERROR: {groups_table} row name='admin' not found",
                     file=sys.stderr,
                 )
                 return 1
@@ -290,14 +316,17 @@ def _set_admin_mysql(url: str, login: str, pw_hash: str, now: datetime) -> int:
         conn.close()
 
 
-def _set_admin_pg(url: str, login: str, pw_hash: str, now: datetime) -> int:
+def _set_admin_pg(url: str, login: str, pw_hash: str, now: datetime, *, groups_table: str) -> int:
     import psycopg2
+
+    from tiqora.db.legacy.profile import quote_ident
 
     raw = url
     for prefix in ("postgresql+psycopg2://", "postgresql+asyncpg://"):
         if raw.startswith(prefix):
             raw = "postgresql://" + raw[len(prefix) :]
             break
+    gt = quote_ident(groups_table, dialect="postgresql")
     conn = psycopg2.connect(raw)
     conn.autocommit = True
     try:
@@ -316,13 +345,13 @@ def _set_admin_pg(url: str, login: str, pw_hash: str, now: datetime) -> int:
                 (pw_hash, now, user_id, user_id),
             )
             cur.execute(
-                "SELECT id FROM permission_groups WHERE name = %s LIMIT 1",
+                f"SELECT id FROM {gt} WHERE name = %s LIMIT 1",
                 ("admin",),
             )
             g_row = cur.fetchone()
             if not g_row:
                 print(  # noqa: T201
-                    "ERROR: permission_groups row name='admin' not found",
+                    f"ERROR: {groups_table} row name='admin' not found",
                     file=sys.stderr,
                 )
                 return 1

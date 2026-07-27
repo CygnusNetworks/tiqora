@@ -44,15 +44,42 @@ async def get_priority(priority_id: int, admin: AdminUser, session: DbSession) -
 async def create_priority(
     body: PriorityCreate, admin: AdminUser, session: DbSession
 ) -> TicketPriority:
+    from tiqora.db.legacy.profile import default_color_for_write, insert_row_with_color
+
     ts = now()
-    priority = TicketPriority(
-        **body.model_dump(),
-        create_time=ts,
-        create_by=admin.id,
-        change_time=ts,
-        change_by=admin.id,
-    )
-    session.add(priority)
+    data = body.model_dump()
+    color = default_color_for_write()
+    if color is None:
+        priority = TicketPriority(
+            **data,
+            create_time=ts,
+            create_by=admin.id,
+            change_time=ts,
+            change_by=admin.id,
+        )
+        session.add(priority)
+    else:
+        # Znuny 7.0+: ticket_priority.color is NOT NULL and not on the 6.5 ORM
+        # baseline. Insert via shared Core helper (see DEFAULT_STATE_PRIORITY_COLOR).
+        priority_id = await insert_row_with_color(
+            session,
+            table_name="ticket_priority",
+            values={
+                **data,
+                "create_time": ts,
+                "create_by": admin.id,
+                "change_time": ts,
+                "change_by": admin.id,
+                "color": color,
+            },
+        )
+        loaded = await session.get(TicketPriority, priority_id)
+        if loaded is None:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Priority insert failed",
+            )
+        priority = loaded
     await invalidate_znuny_cache_types(session, PRIORITY_CACHE_TYPES)
     await session.commit()
     await session.refresh(priority)

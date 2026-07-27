@@ -1,10 +1,12 @@
 # Tiqora — Licensing Notice
 
 Tiqora is an **independent reimplementation** of a ticket system compatible
-with the Znuny 6.5 database schema and APIs. It contains no copied Znuny or
-OTRS application code. Compatibility was achieved by studying the behaviour
-of the GPL-3.0-licensed Znuny 6.5 source code and reimplementing it in
-Python/TypeScript.
+with **OTRS 6.0.x and Znuny 6.0–7.3** database schemas (MariaDB/MySQL and
+PostgreSQL) and GenericInterface-style APIs validated across that range. It
+contains no copied Znuny or OTRS application code. Compatibility was achieved
+by studying the behaviour of the GPL-3.0-licensed Znuny source code and
+reimplementing it in Python/TypeScript. See
+[docs/support-matrix.md](./docs/support-matrix.md).
 
 ## Licence overview
 
@@ -14,6 +16,7 @@ Python/TypeScript.
 | `backend/src/tiqora/znuny/` (Znuny-behaviour compatibility modules) | **AGPL-3.0-only OR GPL-3.0-only** (dual-licensed, recipient's choice — see below) |
 | `packages/znuny-addon/TiqoraSync/` (Znuny add-on package) | **GPL-3.0-only** — see its [LICENSE](./packages/znuny-addon/TiqoraSync/LICENSE) |
 | `backend/tests/fixtures/znuny-schema/*.sql` (verbatim upstream DDL/seed files) | **GPL-3.0** — © Znuny GmbH / OTRS AG, unmodified, included as test fixtures (mere aggregation); see the [NOTICE in that directory](./backend/tests/fixtures/znuny-schema/README.md) |
+| `backend/tests/fixtures/legacy-schema/**/*.sql` (multi-version OTRS/Znuny DDL fixtures) | **GPL-3.0** — © Znuny GmbH / OTRS AG, unmodified upstream `scripts/database/` files renamed to Tiqora convention; see [legacy-schema README](./backend/tests/fixtures/legacy-schema/README.md) |
 
 ## Why the exceptions?
 
