@@ -67,34 +67,34 @@ peers:
 
   znuny-7.0:
     product: Znuny
-    version: "7.0.x"
+    version: "7.0.19"
     framework: "7.0.x"
-    source_dir: znuny-7.0
+    source_dir: znuny-7.0.19
     install_home: /opt/otrs
     schema_profile: znuny-7.0
     notes: State/priority color NOT NULL on writes.
 
   znuny-7.1:
     product: Znuny
-    version: "7.1.x"
+    version: "7.1.7"
     framework: "7.1.x"
-    source_dir: znuny-7.1
+    source_dir: znuny-7.1.7
     install_home: /opt/otrs
     schema_profile: znuny-7.1
 
   znuny-7.2:
     product: Znuny
-    version: "7.2.x"
+    version: "7.2.3"
     framework: "7.2.x"
-    source_dir: znuny-7.2
+    source_dir: znuny-7.2.3
     install_home: /opt/otrs
     schema_profile: znuny-7.2
 
   znuny-7.3:
     product: Znuny
-    version: "7.3.x"
+    version: "7.3.5"
     framework: "7.3.x"
-    source_dir: znuny-7.3
+    source_dir: znuny-7.3.5
     install_home: /opt/otrs
     schema_profile: znuny-7.3
     notes: Newest 7.x golden target.
