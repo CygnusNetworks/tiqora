@@ -6771,6 +6771,23 @@
             "description": "ISO date, e.g. 2026-07-31"
           },
           {
+            "name": "sort",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "changed_desc",
+                "created_desc",
+                "created_asc"
+              ],
+              "type": "string",
+              "description": "Result ordering.",
+              "default": "changed_desc",
+              "title": "Sort"
+            },
+            "description": "Result ordering."
+          },
+          {
             "name": "authorization",
             "in": "header",
             "required": false,
@@ -28120,6 +28137,162 @@
         ],
         "summary": "Canonical Ticket Search",
         "operationId": "canonical_ticket_search_znuny_compat_TicketSearch_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/znuny-compat/Session/{session_id}": {
+      "get": {
+        "tags": [
+          "znuny-compat"
+        ],
+        "summary": "Canonical Session Get",
+        "operationId": "canonical_session_get_znuny_compat_Session__session_id__get",
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Session Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "znuny-compat"
+        ],
+        "summary": "Canonical Session Remove",
+        "operationId": "canonical_session_remove_znuny_compat_Session__session_id__delete",
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Session Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/znuny-compat/Ticket/History/{ticket_id}": {
+      "get": {
+        "tags": [
+          "znuny-compat"
+        ],
+        "summary": "Canonical Ticket History Get",
+        "operationId": "canonical_ticket_history_get_znuny_compat_Ticket_History__ticket_id__get",
+        "parameters": [
+          {
+            "name": "ticket_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Ticket Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/znuny-compat/TimeAccountingGet": {
+      "get": {
+        "tags": [
+          "znuny-compat"
+        ],
+        "summary": "Canonical Time Accounting Get",
+        "operationId": "canonical_time_accounting_get_znuny_compat_TimeAccountingGet_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/znuny-compat/OutOfOffice": {
+      "post": {
+        "tags": [
+          "znuny-compat"
+        ],
+        "summary": "Canonical Out Of Office",
+        "operationId": "canonical_out_of_office_znuny_compat_OutOfOffice_post",
         "responses": {
           "200": {
             "description": "Successful Response",

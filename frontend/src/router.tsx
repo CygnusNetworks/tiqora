@@ -220,6 +220,10 @@ const agentSearchRoute = createRoute({
     };
     const isoDate = (v: unknown): string | undefined =>
       typeof v === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : undefined;
+    const sortOrder = (v: unknown): SearchSearch["sort"] =>
+      v === "created_desc" || v === "created_asc" || v === "changed_desc"
+        ? v
+        : undefined;
 
     return {
       q: typeof s.q === "string" ? s.q : undefined,
@@ -232,6 +236,7 @@ const agentSearchRoute = createRoute({
         typeof s.customer_label === "string" ? s.customer_label : undefined,
       created_from: isoDate(s.created_from),
       created_to: isoDate(s.created_to),
+      sort: sortOrder(s.sort),
     };
   },
   component: SearchPage,
