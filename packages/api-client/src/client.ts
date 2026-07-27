@@ -44,6 +44,11 @@ export type HistoryEntry = Schemas["HistoryEntry"];
 export type CustomerUserOut = Schemas["CustomerUserOut"];
 export type SearchHit = Schemas["SearchHit"];
 export type SearchResponse = Schemas["SearchResponse"];
+export type SimilarTicketItem = Schemas["SimilarTicketItem"];
+export type SimilarTicketsOut = Schemas["SimilarTicketsOut"];
+export type CustomerCompanyRefOut = Schemas["CustomerCompanyRefOut"];
+export type CustomerContactRefOut = Schemas["CustomerContactRefOut"];
+export type CustomerSearchOut = Schemas["CustomerSearchOut"];
 export type DynamicFieldValueOut = Schemas["DynamicFieldValueOut"];
 export type PresenceIn = Schemas["PresenceIn"];
 export type PresenceEntry = Schemas["PresenceEntry"];
@@ -796,7 +801,16 @@ export class ApiClient {
     path: string,
     init?: {
       body?: unknown;
-      query?: Record<string, string | number | boolean | null | undefined>;
+      /** Scalar values use ``set``; arrays emit repeated keys (FastAPI list Query). */
+      query?: Record<
+        string,
+        | string
+        | number
+        | boolean
+        | null
+        | undefined
+        | ReadonlyArray<string | number | boolean>
+      >;
       headers?: Record<string, string>;
       signal?: AbortSignal;
     },
@@ -806,6 +820,13 @@ export class ApiClient {
       const qs = new URLSearchParams();
       for (const [k, v] of Object.entries(init.query)) {
         if (v === undefined || v === null || v === "") continue;
+        if (Array.isArray(v)) {
+          for (const item of v) {
+            if (item === undefined || item === null || item === "") continue;
+            qs.append(k, String(item));
+          }
+          continue;
+        }
         qs.set(k, String(v));
       }
       const s = qs.toString();
@@ -1008,6 +1029,15 @@ export class ApiClient {
     return this.request<TicketDetail>(
       "GET",
       `/api/v1/tickets/${ticketId}`,
+      { signal },
+    );
+  }
+
+  /** Closed tickets similar to *ticketId* (Meili keyword rank v1). */
+  getSimilarTickets(ticketId: number, signal?: AbortSignal) {
+    return this.request<SimilarTicketsOut>(
+      "GET",
+      `/api/v1/tickets/${ticketId}/similar`,
       { signal },
     );
   }
@@ -1289,6 +1319,20 @@ export class ApiClient {
   }
 
   /**
+   * Quick company + contact search for agent typeaheads.
+   * Distinct from ``searchReferenceCustomers`` (contacts only).
+   */
+  customerQuickSearch(
+    params: { q?: string; limit?: number } = {},
+    signal?: AbortSignal,
+  ) {
+    return this.request<CustomerSearchOut>("GET", "/api/v1/reference/customer-search", {
+      query: params,
+      signal,
+    });
+  }
+
+  /**
    * Queues for agent pickers. Pass `movable: true` for the Verschieben
    * (move) picker — only valid queues the agent has `rw` on.
    */
@@ -1313,7 +1357,19 @@ export class ApiClient {
   // ── Search ────────────────────────────────────────────────────────────
 
   search(
-    params: { q: string; offset?: number; limit?: number },
+    params: {
+      q: string;
+      offset?: number;
+      limit?: number;
+      queue_id?: number[];
+      state_type?: string[];
+      owner_id?: number;
+      customer_id?: string;
+      /** ISO date ``YYYY-MM-DD`` (inclusive day start UTC). */
+      created_from?: string;
+      /** ISO date ``YYYY-MM-DD`` (inclusive day end UTC). */
+      created_to?: string;
+    },
     signal?: AbortSignal,
   ) {
     return this.request<SearchResponse>("GET", "/api/v1/search", {

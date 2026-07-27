@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Any
 
 from meilisearch_python_sdk import AsyncClient
+from meilisearch_python_sdk.errors import MeilisearchApiError
 from meilisearch_python_sdk.models.settings import MeilisearchSettings
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -22,7 +23,17 @@ from tiqora.db.legacy.ticket import (
 )
 from tiqora.db.legacy.user import Users
 from tiqora.domain.queue_service import QueueService
-from tiqora.domain.schemas import SearchHit, SearchResponse
+from tiqora.domain.schemas import (
+    SearchHit,
+    SearchResponse,
+    SimilarTicketItem,
+    SimilarTicketsOut,
+)
+
+# Similar-tickets v1: pull a wider Meili window then rank down to the public top-N.
+_SIMILAR_CANDIDATE_LIMIT = 20
+_SIMILAR_RESULT_LIMIT = 5
+_SIMILAR_QUERY_MAX_CHARS = 500
 
 
 def _dt_iso(value: datetime | None) -> str | None:
@@ -31,6 +42,47 @@ def _dt_iso(value: datetime | None) -> str | None:
     if value.tzinfo is None:
         return value.isoformat() + "Z"
     return value.isoformat()
+
+
+def _dt_ts(value: datetime | None) -> int | None:
+    """Unix timestamp for a Znuny datetime, which is naive and always UTC."""
+    if value is None:
+        return None
+    if value.tzinfo is None:
+        value = value.replace(tzinfo=UTC)
+    return int(value.timestamp())
+
+
+def _meili_escape_string(value: str) -> str:
+    """Escape a string value for embedding in a Meilisearch filter expression.
+
+    Meili string literals use single quotes; backslash escapes ``\\`` and ``'``.
+    Without this, a crafted filter value could break out of the mandatory
+    ``queue_id IN [...]`` permission clause (Meili binds AND tighter than OR).
+    """
+    return value.replace("\\", "\\\\").replace("'", "\\'")
+
+
+def build_similar_query(title: str | None, excerpt: str | None) -> str:
+    """Compose the Meili query string for similar-ticket search."""
+    parts = [p.strip() for p in (title or "", excerpt or "") if p and p.strip()]
+    return " ".join(parts)[:_SIMILAR_QUERY_MAX_CHARS].strip()
+
+
+def rank_similar_keyword(
+    candidates: list[SimilarTicketItem],
+    *,
+    exclude_id: int,
+    limit: int = _SIMILAR_RESULT_LIMIT,
+) -> list[SimilarTicketItem]:
+    """Keyword-only ranking for similar tickets (v1).
+
+    Candidates are assumed pre-ordered by Meilisearch relevance (best first).
+    This function only drops the source ticket and trims to *limit* so a later
+    embedding cosine blend can replace or wrap it without touching the route.
+    """
+    ranked = [c for c in candidates if c.id != exclude_id]
+    return ranked[: max(0, limit)]
 
 
 def build_ticket_document(
@@ -62,6 +114,8 @@ def build_ticket_document(
         "customer_user_id": ticket.customer_user_id or "",
         "created": _dt_iso(ticket.create_time),
         "changed": _dt_iso(ticket.change_time),
+        "created_ts": _dt_ts(ticket.create_time),
+        "changed_ts": _dt_ts(ticket.change_time),
         "escalation_time": ticket.escalation_time,
         "escalation_response_time": ticket.escalation_response_time,
         "escalation_update_time": ticket.escalation_update_time,
@@ -119,6 +173,8 @@ class SearchIndexService:
                 "owner_id",
                 "customer_id",
                 "has_escalation",
+                "created_ts",
+                "changed_ts",
             ],
             sortable_attributes=["changed", "created", "id"],
             searchable_attributes=[
@@ -265,23 +321,53 @@ class SearchIndexService:
         *,
         limit: int = 20,
         offset: int = 0,
+        queue_ids: list[int] | None = None,
+        state_types: list[str] | None = None,
+        owner_id: int | None = None,
+        customer_id: str | None = None,
+        created_from: int | None = None,
+        created_to: int | None = None,
     ) -> SearchResponse:
         allowed = await QueueService(self._session).allowed_queue_ids(user_id, "ro")
         if not allowed:
-            return SearchResponse(query=query, hits=[], estimated_total=0)
+            return SearchResponse(query=query, hits=[], estimated_total=0, facets={})
 
         await self.ensure_index()
         client = await self._get_client()
         index = client.index(self._settings.meili_tickets_index)
-        # Mandatory permission filter
-        queue_filter = " OR ".join(f"queue_id = {qid}" for qid in sorted(allowed))
+        # Mandatory permission filter — always ANDed, never widened by caller-supplied
+        # queue_ids (an AND of two IN clauses is exactly their intersection).
+        filters: list[str] = [f"queue_id IN [{','.join(str(qid) for qid in sorted(allowed))}]"]
+        if queue_ids:
+            filters.append(f"queue_id IN [{','.join(str(int(qid)) for qid in queue_ids)}]")
+        if state_types:
+            joined = ",".join(f"'{_meili_escape_string(st)}'" for st in state_types)
+            filters.append(f"state_type IN [{joined}]")
+        if owner_id is not None:
+            filters.append(f"owner_id = {int(owner_id)}")
+        if customer_id:
+            filters.append(f"customer_id = '{_meili_escape_string(customer_id)}'")
+        # Date filters require created_ts on documents. Documents indexed before
+        # that field was added lack it and are excluded (silent empty results)
+        # until `tiqora index rebuild --no-resume`. See docs/deployment.md.
+        if created_from is not None:
+            filters.append(f"created_ts >= {int(created_from)}")
+        if created_to is not None:
+            filters.append(f"created_ts <= {int(created_to)}")
+        # Only facets the agent UI consumes. owner_id/customer_id are high-cardinality
+        # and unused in the filter bar counts — requesting them bloats every response.
         result = await index.search(
             query,
-            filter=queue_filter,
+            filter=" AND ".join(filters),
+            facets=["queue_id", "state_type"],
             limit=min(limit, 100),
             offset=offset,
             sort=["changed:desc"],
         )
+        facets: dict[str, dict[str, int]] = {
+            name: {str(k): v for k, v in dist.items()}
+            for name, dist in (result.facet_distribution or {}).items()
+        }
         hits: list[SearchHit] = []
         for raw in result.hits or []:
             h = raw if isinstance(raw, dict) else dict(raw)
@@ -306,4 +392,85 @@ class SearchIndexService:
             query=query,
             hits=hits,
             estimated_total=int(result.estimated_total_hits or len(hits)),
+            facets=facets,
+        )
+
+    async def get_indexed_document(self, ticket_id: int) -> dict[str, Any] | None:
+        """Return the Meili document for *ticket_id*, or ``None`` if missing.
+
+        Prefer this over :meth:`build_document` for read paths that only need
+        fields already in the index (e.g. similar-ticket excerpt) — no SQL fan-out.
+        """
+        await self.ensure_index()
+        client = await self._get_client()
+        index = client.index(self._settings.meili_tickets_index)
+        try:
+            # Meili primary keys are strings in the SDK typing, even when the
+            # document field is numeric.
+            doc = await index.get_document(str(ticket_id))
+        except MeilisearchApiError:
+            # 404 document_not_found (and rare transient API errors): treat as miss.
+            return None
+        if doc is None:
+            return None
+        return doc if isinstance(doc, dict) else dict(doc)
+
+    async def find_similar(
+        self,
+        user_id: int,
+        ticket_id: int,
+        *,
+        title: str | None,
+        excerpt: str | None = None,
+        limit: int = _SIMILAR_RESULT_LIMIT,
+        candidate_limit: int = _SIMILAR_CANDIDATE_LIMIT,
+    ) -> SimilarTicketsOut:
+        """Find closed tickets similar to *ticket_id* via Meili keyword ranking.
+
+        Permission filter is mandatory. Only ``state_type = closed`` tickets are
+        considered. The source ticket is excluded in :func:`rank_similar_keyword`.
+        """
+        query = build_similar_query(title, excerpt)
+        if not query:
+            return SimilarTicketsOut(items=[])
+
+        allowed = await QueueService(self._session).allowed_queue_ids(user_id, "ro")
+        if not allowed:
+            return SimilarTicketsOut(items=[])
+
+        await self.ensure_index()
+        client = await self._get_client()
+        index = client.index(self._settings.meili_tickets_index)
+        filters = [
+            f"queue_id IN [{','.join(str(qid) for qid in sorted(allowed))}]",
+            "state_type = 'closed'",
+        ]
+        # No sort: keep Meili relevance order (sort would override ranking).
+        result = await index.search(
+            query,
+            filter=" AND ".join(filters),
+            limit=min(max(candidate_limit, limit), 100),
+            offset=0,
+            show_ranking_score=True,
+        )
+        candidates: list[SimilarTicketItem] = []
+        for raw in result.hits or []:
+            h = raw if isinstance(raw, dict) else dict(raw)
+            score_raw = h.get("_rankingScore")
+            try:
+                score = float(score_raw) if score_raw is not None else 0.0
+            except (TypeError, ValueError):
+                score = 0.0
+            candidates.append(
+                SimilarTicketItem(
+                    id=int(h["id"]),
+                    tn=h.get("tn"),
+                    title=h.get("title"),
+                    state=h.get("state"),
+                    queue_name=h.get("queue_name"),
+                    score=score,
+                )
+            )
+        return SimilarTicketsOut(
+            items=rank_similar_keyword(candidates, exclude_id=ticket_id, limit=limit)
         )

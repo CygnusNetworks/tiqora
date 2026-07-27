@@ -10,6 +10,7 @@ import { HistoryTable } from "@/components/agent/HistoryTable";
 import { PresenceBar } from "@/components/agent/PresenceBar";
 import { ProcessWidget } from "@/components/agent/process/ProcessWidget";
 import { AiPanel } from "@/components/agent/AiPanel";
+import { SimilarTicketsPanel } from "@/components/agent/SimilarTicketsPanel";
 import { TicketZoomOverflowMenu } from "@/components/agent/TicketZoomOverflowMenu";
 import { Spinner } from "@/components/ui/Spinner";
 
@@ -154,6 +155,7 @@ export function TicketZoomPage() {
         onStartOpenChange={setProcessStartOpen}
       />
       <AiPanel ticketId={ticketId} canNote={canNote} />
+      <SimilarTicketsPanel ticketId={ticketId} />
       <PresenceBar ticketId={ticketId} selfUserId={user?.id} />
       {tab === "articles" ? (
         <ArticleMasterDetail

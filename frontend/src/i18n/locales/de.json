@@ -480,6 +480,11 @@
       "attachments_one": "1 Anhang",
       "attachments_other": "{{count}} Anhänge",
       "hasSummary": "KI-Zusammenfassung vorhanden"
+    },
+    "similar": {
+      "title": "Ähnliche Tickets",
+      "empty": "Keine ähnlichen geschlossenen Tickets gefunden.",
+      "loadError": "Ähnliche Tickets konnten nicht geladen werden."
     }
   },
   "search": {
@@ -491,7 +496,24 @@
     "results": "{{total}} Treffer für „{{query}}“",
     "noResults": "Keine passenden Tickets.",
     "groupTickets": "Tickets",
-    "groupKb": "Wissensdatenbank"
+    "groupKb": "Wissensdatenbank",
+    "filters": {
+      "title": "Filter",
+      "clear": "Zurücksetzen",
+      "queue": "Queue",
+      "owner": "Besitzer",
+      "ownerAll": "Beliebiger Besitzer",
+      "customer": "Kunde",
+      "customerPlaceholder": "Firma oder Kontakt…",
+      "createdFrom": "Erstellt von",
+      "createdTo": "Erstellt bis",
+      "state": {
+        "new": "Neu",
+        "open": "Offen",
+        "pending": "Wartend",
+        "closed": "Geschlossen"
+      }
+    }
   },
   "account": {
     "menu": "Kontomenü",
