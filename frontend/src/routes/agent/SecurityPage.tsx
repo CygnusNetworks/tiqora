@@ -9,6 +9,7 @@ import { api, ApiError } from "@/lib/api";
 import { formatDateTime } from "@/lib/format";
 import { Button } from "@/components/ui/Button";
 import { Spinner } from "@/components/ui/Spinner";
+import { OtpInput } from "@/components/ui/OtpInput";
 import { Badge } from "@/components/ui/Badge";
 import { useConfirm, usePrompt } from "@/components/ui/ConfirmDialog";
 import { HelpPopover } from "@/components/ui/HelpPopover";
@@ -110,12 +111,14 @@ export function SecurityPage() {
 
   const onConfirm = (e: FormEvent) => {
     e.preventDefault();
+    if (confirmMutation.isPending) return;
     setConfirmError(null);
     confirmMutation.mutate(confirmCode);
   };
 
   const onDisable = (e: FormEvent) => {
     e.preventDefault();
+    if (disableMutation.isPending) return;
     setDisableError(null);
     disableMutation.mutate(disableCode);
   };
@@ -208,23 +211,22 @@ export function SecurityPage() {
               </code>
             </p>
             <form onSubmit={onConfirm} className="space-y-3" data-testid="totp-confirm-form">
-              <label className="block text-sm">
-                <span className="mb-1 block text-muted">{t("security.confirmCode")}</span>
-                <input
+              <div className="text-sm">
+                <span className="mb-2 block text-muted">{t("security.confirmCode")}</span>
+                <OtpInput
                   data-testid="totp-confirm-code"
-                  inputMode="numeric"
-                  autoComplete="one-time-code"
+                  aria-label={t("security.confirmCode")}
                   required
                   value={confirmCode}
-                  onChange={(e) => setConfirmCode(e.target.value)}
-                  className="w-full rounded-md border border-hairline bg-surface-subtle px-3 py-2 text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent focus:border-accent"
+                  onChange={(v) => {
+                    setConfirmError(null);
+                    setConfirmCode(v);
+                  }}
+                  onComplete={(code) => confirmMutation.mutate(code)}
+                  status={confirmMutation.isPending ? "verifying" : confirmError ? "error" : "idle"}
+                  statusMessage={confirmError}
                 />
-              </label>
-              {confirmError && (
-                <p className="text-sm text-danger" role="alert" data-testid="totp-confirm-error">
-                  {confirmError}
-                </p>
-              )}
+              </div>
               <Button
                 type="submit"
                 variant="primary"
@@ -239,23 +241,24 @@ export function SecurityPage() {
 
         {enabled && (
           <form onSubmit={onDisable} className="mt-4 space-y-3" data-testid="totp-disable-form">
-            <label className="block text-sm">
-              <span className="mb-1 block text-muted">{t("security.disableCode")}</span>
-              <input
+            <div className="text-sm">
+              <span className="mb-2 block text-muted">{t("security.disableCode")}</span>
+              <OtpInput
                 data-testid="totp-disable-code"
-                inputMode="numeric"
-                autoComplete="one-time-code"
+                aria-label={t("security.disableCode")}
                 required
                 value={disableCode}
-                onChange={(e) => setDisableCode(e.target.value)}
-                className="w-full rounded-md border border-hairline bg-surface-subtle px-3 py-2 text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent focus:border-accent"
+                onChange={(v) => {
+                  setDisableError(null);
+                  setDisableCode(v);
+                }}
+                onComplete={(code) => disableMutation.mutate(code)}
+                status={
+                  disableMutation.isPending ? "verifying" : disableError ? "error" : "idle"
+                }
+                statusMessage={disableError}
               />
-            </label>
-            {disableError && (
-              <p className="text-sm text-danger" role="alert" data-testid="totp-disable-error">
-                {disableError}
-              </p>
-            )}
+            </div>
             <Button
               type="submit"
               variant="danger"
