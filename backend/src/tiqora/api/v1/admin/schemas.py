@@ -839,7 +839,8 @@ class ApiKeyOut(BaseModel):
     expires_at: datetime | None
     last_used_at: datetime | None
     created_by: int | None
-    # Comma-separated: read, write, mcp. Null/empty = unrestricted.
+    # Comma-separated: legacy read/write/mcp/* and/or area:ro|area:rw.
+    # Null/empty = unrestricted. See tiqora.domain.api_key_scopes.
     scopes: str | None = None
 
 
