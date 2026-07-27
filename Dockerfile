@@ -71,10 +71,20 @@ COPY docker/entrypoint.sh /app/entrypoint.sh
 
 RUN chmod +x /app/entrypoint.sh
 
+# Build provenance surfaced in the System-Info page / health endpoints / OpenAPI
+# (see backend/src/tiqora/__init__.py + config.py). Same describe/sha the frontend
+# gets; empty in plain local builds → falls back to package metadata.
+ARG TIQORA_VERSION=""
+ARG TIQORA_GIT_SHA=""
+ARG TIQORA_BUILD_TIME=""
+
 ENV PATH="/app/.venv/bin:$PATH" \
     PYTHONPATH="/app/backend/src" \
     PYTHONUNBUFFERED=1 \
-    TIQORA_ENV=production
+    TIQORA_ENV=production \
+    TIQORA_VERSION=$TIQORA_VERSION \
+    TIQORA_GIT_SHA=$TIQORA_GIT_SHA \
+    TIQORA_BUILD_TIME=$TIQORA_BUILD_TIME
 
 WORKDIR /app/backend
 USER tiqora

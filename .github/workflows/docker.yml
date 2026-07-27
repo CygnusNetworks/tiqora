@@ -42,6 +42,7 @@ jobs:
         id: version
         run: |
           echo "describe=$(git describe --tags --long --always 2>/dev/null || git rev-parse --short HEAD)" >> "$GITHUB_OUTPUT"
+          echo "build_time=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_OUTPUT"
 
       - name: Determine platforms
         id: platforms
@@ -112,5 +113,8 @@ jobs:
           build-args: |
             VITE_APP_VERSION=${{ steps.version.outputs.describe }}
             VITE_GIT_SHA=${{ github.sha }}
+            TIQORA_VERSION=${{ steps.version.outputs.describe }}
+            TIQORA_GIT_SHA=${{ github.sha }}
+            TIQORA_BUILD_TIME=${{ steps.version.outputs.build_time }}
           cache-from: type=gha
           cache-to: type=gha,mode=max

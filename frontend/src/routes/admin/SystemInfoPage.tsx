@@ -310,10 +310,8 @@ export function SystemInfoPage() {
                     <td className="px-4 py-2.5 text-right text-xs text-muted">
                       {svc.last_error ? (
                         <span className="text-danger">{svc.last_error}</span>
-                      ) : svc.last_result ? (
-                        <span className="font-mono">{JSON.stringify(svc.last_result)}</span>
                       ) : (
-                        "—"
+                        <ResultSummary result={svc.last_result} />
                       )}
                     </td>
                   </tr>
@@ -337,7 +335,19 @@ export function SystemInfoPage() {
           tier={tierOptin(t("admin.systemInfo.tier.dockerSocket"))}
         />
         {containers.available ? (
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          <>
+            {containers.engine_version ? (
+              <p className="mb-3 text-xs text-muted">
+                {t("admin.systemInfo.containers.engine")}{" "}
+                <span className="font-mono text-ink">{containers.engine_version}</span>
+                {" · "}
+                {t("admin.systemInfo.containers.running", {
+                  count: containerItems.filter((c) => containerColor(c) === "green").length,
+                  total: containerItems.length,
+                })}
+              </p>
+            ) : null}
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {containerItems.map((c) => {
               const color = containerColor(c);
               return (
@@ -366,9 +376,14 @@ export function SystemInfoPage() {
                 </Card>
               );
             })}
-          </div>
+            </div>
+          </>
         ) : (
-          <UnavailableNote reason={containers.reason} />
+          <UnavailableNote
+            configured={containers.configured}
+            reason={containers.reason}
+            hint={t("admin.systemInfo.containers.notConfiguredHint")}
+          />
         )}
       </section>
 
@@ -381,7 +396,11 @@ export function SystemInfoPage() {
         {host.available ? (
           <HostMeters host={host} />
         ) : (
-          <UnavailableNote reason={host.reason} />
+          <UnavailableNote
+            configured={host.configured}
+            reason={host.reason}
+            hint={t("admin.systemInfo.host.notConfiguredHint")}
+          />
         )}
       </section>
     </div>
@@ -544,13 +563,62 @@ function Metric({ label, value }: { label: string; value: string }) {
   );
 }
 
-function UnavailableNote({ reason }: { reason?: string | null }) {
+/**
+ * Neutral note for an optional section that isn't showing data. Separates
+ * "opt-in simply not set up" (configured=false → a calm hint) from a real
+ * probe error (reason set → shown as-is).
+ */
+function UnavailableNote({
+  configured = true,
+  reason,
+  hint,
+}: {
+  configured?: boolean;
+  reason?: string | null;
+  hint?: string;
+}) {
   const { t } = useTranslation();
+  const notConfigured = configured === false;
   return (
     <Card className="border-dashed">
-      <p className="text-sm text-muted">{reason ?? t("admin.systemInfo.unavailable")}</p>
+      {notConfigured ? (
+        <div>
+          <p className="text-sm font-medium text-muted">
+            {t("admin.systemInfo.notConfigured")}
+          </p>
+          {hint ? <p className="mt-0.5 text-xs text-muted">{hint}</p> : null}
+        </div>
+      ) : (
+        <p className="text-sm text-muted">{reason ?? t("admin.systemInfo.unavailable")}</p>
+      )}
     </Card>
   );
+}
+
+/** Compact key/value rendering of a daemon's last structured result (was raw JSON). */
+function ResultSummary({ result }: { result?: Record<string, unknown> | null }) {
+  if (!result || typeof result !== "object") return <>—</>;
+  const entries = Object.entries(result);
+  if (entries.length === 0) return <>—</>;
+  return (
+    <span className="inline-flex flex-wrap justify-end gap-1">
+      {entries.map(([k, v]) => (
+        <span
+          key={k}
+          className="inline-flex items-center gap-1 rounded bg-surface-subtle px-1.5 py-0.5"
+        >
+          <span className="text-muted">{k}</span>
+          <span className="font-mono tabular-nums text-ink">{formatResultValue(v)}</span>
+        </span>
+      ))}
+    </span>
+  );
+}
+
+function formatResultValue(v: unknown): string {
+  if (v == null) return "—";
+  if (typeof v === "object") return JSON.stringify(v);
+  return String(v);
 }
 
 function fmtBytesOrDash(v: number | null | undefined): string {

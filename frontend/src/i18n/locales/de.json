@@ -1638,6 +1638,7 @@
       "description": "Gesamtzustand der Installation auf einen Blick — Version, Dienste, Datenspeicher, Container und Auslastung. Für Diagnose und Support.",
       "loadError": "System-Informationen konnten nicht geladen werden.",
       "unavailable": "Nicht verfügbar.",
+      "notConfigured": "Nicht eingerichtet",
       "overall": {
         "ok": "Alle Systeme betriebsbereit",
         "degraded": "Betrieb mit Einschränkungen",
@@ -1693,13 +1694,17 @@
       },
       "containers": {
         "since": "seit",
-        "restarts": "Neustarts"
+        "restarts": "Neustarts",
+        "engine": "Docker-Engine",
+        "running": "{{count}}/{{total}} laufend",
+        "notConfiguredHint": "Docker-Socket nicht gemountet — Opt-in nicht aktiviert."
       },
       "host": {
         "cpu": "CPU",
         "memory": "Arbeitsspeicher",
         "disk": "Festplatte",
-        "cores": "{{count}} Kerne · Load {{load}}"
+        "cores": "{{count}} Kerne · Load {{load}}",
+        "notConfiguredHint": "psutil nicht installiert — Host-Metriken nicht verfügbar."
       }
     },
     "daemons": {

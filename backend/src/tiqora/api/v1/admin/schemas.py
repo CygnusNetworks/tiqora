@@ -1254,19 +1254,27 @@ class ContainerOut(BaseModel):
 
 
 class ContainersOut(BaseModel):
-    """Degrades gracefully: ``available`` is false with a ``reason`` when the
-    docker SDK is missing or the socket is not mounted."""
+    """Degrades gracefully: ``available`` is false when the docker SDK is
+    missing or the socket is not mounted.
+
+    ``configured`` separates "opt-in simply not set up" (no socket mounted /
+    SDK absent → a neutral note) from an actual error while talking to a
+    present daemon (``reason`` set → surfaced as a problem).
+    """
 
     available: bool
+    configured: bool = True
     reason: str | None = None
+    engine_version: str | None = None
     items: list[ContainerOut] = Field(default_factory=list)
 
 
 class HostOut(BaseModel):
-    """Host resource utilisation via psutil. Degrades gracefully (``available``
-    false + ``reason``) when psutil is not installed."""
+    """Host resource utilisation via psutil. Degrades gracefully when psutil is
+    not installed (``available`` false, ``configured`` false → neutral note)."""
 
     available: bool
+    configured: bool = True
     reason: str | None = None
     cpu_percent: float | None = None
     cpu_count: int | None = None
