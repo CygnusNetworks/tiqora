@@ -14,28 +14,21 @@ from tiqora.api.v1.admin.pagination import ListParamsDep, Page, paginate
 from tiqora.api.v1.admin.schemas import ApiKeyCreate, ApiKeyCreated, ApiKeyOut, ApiKeyUpdate
 from tiqora.db.legacy.user import Users
 from tiqora.db.tiqora.models import TiqoraApiKey
+from tiqora.domain.api_key_scopes import InvalidApiKeyScopeError, normalize_scopes
 from tiqora.domain.auth import generate_api_key, hash_api_key
 
 router = APIRouter(prefix="/api-keys", tags=["admin:api-keys"])
 
-_ALLOWED_SCOPES = frozenset({"read", "write", "mcp", "*"})
-
 
 def _normalize_scopes(raw: str | None) -> str | None:
     """Normalize comma-separated scopes; reject unknown tokens."""
-    if raw is None:
-        return None
-    parts = [p.strip().lower() for p in raw.split(",") if p.strip()]
-    if not parts:
-        return None
-    unknown = set(parts) - _ALLOWED_SCOPES
-    if unknown:
+    try:
+        return normalize_scopes(raw)
+    except InvalidApiKeyScopeError as exc:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail=f"Unknown API key scope(s): {sorted(unknown)}. "
-            f"Allowed: {sorted(_ALLOWED_SCOPES)}",
-        )
-    return ",".join(sorted(set(parts)))
+            detail=str(exc),
+        ) from exc
 
 
 def _naive_utc(value: datetime | None) -> datetime | None:

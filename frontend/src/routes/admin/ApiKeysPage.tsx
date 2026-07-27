@@ -27,6 +27,16 @@ import {
   tomorrowDateStr,
   isExpired,
 } from "@/lib/apiKeyExpiry";
+import {
+  API_KEY_AREAS,
+  type AreaLevel,
+  type AreaSelection,
+  type ScopeMode,
+  emptyAreaSelection,
+  parseScopesToMode,
+  selectionToScopes,
+  scopesSummaryKey,
+} from "@/lib/apiKeyScopes";
 
 const PRESETS: { key: ExpiryPreset; labelKey: string }[] = [
   { key: "unlimited", labelKey: "expiryPresetUnlimited" },
@@ -110,6 +120,106 @@ function ExpiryField({
           ? t("admin.apiKeys.expiryPreviewLabel", { date: formatDateOnly(value, locale) })
           : t("admin.apiKeys.expiryPreviewUnlimited")}
       </p>
+    </div>
+  );
+}
+
+/** Mode (unrestricted / read-only / custom) + optional area matrix. Value is scopes CSV or null. */
+function ScopesField({
+  value,
+  onChange,
+}: {
+  value: string | null;
+  onChange: (v: string | null) => void;
+}) {
+  const { t } = useTranslation();
+  const initial = useMemo(() => parseScopesToMode(value), [value]);
+  const [mode, setMode] = useState<ScopeMode>(initial.mode);
+  const [selection, setSelection] = useState<AreaSelection>(initial.selection);
+
+  const apply = (nextMode: ScopeMode, nextSel: AreaSelection) => {
+    setMode(nextMode);
+    setSelection(nextSel);
+    onChange(selectionToScopes(nextMode, nextSel));
+  };
+
+  const setArea = (area: (typeof API_KEY_AREAS)[number], level: AreaLevel) => {
+    const next = { ...selection, [area]: level };
+    apply("custom", next);
+  };
+
+  return (
+    <div className="space-y-3" data-testid="admin-api-keys-form-scopes">
+      <div className="flex flex-wrap gap-1.5" role="group">
+        {(
+          [
+            ["unrestricted", "scopesUnrestricted"],
+            ["read_only", "scopesReadOnly"],
+            ["custom", "scopesCustom"],
+          ] as const
+        ).map(([key, labelKey]) => (
+          <button
+            key={key}
+            type="button"
+            data-testid={`admin-api-keys-form-scope-mode-${key}`}
+            aria-pressed={mode === key}
+            onClick={() =>
+              apply(
+                key,
+                key === "read_only"
+                  ? Object.fromEntries(API_KEY_AREAS.map((a) => [a, "ro"])) as AreaSelection
+                  : key === "unrestricted"
+                    ? emptyAreaSelection()
+                    : selection,
+              )
+            }
+            className={cn(
+              "rounded-full border px-2.5 py-1 text-xs font-medium transition-colors duration-100",
+              mode === key
+                ? "border-accent bg-accent-dim text-accent"
+                : "border-hairline bg-surface-subtle text-muted hover:text-ink",
+            )}
+          >
+            {t(`admin.apiKeys.${labelKey}`)}
+          </button>
+        ))}
+      </div>
+      <p className="text-xs text-muted">{t("admin.apiKeys.scopesHelp")}</p>
+      {mode === "custom" && (
+        <div className="overflow-x-auto rounded-md border border-hairline">
+          <table className="w-full text-left text-xs">
+            <thead className="border-b border-hairline bg-surface-subtle text-muted">
+              <tr>
+                <th className="px-2 py-1.5 font-medium">{t("admin.apiKeys.scopesArea")}</th>
+                <th className="px-2 py-1.5 font-medium">{t("admin.apiKeys.scopesOff")}</th>
+                <th className="px-2 py-1.5 font-medium">{t("admin.apiKeys.scopesRo")}</th>
+                <th className="px-2 py-1.5 font-medium">{t("admin.apiKeys.scopesRw")}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {API_KEY_AREAS.map((area) => (
+                <tr key={area} className="border-b border-hairline last:border-0">
+                  <td className="px-2 py-1.5 text-ink">
+                    {t(`admin.apiKeys.areas.${area}`)}
+                  </td>
+                  {(["off", "ro", "rw"] as const).map((level) => (
+                    <td key={level} className="px-2 py-1.5">
+                      <input
+                        type="radio"
+                        name={`scope-${area}`}
+                        data-testid={`admin-api-keys-form-scope-${area}-${level}`}
+                        checked={selection[area] === level}
+                        onChange={() => setArea(area, level)}
+                        className="accent-accent"
+                      />
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   );
 }
@@ -204,6 +314,12 @@ export function ApiKeysPage() {
     setFormError(null);
     const name = String(values.name ?? "").trim();
     const expires_at = typeof values.expires_at === "string" && values.expires_at ? values.expires_at : null;
+    const scopes =
+      values.scopes === undefined
+        ? null
+        : values.scopes === null || values.scopes === ""
+          ? null
+          : String(values.scopes);
     try {
       if (editing) {
         await updateM.mutateAsync({
@@ -212,6 +328,7 @@ export function ApiKeysPage() {
             name,
             expires_at,
             valid: Boolean(values.valid ?? editing.valid),
+            scopes,
           },
         });
       } else {
@@ -224,6 +341,7 @@ export function ApiKeysPage() {
           name,
           user_id,
           expires_at,
+          scopes,
         });
       }
     } catch (err) {
@@ -285,6 +403,30 @@ export function ApiKeysPage() {
           <span className="text-muted">{t("admin.apiKeys.unbounded")}</span>
         ),
     },
+    {
+      key: "scopes",
+      header: t("admin.apiKeys.scopes"),
+      render: (r) => {
+        const key = scopesSummaryKey(r.scopes);
+        const label =
+          key === "unrestricted"
+            ? t("admin.apiKeys.scopesUnrestricted")
+            : key === "readOnly"
+              ? t("admin.apiKeys.scopesReadOnly")
+              : t("admin.apiKeys.scopesCustom");
+        return (
+          <span
+            className="text-xs"
+            title={r.scopes ?? "*"}
+            data-testid={`admin-api-keys-scopes-${r.id}`}
+          >
+            <Badge tone={key === "unrestricted" ? "muted" : key === "readOnly" ? "default" : "accent"}>
+              {label}
+            </Badge>
+          </span>
+        );
+      },
+    },
   ];
 
   const fields: FieldDef[] = editing
@@ -322,6 +464,21 @@ export function ApiKeysPage() {
               value={typeof value === "string" ? value : null}
               onChange={onChange}
               locale={locale}
+            />
+          ),
+        },
+        {
+          name: "scopes",
+          label: t("admin.apiKeys.scopes"),
+          type: "custom",
+          help: {
+            title: t("admin.apiKeys.scopes"),
+            description: t("admin.apiKeys.scopesHelp"),
+          },
+          render: (value, onChange) => (
+            <ScopesField
+              value={typeof value === "string" ? value : value == null ? null : String(value)}
+              onChange={onChange}
             />
           ),
         },
@@ -391,6 +548,21 @@ export function ApiKeysPage() {
               value={typeof value === "string" ? value : null}
               onChange={onChange}
               locale={locale}
+            />
+          ),
+        },
+        {
+          name: "scopes",
+          label: t("admin.apiKeys.scopes"),
+          type: "custom",
+          help: {
+            title: t("admin.apiKeys.scopes"),
+            description: t("admin.apiKeys.scopesHelp"),
+          },
+          render: (value, onChange) => (
+            <ScopesField
+              value={typeof value === "string" ? value : value == null ? null : String(value)}
+              onChange={onChange}
             />
           ),
         },
@@ -498,12 +670,14 @@ export function ApiKeysPage() {
                 name: editing.name,
                 user_id: editing.user_id,
                 expires_at: editing.expires_at ?? null,
+                scopes: editing.scopes ?? null,
                 valid: editing.valid,
               }
             : {
                 name: "",
                 user_id: userItems[0]?.value ?? "",
                 expires_at: null,
+                scopes: null,
               }
         }
         onSubmit={handleSubmit}
