@@ -131,7 +131,7 @@ VITE_BASE=/tiqora/demo/ pnpm --filter tiqora-frontend build:demo
 | Area | Notes |
 |---|---|
 | Ticket write path + Znuny invariants | Golden-master multi-peer matrix (OTRS/Znuny 6.0–7.3) |
-| GenericInterface compatibility | TicketCreate/Update/Get/Search, SessionCreate; REST + SOAP |
+| GenericInterface compatibility | Session*, TicketCreate/Update/Get/Search/HistoryGet, TimeAccountingGet, OutOfOffice; REST + SOAP |
 | MCP tools | `ticket_*`, customer lookup, KB — see [docs/ai-integration.md](./docs/ai-integration.md) |
 | AI assistance subsystem | Draft replies, summaries, auto-reply worker, attachment/vision, PII masking, per-subject ACL & audit — `/admin/ai/*`, [docs/ai-integration.md](./docs/ai-integration.md) |
 | Daemon takeover (mail, escalation, notify, GA) | Per-function flags, off by default |
