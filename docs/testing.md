@@ -1,11 +1,39 @@
-# Golden-master testing (real Znuny vs Tiqora)
+# Testing: multi-version schema matrix and golden-master
 
-Tiqora reimplements large parts of Znuny 6.5's ticket-write behaviour
+Tiqora reimplements large parts of Znuny ticket-write behaviour
 (history formats, ticket numbering, escalation math, the GenericInterface
-compat surface). Unit/DB-integration tests cover the ported logic in
-isolation; the **golden-master suite** in `tests/golden/` goes one step
-further and runs a REAL Znuny 6.5.22 container against the SAME MariaDB
-database Tiqora uses, then diffs the resulting rows/JSON directly.
+compat surface). Tests are layered by cost and what they prove.
+
+## Layer A — multi-version schema matrix (real DDL, no peer app)
+
+**Goal:** prove Tiqora **detects, migrates, and runs** against real OTRS/Znuny
+fresh-install schemas (MariaDB **and** PostgreSQL).
+
+| Piece | Location |
+|-------|----------|
+| Fixtures | `backend/tests/fixtures/legacy-schema/<profile_id>/` |
+| Tests | `backend/tests/test_legacy_schema_matrix.py` (`-m schema_matrix`) |
+| CI | `.github/workflows/schema-matrix.yml` (release tags, nightly, `workflow_dispatch`) |
+
+Release anchors: `otrs-znuny-6.0`, `znuny-6.3`, `znuny-6.5`, `znuny-7.0`,
+`znuny-7.3` × `{mysql, postgresql}`.
+
+```sh
+cd backend
+SCHEMA_MATRIX=1 uv run pytest -q -m schema_matrix   # needs Docker
+```
+
+Day-to-day `pytest -q` / PR CI still use the single **Znuny 6.5** bootstrap
+schema under `tiqora.bootstrap.schema` for hundreds of `db` tests.
+
+Profile detection IDs: see `docs/parallel-operation.md` and
+`tiqora.db.legacy.profile.SchemaProfileId`.
+
+## Layer B — golden-master (real Znuny peer vs Tiqora)
+
+The **golden-master suite** in `tests/golden/` goes one step further and runs
+a REAL Znuny 6.5.22 container against the SAME MariaDB database Tiqora uses,
+then diffs the resulting rows/JSON directly.
 
 This is heavy (a real Apache+mod_perl+Znuny container) and **opt-in** — it
 does not run as part of `just test` / the normal CI pipeline.

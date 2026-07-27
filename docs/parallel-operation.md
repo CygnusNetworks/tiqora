@@ -1,8 +1,41 @@
 # Parallel operation with Znuny
 
-Tiqora V1 is designed to run **alongside Znuny 6.5 on the same database**.
+Tiqora V1 is designed to run **alongside an OTRS/Znuny database** (primary target
+**Znuny 6.5**; schema adapters also cover **OTRS/Znuny 6.0–6.4** and **Znuny 7.0–7.3**).
 This document lists the behavioural invariants Tiqora must honour so that both
 systems remain coherent.
+
+## Multi-version schema profile
+
+At process start (API + worker), Tiqora probes `INFORMATION_SCHEMA` and classifies
+the live peer schema into a **version-keyed profile id**:
+
+| Profile id | Peer product (fresh DDL) | Decisive markers |
+|------------|--------------------------|------------------|
+| `otrs-znuny-6.0` | OTRS 6.0 / Znuny 6.0 | table `groups` (not `permission_groups`) |
+| `znuny-6.1` | Znuny 6.1 | `permission_groups`, no mail OAuth |
+| `znuny-6.2` | Znuny 6.2 | + `acl_ticket_attribute_relations` |
+| `znuny-6.3` | Znuny 6.3 | `mail_account.authentication_type` |
+| `znuny-6.4` / **`znuny-6.5`** | Znuny 6.4 / 6.5 | `mention` / `smime_keys` (6.4≈6.5 → detected as `znuny-6.5`) |
+| `znuny-7.0` | Znuny 7.0 | `ticket_state.color` / `ticket_priority.color` |
+| `znuny-7.1` | Znuny 7.1 | surrogate `id` on junction tables (e.g. `group_user`) |
+| `znuny-7.2` | Znuny 7.2 | `article_color`, … |
+| `znuny-7.3` | Znuny 7.3 | `sendmail_config` |
+
+Implementation: `tiqora.db.legacy.profile.LegacySchemaProfile` / `SchemaProfileId`.
+
+- **Unknown schemas refuse to start** (hard fail) so a Znuny 8 / heavily custom
+  dump cannot silently 500 later. Override with
+  `TIQORA_ALLOW_UNKNOWN_LEGACY_SCHEMA=1` (unsupported) or force a known profile with
+  `TIQORA_LEGACY_SCHEMA_PROFILE=znuny-6.5` (version ids only — no letter tiers).
+  Disable the gate entirely with `TIQORA_LEGACY_SCHEMA_CHECK=0` (tests only).
+- The detected profile is shown on **Admin → System info** (database card).
+- Preferred path when possible: upgrade the peer to **6.5 or 7.3 LTS**, then
+  parallel-op. Multi-version support is a bridge for sites that cannot upgrade yet.
+- Golden-master behavioural validation is still **Znuny 6.5.22 + MariaDB** first;
+  other anchors land as the Layer B matrix expands.
+- **Layer A release tests** (`-m schema_matrix`) load real upstream DDLs for
+  release anchors on MariaDB and PostgreSQL — see `docs/testing.md`.
 
 ## Ground rules
 
