@@ -81,13 +81,53 @@ SUPPORTED_PROFILES: frozenset[SchemaProfileId] = frozenset(
     }
 )
 
-#: Release Layer-A matrix anchors (CI / ``-m schema_matrix``).
+#: Release Layer-A matrix anchors (CI tags / default ``schema_matrix``).
 RELEASE_SCHEMA_PROFILES: tuple[SchemaProfileId, ...] = (
     SchemaProfileId.OTRS_ZNUNY_6_0,
     SchemaProfileId.ZNUNY_6_3,
     SchemaProfileId.ZNUNY_6_5,
     SchemaProfileId.ZNUNY_7_0,
     SchemaProfileId.ZNUNY_7_3,
+)
+
+#: Full fixture set (nightly / ``SCHEMA_MATRIX_FULL=1``).
+ALL_SCHEMA_PROFILES: tuple[SchemaProfileId, ...] = (
+    SchemaProfileId.OTRS_ZNUNY_6_0,
+    SchemaProfileId.ZNUNY_6_1,
+    SchemaProfileId.ZNUNY_6_2,
+    SchemaProfileId.ZNUNY_6_3,
+    SchemaProfileId.ZNUNY_6_4,
+    SchemaProfileId.ZNUNY_6_5,
+    SchemaProfileId.ZNUNY_7_0,
+    SchemaProfileId.ZNUNY_7_1,
+    SchemaProfileId.ZNUNY_7_2,
+    SchemaProfileId.ZNUNY_7_3,
+)
+
+#: Model tables that are absent on older peer tiers (skip conformance if missing).
+OPTIONAL_LEGACY_TABLES: frozenset[str] = frozenset(
+    {
+        "mention",
+        "smime_keys",
+        "oauth2_token",
+        "oauth2_token_config",
+        "calendar_appointment_plugin",
+        "acl_ticket_attribute_relations",
+        "activity",
+        "article_color",
+        "pm_process_preferences",
+        "translation",
+        "sendmail_config",
+        "cloud_service_config",
+    }
+)
+
+#: Model columns present only from certain profiles onward.
+OPTIONAL_LEGACY_COLUMNS: frozenset[tuple[str, str]] = frozenset(
+    {
+        ("mail_account", "authentication_type"),
+        ("mail_account", "oauth2_token_config_id"),
+    }
 )
 
 _CORE_TABLES: frozenset[str] = frozenset(
@@ -191,6 +231,23 @@ def groups_table_name() -> str:
     if profile is None:
         return "permission_groups"
     return profile.groups_table
+
+
+def quote_ident(name: str, *, dialect: str) -> str:
+    """Quote a trusted SQL identifier for MySQL/MariaDB or PostgreSQL.
+
+    *name* must come from our code / profile (never user input).
+    """
+    if not name.replace("_", "").isalnum():
+        raise ValueError(f"refusing to quote unsafe identifier: {name!r}")
+    if dialect in {"mysql", "mariadb"}:
+        return f"`{name}`"
+    return f'"{name}"'
+
+
+def groups_table_sql(*, dialect: str) -> str:
+    """Quoted groups table identifier for embedding in trusted SQL strings."""
+    return quote_ident(groups_table_name(), dialect=dialect)
 
 
 def parse_profile_id(value: str | SchemaProfileId) -> SchemaProfileId:

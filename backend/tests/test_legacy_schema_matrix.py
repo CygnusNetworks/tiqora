@@ -28,6 +28,7 @@ from tiqora.bootstrap.schema_loader import (
 )
 from tiqora.config import get_settings
 from tiqora.db.legacy.profile import (
+    ALL_SCHEMA_PROFILES,
     RELEASE_SCHEMA_PROFILES,
     SchemaProfileId,
     detect_legacy_schema_profile_sync,
@@ -39,10 +40,17 @@ from tiqora.znuny.sysconfig import SysConfig
 
 pytestmark = pytest.mark.schema_matrix
 
-_FIXTURE_PROFILES = tuple(p.value for p in RELEASE_SCHEMA_PROFILES)
+
+def _fixture_profiles() -> tuple[str, ...]:
+    if os.environ.get("SCHEMA_MATRIX_FULL") == "1":
+        return tuple(p.value for p in ALL_SCHEMA_PROFILES)
+    return tuple(p.value for p in RELEASE_SCHEMA_PROFILES)
 
 
 def _expected_profile(profile_id: str) -> SchemaProfileId:
+    # Fresh 6.4 DDL shares markers with 6.5 → detector reports znuny-6.5.
+    if profile_id == "znuny-6.4":
+        return SchemaProfileId.ZNUNY_6_5
     return SchemaProfileId(profile_id)
 
 
@@ -155,7 +163,7 @@ def matrix_postgres_url() -> Generator[str, None, None]:
         yield pg.get_connection_url()
 
 
-@pytest.mark.parametrize("profile_id", _FIXTURE_PROFILES)
+@pytest.mark.parametrize("profile_id", _fixture_profiles())
 def test_fixture_dir_has_six_sql_files(profile_id: str) -> None:
     d = legacy_schema_dir(profile_id)
     for name in (
@@ -287,12 +295,12 @@ def _assert_profile_cell(sync_url: str, profile_id: str, dialect: str) -> None:
 
 
 @pytest.mark.db
-@pytest.mark.parametrize("profile_id", _FIXTURE_PROFILES)
+@pytest.mark.parametrize("profile_id", _fixture_profiles())
 def test_matrix_mariadb(profile_id: str, matrix_mariadb_url: str) -> None:
     _assert_profile_cell(matrix_mariadb_url, profile_id, "mysql")
 
 
 @pytest.mark.db
-@pytest.mark.parametrize("profile_id", _FIXTURE_PROFILES)
+@pytest.mark.parametrize("profile_id", _fixture_profiles())
 def test_matrix_postgres(profile_id: str, matrix_postgres_url: str) -> None:
     _assert_profile_cell(matrix_postgres_url, profile_id, "postgresql")

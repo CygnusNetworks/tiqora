@@ -15,12 +15,20 @@ fresh-install schemas (MariaDB **and** PostgreSQL).
 | Tests | `backend/tests/test_legacy_schema_matrix.py` (`-m schema_matrix`) |
 | CI | `.github/workflows/schema-matrix.yml` (release tags, nightly, `workflow_dispatch`) |
 
-Release anchors: `otrs-znuny-6.0`, `znuny-6.3`, `znuny-6.5`, `znuny-7.0`,
-`znuny-7.3` × `{mysql, postgresql}`.
+**Release anchors** (default matrix): `otrs-znuny-6.0`, `znuny-6.3`,
+`znuny-6.5`, `znuny-7.0`, `znuny-7.3` × `{mysql, postgresql}`.
+
+**Full set** (`SCHEMA_MATRIX_FULL=1`, nightly CI): also 6.1, 6.2, 6.4, 7.1, 7.2.
+
+Tests included under `-m schema_matrix`:
+
+- `test_legacy_schema_matrix.py` — detect + migrate + ticket write
+- `test_schema_conformance_profile.py` — profile-aware column/table checks
 
 ```sh
 cd backend
-SCHEMA_MATRIX=1 uv run pytest -q -m schema_matrix   # needs Docker
+SCHEMA_MATRIX=1 uv run pytest -q -m schema_matrix              # release anchors
+SCHEMA_MATRIX=1 SCHEMA_MATRIX_FULL=1 uv run pytest -q -m schema_matrix  # all fixtures
 ```
 
 Day-to-day `pytest -q` / PR CI still use the single **Znuny 6.5** bootstrap
@@ -28,6 +36,11 @@ schema under `tiqora.bootstrap.schema` for hundreds of `db` tests.
 
 Profile detection IDs: see `docs/parallel-operation.md` and
 `tiqora.db.legacy.profile.SchemaProfileId`.
+
+TiqoraSync multi-framework install: `packages/znuny-addon/TiqoraSync/install/README.md`.
+
+Multi-peer golden roadmap: `tests/golden/peers.yaml` and
+`tests/golden/README-multi-peer.md`.
 
 ## Layer B — golden-master (real Znuny peer vs Tiqora)
 

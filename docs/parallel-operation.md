@@ -36,6 +36,10 @@ Implementation: `tiqora.db.legacy.profile.LegacySchemaProfile` / `SchemaProfileI
   other anchors land as the Layer B matrix expands.
 - **Layer A release tests** (`-m schema_matrix`) load real upstream DDLs for
   release anchors on MariaDB and PostgreSQL — see `docs/testing.md`.
+- **TiqoraSync** OPM declares Framework `6.0.x`–`7.3.x` (install paths
+  `/opt/otrs` vs `/opt/znuny` — see `packages/znuny-addon/TiqoraSync/install/README.md`).
+- **Layer B golden** multi-peer roadmap: `tests/golden/peers.yaml` (default
+  ready peer remains Znuny 6.5.22).
 
 ## Ground rules
 

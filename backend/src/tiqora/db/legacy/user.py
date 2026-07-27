@@ -43,7 +43,13 @@ class UserPreferences(LegacyBase):
 
 
 class PermissionGroups(LegacyBase):
-    """Znuny table `permission_groups`."""
+    """OTRS/Znuny groups table.
+
+    Baseline mapping is ``permission_groups`` (Znuny 6.1+). At startup,
+    :func:`tiqora.db.legacy.profile.apply_legacy_schema_profile` rebinds
+    ``__table__.name`` to ``groups`` on OTRS/Znuny 6.0. Prefer
+    :func:`groups_table_name` for raw SQL.
+    """
 
     __tablename__ = "permission_groups"
 
