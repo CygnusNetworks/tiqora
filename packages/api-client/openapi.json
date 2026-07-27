@@ -31783,6 +31783,17 @@
               }
             ],
             "title": "Expires At"
+          },
+          "scopes": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scopes"
           }
         },
         "type": "object",
@@ -31849,6 +31860,17 @@
               }
             ],
             "title": "Created By"
+          },
+          "scopes": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scopes"
           },
           "key": {
             "type": "string",
@@ -31927,6 +31949,17 @@
               }
             ],
             "title": "Created By"
+          },
+          "scopes": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scopes"
           }
         },
         "type": "object",
@@ -31978,6 +32011,17 @@
               }
             ],
             "title": "Expires At"
+          },
+          "scopes": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scopes"
           }
         },
         "type": "object",
