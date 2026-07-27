@@ -26,6 +26,23 @@ def _normalize_url(url: str) -> str:
     return url
 
 
+def _utc_connect_args(url: str) -> dict:
+    """Force every DB connection's session timezone to UTC.
+
+    Znuny's contract is that all stored timestamps are UTC (``OTRSTimeZone`` =
+    UTC). Our INSERT/UPDATE statements use SQL ``current_timestamp``, which
+    resolves to the *session* timezone — MariaDB defaults to ``SYSTEM`` (the
+    container's local tz, e.g. CEST), so without this Tiqora-written rows would
+    land in local time, 1–2h off from Znuny-written rows. Pinning the session
+    to UTC keeps every writer consistent.
+    """
+    if url.startswith("mysql+aiomysql://"):
+        return {"init_command": "SET time_zone = '+00:00'"}
+    if url.startswith("postgresql+asyncpg://"):
+        return {"server_settings": {"timezone": "UTC"}}
+    return {}
+
+
 @lru_cache
 def get_engine(database_url: str | None = None) -> AsyncEngine:
     """Create (and cache) an async engine for the configured database URL."""
@@ -35,6 +52,7 @@ def get_engine(database_url: str | None = None) -> AsyncEngine:
         url,
         pool_pre_ping=True,
         echo=settings.debug,
+        connect_args=_utc_connect_args(url),
     )
 
 
