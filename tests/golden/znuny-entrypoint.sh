@@ -61,12 +61,20 @@ fi
 
 echo "[znuny-entrypoint] fixing permissions"
 perl /opt/otrs/bin/otrs.SetPermissions.pl --otrs-user=otrs --web-group=www-data || true
+# FileStorable cache creates nested dirs under var/tmp at runtime; ensure the
+# otrs user can always mkdir there (apache/www-data may have left root-owned
+# paths after first boot / seed).
+mkdir -p /opt/otrs/var/tmp /opt/otrs/var/log
+chown -R otrs:otrs /opt/otrs/var/tmp /opt/otrs/var/log
+chmod -R ug+rwX /opt/otrs/var/tmp /opt/otrs/var/log
 
 echo "[znuny-entrypoint] running SetPackageList / rebuild config cache"
 su -s /bin/bash otrs -c "perl /opt/otrs/bin/otrs.Console.pl Maint::Config::Rebuild" || true
 
 if [ "${1:-}" = "console" ]; then
     shift
+    # Re-assert tmp ownership before each console invocation (seed/tests).
+    chown -R otrs:otrs /opt/otrs/var/tmp 2>/dev/null || true
     exec su -s /bin/bash otrs -c "perl /opt/otrs/bin/otrs.Console.pl $*"
 fi
 
