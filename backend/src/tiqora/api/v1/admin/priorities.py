@@ -73,8 +73,13 @@ async def create_priority(
                 "color": color,
             },
         )
-        priority = await session.get(TicketPriority, priority_id)
-        assert priority is not None
+        loaded = await session.get(TicketPriority, priority_id)
+        if loaded is None:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Priority insert failed",
+            )
+        priority = loaded
     await invalidate_znuny_cache_types(session, PRIORITY_CACHE_TYPES)
     await session.commit()
     await session.refresh(priority)

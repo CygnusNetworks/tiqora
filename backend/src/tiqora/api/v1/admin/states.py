@@ -71,8 +71,13 @@ async def create_state(body: StateCreate, admin: AdminUser, session: DbSession) 
                 "color": color,
             },
         )
-        state = await session.get(TicketState, state_id)
-        assert state is not None
+        loaded = await session.get(TicketState, state_id)
+        if loaded is None:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="State insert failed",
+            )
+        state = loaded
     await invalidate_znuny_cache_types(session, STATE_CACHE_TYPES)
     await session.commit()
     await session.refresh(state)
