@@ -12,15 +12,20 @@ value and contains the six dialect files Tiqora loaders expect:
 
 **Installer order (required):** `schema` → `initial_insert` → `schema-post`.
 
-## Profiles in this tree (release anchors)
+## Profiles in this tree
 
-| Directory | Upstream source |
-|-----------|-----------------|
-| `otrs-znuny-6.0` | Znuny 6.0.45 `scripts/database/otrs-*` |
-| `znuny-6.3` | Znuny 6.3.4 `scripts/database/otrs-*` |
-| `znuny-6.5` | Znuny 6.5.22 `scripts/database/*` |
-| `znuny-7.0` | Znuny 7.0.19 (GitHub `rel-7_0_19`) |
-| `znuny-7.3` | Znuny 7.3.5 (GitHub `rel-7_3_5`) |
+| Directory | Upstream source | Matrix |
+|-----------|-----------------|--------|
+| `otrs-znuny-6.0` | Znuny 6.0.45 `otrs-*` | release |
+| `znuny-6.1` | Znuny 6.1.2 `otrs-*` | full |
+| `znuny-6.2` | Znuny 6.2.2 `otrs-*` | full |
+| `znuny-6.3` | Znuny 6.3.4 `otrs-*` | release |
+| `znuny-6.4` | Znuny 6.4.5 | full (detected as `znuny-6.5`) |
+| `znuny-6.5` | Znuny 6.5.22 | release |
+| `znuny-7.0` | GitHub `rel-7_0_19` | release |
+| `znuny-7.1` | GitHub `rel-7_1_7` | full |
+| `znuny-7.2` | GitHub `rel-7_2_3` | full |
+| `znuny-7.3` | GitHub `rel-7_3_5` | release |
 
 Files are renamed to the Tiqora convention (`schema.mysql.sql` etc.) without
 content changes. Older Znuny trees used an `otrs-` prefix on the same files.

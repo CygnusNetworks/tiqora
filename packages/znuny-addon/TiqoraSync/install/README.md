@@ -1,9 +1,14 @@
 # TiqoraSync — install / verify / uninstall
 
-TiqoraSync is a small Znuny OPM addon that keeps Znuny's in-process ticket
-cache in sync while Tiqora writes tickets directly to the shared database.
-See the top-level [`docs/parallel-operation.md`](../../../../docs/parallel-operation.md)
-for the full background.
+TiqoraSync is a small OTRS/Znuny OPM addon that keeps the peer's in-process
+ticket cache in sync while Tiqora writes tickets directly to the shared
+database. See the top-level
+[`docs/parallel-operation.md`](../../../../docs/parallel-operation.md) for
+background.
+
+**Supported peer frameworks (SOPM):** `6.0.x` … `6.5.x` and `7.0.x` … `7.3.x`.
+APIs used (`Kernel::System::DB`, `Cache`, `Log`, daemon cron SysConfig) are
+stable across this range.
 
 ## What it installs
 
@@ -11,35 +16,43 @@ for the full background.
 - `Kernel/Config/Files/XML/TiqoraSync.xml` — SysConfig registration of the
   daemon cron task `Daemon::SchedulerCronTaskManager::Task###TiqoraSync`.
 
+## Install paths
+
+| Peer | Typical home | Console |
+|------|--------------|---------|
+| OTRS 6.0.x | `/opt/otrs` | `bin/otrs.Console.pl` |
+| Znuny 6.x / 7.x | `/opt/znuny` | `bin/znuny.Console.pl` |
+
+Below, `$OTRS` is that home and `$CONSOLE` is the matching Console.pl. Run as
+the application user (`otrs` / `znuny`).
+
 ## Build the installable package
 
 `TiqoraSync.sopm` is the package *source* (it references the two files above
-by their relative `Location`, it does not embed their content). Znuny's own
-package tooling turns a `.sopm` into an installable `.opm` by embedding the
-referenced files:
+by their relative `Location`, it does not embed their content). Znuny's /
+OTRS's package tooling turns a `.sopm` into an installable `.opm` by embedding
+the referenced files:
 
 ```sh
-# run from inside the Znuny checkout, with this addon's source tree
-# available on disk, e.g. bind-mounted or copied to
-# /opt/znuny/TiqoraSync-src/
-bin/znuny.Console.pl Dev::Package::Build \
-    /opt/znuny/TiqoraSync-src/TiqoraSync.sopm \
-    /opt/znuny/var/packages/
+# e.g. bind-mount this tree to $OTRS/TiqoraSync-src/
+$CONSOLE Dev::Package::Build \
+    $OTRS/TiqoraSync-src/TiqoraSync.sopm \
+    $OTRS/var/packages/
 ```
 
-This produces `/opt/znuny/var/packages/TiqoraSync-1.0.0.opm`.
+This produces `$OTRS/var/packages/TiqoraSync-1.1.0.opm` (version from the SOPM).
 
-If your Znuny version accepts `.sopm` files directly for installation (the
-`.sopm`/`.opm` XML format is otherwise identical, the `.sopm` just lacks
-embedded file content — some Znuny/OTRS versions read files straight off
-disk relative to the package's own location when installing a `.sopm`),
-you can skip the build step and install `TiqoraSync.sopm` directly. If in
-doubt, build the `.opm` first as shown above and install that.
+If your peer accepts `.sopm` files directly for installation, you can skip the
+build step. If in doubt, build the `.opm` first.
+
+If the Package Manager rejects multi-`<Framework>` packages on a very old
+OTRS 6.0 build, ship a one-line SOPM fork with only `<Framework>6.0.x</Framework>`
+(same code files) — the runtime module does not branch on version.
 
 ## Install
 
 ```sh
-bin/znuny.Console.pl Admin::Package::Install /opt/znuny/var/packages/TiqoraSync-1.0.0.opm
+$CONSOLE Admin::Package::Install $OTRS/var/packages/TiqoraSync-1.1.0.opm
 ```
 
 ## Verify
@@ -47,56 +60,48 @@ bin/znuny.Console.pl Admin::Package::Install /opt/znuny/var/packages/TiqoraSync-
 1. Confirm the package is registered:
 
    ```sh
-   bin/znuny.Console.pl Admin::Package::List
+   $CONSOLE Admin::Package::List
    ```
 
-   `TiqoraSync 1.0.0` should be listed.
+   `TiqoraSync 1.1.0` should be listed.
 
 2. Confirm the daemon cron task is registered and enabled:
 
-   Admin UI -> System Configuration -> search for
+   Admin UI → System Configuration → search for
    `Daemon::SchedulerCronTaskManager::Task###TiqoraSync`, or:
 
    ```sh
-   bin/znuny.Console.pl Admin::Config::Read \
+   $CONSOLE Admin::Config::Read \
        --setting-name "Daemon::SchedulerCronTaskManager::Task###TiqoraSync"
    ```
 
-3. Restart (or wait for) the Znuny daemon to pick up the new SysConfig, then
-   watch the daemon log for the task firing every minute (see the "Note on
-   scheduling granularity" in `TiqoraSync.xml` — Znuny's cron task manager
-   only supports minute resolution, so the effective interval is 60s, not
-   the originally targeted 30s):
+3. Restart (or wait for) the peer daemon, then watch the daemon log for the
+   task firing every minute (Znuny's cron task manager is minute-resolution):
 
    ```sh
-   tail -f /opt/znuny/var/log/Daemon/SchedulerTaskWorker.log
+   tail -f $OTRS/var/log/Daemon/SchedulerTaskWorker.log
    ```
 
 4. End-to-end check: with both `tiqora_cache_invalidation` and
-   `tiqora_settings` present in the shared database (i.e. Tiqora has run its
-   Alembic migrations), manually insert a row:
+   `tiqora_settings` present (Tiqora migrations applied), insert:
 
    ```sql
    INSERT INTO tiqora_cache_invalidation (ticket_id) VALUES (123);
    ```
 
-   Within about a minute, confirm the watermark advanced:
+   Within about a minute:
 
    ```sql
    SELECT * FROM tiqora_settings WHERE `key` = 'tiqorasync.watermark';
    ```
 
-   The stored `value` should be greater than or equal to the `id` of the row
-   you inserted. If the hand-off tables do not exist yet, TiqoraSync logs a
-   `debug`-level message and returns cleanly on every run — it does not
-   error, retry loudly, or block the daemon.
+   The stored `value` should be ≥ the inserted row's `id`. If the hand-off
+   tables do not exist yet, TiqoraSync logs at `debug` and returns cleanly.
 
 ## Uninstall
 
 ```sh
-bin/znuny.Console.pl Admin::Package::Uninstall TiqoraSync
+$CONSOLE Admin::Package::Uninstall TiqoraSync
 ```
 
-This removes the `Kernel/System/TiqoraSync.pm` module and the SysConfig
-cron task registration. It does not touch the `tiqora_cache_invalidation`
-or `tiqora_settings` tables, which are owned and migrated by Tiqora.
+This removes the module and SysConfig task; it does not drop `tiqora_*` tables.
