@@ -42,7 +42,7 @@ async def get_state(state_id: int, admin: AdminUser, session: DbSession) -> Tick
 
 @router.post("", response_model=StateOut, status_code=status.HTTP_201_CREATED)
 async def create_state(body: StateCreate, admin: AdminUser, session: DbSession) -> TicketState:
-    from tiqora.db.legacy.profile import default_color_for_write
+    from tiqora.db.legacy.profile import default_color_for_write, insert_row_with_color
 
     ts = now()
     data = body.model_dump()
@@ -58,47 +58,19 @@ async def create_state(body: StateCreate, admin: AdminUser, session: DbSession) 
         session.add(state)
     else:
         # Znuny 7.0+: ticket_state.color is NOT NULL and not on the 6.5 ORM
-        # baseline. Insert via Core with an explicit default color.
-        from sqlalchemy import text
-
-        params = {
-            **data,
-            "create_time": ts,
-            "create_by": admin.id,
-            "change_time": ts,
-            "change_by": admin.id,
-            "color": color,
-        }
-        try:
-            dialect = session.get_bind().dialect.name
-        except Exception:  # noqa: BLE001
-            dialect = ""
-        if dialect in {"postgresql", "postgres"}:
-            state_id = (
-                await session.execute(
-                    text(
-                        "INSERT INTO ticket_state "
-                        "(name, comments, type_id, valid_id, create_time, create_by, "
-                        "change_time, change_by, color) "
-                        "VALUES (:name, :comments, :type_id, :valid_id, :create_time, "
-                        ":create_by, :change_time, :change_by, :color) "
-                        "RETURNING id"
-                    ),
-                    params,
-                )
-            ).scalar_one()
-        else:
-            await session.execute(
-                text(
-                    "INSERT INTO ticket_state "
-                    "(name, comments, type_id, valid_id, create_time, create_by, "
-                    "change_time, change_by, color) "
-                    "VALUES (:name, :comments, :type_id, :valid_id, :create_time, "
-                    ":create_by, :change_time, :change_by, :color)"
-                ),
-                params,
-            )
-            state_id = (await session.execute(text("SELECT LAST_INSERT_ID()"))).scalar_one()
+        # baseline. Insert via shared Core helper (see DEFAULT_STATE_PRIORITY_COLOR).
+        state_id = await insert_row_with_color(
+            session,
+            table_name="ticket_state",
+            values={
+                **data,
+                "create_time": ts,
+                "create_by": admin.id,
+                "change_time": ts,
+                "change_by": admin.id,
+                "color": color,
+            },
+        )
         state = await session.get(TicketState, state_id)
         assert state is not None
     await invalidate_znuny_cache_types(session, STATE_CACHE_TYPES)
