@@ -337,6 +337,12 @@ function SidebarBody({ onNavigate }: { onNavigate?: () => void }) {
           onToggle={() => toggleGroup("workspace")}
         >
           <NavItem
+            to="/agent/search"
+            label={t("search.title")}
+            testId="agent-nav-search"
+            onNavigate={onNavigate}
+          />
+          <NavItem
             to="/agent/queues"
             search={{ state_type: "open" }}
             label={t("sidebar.inbox")}
@@ -454,11 +460,26 @@ function HeaderIconButton({
 
 /** The cohesive top-right control cluster shared by the desktop and mobile
  * agent headers: search · new · connection · online · bell · help │ account. */
-function HeaderControls({ onHelp, logoutTestId }: { onHelp: () => void; logoutTestId: string }) {
+function HeaderControls({
+  onHelp,
+  logoutTestId,
+  searchFill = false,
+}: {
+  onHelp: () => void;
+  logoutTestId: string;
+  /** Let the search bar grow into the available header width (desktop). */
+  searchFill?: boolean;
+}) {
   const { t } = useTranslation();
   return (
-    <div className="flex items-center gap-1.5">
-      <CommandSearch />
+    <div className={cn("flex items-center gap-1.5", searchFill && "w-full")}>
+      {searchFill ? (
+        <div className="min-w-0 flex-1">
+          <CommandSearch fill />
+        </div>
+      ) : (
+        <CommandSearch />
+      )}
       <NewTicketButton />
       <div className="mx-0.5 flex items-center gap-0.5">
         <ConnectionStatus />
@@ -547,8 +568,12 @@ export function AgentShell({ children }: { children: ReactNode }) {
               <HeaderControls onHelp={() => setHelpOpen(true)} logoutTestId="logout-btn" />
             </div>
           </header>
-          <div className="hidden items-center justify-end border-b border-hairline bg-surface px-4 py-1.5 md:flex">
-            <HeaderControls onHelp={() => setHelpOpen(true)} logoutTestId="logout-btn-desktop" />
+          <div className="hidden items-center border-b border-hairline bg-surface px-4 py-1.5 md:flex">
+            <HeaderControls
+              onHelp={() => setHelpOpen(true)}
+              logoutTestId="logout-btn-desktop"
+              searchFill
+            />
           </div>
           <main key={location.pathname} className="flex flex-1 flex-col animate-route-in">
             {children}
