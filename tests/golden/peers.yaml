@@ -1,63 +1,100 @@
-# Golden Layer-B peer definitions (real OTRS/Znuny container vs Tiqora).
-# Layer A (DDL-only) lives under backend/tests/fixtures/legacy-schema/.
+# Golden Layer-B peers — real OTRS/Znuny container vs Tiqora on shared MariaDB.
+# Manual only (local + workflow_dispatch). No nightly / no PR gate.
 #
-# Default peer remains znuny-6.5.22. Other peers are opt-in via
-# GOLDEN_PEER=<id> once source trees / images are available locally.
+# Usage:
+#   GOLDEN_PEER=znuny-6.5 just golden-up
+#   GOLDEN_PEER=znuny-6.5 just golden-seed
+#   GOLDEN_PEER=znuny-6.5 just golden-test
+#   just golden-all-peers   # sequential, all peers with source present
 #
-# Status:
-#   ready     — Dockerfile + compose path exercised in CI (manual golden.yml)
-#   scaffold  — docs + env hooks present; full peer image not yet in default CI
+# source_dir is relative to the repo root and gitignored. Place/copy the
+# matching release tree there before golden-up (Docker COPY cannot use
+# external symlinks).
+
+default: znuny-6.5
 
 peers:
+  otrs-znuny-6.0:
+    product: OTRS/Znuny
+    version: "6.0.45"
+    framework: "6.0.x"
+    source_dir: znuny-6.0.45
+    # Inside the image we always install under /opt/otrs for a single Dockerfile.
+    install_home: /opt/otrs
+    schema_profile: otrs-znuny-6.0
+    notes: Hardest adapter (table groups). Source often from 6.0.45 tarball.
+
+  znuny-6.1:
+    product: Znuny
+    version: "6.1.2"
+    framework: "6.1.x"
+    source_dir: znuny-6.1.2
+    install_home: /opt/otrs
+    schema_profile: znuny-6.1
+
+  znuny-6.2:
+    product: Znuny
+    version: "6.2.2"
+    framework: "6.2.x"
+    source_dir: znuny-6.2.2
+    install_home: /opt/otrs
+    schema_profile: znuny-6.2
+
+  znuny-6.3:
+    product: Znuny
+    version: "6.3.4"
+    framework: "6.3.x"
+    source_dir: znuny-6.3.4
+    install_home: /opt/otrs
+    schema_profile: znuny-6.3
+
+  znuny-6.4:
+    product: Znuny
+    version: "6.4.5"
+    framework: "6.4.x"
+    source_dir: znuny-6.4.5
+    install_home: /opt/otrs
+    schema_profile: znuny-6.4
+
   znuny-6.5:
-    status: ready
     product: Znuny
     version: "6.5.22"
     framework: "6.5.x"
-    source_dir: znuny-6.5.22   # repo root, gitignored vendored tree
-    install_home: /opt/otrs    # historical path in Dockerfile.znuny
-    console: bin/otrs.Console.pl
-    schema_profile: znuny-6.5
-    notes: Primary golden anchor (history, TN interleaving, escalation, compat).
-
-  otrs-6.0:
-    status: scaffold
-    product: OTRS
-    version: "6.0.x"
-    framework: "6.0.x"
-    source_dir: otrs-6.0       # operator-supplied
+    source_dir: znuny-6.5.22
     install_home: /opt/otrs
-    console: bin/otrs.Console.pl
-    schema_profile: otrs-znuny-6.0
-    notes: Required for formal 6.0 parallel-op GA claim (Wave 1 Layer B).
-
-  znuny-6.3:
-    status: scaffold
-    product: Znuny
-    version: "6.3.x"
-    framework: "6.3.x"
-    source_dir: znuny-6.3.4
-    install_home: /opt/znuny
-    console: bin/znuny.Console.pl
-    schema_profile: znuny-6.3
+    schema_profile: znuny-6.5
+    notes: Primary peer — history, TN interleaving, escalation, compat.
 
   znuny-7.0:
-    status: scaffold
     product: Znuny
     version: "7.0.x"
     framework: "7.0.x"
     source_dir: znuny-7.0
-    install_home: /opt/znuny
-    console: bin/znuny.Console.pl
+    install_home: /opt/otrs
     schema_profile: znuny-7.0
+    notes: State/priority color NOT NULL on writes.
+
+  znuny-7.1:
+    product: Znuny
+    version: "7.1.x"
+    framework: "7.1.x"
+    source_dir: znuny-7.1
+    install_home: /opt/otrs
+    schema_profile: znuny-7.1
+
+  znuny-7.2:
+    product: Znuny
+    version: "7.2.x"
+    framework: "7.2.x"
+    source_dir: znuny-7.2
+    install_home: /opt/otrs
+    schema_profile: znuny-7.2
 
   znuny-7.3:
-    status: scaffold
     product: Znuny
     version: "7.3.x"
     framework: "7.3.x"
     source_dir: znuny-7.3
-    install_home: /opt/znuny
-    console: bin/znuny.Console.pl
+    install_home: /opt/otrs
     schema_profile: znuny-7.3
-    notes: Primary 7.x golden target after Layer A green.
+    notes: Newest 7.x golden target.
