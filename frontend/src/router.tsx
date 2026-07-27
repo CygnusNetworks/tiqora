@@ -193,15 +193,46 @@ const agentTicketRoute = createRoute({
 const agentSearchRoute = createRoute({
   getParentRoute: () => agentLayoutRoute,
   path: "/search",
-  validateSearch: (s: Record<string, unknown>): SearchSearch => ({
-    q: typeof s.q === "string" ? s.q : undefined,
-    offset:
-      typeof s.offset === "number"
-        ? s.offset
-        : typeof s.offset === "string"
-          ? Number(s.offset)
-          : undefined,
-  }),
+  validateSearch: (s: Record<string, unknown>): SearchSearch => {
+    const num = (v: unknown): number | undefined => {
+      if (typeof v === "number" && Number.isFinite(v)) return v;
+      if (typeof v === "string" && v !== "") {
+        const n = Number(v);
+        return Number.isFinite(n) ? n : undefined;
+      }
+      return undefined;
+    };
+    const numList = (v: unknown): number[] | undefined => {
+      if (v === undefined || v === null || v === "") return undefined;
+      const raw = Array.isArray(v) ? v : [v];
+      const out = raw
+        .map((x) => num(x))
+        .filter((x): x is number => x !== undefined);
+      return out.length ? out : undefined;
+    };
+    const strList = (v: unknown): string[] | undefined => {
+      if (v === undefined || v === null || v === "") return undefined;
+      const raw = Array.isArray(v) ? v : [v];
+      const out = raw
+        .filter((x): x is string => typeof x === "string" && x.length > 0)
+        .map((x) => x.trim())
+        .filter(Boolean);
+      return out.length ? out : undefined;
+    };
+    const isoDate = (v: unknown): string | undefined =>
+      typeof v === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : undefined;
+
+    return {
+      q: typeof s.q === "string" ? s.q : undefined,
+      offset: num(s.offset),
+      queue_id: numList(s.queue_id),
+      state_type: strList(s.state_type),
+      owner_id: num(s.owner_id),
+      customer_id: typeof s.customer_id === "string" ? s.customer_id : undefined,
+      created_from: isoDate(s.created_from),
+      created_to: isoDate(s.created_to),
+    };
+  },
   component: SearchPage,
 });
 
