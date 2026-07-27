@@ -38,6 +38,8 @@ export function CommandSearch({ fill = false }: { fill?: boolean }) {
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
   const [values, setValues] = useState<SmartSearchValues>(EMPTY);
+  /** True while the user types queue:/kunde:/… — hide ticket hits under filter suggests. */
+  const [composingFilter, setComposingFilter] = useState(false);
   const rootRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -64,7 +66,10 @@ export function CommandSearch({ fill = false }: { fill?: boolean }) {
 
   // Reset the composed query/filters whenever the palette closes.
   useEffect(() => {
-    if (!open) setValues(EMPTY);
+    if (!open) {
+      setValues(EMPTY);
+      setComposingFilter(false);
+    }
   }, [open]);
 
   // Click outside closes the inline panel.
@@ -138,8 +143,9 @@ export function CommandSearch({ fill = false }: { fill?: boolean }) {
   };
 
   const hits = resultsQ.data?.hits ?? [];
-  // Show the results panel once the user has typed free text (or while loading).
-  const showResultsPanel = open && (hasQuery || Boolean(values.q.trim()));
+  // Ticket hits only for free-text (not while composing queue:/kunde:/…).
+  const showResultsPanel =
+    open && !composingFilter && (hasQuery || Boolean(values.q.trim()));
 
   if (!open) {
     return (
@@ -187,6 +193,7 @@ export function CommandSearch({ fill = false }: { fill?: boolean }) {
         onSubmitQuery={openFull}
         onQueryChange={(text) => setValues((v) => ({ ...v, q: text }))}
         onEscape={() => setOpen(false)}
+        onComposingFilterChange={setComposingFilter}
         inputTestId="command-search-input"
         submitLabel={null}
         autoFocus
