@@ -4,7 +4,12 @@ import { useTranslation } from "react-i18next";
 import { api } from "@/lib/api";
 import { SearchIcon } from "@/components/ui/icons";
 import {
+  FILTER_KEY_HINTS,
   formatCustomerLabel,
+  isFilterComposition,
+  matchQueues,
+  parseKeyed,
+  uniqueQueueMatch,
   type AgentOption,
   type QueueOption,
   type SmartPatch,
@@ -33,32 +38,6 @@ const CHIP_CLASS: Record<ChipKind, string> = {
 
 const STATE_TYPES = ["new", "open", "pending", "closed"] as const;
 
-type FilterKey = "queue" | "owner" | "status" | "customer" | "from" | "to";
-
-// Alias → canonical filter key. Both German and English spellings are accepted.
-const KEY_ALIASES: Record<string, FilterKey> = {
-  queue: "queue",
-  besitzer: "owner",
-  owner: "owner",
-  status: "status",
-  state: "status",
-  kunde: "customer",
-  customer: "customer",
-  von: "from",
-  from: "from",
-  bis: "to",
-  to: "to",
-};
-
-/** Parse ``key:fragment``; returns null when the text is not a recognised key. */
-function parseKeyed(text: string): { key: FilterKey; frag: string } | null {
-  const m = text.match(/^([\p{L}]+):(.*)$/u);
-  if (!m) return null;
-  const canonical = KEY_ALIASES[m[1].toLowerCase()];
-  if (!canonical) return null;
-  return { key: canonical, frag: m[2] };
-}
-
 /** Accept ``YYYY-MM-DD`` or ``DD.MM.YYYY``; return ISO ``YYYY-MM-DD`` or null. */
 function parseDate(frag: string): string | null {
   const s = frag.trim();
@@ -71,7 +50,15 @@ function parseDate(frag: string): string | null {
   return null;
 }
 
-type Suggestion = { id: string; kind: ChipKind | "text"; label: string; hint?: string; apply: () => void };
+type Suggestion = {
+  id: string;
+  kind: ChipKind | "text" | "hint";
+  label: string;
+  hint?: string;
+  /** When false, row is informational only (no apply on Enter). */
+  actionable?: boolean;
+  apply: () => void;
+};
 
 export function SmartSearchBar({
   values,
@@ -86,6 +73,7 @@ export function SmartSearchBar({
   compact = false,
   onEscape,
   freeTextSuggest = true,
+  onComposingFilterChange,
 }: {
   values: SmartSearchValues;
   queues: QueueOption[];
@@ -108,6 +96,8 @@ export function SmartSearchBar({
   /** When false, free-text key-prefix / “search as fulltext” rows are omitted
    * (header palette shows ticket hits instead). Keyed filter typeahead stays. */
   freeTextSuggest?: boolean;
+  /** Notifies parent when the user is composing a filter token (hide ticket hits). */
+  onComposingFilterChange?: (composing: boolean) => void;
 }) {
   const { t } = useTranslation();
   // The input mirrors the active free-text query; while composing a key:token it
@@ -116,14 +106,26 @@ export function SmartSearchBar({
   const [active, setActive] = useState(0);
   const [focused, setFocused] = useState(false);
   const inputRef = useRef<HTMLInputElement | null>(null);
+  // Keep latest values/onQueryChange for commit without stale closures in suggestions.
+  const valuesRef = useRef(values);
+  valuesRef.current = values;
+  const onQueryChangeRef = useRef(onQueryChange);
+  onQueryChangeRef.current = onQueryChange;
 
   useEffect(() => {
-    setText(values.q);
+    // Only re-sync free text when not mid-filter-token (avoids wiping "queue:…").
+    if (!isFilterComposition(text)) setText(values.q);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [values.q]);
 
   useEffect(() => {
     if (autoFocus) inputRef.current?.focus();
   }, [autoFocus]);
+
+  const composingFilter = isFilterComposition(text);
+  useEffect(() => {
+    onComposingFilterChange?.(composingFilter);
+  }, [composingFilter, onComposingFilterChange]);
 
   const queueName = (id: number) => queues.find((q) => q.id === id)?.name ?? String(id);
   const agentName = (id: number) =>
@@ -187,54 +189,83 @@ export function SmartSearchBar({
     enabled: customerFrag.length >= 2,
   });
 
-  const commit = (patch: Parameters<typeof onPatch>[0]) => {
+  /** Apply a filter chip and clear the token input (never restore polluted free text). */
+  const commit = (patch: SmartPatch) => {
     onPatch(patch);
-    // Drop the token text but keep the active free-text query visible.
-    setText(values.q);
+    setText("");
     setActive(0);
+    // Drop any partial-key that leaked into free-text before the colon.
+    const q = valuesRef.current.q;
+    if (q && isFilterComposition(q)) onQueryChangeRef.current?.("");
     inputRef.current?.focus();
   };
 
   // --- Build the suggestion list for the current input -------------------
   const suggestions: Suggestion[] = useMemo(() => {
-    const raw = text.trim();
-    if (!raw) return [];
+    const raw = text.trimEnd();
+    if (!raw.trim()) return [];
     const parsed = parseKeyed(raw);
 
     if (parsed) {
-      const frag = parsed.frag.toLowerCase().trim();
+      const frag = parsed.frag.replace(/\s+$/, "");
+      const fragLow = frag.toLowerCase().trim();
+
       if (parsed.key === "queue") {
-        return queues
-          .filter((qu) => qu.name.toLowerCase().includes(frag) && !values.queueIds.includes(qu.id))
-          .slice(0, 6)
-          .map((qu) => ({
-            id: `queue-${qu.id}`,
-            kind: "queue" as const,
-            label: qu.name,
-            apply: () => commit({ queue_id: [...values.queueIds, qu.id] }),
-          }));
+        const matched = matchQueues(queues, fragLow, values.queueIds, 8);
+        if (matched.length === 0) {
+          return [
+            {
+              id: "queue-empty",
+              kind: "hint" as const,
+              label: t("search.smart.noQueueMatch", { frag: fragLow || "…" }),
+              actionable: false,
+              apply: () => {},
+            },
+          ];
+        }
+        return matched.map((qu) => ({
+          id: `queue-${qu.id}`,
+          kind: "queue" as const,
+          label: qu.name,
+          apply: () => commit({ queue_id: [...values.queueIds, qu.id] }),
+        }));
       }
       if (parsed.key === "owner") {
-        return agents
+        const matched = agents
           .filter(
             (a) =>
-              a.full_name.toLowerCase().includes(frag) || a.login.toLowerCase().includes(frag),
+              !fragLow ||
+              a.full_name.toLowerCase().includes(fragLow) ||
+              a.login.toLowerCase().includes(fragLow),
           )
-          .slice(0, 6)
-          .map((a) => ({
-            id: `owner-${a.id}`,
-            kind: "owner" as const,
-            label: a.full_name,
-            hint: a.login,
-            apply: () => commit({ owner_id: a.id }),
-          }));
+          .slice(0, 6);
+        if (matched.length === 0) {
+          return [
+            {
+              id: "owner-empty",
+              kind: "hint" as const,
+              label: t("search.smart.noOwnerMatch", { frag: fragLow || "…" }),
+              actionable: false,
+              apply: () => {},
+            },
+          ];
+        }
+        return matched.map((a) => ({
+          id: `owner-${a.id}`,
+          kind: "owner" as const,
+          label: a.full_name,
+          hint: a.login,
+          apply: () => commit({ owner_id: a.id }),
+        }));
       }
       if (parsed.key === "status") {
-        return STATE_TYPES.filter(
+        const matched = STATE_TYPES.filter(
           (st) =>
-            (st.includes(frag) || t(`search.filters.state.${st}`).toLowerCase().includes(frag)) &&
-            !values.stateTypes.includes(st),
-        ).map((st) => ({
+            !fragLow ||
+            st.includes(fragLow) ||
+            t(`search.filters.state.${st}`).toLowerCase().includes(fragLow),
+        ).filter((st) => !values.stateTypes.includes(st));
+        return matched.map((st) => ({
           id: `status-${st}`,
           kind: "status" as const,
           label: t(`search.filters.state.${st}`),
@@ -242,6 +273,28 @@ export function SmartSearchBar({
         }));
       }
       if (parsed.key === "customer") {
+        if (fragLow.length < 2) {
+          return [
+            {
+              id: "customer-hint",
+              kind: "hint" as const,
+              label: t("search.smart.customerHint"),
+              actionable: false,
+              apply: () => {},
+            },
+          ];
+        }
+        if (customerQ.isLoading || customerQ.isFetching) {
+          return [
+            {
+              id: "customer-loading",
+              kind: "hint" as const,
+              label: t("search.smart.loading"),
+              actionable: false,
+              apply: () => {},
+            },
+          ];
+        }
         const items: Suggestion[] = [];
         for (const c of customerQ.data?.companies ?? [])
           items.push({
@@ -262,7 +315,6 @@ export function SmartSearchBar({
             id: `ct-${c.login}`,
             kind: "customer",
             label,
-            // Prefer customer number over email so agents can verify the right account.
             hint: c.customer_id || c.email,
             apply: () =>
               commit({
@@ -270,6 +322,17 @@ export function SmartSearchBar({
                 customer_label: formatCustomerLabel(label, c.customer_id),
               }),
           });
+        }
+        if (items.length === 0) {
+          return [
+            {
+              id: "customer-empty",
+              kind: "hint" as const,
+              label: t("search.smart.noCustomerMatch", { frag: fragLow }),
+              actionable: false,
+              apply: () => {},
+            },
+          ];
         }
         return items.slice(0, 8);
       }
@@ -280,7 +343,7 @@ export function SmartSearchBar({
         return [
           {
             id: `date-${parsed.key}`,
-            kind: "date",
+            kind: "date" as const,
             label: `${t(parsed.key === "from" ? "search.smart.from" : "search.smart.to")}: ${iso}`,
             apply: () => commit(patch),
           },
@@ -289,75 +352,174 @@ export function SmartSearchBar({
       return [
         {
           id: "date-hint",
-          kind: "date",
+          kind: "hint" as const,
           label: t("search.smart.dateHint"),
+          actionable: false,
           apply: () => {},
         },
       ];
     }
 
     // Not a recognised key yet: offer matching filter keys, plus full-text.
-    // Header palette can omit the full-text row so live ticket hits own that panel.
-    const low = raw.toLowerCase();
-    const keyHints: Suggestion[] = (["queue", "besitzer", "status", "kunde", "von", "bis"] as const)
-      .filter((k) => k.startsWith(low))
-      .map((k) => ({
-        id: `key-${k}`,
-        kind: "text" as const,
-        label: `${k}:`,
-        hint: t("search.smart.filterHint"),
-        apply: () => {
-          setText(`${k}:`);
-          setActive(0);
-          inputRef.current?.focus();
-        },
-      }));
+    const low = raw.trim().toLowerCase();
+    const keyHints: Suggestion[] = FILTER_KEY_HINTS.filter((k) => k.startsWith(low)).map((k) => ({
+      id: `key-${k}`,
+      kind: "text" as const,
+      label: `${k}:`,
+      hint: t("search.smart.filterHint"),
+      apply: () => {
+        setText(`${k}:`);
+        setActive(0);
+        inputRef.current?.focus();
+      },
+    }));
     if (!freeTextSuggest) return keyHints;
     return [
       ...keyHints,
       {
         id: "fulltext",
-        kind: "text",
-        label: t("search.smart.fulltext", { text: raw }),
+        kind: "text" as const,
+        label: t("search.smart.fulltext", { text: raw.trim() }),
         hint: "Enter",
         apply: () => {
-          onSubmitQuery(raw);
+          onSubmitQuery(raw.trim());
           setFocused(false);
         },
       },
     ];
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [text, queues, agents, values, customerQ.data, t, freeTextSuggest]);
+  }, [text, queues, agents, values, customerQ.data, customerQ.isLoading, customerQ.isFetching, t, freeTextSuggest]);
+
+  /** Try to auto-commit a unique filter match from the current token. */
+  const tryAutoCommit = (raw: string): boolean => {
+    const parsed = parseKeyed(raw.trimEnd());
+    if (!parsed) return false;
+    const frag = parsed.frag.replace(/\s+$/, "").trim();
+
+    if (parsed.key === "queue") {
+      const hit = uniqueQueueMatch(queues, frag, values.queueIds);
+      if (hit) {
+        commit({ queue_id: [...values.queueIds, hit.id] });
+        return true;
+      }
+    }
+    if (parsed.key === "owner" && frag) {
+      const matched = agents.filter(
+        (a) =>
+          a.full_name.toLowerCase().includes(frag.toLowerCase()) ||
+          a.login.toLowerCase().includes(frag.toLowerCase()),
+      );
+      const exact = matched.find(
+        (a) =>
+          a.full_name.toLowerCase() === frag.toLowerCase() ||
+          a.login.toLowerCase() === frag.toLowerCase(),
+      );
+      const hit = exact ?? (matched.length === 1 ? matched[0] : null);
+      if (hit) {
+        commit({ owner_id: hit.id });
+        return true;
+      }
+    }
+    if (parsed.key === "status" && frag) {
+      const matched = STATE_TYPES.filter(
+        (st) =>
+          st.includes(frag.toLowerCase()) ||
+          t(`search.filters.state.${st}`).toLowerCase().includes(frag.toLowerCase()),
+      ).filter((st) => !values.stateTypes.includes(st));
+      if (matched.length === 1) {
+        commit({ state_type: [...values.stateTypes, matched[0]!] });
+        return true;
+      }
+    }
+    if ((parsed.key === "from" || parsed.key === "to") && frag) {
+      const iso = parseDate(frag);
+      if (iso) {
+        commit(parsed.key === "from" ? { created_from: iso } : { created_to: iso });
+        return true;
+      }
+    }
+    // Customer: only auto-commit when exactly one result is loaded.
+    if (parsed.key === "customer" && frag.length >= 2 && customerQ.data) {
+      const companies = customerQ.data.companies ?? [];
+      const contacts = customerQ.data.contacts ?? [];
+      if (companies.length === 1 && contacts.length === 0) {
+        const c = companies[0]!;
+        commit({
+          customer_id: c.customer_id,
+          customer_label: formatCustomerLabel(c.name, c.customer_id),
+        });
+        return true;
+      }
+      if (contacts.length === 1 && companies.length === 0) {
+        const c = contacts[0]!;
+        const name = `${c.first_name} ${c.last_name}`.trim() || c.login || c.customer_id;
+        const label = c.company_name ? `${name} · ${c.company_name}` : name;
+        commit({
+          customer_id: c.customer_id,
+          customer_label: formatCustomerLabel(label, c.customer_id),
+        });
+        return true;
+      }
+    }
+    return false;
+  };
 
   const onKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === "ArrowDown" && suggestions.length) {
+    const actionable = suggestions.filter((s) => s.actionable !== false);
+    if (e.key === "ArrowDown" && actionable.length) {
       e.preventDefault();
       setActive((i) => Math.min(i + 1, suggestions.length - 1));
-    } else if (e.key === "ArrowUp" && suggestions.length) {
+    } else if (e.key === "ArrowUp" && actionable.length) {
       e.preventDefault();
       setActive((i) => Math.max(i - 1, 0));
     } else if (e.key === "Enter") {
       e.preventDefault();
       const chosen = suggestions[active];
-      if (chosen) chosen.apply();
-      else {
-        onSubmitQuery(text.trim());
-        setFocused(false);
+      if (chosen && chosen.actionable !== false) {
+        chosen.apply();
+        return;
       }
+      // Prefer unique auto-commit for filter tokens over dumping raw "queue:…" as q.
+      if (parseKeyed(text) && tryAutoCommit(text)) return;
+      if (parseKeyed(text)) return; // no match — don't pollute free text
+      const firstActionable = actionable[0];
+      if (firstActionable) {
+        firstActionable.apply();
+        return;
+      }
+      onSubmitQuery(text.trim());
+      setFocused(false);
     } else if (e.key === "Backspace" && text === "" && chips.length) {
-      chips[chips.length - 1].remove();
+      chips[chips.length - 1]!.remove();
     } else if (e.key === "Escape") {
       if (text !== "") {
         setText("");
-        // Drop free-text live query too so results don't keep the old term.
-        onQueryChange?.("");
+        if (!isFilterComposition(text)) onQueryChange?.("");
+        else if (values.q && isFilterComposition(values.q)) onQueryChange?.("");
         return;
       }
       onEscape?.();
     }
   };
 
+  const handleChange = (val: string) => {
+    // Trailing space on a filter token → try unique auto-commit.
+    if (/\s$/.test(val) && parseKeyed(val.trimEnd())) {
+      if (tryAutoCommit(val)) return;
+      // Ambiguous: drop the space, keep the token, show suggestions.
+      setText(val.trimEnd());
+      setActive(0);
+      return;
+    }
+    setText(val);
+    setActive(0);
+    if (onQueryChange && !isFilterComposition(val)) onQueryChange(val);
+  };
+
   const showSuggest = focused && text.trim().length > 0 && suggestions.length > 0;
+
+  // Keep active index in range when list shrinks.
+  const safeActive = Math.min(active, Math.max(0, suggestions.length - 1));
 
   return (
     <div className="flex gap-2">
@@ -398,13 +560,7 @@ export function SmartSearchBar({
           <input
             ref={inputRef}
             value={text}
-            onChange={(e) => {
-              const val = e.target.value;
-              setText(val);
-              setActive(0);
-              // Live free-text query; suppressed while composing a key:token.
-              if (onQueryChange && !parseKeyed(val)) onQueryChange(val);
-            }}
+            onChange={(e) => handleChange(e.target.value)}
             onFocus={() => setFocused(true)}
             onBlur={() => setFocused(false)}
             onKeyDown={onKeyDown}
@@ -420,34 +576,43 @@ export function SmartSearchBar({
 
         {showSuggest && (
           <ul
-            className="absolute z-20 mt-1 w-full overflow-hidden rounded-md border border-hairline bg-surface shadow-lg"
+            className="absolute z-50 mt-1 max-h-[min(16rem,50vh)] w-full overflow-auto rounded-lg border border-hairline bg-surface py-1 shadow-lg"
             data-testid="smart-search-suggest"
           >
-            {suggestions.map((s, i) => (
-              <li key={s.id}>
-                <button
-                  type="button"
-                  onMouseDown={(e) => {
-                    e.preventDefault();
-                    s.apply();
-                  }}
-                  onMouseEnter={() => setActive(i)}
-                  className={`flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm ${
-                    i === active ? "bg-surface-subtle" : ""
-                  }`}
-                  data-testid={`smart-suggest-${s.id}`}
-                >
-                  {s.kind !== "text" && (
-                    <span
-                      className={`h-2 w-2 shrink-0 rounded-full ${CHIP_CLASS[s.kind]}`}
-                      aria-hidden
-                    />
-                  )}
-                  <span className="min-w-0 flex-1 truncate text-ink">{s.label}</span>
-                  {s.hint && <span className="shrink-0 text-xs text-muted">{s.hint}</span>}
-                </button>
-              </li>
-            ))}
+            {suggestions.map((s, i) => {
+              const isHint = s.kind === "hint" || s.actionable === false;
+              return (
+                <li key={s.id}>
+                  <button
+                    type="button"
+                    disabled={isHint}
+                    onMouseDown={(e) => {
+                      if (isHint) return;
+                      e.preventDefault();
+                      s.apply();
+                    }}
+                    onMouseEnter={() => !isHint && setActive(i)}
+                    className={`flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm ${
+                      isHint
+                        ? "cursor-default text-muted"
+                        : i === safeActive
+                          ? "bg-surface-subtle text-ink"
+                          : "text-ink"
+                    }`}
+                    data-testid={`smart-suggest-${s.id}`}
+                  >
+                    {s.kind !== "text" && s.kind !== "hint" && (
+                      <span
+                        className={`h-2 w-2 shrink-0 rounded-full ${CHIP_CLASS[s.kind as ChipKind]}`}
+                        aria-hidden
+                      />
+                    )}
+                    <span className="min-w-0 flex-1 truncate">{s.label}</span>
+                    {s.hint && <span className="shrink-0 text-xs text-muted">{s.hint}</span>}
+                  </button>
+                </li>
+              );
+            })}
           </ul>
         )}
       </div>
@@ -465,3 +630,4 @@ export function SmartSearchBar({
     </div>
   );
 }
+
