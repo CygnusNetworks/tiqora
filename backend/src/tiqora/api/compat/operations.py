@@ -482,24 +482,21 @@ async def _state_ids_for_type(session: AsyncSession, type_name: str) -> list[int
 
 async def _agent_in_group(session: AsyncSession, user_id: int, group_name: str) -> bool:
     """True if agent has rw (or any) membership on the named group."""
+    from tiqora.db.legacy.profile import groups_table_sql
+
     pe = PermissionEngine(session)
     groups = await pe.groups_for_permission(user_id, "rw")
     if not groups:
         return False
+    bind = session.get_bind()
+    dialect = bind.dialect.name if bind is not None else "mysql"
+    gt = groups_table_sql(dialect=dialect)
     row = (
         await session.execute(
-            text("SELECT id FROM permission_groups WHERE name = :n AND valid_id = 1 LIMIT 1"),
+            text(f"SELECT id FROM {gt} WHERE name = :n AND valid_id = 1 LIMIT 1"),  # noqa: S608
             {"n": group_name},
         )
     ).first()
-    if row is None:
-        # OTRS 6.0 uses `groups` instead of permission_groups
-        row = (
-            await session.execute(
-                text("SELECT id FROM `groups` WHERE name = :n AND valid_id = 1 LIMIT 1"),
-                {"n": group_name},
-            )
-        ).first()
     if row is None:
         return False
     return int(row[0]) in set(groups)
