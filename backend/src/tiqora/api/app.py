@@ -105,9 +105,27 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
             )
         except UnsupportedLegacySchemaError:
             raise
-        except Exception as _exc:  # noqa: BLE001 — DB down in dev/tests
-            logger.warning("legacy_schema_check_skipped", error=str(_exc))
-            app.state.legacy_schema_profile = None
+        except Exception as _exc:  # noqa: BLE001 — classified below
+            from tiqora.db.legacy.profile import is_db_unavailable
+
+            if is_db_unavailable(_exc):
+                # Peer DB not reachable (local dev without stack). Soft-skip.
+                logger.warning(
+                    "legacy_schema_check_skipped",
+                    error=str(_exc),
+                    reason="db_unavailable",
+                )
+                app.state.legacy_schema_profile = None
+            else:
+                # Detection/adapter bug on a reachable DB must not boot silently
+                # with profile=None (wrong groups table / missing color default).
+                logger.error(
+                    "legacy_schema_detection_failed",
+                    error=str(_exc),
+                    error_type=type(_exc).__name__,
+                    exc_info=True,
+                )
+                raise
     else:
         app.state.legacy_schema_profile = None
 

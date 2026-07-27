@@ -275,6 +275,76 @@ def _assert_profile_cell(sync_url: str, profile_id: str, dialect: str) -> None:
     ticket_id = asyncio.run(_write())
     assert ticket_id >= 1
 
+    # 7.0+: exercise the color Core-insert path used by admin state/priority
+    # creates (riskiest new write code — not covered by ticket create alone).
+    if detected.state_priority_has_color:
+
+        async def _color_writes() -> tuple[int, int]:
+            from datetime import datetime, timezone
+
+            from tiqora.db.legacy.profile import (
+                default_color_for_write,
+                insert_row_with_color,
+            )
+
+            eng = create_async_engine(async_url)
+            factory = async_sessionmaker(eng, expire_on_commit=False)
+            ts = datetime.now(timezone.utc).replace(tzinfo=None)
+            color = default_color_for_write()
+            assert color is not None
+            try:
+                async with factory() as session, session.begin():
+                    state_id = await insert_row_with_color(
+                        session,
+                        table_name="ticket_state",
+                        values={
+                            "name": f"matrix-state-{profile_id}",
+                            "comments": "schema matrix color write",
+                            "type_id": 1,
+                            "valid_id": 1,
+                            "create_time": ts,
+                            "create_by": 1,
+                            "change_time": ts,
+                            "change_by": 1,
+                            "color": color,
+                        },
+                    )
+                    prio_id = await insert_row_with_color(
+                        session,
+                        table_name="ticket_priority",
+                        values={
+                            "name": f"matrix-prio-{profile_id}",
+                            "valid_id": 1,
+                            "create_time": ts,
+                            "create_by": 1,
+                            "change_time": ts,
+                            "change_by": 1,
+                            "color": color,
+                        },
+                    )
+                    return int(state_id), int(prio_id)
+            finally:
+                await eng.dispose()
+
+        state_id, prio_id = asyncio.run(_color_writes())
+        assert state_id >= 1
+        assert prio_id >= 1
+        engine = create_engine(sync_url)
+        try:
+            with engine.connect() as conn:
+                scolor = conn.execute(
+                    text("SELECT color FROM ticket_state WHERE id = :id"),
+                    {"id": state_id},
+                ).scalar_one()
+                pcolor = conn.execute(
+                    text("SELECT color FROM ticket_priority WHERE id = :id"),
+                    {"id": prio_id},
+                ).scalar_one()
+                assert scolor
+                assert pcolor
+        finally:
+            engine.dispose()
+
     engine = create_engine(sync_url)
     try:
         with engine.connect() as conn:

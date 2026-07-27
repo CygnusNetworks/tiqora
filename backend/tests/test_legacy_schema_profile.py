@@ -299,6 +299,54 @@ async def test_ensure_honours_profile_override() -> None:
     reset_legacy_schema_profile()
 
 
+def test_is_db_unavailable_classifies_connection_vs_logic_errors() -> None:
+    from sqlalchemy.exc import InterfaceError, OperationalError, ProgrammingError
+
+    from tiqora.db.legacy.profile import is_db_unavailable
+
+    assert is_db_unavailable(ConnectionRefusedError("connection refused"))
+    assert is_db_unavailable(TimeoutError("connect timed out"))
+    assert is_db_unavailable(OSError("Network is unreachable"))
+
+    # SQLAlchemy InterfaceError → unavailable
+    assert is_db_unavailable(InterfaceError("statement", {}, Exception("closed")))
+
+    # OperationalError with connect-time wording
+    assert is_db_unavailable(
+        OperationalError("can't connect to MySQL server on '127.0.0.1'", {}, None)
+    )
+
+    # ProgrammingError / logic bugs must NOT soft-skip
+    prog = ProgrammingError("(1146, \"Table 'x.y' doesn't exist\")", {}, None)
+    assert not is_db_unavailable(prog)
+    assert not is_db_unavailable(ValueError("unexpected marker set"))
+    assert not is_db_unavailable(RuntimeError("detection bug"))
+
+
+def test_default_color_for_write_only_on_7x() -> None:
+    from tiqora.db.legacy.profile import (
+        DEFAULT_STATE_PRIORITY_COLOR,
+        SchemaProfileId,
+        apply_legacy_schema_profile,
+        default_color_for_write,
+        profile_for_id,
+        reset_legacy_schema_profile,
+    )
+
+    reset_legacy_schema_profile()
+    assert default_color_for_write() is None
+
+    apply_legacy_schema_profile(profile_for_id(SchemaProfileId.ZNUNY_6_5))
+    assert default_color_for_write() is None
+
+    apply_legacy_schema_profile(profile_for_id(SchemaProfileId.ZNUNY_7_0))
+    assert default_color_for_write() == DEFAULT_STATE_PRIORITY_COLOR == "#FFFFFF"
+
+    apply_legacy_schema_profile(profile_for_id(SchemaProfileId.ZNUNY_7_3))
+    assert default_color_for_write() == "#FFFFFF"
+    reset_legacy_schema_profile()
+
+
 # ---------------------------------------------------------------------------
 # Live detection against Znuny 6.5 MariaDB fixture
 # ---------------------------------------------------------------------------

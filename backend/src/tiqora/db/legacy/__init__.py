@@ -51,6 +51,7 @@ from tiqora.db.legacy.misc import (  # noqa: F401
 )
 from tiqora.db.legacy.profile import (  # noqa: F401
     ALL_SCHEMA_PROFILES,
+    DEFAULT_STATE_PRIORITY_COLOR,
     RELEASE_SCHEMA_PROFILES,
     LegacySchemaProfile,
     SchemaProfileId,
@@ -62,6 +63,8 @@ from tiqora.db.legacy.profile import (  # noqa: F401
     get_legacy_schema_profile,
     groups_table_name,
     groups_table_sql,
+    insert_row_with_color,
+    is_db_unavailable,
     mail_account_load_options,
     profile_for_id,
     quote_ident,
@@ -122,6 +125,7 @@ __all__ = [
     "RELEASE_SCHEMA_PROFILES",
     "SchemaProfileId",
     "UnsupportedLegacySchemaError",
+    "DEFAULT_STATE_PRIORITY_COLOR",
     "apply_legacy_schema_profile",
     "default_color_for_write",
     "detect_legacy_schema_profile",
@@ -129,6 +133,8 @@ __all__ = [
     "get_legacy_schema_profile",
     "groups_table_name",
     "groups_table_sql",
+    "insert_row_with_color",
+    "is_db_unavailable",
     "mail_account_load_options",
     "profile_for_id",
     "quote_ident",
