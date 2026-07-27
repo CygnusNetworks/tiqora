@@ -1,4 +1,3 @@
-import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link, useNavigate, useSearch } from "@tanstack/react-router";
 import DOMPurify from "dompurify";
@@ -7,7 +6,6 @@ import { api } from "@/lib/api";
 import type { KbSearchHit } from "@/lib/api";
 import { Spinner } from "@/components/ui/Spinner";
 import { Badge } from "@/components/ui/Badge";
-import { SelectMenu, type SelectMenuItem } from "@/components/ui/SelectMenu";
 import { PriorityChip, StateChip } from "@/components/ui/StatusChip";
 import { SmartSearchBar } from "@/components/agent/SmartSearchBar";
 
@@ -49,15 +47,6 @@ const RANGE_PRESETS: { key: string; days: number | null }[] = [
   { key: "d30", days: 30 },
   { key: "d90", days: 90 },
 ];
-
-function useDebouncedValue<T>(value: T, delayMs: number): T {
-  const [debounced, setDebounced] = useState(value);
-  useEffect(() => {
-    const t = window.setTimeout(() => setDebounced(value), delayMs);
-    return () => window.clearTimeout(t);
-  }, [value, delayMs]);
-  return debounced;
-}
 
 /** Escape first, highlight query terms, then allow only em/mark through to the DOM. */
 function highlight(text: string | null | undefined, q: string): string {
@@ -113,9 +102,6 @@ export function SearchPage() {
   const createdTo = search.created_to;
   const sort = search.sort ?? DEFAULT_SORT;
 
-  const [customerQuery, setCustomerQuery] = useState("");
-  const debouncedCustomerQuery = useDebouncedValue(customerQuery, 250);
-
   const patchSearch = (patch: Partial<SearchSearch>) => {
     void navigate({
       search: (prev) => {
@@ -152,12 +138,6 @@ export function SearchPage() {
   const agentsQ = useQuery({
     queryKey: ["reference", "agents"],
     queryFn: ({ signal }) => api.listReferenceAgents(signal),
-  });
-  const customerSearchQ = useQuery({
-    queryKey: ["reference", "customer-search", debouncedCustomerQuery],
-    queryFn: ({ signal }) =>
-      api.customerQuickSearch({ q: debouncedCustomerQuery, limit: 10 }, signal),
-    enabled: debouncedCustomerQuery.trim().length >= 2,
   });
 
   const resultsQ = useQuery({
@@ -212,20 +192,6 @@ export function SearchPage() {
   const totalHits = (resultsQ.data?.hits.length ?? 0) + kbHits.length;
   const facets = resultsQ.data?.facets;
 
-  const agentItems: SelectMenuItem<number>[] = useMemo(
-    () =>
-      (agentsQ.data ?? []).map((a) => ({
-        value: a.id,
-        label: a.full_name,
-        hint: a.login,
-      })),
-    [agentsQ.data],
-  );
-
-  const selectedOwnerLabel =
-    agentsQ.data?.find((a) => a.id === ownerId)?.full_name ??
-    (ownerId != null ? String(ownerId) : t("search.filters.ownerAll"));
-
   const hasActiveFilters =
     queueIds.length > 0 ||
     stateTypes.length > 0 ||
@@ -235,12 +201,12 @@ export function SearchPage() {
     Boolean(createdTo);
 
   const clearFilters = () => {
-    setCustomerQuery("");
     patchSearch({
       queue_id: [],
       state_type: [],
       owner_id: undefined,
       customer_id: undefined,
+      customer_label: undefined,
       created_from: undefined,
       created_to: undefined,
       offset: 0,
@@ -276,8 +242,13 @@ export function SearchPage() {
       : (RANGE_PRESETS.find((p) => p.days !== null && createdFrom === isoDaysAgo(p.days))?.key ??
         null);
 
+  const chipBtn = (active: boolean) =>
+    active
+      ? "inline-flex items-center gap-1 rounded-full border border-accent bg-accent-dim px-2.5 py-1 text-xs font-medium text-accent"
+      : "inline-flex items-center gap-1 rounded-full border border-hairline bg-surface-subtle px-2.5 py-1 text-xs text-ink hover:border-accent/50";
+
   return (
-    <div className="mx-auto w-full max-w-5xl space-y-4 px-4 py-6" data-testid="search-page">
+    <div className="mx-auto w-full max-w-5xl space-y-3 px-4 py-6" data-testid="search-page">
       <h1 className="font-display text-xl font-semibold text-ink">{t("search.title")}</h1>
 
       <SmartSearchBar
@@ -301,31 +272,66 @@ export function SearchPage() {
         onSubmitQuery={(term) => patchSearch({ q: term, offset: 0 })}
       />
 
-      {/* Quick time-range presets + result ordering. */}
-      <div className="flex flex-wrap items-center gap-2" data-testid="search-controls">
-        <span className="text-[11px] font-semibold uppercase tracking-wide text-muted">
-          {t("search.presets.label")}
-        </span>
-        {RANGE_PRESETS.map((p) => {
-          const active = activeRangeKey === p.key;
-          return (
-            <button
-              key={p.key}
-              type="button"
-              onClick={() => applyRangePreset(p.days)}
-              aria-pressed={active}
-              data-testid={`search-preset-${p.key}`}
-              className={
-                active
-                  ? "rounded-full border border-accent bg-accent-dim px-2.5 py-1 text-xs font-medium text-accent"
-                  : "rounded-full border border-hairline bg-surface-subtle px-2.5 py-1 text-xs text-ink hover:border-accent/50"
-              }
-            >
-              {t(`search.presets.${p.key}`)}
-            </button>
-          );
-        })}
+      {/* Compact control row: status facets · time presets · sort · clear */}
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-2" data-testid="search-controls">
+        <div className="flex flex-wrap items-center gap-1.5" data-testid="search-filter-state-types">
+          {STATE_TYPES.map((st) => {
+            const active = stateTypes.includes(st);
+            const count = facetCount(facets, "state_type", st);
+            return (
+              <button
+                key={st}
+                type="button"
+                onClick={() => toggleStateType(st)}
+                className={chipBtn(active)}
+                data-testid={`search-filter-state-${st}`}
+                aria-pressed={active}
+              >
+                {t(`search.filters.state.${st}`)}
+                {count != null && (
+                  <Badge tone={active ? "accent" : "muted"} data-testid={`search-facet-state-${st}`}>
+                    {count}
+                  </Badge>
+                )}
+              </button>
+            );
+          })}
+        </div>
+
+        <span className="hidden h-4 w-px bg-hairline sm:inline" aria-hidden />
+
+        <div className="flex flex-wrap items-center gap-1.5">
+          <span className="text-[11px] font-semibold uppercase tracking-wide text-muted">
+            {t("search.presets.label")}
+          </span>
+          {RANGE_PRESETS.map((p) => {
+            const active = activeRangeKey === p.key;
+            return (
+              <button
+                key={p.key}
+                type="button"
+                onClick={() => applyRangePreset(p.days)}
+                aria-pressed={active}
+                data-testid={`search-preset-${p.key}`}
+                className={chipBtn(active)}
+              >
+                {t(`search.presets.${p.key}`)}
+              </button>
+            );
+          })}
+        </div>
+
         <div className="ml-auto flex items-center gap-2">
+          {hasActiveFilters && (
+            <button
+              type="button"
+              onClick={clearFilters}
+              className="text-xs text-accent hover:underline"
+              data-testid="search-filter-clear"
+            >
+              {t("search.filters.clear")}
+            </button>
+          )}
           <label
             htmlFor="search-sort"
             className="text-[11px] font-semibold uppercase tracking-wide text-muted"
@@ -350,251 +356,36 @@ export function SearchPage() {
         </div>
       </div>
 
-      <div
-        className="space-y-3 rounded-lg border border-hairline bg-surface p-3"
-        data-testid="search-filters"
-      >
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <p className="text-xs font-semibold uppercase tracking-wide text-muted">
-            {t("search.filters.title")}
-          </p>
-          {hasActiveFilters && (
+      {/* Queue facet chips (toggle + counts) — still useful alongside smart tokens */}
+      <div className="flex flex-wrap items-center gap-1.5" data-testid="search-filter-queues">
+        <span className="text-[11px] font-semibold uppercase tracking-wide text-muted">
+          {t("search.filters.queue")}
+        </span>
+        {(queuesQ.data ?? []).map((queue) => {
+          const active = queueIds.includes(queue.id);
+          const count = facetCount(facets, "queue_id", queue.id);
+          return (
             <button
+              key={queue.id}
               type="button"
-              onClick={clearFilters}
-              className="text-xs text-accent hover:underline"
-              data-testid="search-filter-clear"
+              onClick={() => toggleQueue(queue.id)}
+              className={chipBtn(active)}
+              data-testid={`search-filter-queue-${queue.id}`}
+              aria-pressed={active}
             >
-              {t("search.filters.clear")}
-            </button>
-          )}
-        </div>
-
-        {/* State-type chips */}
-        <div className="flex flex-wrap gap-1.5" data-testid="search-filter-state-types">
-          {STATE_TYPES.map((st) => {
-            const active = stateTypes.includes(st);
-            const count = facetCount(facets, "state_type", st);
-            return (
-              <button
-                key={st}
-                type="button"
-                onClick={() => toggleStateType(st)}
-                className={
-                  active
-                    ? "inline-flex items-center gap-1 rounded-full border border-accent bg-accent-dim px-2.5 py-1 text-xs font-medium text-accent"
-                    : "inline-flex items-center gap-1 rounded-full border border-hairline bg-surface-subtle px-2.5 py-1 text-xs text-ink hover:border-accent/50"
-                }
-                data-testid={`search-filter-state-${st}`}
-                aria-pressed={active}
-              >
-                {t(`search.filters.state.${st}`)}
-                {count != null && (
-                  <Badge tone={active ? "accent" : "muted"} data-testid={`search-facet-state-${st}`}>
-                    {count}
-                  </Badge>
-                )}
-              </button>
-            );
-          })}
-        </div>
-
-        {/* Queue multi-select as chips */}
-        <div className="space-y-1" data-testid="search-filter-queues">
-          <p className="text-[11px] font-medium text-muted">{t("search.filters.queue")}</p>
-          <div className="flex flex-wrap gap-1.5">
-            {(queuesQ.data ?? []).map((queue) => {
-              const active = queueIds.includes(queue.id);
-              const count = facetCount(facets, "queue_id", queue.id);
-              return (
-                <button
-                  key={queue.id}
-                  type="button"
-                  onClick={() => toggleQueue(queue.id)}
-                  className={
-                    active
-                      ? "inline-flex items-center gap-1 rounded-full border border-accent bg-accent-dim px-2.5 py-1 text-xs font-medium text-accent"
-                      : "inline-flex items-center gap-1 rounded-full border border-hairline bg-surface-subtle px-2.5 py-1 text-xs text-ink hover:border-accent/50"
-                  }
-                  data-testid={`search-filter-queue-${queue.id}`}
-                  aria-pressed={active}
+              {queue.name}
+              {count != null && (
+                <Badge
+                  tone={active ? "accent" : "muted"}
+                  data-testid={`search-facet-queue-${queue.id}`}
                 >
-                  {queue.name}
-                  {count != null && (
-                    <Badge
-                      tone={active ? "accent" : "muted"}
-                      data-testid={`search-facet-queue-${queue.id}`}
-                    >
-                      {count}
-                    </Badge>
-                  )}
-                </button>
-              );
-            })}
-            {queuesQ.isLoading && <Spinner className="h-4 w-4" />}
-          </div>
-        </div>
-
-        <div className="grid gap-3 sm:grid-cols-2">
-          {/* Owner */}
-          <div className="space-y-1" data-testid="search-filter-owner">
-            <p className="text-[11px] font-medium text-muted">{t("search.filters.owner")}</p>
-            <SelectMenu
-              items={[
-                { value: 0, label: t("search.filters.ownerAll") },
-                ...agentItems,
-              ]}
-              value={ownerId ?? 0}
-              onSelect={(v) =>
-                patchSearch({ owner_id: v === 0 ? undefined : v })
-              }
-              panelTestId="search-filter-owner-panel"
-              trigger={({ open, ref, toggleProps }) => (
-                <button
-                  type="button"
-                  ref={ref}
-                  {...toggleProps}
-                  className="flex w-full items-center justify-between rounded-md border border-hairline bg-surface px-3 py-1.5 text-left text-sm text-ink hover:border-accent/50"
-                  data-testid="search-filter-owner-trigger"
-                  aria-expanded={open}
-                >
-                  <span className="truncate">{selectedOwnerLabel}</span>
-                  <span className="text-muted" aria-hidden>
-                    ▾
-                  </span>
-                </button>
+                  {count}
+                </Badge>
               )}
-            />
-          </div>
-
-          {/* Customer typeahead */}
-          <div className="space-y-1" data-testid="search-filter-customer">
-            <p className="text-[11px] font-medium text-muted">{t("search.filters.customer")}</p>
-            {customerId ? (
-              <div className="flex items-center gap-2 rounded-md border border-hairline bg-surface-subtle px-3 py-1.5 text-sm">
-                <span className="min-w-0 truncate font-medium text-ink" data-testid="search-filter-customer-value">
-                  {customerLabel || customerId}
-                </span>
-                {customerLabel && customerLabel !== customerId && (
-                  <span className="shrink-0 text-xs text-muted" data-testid="search-filter-customer-id">
-                    {customerId}
-                  </span>
-                )}
-                <button
-                  type="button"
-                  className="ml-auto shrink-0 text-xs text-accent hover:underline"
-                  onClick={() => {
-                    setCustomerQuery("");
-                    patchSearch({ customer_id: undefined, customer_label: undefined });
-                  }}
-                  data-testid="search-filter-customer-clear"
-                >
-                  {t("search.filters.clear")}
-                </button>
-              </div>
-            ) : (
-              <div className="relative">
-                <input
-                  value={customerQuery}
-                  onChange={(e) => setCustomerQuery(e.target.value)}
-                  placeholder={t("search.filters.customerPlaceholder")}
-                  className="w-full rounded-md border border-hairline bg-surface px-3 py-1.5 text-sm text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent"
-                  data-testid="search-filter-customer-input"
-                />
-                {debouncedCustomerQuery.trim().length >= 2 &&
-                  (customerSearchQ.data?.companies.length ||
-                    customerSearchQ.data?.contacts.length) ? (
-                  <ul
-                    className="absolute z-10 mt-1 max-h-48 w-full overflow-auto rounded-md border border-hairline bg-surface shadow-md"
-                    data-testid="search-filter-customer-results"
-                  >
-                    {(customerSearchQ.data?.companies ?? []).map((c) => (
-                      <li key={`co-${c.customer_id}`}>
-                        <button
-                          type="button"
-                          className="flex w-full flex-col px-3 py-1.5 text-left text-sm hover:bg-surface-subtle"
-                          onClick={() => {
-                            setCustomerQuery("");
-                            patchSearch({
-                              customer_id: c.customer_id,
-                              customer_label: c.name,
-                            });
-                          }}
-                          data-testid={`search-filter-customer-company-${c.customer_id}`}
-                        >
-                          <span className="font-medium text-ink">{c.name}</span>
-                          <span className="text-xs text-muted">{c.customer_id}</span>
-                        </button>
-                      </li>
-                    ))}
-                    {(customerSearchQ.data?.contacts ?? []).map((c) => {
-                      const name = `${c.first_name} ${c.last_name}`.trim();
-                      const label = c.company_name
-                        ? `${name || c.login} · ${c.company_name}`
-                        : name || c.login || c.customer_id;
-                      return (
-                        <li key={`ct-${c.login}`}>
-                          <button
-                            type="button"
-                            className="flex w-full flex-col px-3 py-1.5 text-left text-sm hover:bg-surface-subtle"
-                            onClick={() => {
-                              setCustomerQuery("");
-                              patchSearch({
-                                customer_id: c.customer_id,
-                                customer_label: label,
-                              });
-                            }}
-                            data-testid={`search-filter-customer-contact-${c.login}`}
-                          >
-                            <span className="font-medium text-ink">
-                              {c.first_name} {c.last_name}
-                            </span>
-                            <span className="text-xs text-muted">
-                              {c.email}
-                              {c.company_name ? ` · ${c.company_name}` : ""}
-                            </span>
-                          </button>
-                        </li>
-                      );
-                    })}
-                  </ul>
-                ) : null}
-              </div>
-            )}
-          </div>
-
-          {/* Date range */}
-          <div className="space-y-1" data-testid="search-filter-created-from">
-            <label className="text-[11px] font-medium text-muted" htmlFor="search-created-from">
-              {t("search.filters.createdFrom")}
-            </label>
-            <input
-              id="search-created-from"
-              type="date"
-              value={createdFrom ?? ""}
-              onChange={(e) =>
-                patchSearch({ created_from: e.target.value || undefined })
-              }
-              className="w-full rounded-md border border-hairline bg-surface px-3 py-1.5 text-sm text-ink"
-              data-testid="search-filter-created-from-input"
-            />
-          </div>
-          <div className="space-y-1" data-testid="search-filter-created-to">
-            <label className="text-[11px] font-medium text-muted" htmlFor="search-created-to">
-              {t("search.filters.createdTo")}
-            </label>
-            <input
-              id="search-created-to"
-              type="date"
-              value={createdTo ?? ""}
-              onChange={(e) =>
-                patchSearch({ created_to: e.target.value || undefined })
-              }
-              className="w-full rounded-md border border-hairline bg-surface px-3 py-1.5 text-sm text-ink"
-              data-testid="search-filter-created-to-input"
-            />
-          </div>
-        </div>
+            </button>
+          );
+        })}
+        {queuesQ.isLoading && <Spinner className="h-4 w-4" />}
       </div>
 
       {!q.trim() && (

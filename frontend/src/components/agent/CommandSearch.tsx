@@ -1,9 +1,8 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { api } from "@/lib/api";
-import { Dialog } from "@/components/ui/Dialog";
 import { Button } from "@/components/ui/Button";
 import { Spinner } from "@/components/ui/Spinner";
 import { StateChip } from "@/components/ui/StatusChip";
@@ -14,14 +13,13 @@ import {
   smartValuesToSearchParams,
   type SmartSearchValues,
 } from "@/components/agent/smartSearch";
+import { cn } from "@/lib/cn";
 
 /**
- * Top-bar search launcher. The trigger opens a large command palette built on
- * the same {@link SmartSearchBar} as the full search page: token recognition
- * (queue:/besitzer:/status:/kunde:/von:/bis:) with colour-coded chips, plus
- * live ticket results as you type. Enter (or "show all results") hands the
- * query and filters to /agent/search; picking a result opens that ticket.
- * Binds ⌘K / Ctrl-K / "/" globally.
+ * Top-bar search. Click / ⌘K / Ctrl-K / "/" expands the field **inline** in the
+ * header (no modal dialog). Same token-aware {@link SmartSearchBar} as the full
+ * search page; live ticket hits appear in a dropdown under the field. Enter or
+ * "show all results" navigates to /agent/search; picking a hit opens the ticket.
  */
 
 const EMPTY: SmartSearchValues = { q: "", queueIds: [], stateTypes: [] };
@@ -40,6 +38,7 @@ export function CommandSearch({ fill = false }: { fill?: boolean }) {
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
   const [values, setValues] = useState<SmartSearchValues>(EMPTY);
+  const rootRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -66,6 +65,20 @@ export function CommandSearch({ fill = false }: { fill?: boolean }) {
   // Reset the composed query/filters whenever the palette closes.
   useEffect(() => {
     if (!open) setValues(EMPTY);
+  }, [open]);
+
+  // Click outside closes the inline panel.
+  useEffect(() => {
+    if (!open) return;
+    const onPointer = (e: MouseEvent) => {
+      const root = rootRef.current;
+      if (!root) return;
+      if (e.target instanceof Node && !root.contains(e.target)) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", onPointer);
+    return () => document.removeEventListener("mousedown", onPointer);
   }, [open]);
 
   const queuesQ = useQuery({
@@ -125,9 +138,11 @@ export function CommandSearch({ fill = false }: { fill?: boolean }) {
   };
 
   const hits = resultsQ.data?.hits ?? [];
+  // Show the results panel once the user has typed free text (or while loading).
+  const showResultsPanel = open && (hasQuery || Boolean(values.q.trim()));
 
-  return (
-    <>
+  if (!open) {
+    return (
       <button
         type="button"
         data-testid="command-search-trigger"
@@ -151,43 +166,42 @@ export function CommandSearch({ fill = false }: { fill?: boolean }) {
           ⌘K
         </kbd>
       </button>
+    );
+  }
 
-      <Dialog
-        open={open}
-        onClose={() => setOpen(false)}
-        title={t("search.title")}
-        description={t("search.smart.paletteHint")}
-        size="2xl"
-        footer={
-          <Button
-            variant="secondary"
-            size="sm"
-            data-testid="command-search-viewall"
-            onClick={() => openFull(values.q)}
-          >
-            {t("search.smart.viewAll")}
-          </Button>
-        }
-      >
-        <div data-testid="command-search-form" className="space-y-3">
-          <SmartSearchBar
-            values={values}
-            queues={(queuesQ.data ?? []).map((qu) => ({ id: qu.id, name: qu.name }))}
-            agents={(agentsQ.data ?? []).map((a) => ({
-              id: a.id,
-              full_name: a.full_name,
-              login: a.login,
-            }))}
-            onPatch={(patch) => setValues((v) => applySmartPatch(v, patch))}
-            onSubmitQuery={openFull}
-            onQueryChange={(text) => setValues((v) => ({ ...v, q: text }))}
-            inputTestId="command-search-input"
-            submitLabel={null}
-          />
+  return (
+    <div
+      ref={rootRef}
+      data-testid="command-search-form"
+      className={cn("relative", fill ? "w-full" : "min-w-[16rem] sm:min-w-[22rem]")}
+    >
+      <SmartSearchBar
+        values={values}
+        queues={(queuesQ.data ?? []).map((qu) => ({ id: qu.id, name: qu.name }))}
+        agents={(agentsQ.data ?? []).map((a) => ({
+          id: a.id,
+          full_name: a.full_name,
+          login: a.login,
+        }))}
+        onPatch={(patch) => setValues((v) => applySmartPatch(v, patch))}
+        onSubmitQuery={openFull}
+        onQueryChange={(text) => setValues((v) => ({ ...v, q: text }))}
+        onEscape={() => setOpen(false)}
+        inputTestId="command-search-input"
+        submitLabel={null}
+        autoFocus
+        compact
+        freeTextSuggest={false}
+      />
 
-          <div data-testid="command-search-results" className="min-h-[3rem]">
+      {showResultsPanel && (
+        <div
+          className="absolute left-0 right-0 top-full z-50 mt-1 overflow-hidden rounded-lg border border-hairline bg-surface shadow-lg"
+          data-testid="command-search-results"
+        >
+          <div className="max-h-[min(24rem,70vh)] overflow-y-auto p-1.5">
             {!hasQuery && (
-              <p className="px-1 py-3 text-xs text-muted">{t("search.hint")}</p>
+              <p className="px-2 py-3 text-xs text-muted">{t("search.hint")}</p>
             )}
             {hasQuery && resultsQ.isLoading && (
               <div className="flex justify-center py-4">
@@ -195,9 +209,9 @@ export function CommandSearch({ fill = false }: { fill?: boolean }) {
               </div>
             )}
             {hasQuery && !resultsQ.isLoading && hits.length === 0 && (
-              <p className="px-1 py-3 text-xs text-muted">{t("search.noResults")}</p>
+              <p className="px-2 py-3 text-xs text-muted">{t("search.noResults")}</p>
             )}
-            <ul className="space-y-1">
+            <ul className="space-y-0.5">
               {hits.map((hit) => (
                 <li key={hit.id}>
                   <button
@@ -219,8 +233,18 @@ export function CommandSearch({ fill = false }: { fill?: boolean }) {
               ))}
             </ul>
           </div>
+          <div className="flex items-center justify-end border-t border-hairline px-2 py-1.5">
+            <Button
+              variant="secondary"
+              size="sm"
+              data-testid="command-search-viewall"
+              onClick={() => openFull(values.q)}
+            >
+              {t("search.smart.viewAll")}
+            </Button>
+          </div>
         </div>
-      </Dialog>
-    </>
+      )}
+    </div>
   );
 }

@@ -289,6 +289,23 @@ export function TicketHeaderActions({
               </MenuItem>
             )}
 
+            {perms.rw && closedStates.length > 0 && (
+              <>
+                <MenuSeparator />
+                <MenuLabel>{t("ticket.toolbar.close")}</MenuLabel>
+                {closedStates.map((s) => (
+                  <MenuItem
+                    key={s.id}
+                    testId={`more-close-${s.id}`}
+                    selected={s.id === ticket.state_id}
+                    onSelect={() => patch.mutate({ state_id: s.id })}
+                  >
+                    {stateLabel(t, s.name)}
+                  </MenuItem>
+                ))}
+              </>
+            )}
+
             <MenuSeparator />
             <MenuLabel>{t("ticket.actionsGroupMisc")}</MenuLabel>
             <MenuItem testId="more-print" onSelect={() => window.print()}>

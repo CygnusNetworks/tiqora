@@ -12,7 +12,6 @@ const search = vi.fn();
 const searchKb = vi.fn();
 const listReferenceQueues = vi.fn();
 const listReferenceAgents = vi.fn();
-const customerQuickSearch = vi.fn();
 
 vi.mock("@tanstack/react-router", () => ({
   useNavigate: () => navigate,
@@ -46,7 +45,7 @@ vi.mock("@/lib/api", () => ({
     searchKb: (...args: unknown[]) => searchKb(...args),
     listReferenceQueues: (...args: unknown[]) => listReferenceQueues(...args),
     listReferenceAgents: (...args: unknown[]) => listReferenceAgents(...args),
-    customerQuickSearch: (...args: unknown[]) => customerQuickSearch(...args),
+    customerQuickSearch: vi.fn().mockResolvedValue({ companies: [], contacts: [] }),
   },
 }));
 
@@ -70,7 +69,6 @@ describe("SearchPage XSS", () => {
     searchKb.mockReset();
     listReferenceQueues.mockReset().mockResolvedValue([]);
     listReferenceAgents.mockReset().mockResolvedValue([]);
-    customerQuickSearch.mockReset().mockResolvedValue({ companies: [], contacts: [] });
     searchParams = { q: "xss" };
     searchKb.mockResolvedValue({ hits: [], estimated_total: 0, query: "xss" });
   });

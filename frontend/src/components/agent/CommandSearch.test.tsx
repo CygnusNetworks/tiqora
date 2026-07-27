@@ -78,7 +78,7 @@ describe("CommandSearch", () => {
     expect(screen.getByTestId("command-search-input")).toBeInTheDocument();
   });
 
-  it("focuses the input once the dialog opens", async () => {
+  it("focuses the input once the inline field opens", async () => {
     renderSearch();
     fireEvent.click(screen.getByTestId("command-search-trigger"));
     await flushRaf();
@@ -118,6 +118,8 @@ describe("CommandSearch", () => {
     renderSearch();
     fireEvent.click(screen.getByTestId("command-search-trigger"));
     fireEvent.change(screen.getByTestId("command-search-input"), { target: { value: "leftover" } });
+    // First Escape clears free text; second closes the inline panel.
+    fireEvent.keyDown(screen.getByTestId("command-search-input"), { key: "Escape" });
     fireEvent.keyDown(screen.getByTestId("command-search-input"), { key: "Escape" });
     await waitFor(() =>
       expect(screen.queryByTestId("command-search-input")).not.toBeInTheDocument(),
