@@ -29,17 +29,26 @@ Implementation: `tiqora.db.legacy.profile.LegacySchemaProfile` / `SchemaProfileI
   `TIQORA_ALLOW_UNKNOWN_LEGACY_SCHEMA=1` (unsupported) or force a known profile with
   `TIQORA_LEGACY_SCHEMA_PROFILE=znuny-6.5` (version ids only — no letter tiers).
   Disable the gate entirely with `TIQORA_LEGACY_SCHEMA_CHECK=0` (tests only).
+- **Startup soft-skip** applies only when the peer DB is **unreachable**
+  (`is_db_unavailable`: connection refused / timeout / DNS). Detection bugs on a
+  reachable DB re-raise so the process never boots with `profile=None` and the
+  wrong `groups` table or missing color default.
+- **Groups table rebind** (`PermissionGroups.__table__.name`) is process-global
+  and applied once at startup — intentional for single-process deploy; tests call
+  `reset_legacy_schema_profile()`.
+- **Znuny 7.0+ color**: admin state/priority creates inject
+  `DEFAULT_STATE_PRIORITY_COLOR` (`#FFFFFF`) because the API does not yet accept
+  a client colour. Intentional minimal support — recolour later in UI if needed.
 - The detected profile is shown on **Admin → System info** (database card).
 - Preferred path when possible: upgrade the peer to **6.5 or 7.3 LTS**, then
   parallel-op. Multi-version support is a bridge for sites that cannot upgrade yet.
-- Golden-master behavioural validation is still **Znuny 6.5.22 + MariaDB** first;
-  other anchors land as the Layer B matrix expands.
 - **Layer A release tests** (`-m schema_matrix`) load real upstream DDLs for
-  release anchors on MariaDB and PostgreSQL — see `docs/testing.md`.
+  release anchors on MariaDB and PostgreSQL, including a color INSERT smoke on
+  7.x — see `docs/testing.md`.
 - **TiqoraSync** OPM declares Framework `6.0.x`–`7.3.x` (install paths
   `/opt/otrs` vs `/opt/znuny` — see `packages/znuny-addon/TiqoraSync/install/README.md`).
-- **Layer B golden** multi-peer roadmap: `tests/golden/peers.yaml` (default
-  ready peer remains Znuny 6.5.22).
+- **Layer B golden** multi-peer matrix (manual): `tests/golden/peers.yaml` +
+  `just golden-all-peers` (6.0–7.3 validated).
 
 ## Ground rules
 

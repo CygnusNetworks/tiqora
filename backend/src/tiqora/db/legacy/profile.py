@@ -13,6 +13,7 @@ defaults) are applied via :func:`apply_legacy_schema_profile`.
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
 from enum import StrEnum
 from typing import Any
@@ -23,6 +24,17 @@ from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import AsyncConnection, AsyncEngine, AsyncSession
 
 logger = structlog.get_logger(__name__)
+
+# Connect-time / transport failure substrings for :func:`is_db_unavailable`.
+_CONNECTION_FAILURE_MARKERS = re.compile(
+    r"(?i)"
+    r"can'?t connect|could not connect|connection refused|connection reset|"
+    r"timed? ?out|name or service not known|nodename nor servname|"
+    r"no such host|server closed the connection|is the server running|"
+    r"network is unreachable|connection aborted|actively refused|"
+    r"no route to host|temporary failure in name resolution|"
+    r"connection does not exist|connect call failed|failed to connect"
+)
 
 # ---------------------------------------------------------------------------
 # Public types
@@ -217,8 +229,8 @@ def reset_legacy_schema_profile() -> None:
         if PermissionGroups.__table__.name != "permission_groups":
             PermissionGroups.__table__.name = "permission_groups"
             PermissionGroups.__tablename__ = "permission_groups"
-    except Exception:  # noqa: BLE001
-        pass
+    except Exception as exc:  # noqa: BLE001 — import / metadata edge in teardown
+        logger.warning("legacy_schema_profile_reset_partial", error=str(exc))
 
 
 def groups_table_name() -> str:
@@ -561,7 +573,14 @@ async def detect_legacy_schema_profile(
 
 
 def apply_legacy_schema_profile(profile: LegacySchemaProfile) -> None:
-    """Cache *profile* and adapt ORM bindings (groups table name)."""
+    """Cache *profile* and adapt ORM bindings (groups table name).
+
+    Design note: rebinding ``PermissionGroups.__table__.name`` is a
+    **process-global** SQLAlchemy metadata mutation. That is intentional and
+    safe for the production model (exactly once at API/worker startup, single
+    process). Tests must call :func:`reset_legacy_schema_profile` between
+    cases. Do not rely on thread-local rebinding for in-process parallelism.
+    """
     global _cached_profile, _adapters_applied
     _cached_profile = profile
 
@@ -623,20 +642,121 @@ def mail_account_load_options() -> list[Any]:
     ]
 
 
+# Znuny 7.0+ requires ticket_state.color / ticket_priority.color (NOT NULL).
+# Admin create APIs do not yet accept a colour from the client; use a fixed
+# neutral white so inserts succeed. Operators can recolour in Znuny/Tiqora UI
+# later. Intentional minimal support — not a product default palette.
 DEFAULT_STATE_PRIORITY_COLOR = "#FFFFFF"
 
 
 def default_color_for_write() -> str | None:
-    """Return a color default when the live schema requires it, else ``None``."""
+    """Return a color default when the live schema requires it, else ``None``.
+
+    On 7.0+ profiles returns :data:`DEFAULT_STATE_PRIORITY_COLOR` (``#FFFFFF``)
+    so admin state/priority creates satisfy the NOT NULL column without a
+    client-supplied colour field. On pre-7.0 returns ``None`` (ORM path).
+    """
     profile = _cached_profile
     if profile is not None and profile.state_priority_has_color:
         return DEFAULT_STATE_PRIORITY_COLOR
     return None
 
 
+async def insert_row_with_color(
+    session: AsyncSession,
+    *,
+    table_name: str,
+    values: dict[str, Any],
+) -> int:
+    """INSERT into a legacy table that has a ``color`` column (Znuny 7.0+).
+
+    The 6.5 ORM models omit ``color``; this Core path keeps admin routes free of
+    duplicated dialekt-SQL. Requires a bound session — no silent MySQL fallback
+    when the dialect cannot be determined.
+    """
+    from sqlalchemy import Integer, column, insert, table
+
+    bind = session.get_bind()
+    if bind is None:
+        raise RuntimeError(
+            f"session has no bind; cannot INSERT into {table_name!r} with color"
+        )
+    dialect = bind.dialect.name
+    if not dialect:
+        raise RuntimeError(
+            f"session bind has empty dialect name; refusing MySQL LAST_INSERT_ID "
+            f"guess for {table_name!r}"
+        )
+
+    cols = [column("id", Integer)]
+    cols.extend(column(k) for k in values if k != "id")
+    tbl = table(table_name, *cols)
+    stmt = insert(tbl).values(**values)
+
+    if dialect in {"postgresql", "postgres"}:
+        result = await session.execute(stmt.returning(tbl.c.id))
+        return int(result.scalar_one())
+
+    result = await session.execute(stmt)
+    pk = result.inserted_primary_key
+    if pk and pk[0] is not None:
+        return int(pk[0])
+    # MariaDB/MySQL: Core usually fills inserted_primary_key; last resort.
+    rid = (await session.execute(text("SELECT LAST_INSERT_ID()"))).scalar_one()
+    return int(rid)
+
+
 # ---------------------------------------------------------------------------
 # Startup gate
 # ---------------------------------------------------------------------------
+
+
+def is_db_unavailable(exc: BaseException) -> bool:
+    """True when *exc* means the peer DB is unreachable (soft-skip the gate).
+
+    Connection failures (dev without a stack) must not hard-fail startup.
+    Detection bugs against a **reachable** DB (bad SQL, permission denied on
+    ``information_schema``, unexpected types) must **not** match — callers
+    re-raise those so the process does not boot with a silent wrong profile.
+    """
+    from sqlalchemy.exc import DBAPIError, InterfaceError, OperationalError
+
+    if isinstance(exc, InterfaceError):
+        return True
+
+    if isinstance(exc, OperationalError):
+        # OperationalError is also used for some server-side failures; only
+        # treat connect-time / transport failures as "unavailable".
+        if getattr(exc, "connection_invalidated", False):
+            return True
+        msg = str(exc).lower()
+        if _CONNECTION_FAILURE_MARKERS.search(msg):
+            return True
+        # Unwrapped driver error on connect (pymysql/asyncpg/psycopg).
+        orig = getattr(exc, "orig", None)
+        if orig is not None and _CONNECTION_FAILURE_MARKERS.search(str(orig).lower()):
+            return True
+        # Bare "can't connect" style without ProgrammingError subclass.
+        if orig is not None and type(orig).__name__ in {
+            "OperationalError",  # pymysql / psycopg
+            "InterfaceError",
+            "Error",  # asyncpg.exceptions.ConnectionDoesNotExistError parent
+        }:
+            return _CONNECTION_FAILURE_MARKERS.search(str(orig).lower()) is not None
+        return False
+
+    if isinstance(exc, DBAPIError) and getattr(exc, "connection_invalidated", False):
+        return True
+
+    if isinstance(exc, (ConnectionError, TimeoutError, OSError)):
+        return True
+
+    for attr in ("orig", "__cause__", "__context__"):
+        inner = getattr(exc, attr, None)
+        if isinstance(inner, BaseException) and inner is not exc:
+            if is_db_unavailable(inner):
+                return True
+    return False
 
 
 async def ensure_legacy_schema_supported(

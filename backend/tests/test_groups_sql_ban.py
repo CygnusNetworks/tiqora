@@ -30,17 +30,44 @@ _ALLOW = frozenset(
 )
 
 # SQL-ish uses of the literal table name (not comments).
+# Broader than bare FROM/JOIN so aliases, multi-table FROM lists, and
+# ``permission_groups.col`` qualification also fail the guard.
 _SQL_USE = re.compile(
     r"""(?ix)
     (?:
-        FROM\s+[`"]?permission_groups[`"]?
-        | JOIN\s+[`"]?permission_groups[`"]?
-        | INTO\s+[`"]?permission_groups[`"]?
-        | UPDATE\s+[`"]?permission_groups[`"]?
-        | TABLE\s+[`"]?permission_groups[`"]?
+        (?:FROM|JOIN|INTO|UPDATE|TABLE|USING|DELETE\s+FROM)\s+[`"]?permission_groups[`"]?
+        | [`"]?permission_groups[`"]?\s*\.
+        | [`"]?permission_groups[`"]?\s+AS\s+
+        | ,\s*[`"]?permission_groups[`"]?
     )
     """
 )
+
+
+def _code_portion(line: str) -> str:
+    """Strip full-line and trailing ``#`` comments (outside simple quotes)."""
+    stripped = line.lstrip()
+    if stripped.startswith("#"):
+        return ""
+    # Drop trailing # comment when # is not inside a single/double-quoted span.
+    out: list[str] = []
+    in_single = False
+    in_double = False
+    i = 0
+    while i < len(line):
+        ch = line[i]
+        if ch == "'" and not in_double:
+            in_single = not in_single
+            out.append(ch)
+        elif ch == '"' and not in_single:
+            in_double = not in_double
+            out.append(ch)
+        elif ch == "#" and not in_single and not in_double:
+            break
+        else:
+            out.append(ch)
+        i += 1
+    return "".join(out)
 
 
 def test_no_hardcoded_permission_groups_sql_in_src() -> None:
@@ -50,12 +77,11 @@ def test_no_hardcoded_permission_groups_sql_in_src() -> None:
         if rel in _ALLOW:
             continue
         text = path.read_text(encoding="utf-8")
-        # Strip comments roughly so docstrings in allow-needed files elsewhere still catch SQL
         for i, line in enumerate(text.splitlines(), start=1):
-            stripped = line.lstrip()
-            if stripped.startswith("#"):
+            code = _code_portion(line)
+            if not code.strip():
                 continue
-            if _SQL_USE.search(line):
+            if _SQL_USE.search(code):
                 offenders.append(f"{rel}:{i}: {line.strip()}")
     assert not offenders, (
         "Hard-coded permission_groups SQL found — use groups_table_name() / "
@@ -85,3 +111,19 @@ def test_quote_ident_and_groups_sql_helpers() -> None:
     apply_legacy_schema_profile(profile_for_id(SchemaProfileId.ZNUNY_6_5))
     assert groups_table_sql(dialect="postgresql") == '"permission_groups"'
     reset_legacy_schema_profile()
+
+
+def test_ban_regex_catches_alias_and_qualified_forms() -> None:
+    assert _SQL_USE.search("SELECT * FROM permission_groups AS g")
+    assert _SQL_USE.search("JOIN permission_groups ON g.id = u.group_id")
+    assert _SQL_USE.search("WHERE permission_groups.id = 1")
+    assert _SQL_USE.search("FROM users, permission_groups")
+    # Full-line / trailing comments are stripped before the regex runs.
+    assert _code_portion("# FROM permission_groups") == ""
+    assert not _SQL_USE.search(_code_portion("# FROM permission_groups"))
+    assert _code_portion('x = "permission_groups"  # FROM permission_groups') == (
+        'x = "permission_groups"  '
+    )
+    assert not _SQL_USE.search(
+        _code_portion('x = "permission_groups"  # FROM permission_groups')
+    )

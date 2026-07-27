@@ -224,12 +224,26 @@ async def _ensure_legacy_schema_at_worker_start() -> None:
         )
     except UnsupportedLegacySchemaError:
         raise
-    except Exception as exc:  # noqa: BLE001
-        # Mirror API behaviour: connection failures are logged; unknown schemas
-        # already re-raised above. A worker without a DB cannot do useful work
-        # either, but we keep the soft-skip so local dev without a peer DB can
-        # still start the process (ticks will fail independently).
-        logger.warning("legacy_schema_check_skipped", error=str(exc))
+    except Exception as exc:  # noqa: BLE001 — classified below
+        from tiqora.db.legacy.profile import is_db_unavailable
+
+        # Mirror API: soft-skip only when the peer DB is unreachable (local
+        # dev without a stack). Detection bugs on a reachable DB re-raise so
+        # we never run with profile=None and wrong groups/color adapters.
+        if is_db_unavailable(exc):
+            logger.warning(
+                "legacy_schema_check_skipped",
+                error=str(exc),
+                reason="db_unavailable",
+            )
+            return
+        logger.error(
+            "legacy_schema_detection_failed",
+            error=str(exc),
+            error_type=type(exc).__name__,
+            exc_info=True,
+        )
+        raise
 
 
 def run_worker() -> None:
