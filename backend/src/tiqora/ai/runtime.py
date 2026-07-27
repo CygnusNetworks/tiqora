@@ -40,6 +40,7 @@ from tiqora.ai.context import (
     render_ticket_header,
     ticket_snapshot,
 )
+from tiqora.ai.capabilities import resolve_capabilities
 from tiqora.ai.gate import AiGateError, require_feature_allowed
 from tiqora.ai.kb_wiring import build_vision_llm_factory
 from tiqora.ai.listfields import parse_int_list
@@ -65,11 +66,13 @@ from tiqora.ai.models import (
 )
 from tiqora.ai.pii import PiiMapper
 from tiqora.ai.policies import get_queue_policy_by_queue, load_prompt_parts
+from tiqora.ai.prompt_safety import UNTRUSTED_CONTENT_SYSTEM_BLOCK
 from tiqora.ai.reply_language import (
     LANGUAGE_PROFILES,
     detect_reply_language,
     detect_reply_language_detailed,
 )
+from tiqora.ai.tool_chain import analyze_tool_chain
 from tiqora.ai.tools import (
     McpToolSpec,
     ToolArgumentError,
@@ -210,6 +213,14 @@ async def _load_mcp_tools(
             .all()
         )
         for tp in policies:
+            params_schema: dict | None = None
+            if tp.parameters_snapshot:
+                try:
+                    parsed = json.loads(tp.parameters_snapshot)
+                    if isinstance(parsed, dict):
+                        params_schema = parsed
+                except (TypeError, ValueError):
+                    params_schema = None
             specs.append(
                 McpToolSpec(
                     client_name=client.name,
@@ -218,6 +229,7 @@ async def _load_mcp_tools(
                     tool_name=tp.tool_name,
                     mutating=bool(tp.mutating),
                     description=tp.description_snapshot,
+                    parameters_schema=params_schema,
                 )
             )
     return specs
@@ -231,7 +243,8 @@ def _build_system_prompt(
     reply_language_binding: bool = False,
     prompt_parts: list[TiqoraAiPromptPart] | None = None,
 ) -> str:
-    parts = [policy.system_prompt or ""]
+    # Kernel safety block first — not admin-editable, always present.
+    parts = [UNTRUSTED_CONTENT_SYSTEM_BLOCK, policy.system_prompt or ""]
     ordered_parts = sorted(prompt_parts or [], key=lambda p: p.position)
     parts.extend(p.content for p in ordered_parts if p.enabled)
     if trigger == TRIGGER_MANUAL:
@@ -489,8 +502,11 @@ async def run_ticket_agent(
         # 8. Tools
         mcp_tools = await _load_mcp_tools(session, policy, settings=settings)
         kb_enabled = bool(policy.kb_tags or policy.kb_category_ids)
+        capabilities = resolve_capabilities(
+            policy.autonomy, capabilities_json=policy.capabilities_json
+        )
         registry = ToolRegistry(
-            autonomy=policy.autonomy, mcp_tools=mcp_tools, kb_enabled=kb_enabled
+            capabilities=capabilities, mcp_tools=mcp_tools, kb_enabled=kb_enabled
         )
         escalation_rules = json.loads(policy.escalation_rules) if policy.escalation_rules else None
         executor = ToolExecutor(
@@ -506,6 +522,8 @@ async def run_ticket_agent(
             kb_get_article_fn=kb_get_article_fn,
             allowed_state_types_raw=policy.allowed_state_types,
             mask_results=bool(policy.pii_masking),
+            ticket_customer_id=ticket.customer_id,
+            ticket_customer_user_id=ticket.customer_user_id,
         )
 
         messages: list[LlmMessage] = [
@@ -517,6 +535,7 @@ async def run_ticket_agent(
         prompt_tokens = attachment_context.vision_usage.prompt_tokens
         completion_tokens = attachment_context.vision_usage.completion_tokens
         outcome: ToolOutcome | None = None
+        executed_tool_names: list[str] = []
 
         # 9. Tool loop
         for _round in range(max_tool_rounds):
@@ -546,6 +565,7 @@ async def run_ticket_agent(
                         )
                     )
                     continue
+                executed_tool_names.append(tc.name)
                 messages.append(
                     LlmMessage(
                         role="tool",
@@ -561,6 +581,17 @@ async def run_ticket_agent(
             if terminal_hit:
                 break
 
+        chain_alerts = analyze_tool_chain(executed_tool_names)
+        for alert in chain_alerts:
+            logger.warning(
+                "ai_tool_chain_alert",
+                ticket_id=ticket_id,
+                code=alert.code,
+                message=alert.message,
+                tools=list(alert.tools),
+                trigger=trigger,
+            )
+
         await usage_service.record_usage(
             session,
             user_id=acting_user_id if trigger == TRIGGER_MANUAL else None,
@@ -572,7 +603,15 @@ async def run_ticket_agent(
             prompt_tokens=prompt_tokens,
             completion_tokens=completion_tokens,
             success=True,
-            extra_json=json.dumps({"tool_trace": "masked_in_messages"}),
+            extra_json=json.dumps(
+                {
+                    "tool_trace": "masked_in_messages",
+                    "tools_executed": executed_tool_names,
+                    "tool_chain_alerts": [
+                        {"code": a.code, "message": a.message} for a in chain_alerts
+                    ],
+                }
+            ),
         )
 
         # 12 (ticket state bookkeeping happens below, after we know the outcome)

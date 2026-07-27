@@ -89,6 +89,8 @@ describe("AiSettingsPage", () => {
       operation_mode: "tiqora_primary",
       disclosure_default_text: "Diese Antwort wurde von einer KI erstellt.",
       global_max_replies_per_hour: null,
+      audit_retention_days: 30,
+      auto_reply_paused: false,
     });
     listProviders.mockResolvedValue({ items: [{ id: 1 }], total: 1, page: 1, page_size: 1 });
     listMcpClients.mockResolvedValue({ items: [], total: 0, page: 1, page_size: 0 });
@@ -126,6 +128,8 @@ describe("AiSettingsPage", () => {
       operation_mode: "parallel",
       disclosure_default_text: "",
       global_max_replies_per_hour: null,
+      audit_retention_days: 30,
+      auto_reply_paused: false,
     });
     renderPage();
     await waitFor(() => {
@@ -138,6 +142,8 @@ describe("AiSettingsPage", () => {
       operation_mode: "parallel",
       disclosure_default_text: "",
       global_max_replies_per_hour: null,
+      audit_retention_days: 30,
+      auto_reply_paused: false,
     });
     renderPage();
     await waitFor(() => expect(screen.getByTestId("admin-ai-mode-parallel")).toBeInTheDocument());
@@ -157,6 +163,8 @@ describe("AiSettingsPage", () => {
       operation_mode: "tiqora_primary",
       disclosure_default_text: "Neuer Text",
       global_max_replies_per_hour: 20,
+      audit_retention_days: 30,
+      auto_reply_paused: false,
     });
     renderPage();
     await waitFor(() => expect(screen.getByTestId("admin-ai-disclosure-text")).toBeInTheDocument());
@@ -171,7 +179,26 @@ describe("AiSettingsPage", () => {
       expect(putSettings).toHaveBeenCalledWith({
         disclosure_default_text: "Neuer Text",
         global_max_replies_per_hour: 20,
+        auto_reply_paused: false,
       });
+    });
+  });
+
+  it("toggles the global auto-reply kill-switch", async () => {
+    putSettings.mockResolvedValue({
+      operation_mode: "tiqora_primary",
+      disclosure_default_text: "Diese Antwort wurde von einer KI erstellt.",
+      global_max_replies_per_hour: null,
+      audit_retention_days: 30,
+      auto_reply_paused: true,
+    });
+    renderPage();
+    await waitFor(() =>
+      expect(screen.getByTestId("admin-ai-auto-reply-pause-toggle")).toBeInTheDocument(),
+    );
+    fireEvent.click(screen.getByTestId("admin-ai-auto-reply-pause-toggle"));
+    await waitFor(() => {
+      expect(putSettings).toHaveBeenCalledWith({ auto_reply_paused: true });
     });
   });
 

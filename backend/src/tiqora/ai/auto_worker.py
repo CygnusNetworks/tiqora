@@ -53,7 +53,7 @@ from tiqora.ai.context import (
     get_or_create_state,
     ticket_snapshot,
 )
-from tiqora.ai.gate import is_tiqora_primary
+from tiqora.ai.gate import is_auto_reply_paused, is_tiqora_primary
 from tiqora.ai.kb_wiring import build_llm_client, kb_bundle, kb_get_article_fn, kb_search_fn
 from tiqora.ai.listfields import parse_str_list
 from tiqora.ai.models import FEATURE_AUTO_REPLY, TiqoraAiQueuePolicy, TiqoraAiUsage
@@ -306,7 +306,7 @@ async def run_auto_tick(
     factory = session_factory or get_session_factory()
 
     async with factory() as session:
-        gate_open = await is_tiqora_primary(session)
+        gate_open = await is_tiqora_primary(session) and not await is_auto_reply_paused(session)
         watermark = await get_setting_int(session, KEY_AI_OUTBOX_WATERMARK, 0)
         batch = await _next_outbox_batch(session, watermark, _BATCH_SIZE)
 

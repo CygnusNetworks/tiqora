@@ -30,6 +30,8 @@ class AiSettingsOut(BaseModel):
     disclosure_default_text: str
     global_max_replies_per_hour: int | None
     audit_retention_days: int
+    # Global kill-switch for auto-reply (independent of operation_mode).
+    auto_reply_paused: bool = False
 
 
 class AiSettingsUpdate(BaseModel):
@@ -37,6 +39,7 @@ class AiSettingsUpdate(BaseModel):
     disclosure_default_text: str | None = None
     global_max_replies_per_hour: int | None = Field(default=None, ge=0)
     audit_retention_days: int | None = Field(default=None, ge=1, le=365)
+    auto_reply_paused: bool | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -150,6 +153,7 @@ class McpToolPolicyOut(BaseModel):
     enabled: bool
     mutating: bool
     description_snapshot: str | None
+    parameters_snapshot: str | None = None
 
 
 class McpToolPolicyUpdate(BaseModel):
@@ -207,6 +211,7 @@ class AiQueuePolicyOut(BaseModel):
     reply_language_fixed: str | None
     reply_language_default: str | None
     allowed_state_types: str | None
+    capabilities_json: str | None = None
     summary_detail: SummaryDetail
     valid_id: int
     create_time: datetime
@@ -249,6 +254,7 @@ class AiQueuePolicyCreate(BaseModel):
     reply_language_fixed: str | None = None
     reply_language_default: str | None = None
     allowed_state_types: str | None = None
+    capabilities_json: str | None = None
     summary_detail: SummaryDetail = "standard"
 
 
@@ -287,6 +293,7 @@ class AiQueuePolicyUpdate(BaseModel):
     reply_language_fixed: str | None = None
     reply_language_default: str | None = None
     allowed_state_types: str | None = None
+    capabilities_json: str | None = None
     summary_detail: SummaryDetail | None = None
     valid_id: int | None = None
 
