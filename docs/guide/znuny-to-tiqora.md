@@ -19,16 +19,17 @@ are the territory.
 
 ## The core idea
 
-Tiqora is designed to run **on the same database as an existing Znuny 6.5
-install**, adding only new `tiqora_*` tables. Znuny keeps owning its own
-schema (`ticket`, `article`, `queue`, `sessions`, …) throughout — Tiqora
-reads and, once verified, writes to those tables using logic ported to be
-behaviourally identical to Znuny's own (ticket number allocation, history
-row formats, escalation column recompute — see
-[`../parallel-operation.md`](../parallel-operation.md) for the details and
-golden-master validation evidence). Only at the very end, after Znuny is
-fully shut down, does Tiqora take **ownership** of the schema and start
-applying its own additive migrations (indexes, FKs).
+Tiqora is designed to run **on the same database as an existing OTRS/Znuny
+install (6.0–7.3)**, adding only new `tiqora_*` tables. Supported peers are
+listed in [`../support-matrix.md`](../support-matrix.md). Preferred LTS peers
+are **Znuny 6.5** or **7.3**. Znuny/OTRS keeps owning its own schema
+(`ticket`, `article`, `queue`, `sessions`, …) throughout — Tiqora reads and,
+once verified, writes to those tables using logic ported to be behaviourally
+identical (ticket number allocation, history row formats, escalation column
+recompute — see [`../parallel-operation.md`](../parallel-operation.md)). Only
+at the very end, after the peer is fully shut down, does Tiqora take
+**ownership** of the schema and start applying its own additive migrations
+(indexes, FKs).
 
 This lets you run both systems side by side for as long as you need to
 build confidence, with a well-defined, reversible rollback at every stage

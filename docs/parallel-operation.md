@@ -1,9 +1,13 @@
 # Parallel operation with Znuny
 
-Tiqora V1 is designed to run **alongside an OTRS/Znuny database** (primary target
-**Znuny 6.5**; schema adapters also cover **OTRS/Znuny 6.0–6.4** and **Znuny 7.0–7.3**).
-This document lists the behavioural invariants Tiqora must honour so that both
-systems remain coherent.
+Tiqora V1 is designed to run **alongside an OTRS/Znuny database** —
+**OTRS 6.0.x and Znuny 6.0–7.3** (MariaDB/MySQL and PostgreSQL). This document
+lists the behavioural invariants Tiqora must honour so that both systems remain
+coherent.
+
+**Canonical matrix:** [support-matrix.md](support-matrix.md) (profiles,
+engines, TiqoraSync Framework tags, validation evidence). Preferred production
+peers: **Znuny 6.5 LTS** or **7.3 LTS**.
 
 ## Multi-version schema profile
 
@@ -42,9 +46,10 @@ Implementation: `tiqora.db.legacy.profile.LegacySchemaProfile` / `SchemaProfileI
 - The detected profile is shown on **Admin → System info** (database card).
 - Preferred path when possible: upgrade the peer to **6.5 or 7.3 LTS**, then
   parallel-op. Multi-version support is a bridge for sites that cannot upgrade yet.
+- Full matrix (profiles, engines, validation): [support-matrix.md](support-matrix.md).
 - **Layer A release tests** (`-m schema_matrix`) load real upstream DDLs for
   release anchors on MariaDB and PostgreSQL, including a color INSERT smoke on
-  7.x — see `docs/testing.md`.
+  7.x — see [testing.md](testing.md).
 - **TiqoraSync** OPM declares Framework `6.0.x`–`7.3.x` (install paths
   `/opt/otrs` vs `/opt/znuny` — see `packages/znuny-addon/TiqoraSync/install/README.md`).
 - **Layer B golden** multi-peer matrix (manual): `tests/golden/peers.yaml` +
@@ -126,12 +131,14 @@ Znuny parsers depend on exact shape.
 - Regression tests compare history rows against a golden Znuny write for the
   same logical action.
 
-**Golden-master validated (2026-07-19)** against a real Znuny 6.5.22 container
+**Golden-master validated** against real peer containers (multi-peer matrix
+6.0–7.3 on MariaDB; default local peer Znuny 6.5.22). History parity
 (`tests/golden/test_history_diff.py`): the full create → state → move →
-priority → owner → note → close lifecycle now produces byte-identical
-normalized history rows. Four divergences were found and fixed in the process
-(CustomerUpdate row on TicketCreate, SetPendingTime `%%00-00-00 00:00` reset on
-every non-pending state change, TicketOwnerSet same-owner no-op without
+priority → owner → note → close lifecycle produces matching normalized
+history rows (with documented peer-specific optional types such as
+`SetPendingTime` on older 6.x). Earlier divergences fixed in the process
+included CustomerUpdate on TicketCreate, SetPendingTime `%%00-00-00 00:00`
+reset on non-pending state changes, TicketOwnerSet same-owner no-op without
 auto-lock, and the Misc "Reset of unlock time." row on agent article
 creation). Ticket-number counter interleaving, DateChecksum checksum digits,
 and escalation columns (incl. zero-on-close) are golden-validated too — see

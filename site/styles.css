@@ -348,6 +348,59 @@ section {
   font-size: 0.92rem;
 }
 
+/* ── Compatibility matrix ───────────────────────────────── */
+.matrix-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+
+.matrix {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.95rem;
+}
+
+.matrix th,
+.matrix td {
+  padding: 0.75rem 1rem;
+  text-align: left;
+  border-bottom: 1px solid var(--hairline);
+  vertical-align: top;
+}
+
+.matrix th {
+  color: var(--muted);
+  font-weight: 600;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  background: var(--surface-subtle);
+}
+
+.matrix tr:last-child td {
+  border-bottom: none;
+}
+
+.matrix code {
+  font-size: 0.85em;
+  color: var(--accent);
+}
+
+.badge {
+  display: inline-block;
+  padding: 0.15rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.badge-ok {
+  background: rgba(62, 207, 154, 0.15);
+  color: var(--green);
+}
+
 .chips {
   display: flex;
   flex-wrap: wrap;

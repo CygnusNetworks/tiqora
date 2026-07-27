@@ -7,7 +7,7 @@ the API-reference index.
 ## Why this exists
 
 If you have existing scripts, middleware, or third-party tools that talk to
-a Znuny 6.5 install's GenericInterface REST webservices
+a Znuny/OTRS install's GenericInterface REST webservices (peer DB 6.0–7.3)
 (`nph-genericinterface.pl`), you do not have to rewrite them on day one.
 Tiqora's `/znuny-compat` surface emulates the operations those clients
 actually use, so you can repoint traffic at Tiqora and migrate integrations

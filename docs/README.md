@@ -10,7 +10,7 @@
 | Path | When | Doc |
 |---|---|---|
 | **Fresh standalone** | Empty database, no Znuny — greenfield install via `tiqora bootstrap` | [guide/fresh-install.md](guide/fresh-install.md) |
-| **Parallel to Znuny** | Co-run with an existing Znuny 6.5 database (same schema, additive `tiqora_*` only) | [parallel-operation.md](parallel-operation.md), [guide/znuny-to-tiqora.md](guide/znuny-to-tiqora.md) |
+| **Parallel to Znuny** | Co-run with an existing OTRS/Znuny **6.0–7.3** database (additive `tiqora_*` only) | [support-matrix.md](support-matrix.md), [parallel-operation.md](parallel-operation.md), [guide/znuny-to-tiqora.md](guide/znuny-to-tiqora.md) |
 | **Migrate away** | After parallel operation: schema ownership, cutover checklist | [cutover.md](cutover.md) |
 
 ## Getting started
@@ -40,6 +40,7 @@
 | Document | Content |
 |---|---|
 | [guide/znuny-to-tiqora.md](guide/znuny-to-tiqora.md) | Operator playbook: backup → read-only deploy → TiqoraSync + writes → daemon takeover → cutover |
+| [support-matrix.md](support-matrix.md) | **Supported peers** OTRS/Znuny 6.0–7.3 × MariaDB/PostgreSQL; TiqoraSync; validation layers |
 | [parallel-operation.md](parallel-operation.md) | Behavioural invariants Tiqora maintains while co-running with Znuny; per-function daemon-takeover procedures |
 | [cutover.md](cutover.md) | Detailed, checklist-driven cutover runbook with rollback per stage |
 | [compatibility.md](compatibility.md) | GenericInterface compatibility layer: scope, gotchas, golden-master validation |
