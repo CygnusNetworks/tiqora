@@ -3,6 +3,12 @@ import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { api } from "@/lib/api";
 import { SearchIcon } from "@/components/ui/icons";
+import type {
+  AgentOption,
+  QueueOption,
+  SmartPatch,
+  SmartSearchValues,
+} from "@/components/agent/smartSearch";
 
 /**
  * Smart, token-aware search field. Free text drives the full-text query; typing
@@ -13,20 +19,6 @@ import { SearchIcon } from "@/components/ui/icons";
  * in sync automatically. This component owns no filter state of its own — it is
  * a view over the caller's values plus a set of patch callbacks.
  */
-
-export type QueueOption = { id: number; name: string };
-export type AgentOption = { id: number; full_name: string; login: string };
-
-export type SmartSearchValues = {
-  q: string;
-  queueIds: number[];
-  stateTypes: string[];
-  ownerId?: number;
-  customerId?: string;
-  customerLabel?: string;
-  createdFrom?: string;
-  createdTo?: string;
-};
 
 type ChipKind = "queue" | "status" | "owner" | "customer" | "date";
 
@@ -86,20 +78,22 @@ export function SmartSearchBar({
   agents,
   onPatch,
   onSubmitQuery,
+  onQueryChange,
+  inputTestId = "search-input",
+  submitLabel,
 }: {
   values: SmartSearchValues;
   queues: QueueOption[];
   agents: AgentOption[];
-  onPatch: (patch: Partial<{
-    queue_id: number[];
-    state_type: string[];
-    owner_id?: number;
-    customer_id?: string;
-    customer_label?: string;
-    created_from?: string;
-    created_to?: string;
-  }>) => void;
+  onPatch: (patch: SmartPatch) => void;
   onSubmitQuery: (term: string) => void;
+  /** Fires on every free-text keystroke (NOT while composing a key:token), so
+   * consumers can drive live results as the user types. */
+  onQueryChange?: (text: string) => void;
+  /** data-testid for the free-text input (default "search-input"). */
+  inputTestId?: string;
+  /** Override the submit button label; when null the button is hidden. */
+  submitLabel?: string | null;
 }) {
   const { t } = useTranslation();
   // The input mirrors the active free-text query; while composing a key:token it
@@ -366,14 +360,17 @@ export function SmartSearchBar({
             ref={inputRef}
             value={text}
             onChange={(e) => {
-              setText(e.target.value);
+              const val = e.target.value;
+              setText(val);
               setActive(0);
+              // Live free-text query; suppressed while composing a key:token.
+              if (onQueryChange && !parseKeyed(val)) onQueryChange(val);
             }}
             onFocus={() => setFocused(true)}
             onBlur={() => setFocused(false)}
             onKeyDown={onKeyDown}
             placeholder={chips.length ? "" : t("search.smart.placeholder")}
-            data-testid="search-input"
+            data-testid={inputTestId}
             autoComplete="off"
             spellCheck={false}
             className="min-w-[8rem] flex-1 bg-transparent py-0.5 text-sm text-ink placeholder:text-muted focus:outline-none"
@@ -414,14 +411,16 @@ export function SmartSearchBar({
         )}
       </div>
 
-      <button
-        type="button"
-        onClick={() => onSubmitQuery(text.trim() || values.q)}
-        className="shrink-0 rounded-md bg-accent px-4 py-2 text-sm font-medium text-accent-ink transition-colors duration-100 hover:opacity-90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent"
-        data-testid="search-submit"
-      >
-        {t("search.submit")}
-      </button>
+      {submitLabel !== null && (
+        <button
+          type="button"
+          onClick={() => onSubmitQuery(text.trim() || values.q)}
+          className="shrink-0 rounded-md bg-accent px-4 py-2 text-sm font-medium text-accent-ink transition-colors duration-100 hover:opacity-90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent"
+          data-testid="search-submit"
+        >
+          {submitLabel ?? t("search.submit")}
+        </button>
+      )}
     </div>
   );
 }
