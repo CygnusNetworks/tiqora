@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import type { HTMLAttributes, ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { api, type SystemInfoOut } from "@/lib/api";
@@ -60,13 +60,30 @@ function SectionHead({ title, tier }: { title: string; tier?: { label: string; l
   );
 }
 
-function Card({ children, className }: { children: ReactNode; className?: string }) {
+function Card({
+  children,
+  className,
+  ...rest
+}: { children: ReactNode; className?: string } & HTMLAttributes<HTMLDivElement>) {
   return (
     <div
       className={`rounded-xl border border-hairline bg-surface p-4 shadow-[0_1px_2px_rgba(0,0,0,0.04)] ${className ?? ""}`}
+      {...rest}
     >
       {children}
     </div>
+  );
+}
+
+/** Read-only Aktiv/Inaktiv chip for the system-info services list. */
+function EnabledBadge({ enabled }: { enabled: boolean }) {
+  const { t } = useTranslation();
+  return (
+    <Chip color={enabled ? "green" : "grey"}>
+      {enabled
+        ? t("admin.systemInfo.services.enabledOn")
+        : t("admin.systemInfo.services.enabledOff")}
+    </Chip>
   );
 }
 
@@ -273,16 +290,61 @@ export function SystemInfoPage() {
         </div>
       </section>
 
-      {/* Background services */}
+      {/* Background services — cards on mobile, table from md up */}
       <section>
         <SectionHead title={t("admin.systemInfo.sections.services")} tier={tierLive} />
-        <div className="overflow-x-auto rounded-xl border border-hairline bg-surface">
+
+        <div className="space-y-3 md:hidden">
+          {services.map((svc, i) => {
+            const color = serviceColors[i];
+            return (
+              <Card
+                key={svc.slug}
+                className="space-y-2"
+                data-testid={`system-service-${svc.slug}`}
+              >
+                <div className="flex flex-wrap items-center gap-2">
+                  <b className="min-w-0 flex-1 font-semibold text-ink">
+                    {t(`admin.daemons.services.${svc.slug}.name`)}
+                  </b>
+                  <EnabledBadge enabled={svc.enabled} />
+                  <span data-status={color}>
+                    {svc.enabled ? (
+                      <Chip color={color}>
+                        <StatusDot color={color} />
+                        {t(`admin.daemons.status.${color}`)}
+                      </Chip>
+                    ) : (
+                      <span className="text-xs text-muted">—</span>
+                    )}
+                  </span>
+                </div>
+                <div className="text-xs tabular-nums text-muted">
+                  {t("admin.systemInfo.services.lastOk")}:{" "}
+                  {svc.last_ok_at ? formatDateTime(svc.last_ok_at, locale) : "—"}
+                </div>
+                <div className="text-xs text-muted">
+                  {svc.last_error ? (
+                    <span className="break-words text-danger">{svc.last_error}</span>
+                  ) : (
+                    <ResultSummary result={svc.last_result} align="start" />
+                  )}
+                </div>
+              </Card>
+            );
+          })}
+        </div>
+
+        <div className="hidden overflow-x-auto rounded-xl border border-hairline bg-surface md:block">
           <table className="w-full text-left text-sm">
             <thead className="border-b border-hairline text-xs uppercase tracking-wide text-muted">
               <tr>
                 <th className="px-4 py-2.5">{t("admin.systemInfo.services.service")}</th>
+                <th className="px-4 py-2.5">{t("admin.systemInfo.services.enabled")}</th>
                 <th className="px-4 py-2.5">{t("admin.systemInfo.services.status")}</th>
-                <th className="px-4 py-2.5">{t("admin.systemInfo.services.lastOk")}</th>
+                <th className="px-4 py-2.5 whitespace-nowrap">
+                  {t("admin.systemInfo.services.lastOk")}
+                </th>
                 <th className="px-4 py-2.5 text-right">{t("admin.systemInfo.services.message")}</th>
               </tr>
             </thead>
@@ -298,18 +360,25 @@ export function SystemInfoPage() {
                     <td className="px-4 py-2.5 font-medium text-ink">
                       {t(`admin.daemons.services.${svc.slug}.name`)}
                     </td>
-                    <td className="px-4 py-2.5" data-status={color}>
-                      <Chip color={color}>
-                        <StatusDot color={color} />
-                        {t(`admin.daemons.status.${color}`)}
-                      </Chip>
+                    <td className="px-4 py-2.5">
+                      <EnabledBadge enabled={svc.enabled} />
                     </td>
-                    <td className="px-4 py-2.5 text-xs tabular-nums text-muted">
+                    <td className="px-4 py-2.5" data-status={color}>
+                      {svc.enabled ? (
+                        <Chip color={color}>
+                          <StatusDot color={color} />
+                          {t(`admin.daemons.status.${color}`)}
+                        </Chip>
+                      ) : (
+                        <span className="text-xs text-muted">—</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-2.5 whitespace-nowrap text-xs tabular-nums text-muted">
                       {svc.last_ok_at ? formatDateTime(svc.last_ok_at, locale) : "—"}
                     </td>
-                    <td className="px-4 py-2.5 text-right text-xs text-muted">
+                    <td className="max-w-xs px-4 py-2.5 text-right text-xs text-muted">
                       {svc.last_error ? (
-                        <span className="text-danger">{svc.last_error}</span>
+                        <span className="break-words text-danger">{svc.last_error}</span>
                       ) : (
                         <ResultSummary result={svc.last_result} />
                       )}
@@ -620,17 +689,28 @@ function UnavailableNote({
   );
 }
 
-/** Compact key/value rendering of a daemon's last structured result (was raw JSON). */
-function ResultSummary({ result }: { result?: Record<string, unknown> | null }) {
+/**
+ * Compact key/value rendering of a daemon's last structured result (was raw JSON).
+ * Drops a top-level ``enabled`` key — that lives in its own column/badge.
+ */
+function ResultSummary({
+  result,
+  align = "end",
+}: {
+  result?: Record<string, unknown> | null;
+  align?: "start" | "end";
+}) {
   if (!result || typeof result !== "object") return <>—</>;
-  const entries = Object.entries(result);
+  const entries = Object.entries(result).filter(([k]) => k !== "enabled");
   if (entries.length === 0) return <>—</>;
   return (
-    <span className="inline-flex flex-wrap justify-end gap-1">
+    <span
+      className={`inline-flex flex-wrap gap-1 ${align === "start" ? "justify-start" : "justify-end"}`}
+    >
       {entries.map(([k, v]) => (
         <span
           key={k}
-          className="inline-flex items-center gap-1 rounded bg-surface-subtle px-1.5 py-0.5"
+          className="inline-flex max-w-full items-center gap-1 break-all rounded bg-surface-subtle px-1.5 py-0.5"
         >
           <span className="text-muted">{k}</span>
           <span className="font-mono tabular-nums text-ink">{formatResultValue(v)}</span>

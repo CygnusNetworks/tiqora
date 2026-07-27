@@ -1700,6 +1700,9 @@
       },
       "services": {
         "service": "Dienst",
+        "enabled": "Aktiv",
+        "enabledOn": "Aktiv",
+        "enabledOff": "Inaktiv",
         "status": "Status",
         "lastOk": "Letzter Erfolg",
         "message": "Meldung"
