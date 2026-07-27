@@ -3,6 +3,15 @@
 export type QueueOption = { id: number; name: string };
 export type AgentOption = { id: number; full_name: string; login: string };
 
+/** Display label for a customer chip / selection: name with customer number. */
+export function formatCustomerLabel(name: string, customerId: string): string {
+  const n = name.trim();
+  const id = customerId.trim();
+  if (!n) return id;
+  if (!id || n === id || n.includes(id)) return n;
+  return `${n} · ${id}`;
+}
+
 export type SmartSearchValues = {
   q: string;
   queueIds: number[];

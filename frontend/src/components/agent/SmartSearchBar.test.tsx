@@ -88,4 +88,41 @@ describe("SmartSearchBar", () => {
     fireEvent.mouseDown(screen.getByTestId("smart-chip-remove-q7"));
     expect(onPatch).toHaveBeenCalledWith({ queue_id: [] });
   });
+
+  it("shows customer number on contact suggestions and in the chip label", async () => {
+    customerQuickSearch.mockResolvedValue({
+      companies: [],
+      contacts: [
+        {
+          login: "mlas",
+          first_name: "Marcus",
+          last_name: "Laschinski",
+          email: "marcus@example.com",
+          customer_id: "z26111",
+          company_name: null,
+        },
+      ],
+    });
+    const { onPatch } = renderBar(EMPTY);
+    const input = screen.getByTestId("search-input");
+    fireEvent.focus(input);
+    fireEvent.change(input, { target: { value: "kunde:z261" } });
+    const opt = await screen.findByTestId("smart-suggest-ct-mlas");
+    expect(opt).toHaveTextContent("Marcus Laschinski");
+    expect(opt).toHaveTextContent("z26111");
+    fireEvent.mouseDown(opt);
+    expect(onPatch).toHaveBeenCalledWith({
+      customer_id: "z26111",
+      customer_label: "Marcus Laschinski · z26111",
+    });
+  });
+
+  it("renders customer chip with name and customer number", () => {
+    renderBar({
+      ...EMPTY,
+      customerId: "z26111",
+      customerLabel: "Marcus Laschinski · z26111",
+    });
+    expect(screen.getByTestId("smart-chip-customer")).toHaveTextContent("Marcus Laschinski · z26111");
+  });
 });

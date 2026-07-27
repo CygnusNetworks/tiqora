@@ -220,10 +220,13 @@ describe("TicketHeaderActions", () => {
   it("lists the Mehr menu's grouped entries and triggers a dialog", async () => {
     wrap(<TicketHeaderActions ticket={makeTicket()} canNote onOpenNote={vi.fn()} />);
     fireEvent.click(screen.getByTestId("ticket-actions-more"));
+    // Closed states load asynchronously — wait for the Close section.
+    expect(await screen.findByTestId("more-close-2")).toBeInTheDocument();
     const menu = screen.getByTestId("ticket-actions-more-menu");
     expect(menu).toHaveTextContent("Assignment");
     expect(menu).toHaveTextContent("Organize");
     expect(menu).toHaveTextContent("Other");
+    expect(menu).toHaveTextContent("Close");
     expect(screen.getByTestId("more-link")).toBeInTheDocument();
     expect(screen.getByTestId("more-merge")).toBeInTheDocument();
     expect(screen.getByTestId("more-print")).toBeInTheDocument();
@@ -240,6 +243,15 @@ describe("TicketHeaderActions", () => {
     fireEvent.click(screen.getByTestId("ticket-actions-more"));
     fireEvent.click(screen.getByTestId("more-watch"));
     await waitFor(() => expect(patchTicket).toHaveBeenCalledWith(7, { watcher_user_id: 42 }));
+  });
+
+  it("closes the ticket from the Mehr menu", async () => {
+    wrap(<TicketHeaderActions ticket={makeTicket()} canNote onOpenNote={vi.fn()} />);
+    fireEvent.click(screen.getByTestId("ticket-actions-more"));
+    const closeItem = await screen.findByTestId("more-close-2");
+    expect(closeItem).toHaveTextContent(/closed successful|Erfolgreich geschlossen/i);
+    fireEvent.click(closeItem);
+    await waitFor(() => expect(patchTicket).toHaveBeenCalledWith(7, { state_id: 2 }));
   });
 
   it("disables Antworten/Notiz without the note permission", () => {

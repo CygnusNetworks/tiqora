@@ -3,11 +3,12 @@ import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { api } from "@/lib/api";
 import { SearchIcon } from "@/components/ui/icons";
-import type {
-  AgentOption,
-  QueueOption,
-  SmartPatch,
-  SmartSearchValues,
+import {
+  formatCustomerLabel,
+  type AgentOption,
+  type QueueOption,
+  type SmartPatch,
+  type SmartSearchValues,
 } from "@/components/agent/smartSearch";
 
 /**
@@ -81,6 +82,10 @@ export function SmartSearchBar({
   onQueryChange,
   inputTestId = "search-input",
   submitLabel,
+  autoFocus = false,
+  compact = false,
+  onEscape,
+  freeTextSuggest = true,
 }: {
   values: SmartSearchValues;
   queues: QueueOption[];
@@ -94,6 +99,15 @@ export function SmartSearchBar({
   inputTestId?: string;
   /** Override the submit button label; when null the button is hidden. */
   submitLabel?: string | null;
+  /** Focus the free-text input on mount. */
+  autoFocus?: boolean;
+  /** Tighter chrome for the header command palette. */
+  compact?: boolean;
+  /** Called when Escape is pressed with an empty input (e.g. close the palette). */
+  onEscape?: () => void;
+  /** When false, free-text key-prefix / “search as fulltext” rows are omitted
+   * (header palette shows ticket hits instead). Keyed filter typeahead stays. */
+  freeTextSuggest?: boolean;
 }) {
   const { t } = useTranslation();
   // The input mirrors the active free-text query; while composing a key:token it
@@ -106,6 +120,10 @@ export function SmartSearchBar({
   useEffect(() => {
     setText(values.q);
   }, [values.q]);
+
+  useEffect(() => {
+    if (autoFocus) inputRef.current?.focus();
+  }, [autoFocus]);
 
   const queueName = (id: number) => queues.find((q) => q.id === id)?.name ?? String(id);
   const agentName = (id: number) =>
@@ -139,7 +157,7 @@ export function SmartSearchBar({
       out.push({
         key: "customer",
         kind: "customer",
-        label: values.customerLabel || values.customerId,
+        label: formatCustomerLabel(values.customerLabel || values.customerId, values.customerId),
         remove: () => onPatch({ customer_id: undefined, customer_label: undefined }),
       });
     if (values.createdFrom)
@@ -231,7 +249,11 @@ export function SmartSearchBar({
             kind: "customer",
             label: c.name,
             hint: c.customer_id,
-            apply: () => commit({ customer_id: c.customer_id, customer_label: c.name }),
+            apply: () =>
+              commit({
+                customer_id: c.customer_id,
+                customer_label: formatCustomerLabel(c.name, c.customer_id),
+              }),
           });
         for (const c of customerQ.data?.contacts ?? []) {
           const name = `${c.first_name} ${c.last_name}`.trim() || c.login || c.customer_id;
@@ -240,8 +262,13 @@ export function SmartSearchBar({
             id: `ct-${c.login}`,
             kind: "customer",
             label,
-            hint: c.email,
-            apply: () => commit({ customer_id: c.customer_id, customer_label: label }),
+            // Prefer customer number over email so agents can verify the right account.
+            hint: c.customer_id || c.email,
+            apply: () =>
+              commit({
+                customer_id: c.customer_id,
+                customer_label: formatCustomerLabel(label, c.customer_id),
+              }),
           });
         }
         return items.slice(0, 8);
@@ -270,6 +297,7 @@ export function SmartSearchBar({
     }
 
     // Not a recognised key yet: offer matching filter keys, plus full-text.
+    // Header palette can omit the full-text row so live ticket hits own that panel.
     const low = raw.toLowerCase();
     const keyHints: Suggestion[] = (["queue", "besitzer", "status", "kunde", "von", "bis"] as const)
       .filter((k) => k.startsWith(low))
@@ -284,6 +312,7 @@ export function SmartSearchBar({
           inputRef.current?.focus();
         },
       }));
+    if (!freeTextSuggest) return keyHints;
     return [
       ...keyHints,
       {
@@ -298,7 +327,7 @@ export function SmartSearchBar({
       },
     ];
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [text, queues, agents, values, customerQ.data, t]);
+  }, [text, queues, agents, values, customerQ.data, t, freeTextSuggest]);
 
   const onKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "ArrowDown" && suggestions.length) {
@@ -318,7 +347,13 @@ export function SmartSearchBar({
     } else if (e.key === "Backspace" && text === "" && chips.length) {
       chips[chips.length - 1].remove();
     } else if (e.key === "Escape") {
-      setText("");
+      if (text !== "") {
+        setText("");
+        // Drop free-text live query too so results don't keep the old term.
+        onQueryChange?.("");
+        return;
+      }
+      onEscape?.();
     }
   };
 
@@ -328,13 +363,17 @@ export function SmartSearchBar({
     <div className="flex gap-2">
       <div className="relative flex-1">
         <div
-          className="flex min-h-[42px] flex-wrap items-center gap-1.5 rounded-md border border-hairline bg-surface px-2.5 py-1.5 focus-within:border-accent focus-within:outline focus-within:outline-2 focus-within:outline-offset-1 focus-within:outline-accent"
+          className={
+            compact
+              ? "flex min-h-9 flex-wrap items-center gap-1 rounded-lg border border-hairline bg-surface-subtle px-2 py-1 focus-within:border-accent focus-within:outline focus-within:outline-2 focus-within:outline-offset-1 focus-within:outline-accent"
+              : "flex min-h-[42px] flex-wrap items-center gap-1.5 rounded-md border border-hairline bg-surface px-2.5 py-1.5 focus-within:border-accent focus-within:outline focus-within:outline-2 focus-within:outline-offset-1 focus-within:outline-accent"
+          }
           onMouseDown={(e) => {
             if (e.target === e.currentTarget) inputRef.current?.focus();
           }}
           data-testid="smart-search-field"
         >
-          <SearchIcon className="shrink-0 text-[16px] text-muted" />
+          <SearchIcon className={`shrink-0 text-muted ${compact ? "text-[15px]" : "text-[16px]"}`} />
           {chips.map((chip) => (
             <span
               key={chip.key}
@@ -373,7 +412,9 @@ export function SmartSearchBar({
             data-testid={inputTestId}
             autoComplete="off"
             spellCheck={false}
-            className="min-w-[8rem] flex-1 bg-transparent py-0.5 text-sm text-ink placeholder:text-muted focus:outline-none"
+            className={`min-w-[8rem] flex-1 bg-transparent text-ink placeholder:text-muted focus:outline-none ${
+              compact ? "py-0.5 text-[13px]" : "py-0.5 text-sm"
+            }`}
           />
         </div>
 
