@@ -1,17 +1,16 @@
-# Golden-master validation stack: a REAL Znuny 6.5.22 (built from vendored
-# source) running against the same MariaDB Tiqora points at. See
-# docs/testing.md for how to run this and the golden-master pytest suite.
+# Multi-peer golden stack (manual only). Project name isolates volumes per peer.
 #
-# Usage (from repo root):
-#   just golden-up
-#   GOLDEN=1 just golden-test
-#   just golden-down
+#   eval "$(python3 tests/golden/peer_env.py znuny-6.5)"
+#   docker compose -p "$GOLDEN_COMPOSE_PROJECT" -f tests/golden/docker-compose.golden.yml up -d --build --wait
+#
+# Or: just golden-up  (uses GOLDEN_PEER, default znuny-6.5)
+# Project name is set via `docker compose -p` (see peer_env GOLDEN_COMPOSE_PROJECT).
+# Avoid embedding peer ids with dots here — Compose rejects them in `name:`.
 name: tiqora-golden
 
 services:
   mariadb:
     image: mariadb:10.11
-    container_name: tiqora-golden-mariadb
     environment:
       MYSQL_ROOT_PASSWORD: root
       MYSQL_DATABASE: znuny
@@ -35,7 +34,9 @@ services:
     build:
       context: ../..
       dockerfile: tests/golden/Dockerfile.znuny
-    container_name: tiqora-golden-znuny
+      args:
+        SOURCE_DIR: ${GOLDEN_SOURCE_DIR:-znuny-6.5.22}
+    image: tiqora-golden-peer-${GOLDEN_PEER:-znuny-6.5}
     depends_on:
       mariadb:
         condition: service_healthy
@@ -48,17 +49,20 @@ services:
       DB_ROOT_PASSWORD: root
       ZNUNY_FQDN: znuny.golden.local
       ZNUNY_SYSTEM_ID: "10"
+      GOLDEN_PEER: ${GOLDEN_PEER:-znuny-6.5}
     ports:
       - "8180:80"
-    # Golden-master runs are single-threaded/interleaved from the test
-    # suite; a large startup timeout is expected (perl compile + schema
-    # load on first boot can take a couple of minutes).
+    # Accept either classic /otrs/ or /znuny/ ScriptAlias depending on peer tree.
     healthcheck:
-      test: ["CMD", "curl", "-fsS", "http://127.0.0.1/otrs/index.pl"]
+      test:
+        [
+          "CMD-SHELL",
+          "curl -fsS http://127.0.0.1/otrs/index.pl >/dev/null 2>&1 || curl -fsS http://127.0.0.1/znuny/index.pl >/dev/null 2>&1",
+        ]
       interval: 10s
       timeout: 10s
-      retries: 30
-      start_period: 60s
+      retries: 36
+      start_period: 90s
 
 volumes:
   tiqora_golden_mariadb_data:

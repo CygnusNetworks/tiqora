@@ -1,22 +1,29 @@
-# Minimal Debian image running a REAL Znuny 6.5.22 from the vendored source
-# tree (znuny-6.5.22/) for golden-master comparisons against Tiqora.
+# Real OTRS/Znuny peer image for golden-master (manual multi-peer).
 #
-# No official `znuny/znuny` image exists on Docker Hub, so this builds one
-# from the tarball already vendored in the repo (see docs/testing.md).
+# No official znuny image exists — build from a release tree at the repo root.
 #
-# Build context MUST be the repo root:
-#   docker build -f tests/golden/Dockerfile.znuny -t tiqora-golden-znuny .
+#   docker build -f tests/golden/Dockerfile.znuny \
+#     --build-arg SOURCE_DIR=znuny-6.5.22 \
+#     -t tiqora-golden-znuny-6.5 .
+#
+# SOURCE_DIR must be a real directory in the build context (not an external
+# symlink). install_home inside the image is always /opt/otrs for one layout;
+# Console is auto-detected (otrs.Console.pl vs znuny.Console.pl).
+
+ARG SOURCE_DIR=znuny-6.5.22
+
 FROM debian:bookworm-slim
+
+ARG SOURCE_DIR
 
 ENV DEBIAN_FRONTEND=noninteractive \
     TZ=Etc/UTC \
     OTRS_USER=otrs \
     OTRS_GROUP=otrs \
-    PERL5LIB=/opt/otrs:/opt/otrs/Kernel/cpan-lib:/opt/otrs/Custom
+    PERL5LIB=/opt/otrs:/opt/otrs/Kernel/cpan-lib:/opt/otrs/Custom \
+    GOLDEN_SOURCE_DIR=${SOURCE_DIR}
 
-# System + Perl module packages required by bin/otrs.CheckModules.pl for a
-# MySQL/MariaDB-backed install. Derived by running otrs.CheckModules.pl
-# --package-list inside a bare debian:bookworm-slim container.
+# System + Perl modules for a MySQL-backed install (otrs.CheckModules.pl set).
 RUN apt-get update -qq && apt-get install -y -qq --no-install-recommends \
         apache2 \
         libapache2-mod-perl2 \
@@ -66,19 +73,40 @@ RUN apt-get update -qq && apt-get install -y -qq --no-install-recommends \
 RUN useradd -r -m -d /opt/otrs -s /bin/bash "$OTRS_USER" \
     && usermod -a -G "$OTRS_USER" www-data
 
-# Vendored Znuny 6.5.22 source tree (already present in the repo, no network
-# fetch needed at build time).
-COPY --chown=otrs:otrs znuny-6.5.22/ /opt/otrs/
+# Peer release tree → fixed install home (simplifies entrypoint + helpers).
+COPY --chown=otrs:otrs ${SOURCE_DIR}/ /opt/otrs/
+
+# Prefer znuny.Console.pl when present; always expose bin/console.pl for scripts.
+RUN set -e; \
+    if [ -f /opt/otrs/bin/znuny.Console.pl ]; then \
+      ln -sfn znuny.Console.pl /opt/otrs/bin/console.pl; \
+    elif [ -f /opt/otrs/bin/otrs.Console.pl ]; then \
+      ln -sfn otrs.Console.pl /opt/otrs/bin/console.pl; \
+    else \
+      echo "ERROR: no Console.pl in peer source" >&2; exit 1; \
+    fi; \
+    if [ -f /opt/otrs/bin/znuny.SetPermissions.pl ]; then \
+      ln -sfn znuny.SetPermissions.pl /opt/otrs/bin/SetPermissions.pl; \
+    elif [ -f /opt/otrs/bin/otrs.SetPermissions.pl ]; then \
+      ln -sfn otrs.SetPermissions.pl /opt/otrs/bin/SetPermissions.pl; \
+    fi
 
 COPY tests/golden/znuny-entrypoint.sh /usr/local/bin/znuny-entrypoint.sh
 COPY tests/golden/Config.pm.tmpl /opt/otrs/Kernel/Config.pm.tmpl
 RUN chmod +x /usr/local/bin/znuny-entrypoint.sh
 
-# apache2 config: point at the OTRS/Znuny vhost include and mod_perl startup.
-RUN sed -i 's#/opt/otrs/#/opt/otrs/#g' /opt/otrs/scripts/apache2-httpd.include.conf \
-    && cp /opt/otrs/scripts/apache2-httpd.include.conf /etc/apache2/conf-available/znuny.conf \
-    && a2enconf znuny \
-    && a2enmod perl headers deflate filter
+# Apache include: ScriptAlias is usually /otrs/ or /znuny/ depending on release.
+RUN set -e; \
+    INC=""; \
+    for f in /opt/otrs/scripts/apache2-httpd.include.conf \
+             /opt/otrs/scripts/apache2-httpd-mp1-or-mp2.include.conf; do \
+      if [ -f "$f" ]; then INC="$f"; break; fi; \
+    done; \
+    if [ -n "$INC" ]; then \
+      cp "$INC" /etc/apache2/conf-available/znuny.conf; \
+      a2enconf znuny; \
+    fi; \
+    a2enmod perl headers deflate filter || true
 
 WORKDIR /opt/otrs
 EXPOSE 80
