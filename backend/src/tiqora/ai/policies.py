@@ -328,6 +328,7 @@ async def create_queue_policy(
     reply_language_fixed: str | None = None,
     reply_language_default: str | None = None,
     allowed_state_types: str | None = None,
+    capabilities_json: str | None = None,
     summary_detail: str = "standard",
 ) -> TiqoraAiQueuePolicy:
     _validate_fields(
@@ -387,6 +388,7 @@ async def create_queue_policy(
         reply_language_fixed=reply_language_fixed,
         reply_language_default=reply_language_default,
         allowed_state_types=allowed_state_types,
+        capabilities_json=capabilities_json,
         summary_detail=summary_detail,
         create_by=change_by,
         change_by=change_by,

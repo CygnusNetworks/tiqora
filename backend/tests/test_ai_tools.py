@@ -32,11 +32,14 @@ def _mcp_spec(*, mutating: bool) -> McpToolSpec:
 
 
 def test_local_tools_always_present() -> None:
+    """Core non-mutating local tools are present at autonomy=off; field
+    mutations are capability-gated (see test_ai_security_hardening)."""
     registry = ToolRegistry(autonomy=AUTONOMY_OFF)
     names = {s["function"]["name"] for s in registry.build_schemas()}
     assert TOOL_PROPOSE_CUSTOMER_MESSAGE in names
     assert TOOL_ADD_INTERNAL_NOTE in names
     assert TOOL_ESCALATE_TO_HUMAN in names
+    assert "update_ticket_fields" not in names
 
 
 def test_readonly_mcp_tool_available_in_every_autonomy_mode() -> None:
@@ -130,9 +133,12 @@ async def test_mcp_call_rejects_scoping_id_arguments() -> None:
             await executor.execute(spec.full_name, bad)
     assert called == []  # MCP server never reached
 
-    # A benign, non-identifying argument still goes through.
+    # A benign, non-identifying argument still goes through; server injects
+    # pinned ticket context under ``_tiqora_*`` keys.
     await executor.execute(spec.full_name, {"query": "status"})
-    assert called == [{"query": "status"}]
+    assert len(called) == 1
+    assert called[0]["query"] == "status"
+    assert called[0]["_tiqora_ticket_id"] == 1
 
 
 # ---------------------------------------------------------------------------

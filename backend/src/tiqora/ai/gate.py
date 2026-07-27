@@ -1,8 +1,10 @@
-"""Readiness-Gate (plan §3.0, relaxed in v1.1 / Phase E): the AI subsystem's
-**auto-reply** feature may only be enabled once the operator has switched the
-install to Tiqora-primary operation (mail ingestion fully on Tiqora, Znuny
-read-only/off). This is a deliberate operator decision via
-``system.operation_mode``, never auto-detected from running processes.
+"""Readiness-Gate (plan §3.0, relaxed in v1.1 / Phase E) + auto-reply kill-switch.
+
+The AI subsystem's **auto-reply** feature may only be enabled once the
+operator has switched the install to Tiqora-primary operation (mail
+ingestion fully on Tiqora, Znuny read-only/off). This is a deliberate
+operator decision via ``system.operation_mode``, never auto-detected from
+running processes.
 
 Auto-reply sends a customer-visible article via the Tiqora outbox, which
 Znuny does not observe while running in parallel — with Znuny's own
@@ -20,6 +22,10 @@ Enforcement happens in two places, both required for ``auto_reply``:
    of every ``trigger="auto"`` run; the auto-worker tick skips invoking it at
    all while the gate is closed (:mod:`tiqora.ai.auto_worker`).
 
+Additionally, ``ai.auto_reply.paused`` is a global kill-switch (plan #10)
+independent of ``operation_mode``: when true, auto-reply runs are blocked
+even in ``tiqora_primary``. Toggle via Admin → AI settings.
+
 Switching back to ``parallel`` is always allowed (regression must never be
 blocked) and pauses auto-reply only.
 """
@@ -29,7 +35,13 @@ from __future__ import annotations
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from tiqora.ai.models import FEATURE_AUTO_REPLY
-from tiqora.domain.settings_store import KEY_OPERATION_MODE, get_setting, set_setting
+from tiqora.domain.settings_store import (
+    KEY_AI_AUTO_REPLY_PAUSED,
+    KEY_OPERATION_MODE,
+    get_setting,
+    get_setting_bool,
+    set_setting,
+)
 
 OPERATION_MODE_PARALLEL = "parallel"
 OPERATION_MODE_TIQORA_PRIMARY = "tiqora_primary"
@@ -38,6 +50,10 @@ VALID_OPERATION_MODES = frozenset({OPERATION_MODE_PARALLEL, OPERATION_MODE_TIQOR
 
 class AiGateError(RuntimeError):
     """Raised when an AI feature is enabled/run while the gate is not open."""
+
+
+class AiAutoReplyPausedError(AiGateError):
+    """Raised when the global auto-reply kill-switch is on (plan #10)."""
 
 
 async def get_operation_mode(session: AsyncSession) -> str:
@@ -81,25 +97,49 @@ async def require_tiqora_primary(session: AsyncSession) -> None:
         )
 
 
+async def is_auto_reply_paused(session: AsyncSession) -> bool:
+    """Return True when the global auto-reply kill-switch is engaged."""
+    return await get_setting_bool(session, KEY_AI_AUTO_REPLY_PAUSED, default=False)
+
+
+async def set_auto_reply_paused(session: AsyncSession, paused: bool) -> bool:
+    """Persist the global auto-reply kill-switch."""
+    await set_setting(session, KEY_AI_AUTO_REPLY_PAUSED, "true" if paused else "false")
+    return paused
+
+
+async def require_auto_reply_not_paused(session: AsyncSession) -> None:
+    if await is_auto_reply_paused(session):
+        raise AiAutoReplyPausedError(
+            "Auto-reply is globally paused (ai.auto_reply.paused=true). "
+            "Clear the kill-switch in AI settings to resume."
+        )
+
+
 async def require_feature_allowed(session: AsyncSession, feature: str) -> None:
     """Feature-scoped Readiness-Gate (plan §3.0 v1.1 relaxation, Phase E).
 
     Only :data:`~tiqora.ai.models.FEATURE_AUTO_REPLY` requires
-    ``operation_mode=tiqora_primary`` — see the module docstring for why.
-    ``manual_assist`` and ``summary`` always pass, gate or no gate.
+    ``operation_mode=tiqora_primary`` and a clear kill-switch — see the
+    module docstring for why. ``manual_assist`` and ``summary`` always pass.
     """
     if feature == FEATURE_AUTO_REPLY:
         await require_tiqora_primary(session)
+        await require_auto_reply_not_paused(session)
 
 
 __all__ = [
     "OPERATION_MODE_PARALLEL",
     "OPERATION_MODE_TIQORA_PRIMARY",
     "VALID_OPERATION_MODES",
+    "AiAutoReplyPausedError",
     "AiGateError",
     "get_operation_mode",
+    "is_auto_reply_paused",
     "is_tiqora_primary",
+    "require_auto_reply_not_paused",
     "require_feature_allowed",
     "require_tiqora_primary",
+    "set_auto_reply_paused",
     "set_operation_mode",
 ]

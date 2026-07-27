@@ -35,6 +35,30 @@ class DiscoveredTool(Protocol):
     name: str
     description: str | None
     annotations: Any
+    # Optional JSON Schema for arguments (MCP ``inputSchema`` / ``parameters``).
+    inputSchema: Any
+
+
+def _tool_parameters_snapshot(tool: Any) -> str | None:
+    """Serialize a discovered tool's JSON Schema for storage, if present."""
+    schema = getattr(tool, "inputSchema", None)
+    if schema is None:
+        schema = getattr(tool, "parameters", None)
+    if schema is None:
+        return None
+    if isinstance(schema, dict):
+        try:
+            return json.dumps(schema)
+        except (TypeError, ValueError):
+            return None
+    # Some SDKs expose a pydantic/BaseModel-like object.
+    model_dump = getattr(schema, "model_dump", None)
+    if callable(model_dump):
+        try:
+            return json.dumps(model_dump())
+        except (TypeError, ValueError):
+            return None
+    return None
 
 
 @dataclass(frozen=True, slots=True)
@@ -203,6 +227,7 @@ async def refresh_tools(
 
     added: list[str] = []
     for tool in discovered:
+        params_snap = _tool_parameters_snapshot(tool)
         policy = existing_by_name.get(tool.name)
         if policy is None:
             session.add(
@@ -212,13 +237,16 @@ async def refresh_tools(
                     enabled=False,
                     mutating=_prefill_mutating(getattr(tool, "annotations", None)),
                     description_snapshot=getattr(tool, "description", None),
+                    parameters_snapshot=params_snap,
                 )
             )
             added.append(tool.name)
         else:
             # Admin's enabled/mutating choices are never overwritten; only
-            # refresh the informational description snapshot.
+            # refresh informational description + parameters snapshots.
             policy.description_snapshot = getattr(tool, "description", None)
+            if params_snap is not None:
+                policy.parameters_snapshot = params_snap
 
     removed: list[str] = []
     for name, policy in existing_by_name.items():

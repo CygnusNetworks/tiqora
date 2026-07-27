@@ -1,4 +1,4 @@
-"""Ticket-pinned tool registry + executor (plan §3.4 step 8, §3.8).
+"""Ticket-pinned tool registry + executor (plan §3.4 step 8, §3.8 + A/B/C).
 
 Every tool call in an agent run is pinned to one ticket (``ticket_id`` is
 never a model-supplied argument) and goes through this module's hard
@@ -11,13 +11,15 @@ runtime: :data:`TOOL_PROPOSE_CUSTOMER_MESSAGE`. There is no ``send`` tool —
 the autonomy → draft/send mapping happens in :mod:`tiqora.ai.runtime`, never
 here and never in the model.
 
-MCP passthrough tools are looked up by ``"{client_name}:{tool_name}"``; a
-*mutating* MCP tool is only ever exposed in the schema (and thus callable)
-when ``autonomy == full`` (plan §3.3/§3.4). The Escalation-Rule-Guard runs
-here, on the **raw** MCP result, before the caller ever sees a masked
-version (plan §3.1) — a hit is surfaced as ``escalated=True`` and the
-outcome is terminal, exactly like the model calling ``escalate_to_human``
-itself.
+Which local side-effect tools and which MCP tools are exposed is gated by
+:class:`~tiqora.ai.capabilities.AgentCapabilities` (derived from queue
+autonomy, optionally overridden). Mutating MCP tools require
+``mcp_mutating``; local field updates require the matching capability bits.
+
+MCP passthrough tools are looked up by ``"{client_name}:{tool_name}"``. The
+Escalation-Rule-Guard runs here on the **raw** MCP result, before the caller
+ever sees a masked version (plan §3.1). Server-side ticket context is
+injected under ``_tiqora_*`` keys; model-supplied scope ids are rejected (H2).
 """
 
 from __future__ import annotations
@@ -31,16 +33,25 @@ import structlog
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from tiqora.ai.capabilities import AgentCapabilities, capabilities_for_autonomy
 from tiqora.ai.escalation import check_escalation
 from tiqora.ai.listfields import parse_str_list
-from tiqora.ai.models import AUTONOMY_FULL, DEFAULT_ALLOWED_STATE_TYPES
+from tiqora.ai.models import DEFAULT_ALLOWED_STATE_TYPES
+from tiqora.ai.output_guards import CustomerMessageGuardError, validate_customer_message
 from tiqora.ai.pii import PiiMapper
+from tiqora.ai.prompt_safety import with_untrusted_tool_prefix
 from tiqora.domain.ticket_write_service import ArticleIn, add_article, change_priority
 from tiqora.domain.ticket_write_service import change_state as _change_state
 from tiqora.domain.ticket_write_service import set_customer as _set_customer
 from tiqora.znuny.sysconfig import SysConfig
 
 logger = structlog.get_logger(__name__)
+
+# Server-injected MCP context keys (model may not set or override these).
+MCP_CONTEXT_TICKET_ID = "_tiqora_ticket_id"
+MCP_CONTEXT_CUSTOMER_ID = "_tiqora_customer_id"
+MCP_CONTEXT_CUSTOMER_USER_ID = "_tiqora_customer_user_id"
+_MCP_CONTEXT_PREFIX = "_tiqora_"
 
 
 def resolve_allowed_state_types(raw: str | None) -> list[str]:
@@ -63,9 +74,9 @@ TOOL_ESCALATE_TO_HUMAN = "escalate_to_human"
 TOOL_KB_SEARCH = "kb_search"
 TOOL_KB_GET_ARTICLE = "kb_get_article"
 
-# Argument keys an MCP tool call may NOT carry — they would let a prompt-injected
-# model retarget the tool at a foreign ticket/customer/user (security review H2).
-# Compared after stripping non-alphanumerics and lowercasing.
+# Argument keys an MCP tool call may NOT carry from the model — they would let
+# a prompt-injected model retarget the tool at a foreign ticket/customer/user
+# (security review H2). Compared after stripping non-alphanumerics + lowercasing.
 _MCP_FORBIDDEN_ARG_KEYS = frozenset(
     {
         "ticketid",
@@ -114,6 +125,9 @@ class McpToolSpec:
     tool_name: str
     mutating: bool
     description: str | None = None
+    # JSON-schema object (or null) from MCP discovery — used to reject unknown
+    # argument keys when the schema declares properties.
+    parameters_schema: dict[str, Any] | None = None
 
     @property
     def full_name(self) -> str:
@@ -162,7 +176,7 @@ def _mcp_result_payload(raw: Any) -> Any:
     """Normalize a fastmcp ``CallToolResult`` into plain data before it is
     JSON-serialized for the model/trace — ``json.dumps(raw, default=str)``
     on the result object itself would store its repr
-    (``"content=[TextContent(...)］"``), which neither the model nor the UI
+    (``"content=[TextContent(...)]"``), which neither the model nor the UI
     formatter can read. Duck-typed so test fakes returning dicts/lists/str
     pass through untouched."""
     if raw is None or isinstance(raw, (dict, list, str, int, float, bool)):
@@ -185,84 +199,128 @@ def _mcp_result_payload(raw: Any) -> Any:
     return str(raw)
 
 
-def _local_tool_schemas(*, kb_enabled: bool) -> list[dict[str, Any]]:
-    schemas: list[dict[str, Any]] = [
-        {
-            "type": "function",
-            "function": {
-                "name": TOOL_PROPOSE_CUSTOMER_MESSAGE,
-                "description": (
-                    "Deliver a customer-facing message. This is the ONLY way to send "
-                    "text to the customer; the runtime decides (based on queue "
-                    "autonomy) whether it is sent immediately or kept as a draft for "
-                    "a human to review."
-                ),
-                "parameters": {
-                    "type": "object",
-                    "properties": {
-                        "kind": {"type": "string", "enum": ["reply", "clarify"]},
-                        "subject": {"type": "string"},
-                        "body": {"type": "string"},
-                    },
-                    "required": ["kind", "body"],
-                },
-            },
-        },
-        {
-            "type": "function",
-            "function": {
-                "name": TOOL_ADD_INTERNAL_NOTE,
-                "description": (
-                    "Add an internal (agent-only, never customer-visible) note with "
-                    "meta information — e.g. why no reply was sent. Never use this "
-                    "to draft a customer answer."
-                ),
-                "parameters": {
-                    "type": "object",
-                    "properties": {"body": {"type": "string"}},
-                    "required": ["body"],
-                },
-            },
-        },
-        {
-            "type": "function",
-            "function": {
-                "name": TOOL_UPDATE_TICKET_FIELDS,
-                "description": (
-                    "Set ticket state/priority/customer_id. Pass at most one of "
-                    "'state' (state name, e.g. \"open\") or 'state_id' (numeric id) — "
-                    "never both. Which target states are allowed is a queue policy "
-                    "setting; an unlisted state is rejected."
-                ),
-                "parameters": {
-                    "type": "object",
-                    "properties": {
-                        "state": {"type": "string"},
-                        "state_id": {"type": "integer"},
-                        "priority_id": {"type": "integer"},
-                        "customer_id": {"type": "string"},
+def validate_mcp_arguments_against_schema(
+    arguments: dict[str, Any], parameters_schema: dict[str, Any] | None
+) -> None:
+    """Reject model args that are not in the discovered JSON schema properties.
+
+    When no schema / no properties are available, this is a no-op (the
+    forbidden-key blacklist still applies). Required fields are enforced when
+    listed. Server-injected ``_tiqora_*`` keys are not part of *arguments*
+    here — validation runs on model-supplied args only.
+    """
+    if not parameters_schema or not isinstance(parameters_schema, dict):
+        return
+    props = parameters_schema.get("properties")
+    if not isinstance(props, dict) or not props:
+        return
+    allowed = set(props.keys())
+    unknown = [k for k in arguments if k not in allowed]
+    if unknown:
+        raise ToolArgumentError(
+            f"MCP tool argument(s) not in schema: {sorted(unknown)} "
+            f"(allowed: {sorted(allowed)})"
+        )
+    required = parameters_schema.get("required")
+    if isinstance(required, list):
+        missing = [r for r in required if isinstance(r, str) and r not in arguments]
+        if missing:
+            raise ToolArgumentError(f"MCP tool missing required argument(s): {sorted(missing)}")
+
+
+def _local_tool_schemas(*, capabilities: AgentCapabilities, kb_enabled: bool) -> list[dict[str, Any]]:
+    schemas: list[dict[str, Any]] = []
+    if capabilities.propose_message:
+        schemas.append(
+            {
+                "type": "function",
+                "function": {
+                    "name": TOOL_PROPOSE_CUSTOMER_MESSAGE,
+                    "description": (
+                        "Deliver a customer-facing message. This is the ONLY way to send "
+                        "text to the customer; the runtime decides (based on queue "
+                        "autonomy) whether it is sent immediately or kept as a draft for "
+                        "a human to review."
+                    ),
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "kind": {"type": "string", "enum": ["reply", "clarify"]},
+                            "subject": {"type": "string"},
+                            "body": {"type": "string"},
+                        },
+                        "required": ["kind", "body"],
                     },
                 },
-            },
-        },
-        {
-            "type": "function",
-            "function": {
-                "name": TOOL_ESCALATE_TO_HUMAN,
-                "description": (
-                    "Stop autonomous handling and hand the ticket to a human agent. "
-                    "Use this whenever you are uncertain, or an escalation condition "
-                    "applies."
-                ),
-                "parameters": {
-                    "type": "object",
-                    "properties": {"reason": {"type": "string"}},
-                    "required": ["reason"],
+            }
+        )
+    if capabilities.internal_note:
+        schemas.append(
+            {
+                "type": "function",
+                "function": {
+                    "name": TOOL_ADD_INTERNAL_NOTE,
+                    "description": (
+                        "Add an internal (agent-only, never customer-visible) note with "
+                        "meta information — e.g. why no reply was sent. Never use this "
+                        "to draft a customer answer."
+                    ),
+                    "parameters": {
+                        "type": "object",
+                        "properties": {"body": {"type": "string"}},
+                        "required": ["body"],
+                    },
                 },
-            },
-        },
-    ]
-    if kb_enabled:
+            }
+        )
+    if capabilities.allows_update_ticket_fields():
+        field_props: dict[str, Any] = {}
+        if capabilities.update_state:
+            field_props["state"] = {"type": "string"}
+            field_props["state_id"] = {"type": "integer"}
+        if capabilities.update_priority:
+            field_props["priority_id"] = {"type": "integer"}
+        if capabilities.set_customer:
+            field_props["customer_id"] = {"type": "string"}
+        schemas.append(
+            {
+                "type": "function",
+                "function": {
+                    "name": TOOL_UPDATE_TICKET_FIELDS,
+                    "description": (
+                        "Set ticket state/priority/customer_id. Pass at most one of "
+                        "'state' (state name, e.g. \"open\") or 'state_id' (numeric id) — "
+                        "never both. Which target states are allowed is a queue policy "
+                        "setting; an unlisted state is rejected. Which fields are "
+                        "available depends on queue autonomy/capabilities."
+                    ),
+                    "parameters": {
+                        "type": "object",
+                        "properties": field_props,
+                    },
+                },
+            }
+        )
+    if capabilities.escalate:
+        schemas.append(
+            {
+                "type": "function",
+                "function": {
+                    "name": TOOL_ESCALATE_TO_HUMAN,
+                    "description": (
+                        "Stop autonomous handling and hand the ticket to a human agent. "
+                        "Use this whenever you are uncertain, or an escalation condition "
+                        "applies."
+                    ),
+                    "parameters": {
+                        "type": "object",
+                        "properties": {"reason": {"type": "string"}},
+                        "required": ["reason"],
+                    },
+                },
+            }
+        )
+    if kb_enabled and capabilities.kb_read:
         schemas.append(
             {
                 "type": "function",
@@ -295,50 +353,75 @@ def _local_tool_schemas(*, kb_enabled: bool) -> list[dict[str, Any]]:
 
 
 class ToolRegistry:
-    """Builds the tool JSON-schema list the model sees, gated by autonomy."""
+    """Builds the tool JSON-schema list the model sees, gated by capabilities."""
 
     def __init__(
         self,
         *,
-        autonomy: str,
+        autonomy: str | None = None,
+        capabilities: AgentCapabilities | None = None,
         mcp_tools: list[McpToolSpec] | None = None,
         kb_enabled: bool = True,
     ) -> None:
-        self._autonomy = autonomy
+        if capabilities is None:
+            if autonomy is None:
+                raise TypeError("ToolRegistry requires autonomy= or capabilities=")
+            capabilities = capabilities_for_autonomy(autonomy)
+        self._capabilities = capabilities
         self._mcp_tools = {t.full_name: t for t in (mcp_tools or [])}
         self._kb_enabled = kb_enabled
 
+    @property
+    def capabilities(self) -> AgentCapabilities:
+        return self._capabilities
+
     def _callable_mcp_tools(self) -> dict[str, McpToolSpec]:
-        return {
-            name: spec
-            for name, spec in self._mcp_tools.items()
-            if not spec.mutating or self._autonomy == AUTONOMY_FULL
-        }
+        out: dict[str, McpToolSpec] = {}
+        for name, spec in self._mcp_tools.items():
+            if spec.mutating:
+                if self._capabilities.mcp_mutating:
+                    out[name] = spec
+            elif self._capabilities.mcp_readonly:
+                out[name] = spec
+        return out
 
     def build_schemas(self) -> list[dict[str, Any]]:
-        schemas = _local_tool_schemas(kb_enabled=self._kb_enabled)
+        schemas = _local_tool_schemas(
+            capabilities=self._capabilities, kb_enabled=self._kb_enabled
+        )
         for name, spec in self._callable_mcp_tools().items():
+            params: dict[str, Any]
+            if isinstance(spec.parameters_schema, dict) and spec.parameters_schema:
+                params = spec.parameters_schema
+            else:
+                params = {
+                    "type": "object",
+                    "properties": {},
+                    "additionalProperties": True,
+                }
             schemas.append(
                 {
                     "type": "function",
                     "function": {
                         "name": name,
                         "description": spec.description or f"MCP tool {name}",
-                        "parameters": {
-                            "type": "object",
-                            "properties": {},
-                            "additionalProperties": True,
-                        },
+                        "parameters": params,
                     },
                 }
             )
         return schemas
 
     def is_known(self, name: str) -> bool:
+        if name == TOOL_PROPOSE_CUSTOMER_MESSAGE:
+            return self._capabilities.propose_message
+        if name == TOOL_ADD_INTERNAL_NOTE:
+            return self._capabilities.internal_note
+        if name == TOOL_UPDATE_TICKET_FIELDS:
+            return self._capabilities.allows_update_ticket_fields()
+        if name == TOOL_ESCALATE_TO_HUMAN:
+            return self._capabilities.escalate
         if name in (TOOL_KB_SEARCH, TOOL_KB_GET_ARTICLE):
-            return self._kb_enabled
-        if name in LOCAL_TOOL_NAMES:
-            return True
+            return self._kb_enabled and self._capabilities.kb_read
         return name in self._callable_mcp_tools()
 
     def mcp_spec(self, name: str) -> McpToolSpec | None:
@@ -364,6 +447,8 @@ class ToolExecutor:
         kb_get_article_fn: KbGetArticleFn | None = None,
         allowed_state_types_raw: str | None = None,
         mask_results: bool = True,
+        ticket_customer_id: str | None = None,
+        ticket_customer_user_id: str | None = None,
     ) -> None:
         self._session = session
         self._sysconfig = sysconfig
@@ -381,6 +466,8 @@ class ToolExecutor:
         # ALWAYS pattern-masked — timestamps etc. got shredded even on
         # queues with PII masking disabled).
         self._mask_results = mask_results
+        self._ticket_customer_id = ticket_customer_id
+        self._ticket_customer_user_id = ticket_customer_user_id
 
     async def execute(self, name: str, arguments: dict[str, Any]) -> ToolOutcome:
         if not self._registry.is_known(name):
@@ -414,9 +501,14 @@ class ToolExecutor:
                 "propose_customer_message requires kind in {reply, clarify} and a non-empty body"
             )
         subject = arguments.get("subject")
+        subject_str = subject if isinstance(subject, str) else ""
+        try:
+            validate_customer_message(kind=kind, subject=subject_str, body=body)
+        except CustomerMessageGuardError as exc:
+            raise ToolArgumentError(str(exc)) from exc
         proposal = {
             "kind": kind,
-            "subject": self._pii.unmask(subject) if isinstance(subject, str) else "",
+            "subject": self._pii.unmask(subject_str) if subject_str else "",
             "body": self._pii.unmask(body),
         }
         return ToolOutcome(
@@ -492,10 +584,15 @@ class ToolExecutor:
         return resolved_id
 
     async def _update_ticket_fields(self, arguments: dict[str, Any]) -> ToolOutcome:
+        caps = self._registry.capabilities
         applied: list[str] = []
         state_id_arg = arguments.get("state_id")
         state_name_arg = arguments.get("state")
         if state_id_arg is not None or state_name_arg is not None:
+            if not caps.update_state:
+                raise ToolArgumentError(
+                    "update_ticket_fields: state changes are not allowed by capabilities"
+                )
             resolved_state_id = await self._resolve_state_id(
                 state_id=state_id_arg, state_name=state_name_arg
             )
@@ -509,6 +606,10 @@ class ToolExecutor:
             applied.append("state")
         priority_id = arguments.get("priority_id")
         if priority_id is not None:
+            if not caps.update_priority:
+                raise ToolArgumentError(
+                    "update_ticket_fields: priority changes are not allowed by capabilities"
+                )
             await change_priority(
                 self._session,
                 ticket_id=self._ticket_id,
@@ -519,6 +620,10 @@ class ToolExecutor:
             applied.append("priority_id")
         customer_id = arguments.get("customer_id")
         if customer_id is not None:
+            if not caps.set_customer:
+                raise ToolArgumentError(
+                    "update_ticket_fields: customer_id changes are not allowed by capabilities"
+                )
             unmasked_cid = self._pii.unmask(str(customer_id))
             await _set_customer(
                 self._session,
@@ -530,7 +635,8 @@ class ToolExecutor:
             applied.append("customer_id")
         if not applied:
             raise ToolArgumentError(
-                "update_ticket_fields requires at least one of state_id/priority_id/customer_id"
+                "update_ticket_fields requires at least one allowed field "
+                "(state_id/state, priority_id, and/or customer_id)"
             )
         return ToolOutcome(
             name=TOOL_UPDATE_TICKET_FIELDS,
@@ -567,43 +673,72 @@ class ToolExecutor:
         if not isinstance(query, str) or not query.strip():
             raise ToolArgumentError("kb_search requires a non-empty query")
         if self._kb_search_fn is None:
-            return ToolOutcome(name=TOOL_KB_SEARCH, content_for_model="[]")
+            return ToolOutcome(
+                name=TOOL_KB_SEARCH,
+                content_for_model=with_untrusted_tool_prefix("[]"),
+            )
         results = await self._kb_search_fn(self._pii.unmask(query), limit=5)
         content = json.dumps(results, default=str)
         if self._mask_results:
             content = self._pii.mask(content)
-        return ToolOutcome(name=TOOL_KB_SEARCH, content_for_model=content, raw_result=results)
+        return ToolOutcome(
+            name=TOOL_KB_SEARCH,
+            content_for_model=with_untrusted_tool_prefix(content),
+            raw_result=results,
+        )
 
     async def _kb_get_article(self, arguments: dict[str, Any]) -> ToolOutcome:
         article_id = arguments.get("article_id")
         if article_id is None:
             raise ToolArgumentError("kb_get_article requires article_id")
         if self._kb_get_article_fn is None:
-            return ToolOutcome(name=TOOL_KB_GET_ARTICLE, content_for_model="null")
+            return ToolOutcome(
+                name=TOOL_KB_GET_ARTICLE,
+                content_for_model=with_untrusted_tool_prefix("null"),
+            )
         result = await self._kb_get_article_fn(int(article_id))
         content = json.dumps(result, default=str)
         if self._mask_results:
             content = self._pii.mask(content)
-        return ToolOutcome(name=TOOL_KB_GET_ARTICLE, content_for_model=content, raw_result=result)
+        return ToolOutcome(
+            name=TOOL_KB_GET_ARTICLE,
+            content_for_model=with_untrusted_tool_prefix(content),
+            raw_result=result,
+        )
+
+    def _mcp_server_context(self) -> dict[str, Any]:
+        """Pinned ticket identity injected into every MCP call (plan B #3)."""
+        ctx: dict[str, Any] = {MCP_CONTEXT_TICKET_ID: self._ticket_id}
+        if self._ticket_customer_id:
+            ctx[MCP_CONTEXT_CUSTOMER_ID] = self._ticket_customer_id
+        if self._ticket_customer_user_id:
+            ctx[MCP_CONTEXT_CUSTOMER_USER_ID] = self._ticket_customer_user_id
+        return ctx
 
     async def _call_mcp(self, spec: McpToolSpec, arguments: dict[str, Any]) -> ToolOutcome:
         # Ticket-pinning boundary (security review H2): MCP tools get an
-        # unconstrained argument schema, so a prompt-injected ticket/attachment
-        # could make the model call an MCP tool with a *foreign* ticket/customer
-        # id and exfiltrate cross-ticket data. The current ticket is always known
-        # server-side, so the model must not be able to name a scope by id — any
-        # such argument fails the call closed.
+        # unconstrained (or schema-bound) argument object, so a prompt-injected
+        # ticket/attachment could make the model call an MCP tool with a
+        # *foreign* ticket/customer id. Reject model-supplied scope keys and
+        # any attempt to set server-owned ``_tiqora_*`` context.
         for key in arguments:
+            if str(key).startswith(_MCP_CONTEXT_PREFIX):
+                raise ToolArgumentError(
+                    f"MCP tool argument '{key}' is reserved for server-injected context"
+                )
             if _norm_arg_key(key) in _MCP_FORBIDDEN_ARG_KEYS:
                 raise ToolArgumentError(
                     f"MCP tool argument '{key}' is not allowed — a tool call may not "
                     "target a ticket, customer or user by id."
                 )
+        validate_mcp_arguments_against_schema(arguments, spec.parameters_schema)
         unmasked_args = {
             k: (self._pii.unmask(v) if isinstance(v, str) else v) for k, v in arguments.items()
         }
+        # Server context wins on key collision (should not happen after strip).
+        call_args = {**unmasked_args, **self._mcp_server_context()}
         raw_result = _mcp_result_payload(
-            await self._mcp_caller(spec.client_url, spec.auth_token, spec.tool_name, unmasked_args)
+            await self._mcp_caller(spec.client_url, spec.auth_token, spec.tool_name, call_args)
         )
         hit = check_escalation(
             self._escalation_rules, tool_full_name=spec.full_name, raw_result=raw_result
@@ -625,11 +760,18 @@ class ToolExecutor:
         content = json.dumps(raw_result, default=str)
         if self._mask_results:
             content = self._pii.mask(content)
-        return ToolOutcome(name=spec.full_name, content_for_model=content, raw_result=raw_result)
+        return ToolOutcome(
+            name=spec.full_name,
+            content_for_model=with_untrusted_tool_prefix(content),
+            raw_result=raw_result,
+        )
 
 
 __all__ = [
     "LOCAL_TOOL_NAMES",
+    "MCP_CONTEXT_CUSTOMER_ID",
+    "MCP_CONTEXT_CUSTOMER_USER_ID",
+    "MCP_CONTEXT_TICKET_ID",
     "TOOL_ADD_INTERNAL_NOTE",
     "TOOL_ESCALATE_TO_HUMAN",
     "TOOL_KB_GET_ARTICLE",
@@ -646,4 +788,5 @@ __all__ = [
     "ToolRegistry",
     "UnknownToolError",
     "resolve_allowed_state_types",
+    "validate_mcp_arguments_against_schema",
 ]

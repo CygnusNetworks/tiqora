@@ -30,7 +30,13 @@ from tiqora.ai import usage as ai_usage
 from tiqora.ai.acl import AiAclValidationError
 from tiqora.ai.audit import DEFAULT_RETENTION_DAYS
 from tiqora.ai.escalation import EscalationRuleError, check_escalation, validate_escalation_rules
-from tiqora.ai.gate import AiGateError, get_operation_mode, set_operation_mode
+from tiqora.ai.gate import (
+    AiGateError,
+    get_operation_mode,
+    is_auto_reply_paused,
+    set_auto_reply_paused,
+    set_operation_mode,
+)
 from tiqora.ai.models import TiqoraAiPromptPart, TiqoraMcpClient
 from tiqora.ai.policies import PromptPartValidationError, QueuePolicyValidationError
 from tiqora.api.deps import DbSession
@@ -124,6 +130,7 @@ async def get_ai_settings(admin: AdminUser, session: DbSession) -> AiSettingsOut
         disclosure_default_text=disclosure,
         global_max_replies_per_hour=global_cap,
         audit_retention_days=audit_retention_days,
+        auto_reply_paused=await is_auto_reply_paused(session),
     )
 
 
@@ -147,6 +154,8 @@ async def put_ai_settings(
         )
     if body.audit_retention_days is not None:
         await set_setting(session, KEY_AI_AUDIT_RETENTION_DAYS, str(body.audit_retention_days))
+    if body.auto_reply_paused is not None:
+        await set_auto_reply_paused(session, body.auto_reply_paused)
     return await get_ai_settings(admin, session)
 
 
