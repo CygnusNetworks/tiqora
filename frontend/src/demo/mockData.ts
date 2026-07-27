@@ -590,6 +590,7 @@ const aiSettings = {
     "This reply was drafted with AI assistance and reviewed by a support agent.",
   global_max_replies_per_hour: 60,
   audit_retention_days: 90,
+  auto_reply_paused: false,
 };
 const aiProviders = [
   {

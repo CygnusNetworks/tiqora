@@ -229,6 +229,9 @@ class TiqoraMcpToolPolicy(TiqoraBase):
         Boolean, nullable=False, default=True, server_default=true()
     )
     description_snapshot: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # JSON Schema object for tool arguments (from MCP discovery inputSchema).
+    # Used by the tool executor to reject unknown argument keys (plan B #4).
+    parameters_snapshot: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     __table_args__ = (
         UniqueConstraint(
@@ -335,6 +338,10 @@ class TiqoraAiQueuePolicy(TiqoraBase):
     # ticket_state_type names. NULL/blank = default ["open"] (reopen allowed,
     # never close); an explicit "[]" disables state changes entirely.
     allowed_state_types: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    # Optional partial override of capability bits derived from autonomy
+    # (plan C #5). JSON object of bool fields; see tiqora.ai.capabilities.
+    capabilities_json: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     # tiqora.ai.summary system-prompt verbosity — see DETAIL_STANDARD/
     # DETAIL_DETAILED above.

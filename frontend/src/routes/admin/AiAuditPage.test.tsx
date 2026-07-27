@@ -144,12 +144,14 @@ describe("AiAuditPage", () => {
       disclosure_default_text: "",
       global_max_replies_per_hour: null,
       audit_retention_days: 30,
+      auto_reply_paused: false,
     });
     putSettings.mockResolvedValue({
       operation_mode: "tiqora_primary",
       disclosure_default_text: "",
       global_max_replies_per_hour: null,
       audit_retention_days: 45,
+      auto_reply_paused: false,
     });
   });
 

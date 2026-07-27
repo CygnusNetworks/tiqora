@@ -27,6 +27,8 @@ export type AiSettingsOut = {
   disclosure_default_text: string;
   global_max_replies_per_hour: number | null;
   audit_retention_days: number;
+  /** Global kill-switch for auto-reply (independent of operation_mode). */
+  auto_reply_paused: boolean;
 };
 
 export type AiSettingsUpdate = Partial<AiSettingsOut>;
@@ -154,6 +156,8 @@ export type AiQueuePolicyOut = {
   reply_language_fixed: string | null;
   reply_language_default: string | null;
   allowed_state_types: string | null;
+  /** Optional JSON capability overrides (bool map) on top of autonomy defaults. */
+  capabilities_json: string | null;
   summary_detail: "standard" | "detailed";
   valid_id: number;
   create_time: string;
@@ -197,6 +201,7 @@ export type AiQueuePolicyCreate = {
   reply_language_fixed?: string | null;
   reply_language_default?: string | null;
   allowed_state_types?: string | null;
+  capabilities_json?: string | null;
 };
 
 export type AiQueuePolicyUpdate = Partial<AiQueuePolicyCreate> & { valid_id?: number };
