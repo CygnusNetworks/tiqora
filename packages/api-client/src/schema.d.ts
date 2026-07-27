@@ -6606,12 +6606,23 @@ export interface components {
         };
         /**
          * ContainersOut
-         * @description Degrades gracefully: ``available`` is false with a ``reason`` when the
-         *     docker SDK is missing or the socket is not mounted.
+         * @description Degrades gracefully: ``available`` is false when the docker SDK is
+         *     missing or the socket is not mounted.
+         *
+         *     ``configured`` separates "opt-in simply not set up" (no socket mounted /
+         *     SDK absent → a neutral note) from an actual error while talking to a
+         *     present daemon (``reason`` set → surfaced as a problem).
          */
         ContainersOut: {
             /** Available */
             available: boolean;
+            /**
+             * Configured
+             * @default true
+             */
+            configured: boolean;
+            /** Engine Version */
+            engine_version?: string | null;
             /** Items */
             items?: components["schemas"]["ContainerOut"][];
             /** Reason */
@@ -7573,12 +7584,17 @@ export interface components {
         };
         /**
          * HostOut
-         * @description Host resource utilisation via psutil. Degrades gracefully (``available``
-         *     false + ``reason``) when psutil is not installed.
+         * @description Host resource utilisation via psutil. Degrades gracefully when psutil is
+         *     not installed (``available`` false, ``configured`` false → neutral note).
          */
         HostOut: {
             /** Available */
             available: boolean;
+            /**
+             * Configured
+             * @default true
+             */
+            configured: boolean;
             /** Cpu Count */
             cpu_count?: number | null;
             /** Cpu Percent */
