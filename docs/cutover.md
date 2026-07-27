@@ -170,8 +170,12 @@ supported natively by `tiqora.api.compat.router`, see
    once (there is no traffic-splitting layer in v1).
 2. `nginx -t && systemctl reload nginx`.
 3. Re-run a smoke test of each production webservice operation your
-   integrators use (`TicketCreate`, `TicketSearch`, `TicketUpdate`,
-   `TicketGet`, `SessionCreate` at minimum).
+   integrators use. At minimum: `SessionCreate`, `TicketCreate`,
+   `TicketSearch`, `TicketUpdate`, `TicketGet`. If clients use them,
+   also: `SessionGet`/`SessionRemove`, `TicketHistoryGet`,
+   `TimeAccountingGet`, `OutOfOffice` (see
+   [`compatibility.md`](compatibility.md#what-is-not-emulated-and-why)
+   for known partial fidelity).
 
 **Verify**: `tiqora_http_requests_total{path="/znuny-compat/..."}` starts
 incrementing; Znuny's own GI access log stops receiving traffic.

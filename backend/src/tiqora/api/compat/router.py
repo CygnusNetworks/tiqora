@@ -14,10 +14,15 @@ from the SOAP Body wrapper element, see api/compat/soap.py):
 
 Fallback canonical routes (always available):
   POST   /znuny-compat/Session              → SessionCreate
+  GET    /znuny-compat/Session/:SessionID   → SessionGet
+  DELETE /znuny-compat/Session/:SessionID   → SessionRemove
   POST   /znuny-compat/Ticket              → TicketCreate
   GET    /znuny-compat/Ticket/:TicketID     → TicketGet
   PATCH  /znuny-compat/Ticket/:TicketID     → TicketUpdate
   GET    /znuny-compat/TicketSearch         → TicketSearch
+  GET    /znuny-compat/Ticket/History/:id   → TicketHistoryGet
+  GET    /znuny-compat/TimeAccountingGet    → TimeAccountingGet
+  POST   /znuny-compat/OutOfOffice          → OutOfOffice
   POST   /znuny-compat/soap/{webservice}    → SOAP, dispatched via Body wrapper
 
 Admin reload endpoint: POST /znuny-compat/admin/reload (requires tiqora auth).
@@ -38,11 +43,16 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from tiqora.api.compat.operations import (
+    op_out_of_office,
     op_session_create,
+    op_session_get,
+    op_session_remove,
     op_ticket_create,
     op_ticket_get,
+    op_ticket_history_get,
     op_ticket_search,
     op_ticket_update,
+    op_time_accounting_get,
 )
 from tiqora.api.compat.soap import (
     DEFAULT_NAMESPACE,
@@ -63,12 +73,20 @@ logger = structlog.get_logger(__name__)
 # Supported operation types → handler mapping
 # ---------------------------------------------------------------------------
 
+# Maps webservice operation name → canonical handler key.
+# SessionDelete is an alias used by GenericTicketConnectorREST (Type Session::SessionRemove).
 _SUPPORTED_OPS: dict[str, str] = {
     "SessionCreate": "SessionCreate",
+    "SessionGet": "SessionGet",
+    "SessionRemove": "SessionRemove",
+    "SessionDelete": "SessionRemove",
     "TicketCreate": "TicketCreate",
     "TicketUpdate": "TicketUpdate",
     "TicketGet": "TicketGet",
     "TicketSearch": "TicketSearch",
+    "TicketHistoryGet": "TicketHistoryGet",
+    "TimeAccountingGet": "TimeAccountingGet",
+    "OutOfOffice": "OutOfOffice",
 }
 
 # ---------------------------------------------------------------------------
@@ -104,9 +122,21 @@ async def _dispatch_operation(
     """Route an operation name to the right handler."""
     sysconfig = SysConfig(session)
     settings = getattr(request.app.state, "settings", None)
+    # Normalize aliases (e.g. SessionDelete → SessionRemove).
+    operation = _SUPPORTED_OPS.get(operation, operation)
 
     if operation == "SessionCreate":
         return await op_session_create(
+            data, session, session_store, request=request, settings=settings
+        )
+
+    if operation == "SessionGet":
+        return await op_session_get(
+            data, session, session_store, request=request, settings=settings
+        )
+
+    if operation == "SessionRemove":
+        return await op_session_remove(
             data, session, session_store, request=request, settings=settings
         )
 
@@ -147,6 +177,21 @@ async def _dispatch_operation(
 
     if operation == "TicketSearch":
         return await op_ticket_search(
+            data, session, session_store, request=request, settings=settings
+        )
+
+    if operation == "TicketHistoryGet":
+        return await op_ticket_history_get(
+            data, session, session_store, request=request, settings=settings
+        )
+
+    if operation == "TimeAccountingGet":
+        return await op_time_accounting_get(
+            data, session, session_store, request=request, settings=settings
+        )
+
+    if operation == "OutOfOffice":
+        return await op_out_of_office(
             data, session, session_store, request=request, settings=settings
         )
 
@@ -251,6 +296,67 @@ async def canonical_ticket_search(
 ) -> Response:
     data = await _merge_params(request)
     result = await _dispatch_operation("TicketSearch", data, session, session_store, request)
+    return _json_or_501(result)
+
+
+@compat_router.get("/Session/{session_id}")
+async def canonical_session_get(
+    session_id: str,
+    request: Request,
+    session: DbSession,
+    session_store: SessionStore = Depends(get_session_store),  # noqa: B008
+) -> Response:
+    data = await _merge_params(request)
+    data["SessionID"] = session_id
+    result = await _dispatch_operation("SessionGet", data, session, session_store, request)
+    return _json_or_501(result)
+
+
+@compat_router.delete("/Session/{session_id}")
+async def canonical_session_remove(
+    session_id: str,
+    request: Request,
+    session: DbSession,
+    session_store: SessionStore = Depends(get_session_store),  # noqa: B008
+) -> Response:
+    data = await _merge_params(request)
+    data["SessionID"] = session_id
+    result = await _dispatch_operation("SessionRemove", data, session, session_store, request)
+    return _json_or_501(result)
+
+
+@compat_router.get("/Ticket/History/{ticket_id}")
+async def canonical_ticket_history_get(
+    ticket_id: int,
+    request: Request,
+    session: DbSession,
+    session_store: SessionStore = Depends(get_session_store),  # noqa: B008
+) -> Response:
+    data = await _merge_params(request)
+    data["TicketID"] = ticket_id
+    result = await _dispatch_operation("TicketHistoryGet", data, session, session_store, request)
+    return _json_or_501(result)
+
+
+@compat_router.get("/TimeAccountingGet")
+async def canonical_time_accounting_get(
+    request: Request,
+    session: DbSession,
+    session_store: SessionStore = Depends(get_session_store),  # noqa: B008
+) -> Response:
+    data = await _merge_params(request)
+    result = await _dispatch_operation("TimeAccountingGet", data, session, session_store, request)
+    return _json_or_501(result)
+
+
+@compat_router.post("/OutOfOffice")
+async def canonical_out_of_office(
+    request: Request,
+    session: DbSession,
+    session_store: SessionStore = Depends(get_session_store),  # noqa: B008
+) -> Response:
+    data = await _merge_params(request)
+    result = await _dispatch_operation("OutOfOffice", data, session, session_store, request)
     return _json_or_501(result)
 
 
