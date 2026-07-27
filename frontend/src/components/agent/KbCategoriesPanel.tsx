@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Link, useSearch } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
 import {
   api,
@@ -23,25 +22,28 @@ function asNumberArray(value: unknown): number[] {
 }
 
 /**
- * Agent-area KB category management: list/create/edit/deactivate categories.
- * Display reuses {@link CategoryTree}; the form reuses {@link CrudDrawer} with
- * a custom checkbox-list field for the permission-group multi-select.
+ * KB category management: list/create/edit/deactivate categories. Rendered as
+ * the "Categories" tab of the KB page (see {@link KbPage}). Display reuses
+ * {@link CategoryTree}; the form reuses {@link CrudDrawer} with a custom
+ * checkbox-list field for the permission-group multi-select.
+ *
+ * `initialCreate` opens the create drawer on mount — used when the KB page is
+ * entered via a "+ new category" affordance (search param `new`).
  */
-export function KbCategoriesPage() {
+export function KbCategoriesPanel({ initialCreate = false }: { initialCreate?: boolean }) {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
-  const search = useSearch({ from: "/agent/kb/categories" }) as { new?: boolean };
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [editing, setEditing] = useState<CategoryOut | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
 
-  // Deep link from the KB page's "+ Kategorie": open the create drawer once.
   useEffect(() => {
-    if (search.new) {
+    if (initialCreate) {
       setEditing(null);
       setFormError(null);
       setDrawerOpen(true);
     }
+    // Consume the deep-link signal exactly once on mount.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -221,18 +223,8 @@ export function KbCategoriesPage() {
   };
 
   return (
-    <div className="mx-auto w-full max-w-3xl space-y-4 p-3" data-testid="kb-categories-page">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <div>
-          <h1 className="font-display text-xl font-semibold text-ink">{t("kb.category.title")}</h1>
-          <Link
-            to="/agent/kb"
-            className="text-xs text-accent hover:underline"
-            data-testid="kb-category-back"
-          >
-            ← {t("kb.title")}
-          </Link>
-        </div>
+    <div className="space-y-4" data-testid="kb-categories-page">
+      <div className="flex justify-end">
         <Button variant="primary" onClick={openNew} data-testid="kb-category-new">
           {t("kb.category.new")}
         </Button>

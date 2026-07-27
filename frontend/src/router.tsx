@@ -25,7 +25,6 @@ import {
   KbArticleNewPage,
   KbArticleEditPage,
 } from "@/routes/agent/KbArticleEditorPage";
-import { KbCategoriesPage } from "@/routes/agent/KbCategoriesPage";
 import { AgentShell } from "@/components/layout/AgentShell";
 import { PortalShell } from "@/components/layout/PortalShell";
 import { RequireAuth } from "@/auth/RequireAuth";
@@ -227,6 +226,9 @@ const agentKbRoute = createRoute({
       category_id: num(s.category_id),
       state,
       tag: typeof s.tag === "string" && s.tag !== "" ? s.tag : undefined,
+      // "articles" is the default and stays out of the URL.
+      tab: s.tab === "categories" ? "categories" : undefined,
+      new: s.new === true || s.new === 1 || s.new === "1" ? true : undefined,
     };
   },
   component: KbPage,
@@ -241,11 +243,16 @@ const agentKbNewRoute = createRoute({
 const agentKbCategoriesRoute = createRoute({
   getParentRoute: () => agentLayoutRoute,
   path: "/kb/categories",
-  // ?new=1 opens the create drawer immediately (deep link from the KB page's
-  // "+ Kategorie" affordance).
+  // Categories are now the "Kategorien" tab of the KB page. Keep the old URL
+  // (and its ?new deep link) working by redirecting to /agent/kb?tab=categories.
   validateSearch: (s: Record<string, unknown>): { new?: boolean } =>
     s.new === true || s.new === 1 || s.new === "1" ? { new: true } : {},
-  component: KbCategoriesPage,
+  beforeLoad: ({ search }) => {
+    throw redirect({
+      to: "/agent/kb",
+      search: { tab: "categories", ...(search.new ? { new: true } : {}) },
+    });
+  },
 });
 
 const agentKbArticleRoute = createRoute({
