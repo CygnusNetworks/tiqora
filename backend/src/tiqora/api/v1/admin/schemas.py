@@ -1207,6 +1207,27 @@ class AppInfoOut(BaseModel):
     uptime_seconds: float
 
 
+class LegacySchemaOut(BaseModel):
+    """Detected OTRS/Znuny schema profile for the connected database.
+
+    See ``tiqora.db.legacy.profile`` / multi-version support matrix
+    (version ids such as ``znuny-6.5``, OTRS/Znuny 6.0–7.3). Surfaced on the
+    admin System-Info page so operators can see which peer schema Tiqora
+    adapted to.
+    """
+
+    profile_id: str  # e.g. znuny-6.5, otrs-znuny-6.0, unknown
+    label: str
+    known: bool
+    supported: bool
+    groups_table: str
+    mail_account_has_oauth: bool
+    state_priority_has_color: bool
+    junction_tables_have_surrogate_id: bool
+    dialect: str
+    source: str  # detected | override | builtin
+
+
 class DbStatusOut(BaseModel):
     """PostgreSQL/MariaDB connectivity and size probe (best-effort)."""
 
@@ -1215,6 +1236,8 @@ class DbStatusOut(BaseModel):
     version: str | None = None
     latency_ms: float | None = None
     size_bytes: int | None = None
+    #: OTRS/Znuny schema profile derived from INFORMATION_SCHEMA (or override).
+    legacy_schema: LegacySchemaOut | None = None
 
 
 class RedisStatusOut(BaseModel):

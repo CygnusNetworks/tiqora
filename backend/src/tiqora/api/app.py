@@ -71,6 +71,46 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         version=__version__,
         environment=settings.environment,
     )
+
+    # Detect OTRS/Znuny schema tier and refuse unknown shapes (with override).
+    # Soft-skip only when the DB is unreachable (dev/tests without a peer DB);
+    # an *unknown* schema on a reachable DB hard-fails unless overridden.
+    if settings.legacy_schema_check_enabled:
+        try:
+            from tiqora.db.legacy.profile import (
+                UnsupportedLegacySchemaError,
+                ensure_legacy_schema_supported,
+            )
+
+            dialect_hint = (
+                "postgresql"
+                if settings.is_postgres
+                else "mysql"
+                if settings.is_mysql
+                else "unknown"
+            )
+            async with app.state.session_factory() as _schema_session:
+                profile = await ensure_legacy_schema_supported(
+                    _schema_session,
+                    allow_unknown=settings.allow_unknown_legacy_schema,
+                    profile_override=settings.legacy_schema_profile,
+                    dialect_hint=dialect_hint,
+                )
+            app.state.legacy_schema_profile = profile
+            logger.info(
+                "legacy_schema_ready",
+                profile_id=profile.profile_id.value,
+                label=profile.label,
+                groups_table=profile.groups_table,
+            )
+        except UnsupportedLegacySchemaError:
+            raise
+        except Exception as _exc:  # noqa: BLE001 — DB down in dev/tests
+            logger.warning("legacy_schema_check_skipped", error=str(_exc))
+            app.state.legacy_schema_profile = None
+    else:
+        app.state.legacy_schema_profile = None
+
     # Mount dynamic GenericInterface compat routes from webservice config
     try:
         async with app.state.session_factory() as _compat_session:

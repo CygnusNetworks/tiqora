@@ -161,6 +161,7 @@ markers = [
     "db: integration tests that require Docker (testcontainers MariaDB/Postgres)",
     "search: integration tests that require Meilisearch (testcontainers)",
     "golden: golden-master tests comparing real Znuny vs Tiqora (GOLDEN=1, needs Docker, see tests/golden/)",
+    "schema_matrix: multi-version OTRS/Znuny DDL Layer A (release anchors × MariaDB/Postgres)",
 ]
 
 [dependency-groups]

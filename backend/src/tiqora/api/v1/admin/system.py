@@ -38,6 +38,7 @@ from tiqora.api.v1.admin.schemas import (
     DatastoresOut,
     DbStatusOut,
     HostOut,
+    LegacySchemaOut,
     RedisStatusOut,
     SearchStatusOut,
     SystemInfoOut,
@@ -74,6 +75,36 @@ def _app_info(cfg: Settings) -> AppInfoOut:
     )
 
 
+async def _legacy_schema_out(session: DbSession, cfg: Settings) -> LegacySchemaOut | None:
+    """Return the cached schema profile, or detect on the fly for this request."""
+    from tiqora.db.legacy.profile import (
+        detect_legacy_schema_profile,
+        get_legacy_schema_profile,
+        profile_for_id,
+    )
+
+    cached = get_legacy_schema_profile()
+    if cached is not None:
+        return LegacySchemaOut(**cached.to_public_dict())
+
+    if cfg.legacy_schema_profile.strip():
+        try:
+            dialect = "postgresql" if cfg.is_postgres else "mysql" if cfg.is_mysql else "unknown"
+            forced = profile_for_id(
+                cfg.legacy_schema_profile.strip(), dialect=dialect, source="override"
+            )
+            return LegacySchemaOut(**forced.to_public_dict())
+        except ValueError:
+            pass
+
+    try:
+        detected = await detect_legacy_schema_profile(session)
+        return LegacySchemaOut(**detected.to_public_dict())
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("sysinfo_legacy_schema_probe_failed", error=str(exc))
+        return None
+
+
 async def _db_status(session: DbSession, cfg: Settings) -> DbStatusOut:
     dialect = "postgresql" if cfg.is_postgres else "mysql" if cfg.is_mysql else "unknown"
     out = DbStatusOut(dialect=dialect, connected=False)
@@ -101,6 +132,7 @@ async def _db_status(session: DbSession, cfg: Settings) -> DbStatusOut:
     except Exception:  # noqa: BLE001
         pass
 
+    out.legacy_schema = await _legacy_schema_out(session, cfg)
     return out
 
 
