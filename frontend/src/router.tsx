@@ -229,6 +229,8 @@ const agentSearchRoute = createRoute({
       state_type: strList(s.state_type),
       owner_id: num(s.owner_id),
       customer_id: typeof s.customer_id === "string" ? s.customer_id : undefined,
+      customer_label:
+        typeof s.customer_label === "string" ? s.customer_label : undefined,
       created_from: isoDate(s.created_from),
       created_to: isoDate(s.created_to),
     };

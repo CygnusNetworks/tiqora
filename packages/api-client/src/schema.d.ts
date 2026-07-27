@@ -9253,7 +9253,10 @@ export interface components {
         SearchResponse: {
             /** Estimated Total */
             estimated_total: number;
-            /** Facets */
+            /**
+             * Facets
+             * @description Facet distribution for UI-consumed facets (queue_id, state_type); values are string keys → hit counts.
+             */
             facets?: {
                 [key: string]: {
                     [key: string]: number;
