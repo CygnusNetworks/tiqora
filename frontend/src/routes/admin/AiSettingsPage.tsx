@@ -17,6 +17,7 @@ export function AiSettingsPage() {
 
   const [disclosureText, setDisclosureText] = useState("");
   const [globalCap, setGlobalCap] = useState<string>("");
+  const [autoReplyPaused, setAutoReplyPaused] = useState(false);
   const [pendingMode, setPendingMode] = useState<OperationMode | null>(null);
   const [statusMsg, setStatusMsg] = useState<string | null>(null);
 
@@ -44,6 +45,7 @@ export function AiSettingsPage() {
           ? String(settingsQ.data.global_max_replies_per_hour)
           : "",
       );
+      setAutoReplyPaused(Boolean(settingsQ.data.auto_reply_paused));
     }
   }, [settingsQ.data]);
 
@@ -62,7 +64,15 @@ export function AiSettingsPage() {
     saveM.mutate({
       disclosure_default_text: disclosureText,
       global_max_replies_per_hour: capNum != null && Number.isFinite(capNum) ? capNum : null,
+      auto_reply_paused: autoReplyPaused,
     });
+  };
+
+  const toggleAutoReplyPaused = () => {
+    setStatusMsg(null);
+    const next = !autoReplyPaused;
+    setAutoReplyPaused(next);
+    saveM.mutate({ auto_reply_paused: next });
   };
 
   const confirmModeChange = () => {
@@ -105,6 +115,15 @@ export function AiSettingsPage() {
           data-testid="admin-ai-parallel-banner"
         >
           {t("admin.ai.settings.parallelBanner")}
+        </div>
+      )}
+
+      {autoReplyPaused && (
+        <div
+          className="rounded-lg border border-danger/40 bg-danger/10 p-3 text-sm text-danger"
+          data-testid="admin-ai-auto-reply-paused-banner"
+        >
+          {t("admin.ai.settings.autoReplyPausedBanner")}
         </div>
       )}
 
@@ -196,6 +215,34 @@ export function AiSettingsPage() {
             </div>
           </div>
         )}
+      </div>
+
+      <div className="space-y-3 rounded-lg border border-hairline bg-surface p-4">
+        <h2 className="font-display text-sm font-semibold text-ink">
+          {t("admin.ai.settings.autoReplyKillSwitch")}
+        </h2>
+        <p className="text-sm text-muted">{t("admin.ai.settings.autoReplyKillSwitchHint")}</p>
+        <div className="flex flex-wrap items-center gap-3">
+          <Button
+            variant={autoReplyPaused ? "primary" : "ghost"}
+            size="sm"
+            data-testid="admin-ai-auto-reply-pause-toggle"
+            disabled={saveM.isPending}
+            onClick={toggleAutoReplyPaused}
+          >
+            {autoReplyPaused
+              ? t("admin.ai.settings.autoReplyResume")
+              : t("admin.ai.settings.autoReplyPause")}
+          </Button>
+          <span
+            className="text-sm text-muted"
+            data-testid="admin-ai-auto-reply-pause-status"
+          >
+            {autoReplyPaused
+              ? t("admin.ai.settings.autoReplyPausedStatus")
+              : t("admin.ai.settings.autoReplyActiveStatus")}
+          </span>
+        </div>
       </div>
 
       <div className="space-y-3 rounded-lg border border-hairline bg-surface p-4">

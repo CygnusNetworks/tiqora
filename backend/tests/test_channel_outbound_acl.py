@@ -13,12 +13,14 @@ from tiqora.domain.ticket_write_service import TicketAccessDenied, TicketNotFoun
 @pytest.mark.asyncio
 async def test_assert_ticket_note_permission_missing_ticket() -> None:
     session = MagicMock()
-    with patch(
-        "tiqora.channels.common._ticket_must_exist",
-        new=AsyncMock(side_effect=TicketNotFound(99)),
+    with (
+        patch(
+            "tiqora.channels.common._ticket_must_exist",
+            new=AsyncMock(side_effect=TicketNotFound(99)),
+        ),
+        pytest.raises(TicketNotFound),
     ):
-        with pytest.raises(TicketNotFound):
-            await assert_ticket_note_permission(session, user_id=1, ticket_id=99)
+        await assert_ticket_note_permission(session, user_id=1, ticket_id=99)
 
 
 @pytest.mark.asyncio

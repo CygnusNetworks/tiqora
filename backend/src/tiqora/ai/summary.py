@@ -60,6 +60,7 @@ from tiqora.ai.models import (
 )
 from tiqora.ai.pii import PiiMapper
 from tiqora.ai.policies import get_queue_policy_by_queue
+from tiqora.ai.prompt_safety import UNTRUSTED_CONTENT_SUMMARY_BLOCK
 from tiqora.config import Settings, get_settings
 
 logger = structlog.get_logger(__name__)
@@ -150,7 +151,8 @@ _SYSTEM_PROMPT_DETAILED = (
 
 
 def _system_prompt_for_detail(detail: str) -> str:
-    return _SYSTEM_PROMPT_DETAILED if detail == DETAIL_DETAILED else _SYSTEM_PROMPT
+    base = _SYSTEM_PROMPT_DETAILED if detail == DETAIL_DETAILED else _SYSTEM_PROMPT
+    return f"{UNTRUSTED_CONTENT_SUMMARY_BLOCK}\n\n{base}"
 
 
 _ATTACH_SIZE_RE = re.compile(r"^\[Anhang: (.+?) — ca\. (\d+) Zeichen\]", re.MULTILINE)

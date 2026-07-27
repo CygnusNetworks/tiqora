@@ -29,6 +29,7 @@ from tiqora.ai.summary import (
     TRIGGER_MANUAL,
     SummaryAclDeniedError,
     SummaryPolicyDisabledError,
+    _system_prompt_for_detail,
     auto_summary_due,
     summarize_ticket,
 )
@@ -823,7 +824,8 @@ async def test_summary_detail_standard_sends_unchanged_system_prompt(
                 trigger=TRIGGER_MANUAL,
                 acting_user_id=seed["agent_id"],
             )
-        assert llm.last_system_message == _SYSTEM_PROMPT
+        assert llm.last_system_message == _system_prompt_for_detail("standard")
+        assert "UNTRUSTED" in (llm.last_system_message or "")
     finally:
         await engine.dispose()
 
@@ -850,7 +852,7 @@ async def test_summary_detail_detailed_sends_detailed_system_prompt(
                 trigger=TRIGGER_MANUAL,
                 acting_user_id=seed["agent_id"],
             )
-        assert llm.last_system_message == _SYSTEM_PROMPT_DETAILED
+        assert llm.last_system_message == _system_prompt_for_detail("detailed")
     finally:
         await engine.dispose()
 
@@ -880,7 +882,7 @@ async def test_summary_detail_request_override_beats_policy(
                 acting_user_id=seed["agent_id"],
                 detail="detailed",
             )
-        assert llm.last_system_message == _SYSTEM_PROMPT_DETAILED
+        assert llm.last_system_message == _system_prompt_for_detail("detailed")
     finally:
         await engine.dispose()
 
