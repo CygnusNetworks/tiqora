@@ -1889,7 +1889,8 @@
       "detail": "Detail",
       "detailField": "Detail / SMTP response",
       "empty": "No log entries match the filters.",
-      "entries": "entries"
+      "entries": "entries",
+      "selectPrompt": "Select a message to see its details."
     },
     "attachments": {
       "title_plural": "Attachments",

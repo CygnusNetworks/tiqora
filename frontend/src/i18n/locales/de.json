@@ -1889,7 +1889,8 @@
       "detail": "Detail",
       "detailField": "Detail / SMTP-Antwort",
       "empty": "Keine Einträge für die Filter.",
-      "entries": "Einträge"
+      "entries": "Einträge",
+      "selectPrompt": "Nachricht auswählen, um Details zu sehen."
     },
     "attachments": {
       "title_plural": "Anhänge",

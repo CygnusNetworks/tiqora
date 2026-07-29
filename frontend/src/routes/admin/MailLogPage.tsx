@@ -216,70 +216,181 @@ export function MailLogPage() {
         </label>
       </div>
 
-      <div className="overflow-x-auto rounded border border-hairline bg-surface">
-        {listQ.isLoading ? (
-          <div className="flex justify-center p-8">
-            <Spinner />
-          </div>
-        ) : items.length === 0 ? (
-          <p className="p-6 text-sm text-muted" data-testid="mail-log-empty">
-            {t("admin.mailLog.empty")}
-          </p>
-        ) : (
-          <table className="w-full min-w-[48rem] text-left text-sm" data-testid="mail-log-table">
-            <thead className="border-b border-hairline bg-surface-subtle text-xs uppercase tracking-wide text-muted">
-              <tr>
-                <th className="px-3 py-2 font-medium">{t("admin.mailLog.time")}</th>
-                <th className="px-3 py-2 font-medium">{t("admin.mailLog.direction")}</th>
-                <th className="px-3 py-2 font-medium">{t("admin.mailLog.status")}</th>
-                <th className="px-3 py-2 font-medium">{t("admin.mailLog.fromTo")}</th>
-                <th className="px-3 py-2 font-medium">{t("admin.mailLog.subject")}</th>
-                <th className="px-3 py-2 font-medium">{t("admin.mailLog.ticket")}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {items.map((row) => (
-                <tr
-                  key={row.id}
-                  data-testid={`mail-log-row-${row.id}`}
-                  className="cursor-pointer border-b border-hairline last:border-0 hover:bg-surface-subtle"
-                  onClick={() => setSelected(row)}
-                >
-                  <td className="whitespace-nowrap px-3 py-2 font-mono text-xs text-muted">
-                    {formatDateTime(row.created_at, locale)}
-                  </td>
-                  <td className="px-3 py-2">
+      {/* Split view ("Variante C"): message list left, fixed detail panel
+          right — like a mail client, no overlaying drawer. ArrowUp/Down move
+          the selection along the list; the detail follows. */}
+      <div className="grid items-start gap-4 lg:grid-cols-[1.1fr_0.9fr]">
+        <div className="overflow-hidden rounded-xl border border-hairline bg-surface">
+          {listQ.isLoading ? (
+            <div className="flex justify-center p-8">
+              <Spinner />
+            </div>
+          ) : items.length === 0 ? (
+            <p className="p-6 text-sm text-muted" data-testid="mail-log-empty">
+              {t("admin.mailLog.empty")}
+            </p>
+          ) : (
+            <div
+              data-testid="mail-log-table"
+              role="listbox"
+              aria-label={t("admin.mailLog.title")}
+              tabIndex={0}
+              onKeyDown={(e) => {
+                if (e.key !== "ArrowDown" && e.key !== "ArrowUp") return;
+                e.preventDefault();
+                const idx = items.findIndex((r) => r.id === selected?.id);
+                const next =
+                  e.key === "ArrowDown"
+                    ? items[Math.min(idx + 1, items.length - 1)]
+                    : items[Math.max(idx - 1, 0)];
+                if (next) setSelected(next);
+              }}
+              className="focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent"
+            >
+              {items.map((row) => {
+                const isSel = selected?.id === row.id;
+                return (
+                  <div
+                    key={row.id}
+                    role="option"
+                    aria-selected={isSel}
+                    data-testid={`mail-log-row-${row.id}`}
+                    className={cn(
+                      "flex cursor-pointer items-center gap-3 border-b border-hairline px-3.5 py-2.5 last:border-0",
+                      isSel
+                        ? "bg-accent-dim shadow-[inset_3px_0_0_0] shadow-accent"
+                        : "hover:bg-surface-subtle",
+                    )}
+                    onClick={() => setSelected(row)}
+                  >
                     <DirectionIcon direction={row.direction} />
-                  </td>
-                  <td className="px-3 py-2">
-                    <Badge tone={statusTone(row.status)} data-testid={`mail-log-status-${row.status}`}>
-                      {row.status}
-                    </Badge>
-                  </td>
-                  <td className="max-w-xs truncate px-3 py-2 text-xs">
-                    <span className="text-ink">{row.from_addr || "—"}</span>
-                    <span className="text-muted"> → </span>
-                    <span className="text-ink">{row.to_addr || "—"}</span>
-                  </td>
-                  <td className="max-w-xs truncate px-3 py-2">{row.subject || "—"}</td>
-                  <td className="px-3 py-2">
-                    {row.ticket_id != null ? (
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate text-[13.5px] font-semibold text-ink">
+                        {row.subject || "—"}
+                      </div>
+                      <div className="truncate font-mono text-xs text-muted">
+                        {row.from_addr || "—"}
+                        <span className="opacity-60"> → </span>
+                        {row.to_addr || "—"}
+                      </div>
+                    </div>
+                    {row.ticket_id != null && (
                       <Link
                         to="/agent/tickets/$ticketId"
                         params={{ ticketId: String(row.ticket_id) }}
-                        className="font-mono text-xs text-accent hover:underline"
+                        className="shrink-0 font-mono text-xs font-semibold text-accent hover:underline"
                         onClick={(e) => e.stopPropagation()}
                       >
                         #{row.ticket_id}
                       </Link>
-                    ) : (
-                      "—"
                     )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                    <Badge
+                      tone={statusTone(row.status)}
+                      data-testid={`mail-log-status-${row.status}`}
+                    >
+                      {row.status}
+                    </Badge>
+                    <span
+                      className="shrink-0 text-right font-mono text-[11px] tabular-nums text-muted"
+                      title={formatDateTime(row.created_at, locale)}
+                    >
+                      {formatDateTime(row.created_at, locale)}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        {selected != null && detail != null ? (
+          <aside
+            className="sticky top-4 flex max-h-[calc(100vh-2rem)] flex-col overflow-hidden rounded-xl border border-hairline bg-surface"
+            data-testid="mail-log-drawer"
+          >
+            <div className="flex items-start justify-between gap-3 border-b border-hairline px-4 py-3">
+              <div className="min-w-0">
+                <h2 className="truncate font-display text-[15px] font-semibold text-ink">
+                  {detail.subject || `${t("admin.mailLog.detail")} #${detail.id}`}
+                </h2>
+                <p className="mt-0.5 flex flex-wrap items-center gap-2 text-xs text-muted">
+                  <span className="inline-flex items-center gap-1.5">
+                    <DirectionIcon direction={detail.direction} />
+                    {detail.direction === "out"
+                      ? t("admin.mailLog.dirOut")
+                      : t("admin.mailLog.dirIn")}
+                  </span>
+                  <Badge tone={statusTone(detail.status)}>{detail.status}</Badge>
+                  <span className="font-mono tabular-nums">
+                    {formatDateTime(detail.created_at, locale)}
+                  </span>
+                </p>
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setSelected(null)}
+                data-testid="mail-log-drawer-close"
+              >
+                ✕
+              </Button>
+            </div>
+            <div className="flex-1 space-y-3 overflow-y-auto p-4 text-sm">
+              <DetailRow label={t("admin.mailLog.from")} value={detail.from_addr || "—"} mono />
+              <DetailRow label={t("admin.mailLog.to")} value={detail.to_addr || "—"} mono />
+              <DetailRow label="Cc" value={detail.cc_addr || "—"} mono />
+              <DetailRow label="Message-ID" value={detail.message_id || "—"} mono />
+              <DetailRow
+                label={t("admin.mailLog.ticket")}
+                value={
+                  detail.ticket_id != null ? (
+                    <Link
+                      to="/agent/tickets/$ticketId"
+                      params={{ ticketId: String(detail.ticket_id) }}
+                      className="text-accent hover:underline"
+                    >
+                      #{detail.ticket_id}
+                    </Link>
+                  ) : (
+                    "—"
+                  )
+                }
+              />
+              <DetailRow
+                label="Article"
+                value={detail.article_id != null ? String(detail.article_id) : "—"}
+                mono
+              />
+              <DetailRow label={t("admin.mailLog.queue")} value={detail.queue || "—"} />
+              <DetailRow
+                label="SMTP"
+                value={detail.smtp_code != null ? String(detail.smtp_code) : "—"}
+                mono
+              />
+              <DetailRow
+                label={t("admin.mailLog.duration")}
+                value={detail.duration_ms != null ? `${detail.duration_ms} ms` : "—"}
+              />
+              <div>
+                <div className="mb-1 text-xs font-medium uppercase tracking-wide text-muted">
+                  {t("admin.mailLog.detailField")}
+                </div>
+                <pre
+                  className="max-h-64 overflow-auto whitespace-pre-wrap rounded border border-hairline bg-bg p-3 font-mono text-xs text-ink"
+                  data-testid="mail-log-detail-body"
+                >
+                  {detail.detail || "—"}
+                </pre>
+              </div>
+            </div>
+          </aside>
+        ) : (
+          <div
+            className="sticky top-4 hidden min-h-[16rem] items-center justify-center rounded-xl border border-dashed border-hairline bg-surface p-6 text-center text-sm text-muted lg:flex"
+            data-testid="mail-log-detail-placeholder"
+          >
+            {t("admin.mailLog.selectPrompt")}
+          </div>
         )}
       </div>
 
@@ -314,96 +425,6 @@ export function MailLogPage() {
         </div>
       )}
 
-      {selected != null && detail != null && (
-        <div
-          className="fixed inset-0 z-40 flex justify-end bg-black/30"
-          data-testid="mail-log-drawer-backdrop"
-          onClick={() => setSelected(null)}
-        >
-          <aside
-            className="flex h-full w-full max-w-lg flex-col border-l border-hairline bg-surface shadow-xl"
-            data-testid="mail-log-drawer"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between border-b border-hairline px-4 py-3">
-              <h2 className="font-display text-base font-semibold text-ink">
-                {t("admin.mailLog.detail")} #{detail.id}
-              </h2>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setSelected(null)}
-                data-testid="mail-log-drawer-close"
-              >
-                ✕
-              </Button>
-            </div>
-            <div className="flex-1 space-y-3 overflow-y-auto p-4 text-sm">
-              <DetailRow label={t("admin.mailLog.time")} value={formatDateTime(detail.created_at, locale)} />
-              <DetailRow
-                label={t("admin.mailLog.direction")}
-                value={
-                  <span className="inline-flex items-center gap-2">
-                    <DirectionIcon direction={detail.direction} />
-                    {detail.direction}
-                  </span>
-                }
-              />
-              <DetailRow
-                label={t("admin.mailLog.status")}
-                value={<Badge tone={statusTone(detail.status)}>{detail.status}</Badge>}
-              />
-              <DetailRow label={t("admin.mailLog.from")} value={detail.from_addr || "—"} mono />
-              <DetailRow label={t("admin.mailLog.to")} value={detail.to_addr || "—"} mono />
-              <DetailRow label="Cc" value={detail.cc_addr || "—"} mono />
-              <DetailRow label={t("admin.mailLog.subject")} value={detail.subject || "—"} />
-              <DetailRow label="Message-ID" value={detail.message_id || "—"} mono />
-              <DetailRow
-                label={t("admin.mailLog.ticket")}
-                value={
-                  detail.ticket_id != null ? (
-                    <Link
-                      to="/agent/tickets/$ticketId"
-                      params={{ ticketId: String(detail.ticket_id) }}
-                      className="text-accent hover:underline"
-                    >
-                      #{detail.ticket_id}
-                    </Link>
-                  ) : (
-                    "—"
-                  )
-                }
-              />
-              <DetailRow label="Article" value={detail.article_id != null ? String(detail.article_id) : "—"} mono />
-              <DetailRow label={t("admin.mailLog.queue")} value={detail.queue || "—"} />
-              <DetailRow
-                label="SMTP"
-                value={
-                  detail.smtp_code != null
-                    ? String(detail.smtp_code)
-                    : "—"
-                }
-                mono
-              />
-              <DetailRow
-                label={t("admin.mailLog.duration")}
-                value={detail.duration_ms != null ? `${detail.duration_ms} ms` : "—"}
-              />
-              <div>
-                <div className="mb-1 text-xs font-medium uppercase tracking-wide text-muted">
-                  {t("admin.mailLog.detailField")}
-                </div>
-                <pre
-                  className="max-h-64 overflow-auto whitespace-pre-wrap rounded border border-hairline bg-bg p-3 font-mono text-xs text-ink"
-                  data-testid="mail-log-detail-body"
-                >
-                  {detail.detail || "—"}
-                </pre>
-              </div>
-            </div>
-          </aside>
-        </div>
-      )}
     </div>
   );
 }
