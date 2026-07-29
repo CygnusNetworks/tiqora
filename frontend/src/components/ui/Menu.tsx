@@ -4,11 +4,19 @@ import {
   useContext,
   useEffect,
   useId,
+  useLayoutEffect,
   useRef,
   useState,
   type ReactNode,
 } from "react";
+import { createPortal } from "react-dom";
 import { cn } from "@/lib/cn";
+
+/** Rough panel height budget used only to decide whether to flip the panel
+ * above the trigger when there isn't room below (mirrors `SelectMenu`). */
+const PANEL_MAX_H = 280;
+
+type PanelPos = { top?: number; bottom?: number; left?: number; right?: number };
 
 /**
  * A lightweight dropdown menu primitive — no external dependency. Owns its own
@@ -54,11 +62,35 @@ export function Menu({
 }) {
   const [open, setOpen] = useState(false);
   const [autoFocus, setAutoFocus] = useState(false);
+  const [pos, setPos] = useState<PanelPos | null>(null);
   const triggerRef = useRef<HTMLButtonElement | null>(null);
   const panelRef = useRef<HTMLDivElement | null>(null);
   const menuId = useId();
 
   const close = useCallback(() => setOpen(false), []);
+
+  // The panel is portaled to `document.body` (see below) so it is never clipped
+  // by an `overflow` ancestor such as the admin `DataTable` scroll container —
+  // previously the row "Aktionen" menu was swallowed for rows near the bottom.
+  // Derive its fixed position from the trigger rect on open, flipping above when
+  // there isn't room below.
+  useLayoutEffect(() => {
+    if (!open) {
+      setPos(null);
+      return;
+    }
+    const el = triggerRef.current;
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    const spaceBelow = window.innerHeight - rect.bottom;
+    const flip = spaceBelow < PANEL_MAX_H && rect.top > spaceBelow;
+    setPos({
+      top: flip ? undefined : rect.bottom + 6,
+      bottom: flip ? window.innerHeight - rect.top + 6 : undefined,
+      left: align === "right" ? undefined : rect.left,
+      right: align === "right" ? window.innerWidth - rect.right : undefined,
+    });
+  }, [open, align]);
 
   // Outside pointer-down + Escape close, and initial focus into the panel when
   // opened by keyboard. Focus returns to the trigger on close.
@@ -82,11 +114,23 @@ export function Menu({
         triggerRef.current?.focus();
       }
     };
+    // The panel is fixed-positioned from the trigger rect on open; scrolling or
+    // resizing would leave it stranded, so just close rather than re-track.
+    // Scrolling inside the panel itself (long menus) must not close it.
+    const onScroll = (e: Event) => {
+      if (e.target instanceof Node && panelRef.current?.contains(e.target)) return;
+      setOpen(false);
+    };
+    const onResize = () => setOpen(false);
     document.addEventListener("pointerdown", onPointerDown);
     document.addEventListener("keydown", onKey);
+    window.addEventListener("scroll", onScroll, true);
+    window.addEventListener("resize", onResize);
     return () => {
       document.removeEventListener("pointerdown", onPointerDown);
       document.removeEventListener("keydown", onKey);
+      window.removeEventListener("scroll", onScroll, true);
+      window.removeEventListener("resize", onResize);
     };
   }, [open]);
 
@@ -139,22 +183,26 @@ export function Menu({
           onKeyDown: onTriggerKeyDown,
         },
       })}
-      {open && (
-        <div
-          ref={panelRef}
-          role="menu"
-          id={menuId}
-          data-testid={panelTestId}
-          onKeyDown={onPanelKeyDown}
-          className={cn(
-            "absolute z-50 mt-1.5 min-w-[13rem] overflow-hidden rounded-xl border border-hairline bg-surface p-1 shadow-xl animate-route-in",
-            align === "right" ? "right-0" : "left-0",
-            panelClassName,
-          )}
-        >
-          <MenuContext.Provider value={{ close }}>{children}</MenuContext.Provider>
-        </div>
-      )}
+      {open &&
+        pos &&
+        createPortal(
+          <div
+            ref={panelRef}
+            role="menu"
+            id={menuId}
+            data-testid={panelTestId}
+            data-portal-menu
+            onKeyDown={onPanelKeyDown}
+            style={{ position: "fixed", ...pos }}
+            className={cn(
+              "z-50 max-h-[min(20rem,80vh)] min-w-[13rem] overflow-y-auto rounded-xl border border-hairline bg-surface p-1 shadow-xl animate-route-in",
+              panelClassName,
+            )}
+          >
+            <MenuContext.Provider value={{ close }}>{children}</MenuContext.Provider>
+          </div>,
+          document.body,
+        )}
     </div>
   );
 }
