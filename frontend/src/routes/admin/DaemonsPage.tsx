@@ -1,12 +1,13 @@
-import { useState } from "react";
+import { Fragment, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { api, type DaemonServiceOut, type DaemonUpdate } from "@/lib/api";
 import { Button } from "@/components/ui/Button";
 import { Spinner } from "@/components/ui/Spinner";
-import { formatDateTime } from "@/lib/format";
+import { formatAgeSeconds, formatDateTime } from "@/lib/format";
 import { statusColor, type StatusColor } from "@/lib/daemonStatus";
 import { HelpPopover } from "@/components/ui/HelpPopover";
+import { cn } from "@/lib/cn";
 
 const QUERY_KEY = ["admin", "daemons"] as const;
 const REFETCH_INTERVAL_MS = 10_000;
@@ -17,11 +18,83 @@ const REFETCH_INTERVAL_MS = 10_000;
 const TAKEOVER_SLUGS = new Set(["postmaster", "escalation", "notifications", "generic_agent"]);
 
 const DOT_CLASS: Record<StatusColor, string> = {
-  green: "bg-accent",
+  green: "bg-green",
   amber: "bg-amber",
   red: "bg-danger",
   grey: "bg-muted",
 };
+
+/** Status word color + dot halo per health color ("Variante B" restyle). */
+const STATUS_TEXT_CLASS: Record<StatusColor, string> = {
+  green: "text-green",
+  amber: "text-amber",
+  red: "text-danger",
+  grey: "text-muted",
+};
+const DOT_HALO_CLASS: Record<StatusColor, string> = {
+  green: "shadow-[0_0_0_3px] shadow-green/15",
+  amber: "shadow-[0_0_0_3px] shadow-amber/15",
+  red: "shadow-[0_0_0_3px] shadow-danger/15",
+  grey: "",
+};
+
+/** Compact humanized form of the raw last_result JSON — "processed: 12" reads
+ * better in a pill than {"processed":12}. Non-objects fall back to String(). */
+function humanizeResult(result: unknown): string {
+  if (result == null) return "";
+  if (typeof result === "object" && !Array.isArray(result)) {
+    const entries = Object.entries(result as Record<string, unknown>);
+    if (entries.length > 0) {
+      return entries.map(([k, v]) => `${k}: ${String(v)}`).join(" · ");
+    }
+  }
+  return JSON.stringify(result);
+}
+
+/** Styled on/off switch backed by a real (screen-reader-only) checkbox so
+ * existing tests and a11y semantics (checked/disabled) keep working. */
+function Switch({
+  checked,
+  disabled,
+  onChange,
+  testId,
+  label,
+}: {
+  checked: boolean;
+  disabled?: boolean;
+  onChange: () => void;
+  testId: string;
+  label: string;
+}) {
+  return (
+    <label
+      className={cn(
+        "relative inline-flex shrink-0 items-center",
+        disabled ? "cursor-not-allowed" : "cursor-pointer",
+      )}
+    >
+      <input
+        type="checkbox"
+        className="peer sr-only"
+        data-testid={testId}
+        checked={checked}
+        disabled={disabled}
+        onChange={onChange}
+        aria-label={label}
+      />
+      <span
+        className={cn(
+          "relative h-5 w-[34px] rounded-full bg-hairline transition-colors duration-150",
+          "after:absolute after:left-0.5 after:top-0.5 after:h-4 after:w-4 after:rounded-full after:bg-white after:shadow after:transition-transform after:duration-150",
+          "peer-checked:bg-accent peer-checked:after:translate-x-3.5",
+          "peer-disabled:opacity-50",
+          "peer-focus-visible:outline peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-accent",
+        )}
+        aria-hidden
+      />
+    </label>
+  );
+}
 
 export function DaemonsPage() {
   const { t, i18n } = useTranslation();
@@ -103,21 +176,13 @@ export function DaemonsPage() {
         <p className="mt-1 text-sm text-muted">{t("admin.daemons.description")}</p>
       </div>
 
-      <div className="overflow-x-auto rounded-lg border border-hairline bg-surface">
+      <div className="overflow-x-auto rounded-xl border border-hairline bg-surface">
         <table className="w-full text-left text-sm">
-          <thead className="border-b border-hairline text-xs uppercase tracking-wide text-muted">
+          <thead className="border-b border-hairline bg-surface-subtle text-xs uppercase tracking-wide text-muted">
             <tr>
-              <th className="px-3 py-2">{t("admin.daemons.columns.status")}</th>
-              <th className="px-3 py-2">{t("admin.daemons.columns.service")}</th>
-              <th className="px-3 py-2">
-                <span className="inline-flex items-center gap-1.5">
-                  {t("admin.daemons.columns.enabled")}
-                  <HelpPopover title={t("admin.daemons.columns.enabled")} testId="daemons-help-enabled">
-                    {t("admin.help.daemons.enabled")}
-                  </HelpPopover>
-                </span>
-              </th>
-              <th className="px-3 py-2">
+              <th className="px-3 py-2 font-medium">{t("admin.daemons.columns.status")}</th>
+              <th className="px-3 py-2 font-medium">{t("admin.daemons.columns.service")}</th>
+              <th className="px-3 py-2 font-medium">
                 <span className="inline-flex items-center gap-1.5">
                   {t("admin.daemons.columns.schedule")}
                   <HelpPopover title={t("admin.daemons.columns.schedule")} testId="daemons-help-schedule">
@@ -125,128 +190,179 @@ export function DaemonsPage() {
                   </HelpPopover>
                 </span>
               </th>
-              <th className="px-3 py-2">{t("admin.daemons.columns.lastOk")}</th>
-              <th className="px-3 py-2">{t("admin.daemons.columns.lastResult")}</th>
+              <th className="px-3 py-2 font-medium">{t("admin.daemons.columns.lastOk")}</th>
+              <th className="px-3 py-2 font-medium">{t("admin.daemons.columns.lastResult")}</th>
+              <th className="px-3 py-2 font-medium">
+                <span className="inline-flex items-center gap-1.5">
+                  {t("admin.daemons.columns.enabled")}
+                  <HelpPopover title={t("admin.daemons.columns.enabled")} testId="daemons-help-enabled">
+                    {t("admin.help.daemons.enabled")}
+                  </HelpPopover>
+                </span>
+              </th>
             </tr>
           </thead>
           <tbody>
             {services.map((svc) => {
               const color = statusColor(svc, nowMs);
+              const hasError = svc.enabled && Boolean(svc.last_error);
               const draft = drafts[svc.slug];
               const intervalValue = draft ?? String(svc.interval_seconds ?? "");
+              const lastOkAgeS = svc.last_ok_at
+                ? (nowMs - new Date(svc.last_ok_at).getTime()) / 1000
+                : null;
+              const resultText = humanizeResult(svc.last_result);
               return (
-                <tr
-                  key={svc.slug}
-                  className="border-b border-hairline last:border-0"
-                  data-testid={`daemon-row-${svc.slug}`}
-                >
-                  <td className="px-3 py-2 align-top">
-                    {/*
-                      Status is runtime health only. When disabled, Aktiv already
-                      carries the config state — don't also label status "Deaktiviert".
-                    */}
-                    <span
-                      className="inline-flex items-center gap-1.5"
-                      data-testid={`daemon-status-${svc.slug}`}
-                      data-status={color}
-                      title={svc.enabled ? (svc.last_error ?? undefined) : undefined}
-                    >
-                      {svc.enabled ? (
-                        <>
-                          <span className={`h-2.5 w-2.5 rounded-full ${DOT_CLASS[color]}`} />
-                          {t(`admin.daemons.status.${color}`)}
-                        </>
-                      ) : (
-                        <span className="text-muted">—</span>
-                      )}
-                    </span>
-                    {svc.enabled && svc.last_error ? (
-                      <p className="mt-1 max-w-xs truncate text-xs text-danger">{svc.last_error}</p>
-                    ) : null}
-                  </td>
-                  <td className="px-3 py-2 align-top">
-                    <div className="flex items-center gap-1.5 font-medium text-ink">
-                      {t(`admin.daemons.services.${svc.slug}.name`)}
-                      {TAKEOVER_SLUGS.has(svc.slug) && (
-                        <HelpPopover
-                          title={t(`admin.daemons.services.${svc.slug}.name`)}
-                          testId={`daemons-help-takeover-${svc.slug}`}
-                        >
-                          {t("admin.help.daemons.takeover")}
-                        </HelpPopover>
-                      )}
-                    </div>
-                    <div className="text-xs text-muted">
-                      {t(`admin.daemons.services.${svc.slug}.description`)}
-                    </div>
-                    {TAKEOVER_SLUGS.has(svc.slug) ? (
-                      <p className="mt-1 text-xs text-amber">{t("admin.daemons.takeoverNote")}</p>
-                    ) : null}
-                  </td>
-                  <td className="px-3 py-2 align-top">
-                    <label className="flex items-center gap-2">
-                      <input
-                        type="checkbox"
-                        data-testid={`daemon-toggle-${svc.slug}`}
-                        checked={svc.enabled}
-                        disabled={!svc.toggleable || updateM.isPending}
-                        onChange={() => toggle(svc)}
-                        className="rounded border-hairline"
-                      />
-                      {!svc.toggleable ? (
-                        <span className="rounded bg-surface-subtle px-1.5 py-0.5 text-[11px] font-medium text-muted">
-                          {t("admin.daemons.alwaysOn")}
-                        </span>
-                      ) : null}
-                    </label>
-                  </td>
-                  <td className="px-3 py-2 align-top">
-                    {svc.schedule === "daily" ? (
-                      <span className="text-ink">
-                        {t("admin.daemons.dailyAt", { time: svc.daily_at })}
-                      </span>
-                    ) : svc.slug === "poller" ? (
-                      <span className="text-ink">
-                        {t("admin.daemons.intervalSeconds", { seconds: svc.interval_seconds })}
-                      </span>
-                    ) : (
-                      <div className="flex items-center gap-1.5">
-                        <input
-                          type="number"
-                          min={5}
-                          data-testid={`daemon-interval-${svc.slug}`}
-                          value={intervalValue}
-                          onChange={(e) =>
-                            setDrafts((d) => ({ ...d, [svc.slug]: e.target.value }))
-                          }
-                          onBlur={() => commitInterval(svc)}
-                          onKeyDown={(e) => {
-                            if (e.key === "Enter") (e.target as HTMLInputElement).blur();
-                          }}
-                          className="w-20 rounded-md border border-hairline bg-surface-subtle px-2 py-1 text-sm text-ink"
-                        />
-                        <span className="text-xs text-muted">{t("admin.daemons.seconds")}</span>
-                        {svc.interval_overridden ? (
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => resetInterval(svc)}
-                            data-testid={`daemon-interval-reset-${svc.slug}`}
-                          >
-                            {t("admin.daemons.reset")}
-                          </Button>
-                        ) : null}
-                      </div>
+                <Fragment key={svc.slug}>
+                  <tr
+                    className={cn(
+                      "border-b border-hairline last:border-0",
+                      hasError ? "border-b-0 bg-danger/5" : "hover:bg-surface-subtle/60",
                     )}
-                  </td>
-                  <td className="px-3 py-2 align-top text-xs text-muted">
-                    {svc.last_ok_at ? formatDateTime(svc.last_ok_at, locale) : "—"}
-                  </td>
-                  <td className="px-3 py-2 align-top font-mono text-xs text-muted">
-                    {svc.last_result ? JSON.stringify(svc.last_result) : "—"}
-                  </td>
-                </tr>
+                    data-testid={`daemon-row-${svc.slug}`}
+                  >
+                    <td className="whitespace-nowrap px-3 py-2.5 align-top">
+                      {/*
+                        Status is runtime health only. When disabled, Aktiv already
+                        carries the config state — don't also label status "Deaktiviert".
+                      */}
+                      <span
+                        className={cn(
+                          "inline-flex items-center gap-2 text-[12.5px] font-semibold",
+                          STATUS_TEXT_CLASS[color],
+                        )}
+                        data-testid={`daemon-status-${svc.slug}`}
+                        data-status={color}
+                      >
+                        {svc.enabled ? (
+                          <>
+                            <span
+                              className={cn(
+                                "h-2 w-2 shrink-0 rounded-full",
+                                DOT_CLASS[color],
+                                DOT_HALO_CLASS[color],
+                              )}
+                            />
+                            {t(`admin.daemons.status.${color}`)}
+                          </>
+                        ) : (
+                          <span className="font-normal text-muted">—</span>
+                        )}
+                      </span>
+                    </td>
+                    <td className="px-3 py-2.5 align-top">
+                      <div className="flex items-center gap-1.5 font-semibold text-ink">
+                        {t(`admin.daemons.services.${svc.slug}.name`)}
+                        {TAKEOVER_SLUGS.has(svc.slug) && (
+                          <span className="inline-flex items-center gap-1 rounded-md border border-purple/30 bg-purple/10 px-1.5 py-0.5 text-[10.5px] font-semibold text-purple">
+                            {t("admin.daemons.takeoverBadge")}
+                            <HelpPopover
+                              title={t(`admin.daemons.services.${svc.slug}.name`)}
+                              testId={`daemons-help-takeover-${svc.slug}`}
+                            >
+                              {t("admin.help.daemons.takeover")}
+                            </HelpPopover>
+                          </span>
+                        )}
+                      </div>
+                      <div className="mt-0.5 text-xs text-muted">
+                        {t(`admin.daemons.services.${svc.slug}.description`)}
+                      </div>
+                    </td>
+                    <td className="whitespace-nowrap px-3 py-2.5 align-top">
+                      {svc.schedule === "daily" ? (
+                        <span className="inline-flex items-center rounded-lg border border-hairline bg-surface-subtle px-2 py-1 text-xs text-ink">
+                          {t("admin.daemons.dailyAt", { time: svc.daily_at })}
+                        </span>
+                      ) : svc.slug === "poller" ? (
+                        <span className="inline-flex items-center rounded-lg border border-hairline bg-surface-subtle px-2 py-1 text-xs text-ink">
+                          {t("admin.daemons.intervalSeconds", { seconds: svc.interval_seconds })}
+                        </span>
+                      ) : (
+                        <div className="flex items-center gap-1.5">
+                          <div className="inline-flex items-center gap-1 rounded-lg border border-hairline bg-surface-subtle px-2 py-1">
+                            <input
+                              type="number"
+                              min={5}
+                              data-testid={`daemon-interval-${svc.slug}`}
+                              value={intervalValue}
+                              onChange={(e) =>
+                                setDrafts((d) => ({ ...d, [svc.slug]: e.target.value }))
+                              }
+                              onBlur={() => commitInterval(svc)}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+                              }}
+                              className="w-14 bg-transparent text-xs text-ink [appearance:textfield] focus:outline-none [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                            />
+                            <span className="text-[11px] text-muted">
+                              {t("admin.daemons.seconds")}
+                            </span>
+                          </div>
+                          {svc.interval_overridden ? (
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => resetInterval(svc)}
+                              data-testid={`daemon-interval-reset-${svc.slug}`}
+                            >
+                              {t("admin.daemons.reset")}
+                            </Button>
+                          ) : null}
+                        </div>
+                      )}
+                    </td>
+                    <td
+                      className={cn(
+                        "whitespace-nowrap px-3 py-2.5 align-top text-xs tabular-nums",
+                        hasError ? "text-danger" : "text-muted",
+                      )}
+                      title={svc.last_ok_at ? formatDateTime(svc.last_ok_at, locale) : undefined}
+                    >
+                      {lastOkAgeS != null ? formatAgeSeconds(lastOkAgeS, locale) : "—"}
+                    </td>
+                    <td className="px-3 py-2.5 align-top">
+                      {resultText ? (
+                        <span
+                          className="inline-flex max-w-[16rem] items-center truncate rounded-full border border-hairline bg-surface-subtle px-2.5 py-0.5 font-mono text-[11px] text-ink"
+                          title={JSON.stringify(svc.last_result)}
+                        >
+                          {resultText}
+                        </span>
+                      ) : (
+                        <span className="text-xs text-muted">—</span>
+                      )}
+                    </td>
+                    <td className="whitespace-nowrap px-3 py-2.5 align-top">
+                      <span className="inline-flex items-center gap-2">
+                        <Switch
+                          checked={svc.enabled}
+                          disabled={!svc.toggleable || updateM.isPending}
+                          onChange={() => toggle(svc)}
+                          testId={`daemon-toggle-${svc.slug}`}
+                          label={t("admin.daemons.columns.enabled")}
+                        />
+                        {!svc.toggleable ? (
+                          <span className="rounded bg-surface-subtle px-1.5 py-0.5 text-[11px] font-medium text-muted">
+                            {t("admin.daemons.alwaysOn")}
+                          </span>
+                        ) : null}
+                      </span>
+                    </td>
+                  </tr>
+                  {hasError && (
+                    <tr
+                      className="border-b border-hairline bg-danger/5 last:border-0"
+                      data-testid={`daemon-error-${svc.slug}`}
+                    >
+                      <td />
+                      <td colSpan={5} className="px-3 pb-2.5 pt-0 text-xs text-danger">
+                        ⚠ {svc.last_error}
+                      </td>
+                    </tr>
+                  )}
+                </Fragment>
               );
             })}
           </tbody>

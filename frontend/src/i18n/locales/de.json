@@ -1865,7 +1865,8 @@
           "name": "KI-Audit-Bereinigung",
           "description": "Löscht LLM-Audit-Log-Einträge nach Ablauf der konfigurierten Aufbewahrungsfrist täglich."
         }
-      }
+      },
+      "takeoverBadge": "Übernahme"
     },
     "mailLog": {
       "title": "E-Mail-Kommunikationsprotokoll",
