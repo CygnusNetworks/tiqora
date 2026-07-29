@@ -52,6 +52,12 @@ def get_engine(database_url: str | None = None) -> AsyncEngine:
     return create_async_engine(
         url,
         pool_pre_ping=True,
+        # Below MariaDB's default wait_timeout (8h): idle connections in low-traffic
+        # periods (e.g. overnight) get server-closed past that point, and pre_ping's
+        # validation ping then hits a dead transport, raising a RuntimeError that
+        # SQLAlchemy's aiomysql dialect doesn't recognize as "stale, discard & retry" —
+        # it propagates as an unhandled 500 instead. Recycling proactively avoids this.
+        pool_recycle=1800,
         echo=settings.debug,
         connect_args=_utc_connect_args(url),
     )
