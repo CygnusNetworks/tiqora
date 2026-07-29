@@ -26,6 +26,9 @@ function isSafeNextPath(next: string | undefined): next is string {
   );
 }
 
+/** Delay before auto-redirect into the SPNEGO handshake after session expiry. */
+export const KERBEROS_REAUTH_DELAY_S = 30;
+
 export function LoginPage() {
   const { t } = useTranslation();
   const {
@@ -92,25 +95,37 @@ export function LoginPage() {
   ]);
 
   // Seamless SSO re-auth: when an expired session bounced the agent here (a
-  // `next` target is present) and Kerberos/SPNEGO is available, redirect
-  // straight into the handshake so a valid ticket lands them back where they
-  // were — no visible login step. `sso_error` (set by a failed handshake) and
-  // the ref both prevent an auto-retry loop; a plain visit to /login (no
-  // `next`) still shows the normal form with the Kerberos button.
+  // `next` target is present) and Kerberos/SPNEGO is available, start a short
+  // countdown then enter the handshake so a valid ticket lands them back
+  // where they were. The delay gives the user time to notice and, if needed,
+  // switch to password login instead of being yanked into Negotiate. `sso_error`
+  // (set by a failed handshake) and the ref both prevent an auto-retry loop;
+  // a plain visit to /login (no `next`) still shows the normal form with the
+  // Kerberos button.
   const ssoErrorFlag = search.sso_error === "1" || search.sso_error === "true";
   const autoSsoTriggered = useRef(false);
+  const reauthNextRef = useRef<string | undefined>(undefined);
+  const [kerberosReauthSeconds, setKerberosReauthSeconds] = useState<
+    number | null
+  >(null);
+
+  const startKerberosHandshake = (next?: string) => {
+    rememberLoginMethod("spnego");
+    window.location.assign(api.spnegoLoginUrl(next));
+  };
+
   useEffect(() => {
     if (autoSsoTriggered.current) return;
     if (isLoading || isAuthenticated || pending2fa || mustEnroll2fa) return;
     if (ssoErrorFlag || !spnegoEnabled) return;
     if (!isSafeNextPath(search.next)) return;
-    // Only silently re-auth via Kerberos if THIS browser's expired session was
+    // Only auto re-auth via Kerberos if THIS browser's expired session was
     // itself started with SPNEGO. A password (or OIDC/LDAP) agent must see the
     // normal form instead of being bounced into the Kerberos handshake.
     if (getLoginMethod() !== "spnego") return;
     autoSsoTriggered.current = true;
-    rememberLoginMethod("spnego");
-    window.location.assign(api.spnegoLoginUrl(search.next));
+    reauthNextRef.current = search.next;
+    setKerberosReauthSeconds(KERBEROS_REAUTH_DELAY_S);
   }, [
     isLoading,
     isAuthenticated,
@@ -120,6 +135,19 @@ export function LoginPage() {
     spnegoEnabled,
     search.next,
   ]);
+
+  // Tick the countdown once per second; redirect when it hits zero.
+  useEffect(() => {
+    if (kerberosReauthSeconds === null) return;
+    if (kerberosReauthSeconds <= 0) {
+      startKerberosHandshake(reauthNextRef.current);
+      return;
+    }
+    const id = window.setTimeout(() => {
+      setKerberosReauthSeconds((s) => (s === null ? null : s - 1));
+    }, 1000);
+    return () => window.clearTimeout(id);
+  }, [kerberosReauthSeconds]);
 
   // Auto-start TOTP enrollment when forced into must-enroll mode (unless the
   // agent is mid passkey registration as the alternative path).
@@ -494,6 +522,33 @@ export function LoginPage() {
             {t("auth.ssoFailed")}
           </p>
         )}
+        {kerberosReauthSeconds !== null && (
+          <div
+            className="mt-3 rounded-md border border-accent/30 bg-accent/10 px-3 py-3 text-sm text-ink"
+            role="status"
+            aria-live="polite"
+            data-testid="kerberos-reauth-banner"
+          >
+            <p className="font-medium">{t("auth.kerberosReauthTitle")}</p>
+            <p
+              className="mt-1 text-muted"
+              data-testid="kerberos-reauth-countdown"
+            >
+              {t("auth.kerberosReauthCountdown", {
+                seconds: kerberosReauthSeconds,
+              })}
+            </p>
+            <Button
+              type="button"
+              variant="secondary"
+              className="mt-3 w-full"
+              data-testid="kerberos-reauth-now"
+              onClick={() => startKerberosHandshake(reauthNextRef.current)}
+            >
+              {t("auth.kerberosReauthNow")}
+            </Button>
+          </div>
+        )}
         <form
           onSubmit={(e) => void onSubmit(e)}
           className="mt-7 space-y-4"
@@ -557,10 +612,7 @@ export function LoginPage() {
                   variant="secondary"
                   className="w-full"
                   data-testid="kerberos-login"
-                  onClick={() => {
-                    rememberLoginMethod("spnego");
-                    window.location.assign(api.spnegoLoginUrl());
-                  }}
+                  onClick={() => startKerberosHandshake()}
                 >
                   {t("auth.kerberosButton")}
                 </Button>

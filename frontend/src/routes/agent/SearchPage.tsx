@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link, useNavigate, useSearch } from "@tanstack/react-router";
 import DOMPurify from "dompurify";
@@ -6,7 +7,10 @@ import { api } from "@/lib/api";
 import type { KbSearchHit } from "@/lib/api";
 import { Spinner } from "@/components/ui/Spinner";
 import { Badge } from "@/components/ui/Badge";
+import { SelectMenu, type SelectMenuItem } from "@/components/ui/SelectMenu";
 import { PriorityChip, StateChip } from "@/components/ui/StatusChip";
+import { ChevronDownIcon } from "@/components/ui/icons";
+import { cn } from "@/lib/cn";
 import { SmartSearchBar } from "@/components/agent/SmartSearchBar";
 
 export type SearchSearch = {
@@ -28,9 +32,11 @@ export type SearchSearch = {
   sort?: "changed_desc" | "created_desc" | "created_asc";
 };
 
+type SortOrder = NonNullable<SearchSearch["sort"]>;
+
 const STATE_TYPES = ["new", "open", "pending", "closed"] as const;
-const SORT_ORDERS = ["changed_desc", "created_desc", "created_asc"] as const;
-const DEFAULT_SORT = "changed_desc";
+const SORT_ORDERS = ["changed_desc", "created_desc", "created_asc"] as const satisfies readonly SortOrder[];
+const DEFAULT_SORT: SortOrder = "changed_desc";
 
 /** ISO date (YYYY-MM-DD) for N days before today, local calendar. */
 function isoDaysAgo(days: number): string {
@@ -247,6 +253,15 @@ export function SearchPage() {
       ? "inline-flex items-center gap-1 rounded-full border border-accent bg-accent-dim px-2.5 py-1 text-xs font-medium text-accent"
       : "inline-flex items-center gap-1 rounded-full border border-hairline bg-surface-subtle px-2.5 py-1 text-xs text-ink hover:border-accent/50";
 
+  const sortItems: SelectMenuItem<SortOrder>[] = useMemo(
+    () =>
+      SORT_ORDERS.map((o) => ({
+        value: o,
+        label: t(`search.sort.${o}`),
+      })),
+    [t],
+  );
+
   return (
     <div className="mx-auto w-full max-w-5xl space-y-3 px-4 py-6" data-testid="search-page">
       <h1 className="font-display text-xl font-semibold text-ink">{t("search.title")}</h1>
@@ -332,27 +347,33 @@ export function SearchPage() {
               {t("search.filters.clear")}
             </button>
           )}
-          <label
-            htmlFor="search-sort"
-            className="text-[11px] font-semibold uppercase tracking-wide text-muted"
-          >
+          <span className="text-[11px] font-semibold uppercase tracking-wide text-muted">
             {t("search.sort.label")}
-          </label>
-          <select
-            id="search-sort"
+          </span>
+          <SelectMenu
+            items={sortItems}
             value={sort}
-            onChange={(e) =>
-              patchSearch({ sort: e.target.value as SearchSearch["sort"] })
-            }
-            data-testid="search-sort"
-            className="rounded-md border border-hairline bg-surface px-2.5 py-1 text-xs text-ink focus:border-accent focus:outline-none"
-          >
-            {SORT_ORDERS.map((o) => (
-              <option key={o} value={o}>
-                {t(`search.sort.${o}`)}
-              </option>
-            ))}
-          </select>
+            onSelect={(v) => patchSearch({ sort: v })}
+            panelTestId="search-sort-panel"
+            trigger={({ open, ref, toggleProps }) => (
+              <button
+                ref={ref}
+                type="button"
+                data-testid="search-sort"
+                aria-label={t("search.sort.label")}
+                {...toggleProps}
+                className="flex min-w-[9rem] items-center justify-between gap-2 rounded-md border border-hairline bg-surface px-2.5 py-1 text-xs text-ink hover:border-accent/50 hover:bg-surface-subtle focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent"
+              >
+                <span className="truncate">{t(`search.sort.${sort}`)}</span>
+                <ChevronDownIcon
+                  className={cn(
+                    "shrink-0 text-muted transition-transform duration-150",
+                    open && "rotate-180",
+                  )}
+                />
+              </button>
+            )}
+          />
         </div>
       </div>
 
