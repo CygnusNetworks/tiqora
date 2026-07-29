@@ -1,9 +1,9 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, waitFor, fireEvent } from "@testing-library/react";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { act, render, screen, waitFor, fireEvent } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { I18nextProvider } from "react-i18next";
 import i18n from "@/i18n";
-import { LoginPage } from "./LoginPage";
+import { KERBEROS_REAUTH_DELAY_S, LoginPage } from "./LoginPage";
 
 const navigate = vi.fn();
 const login = vi.fn();
@@ -113,6 +113,10 @@ describe("LoginPage", () => {
     });
   });
 
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it("shows Kerberos button only when methods.spnego is true", async () => {
     authMethods.mockResolvedValue({
       password: true,
@@ -143,7 +147,8 @@ describe("LoginPage", () => {
     };
   }
 
-  it("auto re-auths an expired SPNEGO session back into the Kerberos handshake", async () => {
+  it("counts down 30s before auto re-auth of an expired SPNEGO session", async () => {
+    vi.useFakeTimers();
     localStorage.setItem("tiqora-login-method", "spnego");
     authMethods.mockResolvedValue({
       password: true,
@@ -155,7 +160,55 @@ describe("LoginPage", () => {
     searchParams = { next: "/agent/tickets" };
     const loc = stubLocationAssign();
     renderPage();
-    await waitFor(() => expect(spnegoLoginUrl).toHaveBeenCalled());
+
+    // Flush authMethods → setSpnegoEnabled → countdown start.
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    // Banner appears; handshake is not started yet.
+    const countdown = screen.getByTestId("kerberos-reauth-countdown");
+    expect(countdown).toHaveTextContent(String(KERBEROS_REAUTH_DELAY_S));
+    expect(spnegoLoginUrl).not.toHaveBeenCalled();
+    expect(loc.assign).not.toHaveBeenCalled();
+
+    // Each tick re-schedules via useEffect, so advance one second at a time.
+    for (let i = 0; i < KERBEROS_REAUTH_DELAY_S - 1; i++) {
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(1_000);
+      });
+    }
+    expect(loc.assign).not.toHaveBeenCalled();
+    expect(screen.getByTestId("kerberos-reauth-countdown")).toHaveTextContent(
+      "1",
+    );
+
+    // Final second reaches 0 and starts the SPNEGO handshake.
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1_000);
+    });
+    expect(spnegoLoginUrl).toHaveBeenCalled();
+    expect(loc.assign).toHaveBeenCalledWith("/api/v1/auth/spnego");
+    loc.restore();
+  });
+
+  it("skips the Kerberos re-auth countdown when the user clicks Sign in now", async () => {
+    localStorage.setItem("tiqora-login-method", "spnego");
+    authMethods.mockResolvedValue({
+      password: true,
+      oidc: false,
+      spnego: true,
+      ldap: false,
+      webauthn: false,
+    });
+    searchParams = { next: "/agent/tickets" };
+    const loc = stubLocationAssign();
+    renderPage();
+
+    await screen.findByTestId("kerberos-reauth-banner");
+    fireEvent.click(screen.getByTestId("kerberos-reauth-now"));
+    expect(spnegoLoginUrl).toHaveBeenCalled();
     expect(loc.assign).toHaveBeenCalledWith("/api/v1/auth/spnego");
     loc.restore();
   });
