@@ -98,6 +98,9 @@
     "passkeyEnroll": "Register a passkey",
     "passkeyEnrollFailed": "Could not register passkey. Please try again.",
     "kerberosButton": "Sign in with Kerberos",
+    "kerberosReauthTitle": "Session expired",
+    "kerberosReauthCountdown": "Renewing Kerberos sign-in in {{seconds}}s…",
+    "kerberosReauthNow": "Sign in now",
     "ssoFailed": "SSO failed — please sign in with your password.",
     "mustEnroll": {
       "title": "Set up two-factor authentication",
