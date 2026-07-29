@@ -1865,7 +1865,8 @@
           "name": "AI audit cleanup",
           "description": "Deletes LLM audit log rows past the configured retention once a day."
         }
-      }
+      },
+      "takeoverBadge": "Takeover"
     },
     "mailLog": {
       "title": "Email communication log",
