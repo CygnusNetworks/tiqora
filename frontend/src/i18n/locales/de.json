@@ -98,6 +98,9 @@
     "passkeyEnroll": "Passkey registrieren",
     "passkeyEnrollFailed": "Passkey konnte nicht registriert werden. Bitte erneut versuchen.",
     "kerberosButton": "Mit Kerberos anmelden",
+    "kerberosReauthTitle": "Sitzung abgelaufen",
+    "kerberosReauthCountdown": "Kerberos-Anmeldung wird in {{seconds}}s erneuert…",
+    "kerberosReauthNow": "Jetzt anmelden",
     "ssoFailed": "SSO fehlgeschlagen — bitte per Passwort anmelden.",
     "mustEnroll": {
       "title": "Zwei-Faktor-Authentifizierung einrichten",
