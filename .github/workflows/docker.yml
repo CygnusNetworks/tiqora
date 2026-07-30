@@ -119,6 +119,16 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
+      - name: Render README for Docker Hub
+        if: env.HAS_DOCKERHUB == 'true' && github.ref == 'refs/heads/main'
+        run: |
+          # Docker Hub has no base URL to resolve GitHub-relative links/images
+          # against, so rewrite them to absolute GitHub URLs for the synced copy.
+          sed -E \
+            -e 's#!\[([^]]*)\]\(\./#![\1](https://raw.githubusercontent.com/CygnusNetworks/tiqora/main/#g' \
+            -e 's#\]\(\./#](https://github.com/CygnusNetworks/tiqora/blob/main/#g' \
+            README.md > README.dockerhub.md
+
       - name: Sync README to Docker Hub
         if: env.HAS_DOCKERHUB == 'true' && github.ref == 'refs/heads/main'
         uses: peter-evans/dockerhub-description@v4
@@ -127,4 +137,4 @@ jobs:
           password: ${{ secrets.DOCKER_TOKEN }}
           repository: ${{ env.DOCKERHUB_IMAGE }}
           short-description: "Self-hosted ticket/helpdesk system, database-compatible with OTRS 6.0.x / Znuny 6.0–7.3"
-          readme-filepath: ./README.md
+          readme-filepath: ./README.dockerhub.md
