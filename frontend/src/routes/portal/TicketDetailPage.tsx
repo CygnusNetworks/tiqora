@@ -2,6 +2,7 @@ import { useRef, useState, type FormEvent } from "react";
 import { useParams } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
+import { toBcp47 } from "@/i18n";
 import { portalApi, ApiError, type ArticleListItem } from "@/lib/portalApi";
 import { stateColorVar } from "@/lib/status";
 import { formatDateTime } from "@/lib/format";
@@ -26,7 +27,7 @@ type KnownBodies = Record<number, string>;
 
 export function TicketDetailPage() {
   const { t, i18n } = useTranslation();
-  const locale = i18n.language?.startsWith("de") ? "de" : "en";
+  const locale = toBcp47(i18n.language);
   const { ticketId: ticketIdParam } = useParams({ from: "/portal/tickets/$ticketId" });
   const ticketId = Number(ticketIdParam);
   const queryClient = useQueryClient();

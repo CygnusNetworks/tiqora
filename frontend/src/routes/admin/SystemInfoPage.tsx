@@ -1,6 +1,7 @@
 import type { HTMLAttributes, ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
+import { toBcp47 } from "@/i18n";
 import { api, type SystemInfoOut } from "@/lib/api";
 import { Spinner } from "@/components/ui/Spinner";
 import { formatBytes, formatDateTime } from "@/lib/format";
@@ -132,7 +133,7 @@ function containerColor(c: ContainerItem): StatusColor {
 
 export function SystemInfoPage() {
   const { t, i18n } = useTranslation();
-  const locale = i18n.language?.startsWith("de") ? "de" : "en";
+  const locale = toBcp47(i18n.language);
 
   const infoQ = useQuery({
     queryKey: QUERY_KEY,

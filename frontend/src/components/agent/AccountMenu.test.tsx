@@ -95,12 +95,12 @@ describe("AccountMenu", () => {
     expect(navigate).toHaveBeenCalledWith({ to: "/agent/security" });
   });
 
-  it("changes language via the SelectMenu and persists the choice, keeping the menu open", () => {
+  it("changes language via the SelectMenu and persists the choice, keeping the menu open", async () => {
     const changeLanguage = vi.spyOn(i18n, "changeLanguage");
     open();
     fireEvent.click(screen.getByTestId("account-menu-lang-select"));
     fireEvent.click(within(screen.getByTestId("account-menu-lang-panel")).getByText("English"));
-    expect(changeLanguage).toHaveBeenCalledWith("en");
+    await vi.waitFor(() => expect(changeLanguage).toHaveBeenCalledWith("en"));
     expect(localStorage.getItem("tiqora-lang")).toBe("en");
     // The surrounding account Menu stays open — SelectMenu's portal panel is
     // recognized as "inside" by Menu.tsx's outside-pointerdown handler.

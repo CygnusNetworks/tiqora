@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { toBcp47 } from "@/i18n";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api, type StandardTemplateOut, type StandardTemplateUpdate } from "@/lib/api";
 import { useAuth } from "@/auth/AuthContext";
@@ -17,7 +18,7 @@ const LIST_KEY = ["agent", "templates"] as const;
  */
 export function TemplatesPage() {
   const { t, i18n } = useTranslation();
-  const locale = i18n.language?.startsWith("de") ? "de" : "en";
+  const locale = toBcp47(i18n.language);
   const { user } = useAuth();
   const qc = useQueryClient();
   const [editing, setEditing] = useState<StandardTemplateOut | null>(null);

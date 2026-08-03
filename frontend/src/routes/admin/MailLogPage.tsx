@@ -2,6 +2,7 @@ import { useMemo, useState, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
+import { toBcp47 } from "@/i18n";
 import {
   api,
   type MailLogDirection,
@@ -55,7 +56,7 @@ function DirectionIcon({ direction }: { direction: string }) {
 
 export function MailLogPage() {
   const { t, i18n } = useTranslation();
-  const locale = i18n.language?.startsWith("de") ? "de" : "en";
+  const locale = toBcp47(i18n.language);
 
   const [direction, setDirection] = useState<MailLogDirection | "">("");
   const [status, setStatus] = useState<MailLogStatus | "">("");

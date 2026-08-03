@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
+import { toBcp47 } from "@/i18n";
 import {
   api,
   ApiError,
@@ -59,7 +60,7 @@ function formFromRow(row: DynamicFieldOut): FormState {
 
 export function DynamicFieldsPage() {
   const { t, i18n } = useTranslation();
-  const locale = i18n.language?.startsWith("de") ? "de" : "en";
+  const locale = toBcp47(i18n.language);
   const queryClient = useQueryClient();
 
   const [open, setOpen] = useState(false);

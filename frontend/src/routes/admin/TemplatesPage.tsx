@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { toBcp47 } from "@/i18n";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import {
   api,
@@ -28,7 +29,7 @@ const TEMPLATE_TYPE_OPTIONS = [
 
 export function TemplatesPage() {
   const { t, i18n } = useTranslation();
-  const locale = i18n.language?.startsWith("de") ? "de" : "en";
+  const locale = toBcp47(i18n.language);
   const [editorsTarget, setEditorsTarget] = useState<StandardTemplateOut | null>(null);
 
   const columns: DataTableColumn<StandardTemplateOut>[] = [

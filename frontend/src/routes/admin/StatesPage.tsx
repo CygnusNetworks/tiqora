@@ -1,4 +1,5 @@
 import { useTranslation } from "react-i18next";
+import { toBcp47 } from "@/i18n";
 import { useQuery } from "@tanstack/react-query";
 import { api, type StateOut, type StateCreate, type StateUpdate } from "@/lib/api";
 import { AdminResourcePage } from "@/components/admin/AdminResourcePage";
@@ -21,7 +22,7 @@ const STATE_TYPE_OPTIONS = [
 
 export function StatesPage() {
   const { t, i18n } = useTranslation();
-  const locale = i18n.language?.startsWith("de") ? "de" : "en";
+  const locale = toBcp47(i18n.language);
 
   // Resolve type_id to the state-type name (live from the DB, falling back to
   // the static labels for offline/loading states).

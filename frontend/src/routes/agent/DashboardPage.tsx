@@ -2,6 +2,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
+import { toBcp47 } from "@/i18n";
 import { api } from "@/lib/api";
 import type { TicketListItem } from "@/lib/api";
 import { useAuth } from "@/auth/AuthContext";
@@ -225,7 +226,7 @@ function DashboardTicketList({
 export function DashboardPage() {
   const { t, i18n } = useTranslation();
   const { user } = useAuth();
-  const locale = i18n.language?.startsWith("de") ? "de" : "en";
+  const locale = toBcp47(i18n.language);
   const nowSeconds = Date.now() / 1000;
 
   const [filter, setFilter] = useState<DashboardFilter>(readStoredFilter);

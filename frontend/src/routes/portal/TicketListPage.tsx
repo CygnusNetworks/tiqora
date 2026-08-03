@@ -2,6 +2,7 @@ import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate, useSearch, Link } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
+import { toBcp47 } from "@/i18n";
 import { portalApi, type TicketListItem } from "@/lib/portalApi";
 import { stateColorVar } from "@/lib/status";
 import { formatDateTime } from "@/lib/format";
@@ -19,7 +20,7 @@ export type PortalTicketListSearch = {
 
 export function TicketListPage() {
   const { t, i18n } = useTranslation();
-  const locale = i18n.language?.startsWith("de") ? "de" : "en";
+  const locale = toBcp47(i18n.language);
   const navigate = useNavigate({ from: "/portal" });
   const search = useSearch({ from: "/portal/" }) as PortalTicketListSearch;
   const stateType = search.state_type ?? "all";
