@@ -13,6 +13,14 @@ import i18n from "@/i18n";
 import type { TicketListItem } from "@/lib/api";
 import { QueuesPage } from "./QueuesPage";
 
+const authUser = vi.hoisted(() => ({
+  current: { id: 5, login: "agent1", is_admin: false } as { id: number; login: string; is_admin: boolean },
+}));
+
+vi.mock("@/auth/AuthContext", () => ({
+  useAuth: () => ({ user: authUser.current }),
+}));
+
 const {
   listQueues,
   listTickets,
@@ -70,6 +78,7 @@ function makeTicket(overrides: Partial<TicketListItem> & { id: number }): Ticket
     until_time: 0,
     attachment_count: 0,
     has_ai_summary: false,
+    archive_flag: 0,
     ...overrides,
   };
 }
@@ -453,5 +462,37 @@ describe("QueuesPage customer filter", () => {
       expect(search.customer_id).toBe("10042");
     });
     expect(router.state.location.pathname).toBe("/agent/queues");
+  });
+});
+
+describe("QueuesPage archived filter (admin-only)", () => {
+  beforeEach(() => {
+    listQueues.mockReset();
+    listTickets.mockReset();
+    void i18n.changeLanguage("de");
+    listQueues.mockResolvedValue([]);
+    listTickets.mockResolvedValue(page(tickets, tickets.length));
+    authUser.current = { id: 5, login: "agent1", is_admin: false };
+  });
+
+  it("hides the toggle for non-admins", async () => {
+    await renderQueuesPage();
+    await screen.findByTestId("ticket-row-101");
+    expect(screen.queryByTestId("queue-show-archived")).toBeNull();
+  });
+
+  it("shows the toggle for admins and passes include_archived to the API", async () => {
+    authUser.current = { id: 5, login: "agent1", is_admin: true };
+    await renderQueuesPage();
+    await screen.findByTestId("ticket-row-101");
+
+    const toggle = screen.getByTestId("queue-show-archived");
+    fireEvent.click(toggle.querySelector("input")!);
+
+    await waitFor(() => {
+      expect(listTickets).toHaveBeenCalledWith(
+        expect.objectContaining({ include_archived: true }),
+      );
+    });
   });
 });

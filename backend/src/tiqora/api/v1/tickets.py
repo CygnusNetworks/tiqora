@@ -51,6 +51,7 @@ from tiqora.domain.ticket_write_service import (
 from tiqora.domain.ticket_write_service import (
     TicketNotFound as WriteNotFound,
 )
+from tiqora.permissions.engine import PermissionEngine
 from tiqora.znuny.sysconfig import SysConfig
 
 # ---------------------------------------------------------------------------
@@ -190,7 +191,12 @@ async def list_tickets(
     limit: int = Query(50, ge=1, le=200),
     sort: str = Query("age"),
     order: str = Query("desc"),
+    include_archived: bool = Query(
+        False, description="Also list archived tickets (admins only; ignored otherwise)."
+    ),
 ) -> PaginatedTickets:
+    if include_archived and not await PermissionEngine(session).is_admin(user.id):
+        include_archived = False
     svc = TicketService(session)
     return await svc.list_tickets(
         user.id,
@@ -203,6 +209,7 @@ async def list_tickets(
         limit=limit,
         sort=sort,
         order=order,
+        include_archived=include_archived,
     )
 
 
@@ -325,6 +332,7 @@ async def _export_tickets_csv_stream(
     customer_id: str | None,
     sort: str,
     order: str,
+    include_archived: bool = False,
 ) -> AsyncGenerator[bytes, None]:
     writer = csv.writer(_EchoWriter(), delimiter=";")
     # UTF-8 BOM first, so Excel opens the file as UTF-8 instead of guessing
@@ -340,6 +348,7 @@ async def _export_tickets_csv_stream(
         customer_id=customer_id,
         sort=sort,
         order=order,
+        include_archived=include_archived,
     ):
         yield writer.writerow(_ticket_csv_row(item)).encode("utf-8")
 
@@ -355,6 +364,9 @@ async def export_tickets_csv(
     customer_id: str | None = None,
     sort: str = Query("age"),
     order: str = Query("desc"),
+    include_archived: bool = Query(
+        False, description="Also export archived tickets (admins only; ignored otherwise)."
+    ),
 ) -> StreamingResponse:
     """Stream every ticket matching the same filters as ``GET /tickets`` as CSV.
 
@@ -364,6 +376,8 @@ async def export_tickets_csv(
     ``/{ticket_id}`` so FastAPI does not try to parse "export.csv" as a
     ticket id.
     """
+    if include_archived and not await PermissionEngine(session).is_admin(user.id):
+        include_archived = False
     svc = TicketService(session)
     return StreamingResponse(
         _export_tickets_csv_stream(
@@ -376,6 +390,7 @@ async def export_tickets_csv(
             customer_id=customer_id,
             sort=sort,
             order=order,
+            include_archived=include_archived,
         ),
         media_type="text/csv; charset=utf-8",
         headers={"Content-Disposition": 'attachment; filename="tickets.csv"'},
