@@ -113,6 +113,18 @@ describe("TicketTable state display", () => {
   });
 });
 
+describe("TicketTable queue name", () => {
+  it("shows the queue name as a chip next to the title", async () => {
+    await renderTable([makeItem({ queue_name: "Support" })]);
+    expect(screen.getByTestId("ticket-queue-chip-11")).toHaveTextContent("Support");
+  });
+
+  it("omits the chip when queue_name is absent", async () => {
+    await renderTable([makeItem({ queue_name: undefined })]);
+    expect(screen.queryByTestId("ticket-queue-chip-11")).toBeNull();
+  });
+});
+
 describe("TicketTable customer cell", () => {
   it("shows the customer_user_id when a customer is assigned", async () => {
     await renderTable([makeItem({ customer_user_id: "bob", first_from: "alice@example.com" })]);
@@ -137,6 +149,32 @@ describe("TicketTable customer cell", () => {
     await renderTable([makeItem({ customer_user_id: undefined, customer_id: undefined, first_from: undefined })]);
     expect(screen.getByTestId("ticket-customer-cell-11")).toHaveTextContent("—");
     expect(screen.queryByTestId("ticket-sender-fallback-11")).toBeNull();
+  });
+
+  it("shows the customer number with the customer_email underneath", async () => {
+    await renderTable([
+      makeItem({ customer_id: "10042", customer_user_id: "bob", customer_email: "bob@example.com" }),
+    ]);
+    expect(screen.getByTestId("ticket-customer-cell-11")).toHaveTextContent("10042");
+    const email = screen.getByTestId("ticket-customer-email-11");
+    expect(email).toHaveTextContent("bob@example.com");
+    expect(email).toHaveAttribute("title", "bob@example.com");
+  });
+
+  it("falls back to customer_user_id as the e-mail when it looks like one and customer_email is absent", async () => {
+    await renderTable([
+      makeItem({ customer_id: "10042", customer_user_id: "bob@example.com", customer_email: undefined }),
+    ]);
+    expect(screen.getByTestId("ticket-customer-cell-11")).toHaveTextContent("10042");
+    expect(screen.getByTestId("ticket-customer-email-11")).toHaveTextContent("bob@example.com");
+  });
+
+  it("does not duplicate the customer number as an e-mail line when no e-mail is known", async () => {
+    await renderTable([
+      makeItem({ customer_id: "10042", customer_user_id: undefined, customer_email: undefined }),
+    ]);
+    expect(screen.getByTestId("ticket-customer-cell-11")).toHaveTextContent("10042");
+    expect(screen.queryByTestId("ticket-customer-email-11")).toBeNull();
   });
 
   it("shows attachment and AI-summary indicators only when present", async () => {
