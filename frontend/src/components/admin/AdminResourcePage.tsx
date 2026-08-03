@@ -62,6 +62,12 @@ export type AdminResourcePageProps<Out, Create, Update> = {
    */
   searchable?: boolean;
   /**
+   * Opt-in regex-search toggle next to the search input. Only meaningful
+   * together with `searchable`; forwards `regex: true` to `api.list` while
+   * checked. Default off — only customer users opt in.
+   */
+  searchRegexToggle?: boolean;
+  /**
    * Opt-in bulk selection + floating action bar. When provided, adds a leading
    * checkbox column and a bottom pill bar. Default off.
    */
@@ -190,6 +196,7 @@ export function AdminResourcePage<Out, Create, Update>({
   isRowValid,
   pageSize: initialPageSize = 25,
   searchable = false,
+  searchRegexToggle = false,
   bulkActions,
   allowAllPageSize = false,
   allPageSize = DEFAULT_ALL_PAGE_SIZE,
@@ -209,6 +216,8 @@ export function AdminResourcePage<Out, Create, Update>({
   const [searchInput, setSearchInput] = useState("");
   const debouncedSearch = useDebouncedValue(searchInput, 300);
   const search = searchable ? debouncedSearch.trim() : "";
+  const [regexSearch, setRegexSearch] = useState(false);
+  const regex = searchable && searchRegexToggle && regexSearch ? true : undefined;
   const [sortState, setSortState] = useState<DataTableSortState>({ sort: null, order: "asc" });
   const sort = sortable ? sortState.sort : undefined;
   const order: DataTableSortOrder | undefined =
@@ -232,17 +241,17 @@ export function AdminResourcePage<Out, Create, Update>({
     return () => window.clearTimeout(handle);
   }, [bulkStatus]);
 
-  // Reset to page 1 when the debounced search term changes.
+  // Reset to page 1 when the debounced search term (or regex toggle) changes.
   useEffect(() => {
     if (!searchable) return;
     setPage(1);
-  }, [search, searchable]);
+  }, [search, regex, searchable]);
 
   // Drop selection when the list context changes (filter / search / page size / sort).
   useEffect(() => {
     setSelected(new Set());
     rangeAnchorRef.current = null;
-  }, [valid, search, pageSize, sort, order]);
+  }, [valid, search, regex, pageSize, sort, order]);
 
   const listQ = useQuery({
     queryKey: [
@@ -253,6 +262,7 @@ export function AdminResourcePage<Out, Create, Update>({
         pageSize,
         valid,
         search: search || undefined,
+        regex,
         sort: sort || undefined,
         order: order || undefined,
       },
@@ -260,7 +270,7 @@ export function AdminResourcePage<Out, Create, Update>({
     queryFn: ({ signal }) => {
       const base = {
         valid,
-        ...(search ? { search } : {}),
+        ...(search ? { search, ...(regex ? { regex } : {}) } : {}),
         ...(sort ? { sort, order } : {}),
       };
       // "Alle" is a UI sentinel only — never send allPageSize to the backend.
@@ -538,6 +548,21 @@ export function AdminResourcePage<Out, Create, Update>({
                 data-testid={`admin-${resourceKey}-search`}
                 className="w-56 rounded-md border border-hairline bg-surface px-2 py-1 text-xs text-ink placeholder:text-muted focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
               />
+            </label>
+          )}
+          {searchable && searchRegexToggle && (
+            <label
+              className="inline-flex items-center gap-1 text-xs text-muted"
+              title={t("admin.searchRegexTooltip")}
+            >
+              <input
+                type="checkbox"
+                checked={regexSearch}
+                onChange={(e) => setRegexSearch(e.target.checked)}
+                data-testid={`admin-${resourceKey}-search-regex`}
+                className="h-3.5 w-3.5 rounded border-hairline text-accent focus:ring-1 focus:ring-accent"
+              />
+              {t("admin.searchRegex")}
             </label>
           )}
         </div>
