@@ -1,8 +1,8 @@
 {
   "app": {
     "name": "Tiqora",
-    "tagline": "Système de tickets auto-hébergé avec assistance IA intégrée",
-    "beta": "Bêta"
+    "tagline": "Billetterie auto-hébergée avec assistance IA intégrée",
+    "beta": "Beta"
   },
   "notifications": {
     "title": "Notifications",
@@ -40,7 +40,7 @@
   "sidebar": {
     "workspace": "Espace de travail",
     "inbox": "Boîte de réception",
-    "myTickets": "Mes tickets",
+    "myTickets": "Mes billets",
     "watched": "Regardé",
     "queues": "Files d'attente",
     "knowledge": "Connaissance",
@@ -152,7 +152,7 @@
       "evening": "Bonsoir, {{name}}"
     },
     "noMyTickets": "Aucun ticket ouvert ne vous est attribué.",
-    "myNewEmpty": "Aucun nouveau ticket ne vous est attribué.",
+    "myNewEmpty": "Aucun nouveau billet ne vous est attribué.",
     "queueShortcuts": "Files d'attente",
     "viewAllQueues": "Afficher toutes les files d'attente",
     "openCount": "ouvrir",
@@ -168,10 +168,10 @@
     "escalatedEmpty": "Pas de tickets escaladés.",
     "newLabel": "nouveau",
     "viewAll": "Voir tout",
-    "toPickUpEmpty": "Pas de nouveaux tickets à récupérer.",
+    "toPickUpEmpty": "Pas de nouveaux billets à récupérer.",
     "remindersDue": "Rappels dus",
     "remindersDueEmpty": "Aucun rappel n'est dû.",
-    "queueShortcutsEmpty": "Aucune file d'attente avec des tickets ouverts ou nouveaux pour le moment."
+    "queueShortcutsEmpty": "Aucune file d'attente avec des billets ouverts ou nouveaux pour le moment."
   },
   "queue": {
     "sidebar": "Files d'attente",
@@ -199,7 +199,7 @@
       "selectAllOnPage": "Sélectionnez tout sur cette page",
       "selectedOnPage": "{{count}} sélectionné sur cette page",
       "selectAllMatches": "Sélectionnez tous les {{count}} dans \"{{queue}}\"",
-      "selectAllMatchesLoading": "Chargement des tickets…",
+      "selectAllMatchesLoading": "Chargement des billets…",
       "allSelected": "Tous les {{count}} sélectionnés",
       "allSelectedCapped": "Tous les {{count}} sélectionnés (plafonnés à {{cap}})",
       "clearSelection": "Effacer la sélection",
@@ -207,7 +207,7 @@
       "fieldPriority": "Priorité",
       "fieldOwner": "Propriétaire",
       "confirmTitle": "Changer {{field}} ?",
-      "confirmText": "Remplacer {{field}} par « {{value}} » pour les tickets {{count}} ?",
+      "confirmText": "Remplacer {{field}} par « {{value}} » pour les billets {{count}} ?",
       "confirmApply": "Changement",
       "confirmCancel": "Annuler",
       "progress": "{{done}}/{{total}} modifié…",
@@ -216,7 +216,7 @@
     }
   },
   "ticket": {
-    "tn": "Ticket#",
+    "tn": "Billet#",
     "title": "Titre",
     "state": "État",
     "priority": "Priorité",
@@ -226,9 +226,9 @@
     "changed": "Modifié",
     "created": "Créé",
     "queue": "File d'attente",
-    "noTickets": "Aucun ticket ne correspond à ce filtre.",
+    "noTickets": "Aucun billet ne correspond à ce filtre.",
     "senderNoCustomer": "Expéditeur du premier article — aucun client attribué",
-    "filterByCustomer": "Afficher uniquement les tickets de ce client",
+    "filterByCustomer": "Afficher uniquement les billets de ce client",
     "pagination": "{{from}}–{{to}} sur {{total}}",
     "escalated": "Escaladé",
     "slaCountdown": "SLA {{value}}",
@@ -248,7 +248,7 @@
     "noTitle": "(pas de titre)",
     "articles": "Articles",
     "history": "Histoire",
-    "noArticles": "Aucun article sur ce ticket.",
+    "noArticles": "Aucun article sur ce billet.",
     "noHistory": "Aucune entrée d'historique.",
     "noSubject": "(pas de sujet)",
     "unknownSender": "inconnu",
@@ -262,7 +262,7 @@
     "historyType": "Taper",
     "historyName": "Entrée",
     "historyBy": "Par",
-    "invalidId": "ID de ticket invalide",
+    "invalidId": "ID de billet invalide",
     "loadError": "Impossible de charger ce ticket.",
     "presenceViewing": "visualisation",
     "presenceComposing": "composition",
@@ -490,7 +490,7 @@
       "hasSummary": "Résumé de l'IA disponible"
     },
     "similar": {
-      "title": "Tickets similaires",
+      "title": "Billets similaires",
       "empty": "Aucun ticket fermé similaire n'a été trouvé.",
       "loadError": "Impossible de charger des tickets similaires."
     }
@@ -498,13 +498,13 @@
   "search": {
     "title": "Recherche",
     "archivedBadge": "Archivé",
-    "placeholder": "Rechercher des tickets…",
+    "placeholder": "Rechercher des billets…",
     "commandHint": "Rechercher ou commander…",
     "submit": "Recherche",
     "hint": "Saisissez un numéro de ticket, un sujet ou un corps de texte.",
     "results": "{{total}} résultats pour « {{query}} »",
-    "noResults": "Aucun ticket correspondant.",
-    "groupTickets": "Tickets",
+    "noResults": "Aucun billet correspondant.",
+    "groupTickets": "Billets",
     "groupKb": "Base de connaissances",
     "smart": {
       "placeholder": "Recherche – ou file d’attente :, propriétaire :, statut :, client :, de :, à : …",
@@ -567,7 +567,7 @@
   "newTicket": {
     "new": "Nouveau",
     "chooseQueue": "Choisir la file d'attente",
-    "title": "Nouveau ticket",
+    "title": "Nouveau billet",
     "intro": "Ouvrez un ticket au nom d'un client.",
     "queue": "File d'attente",
     "noQueues": "Aucune file d'attente disponible",
@@ -581,8 +581,8 @@
     "submitError": "Impossible de créer le ticket. Veuillez réessayer.",
     "submit": "Créer un ticket",
     "cancel": "Annuler",
-    "typeEmail": "Ticket par e-mail",
-    "typePhone": "Ticket téléphonique",
+    "typeEmail": "Billet par e-mail",
+    "typePhone": "Billet téléphonique",
     "customerSearch": "Rechercher un client…",
     "customerSearchHint": "Nom, identifiant ou e-mail – min. 2 personnages",
     "customerSelected": "Client sélectionné",
@@ -595,7 +595,7 @@
     "directionOut": "Sortant",
     "submitSend": "Créer et envoyer",
     "sendError": "L'e-mail n'a pas pu être envoyé. Le ticket a déjà été créé. Veuillez réessayer d'envoyer la réponse à partir de là.",
-    "goToTicket": "Aller au ticket",
+    "goToTicket": "Aller au billet",
     "note": "Note d'appel"
   },
   "connection": {
@@ -617,8 +617,8 @@
     "title": "Portail client",
     "subtitle": "Soutien",
     "nav": {
-      "myTickets": "Mes tickets",
-      "newTicket": "Nouveau ticket",
+      "myTickets": "Mes billets",
+      "newTicket": "Nouveau billet",
       "kb": "Articles d'aide"
     },
     "login": {
@@ -626,7 +626,7 @@
       "email": "E-mail ou nom d'utilisateur"
     },
     "tickets": {
-      "title": "Mes tickets",
+      "title": "Mes billets",
       "unknownState": "inconnu",
       "updated": "Mise à jour {{date}}",
       "stateTabs": {
@@ -636,15 +636,15 @@
         "closed": "Fermé"
       },
       "emptyNone": "Vous n'avez pas encore ouvert de ticket d'assistance.",
-      "emptyFiltered": "Aucun ticket ne correspond à ce filtre.",
+      "emptyFiltered": "Aucun billet ne correspond à ce filtre.",
       "emptyHint": "Besoin d'aide pour quelque chose ? Créez un nouveau ticket et nous vous répondrons."
     },
     "newTicket": {
-      "title": "Nouveau ticket",
+      "title": "Nouveau billet",
       "intro": "Dites-nous ce qui se passe et nous vous répondrons dès que possible.",
       "subject": "Sujet",
       "message": "Message",
-      "submit": "Soumettre le ticket",
+      "submit": "Soumettre le billet",
       "validationError": "Merci de renseigner un sujet et un message.",
       "submitError": "Impossible de soumettre votre ticket. Veuillez réessayer."
     },
@@ -672,55 +672,55 @@
   },
   "admin": {
     "title": "Administration",
-    "toggleSidebar": "Basculer la navigation d'administration",
+    "toggleSidebar": "Basculer la navigation de l'administrateur",
     "readOnly": "Lecture seule",
     "accessDenied": {
       "title": "Accès refusé",
-      "body": "Votre compte ne dispose pas des privilèges d'administration.",
+      "body": "Votre compte ne dispose pas de privilèges d'administrateur.",
       "error": "Impossible de vérifier l'accès administrateur. Veuillez réessayer."
     },
     "group": {
       "access": "Accès et utilisateurs",
-      "tickets": "Tickets et flux de travail",
+      "tickets": "Billets et flux de travail",
       "communication": "Communication et modèles",
-      "automation": "Automatisation",
+      "automation": "Automation",
       "system": "Système et opérations",
       "ai": "Intelligence artificielle"
     },
     "ai": {
       "settings": {
-        "title": "Paramètres IA",
-        "description": "Prérequis d'exploitation, valeurs par défaut globales et état du sous-système IA.",
-        "loadError": "Impossible de charger les paramètres.",
+        "title": "Paramètres de l'IA",
+        "description": "Conditions préalables de fonctionnement, paramètres globaux par défaut et état du sous-système IA.",
+        "loadError": "Les paramètres n'ont pas pu être chargés.",
         "saved": "Enregistré.",
-        "saveError": "Échec de l'enregistrement.",
-        "parallelBanner": "Fonctionnement en parallèle : les fonctions IA autonomes (p. ex. réponses automatiques) sont verrouillées — les résumés et les brouillons approuvés par un humain fonctionnent normalement. L'autonomie complète nécessite le mode « Tiqora uniquement » (tiqora_primary).",
-        "statProviders": "Fournisseurs LLM",
+        "saveError": "L'enregistrement a échoué.",
+        "parallelBanner": "Fonctionnement parallèle : les fonctionnalités autonomes de l'IA (par exemple, les réponses automatiques) sont verrouillées – les résumés et les brouillons approuvés par l'homme fonctionnent normalement. L'autonomie totale nécessite le mode \"Tiqora uniquement\" (tiqora_primary).",
+        "statProviders": "Fournisseurs de LLM",
         "statMcp": "Clients MCP",
-        "statActivePolicies": "Politiques de file actives",
+        "statActivePolicies": "Politiques de file d'attente actives",
         "operationMode": "Mode de fonctionnement",
-        "operationModeHint": "Les fonctions IA nécessitent le mode « Tiqora uniquement ». Ne basculez qu'après migration/basculement — voir la documentation d'exploitation.",
+        "operationModeHint": "Les fonctionnalités d'IA nécessitent le mode \"Tiqora uniquement\". Basculez uniquement après la migration/le basculement – voir la documentation sur les opérations.",
         "mode": {
-          "parallel": "Fonctionnement en parallèle (avec Znuny)",
+          "parallel": "Fonctionnement parallèle (avec Znuny)",
           "tiqora_primary": "Tiqora uniquement"
         },
-        "modeConfirm": "Basculer réellement le mode de fonctionnement vers « {{mode}} » ?",
-        "modeConfirmApply": "Basculer",
-        "autoReplyKillSwitch": "Coupe-circuit de réponse automatique",
-        "autoReplyKillSwitchHint": "Met en pause immédiatement toutes les réponses automatiques aux clients sans changer le mode de fonctionnement. L'assistance manuelle et les résumés restent disponibles.",
-        "autoReplyPause": "Mettre en pause les réponses automatiques",
-        "autoReplyResume": "Reprendre les réponses automatiques",
-        "autoReplyPausedStatus": "Les réponses automatiques sont en pause globalement.",
-        "autoReplyActiveStatus": "Les réponses automatiques sont autorisées (sous réserve du mode de fonctionnement et de la politique de file).",
-        "autoReplyPausedBanner": "Le coupe-circuit global de réponse automatique est ACTIVÉ — aucune réponse automatique ne sera envoyée aux clients tant que vous n'aurez pas repris.",
-        "disclosure": "Divulgation et valeurs par défaut globales",
-        "disclosureText": "Texte de divulgation par défaut global",
-        "globalCap": "Plafond global de réponses automatiques (par heure)",
+        "modeConfirm": "Vraiment passer le mode de fonctionnement sur « {{mode}} » ?",
+        "modeConfirmApply": "Changer",
+        "autoReplyKillSwitch": "Kill-switch de réponse automatique",
+        "autoReplyKillSwitchHint": "Mettez instantanément en pause toutes les réponses automatiques des clients sans changer de mode de fonctionnement. L’assistance manuelle et les résumés continuent de fonctionner.",
+        "autoReplyPause": "Suspendre la réponse automatique",
+        "autoReplyResume": "Reprendre la réponse automatique",
+        "autoReplyPausedStatus": "La réponse automatique est suspendue globalement.",
+        "autoReplyActiveStatus": "La réponse automatique est autorisée (sous réserve du mode de fonctionnement et de la politique de file d'attente).",
+        "autoReplyPausedBanner": "Le kill-switch de réponse automatique globale est activé : aucune réponse automatique du client ne sera envoyée jusqu'à ce que vous repreniez.",
+        "disclosure": "Divulgation et défauts globaux",
+        "disclosureText": "Texte d’information global par défaut",
+        "globalCap": "Plafond global de réponse automatique (par heure)",
         "globalCapPlaceholder": "vide = désactivé"
       },
       "acl": {
         "title": "Contrôle d'accès (ACL)",
-        "description": "Permissions et limites par groupe/rôle/utilisateur pour les fonctions IA.",
+        "description": "Autorisations et limites par groupe/rôle/utilisateur pour les fonctionnalités d'IA.",
         "new": "Nouvelle entrée ACL",
         "subject": "Sujet",
         "subjectType": {
@@ -731,15 +731,15 @@
         },
         "subjectId": "ID du sujet",
         "subjectIdHelp": "ID du groupe/rôle/utilisateur.",
-        "feature": "Fonction",
+        "feature": "Caractéristique",
         "allowed": "Autorisé",
         "allowedYes": "Autorisé",
         "allowedNo": "Bloqué",
         "limits": "Limites",
-        "noLimits": "aucune limite",
-        "limitRequestsDay": "Limite de requêtes/jour",
-        "limitTokensDay": "Limite de tokens/jour",
-        "limitRequestsMonth": "Limite de requêtes/mois",
+        "noLimits": "pas de limites",
+        "limitRequestsDay": "Limiter les demandes/jour",
+        "limitTokensDay": "Limiter les jetons/jour",
+        "limitRequestsMonth": "Limiter les demandes/mois",
         "subjectMismatch": "Veuillez resélectionner le sujet — la sélection ne correspond pas au type choisi."
       },
       "feature": {
@@ -749,126 +749,126 @@
         "mcp": "MCP"
       },
       "providers": {
-        "title": "Fournisseurs LLM",
-        "description": "Gérer les fournisseurs de modèles de langage pour le sous-système IA.",
+        "title": "Fournisseurs de LLM",
+        "description": "Gérez les fournisseurs de modèles linguistiques pour le sous-système IA.",
         "new": "Nouveau fournisseur",
         "name": "Nom",
-        "kind": "Type",
+        "kind": "Genre",
         "kindLabel": {
           "openai_compat": "Compatible OpenAI",
-          "anthropic": "Anthropic"
+          "anthropic": "Anthropique"
         },
         "baseUrl": "URL de base",
         "defaultModel": "Modèle par défaut",
-        "flags": "Options",
-        "flagTools": "Appel d'outils",
-        "flagStreaming": "Streaming",
-        "flagEu": "Hébergé en UE",
+        "flags": "Drapeaux",
+        "flagTools": "Appel d'outil",
+        "flagStreaming": "Diffusion en continu",
+        "flagEu": "L'UE a accueilli",
         "flagVision": "Vision",
-        "flagVisionHelp": "Ce fournisseur peut décrire des images (utilisé uniquement par le pré-traitement vision des pièces jointes, jamais pour le texte des tickets).",
-        "hasKey": "Clé API définie",
+        "flagVisionHelp": "Ce fournisseur peut décrire des images (utilisées uniquement par le pré-passage de la vision des pièces jointes, jamais pour le texte du ticket).",
+        "hasKey": "Ensemble de clés API",
         "test": "Tester",
         "testAction": "Tester la connexion",
         "testOk": "D'ACCORD",
         "testFail": "Échec",
         "duplicateAction": "Dupliquer",
         "apiKey": "Clé API",
-        "apiKeySetHelp": "Une clé API est enregistrée. Laissez vide pour la conserver.",
-        "apiKeyHelp": "Stockée chiffrée et ne sera plus jamais affichée.",
-        "deleteConfirm": "Supprimer réellement le fournisseur « {{name}} » ?",
-        "price": "Prix (1 M de tokens)",
-        "priceInput": "Prix entrée pour 1 M de tokens",
-        "priceOutput": "Prix sortie pour 1 M de tokens",
+        "apiKeySetHelp": "Une clé API est stockée. Laissez vide pour le conserver.",
+        "apiKeyHelp": "Stocké crypté et jamais affiché à nouveau.",
+        "deleteConfirm": "Vraiment supprimer le fournisseur « {{name}} » ?",
+        "price": "Prix (1 million de jetons)",
+        "priceInput": "Saisie du prix par 1 million de jetons",
+        "priceOutput": "Prix ​​de sortie par 1 million de jetons",
         "priceCurrency": "Devise",
-        "priceHelp": "Coût pour 1 M de tokens (entrée/sortie) dans la devise indiquée — utilisé pour le calcul des coûts dans l'audit LLM.",
-        "priceCurrencyNone": "— aucune —"
+        "priceHelp": "Coût par million de jetons (entrée/sortie) dans la devise donnée — utilisé pour le calcul du coût dans l'audit LLM.",
+        "priceCurrencyNone": "— aucun —"
       },
       "mcp": {
         "title": "Clients MCP",
-        "description": "Gérer les serveurs MCP (Model Context Protocol) comme sources d'outils pour l'IA.",
+        "description": "Gérez les serveurs MCP (Model Context Protocol) comme sources d'outils pour l'IA.",
         "new": "Nouveau client MCP",
         "name": "Nom",
         "url": "URL",
         "authToken": "Jeton d'authentification",
-        "authTokenSetHelp": "Un jeton est enregistré. Laissez vide pour le conserver.",
-        "authTokenHelp": "Stocké chiffré et ne sera plus jamais affiché.",
-        "empty": "Aucun client MCP créé pour le moment.",
-        "hasToken": "Jeton défini",
-        "lastDiscovered": "Dernier rafraîchissement : {{date}}",
+        "authTokenSetHelp": "Un jeton est stocké. Laissez vide pour le conserver.",
+        "authTokenHelp": "Stocké crypté et jamais affiché à nouveau.",
+        "empty": "Aucun client MCP n'a encore été créé.",
+        "hasToken": "Ensemble de jetons",
+        "lastDiscovered": "Dernière actualisation : {{date}}",
         "neverDiscovered": "Jamais rafraîchi",
         "discover": "Actualiser les outils",
-        "discoverResult": "{{total}} outils ({{added}} ajoutés, {{removed}} supprimés).",
-        "deleteConfirm": "Supprimer réellement le client MCP « {{name}} » ?",
+        "discoverResult": "{{total}} outils ({{added}} ajouté, {{removed}} supprimé).",
+        "deleteConfirm": "Vraiment supprimer le client MCP \"{{name}}\" ?",
         "toolsLoading": "Chargement des outils…",
-        "noTools": "Aucun outil découvert pour le moment.",
-        "mutating": "Mutant",
+        "noTools": "Aucun outil découvert pour l'instant.",
+        "mutating": "Mutation",
         "enabled": "Activé",
-        "mutatingGateHint": "Proposé à l'IA uniquement en mode d'autonomie « complete »."
+        "mutatingGateHint": "Uniquement proposé à l’IA en mode « pleine » autonomie."
       },
       "queues": {
-        "title": "Politiques IA par file",
-        "description": "Configurer le comportement IA par file : fonctions, autonomie, fournisseur, limites et escalade.",
+        "title": "Politiques d'IA de file d'attente",
+        "description": "Configurez le comportement de l'IA par file d'attente : fonctionnalités, autonomie, fournisseur, limites et escalade.",
         "new": "Nouvelle politique",
-        "queue": "File",
-        "features": "Fonctions",
-        "noFeatures": "aucune",
-        "queueRequired": "Veuillez sélectionner une file.",
-        "deleteConfirm": "Supprimer réellement cette politique ?",
-        "gateError": "Impossible en fonctionnement parallèle — basculez d'abord le mode vers « Tiqora uniquement » (tiqora_primary).",
+        "queue": "File d'attente",
+        "features": "Caractéristiques",
+        "noFeatures": "aucun",
+        "queueRequired": "Veuillez sélectionner une file d'attente.",
+        "deleteConfirm": "Vraiment supprimer cette politique ?",
+        "gateError": "Impossible en fonctionnement parallèle — passez d'abord au mode de fonctionnement « Tiqora uniquement » (tiqora_primary).",
         "invalidJson": "{{field}} : JSON invalide.",
         "autonomy": {
           "label": "Autonomie",
-          "off": "Désactivée (brouillons uniquement)",
-          "clarify_only": "Clarification uniquement",
-          "full": "Pleinement autonome",
-          "offHint": "L'IA crée uniquement des brouillons — un humain doit approuver chaque réponse.",
-          "clarify_onlyHint": "L'IA peut poser des questions de clarification seule, mais ne peut pas envoyer de réponses finales.",
-          "fullHint": "L'IA peut répondre de façon autonome dans les limites configurées."
+          "off": "Désactivé (brouillons uniquement)",
+          "clarify_only": "Clarifier seulement",
+          "full": "Entièrement autonome",
+          "offHint": "L'IA ne crée que des brouillons : un humain doit approuver chaque réponse.",
+          "clarify_onlyHint": "L’IA peut poser elle-même des questions de clarification, mais ne peut pas envoyer de réponses définitives.",
+          "fullHint": "L'IA peut répondre de manière autonome dans les limites configurées."
         },
         "section": {
-          "features": "Fonctions",
+          "features": "Caractéristiques",
           "autonomy": "Autonomie",
           "prompt": "Invite système",
-          "summary": "Seuils de résumé",
-          "caps": "Plafonds",
+          "summary": "Seuils récapitulatifs",
+          "caps": "Casquettes",
           "disclosure": "Divulgation et confidentialité",
           "identity": "Identité",
           "language": "Langue"
         },
-        "modelOverride": "Remplacement de modèle",
-        "visionProvider": "Modèle vision (images)",
+        "modelOverride": "Remplacement du modèle",
+        "visionProvider": "Modèle de vision (images)",
         "visionProviderNone": "— aucun — les images sont ignorées",
         "serviceUser": "Agent de service",
-        "kbTags": "Tags KB",
-        "kbTagsPlaceholder": "tag1, tag2, …",
-        "kbCategoryIds": "IDs de catégories KB",
+        "kbTags": "Balises de la base de connaissances",
+        "kbTagsPlaceholder": "balise1, balise2,…",
+        "kbCategoryIds": "ID de catégorie de la base de connaissances",
         "mcpClients": "Clients MCP",
-        "mcpClientsSelected": "{{count}} sélectionné(s)",
-        "promptLoadFile": "Charger depuis un fichier…",
+        "mcpClientsSelected": "{{count}} sélectionné",
+        "promptLoadFile": "Charger à partir du fichier…",
         "promptCharCount": "{{formatted}} caractères",
-        "promptCharCountWarning": "Invite très volumineuse — risque de contexte/coût.",
+        "promptCharCountWarning": "Invite très volumineuse : contexte/risque de coût.",
         "promptFileTooLarge": "Fichier trop volumineux (max. 2 Mo).",
-        "promptFileBinary": "Le fichier semble binaire — seuls les fichiers texte/markdown sont pris en charge.",
-        "promptReplaceConfirmTitle": "Remplacer le contenu ?",
-        "promptReplaceConfirmMessage": "L'invite système actuelle sera remplacée par le contenu du fichier. Continuer ?",
-        "summaryArticleThreshold": "Seuil d'articles",
-        "summaryCharThreshold": "Seuil de caractères",
-        "summaryIncrementalMinArticles": "Min. d'articles (incrémental)",
-        "summaryIncrementalMinChars": "Min. de caractères (incrémental)",
-        "maxClarifications": "Max. clarifications/ticket",
-        "maxAutoReplies": "Max. réponses auto/ticket",
-        "maxRepliesPerHour": "Max. réponses/heure",
-        "budgetTokensDay": "Budget de tokens/jour",
+        "promptFileBinary": "Le fichier semble être binaire — seuls les fichiers texte/markdown sont pris en charge.",
+        "promptReplaceConfirmTitle": "Remplacer le contenu ?",
+        "promptReplaceConfirmMessage": "L'invite système actuelle sera remplacée par le contenu du fichier. Continuer?",
+        "summaryArticleThreshold": "Seuil d'article",
+        "summaryCharThreshold": "Seuil de caractère",
+        "summaryIncrementalMinArticles": "Min. articles (incrémentiels)",
+        "summaryIncrementalMinChars": "Min. caractères (incrémentaux)",
+        "maxClarifications": "Max clarifications/ticket",
+        "maxAutoReplies": "Nombre maximum de réponses automatiques/ticket",
+        "maxRepliesPerHour": "Nombre maximum de réponses/heure",
+        "budgetTokensDay": "Budget de jetons/jour",
         "escalationRules": "Règles d'escalade (JSON)",
-        "escalationRulesHint": "Tableau JSON de règles de correspondance sur les résultats d'outils MCP qui déclenchent une escalade vers un humain.",
-        "escalationRulesPlaceholder": "vide = aucune règle, p. ex. [{\"tool\":\"client:*\",\"match\":\"substring\",\"values\":[\"ESCALATE\"]}]",
+        "escalationRulesHint": "Tableau JSON de règles de correspondance avec les résultats de l'outil MCP qui déclenchent la transmission à un humain.",
+        "escalationRulesPlaceholder": "vide = pas de règles, par ex. [{\"tool\":\"client:*\",\"match\":\"substring\",\"values\":[\"ESCALATE\"]}]",
         "emptyUnlimited": "vide = illimité",
         "disclosureEnabled": "Divulgation IA activée",
-        "disclosureTextPlaceholder": "Vide = utiliser le texte par défaut global",
-        "piiMasking": "Masquage des données personnelles (PII)",
+        "disclosureTextPlaceholder": "Vide = utiliser le texte global par défaut",
+        "piiMasking": "Masquage des informations personnelles",
         "identityMode": {
-          "ticket_customer_id": "Client du ticket",
-          "clarify_schema": "Schéma de clarification",
+          "ticket_customer_id": "Client du billet",
+          "clarify_schema": "Clarifier le schéma",
           "off": "Désactivé"
         },
         "list": {
@@ -876,21 +876,21 @@
           "tabUsage": "Utilisation"
         },
         "tab": {
-          "basics": "Bases",
+          "basics": "Les bases",
           "drafts": "Brouillons",
           "summaries": "Résumés",
           "auto": "Réponses automatiques",
           "safety": "Sécurité"
         },
         "editor": {
-          "newTitle": "Nouvelle politique de file",
-          "loadError": "Impossible de charger la politique.",
-          "queueLocked": "La file ne peut plus être modifiée après la création."
+          "newTitle": "Nouvelle politique de file d'attente",
+          "loadError": "La stratégie n'a pas pu être chargée.",
+          "queueLocked": "La file d'attente ne peut plus être modifiée après sa création."
         },
-        "autoGateWarning": "Les réponses automatiques nécessitent le mode « Tiqora uniquement » (tiqora_primary). Actuellement : fonctionnement parallèle — le basculement reste verrouillé.",
+        "autoGateWarning": "Les réponses automatiques nécessitent le mode « Tiqora uniquement » (tiqora_primary). Actuellement : fonctionnement en parallèle – l'interrupteur reste verrouillé.",
         "ignoredSenders": "Expéditeurs ignorés",
-        "ignoredSendersPlaceholder": "une adresse par ligne, p. ex. noreply@example.com ou *@internal.example",
-        "ignoreSendersManual": "Bloquer aussi les brouillons manuels",
+        "ignoredSendersPlaceholder": "une adresse par ligne, par ex. noreply@example.com ou *@internal.example",
+        "ignoreSendersManual": "Bloquez également les brouillons manuels",
         "replyLanguageMode": {
           "label": "Langue de réponse",
           "off": "Désactivé (inchangé)",
@@ -959,14 +959,14 @@
         "allStatuses": "Tous les statuts",
         "statusOk": "D'ACCORD",
         "error": "Erreur",
-        "ticketSearch": "Ticket",
-        "ticketSearchPlaceholder": "Numéro de ticket ou ID…",
+        "ticketSearch": "Billet",
+        "ticketSearchPlaceholder": "Numéro de billet ou pièce d’identité…",
         "empty": "Aucune demande ne correspond à ces filtres.",
         "table": {
           "time": "Temps",
           "provider": "Fournisseur / modèle",
           "feature": "Caractéristique",
-          "ticket": "Ticket",
+          "ticket": "Billet",
           "tokens": "Jetons (entrée/sortie)",
           "duration": "Durée",
           "pii": "Informations personnelles",
@@ -1059,7 +1059,7 @@
         "kbTags": "Balises séparées par des virgules dont les articles de la base de connaissances sont donnés au modèle comme contexte.",
         "kbCategoryIds": "ID de catégorie de base de connaissances séparés par des virgules, inclus en plus des balises.",
         "mcpClients": "Clients MCP dont les outils activés sont disponibles pour le modèle pour cette file d'attente. Les outils de mutation ne sont autorisés qu'en mode \"Entièrement autonome\".",
-        "enabledSummary": "Affiche le bouton « Résumer » dans le zoom du ticket et permet des résumés automatiques une fois les seuils ci-dessous atteints. Stocké exclusivement à l'état de ticket, jamais comme note interne.",
+        "enabledSummary": "Affiche le bouton « Résumer » dans le zoom du ticket et permet des résumés automatiques une fois les seuils ci-dessous atteints. Stocké exclusivement à l'état de ticket, jamais comme note interne.",
         "summaryArticleThreshold": "Déclenche un nouveau résumé automatique une fois qu'au moins autant d'articles sont arrivés depuis le dernier résumé.",
         "summaryCharThreshold": "Déclenche un nouveau résumé automatique une fois que le nouveau contenu depuis le dernier résumé dépasse ce nombre de caractères.",
         "summaryIncrementalMinArticles": "Nombre minimum de nouveaux articles avant qu'un recalcul incrémentiel (plutôt que complet) ne soit déclenché.",
@@ -1081,13 +1081,13 @@
         "ignoreSendersManual": "Lors d'une correspondance, bloque également le bouton manuel \"AI draft\" (erreur 409) — par défaut, seul le chemin de réponse automatique est affecté, Manual Assist s'exécute toujours pour le débogage.",
         "replyLanguageMode": "Contrôle si le modèle reçoit une langue de réponse contraignante : \"Off\" = comportement actuel (pas de directive), \"Fixed\" = toujours la langue configurée, \"Auto\" = détecté à partir du sujet + dernier article client, retour à la valeur par défaut configurée lorsque le texte est trop court/ambigu.",
         "replyLanguageFixed": "Code de langue BCP-47 (par exemple \"de\", \"en\") toujours utilisé comme langue de réponse contraignante en mode \"Fixe\".",
-        "replyLanguageDefault": "Code de langue BCP-47 utilisé en mode « Auto » lorsque le texte ne peut pas être associé en toute confiance à un profil de langue connu.",
-        "allowedStateTypes": "Liste séparée par des virgules des types d'état Znuny autorisés (par exemple \"ouvert\" ou \"ouvert, en attente de rappel\") pour lesquels l'IA peut définir un ticket via update_ticket_fields - appliquée à la fois pour le nom de l'état et l'ID numérique d'état. Vide = \"ouvert\" par défaut uniquement (réouverture autorisée, jamais fermeture) ; une liste vide explicite \"[]\" désactive entièrement les changements d'état.",
+        "replyLanguageDefault": "Code de langue BCP-47 utilisé en mode « Auto » lorsque le texte ne peut pas être associé en toute confiance à un profil de langue connu.",
+        "allowedStateTypes": "Liste séparée par des virgules des types d'état Znuny autorisés (par exemple \"ouvert\" ou \"ouvert, en attente de rappel\") pour lesquels l'IA peut définir un ticket via update_ticket_fields - appliquée à la fois pour le nom de l'état et l'identifiant numérique de l'état. Vide = \"ouvert\" par défaut uniquement (réouverture autorisée, jamais fermeture) ; une liste vide explicite \"[]\" désactive entièrement les changements d'état.",
         "piiNer": "Détecte les noms de personnes dans le texte via spaCy NER (allemand + anglais) et les masque comme [NAME_n] avant que le contenu n'atteigne le fournisseur LLM — en plus du nom du client et des expéditeurs. Actif uniquement lorsque le masquage PII est activé. Les faux positifs sont inoffensifs (juste plus de masquage).",
         "summaryDetail": "Standard : paragraphes compacts, 1 à 2 phrases par document joint. Détaillé : paragraphes plus détaillés et 3 à 5 phrases par document – utile pour les files d'attente contenant de nombreuses pièces jointes PDF."
       },
       "common": {
-        "validId": "Valide/invalide est un indicateur de suppression logique : marquer une entrée comme invalide la masque des sélecteurs de nouveaux enregistrements sans supprimer les références existantes (p. ex. tickets, affectations). Il n'y a pas de suppression définitive."
+        "validId": "Valide/invalide est un indicateur de suppression logicielle : marquer une entrée comme invalide la cache des sélecteurs de nouveaux enregistrements sans supprimer les références existantes (par exemple, les tickets, les devoirs). Il n’y a pas de suppression définitive."
       },
       "groups": {
         "name": "Accès aux files d'attente des groupes : chaque file d'attente appartient exactement à un groupe, et les agents, les rôles ou les utilisateurs clients y obtiennent un accès en lecture (\"ro\") ou complet (\"rw\") uniquement via l'appartenance au groupe - jamais directement sur la file d'attente."
@@ -1144,7 +1144,7 @@
       },
       "subjectConfig": {
         "hook": "La balise préfixant le numéro du ticket dans le sujet (par exemple \"Ticket#\"). Laissé vide, le hook configuré par Znuny est utilisé.",
-        "divider": "Caractère(s) entre le crochet et le numéro du ticket entre parenthèses, par ex. \"Ticket n°123\" contre \"Ticket n°123\".",
+        "divider": "Caractère(s) entre le crochet et le numéro du ticket entre parenthèses, par ex. \"Billet n°123\" contre \"Billet n°123\".",
         "subjectFormat": "Où la balise [Hook#Number] est placée dans le sujet : \"Left\" la préfixe, \"Right\" l'ajoute, \"None\" l'omet (les références de ticket reposent alors uniquement sur le thread Message-ID)."
       },
       "postmasterFilters": {
@@ -1160,22 +1160,22 @@
         "expires": "Les clés « illimitées » n'expirent jamais d'elles-mêmes et restent valides jusqu'à leur révocation manuelle. Préférez une expiration fixe à moins que l'intégration n'ait réellement besoin d'une clé permanente."
       },
       "daemons": {
-        "enabled": "Si l'exécution planifiée du service est active. Les services marqués « toujours activés » n'ont pas de bascule : ils sont au cœur de l'application et s'exécutent toujours.",
+        "enabled": "Si l'exécution planifiée du service est active. Les services marqués « toujours activés » n'ont pas de bascule : ils sont au cœur de l'application et s'exécutent toujours.",
         "schedule": "À quelle fréquence le service fonctionne. Les services quotidiens se déclenchent toujours à l'heure UTC fixe indiquée ; ceux basés sur des intervalles peuvent être modifiés ici et réinitialisés à leur valeur par défaut intégrée.",
         "takeover": "Ce service remplace la tâche en arrière-plan Znuny correspondante. Gardez le cron/démon de Znuny désactivé - exécuter les deux en même temps signifie que le même travail se produit deux fois et peut courir sur les mêmes enregistrements."
       },
       "ai": {
         "audit": {
-          "overview": "Chaque appel de fin de chat LLM (modèle principal, pré-traitement de vision, test de connexion du fournisseur) est enregistré ici – succès ou échec, avec la charge utile exacte envoyée après le masquage des PII. Les charges utiles brutes et le mappage PII ne sont visibles que dans la vue détaillée ; les révélations sont elles-mêmes enregistrées.",
+          "overview": "Chaque appel de fin de chat LLM (modèle principal, pré-passage de vision, test de connexion du fournisseur) est enregistré ici – succès ou échec, avec la charge utile exacte envoyée après le masquage des PII. Les charges utiles brutes et le mappage PII ne sont visibles que dans la vue détaillée ; les révélations sont elles-mêmes enregistrées.",
           "retention": "Les lignes d'audit datant de plus de ce nombre de jours sont automatiquement supprimées une fois par jour. Plage : 1 à 365 jours."
         },
         "promptParts": "L'invite système efficace est composée de l'invite de base et des blocs de construction actifs dans l'ordre indiqué (de base d'abord, puis de haut en bas). Les notes concernent de petites précisions que vous pouvez ajouter, désactiver ou supprimer rapidement sans toucher au fichier d'invite principal.",
         "escalationTester": "Vérifie les règles ci-dessus par rapport à un exemple de résultat d'outil sans rien enregistrer - exactement la même logique que le Runtime Guard utilise avant l'envoi autonome. Un succès signifie que l’envoi autonome serait arrêté et remonté."
       },
       "gdpr": {
-        "mode": "\"Anonymize\" nettoie les données personnelles mais conserve les enregistrements des tickets et leur historique (intégrité référentielle intacte). « Supprimer » supprime entièrement l'enregistrement client ; les données du ticket ne sont également supprimées que si la case ci-dessous est cochée.",
+        "mode": "\"Anonymize\" nettoie les données personnelles mais conserve les enregistrements des tickets et leur historique (intégrité référentielle intacte). « Supprimer » supprime entièrement l'enregistrement client ; les données du ticket ne sont également supprimées que si la case ci-dessous est cochée.",
         "filters": "Des sélecteurs supplémentaires limitent davantage l'ensemble des clients : chaque filtre ajouté est associé aux connexions/entreprises ci-dessus et entre eux.",
-        "negate": "Basculez entre « correspondances » (clients pour lesquels le modèle correspond) et « correspond pas » (≠, clients pour lesquels il ne correspond PAS).",
+        "negate": "Basculez entre « correspondances » (clients pour lesquels le modèle correspond) et « correspond pas » (≠, clients pour lesquels il ne correspond PAS).",
         "validId": "\"Temp\" (valid_id 3) est le troisième état de validité de Znuny - généralement un compte en attente de confirmation (par exemple, une auto-inscription non confirmée), distinct du simple valide/invalide."
       }
     },
@@ -1186,25 +1186,25 @@
       "agentRoles": "Attribution des rôles",
       "agentGroups": "Travail de groupe",
       "roleGroups": "Groupes de rôles",
-      "queues": "Files",
+      "queues": "Files d'attente",
       "states": "États",
       "priorities": "Priorités",
       "customerUsers": "Utilisateurs clients",
-      "customerCompanies": "Sociétés clientes",
+      "customerCompanies": "Entreprises clientes",
       "customerUserCustomers": "Mission d'entreprise",
       "templates": "Modèles",
       "salutations": "Salutations",
-      "signatures": "Signatures",
+      "signatures": "Signature",
       "autoResponses": "Réponses automatiques",
       "postmasterFilters": "Filtres Postmaster",
       "acl": "ACL",
-      "genericAgentJobs": "Tâches d'agent générique",
+      "genericAgentJobs": "Emplois d'agent générique",
       "dynamicFields": "Champs dynamiques",
       "webhooks": "Webhooks",
       "apiKeys": "Clés API",
       "processes": "Processus",
-      "mailOutbound": "Envoi de mails",
-      "mailLog": "Journal des mails",
+      "mailOutbound": "E-mail (sortant)",
+      "mailLog": "Journal des communications",
       "subjectConfig": "Sujet crochet",
       "customerUserGroups": "Clients ↔ Groupes",
       "attachments": "Pièces jointes",
@@ -1213,11 +1213,11 @@
       "queueAutoResponses": "Files d'attente↔Réponses automatiques",
       "queueVariables": "Variables de file d'attente",
       "customerFields": "Champs client",
-      "authConfig": "Authentification",
-      "gdpr": "RGPD",
-      "daemons": "Services d'arrière-plan",
+      "authConfig": "Authentification / 2FA",
+      "gdpr": "Confidentialité / RGPD",
+      "daemons": "Prestations",
       "systemInfo": "Informations système",
-      "ai": "IA",
+      "ai": "Paramètres",
       "aiProviders": "Fournisseurs",
       "aiMcp": "Clients MCP",
       "aiQueues": "Politiques de file d'attente",
@@ -1237,7 +1237,7 @@
       "deactivate": "Désactiver",
       "activate": "Activer",
       "delete": "Supprimer",
-      "empty": "Aucun résultat."
+      "empty": "Aucun enregistrement pour l'instant."
     },
     "filter": {
       "label": "Validité",
@@ -1261,7 +1261,7 @@
     "pagination": {
       "prev": "Précédent",
       "next": "Suivant",
-      "page": "Page {{page}} sur {{total}}",
+      "page": "Page {{page}} de {{total}}",
       "pageSize": "Par page",
       "showing": "{{from}}–{{to}} sur {{total}}",
       "all": "Tous"
@@ -1303,8 +1303,8 @@
       "noGroups": "Aucun groupe valide n'existe pour l'instant."
     },
     "customerUserCustomers": {
-      "title": "Affectation client",
-      "subtitle": "Choisissez un utilisateur client et définissez les entreprises pour lesquelles il peut voir les tickets. Ceci est distinct de leur entreprise d’origine.",
+      "title": "Mission client",
+      "subtitle": "Choisissez un utilisateur client et définissez les entreprises pour lesquelles il peut voir les billets. Ceci est distinct de leur entreprise d’origine.",
       "customerUser": "Utilisateur client",
       "selectCustomerUser": "Sélectionnez un utilisateur client…",
       "empty": "Choisissez un utilisateur client ci-dessus pour modifier ses entreprises.",
@@ -1314,7 +1314,7 @@
     },
     "form": {
       "cancel": "Annuler",
-      "save": "Enregistrer",
+      "save": "Sauvegarder",
       "saving": "Sauvegarde…",
       "required": "Ce champ est obligatoire.",
       "selectPlaceholder": "Sélectionner…",
@@ -1439,16 +1439,16 @@
       "title": "Variables disponibles",
       "insertHint": "Cliquez pour insérer à la position du curseur",
       "groups": {
-        "ticket": "Ticket",
+        "ticket": "Billet",
         "customer": "Client",
         "agent": "Agent",
         "queue": "File d'attente"
       },
       "items": {
-        "ticketNumber": "Numéro de ticket",
+        "ticketNumber": "Numéro de billet",
         "ticketTitle": "Titre",
         "ticketState": "État",
-        "ticketQueue": "File d'attente des tickets",
+        "ticketQueue": "File d'attente des billets",
         "ticketPriority": "Priorité",
         "customerFirstname": "Prénom du client",
         "customerLastname": "Nom du client",
@@ -1456,8 +1456,8 @@
         "customerWpnum": "Numéro de client (wpnum)",
         "currentFirstname": "Prénom de l'agent connecté",
         "currentLastname": "Nom de famille de l'agent connecté",
-        "ownerFirstname": "Prénom du propriétaire du ticket",
-        "ownerLastname": "Nom du propriétaire du ticket",
+        "ownerFirstname": "Prénom du propriétaire du billet",
+        "ownerLastname": "Nom du propriétaire du billet",
         "queueName": "Nom de la file d'attente",
         "configuredQueueVar": "Variable de file d'attente configurée ({name})"
       },
@@ -1535,7 +1535,7 @@
       "addSet": "Ajouter une action",
       "remove": "Retirer",
       "matchRequired": "Au moins une condition de correspondance est requise.",
-      "deleteConfirm": "Supprimer définitivement le filtre PostMaster « {{name}} » ?",
+      "deleteConfirm": "Supprimer définitivement le filtre PostMaster « {{name}} » ?",
       "empty": "Aucun filtre PostMaster pour l'instant.",
       "hint": "Les filtres sont stockés dans la table postmaster_filter partagée (parallèle à Znuny) et s'appliquent aux e-mails entrants."
     },
@@ -1547,7 +1547,7 @@
       "change": "Changement"
     },
     "genericAgentJobs": {
-      "title_plural": "Tâches d'agent générique",
+      "title_plural": "Emplois d'agent générique",
       "name": "Nom du travail",
       "settings": "Paramètres",
       "key": "Clé",
@@ -1572,7 +1572,7 @@
       "every": "chaque",
       "olderThan": "plus vieux que {{duration}}",
       "newerThan": "plus récent que {{duration}}",
-      "weekdaysShort": "[\"Dim\", \"Lun\", \"Mar\", \"Mer\", \"Jeu\", \"Ven\", \"Sam\"]",
+      "weekdaysShort": "['Dim', 'Lun', 'Tue', 'Mercredi', 'Jeudi', 'Ven', 'Sam']",
       "keyLabel": {
         "StateIDs": "État",
         "QueueIDs": "File d'attente",
@@ -1589,7 +1589,7 @@
         "LockID": "Définir le verrouillage",
         "NoteBody": "Note interne",
         "NoteSubject": "Objet de la note",
-        "Delete": "Supprimer le ticket"
+        "Delete": "Supprimer le billet"
       }
     },
     "webhooks": {
@@ -1623,10 +1623,10 @@
       "expiryPreviewUnlimited": "Valable indéfiniment",
       "expiryPreviewLabel": "Expire : {{date}}",
       "empty": "Aucune clé API pour l'instant.",
-      "hint": "Les clés en texte brut ne s'affichent qu'une seule fois. « Révoquer » définit valid=false ; « Supprimer » efface définitivement la ligne. Les portées limitent les zones d'API que la clé peut utiliser (les droits de file proviennent toujours de l'utilisateur lié).",
+      "hint": "Les clés en texte brut ne sont affichées qu'une seule fois. Revoke définit valid=false ; delete supprime définitivement la ligne. Les étendues limitent les zones d'API que la clé peut utiliser (les droits de file d'attente proviennent toujours de l'utilisateur lié).",
       "delete": "Supprimer",
-      "deleteConfirm": "Supprimer définitivement la clé API « {{name}} » ?",
-      "revokeConfirm": "Révoquer la clé API « {{name}} » ?",
+      "deleteConfirm": "Supprimer définitivement la clé API « {{name}} » ?",
+      "revokeConfirm": "Révoquer la clé API « {{name}} » ?",
       "createdTitle": "Clé API créée",
       "onceWarning": "Affiché une seule fois : copiez-le et stockez-le en toute sécurité maintenant.",
       "onceHint": "La clé en texte brut ne peut pas être récupérée ultérieurement.",
@@ -1643,7 +1643,7 @@
       "scopesRw": "RW",
       "scopesCustomEmpty": "Sélectionnez au moins une zone ou passez en mode sans restriction.",
       "areas": {
-        "tickets": "Tickets / files d'attente / recherche",
+        "tickets": "Billets / files d'attente / recherche",
         "customers": "Clients",
         "kb": "Base de connaissances",
         "calendar": "Calendrier",
@@ -1701,7 +1701,7 @@
       "loadError": "Échec du chargement des paramètres."
     },
     "subjectConfig": {
-      "title": "Numéro de ticket dans le sujet",
+      "title": "Numéro de billet dans le sujet",
       "description": "Préfixe et position du numéro de ticket dans l'objet des emails sortants. Effacer un champ réhérite de la valeur Znuny SysConfig en direct.",
       "enabled": "Ajouter un crochet aux sujets sortants",
       "hook": "Préfixe de crochet",
@@ -1780,7 +1780,7 @@
       },
       "search": {
         "available": "disponible",
-        "tickets": "Tickets",
+        "tickets": "Billets",
         "kb": "Base de connaissances",
         "indexSize": "Taille de l'index",
         "unavailable": "inaccessible"
@@ -1884,7 +1884,7 @@
       "time": "Temps",
       "fromTo": "De → À",
       "subject": "Sujet",
-      "ticket": "Ticket",
+      "ticket": "Billet",
       "queue": "File d'attente",
       "duration": "Durée",
       "detail": "Détail",
@@ -2045,8 +2045,8 @@
       },
       "activity": {
         "all": "Tous",
-        "noTickets": "Pas de tickets",
-        "noOpenTickets": "Fermé uniquement (pas de tickets ouverts)",
+        "noTickets": "Pas de billets",
+        "noOpenTickets": "Fermé uniquement (pas de billets ouverts)",
         "inactiveSince": "Inactif depuis…"
       },
       "validity": {
@@ -2112,7 +2112,7 @@
       "confirmTitle": "Confirmer la tâche RGPD",
       "confirmAnonymizeBody": "Anonymiser {{count}} utilisateurs clients ? Une sauvegarde sera créée.",
       "confirmDeleteBody": "ATTENTION : {{count}} les utilisateurs clients seront définitivement supprimés (sauvegarde jusqu'à expiration). Tapez LÖSCHEN pour confirmer.",
-      "confirmTypePrompt": "Tapez « {{word}} » pour confirmer :",
+      "confirmTypePrompt": "Tapez « {{word}} » pour confirmer :",
       "confirmSubmit": "Courez maintenant",
       "runSuccess": "Le travail a démarré avec succès.",
       "runSuccessDetail": "Emploi n°{{id}} · statut : {{status}} · {{count}} connexion(s).",
@@ -2328,16 +2328,16 @@
       "reset": "Réinitialiser"
     },
     "tiles": {
-      "total": "Tickets",
+      "total": "Billets",
       "escalated": "Escaladé",
       "firstResponseBreached": "Première réponse en retard",
       "avgFirstResponse": "Moy. première réponse",
       "avgSolution": "Moy. temps de solution"
     },
     "sections": {
-      "volume": "Volume de tickets",
+      "volume": "Volume de billets",
       "backlog": "Tendance du carnet de commandes",
-      "openSnapshot": "Tickets ouverts",
+      "openSnapshot": "Billets ouverts",
       "agentWorkload": "Charge de travail des agents"
     },
     "dimension": {
@@ -2405,7 +2405,7 @@
     },
     "subscribe": "Abonnez-vous (ICS)",
     "exportIcs": "Exporter .ics",
-    "linkedTickets": "Tickets liés"
+    "linkedTickets": "Billets liés"
   },
   "process": {
     "widget": {

@@ -13,12 +13,12 @@ import {
 } from "./locales";
 
 describe("locale registry", () => {
-  it("includes ~15 shipped UI languages and the full Znuny code set", () => {
-    expect(TRANSLATED_LOCALE_CODES).toEqual(expect.arrayContaining(["en", "de", "fr", "zh_CN"]));
-    expect(SHIPPED_UI_LOCALE_CODES).toHaveLength(15);
-    expect(TRANSLATED_LOCALE_CODES).toHaveLength(15);
-    // Plain `en` (source) + every Znuny .po code (48) → 49 entries.
+  it("ships the full Znuny language catalogue as translated UI locales", () => {
+    expect(TRANSLATED_LOCALE_CODES).toEqual(expect.arrayContaining(["en", "de", "fr", "zh_CN", "ar_SA"]));
+    // Plain `en` + every Znuny .po code (48) → 49 entries, all translated.
     expect(SUPPORTED_LOCALES.length).toBe(49);
+    expect(SHIPPED_UI_LOCALE_CODES).toHaveLength(49);
+    expect(TRANSLATED_LOCALE_CODES).toHaveLength(49);
     expect(getLocale("pt_BR")?.bcp47).toBe("pt-BR");
     expect(getLocale("zh_CN")?.dir).toBe("ltr");
     expect(getLocale("ar_SA")?.dir).toBe("rtl");
@@ -44,13 +44,12 @@ describe("locale registry", () => {
     expect(textDirection("en")).toBe("ltr");
   });
 
-  it("exposes picker items for shipped UI locales by default", () => {
+  it("exposes picker items for every shipped UI locale", () => {
     const items = localePickerItems();
     expect(items.length).toBe(SHIPPED_UI_LOCALE_CODES.length);
     expect(items.find((i) => i.value === "de")?.label).toBe("Deutsch");
-    expect(items.find((i) => i.value === "ar_SA")).toBeUndefined();
-    const all = localePickerItems({ all: true });
-    expect(all.length).toBe(SUPPORTED_LOCALES.length);
+    expect(items.find((i) => i.value === "ar_SA")?.label).toBe("العربية");
+    expect(localePickerItems({ all: true }).length).toBe(SUPPORTED_LOCALES.length);
   });
 });
 
