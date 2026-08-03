@@ -46,7 +46,10 @@ fork of Znuny — no Znuny source code is included or redistributed.
   Bring your own OpenAI-compatible or Anthropic providers. Gated by the operation mode
   so nothing autonomous runs during parallel operation.
 - **GDPR tooling** — anonymization, retention jobs, and audit trails in admin.
-- **Modern design** — dark/light themes, EN + DE i18n, compact cobalt design system.
+- **Modern design** — dark/light themes, compact cobalt design system.
+- **49 UI languages** — full Znuny language catalogue (48 Znuny `.po` codes +
+  English source), RTL included; agent preference syncs with Znuny
+  `UserLanguage` (see [docs/i18n.md](./docs/i18n.md)).
 - **No Perl application stack** — Python FastAPI + React throughout Tiqora itself
   (optional small Znuny OPM addon only if you co-run Znuny for cache coherence).
 - **Customer portal & knowledge base** — self-service tickets and Markdown KB.
@@ -329,7 +332,7 @@ make lint
 | Search | Meilisearch | Fast full-text; later hybrid/vector for RAG |
 | Sessions | Redis server-side | No JWT; Znuny-compatible session table for compat API |
 | Frontend | Vite, React, TS, Tailwind | One app, three route trees, code-split |
-| i18n | react-i18next | EN + DE |
+| i18n | react-i18next | 49 locales (Znuny catalogue parity; [docs/i18n.md](./docs/i18n.md)) |
 | Observability | structlog JSON, Prometheus `/metrics` | Zabbix template placeholder under `deploy/zabbix/` |
 | MCP | FastMCP (separate process) | Same permission engine as UI/REST |
 

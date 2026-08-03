@@ -374,7 +374,8 @@ Frontend: `/agent/calendar` (`routes/agent/CalendarPage.tsx`) — month grid
 calendar library), week and agenda views, a calendar-switcher sidebar
 (checkbox per calendar, permission-filtered), date navigation, and a
 create/edit `AppointmentDialog` (title, calendar, start/end, all-day,
-location, description, recurrence). i18n: EN + DE (`calendar.*` keys).
+location, description, recurrence). Calendar strings use the shared UI i18n
+catalogue (`calendar.*` keys in all 49 locales — see [i18n.md](./i18n.md)).
 
 ### Process management (BPM ticket processes)
 
@@ -428,11 +429,13 @@ Code-split per tree. Theming uses CSS variables and `data-theme` (`light` /
 `dark`) via a shared design-token stylesheet (`themes/tokens.css` +
 `themes/theme.tsx`), consumed by all three shells so agent/portal/admin share
 one visual language. i18n via `react-i18next` with a Znuny-compatible locale
-registry (`i18n/locales.ts`: full Znuny language catalogue — 49 codes including
-plain `en`, RTL/`lang` on `<html>`, BCP-47 for `Intl`). Every code ships a
+registry (`i18n/locales.ts`): **49 UI languages** = plain `en` + all **48**
+Znuny `i18n/Znuny/Znuny.<code>.po` codes (full catalogue parity — no Znuny
+language missing). RTL/`lang` on `<html>`, BCP-47 for `Intl`. Every code ships
 complete UI JSON under `i18n/locales/*.json` (key-for-key with `en.json` via
 `pnpm i18n:check`; lazy-loaded except en/de). Agent UI language syncs with
-Znuny `UserLanguage` (`GET/PUT /api/v1/auth/me/language`).
+Znuny `UserLanguage` (`GET/PUT /api/v1/auth/me/language`). Details and code
+list: [i18n.md](./i18n.md).
 
 Admin CRUD screens are generated from a generic pattern rather than
 hand-rolled per resource: `components/admin/DataTable.tsx` (sortable/paginated
