@@ -155,9 +155,20 @@ const agentQueuesRoute = createRoute({
       s.state_type === "all"
         ? s.state_type
         : undefined;
+    // Customer numbers are typically all-digit strings (e.g. "10042"), and
+    // the router's default search codec parses those as JS numbers rather
+    // than leaving them as strings — accept both and normalize to a string
+    // so `customer_id` round-trips through the URL correctly.
+    const customerId =
+      typeof s.customer_id === "string" && s.customer_id !== ""
+        ? s.customer_id
+        : typeof s.customer_id === "number"
+          ? String(s.customer_id)
+          : undefined;
     return {
       queue_id: num(s.queue_id),
       state_type: state,
+      customer_id: customerId,
       offset: num(s.offset),
       limit: num(s.limit),
       sort,

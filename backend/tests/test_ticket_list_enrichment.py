@@ -276,3 +276,36 @@ async def test_list_tickets_enrichment_fields(
         assert plain_item.customer_email == CUSTOMER_EMAIL
 
     await engine.dispose()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("url_fixture", ["mariadb_znuny_url", "postgres_znuny_url"])
+async def test_list_tickets_customer_id_filter(
+    url_fixture: str,
+    request: pytest.FixtureRequest,
+) -> None:
+    """``customer_id`` narrows the list to that customer's tickets only —
+    powers the "click a customer to filter" feature in the agent ticket
+    list. Only ``TICKET_PLAIN`` has a ``customer_id`` in this fixture."""
+    sync_url: str = request.getfixturevalue(url_fixture)
+    ids = _seed(sync_url)
+    async_url = _to_async_url(sync_url)
+    engine = create_async_engine(async_url)
+    factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+
+    async with factory() as session:
+        ts = TicketService(session)
+
+        matched = await ts.list_tickets(
+            ids["reader"], queue_id=ids["queue"], customer_id=CUSTOMER_ID, limit=50
+        )
+        matched_ids = {i.id for i in matched.items}
+        assert matched_ids == {ids["ticket_plain"]}
+
+        unmatched = await ts.list_tickets(
+            ids["reader"], queue_id=ids["queue"], customer_id="no-such-customer", limit=50
+        )
+        assert unmatched.items == []
+        assert unmatched.total == 0
+
+    await engine.dispose()

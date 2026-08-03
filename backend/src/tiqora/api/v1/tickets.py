@@ -185,6 +185,7 @@ async def list_tickets(
     state_id: int | None = None,
     state_type: str | None = None,
     owner_id: int | None = None,
+    customer_id: str | None = None,
     offset: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=200),
     sort: str = Query("age"),
@@ -197,6 +198,7 @@ async def list_tickets(
         state_id=state_id,
         state_type=state_type,
         owner_id=owner_id,
+        customer_id=customer_id,
         offset=offset,
         limit=limit,
         sort=sort,
@@ -320,6 +322,7 @@ async def _export_tickets_csv_stream(
     state_id: int | None,
     state_type: str | None,
     owner_id: int | None,
+    customer_id: str | None,
     sort: str,
     order: str,
 ) -> AsyncGenerator[bytes, None]:
@@ -334,6 +337,7 @@ async def _export_tickets_csv_stream(
         state_id=state_id,
         state_type=state_type,
         owner_id=owner_id,
+        customer_id=customer_id,
         sort=sort,
         order=order,
     ):
@@ -348,6 +352,7 @@ async def export_tickets_csv(
     state_id: int | None = None,
     state_type: str | None = None,
     owner_id: int | None = None,
+    customer_id: str | None = None,
     sort: str = Query("age"),
     order: str = Query("desc"),
 ) -> StreamingResponse:
@@ -368,6 +373,7 @@ async def export_tickets_csv(
             state_id=state_id,
             state_type=state_type,
             owner_id=owner_id,
+            customer_id=customer_id,
             sort=sort,
             order=order,
         ),
