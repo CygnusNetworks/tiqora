@@ -892,6 +892,14 @@ export class ApiClient {
     return this.request<UserMe>("GET", "/api/v1/auth/me", { signal });
   }
 
+  /** Persist Znuny-compatible UserLanguage (also drives notification templates). */
+  setMyLanguage(language: string, signal?: AbortSignal) {
+    return this.request<UserMe>("PUT", "/api/v1/auth/me/language", {
+      body: { language },
+      signal,
+    });
+  }
+
   logout(signal?: AbortSignal) {
     return this.request<void>("POST", "/api/v1/auth/logout", { signal });
   }

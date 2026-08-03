@@ -45,6 +45,9 @@ class UserMe(BaseModel):
     email: str | None = None
     # Best-effort OIDC/Google ``picture`` claim captured at SSO login.
     avatar_url: str | None = None
+    # Znuny ``user_preferences.UserLanguage`` (e.g. ``de``, ``pt_BR``). Used by
+    # the agent UI as the preferred interface language and by notifications.
+    language: str | None = None
     # True when the agent has ``rw`` on the group named ``admin``
     # (see ``PermissionEngine.is_admin``). Used by the agent UI to show
     # admin navigation without probing an admin endpoint.
@@ -53,6 +56,12 @@ class UserMe(BaseModel):
     # per-template grant to them / a group they hold ``rw`` on). Drives the
     # agent "Templates" nav item.
     can_edit_templates: bool = False
+
+
+class UserLanguageUpdate(BaseModel):
+    """Body for ``PUT /auth/me/language`` — Znuny-compatible language code."""
+
+    language: str
 
 
 class LoginRequest(BaseModel):

@@ -11,8 +11,8 @@ import {
 } from "./locales";
 
 /**
- * Eager resources for day-one translations. Additional locales can be added
- * here once their JSON ships, or loaded on demand via {@link ensureLocaleLoaded}.
+ * Eager resources for the two day-one languages. All other shipped locales
+ * load on demand via {@link ensureLocaleLoaded} so the main bundle stays small.
  */
 const bundledResources: Record<string, { translation: object }> = {
   en: { translation: en },
@@ -20,12 +20,23 @@ const bundledResources: Record<string, { translation: object }> = {
 };
 
 /**
- * Dynamic loaders for locales that are not eager-bundled. Keep empty until a
- * third language ships — the hook is in place so pickers can call
- * `setAppLanguage` without a further i18n rewrite.
+ * Dynamic loaders for priority languages beyond en/de. Vite code-splits each
+ * JSON into its own chunk.
  */
 const localeLoaders: Record<string, () => Promise<{ default: object }>> = {
-  // e.g. fr: () => import("./locales/fr.json"),
+  fr: () => import("./locales/fr.json"),
+  es: () => import("./locales/es.json"),
+  it: () => import("./locales/it.json"),
+  nl: () => import("./locales/nl.json"),
+  pl: () => import("./locales/pl.json"),
+  pt_BR: () => import("./locales/pt_BR.json"),
+  ru: () => import("./locales/ru.json"),
+  zh_CN: () => import("./locales/zh_CN.json"),
+  ja: () => import("./locales/ja.json"),
+  tr: () => import("./locales/tr.json"),
+  cs: () => import("./locales/cs.json"),
+  hu: () => import("./locales/hu.json"),
+  sv: () => import("./locales/sv.json"),
 };
 
 const loadedCodes = new Set(Object.keys(bundledResources));
@@ -39,33 +50,54 @@ export async function ensureLocaleLoaded(code: string): Promise<void> {
     loadedCodes.add(resolved);
     return;
   }
-  const mod = await loader();
-  i18n.addResourceBundle(resolved, "translation", mod.default, true, true);
-  loadedCodes.add(resolved);
+  try {
+    const mod = await loader();
+    i18n.addResourceBundle(resolved, "translation", mod.default, true, true);
+    loadedCodes.add(resolved);
+  } catch (err) {
+    // Missing chunk during development before MT finishes — fall back to en.
+    console.warn(`[i18n] failed to load locale ${resolved}`, err);
+    loadedCodes.add(resolved);
+  }
 }
+
+export type SetAppLanguageOptions = {
+  /** When true (default), also persist Znuny UserLanguage via the API if logged in. */
+  persistRemote?: boolean;
+};
 
 /**
  * Switch UI language: persist preference, load resources if needed, update
- * i18next + `<html lang/dir>`. Safe to call from menus and settings.
+ * i18next + `<html lang/dir>`. Optionally syncs to `PUT /auth/me/language`.
  */
-export async function setAppLanguage(code: string): Promise<void> {
+export async function setAppLanguage(
+  code: string,
+  opts: SetAppLanguageOptions = {},
+): Promise<void> {
   const resolved = resolveLocaleCode(code);
   writeStoredLang(resolved);
   await ensureLocaleLoaded(resolved);
   await i18n.changeLanguage(resolved);
   applyDocumentLocale(resolved);
+
+  if (opts.persistRemote === false) return;
+  try {
+    // Dynamic import avoids a circular dep with the api client package.
+    const { api } = await import("@/lib/api");
+    await api.setMyLanguage(resolved);
+  } catch {
+    // Not authenticated or network error — local preference still applies.
+  }
 }
 
 void i18n.use(initReactI18next).init({
   resources: bundledResources,
   lng: readStoredLang(),
   fallbackLng: DEFAULT_LOCALE,
-  // Accept Znuny-style codes (pt_BR) and BCP-47 (pt-BR).
   supportedLngs: false,
   nonExplicitSupportedLngs: true,
   load: "currentOnly",
   interpolation: { escapeValue: false },
-  // Return the key path only when truly missing — partial locales fall back.
   returnNull: false,
 });
 
@@ -73,13 +105,23 @@ i18n.on("languageChanged", (lng) => {
   applyDocumentLocale(lng);
 });
 
-// Initial document attributes (languageChanged does not fire on first init).
 applyDocumentLocale(i18n.language);
+
+// Preload the stored language if it is not already in the eager bundle.
+const initial = readStoredLang();
+if (initial !== "en" && initial !== "de") {
+  void ensureLocaleLoaded(initial).then(() => {
+    if (i18n.language !== initial) {
+      void i18n.changeLanguage(initial);
+    }
+  });
+}
 
 export {
   DEFAULT_LOCALE,
   LANG_STORAGE_KEY,
   LOCALE_CODES,
+  SHIPPED_UI_LOCALE_CODES,
   SUPPORTED_LOCALES,
   TRANSLATED_LOCALE_CODES,
   applyDocumentLocale,
