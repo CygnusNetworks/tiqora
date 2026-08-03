@@ -1,4 +1,5 @@
-"""DB tests for the ticket-list enrichment fields (attachment_count, has_ai_summary).
+"""DB tests for the ticket-list enrichment fields (attachment_count, has_ai_summary,
+customer_email).
 
 Seed ids use the 893xx range — disjoint from other DB test files sharing the
 session-scoped testcontainer DB (see e.g. ``test_read_api_db.py`` 5/6/7/8/9xx,
@@ -26,10 +27,13 @@ GROUP_ID = 89320
 QUEUE_ID = 89300
 TICKET_ATTACHMENTS = 89310  # 2 real attachments + 1 inline image + 1 body part
 TICKET_AI_SUMMARY = 89311  # has a tiqora_ai_ticket_state row with summary_body
-TICKET_PLAIN = 89312  # no attachments, no ai summary
+TICKET_PLAIN = 89312  # no attachments, no ai summary, but has a customer_user
 ARTICLE_ATTACHMENTS = 89310
 ARTICLE_AI_SUMMARY = 89311
 ARTICLE_PLAIN = 89312
+CUSTOMER_LOGIN = "enrich893cust"
+CUSTOMER_EMAIL = "enrich893cust@example.com"
+CUSTOMER_ID = "89312-CUST"
 
 
 def _to_async_url(sync_url: str) -> str:
@@ -70,6 +74,9 @@ def _seed(sync_url: str) -> dict[str, Any]:
         conn.execute(
             text("DELETE FROM ticket WHERE id IN (:t1, :t2, :t3)"),
             {"t1": TICKET_ATTACHMENTS, "t2": TICKET_AI_SUMMARY, "t3": TICKET_PLAIN},
+        )
+        conn.execute(
+            text("DELETE FROM customer_user WHERE login = :login"), {"login": CUSTOMER_LOGIN}
         )
         conn.execute(text("DELETE FROM queue WHERE id = :id"), {"id": QUEUE_ID})
         conn.execute(
@@ -113,10 +120,19 @@ def _seed(sync_url: str) -> dict[str, Any]:
             {"id": QUEUE_ID, "gid": GROUP_ID, "t": NOW},
         )
 
-        for ticket_id, tn_suffix, title in (
-            (TICKET_ATTACHMENTS, "1", "Ticket with attachments"),
-            (TICKET_AI_SUMMARY, "2", "Ticket with AI summary"),
-            (TICKET_PLAIN, "3", "Plain ticket"),
+        conn.execute(
+            text(
+                "INSERT INTO customer_user (login, email, customer_id, first_name, last_name,"
+                " pw, valid_id, create_time, create_by, change_time, change_by)"
+                " VALUES (:login, :email, :cid, 'Enrich', 'Customer', 'x', 1, :t, 1, :t, 1)"
+            ),
+            {"login": CUSTOMER_LOGIN, "email": CUSTOMER_EMAIL, "cid": CUSTOMER_ID, "t": NOW},
+        )
+
+        for ticket_id, tn_suffix, title, customer_id, customer_user_id in (
+            (TICKET_ATTACHMENTS, "1", "Ticket with attachments", None, None),
+            (TICKET_AI_SUMMARY, "2", "Ticket with AI summary", None, None),
+            (TICKET_PLAIN, "3", "Plain ticket", CUSTOMER_ID, CUSTOMER_LOGIN),
         ):
             conn.execute(
                 text(
@@ -128,7 +144,7 @@ def _seed(sync_url: str) -> dict[str, Any]:
                     " create_time, create_by, change_time, change_by)"
                     " VALUES (:id, :tn, :title, :qid, 1, 1,"
                     " :uid, 1, 3, 4,"
-                    " NULL, NULL,"
+                    " :cid, :cuid,"
                     " 0, 0, 0, 0, 0, 0, 0,"
                     " :t, 1, :t, 1)"
                 ),
@@ -138,6 +154,8 @@ def _seed(sync_url: str) -> dict[str, Any]:
                     "title": title,
                     "qid": QUEUE_ID,
                     "uid": AGENT_ID,
+                    "cid": customer_id,
+                    "cuid": customer_user_id,
                     "t": NOW,
                 },
             )
@@ -253,5 +271,8 @@ async def test_list_tickets_enrichment_fields(
         plain_item = by_id[ids["ticket_plain"]]
         assert plain_item.attachment_count == 0
         assert plain_item.has_ai_summary is False
+        assert plain_item.customer_id == CUSTOMER_ID
+        assert plain_item.customer_user_id == CUSTOMER_LOGIN
+        assert plain_item.customer_email == CUSTOMER_EMAIL
 
     await engine.dispose()

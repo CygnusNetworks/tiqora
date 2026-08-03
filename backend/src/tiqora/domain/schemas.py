@@ -160,6 +160,9 @@ class TicketListItem(BaseModel):
     owner_name: str | None = None
     customer_id: str | None = None
     customer_user_id: str | None = None
+    customer_email: str | None = None
+    """``customer_user.email`` for ``customer_user_id`` (the login) — distinct
+    from the login itself, which is not always an e-mail address."""
     first_from: str | None = None
     """Raw ``From`` header of the ticket's first article — a display fallback
     for the queue list when no customer is assigned. ``None`` if the ticket
