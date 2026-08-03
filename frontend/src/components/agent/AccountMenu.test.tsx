@@ -108,6 +108,19 @@ describe("AccountMenu", () => {
     changeLanguage.mockRestore();
   });
 
+  it("keeps the account menu open while scrolling the language list", () => {
+    // Regression: Menu closed on any non-self scroll, including the portaled
+    // SelectMenu panel — so users could not reach languages below the fold.
+    open();
+    fireEvent.click(screen.getByTestId("account-menu-lang-select"));
+    const langPanel = screen.getByTestId("account-menu-lang-panel");
+    fireEvent.scroll(langPanel);
+    expect(screen.getByTestId("account-menu")).toBeInTheDocument();
+    expect(langPanel).toBeInTheDocument();
+    // Deep option still reachable after scroll.
+    expect(within(langPanel).getByText("日本語")).toBeInTheDocument();
+  });
+
   it("toggles theme via setTheme", () => {
     open();
     fireEvent.click(screen.getByTestId("account-menu-theme-light"));

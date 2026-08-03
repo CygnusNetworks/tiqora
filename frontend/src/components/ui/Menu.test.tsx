@@ -78,4 +78,27 @@ describe("Menu", () => {
     expect(onSelect).toHaveBeenCalledOnce();
     expect(screen.getByTestId("menu")).toBeInTheDocument();
   });
+
+  it("does not close when a nested [data-portal-menu] panel is scrolled", () => {
+    // Account language SelectMenu is portaled next to the Menu panel on body.
+    renderMenu();
+    fireEvent.click(screen.getByTestId("trigger"));
+    const nested = document.createElement("div");
+    nested.setAttribute("data-portal-menu", "");
+    nested.setAttribute("data-testid", "nested-portal");
+    document.body.appendChild(nested);
+    try {
+      fireEvent.scroll(nested);
+      expect(screen.getByTestId("menu")).toBeInTheDocument();
+    } finally {
+      nested.remove();
+    }
+  });
+
+  it("still closes when the page (non-portal) is scrolled", () => {
+    renderMenu();
+    fireEvent.click(screen.getByTestId("trigger"));
+    fireEvent.scroll(document.body);
+    expect(screen.queryByTestId("menu")).toBeNull();
+  });
 });
