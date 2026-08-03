@@ -3,3 +3,6 @@ dist
 dist-ssr
 *.local
 .vite
+
+# Machine-translation cache
+scripts/.mt-cache.json

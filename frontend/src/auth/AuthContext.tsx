@@ -16,6 +16,7 @@ import {
 } from "@simplewebauthn/browser";
 import { api, ApiError, type UserMe } from "@/lib/api";
 import { clearLoginMethod, rememberLoginMethod } from "@/lib/loginMethod";
+import { resolveLocaleCode, setAppLanguage } from "@/i18n";
 
 type AuthContextValue = {
   user: UserMe | null;
@@ -86,6 +87,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!meQuery.isLoading) setBootstrapped(true);
   }, [meQuery.isLoading]);
+
+  // Prefer Znuny UserLanguage from /me over a stale localStorage value so
+  // notification language and UI stay aligned across devices.
+  useEffect(() => {
+    const lang = meQuery.data?.language;
+    if (!lang) return;
+    const resolved = resolveLocaleCode(lang);
+    void setAppLanguage(resolved, { persistRemote: false });
+  }, [meQuery.data?.language]);
 
   const login = useCallback(
     async (loginName: string, password: string) => {

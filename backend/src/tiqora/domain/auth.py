@@ -221,12 +221,12 @@ class AuthService:
         self._sessions = sessions
         self._settings = settings
 
-    async def _load_user_email(self, user_id: int) -> str | None:
-        """Znuny stores the agent mailbox in ``user_preferences.UserEmail``."""
+    async def _load_preference(self, user_id: int, key: str) -> str | None:
+        """Read a single ``user_preferences`` value (UTF-8 LONGBLOB)."""
         result = await self._session.execute(
             select(UserPreferences.preferences_value).where(
                 UserPreferences.user_id == user_id,
-                UserPreferences.preferences_key == "UserEmail",
+                UserPreferences.preferences_key == key,
             )
         )
         raw = result.scalar_one_or_none()
@@ -237,6 +237,36 @@ class AuthService:
         else:
             value = str(raw).strip()
         return value or None
+
+    async def _load_user_email(self, user_id: int) -> str | None:
+        """Znuny stores the agent mailbox in ``user_preferences.UserEmail``."""
+        return await self._load_preference(user_id, "UserEmail")
+
+    async def load_user_language(self, user_id: int) -> str | None:
+        """Znuny UI / notification language from ``UserLanguage`` preference."""
+        return await self._load_preference(user_id, "UserLanguage")
+
+    async def set_user_language(self, user_id: int, language: str) -> None:
+        """Upsert Znuny-compatible ``UserLanguage`` preference (UTF-8 bytes)."""
+        raw = language.encode("utf-8")
+        result = await self._session.execute(
+            select(UserPreferences).where(
+                UserPreferences.user_id == user_id,
+                UserPreferences.preferences_key == "UserLanguage",
+            )
+        )
+        row = result.scalar_one_or_none()
+        if row is None:
+            self._session.add(
+                UserPreferences(
+                    user_id=user_id,
+                    preferences_key="UserLanguage",
+                    preferences_value=raw,
+                )
+            )
+        else:
+            row.preferences_value = raw
+        await self._session.commit()
 
     async def _user_from_row(
         self,

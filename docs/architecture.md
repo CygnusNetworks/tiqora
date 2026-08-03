@@ -429,10 +429,11 @@ Code-split per tree. Theming uses CSS variables and `data-theme` (`light` /
 `themes/theme.tsx`), consumed by all three shells so agent/portal/admin share
 one visual language. i18n via `react-i18next` with a Znuny-compatible locale
 registry (`i18n/locales.ts`: all Znuny language codes, RTL/`lang` on
-`<html>`, BCP-47 for `Intl`). Day-one translations are English + German
-(`i18n/locales/{en,de}.json`, key-for-key in sync via `pnpm i18n:check`);
-other languages fall back to English until scaffolded
-(`pnpm i18n:scaffold <code>`) and translated.
+`<html>`, BCP-47 for `Intl`). Fifteen priority UI languages ship translation
+JSON (en, de, fr, es, it, nl, pl, pt_BR, ru, zh_CN, ja, tr, cs, hu, sv —
+agent/portal namespaces fully translated; admin chrome may still be English
+in MT locales). Key parity via `pnpm i18n:check`. Agent UI language syncs
+with Znuny `UserLanguage` (`GET/PUT /api/v1/auth/me/language`).
 
 Admin CRUD screens are generated from a generic pattern rather than
 hand-rolled per resource: `components/admin/DataTable.tsx` (sortable/paginated
