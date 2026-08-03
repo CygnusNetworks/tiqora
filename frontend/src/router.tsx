@@ -173,6 +173,8 @@ const agentQueuesRoute = createRoute({
       limit: num(s.limit),
       sort,
       order,
+      include_archived:
+        s.include_archived === true || s.include_archived === "true" ? true : undefined,
     };
   },
   component: QueuesPage,
@@ -248,6 +250,8 @@ const agentSearchRoute = createRoute({
       created_from: isoDate(s.created_from),
       created_to: isoDate(s.created_to),
       sort: sortOrder(s.sort),
+      include_archived:
+        s.include_archived === true || s.include_archived === "true" ? true : undefined,
     };
   },
   component: SearchPage,

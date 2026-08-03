@@ -66,6 +66,7 @@ def test_build_ticket_document_shape() -> None:
     assert doc["changed"] is not None
     assert doc["created_ts"] == int(datetime(2024, 7, 19, 10, 0, 0, tzinfo=UTC).timestamp())
     assert doc["changed_ts"] == int(datetime(2024, 7, 19, 11, 0, 0, tzinfo=UTC).timestamp())
+    assert doc["archive_flag"] == 0
 
 
 def test_build_similar_query_joins_and_trims() -> None:

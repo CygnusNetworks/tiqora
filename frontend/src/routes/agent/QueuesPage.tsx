@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useSearch } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
+import { useAuth } from "@/auth/AuthContext";
 import { api, type MutationRequest } from "@/lib/api";
 import { flattenQueues } from "@/components/agent/QueueTree";
 import {
@@ -28,6 +29,8 @@ export type QueuesSearch = {
   limit?: number;
   sort?: SortKey;
   order?: "asc" | "desc";
+  /** Admin-only: also list archived tickets (backend ignores it for non-admins). */
+  include_archived?: boolean;
 };
 
 /** Hard cap on how many matching ticket ids "Alle M auswählen" will fetch —
@@ -48,6 +51,7 @@ async function fetchMatchingTicketIds(
     customer_id?: string;
     sort: SortKey;
     order: "asc" | "desc";
+    include_archived?: boolean;
   },
   total: number,
 ): Promise<number[]> {
@@ -69,6 +73,8 @@ export function QueuesPage() {
   const navigate = useNavigate({ from: "/agent/queues" });
   const search = useSearch({ from: "/agent/queues" }) as QueuesSearch;
   const queryClient = useQueryClient();
+  const { user } = useAuth();
+  const isAdmin = user?.is_admin === true;
 
   const queueId = search.queue_id ?? null;
   const stateType = (search.state_type ?? "open") as StateTab;
@@ -77,6 +83,7 @@ export function QueuesPage() {
   const limit = search.limit ?? 50;
   const sort = (search.sort ?? "age") as SortKey;
   const order = (search.order ?? "desc") as "asc" | "desc";
+  const includeArchived = isAdmin && search.include_archived === true;
 
   const setSearch = (patch: Partial<QueuesSearch>) => {
     void navigate({
@@ -124,7 +131,7 @@ export function QueuesPage() {
   // bulk action.
   useEffect(() => {
     clearSelection();
-  }, [queueId, stateType, customerId, offset, sort, order]);
+  }, [queueId, stateType, customerId, offset, sort, order, includeArchived]);
 
   // Success feedback auto-dismisses; errors stay until the next action.
   useEffect(() => {
@@ -154,7 +161,7 @@ export function QueuesPage() {
   const ticketsQ = useQuery({
     queryKey: [
       "tickets",
-      { queueId, stateType, customerId, offset, limit, sort, order },
+      { queueId, stateType, customerId, offset, limit, sort, order, includeArchived },
     ],
     queryFn: () =>
       api.listTickets({
@@ -165,6 +172,7 @@ export function QueuesPage() {
         limit,
         sort,
         order,
+        include_archived: includeArchived || undefined,
       }),
   });
 
@@ -242,6 +250,7 @@ export function QueuesPage() {
           customer_id: customerId,
           sort,
           order,
+          include_archived: includeArchived || undefined,
         },
         total,
       );
@@ -371,6 +380,22 @@ export function QueuesPage() {
             }))}
             className="flex-1"
           />
+          {isAdmin && (
+            <label
+              className="inline-flex cursor-pointer items-center gap-1.5 whitespace-nowrap text-xs font-medium text-muted hover:text-ink"
+              data-testid="queue-show-archived"
+            >
+              <input
+                type="checkbox"
+                className="h-3.5 w-3.5 accent-accent"
+                checked={includeArchived}
+                onChange={(e) =>
+                  setSearch({ include_archived: e.target.checked || undefined, offset: 0 })
+                }
+              />
+              {t("queue.showArchived")}
+            </label>
+          )}
           {!selectMode && (
             <Button
               variant="secondary"
@@ -392,6 +417,7 @@ export function QueuesPage() {
                 customer_id: customerId,
                 sort,
                 order,
+                include_archived: includeArchived || undefined,
               });
             }}
           >

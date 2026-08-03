@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Link, useNavigate, useSearch } from "@tanstack/react-router";
 import DOMPurify from "dompurify";
 import { useTranslation } from "react-i18next";
+import { useAuth } from "@/auth/AuthContext";
 import { api } from "@/lib/api";
 import type { KbSearchHit } from "@/lib/api";
 import { Spinner } from "@/components/ui/Spinner";
@@ -30,6 +31,8 @@ export type SearchSearch = {
   created_to?: string;
   /** Result ordering; defaults to changed_desc. */
   sort?: "changed_desc" | "created_desc" | "created_asc";
+  /** Admin-only: also search archived tickets (backend ignores it for non-admins). */
+  include_archived?: boolean;
 };
 
 type SortOrder = NonNullable<SearchSearch["sort"]>;
@@ -107,6 +110,9 @@ export function SearchPage() {
   const createdFrom = search.created_from;
   const createdTo = search.created_to;
   const sort = search.sort ?? DEFAULT_SORT;
+  const { user } = useAuth();
+  const isAdmin = user?.is_admin === true;
+  const includeArchived = isAdmin && search.include_archived === true;
 
   const patchSearch = (patch: Partial<SearchSearch>) => {
     void navigate({
@@ -132,6 +138,7 @@ export function SearchPage() {
         if (!next.sort || next.sort === DEFAULT_SORT) delete next.sort;
         if (!next.q) delete next.q;
         if (!next.offset) delete next.offset;
+        if (!next.include_archived) delete next.include_archived;
         return next;
       },
     });
@@ -158,6 +165,7 @@ export function SearchPage() {
       createdFrom,
       createdTo,
       sort,
+      includeArchived,
     ],
     queryFn: ({ signal }) =>
       api.search(
@@ -172,6 +180,7 @@ export function SearchPage() {
           created_from: createdFrom,
           created_to: createdTo,
           sort,
+          include_archived: includeArchived || undefined,
         },
         signal,
       ),
@@ -311,6 +320,19 @@ export function SearchPage() {
               </button>
             );
           })}
+          {isAdmin && (
+            <button
+              type="button"
+              onClick={() =>
+                patchSearch({ include_archived: includeArchived ? undefined : true })
+              }
+              className={chipBtn(includeArchived)}
+              data-testid="search-filter-archived"
+              aria-pressed={includeArchived}
+            >
+              {t("search.filters.showArchived")}
+            </button>
+          )}
         </div>
 
         <span className="hidden h-4 w-px bg-hairline sm:inline" aria-hidden />
@@ -446,6 +468,11 @@ export function SearchPage() {
                       <span className="font-mono text-xs text-accent">{hit.tn}</span>
                       <StateChip state={hit.state} />
                       <PriorityChip priority={hit.priority} />
+                      {hit.archive_flag === 1 && (
+                        <Badge tone="muted" data-testid={`search-hit-archived-${hit.id}`}>
+                          {t("search.archivedBadge")}
+                        </Badge>
+                      )}
                       {hit.queue_name && (
                         <span className="text-xs text-muted">{hit.queue_name}</span>
                       )}

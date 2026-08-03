@@ -43,6 +43,29 @@ describe("decodeJob", () => {
     expect(job.dynamicFields.every((d) => d.executed)).toBe(true);
   });
 
+  it("marks the Archive-job keys (CloseTime TimePoint, SearchInArchive, NewArchiveFlag) executed", () => {
+    const job = decodeJob({
+      StateIDs: ["2", "3"],
+      CloseTimeSearchType: ["TimePoint"],
+      TicketCloseTimePoint: ["1"],
+      TicketCloseTimePointFormat: ["year"],
+      TicketCloseTimePointStart: ["Before"],
+      SearchInArchive: ["NotArchivedTickets"],
+      NewArchiveFlag: ["y"],
+    });
+
+    for (const key of [
+      "CloseTimeSearchType",
+      "TicketCloseTimePoint",
+      "TicketCloseTimePointFormat",
+      "TicketCloseTimePointStart",
+      "SearchInArchive",
+    ]) {
+      expect(job.criteria.find((c) => c.key === key)?.executed).toBe(true);
+    }
+    expect(job.actions.find((a) => a.key === "ArchiveFlag")?.executed).toBe(true);
+  });
+
   it("treats Valid=0 as inactive and an incomplete schedule as manual-only", () => {
     const job = decodeJob({ Valid: ["0"], ScheduleDays: ["1"], StateIDs: ["1"] });
     expect(job.valid).toBe(false);

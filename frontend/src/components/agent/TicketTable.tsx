@@ -349,6 +349,14 @@ export function TicketTable({
                       {ticket.queue_name}
                     </Link>
                   )}
+                  {ticket.archive_flag === 1 && (
+                    <span
+                      className="flex-none rounded bg-surface-subtle px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-wide text-muted"
+                      data-testid={`ticket-archived-badge-${ticket.id}`}
+                    >
+                      {t("queue.archivedBadge")}
+                    </span>
+                  )}
                   {attachmentCount > 0 && (
                     <span
                       className="inline-flex flex-none items-center gap-0.5 font-mono text-[10.5px] tabular-nums text-muted"

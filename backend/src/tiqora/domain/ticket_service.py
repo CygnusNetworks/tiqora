@@ -189,6 +189,7 @@ class TicketService:
             owner_name=owner[1] if owner else None,
             customer_id=t.customer_id,
             customer_user_id=t.customer_user_id,
+            archive_flag=t.archive_flag,
             customer_email=(
                 (customer_email_by_login or {}).get(t.customer_user_id)
                 if t.customer_user_id
@@ -225,6 +226,7 @@ class TicketService:
         state_type: str | None,
         owner_id: int | None,
         customer_id: str | None = None,
+        include_archived: bool = False,
     ) -> Select[tuple[Ticket]] | None:
         """Build the permission-filtered, unordered ``Ticket`` select.
 
@@ -253,10 +255,9 @@ class TicketService:
         else:
             filter_queues = allowed_queues
 
-        stmt = select(Ticket).where(
-            Ticket.queue_id.in_(filter_queues),
-            Ticket.archive_flag == 0,
-        )
+        stmt = select(Ticket).where(Ticket.queue_id.in_(filter_queues))
+        if not include_archived:
+            stmt = stmt.where(Ticket.archive_flag == 0)
 
         if state_id is not None:
             stmt = stmt.where(Ticket.ticket_state_id == state_id)
@@ -308,6 +309,7 @@ class TicketService:
         limit: int = 50,
         sort: str = "age",
         order: str = "desc",
+        include_archived: bool = False,
     ) -> PaginatedTickets:
         stmt = await self._filtered_ticket_stmt(
             user_id,
@@ -316,6 +318,7 @@ class TicketService:
             state_type=state_type,
             owner_id=owner_id,
             customer_id=customer_id,
+            include_archived=include_archived,
         )
         if stmt is None:
             return PaginatedTickets(items=[], total=0, offset=offset, limit=limit)
@@ -464,6 +467,7 @@ class TicketService:
         sort: str = "age",
         order: str = "desc",
         batch_size: int = 500,
+        include_archived: bool = False,
     ) -> AsyncGenerator[TicketListItem, None]:
         """Yield every matching ticket (no page cap), same filters as ``list_tickets``.
 
@@ -477,6 +481,7 @@ class TicketService:
             state_type=state_type,
             owner_id=owner_id,
             customer_id=customer_id,
+            include_archived=include_archived,
         )
         if stmt is None:
             return
@@ -666,7 +671,6 @@ class TicketService:
             service_id=ticket.service_id,
             sla_id=ticket.sla_id,
             responsible_user_id=ticket.responsible_user_id,
-            archive_flag=ticket.archive_flag,
             create_by=ticket.create_by,
             change_by=ticket.change_by,
             dynamic_fields=dfs,

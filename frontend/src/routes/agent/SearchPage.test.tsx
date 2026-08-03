@@ -13,6 +13,10 @@ const searchKb = vi.fn();
 const listReferenceQueues = vi.fn();
 const listReferenceAgents = vi.fn();
 
+vi.mock("@/auth/AuthContext", () => ({
+  useAuth: () => ({ user: { id: 5, login: "agent1", is_admin: false } }),
+}));
+
 vi.mock("@tanstack/react-router", () => ({
   useNavigate: () => navigate,
   useSearch: () => searchParams,

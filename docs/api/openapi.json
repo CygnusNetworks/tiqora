@@ -13294,6 +13294,11 @@
       },
       "SearchHit": {
         "properties": {
+          "archive_flag": {
+            "default": 0,
+            "title": "Archive Flag",
+            "type": "integer"
+          },
           "change_time": {
             "anyOf": [
               {
@@ -15226,6 +15231,17 @@
             "title": "Create Time",
             "type": "string"
           },
+          "customer_email": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Customer Email"
+          },
           "customer_id": {
             "anyOf": [
               {
@@ -15594,6 +15610,11 @@
             ],
             "title": "Age Seconds"
           },
+          "archive_flag": {
+            "default": 0,
+            "title": "Archive Flag",
+            "type": "integer"
+          },
           "attachment_count": {
             "default": 0,
             "title": "Attachment Count",
@@ -15608,6 +15629,17 @@
             "format": "date-time",
             "title": "Create Time",
             "type": "string"
+          },
+          "customer_email": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Customer Email"
           },
           "customer_id": {
             "anyOf": [
@@ -23799,7 +23831,7 @@
     },
     "/api/v1/admin/customer-users": {
       "get": {
-        "description": "List customer users. ``page_size`` may be up to 100_000 (``Alle`` UI option).",
+        "description": "List customer users. ``page_size`` may be up to 100_000 (``Alle`` UI option).\n\n``search`` is a case-insensitive substring match by default. When\n``regex=true``, ``search`` is instead treated as a case-insensitive\nregular expression matched against the same fields plus ``customer_id``\nand ``phone``. Requires Postgres or MySQL/MariaDB \u2014 other dialects\n(e.g. SQLite in tests) raise 422 since they have no portable native\nregex operator.",
         "operationId": "list_customer_users_api_v1_admin_customer_users_get",
         "parameters": [
           {
@@ -23816,6 +23848,16 @@
                 }
               ],
               "title": "Search"
+            }
+          },
+          {
+            "in": "query",
+            "name": "regex",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "Regex",
+              "type": "boolean"
             }
           },
           {
@@ -40252,6 +40294,18 @@
             }
           },
           {
+            "description": "Also return archived tickets (admins only; ignored otherwise).",
+            "in": "query",
+            "name": "include_archived",
+            "required": false,
+            "schema": {
+              "default": false,
+              "description": "Also return archived tickets (admins only; ignored otherwise).",
+              "title": "Include Archived",
+              "type": "boolean"
+            }
+          },
+          {
             "in": "header",
             "name": "authorization",
             "required": false,
@@ -42548,6 +42602,22 @@
           },
           {
             "in": "query",
+            "name": "customer_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Customer Id"
+            }
+          },
+          {
+            "in": "query",
             "name": "offset",
             "required": false,
             "schema": {
@@ -42587,6 +42657,18 @@
               "default": "desc",
               "title": "Order",
               "type": "string"
+            }
+          },
+          {
+            "description": "Also list archived tickets (admins only; ignored otherwise).",
+            "in": "query",
+            "name": "include_archived",
+            "required": false,
+            "schema": {
+              "default": false,
+              "description": "Also list archived tickets (admins only; ignored otherwise).",
+              "title": "Include Archived",
+              "type": "boolean"
             }
           },
           {
@@ -42861,6 +42943,22 @@
           },
           {
             "in": "query",
+            "name": "customer_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Customer Id"
+            }
+          },
+          {
+            "in": "query",
             "name": "sort",
             "required": false,
             "schema": {
@@ -42877,6 +42975,18 @@
               "default": "desc",
               "title": "Order",
               "type": "string"
+            }
+          },
+          {
+            "description": "Also export archived tickets (admins only; ignored otherwise).",
+            "in": "query",
+            "name": "include_archived",
+            "required": false,
+            "schema": {
+              "default": false,
+              "description": "Also export archived tickets (admins only; ignored otherwise).",
+              "title": "Include Archived",
+              "type": "boolean"
             }
           },
           {

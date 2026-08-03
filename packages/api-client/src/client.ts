@@ -991,6 +991,8 @@ export class ApiClient {
       limit?: number;
       sort?: string;
       order?: string;
+      /** Admins only — also list archived tickets (ignored for non-admins). */
+      include_archived?: boolean;
     } = {},
     signal?: AbortSignal,
   ) {
@@ -1255,6 +1257,8 @@ export class ApiClient {
       customer_id?: string;
       sort?: string;
       order?: string;
+      /** Admins only — also export archived tickets (ignored for non-admins). */
+      include_archived?: boolean;
     } = {},
   ): string {
     const qs = new URLSearchParams();
@@ -1375,6 +1379,8 @@ export class ApiClient {
       created_to?: string;
       /** Result ordering. Defaults to ``changed_desc`` (most recently touched). */
       sort?: "changed_desc" | "created_desc" | "created_asc";
+      /** Admins only — also search archived tickets (ignored for non-admins). */
+      include_archived?: boolean;
     },
     signal?: AbortSignal,
   ) {

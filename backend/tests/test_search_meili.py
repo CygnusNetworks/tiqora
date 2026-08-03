@@ -76,7 +76,7 @@ def _seed_search(sync_url: str) -> dict[str, Any]:
         # Idempotent cleanup of our block (shared session-scoped DB).
         conn.execute(text("DELETE FROM article_data_mime WHERE id = 900"))
         conn.execute(text("DELETE FROM article WHERE id = 900"))
-        conn.execute(text("DELETE FROM ticket WHERE id = 900"))
+        conn.execute(text("DELETE FROM ticket WHERE id IN (900, 901)"))
         conn.execute(text("DELETE FROM queue WHERE id = 300"))
         conn.execute(
             text("DELETE FROM group_user WHERE user_id IN (300, 301) OR group_id = 30"),
@@ -181,8 +181,27 @@ def _seed_search(sync_url: str) -> dict[str, Any]:
             ),
             {"t": NOW},
         )
+        conn.execute(
+            text(
+                """
+                INSERT INTO ticket (
+                    id, tn, title, queue_id, ticket_lock_id, type_id,
+                    user_id, responsible_user_id, ticket_priority_id, ticket_state_id,
+                    customer_id, customer_user_id,
+                    timeout, until_time, escalation_time, escalation_update_time,
+                    escalation_response_time, escalation_solution_time, archive_flag,
+                    create_time, create_by, change_time, change_by
+                ) VALUES (
+                    901, '20240601999998', 'UniqueZebraWidget archived', 300, 1, 1,
+                    300, 1, 3, 4, 'C', 'c@x.com',
+                    0, 0, 0, 0, 0, 0, 1, :t, 1, :t, 1
+                )
+                """
+            ),
+            {"t": NOW},
+        )
     engine.dispose()
-    return {"agent": 300, "outsider": 301, "ticket": 900, "queue": 300}
+    return {"agent": 300, "outsider": 301, "ticket": 900, "archived_ticket": 901, "queue": 300}
 
 
 @pytest.mark.asyncio
@@ -216,6 +235,16 @@ async def test_backfill_search_and_permission_filter(
             hits = await svc.search(ids["agent"], "UniqueZebraWidget", limit=10)
             assert hits.estimated_total >= 1
             assert any(h.id == ids["ticket"] for h in hits.hits)
+            # Archived tickets are hidden by default …
+            assert all(h.id != ids["archived_ticket"] for h in hits.hits)
+
+            # … and visible with include_archived (route gates this to admins).
+            with_archived = await svc.search(
+                ids["agent"], "UniqueZebraWidget", limit=10, include_archived=True
+            )
+            archived_hits = [h for h in with_archived.hits if h.id == ids["archived_ticket"]]
+            assert len(archived_hits) == 1
+            assert archived_hits[0].archive_flag == 1
 
             denied = await svc.search(ids["outsider"], "UniqueZebraWidget", limit=10)
             assert denied.estimated_total == 0

@@ -28,6 +28,7 @@ QUEUE_ID = 89300
 TICKET_ATTACHMENTS = 89310  # 2 real attachments + 1 inline image + 1 body part
 TICKET_AI_SUMMARY = 89311  # has a tiqora_ai_ticket_state row with summary_body
 TICKET_PLAIN = 89312  # no attachments, no ai summary, but has a customer_user
+TICKET_ARCHIVED = 89313  # archive_flag=1 — hidden unless include_archived
 ARTICLE_ATTACHMENTS = 89310
 ARTICLE_AI_SUMMARY = 89311
 ARTICLE_PLAIN = 89312
@@ -72,8 +73,13 @@ def _seed(sync_url: str) -> dict[str, Any]:
             {"t1": TICKET_ATTACHMENTS, "t2": TICKET_AI_SUMMARY, "t3": TICKET_PLAIN},
         )
         conn.execute(
-            text("DELETE FROM ticket WHERE id IN (:t1, :t2, :t3)"),
-            {"t1": TICKET_ATTACHMENTS, "t2": TICKET_AI_SUMMARY, "t3": TICKET_PLAIN},
+            text("DELETE FROM ticket WHERE id IN (:t1, :t2, :t3, :t4)"),
+            {
+                "t1": TICKET_ATTACHMENTS,
+                "t2": TICKET_AI_SUMMARY,
+                "t3": TICKET_PLAIN,
+                "t4": TICKET_ARCHIVED,
+            },
         )
         conn.execute(
             text("DELETE FROM customer_user WHERE login = :login"), {"login": CUSTOMER_LOGIN}
@@ -129,10 +135,11 @@ def _seed(sync_url: str) -> dict[str, Any]:
             {"login": CUSTOMER_LOGIN, "email": CUSTOMER_EMAIL, "cid": CUSTOMER_ID, "t": NOW},
         )
 
-        for ticket_id, tn_suffix, title, customer_id, customer_user_id in (
-            (TICKET_ATTACHMENTS, "1", "Ticket with attachments", None, None),
-            (TICKET_AI_SUMMARY, "2", "Ticket with AI summary", None, None),
-            (TICKET_PLAIN, "3", "Plain ticket", CUSTOMER_ID, CUSTOMER_LOGIN),
+        for ticket_id, tn_suffix, title, customer_id, customer_user_id, archive_flag in (
+            (TICKET_ATTACHMENTS, "1", "Ticket with attachments", None, None, 0),
+            (TICKET_AI_SUMMARY, "2", "Ticket with AI summary", None, None, 0),
+            (TICKET_PLAIN, "3", "Plain ticket", CUSTOMER_ID, CUSTOMER_LOGIN, 0),
+            (TICKET_ARCHIVED, "4", "Archived ticket", None, None, 1),
         ):
             conn.execute(
                 text(
@@ -145,7 +152,7 @@ def _seed(sync_url: str) -> dict[str, Any]:
                     " VALUES (:id, :tn, :title, :qid, 1, 1,"
                     " :uid, 1, 3, 4,"
                     " :cid, :cuid,"
-                    " 0, 0, 0, 0, 0, 0, 0,"
+                    " 0, 0, 0, 0, 0, 0, :af,"
                     " :t, 1, :t, 1)"
                 ),
                 {
@@ -156,6 +163,7 @@ def _seed(sync_url: str) -> dict[str, Any]:
                     "uid": AGENT_ID,
                     "cid": customer_id,
                     "cuid": customer_user_id,
+                    "af": archive_flag,
                     "t": NOW,
                 },
             )
@@ -228,6 +236,7 @@ def _seed(sync_url: str) -> dict[str, Any]:
         "ticket_attachments": TICKET_ATTACHMENTS,
         "ticket_ai_summary": TICKET_AI_SUMMARY,
         "ticket_plain": TICKET_PLAIN,
+        "ticket_archived": TICKET_ARCHIVED,
     }
 
 
@@ -307,5 +316,38 @@ async def test_list_tickets_customer_id_filter(
         )
         assert unmatched.items == []
         assert unmatched.total == 0
+
+    await engine.dispose()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("url_fixture", ["mariadb_znuny_url", "postgres_znuny_url"])
+async def test_list_tickets_include_archived(
+    url_fixture: str,
+    request: pytest.FixtureRequest,
+) -> None:
+    """Archived tickets are hidden by default and listed with
+    ``include_archived=True`` (the API route gates that flag to admins)."""
+    sync_url: str = request.getfixturevalue(url_fixture)
+    ids = _seed(sync_url)
+    async_url = _to_async_url(sync_url)
+    engine = create_async_engine(async_url)
+    factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+
+    async with factory() as session:
+        ts = TicketService(session)
+
+        default = await ts.list_tickets(ids["reader"], queue_id=ids["queue"], limit=50)
+        default_ids = {i.id for i in default.items}
+        assert ids["ticket_archived"] not in default_ids
+        assert ids["ticket_plain"] in default_ids
+
+        with_archived = await ts.list_tickets(
+            ids["reader"], queue_id=ids["queue"], limit=50, include_archived=True
+        )
+        by_id = {i.id: i for i in with_archived.items}
+        assert ids["ticket_archived"] in by_id
+        assert by_id[ids["ticket_archived"]].archive_flag == 1
+        assert default_ids <= set(by_id)
 
     await engine.dispose()

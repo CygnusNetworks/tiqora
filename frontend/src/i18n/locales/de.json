@@ -183,6 +183,8 @@
     "newCount": "{{count}} neu",
     "customerFilter": "Kunde: {{customerId}}",
     "clearCustomerFilter": "Kundenfilter aufheben",
+    "showArchived": "Archivierte anzeigen",
+    "archivedBadge": "Archiviert",
     "state": {
       "new": "Neu",
       "open": "Offen",
@@ -495,6 +497,7 @@
   },
   "search": {
     "title": "Suche",
+    "archivedBadge": "Archiviert",
     "placeholder": "Tickets suchen…",
     "commandHint": "Suchen oder Befehl…",
     "submit": "Suchen",
@@ -542,6 +545,7 @@
       "customerPlaceholder": "Firma oder Kontakt…",
       "createdFrom": "Erstellt von",
       "createdTo": "Erstellt bis",
+      "showArchived": "Archivierte anzeigen",
       "state": {
         "new": "Neu",
         "open": "Offen",

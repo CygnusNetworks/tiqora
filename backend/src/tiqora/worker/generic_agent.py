@@ -16,13 +16,20 @@ Gated by the ``daemon.generic_agent.enabled`` tiqora_settings key (default OFF
   ``PriorityIDs``/``OwnerIDs``/``LockIDs``/``TypeIDs`` (each OR-matched, AND
   across keys — Znuny's ``TicketSearch`` semantics), ``Title``/``CustomerID``
   (SQL ``LIKE``, ``*`` wildcard translated to ``%``), and
-  ``Ticket{Create,Change,Pending,Escalation,EscalationResponse,
+  ``Ticket{Create,Change,Close,Pending,Escalation,EscalationResponse,
   EscalationUpdate,EscalationSolution}Time{Older,Newer}Minutes`` (direct
-  column range checks — Znuny's ``TimeSlot``/``TimePoint`` UI variants are not
-  ported, see Uncertainties). A job with zero criteria refuses to run (mirrors
-  Znuny's "no search attributes" guard) to avoid an accidental full-table sweep.
+  column range checks; CloseTime via a ``ticket_history`` EXISTS subquery —
+  Znuny derives close time from StateUpdate/NewTicket history rows into a
+  closed-type state). ``TimePoint`` criteria are translated to Older/Newer
+  minutes, gated on the matching ``*SearchType`` key being ``TimePoint``
+  (inactive TimePoint rows with an empty SearchType are ignored, like Znuny);
+  ``TimeSlot`` is not ported (logged + ignored). ``SearchInArchive``/
+  ``ArchiveFlags`` scopes on ``archive_flag`` and defaults to unarchived
+  tickets (Znuny's ``Ticket::ArchiveSystem`` search default). A job with zero
+  criteria refuses to run (mirrors Znuny's "no search attributes" guard) to
+  avoid an accidental full-table sweep.
 - Actions (``_JobRunTicket``): ``NewQueueID``/``NewStateID``/``NewPriorityID``/
-  ``NewOwnerID``/``NewLockID``/``NewTitle`` via the matching
+  ``NewOwnerID``/``NewLockID``/``NewTitle``/``NewArchiveFlag`` via the matching
   ``domain.ticket_write_service`` mutator (so every Znuny invariant — history,
   ticket_index, escalation recompute, cache invalidation, outbox event — fires
   exactly as it would for an interactive edit); ``NewNoteBody``/``NewNoteSubject``
@@ -56,6 +63,7 @@ from tiqora.domain.settings_store import KEY_GENERIC_AGENT_ENABLED, get_setting_
 from tiqora.domain.ticket_write_service import (
     ArticleIn,
     add_article,
+    archive_ticket,
     assign_owner,
     change_priority,
     change_state,
@@ -104,7 +112,50 @@ _TIME_RANGE_COLUMNS: dict[str, str] = {
     "TicketEscalationResponseTime": "escalation_response_time",
     "TicketEscalationUpdateTime": "escalation_update_time",
     "TicketEscalationSolutionTime": "escalation_solution_time",
+    # Pseudo-column: no close_time exists on ticket; Znuny derives it from
+    # ticket_history (StateUpdate/NewTicket into a closed-type state) — see
+    # the EXISTS subquery in build_ticket_query.
+    "TicketCloseTime": "__close_time__",
 }
+
+# AdminGenericAgent stores each time criterion's mode in a ``*SearchType`` job
+# key (``TimePoint``/``TimeSlot``/empty). Note the create-time oddity: its key
+# is plain ``TimeSearchType``. TimePoint rows with an empty/absent SearchType
+# are dead data the UI leaves behind and MUST NOT filter (the production
+# Archive job carries inactive TicketChangeTimePoint/TicketCreateTimePoint
+# rows exactly like that).
+_TIME_SEARCH_TYPE_KEYS: dict[str, str] = {
+    "TicketCreateTime": "TimeSearchType",
+    "TicketChangeTime": "ChangeTimeSearchType",
+    "TicketCloseTime": "CloseTimeSearchType",
+    "TicketPendingTime": "PendingTimeSearchType",
+    "TicketEscalationTime": "EscalationTimeSearchType",
+    "TicketEscalationResponseTime": "EscalationResponseTimeSearchType",
+    "TicketEscalationUpdateTime": "EscalationUpdateTimeSearchType",
+    "TicketEscalationSolutionTime": "EscalationSolutionTimeSearchType",
+}
+
+# Znuny's TimePoint unit factors in minutes (month/year approximations match
+# Kernel/System/GenericAgent.pm: 30 days / 365 days).
+_TIME_POINT_FACTORS: dict[str, int] = {
+    "minute": 1,
+    "hour": 60,
+    "day": 60 * 24,
+    "week": 60 * 24 * 7,
+    "month": 60 * 24 * 30,
+    "year": 60 * 24 * 365,
+}
+
+_CLOSE_TIME_EXISTS = (
+    "EXISTS (SELECT 1 FROM ticket_history th"
+    " WHERE th.ticket_id = ticket.id"
+    " AND th.history_type_id IN"
+    " (SELECT id FROM ticket_history_type WHERE name IN ('StateUpdate', 'NewTicket'))"
+    " AND th.state_id IN"
+    " (SELECT s.id FROM ticket_state s"
+    "  JOIN ticket_state_type st ON st.id = s.type_id WHERE st.name = 'closed')"
+    " AND th.create_time {op} DATE_SUB(current_timestamp, INTERVAL :{pname} MINUTE))"
+)
 
 
 @dataclass
@@ -184,6 +235,44 @@ def _like_pattern(value: str) -> str:
     return value.replace("*", "%")
 
 
+def _first(criteria: dict[str, list[str]], key: str) -> str | None:
+    values = criteria.get(key)
+    return values[0] if values else None
+
+
+def _time_point_minutes(
+    criteria: dict[str, list[str]], prefix: str
+) -> tuple[int | None, int | None]:
+    """TimePoint criterion → ``(older_minutes, newer_minutes)``.
+
+    Only active when the criterion's ``*SearchType`` key is ``TimePoint``
+    (empty/absent SearchType means the TimePoint rows are inactive UI
+    leftovers). ``Before`` → older-than, ``Last`` → within-the-last;
+    ``Next``/``After`` (pending time futures) and ``TimeSlot`` are not
+    ported — logged and ignored.
+    """
+    search_type = _first(criteria, _TIME_SEARCH_TYPE_KEYS[prefix]) or ""
+    if search_type == "TimeSlot":
+        logger.warning("generic_agent_time_slot_unsupported", prefix=prefix)
+        return None, None
+    if search_type != "TimePoint":
+        return None, None
+    try:
+        point = int(_first(criteria, f"{prefix}Point") or "")
+        factor = _TIME_POINT_FACTORS[(_first(criteria, f"{prefix}PointFormat") or "").lower()]
+    except (ValueError, KeyError):
+        logger.warning("generic_agent_time_point_invalid", prefix=prefix)
+        return None, None
+    minutes = point * factor
+    start = _first(criteria, f"{prefix}PointStart") or "Before"
+    if start == "Before":
+        return minutes, None
+    if start == "Last":
+        return None, minutes
+    logger.warning("generic_agent_time_point_start_unsupported", prefix=prefix, start=start)
+    return None, None
+
+
 def build_ticket_query(criteria: dict[str, list[str]]) -> tuple[str, dict[str, object]] | None:
     """Build a WHERE-clause fragment + params from the supported criteria subset.
 
@@ -226,34 +315,53 @@ def build_ticket_query(criteria: dict[str, list[str]]) -> tuple[str, dict[str, o
         clauses.append(f"customer_id LIKE :{pname}")
 
     for prefix, column in _TIME_RANGE_COLUMNS.items():
-        older = criteria.get(f"{prefix}OlderMinutes")
-        newer = criteria.get(f"{prefix}NewerMinutes")
-        if older:
-            with _ignore_value_error():
-                n += 1
-                pname = f"p{n}"
-                params[pname] = int(older[0])
-                if column == "create_time":
-                    clauses.append(
-                        f"{column} <= DATE_SUB(current_timestamp, INTERVAL :{pname} MINUTE)"
-                    )
-                else:
-                    # epoch-second columns (escalation_*, until_time)
-                    clauses.append(f"{column} > 0 AND {column} <= UNIX_TIMESTAMP() - :{pname} * 60")
-        if newer:
-            with _ignore_value_error():
-                n += 1
-                pname = f"p{n}"
-                params[pname] = int(newer[0])
-                if column == "create_time":
-                    clauses.append(
-                        f"{column} >= DATE_SUB(current_timestamp, INTERVAL :{pname} MINUTE)"
-                    )
-                else:
-                    clauses.append(f"{column} > 0 AND {column} >= UNIX_TIMESTAMP() - :{pname} * 60")
+        tp_older, tp_newer = _time_point_minutes(criteria, prefix)
+        older_raw = _first(criteria, f"{prefix}OlderMinutes")
+        newer_raw = _first(criteria, f"{prefix}NewerMinutes")
+        older: int | None = tp_older
+        newer: int | None = tp_newer
+        with _ignore_value_error():
+            if older_raw:
+                older = int(older_raw)
+        with _ignore_value_error():
+            if newer_raw:
+                newer = int(newer_raw)
+
+        if older is not None:
+            n += 1
+            pname = f"p{n}"
+            params[pname] = older
+            if column == "__close_time__":
+                clauses.append(_CLOSE_TIME_EXISTS.format(op="<=", pname=pname))
+            elif column in ("create_time", "change_time"):
+                clauses.append(f"{column} <= DATE_SUB(current_timestamp, INTERVAL :{pname} MINUTE)")
+            else:
+                # epoch-second columns (escalation_*, until_time)
+                clauses.append(f"{column} > 0 AND {column} <= UNIX_TIMESTAMP() - :{pname} * 60")
+        if newer is not None:
+            n += 1
+            pname = f"p{n}"
+            params[pname] = newer
+            if column == "__close_time__":
+                clauses.append(_CLOSE_TIME_EXISTS.format(op=">=", pname=pname))
+            elif column in ("create_time", "change_time"):
+                clauses.append(f"{column} >= DATE_SUB(current_timestamp, INTERVAL :{pname} MINUTE)")
+            else:
+                clauses.append(f"{column} > 0 AND {column} >= UNIX_TIMESTAMP() - :{pname} * 60")
 
     if not clauses:
         return None
+
+    # Archive scoping (Ticket::ArchiveSystem semantics): default to unarchived
+    # tickets only — Znuny's TicketSearch default, and what keeps a nightly
+    # NewArchiveFlag job from re-matching its own output forever. Deliberately
+    # appended AFTER the no-criteria guard so it can't satisfy it by itself.
+    archive_mode = _first(criteria, "SearchInArchive") or _first(criteria, "ArchiveFlags")
+    if archive_mode == "ArchivedTickets":
+        clauses.append("archive_flag = 1")
+    elif archive_mode != "AllTickets":
+        clauses.append("archive_flag = 0")
+
     return " AND ".join(clauses), params
 
 
@@ -339,6 +447,17 @@ async def apply_actions(
             session, ticket_id=ticket_id, new_title=actions["Title"], user_id=user_id
         )
         applied.append("Title")
+
+    archive_flag = actions.get("ArchiveFlag")
+    if archive_flag in ("y", "n"):
+        await archive_ticket(
+            session,
+            ticket_id=ticket_id,
+            archive=archive_flag == "y",
+            user_id=user_id,
+            sysconfig=sysconfig,
+        )
+        applied.append("ArchiveFlag")
 
     note_body = actions.get("NoteBody")
     if note_body:

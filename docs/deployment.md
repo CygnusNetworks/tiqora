@@ -252,6 +252,7 @@ Known examples:
 | Change | Fields | Rebuild required? |
 |--------|--------|-------------------|
 | Faceted date filters (search facets PR) | `created_ts`, `changed_ts` on ticket docs | **Yes** — date filters exclude pre-change docs until rebuild |
+| Archive filter (archived tickets hidden from search) | `archive_flag` on ticket docs | **Yes** — the default `archive_flag = 0` filter excludes pre-change docs (they lack the field), hiding unarchived tickets from search until rebuild |
 
 ## Security checklist (draft)
 

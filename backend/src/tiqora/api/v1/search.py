@@ -10,6 +10,7 @@ from fastapi import APIRouter, Query
 from tiqora.api.deps import AppSettings, CurrentUser, DbSession
 from tiqora.domain.schemas import SearchResponse
 from tiqora.domain.search import SearchIndexService
+from tiqora.permissions.engine import PermissionEngine
 
 # Keep in sync with ``tiqora.domain.search.SORT_OPTIONS``.
 SortOrder = Literal["changed_desc", "created_desc", "created_asc"]
@@ -40,7 +41,12 @@ async def search(
     created_from: Annotated[date | None, Query(description="ISO date, e.g. 2026-07-01")] = None,
     created_to: Annotated[date | None, Query(description="ISO date, e.g. 2026-07-31")] = None,
     sort: Annotated[SortOrder, Query(description="Result ordering.")] = "changed_desc",
+    include_archived: Annotated[
+        bool, Query(description="Also return archived tickets (admins only; ignored otherwise).")
+    ] = False,
 ) -> SearchResponse:
+    if include_archived and not await PermissionEngine(session).is_admin(user.id):
+        include_archived = False
     svc = SearchIndexService(session, settings)
     try:
         return await svc.search(
@@ -55,6 +61,7 @@ async def search(
             created_from=_day_start_ts(created_from) if created_from else None,
             created_to=_day_end_ts(created_to) if created_to else None,
             sort=sort,
+            include_archived=include_archived,
         )
     finally:
         await svc.close()
