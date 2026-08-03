@@ -3,9 +3,7 @@
  *
  * Codes match Znuny `UserLanguage` / `i18n/Znuny/Znuny.<code>.po` so agent UI
  * choice, notification templates, and legacy preferences stay aligned.
- * Only locales with a shipped JSON under `./locales/` are fully translated;
- * everything else falls back to English strings via i18next while still using
- * the correct BCP-47 tag for `Intl` formatting and `document.dir`.
+ * Every locale with `translated: true` ships a full JSON under `./locales/`.
  */
 
 export type TextDirection = "ltr" | "rtl";
@@ -28,96 +26,67 @@ export const LANG_STORAGE_KEY = "tiqora-lang";
 export const DEFAULT_LOCALE = "en";
 
 /**
- * Priority UI languages shipped with translation JSON (~15 most common for
- * European/global helpdesks). All other Znuny codes remain in the registry
- * for content pickers (KB, AI reply language) and `UserLanguage` validation.
- */
-export const SHIPPED_UI_LOCALE_CODES = [
-  "en",
-  "de",
-  "fr",
-  "es",
-  "it",
-  "nl",
-  "pl",
-  "pt_BR",
-  "ru",
-  "zh_CN",
-  "ja",
-  "tr",
-  "cs",
-  "hu",
-  "sv",
-] as const;
-
-const SHIPPED = new Set<string>(SHIPPED_UI_LOCALE_CODES);
-
-function loc(
-  code: string,
-  label: string,
-  bcp47: string,
-  dir: TextDirection = "ltr",
-): LocaleDef {
-  return { code, label, bcp47, dir, translated: SHIPPED.has(code) };
-}
-
-/**
- * Full Znuny language set (plus plain `en` as the Tiqora default / source).
- * Order: English + German first, then remaining shipped UI languages, then
- * the rest of Znuny codes alphabetical by label.
+ * Full Znuny language set + plain `en` as source.
+ * All codes with a shipped JSON are `translated: true` so the picker offers
+ * the complete Znuny catalogue (full UI strings, not partial).
  */
 export const SUPPORTED_LOCALES: readonly LocaleDef[] = [
-  loc("en", "English", "en"),
-  loc("de", "Deutsch", "de"),
-  loc("fr", "Français", "fr"),
-  loc("es", "Español", "es"),
-  loc("it", "Italiano", "it"),
-  loc("nl", "Nederlands", "nl"),
-  loc("pl", "Polski", "pl"),
-  loc("pt_BR", "Português (Brasil)", "pt-BR"),
-  loc("ru", "Русский", "ru"),
-  loc("zh_CN", "简体中文", "zh-CN"),
-  loc("ja", "日本語", "ja"),
-  loc("tr", "Türkçe", "tr"),
-  loc("cs", "Čeština", "cs"),
-  loc("hu", "Magyar", "hu"),
-  loc("sv", "Svenska", "sv"),
-  // Remaining Znuny codes (content / UserLanguage only until translated).
-  loc("ar_SA", "العربية", "ar-SA", "rtl"),
-  loc("bg", "Български", "bg"),
-  loc("ca", "Català", "ca"),
-  loc("da", "Dansk", "da"),
-  loc("el", "Ελληνικά", "el"),
-  loc("en_CA", "English (Canada)", "en-CA"),
-  loc("en_GB", "English (UK)", "en-GB"),
-  loc("es_CO", "Español (Colombia)", "es-CO"),
-  loc("es_MX", "Español (México)", "es-MX"),
-  loc("et", "Eesti", "et"),
-  loc("fa", "فارسی", "fa", "rtl"),
-  loc("fi", "Suomi", "fi"),
-  loc("fr_CA", "Français (Canada)", "fr-CA"),
-  loc("gl", "Galego", "gl"),
-  loc("he", "עברית", "he", "rtl"),
-  loc("hi", "हिन्दी", "hi"),
-  loc("hr", "Hrvatski", "hr"),
-  loc("id", "Bahasa Indonesia", "id"),
-  loc("ko", "한국어", "ko"),
-  loc("lt", "Lietuvių", "lt"),
-  loc("lv", "Latviešu", "lv"),
-  loc("mk", "Македонски", "mk"),
-  loc("ms", "Bahasa Melayu", "ms"),
-  loc("nb_NO", "Norsk bokmål", "nb-NO"),
-  loc("pt", "Português", "pt"),
-  loc("ro", "Română", "ro"),
-  loc("sk_SK", "Slovenčina", "sk-SK"),
-  loc("sl", "Slovenščina", "sl"),
-  loc("sr", "Српски", "sr"),
-  loc("sw", "Kiswahili", "sw"),
-  loc("th_TH", "ไทย", "th-TH"),
-  loc("uk", "Українська", "uk"),
-  loc("vi_VN", "Tiếng Việt", "vi-VN"),
-  loc("zh_TW", "繁體中文", "zh-TW"),
-];
+  { code: "en", label: "English", bcp47: "en", dir: "ltr", translated: true },
+  { code: "de", label: "Deutsch", bcp47: "de", dir: "ltr", translated: true },
+  { code: "fr", label: "Français", bcp47: "fr", dir: "ltr", translated: true },
+  { code: "es", label: "Español", bcp47: "es", dir: "ltr", translated: true },
+  { code: "it", label: "Italiano", bcp47: "it", dir: "ltr", translated: true },
+  { code: "nl", label: "Nederlands", bcp47: "nl", dir: "ltr", translated: true },
+  { code: "pl", label: "Polski", bcp47: "pl", dir: "ltr", translated: true },
+  { code: "pt_BR", label: "Português (Brasil)", bcp47: "pt-BR", dir: "ltr", translated: true },
+  { code: "ru", label: "Русский", bcp47: "ru", dir: "ltr", translated: true },
+  { code: "zh_CN", label: "简体中文", bcp47: "zh-CN", dir: "ltr", translated: true },
+  { code: "ja", label: "日本語", bcp47: "ja", dir: "ltr", translated: true },
+  { code: "tr", label: "Türkçe", bcp47: "tr", dir: "ltr", translated: true },
+  { code: "cs", label: "Čeština", bcp47: "cs", dir: "ltr", translated: true },
+  { code: "hu", label: "Magyar", bcp47: "hu", dir: "ltr", translated: true },
+  { code: "sv", label: "Svenska", bcp47: "sv", dir: "ltr", translated: true },
+  // Remaining Znuny PO languages
+  { code: "ar_SA", label: "العربية", bcp47: "ar-SA", dir: "rtl", translated: true },
+  { code: "bg", label: "Български", bcp47: "bg", dir: "ltr", translated: true },
+  { code: "ca", label: "Català", bcp47: "ca", dir: "ltr", translated: true },
+  { code: "da", label: "Dansk", bcp47: "da", dir: "ltr", translated: true },
+  { code: "el", label: "Ελληνικά", bcp47: "el", dir: "ltr", translated: true },
+  { code: "en_CA", label: "English (Canada)", bcp47: "en-CA", dir: "ltr", translated: true },
+  { code: "en_GB", label: "English (UK)", bcp47: "en-GB", dir: "ltr", translated: true },
+  { code: "es_CO", label: "Español (Colombia)", bcp47: "es-CO", dir: "ltr", translated: true },
+  { code: "es_MX", label: "Español (México)", bcp47: "es-MX", dir: "ltr", translated: true },
+  { code: "et", label: "Eesti", bcp47: "et", dir: "ltr", translated: true },
+  { code: "fa", label: "فارسی", bcp47: "fa", dir: "rtl", translated: true },
+  { code: "fi", label: "Suomi", bcp47: "fi", dir: "ltr", translated: true },
+  { code: "fr_CA", label: "Français (Canada)", bcp47: "fr-CA", dir: "ltr", translated: true },
+  { code: "gl", label: "Galego", bcp47: "gl", dir: "ltr", translated: true },
+  { code: "he", label: "עברית", bcp47: "he", dir: "rtl", translated: true },
+  { code: "hi", label: "हिन्दी", bcp47: "hi", dir: "ltr", translated: true },
+  { code: "hr", label: "Hrvatski", bcp47: "hr", dir: "ltr", translated: true },
+  { code: "id", label: "Bahasa Indonesia", bcp47: "id", dir: "ltr", translated: true },
+  { code: "ko", label: "한국어", bcp47: "ko", dir: "ltr", translated: true },
+  { code: "lt", label: "Lietuvių", bcp47: "lt", dir: "ltr", translated: true },
+  { code: "lv", label: "Latviešu", bcp47: "lv", dir: "ltr", translated: true },
+  { code: "mk", label: "Македонски", bcp47: "mk", dir: "ltr", translated: true },
+  { code: "ms", label: "Bahasa Melayu", bcp47: "ms", dir: "ltr", translated: true },
+  { code: "nb_NO", label: "Norsk bokmål", bcp47: "nb-NO", dir: "ltr", translated: true },
+  { code: "pt", label: "Português", bcp47: "pt", dir: "ltr", translated: true },
+  { code: "ro", label: "Română", bcp47: "ro", dir: "ltr", translated: true },
+  { code: "sk_SK", label: "Slovenčina", bcp47: "sk-SK", dir: "ltr", translated: true },
+  { code: "sl", label: "Slovenščina", bcp47: "sl", dir: "ltr", translated: true },
+  { code: "sr", label: "Српски", bcp47: "sr", dir: "ltr", translated: true },
+  { code: "sw", label: "Kiswahili", bcp47: "sw", dir: "ltr", translated: true },
+  { code: "th_TH", label: "ไทย", bcp47: "th-TH", dir: "ltr", translated: true },
+  { code: "uk", label: "Українська", bcp47: "uk", dir: "ltr", translated: true },
+  { code: "vi_VN", label: "Tiếng Việt", bcp47: "vi-VN", dir: "ltr", translated: true },
+  { code: "zh_TW", label: "繁體中文", bcp47: "zh-TW", dir: "ltr", translated: true },
+] as const;
+
+/** Alias: every locale we ship UI JSON for (same as all translated codes). */
+export const SHIPPED_UI_LOCALE_CODES: readonly string[] = SUPPORTED_LOCALES.filter(
+  (l) => l.translated,
+).map((l) => l.code);
 
 const byCode = new Map(SUPPORTED_LOCALES.map((l) => [l.code.toLowerCase(), l]));
 const byBcp47 = new Map(SUPPORTED_LOCALES.map((l) => [l.bcp47.toLowerCase(), l]));
@@ -147,7 +116,6 @@ export function resolveLocaleCode(lang: string | null | undefined): string {
   const exact = getLocale(lang);
   if (exact) return exact.code;
 
-  // i18next may report "de-DE" / "pt-BR" — try base + underscore form.
   const normalized = lang.replace(/-/g, "_");
   const underscored = getLocale(normalized);
   if (underscored) return underscored.code;
@@ -156,7 +124,6 @@ export function resolveLocaleCode(lang: string | null | undefined): string {
   if (base) {
     const baseMatch = getLocale(base);
     if (baseMatch) return baseMatch.code;
-    // Prefer a regional variant when only the base is known (e.g. "zh" → zh_CN).
     const regional = SUPPORTED_LOCALES.find((l) => l.code.toLowerCase().startsWith(`${base}_`));
     if (regional) return regional.code;
   }
@@ -199,9 +166,8 @@ export function writeStoredLang(code: string): void {
 }
 
 /**
- * Items for language pickers. By default only locales with shipped UI JSON
- * (`translated: true`) appear so agents don't switch into English-fallback UIs.
- * Pass `{ all: true }` for admin/content language fields.
+ * Items for language pickers. By default only locales with shipped UI JSON.
+ * Pass `{ all: true }` for the full registry (same set once all are translated).
  */
 export function localePickerItems(opts?: {
   all?: boolean;

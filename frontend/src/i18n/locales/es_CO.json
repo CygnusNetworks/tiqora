@@ -1,13 +1,13 @@
 {
   "app": {
     "name": "Tiqora",
-    "tagline": "Sistema de tickets autoalojado con asistencia de AI integrada",
+    "tagline": "Boletos autohospedados con asistencia de IA incorporada",
     "beta": "Beta"
   },
   "notifications": {
     "title": "Notificaciones",
-    "empty": "No hay notificaciones nuevas.",
-    "newTicket": "Nuevo en su cola",
+    "empty": "No hay nuevas notificaciones.",
+    "newTicket": "Nuevo en tu cola",
     "noSubject": "(sin tema)"
   },
   "onlineAgents": {
@@ -17,23 +17,23 @@
   "settings": {
     "title": "Configuración",
     "language": "Idioma",
-    "langEnglish": "Inglés",
-    "langGerman": "Alemán",
+    "langEnglish": "ingles",
+    "langGerman": "alemán",
     "theme": "Apariencia",
-    "themeLight": "Claro",
-    "themeDark": "Oscuro",
+    "themeLight": "Luz",
+    "themeDark": "oscuro",
     "security": "Seguridad",
-    "securityHint": "Administre la autenticación de dos factores de su cuenta.",
+    "securityHint": "Administre la autenticación de dos factores para su cuenta.",
     "securityLink": "Abrir configuración de seguridad"
   },
   "nav": {
     "home": "Inicio",
     "agent": "Agente",
     "portal": "Portal del cliente",
-    "admin": "Admin",
+    "admin": "administrador",
     "theme": "Tema",
     "language": "Idioma",
-    "dashboard": "Panel",
+    "dashboard": "Panel de control",
     "queues": "Colas",
     "kb": "base de conocimientos"
   },
@@ -152,7 +152,7 @@
       "evening": "Buenas noches, {{name}}"
     },
     "noMyTickets": "No se le han asignado tickets abiertos.",
-    "myNewEmpty": "No se le asignaron nuevos tickets.",
+    "myNewEmpty": "No se le asignaron nuevos boletos.",
     "queueShortcuts": "Colas",
     "viewAllQueues": "Ver todas las colas",
     "openCount": "abierto",
@@ -168,7 +168,7 @@
     "escalatedEmpty": "Sin multas escaladas.",
     "newLabel": "nuevo",
     "viewAll": "Ver todo",
-    "toPickUpEmpty": "No hay tickets nuevos para recoger.",
+    "toPickUpEmpty": "No hay boletos nuevos para recoger.",
     "remindersDue": "Recordatorios vencidos",
     "remindersDueEmpty": "No hay recordatorios vencidos.",
     "queueShortcutsEmpty": "No hay colas con entradas abiertas o nuevas en este momento."
@@ -207,7 +207,7 @@
       "fieldPriority": "Prioridad",
       "fieldOwner": "propietario",
       "confirmTitle": "¿Cambiar {{field}}?",
-      "confirmText": "¿Cambiar {{field}} a \"{{value}}\" para {{count}} tickets?",
+      "confirmText": "¿Cambiar {{field}} a \"{{value}}\" para {{count}} boletos?",
       "confirmApply": "Cambiar",
       "confirmCancel": "Cancelar",
       "progress": "{{done}}/{{total}} cambió…",
@@ -216,7 +216,7 @@
     }
   },
   "ticket": {
-    "tn": "Ticket#",
+    "tn": "Boleto#",
     "title": "Título",
     "state": "Estado",
     "priority": "Prioridad",
@@ -225,10 +225,10 @@
     "age": "edad",
     "changed": "cambiado",
     "created": "Creado",
-    "queue": "Cola",
+    "queue": "cola",
     "noTickets": "No hay entradas que coincidan con este filtro.",
     "senderNoCustomer": "Remitente del primer artículo: ningún cliente asignado",
-    "filterByCustomer": "Mostrar solo los tickets de este cliente",
+    "filterByCustomer": "Mostrar solo los boletos de este cliente",
     "pagination": "{{from}}–{{to}} de {{total}}",
     "escalated": "escalado",
     "slaCountdown": "Acuerdo de Nivel de Servicio {{value}}",
@@ -263,7 +263,7 @@
     "historyName": "Entrada",
     "historyBy": "Por",
     "invalidId": "ID de billete no válido",
-    "loadError": "No se pudo cargar este ticket.",
+    "loadError": "No se pudo cargar este boleto.",
     "presenceViewing": "viendo",
     "presenceComposing": "componiendo",
     "composerReply": "Responder",
@@ -344,8 +344,8 @@
     "historySortDesc": "Lo más nuevo primero",
     "replyDialogTitle": "Responder",
     "replyTo": "a",
-    "replyCc": "Cc",
-    "replyBcc": "Bcc",
+    "replyCc": "cc",
+    "replyBcc": "Cco",
     "replyReplyTo": "Responder a",
     "recipientAddHint": "Nombre <address@example.com>",
     "recipientName": "Nombre",
@@ -356,7 +356,7 @@
     "replySubject": "Asunto",
     "replyTemplate": "Plantilla",
     "replyTemplateNone": "— Sin plantilla —",
-    "replyAnswer": "Su respuesta",
+    "replyAnswer": "Tu respuesta",
     "replySending": "Enviando…",
     "replyError": "No se pudo enviar la respuesta. Por favor inténtalo de nuevo.",
     "replyDraftError": "No se pudo cargar el borrador de respuesta.",
@@ -369,7 +369,7 @@
     "splitQueue": "Cola de destino",
     "splitNewTitle": "Nuevo título del billete (opcional)",
     "ai": {
-      "title": "Asistencia de AI",
+      "title": "Asistencia de IA",
       "help": {
         "summary": "Generado a partir de los artículos del ticket mediante el modelo configurado de la cola y almacenado únicamente en el estado del ticket, nunca como una nota; nunca se envía al cliente por sí solo.",
         "drafts": "Generado por el modelo del ticket hasta el momento. Cada borrador es su propio registro: nada se envía automáticamente; debes abrirlo y enviarlo o descartarlo explícitamente."
@@ -393,7 +393,7 @@
       "draftsLabel": "Borradores",
       "createDraftButton": "Crear borrador",
       "createDraftHint": "Esto puede tardar hasta un minuto...",
-      "draftsEmpty": "Aún no hay borradores de AI.",
+      "draftsEmpty": "Aún no hay borradores de IA.",
       "draftKind": {
         "reply": "Responder",
         "clarify": "aclarar"
@@ -409,15 +409,15 @@
       "collapse": "Colapso",
       "useDraft": "Usar como respuesta",
       "discardDraft": "Descartar",
-      "discardConfirm": "¿Descartar este borrador de AI? Esto no se puede deshacer.",
-      "errorLocked": "Ya hay una ejecución de AI activa para este ticket. Inténtelo de nuevo en breve.",
-      "errorForbidden": "No tienes permiso para utilizar esta función de AI.",
+      "discardConfirm": "¿Descartar este borrador de IA? Esto no se puede deshacer.",
+      "errorLocked": "Ya hay una ejecución de IA activa para este ticket. Inténtelo de nuevo en breve.",
+      "errorForbidden": "No tienes permiso para utilizar esta función de IA.",
       "errorRateLimited": "Límite alcanzado. Vuelve a intentarlo más tarde.",
-      "errorDisabled": "Esta función de AI está actualmente deshabilitada.",
+      "errorDisabled": "Esta función de IA está actualmente deshabilitada.",
       "errorGeneric": "Algo salió mal. Por favor inténtalo de nuevo.",
       "adminDeleteDraft": "Eliminar permanentemente",
       "adminDeleteDraftHint": "Administrador: eliminar permanentemente este borrador de la base de datos",
-      "adminDeleteConfirm": "¿Eliminar permanentemente este borrador de AI? Esto no se puede deshacer.",
+      "adminDeleteConfirm": "¿Eliminar permanentemente este borrador de IA? Esto no se puede deshacer.",
       "detailLabel": "Alcance",
       "moreActions": "Más acciones",
       "detail": {
@@ -425,8 +425,8 @@
         "detailed": "Detallado"
       },
       "adminDeleteSummary": "Eliminar resumen",
-      "adminDeleteSummaryHint": "Administrador: elimine el resumen de AI almacenado; la siguiente ejecución comienza desde cero",
-      "adminDeleteSummaryConfirm": "¿Eliminar permanentemente el resumen de AI almacenado de este ticket? La próxima ejecución resumirá el ticket desde cero.",
+      "adminDeleteSummaryHint": "Administrador: elimine el resumen de IA almacenado; la siguiente ejecución comienza desde cero",
+      "adminDeleteSummaryConfirm": "¿Eliminar permanentemente el resumen de IA almacenado de este ticket? La próxima ejecución resumirá el boleto desde cero.",
       "draftStatus": {
         "accepted": "Aceptado",
         "discarded": "Descartado",
@@ -460,7 +460,7 @@
       "merge": "fusionar",
       "appointment": "Nueva cita",
       "move": "Mover",
-      "queue": "Cola",
+      "queue": "cola",
       "noPermission": "Sin permiso"
     },
     "dialog": {
@@ -487,7 +487,7 @@
     "list": {
       "attachments_one": "1 archivo adjunto",
       "attachments_other": "{{count}} archivos adjuntos",
-      "hasSummary": "Resumen de AI disponible"
+      "hasSummary": "Resumen de IA disponible"
     },
     "similar": {
       "title": "Entradas similares",
@@ -504,7 +504,7 @@
     "hint": "Ingrese un número de ticket, asunto o texto del cuerpo.",
     "results": "{{total}} resultados para “{{query}}”",
     "noResults": "No hay entradas coincidentes.",
-    "groupTickets": "Tickets",
+    "groupTickets": "Entradas",
     "groupKb": "base de conocimientos",
     "smart": {
       "placeholder": "Buscar – o cola:, propietario:, estado:, cliente:, de:, a:…",
@@ -538,7 +538,7 @@
     "filters": {
       "title": "Filtros",
       "clear": "Borrar",
-      "queue": "Cola",
+      "queue": "cola",
       "owner": "propietario",
       "ownerAll": "Cualquier propietario",
       "customer": "Cliente",
@@ -569,7 +569,7 @@
     "chooseQueue": "Elige cola",
     "title": "Nuevo billete",
     "intro": "Abrir un ticket en nombre de un cliente.",
-    "queue": "Cola",
+    "queue": "cola",
     "noQueues": "No hay cola disponible",
     "customer": "Cliente",
     "customerHint": "Inicio de sesión de cliente (opcional)",
@@ -622,7 +622,7 @@
       "kb": "Artículos de ayuda"
     },
     "login": {
-      "subtitle": "Inicia sesión en su cuenta de soporte",
+      "subtitle": "Inicia sesión en tu cuenta de soporte",
       "email": "Correo electrónico o nombre de usuario"
     },
     "tickets": {
@@ -646,7 +646,7 @@
       "message": "Mensaje",
       "submit": "Enviar ticket",
       "validationError": "Por favor complete un asunto y un mensaje.",
-      "submitError": "No se pudo enviar su ticket. Por favor inténtalo de nuevo."
+      "submitError": "No se pudo enviar su boleto. Por favor inténtalo de nuevo."
     },
     "ticket": {
       "you": "tu",
@@ -671,13 +671,13 @@
     }
   },
   "admin": {
-    "title": "Administración",
-    "toggleSidebar": "Alternar navegación de administración",
-    "readOnly": "Solo lectura",
+    "title": "administración",
+    "toggleSidebar": "Alternar navegación de administrador",
+    "readOnly": "Sólo lectura",
     "accessDenied": {
       "title": "Acceso denegado",
-      "body": "Su cuenta no tiene privilegios de administración.",
-      "error": "No se pudo verificar el acceso de administración. Inténtelo de nuevo."
+      "body": "Su cuenta no tiene privilegios de administrador.",
+      "error": "No se pudo verificar el acceso de administrador. Por favor inténtalo de nuevo."
     },
     "group": {
       "access": "Acceso y usuarios",
@@ -689,24 +689,24 @@
     },
     "ai": {
       "settings": {
-        "title": "Configuración de AI",
-        "description": "Requisitos operativos, valores predeterminados globales y estado del subsistema de AI.",
-        "loadError": "No se pudo cargar la configuración.",
+        "title": "Configuración de IA",
+        "description": "Prerrequisitos operativos, valores predeterminados globales y estado del subsistema de IA.",
+        "loadError": "No se pudieron cargar las configuraciones.",
         "saved": "Guardado.",
         "saveError": "Error al guardar.",
-        "parallelBanner": "Operación en paralelo: las funciones autónomas de AI (p. ej. respuestas automáticas) están bloqueadas; los resúmenes y los borradores aprobados por humanos funcionan con normalidad. La autonomía total requiere el modo \"Solo Tiqora\" (tiqora_primary).",
-        "statProviders": "Proveedores LLM",
+        "parallelBanner": "Operación paralela: las funciones autónomas de IA (por ejemplo, respuestas automáticas) están bloqueadas; los resúmenes y los borradores aprobados por humanos funcionan normalmente. La autonomía total requiere el modo \"Solo Tiqora\" (tiqora_primary).",
+        "statProviders": "Proveedores de LLM",
         "statMcp": "Clientes MCP",
-        "statActivePolicies": "Políticas de cola activas",
+        "statActivePolicies": "Políticas de cola activa",
         "operationMode": "Modo de operación",
-        "operationModeHint": "Las funciones de AI requieren el modo \"Solo Tiqora\". Cámbielo solo después de la migración/corte; consulte la documentación de operaciones.",
+        "operationModeHint": "Las funciones de IA requieren el modo \"solo Tiqora\". Cambie solo después de la migración/transición: consulte los documentos de operaciones.",
         "mode": {
-          "parallel": "Operación en paralelo (con Znuny)",
-          "tiqora_primary": "Solo Tiqora"
+          "parallel": "Operación paralela (con Znuny)",
+          "tiqora_primary": "Sólo Tiqora"
         },
-        "modeConfirm": "¿Cambiar realmente el modo de operación a \"{{mode}}\"?",
+        "modeConfirm": "¿Realmente cambiar el modo de operación a \"{{mode}}\"?",
         "modeConfirmApply": "Cambiar",
-        "autoReplyKillSwitch": "Interruptor de emergencia de respuesta automática",
+        "autoReplyKillSwitch": "Interruptor de apagado de respuesta automática",
         "autoReplyKillSwitchHint": "Pause instantáneamente todas las respuestas automáticas de los clientes sin cambiar el modo de operación. La asistencia manual y los resúmenes siguen funcionando.",
         "autoReplyPause": "Pausar la respuesta automática",
         "autoReplyResume": "Reanudar la respuesta automática",
@@ -720,7 +720,7 @@
       },
       "acl": {
         "title": "Control de acceso (ACL)",
-        "description": "Permisos y límites por grupo/rol/usuario para funciones de AI.",
+        "description": "Permisos y límites por grupo/rol/usuario para funciones de IA.",
         "new": "Nueva entrada de ACL",
         "subject": "Asunto",
         "subjectType": {
@@ -750,7 +750,7 @@
       },
       "providers": {
         "title": "Proveedores de LLM",
-        "description": "Gestionar proveedores de modelos de lenguaje para el subsistema de AI.",
+        "description": "Gestionar proveedores de modelos de lenguaje para el subsistema de IA.",
         "new": "Nuevo proveedor",
         "name": "Nombre",
         "kind": "amable",
@@ -785,7 +785,7 @@
       },
       "mcp": {
         "title": "Clientes MCP",
-        "description": "Administre servidores MCP (Model Context Protocol) como fuentes de herramientas para la AI.",
+        "description": "Administre servidores MCP (Model Context Protocol) como fuentes de herramientas para la IA.",
         "new": "Nuevo cliente MCP",
         "name": "Nombre",
         "url": "URL",
@@ -803,11 +803,11 @@
         "noTools": "Aún no se han descubierto herramientas.",
         "mutating": "mutando",
         "enabled": "Habilitado",
-        "mutatingGateHint": "Sólo se ofrece a la AI en modo de autonomía “completa”."
+        "mutatingGateHint": "Sólo se ofrece a la IA en modo de autonomía “completa”."
       },
       "queues": {
-        "title": "Políticas de cola de AI",
-        "description": "Configure el comportamiento de la AI por cola: características, autonomía, proveedor, límites y escalamiento.",
+        "title": "Políticas de cola de IA",
+        "description": "Configure el comportamiento de la IA por cola: características, autonomía, proveedor, límites y escalamiento.",
         "new": "Nueva politica",
         "queue": "cola",
         "features": "Características",
@@ -821,9 +821,9 @@
           "off": "Desactivado (solo borradores)",
           "clarify_only": "Aclarar sólo",
           "full": "Totalmente autónomo",
-          "offHint": "La AI sólo crea borradores: un humano debe aprobar cada respuesta.",
-          "clarify_onlyHint": "La AI puede formular preguntas aclaratorias por sí sola, pero no enviar respuestas finales.",
-          "fullHint": "La AI podrá responder de forma autónoma dentro de los límites configurados."
+          "offHint": "La IA sólo crea borradores: un humano debe aprobar cada respuesta.",
+          "clarify_onlyHint": "La IA puede formular preguntas aclaratorias por sí sola, pero no enviar respuestas finales.",
+          "fullHint": "La IA podrá responder de forma autónoma dentro de los límites configurados."
         },
         "section": {
           "features": "Características",
@@ -863,11 +863,11 @@
         "escalationRulesHint": "Matriz JSON de reglas coincidentes con los resultados de la herramienta MCP que desencadenan la derivación a un humano.",
         "escalationRulesPlaceholder": "vacío = sin reglas, p.e. [{\"tool\":\"cliente:*\",\"match\":\"substring\",\"values\":[\"ESCALATE\"]}]",
         "emptyUnlimited": "vacío = ilimitado",
-        "disclosureEnabled": "Divulgación de AI habilitada",
+        "disclosureEnabled": "Divulgación de IA habilitada",
         "disclosureTextPlaceholder": "Vacío = usar el texto predeterminado global",
         "piiMasking": "Enmascaramiento de PII",
         "identityMode": {
-          "ticket_customer_id": "Cliente de tickets",
+          "ticket_customer_id": "Cliente de boletos",
           "clarify_schema": "Aclarar esquema",
           "off": "Apagado"
         },
@@ -959,14 +959,14 @@
         "allStatuses": "Todos los estados",
         "statusOk": "bien",
         "error": "error",
-        "ticketSearch": "Ticket",
+        "ticketSearch": "Boleto",
         "ticketSearchPlaceholder": "Número de billete o DNI…",
         "empty": "Ninguna solicitud coincide con estos filtros.",
         "table": {
           "time": "tiempo",
           "provider": "Proveedor / modelo",
           "feature": "Característica",
-          "ticket": "Ticket",
+          "ticket": "Boleto",
           "tokens": "Fichas (entrada/salida)",
           "duration": "Duración",
           "pii": "PII",
@@ -1051,10 +1051,10 @@
     "help": {
       "aiQueue": {
         "queue": "La cola a la que se aplica esta política. Cada cola puede tener como máximo una política; Las políticas no son heredadas por las subcolas.",
-        "systemPrompt": "Texto de instrucción adicional antepuesto a cada solicitud de modelo (por ejemplo, tono, contexto específico de la cola), combinado con la plantilla de autonomía y cualquier regla de identidad.",
+        "systemPrompt": "Texto de aviso adicional antepuesto a cada solicitud de modelo (por ejemplo, tono, contexto específico de la cola), combinado con la plantilla de autonomía y cualquier regla de identidad.",
         "llmProvider": "El proveedor del modelo de idioma para esta cola. Debe admitir la llamada de herramientas una vez que se utilizan las herramientas MCP o la autonomía.",
         "modelOverride": "Anula el modelo predeterminado del proveedor seleccionado solo para esta cola.",
-        "visionProvider": "Las imágenes adjuntas nunca se muestran en el modelo principal, solo en este modelo de visión dedicado, que las describe en texto plano. Esa descripción (no la imagen) es lo que ve el modelo principal. Déjelo sin configurar para ignorar por completo los archivos adjuntos de imágenes. Debido a que las imágenes no se pueden enmascarar para PII, prefiera aquí un proveedor alojado en la UE y habilítelo deliberadamente.",
+        "visionProvider": "Las imágenes adjuntas nunca se muestran en el modelo principal, solo en este modelo de visión dedicado, que las describe en texto sin formato. Esa descripción (no la imagen) es lo que ve el modelo principal. Déjelo sin configurar para ignorar por completo los archivos adjuntos de imágenes. Debido a que las imágenes no se pueden enmascarar para PII, prefiera aquí un proveedor alojado en la UE y habilítelo deliberadamente.",
         "enabledManualAssist": "Muestra el botón \"Borrador AI\" en el zoom del ticket. Los borradores son su propio registro, nunca un artículo: un agente debe aceptar y enviar cada uno de ellos explícitamente. No afectado por la puerta del modo de operación.",
         "kbTags": "Etiquetas separadas por comas cuyos artículos de la base de conocimientos se proporcionan al modelo como contexto.",
         "kbCategoryIds": "ID de categorías de la base de conocimientos separados por comas, incluidos además de las etiquetas.",
@@ -1065,24 +1065,24 @@
         "summaryIncrementalMinArticles": "Número mínimo de artículos nuevos antes de que se active un recálculo incremental (en lugar de completo).",
         "summaryIncrementalMinChars": "Número mínimo de caracteres nuevos antes de que se active un recálculo incremental.",
         "enabledAutoReply": "Habilita el trabajador autónomo de respuesta automática para esta cola: envía respuestas a los clientes sin aprobación humana, según la matriz de autonomía. Requiere el modo \"Solo Tiqora\" (tiqora_primary).",
-        "autonomy": "Controla lo que la AI puede hacer sin la aprobación humana: \"Desactivado\" = solo borradores, \"Aclarar solo\" = las preguntas aclaratorias pueden enviarse directamente (las respuestas sustanciales permanecen como borradores), \"Totalmente autónomo\" = ambas pueden enviarse automáticamente, incluidas las herramientas MCP mutantes.",
+        "autonomy": "Controla lo que la IA puede hacer sin la aprobación humana: \"Desactivado\" = solo borradores, \"Aclarar solo\" = las preguntas aclaratorias pueden enviarse directamente (las respuestas sustanciales permanecen como borradores), \"Totalmente autónomo\" = ambas pueden enviarse automáticamente, incluidas las herramientas MCP mutantes.",
         "serviceUser": "La cuenta del agente bajo la cual se crean las respuestas/aclaraciones automáticas de esta cola (auditoría y identidad de permiso). Requerido una vez que se habilitan las respuestas automáticas.",
         "maxClarifications": "Número máximo de preguntas aclaratorias automáticas por ticket antes de escalar.",
         "maxAutoReplies": "Número máximo de respuestas automáticas por ticket.",
         "maxRepliesPerHour": "Número máximo de respuestas automáticas para esta cola por hora: un freno de costos.",
         "budgetTokensDay": "Presupuesto de token diario para la ruta de respuesta automática de esta cola. Una vez superado, el trabajador automático hace una pausa hasta el día siguiente.",
-        "disclosureEnabled": "Agrega un pie de página de divulgación de AI a las respuestas de los clientes enviadas de forma autónoma. Los borradores que un agente acepta y envía cuentan como una respuesta humana y no tienen pie de página.",
+        "disclosureEnabled": "Agrega un pie de página de divulgación de IA a las respuestas de los clientes enviadas de forma autónoma. Los borradores que un agente acepta y envía cuentan como una respuesta humana y no tienen pie de página.",
         "disclosureText": "Texto informativo específico de la cola. Vacío = se utiliza el texto predeterminado global de la configuración de AI.",
         "escalationRules": "Reglas JSON que verifican los resultados de la herramienta MCP antes del enmascaramiento de PII; cualquier coincidencia detiene el envío automático y escala a un humano (lógica OR pura, sin prioridad entre reglas).",
         "piiMasking": "Enmascara los identificadores de clientes reconocidos (correo electrónico, teléfono, MAC, IP) en el texto del ticket y en los resultados de la herramienta MCP antes de que lleguen al modelo, y los desenmascara nuevamente antes de que la herramienta real llame o envíe. Complementa, pero no reemplaza, la elección del proveedor (alojamiento de la UE/DPA) como control de privacidad principal.",
-        "identityMode": "Cómo se resuelve la identidad del cliente para las llamadas a herramientas: \"Cliente del ticket\" utiliza el ID del cliente en el ticket, \"Aclarar esquema\" permite que la AI solicite activamente la información faltante, \"Desactivado\" deshabilita la resolución de identidad.",
-        "clarifySchemaJson": "Descripción JSON de los campos que la AI puede recopilar activamente según el esquema de aclaración (nombre del campo + herramienta de coincidencia MCP opcional).",
-        "ignoredSenders": "Remitentes a los que nunca se responde automáticamente: una dirección exacta o un patrón glob \"*@dominio\", que no distingue entre mayúsculas y minúsculas. Una coincidencia es un salto silencioso (sin ejecución, sin borrador). Ejemplos: noreply@example.com, *@internal.example.",
+        "identityMode": "Cómo se resuelve la identidad del cliente para las llamadas a herramientas: \"Cliente del ticket\" utiliza el ID del cliente en el ticket, \"Aclarar esquema\" permite que la IA solicite activamente la información faltante, \"Desactivado\" deshabilita la resolución de identidad.",
+        "clarifySchemaJson": "Descripción JSON de los campos que la IA puede recopilar activamente según el esquema de aclaración (nombre del campo + herramienta de coincidencia MCP opcional).",
+        "ignoredSenders": "Remitentes a los que nunca se responde automáticamente: una dirección exacta o un globo \"*@dominio\", que no distingue entre mayúsculas y minúsculas. Un partido es un salto silencioso (sin carrera, sin draft). Ejemplos: noreply@example.com, *@internal.example.",
         "ignoreSendersManual": "En una coincidencia, también bloquea el botón manual \"Borrador AI\" (error 409); de forma predeterminada, solo se ve afectada la ruta de respuesta automática, la Asistencia manual aún se ejecuta para depurar.",
         "replyLanguageMode": "Controla si el modelo recibe un idioma de respuesta vinculante: \"Desactivado\" = comportamiento actual (sin directiva), \"Fijo\" = siempre el idioma configurado, \"Automático\" = detectado desde el asunto + último artículo del cliente, recurriendo al valor predeterminado configurado cuando el texto es demasiado corto/ambiguo.",
         "replyLanguageFixed": "El código de idioma BCP-47 (por ejemplo, \"de\", \"en\") siempre se utiliza como idioma de respuesta vinculante en el modo \"Fijo\".",
         "replyLanguageDefault": "Código de idioma BCP-47 utilizado en modo \"Automático\" cuando el texto no se puede hacer coincidir con confianza con un perfil de idioma conocido.",
-        "allowedStateTypes": "Lista separada por comas de tipos de estado de Znuny permitidos (por ejemplo, \"abierto\" o \"abierto, recordatorio pendiente\") a los que la AI puede configurar un ticket a través de update_ticket_fields, aplicado tanto para el nombre del estado como para la identificación numérica del estado. Vacío = predeterminado sólo \"abierto\" (se permite reabrir, nunca cerrar); una lista vacía explícita \"[]\" deshabilita los cambios de estado por completo.",
+        "allowedStateTypes": "Lista separada por comas de tipos de estado de Znuny permitidos (por ejemplo, \"abierto\" o \"abierto, recordatorio pendiente\") a los que la IA puede configurar un ticket a través de update_ticket_fields, aplicado tanto para el nombre del estado como para la identificación numérica del estado. Vacío = predeterminado sólo \"abierto\" (se permite reabrir, nunca cerrar); una lista vacía explícita \"[]\" deshabilita los cambios de estado por completo.",
         "piiNer": "Detecta nombres de personas en texto a través de spaCy NER (alemán + inglés) y los enmascara como [NOMBRE_n] antes de que el contenido llegue al proveedor de LLM, además del nombre del cliente y los remitentes. Solo está activo cuando el enmascaramiento de PII está activado. Los falsos positivos son inofensivos (solo más enmascaramiento).",
         "summaryDetail": "Estándar: párrafos compactos, 1 o 2 oraciones por documento adjunto. Detallado: párrafos más completos y de 3 a 5 oraciones por documento, útil para colas con muchos archivos adjuntos en PDF."
       },
@@ -1144,12 +1144,12 @@
       },
       "subjectConfig": {
         "hook": "La etiqueta que antepone el número de billete en el asunto (por ejemplo, \"Nº de billete\"). Si se deja vacío, se utiliza el gancho configurado por Znuny.",
-        "divider": "Caracter(es) entre el gancho y el número de billete dentro de los corchetes, p.e. \"Ticket n.º 123\" frente a \"Ticket n.º 123\".",
+        "divider": "Caracter(es) entre el gancho y el número de billete dentro de los corchetes, p.e. \"Boleto n.º 123\" frente a \"Boleto n.º 123\".",
         "subjectFormat": "Dónde se coloca la etiqueta [Hook#Number] en el asunto: \"Izquierda\" le antepone, \"Derecha\" la agrega, \"Ninguno\" la omite (las referencias a los tickets dependen únicamente del subprocesamiento de ID de mensaje)."
       },
       "postmasterFilters": {
         "match": "Los pares de encabezado/valor que debe cumplir un correo entrante para que se aplique este filtro. Todas las filas están conectadas con AND; marque \"negar\" para requerir que el encabezado NO coincida.",
-        "set": "Pseudoencabezados X-OTRS-* escritos en el ticket una vez que se cumplen todas las reglas de partido anteriores, p. X-OTRS-Cola para enrutar a una cola específica."
+        "set": "Pseudoencabezados X-OTRS-* escritos en el boleto una vez que se cumplen todas las reglas de partido anteriores, p. X-OTRS-Queue para enrutar a una cola específica."
       },
       "autoResponses": {
         "typeId": "ID numérico de la tabla auto_response_type de Znuny, no es un selector aquí: normalmente 1 = respuesta automática, 2 = rechazo automático, 3 = seguimiento automático, 4 = respuesta automática/billete nuevo, 5 = eliminación automática.",
@@ -1231,7 +1231,7 @@
       "valid": "Válido",
       "invalid": "Inválido",
       "comments": "Comentarios",
-      "changed": "Modificado",
+      "changed": "cambiado",
       "actions": "Acciones",
       "edit": "Editar",
       "deactivate": "Desactivar",
@@ -1324,12 +1324,12 @@
     "users": {
       "title_plural": "Usuarios",
       "new": "Nuevo usuario",
-      "login": "Inicio de sesión",
+      "login": "Iniciar sesión",
       "password": "Contraseña",
-      "passwordHelp": "Deje en blanco para conservar la contraseña actual.",
+      "passwordHelp": "Déjelo en blanco para conservar la contraseña actual.",
       "title": "Título",
-      "firstName": "Nombre",
-      "lastName": "Apellido",
+      "firstName": "nombre",
+      "lastName": "apellido",
       "name": "Nombre"
     },
     "groups": {
@@ -1439,7 +1439,7 @@
       "title": "Variables disponibles",
       "insertHint": "Haga clic para insertar en la posición del cursor",
       "groups": {
-        "ticket": "Ticket",
+        "ticket": "Boleto",
         "customer": "Cliente",
         "agent": "Agente",
         "queue": "cola"
@@ -1572,7 +1572,7 @@
       "every": "cada",
       "olderThan": "mayor que {{duration}}",
       "newerThan": "más nuevo que {{duration}}",
-      "weekdaysShort": "[\"Dom\", \"Lun\", \"Mar\", \"Mié\", \"Jue\", \"Vie\", \"Sáb\"]",
+      "weekdaysShort": "['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado']",
       "keyLabel": {
         "StateIDs": "Estado",
         "QueueIDs": "cola",
@@ -1608,47 +1608,47 @@
       "new": "Nueva clave API",
       "name": "Nombre",
       "user": "Usuario",
-      "userRequired": "Seleccione un usuario válido.",
-      "created": "Creada",
-      "lastUsed": "Último uso",
+      "userRequired": "Por favor seleccione un usuario válido.",
+      "created": "Creado",
+      "lastUsed": "último usado",
       "expires": "Vence",
-      "unbounded": "sin vencimiento",
-      "expired": "Vencida",
+      "unbounded": "sin caducidad",
+      "expired": "Caducado",
       "expiryPresetUnlimited": "Ilimitado",
-      "expiryPreset30": "30 días",
-      "expiryPreset90": "90 días",
+      "expiryPreset30": "30 dias",
+      "expiryPreset90": "90 dias",
       "expiryPreset180": "180 días",
       "expiryPreset365": "1 año",
       "expiryPresetCustom": "Fecha…",
-      "expiryPreviewUnlimited": "Válida indefinidamente",
-      "expiryPreviewLabel": "Vence: {{date}}",
+      "expiryPreviewUnlimited": "Válido indefinidamente",
+      "expiryPreviewLabel": "Caduca: {{date}}",
       "empty": "Aún no hay claves API.",
-      "hint": "Las claves en texto plano se muestran solo una vez. Revocar establece valid=false; eliminar quita permanentemente la fila. Los ámbitos limitan qué áreas de la API puede usar la clave (los derechos de cola siguen viniendo del usuario vinculado).",
+      "hint": "Las claves de texto sin formato se muestran solo una vez. Revocar conjuntos valid=false; eliminar elimina permanentemente la fila. Los alcances limitan qué áreas de API puede usar la clave (los derechos de cola aún provienen del usuario vinculado).",
       "delete": "Eliminar",
       "deleteConfirm": "¿Eliminar permanentemente la clave API “{{name}}”?",
       "revokeConfirm": "¿Revocar la clave API “{{name}}”?",
       "createdTitle": "Clave API creada",
-      "onceWarning": "Se muestra solo una vez: cópiela y guárdela de forma segura ahora.",
-      "onceHint": "La clave en texto plano no se puede recuperar después.",
+      "onceWarning": "Se muestra solo una vez: cópielo y guárdelo de forma segura ahora.",
+      "onceHint": "La clave de texto sin formato no se puede recuperar más adelante.",
       "copy": "Copiar",
       "copied": "Copiado",
       "scopes": "Acceso",
       "scopesUnrestricted": "Sin restricciones",
-      "scopesReadOnly": "Solo lectura",
-      "scopesCustom": "Personalizado",
-      "scopesHelp": "Sin restricciones usa todos los privilegios de agente del usuario vinculado. Solo lectura permite GET en cada área. Personalizado elige RO o RW por área de la API.",
+      "scopesReadOnly": "Sólo lectura",
+      "scopesCustom": "personalizado",
+      "scopesHelp": "Sin restricciones utiliza todos los privilegios de agente del usuario vinculado. El modo de solo lectura permite GET en cada área. Selecciones personalizadas RO o RW por área API.",
       "scopesArea": "Área",
-      "scopesOff": "Desactivado",
+      "scopesOff": "Apagado",
       "scopesRo": "RO",
       "scopesRw": "RW",
-      "scopesCustomEmpty": "Seleccione al menos un área, o cambie a sin restricciones.",
+      "scopesCustomEmpty": "Seleccione al menos un área o cambie a sin restricciones.",
       "areas": {
         "tickets": "Entradas/colas/búsqueda",
         "customers": "Clientes",
         "kb": "base de conocimientos",
         "calendar": "Calendario",
         "stats": "Estadísticas",
-        "ai": "asistencia de AI",
+        "ai": "asistencia de IA",
         "process": "Procesos",
         "channels": "Canales",
         "events": "Eventos / ESS",
@@ -1859,11 +1859,11 @@
           "description": "Elimina las copias de seguridad de borrado caducadas una vez al día."
         },
         "ai_worker": {
-          "name": "trabajador de AI",
-          "description": "Procesa tareas de AI (borrador automático, respuesta automática, escalamiento) en segundo plano."
+          "name": "trabajador de IA",
+          "description": "Procesa tareas de IA (borrador automático, respuesta automática, escalamiento) en segundo plano."
         },
         "ai_audit_cleanup": {
-          "name": "Limpieza de auditoría de AI",
+          "name": "Limpieza de auditoría de IA",
           "description": "Elimina las filas del registro de auditoría de LLM más allá de la retención configurada una vez al día."
         }
       },
@@ -1884,7 +1884,7 @@
       "time": "tiempo",
       "fromTo": "Desde → Hasta",
       "subject": "Asunto",
-      "ticket": "Ticket",
+      "ticket": "Boleto",
       "queue": "cola",
       "duration": "Duración",
       "detail": "Detalle",
@@ -2195,12 +2195,12 @@
       "gdpr": "Solicitudes RGPD: acceso, anonimización y eliminación con copia de seguridad.",
       "mailLog": "Revise los intentos de entrega de correo electrónico entrantes y salientes.",
       "customerFields": "Mantener variables de marcador de posición para los usuarios de los clientes.",
-      "ai": "Gestionar el modo de operación, divulgación y control de acceso del subsistema de AI.",
+      "ai": "Gestionar el modo de operación, divulgación y control de acceso del subsistema de IA.",
       "aiProviders": "Administre y pruebe proveedores de LLM (compatibles con OpenAI, Anthropic).",
-      "aiMcp": "Administre servidores MCP como fuentes de herramientas para la AI y habilite herramientas.",
-      "aiQueues": "Configure el comportamiento de la AI por cola: autonomía, límites, escalamiento.",
+      "aiMcp": "Administre servidores MCP como fuentes de herramientas para la IA y habilite herramientas.",
+      "aiQueues": "Configure el comportamiento de la IA por cola: autonomía, límites, escalamiento.",
       "aiAudit": "Auditoría completa de cada solicitud/respuesta de LLM, con revelación de PII.",
-      "aiAcl": "Permisos de AI y cuotas por grupo, rol o agente."
+      "aiAcl": "Permisos de IA y cuotas por grupo, rol o agente."
     }
   },
   "kb": {
@@ -2241,10 +2241,10 @@
       "archived": "Archivado"
     },
     "help": {
-      "category": "Agrupa el artículo en la barra lateral de la base de conocimientos y limita qué artículos puede extraer una política de cola de AI a través de su filtro de ID de categoría.",
-      "language": "El idioma del contenido del artículo. Los agentes y la búsqueda de conocimientos de AI pueden filtrarlo, por lo que el contenido en varios idiomas debe dividirse en artículos separados por idioma.",
-      "state": "\"Borrador\"/\"En revisión\" solo son visibles en este editor; solo los artículos \"Publicados\" aparecen en la búsqueda orientada al cliente y pueden usarse como contexto de conocimiento de AI. \"Archivado\" lo oculta de ambos sin eliminarlo.",
-      "tags": "Etiquetas separadas por comas que se utilizan para navegar y buscar; también son el enlace con el que coincide la configuración de \"etiquetas KB\" de una política de cola de AI para decidir qué artículos alimentan el modelo.",
+      "category": "Agrupa el artículo en la barra lateral de la base de conocimientos y limita qué artículos puede extraer una política de cola de IA a través de su filtro de ID de categoría.",
+      "language": "El idioma del contenido del artículo. Los agentes y la búsqueda de conocimientos de IA pueden filtrarlo, por lo que el contenido en varios idiomas debe dividirse en artículos separados por idioma.",
+      "state": "\"Borrador\"/\"En revisión\" solo son visibles en este editor; solo los artículos \"publicados\" aparecen en la búsqueda orientada al cliente y pueden usarse como contexto de conocimiento de IA. \"Archivado\" lo oculta a ambos sin eliminarlo.",
+      "tags": "Etiquetas separadas por comas que se utilizan para navegar y buscar; también son el enlace con el que coincide la configuración de \"etiquetas KB\" de una política de cola de IA para decidir qué artículos alimentan el modelo.",
       "categoryParent": "Coloca la categoría como una subcategoría. El árbol es sólo de navegación: los permisos no se heredan; Cada categoría tiene sus propios grupos.",
       "categorySlug": "Slug URL de la categoría. Déjelo vacío para derivarlo del nombre automáticamente (las colisiones obtienen un sufijo numérico).",
       "categorySort": "Ordene la posición dentro de su nivel: los números más pequeños van primero.",
@@ -2436,7 +2436,7 @@
       "submitError": "No se pudo enviar el diálogo.",
       "articleSubject": "Asunto",
       "articleBody": "cuerpo",
-      "fieldFallbackNote": "Entrada de texto plano (no hay widget dedicado para este tipo de campo)."
+      "fieldFallbackNote": "Entrada de texto sin formato (no hay widget dedicado para este tipo de campo)."
     }
   },
   "agentTemplates": {

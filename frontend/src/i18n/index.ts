@@ -11,18 +11,15 @@ import {
 } from "./locales";
 
 /**
- * Eager resources for the two day-one languages. All other shipped locales
- * load on demand via {@link ensureLocaleLoaded} so the main bundle stays small.
+ * Eager resources for the two day-one languages. Every other Znuny locale
+ * loads on demand via {@link ensureLocaleLoaded}.
  */
 const bundledResources: Record<string, { translation: object }> = {
   en: { translation: en },
   de: { translation: de },
 };
 
-/**
- * Dynamic loaders for priority languages beyond en/de. Vite code-splits each
- * JSON into its own chunk.
- */
+/** Vite code-splits each JSON into its own chunk. */
 const localeLoaders: Record<string, () => Promise<{ default: object }>> = {
   fr: () => import("./locales/fr.json"),
   es: () => import("./locales/es.json"),
@@ -37,6 +34,40 @@ const localeLoaders: Record<string, () => Promise<{ default: object }>> = {
   cs: () => import("./locales/cs.json"),
   hu: () => import("./locales/hu.json"),
   sv: () => import("./locales/sv.json"),
+  ar_SA: () => import("./locales/ar_SA.json"),
+  bg: () => import("./locales/bg.json"),
+  ca: () => import("./locales/ca.json"),
+  da: () => import("./locales/da.json"),
+  el: () => import("./locales/el.json"),
+  en_CA: () => import("./locales/en_CA.json"),
+  en_GB: () => import("./locales/en_GB.json"),
+  es_CO: () => import("./locales/es_CO.json"),
+  es_MX: () => import("./locales/es_MX.json"),
+  et: () => import("./locales/et.json"),
+  fa: () => import("./locales/fa.json"),
+  fi: () => import("./locales/fi.json"),
+  fr_CA: () => import("./locales/fr_CA.json"),
+  gl: () => import("./locales/gl.json"),
+  he: () => import("./locales/he.json"),
+  hi: () => import("./locales/hi.json"),
+  hr: () => import("./locales/hr.json"),
+  id: () => import("./locales/id.json"),
+  ko: () => import("./locales/ko.json"),
+  lt: () => import("./locales/lt.json"),
+  lv: () => import("./locales/lv.json"),
+  mk: () => import("./locales/mk.json"),
+  ms: () => import("./locales/ms.json"),
+  nb_NO: () => import("./locales/nb_NO.json"),
+  pt: () => import("./locales/pt.json"),
+  ro: () => import("./locales/ro.json"),
+  sk_SK: () => import("./locales/sk_SK.json"),
+  sl: () => import("./locales/sl.json"),
+  sr: () => import("./locales/sr.json"),
+  sw: () => import("./locales/sw.json"),
+  th_TH: () => import("./locales/th_TH.json"),
+  uk: () => import("./locales/uk.json"),
+  vi_VN: () => import("./locales/vi_VN.json"),
+  zh_TW: () => import("./locales/zh_TW.json"),
 };
 
 const loadedCodes = new Set(Object.keys(bundledResources));
@@ -46,7 +77,6 @@ export async function ensureLocaleLoaded(code: string): Promise<void> {
   if (loadedCodes.has(resolved)) return;
   const loader = localeLoaders[resolved];
   if (!loader) {
-    // Untranslated locale: i18next falls back to `en` for missing keys.
     loadedCodes.add(resolved);
     return;
   }
@@ -55,7 +85,6 @@ export async function ensureLocaleLoaded(code: string): Promise<void> {
     i18n.addResourceBundle(resolved, "translation", mod.default, true, true);
     loadedCodes.add(resolved);
   } catch (err) {
-    // Missing chunk during development before MT finishes — fall back to en.
     console.warn(`[i18n] failed to load locale ${resolved}`, err);
     loadedCodes.add(resolved);
   }
@@ -82,7 +111,6 @@ export async function setAppLanguage(
 
   if (opts.persistRemote === false) return;
   try {
-    // Dynamic import avoids a circular dep with the api client package.
     const { api } = await import("@/lib/api");
     await api.setMyLanguage(resolved);
   } catch {
@@ -107,7 +135,6 @@ i18n.on("languageChanged", (lng) => {
 
 applyDocumentLocale(i18n.language);
 
-// Preload the stored language if it is not already in the eager bundle.
 const initial = readStoredLang();
 if (initial !== "en" && initial !== "de") {
   void ensureLocaleLoaded(initial).then(() => {
