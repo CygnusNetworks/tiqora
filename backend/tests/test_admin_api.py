@@ -572,6 +572,114 @@ async def test_admin_customer_user_list_search(
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("url_fixture", ["mariadb_znuny_url", "postgres_znuny_url"])
+async def test_admin_customer_user_list_search_regex(
+    url_fixture: str, request: pytest.FixtureRequest
+) -> None:
+    """``regex=True`` matches a case-insensitive regular expression across
+    login/email/first/last/customer_id/phone; invalid patterns raise 422;
+    ``regex=False`` (default) keeps the plain substring behavior."""
+    sync_url: str = request.getfixturevalue(url_fixture)
+    ids = _seed_admin_and_plain_user(sync_url)
+    session, engine = await _make_session(sync_url)
+    ns = uuid.uuid4().hex[:8]
+
+    async with session as s:
+        admin_user = AuthenticatedUser(
+            id=ids["admin_id"],
+            login="root@localhost",
+            first_name="Admin",
+            last_name="Znuny",
+            auth_method="session",
+        )
+        cust = f"RX-{ns}"
+        await admin_customers.create_customer_user(
+            CustomerUserAdminCreate(
+                login=f"alice.rx.{ns}@example.com",
+                email=f"alice.mail.{ns}@example.com",
+                customer_id=cust,
+                first_name="Alice",
+                last_name=f"Wonder{ns}",
+                phone="+49 111",
+            ),
+            admin_user,
+            s,
+        )
+        await admin_customers.create_customer_user(
+            CustomerUserAdminCreate(
+                login=f"bob.rx.{ns}@example.com",
+                email=f"bob.mail.{ns}@example.com",
+                customer_id=cust,
+                first_name="Bob",
+                last_name=f"Builder{ns}",
+                phone="+49 222",
+            ),
+            admin_user,
+            s,
+        )
+
+        params = ListParams(page=1, page_size=50, valid="valid")
+
+        # Anchored alternation on login, case-insensitive.
+        by_login = await admin_customers.list_customer_users(
+            admin_user, s, params, search=f"^ALICE\\.RX\\.{ns}", regex=True
+        )
+        assert {i.login for i in by_login.items} == {f"alice.rx.{ns}@example.com"}
+
+        # Matches via email field.
+        by_email = await admin_customers.list_customer_users(
+            admin_user, s, params, search=f"bob\\.mail\\.{ns}", regex=True
+        )
+        assert {i.login for i in by_email.items} == {f"bob.rx.{ns}@example.com"}
+
+        # Matches via customer_id field.
+        by_customer_id = await admin_customers.list_customer_users(
+            admin_user, s, params, search=f"^{cust}$", regex=True
+        )
+        assert {i.login for i in by_customer_id.items} == {
+            f"alice.rx.{ns}@example.com",
+            f"bob.rx.{ns}@example.com",
+        }
+
+        # Matches via phone field.
+        by_phone = await admin_customers.list_customer_users(
+            admin_user, s, params, search=r"\+49 111", regex=True
+        )
+        assert {i.login for i in by_phone.items} == {f"alice.rx.{ns}@example.com"}
+
+        # Alternation across two rows.
+        alt = await admin_customers.list_customer_users(
+            admin_user, s, params, search=f"(alice|bob)\\.rx\\.{ns}", regex=True
+        )
+        assert {i.login for i in alt.items} == {
+            f"alice.rx.{ns}@example.com",
+            f"bob.rx.{ns}@example.com",
+        }
+
+        # No match.
+        none = await admin_customers.list_customer_users(
+            admin_user, s, params, search=f"zzz-no-hit-{ns}", regex=True
+        )
+        assert none.total == 0
+
+        # Invalid regex -> 422, regardless of dialect.
+        with pytest.raises(HTTPException) as exc_info:
+            await admin_customers.list_customer_users(
+                admin_user, s, params, search="(unclosed", regex=True
+            )
+        assert exc_info.value.status_code == 422
+
+        # regex=False (default) treats the same pattern as a literal substring
+        # — no match, since no login contains the raw text "(alice|bob)".
+        literal = await admin_customers.list_customer_users(
+            admin_user, s, params, search=f"(alice|bob)\\.rx\\.{ns}"
+        )
+        assert literal.total == 0
+
+    await engine.dispose()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("url_fixture", ["mariadb_znuny_url", "postgres_znuny_url"])
 async def test_admin_customer_user_bulk_update(
     url_fixture: str, request: pytest.FixtureRequest
 ) -> None:

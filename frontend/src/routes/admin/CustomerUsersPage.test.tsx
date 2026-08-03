@@ -106,6 +106,7 @@ describe("CustomerUsersPage", () => {
       expect(screen.getByTestId("admin-customer-users-page")).toBeInTheDocument();
     });
     expect(screen.getByTestId("admin-customer-users-search")).toBeInTheDocument();
+    expect(screen.getByTestId("admin-customer-users-search-regex")).toBeInTheDocument();
 
     await waitFor(() => {
       expect(screen.getByTestId("admin-row-select-42")).toBeInTheDocument();
@@ -139,6 +140,44 @@ describe("CustomerUsersPage", () => {
         valid_id: 1,
       });
     });
+  });
+
+  it("forwards regex: true to the list call only while the toggle is checked", async () => {
+    renderPage();
+    await waitFor(() => expect(list).toHaveBeenCalled());
+
+    const searchInput = screen.getByTestId("admin-customer-users-search");
+    const regexToggle = screen.getByTestId("admin-customer-users-search-regex");
+    expect(regexToggle).not.toBeChecked();
+
+    list.mockClear();
+    fireEvent.change(searchInput, { target: { value: "^alice" } });
+    await waitFor(() => {
+      expect(list).toHaveBeenCalledWith(
+        expect.objectContaining({ search: "^alice" }),
+        expect.anything(),
+      );
+    });
+    expect(list.mock.calls.at(-1)?.[0]).not.toHaveProperty("regex");
+
+    list.mockClear();
+    fireEvent.click(regexToggle);
+    await waitFor(() => {
+      expect(list).toHaveBeenCalledWith(
+        expect.objectContaining({ search: "^alice", regex: true }),
+        expect.anything(),
+      );
+    });
+
+    list.mockClear();
+    fireEvent.click(regexToggle);
+    await waitFor(() => {
+      expect(list).toHaveBeenCalledWith(
+        expect.objectContaining({ search: "^alice" }),
+        expect.anything(),
+      );
+    });
+    expect(list.mock.calls.at(-1)?.[0]).not.toHaveProperty("regex");
   });
 
   it("offers an Alle page-size option that chunk-fetches at pageSize 500", async () => {

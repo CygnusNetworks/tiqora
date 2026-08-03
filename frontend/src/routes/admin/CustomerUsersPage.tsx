@@ -244,6 +244,7 @@ export function CustomerUsersPage() {
         columns={columns}
         fields={fields}
         searchable
+        searchRegexToggle
         sortable
         statusSortable
         pageSize={100}

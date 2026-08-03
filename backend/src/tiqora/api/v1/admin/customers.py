@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import re
+
 from fastapi import APIRouter, HTTPException, status
 from sqlalchemy import func, or_, select
 
@@ -53,6 +55,25 @@ CUSTOMER_USER_SORT_COLUMNS = {
     "change_time": CustomerUser.change_time,
 }
 
+# Columns searched by both the plain substring search and the regex search.
+CUSTOMER_USER_SEARCH_COLUMNS = (
+    CustomerUser.login,
+    CustomerUser.email,
+    CustomerUser.first_name,
+    CustomerUser.last_name,
+    CustomerUser.customer_id,
+    CustomerUser.phone,
+)
+
+
+def _bind_dialect_name(session: DbSession) -> str:
+    """Best-effort dialect name of *session*'s bind (``postgresql``/``mysql``/other)."""
+    try:
+        bind = session.get_bind()
+        return str(bind.dialect.name) if bind is not None else ""
+    except Exception:  # noqa: BLE001
+        return ""
+
 
 @router.get("/customer-users", response_model=Page[CustomerUserAdminOut])
 async def list_customer_users(
@@ -60,21 +81,59 @@ async def list_customer_users(
     session: DbSession,
     params: CustomerUserListParamsDep,
     search: str | None = None,
+    regex: bool = False,
 ) -> Page[CustomerUserAdminOut]:
-    """List customer users. ``page_size`` may be up to 100_000 (``Alle`` UI option)."""
+    """List customer users. ``page_size`` may be up to 100_000 (``Alle`` UI option).
+
+    ``search`` is a case-insensitive substring match by default. When
+    ``regex=true``, ``search`` is instead treated as a case-insensitive
+    regular expression matched against the same fields plus ``customer_id``
+    and ``phone``. Requires Postgres or MySQL/MariaDB — other dialects
+    (e.g. SQLite in tests) raise 422 since they have no portable native
+    regex operator.
+    """
     _ = admin
     stmt = apply_valid_filter(select(CustomerUser), CustomerUser.valid_id, params.valid)
-    # Dialect-portable case-insensitive match (Postgres LIKE is case-sensitive).
-    if search and (term := search.strip().lower()):
-        pattern = f"%{term}%"
-        stmt = stmt.where(
-            or_(
-                func.lower(CustomerUser.login).like(pattern),
-                func.lower(CustomerUser.email).like(pattern),
-                func.lower(CustomerUser.first_name).like(pattern),
-                func.lower(CustomerUser.last_name).like(pattern),
+    if search and (term := search.strip()):
+        if regex:
+            try:
+                re.compile(term)
+            except re.error as exc:
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail=f"Invalid regular expression: {exc}",
+                ) from exc
+            dialect = _bind_dialect_name(session)
+            if dialect == "postgresql":
+                stmt = stmt.where(
+                    or_(*(col.op("~*")(term) for col in CUSTOMER_USER_SEARCH_COLUMNS))
+                )
+            elif dialect in {"mysql", "mariadb"}:
+                pattern = term.lower()
+                stmt = stmt.where(
+                    or_(
+                        *(
+                            func.lower(col).op("REGEXP")(pattern)
+                            for col in CUSTOMER_USER_SEARCH_COLUMNS
+                        )
+                    )
+                )
+            else:
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail="Regex search requires PostgreSQL or MySQL/MariaDB",
+                )
+        else:
+            # Dialect-portable case-insensitive match (Postgres LIKE is case-sensitive).
+            pattern = f"%{term.lower()}%"
+            stmt = stmt.where(
+                or_(
+                    func.lower(CustomerUser.login).like(pattern),
+                    func.lower(CustomerUser.email).like(pattern),
+                    func.lower(CustomerUser.first_name).like(pattern),
+                    func.lower(CustomerUser.last_name).like(pattern),
+                )
             )
-        )
     stmt = apply_sort(
         stmt,
         CUSTOMER_USER_SORT_COLUMNS,
