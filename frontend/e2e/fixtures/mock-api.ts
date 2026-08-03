@@ -291,6 +291,13 @@ const calendars = [
   { id: 2, group_id: 1, name: "On-call", color: "#ef4444", valid: true },
 ];
 
+// Mid-month in the current month so the appointment is always visible in the
+// calendar's default (current-month) grid regardless of when the tests run.
+const _now = new Date();
+const _ym = `${_now.getFullYear()}-${String(_now.getMonth() + 1).padStart(2, "0")}`;
+const appointmentStart = `${_ym}-15T09:00:00`;
+const appointmentEnd = `${_ym}-15T10:00:00`;
+
 const calendarAppointment = {
   id: 900,
   parent_id: null,
@@ -299,8 +306,8 @@ const calendarAppointment = {
   title: "Sprint planning",
   description: "Plan next sprint",
   location: "Room 2",
-  start_time: "2026-07-19T09:00:00",
-  end_time: "2026-07-19T10:00:00",
+  start_time: appointmentStart,
+  end_time: appointmentEnd,
   all_day: false,
   team_id: null,
   resource_id: null,
@@ -320,8 +327,8 @@ const occurrences = [
     title: "Sprint planning",
     description: "Plan next sprint",
     location: "Room 2",
-    start_time: "2026-07-19T09:00:00",
-    end_time: "2026-07-19T10:00:00",
+    start_time: appointmentStart,
+    end_time: appointmentEnd,
     all_day: false,
     is_recurring: false,
   },
