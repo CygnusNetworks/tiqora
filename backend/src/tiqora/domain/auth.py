@@ -32,6 +32,33 @@ def _utcnow() -> datetime:
     return datetime.utcnow()  # noqa: DTZ003 — intentional naive UTC for DB columns
 
 
+def decode_preference_value(raw: object) -> str | None:
+    """Decode ``user_preferences.preferences_value`` (MySQL LONGBLOB / PG TEXT).
+
+    Drivers differ: MariaDB returns ``bytes``; PostgreSQL's Znuny schema uses
+    TEXT, and LargeBinary inserts may surface as a hex literal (``\\x6465`` for
+    ``de``). Accept bytes, memoryview, plain text, and the hex form.
+    """
+    if raw is None:
+        return None
+    if isinstance(raw, memoryview | bytearray):
+        raw = bytes(raw)
+    if isinstance(raw, bytes):
+        text = raw.decode("utf-8", errors="replace").strip()
+        return text or None
+    if isinstance(raw, str):
+        if raw.startswith("\\x"):
+            try:
+                text = bytes.fromhex(raw[2:]).decode("utf-8", errors="replace").strip()
+                return text or None
+            except ValueError:
+                pass
+        text = raw.strip()
+        return text or None
+    text = str(raw).strip()
+    return text or None
+
+
 @dataclass(frozen=True, slots=True)
 class AuthenticatedUser:
     """Resolved agent identity for request handling."""
@@ -222,21 +249,22 @@ class AuthService:
         self._settings = settings
 
     async def _load_preference(self, user_id: int, key: str) -> str | None:
-        """Read a single ``user_preferences`` value (UTF-8 LONGBLOB)."""
+        """Read a single ``user_preferences`` value (UTF-8 LONGBLOB / TEXT).
+
+        Uses raw SQL: the ORM maps the column as ``LargeBinary`` (correct for
+        MySQL LONGBLOB) but Znuny PG schema uses TEXT, and LargeBinary coercion
+        can drop plain-text language codes on asyncpg.
+        """
+        from sqlalchemy import text
+
         result = await self._session.execute(
-            select(UserPreferences.preferences_value).where(
-                UserPreferences.user_id == user_id,
-                UserPreferences.preferences_key == key,
-            )
+            text(
+                "SELECT preferences_value FROM user_preferences"
+                " WHERE user_id = :uid AND preferences_key = :k"
+            ),
+            {"uid": user_id, "k": key},
         )
-        raw = result.scalar_one_or_none()
-        if raw is None:
-            return None
-        if isinstance(raw, bytes | bytearray | memoryview):
-            value = bytes(raw).decode("utf-8", errors="replace").strip()
-        else:
-            value = str(raw).strip()
-        return value or None
+        return decode_preference_value(result.scalar_one_or_none())
 
     async def _load_user_email(self, user_id: int) -> str | None:
         """Znuny stores the agent mailbox in ``user_preferences.UserEmail``."""
@@ -247,25 +275,36 @@ class AuthService:
         return await self._load_preference(user_id, "UserLanguage")
 
     async def set_user_language(self, user_id: int, language: str) -> None:
-        """Upsert Znuny-compatible ``UserLanguage`` preference (UTF-8 bytes)."""
-        raw = language.encode("utf-8")
+        """Upsert Znuny-compatible ``UserLanguage`` preference as UTF-8 text.
+
+        Bind a Python ``str`` (not ``bytes``) so PostgreSQL TEXT and MySQL
+        LONGBLOB both store readable language codes rather than PG hex escapes.
+        """
+        from sqlalchemy import text
+
         result = await self._session.execute(
-            select(UserPreferences).where(
+            select(UserPreferences.user_id).where(
                 UserPreferences.user_id == user_id,
                 UserPreferences.preferences_key == "UserLanguage",
             )
         )
-        row = result.scalar_one_or_none()
-        if row is None:
-            self._session.add(
-                UserPreferences(
-                    user_id=user_id,
-                    preferences_key="UserLanguage",
-                    preferences_value=raw,
-                )
+        if result.scalar_one_or_none() is None:
+            await self._session.execute(
+                text(
+                    "INSERT INTO user_preferences"
+                    " (user_id, preferences_key, preferences_value)"
+                    " VALUES (:uid, 'UserLanguage', :v)"
+                ),
+                {"uid": user_id, "v": language},
             )
         else:
-            row.preferences_value = raw
+            await self._session.execute(
+                text(
+                    "UPDATE user_preferences SET preferences_value = :v"
+                    " WHERE user_id = :uid AND preferences_key = 'UserLanguage'"
+                ),
+                {"uid": user_id, "v": language},
+            )
         await self._session.commit()
 
     async def _user_from_row(

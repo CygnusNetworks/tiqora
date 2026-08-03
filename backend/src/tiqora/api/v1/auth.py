@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import base64
+import contextlib
 import secrets
 from html import escape as html_escape
 from typing import Annotated, Any
@@ -23,7 +24,12 @@ from tiqora.api.deps import (
     get_auth_service,
     get_redis,
 )
-from tiqora.domain.auth import AuthenticatedUser, AuthService, user_to_dict
+from tiqora.domain.auth import (
+    AuthenticatedUser,
+    AuthService,
+    decode_preference_value,
+    user_to_dict,
+)
 from tiqora.domain.auth_config import AuthConfigService
 from tiqora.domain.auth_ldap import LdapAuthService
 from tiqora.domain.oidc import OIDCError, OIDCService
@@ -120,27 +126,20 @@ _USER_LANGUAGE_CODES = frozenset(
 
 async def _load_user_language(session: AsyncSession, user_id: int) -> str | None:
     """Read Znuny ``UserLanguage`` preference; never raises into /me."""
-    from sqlalchemy import select
-
-    from tiqora.db.legacy.user import UserPreferences
+    from sqlalchemy import text
 
     try:
+        # Raw SQL: ORM LargeBinary vs PG TEXT can mis-coerce preference values.
         result = await session.execute(
-            select(UserPreferences.preferences_value).where(
-                UserPreferences.user_id == user_id,
-                UserPreferences.preferences_key == "UserLanguage",
-            )
+            text(
+                "SELECT preferences_value FROM user_preferences"
+                " WHERE user_id = :uid AND preferences_key = 'UserLanguage'"
+            ),
+            {"uid": user_id},
         )
-        raw = result.scalar_one_or_none()
+        return decode_preference_value(result.scalar_one_or_none())
     except Exception:  # noqa: BLE001 — never fail /me for a missing pref
         return None
-    if raw is None:
-        return None
-    if isinstance(raw, bytes | bytearray | memoryview):
-        value = bytes(raw).decode("utf-8", errors="replace").strip()
-    else:
-        value = str(raw).strip()
-    return value or None
 
 
 async def _user_me(
@@ -155,9 +154,18 @@ async def _user_me(
     if extra:
         data.update(extra)
     data["is_admin"] = await pe.is_admin(user.id)
-    data["can_edit_templates"] = await TemplatePermissionService(session).can_edit_any(user.id)
+    # Load language before optional tiqora-table probes. On Postgres a failed
+    # statement aborts the transaction; later queries then raise and would be
+    # swallowed by the language loader's broad except → language always null.
     if "language" not in data:
         data["language"] = await _load_user_language(session, user.id)
+    try:
+        data["can_edit_templates"] = await TemplatePermissionService(session).can_edit_any(user.id)
+    except Exception:  # noqa: BLE001 — never fail /me if tiqora tables missing
+        data["can_edit_templates"] = False
+        # Clear aborted transaction so callers (e.g. PUT language) can continue.
+        with contextlib.suppress(Exception):
+            await session.rollback()
     return UserMe(**data)
 
 

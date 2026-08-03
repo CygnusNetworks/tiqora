@@ -244,12 +244,10 @@ def _as_int(value: object) -> int:
 
 
 def _decode_pref(value: object) -> str:
-    """user_preferences.preferences_value is LONGBLOB — decode bytes to str."""
-    if value is None:
-        return ""
-    if isinstance(value, bytes):
-        return value.decode("utf-8", errors="replace")
-    return str(value)
+    """user_preferences.preferences_value is LONGBLOB/TEXT — decode to str."""
+    from tiqora.domain.auth import decode_preference_value
+
+    return decode_preference_value(value) or ""
 
 
 async def _resolve_recipients(

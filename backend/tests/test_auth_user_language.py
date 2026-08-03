@@ -31,6 +31,21 @@ def _to_async_url(sync_url: str) -> str:
     return sync_url
 
 
+def _cleanup(sync_url: str) -> None:
+    """Remove rows this module commits so the DB leak detector stays green."""
+    engine = create_engine(sync_url)
+    with engine.begin() as conn:
+        conn.execute(
+            text("DELETE FROM user_preferences WHERE user_id = :id"),
+            {"id": USER_ID},
+        )
+        conn.execute(
+            text("DELETE FROM users WHERE id = :id OR login = :login"),
+            {"id": USER_ID, "login": LOGIN},
+        )
+    engine.dispose()
+
+
 def _seed(sync_url: str, *, language: str | None = None) -> None:
     pw = hash_password("secret")
     engine = create_engine(sync_url)
@@ -54,6 +69,8 @@ def _seed(sync_url: str, *, language: str | None = None) -> None:
             {"id": USER_ID, "login": LOGIN, "pw": pw, "t": NOW},
         )
         if language is not None:
+            # Store as text (not bytes) so MySQL LONGBLOB and PG TEXT both keep
+            # a readable language code — matches Znuny and set_user_language.
             conn.execute(
                 text(
                     """
@@ -61,7 +78,7 @@ def _seed(sync_url: str, *, language: str | None = None) -> None:
                     VALUES (:id, 'UserLanguage', :v)
                     """
                 ),
-                {"id": USER_ID, "v": language.encode("utf-8")},
+                {"id": USER_ID, "v": language},
             )
     engine.dispose()
 
@@ -107,9 +124,7 @@ async def _client(sync_url: str) -> Any:
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("url_fixture", ["mariadb_znuny_url", "postgres_znuny_url"])
-async def test_me_returns_user_language(
-    url_fixture: str, request: pytest.FixtureRequest
-) -> None:
+async def test_me_returns_user_language(url_fixture: str, request: pytest.FixtureRequest) -> None:
     sync_url: str = request.getfixturevalue(url_fixture)
     _seed(sync_url, language="de")
     client, engine = await _client(sync_url)
@@ -120,6 +135,7 @@ async def test_me_returns_user_language(
         assert resp.json()["language"] == "de"
     finally:
         await engine.dispose()
+        _cleanup(sync_url)
 
 
 @pytest.mark.asyncio
@@ -137,13 +153,12 @@ async def test_me_language_null_when_unset(
         assert resp.json().get("language") in (None, "")
     finally:
         await engine.dispose()
+        _cleanup(sync_url)
 
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("url_fixture", ["mariadb_znuny_url", "postgres_znuny_url"])
-async def test_put_me_language_persists(
-    url_fixture: str, request: pytest.FixtureRequest
-) -> None:
+async def test_put_me_language_persists(url_fixture: str, request: pytest.FixtureRequest) -> None:
     sync_url: str = request.getfixturevalue(url_fixture)
     _seed(sync_url, language=None)
     client, engine = await _client(sync_url)
@@ -161,3 +176,17 @@ async def test_put_me_language_persists(
             assert me.json()["language"] == "pt_BR"
     finally:
         await engine.dispose()
+        _cleanup(sync_url)
+
+
+def test_decode_preference_value_handles_pg_hex() -> None:
+    """Regression: PG TEXT + LargeBinary can surface language as \\x hex."""
+    from tiqora.domain.auth import decode_preference_value
+
+    assert decode_preference_value(b"de") == "de"
+    assert decode_preference_value("de") == "de"
+    assert decode_preference_value("\\x6465") == "de"
+    assert decode_preference_value("\\x70745f4252") == "pt_BR"
+    assert decode_preference_value(None) is None
+    assert decode_preference_value("") is None
+    assert decode_preference_value(memoryview(b"en")) == "en"
