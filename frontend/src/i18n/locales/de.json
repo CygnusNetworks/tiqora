@@ -1240,6 +1240,8 @@
     },
     "search": "Suche",
     "searchPlaceholder": "Suchen…",
+    "searchRegex": "Regex",
+    "searchRegexTooltip": "Reguläre Ausdrücke verwenden",
     "bulk": {
       "selected": "{{count}} ausgewählt",
       "selectAll": "Alle auf der Seite auswählen",

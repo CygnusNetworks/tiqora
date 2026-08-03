@@ -128,6 +128,44 @@ describe("AdminResourcePage", () => {
     vi.useRealTimers();
   });
 
+  it("does not render a regex toggle unless searchRegexToggle is set", async () => {
+    renderPage({ searchable: true });
+    await waitFor(() => {
+      expect(screen.getByTestId("admin-test-resource-search")).toBeInTheDocument();
+    });
+    expect(screen.queryByTestId("admin-test-resource-search-regex")).not.toBeInTheDocument();
+  });
+
+  it("forwards regex only while the toggle is checked", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    const { list } = renderPage({ searchable: true, searchRegexToggle: true });
+
+    await waitFor(() => expect(list).toHaveBeenCalled());
+    list.mockClear();
+
+    const input = screen.getByTestId("admin-test-resource-search");
+    fireEvent.change(input, { target: { value: "^a" } });
+    await vi.advanceTimersByTimeAsync(350);
+    await waitFor(() => {
+      expect(list).toHaveBeenCalledWith(
+        expect.objectContaining({ search: "^a" }),
+        expect.anything(),
+      );
+    });
+    expect(list.mock.calls.at(-1)?.[0]).not.toHaveProperty("regex");
+
+    list.mockClear();
+    const toggle = screen.getByTestId("admin-test-resource-search-regex");
+    fireEvent.click(toggle);
+    await waitFor(() => {
+      expect(list).toHaveBeenCalledWith(
+        expect.objectContaining({ search: "^a", regex: true }),
+        expect.anything(),
+      );
+    });
+    vi.useRealTimers();
+  });
+
   it("renders bulk bar and calls run with selected ids", async () => {
     const run = vi.fn().mockResolvedValue(undefined);
     renderPage({
