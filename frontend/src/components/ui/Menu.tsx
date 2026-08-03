@@ -114,11 +114,18 @@ export function Menu({
         triggerRef.current?.focus();
       }
     };
-    // The panel is fixed-positioned from the trigger rect on open; scrolling or
-    // resizing would leave it stranded, so just close rather than re-track.
-    // Scrolling inside the panel itself (long menus) must not close it.
+    // The panel is fixed-positioned from the trigger rect on open; page scroll
+    // or resize would leave it stranded, so close rather than re-track.
+    // Scrolling *inside* this panel (long menus) must not close it, and neither
+    // may scrolling a nested portal listbox such as the account language
+    // `SelectMenu` — those render into `document.body` under
+    // `[data-portal-menu]`, outside this panel's DOM subtree.
     const onScroll = (e: Event) => {
-      if (e.target instanceof Node && panelRef.current?.contains(e.target)) return;
+      const target = e.target;
+      if (target instanceof Node && panelRef.current?.contains(target)) return;
+      const el =
+        target instanceof Element ? target : target instanceof Node ? target.parentElement : null;
+      if (el?.closest("[data-portal-menu]")) return;
       setOpen(false);
     };
     const onResize = () => setOpen(false);
