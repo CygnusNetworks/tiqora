@@ -389,7 +389,11 @@ function downloadJson(filename: string, content: string) {
 // sample-PDF generator (e2e/audit-sample.spec.ts) can reuse them.
 
 function openPrintWindow(html: string): void {
-  const w = window.open("", "_blank", "noopener,noreferrer,width=900,height=1000");
+  // No `noopener`/`noreferrer` here: per spec, window.open() with those
+  // features returns null, which made this handler silently no-op. The
+  // popup only ever shows our own generated HTML (see buildAuditPdfHtml in
+  // ./auditPdf) and never navigates anywhere, so there is no tabnabbing risk.
+  const w = window.open("", "_blank", "width=900,height=1000");
   if (!w) return;
   w.document.open();
   w.document.write(html);

@@ -211,6 +211,34 @@ describe("AiAuditPage", () => {
     expect(screen.getByTestId("ai-audit-raw-response")).toHaveTextContent("finish_reason");
   });
 
+  it("exports the detail as PDF via a popup window without noopener", async () => {
+    const printWindow = {
+      document: { open: vi.fn(), write: vi.fn(), close: vi.fn() },
+      focus: vi.fn(),
+      print: vi.fn(),
+      setTimeout: (fn: () => void) => {
+        fn();
+        return 0;
+      },
+    };
+    const openSpy = vi
+      .spyOn(window, "open")
+      .mockReturnValue(printWindow as unknown as Window);
+
+    renderPage();
+    fireEvent.click(await screen.findByTestId("ai-audit-row-501"));
+    await waitFor(() => expect(screen.getByTestId("ai-audit-drawer")).toBeInTheDocument());
+
+    fireEvent.click(await screen.findByTestId("ai-audit-export-pdf"));
+
+    expect(openSpy).toHaveBeenCalledWith("", "_blank", "width=900,height=1000");
+    expect(printWindow.document.write).toHaveBeenCalled();
+    expect(printWindow.document.write.mock.calls[0][0]).toContain("<html");
+    expect(printWindow.print).toHaveBeenCalled();
+
+    openSpy.mockRestore();
+  });
+
   it("edits and saves the retention setting", async () => {
     renderPage();
     await waitFor(() =>
