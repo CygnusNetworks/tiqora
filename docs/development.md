@@ -233,12 +233,13 @@ pnpm install
 pnpm dev
 ```
 
-Route stubs: `/agent`, `/portal`, `/admin`. i18n: registry in
-`src/i18n/locales.ts` (full Znuny catalogue, 49 codes). Complete locale JSON
-under `src/i18n/locales/*.json`. Commands: `pnpm i18n:check`,
-`pnpm i18n:scaffold`, `pnpm i18n:translate -- --all-znuny --force`. Theme via
-`data-theme` on `<html>`; UI language sets `lang` + `dir` and persists to
-Znuny `UserLanguage` when logged in.
+Route stubs: `/agent`, `/portal`, `/admin`. i18n: **49 locales** (Znuny’s 48
+`.po` codes + plain `en`) — registry in `src/i18n/locales.ts`, full JSON under
+`src/i18n/locales/*.json`. Commands: `pnpm i18n:check`, `pnpm i18n:scaffold`,
+`pnpm i18n:translate -- --all-znuny --force`. Theme via `data-theme` on
+`<html>`; UI language sets `lang` + `dir` and persists to Znuny `UserLanguage`
+when logged in. Comparison with Znuny and the full code list:
+[i18n.md](./i18n.md).
 
 ## Environment files
 
@@ -253,8 +254,10 @@ documented in `tiqora.config.Settings` and [deployment.md](./deployment.md).
   directly.
 - **Async**: prefer async I/O; avoid blocking the event loop in MCP tools
   (SSE starvation risk).
-- **i18n**: user-visible strings go through keys from day one. Add keys to
-  `en.json` and `de.json` together; run `pnpm i18n:check`. Prefer
+- **i18n**: user-visible strings go through keys from day one. Add new keys to
+  `en.json` (source) and keep `de.json` in sync for the day-one pair; run
+  `pnpm i18n:check` (all 49 locale files must match). Fill other locales via
+  scaffold/translate or review — see [i18n.md](./i18n.md). Prefer
   `toBcp47(i18n.language)` for `Intl` formatting and `setAppLanguage()` for
   switches (not ad-hoc `localStorage` / `startsWith("de")`).
 
