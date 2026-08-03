@@ -204,7 +204,7 @@ describe("TicketTable customer cell", () => {
     await renderTable([makeItem({ customer_id: "10042", customer_user_id: "bob" })], {
       onCustomerClick,
     });
-    fireEvent.click(screen.getByTestId("ticket-customer-cell-11"));
+    fireEvent.click(screen.getByTestId("ticket-customer-name-11"));
     expect(onCustomerClick).toHaveBeenCalledWith("10042");
   });
 
@@ -214,9 +214,23 @@ describe("TicketTable customer cell", () => {
       [makeItem({ customer_id: "10042", customer_user_id: "bob" })],
       { onCustomerClick },
     );
-    fireEvent.click(screen.getByTestId("ticket-customer-cell-11"));
+    fireEvent.click(screen.getByTestId("ticket-customer-name-11"));
     await router.load();
     expect(router.state.location.pathname).toBe("/");
+  });
+
+  it("clicking the cell area next to the customer name still navigates to the ticket", async () => {
+    // Regression: the filter handler used to sit on the full-width cell and
+    // swallowed row clicks landing right of the name (e2e queue.spec row click).
+    const onCustomerClick = vi.fn();
+    const { router } = await renderTable(
+      [makeItem({ customer_id: "10042", customer_user_id: "bob" })],
+      { onCustomerClick },
+    );
+    fireEvent.click(screen.getByTestId("ticket-customer-cell-11"));
+    await router.load();
+    expect(onCustomerClick).not.toHaveBeenCalled();
+    expect(router.state.location.pathname).toBe("/agent/tickets/11");
   });
 
   it("does not call onCustomerClick when the ticket has no customer_id", async () => {

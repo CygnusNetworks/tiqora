@@ -455,7 +455,7 @@ describe("QueuesPage customer filter", () => {
     const router = await renderQueuesPage();
     await screen.findByTestId("ticket-row-101");
 
-    fireEvent.click(screen.getByTestId("ticket-customer-cell-101"));
+    fireEvent.click(screen.getByTestId("ticket-customer-name-101"));
 
     await waitFor(() => {
       const search = router.state.location.search as Record<string, unknown>;
