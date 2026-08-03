@@ -224,6 +224,7 @@ class TicketService:
         state_id: int | None,
         state_type: str | None,
         owner_id: int | None,
+        customer_id: str | None = None,
     ) -> Select[tuple[Ticket]] | None:
         """Build the permission-filtered, unordered ``Ticket`` select.
 
@@ -261,6 +262,8 @@ class TicketService:
             stmt = stmt.where(Ticket.ticket_state_id == state_id)
         if owner_id is not None:
             stmt = stmt.where(Ticket.user_id == owner_id)
+        if customer_id is not None:
+            stmt = stmt.where(Ticket.customer_id == customer_id)
         if state_type is not None:
             type_names = VIEW_STATE_TYPES.get(state_type, {state_type})
             state_ids = (
@@ -300,6 +303,7 @@ class TicketService:
         state_id: int | None = None,
         state_type: str | None = None,
         owner_id: int | None = None,
+        customer_id: str | None = None,
         offset: int = 0,
         limit: int = 50,
         sort: str = "age",
@@ -311,6 +315,7 @@ class TicketService:
             state_id=state_id,
             state_type=state_type,
             owner_id=owner_id,
+            customer_id=customer_id,
         )
         if stmt is None:
             return PaginatedTickets(items=[], total=0, offset=offset, limit=limit)
@@ -455,6 +460,7 @@ class TicketService:
         state_id: int | None = None,
         state_type: str | None = None,
         owner_id: int | None = None,
+        customer_id: str | None = None,
         sort: str = "age",
         order: str = "desc",
         batch_size: int = 500,
@@ -470,6 +476,7 @@ class TicketService:
             state_id=state_id,
             state_type=state_type,
             owner_id=owner_id,
+            customer_id=customer_id,
         )
         if stmt is None:
             return

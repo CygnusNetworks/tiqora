@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
-import { useNavigate } from "@tanstack/react-router";
+import { Link, useNavigate } from "@tanstack/react-router";
 import type { MutationRequest, TicketListItem } from "@/lib/api";
 import { formatAgeSeconds, formatDateTime, isEscalated } from "@/lib/format";
 import { senderDisplayName } from "@/lib/articleChannel";
@@ -64,6 +64,11 @@ export type TicketTableProps = {
   /** Opt-in inline quick edit for state/priority/owner cells. Disabled while
    * `selection` is active — see the row-click contention note below. */
   quickEdit?: TicketQuickEdit;
+  /** Fired when the agent clicks a ticket's customer cell (number/email),
+   * with that ticket's `customer_id`. Filtering happens client-side (caller
+   * updates its own search state) — the cell is only clickable when a
+   * `customer_id` is present, since that's what the list endpoint filters on. */
+  onCustomerClick?: (customerId: string) => void;
 };
 
 const SORT_COLUMNS: { key: SortKey; labelKey: string }[] = [
@@ -96,6 +101,7 @@ export function TicketTable({
   onPageChange,
   selection,
   quickEdit,
+  onCustomerClick,
 }: TicketTableProps) {
   const { t, i18n } = useTranslation();
   const navigate = useNavigate();
@@ -234,6 +240,10 @@ export function TicketTable({
             ticket.customer_email || (customerLogin?.includes("@") ? customerLogin : null);
           const customerLabel = customerNumber || customerLogin;
           const showCustomerEmail = Boolean(customerEmail) && customerEmail !== customerLabel;
+          // Filtering is by `customer_id` (the backend's exact-match filter
+          // param), so the cell is only clickable when that field is set —
+          // a customer_user_id-only ticket has nothing to filter on.
+          const canFilterByCustomer = Boolean(onCustomerClick && customerNumber);
           const senderFallback = !customerLabel ? senderDisplayName(ticket.first_from) : null;
           const escalationBadge = esc && (
             <span
@@ -327,13 +337,16 @@ export function TicketTable({
                     {ticket.title || "—"}
                   </span>
                   {ticket.queue_name && (
-                    <span
-                      className="flex-none truncate rounded bg-surface-subtle px-1.5 py-0.5 font-mono text-[10px] text-muted"
+                    <Link
+                      to="/agent/queues"
+                      search={{ queue_id: ticket.queue_id, state_type: "open" }}
+                      onClick={(e) => e.stopPropagation()}
+                      className="flex-none truncate rounded bg-surface-subtle px-1.5 py-0.5 font-mono text-[10px] text-muted transition-colors duration-100 hover:bg-accent-dim hover:text-accent"
                       title={ticket.queue_name}
                       data-testid={`ticket-queue-chip-${ticket.id}`}
                     >
                       {ticket.queue_name}
-                    </span>
+                    </Link>
                   )}
                   {attachmentCount > 0 && (
                     <span
@@ -367,8 +380,20 @@ export function TicketTable({
                   )}
                 </span>
                 <span
-                  className="block min-w-0 text-[11.5px] text-muted"
+                  className={cn(
+                    "block min-w-0 text-[11.5px] text-muted",
+                    canFilterByCustomer && "cursor-pointer hover:text-ink hover:underline",
+                  )}
                   data-testid={`ticket-customer-cell-${ticket.id}`}
+                  title={canFilterByCustomer ? t("ticket.filterByCustomer") : undefined}
+                  onClick={
+                    canFilterByCustomer
+                      ? (e) => {
+                          e.stopPropagation();
+                          if (customerNumber) onCustomerClick?.(customerNumber);
+                        }
+                      : undefined
+                  }
                 >
                   {customerLabel ? (
                     <>

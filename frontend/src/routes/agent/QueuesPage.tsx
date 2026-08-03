@@ -22,6 +22,8 @@ type StateTab = (typeof STATE_TABS)[number];
 export type QueuesSearch = {
   queue_id?: number;
   state_type?: StateTab;
+  /** Exact-match filter on `customer_id`, set by clicking a ticket's customer cell. */
+  customer_id?: string;
   offset?: number;
   limit?: number;
   sort?: SortKey;
@@ -40,7 +42,13 @@ const BULK_CONCURRENCY = 4;
 type BulkField = "state" | "priority" | "owner";
 
 async function fetchMatchingTicketIds(
-  params: { queue_id?: number; state_type?: string; sort: SortKey; order: "asc" | "desc" },
+  params: {
+    queue_id?: number;
+    state_type?: string;
+    customer_id?: string;
+    sort: SortKey;
+    order: "asc" | "desc";
+  },
   total: number,
 ): Promise<number[]> {
   const cap = Math.min(total, SELECT_ALL_HARD_MAX);
@@ -64,6 +72,7 @@ export function QueuesPage() {
 
   const queueId = search.queue_id ?? null;
   const stateType = (search.state_type ?? "open") as StateTab;
+  const customerId = search.customer_id;
   const offset = search.offset ?? 0;
   const limit = search.limit ?? 50;
   const sort = (search.sort ?? "age") as SortKey;
@@ -115,7 +124,7 @@ export function QueuesPage() {
   // bulk action.
   useEffect(() => {
     clearSelection();
-  }, [queueId, stateType, offset, sort, order]);
+  }, [queueId, stateType, customerId, offset, sort, order]);
 
   // Success feedback auto-dismisses; errors stay until the next action.
   useEffect(() => {
@@ -145,12 +154,13 @@ export function QueuesPage() {
   const ticketsQ = useQuery({
     queryKey: [
       "tickets",
-      { queueId, stateType, offset, limit, sort, order },
+      { queueId, stateType, customerId, offset, limit, sort, order },
     ],
     queryFn: () =>
       api.listTickets({
         queue_id: queueId ?? undefined,
         state_type: stateType === "all" ? undefined : stateType,
+        customer_id: customerId,
         offset,
         limit,
         sort,
@@ -229,6 +239,7 @@ export function QueuesPage() {
         {
           queue_id: queueId ?? undefined,
           state_type: stateType === "all" ? undefined : stateType,
+          customer_id: customerId,
           sort,
           order,
         },
@@ -328,6 +339,23 @@ export function QueuesPage() {
             >
               {t("queue.openBadge", { count: ticketsQ.data?.total ?? 0 })}
             </span>
+            {customerId && (
+              <span
+                className="inline-flex items-center gap-1 rounded-full border border-accent/40 bg-accent-dim px-2.5 py-0.5 font-mono text-[11px] text-accent"
+                data-testid="queue-customer-filter-chip"
+              >
+                {t("queue.customerFilter", { customerId })}
+                <button
+                  type="button"
+                  className="ml-0.5 leading-none hover:text-ink"
+                  aria-label={t("queue.clearCustomerFilter")}
+                  data-testid="queue-customer-filter-clear"
+                  onClick={() => setSearch({ customer_id: undefined, offset: 0 })}
+                >
+                  ×
+                </button>
+              </span>
+            )}
           </div>
           <p className="mt-0.5 text-[12.5px] text-muted">{t("queue.metaLine")}</p>
         </div>
@@ -361,6 +389,7 @@ export function QueuesPage() {
               window.location.href = api.exportTicketsCsvUrl({
                 queue_id: queueId ?? undefined,
                 state_type: stateType === "all" ? undefined : stateType,
+                customer_id: customerId,
                 sort,
                 order,
               });
@@ -523,6 +552,7 @@ export function QueuesPage() {
           isLoading={ticketsQ.isLoading}
           onSortChange={(s, o) => setSearch({ sort: s, order: o, offset: 0 })}
           onPageChange={(off) => setSearch({ offset: off })}
+          onCustomerClick={(id) => setSearch({ customer_id: id, offset: 0 })}
           selection={
             selectMode
               ? {
