@@ -88,6 +88,30 @@ describe("SimilarTicketsPanel", () => {
     });
     expect(screen.getByText("Related closed issue")).toBeInTheDocument();
     expect(screen.getByText("20240721000007")).toBeInTheDocument();
+    expect(screen.getByTestId("similar-tickets-score-7")).toHaveTextContent("90%");
+  });
+
+  it("hides the score badge when score is missing or zero", async () => {
+    getSimilarTickets.mockResolvedValue({
+      items: [
+        {
+          id: 8,
+          tn: "20240721000008",
+          title: "No score issue",
+          state: "closed successful",
+          queue_name: "Support",
+          score: 0,
+        },
+      ],
+    });
+
+    renderPanel();
+    fireEvent.click(screen.getByTestId("similar-tickets-toggle"));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("similar-tickets-item-8")).toBeInTheDocument();
+    });
+    expect(screen.queryByTestId("similar-tickets-score-8")).toBeNull();
   });
 
   it("shows empty state when no similar tickets", async () => {

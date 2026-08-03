@@ -75,6 +75,14 @@ export function SimilarTicketsPanel({ ticketId }: { ticketId: number }) {
                     <span className="w-full truncate text-ink sm:w-auto sm:flex-1">
                       {item.title || t("ticket.noTitle")}
                     </span>
+                    {item.score > 0 && (
+                      <span
+                        className="text-xs text-muted"
+                        data-testid={`similar-tickets-score-${item.id}`}
+                      >
+                        {Math.round(item.score * 100)}%
+                      </span>
+                    )}
                   </Link>
                 </li>
               ))}

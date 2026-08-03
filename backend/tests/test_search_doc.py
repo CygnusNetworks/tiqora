@@ -90,3 +90,24 @@ def test_rank_similar_keyword_excludes_source_and_caps() -> None:
     assert [r.id for r in ranked] == [2, 3, 4, 5, 6]
     # Source not present even if it would fit under limit.
     assert all(r.id != 1 for r in ranked)
+
+
+def test_rank_similar_keyword_sorts_by_score_descending() -> None:
+    cands = [
+        SimilarTicketItem(id=1, tn="A", title="a", score=0.5),
+        SimilarTicketItem(id=2, tn="B", title="b", score=0.9),
+        SimilarTicketItem(id=3, tn="C", title="c", score=0.7),
+    ]
+    ranked = rank_similar_keyword(cands, exclude_id=99, limit=5)
+    assert [r.id for r in ranked] == [2, 3, 1]
+
+
+def test_rank_similar_keyword_stable_for_equal_scores() -> None:
+    cands = [
+        SimilarTicketItem(id=1, tn="A", title="a", score=0.5),
+        SimilarTicketItem(id=2, tn="B", title="b", score=0.5),
+        SimilarTicketItem(id=3, tn="C", title="c", score=0.5),
+    ]
+    ranked = rank_similar_keyword(cands, exclude_id=99, limit=5)
+    # Equal scores keep their original (Meilisearch relevance) order.
+    assert [r.id for r in ranked] == [1, 2, 3]
