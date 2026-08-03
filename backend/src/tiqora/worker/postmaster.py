@@ -146,6 +146,8 @@ async def run_postmaster_tick(
     async with factory() as session:
         enabled = await get_setting_bool(session, KEY_POSTMASTER_ENABLED, False)
         leave_on_server = await get_setting_bool(session, KEY_POSTMASTER_LEAVE_ON_SERVER, False)
+        if isinstance(sender, SmtpMailSender):
+            sender.sendmail_bcc = (await SysConfig(session).sendmail_bcc()) or None
 
     if not enabled:
         logger.debug("postmaster_disabled")
