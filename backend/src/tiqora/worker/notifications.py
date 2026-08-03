@@ -562,6 +562,8 @@ async def run_notifications_tick(
         watermark = await get_setting_int(session, KEY_NOTIFICATIONS_WATERMARK, 0)
         sysconfig = SysConfig(session)
         user_id = await sysconfig.postmaster_user_id()
+        if isinstance(sender, SmtpMailSender):
+            sender.sendmail_bcc = (await sysconfig.sendmail_bcc()) or None
         batch = await _next_outbox_batch(session, watermark, _BATCH_SIZE)
 
     totals = {"events": 0, "sent": 0, "errors": 0}
