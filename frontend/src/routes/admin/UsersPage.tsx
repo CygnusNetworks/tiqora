@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
+import { toBcp47 } from "@/i18n";
 import { useMutation } from "@tanstack/react-query";
 import { api, type UserOut, type UserCreate, type UserUpdate } from "@/lib/api";
 import { AdminResourcePage } from "@/components/admin/AdminResourcePage";
@@ -24,7 +25,7 @@ function ShieldIcon() {
 
 export function UsersPage() {
   const { t, i18n } = useTranslation();
-  const locale = i18n.language?.startsWith("de") ? "de" : "en";
+  const locale = toBcp47(i18n.language);
 
   // Per-user 2FA reset — same endpoint as the dedicated auth-config page, but
   // reachable straight from the user list. A confirmation guards the reset.

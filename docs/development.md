@@ -233,8 +233,10 @@ pnpm install
 pnpm dev
 ```
 
-Route stubs: `/agent`, `/portal`, `/admin`. i18n resources in
-`src/i18n/locales/{en,de}.json`. Theme via `data-theme` on `<html>`.
+Route stubs: `/agent`, `/portal`, `/admin`. i18n: registry in
+`src/i18n/locales.ts` (full Znuny language set); translation JSON in
+`src/i18n/locales/{en,de}.json` (more languages via `pnpm i18n:scaffold`).
+Theme via `data-theme` on `<html>`; UI language sets `lang` + `dir` too.
 
 ## Environment files
 
@@ -249,7 +251,10 @@ documented in `tiqora.config.Settings` and [deployment.md](./deployment.md).
   directly.
 - **Async**: prefer async I/O; avoid blocking the event loop in MCP tools
   (SSE starvation risk).
-- **i18n**: user-visible strings go through keys from day one.
+- **i18n**: user-visible strings go through keys from day one. Add keys to
+  `en.json` and `de.json` together; run `pnpm i18n:check`. Prefer
+  `toBcp47(i18n.language)` for `Intl` formatting and `setAppLanguage()` for
+  switches (not ad-hoc `localStorage` / `startsWith("de")`).
 
 ## Useful commands
 

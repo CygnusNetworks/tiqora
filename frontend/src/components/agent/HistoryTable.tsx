@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
+import { toBcp47 } from "@/i18n";
 import { api } from "@/lib/api";
 import { formatDateTime } from "@/lib/format";
 import { Spinner } from "@/components/ui/Spinner";
@@ -13,7 +14,7 @@ export function HistoryTable({
   order?: "asc" | "desc";
 }) {
   const { t, i18n } = useTranslation();
-  const locale = i18n.language?.startsWith("de") ? "de" : "en";
+  const locale = toBcp47(i18n.language);
 
   const histQ = useQuery({
     queryKey: ["tickets", ticketId, "history", order],

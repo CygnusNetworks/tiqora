@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
+import { toBcp47 } from "@/i18n";
 import { api, type ArticleListItem } from "@/lib/api";
 import { formatDateTime, formatBytes } from "@/lib/format";
 import { fileTypeInfo } from "@/lib/filetype";
@@ -58,7 +59,7 @@ export function ArticleTimeline({
   canNote?: boolean;
 }) {
   const { t, i18n } = useTranslation();
-  const locale = i18n.language?.startsWith("de") ? "de" : "en";
+  const locale = toBcp47(i18n.language);
   const [expanded, setExpanded] = useState<Record<number, boolean>>({});
 
   const articlesQ = useQuery({

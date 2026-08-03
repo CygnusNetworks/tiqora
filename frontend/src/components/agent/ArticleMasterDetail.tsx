@@ -1,4 +1,5 @@
 import { useTranslation } from "react-i18next";
+import { toBcp47 } from "@/i18n";
 import { Button } from "@/components/ui/Button";
 import { Spinner } from "@/components/ui/Spinner";
 import { cn } from "@/lib/cn";
@@ -44,7 +45,7 @@ export function ArticleMasterDetail({
   onToggleDescending?: () => void;
 }) {
   const { t, i18n } = useTranslation();
-  const locale = i18n.language?.startsWith("de") ? "de" : "en";
+  const locale = toBcp47(i18n.language);
   const state = useArticleListState({ ticketId, descending, onToggleDescending });
   const { view, isAuto, setView } = useArticleView(ticketId, state.articles);
 
