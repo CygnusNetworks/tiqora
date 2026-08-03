@@ -39,6 +39,7 @@ from tiqora.domain.schemas import (
     TOTPCodeIn,
     TOTPEnrollOut,
     TOTPStatusOut,
+    UserLanguageUpdate,
     UserMe,
 )
 from tiqora.domain.spnego import (
@@ -60,6 +61,88 @@ _OIDC_STATE_PREFIX = "tiqora:oidc:state:"
 _OIDC_STATE_TTL = 300
 
 
+# Znuny-compatible language codes accepted by PUT /auth/me/language.
+# Keep in sync with frontend/src/i18n/locales.ts SUPPORTED_LOCALES.
+_USER_LANGUAGE_CODES = frozenset(
+    {
+        "en",
+        "de",
+        "ar_SA",
+        "bg",
+        "ca",
+        "cs",
+        "da",
+        "el",
+        "en_CA",
+        "en_GB",
+        "es",
+        "es_CO",
+        "es_MX",
+        "et",
+        "fa",
+        "fi",
+        "fr",
+        "fr_CA",
+        "gl",
+        "he",
+        "hi",
+        "hr",
+        "hu",
+        "id",
+        "it",
+        "ja",
+        "ko",
+        "lt",
+        "lv",
+        "mk",
+        "ms",
+        "nb_NO",
+        "nl",
+        "pl",
+        "pt",
+        "pt_BR",
+        "ro",
+        "ru",
+        "sk_SK",
+        "sl",
+        "sr",
+        "sv",
+        "sw",
+        "th_TH",
+        "tr",
+        "uk",
+        "vi_VN",
+        "zh_CN",
+        "zh_TW",
+    }
+)
+
+
+async def _load_user_language(session: AsyncSession, user_id: int) -> str | None:
+    """Read Znuny ``UserLanguage`` preference; never raises into /me."""
+    from sqlalchemy import select
+
+    from tiqora.db.legacy.user import UserPreferences
+
+    try:
+        result = await session.execute(
+            select(UserPreferences.preferences_value).where(
+                UserPreferences.user_id == user_id,
+                UserPreferences.preferences_key == "UserLanguage",
+            )
+        )
+        raw = result.scalar_one_or_none()
+    except Exception:  # noqa: BLE001 — never fail /me for a missing pref
+        return None
+    if raw is None:
+        return None
+    if isinstance(raw, bytes | bytearray | memoryview):
+        value = bytes(raw).decode("utf-8", errors="replace").strip()
+    else:
+        value = str(raw).strip()
+    return value or None
+
+
 async def _user_me(
     session: AsyncSession,
     user: AuthenticatedUser,
@@ -73,6 +156,8 @@ async def _user_me(
         data.update(extra)
     data["is_admin"] = await pe.is_admin(user.id)
     data["can_edit_templates"] = await TemplatePermissionService(session).can_edit_any(user.id)
+    if "language" not in data:
+        data["language"] = await _load_user_language(session, user.id)
     return UserMe(**data)
 
 
@@ -292,6 +377,32 @@ async def login(
 
 @router.get("/me", response_model=UserMe)
 async def me(user: CurrentUser, session: DbSession) -> UserMe:
+    return await _user_me(session, user)
+
+
+@router.put("/me/language", response_model=UserMe)
+async def set_my_language(
+    body: UserLanguageUpdate,
+    user: CurrentUser,
+    session: DbSession,
+    auth: Annotated[AuthService, Depends(get_auth_service)],
+) -> UserMe:
+    """Persist Znuny ``UserLanguage`` so UI choice matches notification language."""
+    code = (body.language or "").strip()
+    # Accept BCP-47 form (pt-BR) by normalising to Znuny underscore style.
+    code = code.replace("-", "_")
+    # Lower-case language, keep region case: pt_BR / zh_CN.
+    if "_" in code:
+        lang, _, region = code.partition("_")
+        code = f"{lang.lower()}_{region.upper()}"
+    else:
+        code = code.lower()
+    if code not in _USER_LANGUAGE_CODES:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"Unsupported language code: {body.language!r}",
+        )
+    await auth.set_user_language(user.id, code)
     return await _user_me(session, user)
 
 
