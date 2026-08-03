@@ -81,9 +81,11 @@ describe("PortalShell", () => {
 
   it("switches the language and persists the choice", async () => {
     await renderShell();
-    expect(screen.getByText("EN")).toBeInTheDocument();
-    fireEvent.click(screen.getByText("EN"));
-    await waitFor(() => expect(i18n.language?.startsWith("de")).toBe(true));
+    const trigger = screen.getByTestId("portal-lang-select");
+    expect(trigger).toHaveTextContent("EN");
+    fireEvent.click(trigger);
+    fireEvent.click(screen.getByText("Deutsch"));
+    await waitFor(() => expect(i18n.language).toMatch(/^de/));
     expect(localStorage.getItem("tiqora-lang")).toBe("de");
   });
 

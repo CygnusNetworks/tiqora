@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
+import { toBcp47 } from "@/i18n";
 import { Link, useNavigate } from "@tanstack/react-router";
 import type { MutationRequest, TicketListItem } from "@/lib/api";
 import { formatAgeSeconds, formatDateTime, isEscalated } from "@/lib/format";
@@ -107,7 +108,7 @@ export function TicketTable({
   const navigate = useNavigate();
   const [focusIdx, setFocusIdx] = useState(0);
   const rootRef = useRef<HTMLDivElement>(null);
-  const locale = i18n.language?.startsWith("de") ? "de" : "en";
+  const locale = toBcp47(i18n.language);
   const gridCols = selection ? SELECT_GRID_COLS : GRID_COLS;
   // Selection mode's row click toggles the checkbox; letting a quick-edit
   // trigger fire at the same time would be ambiguous (open a menu vs. select

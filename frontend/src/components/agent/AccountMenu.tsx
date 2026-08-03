@@ -16,17 +16,13 @@ import {
 } from "@/components/ui/icons";
 import { cn } from "@/lib/cn";
 import { userEmailForAvatar } from "@/lib/gravatar";
-
-const LANGUAGES = [
-  { code: "de", label: "Deutsch" },
-  { code: "en", label: "English" },
-] as const;
+import { getLocale, localePickerItems, resolveLocaleCode, setAppLanguage } from "@/i18n";
 
 /**
  * Avatar dropdown for account actions, shared by the agent and admin shells.
  * Opens a Menu with the signed-in identity, a link to security / 2FA settings
- * (general preferences live in the sidebar), a language picker (Deutsch /
- * English, via the portal-based `SelectMenu`), a light/dark theme toggle,
+ * (general preferences live in the sidebar), a language picker (full Znuny
+ * locale set via the portal-based `SelectMenu`), a light/dark theme toggle,
  * and finally sign-out.
  * Admins additionally get a highlighted "Admin-Bereich" entry.
  *
@@ -39,7 +35,10 @@ export function AccountMenu({ logoutTestId = "logout-btn" }: { logoutTestId?: st
   const { theme, setTheme } = useTheme();
   const navigate = useNavigate();
 
-  const currentLang = i18n.language?.startsWith("de") ? "de" : "en";
+  const currentLang = resolveLocaleCode(i18n.language);
+  const languageItems = localePickerItems();
+  const currentLabel =
+    getLocale(currentLang)?.label ?? languageItems.find((l) => l.value === currentLang)?.label ?? currentLang;
   const initials = (
     (user?.first_name?.[0] ?? user?.login?.[0] ?? "?") + (user?.last_name?.[0] ?? "")
   ).toUpperCase();
@@ -49,8 +48,7 @@ export function AccountMenu({ logoutTestId = "logout-btn" }: { logoutTestId?: st
   const isAdmin = user?.is_admin === true;
 
   const changeLang = (code: string) => {
-    void i18n.changeLanguage(code);
-    localStorage.setItem("tiqora-lang", code);
+    void setAppLanguage(code);
   };
 
   return (
@@ -123,9 +121,10 @@ export function AccountMenu({ logoutTestId = "logout-btn" }: { logoutTestId?: st
           menu's own panel is overflow-hidden, which would clip a plain
           flyout; the portal panel renders above everything instead. The
           surrounding Menu stays open on selection (Menu.tsx's outside-click
-          handler ignores `[data-portal-menu]`). */}
+          handler ignores `[data-portal-menu]`). Search appears once the
+          full Znuny locale list exceeds SelectMenu's default threshold. */}
       <SelectMenu
-        items={LANGUAGES.map((lang) => ({ value: lang.code, label: lang.label }))}
+        items={languageItems}
         value={currentLang}
         onSelect={changeLang}
         panelTestId="account-menu-lang-panel"
@@ -144,9 +143,7 @@ export function AccountMenu({ logoutTestId = "logout-btn" }: { logoutTestId?: st
             <span className="flex w-4 shrink-0 justify-center text-[15px] text-muted" aria-hidden>
               <GlobeIcon />
             </span>
-            <span className="min-w-0 flex-1 truncate">
-              {LANGUAGES.find((lang) => lang.code === currentLang)?.label}
-            </span>
+            <span className="min-w-0 flex-1 truncate">{currentLabel}</span>
             <span
               className={cn("text-muted transition-transform duration-150", open && "rotate-180")}
               aria-hidden

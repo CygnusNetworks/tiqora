@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type FormEvent } from "react";
 import { useParams, useNavigate, Link } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
+import { LOCALE_CODES } from "@/i18n";
 import { api, ApiError } from "@/lib/api";
 import { Button } from "@/components/ui/Button";
 import { Spinner } from "@/components/ui/Spinner";
@@ -16,7 +17,8 @@ import { slugify } from "@/lib/slug";
 import { cn } from "@/lib/cn";
 
 const STATES = ["draft", "review", "published", "archived"] as const;
-const LANGUAGES = ["en", "de"] as const;
+/** Znuny-compatible content language codes for KB articles. */
+const LANGUAGES = LOCALE_CODES;
 
 const inputClass =
   "w-full rounded-md border border-hairline bg-surface-subtle px-3 py-2 text-sm text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent focus:border-accent";

@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
+import { toBcp47 } from "@/i18n";
 import {
   api,
   ApiError,
@@ -226,7 +227,7 @@ function ScopesField({
 
 export function ApiKeysPage() {
   const { t, i18n } = useTranslation();
-  const locale = i18n.language?.startsWith("de") ? "de" : "en";
+  const locale = toBcp47(i18n.language);
   const queryClient = useQueryClient();
 
   const [validFilter, setValidFilter] = useState<AdminValidFilter>("valid");

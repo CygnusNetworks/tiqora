@@ -1,5 +1,6 @@
 import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
+import { toBcp47 } from "@/i18n";
 import { useQuery } from "@tanstack/react-query";
 import { api, type QueueOut, type QueueCreate, type QueueUpdate } from "@/lib/api";
 import { AdminResourcePage } from "@/components/admin/AdminResourcePage";
@@ -21,7 +22,7 @@ function emptyToNullStr(v: unknown): string | null {
 
 export function QueuesPage() {
   const { t, i18n } = useTranslation();
-  const locale = i18n.language?.startsWith("de") ? "de" : "en";
+  const locale = toBcp47(i18n.language);
 
   const groupsQ = useQuery({
     queryKey: ["admin", "groups", "ref"],

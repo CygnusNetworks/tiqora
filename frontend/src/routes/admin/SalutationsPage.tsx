@@ -1,4 +1,5 @@
 import { useTranslation } from "react-i18next";
+import { toBcp47 } from "@/i18n";
 import {
   api,
   type SalutationOut,
@@ -12,7 +13,7 @@ import { formatDateTime } from "@/lib/format";
 
 export function SalutationsPage() {
   const { t, i18n } = useTranslation();
-  const locale = i18n.language?.startsWith("de") ? "de" : "en";
+  const locale = toBcp47(i18n.language);
 
   const columns: DataTableColumn<SalutationOut>[] = [
     { key: "id", header: t("admin.table.id"), mono: true, render: (r) => r.id },

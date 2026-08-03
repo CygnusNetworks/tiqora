@@ -427,8 +427,12 @@ layout component (`components/layout/{Agent,Portal,Admin}Shell.tsx`):
 Code-split per tree. Theming uses CSS variables and `data-theme` (`light` /
 `dark`) via a shared design-token stylesheet (`themes/tokens.css` +
 `themes/theme.tsx`), consumed by all three shells so agent/portal/admin share
-one visual language. i18n via `react-i18next` (English + German from day
-one; `i18n/locales/{en,de}.json` are kept key-for-key in sync).
+one visual language. i18n via `react-i18next` with a Znuny-compatible locale
+registry (`i18n/locales.ts`: all Znuny language codes, RTL/`lang` on
+`<html>`, BCP-47 for `Intl`). Day-one translations are English + German
+(`i18n/locales/{en,de}.json`, key-for-key in sync via `pnpm i18n:check`);
+other languages fall back to English until scaffolded
+(`pnpm i18n:scaffold <code>`) and translated.
 
 Admin CRUD screens are generated from a generic pattern rather than
 hand-rolled per resource: `components/admin/DataTable.tsx` (sortable/paginated

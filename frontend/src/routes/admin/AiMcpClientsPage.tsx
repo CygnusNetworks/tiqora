@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
+import { toBcp47 } from "@/i18n";
 import { ApiError } from "@/lib/api";
 import {
   aiApi,
@@ -164,7 +165,7 @@ function ClientTools({ clientId }: { clientId: number }) {
 
 export function AiMcpClientsPage() {
   const { t, i18n } = useTranslation();
-  const locale = i18n.language?.startsWith("de") ? "de" : "en";
+  const locale = toBcp47(i18n.language);
   const qc = useQueryClient();
   const { confirm, dialog: confirmDialog } = useConfirm();
 

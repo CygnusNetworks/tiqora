@@ -1,4 +1,5 @@
 import { useTranslation } from "react-i18next";
+import { toBcp47 } from "@/i18n";
 import { api, type WebhookOut, type WebhookCreate, type WebhookUpdate } from "@/lib/api";
 import { AdminResourcePage } from "@/components/admin/AdminResourcePage";
 import type { FieldDef, FieldValues } from "@/components/admin/CrudDrawer";
@@ -14,7 +15,7 @@ function parseEvents(value: unknown): string[] {
 
 export function WebhooksPage() {
   const { t, i18n } = useTranslation();
-  const locale = i18n.language?.startsWith("de") ? "de" : "en";
+  const locale = toBcp47(i18n.language);
 
   const columns: DataTableColumn<WebhookOut>[] = [
     { key: "id", header: t("admin.table.id"), mono: true, render: (r) => r.id },

@@ -5,6 +5,9 @@ import { useCustomerAuth } from "@/auth/CustomerAuthContext";
 import { logoUrl } from "@/lib/assets";
 import { useTheme } from "@/themes/theme";
 import { Button } from "@/components/ui/Button";
+import { SelectMenu } from "@/components/ui/SelectMenu";
+import { localePickerItems, resolveLocaleCode, setAppLanguage } from "@/i18n";
+import { cn } from "@/lib/cn";
 
 export function PortalShell({ children }: { children: ReactNode }) {
   const { t, i18n } = useTranslation();
@@ -12,11 +15,10 @@ export function PortalShell({ children }: { children: ReactNode }) {
   const { theme, toggleTheme } = useTheme();
   const navigate = useNavigate();
 
-  const switchLang = () => {
-    const next = i18n.language?.startsWith("de") ? "en" : "de";
-    void i18n.changeLanguage(next);
-    localStorage.setItem("tiqora-lang", next);
-  };
+  const currentLang = resolveLocaleCode(i18n.language);
+  const languageItems = localePickerItems();
+  /** Compact label for the header control (code, not full autonym). */
+  const langBadge = currentLang.replace(/_/g, "-").toUpperCase();
 
   return (
     <div className="flex min-h-screen flex-col bg-bg">
@@ -39,9 +41,28 @@ export function PortalShell({ children }: { children: ReactNode }) {
             <Button variant="ghost" size="sm" onClick={toggleTheme}>
               {theme === "dark" ? "☀" : "☾"}
             </Button>
-            <Button variant="ghost" size="sm" onClick={switchLang}>
-              {i18n.language?.startsWith("de") ? "DE" : "EN"}
-            </Button>
+            <SelectMenu
+              items={languageItems}
+              value={currentLang}
+              onSelect={(code) => void setAppLanguage(code)}
+              panelTestId="portal-lang-panel"
+              align="right"
+              trigger={({ open, ref, toggleProps }) => (
+                <button
+                  ref={ref}
+                  type="button"
+                  data-testid="portal-lang-select"
+                  aria-label={t("nav.language")}
+                  {...toggleProps}
+                  className={cn(
+                    "inline-flex h-8 items-center rounded-lg px-2.5 text-sm text-ink transition-colors hover:bg-surface-subtle focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent",
+                    open && "bg-surface-subtle",
+                  )}
+                >
+                  {langBadge}
+                </button>
+              )}
+            />
             {customer && (
               <span
                 className="hidden max-w-[10rem] truncate text-xs text-muted sm:inline"

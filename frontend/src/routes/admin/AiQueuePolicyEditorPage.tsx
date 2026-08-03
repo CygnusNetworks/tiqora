@@ -9,6 +9,7 @@ import {
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useParams, Link } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
+import { LOCALE_CODES, toBcp47 } from "@/i18n";
 import { api, ApiError, type QueueRef } from "@/lib/api";
 import {
   aiApi,
@@ -49,9 +50,8 @@ const IDENTITY_MODES: IdentityMode[] = [
   "off",
 ];
 const REPLY_LANGUAGE_MODES: ReplyLanguageMode[] = ["off", "fixed", "auto"];
-/** Offered reply languages — deliberately just the two the Studierendenwerk
- * actually answers in; free-text ISO codes confused operators. */
-const REPLY_LANGUAGES = ["de", "en"];
+/** Znuny-compatible language codes for fixed/auto reply language. */
+const REPLY_LANGUAGES = [...LOCALE_CODES];
 
 type TabId = "basics" | "drafts" | "summaries" | "auto" | "safety";
 
@@ -302,7 +302,7 @@ const inputClass =
 
 function AiQueuePolicyEditor({ policyId }: { policyId?: number }) {
   const { t, i18n } = useTranslation();
-  const locale = i18n.language?.startsWith("de") ? "de-DE" : "en-US";
+  const locale = toBcp47(i18n.language);
   const navigate = useNavigate();
   const qc = useQueryClient();
   const { confirm, dialog: confirmDialog } = useConfirm();

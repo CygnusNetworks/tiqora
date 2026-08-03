@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
+import { toBcp47 } from "@/i18n";
 import {
   aiApi,
   type AiAuditLogDetailOut,
@@ -144,7 +145,7 @@ function PerDayChart({
   perDay: { date: string; count: number }[];
 }) {
   const { i18n } = useTranslation();
-  const locale = i18n.language?.startsWith("de") ? "de" : "en";
+  const locale = toBcp47(i18n.language);
   if (perDay.length === 0) return null;
   const max = Math.max(1, ...perDay.map((d) => d.count));
   return (
@@ -494,7 +495,7 @@ function AuditDetailDrawer({
   onClose: () => void;
 }) {
   const { t, i18n } = useTranslation();
-  const locale = i18n.language?.startsWith("de") ? "de" : "en";
+  const locale = toBcp47(i18n.language);
   const [tab, setTab] = useState<"messages" | "raw">("messages");
   const [piiVisible, setPiiVisible] = useState(false);
   const [piiMap, setPiiMap] = useState<Record<string, string> | null>(null);
@@ -823,7 +824,7 @@ function RetentionFooter() {
 
 export function AiAuditPage() {
   const { t, i18n } = useTranslation();
-  const locale = i18n.language?.startsWith("de") ? "de" : "en";
+  const locale = toBcp47(i18n.language);
 
   const [preset, setPreset] = useState<PeriodPreset>("7d");
   const [customFrom, setCustomFrom] = useState("");
