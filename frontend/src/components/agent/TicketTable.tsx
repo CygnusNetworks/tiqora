@@ -388,24 +388,32 @@ export function TicketTable({
                     </span>
                   )}
                 </span>
+                {/* The click-to-filter handler sits on a shrink-to-fit inline
+                    block, NOT the full-width cell: the cell spans the whole
+                    column, so a full-width handler (with stopPropagation)
+                    swallows row clicks landing right of the customer name —
+                    the row then filters instead of opening the ticket. */}
                 <span
-                  className={cn(
-                    "block min-w-0 text-[11.5px] text-muted",
-                    canFilterByCustomer && "cursor-pointer hover:text-ink hover:underline",
-                  )}
+                  className="block min-w-0 text-[11.5px] text-muted"
                   data-testid={`ticket-customer-cell-${ticket.id}`}
-                  title={canFilterByCustomer ? t("ticket.filterByCustomer") : undefined}
-                  onClick={
-                    canFilterByCustomer
-                      ? (e) => {
-                          e.stopPropagation();
-                          if (customerNumber) onCustomerClick?.(customerNumber);
-                        }
-                      : undefined
-                  }
                 >
                   {customerLabel ? (
-                    <>
+                    <span
+                      className={cn(
+                        "inline-block max-w-full align-top",
+                        canFilterByCustomer && "cursor-pointer hover:text-ink hover:underline",
+                      )}
+                      data-testid={`ticket-customer-name-${ticket.id}`}
+                      title={canFilterByCustomer ? t("ticket.filterByCustomer") : undefined}
+                      onClick={
+                        canFilterByCustomer
+                          ? (e) => {
+                              e.stopPropagation();
+                              if (customerNumber) onCustomerClick?.(customerNumber);
+                            }
+                          : undefined
+                      }
+                    >
                       <span className="block truncate" title={customerLabel}>
                         {customerLabel}
                       </span>
@@ -418,7 +426,7 @@ export function TicketTable({
                           {customerEmail}
                         </span>
                       )}
-                    </>
+                    </span>
                   ) : senderFallback ? (
                     <span
                       className="italic"
