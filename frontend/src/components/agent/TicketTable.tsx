@@ -225,7 +225,15 @@ export function TicketTable({
           };
           const attachmentCount = extras.attachment_count ?? 0;
           const hasAiSummary = extras.has_ai_summary ?? false;
-          const customerLabel = ticket.customer_user_id || ticket.customer_id;
+          const customerNumber = ticket.customer_id || null;
+          const customerLogin = ticket.customer_user_id || null;
+          // `customer_email` comes from the customer_user record; customer_user_id
+          // (the login) is often the e-mail address itself, so fall back to it
+          // when the record has no separate email on file.
+          const customerEmail =
+            ticket.customer_email || (customerLogin?.includes("@") ? customerLogin : null);
+          const customerLabel = customerNumber || customerLogin;
+          const showCustomerEmail = Boolean(customerEmail) && customerEmail !== customerLabel;
           const senderFallback = !customerLabel ? senderDisplayName(ticket.first_from) : null;
           const escalationBadge = esc && (
             <span
@@ -318,6 +326,15 @@ export function TicketTable({
                   >
                     {ticket.title || "—"}
                   </span>
+                  {ticket.queue_name && (
+                    <span
+                      className="flex-none truncate rounded bg-surface-subtle px-1.5 py-0.5 font-mono text-[10px] text-muted"
+                      title={ticket.queue_name}
+                      data-testid={`ticket-queue-chip-${ticket.id}`}
+                    >
+                      {ticket.queue_name}
+                    </span>
+                  )}
                   {attachmentCount > 0 && (
                     <span
                       className="inline-flex flex-none items-center gap-0.5 font-mono text-[10.5px] tabular-nums text-muted"
@@ -350,11 +367,24 @@ export function TicketTable({
                   )}
                 </span>
                 <span
-                  className="block truncate text-[11.5px] text-muted"
+                  className="block min-w-0 text-[11.5px] text-muted"
                   data-testid={`ticket-customer-cell-${ticket.id}`}
                 >
                   {customerLabel ? (
-                    customerLabel
+                    <>
+                      <span className="block truncate" title={customerLabel}>
+                        {customerLabel}
+                      </span>
+                      {showCustomerEmail && (
+                        <span
+                          className="block truncate text-[10.5px] text-muted/70"
+                          title={customerEmail ?? undefined}
+                          data-testid={`ticket-customer-email-${ticket.id}`}
+                        >
+                          {customerEmail}
+                        </span>
+                      )}
+                    </>
                   ) : senderFallback ? (
                     <span
                       className="italic"

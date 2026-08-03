@@ -19,6 +19,7 @@ from tiqora.db.legacy.article import (
     ArticleDataMimeAttachment,
     ArticleSenderType,
 )
+from tiqora.db.legacy.customer import CustomerUser
 from tiqora.db.legacy.dynamic_field import DynamicField, DynamicFieldValue
 from tiqora.db.legacy.queue import Queue, QueueStandardTemplate, StandardTemplate
 from tiqora.db.legacy.ticket import (
@@ -167,6 +168,7 @@ class TicketService:
         first_from_by_ticket: dict[int, str] | None = None,
         attachment_count_by_ticket: dict[int, int] | None = None,
         ai_summary_ticket_ids: set[int] | None = None,
+        customer_email_by_login: dict[str, str] | None = None,
     ) -> TicketListItem:
         owner = maps["user"].get(t.user_id)
         return TicketListItem(
@@ -187,6 +189,11 @@ class TicketService:
             owner_name=owner[1] if owner else None,
             customer_id=t.customer_id,
             customer_user_id=t.customer_user_id,
+            customer_email=(
+                (customer_email_by_login or {}).get(t.customer_user_id)
+                if t.customer_user_id
+                else None
+            ),
             first_from=(first_from_by_ticket or {}).get(t.id),
             attachment_count=(attachment_count_by_ticket or {}).get(t.id, 0),
             has_ai_summary=t.id in (ai_summary_ticket_ids or set()),
@@ -319,6 +326,9 @@ class TicketService:
         first_from_by_ticket = await self._first_article_from_by_ticket(ticket_ids)
         attachment_count_by_ticket = await self._attachment_counts_by_ticket(ticket_ids)
         ai_summary_ticket_ids = await self._ai_summary_ticket_ids(ticket_ids)
+        customer_email_by_login = await self._customer_emails_by_login(
+            [t.customer_user_id for t in tickets if t.customer_user_id]
+        )
         items = [
             self._to_list_item(
                 t,
@@ -326,6 +336,7 @@ class TicketService:
                 first_from_by_ticket,
                 attachment_count_by_ticket,
                 ai_summary_ticket_ids,
+                customer_email_by_login,
             )
             for t in tickets
         ]
@@ -355,6 +366,24 @@ class TicketService:
             .join(ArticleDataMime, ArticleDataMime.article_id == Article.id)
         )
         return {ticket_id: a_from for ticket_id, a_from in rows.all() if a_from}
+
+    async def _customer_emails_by_login(self, logins: list[str]) -> dict[str, str]:
+        """``customer_user.email`` for a set of ``customer_user.login`` values.
+
+        ``ticket.customer_user_id`` stores the login, which is not always an
+        e-mail address itself — a separate lookup against ``customer_user``
+        is needed to show the real address next to the customer number.
+        Scoped to the page's logins (mirrors ``_first_article_from_by_ticket``)
+        rather than loading the whole (potentially huge) customer table.
+        """
+        if not logins:
+            return {}
+        rows = await self._session.execute(
+            select(CustomerUser.login, CustomerUser.email).where(
+                CustomerUser.login.in_(set(logins))
+            )
+        )
+        return {login: email for login, email in rows.all() if email}
 
     async def _attachment_counts_by_ticket(self, ticket_ids: list[int]) -> dict[int, int]:
         """Count of "real" attachments per ticket, one bulk query for the page.
@@ -608,7 +637,10 @@ class TicketService:
     async def get_ticket(self, user_id: int, ticket_id: int) -> TicketDetail:
         ticket = await self._assert_ticket_ro(user_id, ticket_id)
         maps = await self._lookup_maps()
-        base = self._to_list_item(ticket, maps)
+        customer_email_by_login = await self._customer_emails_by_login(
+            [ticket.customer_user_id] if ticket.customer_user_id else []
+        )
+        base = self._to_list_item(ticket, maps, customer_email_by_login=customer_email_by_login)
         dfs = await self._load_dynamic_fields(ticket.id)
         is_watched = (
             await self._session.execute(
