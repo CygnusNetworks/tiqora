@@ -183,6 +183,8 @@
     "newCount": "{{count}} new",
     "customerFilter": "Customer: {{customerId}}",
     "clearCustomerFilter": "Clear customer filter",
+    "showArchived": "Show archived",
+    "archivedBadge": "Archived",
     "state": {
       "new": "New",
       "open": "Open",
@@ -495,6 +497,7 @@
   },
   "search": {
     "title": "Search",
+    "archivedBadge": "Archived",
     "placeholder": "Search tickets…",
     "commandHint": "Search or command…",
     "submit": "Search",
@@ -542,6 +545,7 @@
       "customerPlaceholder": "Company or contact…",
       "createdFrom": "Created from",
       "createdTo": "Created to",
+      "showArchived": "Show archived",
       "state": {
         "new": "New",
         "open": "Open",

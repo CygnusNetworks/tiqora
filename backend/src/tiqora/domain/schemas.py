@@ -174,6 +174,9 @@ class TicketListItem(BaseModel):
     has_ai_summary: bool = False
     """True when ``tiqora_ai_ticket_state.summary_body`` is set for this
     ticket — used by the agent queue view to show an AI-summary badge."""
+    archive_flag: int = 0
+    """1 when the ticket is archived — only ever non-zero in admin listings
+    with ``include_archived`` (used to show an "Archiviert" badge)."""
     create_time: UtcDateTime
     change_time: UtcDateTime
     age_seconds: int | None = None
@@ -367,6 +370,7 @@ class SearchHit(BaseModel):
     create_time: str | None = None
     change_time: str | None = None
     excerpt: str | None = None
+    archive_flag: int = 0
 
 
 class SearchResponse(BaseModel):

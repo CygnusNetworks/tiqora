@@ -35,6 +35,7 @@ const ticket: TicketListItem = {
   until_time: 0,
   attachment_count: 0,
   has_ai_summary: false,
+  archive_flag: 0,
 };
 
 async function renderInRouter(ui: React.ReactElement) {

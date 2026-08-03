@@ -125,6 +125,7 @@ def build_ticket_document(
         "owner_name": owner_name or "",
         "customer_id": ticket.customer_id or "",
         "customer_user_id": ticket.customer_user_id or "",
+        "archive_flag": int(ticket.archive_flag or 0),
         "created": _dt_iso(ticket.create_time),
         "changed": _dt_iso(ticket.change_time),
         "created_ts": _dt_ts(ticket.create_time),
@@ -188,6 +189,7 @@ class SearchIndexService:
                 "has_escalation",
                 "created_ts",
                 "changed_ts",
+                "archive_flag",
             ],
             sortable_attributes=["changed", "created", "id"],
             searchable_attributes=[
@@ -341,6 +343,7 @@ class SearchIndexService:
         created_from: int | None = None,
         created_to: int | None = None,
         sort: str = _DEFAULT_SORT,
+        include_archived: bool = False,
     ) -> SearchResponse:
         allowed = await QueueService(self._session).allowed_queue_ids(user_id, "ro")
         if not allowed:
@@ -352,6 +355,12 @@ class SearchIndexService:
         # Mandatory permission filter — always ANDed, never widened by caller-supplied
         # queue_ids (an AND of two IN clauses is exactly their intersection).
         filters: list[str] = [f"queue_id IN [{','.join(str(qid) for qid in sorted(allowed))}]"]
+        # Archived tickets are hidden by default (Ticket::ArchiveSystem
+        # semantics); include_archived is admin-gated at the route. Documents
+        # indexed before the archive_flag field existed lack it and are
+        # excluded by this filter until a full rebuild — see docs/deployment.md.
+        if not include_archived:
+            filters.append("archive_flag = 0")
         if queue_ids:
             filters.append(f"queue_id IN [{','.join(str(int(qid)) for qid in queue_ids)}]")
         if state_types:
@@ -400,6 +409,7 @@ class SearchIndexService:
                     create_time=h.get("created"),
                     change_time=h.get("changed"),
                     excerpt=h.get("latest_article_excerpt"),
+                    archive_flag=int(h.get("archive_flag") or 0),
                 )
             )
         return SearchResponse(
@@ -458,6 +468,7 @@ class SearchIndexService:
         filters = [
             f"queue_id IN [{','.join(str(qid) for qid in sorted(allowed))}]",
             "state_type = 'closed'",
+            "archive_flag = 0",
         ]
         # No sort: keep Meili relevance order (sort would override ranking).
         result = await index.search(

@@ -46,16 +46,35 @@ const EXECUTED_CRITERIA_IDS = new Set([
   "LockIDs",
   "TypeIDs",
 ]);
-const EXECUTED_CRITERIA_TEXT = new Set(["Title", "CustomerID"]);
+const EXECUTED_CRITERIA_TEXT = new Set([
+  "Title",
+  "CustomerID",
+  "SearchInArchive",
+  "ArchiveFlags",
+]);
 const TIME_RANGE_PREFIXES = [
   "TicketCreateTime",
   "TicketChangeTime",
+  "TicketCloseTime",
   "TicketPendingTime",
   "TicketEscalationTime",
   "TicketEscalationResponseTime",
   "TicketEscalationUpdateTime",
   "TicketEscalationSolutionTime",
 ];
+// *SearchType keys gate the TimePoint variant of each time criterion; the
+// executor honors TimePoint (translated to Older/Newer minutes) but not
+// TimeSlot. The keys themselves count as executed — their TimePoint rows do.
+const TIME_SEARCH_TYPE_KEYS = new Set([
+  "TimeSearchType",
+  "ChangeTimeSearchType",
+  "CloseTimeSearchType",
+  "PendingTimeSearchType",
+  "EscalationTimeSearchType",
+  "EscalationResponseTimeSearchType",
+  "EscalationUpdateTimeSearchType",
+  "EscalationSolutionTimeSearchType",
+]);
 // New<suffix> actions the port applies. NoteSubject/NoteIsVisibleForCustomer
 // only take effect together with NoteBody, but are "used" so we mark them so.
 const EXECUTED_ACTION_SUFFIXES = new Set([
@@ -65,6 +84,7 @@ const EXECUTED_ACTION_SUFFIXES = new Set([
   "OwnerID",
   "LockID",
   "Title",
+  "ArchiveFlag",
   "NoteBody",
   "NoteSubject",
   "NoteIsVisibleForCustomer",
@@ -73,8 +93,14 @@ const EXECUTED_ACTION_SUFFIXES = new Set([
 
 function isExecutedCriterion(key: string): boolean {
   if (EXECUTED_CRITERIA_IDS.has(key) || EXECUTED_CRITERIA_TEXT.has(key)) return true;
+  if (TIME_SEARCH_TYPE_KEYS.has(key)) return true;
   return TIME_RANGE_PREFIXES.some(
-    (p) => key === `${p}OlderMinutes` || key === `${p}NewerMinutes`,
+    (p) =>
+      key === `${p}OlderMinutes` ||
+      key === `${p}NewerMinutes` ||
+      key === `${p}Point` ||
+      key === `${p}PointFormat` ||
+      key === `${p}PointStart`,
   );
 }
 
