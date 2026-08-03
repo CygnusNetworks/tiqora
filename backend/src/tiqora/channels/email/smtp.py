@@ -9,6 +9,7 @@ protocol so tests can inject a capturing fake.
 from __future__ import annotations
 
 from email.message import EmailMessage
+from email.utils import getaddresses
 from typing import TYPE_CHECKING, Literal, Protocol
 
 import aiosmtplib
@@ -27,6 +28,22 @@ class MailSender(Protocol):
     async def send(self, message: EmailMessage) -> None: ...
 
 
+def envelope_recipients(message: EmailMessage, extra: str | None) -> list[str] | None:
+    """Envelope (RCPT TO) list: To/Cc/Bcc headers plus *extra* (``SendmailBcc``).
+
+    Returns ``None`` when *extra* is empty so ``aiosmtplib.send`` keeps its
+    default header-based extraction. *extra* is envelope-only — it is never
+    added to the message headers (Znuny ``SendmailBcc`` semantics).
+    """
+    if not extra:
+        return None
+    values = [str(v) for field in ("To", "Cc", "Bcc") for v in message.get_all(field, [])]
+    recipients = [addr for _name, addr in getaddresses(values) if addr]
+    if extra not in recipients:
+        recipients.append(extra)
+    return recipients
+
+
 class SmtpMailSender:
     """Default sender: aiosmtplib against host/port/security/auth/timeout."""
 
@@ -40,6 +57,7 @@ class SmtpMailSender:
         password: str | None = None,
         security: MailSecurity | None = None,
         timeout: float | None = None,
+        sendmail_bcc: str | None = None,
     ) -> None:
         # Backward-compatible: ``SmtpMailSender(settings)`` still works.
         if settings is not None and host is None:
@@ -55,12 +73,17 @@ class SmtpMailSender:
         self._password = password or None
         self._security: MailSecurity = security or "none"
         self._timeout = float(timeout if timeout is not None else 60.0)
+        # Znuny ``SendmailBcc``: extra envelope-only recipient on every send.
+        # Mutable so callers that resolve SysConfig after construction can set it.
+        self.sendmail_bcc = sendmail_bcc or None
         # Populated after a successful ``send`` for communication-log detail.
         self.last_smtp_code: int | None = None
         self.last_smtp_detail: str | None = None
 
     @classmethod
-    def from_resolved(cls, cfg: ResolvedOutboundSmtp) -> SmtpMailSender:
+    def from_resolved(
+        cls, cfg: ResolvedOutboundSmtp, *, sendmail_bcc: str | None = None
+    ) -> SmtpMailSender:
         user = cfg.auth_user if cfg.auth_type == "password" else None
         password = cfg.auth_password if cfg.auth_type == "password" else None
         return cls(
@@ -70,6 +93,7 @@ class SmtpMailSender:
             password=password or None,
             security=cfg.security,
             timeout=float(cfg.timeout_seconds),
+            sendmail_bcc=sendmail_bcc,
         )
 
     async def send(self, message: EmailMessage) -> None:
@@ -84,6 +108,7 @@ class SmtpMailSender:
             timeout=self._timeout,
             use_tls=use_tls,
             start_tls=start_tls,
+            recipients=envelope_recipients(message, self.sendmail_bcc),
         )
         # aiosmtplib returns dict[recipient, SMTPResponse]; pick first for log.
         self.last_smtp_code = None

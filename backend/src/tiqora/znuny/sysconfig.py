@@ -41,6 +41,8 @@ ZNUNY_SETTING_DEFAULTS: Final[dict[str, Any]] = {
     "PostmasterFollowUpStateClosed": "open",
     "PostmasterBounceEmailAsFollowUp": 1,
     "PostmasterUserID": 1,
+    # Envelope-only archive copy of all outgoing mail (Defaults.pm: empty).
+    "SendmailBcc": "",
 }
 
 # Settings Tiqora currently needs typed accessors for.
@@ -170,6 +172,10 @@ class SysConfig:
 
     async def fqdn(self) -> str:
         return await self.get_str("FQDN")
+
+    async def sendmail_bcc(self) -> str:
+        """``SendmailBcc`` — extra envelope recipient for every outgoing mail."""
+        return await self.get_str("SendmailBcc", "")
 
     # --- postmaster (Phase 4a) ---
 

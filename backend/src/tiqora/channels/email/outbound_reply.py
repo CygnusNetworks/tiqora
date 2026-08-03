@@ -337,16 +337,17 @@ async def deliver_agent_email_reply(
         queue_name = None
 
     if should_dispatch:
+        sendmail_bcc = await sysconfig.sendmail_bcc()
         sender: MailSender
         if mail_sender is not None:
             sender = mail_sender
         elif resolved.enabled:
-            sender = SmtpMailSender.from_resolved(resolved)
+            sender = SmtpMailSender.from_resolved(resolved, sendmail_bcc=sendmail_bcc)
         else:
             # Explicit dispatch=True without resolved config: env-shaped default.
             from tiqora.config import get_settings
 
-            sender = SmtpMailSender(get_settings())
+            sender = SmtpMailSender(get_settings(), sendmail_bcc=sendmail_bcc)
         t0 = time.perf_counter()
         try:
             await send_prepared_agent_email(sender, prepared)
