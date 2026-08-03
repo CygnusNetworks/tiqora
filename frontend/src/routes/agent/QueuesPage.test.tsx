@@ -84,7 +84,19 @@ async function renderQueuesPage(initialSearch: Record<string, unknown> = {}) {
     getParentRoute: () => rootRoute,
     path: "/agent/queues",
     component: () => <QueuesPage />,
-    validateSearch: (s: Record<string, unknown>) => s,
+    // Mirrors router.tsx's real validateSearch just enough for these tests:
+    // the router's default codec parses all-digit query values (customer
+    // numbers) as JS numbers, so customer_id must be normalized back to a
+    // string the same way the production route does.
+    validateSearch: (s: Record<string, unknown>) => ({
+      ...s,
+      customer_id:
+        typeof s.customer_id === "string" && s.customer_id !== ""
+          ? s.customer_id
+          : typeof s.customer_id === "number"
+            ? String(s.customer_id)
+            : undefined,
+    }),
   });
   const ticketRoute = createRoute({
     getParentRoute: () => rootRoute,
@@ -368,5 +380,78 @@ describe("QueuesPage row quick edit", () => {
 
     expect(screen.queryByTestId("ticket-row-state-101")).toBeNull();
     expect(screen.queryByTestId("ticket-row-owner-101")).toBeNull();
+  });
+});
+
+describe("QueuesPage customer filter", () => {
+  beforeEach(() => {
+    listQueues.mockReset();
+    listTickets.mockReset();
+    patchTicket.mockReset();
+    listReferenceStates.mockReset();
+    listReferencePriorities.mockReset();
+    listReferenceAgents.mockReset();
+    void i18n.changeLanguage("de");
+
+    listQueues.mockResolvedValue([]);
+    listReferenceStates.mockResolvedValue([]);
+    listReferencePriorities.mockResolvedValue([]);
+    listReferenceAgents.mockResolvedValue([]);
+    patchTicket.mockResolvedValue(undefined);
+  });
+
+  it("passes customer_id from the URL to listTickets", async () => {
+    listTickets.mockResolvedValue(page(tickets, tickets.length));
+    await renderQueuesPage({ customer_id: "10042" });
+    await screen.findByTestId("ticket-row-101");
+    expect(listTickets).toHaveBeenCalledWith(
+      expect.objectContaining({ customer_id: "10042" }),
+    );
+  });
+
+  it("omits the chip when no customer_id filter is active", async () => {
+    listTickets.mockResolvedValue(page(tickets, tickets.length));
+    await renderQueuesPage();
+    await screen.findByTestId("ticket-row-101");
+    expect(screen.queryByTestId("queue-customer-filter-chip")).toBeNull();
+    // ...and the filter is not sent to the API either.
+    expect(listTickets).toHaveBeenCalledWith(
+      expect.objectContaining({ customer_id: undefined }),
+    );
+  });
+
+  it("shows an active filter chip that clears the filter when dismissed", async () => {
+    listTickets.mockResolvedValue(page(tickets, tickets.length));
+    const router = await renderQueuesPage({ customer_id: "10042" });
+    await screen.findByTestId("ticket-row-101");
+
+    const chip = screen.getByTestId("queue-customer-filter-chip");
+    expect(chip).toHaveTextContent("10042");
+
+    fireEvent.click(screen.getByTestId("queue-customer-filter-clear"));
+
+    await waitFor(() => {
+      expect(screen.queryByTestId("queue-customer-filter-chip")).toBeNull();
+    });
+    const search = router.state.location.search as Record<string, unknown>;
+    expect(search.customer_id).toBeUndefined();
+  });
+
+  it("clicking a ticket's customer cell sets the customer_id search param without navigating away", async () => {
+    const withCustomer = [
+      makeTicket({ id: 101, customer_id: "10042", customer_user_id: "bob" }),
+      makeTicket({ id: 102 }),
+    ];
+    listTickets.mockResolvedValue(page(withCustomer, withCustomer.length));
+    const router = await renderQueuesPage();
+    await screen.findByTestId("ticket-row-101");
+
+    fireEvent.click(screen.getByTestId("ticket-customer-cell-101"));
+
+    await waitFor(() => {
+      const search = router.state.location.search as Record<string, unknown>;
+      expect(search.customer_id).toBe("10042");
+    });
+    expect(router.state.location.pathname).toBe("/agent/queues");
   });
 });

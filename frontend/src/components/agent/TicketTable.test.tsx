@@ -66,15 +66,20 @@ async function renderTable(
     getParentRoute: () => rootRoute,
     path: "/agent/tickets/$ticketId",
   });
+  const queuesRoute = createRoute({
+    getParentRoute: () => rootRoute,
+    path: "/agent/queues",
+  });
   const router = createRouter({
-    routeTree: rootRoute.addChildren([ticketRoute]),
+    routeTree: rootRoute.addChildren([ticketRoute, queuesRoute]),
     history: createMemoryHistory({ initialEntries: ["/"] }),
   });
   await router.load();
-  return render(
+  const result = render(
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     <RouterProvider router={router as any} />,
   );
+  return { ...result, router };
 }
 
 describe("TicketTable state display", () => {
@@ -122,6 +127,23 @@ describe("TicketTable queue name", () => {
   it("omits the chip when queue_name is absent", async () => {
     await renderTable([makeItem({ queue_name: undefined })]);
     expect(screen.queryByTestId("ticket-queue-chip-11")).toBeNull();
+  });
+
+  it("links the chip to that queue's open view rather than the ticket row", async () => {
+    await renderTable([makeItem({ queue_id: 42, queue_name: "Support" })]);
+    const chip = screen.getByTestId("ticket-queue-chip-11");
+    expect(chip.tagName).toBe("A");
+    const href = chip.getAttribute("href") ?? "";
+    expect(href).toContain("/agent/queues");
+    expect(href).toContain("queue_id=42");
+    expect(href).toContain("state_type=open");
+  });
+
+  it("clicking the chip does not also navigate to the ticket detail route", async () => {
+    const { router } = await renderTable([makeItem({ queue_id: 42, queue_name: "Support" })]);
+    fireEvent.click(screen.getByTestId("ticket-queue-chip-11"));
+    await router.load();
+    expect(router.state.location.pathname).toBe("/agent/queues");
   });
 });
 
@@ -175,6 +197,36 @@ describe("TicketTable customer cell", () => {
     ]);
     expect(screen.getByTestId("ticket-customer-cell-11")).toHaveTextContent("10042");
     expect(screen.queryByTestId("ticket-customer-email-11")).toBeNull();
+  });
+
+  it("calls onCustomerClick with the customer_id when the cell is clicked", async () => {
+    const onCustomerClick = vi.fn();
+    await renderTable([makeItem({ customer_id: "10042", customer_user_id: "bob" })], {
+      onCustomerClick,
+    });
+    fireEvent.click(screen.getByTestId("ticket-customer-cell-11"));
+    expect(onCustomerClick).toHaveBeenCalledWith("10042");
+  });
+
+  it("does not navigate to the ticket when the customer cell is clicked", async () => {
+    const onCustomerClick = vi.fn();
+    const { router } = await renderTable(
+      [makeItem({ customer_id: "10042", customer_user_id: "bob" })],
+      { onCustomerClick },
+    );
+    fireEvent.click(screen.getByTestId("ticket-customer-cell-11"));
+    await router.load();
+    expect(router.state.location.pathname).toBe("/");
+  });
+
+  it("does not call onCustomerClick when the ticket has no customer_id", async () => {
+    const onCustomerClick = vi.fn();
+    await renderTable(
+      [makeItem({ customer_id: undefined, customer_user_id: "bob" })],
+      { onCustomerClick },
+    );
+    fireEvent.click(screen.getByTestId("ticket-customer-cell-11"));
+    expect(onCustomerClick).not.toHaveBeenCalled();
   });
 
   it("shows attachment and AI-summary indicators only when present", async () => {

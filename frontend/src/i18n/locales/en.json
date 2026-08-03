@@ -181,6 +181,8 @@
     "metaLine": "All queues · sorted by urgency",
     "exportCsv": "Export CSV",
     "newCount": "{{count}} new",
+    "customerFilter": "Customer: {{customerId}}",
+    "clearCustomerFilter": "Clear customer filter",
     "state": {
       "new": "New",
       "open": "Open",
@@ -224,6 +226,7 @@
     "queue": "Queue",
     "noTickets": "No tickets match this filter.",
     "senderNoCustomer": "Sender of the first article — no customer assigned",
+    "filterByCustomer": "Show only this customer's tickets",
     "pagination": "{{from}}–{{to}} of {{total}}",
     "escalated": "Escalated",
     "slaCountdown": "SLA {{value}}",

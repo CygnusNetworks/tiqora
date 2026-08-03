@@ -11623,6 +11623,7 @@ export interface operations {
                 state_id?: number | null;
                 state_type?: string | null;
                 owner_id?: number | null;
+                customer_id?: string | null;
                 offset?: number;
                 limit?: number;
                 sort?: string;
@@ -11805,6 +11806,7 @@ export interface operations {
                 state_id?: number | null;
                 state_type?: string | null;
                 owner_id?: number | null;
+                customer_id?: string | null;
                 sort?: string;
                 order?: string;
             };

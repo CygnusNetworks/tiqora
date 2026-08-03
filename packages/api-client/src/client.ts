@@ -986,6 +986,7 @@ export class ApiClient {
       state_id?: number;
       state_type?: string;
       owner_id?: number;
+      customer_id?: string;
       offset?: number;
       limit?: number;
       sort?: string;
@@ -1251,6 +1252,7 @@ export class ApiClient {
       state_id?: number;
       state_type?: string;
       owner_id?: number;
+      customer_id?: string;
       sort?: string;
       order?: string;
     } = {},
