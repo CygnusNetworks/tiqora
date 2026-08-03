@@ -88,11 +88,13 @@ def rank_similar_keyword(
 ) -> list[SimilarTicketItem]:
     """Keyword-only ranking for similar tickets (v1).
 
-    Candidates are assumed pre-ordered by Meilisearch relevance (best first).
-    This function only drops the source ticket and trims to *limit* so a later
-    embedding cosine blend can replace or wrap it without touching the route.
+    Drops the source ticket, sorts the remainder by ``score`` descending
+    (stable for ties, so equal-score candidates keep their Meilisearch
+    relevance order), and trims to *limit* so a later embedding cosine blend
+    can replace or wrap it without touching the route.
     """
     ranked = [c for c in candidates if c.id != exclude_id]
+    ranked.sort(key=lambda c: c.score, reverse=True)
     return ranked[: max(0, limit)]
 
 
