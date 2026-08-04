@@ -29,13 +29,15 @@ Analyse gegen Code (`backend/src/tiqora/…`) und OpenAPI (`packages/api-client/
 | MCP-Mutation ohne Queue-Permission | 2026-07-24 | Minimal-Gate `_assert_queue_permission` + Regressionstests |
 | `ticket_update_queue` nur Quell-`move_into` | 2026-07-24 | Auch Ziel-Queue; gleicher Fix in `TicketWriteService.move_queue` (REST) |
 | `ticket_create` „Access denied“ bei unbekannter Queue | 2026-07-24 | Existenz vor Permission (`_assert_raw_queue_permission`) |
-| Znuny-ACL-Runtime vs. Doku | 2026-07-21 | Bewusst **group/role only** dokumentiert (Design-Doc + hier) |
+| Znuny-ACL-Runtime vs. Doku (historisch group/role only) | 2026-07-21 | **Superseded** 2026-08-04: TicketACL + group/role (siehe unten) |
 | Type / service / SLA native REST + write service | 2026-08-04 | `change_type/service/sla`; PATCH-Felder; Reference-Listen |
 | Mentions + Time Accounting REST | 2026-08-04 | `…/mentions`, `…/time-accounting` auf Ticket |
 | Admin: types/services/slas, system addresses write, notification events, GenericAgent write | 2026-08-04 | Shared Znuny-Tabellen |
 | MCP history / merge / link / type / service / sla | 2026-08-04 | Tools ergänzt |
-| MCP responsible / watch / archive / attachments / forward / bounce | 2026-08-04 | ~40 Tools total |
-| ACL admin CRUD + TicketACL runtime + field-options | 2026-08-04 | Znuny YAML match/change; picker filter |
+| MCP responsible / watch / archive / attachments / forward / bounce | 2026-08-04 | ~39 Tools total |
+| ACL admin CRUD + TicketACL runtime + field-options | 2026-08-04 | Znuny YAML match/change; picker filter (v0.5.8) |
+| Portal process CustomerInterface | 2026-08-04 | `/api/portal/process/*` + PortalProcessWidget (v0.5.9) |
+| Ticket attribute relations | 2026-08-04 | `acl_ticket_attribute_relations` admin CSV + field-options (v0.5.9) |
 
 ### 🟡 Noch offen
 
@@ -47,7 +49,8 @@ Analyse gegen Code (`backend/src/tiqora/…`) und OpenAPI (`packages/api-client/
 | ~~P3~~ | ACL Editor (Write) + TicketACL runtime | Admin REST + Agent | ✅ CRUD + `domain/ticket_acl.py` + field-options (2026-08-04) |
 | **P3** | Session-Bearer auf MCP (nur Dev) | MCP | Optional; Prod eher nicht |
 | ~~P3~~ | PGP/S-MIME Admin list/import | Admin REST | ✅ `/admin/crypto-keys` |
-| ~~P3~~ | MCP responsible / watch / archive / attach / forward / bounce | MCP | ✅ ~40 Tools |
+| ~~P3~~ | MCP responsible / watch / archive / attach / forward / bounce | MCP | ✅ ~39 Tools |
+| ~~P3~~ | Portal process + attribute relations | Portal / Admin | ✅ v0.5.9 |
 
 ### ⏸ Deferred (Design)
 
@@ -101,11 +104,11 @@ jedes Ticket in jeder Queue mutieren.
 
 | Bereich | Bewertung |
 |---|---|
-| REST `/api/v1` + Portal + Compat (OpenAPI) | Breit abgedeckt. Agent-UI, Admin (inkl. Type/Service/SLA, Notifications, GenericAgent write), Portal, Mentions/TA. |
-| MCP als AI-Subset | Sinnvolles Design. **~31 Tools** (Tickets inkl. history/merge/link/type/service/sla + KB + Customer + Reference). Mutation-Tools mit Queue-Permission-Gate. |
-| Auth-Modell | Key → User → Group/Role (`PermissionEngine`). Zusätzlich grobe Key-Scopes `read`/`write`/`mcp`/`*`. Keine feingranularen OAuth-Scopes. |
+| REST `/api/v1` + Portal + Compat (OpenAPI) | Breit abgedeckt. Agent-UI, Admin (Type/Service/SLA, ACL, TAR, Notifications, GenericAgent), Portal inkl. Process, Mentions/TA. |
+| MCP als AI-Subset | Sinnvolles Design. **~39 Tools** (Tickets inkl. history/merge/link/type/service/sla/responsible/watch/archive/forward/bounce + KB + Reference). Mutations via `TicketWriteService` + optional Tool-Allowlist. |
+| Auth-Modell | Key → User → Group/Role (`PermissionEngine`) für Queue-Zugang. Key-Scopes Area RO/RW + `tool:`; Rate-Limit. Keine feingranularen OAuth-Scopes. |
 | **API-Key-Lifecycle** | ✅ Admin-API, UI, CLI; Expiry + last_used + created_by + scopes. |
-| Znuny-ACL-Runtime | ⏸ group/role only (bewusst); Admin ACL read-only. |
+| Znuny TicketACL | ✅ Admin CRUD + Runtime filtert Picker; Queue-Zugang bleibt group/role. |
 
 **Ehemaliger Hauptblocker (behoben):** Keys nur per manuellem SQL → MCP/Bearer operativ
 blockiert. Seit 2026-07-21 vollständiger Lifecycle.
@@ -214,10 +217,11 @@ ein, *welche API-Fläche* der Key überhaupt ansprechen darf.
 
 | Erwartung | Realität |
 |---|---|
-| Feingranulare Scopes wie `tickets:write`, `kb:read` | Existieren nicht |
-| MCP-Tool-Allowlist pro Key | Existieren nicht — jeder Tool-Call, den User + Key-Scope erlauben |
-| Znuny-ACL filtert States/Queues zur Laufzeit | **Nicht** in `PermissionEngine`; Admin nur read-only |
-| Rate-Limit pro Key | Nicht implementiert |
+| Feingranulare OAuth-Scopes | Nicht vorgesehen; Area RO/RW (`tickets:ro`/`tickets:rw`, …) |
+| MCP-Tool-Allowlist pro Key | ✅ optional `tool:<name>` in Key-Scopes |
+| Znuny-ACL filtert States/Queues zur Laufzeit | ✅ `domain/ticket_acl.py` + field-options; **nicht** Ersatz für group/role Queue-Zugang |
+| Rate-Limit pro Key | ✅ Redis fixed-window (`TIQORA_API_KEY_RATE_LIMIT_*`) |
+| Ticket attribute relations | ✅ CSV-Matrizen → field-options nach ACL |
 
 ---
 
@@ -233,7 +237,7 @@ Regenerieren: `cd backend && uv run tiqora openapi -o ../docs/api/openapi.json`.
 | Admin | ~111 | Users, Groups, Roles, Queues, States, Priorities, DF, Customers, Webhooks, Mail, Templates, API-Keys, … |
 | Tickets | ~27 | CRUD/PATCH, Articles, Attachments, Merge, Links, Drafts, History, Presence, Export CSV |
 | KB | ~19 | Articles, Categories, Search, Publish, Attachments, Knowledge bundle |
-| Portal | ~14 | Customer tickets + KB |
+| Portal | ~14+ | Customer tickets + KB + process (CustomerInterface) |
 | Auth | ~13 | Login/Logout/Me, Methods, OIDC, SPNEGO, TOTP |
 | Calendar | ~12 | Appointments, ICS, Feed-Token |
 | Stats | ~10 | Workload, Backlog, SLA, Volume (+ CSV) |
@@ -251,7 +255,9 @@ Regenerieren: `cd backend && uv run tiqora openapi -o ../docs/api/openapi.json`.
 | Type / service / SLA mutation + admin | ✅ Done | 2026-08-04 |
 | Mentions / time accounting | ✅ Done | ticket-scoped |
 | GenericAgent / notification / system-address write | ✅ Done | 2026-08-04 |
-| ACL Write/Editor | ⏸ P3 | Runtime-Eval ebenfalls deferred |
+| ACL Write/Editor + Runtime | ✅ Done | v0.5.8; field-options |
+| Ticket attribute relations | ✅ Done | v0.5.9 admin + field-options |
+| Portal process | ✅ Done | v0.5.9 CustomerInterface |
 | Postmaster Write | ✅ (seit früher) | CRUD vorhanden |
 | MCP-Tool-Katalog in OpenAPI | n/a | MCP spricht kein OpenAPI (bewusst); Katalog in Docs |
 
@@ -261,15 +267,15 @@ MCP erscheint **nicht** in der OpenAPI-Spec — korrekt; Doku getrennt halten.
 
 ## 6. MCP-Tool-Inventar vs. REST
 
-### Implementierte Tools (~31) — Source of Truth: `mcp_server/server.py`
+### Implementierte Tools (~39) — Source of Truth: `mcp_server/server.py`
 
 | # | MCP Tool | Entspricht grob REST | Permission-Pfad (Ist) |
 |---|---|---|---|
 | 1 | `ticket_search` | `GET /api/v1/search` / Ticket-Liste | Groups mit `ro` → erlaubte Queues |
 | 2 | `ticket_get` | Ticket + Articles + DF als Markdown | `ro` auf Ticket-Queue-Group |
 | 3 | `ticket_get_by_number` | wie `ticket_get`, Lookup per `tn` | `ro` |
-| 4 | `ticket_create` | `POST /api/v1/tickets` | `create` via `_assert_raw_queue_permission` |
-| 5 | `ticket_reply` | `POST …/articles` (customer-visible) | `note` via `_assert_queue_permission` |
+| 4 | `ticket_create` | `POST /api/v1/tickets` | `create` via `TicketWriteService` |
+| 5 | `ticket_reply` | `POST …/articles` (customer-visible; SMTP) | `note` |
 | 6 | `ticket_note` | intern Note | `note` |
 | 7 | `ticket_update_state` | `PATCH` `state_id` | `rw` |
 | 8 | `ticket_update_queue` | `PATCH` `queue_id` | `move_into` Quelle **und** Ziel |
@@ -286,26 +292,31 @@ MCP erscheint **nicht** in der OpenAPI-Spec — korrekt; Doku getrennt halten.
 | 19 | `ticket_history` | `GET …/history` | `ro` |
 | 20 | `ticket_merge` | `POST …/merge` | `rw` on both |
 | 21 | `ticket_link` | `POST …/links` | `rw` on both |
-| 22 | `list_queues` | `GET /api/v1/reference/queues` | Groups mit `ro`/`rw` |
-| 23 | `list_states` | `GET /api/v1/reference/states` | Auth only (global) |
-| 24 | `list_priorities` | `GET /api/v1/reference/priorities` | Auth only (global) |
-| 25 | `list_agents` | `GET /api/v1/reference/agents` | Auth only (global) |
-| 26 | `kb_search` | `GET /api/v1/kb/search` | KB permission groups |
-| 27 | `kb_get_article` | `GET /api/v1/kb/articles/{id}` | scoped get |
-| 28 | `kb_list` | `GET /api/v1/kb/articles` | list + group scope |
-| 29 | `kb_upsert_article` | `POST` / `PATCH` KB articles | write + scoped |
-| 30 | `kb_publish_article` | `POST …/publish` | publish |
-| 31 | `customer_lookup` | customer lookup | nur Auth |
+| 22 | `ticket_set_responsible` | `PATCH` responsible | `rw` |
+| 23 | `ticket_watch` / `ticket_unwatch` | watch endpoints | `ro`/`rw` |
+| 24 | `ticket_archive` / `ticket_unarchive` | archive flag | `rw` |
+| 25 | `list_attachments` | attachment meta | `ro` |
+| 26 | `ticket_forward` / `ticket_bounce` | email forward/bounce | `note`/`rw` |
+| 27 | `list_queues` | `GET /api/v1/reference/queues` | Groups mit `ro`/`rw` |
+| 28 | `list_states` | `GET /api/v1/reference/states` | Auth only (global) |
+| 29 | `list_priorities` | `GET /api/v1/reference/priorities` | Auth only (global) |
+| 30 | `list_agents` | `GET /api/v1/reference/agents` | Auth only (global) |
+| 31 | `kb_search` | `GET /api/v1/kb/search` | KB permission groups |
+| 32 | `kb_get_article` | `GET /api/v1/kb/articles/{id}` | scoped get |
+| 33 | `kb_list` | `GET /api/v1/kb/articles` | list + group scope |
+| 34 | `kb_upsert_article` | `POST` / `PATCH` KB articles | write + scoped |
+| 35 | `kb_publish_article` | `POST …/publish` | publish |
+| 36 | `customer_lookup` | customer lookup | nur Auth |
 
-> Mutation-Tools nutzen **nicht** die Klasse `TicketWriteService`, sondern Modul-Funktionen +
-> explizites Queue-Permission-Gate in `mcp_server/server.py`. Refactor auf die
-> Service-Klasse: P2 (siehe Status-Übersicht).
+> Mutations laufen über **`TicketWriteService`** (2026-08-04) — gleiche Queue-
+> Permission-Gates und SMTP-Parity wie REST. Optional: Key-Scopes `tool:<name>`
+> und Redis Rate-Limit.
 
 ### Docs
 
 | Dokument | Stand |
 |---|---|
-| `docs/api/mcp.md`, `docs/ai-integration.md` | ggf. manuell auf **~40 tools** nachziehen |
+| `docs/api/mcp.md`, `docs/ai-integration.md` | ✅ ~39 tools (2026-08-04) |
 
 ### MCP bewusst *nicht* gespiegelt (OK)
 
@@ -345,14 +356,15 @@ archive / attachment meta / forward / bounce**.
 | ~~P1~~ | MCP DF / title / customer / lock | MCP | ✅ 2026-07-21 |
 | ~~P1~~ | MCP-Docs auf 25 Tools | Docs | ✅ 2026-07-21 |
 | ~~P1~~ | Key `expires_at` / `last_used_at` (+ MCP-Resolve-Parity) | Schema + Auth | ✅ 2026-07-21 |
-| ~~P2~~ | Doku/Decision „group/role only“ (Znuny-ACL) | Permissions | ✅ 2026-07-21 deferred + dokumentiert |
+| ~~P2~~ | Doku/Decision „group/role only“ (Znuny-ACL) | Permissions | ✅ supersediert: TicketACL + group/role (2026-08-04) |
 | ~~P2~~ | MCP TN-lookup | MCP | ✅ `ticket_get_by_number` |
 | ~~P2~~ | MCP history / merge / link | MCP | ✅ 2026-08-04 |
 | ~~P2~~ | MCP type / service / sla | MCP | ✅ 2026-08-04 |
 | ~~P2~~ | MCP → `TicketWriteService` + SMTP parity | MCP | ✅ 2026-08-04 |
 | ~~P2~~ | Tool-Allowlist / Rate-Limit pro Key | Auth | ✅ 2026-08-04 |
 | ~~P3~~ | GenericAgent / Postmaster Write | Admin REST | ✅ Write (Postmaster früher; GenericAgent 2026-08-04) |
-| **P3** | ACL Editor | Admin REST | ⏸ list-only |
+| ~~P3~~ | ACL Editor + TicketACL runtime | Admin REST + Agent | ✅ CRUD + field-options (2026-08-04 / v0.5.8) |
+| ~~P3~~ | Portal process + attribute relations | Portal / Admin | ✅ v0.5.9 |
 | **P3** | Session-Bearer auf MCP (nur Dev) | MCP | ⏸ optional |
 | ~~P3~~ | Scopes in Admin-UI / CLI setzen | UI, CLI | ✅ Area RO/RW + read-only preset (2026-07-28) |
 
@@ -391,25 +403,28 @@ curl -i "$TIQORA_MCP_URL/mcp/" \
 **Ja — für den dokumentierten AI-Triage-Pfad und die Znuny-Kern-Parity ist die
 Oberfläche rund.**
 
-- **REST/OpenAPI:** Produktseitig stimmig; Admin deckt Type/Service/SLA,
-  Notifications, GenericAgent write, Mentions/TA ab.
-- **MCP:** AI-Oberfläche (~40 Tools) mit Queue-Permission-Gate und Key-Scopes
-  inkl. history/merge/link/type/service/sla/responsible/watch/archive/forward.
+- **REST/OpenAPI:** Produktseitig stimmig; Admin deckt Type/Service/SLA, ACL,
+  attribute relations, Notifications, GenericAgent write, Mentions/TA ab.
+  Portal inkl. Process (CustomerInterface).
+- **MCP:** AI-Oberfläche (~39 Tools) via `TicketWriteService` + Key-Scopes
+  inkl. history/merge/link/type/service/sla/responsible/watch/archive/forward/bounce.
   Volle Admin-Parity im MCP wäre gefährlich und unnötig.
-- **Auth:** Key bound to user + Group/Role (+ optionale Surface-Scopes) passt zu
-  Znuny-Kompatibilität und Least Privilege.
-- **ACL:** Admin CRUD + TicketACL runtime filtert Picker (Possible/PossibleNot);
-  Queue-Zugang bleibt group/role.
+- **Auth:** Key bound to user + Group/Role (+ Surface-Scopes + tool: allowlist +
+  rate limit) passt zu Znuny-Kompatibilität und Least Privilege.
+- **ACL / TAR:** TicketACL + attribute relations filter Picker; Queue-Zugang
+  bleibt group/role.
 - **Was noch „nice to have“ ist (kein Blocker):**
   1. MCP Mentions / Time-Accounting wenn Agents sie brauchen
   2. Session-Bearer auf MCP nur für Dev
+  3. OpenAPI-Snapshot regenerieren wenn Admin/Portal-Ops in Clients strikt typisiert werden
 
 ---
 
 ## 10. Empfohlene nächste Schritte (optional)
 
-1. **Doku:** `docs/api/mcp.md` / `docs/ai-integration.md` auf ~40 Tools abgleichen.
-2. **Portal process** und process designer nur bei Bedarf.
+1. **OpenAPI-Snapshot** bei Bedarf neu erzeugen (`tiqora openapi`), wenn Clients
+   streng gegen `packages/api-client` typisieren.
+2. **Process designer** / note-to-linked nur bei Produktbedarf.
 3. **Nicht planen,** solange kein Produktbedarf: feingranulare OAuth-Scopes,
    Session-Bearer auf MCP in Prod, OPM/SysConfig-UI.
 
@@ -425,7 +440,15 @@ Oberfläche rund.**
 | Admin API Keys | `backend/src/tiqora/api/v1/admin/api_keys.py` |
 | CLI API Keys | `backend/src/tiqora/cli/api_key.py` |
 | REST Auth + Scope-Gate | `backend/src/tiqora/api/deps.py` |
-| Permissions | `backend/src/tiqora/permissions/engine.py` |
+| Permissions (queue) | `backend/src/tiqora/permissions/engine.py` |
+| Ticket ACL runtime | `backend/src/tiqora/domain/ticket_acl.py` |
+| Ticket attribute relations | `backend/src/tiqora/domain/ticket_attribute_relations.py` |
+| Portal process | `backend/src/tiqora/api/portal/process.py` |
+| Field-options (ACL+TAR) | `backend/src/tiqora/api/v1/reference.py` / ticket field-options |
+| Admin ACL | `backend/src/tiqora/api/v1/admin/acl.py` |
+| Attribute relations | `backend/src/tiqora/domain/ticket_attribute_relations.py`, `api/v1/admin/ticket_attribute_relations.py` |
+| Portal process | `backend/src/tiqora/api/portal/process.py` |
+| Field-options (ACL+TAR) | `backend/src/tiqora/api/v1/reference.py` (`ticket-field-options`) |
 | Ticket Writes | `backend/src/tiqora/domain/ticket_write_service.py` |
 | Admin ACL read-only | `backend/src/tiqora/api/v1/admin/readonly.py` |
 | OpenAPI | `packages/api-client/openapi.json`, `docs/api/openapi.json` |

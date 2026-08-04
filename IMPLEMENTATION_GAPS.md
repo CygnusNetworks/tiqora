@@ -8,9 +8,11 @@ implementation order and not a security audit.
 
 > **Background:** First draft 2026-07-21 (local only). Restored and updated for
 > the 2026-07-27 codebase; **parity phases 1–4 closed 2026-08-04** (type/service/SLA
-> E2E, admin editors, mentions/time accounting, bulk + MCP). Peer database
-> support is OTRS/Znuny **6.0–7.3** (schema profiles); the feature comparison
-> still uses Znuny 6.5.x as the functional reference.
+> E2E, admin editors, mentions/time accounting, bulk + MCP). **Later same day
+> (v0.5.8–v0.5.9):** TicketACL runtime + admin CRUD, portal CustomerInterface
+> processes, ticket attribute relations, agent UX module views, MCP ~39 tools.
+> Peer database support is OTRS/Znuny **6.0–7.3** (schema profiles); the feature
+> comparison still uses Znuny 6.5.x as the functional reference.
 
 Related (API / MCP / auth surfaces): [`API_GAPS.md`](./API_GAPS.md).
 
@@ -27,10 +29,11 @@ Znuny module. Scope is intentional and documented.
 | Phase 0–5 core (ticket, auth, permissions, daemon flags, cutover) | ✅ largely complete |
 | Agent ticket workflow (create / reply / note / move / state / owner / merge / link / type / service / SLA / …) | ✅ core covered |
 | GenericInterface (Session*, Ticket*, History, TimeAccounting, OutOfOffice; REST + SOAP) | ✅ extended subset of Znuny GI |
-| Admin | ✅ strong coverage (type/service/SLA, mail accounts, system addresses, notifications, GenericAgent write); ACL still list-only |
-| Postmaster / notifications / GenericAgent | ⚠️ takeover available; GenericAgent + notification **admin write** present; runtime simplifications remain |
-| Process management / calendar / stats | ⚠️ present; intentionally reduced vs Znuny (designer still Znuny-side) |
-| Mentions + time accounting | ✅ native API + ticket-zoom panel (shared tables) |
+| Admin | ✅ strong coverage incl. ACL CRUD, attribute relations, type/service/SLA, mail, notifications, GenericAgent write |
+| Postmaster / notifications / GenericAgent | ⚠️ takeover available; admin write present; runtime simplifications remain |
+| Process management / calendar / stats | ⚠️ engine + agent/portal UI; designer still Znuny-side; action/condition subset |
+| Mentions + time accounting | ✅ native API + ticket-zoom panel + agent report |
+| Ticket ACL + attribute relations | ✅ Znuny tables; picker filtering (queue access still group/role) |
 | Znuny platform exclusives (package manager, SysConfig UI, GI admin, …) | ❌ missing or model-only |
 
 **How to read “complete”:**
@@ -38,7 +41,7 @@ Znuny module. Scope is intentional and documented.
 | Definition | Met? |
 |---|---|
 | **A. Design V1 + phases 0–5 + documented extensions** (parallel DB, core workflow, cutover) | **Yes, with known simplifications** |
-| **B. Every Znuny admin/agent feature replaceable without the Znuny UI** | **Mostly for day-to-day ops** — see residual roadmap; ACL/SysConfig/OPM still not |
+| **B. Every Znuny admin/agent feature replaceable without the Znuny UI** | **Mostly for day-to-day ops** — residual: process designer, SysConfig/OPM, note-to-linked, … |
 | **C. Byte-/feature-identical Znuny** | **No** — never a design goal |
 
 ---
@@ -64,10 +67,13 @@ identifiers (post-create mutation: see roadmap).
 
 ### 1.3 Auth / permissions
 
-Legacy passwords, sessions, API keys (admin UI/API/CLI, expiry, coarse scopes),
-OIDC, SPNEGO/Kerberos, TOTP, passkeys, LDAP (agent + customer), group/role
-permission engine. Znuny ACL **editing** is list/detail only; runtime uses
-group/role (design choice — see [`API_GAPS.md`](./API_GAPS.md)).
+Legacy passwords, sessions, API keys (admin UI/API/CLI, expiry, coarse scopes,
+tool allowlist, rate limit), OIDC, SPNEGO/Kerberos, TOTP, passkeys, LDAP
+(agent + customer), group/role permission engine for **queue access**. Znuny
+**Ticket ACL** admin CRUD + runtime (`domain/ticket_acl.py`) filters selectable
+values/actions (Possible / PossibleNot); does not replace group/role gates.
+**Ticket attribute relations** (`acl_ticket_attribute_relations`) CSV admin +
+picker filter after ACL. See [`API_GAPS.md`](./API_GAPS.md).
 
 ### 1.4 Daemon takeover (feature-flagged, default off)
 
@@ -76,13 +82,14 @@ Postmaster, escalation sweep, notifications, GenericAgent, outbox/indexer.
 ### 1.5 Portal, KB, channels, crypto, GDPR, calendar, stats, process (core)
 
 - Portal tickets + knowledge base
+- Portal **process** start/submit for `CustomerInterface` activity dialogs
 - SMS / WhatsApp / phone plugins
-- PGP/S-MIME (flag-gated)
+- PGP/S-MIME (flag-gated; admin crypto-keys import/audit)
 - GDPR anonymize/retention (ownership-gated)
 - Calendar (shared `calendar*` tables)
 - Stats (fixed modern reports; not the Znuny stats framework)
-- Process engine (subset of actions/conditions)
-- AI assistance / MCP (Tiqora-native; no Znuny equivalent)
+- Process engine (subset of actions/conditions; agent + portal UI)
+- AI assistance / MCP (~39 tools; Tiqora-native; no Znuny equivalent)
 
 ### 1.6 Compat API (GenericInterface provider)
 
@@ -107,9 +114,14 @@ Scope and intentional differences: [`docs/compatibility.md`](./docs/compatibilit
 | Postmaster filters list-only | ✅ **CRUD** (API + UI) |
 | API-key lifecycle / MCP P1 (reference + write tools) | ✅ see [`API_GAPS.md`](./API_GAPS.md) |
 | Type / service / SLA post-create + admin + process actions | ✅ **2026-08-04** |
-| System address / notification event / GenericAgent write | ✅ **2026-08-04** (ACL still list-only) |
-| Mentions + native time accounting | ✅ **2026-08-04** (ticket API + zoom panel) |
+| System address / notification event / GenericAgent write | ✅ **2026-08-04** |
+| Mentions + native time accounting | ✅ **2026-08-04** (ticket API + zoom panel + report) |
 | Bulk multi-select (state/priority/owner + queue move + lock) | ✅ **2026-08-04** |
+| Ticket ACL admin + runtime + field-options | ✅ **2026-08-04** (v0.5.8) |
+| Portal process (CustomerInterface) | ✅ **2026-08-04** (v0.5.9) |
+| Ticket attribute relations (CSV + picker filter) | ✅ **2026-08-04** (v0.5.9) |
+| Agent UX: print HTML, module views, CIC, service view, last views, resend/plain | ✅ **2026-08-04** |
+| MCP ~39 tools (responsible/watch/archive/attach/forward/bounce, …) | ✅ **2026-08-04** |
 
 ---
 
@@ -171,8 +183,8 @@ transport, session, or crypto edge cases.
   documented simplifications (transports, recipient types, follow-up modules).
   GenericAgent + notification **admin write** exists; runtime behaviour is
   still a simplified subset. See [`docs/parallel-operation.md`](./docs/parallel-operation.md).
-- **Portal follow-up:** some Znuny follow-up modes are not mirrored 1:1; no
-  customer process UI.
+- **Portal follow-up:** some Znuny follow-up modes are not mirrored 1:1;
+  customer **process** UI is present for CustomerInterface dialogs.
 
 ### Agent UI / productivity
 
@@ -187,7 +199,8 @@ transport, session, or crypto edge cases.
 | Service-centric agent view | ✅ `/agent/services` |
 | Last views / autocompletion | ✅ last views (localStorage); no full autocomplete |
 | Form drafts | own draft path (+ legacy model) |
-| Ticket attribute relations / note-to-linked | not yet |
+| Ticket attribute relations | ✅ admin CSV + field-options filter |
+| Note-to-linked tickets | ❌ not yet |
 | Mentions | ✅ ticket API + zoom panel |
 | Ticket ACL field filtering | ✅ zoom pickers via `field-options` |
 
@@ -227,7 +240,8 @@ priorities, **ticket types**, **services**, **SLAs**, customers/companies
 (+ groups), templates / salutations / signatures / attachments, auto-responses,
 dynamic fields, webhooks, channels, mail log/outbound, **mail accounts**,
 **system addresses**, **notification events**, **GenericAgent jobs** (write),
-**postmaster filters**, **API keys**, AI admin (Tiqora-native).
+**postmaster filters**, **API keys**, **ACL**, **ticket attribute relations**
+(CSV), crypto-keys (import/audit), AI admin (Tiqora-native).
 
 **ACL:** full CRUD + Znuny YAML `config_match`/`config_change` (runtime filters
 pickers; queue access still group/role).
@@ -236,8 +250,7 @@ pickers; queue access still group/role).
 
 **Missing relative to Znuny admin breadth:** SysConfig deploy UI, GI webservice
 admin, package manager, session admin, support data, cloud services, appointment
-admin (calendar via agent UI), ticket attribute relations, full crypto keyring
-parity, …
+admin (calendar via agent UI), full crypto keyring parity, process designer, …
 
 **Present (Znuny-compatible):** mail account admin + OAuth2 token management
 (shared legacy `oauth2_token*` / `mail_account` tables; XOAUTH2 fetch + optional
@@ -266,14 +279,13 @@ custom ops, GI admin ❌ — see §1.6 and
 1. **Design spec** (`docs/specs/2026-07-19-tiqora-design.md`) is historical;
    several items once listed as deferred (process, calendar, stats, PGP/S-MIME,
    SOAP) exist now as subsets. The spec is not live status.
-2. **README / feature lists:** do not market ACL as full admin CRUD —
-   list/detail only. GenericAgent, postmaster filters, notification events,
-   type/service/SLA **do** have write surfaces.
+2. **README / feature lists:** ACL has admin CRUD + runtime picker filter;
+   queue access remains group/role. Attribute relations and portal process
+   are present (v0.5.9).
 3. **Compat / GI:** [`docs/compatibility.md`](./docs/compatibility.md) is the
    source of truth for GI scope, not the historical design spec.
-4. **Process supported actions:** see
-   [`docs/process-management.md`](./docs/process-management.md) (includes
-   Type/Service/SLA setters as of 2026-08-04).
+4. **Process:** [`docs/process-management.md`](./docs/process-management.md) —
+   supported actions/conditions, agent + portal CustomerInterface UI.
 
 ---
 
@@ -294,7 +306,8 @@ accounting**; **bulk queue actions**; MCP history/merge/link/type-service-sla;
 **ACL editor + TicketACL runtime**; process TicketCreate/DFPendingTime/ordered
 conditions; agent module views / print / CIC / service view / last views /
 time-accounting report; email resend + plain; MCP responsible/watch/archive/
-attachments/forward/bounce.
+attachments/forward/bounce; **portal CustomerInterface process**; **ticket
+attribute relations**.
 
 ---
 
@@ -303,7 +316,7 @@ attachments/forward/bounce.
 | Document | Role |
 |---|---|
 | [`README.md`](./README.md) | Product / feature overview |
-| [`API_GAPS.md`](./API_GAPS.md) | API / MCP / auth gaps (as of 2026-07-27) |
+| [`API_GAPS.md`](./API_GAPS.md) | API / MCP / auth gaps (current) |
 | [`docs/support-matrix.md`](./docs/support-matrix.md) | Peer versions 6.0–7.3 |
 | [`docs/parallel-operation.md`](./docs/parallel-operation.md) | Daemon takeover + operational caveats |
 | [`docs/process-management.md`](./docs/process-management.md) | Process supported vs deferred |
@@ -322,3 +335,4 @@ attachments/forward/bounce.
 | 2026-07-27 | Restored to repo; updated for GI ops, postmaster-filter CRUD, API_GAPS cross-ref, roadmap/matrix cleanup |
 | 2026-07-27 | Public rewrite: English; product-roadmap framing; no security-edge inventory |
 | 2026-08-04 | Parity phases 1–4: type/service/SLA E2E; admin write (system addresses, notifications, GenericAgent); mentions + time accounting; bulk queue/lock; process Type/Service/SLA/Watch/Link actions; residual roadmap rewritten |
+| 2026-08-04 | v0.5.8–v0.5.9: TicketACL CRUD+runtime; portal process CustomerInterface; ticket attribute relations; agent UX + MCP ~39 tools; docs aligned (architecture/compatibility/mcp/rest-v1) |
