@@ -165,16 +165,19 @@ never raises. See `_evaluate_field` in `engine.py` for the full semantics
 
 | Supported | Deferred (logged, no-op — collected into `unsupported_actions`) |
 |---|---|
-| `TicketStateSet` | `DynamicFieldRemove` |
-| `TicketQueueSet` | `DynamicFieldIncrement` |
-| `TicketOwnerSet` | `DynamicFieldPendingTimeSet` |
-| `TicketPrioritySet` | `ArticleSend` |
-| `TicketTitleSet` | `TicketCreate`, `ExecuteInvoker`, `Appointment*` (Create/Update/Remove), `ConfigItemUpdate` |
+| `TicketStateSet` | `DynamicFieldPendingTimeSet` |
+| `TicketQueueSet` | `TicketCreate`, `ExecuteInvoker`, `Appointment*` (Create/Update/Remove), `ConfigItemUpdate` |
+| `TicketOwnerSet` | |
+| `TicketPrioritySet` | |
+| `TicketTitleSet` | |
 | `TicketCustomerSet` | |
 | `TicketResponsibleSet` | |
 | `TicketLockSet` | |
 | `DynamicFieldSet` | |
+| `DynamicFieldRemove` | |
+| `DynamicFieldIncrement` | |
 | `TicketArticleCreate` | |
+| `ArticleSend` | (agent email via outbound reply path) |
 | `TicketTypeSet` | |
 | `TicketServiceSet` | |
 | `TicketSLASet` | |

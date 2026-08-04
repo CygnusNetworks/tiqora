@@ -178,7 +178,10 @@ async def create_notification_event(
         nid = int(
             (
                 await session.execute(
-                    text("SELECT id FROM notification_event WHERE name = :n ORDER BY id DESC LIMIT 1"),
+                    text(
+                        "SELECT id FROM notification_event"
+                        " WHERE name = :n ORDER BY id DESC LIMIT 1"
+                    ),
                     {"n": body.name},
                 )
             ).scalar_one()

@@ -39,12 +39,12 @@ Analyse gegen Code (`backend/src/tiqora/…`) und OpenAPI (`packages/api-client/
 
 | Prio | Gap | Surface | Kommentar |
 |---|---|---|---|
-| **P2** | MCP-Mutationen auf `TicketWriteService` umbauen | MCP | Inline-Gate ist sicher, dupliziert aber Check-Logik |
-| **P2** | MCP `ticket_reply` / SMTP-Delivery | MCP / Produkt | Rohe `add_article()` sendet keine Mail; Service-Pfad würde SMTP triggern — Produktentscheidung |
-| **P2** | MCP Tool-Allowlist pro Key | Schema + MCP | Defense-in-depth neben Group/Role und groben Scopes |
-| **P2** | Rate-Limit pro Key | Auth | Nicht implementiert |
+| ~~P2~~ | MCP-Mutationen auf `TicketWriteService` | MCP | ✅ 2026-08-04 (SMTP bei agent email reply = REST-Parity) |
+| ~~P2~~ | MCP Tool-Allowlist pro Key | Scopes | ✅ `tool:<name>` Tokens |
+| ~~P2~~ | Rate-Limit pro Key | Auth | ✅ Redis fixed-window (`TIQORA_API_KEY_RATE_LIMIT_*`) |
 | **P3** | ACL Editor (Write) | Admin REST | List/detail only; Runtime group/role only |
 | **P3** | Session-Bearer auf MCP (nur Dev) | MCP | Optional; Prod eher nicht |
+| ~~P3~~ | PGP/S-MIME Admin list/import | Admin REST | ✅ `/admin/crypto-keys` |
 
 ### ⏸ Deferred (Design)
 
@@ -347,10 +347,8 @@ Bereits erledigt: Reference-Listen, DF/Title/Customer, Lock/Unlock, TN-Lookup,
 | ~~P2~~ | MCP TN-lookup | MCP | ✅ `ticket_get_by_number` |
 | ~~P2~~ | MCP history / merge / link | MCP | ✅ 2026-08-04 |
 | ~~P2~~ | MCP type / service / sla | MCP | ✅ 2026-08-04 |
-| **P2** | MCP → `TicketWriteService` (Code-Duplikat) | MCP | 🟡 offen |
-| **P2** | MCP reply SMTP-Produktentscheidung | MCP | 🟡 offen |
-| **P2** | Tool-Allowlist pro Key | Schema + MCP | 🟡 optional |
-| **P2** | Rate-Limit pro Key | Auth | 🟡 offen |
+| ~~P2~~ | MCP → `TicketWriteService` + SMTP parity | MCP | ✅ 2026-08-04 |
+| ~~P2~~ | Tool-Allowlist / Rate-Limit pro Key | Auth | ✅ 2026-08-04 |
 | ~~P3~~ | GenericAgent / Postmaster Write | Admin REST | ✅ Write (Postmaster früher; GenericAgent 2026-08-04) |
 | **P3** | ACL Editor | Admin REST | ⏸ list-only |
 | **P3** | Session-Bearer auf MCP (nur Dev) | MCP | ⏸ optional |

@@ -1919,7 +1919,14 @@ class TicketWriteService:
             user_id=user_id,
         )
 
-    async def assign_owner(self, user_id: int, ticket_id: int, new_owner_id: int) -> None:
+    async def assign_owner(
+        self,
+        user_id: int,
+        ticket_id: int,
+        new_owner_id: int,
+        *,
+        lock: bool = False,
+    ) -> None:
         t = await _ticket_must_exist(self._session, ticket_id)
         await self._assert(user_id, int(t["queue_id"]), "owner")
         await assign_owner(
@@ -1928,6 +1935,7 @@ class TicketWriteService:
             new_owner_id=new_owner_id,
             user_id=user_id,
             sysconfig=self._sysconfig,
+            lock=lock,
         )
 
     async def assign_responsible(

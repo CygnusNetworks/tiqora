@@ -35,6 +35,39 @@ class RateLimitDecision:
     reason: str = ""
 
 
+class ApiKeyRateLimiter:
+    """Fixed-window per-key request counter (REST bearer + MCP).
+
+    Soft-fail open when Redis is unavailable so a Redis outage does not lock
+    every automation out of the system.
+    """
+
+    def __init__(self, client: Any, settings: Settings) -> None:
+        self._client = client
+        self._enabled = settings.api_key_rate_limit_enabled
+        self._max = max(1, settings.api_key_rate_limit_max)
+        self._window = max(1, settings.api_key_rate_limit_window_seconds)
+
+    async def check_and_incr(self, key_id: int) -> RateLimitDecision:
+        if not self._enabled or self._client is None:
+            return RateLimitDecision(allowed=True)
+        redis_key = f"tiqora:rl:apikey:{key_id}"
+        try:
+            count = await self._client.incr(redis_key)
+            if count == 1:
+                await self._client.expire(redis_key, self._window)
+            if int(count) > self._max:
+                ttl = int(await self._client.ttl(redis_key) or self._window)
+                return RateLimitDecision(
+                    allowed=False,
+                    retry_after=max(1, ttl),
+                    reason="api_key_rate_limit",
+                )
+            return RateLimitDecision(allowed=True)
+        except Exception:  # noqa: BLE001 — fail open
+            return RateLimitDecision(allowed=True)
+
+
 class AuthRateLimiter:
     """Per-login and per-IP failed-attempt throttle with temporary lockout."""
 

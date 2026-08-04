@@ -628,6 +628,112 @@ async def _action_dynamic_field_set(
         )
 
 
+async def _action_dynamic_field_remove(
+    session: AsyncSession,
+    config: dict[str, Any],
+    ticket_id: int,
+    user_id: int,
+    sysconfig: SysConfig,
+) -> None:
+    """Port of DynamicFieldRemove — clear field values (empty set)."""
+    del sysconfig
+    for key in config:
+        if key == "UserID":
+            continue
+        field_name = key.removeprefix("DynamicField_")
+        await update_dynamic_field(
+            session, ticket_id=ticket_id, field_name=field_name, values=[], user_id=user_id
+        )
+
+
+async def _action_dynamic_field_increment(
+    session: AsyncSession,
+    config: dict[str, Any],
+    ticket_id: int,
+    user_id: int,
+    sysconfig: SysConfig,
+) -> None:
+    """Port of DynamicFieldIncrement — numeric field += Value (default 1)."""
+    del sysconfig
+    from sqlalchemy import text
+
+    for key, value in config.items():
+        if key == "UserID":
+            continue
+        field_name = key.removeprefix("DynamicField_")
+        delta = int(value) if value not in (None, "") else 1
+        field_id = (
+            await session.execute(
+                text(
+                    "SELECT id FROM dynamic_field WHERE name = :n"
+                    " AND object_type = 'Ticket' AND valid_id = 1 LIMIT 1"
+                ),
+                {"n": field_name},
+            )
+        ).scalar_one_or_none()
+        if field_id is None:
+            continue
+        row = (
+            await session.execute(
+                text(
+                    "SELECT value_text, value_int FROM dynamic_field_value"
+                    " WHERE field_id = :fid AND object_id = :oid ORDER BY id LIMIT 1"
+                ),
+                {"fid": field_id, "oid": ticket_id},
+            )
+        ).first()
+        current = 0
+        if row is not None:
+            if row[1] is not None:
+                current = int(row[1])
+            elif row[0] is not None:
+                try:
+                    current = int(str(row[0]).strip() or "0")
+                except ValueError:
+                    current = 0
+        await update_dynamic_field(
+            session,
+            ticket_id=ticket_id,
+            field_name=field_name,
+            values=[str(current + delta)],
+            user_id=user_id,
+        )
+
+
+async def _action_article_send(
+    session: AsyncSession,
+    config: dict[str, Any],
+    ticket_id: int,
+    user_id: int,
+    sysconfig: SysConfig,
+) -> None:
+    """Port of ArticleSend — agent email article via outbound reply path."""
+    from tiqora.channels.email.outbound_reply import deliver_agent_email_reply
+
+    subject = str(config.get("Subject") or "Notification")
+    body = str(config.get("Body") or "")
+    if not body and not config.get("Subject"):
+        raise RequiredFieldMissing("ArticleSend: Config must set Body or Subject")
+    t = await _ticket_must_exist(session, ticket_id)
+    article = ArticleIn(
+        sender_type="agent",
+        is_visible_for_customer=bool(config.get("IsVisibleForCustomer", 1)),
+        subject=subject,
+        body=body,
+        channel="email",
+        to_address=str(config.get("To") or config.get("Customer") or "") or None,
+    )
+    await deliver_agent_email_reply(
+        session,
+        sysconfig,
+        None,
+        ticket_id=ticket_id,
+        queue_id=int(t["queue_id"]),
+        user_id=user_id,
+        article=article,
+    )
+
+
 _ARTICLE_CHANNEL_MAP: dict[str, str] = {
     "internal": "note",
     "note": "note",
@@ -772,7 +878,10 @@ _ACTION_HANDLERS: dict[str, _ActionHandler] = {
     "TicketResponsibleSet": _action_ticket_responsible_set,
     "TicketLockSet": _action_ticket_lock_set,
     "DynamicFieldSet": _action_dynamic_field_set,
+    "DynamicFieldRemove": _action_dynamic_field_remove,
+    "DynamicFieldIncrement": _action_dynamic_field_increment,
     "TicketArticleCreate": _action_ticket_article_create,
+    "ArticleSend": _action_article_send,
     "TicketTypeSet": _action_ticket_type_set,
     "TicketServiceSet": _action_ticket_service_set,
     "TicketSLASet": _action_ticket_sla_set,
@@ -781,10 +890,8 @@ _ACTION_HANDLERS: dict[str, _ActionHandler] = {
 }
 """Implemented TransitionAction modules, keyed by the last ``::``-segment of
 ``TransitionActionConfig.module``. Remaining deferred modules include
-``DynamicFieldRemove``, ``DynamicFieldIncrement``,
-``DynamicFieldPendingTimeSet``, ``ArticleSend``, ``TicketCreate``,
-``ExecuteInvoker``, ``Appointment*``, ``ConfigItemUpdate`` — see
-:func:`execute_transition_action`."""
+``DynamicFieldPendingTimeSet``, ``TicketCreate``, ``ExecuteInvoker``,
+``Appointment*``, ``ConfigItemUpdate`` — see :func:`execute_transition_action`."""
 
 
 def _module_short_name(module: str) -> str:

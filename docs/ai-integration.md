@@ -70,7 +70,7 @@ appearing over time.
 ## 2. MCP as the primary AI interface
 
 `tiqora.mcp_server.server` runs a FastMCP streamable-HTTP server (default
-port `8001`, `tiqora mcp` / `tiqora-mcp` entry points) exposing **25 tools**.
+port `8001`, `tiqora mcp` / `tiqora-mcp` entry points) exposing **~31 tools**.
 MCP deliberately does **not** mirror admin/portal/calendar/BPM/stats/GDPR.
 
 #### Ticket read

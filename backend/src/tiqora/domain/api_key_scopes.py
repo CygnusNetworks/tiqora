@@ -96,15 +96,27 @@ def _is_area_token(token: str) -> bool:
     return area in API_KEY_AREAS_SET and level in ("ro", "rw")
 
 
+def _is_tool_token(token: str) -> bool:
+    """MCP tool allowlist: ``tool:<mcp_tool_name>`` (e.g. ``tool:ticket_search``)."""
+    if not token.startswith("tool:"):
+        return False
+    name = token[5:]
+    return bool(name) and name.replace("_", "").isalnum()
+
+
 def validate_scope_tokens(parts: list[str]) -> None:
     """Raise InvalidApiKeyScopeError if any token is unknown."""
     unknown: list[str] = []
     for p in parts:
-        if p in _LEGACY_TOKENS or _is_area_token(p):
+        if p in _LEGACY_TOKENS or _is_area_token(p) or _is_tool_token(p):
             continue
         unknown.append(p)
     if unknown:
-        allowed = sorted(_LEGACY_TOKENS) + [f"{a}:ro/{a}:rw" for a in API_KEY_AREAS]
+        allowed = (
+            sorted(_LEGACY_TOKENS)
+            + [f"{a}:ro/{a}:rw" for a in API_KEY_AREAS]
+            + ["tool:<mcp_tool_name>"]
+        )
         raise InvalidApiKeyScopeError(
             f"Unknown API key scope(s): {sorted(unknown)}. Allowed: {allowed}"
         )
