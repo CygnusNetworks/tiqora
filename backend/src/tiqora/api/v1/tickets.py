@@ -415,6 +415,42 @@ async def get_ticket(
         raise _map_exc(exc) from exc
 
 
+@router.get("/{ticket_id}/field-options")
+async def ticket_field_options(
+    ticket_id: int,
+    user: CurrentUser,
+    session: DbSession,
+    fields: str = Query(
+        "state,queue,priority,type,service,sla",
+        description="Comma-separated field names to return",
+    ),
+    action: str | None = Query(
+        "AgentTicketZoom",
+        description="Frontend Action for ACL Properties (e.g. AgentTicketZoom)",
+    ),
+) -> dict[str, dict[str, str]]:
+    """ACL-filtered field options for an existing ticket (zoom/update forms).
+
+    Requires ticket read access. Returns id→name maps under each field key.
+    """
+    from tiqora.api.v1.reference import collect_ticket_field_options
+
+    try:
+        await TicketService(session).get_ticket(user.id, ticket_id)
+    except (TicketNotFound, TicketAccessDenied) as exc:
+        raise _map_exc(exc) from exc
+
+    requested = {f.strip().lower() for f in fields.split(",") if f.strip()}
+    result = await collect_ticket_field_options(
+        session,
+        user,
+        fields=requested,
+        ticket_id=ticket_id,
+        action=action,
+    )
+    return result.model_dump()
+
+
 @router.get("/{ticket_id}/similar", response_model=SimilarTicketsOut)
 async def get_similar_tickets(
     ticket_id: int,

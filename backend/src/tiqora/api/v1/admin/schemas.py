@@ -800,6 +800,30 @@ class AclOut(BaseModel):
     change_time: datetime | None
 
 
+class AclCreate(BaseModel):
+    """Create a Znuny ``acl`` row. YAML fields stored as text 1:1."""
+
+    name: str
+    comments: str | None = None
+    description: str | None = None
+    valid_id: int = 1
+    stop_after_match: int | None = 0
+    config_match: str | None = None
+    config_change: str | None = None
+
+
+class AclUpdate(BaseModel):
+    """Partial update for a Znuny ``acl`` row."""
+
+    name: str | None = None
+    comments: str | None = None
+    description: str | None = None
+    valid_id: int | None = None
+    stop_after_match: int | None = None
+    config_match: str | None = None
+    config_change: str | None = None
+
+
 class GenericAgentJobOut(BaseModel):
     """Grouped by ``job_name`` (key/value rows per Znuny ``generic_agent_jobs``).
 

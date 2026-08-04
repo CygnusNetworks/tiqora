@@ -1,11 +1,7 @@
-"""Read-only admin endpoints: ACLs, generic agent jobs, reference lists.
+"""Read-only admin endpoints: generic agent jobs and reference lists.
 
-ACL editing is explicitly deferred (config_match/config_change YAML shape is
-complex and Znuny's ACL cache invalidation semantics need dedicated design
-work) — only list/detail are implemented here.
-
-PostMaster filters live in :mod:`tiqora.api.v1.admin.postmaster_filters`
-(full CRUD).
+Ticket ACL CRUD lives in :mod:`tiqora.api.v1.admin.acl`. PostMaster filters
+live in :mod:`tiqora.api.v1.admin.postmaster_filters` (full CRUD).
 """
 
 from __future__ import annotations
@@ -18,13 +14,12 @@ from sqlalchemy import select
 from tiqora.api.deps import DbSession
 from tiqora.api.v1.admin.deps import AdminUser
 from tiqora.api.v1.admin.schemas import (
-    AclOut,
     FollowUpPossibleOut,
     GenericAgentJobOut,
     StateTypeOut,
     SystemAddressOut,
 )
-from tiqora.db.legacy.config import Acl, GenericAgentJobs
+from tiqora.db.legacy.config import GenericAgentJobs
 from tiqora.db.legacy.queue import FollowUpPossible, SystemAddress
 from tiqora.db.legacy.ticket import TicketStateType
 
@@ -68,22 +63,6 @@ async def list_follow_up_possible(admin: AdminUser, session: DbSession) -> list[
         .order_by(FollowUpPossible.id)
     )
     return list(result.scalars().all())
-
-
-@router.get("/acl", response_model=list[AclOut])
-async def list_acls(admin: AdminUser, session: DbSession) -> list[Acl]:
-    _ = admin
-    result = await session.execute(select(Acl).order_by(Acl.name))
-    return list(result.scalars().all())
-
-
-@router.get("/acl/{acl_id}", response_model=AclOut)
-async def get_acl(acl_id: int, admin: AdminUser, session: DbSession) -> Acl:
-    _ = admin
-    row = await session.get(Acl, acl_id)
-    if row is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="ACL not found")
-    return row
 
 
 @router.get("/generic-agent-jobs", response_model=list[GenericAgentJobOut])
