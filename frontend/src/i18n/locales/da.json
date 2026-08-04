@@ -1177,6 +1177,10 @@
         "filters": "Yderligere vælgere indsnævrer kundesættet yderligere - hvert tilføjet filter er ANDed med logins/virksomheder ovenfor og med hinanden.",
         "negate": "Skift mellem \"matches\" (kunder hvor mønsteret matcher) og \"matches not\" (≠, kunder hvor det IKKE matcher).",
         "validId": "\"Temp\" (valid_id 3) er Znunys tredje gyldighedstilstand - typisk en konto, der afventer bekræftelse (f.eks. ubekræftet selvregistrering), adskilt fra almindelig gyldig/ugyldig."
+      },
+      "systemAddresses": {
+        "email": "Address used as the From email for queues and auto-responses.",
+        "name": "Display name shown next to the email (e.g. “Support <support@example.com>”)."
       }
     },
     "nav": {
@@ -2253,6 +2257,13 @@
       "working": "Arbejder...",
       "authorizeOpened": "Godkendelsesside åbnet i en ny fane.",
       "refreshSuccess": "Token opdateret."
+    },
+    "systemAddresses": {
+      "title_plural": "System addresses",
+      "subtitle": "From-addresses for queues and auto-responses. Invalid addresses stay listed so they can be re-enabled.",
+      "new": "Add address",
+      "email": "Email",
+      "name": "Name"
     }
   },
   "kb": {

@@ -1177,6 +1177,10 @@
         "filters": "Papildu atlasītāji vēl vairāk sašaurina klientu kopu — katrs pievienotais filtrs tiek UN pievienots iepriekš norādītajiem pieteikumvārdiem/uzņēmumiem un viens ar otru.",
         "negate": "Pārslēdzieties starp “atbilst” (klienti, kuriem atbilst raksts) un “neatbilst” (≠, klienti, kuriem tas neatbilst).",
         "validId": "“Temp” (valid_id 3) ir Znuny trešais derīguma stāvoklis — parasti konts gaida apstiprinājumu (piemēram, neapstiprināta pašreģistrācija), kas atšķiras no vienkārša derīguma/nederīga."
+      },
+      "systemAddresses": {
+        "email": "Address used as the From email for queues and auto-responses.",
+        "name": "Display name shown next to the email (e.g. “Support <support@example.com>”)."
       }
     },
     "nav": {
@@ -2253,6 +2257,13 @@
       "working": "Strādā…",
       "authorizeOpened": "Autorizācijas lapa ir atvērta jaunā cilnē.",
       "refreshSuccess": "Tokens ir atsvaidzināts."
+    },
+    "systemAddresses": {
+      "title_plural": "System addresses",
+      "subtitle": "From-addresses for queues and auto-responses. Invalid addresses stay listed so they can be re-enabled.",
+      "new": "Add address",
+      "email": "Email",
+      "name": "Name"
     }
   },
   "kb": {

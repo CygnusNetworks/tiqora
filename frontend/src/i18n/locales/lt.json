@@ -1177,6 +1177,10 @@
         "filters": "Papildomi parinkikliai dar labiau susiaurina klientų rinkinį – kiekvienas papildomas filtras IR pridedamas aukščiau esančiais prisijungimais/įmonėmis ir vienas su kitu.",
         "negate": "Perjungti tarp „atitinka“ (klientai, kurių šablonas sutampa) ir „neatitinka“ (≠, klientai, kuriems jis NEatitinka).",
         "validId": "„Temp“ (valid_id 3) yra trečioji „Znuny“ galiojimo būsena – paprastai paskyra, laukianti patvirtinimo (pvz., nepatvirtinta savarankiška registracija), skiriasi nuo paprastos galiojančios / netinkamos."
+      },
+      "systemAddresses": {
+        "email": "Address used as the From email for queues and auto-responses.",
+        "name": "Display name shown next to the email (e.g. “Support <support@example.com>”)."
       }
     },
     "nav": {
@@ -2253,6 +2257,13 @@
       "working": "Dirba…",
       "authorizeOpened": "Leidimo puslapis atidarytas naujame skirtuke.",
       "refreshSuccess": "Žetonas atnaujintas."
+    },
+    "systemAddresses": {
+      "title_plural": "System addresses",
+      "subtitle": "From-addresses for queues and auto-responses. Invalid addresses stay listed so they can be re-enabled.",
+      "new": "Add address",
+      "email": "Email",
+      "name": "Name"
     }
   },
   "kb": {

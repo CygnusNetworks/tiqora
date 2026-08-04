@@ -1177,6 +1177,10 @@
         "filters": "Další selektory dále zúží množinu zákazníků — každý přidaný filtr se spojuje logikou AND s loginy/firmami výše i navzájem.",
         "negate": "Přepíná mezi „odpovídá“ (zákazníci, kde vzor sedí) a „neodpovídá“ (≠, zákazníci, kde vzor NEsedí).",
         "validId": "„Temp“ (valid_id 3) je třetí stav platnosti ve Znuny — typicky účet čekající na potvrzení (např. nepotvrzená self-registrace), odlišný od prostého platný/neplatný."
+      },
+      "systemAddresses": {
+        "email": "Address used as the From email for queues and auto-responses.",
+        "name": "Display name shown next to the email (e.g. “Support <support@example.com>”)."
       }
     },
     "nav": {
@@ -2253,6 +2257,13 @@
       "working": "Práce…",
       "authorizeOpened": "Stránka autorizace se otevřela na nové kartě.",
       "refreshSuccess": "Token obnoven."
+    },
+    "systemAddresses": {
+      "title_plural": "System addresses",
+      "subtitle": "From-addresses for queues and auto-responses. Invalid addresses stay listed so they can be re-enabled.",
+      "new": "Add address",
+      "email": "Email",
+      "name": "Name"
     }
   },
   "kb": {

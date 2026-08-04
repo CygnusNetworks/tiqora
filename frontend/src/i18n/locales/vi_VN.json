@@ -1177,6 +1177,10 @@
         "filters": "Bộ chọn bổ sung thu hẹp nhóm khách hàng hơn nữa — mọi bộ lọc được thêm vào đều được AND với thông tin đăng nhập/công ty ở trên và với nhau.",
         "negate": "Chuyển đổi giữa \"khớp\" (khách hàng có mẫu khớp) và \"không khớp\" (≠, khách hàng KHÔNG khớp).",
         "validId": "\"Temp\" (valid_id 3) là trạng thái hiệu lực thứ ba của Znuny - thường là tài khoản đang chờ xác nhận (ví dụ: tự đăng ký chưa được xác nhận), khác với hợp lệ/không hợp lệ."
+      },
+      "systemAddresses": {
+        "email": "Address used as the From email for queues and auto-responses.",
+        "name": "Display name shown next to the email (e.g. “Support <support@example.com>”)."
       }
     },
     "nav": {
@@ -2253,6 +2257,13 @@
       "working": "Đang làm việc…",
       "authorizeOpened": "Trang ủy quyền đã mở trong một tab mới.",
       "refreshSuccess": "Đã làm mới mã thông báo."
+    },
+    "systemAddresses": {
+      "title_plural": "System addresses",
+      "subtitle": "From-addresses for queues and auto-responses. Invalid addresses stay listed so they can be re-enabled.",
+      "new": "Add address",
+      "email": "Email",
+      "name": "Name"
     }
   },
   "kb": {

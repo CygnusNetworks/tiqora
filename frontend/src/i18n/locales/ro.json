@@ -1177,6 +1177,10 @@
         "filters": "Selectoarele suplimentare restrâng și mai mult setul de clienți - fiecare filtru adăugat este AND cu login-urile/companiile de mai sus și unul cu celălalt.",
         "negate": "Comutați între „potriviri” (clienți în care modelul se potrivește) și „nu se potrivește” (≠, clienții în care NU se potrivește).",
         "validId": "„Temp” (valid_id 3) este a treia stare de valabilitate a lui Znuny – de obicei un cont în așteptarea confirmării (de exemplu, auto-înregistrare neconfirmată), diferit de simplu valid/invalid."
+      },
+      "systemAddresses": {
+        "email": "Address used as the From email for queues and auto-responses.",
+        "name": "Display name shown next to the email (e.g. “Support <support@example.com>”)."
       }
     },
     "nav": {
@@ -2253,6 +2257,13 @@
       "working": "Lucrează…",
       "authorizeOpened": "Pagina de autorizare s-a deschis într-o filă nouă.",
       "refreshSuccess": "Token reîmprospătat."
+    },
+    "systemAddresses": {
+      "title_plural": "System addresses",
+      "subtitle": "From-addresses for queues and auto-responses. Invalid addresses stay listed so they can be re-enabled.",
+      "new": "Add address",
+      "email": "Email",
+      "name": "Name"
     }
   },
   "kb": {

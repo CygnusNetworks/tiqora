@@ -1177,6 +1177,10 @@
         "filters": "Täiendavad valijad kitsendavad klientide komplekti veelgi – iga lisatud filter JA-nimetatakse ülalolevate sisselogimiste/ettevõtete ja üksteisega.",
         "negate": "Lülitage \"sobib\" (kliendid, kelle muster sobib) ja \"ei sobi\" (≠, kliendid, kellel see EI ühti) vahel.",
         "validId": "\"Temp\" (valid_id 3) on Znuny kolmas kehtivusolek – tavaliselt on konto, mis ootab kinnitust (nt kinnitamata eneseregistreerimine), mis erineb tavalisest kehtivusest/kehtetusest."
+      },
+      "systemAddresses": {
+        "email": "Address used as the From email for queues and auto-responses.",
+        "name": "Display name shown next to the email (e.g. “Support <support@example.com>”)."
       }
     },
     "nav": {
@@ -2253,6 +2257,13 @@
       "working": "Töötab…",
       "authorizeOpened": "Autoriseerimisleht avati uuel vahelehel.",
       "refreshSuccess": "Token on värskendatud."
+    },
+    "systemAddresses": {
+      "title_plural": "System addresses",
+      "subtitle": "From-addresses for queues and auto-responses. Invalid addresses stay listed so they can be re-enabled.",
+      "new": "Add address",
+      "email": "Email",
+      "name": "Name"
     }
   },
   "kb": {

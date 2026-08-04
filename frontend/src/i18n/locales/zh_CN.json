@@ -1177,6 +1177,10 @@
         "filters": "附加选择器进一步缩小了客户集范围 - 每个添加的过滤器都与上面的登录名/公司以及彼此之间进行 AND 运算。",
         "negate": "在“匹配”（模式匹配的客户）和“不匹配”（≠，不匹配的客户）之间切换。",
         "validId": "“Temp”（valid_id 3）是 Znuny 的第三种有效性状态——通常是一个待确认的帐户（例如未经确认的自我注册），与普通的有效/无效不同。"
+      },
+      "systemAddresses": {
+        "email": "Address used as the From email for queues and auto-responses.",
+        "name": "Display name shown next to the email (e.g. “Support <support@example.com>”)."
       }
     },
     "nav": {
@@ -2253,6 +2257,13 @@
       "working": "工作…",
       "authorizeOpened": "授权页面在新选项卡中打开。",
       "refreshSuccess": "令牌已刷新。"
+    },
+    "systemAddresses": {
+      "title_plural": "System addresses",
+      "subtitle": "From-addresses for queues and auto-responses. Invalid addresses stay listed so they can be re-enabled.",
+      "new": "Add address",
+      "email": "Email",
+      "name": "Name"
     }
   },
   "kb": {

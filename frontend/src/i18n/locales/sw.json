@@ -1177,6 +1177,10 @@
         "filters": "Viteuzi vya ziada hupunguza mteja zaidi - kila kichujio kilichoongezwa HUTOLEWA na maingizi/kampuni hapo juu na kila moja.",
         "negate": "Geuza kati ya \"zinazolingana\" (wateja ambapo ruwaza inalingana) na \"hailingani\" (≠, wateja ambapo HAIfanani).",
         "validId": "\"Temp\" (id_id 3) ni hali ya tatu ya uhalali ya Znuny - kwa kawaida akaunti inasubiri uthibitisho (k.m. kujiandikisha bila kuthibitishwa), tofauti na halali au batili."
+      },
+      "systemAddresses": {
+        "email": "Address used as the From email for queues and auto-responses.",
+        "name": "Display name shown next to the email (e.g. “Support <support@example.com>”)."
       }
     },
     "nav": {
@@ -2253,6 +2257,13 @@
       "working": "Inafanya kazi...",
       "authorizeOpened": "Ukurasa wa uidhinishaji umefunguliwa kwenye kichupo kipya.",
       "refreshSuccess": "Tokeni imeonyeshwa upya."
+    },
+    "systemAddresses": {
+      "title_plural": "System addresses",
+      "subtitle": "From-addresses for queues and auto-responses. Invalid addresses stay listed so they can be re-enabled.",
+      "new": "Add address",
+      "email": "Email",
+      "name": "Name"
     }
   },
   "kb": {

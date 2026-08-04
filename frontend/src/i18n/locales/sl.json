@@ -1177,6 +1177,10 @@
         "filters": "Dodatni izbirniki še dodatno zožijo nabor strank – vsak dodan filter se poveže z IN z zgornjimi prijavami/podjetji in med seboj.",
         "negate": "Preklapljajte med »ujema se« (stranke, kjer se vzorec ujema) in »ne ujema se« (≠, stranke, kjer se NE ujema).",
         "validId": "»Začasno« (valid_id 3) je tretje stanje veljavnosti Znunyja — običajno čaka potrditev računa (npr. nepotrjena samoregistracija), ki se razlikuje od navadnega veljavnega/neveljavnega."
+      },
+      "systemAddresses": {
+        "email": "Address used as the From email for queues and auto-responses.",
+        "name": "Display name shown next to the email (e.g. “Support <support@example.com>”)."
       }
     },
     "nav": {
@@ -2253,6 +2257,13 @@
       "working": "Delo ...",
       "authorizeOpened": "Stran za avtorizacijo se je odprla v novem zavihku.",
       "refreshSuccess": "Žeton osvežen."
+    },
+    "systemAddresses": {
+      "title_plural": "System addresses",
+      "subtitle": "From-addresses for queues and auto-responses. Invalid addresses stay listed so they can be re-enabled.",
+      "new": "Add address",
+      "email": "Email",
+      "name": "Name"
     }
   },
   "kb": {

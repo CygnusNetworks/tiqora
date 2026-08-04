@@ -1177,6 +1177,10 @@
         "filters": "Pemilih tambahan semakin mempersempit kumpulan pelanggan — setiap filter yang ditambahkan di-AND dengan login/perusahaan di atas dan satu sama lain.",
         "negate": "Beralih antara \"cocok\" (pelanggan yang polanya cocok) dan \"tidak cocok\" (≠, pelanggan yang TIDAK cocok).",
         "validId": "\"Temp\" (valid_id 3) adalah status validitas ketiga Znuny — biasanya akun yang menunggu konfirmasi (misalnya, registrasi mandiri yang belum dikonfirmasi), berbeda dari valid/tidak valid biasa."
+      },
+      "systemAddresses": {
+        "email": "Address used as the From email for queues and auto-responses.",
+        "name": "Display name shown next to the email (e.g. “Support <support@example.com>”)."
       }
     },
     "nav": {
@@ -2253,6 +2257,13 @@
       "working": "Bekerja…",
       "authorizeOpened": "Halaman otorisasi dibuka di tab baru.",
       "refreshSuccess": "Token disegarkan."
+    },
+    "systemAddresses": {
+      "title_plural": "System addresses",
+      "subtitle": "From-addresses for queues and auto-responses. Invalid addresses stay listed so they can be re-enabled.",
+      "new": "Add address",
+      "email": "Email",
+      "name": "Name"
     }
   },
   "kb": {

@@ -859,10 +859,14 @@ async def test_admin_state_types_reference(
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("url_fixture", ["mariadb_znuny_url", "postgres_znuny_url"])
-async def test_admin_system_addresses_reference(
+async def test_admin_system_addresses_list_valid_filter(
     url_fixture: str, request: pytest.FixtureRequest
 ) -> None:
-    """system-addresses reference list returns seed rows (queue From picker)."""
+    """Paginated system-addresses list: default valid-only; all includes invalid."""
+    from tiqora.api.v1.admin import system_addresses as admin_system_addresses
+    from tiqora.api.v1.admin.pagination import ListParams
+    from tiqora.api.v1.admin.schemas import SystemAddressUpdate
+
     sync_url: str = request.getfixturevalue(url_fixture)
     ids = _seed_admin_and_plain_user(sync_url)
     session, engine = await _make_session(sync_url)
@@ -875,14 +879,39 @@ async def test_admin_system_addresses_reference(
             last_name="Znuny",
             auth_method="session",
         )
-        rows = await admin_readonly.list_system_addresses(admin_user, s)
-        assert len(rows) >= 1
+        page = await admin_system_addresses.list_system_addresses(
+            admin_user, s, ListParams(page=1, page_size=50, valid="valid")
+        )
+        assert page.total >= 1
         # Stock Znuny initial_insert: id 1, znuny@localhost / Znuny System.
-        by_id = {r.id: r for r in rows}
+        by_id = {r.id: r for r in page.items}
         assert 1 in by_id
         assert by_id[1].value0  # email
         assert by_id[1].value1  # real name
-        assert all(r.valid_id == 1 for r in rows)
+        assert all(r.valid_id == 1 for r in page.items)
+
+        await admin_system_addresses.update_system_address(
+            1, SystemAddressUpdate(valid_id=2), admin_user, s
+        )
+        valid_after = await admin_system_addresses.list_system_addresses(
+            admin_user, s, ListParams(page=1, page_size=50, valid="valid")
+        )
+        assert all(r.id != 1 for r in valid_after.items)
+
+        all_page = await admin_system_addresses.list_system_addresses(
+            admin_user, s, ListParams(page=1, page_size=50, valid="all")
+        )
+        assert any(r.id == 1 and r.valid_id == 2 for r in all_page.items)
+
+        invalid_page = await admin_system_addresses.list_system_addresses(
+            admin_user, s, ListParams(page=1, page_size=50, valid="invalid")
+        )
+        assert any(r.id == 1 for r in invalid_page.items)
+
+        # Re-enable so other tests sharing the fixture stay stable.
+        await admin_system_addresses.update_system_address(
+            1, SystemAddressUpdate(valid_id=1), admin_user, s
+        )
 
     await engine.dispose()
 

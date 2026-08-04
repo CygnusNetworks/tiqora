@@ -1177,6 +1177,10 @@
         "filters": "Additional selectors narrow the customer set further — every added filter is ANDed with the logins/companies above and with each other.",
         "negate": "Toggle between \"matches\" (customers where the pattern matches) and \"matches not\" (≠, customers where it does NOT match).",
         "validId": "\"Temp\" (valid_id 3) is Znuny's third validity state — typically an account pending confirmation (e.g. unconfirmed self-registration), distinct from plain valid/invalid."
+      },
+      "systemAddresses": {
+        "email": "Address used as the From email for queues and auto-responses.",
+        "name": "Display name shown next to the email (e.g. “Support <support@example.com>”)."
       }
     },
     "nav": {
@@ -2261,6 +2265,13 @@
       "working": "Working…",
       "authorizeOpened": "Authorization page opened in a new tab.",
       "refreshSuccess": "Token refreshed."
+    },
+    "systemAddresses": {
+      "title_plural": "System addresses",
+      "subtitle": "From-addresses for queues and auto-responses. Invalid addresses stay listed so they can be re-enabled.",
+      "new": "Add address",
+      "email": "Email",
+      "name": "Name"
     }
   },
   "kb": {
