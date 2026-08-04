@@ -61,6 +61,14 @@ jobs:
       TIQORA_ENV: test
       TIQORA_STRICT_DB_LEAKS: "1"
     steps:
+      - name: Harden runner
+        # Ueberwacht ausgehende Verbindungen des Jobs. Bewusst "audit":
+        # blockiert nichts, meldet aber ungewoehnliche Ziele. Auf "block"
+        # umstellen erst, wenn die Allowlist aus den Audit-Berichten steht --
+        # sonst brechen Builds an harmlosen Zielen.
+        uses: step-security/harden-runner@f808768d1510423e83855289c910610ca9b43176  # v2.17.0
+        with:
+          egress-policy: audit
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4
       - uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86  # v5
         with:
