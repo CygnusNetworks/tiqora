@@ -455,6 +455,12 @@ async def test_mcp_tools_list(mcp_mariadb: dict[str, Any]) -> None:
         "ticket_set_dynamic_field",
         "ticket_lock",
         "ticket_unlock",
+        "ticket_set_type",
+        "ticket_set_service",
+        "ticket_set_sla",
+        "ticket_history",
+        "ticket_merge",
+        "ticket_link",
         "list_queues",
         "list_states",
         "list_priorities",
@@ -468,7 +474,7 @@ async def test_mcp_tools_list(mcp_mariadb: dict[str, Any]) -> None:
     }
     missing = expected - tool_names
     assert not missing, f"Missing MCP tools: {missing}"
-    assert len(tool_names) == 25, f"Expected 25 tools, got {len(tool_names)}: {sorted(tool_names)}"
+    assert len(tool_names) == 31, f"Expected 31 tools, got {len(tool_names)}: {sorted(tool_names)}"
 
 
 @pytest.mark.db
