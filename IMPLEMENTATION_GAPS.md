@@ -153,12 +153,12 @@ transport, session, or crypto edge cases.
 
 | Area | Tiqora today |
 |---|---|
-| PGP / S-MIME | engines present; no dedicated admin key UI |
-| System configuration | reader only; no deploy/edit UI |
-| ACL | list/detail only; runtime **group/role only** (design) |
-| Process designer / customer process UI | authoring stays Znuny or DB/YAML |
-| Process deferred actions | e.g. `ArticleSend`, `TicketCreate`, DF remove/increment — see [`docs/process-management.md`](./docs/process-management.md) |
-| Dedicated time-accounting report page | ticket-scoped list/book only (no Znuny-style report module) |
+| PGP / S-MIME | engines + admin `/admin/crypto-keys` (import/audit); no Znuny-style full keyring UI |
+| System configuration | reader only; no deploy/edit UI (platform choice) |
+| ACL | ✅ admin CRUD + TicketACL runtime (`domain/ticket_acl.py`); group/role still for queue access |
+| Process designer / customer process UI | authoring stays Znuny or DB/YAML; **no** portal process UI |
+| Process deferred actions | remaining: `ExecuteInvoker`, `Appointment*`, `ConfigItemUpdate`, condition `Module` |
+| Time-accounting report | ✅ agent `/agent/time-accounting` + `GET /api/v1/tickets/time-accounting` |
 
 ### Integration & mail parity
 
@@ -178,16 +178,17 @@ transport, session, or crypto edge cases.
 | Znuny-style capability | Tiqora |
 |---|---|
 | Multi-select bulk actions | ✅ state / priority / owner / queue / lock |
-| Ticket print (PDF) | browser print only |
+| Ticket print (PDF) | ✅ printable HTML `GET /tickets/{id}/print` (browser print) |
 | Dedicated email/phone create flows | simplified via New Ticket + channels |
-| Email resend / plain-text article tools | not yet |
-| Full customer information centre | lookup only |
-| Locked / owner / responsible / watch / escalation module views | dashboard counts / filters instead |
-| Service-centric agent view | not yet (service on ticket is editable) |
-| Last views / autocompletion | not yet |
+| Email resend / plain-text article tools | ✅ `…/resend` (bounce alias) + `…/plain` |
+| Full customer information centre | ✅ `/agent/customers/$login` (counts + recent) |
+| Locked / owner / responsible / watch / escalation module views | ✅ queue presets + sidebar |
+| Service-centric agent view | ✅ `/agent/services` |
+| Last views / autocompletion | ✅ last views (localStorage); no full autocomplete |
 | Form drafts | own draft path (+ legacy model) |
 | Ticket attribute relations / note-to-linked | not yet |
 | Mentions | ✅ ticket API + zoom panel |
+| Ticket ACL field filtering | ✅ zoom pickers via `field-options` |
 
 ### Explicitly out of scope / platform
 
@@ -215,8 +216,8 @@ transport, session, or crypto edge cases.
 | Type / service / SLA | ✅ create + post-create + zoom pickers |
 | Merge, bounce, forward, free text (DF), process | ✅ (process = subset) |
 | Bulk (state/priority/owner/queue/lock), mentions, time accounting | ✅ |
-| PDF print, phone-dedicated, email resend, plain, dedicated service module view | ❌ / ⚠️ |
-| Status / escalation / locked / owner / responsible / watch views | ⚠️ dashboard/filters instead of dedicated modules |
+| Print HTML, email resend, plain, service view | ✅ |
+| Status / escalation / locked / owner / responsible / watch views | ✅ queue presets |
 
 ### Admin
 
@@ -227,12 +228,15 @@ dynamic fields, webhooks, channels, mail log/outbound, **mail accounts**,
 **system addresses**, **notification events**, **GenericAgent jobs** (write),
 **postmaster filters**, **API keys**, AI admin (Tiqora-native).
 
-**List / detail only:** ACL, processes (browse/detail; no visual designer).
+**ACL:** full CRUD + Znuny YAML `config_match`/`config_change` (runtime filters
+pickers; queue access still group/role).
+
+**List / detail only:** processes (browse/detail; no visual designer).
 
 **Missing relative to Znuny admin breadth:** SysConfig deploy UI, GI webservice
-admin, package manager, PGP/SMIME admin, session admin, support data, cloud
-services, appointment admin (calendar via agent UI), ticket attribute
-relations, …
+admin, package manager, session admin, support data, cloud services, appointment
+admin (calendar via agent UI), ticket attribute relations, full crypto keyring
+parity, …
 
 **Present (Znuny-compatible):** mail account admin + OAuth2 token management
 (shared legacy `oauth2_token*` / `mail_account` tables; XOAUTH2 fetch + optional
@@ -276,20 +280,21 @@ custom ops, GI admin ❌ — see §1.6 and
 
 Prioritised product roadmap only — not an automatic implementation mandate:
 
-1. **ACL editor** (and optional runtime expansion) if field/state filtering is
-   required without Znuny UI
-2. **Process** — remaining deferred transition actions/conditions + optional
-   designer (or keep authoring in Znuny)
-3. **PGP/S-MIME admin** key management UI
-4. **Agent UX remainder** — PDF print, CIC depth, service-centric views, last
-   views, email resend / plain tools
-5. **Package manager / SysConfig UI** only if there is explicit demand
-6. Remainder (stats framework, GI side-effects, portal process UI, …)
+1. **Process** — remaining `ExecuteInvoker` / `Appointment*` / `ConfigItemUpdate`
+   + optional designer (or keep authoring in Znuny)
+2. **Portal process UI** (customer interface activity dialogs)
+3. **Ticket attribute relations** + note-to-linked
+4. **Package manager / SysConfig UI** only if there is explicit demand
+5. Remainder (stats framework, GI side-effects, Module conditions, …)
 
 Already done and removed from this list: GI Session/History/TimeAccounting/OOO;
 postmaster-filter CRUD; API-key lifecycle / MCP P1; **type/service/SLA E2E**;
 **system address / notification / GenericAgent write**; **mentions + time
-accounting**; **bulk queue actions**; MCP history/merge/link/type-service-sla.
+accounting**; **bulk queue actions**; MCP history/merge/link/type-service-sla;
+**ACL editor + TicketACL runtime**; process TicketCreate/DFPendingTime/ordered
+conditions; agent module views / print / CIC / service view / last views /
+time-accounting report; email resend + plain; MCP responsible/watch/archive/
+attachments/forward/bounce.
 
 ---
 

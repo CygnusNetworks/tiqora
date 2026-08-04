@@ -665,8 +665,7 @@ async def print_ticket(
     tn = html_escape(ticket.tn or str(ticket.id))
     owner = html_escape(ticket.owner_login or ticket.owner_name or "")
     customer = (
-        f"{html_escape(ticket.customer_id or '')} "
-        f"{html_escape(ticket.customer_user_id or '')}"
+        f"{html_escape(ticket.customer_id or '')} {html_escape(ticket.customer_user_id or '')}"
     ).strip()
     css = (
         "body{font-family:system-ui,sans-serif;margin:1.5rem;color:#111}"

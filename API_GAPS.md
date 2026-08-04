@@ -33,7 +33,9 @@ Analyse gegen Code (`backend/src/tiqora/…`) und OpenAPI (`packages/api-client/
 | Type / service / SLA native REST + write service | 2026-08-04 | `change_type/service/sla`; PATCH-Felder; Reference-Listen |
 | Mentions + Time Accounting REST | 2026-08-04 | `…/mentions`, `…/time-accounting` auf Ticket |
 | Admin: types/services/slas, system addresses write, notification events, GenericAgent write | 2026-08-04 | Shared Znuny-Tabellen |
-| MCP history / merge / link / type / service / sla | 2026-08-04 | Tools ergänzt (~31 Tools total) |
+| MCP history / merge / link / type / service / sla | 2026-08-04 | Tools ergänzt |
+| MCP responsible / watch / archive / attachments / forward / bounce | 2026-08-04 | ~40 Tools total |
+| ACL admin CRUD + TicketACL runtime + field-options | 2026-08-04 | Znuny YAML match/change; picker filter |
 
 ### 🟡 Noch offen
 
@@ -42,23 +44,24 @@ Analyse gegen Code (`backend/src/tiqora/…`) und OpenAPI (`packages/api-client/
 | ~~P2~~ | MCP-Mutationen auf `TicketWriteService` | MCP | ✅ 2026-08-04 (SMTP bei agent email reply = REST-Parity) |
 | ~~P2~~ | MCP Tool-Allowlist pro Key | Scopes | ✅ `tool:<name>` Tokens |
 | ~~P2~~ | Rate-Limit pro Key | Auth | ✅ Redis fixed-window (`TIQORA_API_KEY_RATE_LIMIT_*`) |
-| **P3** | ACL Editor (Write) | Admin REST | List/detail only; Runtime group/role only |
+| ~~P3~~ | ACL Editor (Write) + TicketACL runtime | Admin REST + Agent | ✅ CRUD + `domain/ticket_acl.py` + field-options (2026-08-04) |
 | **P3** | Session-Bearer auf MCP (nur Dev) | MCP | Optional; Prod eher nicht |
 | ~~P3~~ | PGP/S-MIME Admin list/import | Admin REST | ✅ `/admin/crypto-keys` |
+| ~~P3~~ | MCP responsible / watch / archive / attach / forward / bounce | MCP | ✅ ~40 Tools |
 
 ### ⏸ Deferred (Design)
 
 | Thema | Entscheidung |
 |---|---|
-| Znuny-ACL-Runtime (`acl.config_match` / `config_change`) | Runtime bleibt **group/role only**. Admin `GET /api/v1/admin/acl` read-only. Neu öffnen nur bei Produktbedarf für State/Queue/Field-Filtering wie in Znuny. |
 | OAuth2 Resource-Scopes | Nicht vorgesehen. Keys nutzen Area-RO/RW (`tickets:ro`/`tickets:rw`, …) plus Queue/Group des gebundenen Users — kein OAuth-Client-Modell. |
+| ACL vs. group/role | Queue access remains group/role; TicketACL filters selectable values/actions (Znuny TicketAcl parity). |
 
 ---
 
 ## 0. Historie — MCP-Permission-Minimal-Fix (2026-07-24)
 
-**Status: Sicherheitslücke geschlossen.** Sauberer Umbau auf `TicketWriteService` bleibt P2
-(siehe „Noch offen“ oben).
+**Status: Sicherheitslücke geschlossen.** MCP-Mutationen laufen inzwischen über
+`TicketWriteService` (2026-08-04).
 
 ### Befund (vor dem Fix)
 
@@ -302,7 +305,7 @@ MCP erscheint **nicht** in der OpenAPI-Spec — korrekt; Doku getrennt halten.
 
 | Dokument | Stand |
 |---|---|
-| `docs/api/mcp.md`, `docs/ai-integration.md` | ggf. manuell auf **~31 tools** nachziehen |
+| `docs/api/mcp.md`, `docs/ai-integration.md` | ggf. manuell auf **~40 tools** nachziehen |
 
 ### MCP bewusst *nicht* gespiegelt (OK)
 
@@ -314,13 +317,12 @@ nicht an LLM-Tools.
 
 | Fähigkeit | Domain/REST | Nutzen für Agents |
 |---|---|---|
-| Responsible | `assign_responsible` | oft parallel zu Owner |
-| Attachments (Meta/Download) | REST | Kontext |
-| Watch / Archive / Forward / Bounce | write service | seltener |
 | Mentions / time accounting | REST 2026-08-04 | seltener für LLM |
+| Attachment binary download | REST | Meta ist im MCP |
 
 Bereits erledigt: Reference-Listen, DF/Title/Customer, Lock/Unlock, TN-Lookup,
-**history / merge / link / type / service / sla**.
+**history / merge / link / type / service / sla**, **responsible / watch /
+archive / attachment meta / forward / bounce**.
 
 ### MCP Qualitäts-/Sicherheitsnotizen
 
@@ -391,28 +393,25 @@ Oberfläche rund.**
 
 - **REST/OpenAPI:** Produktseitig stimmig; Admin deckt Type/Service/SLA,
   Notifications, GenericAgent write, Mentions/TA ab.
-- **MCP:** AI-Oberfläche (~31 Tools) mit Queue-Permission-Gate und Key-Scopes
-  inkl. history/merge/link/type/service/sla. Volle Admin-Parity im MCP wäre
-  gefährlich und unnötig.
+- **MCP:** AI-Oberfläche (~40 Tools) mit Queue-Permission-Gate und Key-Scopes
+  inkl. history/merge/link/type/service/sla/responsible/watch/archive/forward.
+  Volle Admin-Parity im MCP wäre gefährlich und unnötig.
 - **Auth:** Key bound to user + Group/Role (+ optionale Surface-Scopes) passt zu
   Znuny-Kompatibilität und Least Privilege.
+- **ACL:** Admin CRUD + TicketACL runtime filtert Picker (Possible/PossibleNot);
+  Queue-Zugang bleibt group/role.
 - **Was noch „nice to have“ ist (kein Blocker):**
-  1. MCP-Mutationen über `TicketWriteService` (Clean Code + SMTP-Produktfrage)
-  2. Optionale Tool-Allowlist / Rate-Limit pro Key
-  3. MCP `assign_responsible` / Mentions / Time-Accounting wenn Agents sie brauchen
-  4. ACL-Editor (Runtime weiter group/role only)
+  1. MCP Mentions / Time-Accounting wenn Agents sie brauchen
+  2. Session-Bearer auf MCP nur für Dev
 
 ---
 
 ## 10. Empfohlene nächste Schritte (optional)
 
-1. **P2 Code:** MCP-Mutation-Tools auf `TicketWriteService` migrieren *nach*
-   Produktentscheidung zu SMTP bei `ticket_reply`.
-2. **P2 Hardening:** Rate-Limit pro Key; optional Tool-Allowlist.
-3. **P3:** ACL-Editor nur bei Produktbedarf; Runtime weiter group/role only.
-4. **Doku:** `docs/api/mcp.md` / `docs/ai-integration.md` auf ~31 Tools abgleichen.
-5. **Nicht planen,** solange kein Produktbedarf: Znuny-ACL-Runtime, feingranulare
-   OAuth-Scopes, Session-Bearer auf MCP in Prod.
+1. **Doku:** `docs/api/mcp.md` / `docs/ai-integration.md` auf ~40 Tools abgleichen.
+2. **Portal process** und process designer nur bei Bedarf.
+3. **Nicht planen,** solange kein Produktbedarf: feingranulare OAuth-Scopes,
+   Session-Bearer auf MCP in Prod, OPM/SysConfig-UI.
 
 ---
 
