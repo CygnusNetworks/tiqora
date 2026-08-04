@@ -56,6 +56,9 @@ export function TicketHeaderActions({
   const noPerm = t("ticket.toolbar.noPermission");
   const patch = usePatchTicket(ticketId);
 
+  // Base reference lists (full catalog) + ACL filter map for this ticket.
+  // Znuny TicketACL reduces pickers to Possible/PossibleNot without replacing
+  // group/role queue permissions.
   const prioritiesQ = useQuery({
     queryKey: ["reference", "priorities"],
     queryFn: () => api.listReferencePriorities(),
@@ -84,6 +87,14 @@ export function TicketHeaderActions({
     queryKey: ["reference", "agents"],
     queryFn: () => api.listReferenceAgents(),
   });
+  const aclFieldsQ = useQuery({
+    queryKey: ["tickets", ticketId, "field-options", "AgentTicketZoom"],
+    queryFn: () =>
+      api.ticketAclFieldOptions(ticketId, {
+        fields: "state,priority,type,service,sla,queue",
+        action: "AgentTicketZoom",
+      }),
+  });
   // Latest article drives the header's "Antworten" shortcut — same target a
   // customer-visible per-article reply would pick, so it stays cheap to
   // find rather than adding a dedicated endpoint.
@@ -92,12 +103,23 @@ export function TicketHeaderActions({
     queryFn: () => api.listArticles(ticketId),
   });
 
-  const states = statesQ.data ?? [];
+  const aclAllowed = (field: string, id: number): boolean => {
+    const map = aclFieldsQ.data?.[field];
+    // Until ACL options load (or if ACL returned empty for a field), keep full list.
+    if (!map || Object.keys(map).length === 0) return true;
+    return String(id) in map || id in (map as Record<number, string>);
+  };
+
+  const states = (statesQ.data ?? []).filter((s) => aclAllowed("state", s.id));
   const closedStates = states.filter((s) => s.type_name.startsWith("closed"));
   const pendingStates = states.filter((s) => s.type_name.startsWith("pending"));
   const primaryStates = states.filter(
     (s) => !s.type_name.startsWith("closed") && !s.type_name.startsWith("pending"),
   );
+  const priorities = (prioritiesQ.data ?? []).filter((p) => aclAllowed("priority", p.id));
+  const types = (typesQ.data ?? []).filter((ty) => aclAllowed("type", ty.id));
+  const services = (servicesQ.data ?? []).filter((s) => aclAllowed("service", s.id));
+  const slas = (slasQ.data ?? []).filter((s) => aclAllowed("sla", s.id));
 
   const articles = articlesQ.data ?? [];
   const visibleArticles = articles.filter((a) => a.is_visible_for_customer);
@@ -108,7 +130,7 @@ export function TicketHeaderActions({
   const isLocked = Boolean(ticket.lock && ticket.lock.toLowerCase() !== "unlock");
 
   const queueItems: SelectMenuItem<number>[] = flattenQueues(queuesQ.data ?? [])
-    .filter((q) => q.valid)
+    .filter((q) => q.valid && aclAllowed("queue", q.id))
     .map((q) => ({ value: q.id, label: q.name }));
   const agents = agentsQ.data ?? [];
   const agentItems: SelectMenuItem<number>[] = agents.map((a) => ({
@@ -226,7 +248,7 @@ export function TicketHeaderActions({
             )}
           >
             <MenuLabel>{t("ticket.priority")}</MenuLabel>
-            {(prioritiesQ.data ?? []).map((p) => (
+            {priorities.map((p) => (
               <MenuItem
                 key={p.id}
                 selected={p.id === ticket.priority_id}
@@ -255,7 +277,7 @@ export function TicketHeaderActions({
             )}
           >
             <MenuLabel>{t("ticket.type")}</MenuLabel>
-            {(typesQ.data ?? []).map((ty) => (
+            {types.map((ty) => (
               <MenuItem
                 key={ty.id}
                 selected={ty.id === ticket.type_id}
@@ -290,7 +312,7 @@ export function TicketHeaderActions({
             >
               —
             </MenuItem>
-            {(servicesQ.data ?? []).map((s) => (
+            {services.map((s) => (
               <MenuItem
                 key={s.id}
                 selected={s.id === ticket.service_id}
@@ -325,7 +347,7 @@ export function TicketHeaderActions({
             >
               —
             </MenuItem>
-            {(slasQ.data ?? []).map((s) => (
+            {slas.map((s) => (
               <MenuItem
                 key={s.id}
                 selected={s.id === ticket.sla_id}

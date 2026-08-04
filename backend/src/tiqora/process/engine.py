@@ -1046,7 +1046,18 @@ def _session_factory_from(session: AsyncSession) -> async_sessionmaker[AsyncSess
     short transactions on the counter table); process actions only receive the
     caller's session.
     """
-    return async_sessionmaker(session.get_bind(), expire_on_commit=False)
+    from sqlalchemy.ext.asyncio import AsyncEngine
+
+    raw = session.get_bind()
+    engine: AsyncEngine
+    if isinstance(raw, AsyncEngine):
+        engine = raw
+    else:
+        maybe = getattr(raw, "engine", None)
+        if not isinstance(maybe, AsyncEngine):
+            raise RuntimeError("TicketCreate requires an AsyncEngine-bound session")
+        engine = maybe
+    return async_sessionmaker(engine, expire_on_commit=False)
 
 
 async def _resolve_link_as(session: AsyncSession, link_as: str) -> tuple[str, str] | None:

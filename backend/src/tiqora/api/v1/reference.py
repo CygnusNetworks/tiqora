@@ -9,6 +9,8 @@ CRUD under ``/admin/*`` (which is AdminUser-gated), these are guarded only by
 
 from __future__ import annotations
 
+from typing import Any
+
 from fastapi import APIRouter, HTTPException, Query, status
 from pydantic import BaseModel
 from sqlalchemy import select
@@ -454,7 +456,7 @@ async def collect_ticket_field_options(
     from tiqora.domain.ticket_acl import filter_id_name_map
 
     base = await _base_field_maps(session, user, fields, queue_id=queue_id)
-    checks: dict | None = None
+    checks: dict[str, Any] | None = None
     if queue_id is not None:
         queue_row = await session.get(Queue, queue_id)
         checks = {
