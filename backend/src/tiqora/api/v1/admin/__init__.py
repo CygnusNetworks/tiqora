@@ -21,10 +21,12 @@ from tiqora.api.v1.admin import (
     daemons,
     dynamic_fields,
     gdpr,
+    generic_agent,
     groups,
     mail_accounts,
     mail_log,
     mail_outbound,
+    notification_events,
     oauth2_tokens,
     placeholder_variables,
     postmaster_filters,
@@ -32,10 +34,14 @@ from tiqora.api.v1.admin import (
     queues,
     readonly,
     roles,
+    services,
+    slas,
     states,
     subject_config,
     system,
+    system_addresses,
     templates,
+    types,
     users,
     webhooks,
 )
@@ -48,6 +54,9 @@ admin_router.include_router(roles.router)
 admin_router.include_router(queues.router)
 admin_router.include_router(states.router)
 admin_router.include_router(priorities.router)
+admin_router.include_router(types.router)
+admin_router.include_router(services.router)
+admin_router.include_router(slas.router)
 admin_router.include_router(customers.router)
 admin_router.include_router(templates.router)
 admin_router.include_router(attachments.router)
@@ -55,6 +64,9 @@ admin_router.include_router(auto_responses.router)
 admin_router.include_router(dynamic_fields.router)
 admin_router.include_router(postmaster_filters.router)
 admin_router.include_router(readonly.router)
+admin_router.include_router(system_addresses.router)
+admin_router.include_router(notification_events.router)
+admin_router.include_router(generic_agent.router)
 admin_router.include_router(webhooks.router)
 admin_router.include_router(api_keys.router)
 admin_router.include_router(channels.router)

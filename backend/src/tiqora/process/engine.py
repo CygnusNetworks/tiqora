@@ -40,14 +40,13 @@ Deferred/unsupported scope (documented, not silently missing)
 - Condition types ``GreaterThan(OrEqual)``/``LessThan(OrEqual)`` and any
   ``Module``-based (custom Perl module) condition type: treated as
   non-matching with a logged warning — see ``_evaluate_field``.
-- TransitionAction modules other than the ten implemented below
-  (``TicketSLASet``, ``TicketServiceSet``, ``TicketTypeSet``,
-  ``DynamicFieldRemove``, ``DynamicFieldIncrement``,
-  ``DynamicFieldPendingTimeSet``, ``LinkAdd``, ``TicketWatchSet``,
-  ``ArticleSend``, ``TicketCreate``, ``ExecuteInvoker``,
-  ``Appointment*``, ``ConfigItemUpdate``): logged as unsupported and
-  no-op'd — collected into ``ActivityDialogSubmitResult.unsupported_actions``
-  so callers/tests can assert on skip behaviour.
+- TransitionAction modules other than the implemented handlers (see
+  ``_ACTION_HANDLERS``: ticket field setters including Type/Service/SLA,
+  Watch, LinkAdd, DynamicFieldSet, TicketArticleCreate, …) — remaining
+  deferred: ``DynamicFieldRemove``/``Increment``/``PendingTimeSet``,
+  ``ArticleSend``, ``TicketCreate``, ``ExecuteInvoker``, ``Appointment*``,
+  ``ConfigItemUpdate``. Unsupported modules are logged and no-op'd, and
+  collected into ``ActivityDialogSubmitResult.unsupported_actions``.
 - ``%<OTRS_TICKET_...>%``/``<OTRS_...>`` smart-tag placeholder substitution
   inside TransitionAction ``Config`` values (Znuny's
   ``TemplateGenerator::_Replace``, used e.g. by
@@ -72,8 +71,8 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from tiqora.db.legacy.dynamic_field import DynamicField, DynamicFieldValue
-from tiqora.db.legacy.queue import Queue
-from tiqora.db.legacy.ticket import TicketPriority, TicketState
+from tiqora.db.legacy.queue import Queue, Service, Sla
+from tiqora.db.legacy.ticket import TicketPriority, TicketState, TicketType
 from tiqora.db.legacy.user import Users
 from tiqora.domain.ticket_write_service import (
     ArticleIn,
@@ -85,13 +84,18 @@ from tiqora.domain.ticket_write_service import (
     assign_owner,
     assign_responsible,
     change_priority,
+    change_service,
+    change_sla,
     change_state,
     change_title,
+    change_type,
+    link_tickets,
     lock_ticket,
     move_queue,
     set_customer,
     unlock_ticket,
     update_dynamic_field,
+    watch_ticket,
 )
 from tiqora.permissions.engine import PermissionEngine
 from tiqora.process.config import ActivityDialogConfig, TransitionActionConfig, TransitionConfig
@@ -402,6 +406,40 @@ async def _resolve_user_id(session: AsyncSession, login: str | None, id_: int | 
     ).scalar_one_or_none()
 
 
+async def _resolve_type_id(session: AsyncSession, name: str | None, id_: int | None) -> int | None:
+    if id_ is not None:
+        return id_
+    if not name:
+        return None
+    return (
+        await session.execute(
+            select(TicketType.id).where(TicketType.name == name, TicketType.valid_id == 1)
+        )
+    ).scalar_one_or_none()
+
+
+async def _resolve_service_id(
+    session: AsyncSession, name: str | None, id_: int | None
+) -> int | None:
+    if id_ is not None:
+        return id_
+    if not name:
+        return None
+    return (
+        await session.execute(select(Service.id).where(Service.name == name, Service.valid_id == 1))
+    ).scalar_one_or_none()
+
+
+async def _resolve_sla_id(session: AsyncSession, name: str | None, id_: int | None) -> int | None:
+    if id_ is not None:
+        return id_
+    if not name:
+        return None
+    return (
+        await session.execute(select(Sla.id).where(Sla.name == name, Sla.valid_id == 1))
+    ).scalar_one_or_none()
+
+
 async def _action_ticket_state_set(
     session: AsyncSession,
     config: dict[str, Any],
@@ -624,6 +662,104 @@ async def _action_ticket_article_create(
     )
 
 
+async def _action_ticket_type_set(
+    session: AsyncSession,
+    config: dict[str, Any],
+    ticket_id: int,
+    user_id: int,
+    sysconfig: SysConfig,
+) -> None:
+    type_id = await _resolve_type_id(session, config.get("Type"), config.get("TypeID"))
+    if type_id is None:
+        raise RequiredFieldMissing(
+            "TicketTypeSet: Config must set 'Type' or 'TypeID' to a known type"
+        )
+    await change_type(
+        session,
+        ticket_id=ticket_id,
+        new_type_id=int(type_id),
+        user_id=user_id,
+        sysconfig=sysconfig,
+    )
+
+
+async def _action_ticket_service_set(
+    session: AsyncSession,
+    config: dict[str, Any],
+    ticket_id: int,
+    user_id: int,
+    sysconfig: SysConfig,
+) -> None:
+    service_id = await _resolve_service_id(session, config.get("Service"), config.get("ServiceID"))
+    if service_id is None and config.get("Service") is None and config.get("ServiceID") is None:
+        raise RequiredFieldMissing(
+            "TicketServiceSet: Config must set 'Service' or 'ServiceID'"
+        )
+    await change_service(
+        session,
+        ticket_id=ticket_id,
+        new_service_id=int(service_id) if service_id is not None else None,
+        user_id=user_id,
+        sysconfig=sysconfig,
+    )
+
+
+async def _action_ticket_sla_set(
+    session: AsyncSession,
+    config: dict[str, Any],
+    ticket_id: int,
+    user_id: int,
+    sysconfig: SysConfig,
+) -> None:
+    sla_id = await _resolve_sla_id(session, config.get("SLA"), config.get("SLAID"))
+    if sla_id is None and config.get("SLA") is None and config.get("SLAID") is None:
+        raise RequiredFieldMissing("TicketSLASet: Config must set 'SLA' or 'SLAID'")
+    await change_sla(
+        session,
+        ticket_id=ticket_id,
+        new_sla_id=int(sla_id) if sla_id is not None else None,
+        user_id=user_id,
+        sysconfig=sysconfig,
+    )
+
+
+async def _action_ticket_watch_set(
+    session: AsyncSession,
+    config: dict[str, Any],
+    ticket_id: int,
+    user_id: int,
+    sysconfig: SysConfig,
+) -> None:
+    del sysconfig
+    watcher_id = await _resolve_user_id(session, config.get("User"), config.get("UserID"))
+    if watcher_id is None:
+        watcher_id = user_id
+    await watch_ticket(
+        session, ticket_id=ticket_id, watcher_user_id=int(watcher_id), user_id=user_id
+    )
+
+
+async def _action_link_add(
+    session: AsyncSession,
+    config: dict[str, Any],
+    ticket_id: int,
+    user_id: int,
+    sysconfig: SysConfig,
+) -> None:
+    del sysconfig
+    target = config.get("TargetTicketID") or config.get("TicketID")
+    if target is None:
+        raise RequiredFieldMissing("LinkAdd: Config must set 'TargetTicketID' or 'TicketID'")
+    link_type = str(config.get("Type") or config.get("LinkType") or "Normal")
+    await link_tickets(
+        session,
+        source_ticket_id=ticket_id,
+        target_ticket_id=int(target),
+        link_type=link_type,
+        user_id=user_id,
+    )
+
+
 _ActionHandler = Callable[[AsyncSession, dict[str, Any], int, int, SysConfig], Awaitable[None]]
 
 _ACTION_HANDLERS: dict[str, _ActionHandler] = {
@@ -637,14 +773,17 @@ _ACTION_HANDLERS: dict[str, _ActionHandler] = {
     "TicketLockSet": _action_ticket_lock_set,
     "DynamicFieldSet": _action_dynamic_field_set,
     "TicketArticleCreate": _action_ticket_article_create,
+    "TicketTypeSet": _action_ticket_type_set,
+    "TicketServiceSet": _action_ticket_service_set,
+    "TicketSLASet": _action_ticket_sla_set,
+    "TicketWatchSet": _action_ticket_watch_set,
+    "LinkAdd": _action_link_add,
 }
 """Implemented TransitionAction modules, keyed by the last ``::``-segment of
-``TransitionActionConfig.module``. Any module not in this dict (e.g.
-``TicketSLASet``, ``TicketServiceSet``, ``TicketTypeSet``,
+``TransitionActionConfig.module``. Remaining deferred modules include
 ``DynamicFieldRemove``, ``DynamicFieldIncrement``,
-``DynamicFieldPendingTimeSet``, ``LinkAdd``, ``TicketWatchSet``,
-``ArticleSend``, ``TicketCreate``, ``ExecuteInvoker``, ``Appointment*``,
-``ConfigItemUpdate``) is unsupported/deferred — see
+``DynamicFieldPendingTimeSet``, ``ArticleSend``, ``TicketCreate``,
+``ExecuteInvoker``, ``Appointment*``, ``ConfigItemUpdate`` — see
 :func:`execute_transition_action`."""
 
 

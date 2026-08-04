@@ -493,7 +493,15 @@
       "title": "Similar tickets",
       "empty": "No similar closed tickets found.",
       "loadError": "Could not load similar tickets."
-    }
+    },
+    "type": "Type",
+    "service": "Service",
+    "sla": "SLA",
+    "mentions": "Mentions",
+    "timeAccounting": "Time accounting",
+    "timeUnits": "Time units",
+    "addTime": "Book time",
+    "addMention": "Mention agent"
   },
   "search": {
     "title": "Search",
@@ -1225,7 +1233,12 @@
       "aiQueues": "Queue policies",
       "aiAudit": "Request audit",
       "aiAcl": "Access & limits",
-      "collapse": "Collapse navigation"
+      "collapse": "Collapse navigation",
+      "types": "Ticket types",
+      "services": "Services",
+      "slas": "SLAs",
+      "systemAddresses": "System addresses",
+      "notificationEvents": "Notification events"
     },
     "table": {
       "id": "ID",
@@ -2260,7 +2273,48 @@
       "aiMcp": "Manage MCP servers as tool sources for the AI and enable tools.",
       "aiQueues": "Configure AI behavior per queue: autonomy, caps, escalation.",
       "aiAudit": "Full audit of every LLM request/response, with PII reveal.",
-      "aiAcl": "AI permissions and quotas per group, role, or agent."
+      "aiAcl": "AI permissions and quotas per group, role, or agent.",
+      "types": "Manage ticket types used for classification.",
+      "services": "Manage services and link them to SLAs.",
+      "slas": "Manage service level agreements and timers.",
+      "systemAddresses": "Email addresses used as From for queues and auto-responses.",
+      "notificationEvents": "Configure event-driven agent notifications."
+    },
+    "types": {
+      "title_plural": "Ticket types",
+      "new": "New type",
+      "name": "Name"
+    },
+    "services": {
+      "title_plural": "Services",
+      "new": "New service",
+      "name": "Name",
+      "slaCount": "SLAs"
+    },
+    "slas": {
+      "title_plural": "SLAs",
+      "new": "New SLA",
+      "name": "Name",
+      "firstResponseTime": "First response (min)",
+      "updateTime": "Update (min)",
+      "solutionTime": "Solution (min)",
+      "calendar": "Calendar"
+    },
+    "systemAddresses": {
+      "title_plural": "System addresses",
+      "subtitle": "From-addresses for queues and auto-responses.",
+      "new": "Add address",
+      "email": "Email",
+      "realName": "Real name"
+    },
+    "notificationEvents": {
+      "title_plural": "Notification events",
+      "subtitle": "When events fire, matching notifications are sent to agents.",
+      "new": "Create notification",
+      "name": "Name",
+      "event": "Event",
+      "subject": "Subject",
+      "body": "Body"
     }
   },
   "kb": {

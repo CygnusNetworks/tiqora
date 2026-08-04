@@ -165,16 +165,21 @@ never raises. See `_evaluate_field` in `engine.py` for the full semantics
 
 | Supported | Deferred (logged, no-op — collected into `unsupported_actions`) |
 |---|---|
-| `TicketStateSet` | `TicketSLASet` |
-| `TicketQueueSet` | `TicketServiceSet` |
-| `TicketOwnerSet` | `TicketTypeSet` |
-| `TicketPrioritySet` | `DynamicFieldRemove` |
-| `TicketTitleSet` | `DynamicFieldIncrement` |
-| `TicketCustomerSet` | `DynamicFieldPendingTimeSet` |
-| `TicketResponsibleSet` | `LinkAdd` |
-| `TicketLockSet` | `TicketWatchSet` |
-| `DynamicFieldSet` | `ArticleSend` |
-| `TicketArticleCreate` | `TicketCreate`, `ExecuteInvoker`, `Appointment*` (Create/Update/Remove), `ConfigItemUpdate` |
+| `TicketStateSet` | `DynamicFieldRemove` |
+| `TicketQueueSet` | `DynamicFieldIncrement` |
+| `TicketOwnerSet` | `DynamicFieldPendingTimeSet` |
+| `TicketPrioritySet` | `ArticleSend` |
+| `TicketTitleSet` | `TicketCreate`, `ExecuteInvoker`, `Appointment*` (Create/Update/Remove), `ConfigItemUpdate` |
+| `TicketCustomerSet` | |
+| `TicketResponsibleSet` | |
+| `TicketLockSet` | |
+| `DynamicFieldSet` | |
+| `TicketArticleCreate` | |
+| `TicketTypeSet` | |
+| `TicketServiceSet` | |
+| `TicketSLASet` | |
+| `TicketWatchSet` | |
+| `LinkAdd` | |
 
 An unsupported action does not abort the submission: the transition still
 fires and the activity still advances, but that one action is skipped and

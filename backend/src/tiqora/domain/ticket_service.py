@@ -21,7 +21,7 @@ from tiqora.db.legacy.article import (
 )
 from tiqora.db.legacy.customer import CustomerUser
 from tiqora.db.legacy.dynamic_field import DynamicField, DynamicFieldValue
-from tiqora.db.legacy.queue import Queue, QueueStandardTemplate, StandardTemplate
+from tiqora.db.legacy.queue import Queue, QueueStandardTemplate, Service, Sla, StandardTemplate
 from tiqora.db.legacy.ticket import (
     Ticket,
     TicketHistory,
@@ -30,6 +30,7 @@ from tiqora.db.legacy.ticket import (
     TicketPriority,
     TicketState,
     TicketStateType,
+    TicketType,
     TicketWatcher,
 )
 from tiqora.db.legacy.user import Users
@@ -665,11 +666,33 @@ class TicketService:
         # One queue_permissions() call + group lookup; rw implies every key.
         permissions = await self._ticket_permissions(user_id, ticket.queue_id)
         can_write = permissions.rw
+        type_name = None
+        if ticket.type_id is not None:
+            type_name = (
+                await self._session.execute(
+                    select(TicketType.name).where(TicketType.id == ticket.type_id)
+                )
+            ).scalar_one_or_none()
+        service_name = None
+        if ticket.service_id is not None:
+            service_name = (
+                await self._session.execute(
+                    select(Service.name).where(Service.id == ticket.service_id)
+                )
+            ).scalar_one_or_none()
+        sla_name = None
+        if ticket.sla_id is not None:
+            sla_name = (
+                await self._session.execute(select(Sla.name).where(Sla.id == ticket.sla_id))
+            ).scalar_one_or_none()
         return TicketDetail(
             **base.model_dump(),
             type_id=ticket.type_id,
+            type_name=type_name,
             service_id=ticket.service_id,
+            service_name=service_name,
             sla_id=ticket.sla_id,
+            sla_name=sla_name,
             responsible_user_id=ticket.responsible_user_id,
             create_by=ticket.create_by,
             change_by=ticket.change_by,

@@ -17,8 +17,8 @@ from tiqora.api.deps import CurrentUser, DbSession
 from tiqora.channels.email.outbound_reply import queue_outbound_meta
 from tiqora.channels.email.placeholder import expand_placeholders
 from tiqora.db.legacy.customer import CustomerUser
-from tiqora.db.legacy.queue import Queue
-from tiqora.db.legacy.ticket import TicketPriority, TicketState, TicketStateType
+from tiqora.db.legacy.queue import Queue, Service, ServiceSla, Sla
+from tiqora.db.legacy.ticket import TicketPriority, TicketState, TicketStateType, TicketType
 from tiqora.db.legacy.user import Users
 from tiqora.domain.customer_service import CustomerService
 from tiqora.domain.ticket_write_service import InvalidInput
@@ -34,6 +34,22 @@ _VALID = 1
 class PriorityRefOut(BaseModel):
     id: int
     name: str
+
+
+class TypeRefOut(BaseModel):
+    id: int
+    name: str
+
+
+class ServiceRefOut(BaseModel):
+    id: int
+    name: str
+
+
+class SlaRefOut(BaseModel):
+    id: int
+    name: str
+    service_ids: list[int] = []
 
 
 class StateRefOut(BaseModel):
@@ -97,6 +113,58 @@ async def list_priorities(user: CurrentUser, session: DbSession) -> list[Priorit
         )
     ).scalars()
     return [PriorityRefOut(id=p.id, name=p.name) for p in rows]
+
+
+@router.get("/types", response_model=list[TypeRefOut])
+async def list_types(user: CurrentUser, session: DbSession) -> list[TypeRefOut]:
+    """Valid ticket types for create/zoom pickers."""
+    _ = user
+    rows = (
+        await session.execute(
+            select(TicketType).where(TicketType.valid_id == _VALID).order_by(TicketType.name)
+        )
+    ).scalars()
+    return [TypeRefOut(id=r.id, name=r.name) for r in rows]
+
+
+@router.get("/services", response_model=list[ServiceRefOut])
+async def list_services(user: CurrentUser, session: DbSession) -> list[ServiceRefOut]:
+    """Valid services for create/zoom pickers."""
+    _ = user
+    rows = (
+        await session.execute(
+            select(Service).where(Service.valid_id == _VALID).order_by(Service.name)
+        )
+    ).scalars()
+    return [ServiceRefOut(id=r.id, name=r.name) for r in rows]
+
+
+@router.get("/slas", response_model=list[SlaRefOut])
+async def list_slas(
+    user: CurrentUser,
+    session: DbSession,
+    service_id: int | None = Query(default=None, ge=1),
+) -> list[SlaRefOut]:
+    """Valid SLAs; optionally filtered to those linked to ``service_id``."""
+    _ = user
+    # Map service -> SLA ids for client-side filtering convenience.
+    link_rows = (await session.execute(select(ServiceSla.service_id, ServiceSla.sla_id))).all()
+    sla_to_services: dict[int, list[int]] = {}
+    for sid, sla_id in link_rows:
+        sla_to_services.setdefault(int(sla_id), []).append(int(sid))
+
+    stmt = select(Sla).where(Sla.valid_id == _VALID).order_by(Sla.name)
+    if service_id is not None:
+        linked = {
+            int(sla_id) for sid, sla_id in link_rows if int(sid) == int(service_id)
+        }
+        if not linked:
+            return []
+        stmt = stmt.where(Sla.id.in_(linked))
+    rows = (await session.execute(stmt)).scalars()
+    return [
+        SlaRefOut(id=r.id, name=r.name, service_ids=sla_to_services.get(r.id, [])) for r in rows
+    ]
 
 
 @router.get("/states", response_model=list[StateRefOut])
