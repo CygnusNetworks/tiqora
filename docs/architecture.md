@@ -289,12 +289,17 @@ Znuny conventions) for users (+ group/role assignment, BCRYPT hash via
 salutation/signature/system_address/follow_up), states, priorities,
 customer_users, customer_companies (+ `customer_user_customer`),
 salutations/signatures/standard templates (+ queue assignment),
-auto_responses (+ `queue_auto_response`), and dynamic_fields (per-type YAML
-`config` validation — e.g. Dropdown requires `PossibleValues`). Read-only
-list/detail for postmaster_filter, ACL (edit deferred), and
-generic_agent_jobs. Writes to queue/state/priority additionally invalidate
-every currently-affected ticket (no per-config-row cache-invalidation entity
-exists, so admin writes enumerate affected `ticket.id`s directly).
+auto_responses (+ `queue_auto_response`), dynamic_fields (per-type YAML
+`config` validation — e.g. Dropdown requires `PossibleValues`),
+postmaster_filter, ACL (`acl` table — YAML match/change), ticket attribute
+relations (`acl_ticket_attribute_relations` CSV), types/services/SLAs,
+system addresses, notification events, GenericAgent jobs, and related
+mail/crypto admin surfaces. **TicketACL runtime** (`domain/ticket_acl.py`)
+plus attribute-relation matrices feed agent field-options (picker filter);
+queue *access* remains group/role via `PermissionEngine`. Writes to
+queue/state/priority additionally invalidate every currently-affected
+ticket (no per-config-row cache-invalidation entity exists, so admin
+writes enumerate affected `ticket.id`s directly).
 
 ### Stats / reporting
 
@@ -398,13 +403,16 @@ current activity's outgoing transitions in declared order, first
 advance `ProcessManagementActivityID` to the target activity.
 
 Frontend: a `ProcessWidget` + `StartProcessDialog` + `ActivityDialogModal`
-on ticket zoom (`components/agent/process/`), and a read-only
+on agent ticket zoom (`components/agent/process/`); customer portal
+`PortalProcessWidget` + `/api/portal/process/*` for dialogs whose YAML
+`Interface` includes `CustomerInterface`; and a read-only
 `/admin/processes` list/detail pair — there is no visual process designer;
 processes are still authored via Znuny's admin UI or direct DB/YAML.
 
 Condition types and TransitionAction modules are a documented subset of
-Znuny's (String/Regexp/Contains/NotContains/Equal/NotEqual conditions;
-ten of the most common TransitionAction modules) — see
+Znuny's (String/Regexp/Contains/NotContains/Equal/NotEqual and ordered
+compares; common TransitionAction modules including Type/Service/SLA set,
+TicketCreate, Watch, LinkAdd, …) — see
 [docs/process-management.md](process-management.md) for the full
 supported-vs-deferred breakdown and REST endpoint list.
 
@@ -422,8 +430,8 @@ layout component (`components/layout/{Agent,Portal,Admin}Shell.tsx`):
 | Path | Audience | Shell | Highlights |
 |---|---|---|---|
 | `/agent` | Agents (queue views, ticket zoom, compose, KB editor) | `AgentShell` | Queue tree, ticket zoom, search, `kb/*` article editor + publish flow |
-| `/portal` | Customers | `PortalShell` | Ticket list/detail, follow-up replies, KB search + reader |
-| `/admin` | Configuration | `AdminShell` | Generic CRUD over queues, users, dynamic fields, ACLs |
+| `/portal` | Customers | `PortalShell` | Ticket list/detail, follow-up replies, process (CustomerInterface), KB search + reader |
+| `/admin` | Configuration | `AdminShell` | CRUD over queues, users, DF, ACL, attribute relations, mail, … |
 
 Code-split per tree. Theming uses CSS variables and `data-theme` (`light` /
 `dark`) via a shared design-token stylesheet (`themes/tokens.css` +

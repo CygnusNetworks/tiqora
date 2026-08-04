@@ -374,6 +374,11 @@ MariaDB and validated:
 - No per-config-row cache-invalidation entity exists in `tiqora_*`; admin
   writes to queues/states/priorities enumerate and invalidate every
   currently-affected `ticket.id` directly instead.
-- Deferred: ACL *editing* (list/detail only, as specified), and
+- ACL admin is full CRUD (YAML `config_match` / `config_change`) plus runtime
+  picker filtering via `domain/ticket_acl.py` and field-options; ticket
+  attribute relations (`acl_ticket_attribute_relations`) have CSV admin + the
+  same field-options chain. Queue *access* remains group/role.
+- Deferred relative to full Znuny admin breadth:
   `group_customer`/`group_customer_user` assignment endpoints (not in the
-  originally requested resource list).
+  originally requested resource list), SysConfig deploy UI, GI webservice
+  admin, package manager.
