@@ -22,6 +22,11 @@ Ticket write:
 - ticket_set_dynamic_field: set a dynamic field value
 - ticket_lock / ticket_unlock: lock or unlock a ticket
 - ticket_set_type / ticket_set_service / ticket_set_sla: type/service/SLA
+- ticket_set_responsible: assign responsible agent
+- ticket_watch / ticket_unwatch: subscribe/unsubscribe as watcher
+- ticket_archive / ticket_unarchive: set archive flag
+- list_attachments / get_attachment_meta: article attachment metadata
+- ticket_forward / ticket_bounce: forward or resend-verbatim an article
 - ticket_history: recent history rows
 - ticket_merge / ticket_link: merge or link tickets
 
@@ -69,6 +74,13 @@ from tiqora.db.legacy.ticket import TicketPriority, TicketState, TicketStateType
 from tiqora.db.legacy.user import Users
 from tiqora.db.tiqora.models import TiqoraApiKey
 from tiqora.domain.api_key_scopes import mcp_scopes_allow_write
+from tiqora.domain.ticket_service import (
+    TicketAccessDenied as ReadAccessDenied,
+)
+from tiqora.domain.ticket_service import (
+    TicketNotFound as ReadNotFound,
+)
+from tiqora.domain.ticket_service import TicketService
 from tiqora.domain.ticket_write_service import (
     ArticleIn,
     InvalidInput,
@@ -78,6 +90,8 @@ from tiqora.domain.ticket_write_service import (
     TicketWriteService,
     _queue_name,  # noqa: PLC2701 -- deliberate reuse, see _assert_queue_permission
     _ticket_must_exist,  # noqa: PLC2701 -- deliberate reuse, see _assert_queue_permission
+    unwatch_ticket,
+    watch_ticket,
 )
 from tiqora.kb.schemas import ArticleIn as KbArticleIn
 from tiqora.kb.schemas import ArticleUpdateIn as KbArticleUpdateIn
@@ -1770,6 +1784,351 @@ async def ticket_link(
                 "ticket_id": ticket_id,
                 "target_ticket_id": target_ticket_id,
                 "link_type": link_type,
+            }
+        except (TicketNotFound, TicketAccessDenied, InvalidInput) as e:
+            return {"error": str(e)}
+
+
+# ---------------------------------------------------------------------------
+# Tool: responsible / watch / archive / attachments / forward / bounce
+# ---------------------------------------------------------------------------
+
+
+@mcp.tool(description="Assign a ticket's responsible agent by user ID.")
+async def ticket_set_responsible(
+    ctx: Context,
+    ticket_id: int,
+    responsible_id: int,
+) -> dict[str, Any]:
+    """Assign ticket responsible (Znuny TicketResponsibleSet / owner-key gate).
+
+    Args:
+        ticket_id: Target ticket ID.
+        responsible_id: Agent user ID to set as responsible.
+    """
+    user_id = _get_user_id(ctx)
+    state = _get_state()
+    _assert_tool_allowed("ticket_set_responsible")
+    async with state.session_factory() as session:
+        try:
+            async with session.begin():
+                _assert_mcp_write_scope()
+                svc = _write_service(session, state)
+                await svc.assign_responsible(user_id, ticket_id, responsible_id)
+            return {
+                "ok": True,
+                "ticket_id": ticket_id,
+                "responsible_id": responsible_id,
+            }
+        except (TicketNotFound, TicketAccessDenied, InvalidInput) as e:
+            return {"error": str(e)}
+
+
+@mcp.tool(description="Watch (subscribe to) a ticket. Defaults to the authenticated agent.")
+async def ticket_watch(
+    ctx: Context,
+    ticket_id: int,
+    watcher_user_id: int | None = None,
+) -> dict[str, Any]:
+    """Subscribe a user as ticket watcher. Requires ``ro`` on the ticket's queue.
+
+    Args:
+        ticket_id: Target ticket ID.
+        watcher_user_id: Optional agent to subscribe; defaults to the caller.
+    """
+    user_id = _get_user_id(ctx)
+    state = _get_state()
+    _assert_tool_allowed("ticket_watch")
+    watcher = watcher_user_id if watcher_user_id is not None else user_id
+    async with state.session_factory() as session:
+        try:
+            async with session.begin():
+                _assert_mcp_write_scope()
+                await _assert_queue_permission(
+                    session, ticket_id=ticket_id, user_id=user_id, key="ro"
+                )
+                await watch_ticket(
+                    session,
+                    ticket_id=ticket_id,
+                    watcher_user_id=watcher,
+                    user_id=user_id,
+                )
+            return {"ok": True, "ticket_id": ticket_id, "watcher_user_id": watcher}
+        except (TicketNotFound, TicketAccessDenied, InvalidInput) as e:
+            return {"error": str(e)}
+
+
+@mcp.tool(description="Stop watching (unsubscribe from) a ticket.")
+async def ticket_unwatch(
+    ctx: Context,
+    ticket_id: int,
+    watcher_user_id: int | None = None,
+) -> dict[str, Any]:
+    """Unsubscribe a user from a ticket. Requires ``ro`` on the ticket's queue.
+
+    Args:
+        ticket_id: Target ticket ID.
+        watcher_user_id: Optional agent to unsubscribe; defaults to the caller.
+    """
+    user_id = _get_user_id(ctx)
+    state = _get_state()
+    _assert_tool_allowed("ticket_unwatch")
+    watcher = watcher_user_id if watcher_user_id is not None else user_id
+    async with state.session_factory() as session:
+        try:
+            async with session.begin():
+                _assert_mcp_write_scope()
+                await _assert_queue_permission(
+                    session, ticket_id=ticket_id, user_id=user_id, key="ro"
+                )
+                await unwatch_ticket(
+                    session,
+                    ticket_id=ticket_id,
+                    watcher_user_id=watcher,
+                    user_id=user_id,
+                )
+            return {"ok": True, "ticket_id": ticket_id, "watcher_user_id": watcher}
+        except (TicketNotFound, TicketAccessDenied, InvalidInput) as e:
+            return {"error": str(e)}
+
+
+@mcp.tool(description="Archive a ticket (archive_flag = 1).")
+async def ticket_archive(ctx: Context, ticket_id: int) -> dict[str, Any]:
+    """Archive a ticket. Requires ``rw`` on the ticket's queue.
+
+    Args:
+        ticket_id: Target ticket ID.
+    """
+    user_id = _get_user_id(ctx)
+    state = _get_state()
+    _assert_tool_allowed("ticket_archive")
+    async with state.session_factory() as session:
+        try:
+            async with session.begin():
+                _assert_mcp_write_scope()
+                svc = _write_service(session, state)
+                await svc.archive_ticket(user_id, ticket_id, True)
+            return {"ok": True, "ticket_id": ticket_id, "archive": True}
+        except (TicketNotFound, TicketAccessDenied, InvalidInput) as e:
+            return {"error": str(e)}
+
+
+@mcp.tool(description="Unarchive a ticket (archive_flag = 0).")
+async def ticket_unarchive(ctx: Context, ticket_id: int) -> dict[str, Any]:
+    """Unarchive a ticket. Requires ``rw`` on the ticket's queue.
+
+    Args:
+        ticket_id: Target ticket ID.
+    """
+    user_id = _get_user_id(ctx)
+    state = _get_state()
+    _assert_tool_allowed("ticket_unarchive")
+    async with state.session_factory() as session:
+        try:
+            async with session.begin():
+                _assert_mcp_write_scope()
+                svc = _write_service(session, state)
+                await svc.archive_ticket(user_id, ticket_id, False)
+            return {"ok": True, "ticket_id": ticket_id, "archive": False}
+        except (TicketNotFound, TicketAccessDenied, InvalidInput) as e:
+            return {"error": str(e)}
+
+
+@mcp.tool(
+    description=(
+        "List attachment metadata for a ticket article (id, filename, content_type, "
+        "content_size, disposition). Requires ``ro`` on the ticket's queue."
+    )
+)
+async def list_attachments(
+    ctx: Context,
+    ticket_id: int,
+    article_id: int,
+) -> dict[str, Any] | list[dict[str, Any]]:
+    """List non-body-part attachments on an article.
+
+    Args:
+        ticket_id: Ticket ID that owns the article.
+        article_id: Article ID.
+    """
+    user_id = _get_user_id(ctx)
+    state = _get_state()
+    _assert_tool_allowed("list_attachments")
+    async with state.session_factory() as session:
+        try:
+            await _assert_queue_permission(session, ticket_id=ticket_id, user_id=user_id, key="ro")
+            atts = await TicketService(session).list_attachments(user_id, ticket_id, article_id)
+            return [
+                {
+                    "id": a.id,
+                    "article_id": a.article_id,
+                    "filename": a.filename,
+                    "content_type": a.content_type,
+                    "content_size": a.content_size,
+                    "content_id": a.content_id,
+                    "disposition": a.disposition,
+                    "inline": a.inline,
+                }
+                for a in atts
+            ]
+        except (
+            TicketNotFound,
+            TicketAccessDenied,
+            InvalidInput,
+            ReadNotFound,
+            ReadAccessDenied,
+        ) as e:
+            return {"error": str(e)}
+
+
+@mcp.tool(
+    description=(
+        "Get metadata for one attachment by id within a ticket article. "
+        "Does not return binary content."
+    )
+)
+async def get_attachment_meta(
+    ctx: Context,
+    ticket_id: int,
+    article_id: int,
+    attachment_id: int,
+) -> dict[str, Any]:
+    """Return one attachment's metadata, or an error if not found.
+
+    Args:
+        ticket_id: Ticket ID that owns the article.
+        article_id: Article ID.
+        attachment_id: Attachment row ID.
+    """
+    user_id = _get_user_id(ctx)
+    state = _get_state()
+    _assert_tool_allowed("get_attachment_meta")
+    async with state.session_factory() as session:
+        try:
+            await _assert_queue_permission(session, ticket_id=ticket_id, user_id=user_id, key="ro")
+            atts = await TicketService(session).list_attachments(user_id, ticket_id, article_id)
+            for a in atts:
+                if a.id == attachment_id:
+                    return {
+                        "id": a.id,
+                        "article_id": a.article_id,
+                        "filename": a.filename,
+                        "content_type": a.content_type,
+                        "content_size": a.content_size,
+                        "content_id": a.content_id,
+                        "disposition": a.disposition,
+                        "inline": a.inline,
+                    }
+            return {"error": f"Attachment {attachment_id} not found on article {article_id}"}
+        except (
+            TicketNotFound,
+            TicketAccessDenied,
+            InvalidInput,
+            ReadNotFound,
+            ReadAccessDenied,
+        ) as e:
+            return {"error": str(e)}
+
+
+@mcp.tool(
+    description=(
+        "Forward an article by email: create a customer-visible email article "
+        "with history type Forward. Requires to_address and rw on the queue."
+    )
+)
+async def ticket_forward(
+    ctx: Context,
+    ticket_id: int,
+    to_address: str,
+    body: str,
+    subject: str | None = None,
+    cc: str | None = None,
+    note: str | None = None,
+) -> dict[str, Any]:
+    """Forward ticket content to a new recipient.
+
+    Args:
+        ticket_id: Source ticket ID.
+        to_address: Recipient email address (required).
+        body: Forward body (typically the original article text).
+        subject: Optional subject (default ``Fwd:``).
+        cc: Optional CC addresses.
+        note: Optional note prepended to the body.
+    """
+    user_id = _get_user_id(ctx)
+    state = _get_state()
+    _assert_tool_allowed("ticket_forward")
+    if not to_address or not str(to_address).strip():
+        return {"error": "to_address is required"}
+    fwd_body = f"{note}\n\n{body}" if note else body
+    subj = subject or "Fwd:"
+    async with state.session_factory() as session:
+        try:
+            async with session.begin():
+                _assert_mcp_write_scope()
+                svc = _write_service(session, state)
+                article_id = await svc.forward_article(
+                    user_id,
+                    ticket_id,
+                    subject=subj,
+                    body=fwd_body,
+                    to_address=str(to_address).strip(),
+                    cc=cc,
+                )
+            return {
+                "ok": True,
+                "ticket_id": ticket_id,
+                "article_id": article_id,
+                "to_address": str(to_address).strip(),
+            }
+        except (TicketNotFound, TicketAccessDenied, InvalidInput) as e:
+            return {"error": str(e)}
+
+
+@mcp.tool(
+    description=(
+        "Bounce (resend verbatim) an existing article to a new recipient. "
+        "History type Bounce. Requires to_address and rw on the queue."
+    )
+)
+async def ticket_bounce(
+    ctx: Context,
+    ticket_id: int,
+    article_id: int,
+    to_address: str,
+    state_id: int | None = None,
+) -> dict[str, Any]:
+    """Resend an article's body verbatim to ``to_address``.
+
+    Args:
+        ticket_id: Ticket that owns the article.
+        article_id: Source article to bounce.
+        to_address: Recipient email address (required).
+        state_id: Optional new ticket state after bounce.
+    """
+    user_id = _get_user_id(ctx)
+    state = _get_state()
+    _assert_tool_allowed("ticket_bounce")
+    if not to_address or not str(to_address).strip():
+        return {"error": "to_address is required"}
+    async with state.session_factory() as session:
+        try:
+            async with session.begin():
+                _assert_mcp_write_scope()
+                svc = _write_service(session, state)
+                new_aid = await svc.bounce_article(
+                    user_id,
+                    ticket_id,
+                    article_id,
+                    to_address=str(to_address).strip(),
+                    state_id=state_id,
+                )
+            return {
+                "ok": True,
+                "ticket_id": ticket_id,
+                "source_article_id": article_id,
+                "article_id": new_aid,
+                "to_address": str(to_address).strip(),
             }
         except (TicketNotFound, TicketAccessDenied, InvalidInput) as e:
             return {"error": str(e)}

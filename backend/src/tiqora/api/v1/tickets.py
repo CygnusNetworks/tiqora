@@ -478,6 +478,33 @@ async def get_article_body(
     )
 
 
+@router.get("/{ticket_id}/articles/{article_id}/plain", response_model=ArticleBody)
+async def get_article_plain_body(
+    ticket_id: int,
+    article_id: int,
+    user: CurrentUser,
+    session: DbSession,
+) -> ArticleBody:
+    """Return the plaintext body from ``article_data_mime_plain`` when present.
+
+    Falls back to the rendered MIME body (same as ``/body``) when no plain
+    row exists — Znuny stores the plain part separately for search/index use.
+    Requires ``ro``.
+    """
+    try:
+        plain = await TicketService(session).get_article_plain_body(
+            user.id, ticket_id, article_id
+        )
+    except (TicketNotFound, TicketAccessDenied) as exc:
+        raise _map_exc(exc) from exc
+    return ArticleBody(
+        article_id=article_id,
+        content_type=plain.content_type,
+        is_html=plain.is_html,
+        body=plain.body,
+    )
+
+
 @router.get(
     "/{ticket_id}/articles/{article_id}/attachments",
     response_model=list[AttachmentMetaOut],
@@ -870,6 +897,29 @@ async def bounce_article_endpoint(
     except (WriteAccessDenied, WriteNotFound, InvalidInput) as exc:
         raise _map_exc(exc) from exc
     return ArticleCreateResponse(article_id=aid)
+
+
+@router.post(
+    "/{ticket_id}/articles/{article_id}/resend",
+    response_model=ArticleCreateResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+async def resend_article_endpoint(
+    ticket_id: int,
+    article_id: int,
+    body: BounceRequest,
+    user: CurrentUser,
+    session: DbSession,
+    settings: AppSettings,
+) -> ArticleCreateResponse:
+    """Alias of bounce — naming parity with Znuny AgentTicketEmailResend.
+
+    Resends the article body verbatim to ``to_address`` (history type Bounce).
+    Requires ``rw``.
+    """
+    return await bounce_article_endpoint(
+        ticket_id, article_id, body, user, session, settings
+    )
 
 
 @router.post(
