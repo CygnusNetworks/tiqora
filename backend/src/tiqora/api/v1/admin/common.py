@@ -148,6 +148,9 @@ ATTACHMENT_CACHE_TYPES: tuple[str, ...] = ("StdAttachment",)
 # under Queue cache keys (Queue.pm / AutoResponse list joins).
 AUTO_RESPONSE_CACHE_TYPES: tuple[str, ...] = ("Queue",)
 
+# ACL/DB/ACL.pm ACLAdd/ACLUpdate/ACLDelete: CleanUp Type => 'ACLEditor_ACL'
+ACL_CACHE_TYPES: tuple[str, ...] = ("ACLEditor_ACL",)
+
 
 def now() -> datetime:
     return datetime.now(UTC).replace(tzinfo=None)

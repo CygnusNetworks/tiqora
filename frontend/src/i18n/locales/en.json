@@ -68,7 +68,9 @@
     "cancel": "Cancel",
     "help": "Help",
     "edit": "Edit",
-    "save": "Save"
+    "save": "Save",
+    "saved": "Saved",
+    "delete": "Delete"
   },
   "otp": {
     "verifying": "Verifying…",
@@ -1140,7 +1142,8 @@
       },
       "acl": {
         "match": "Conditions under which this ACL applies (e.g. current queue, state, form field). The change on the right is only applied when every criterion listed here matches.",
-        "change": "The ACL's effect once its conditions match — typically it restricts or forces the choices available in forms (e.g. only certain follow-up states allowed)."
+        "change": "The ACL's effect once its conditions match — typically it restricts or forces the choices available in forms (e.g. only certain follow-up states allowed).",
+        "stopAfterMatch": "When checked, no further ACLs are evaluated after this one matches productively (Znuny StopAfterMatch)."
       },
       "mailOutbound": {
         "host": "SMTP server hostname for outgoing mail. Must be reachable from this server (DNS + firewall) on the port below.",
@@ -1559,7 +1562,10 @@
       "name": "Name",
       "description": "Description",
       "match": "Match",
-      "change": "Change"
+      "change": "Change",
+      "new": "New ACL",
+      "stopAfterMatch": "Stop after match",
+      "confirmDelete": "Delete ACL “{{name}}”? This cannot be undone."
     },
     "genericAgentJobs": {
       "title_plural": "Generic agent jobs",

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, fireEvent } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { I18nextProvider } from "react-i18next";
 import type { ReactNode } from "react";
@@ -30,6 +30,7 @@ vi.mock("@tanstack/react-router", () => ({
 }));
 
 const listAcls = vi.fn();
+const createAcl = vi.fn();
 
 vi.mock("@/lib/api", () => ({
   ApiError: class ApiError extends Error {
@@ -40,6 +41,7 @@ vi.mock("@/lib/api", () => ({
   },
   api: {
     listAcls: (...args: unknown[]) => listAcls(...args),
+    createAcl: (...args: unknown[]) => createAcl(...args),
   },
 }));
 
@@ -72,6 +74,7 @@ const sampleAcl = {
 describe("AclPage", () => {
   beforeEach(() => {
     listAcls.mockReset();
+    createAcl.mockReset();
   });
 
   it("lists ACLs with a link to their detail page", async () => {
@@ -105,5 +108,35 @@ describe("AclPage", () => {
       expect(listAcls).toHaveBeenCalled();
     });
     expect(screen.queryByTestId("acl-link-2")).not.toBeInTheDocument();
+  });
+
+  it("offers a create button without a read-only badge", async () => {
+    listAcls.mockResolvedValue([]);
+    renderPage();
+
+    await waitFor(() => {
+      expect(listAcls).toHaveBeenCalled();
+    });
+    expect(screen.getByTestId("admin-acl-new")).toBeInTheDocument();
+    expect(screen.queryByText(/read-?only/i)).not.toBeInTheDocument();
+  });
+
+  it("creates an ACL from the drawer", async () => {
+    listAcls.mockResolvedValue([]);
+    createAcl.mockResolvedValue({ ...sampleAcl, id: 9, name: "NewAcl" });
+    renderPage();
+
+    await waitFor(() => expect(listAcls).toHaveBeenCalled());
+    fireEvent.click(screen.getByTestId("admin-acl-new"));
+
+    const nameInput = await screen.findByTestId("admin-acl-name");
+    fireEvent.change(nameInput, { target: { value: "NewAcl" } });
+    fireEvent.click(screen.getByTestId("admin-acl-submit"));
+
+    await waitFor(() => {
+      expect(createAcl).toHaveBeenCalled();
+    });
+    const body = createAcl.mock.calls[0][0];
+    expect(body.name).toBe("NewAcl");
   });
 });

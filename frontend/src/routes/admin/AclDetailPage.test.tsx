@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, fireEvent } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { I18nextProvider } from "react-i18next";
 import type { ReactNode } from "react";
@@ -10,6 +10,7 @@ let currentAclId = "2";
 
 vi.mock("@tanstack/react-router", () => ({
   useParams: () => ({ aclId: currentAclId }),
+  useNavigate: () => vi.fn(),
   Link: ({ to, children, ...rest }: { to: string; children: ReactNode; [k: string]: unknown }) => (
     <a href={to} {...rest}>
       {children}
@@ -18,6 +19,8 @@ vi.mock("@tanstack/react-router", () => ({
 }));
 
 const getAcl = vi.fn();
+const updateAcl = vi.fn();
+const deleteAcl = vi.fn();
 
 vi.mock("@/lib/api", () => ({
   ApiError: class ApiError extends Error {
@@ -28,6 +31,8 @@ vi.mock("@/lib/api", () => ({
   },
   api: {
     getAcl: (...args: unknown[]) => getAcl(...args),
+    updateAcl: (...args: unknown[]) => updateAcl(...args),
+    deleteAcl: (...args: unknown[]) => deleteAcl(...args),
   },
 }));
 
@@ -61,35 +66,43 @@ describe("AclDetailPage", () => {
   beforeEach(() => {
     currentAclId = "2";
     getAcl.mockReset();
+    updateAcl.mockReset();
+    deleteAcl.mockReset();
   });
 
-  it("loads the ACL by id and renders its match/change config", async () => {
+  it("loads the ACL by id and renders editable match/change config", async () => {
     getAcl.mockResolvedValue(sampleAcl);
     renderPage();
 
     await waitFor(() => {
-      expect(screen.getByText("RestrictPriority")).toBeInTheDocument();
+      expect(screen.getByTestId("acl-detail-name")).toHaveValue("RestrictPriority");
     });
     expect(getAcl).toHaveBeenCalledWith(2, expect.anything());
-    expect(screen.getByText("Restricts priority selection for non-admins.")).toBeInTheDocument();
-    expect(screen.getByText(/Queue: Support/)).toBeInTheDocument();
-    expect(screen.getByText(/Priority: \[normal\]/)).toBeInTheDocument();
+    expect(screen.getByTestId("acl-detail-config-match")).toHaveValue(
+      "Properties:\n  Ticket:\n    Queue: Support",
+    );
+    expect(screen.getByTestId("acl-detail-config-change")).toHaveValue(
+      "Possible:\n  Ticket:\n    Priority: [normal]",
+    );
+    expect(screen.getByTestId("acl-detail-stop-after-match")).toBeChecked();
   });
 
-  it("shows placeholders when match/change config is absent", async () => {
-    getAcl.mockResolvedValue({
-      ...sampleAcl,
-      description: null,
-      config_match: null,
-      config_change: null,
-    });
+  it("saves edits via updateAcl", async () => {
+    getAcl.mockResolvedValue(sampleAcl);
+    updateAcl.mockResolvedValue({ ...sampleAcl, name: "Renamed" });
     renderPage();
 
     await waitFor(() => {
-      expect(screen.getByText("RestrictPriority")).toBeInTheDocument();
+      expect(screen.getByTestId("acl-detail-name")).toHaveValue("RestrictPriority");
     });
-    const placeholders = screen.getAllByText("—");
-    expect(placeholders).toHaveLength(2);
+    fireEvent.change(screen.getByTestId("acl-detail-name"), { target: { value: "Renamed" } });
+    fireEvent.click(screen.getByTestId("acl-detail-save"));
+
+    await waitFor(() => {
+      expect(updateAcl).toHaveBeenCalled();
+    });
+    expect(updateAcl.mock.calls[0][0]).toBe(2);
+    expect(updateAcl.mock.calls[0][1].name).toBe("Renamed");
   });
 
   it("requests a different ACL when the route id changes", async () => {
@@ -98,7 +111,7 @@ describe("AclDetailPage", () => {
     renderPage();
 
     await waitFor(() => {
-      expect(screen.getByText("Other ACL")).toBeInTheDocument();
+      expect(screen.getByTestId("acl-detail-name")).toHaveValue("Other ACL");
     });
     expect(getAcl).toHaveBeenCalledWith(9, expect.anything());
   });

@@ -226,6 +226,8 @@ export {
   type PostmasterMatchRuleIn,
   type PostmasterSetRuleIn,
   type AclOut,
+  type AclCreate,
+  type AclUpdate,
   type GenericAgentJobOut,
   type SystemAddressOut,
   type FollowUpPossibleOut,

@@ -200,6 +200,8 @@ export type {
   PostmasterFilterRuleOut,
   PostmasterFilterWrite,
   AclOut,
+  AclCreate,
+  AclUpdate,
   GenericAgentJobOut,
   SystemAddressOut,
   FollowUpPossibleOut,

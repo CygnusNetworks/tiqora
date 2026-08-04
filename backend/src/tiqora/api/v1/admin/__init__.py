@@ -10,6 +10,7 @@ from __future__ import annotations
 from fastapi import APIRouter
 
 from tiqora.api.v1.admin import (
+    acl,
     ai,
     ai_audit,
     api_keys,
@@ -64,6 +65,7 @@ admin_router.include_router(attachments.router)
 admin_router.include_router(auto_responses.router)
 admin_router.include_router(dynamic_fields.router)
 admin_router.include_router(postmaster_filters.router)
+admin_router.include_router(acl.router)
 admin_router.include_router(readonly.router)
 admin_router.include_router(system_addresses.router)
 admin_router.include_router(notification_events.router)

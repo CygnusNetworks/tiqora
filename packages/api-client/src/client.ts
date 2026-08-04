@@ -564,6 +564,25 @@ export type PostmasterFilterWrite = Schemas["PostmasterFilterWrite"];
 export type PostmasterMatchRuleIn = Schemas["PostmasterMatchRuleIn"];
 export type PostmasterSetRuleIn = Schemas["PostmasterSetRuleIn"];
 export type AclOut = Schemas["AclOut"];
+// Hand-written until openapi.json is regenerated for ACL write schemas.
+export type AclCreate = {
+  name: string;
+  comments?: string | null;
+  description?: string | null;
+  valid_id?: number;
+  stop_after_match?: number | null;
+  config_match?: string | null;
+  config_change?: string | null;
+};
+export type AclUpdate = {
+  name?: string | null;
+  comments?: string | null;
+  description?: string | null;
+  valid_id?: number | null;
+  stop_after_match?: number | null;
+  config_match?: string | null;
+  config_change?: string | null;
+};
 export type GenericAgentJobOut = Schemas["GenericAgentJobOut"];
 export type SystemAddressOut = Schemas["SystemAddressOut"];
 export type FollowUpPossibleOut = Schemas["FollowUpPossibleOut"];
@@ -2561,6 +2580,56 @@ export class ApiClient {
 
   getAcl(aclId: number, signal?: AbortSignal) {
     return this.request<AclOut>("GET", `/api/v1/admin/acl/${aclId}`, { signal });
+  }
+
+  createAcl(body: AclCreate, signal?: AbortSignal) {
+    return this.request<AclOut>("POST", "/api/v1/admin/acl", { body, signal });
+  }
+
+  updateAcl(aclId: number, body: AclUpdate, signal?: AbortSignal) {
+    return this.request<AclOut>("PATCH", `/api/v1/admin/acl/${aclId}`, { body, signal });
+  }
+
+  deleteAcl(aclId: number, signal?: AbortSignal) {
+    return this.request<void>("DELETE", `/api/v1/admin/acl/${aclId}`, { signal });
+  }
+
+  /** ACL-filtered field options for new-ticket forms. */
+  ticketFieldOptions(
+    params?: { fields?: string; action?: string; queueId?: number },
+    signal?: AbortSignal,
+  ) {
+    return this.request<{
+      state: Record<string, string>;
+      queue: Record<string, string>;
+      priority: Record<string, string>;
+      type: Record<string, string>;
+      service: Record<string, string>;
+      sla: Record<string, string>;
+    }>("GET", "/api/v1/reference/ticket-field-options", {
+      query: {
+        fields: params?.fields,
+        action: params?.action,
+        queue_id: params?.queueId,
+      },
+      signal,
+    });
+  }
+
+  /** ACL-filtered field options for an existing ticket. */
+  ticketAclFieldOptions(
+    ticketId: number,
+    params?: { fields?: string; action?: string },
+    signal?: AbortSignal,
+  ) {
+    return this.request<Record<string, Record<string, string>>>(
+      "GET",
+      `/api/v1/tickets/${ticketId}/field-options`,
+      {
+        query: { fields: params?.fields, action: params?.action },
+        signal,
+      },
+    );
   }
 
   listGenericAgentJobs(signal?: AbortSignal) {
