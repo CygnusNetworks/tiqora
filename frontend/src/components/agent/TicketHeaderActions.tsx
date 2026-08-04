@@ -60,6 +60,21 @@ export function TicketHeaderActions({
     queryKey: ["reference", "priorities"],
     queryFn: () => api.listReferencePriorities(),
   });
+  const typesQ = useQuery({
+    queryKey: ["reference", "types"],
+    queryFn: () => api.listReferenceTypes(),
+  });
+  const servicesQ = useQuery({
+    queryKey: ["reference", "services"],
+    queryFn: () => api.listReferenceServices(),
+  });
+  const slasQ = useQuery({
+    queryKey: ["reference", "slas", ticket.service_id ?? null],
+    queryFn: () =>
+      api.listReferenceSlas(
+        ticket.service_id ? { service_id: ticket.service_id } : {},
+      ),
+  });
   const statesQ = useQuery({
     queryKey: ["reference", "states"],
     queryFn: () => api.listReferenceStates(),
@@ -218,6 +233,105 @@ export function TicketHeaderActions({
                 onSelect={() => patch.mutate({ priority_id: p.id })}
               >
                 {p.name}
+              </MenuItem>
+            ))}
+          </Menu>
+        </span>
+        <span title={!perms.rw ? noPerm : undefined} className={cn(!perms.rw && "opacity-60")}>
+          <Menu
+            align="left"
+            panelTestId="ticket-pill-type-menu"
+            trigger={({ ref, toggleProps }) => (
+              <button
+                ref={ref}
+                type="button"
+                data-testid="ticket-pill-type"
+                disabled={!perms.rw}
+                {...toggleProps}
+                className="rounded-md border border-hairline bg-surface px-2 py-0.5 text-xs text-ink"
+              >
+                {ticket.type_name || t("ticket.type")}
+              </button>
+            )}
+          >
+            <MenuLabel>{t("ticket.type")}</MenuLabel>
+            {(typesQ.data ?? []).map((ty) => (
+              <MenuItem
+                key={ty.id}
+                selected={ty.id === ticket.type_id}
+                onSelect={() => patch.mutate({ type_id: ty.id })}
+              >
+                {ty.name}
+              </MenuItem>
+            ))}
+          </Menu>
+        </span>
+        <span title={!perms.rw ? noPerm : undefined} className={cn(!perms.rw && "opacity-60")}>
+          <Menu
+            align="left"
+            panelTestId="ticket-pill-service-menu"
+            trigger={({ ref, toggleProps }) => (
+              <button
+                ref={ref}
+                type="button"
+                data-testid="ticket-pill-service"
+                disabled={!perms.rw}
+                {...toggleProps}
+                className="rounded-md border border-hairline bg-surface px-2 py-0.5 text-xs text-ink"
+              >
+                {ticket.service_name || t("ticket.service")}
+              </button>
+            )}
+          >
+            <MenuLabel>{t("ticket.service")}</MenuLabel>
+            <MenuItem
+              selected={ticket.service_id == null}
+              onSelect={() => patch.mutate({ clear_service: true })}
+            >
+              —
+            </MenuItem>
+            {(servicesQ.data ?? []).map((s) => (
+              <MenuItem
+                key={s.id}
+                selected={s.id === ticket.service_id}
+                onSelect={() => patch.mutate({ service_id: s.id })}
+              >
+                {s.name}
+              </MenuItem>
+            ))}
+          </Menu>
+        </span>
+        <span title={!perms.rw ? noPerm : undefined} className={cn(!perms.rw && "opacity-60")}>
+          <Menu
+            align="left"
+            panelTestId="ticket-pill-sla-menu"
+            trigger={({ ref, toggleProps }) => (
+              <button
+                ref={ref}
+                type="button"
+                data-testid="ticket-pill-sla"
+                disabled={!perms.rw}
+                {...toggleProps}
+                className="rounded-md border border-hairline bg-surface px-2 py-0.5 text-xs text-ink"
+              >
+                {ticket.sla_name || t("ticket.sla")}
+              </button>
+            )}
+          >
+            <MenuLabel>{t("ticket.sla")}</MenuLabel>
+            <MenuItem
+              selected={ticket.sla_id == null}
+              onSelect={() => patch.mutate({ clear_sla: true })}
+            >
+              —
+            </MenuItem>
+            {(slasQ.data ?? []).map((s) => (
+              <MenuItem
+                key={s.id}
+                selected={s.id === ticket.sla_id}
+                onSelect={() => patch.mutate({ sla_id: s.id })}
+              >
+                {s.name}
               </MenuItem>
             ))}
           </Menu>

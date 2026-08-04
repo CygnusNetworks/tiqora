@@ -42,7 +42,7 @@ const SELECT_ALL_PAGE_SIZE = 200;
 /** Concurrent PATCH requests in flight for a bulk apply. */
 const BULK_CONCURRENCY = 4;
 
-type BulkField = "state" | "priority" | "owner";
+type BulkField = "state" | "priority" | "owner" | "queue" | "lock";
 
 async function fetchMatchingTicketIds(
   params: {
@@ -103,7 +103,7 @@ export function QueuesPage() {
   const [fetchingAll, setFetchingAll] = useState(false);
   const [pendingAction, setPendingAction] = useState<{
     field: BulkField;
-    value: number;
+    value: number | string;
     label: string;
   } | null>(null);
   // Row-level quick edit (state/priority/owner) — reference lists are only
@@ -265,12 +265,16 @@ export function QueuesPage() {
   const applyBulkAction = async () => {
     if (!pendingAction) return;
     const ids = selectedIds;
-    const body =
+    const body: MutationRequest =
       pendingAction.field === "state"
-        ? { state_id: pendingAction.value }
+        ? { state_id: Number(pendingAction.value) }
         : pendingAction.field === "priority"
-          ? { priority_id: pendingAction.value }
-          : { owner_id: pendingAction.value };
+          ? { priority_id: Number(pendingAction.value) }
+          : pendingAction.field === "owner"
+            ? { owner_id: Number(pendingAction.value) }
+            : pendingAction.field === "queue"
+              ? { queue_id: Number(pendingAction.value) }
+              : { lock: String(pendingAction.value) };
 
     setApplying(true);
     setStatus(null);
@@ -321,6 +325,13 @@ export function QueuesPage() {
     label: a.full_name,
     hint: a.login,
   }));
+  const bulkQueueItems: SelectMenuItem<number>[] = flattenQueues(queuesQ.data ?? [])
+    .filter((q) => q.valid)
+    .map((q) => ({ value: q.id, label: q.name }));
+  const lockItems: SelectMenuItem<string>[] = [
+    { value: "lock", label: t("ticket.toolbar.lock", { defaultValue: "Lock" }) },
+    { value: "unlock", label: t("ticket.toolbar.unlock", { defaultValue: "Unlock" }) },
+  ];
 
   // Row quick edit: one ticket at a time, same invalidation as
   // usePatchTicket/the bulk apply above so the sidebar badges stay in sync.
@@ -533,6 +544,49 @@ export function QueuesPage() {
                     className="inline-flex items-center gap-1 rounded-md border border-hairline bg-surface px-2.5 py-1 text-xs font-medium text-ink transition-colors duration-100 hover:bg-surface-subtle disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     {t("queue.bulk.fieldOwner")} ⌄
+                  </button>
+                )}
+              />
+              <SelectMenu
+                items={bulkQueueItems}
+                searchThreshold={8}
+                onSelect={(value) => {
+                  const label = bulkQueueItems.find((i) => i.value === value)?.label ?? "";
+                  setPendingAction({ field: "queue", value, label });
+                }}
+                placeholder={t("ticket.dialog.selectPlaceholder")}
+                panelTestId="queue-bulk-queue-menu"
+                trigger={({ ref, toggleProps }) => (
+                  <button
+                    ref={ref}
+                    type="button"
+                    disabled={noSelection}
+                    data-testid="queue-bulk-queue"
+                    {...toggleProps}
+                    className="inline-flex items-center gap-1 rounded-md border border-hairline bg-surface px-2.5 py-1 text-xs font-medium text-ink transition-colors duration-100 hover:bg-surface-subtle disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {t("queue.bulk.fieldQueue", { defaultValue: "Queue" })} ⌄
+                  </button>
+                )}
+              />
+              <SelectMenu
+                items={lockItems}
+                onSelect={(value) => {
+                  const label = lockItems.find((i) => i.value === value)?.label ?? "";
+                  setPendingAction({ field: "lock", value, label });
+                }}
+                placeholder={t("ticket.dialog.selectPlaceholder")}
+                panelTestId="queue-bulk-lock-menu"
+                trigger={({ ref, toggleProps }) => (
+                  <button
+                    ref={ref}
+                    type="button"
+                    disabled={noSelection}
+                    data-testid="queue-bulk-lock"
+                    {...toggleProps}
+                    className="inline-flex items-center gap-1 rounded-md border border-hairline bg-surface px-2.5 py-1 text-xs font-medium text-ink transition-colors duration-100 hover:bg-surface-subtle disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {t("queue.bulk.fieldLock", { defaultValue: "Lock" })} ⌄
                   </button>
                 )}
               />

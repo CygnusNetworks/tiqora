@@ -113,6 +113,12 @@ class MutationRequest(BaseModel):
     queue_id: int | None = None
     state_id: int | None = None
     priority_id: int | None = None
+    type_id: int | None = None
+    service_id: int | None = None
+    # True when the client explicitly wants to clear service.
+    clear_service: bool | None = None
+    sla_id: int | None = None
+    clear_sla: bool | None = None
     title: str | None = None
     customer_id: str | None = None
     customer_user_id: str | None = None
@@ -724,6 +730,20 @@ async def patch_ticket(
                 )
             if body.priority_id is not None:
                 await svc.change_priority(user.id, ticket_id, body.priority_id)
+            if body.type_id is not None:
+                await svc.change_type(user.id, ticket_id, body.type_id)
+            if body.service_id is not None or body.clear_service:
+                await svc.change_service(
+                    user.id,
+                    ticket_id,
+                    None if body.clear_service else body.service_id,
+                )
+            if body.sla_id is not None or body.clear_sla:
+                await svc.change_sla(
+                    user.id,
+                    ticket_id,
+                    None if body.clear_sla else body.sla_id,
+                )
             if body.title is not None:
                 await svc.change_title(user.id, ticket_id, body.title)
             if body.customer_id is not None or body.customer_user_id is not None:
@@ -1071,3 +1091,349 @@ async def delete_draft(
             ),
             {"tid": ticket_id, "uid": user.id, "act": action},
         )
+
+
+# ---------------------------------------------------------------------------
+# Mentions (Znuny ``mention`` table, schema ≥ 6.4)
+# ---------------------------------------------------------------------------
+
+
+class MentionOut(BaseModel):
+    id: int
+    user_id: int
+    ticket_id: int
+    article_id: int | None = None
+    create_time: datetime | None = None
+    user_login: str | None = None
+    user_name: str | None = None
+
+
+class MentionCreate(BaseModel):
+    user_id: int
+    article_id: int | None = None
+
+
+@router.get("/{ticket_id}/mentions", response_model=list[MentionOut])
+async def list_mentions(
+    ticket_id: int,
+    user: CurrentUser,
+    session: DbSession,
+) -> list[MentionOut]:
+    """List agent mentions on a ticket (requires ticket ``ro``)."""
+    from sqlalchemy import text
+
+    from tiqora.domain.ticket_service import TicketService
+
+    try:
+        await TicketService(session)._assert_ticket_ro(user.id, ticket_id)
+    except (TicketAccessDenied, TicketNotFound) as exc:
+        raise _map_exc(exc) from exc
+
+    # Table may be absent on pre-6.4 peers — return empty rather than 500.
+    try:
+        rows = (
+            (
+                await session.execute(
+                    text(
+                        "SELECT m.id, m.user_id, m.ticket_id, m.article_id, m.create_time,"
+                        " u.login AS user_login, u.first_name, u.last_name"
+                        " FROM mention m"
+                        " LEFT JOIN users u ON u.id = m.user_id"
+                        " WHERE m.ticket_id = :tid ORDER BY m.id"
+                    ),
+                    {"tid": ticket_id},
+                )
+            )
+            .mappings()
+            .all()
+        )
+    except Exception:
+        return []
+    out: list[MentionOut] = []
+    for r in rows:
+        parts = [str(r.get("first_name") or "").strip(), str(r.get("last_name") or "").strip()]
+        name = " ".join(p for p in parts if p) or None
+        out.append(
+            MentionOut(
+                id=int(r["id"]),
+                user_id=int(r["user_id"]),
+                ticket_id=int(r["ticket_id"]),
+                article_id=int(r["article_id"]) if r.get("article_id") is not None else None,
+                create_time=r.get("create_time"),
+                user_login=r.get("user_login"),
+                user_name=name,
+            )
+        )
+    return out
+
+
+@router.post(
+    "/{ticket_id}/mentions",
+    response_model=MentionOut,
+    status_code=status.HTTP_201_CREATED,
+)
+async def create_mention(
+    ticket_id: int,
+    body: MentionCreate,
+    user: CurrentUser,
+    session: DbSession,
+    settings: AppSettings,
+) -> MentionOut:
+    """Mention an agent on a ticket (requires ``note``)."""
+    from sqlalchemy import text
+
+    from tiqora.domain.ticket_write_service import _ticket_must_exist
+
+    svc = _write_service(session, settings)
+    try:
+        async with session.begin():
+            ticket = await _ticket_must_exist(session, ticket_id)
+            await svc._assert(user.id, int(ticket["queue_id"]), "note")
+            await session.execute(
+                text(
+                    "INSERT INTO mention (user_id, ticket_id, article_id, create_time)"
+                    " VALUES (:uid, :tid, :aid, current_timestamp)"
+                ),
+                {
+                    "uid": body.user_id,
+                    "tid": ticket_id,
+                    "aid": body.article_id,
+                },
+            )
+            row = (
+                (
+                    await session.execute(
+                        text(
+                            "SELECT m.id, m.user_id, m.ticket_id, m.article_id, m.create_time,"
+                            " u.login AS user_login"
+                            " FROM mention m LEFT JOIN users u ON u.id = m.user_id"
+                            " WHERE m.ticket_id = :tid AND m.user_id = :uid"
+                            " ORDER BY m.id DESC LIMIT 1"
+                        ),
+                        {"tid": ticket_id, "uid": body.user_id},
+                    )
+                )
+                .mappings()
+                .first()
+            )
+    except (WriteAccessDenied, WriteNotFound, InvalidInput) as exc:
+        raise _map_exc(exc) from exc
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_501_NOT_IMPLEMENTED,
+            detail="Mentions not available on this peer schema",
+        ) from exc
+    if row is None:
+        raise HTTPException(status_code=500, detail="Mention insert failed")
+    return MentionOut(
+        id=int(row["id"]),
+        user_id=int(row["user_id"]),
+        ticket_id=int(row["ticket_id"]),
+        article_id=int(row["article_id"]) if row.get("article_id") is not None else None,
+        create_time=row.get("create_time"),
+        user_login=row.get("user_login"),
+    )
+
+
+@router.delete(
+    "/{ticket_id}/mentions/{mention_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+async def delete_mention(
+    ticket_id: int,
+    mention_id: int,
+    user: CurrentUser,
+    session: DbSession,
+    settings: AppSettings,
+) -> None:
+    """Remove a mention (requires ``note`` on the ticket)."""
+    from sqlalchemy import text
+
+    from tiqora.domain.ticket_write_service import _ticket_must_exist
+
+    svc = _write_service(session, settings)
+    try:
+        async with session.begin():
+            ticket = await _ticket_must_exist(session, ticket_id)
+            await svc._assert(user.id, int(ticket["queue_id"]), "note")
+            result = await session.execute(
+                text("DELETE FROM mention WHERE id = :mid AND ticket_id = :tid"),
+                {"mid": mention_id, "tid": ticket_id},
+            )
+            if result.rowcount == 0:
+                raise WriteNotFound(f"mention {mention_id}")
+    except (WriteAccessDenied, WriteNotFound, InvalidInput) as exc:
+        raise _map_exc(exc) from exc
+
+
+# ---------------------------------------------------------------------------
+# Time accounting (Znuny ``time_accounting``)
+# ---------------------------------------------------------------------------
+
+
+class TimeAccountingOut(BaseModel):
+    id: int
+    ticket_id: int
+    article_id: int | None = None
+    time_unit: float
+    create_time: datetime | None = None
+    create_by: int
+    create_by_login: str | None = None
+
+
+class TimeAccountingCreate(BaseModel):
+    time_unit: float
+    article_id: int | None = None
+
+
+@router.get("/{ticket_id}/time-accounting", response_model=list[TimeAccountingOut])
+async def list_time_accounting(
+    ticket_id: int,
+    user: CurrentUser,
+    session: DbSession,
+) -> list[TimeAccountingOut]:
+    """List time-accounting rows for a ticket (requires ``ro``)."""
+    from sqlalchemy import text
+
+    from tiqora.domain.ticket_service import TicketService
+
+    try:
+        await TicketService(session)._assert_ticket_ro(user.id, ticket_id)
+    except (TicketAccessDenied, TicketNotFound) as exc:
+        raise _map_exc(exc) from exc
+
+    rows = (
+        (
+            await session.execute(
+                text(
+                    "SELECT ta.id, ta.ticket_id, ta.article_id, ta.time_unit,"
+                    " ta.create_time, ta.create_by, u.login AS create_by_login"
+                    " FROM time_accounting ta"
+                    " LEFT JOIN users u ON u.id = ta.create_by"
+                    " WHERE ta.ticket_id = :tid ORDER BY ta.id"
+                ),
+                {"tid": ticket_id},
+            )
+        )
+        .mappings()
+        .all()
+    )
+    return [
+        TimeAccountingOut(
+            id=int(r["id"]),
+            ticket_id=int(r["ticket_id"]),
+            article_id=int(r["article_id"]) if r.get("article_id") is not None else None,
+            time_unit=float(r["time_unit"]),
+            create_time=r.get("create_time"),
+            create_by=int(r["create_by"]),
+            create_by_login=r.get("create_by_login"),
+        )
+        for r in rows
+    ]
+
+
+@router.post(
+    "/{ticket_id}/time-accounting",
+    response_model=TimeAccountingOut,
+    status_code=status.HTTP_201_CREATED,
+)
+async def create_time_accounting(
+    ticket_id: int,
+    body: TimeAccountingCreate,
+    user: CurrentUser,
+    session: DbSession,
+    settings: AppSettings,
+) -> TimeAccountingOut:
+    """Book time units on a ticket (requires ``rw``)."""
+    from sqlalchemy import text
+
+    from tiqora.domain.ticket_write_service import _ticket_must_exist
+
+    if body.time_unit <= 0:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="time_unit must be positive",
+        )
+    svc = _write_service(session, settings)
+    try:
+        async with session.begin():
+            ticket = await _ticket_must_exist(session, ticket_id)
+            await svc._assert_rw(user.id, int(ticket["queue_id"]))
+            await session.execute(
+                text(
+                    "INSERT INTO time_accounting"
+                    " (ticket_id, article_id, time_unit, create_time, create_by,"
+                    "  change_time, change_by)"
+                    " VALUES (:tid, :aid, :units, current_timestamp, :uid,"
+                    "         current_timestamp, :uid)"
+                ),
+                {
+                    "tid": ticket_id,
+                    "aid": body.article_id,
+                    "units": body.time_unit,
+                    "uid": user.id,
+                },
+            )
+            row = (
+                (
+                    await session.execute(
+                        text(
+                            "SELECT ta.id, ta.ticket_id, ta.article_id, ta.time_unit,"
+                            " ta.create_time, ta.create_by, u.login AS create_by_login"
+                            " FROM time_accounting ta"
+                            " LEFT JOIN users u ON u.id = ta.create_by"
+                            " WHERE ta.ticket_id = :tid AND ta.create_by = :uid"
+                            " ORDER BY ta.id DESC LIMIT 1"
+                        ),
+                        {"tid": ticket_id, "uid": user.id},
+                    )
+                )
+                .mappings()
+                .first()
+            )
+    except (WriteAccessDenied, WriteNotFound, InvalidInput) as exc:
+        raise _map_exc(exc) from exc
+    if row is None:
+        raise HTTPException(status_code=500, detail="Time accounting insert failed")
+    return TimeAccountingOut(
+        id=int(row["id"]),
+        ticket_id=int(row["ticket_id"]),
+        article_id=int(row["article_id"]) if row.get("article_id") is not None else None,
+        time_unit=float(row["time_unit"]),
+        create_time=row.get("create_time"),
+        create_by=int(row["create_by"]),
+        create_by_login=row.get("create_by_login"),
+    )
+
+
+@router.delete(
+    "/{ticket_id}/time-accounting/{entry_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+async def delete_time_accounting(
+    ticket_id: int,
+    entry_id: int,
+    user: CurrentUser,
+    session: DbSession,
+    settings: AppSettings,
+) -> None:
+    """Delete a time-accounting row (requires ``rw``)."""
+    from sqlalchemy import text
+
+    from tiqora.domain.ticket_write_service import _ticket_must_exist
+
+    svc = _write_service(session, settings)
+    try:
+        async with session.begin():
+            ticket = await _ticket_must_exist(session, ticket_id)
+            await svc._assert_rw(user.id, int(ticket["queue_id"]))
+            result = await session.execute(
+                text(
+                    "DELETE FROM time_accounting WHERE id = :eid AND ticket_id = :tid"
+                ),
+                {"eid": entry_id, "tid": ticket_id},
+            )
+            if result.rowcount == 0:
+                raise WriteNotFound(f"time_accounting {entry_id}")
+    except (WriteAccessDenied, WriteNotFound, InvalidInput) as exc:
+        raise _map_exc(exc) from exc

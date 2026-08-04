@@ -145,6 +145,30 @@ export type StateUpdate = Schemas["StateUpdate"];
 export type PriorityOut = Schemas["PriorityOut"];
 export type PriorityCreate = Schemas["PriorityCreate"];
 export type PriorityUpdate = Schemas["PriorityUpdate"];
+export type TicketTypeOut = Schemas["TicketTypeOut"];
+export type TicketTypeCreate = Schemas["TicketTypeCreate"];
+export type TicketTypeUpdate = Schemas["TicketTypeUpdate"];
+export type ServiceOut = Schemas["ServiceOut"];
+export type ServiceCreate = Schemas["ServiceCreate"];
+export type ServiceUpdate = Schemas["ServiceUpdate"];
+export type SlaOut = Schemas["SlaOut"];
+export type SlaCreate = Schemas["SlaCreate"];
+export type SlaUpdate = Schemas["SlaUpdate"];
+export type SystemAddressCreate = Schemas["SystemAddressCreate"];
+export type SystemAddressUpdate = Schemas["SystemAddressUpdate"];
+export type NotificationEventOut = Schemas["NotificationEventOut"];
+export type NotificationEventWrite = Schemas["NotificationEventWrite"];
+export type NotificationEventUpdate = Schemas["NotificationEventUpdate"];
+export type NotificationMessageIn = Schemas["NotificationMessageIn"];
+export type GenericAgentJobWrite = Schemas["GenericAgentJobWrite"];
+export type GenericAgentJobUpdate = Schemas["GenericAgentJobUpdate"];
+export type MentionOut = Schemas["MentionOut"];
+export type MentionCreate = Schemas["MentionCreate"];
+export type TimeAccountingOut = Schemas["TimeAccountingOut"];
+export type TimeAccountingCreate = Schemas["TimeAccountingCreate"];
+export type TypeRef = Schemas["TypeRefOut"];
+export type ServiceRef = Schemas["ServiceRefOut"];
+export type SlaRef = Schemas["SlaRefOut"];
 export type CustomerUserAdminOut = Schemas["CustomerUserAdminOut"];
 export type CustomerUserAdminCreate = Schemas["CustomerUserAdminCreate"];
 export type CustomerUserAdminUpdate = Schemas["CustomerUserAdminUpdate"];
@@ -1412,6 +1436,24 @@ export class ApiClient {
     return this.request<PriorityRef[]>("GET", "/api/v1/reference/priorities", { signal });
   }
 
+  listReferenceTypes(signal?: AbortSignal) {
+    return this.request<TypeRef[]>("GET", "/api/v1/reference/types", { signal });
+  }
+
+  listReferenceServices(signal?: AbortSignal) {
+    return this.request<ServiceRef[]>("GET", "/api/v1/reference/services", { signal });
+  }
+
+  listReferenceSlas(
+    params: { service_id?: number } = {},
+    signal?: AbortSignal,
+  ) {
+    return this.request<SlaRef[]>("GET", "/api/v1/reference/slas", {
+      query: params,
+      signal,
+    });
+  }
+
   listReferenceStates(signal?: AbortSignal) {
     return this.request<StateRef[]>("GET", "/api/v1/reference/states", { signal });
   }
@@ -1766,6 +1808,22 @@ export class ApiClient {
     return this.adminCrud<PriorityOut, PriorityCreate, PriorityUpdate>(
       "/api/v1/admin/priorities",
     );
+  }
+
+  get adminTypes() {
+    return this.adminCrud<TicketTypeOut, TicketTypeCreate, TicketTypeUpdate>(
+      "/api/v1/admin/types",
+    );
+  }
+
+  get adminServices() {
+    return this.adminCrud<ServiceOut, ServiceCreate, ServiceUpdate>(
+      "/api/v1/admin/services",
+    );
+  }
+
+  get adminSlas() {
+    return this.adminCrud<SlaOut, SlaCreate, SlaUpdate>("/api/v1/admin/slas");
   }
 
   get adminCustomerUsers() {
@@ -2314,6 +2372,139 @@ export class ApiClient {
     return this.request<SystemAddressOut[]>("GET", "/api/v1/admin/system-addresses", {
       signal,
     });
+  }
+
+  createSystemAddress(body: SystemAddressCreate, signal?: AbortSignal) {
+    return this.request<SystemAddressOut>("POST", "/api/v1/admin/system-addresses", {
+      body,
+      signal,
+    });
+  }
+
+  updateSystemAddress(id: number, body: SystemAddressUpdate, signal?: AbortSignal) {
+    return this.request<SystemAddressOut>("PATCH", `/api/v1/admin/system-addresses/${id}`, {
+      body,
+      signal,
+    });
+  }
+
+  deleteSystemAddress(id: number, signal?: AbortSignal) {
+    return this.request<void>("DELETE", `/api/v1/admin/system-addresses/${id}`, { signal });
+  }
+
+  listNotificationEvents(signal?: AbortSignal) {
+    return this.request<NotificationEventOut[]>("GET", "/api/v1/admin/notification-events", {
+      signal,
+    });
+  }
+
+  getNotificationEvent(id: number, signal?: AbortSignal) {
+    return this.request<NotificationEventOut>(
+      "GET",
+      `/api/v1/admin/notification-events/${id}`,
+      { signal },
+    );
+  }
+
+  createNotificationEvent(body: NotificationEventWrite, signal?: AbortSignal) {
+    return this.request<NotificationEventOut>("POST", "/api/v1/admin/notification-events", {
+      body,
+      signal,
+    });
+  }
+
+  updateNotificationEvent(id: number, body: NotificationEventUpdate, signal?: AbortSignal) {
+    return this.request<NotificationEventOut>(
+      "PATCH",
+      `/api/v1/admin/notification-events/${id}`,
+      { body, signal },
+    );
+  }
+
+  deleteNotificationEvent(id: number, signal?: AbortSignal) {
+    return this.request<void>("DELETE", `/api/v1/admin/notification-events/${id}`, {
+      signal,
+    });
+  }
+
+  upsertGenericAgentJob(body: GenericAgentJobWrite, signal?: AbortSignal) {
+    return this.request<GenericAgentJobOut>("PUT", "/api/v1/admin/generic-agent-jobs", {
+      body,
+      signal,
+    });
+  }
+
+  updateGenericAgentJob(
+    jobName: string,
+    body: GenericAgentJobUpdate,
+    signal?: AbortSignal,
+  ) {
+    return this.request<GenericAgentJobOut>(
+      "PATCH",
+      `/api/v1/admin/generic-agent-jobs/${encodeURIComponent(jobName)}`,
+      { body, signal },
+    );
+  }
+
+  deleteGenericAgentJob(jobName: string, signal?: AbortSignal) {
+    return this.request<void>(
+      "DELETE",
+      `/api/v1/admin/generic-agent-jobs/${encodeURIComponent(jobName)}`,
+      { signal },
+    );
+  }
+
+  listTicketMentions(ticketId: number, signal?: AbortSignal) {
+    return this.request<MentionOut[]>("GET", `/api/v1/tickets/${ticketId}/mentions`, {
+      signal,
+    });
+  }
+
+  createTicketMention(ticketId: number, body: MentionCreate, signal?: AbortSignal) {
+    return this.request<MentionOut>("POST", `/api/v1/tickets/${ticketId}/mentions`, {
+      body,
+      signal,
+    });
+  }
+
+  deleteTicketMention(ticketId: number, mentionId: number, signal?: AbortSignal) {
+    return this.request<void>(
+      "DELETE",
+      `/api/v1/tickets/${ticketId}/mentions/${mentionId}`,
+      { signal },
+    );
+  }
+
+  listTicketTimeAccounting(ticketId: number, signal?: AbortSignal) {
+    return this.request<TimeAccountingOut[]>(
+      "GET",
+      `/api/v1/tickets/${ticketId}/time-accounting`,
+      { signal },
+    );
+  }
+
+  createTicketTimeAccounting(
+    ticketId: number,
+    body: TimeAccountingCreate,
+    signal?: AbortSignal,
+  ) {
+    return this.request<TimeAccountingOut>(
+      "POST",
+      `/api/v1/tickets/${ticketId}/time-accounting`,
+      { body, signal },
+    );
+  }
+
+  deleteTicketTimeAccounting(
+    ticketId: number,
+    entryId: number,
+    signal?: AbortSignal,
+  ) {
+    return this.request<void>(
+      "DELETE",
+      `/api/v1/tickets/${ticketId}/time-accounting/${entryId}`,
+      { signal },
+    );
   }
 
   listFollowUpPossible(signal?: AbortSignal) {

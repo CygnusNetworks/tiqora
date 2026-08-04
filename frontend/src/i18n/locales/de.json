@@ -493,7 +493,15 @@
       "title": "Ähnliche Tickets",
       "empty": "Keine ähnlichen geschlossenen Tickets gefunden.",
       "loadError": "Ähnliche Tickets konnten nicht geladen werden."
-    }
+    },
+    "type": "Typ",
+    "service": "Service",
+    "sla": "SLA",
+    "mentions": "Mentions",
+    "timeAccounting": "Zeiterfassung",
+    "timeUnits": "Zeiteinheiten",
+    "addTime": "Zeit buchen",
+    "addMention": "Agent erwähnen"
   },
   "search": {
     "title": "Suche",
@@ -1225,7 +1233,12 @@
       "aiQueues": "Queue-Policies",
       "aiAudit": "Anfrage-Audit",
       "aiAcl": "Zugriff & Limits",
-      "collapse": "Navigation einklappen"
+      "collapse": "Navigation einklappen",
+      "types": "Ticket-Typen",
+      "services": "Services",
+      "slas": "SLAs",
+      "systemAddresses": "Systemadressen",
+      "notificationEvents": "Benachrichtigungen"
     },
     "table": {
       "id": "ID",
@@ -2260,7 +2273,48 @@
       "aiMcp": "MCP-Server als Werkzeugquellen für die KI verwalten und Tools freigeben.",
       "aiQueues": "KI-Verhalten je Queue konfigurieren: Autonomie, Limits, Eskalation.",
       "aiAudit": "Vollständiges Audit aller LLM-Anfragen/-Antworten, mit PII-Aufdeckung.",
-      "aiAcl": "KI-Berechtigungen und Kontingente je Gruppe, Rolle oder Agent."
+      "aiAcl": "KI-Berechtigungen und Kontingente je Gruppe, Rolle oder Agent.",
+      "types": "Ticket-Typen für die Klassifikation verwalten.",
+      "services": "Services verwalten und mit SLAs verknüpfen.",
+      "slas": "Service-Level-Agreements und Fristen verwalten.",
+      "systemAddresses": "Absenderadressen für Queues und Auto-Antworten.",
+      "notificationEvents": "Ereignisbasierte Agenten-Benachrichtigungen konfigurieren."
+    },
+    "types": {
+      "title_plural": "Ticket-Typen",
+      "new": "Neuer Typ",
+      "name": "Name"
+    },
+    "services": {
+      "title_plural": "Services",
+      "new": "Neuer Service",
+      "name": "Name",
+      "slaCount": "SLAs"
+    },
+    "slas": {
+      "title_plural": "SLAs",
+      "new": "Neue SLA",
+      "name": "Name",
+      "firstResponseTime": "Erste Reaktion (Min.)",
+      "updateTime": "Update (Min.)",
+      "solutionTime": "Lösung (Min.)",
+      "calendar": "Kalender"
+    },
+    "systemAddresses": {
+      "title_plural": "Systemadressen",
+      "subtitle": "Absenderadressen für Queues und Auto-Antworten.",
+      "new": "Adresse hinzufügen",
+      "email": "E-Mail",
+      "realName": "Anzeigename"
+    },
+    "notificationEvents": {
+      "title_plural": "Benachrichtigungen",
+      "subtitle": "Bei Ereignissen werden passende Benachrichtigungen an Agenten gesendet.",
+      "new": "Benachrichtigung anlegen",
+      "name": "Name",
+      "event": "Ereignis",
+      "subject": "Betreff",
+      "body": "Text"
     }
   },
   "kb": {
