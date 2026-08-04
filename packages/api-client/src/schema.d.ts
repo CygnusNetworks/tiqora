@@ -388,6 +388,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/oauth2/callback": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Oauth2 Authorization Callback
+         * @description Exchange ``code`` for tokens; Znuny-compatible ``state=TokenConfigID{{n}}``.
+         */
+        get: operations["oauth2_authorization_callback_api_v1_oauth2_callback_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/agents/presence/ping": {
         parameters: {
             query?: never;
@@ -1075,6 +1095,94 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/tickets/{ticket_id}/mentions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Mentions
+         * @description List agent mentions on a ticket (requires ticket ``ro``).
+         */
+        get: operations["list_mentions_api_v1_tickets__ticket_id__mentions_get"];
+        put?: never;
+        /**
+         * Create Mention
+         * @description Mention an agent on a ticket (requires ``note``).
+         */
+        post: operations["create_mention_api_v1_tickets__ticket_id__mentions_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tickets/{ticket_id}/mentions/{mention_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Delete Mention
+         * @description Remove a mention (requires ``note`` on the ticket).
+         */
+        delete: operations["delete_mention_api_v1_tickets__ticket_id__mentions__mention_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tickets/{ticket_id}/time-accounting": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Time Accounting
+         * @description List time-accounting rows for a ticket (requires ``ro``).
+         */
+        get: operations["list_time_accounting_api_v1_tickets__ticket_id__time_accounting_get"];
+        put?: never;
+        /**
+         * Create Time Accounting
+         * @description Book time units on a ticket (requires ``rw``).
+         */
+        post: operations["create_time_accounting_api_v1_tickets__ticket_id__time_accounting_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tickets/{ticket_id}/time-accounting/{entry_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Delete Time Accounting
+         * @description Delete a time-accounting row (requires ``rw``).
+         */
+        delete: operations["delete_time_accounting_api_v1_tickets__ticket_id__time_accounting__entry_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/tickets/{ticket_id}/ai": {
         parameters: {
             query?: never;
@@ -1375,6 +1483,66 @@ export interface paths {
         };
         /** List Priorities */
         get: operations["list_priorities_api_v1_reference_priorities_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/reference/types": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Types
+         * @description Valid ticket types for create/zoom pickers.
+         */
+        get: operations["list_types_api_v1_reference_types_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/reference/services": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Services
+         * @description Valid services for create/zoom pickers.
+         */
+        get: operations["list_services_api_v1_reference_services_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/reference/slas": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Slas
+         * @description Valid SLAs; optionally filtered to those linked to ``service_id``.
+         */
+        get: operations["list_slas_api_v1_reference_slas_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -2705,6 +2873,117 @@ export interface paths {
         patch: operations["update_priority_api_v1_admin_priorities__priority_id__patch"];
         trace?: never;
     };
+    "/api/v1/admin/types": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Types */
+        get: operations["list_types_api_v1_admin_types_get"];
+        put?: never;
+        /** Create Type */
+        post: operations["create_type_api_v1_admin_types_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/types/{type_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Type */
+        get: operations["get_type_api_v1_admin_types__type_id__get"];
+        put?: never;
+        post?: never;
+        /** Deactivate Type */
+        delete: operations["deactivate_type_api_v1_admin_types__type_id__delete"];
+        options?: never;
+        head?: never;
+        /** Update Type */
+        patch: operations["update_type_api_v1_admin_types__type_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/admin/services": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Services */
+        get: operations["list_services_api_v1_admin_services_get"];
+        put?: never;
+        /** Create Service */
+        post: operations["create_service_api_v1_admin_services_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/services/{service_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Service */
+        get: operations["get_service_api_v1_admin_services__service_id__get"];
+        put?: never;
+        post?: never;
+        /** Deactivate Service */
+        delete: operations["deactivate_service_api_v1_admin_services__service_id__delete"];
+        options?: never;
+        head?: never;
+        /** Update Service */
+        patch: operations["update_service_api_v1_admin_services__service_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/admin/slas": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Slas */
+        get: operations["list_slas_api_v1_admin_slas_get"];
+        put?: never;
+        /** Create Sla */
+        post: operations["create_sla_api_v1_admin_slas_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/slas/{sla_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Sla */
+        get: operations["get_sla_api_v1_admin_slas__sla_id__get"];
+        put?: never;
+        post?: never;
+        /** Deactivate Sla */
+        delete: operations["deactivate_sla_api_v1_admin_slas__sla_id__delete"];
+        options?: never;
+        head?: never;
+        /** Update Sla */
+        patch: operations["update_sla_api_v1_admin_slas__sla_id__patch"];
+        trace?: never;
+    };
     "/api/v1/admin/customer-users": {
         parameters: {
             query?: never;
@@ -3488,10 +3767,14 @@ export interface paths {
         /**
          * List System Addresses
          * @description Valid system addresses for queue / auto-response From pickers.
+         *
+         *     Full CRUD (paginated) lives under :mod:`system_addresses`; this unpaginated
+         *     list stays for existing queue/auto-response pickers.
          */
         get: operations["list_system_addresses_api_v1_admin_system_addresses_get"];
         put?: never;
-        post?: never;
+        /** Create System Address */
+        post: operations["create_system_address_api_v1_admin_system_addresses_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -3561,7 +3844,11 @@ export interface paths {
         };
         /** List Generic Agent Jobs */
         get: operations["list_generic_agent_jobs_api_v1_admin_generic_agent_jobs_get"];
-        put?: never;
+        /**
+         * Upsert Generic Agent Job
+         * @description Create or fully replace a job's settings under ``job_name``.
+         */
+        put: operations["upsert_generic_agent_job_api_v1_admin_generic_agent_jobs_put"];
         post?: never;
         delete?: never;
         options?: never;
@@ -3580,10 +3867,68 @@ export interface paths {
         get: operations["get_generic_agent_job_api_v1_admin_generic_agent_jobs__job_name__get"];
         put?: never;
         post?: never;
+        /** Delete Generic Agent Job */
+        delete: operations["delete_generic_agent_job_api_v1_admin_generic_agent_jobs__job_name__delete"];
+        options?: never;
+        head?: never;
+        /** Update Generic Agent Job */
+        patch: operations["update_generic_agent_job_api_v1_admin_generic_agent_jobs__job_name__patch"];
+        trace?: never;
+    };
+    "/api/v1/admin/system-addresses/{address_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get System Address */
+        get: operations["get_system_address_api_v1_admin_system_addresses__address_id__get"];
+        put?: never;
+        post?: never;
+        /** Deactivate System Address */
+        delete: operations["deactivate_system_address_api_v1_admin_system_addresses__address_id__delete"];
+        options?: never;
+        head?: never;
+        /** Update System Address */
+        patch: operations["update_system_address_api_v1_admin_system_addresses__address_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/admin/notification-events": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Notification Events */
+        get: operations["list_notification_events_api_v1_admin_notification_events_get"];
+        put?: never;
+        /** Create Notification Event */
+        post: operations["create_notification_event_api_v1_admin_notification_events_post"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/notification-events/{notification_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Notification Event */
+        get: operations["get_notification_event_api_v1_admin_notification_events__notification_id__get"];
+        put?: never;
+        post?: never;
+        /** Deactivate Notification Event */
+        delete: operations["deactivate_notification_event_api_v1_admin_notification_events__notification_id__delete"];
+        options?: never;
+        head?: never;
+        /** Update Notification Event */
+        patch: operations["update_notification_event_api_v1_admin_notification_events__notification_id__patch"];
         trace?: never;
     };
     "/api/v1/admin/webhooks": {
@@ -3734,6 +4079,134 @@ export interface paths {
          * @description Connect + AUTH with the effective config; optionally send a test mail.
          */
         post: operations["test_mail_outbound_api_v1_admin_mail_outbound_test_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/mail-accounts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Mail Accounts */
+        get: operations["list_mail_accounts_api_v1_admin_mail_accounts_get"];
+        put?: never;
+        /** Create Mail Account */
+        post: operations["create_mail_account_api_v1_admin_mail_accounts_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/mail-accounts/{account_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Mail Account */
+        get: operations["get_mail_account_api_v1_admin_mail_accounts__account_id__get"];
+        put?: never;
+        post?: never;
+        /**
+         * Deactivate Mail Account
+         * @description Soft-deactivate (valid_id=2); matches other admin resources.
+         */
+        delete: operations["deactivate_mail_account_api_v1_admin_mail_accounts__account_id__delete"];
+        options?: never;
+        head?: never;
+        /** Update Mail Account */
+        patch: operations["update_mail_account_api_v1_admin_mail_accounts__account_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/admin/oauth2-token-configs/templates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Templates */
+        get: operations["get_templates_api_v1_admin_oauth2_token_configs_templates_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/oauth2-token-configs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Token Configs */
+        get: operations["list_token_configs_api_v1_admin_oauth2_token_configs_get"];
+        put?: never;
+        /** Create Token Config */
+        post: operations["create_token_config_api_v1_admin_oauth2_token_configs_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/oauth2-token-configs/{config_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Token Config */
+        get: operations["get_token_config_api_v1_admin_oauth2_token_configs__config_id__get"];
+        put?: never;
+        post?: never;
+        /** Remove Token Config */
+        delete: operations["remove_token_config_api_v1_admin_oauth2_token_configs__config_id__delete"];
+        options?: never;
+        head?: never;
+        /** Patch Token Config */
+        patch: operations["patch_token_config_api_v1_admin_oauth2_token_configs__config_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/admin/oauth2-token-configs/{config_id}/authorize-url": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Authorize Url */
+        get: operations["authorize_url_api_v1_admin_oauth2_token_configs__config_id__authorize_url_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/oauth2-token-configs/{config_id}/refresh": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Refresh Token */
+        post: operations["refresh_token_api_v1_admin_oauth2_token_configs__config_id__refresh_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -6511,6 +6984,15 @@ export interface components {
              */
             webauthn: boolean;
         };
+        /** AuthorizeUrlOut */
+        AuthorizeUrlOut: {
+            /** Url */
+            url: string;
+            /** Redirect Uri */
+            redirect_uri: string;
+            /** State */
+            state: string;
+        };
         /** AutoResponseCreate */
         AutoResponseCreate: {
             /** Name */
@@ -7680,6 +8162,30 @@ export interface components {
                 [key: string]: string[];
             };
         };
+        /**
+         * GenericAgentJobUpdate
+         * @description Rename and/or replace settings. Omitted fields keep previous values.
+         */
+        GenericAgentJobUpdate: {
+            /** Job Name */
+            job_name?: string | null;
+            /** Settings */
+            settings?: {
+                [key: string]: string[];
+            } | null;
+        };
+        /**
+         * GenericAgentJobWrite
+         * @description Create/replace a GenericAgent job as key → list-of-values (Znuny shape).
+         */
+        GenericAgentJobWrite: {
+            /** Job Name */
+            job_name: string;
+            /** Settings */
+            settings?: {
+                [key: string]: string[];
+            };
+        };
         /** GroupAssignment */
         GroupAssignment: {
             /** Group Id */
@@ -8081,6 +8587,110 @@ export interface components {
              */
             passkey_enrolled: boolean;
         };
+        /** MailAccountCreate */
+        MailAccountCreate: {
+            /** Login */
+            login: string;
+            /** Pw */
+            pw?: string | null;
+            /** Host */
+            host: string;
+            /**
+             * Account Type
+             * @default IMAPS
+             * @enum {string}
+             */
+            account_type: "IMAP" | "IMAPS" | "POP3" | "POP3S";
+            /** Queue Id */
+            queue_id: number;
+            /**
+             * Trusted
+             * @default false
+             */
+            trusted: boolean;
+            /**
+             * Imap Folder
+             * @default INBOX
+             */
+            imap_folder: string | null;
+            /**
+             * Authentication Type
+             * @default password
+             * @enum {string}
+             */
+            authentication_type: "password" | "oauth2_token";
+            /** Oauth2 Token Config Id */
+            oauth2_token_config_id?: number | null;
+            /** Comments */
+            comments?: string | null;
+            /**
+             * Valid
+             * @default true
+             */
+            valid: boolean;
+        };
+        /** MailAccountOut */
+        MailAccountOut: {
+            /** Id */
+            id: number;
+            /** Login */
+            login: string;
+            /** Host */
+            host: string;
+            /** Account Type */
+            account_type: string;
+            /** Queue Id */
+            queue_id: number;
+            /** Trusted */
+            trusted: boolean;
+            /** Imap Folder */
+            imap_folder?: string | null;
+            /**
+             * Authentication Type
+             * @default password
+             */
+            authentication_type: string;
+            /** Oauth2 Token Config Id */
+            oauth2_token_config_id?: number | null;
+            /** Comments */
+            comments?: string | null;
+            /** Valid */
+            valid: boolean;
+            /**
+             * Has Password
+             * @default false
+             */
+            has_password: boolean;
+            /** Create Time */
+            create_time?: string | null;
+            /** Change Time */
+            change_time?: string | null;
+        };
+        /** MailAccountUpdate */
+        MailAccountUpdate: {
+            /** Login */
+            login?: string | null;
+            /** Pw */
+            pw?: string | null;
+            /** Host */
+            host?: string | null;
+            /** Account Type */
+            account_type?: ("IMAP" | "IMAPS" | "POP3" | "POP3S") | null;
+            /** Queue Id */
+            queue_id?: number | null;
+            /** Trusted */
+            trusted?: boolean | null;
+            /** Imap Folder */
+            imap_folder?: string | null;
+            /** Authentication Type */
+            authentication_type?: ("password" | "oauth2_token") | null;
+            /** Oauth2 Token Config Id */
+            oauth2_token_config_id?: number | null;
+            /** Comments */
+            comments?: string | null;
+            /** Valid */
+            valid?: boolean | null;
+        };
         /** MailLogOut */
         MailLogOut: {
             /** Id */
@@ -8134,11 +8744,16 @@ export interface components {
              * Auth Type
              * @enum {string}
              */
-            auth_type: "none" | "password";
+            auth_type: "none" | "password" | "oauth2_token";
             /** Auth User */
             auth_user: string;
             /** Has Password */
             has_password: boolean;
+            /**
+             * Oauth2 Token Config Name
+             * @default
+             */
+            oauth2_token_config_name: string;
             /** From Default */
             from_default: string;
             /** Timeout Seconds */
@@ -8176,11 +8791,13 @@ export interface components {
             /** Security */
             security?: ("none" | "starttls" | "ssl") | null;
             /** Auth Type */
-            auth_type?: ("none" | "password") | null;
+            auth_type?: ("none" | "password" | "oauth2_token") | null;
             /** Auth User */
             auth_user?: string | null;
             /** Auth Password */
             auth_password?: string | null;
+            /** Oauth2 Token Config Name */
+            oauth2_token_config_name?: string | null;
             /** From Default */
             from_default?: string | null;
             /** Timeout Seconds */
@@ -8277,6 +8894,30 @@ export interface components {
             /** Mutating */
             mutating?: boolean | null;
         };
+        /** MentionCreate */
+        MentionCreate: {
+            /** User Id */
+            user_id: number;
+            /** Article Id */
+            article_id?: number | null;
+        };
+        /** MentionOut */
+        MentionOut: {
+            /** Id */
+            id: number;
+            /** User Id */
+            user_id: number;
+            /** Ticket Id */
+            ticket_id: number;
+            /** Article Id */
+            article_id?: number | null;
+            /** Create Time */
+            create_time?: string | null;
+            /** User Login */
+            user_login?: string | null;
+            /** User Name */
+            user_name?: string | null;
+        };
         /** MergeRequest */
         MergeRequest: {
             /** Main Ticket Id */
@@ -8293,6 +8934,16 @@ export interface components {
             state_id?: number | null;
             /** Priority Id */
             priority_id?: number | null;
+            /** Type Id */
+            type_id?: number | null;
+            /** Service Id */
+            service_id?: number | null;
+            /** Clear Service */
+            clear_service?: boolean | null;
+            /** Sla Id */
+            sla_id?: number | null;
+            /** Clear Sla */
+            clear_sla?: boolean | null;
             /** Title */
             title?: string | null;
             /** Customer Id */
@@ -8327,6 +8978,178 @@ export interface components {
             open: number;
             /** New */
             new: number;
+        };
+        /** NotificationEventOut */
+        NotificationEventOut: {
+            /** Id */
+            id: number;
+            /** Name */
+            name: string;
+            /** Comments */
+            comments?: string | null;
+            /** Valid Id */
+            valid_id: number;
+            /** Create Time */
+            create_time?: string | null;
+            /** Change Time */
+            change_time?: string | null;
+            /** Items */
+            items?: {
+                [key: string]: string[];
+            };
+            /** Messages */
+            messages?: components["schemas"]["NotificationMessageIn"][];
+        };
+        /** NotificationEventUpdate */
+        NotificationEventUpdate: {
+            /** Name */
+            name?: string | null;
+            /** Comments */
+            comments?: string | null;
+            /** Valid Id */
+            valid_id?: number | null;
+            /** Items */
+            items?: {
+                [key: string]: string[];
+            } | null;
+            /** Messages */
+            messages?: components["schemas"]["NotificationMessageIn"][] | null;
+        };
+        /** NotificationEventWrite */
+        NotificationEventWrite: {
+            /** Name */
+            name: string;
+            /** Comments */
+            comments?: string | null;
+            /**
+             * Valid Id
+             * @default 1
+             */
+            valid_id: number;
+            /** Items */
+            items?: {
+                [key: string]: string[];
+            };
+            /** Messages */
+            messages?: components["schemas"]["NotificationMessageIn"][];
+        };
+        /** NotificationMessageIn */
+        NotificationMessageIn: {
+            /**
+             * Language
+             * @default en
+             */
+            language: string;
+            /** Subject */
+            subject: string;
+            /** Text */
+            text: string;
+            /**
+             * Content Type
+             * @default text/plain
+             */
+            content_type: string;
+        };
+        /** OAuth2TokenConfigCreate */
+        OAuth2TokenConfigCreate: {
+            /** Name */
+            name: string;
+            /** Config */
+            config?: {
+                [key: string]: unknown;
+            };
+            /**
+             * Valid
+             * @default true
+             */
+            valid: boolean;
+            /** Client Id */
+            client_id?: string | null;
+            /** Client Secret */
+            client_secret?: string | null;
+            /** Scope */
+            scope?: string | null;
+            /** Template Id */
+            template_id?: string | null;
+        };
+        /** OAuth2TokenConfigOut */
+        OAuth2TokenConfigOut: {
+            /** Id */
+            id: number;
+            /** Name */
+            name: string;
+            /** Config */
+            config: {
+                [key: string]: unknown;
+            };
+            /**
+             * Client Id
+             * @default
+             */
+            client_id: string;
+            /**
+             * Has Client Secret
+             * @default false
+             */
+            has_client_secret: boolean;
+            /**
+             * Scope
+             * @default
+             */
+            scope: string;
+            /** Valid */
+            valid: boolean;
+            /** Token Status */
+            token_status: string;
+            /** Token Expiration Date */
+            token_expiration_date?: string | null;
+            /** Refresh Token Expiration Date */
+            refresh_token_expiration_date?: string | null;
+            /**
+             * Has Token
+             * @default false
+             */
+            has_token: boolean;
+            /**
+             * Has Refresh Token
+             * @default false
+             */
+            has_refresh_token: boolean;
+            /**
+             * Error Message
+             * @default
+             */
+            error_message: string;
+            /** Create Time */
+            create_time?: string | null;
+            /** Create By */
+            create_by?: number | null;
+            /** Change Time */
+            change_time?: string | null;
+            /** Change By */
+            change_by?: number | null;
+            /**
+             * Redirect Uri
+             * @default
+             */
+            redirect_uri: string;
+        };
+        /** OAuth2TokenConfigUpdate */
+        OAuth2TokenConfigUpdate: {
+            /** Name */
+            name?: string | null;
+            /** Config */
+            config?: {
+                [key: string]: unknown;
+            } | null;
+            /** Valid */
+            valid?: boolean | null;
+            /** Client Id */
+            client_id?: string | null;
+            /** Client Secret */
+            client_secret?: string | null;
+            /** Scope */
+            scope?: string | null;
         };
         /**
          * OccurrenceOut
@@ -8464,10 +9287,32 @@ export interface components {
             /** Page Size */
             page_size: number;
         };
+        /** Page[MailAccountOut] */
+        Page_MailAccountOut_: {
+            /** Items */
+            items: components["schemas"]["MailAccountOut"][];
+            /** Total */
+            total: number;
+            /** Page */
+            page: number;
+            /** Page Size */
+            page_size: number;
+        };
         /** Page[MailLogOut] */
         Page_MailLogOut_: {
             /** Items */
             items: components["schemas"]["MailLogOut"][];
+            /** Total */
+            total: number;
+            /** Page */
+            page: number;
+            /** Page Size */
+            page_size: number;
+        };
+        /** Page[OAuth2TokenConfigOut] */
+        Page_OAuth2TokenConfigOut_: {
+            /** Items */
+            items: components["schemas"]["OAuth2TokenConfigOut"][];
             /** Total */
             total: number;
             /** Page */
@@ -8541,10 +9386,32 @@ export interface components {
             /** Page Size */
             page_size: number;
         };
+        /** Page[ServiceOut] */
+        Page_ServiceOut_: {
+            /** Items */
+            items: components["schemas"]["ServiceOut"][];
+            /** Total */
+            total: number;
+            /** Page */
+            page: number;
+            /** Page Size */
+            page_size: number;
+        };
         /** Page[SignatureOut] */
         Page_SignatureOut_: {
             /** Items */
             items: components["schemas"]["SignatureOut"][];
+            /** Total */
+            total: number;
+            /** Page */
+            page: number;
+            /** Page Size */
+            page_size: number;
+        };
+        /** Page[SlaOut] */
+        Page_SlaOut_: {
+            /** Items */
+            items: components["schemas"]["SlaOut"][];
             /** Total */
             total: number;
             /** Page */
@@ -8578,6 +9445,17 @@ export interface components {
         Page_StateOut_: {
             /** Items */
             items: components["schemas"]["StateOut"][];
+            /** Total */
+            total: number;
+            /** Page */
+            page: number;
+            /** Page Size */
+            page_size: number;
+        };
+        /** Page[TicketTypeOut] */
+        Page_TicketTypeOut_: {
+            /** Items */
+            items: components["schemas"]["TicketTypeOut"][];
             /** Total */
             total: number;
             /** Page */
@@ -9002,6 +9880,17 @@ export interface components {
             name: string;
             /** State Entity Id */
             state_entity_id: string;
+        };
+        /** ProviderTemplateOut */
+        ProviderTemplateOut: {
+            /** Id */
+            id: string;
+            /** Name */
+            name: string;
+            /** Config */
+            config: {
+                [key: string]: unknown;
+            };
         };
         /** QueueAutoResponseAssignment */
         QueueAutoResponseAssignment: {
@@ -9457,6 +10346,55 @@ export interface components {
             /** Database Size Bytes */
             database_size_bytes?: number | null;
         };
+        /** ServiceCreate */
+        ServiceCreate: {
+            /** Name */
+            name: string;
+            /** Comments */
+            comments?: string | null;
+            /**
+             * Valid Id
+             * @default 1
+             */
+            valid_id: number;
+            /** Sla Ids */
+            sla_ids?: number[];
+        };
+        /** ServiceOut */
+        ServiceOut: {
+            /** Id */
+            id: number;
+            /** Name */
+            name: string;
+            /** Comments */
+            comments?: string | null;
+            /** Valid Id */
+            valid_id: number;
+            /** Create Time */
+            create_time?: string | null;
+            /** Change Time */
+            change_time?: string | null;
+            /** Sla Ids */
+            sla_ids?: number[];
+        };
+        /** ServiceRefOut */
+        ServiceRefOut: {
+            /** Id */
+            id: number;
+            /** Name */
+            name: string;
+        };
+        /** ServiceUpdate */
+        ServiceUpdate: {
+            /** Name */
+            name?: string | null;
+            /** Comments */
+            comments?: string | null;
+            /** Valid Id */
+            valid_id?: number | null;
+            /** Sla Ids */
+            sla_ids?: number[] | null;
+        };
         /** SignatureOut */
         SignatureOut: {
             /** Id */
@@ -9531,6 +10469,86 @@ export interface components {
             /** Items */
             items: components["schemas"]["SimilarTicketItem"][];
         };
+        /** SlaCreate */
+        SlaCreate: {
+            /** Name */
+            name: string;
+            /** Calendar Name */
+            calendar_name?: string | null;
+            /**
+             * First Response Time
+             * @default 0
+             */
+            first_response_time: number;
+            /** First Response Notify */
+            first_response_notify?: number | null;
+            /**
+             * Update Time
+             * @default 0
+             */
+            update_time: number;
+            /** Update Notify */
+            update_notify?: number | null;
+            /**
+             * Solution Time
+             * @default 0
+             */
+            solution_time: number;
+            /** Solution Notify */
+            solution_notify?: number | null;
+            /** Comments */
+            comments?: string | null;
+            /**
+             * Valid Id
+             * @default 1
+             */
+            valid_id: number;
+            /** Service Ids */
+            service_ids?: number[];
+        };
+        /** SlaOut */
+        SlaOut: {
+            /** Id */
+            id: number;
+            /** Name */
+            name: string;
+            /** Calendar Name */
+            calendar_name?: string | null;
+            /** First Response Time */
+            first_response_time: number;
+            /** First Response Notify */
+            first_response_notify?: number | null;
+            /** Update Time */
+            update_time: number;
+            /** Update Notify */
+            update_notify?: number | null;
+            /** Solution Time */
+            solution_time: number;
+            /** Solution Notify */
+            solution_notify?: number | null;
+            /** Comments */
+            comments?: string | null;
+            /** Valid Id */
+            valid_id: number;
+            /** Create Time */
+            create_time?: string | null;
+            /** Change Time */
+            change_time?: string | null;
+            /** Service Ids */
+            service_ids?: number[];
+        };
+        /** SlaRefOut */
+        SlaRefOut: {
+            /** Id */
+            id: number;
+            /** Name */
+            name: string;
+            /**
+             * Service Ids
+             * @default []
+             */
+            service_ids: number[];
+        };
         /** SlaStatsOut */
         SlaStatsOut: {
             /** Total */
@@ -9547,6 +10565,31 @@ export interface components {
             first_response_minutes: number[];
             /** Solution Minutes */
             solution_minutes: number[];
+        };
+        /** SlaUpdate */
+        SlaUpdate: {
+            /** Name */
+            name?: string | null;
+            /** Calendar Name */
+            calendar_name?: string | null;
+            /** First Response Time */
+            first_response_time?: number | null;
+            /** First Response Notify */
+            first_response_notify?: number | null;
+            /** Update Time */
+            update_time?: number | null;
+            /** Update Notify */
+            update_notify?: number | null;
+            /** Solution Time */
+            solution_time?: number | null;
+            /** Solution Notify */
+            solution_notify?: number | null;
+            /** Comments */
+            comments?: string | null;
+            /** Valid Id */
+            valid_id?: number | null;
+            /** Service Ids */
+            service_ids?: number[] | null;
         };
         /** SmsInboundRequest */
         SmsInboundRequest: {
@@ -9845,6 +10888,29 @@ export interface components {
             /** Subject Format */
             subject_format: string;
         };
+        /** SystemAddressCreate */
+        SystemAddressCreate: {
+            /** Value0 */
+            value0: string;
+            /** Value1 */
+            value1: string;
+            /** Value2 */
+            value2?: string | null;
+            /** Value3 */
+            value3?: string | null;
+            /**
+             * Queue Id
+             * @default 1
+             */
+            queue_id: number;
+            /** Comments */
+            comments?: string | null;
+            /**
+             * Valid Id
+             * @default 1
+             */
+            valid_id: number;
+        };
         /**
          * SystemAddressOut
          * @description Reference row for resolving ``queue.system_address_id`` to a label.
@@ -9859,10 +10925,37 @@ export interface components {
             value0: string;
             /** Value1 */
             value1: string;
+            /** Value2 */
+            value2?: string | null;
+            /** Value3 */
+            value3?: string | null;
+            /** Queue Id */
+            queue_id?: number | null;
             /** Comments */
             comments?: string | null;
             /** Valid Id */
             valid_id: number;
+            /** Create Time */
+            create_time?: string | null;
+            /** Change Time */
+            change_time?: string | null;
+        };
+        /** SystemAddressUpdate */
+        SystemAddressUpdate: {
+            /** Value0 */
+            value0?: string | null;
+            /** Value1 */
+            value1?: string | null;
+            /** Value2 */
+            value2?: string | null;
+            /** Value3 */
+            value3?: string | null;
+            /** Queue Id */
+            queue_id?: number | null;
+            /** Comments */
+            comments?: string | null;
+            /** Valid Id */
+            valid_id?: number | null;
         };
         /**
          * SystemInfoOut
@@ -10085,10 +11178,16 @@ export interface components {
             until_time: number;
             /** Type Id */
             type_id?: number | null;
+            /** Type Name */
+            type_name?: string | null;
             /** Service Id */
             service_id?: number | null;
+            /** Service Name */
+            service_name?: string | null;
             /** Sla Id */
             sla_id?: number | null;
+            /** Sla Name */
+            sla_name?: string | null;
             /** Responsible User Id */
             responsible_user_id?: number | null;
             /** Create By */
@@ -10332,12 +11431,73 @@ export interface components {
             /** State Type */
             state_type?: string | null;
         };
+        /** TicketTypeCreate */
+        TicketTypeCreate: {
+            /** Name */
+            name: string;
+            /**
+             * Valid Id
+             * @default 1
+             */
+            valid_id: number;
+        };
+        /** TicketTypeOut */
+        TicketTypeOut: {
+            /** Id */
+            id: number;
+            /** Name */
+            name: string;
+            /** Valid Id */
+            valid_id: number;
+            /** Create Time */
+            create_time?: string | null;
+            /** Change Time */
+            change_time?: string | null;
+        };
+        /** TicketTypeUpdate */
+        TicketTypeUpdate: {
+            /** Name */
+            name?: string | null;
+            /** Valid Id */
+            valid_id?: number | null;
+        };
         /** TicketVolumeOut */
         TicketVolumeOut: {
             /** Granularity */
             granularity: string;
             /** Points */
             points: components["schemas"]["VolumePointOut"][];
+        };
+        /** TimeAccountingCreate */
+        TimeAccountingCreate: {
+            /** Time Unit */
+            time_unit: number;
+            /** Article Id */
+            article_id?: number | null;
+        };
+        /** TimeAccountingOut */
+        TimeAccountingOut: {
+            /** Id */
+            id: number;
+            /** Ticket Id */
+            ticket_id: number;
+            /** Article Id */
+            article_id?: number | null;
+            /** Time Unit */
+            time_unit: number;
+            /** Create Time */
+            create_time?: string | null;
+            /** Create By */
+            create_by: number;
+            /** Create By Login */
+            create_by_login?: string | null;
+        };
+        /** TypeRefOut */
+        TypeRefOut: {
+            /** Id */
+            id: number;
+            /** Name */
+            name: string;
         };
         /** UserCreate */
         UserCreate: {
@@ -11165,6 +12325,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    oauth2_authorization_callback_api_v1_oauth2_callback_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/html": string;
                 };
             };
         };
@@ -12734,6 +13914,222 @@ export interface operations {
             };
         };
     };
+    list_mentions_api_v1_tickets__ticket_id__mentions_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                ticket_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MentionOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_mention_api_v1_tickets__ticket_id__mentions_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                ticket_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MentionCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MentionOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_mention_api_v1_tickets__ticket_id__mentions__mention_id__delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                ticket_id: number;
+                mention_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_time_accounting_api_v1_tickets__ticket_id__time_accounting_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                ticket_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TimeAccountingOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_time_accounting_api_v1_tickets__ticket_id__time_accounting_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                ticket_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TimeAccountingCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TimeAccountingOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_time_accounting_api_v1_tickets__ticket_id__time_accounting__entry_id__delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                ticket_id: number;
+                entry_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     get_ai_state_api_v1_tickets__ticket_id__ai_get: {
         parameters: {
             query?: never;
@@ -13290,6 +14686,107 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PriorityRefOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_types_api_v1_reference_types_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TypeRefOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_services_api_v1_reference_services_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ServiceRefOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_slas_api_v1_reference_slas_get: {
+        parameters: {
+            query?: {
+                service_id?: number | null;
+            };
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SlaRefOut"][];
                 };
             };
             /** @description Validation Error */
@@ -16975,6 +18472,555 @@ export interface operations {
             };
         };
     };
+    list_types_api_v1_admin_types_get: {
+        parameters: {
+            query?: {
+                page?: number;
+                page_size?: number;
+                valid?: "valid" | "invalid" | "all";
+                sort?: string | null;
+                order?: "asc" | "desc";
+            };
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Page_TicketTypeOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_type_api_v1_admin_types_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TicketTypeCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TicketTypeOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_type_api_v1_admin_types__type_id__get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                type_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TicketTypeOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    deactivate_type_api_v1_admin_types__type_id__delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                type_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_type_api_v1_admin_types__type_id__patch: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                type_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TicketTypeUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TicketTypeOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_services_api_v1_admin_services_get: {
+        parameters: {
+            query?: {
+                page?: number;
+                page_size?: number;
+                valid?: "valid" | "invalid" | "all";
+                sort?: string | null;
+                order?: "asc" | "desc";
+            };
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Page_ServiceOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_service_api_v1_admin_services_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ServiceCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ServiceOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_service_api_v1_admin_services__service_id__get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                service_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ServiceOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    deactivate_service_api_v1_admin_services__service_id__delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                service_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_service_api_v1_admin_services__service_id__patch: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                service_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ServiceUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ServiceOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_slas_api_v1_admin_slas_get: {
+        parameters: {
+            query?: {
+                page?: number;
+                page_size?: number;
+                valid?: "valid" | "invalid" | "all";
+                sort?: string | null;
+                order?: "asc" | "desc";
+            };
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Page_SlaOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_sla_api_v1_admin_slas_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SlaCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SlaOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_sla_api_v1_admin_slas__sla_id__get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                sla_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SlaOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    deactivate_sla_api_v1_admin_slas__sla_id__delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                sla_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_sla_api_v1_admin_slas__sla_id__patch: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                sla_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SlaUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SlaOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_customer_users_api_v1_admin_customer_users_get: {
         parameters: {
             query?: {
@@ -19544,6 +21590,43 @@ export interface operations {
             };
         };
     };
+    create_system_address_api_v1_admin_system_addresses_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SystemAddressCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SystemAddressOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_follow_up_possible_api_v1_admin_follow_up_possible_get: {
         parameters: {
             query?: never;
@@ -19678,6 +21761,43 @@ export interface operations {
             };
         };
     };
+    upsert_generic_agent_job_api_v1_admin_generic_agent_jobs_put: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GenericAgentJobWrite"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GenericAgentJobOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     get_generic_agent_job_api_v1_admin_generic_agent_jobs__job_name__get: {
         parameters: {
             query?: never;
@@ -19700,6 +21820,362 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["GenericAgentJobOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_generic_agent_job_api_v1_admin_generic_agent_jobs__job_name__delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                job_name: string;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_generic_agent_job_api_v1_admin_generic_agent_jobs__job_name__patch: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                job_name: string;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GenericAgentJobUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GenericAgentJobOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_system_address_api_v1_admin_system_addresses__address_id__get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                address_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SystemAddressOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    deactivate_system_address_api_v1_admin_system_addresses__address_id__delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                address_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_system_address_api_v1_admin_system_addresses__address_id__patch: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                address_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SystemAddressUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SystemAddressOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_notification_events_api_v1_admin_notification_events_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NotificationEventOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_notification_event_api_v1_admin_notification_events_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NotificationEventWrite"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NotificationEventOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_notification_event_api_v1_admin_notification_events__notification_id__get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                notification_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NotificationEventOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    deactivate_notification_event_api_v1_admin_notification_events__notification_id__delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                notification_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_notification_event_api_v1_admin_notification_events__notification_id__patch: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                notification_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NotificationEventUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NotificationEventOut"];
                 };
             };
             /** @description Validation Error */
@@ -20280,6 +22756,475 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MailOutboundTestOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_mail_accounts_api_v1_admin_mail_accounts_get: {
+        parameters: {
+            query?: {
+                page?: number;
+                page_size?: number;
+                valid?: "valid" | "invalid" | "all";
+                sort?: string | null;
+                order?: "asc" | "desc";
+            };
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Page_MailAccountOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_mail_account_api_v1_admin_mail_accounts_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MailAccountCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MailAccountOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_mail_account_api_v1_admin_mail_accounts__account_id__get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                account_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MailAccountOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    deactivate_mail_account_api_v1_admin_mail_accounts__account_id__delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                account_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_mail_account_api_v1_admin_mail_accounts__account_id__patch: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                account_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MailAccountUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MailAccountOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_templates_api_v1_admin_oauth2_token_configs_templates_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProviderTemplateOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_token_configs_api_v1_admin_oauth2_token_configs_get: {
+        parameters: {
+            query?: {
+                page?: number;
+                page_size?: number;
+                valid?: "valid" | "invalid" | "all";
+                sort?: string | null;
+                order?: "asc" | "desc";
+            };
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Page_OAuth2TokenConfigOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_token_config_api_v1_admin_oauth2_token_configs_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OAuth2TokenConfigCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OAuth2TokenConfigOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_token_config_api_v1_admin_oauth2_token_configs__config_id__get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                config_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OAuth2TokenConfigOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    remove_token_config_api_v1_admin_oauth2_token_configs__config_id__delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                config_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    patch_token_config_api_v1_admin_oauth2_token_configs__config_id__patch: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                config_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OAuth2TokenConfigUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OAuth2TokenConfigOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    authorize_url_api_v1_admin_oauth2_token_configs__config_id__authorize_url_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                config_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuthorizeUrlOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    refresh_token_api_v1_admin_oauth2_token_configs__config_id__refresh_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                config_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OAuth2TokenConfigOut"];
                 };
             };
             /** @description Validation Error */

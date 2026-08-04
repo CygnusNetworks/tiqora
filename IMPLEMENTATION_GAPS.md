@@ -1,15 +1,16 @@
 # Implementation Gaps: Znuny Feature Parity → Tiqora
 
-**As of:** 2026-07-27  
+**As of:** 2026-08-04  
 **Method:** Feature comparison of Znuny 6.5.x (reference) against Tiqora
 (`backend/`, `frontend/`, project docs).  
 **Purpose:** Product roadmap input for Znuny-style feature parity — not an
 implementation order and not a security audit.
 
 > **Background:** First draft 2026-07-21 (local only). Restored and updated for
-> the 2026-07-27 codebase. Peer database support is OTRS/Znuny **6.0–7.3**
-> (schema profiles); the feature comparison still uses Znuny 6.5.x as the
-> functional reference.
+> the 2026-07-27 codebase; **parity phases 1–4 closed 2026-08-04** (type/service/SLA
+> E2E, admin editors, mentions/time accounting, bulk + MCP). Peer database
+> support is OTRS/Znuny **6.0–7.3** (schema profiles); the feature comparison
+> still uses Znuny 6.5.x as the functional reference.
 
 Related (API / MCP / auth surfaces): [`API_GAPS.md`](./API_GAPS.md).
 
@@ -24,19 +25,20 @@ Znuny module. Scope is intentional and documented.
 | Area | Status |
 |---|---|
 | Phase 0–5 core (ticket, auth, permissions, daemon flags, cutover) | ✅ largely complete |
-| Agent ticket workflow (create / reply / note / move / state / owner / merge / link / …) | ✅ core covered |
+| Agent ticket workflow (create / reply / note / move / state / owner / merge / link / type / service / SLA / …) | ✅ core covered |
 | GenericInterface (Session*, Ticket*, History, TimeAccounting, OutOfOffice; REST + SOAP) | ✅ extended subset of Znuny GI |
-| Admin | ⚠️ strong coverage; some areas list-only or still missing |
-| Postmaster / notifications / GenericAgent | ⚠️ takeover available; documented simplifications |
-| Process management / calendar / stats | ⚠️ present; intentionally reduced vs Znuny |
-| Znuny platform exclusives (package manager, SysConfig UI, GI admin, mentions, …) | ❌ missing or model-only |
+| Admin | ✅ strong coverage (type/service/SLA, mail accounts, system addresses, notifications, GenericAgent write); ACL still list-only |
+| Postmaster / notifications / GenericAgent | ⚠️ takeover available; GenericAgent + notification **admin write** present; runtime simplifications remain |
+| Process management / calendar / stats | ⚠️ present; intentionally reduced vs Znuny (designer still Znuny-side) |
+| Mentions + time accounting | ✅ native API + ticket-zoom panel (shared tables) |
+| Znuny platform exclusives (package manager, SysConfig UI, GI admin, …) | ❌ missing or model-only |
 
 **How to read “complete”:**
 
 | Definition | Met? |
 |---|---|
 | **A. Design V1 + phases 0–5 + documented extensions** (parallel DB, core workflow, cutover) | **Yes, with known simplifications** |
-| **B. Every Znuny admin/agent feature replaceable without the Znuny UI** | **No** — see roadmap below |
+| **B. Every Znuny admin/agent feature replaceable without the Znuny UI** | **Mostly for day-to-day ops** — see residual roadmap; ACL/SysConfig/OPM still not |
 | **C. Byte-/feature-identical Znuny** | **No** — never a design goal |
 
 ---
@@ -97,17 +99,21 @@ Postmaster, escalation sweep, notifications, GenericAgent, outbox/indexer.
 
 Scope and intentional differences: [`docs/compatibility.md`](./docs/compatibility.md).
 
-### 1.7 Closed since the 2026-07-21 draft (excerpt)
+### 1.7 Closed since earlier drafts (excerpt)
 
-| Former gap | Status 2026-07-27 |
+| Former gap | Status |
 |---|---|
-| GI SessionGet/Remove, TicketHistoryGet, TimeAccountingGet, OutOfOffice | ✅ |
+| GI SessionGet/Remove, TicketHistoryGet, TimeAccountingGet, OutOfOffice | ✅ (2026-07-27) |
 | Postmaster filters list-only | ✅ **CRUD** (API + UI) |
 | API-key lifecycle / MCP P1 (reference + write tools) | ✅ see [`API_GAPS.md`](./API_GAPS.md) |
+| Type / service / SLA post-create + admin + process actions | ✅ **2026-08-04** |
+| System address / notification event / GenericAgent write | ✅ **2026-08-04** (ACL still list-only) |
+| Mentions + native time accounting | ✅ **2026-08-04** (ticket API + zoom panel) |
+| Bulk multi-select (state/priority/owner + queue move + lock) | ✅ **2026-08-04** |
 
 ---
 
-## 2. Planned parity work (roadmap)
+## 2. Remaining parity work (roadmap)
 
 Items below are **product/feature** gaps relative to Znuny-style workflows.
 Operational caveats for mail/daemon takeover live in
@@ -115,40 +121,44 @@ Operational caveats for mail/daemon takeover live in
 [`docs/compatibility.md`](./docs/compatibility.md). This file does not inventory
 transport, session, or crypto edge cases.
 
-### Near-term product priorities
+### Closed in the 2026-08-04 parity pass (no longer open)
 
-#### Service / SLA / type after create
+#### Service / SLA / type (end-to-end)
 
 - Create accepts type, service, and SLA identifiers.
-- Post-create mutation and agent toolbar dialogs for those fields are not wired
-  yet (history format constants exist; write path / UI pending).
-- Admin CRUD for service, SLA, and type is not present (Znuny:
-  `AdminService` / `AdminSLA` / `AdminType`).
-
-#### Admin coverage still thin or list-only
-
-| Area | Tiqora today |
-|---|---|
-| Service, SLA, type | no admin CRUD |
-| Mail accounts | fetch uses accounts; no dedicated admin API/UI |
-| System addresses | picker list only (no full CRUD) |
-| Notification events | runtime evaluation; no editor |
-| PGP / S-MIME | engines present; no admin UI |
-| System configuration | reader only; no deploy/edit UI |
-| ACL | list/detail only (editing deferred) |
-| GenericAgent jobs | list/detail only |
-
-#### Process management subset
-
-Deferred conditions and transition actions (including service/SLA/type setters
-and several ticket/article helpers) are listed in
-[`docs/process-management.md`](./docs/process-management.md). No visual designer;
-no full customer process UI; placeholder language is simplified.
+- Post-create mutation via `TicketWriteService` + `PATCH` (`type_id` /
+  `service_id` / `sla_id` / `clear_service` / `clear_sla`) with Znuny history
+  formats (`TypeUpdate` / `ServiceUpdate` / `SLAUpdate`).
+- Agent ticket-zoom pickers; reference lists
+  `GET /api/v1/reference/{types,services,slas}`.
+- Admin CRUD: `AdminType` / `AdminService` / `AdminSLA` (shared tables +
+  `service_sla` links).
+- Process TransitionActions: `TicketTypeSet` / `TicketServiceSet` /
+  `TicketSLASet` (plus `TicketWatchSet`, `LinkAdd`).
 
 #### Mentions & time accounting
 
-Legacy models exist. Mentions have no domain/API/UI. Time accounting rows move
-on merge and Compat `TimeAccountingGet` can read; no native book/report UI.
+- Shared tables `mention` / `time_accounting`.
+- Native REST list/create/delete on ticket; ticket-zoom panel.
+- Compat `TimeAccountingGet` still available; merge still moves TA rows.
+
+#### Bulk + selected admin write
+
+- Queue multi-select: state, priority, owner, **queue move**, **lock/unlock**.
+- System addresses: create/update/deactivate (picker list kept).
+- Notification events: admin CRUD on `notification_event*`.
+- GenericAgent jobs: PUT/PATCH/DELETE (list/detail still on readonly paths).
+
+### Still open / thin
+
+| Area | Tiqora today |
+|---|---|
+| PGP / S-MIME | engines present; no dedicated admin key UI |
+| System configuration | reader only; no deploy/edit UI |
+| ACL | list/detail only; runtime **group/role only** (design) |
+| Process designer / customer process UI | authoring stays Znuny or DB/YAML |
+| Process deferred actions | e.g. `ArticleSend`, `TicketCreate`, DF remove/increment — see [`docs/process-management.md`](./docs/process-management.md) |
+| Dedicated time-accounting report page | ticket-scoped list/book only (no Znuny-style report module) |
 
 ### Integration & mail parity
 
@@ -157,8 +167,9 @@ on merge and Compat `TimeAccountingGet` can read; no native book/report UI.
   Search/session edge cases and side-effect differences are documented in
   [`docs/compatibility.md`](./docs/compatibility.md).
 - **Postmaster / notifications / GenericAgent:** takeover is available with
-  documented simplifications (transports, recipient types, follow-up modules,
-  job editor). See [`docs/parallel-operation.md`](./docs/parallel-operation.md).
+  documented simplifications (transports, recipient types, follow-up modules).
+  GenericAgent + notification **admin write** exists; runtime behaviour is
+  still a simplified subset. See [`docs/parallel-operation.md`](./docs/parallel-operation.md).
 - **Portal follow-up:** some Znuny follow-up modes are not mirrored 1:1; no
   customer process UI.
 
@@ -166,17 +177,17 @@ on merge and Compat `TimeAccountingGet` can read; no native book/report UI.
 
 | Znuny-style capability | Tiqora |
 |---|---|
-| Multi-select bulk actions | not yet |
+| Multi-select bulk actions | ✅ state / priority / owner / queue / lock |
 | Ticket print (PDF) | browser print only |
 | Dedicated email/phone create flows | simplified via New Ticket + channels |
 | Email resend / plain-text article tools | not yet |
 | Full customer information centre | lookup only |
 | Locked / owner / responsible / watch / escalation module views | dashboard counts / filters instead |
-| Service-centric agent view | not yet |
+| Service-centric agent view | not yet (service on ticket is editable) |
 | Last views / autocompletion | not yet |
 | Form drafts | own draft path (+ legacy model) |
 | Ticket attribute relations / note-to-linked | not yet |
-| Mentions | not yet (see above) |
+| Mentions | ✅ ticket API + zoom panel |
 
 ### Explicitly out of scope / platform
 
@@ -201,25 +212,27 @@ on merge and Compat `TimeAccountingGet` can read; no native book/report UI.
 |---|---|
 | Zoom, queue, search, history, attachment | ✅ |
 | Note, compose/reply, close, pending, move, owner, responsible, priority, customer, lock, watcher | ✅ |
+| Type / service / SLA | ✅ create + post-create + zoom pickers |
 | Merge, bounce, forward, free text (DF), process | ✅ (process = subset) |
-| Bulk, PDF print, phone-dedicated, email resend, plain, mention, service view | ❌ / ⚠️ |
+| Bulk (state/priority/owner/queue/lock), mentions, time accounting | ✅ |
+| PDF print, phone-dedicated, email resend, plain, dedicated service module view | ❌ / ⚠️ |
 | Status / escalation / locked / owner / responsible / watch views | ⚠️ dashboard/filters instead of dedicated modules |
 
 ### Admin
 
 **CRUD (among others):** users, groups, roles (+ assignments), queues, states,
-priorities, customers/companies (+ groups), templates / salutations /
-signatures / attachments, auto-responses, dynamic fields, webhooks, channels,
-mail log/outbound, **postmaster filters**, **API keys**, AI admin
-(Tiqora-native).
+priorities, **ticket types**, **services**, **SLAs**, customers/companies
+(+ groups), templates / salutations / signatures / attachments, auto-responses,
+dynamic fields, webhooks, channels, mail log/outbound, **mail accounts**,
+**system addresses**, **notification events**, **GenericAgent jobs** (write),
+**postmaster filters**, **API keys**, AI admin (Tiqora-native).
 
-**List / detail only:** ACL, GenericAgent jobs, processes (browse/detail),
-system addresses (picker).
+**List / detail only:** ACL, processes (browse/detail; no visual designer).
 
-**Missing relative to Znuny admin breadth:** service, SLA, type,
-notification event, SysConfig, GI webservice admin, package manager, PGP/SMIME
-admin, session admin, support data, cloud services, appointment admin
-(calendar via agent UI), ticket attribute relations, …
+**Missing relative to Znuny admin breadth:** SysConfig deploy UI, GI webservice
+admin, package manager, PGP/SMIME admin, session admin, support data, cloud
+services, appointment admin (calendar via agent UI), ticket attribute
+relations, …
 
 **Present (Znuny-compatible):** mail account admin + OAuth2 token management
 (shared legacy `oauth2_token*` / `mail_account` tables; XOAUTH2 fetch + optional
@@ -237,7 +250,8 @@ SMTP outbound via config name).
 ### GenericInterface
 
 Provider core (Session*, ticket CRUD/search/history, TimeAccounting,
-OutOfOffice) ✅. Requester, custom ops, GI admin ❌ — see §1.6 and
+OutOfOffice) ✅. Type/Service/SLA mutation on TicketUpdate ✅. Requester,
+custom ops, GI admin ❌ — see §1.6 and
 [`docs/compatibility.md`](./docs/compatibility.md).
 
 ---
@@ -247,33 +261,35 @@ OutOfOffice) ✅. Requester, custom ops, GI admin ❌ — see §1.6 and
 1. **Design spec** (`docs/specs/2026-07-19-tiqora-design.md`) is historical;
    several items once listed as deferred (process, calendar, stats, PGP/S-MIME,
    SOAP) exist now as subsets. The spec is not live status.
-2. **README / feature lists:** do not market ACL or GenericAgent as full admin
-   CRUD — list/detail only. Postmaster filters **do** have CRUD.
+2. **README / feature lists:** do not market ACL as full admin CRUD —
+   list/detail only. GenericAgent, postmaster filters, notification events,
+   type/service/SLA **do** have write surfaces.
 3. **Compat / GI:** [`docs/compatibility.md`](./docs/compatibility.md) is the
    source of truth for GI scope, not the historical design spec.
+4. **Process supported actions:** see
+   [`docs/process-management.md`](./docs/process-management.md) (includes
+   Type/Service/SLA setters as of 2026-08-04).
 
 ---
 
-## 5. Suggested closing order (parity goal B)
+## 5. Suggested closing order (residual parity goal B)
 
 Prioritised product roadmap only — not an automatic implementation mandate:
 
-1. **Ticket type / service / SLA** — write APIs + mutation + UI + admin CRUD +
-   process actions
-2. **Admin editors** — ACL (and optional runtime expansion), GenericAgent,
-   notification events
-3. **Mail admin** — mail-account admin and remaining fetch/follow-up parity
-   (see parallel-operation docs for operational detail)
-4. **Mentions + time accounting** — native API + UI (Compat read for TA already
-   exists)
-5. **Bulk actions** in the agent UI
-6. **Process** — remaining transition actions/conditions + designer (or keep
-   authoring in Znuny)
-7. **Package manager / SysConfig UI** only if there is explicit demand
-8. Remainder (PDF print, CIC depth, stats framework, GI side-effects, …)
+1. **ACL editor** (and optional runtime expansion) if field/state filtering is
+   required without Znuny UI
+2. **Process** — remaining deferred transition actions/conditions + optional
+   designer (or keep authoring in Znuny)
+3. **PGP/S-MIME admin** key management UI
+4. **Agent UX remainder** — PDF print, CIC depth, service-centric views, last
+   views, email resend / plain tools
+5. **Package manager / SysConfig UI** only if there is explicit demand
+6. Remainder (stats framework, GI side-effects, portal process UI, …)
 
 Already done and removed from this list: GI Session/History/TimeAccounting/OOO;
-postmaster-filter CRUD; API-key lifecycle / MCP P1.
+postmaster-filter CRUD; API-key lifecycle / MCP P1; **type/service/SLA E2E**;
+**system address / notification / GenericAgent write**; **mentions + time
+accounting**; **bulk queue actions**; MCP history/merge/link/type-service-sla.
 
 ---
 
@@ -300,3 +316,4 @@ postmaster-filter CRUD; API-key lifecycle / MCP P1.
 | 2026-07-21 | Initial draft: Znuny 6.5.22 vs Tiqora (local, uncommitted) |
 | 2026-07-27 | Restored to repo; updated for GI ops, postmaster-filter CRUD, API_GAPS cross-ref, roadmap/matrix cleanup |
 | 2026-07-27 | Public rewrite: English; product-roadmap framing; no security-edge inventory |
+| 2026-08-04 | Parity phases 1–4: type/service/SLA E2E; admin write (system addresses, notifications, GenericAgent); mentions + time accounting; bulk queue/lock; process Type/Service/SLA/Watch/Link actions; residual roadmap rewritten |

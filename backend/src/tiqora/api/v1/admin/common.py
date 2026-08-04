@@ -38,6 +38,24 @@ STATE_CACHE_TYPES: tuple[str, ...] = ("State",)
 # Priority.pm: $Self->{CacheType} = 'Priority'
 PRIORITY_CACHE_TYPES: tuple[str, ...] = ("Priority",)
 
+# Type.pm: $Self->{CacheType} = 'Type'
+TYPE_CACHE_TYPES: tuple[str, ...] = ("Type",)
+
+# Service.pm: $Self->{CacheType} = 'Service'
+SERVICE_CACHE_TYPES: tuple[str, ...] = ("Service",)
+
+# SLA.pm: $Self->{CacheType} = 'SLA'
+SLA_CACHE_TYPES: tuple[str, ...] = ("SLA",)
+
+# SystemAddress.pm: $Self->{CacheType} = 'SystemAddress'
+SYSTEM_ADDRESS_CACHE_TYPES: tuple[str, ...] = ("SystemAddress",)
+
+# NotificationEvent.pm uses CacheType 'NotificationEvent'
+NOTIFICATION_EVENT_CACHE_TYPES: tuple[str, ...] = ("NotificationEvent",)
+
+# GenericAgent.pm CacheType
+GENERIC_AGENT_CACHE_TYPES: tuple[str, ...] = ("GenericAgent",)
+
 # Group.pm GroupAdd/GroupUpdate: Type => 'Group' + CleanUp CustomerGroup;
 # validity change also cleans GroupPermissionUserGet / GroupPermissionGroupGet.
 GROUP_CACHE_TYPES: tuple[str, ...] = (

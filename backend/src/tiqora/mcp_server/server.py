@@ -21,6 +21,9 @@ Ticket write:
 - ticket_set_customer: set customer_id / customer_user_id
 - ticket_set_dynamic_field: set a dynamic field value
 - ticket_lock / ticket_unlock: lock or unlock a ticket
+- ticket_set_type / ticket_set_service / ticket_set_sla: type/service/SLA
+- ticket_history: recent history rows
+- ticket_merge / ticket_link: merge or link tickets
 
 Reference / discovery:
 - list_queues: queues the agent may act in (permission-scoped)
@@ -77,10 +80,15 @@ from tiqora.domain.ticket_write_service import (
     add_article,
     assign_owner,
     change_priority,
+    change_service,
+    change_sla,
     change_state,
     change_title,
+    change_type,
     create_ticket,
+    link_tickets,
     lock_ticket,
+    merge_tickets,
     move_queue,
     set_customer,
     unlock_ticket,
@@ -1646,6 +1654,184 @@ async def kb_publish_article(
             await svc.close()
 
     return result
+
+
+# ---------------------------------------------------------------------------
+# Tool: type / service / SLA / history / merge / link
+# ---------------------------------------------------------------------------
+
+
+@mcp.tool(description="Change a ticket's type by type ID.")
+async def ticket_set_type(ctx: Context, ticket_id: int, type_id: int) -> dict[str, Any]:
+    user_id = _get_user_id(ctx)
+    state = _get_state()
+    async with state.session_factory() as session:
+        sysconfig = state.sysconfig()
+        try:
+            async with session.begin():
+                await _assert_queue_permission(
+                    session, ticket_id=ticket_id, user_id=user_id, key="rw"
+                )
+                await change_type(
+                    session,
+                    ticket_id=ticket_id,
+                    new_type_id=type_id,
+                    user_id=user_id,
+                    sysconfig=sysconfig,
+                )
+            return {"ok": True, "ticket_id": ticket_id, "type_id": type_id}
+        except (TicketNotFound, TicketAccessDenied, InvalidInput) as e:
+            return {"error": str(e)}
+
+
+@mcp.tool(description="Change a ticket's service by service ID (0 or omit to clear).")
+async def ticket_set_service(
+    ctx: Context, ticket_id: int, service_id: int | None = None
+) -> dict[str, Any]:
+    user_id = _get_user_id(ctx)
+    state = _get_state()
+    async with state.session_factory() as session:
+        sysconfig = state.sysconfig()
+        try:
+            async with session.begin():
+                await _assert_queue_permission(
+                    session, ticket_id=ticket_id, user_id=user_id, key="rw"
+                )
+                await change_service(
+                    session,
+                    ticket_id=ticket_id,
+                    new_service_id=service_id if service_id else None,
+                    user_id=user_id,
+                    sysconfig=sysconfig,
+                )
+            return {"ok": True, "ticket_id": ticket_id, "service_id": service_id}
+        except (TicketNotFound, TicketAccessDenied, InvalidInput) as e:
+            return {"error": str(e)}
+
+
+@mcp.tool(description="Change a ticket's SLA by SLA ID (0 or omit to clear).")
+async def ticket_set_sla(
+    ctx: Context, ticket_id: int, sla_id: int | None = None
+) -> dict[str, Any]:
+    user_id = _get_user_id(ctx)
+    state = _get_state()
+    async with state.session_factory() as session:
+        sysconfig = state.sysconfig()
+        try:
+            async with session.begin():
+                await _assert_queue_permission(
+                    session, ticket_id=ticket_id, user_id=user_id, key="rw"
+                )
+                await change_sla(
+                    session,
+                    ticket_id=ticket_id,
+                    new_sla_id=sla_id if sla_id else None,
+                    user_id=user_id,
+                    sysconfig=sysconfig,
+                )
+            return {"ok": True, "ticket_id": ticket_id, "sla_id": sla_id}
+        except (TicketNotFound, TicketAccessDenied, InvalidInput) as e:
+            return {"error": str(e)}
+
+
+@mcp.tool(description="Return recent ticket history entries as a list of {type, name, create_time}.")
+async def ticket_history(
+    ctx: Context, ticket_id: int, limit: int = 30
+) -> dict[str, Any] | list[dict[str, Any]]:
+    user_id = _get_user_id(ctx)
+    state = _get_state()
+    async with state.session_factory() as session:
+        try:
+            await _assert_queue_permission(session, ticket_id=ticket_id, user_id=user_id, key="ro")
+            rows = (
+                await session.execute(
+                    text(
+                        "SELECT tht.name AS history_type, th.name, th.create_time"
+                        " FROM ticket_history th"
+                        " JOIN ticket_history_type tht ON tht.id = th.history_type_id"
+                        " WHERE th.ticket_id = :tid"
+                        " ORDER BY th.id DESC LIMIT :lim"
+                    ),
+                    {"tid": ticket_id, "lim": max(1, min(limit, 200))},
+                )
+            ).mappings().all()
+            return [
+                {
+                    "history_type": r["history_type"],
+                    "name": r["name"],
+                    "create_time": str(r["create_time"]) if r["create_time"] else None,
+                }
+                for r in rows
+            ]
+        except (TicketNotFound, TicketAccessDenied, InvalidInput) as e:
+            return {"error": str(e)}
+
+
+@mcp.tool(description="Merge merge_ticket_id into main_ticket_id (Znuny TicketMerge).")
+async def ticket_merge(
+    ctx: Context, main_ticket_id: int, merge_ticket_id: int
+) -> dict[str, Any]:
+    user_id = _get_user_id(ctx)
+    state = _get_state()
+    async with state.session_factory() as session:
+        sysconfig = state.sysconfig()
+        try:
+            async with session.begin():
+                await _assert_queue_permission(
+                    session, ticket_id=main_ticket_id, user_id=user_id, key="rw"
+                )
+                await _assert_queue_permission(
+                    session, ticket_id=merge_ticket_id, user_id=user_id, key="rw"
+                )
+                await merge_tickets(
+                    session,
+                    main_ticket_id=main_ticket_id,
+                    merge_ticket_id=merge_ticket_id,
+                    user_id=user_id,
+                    sysconfig=sysconfig,
+                )
+            return {
+                "ok": True,
+                "main_ticket_id": main_ticket_id,
+                "merge_ticket_id": merge_ticket_id,
+            }
+        except (TicketNotFound, TicketAccessDenied, InvalidInput) as e:
+            return {"error": str(e)}
+
+
+@mcp.tool(description="Link two tickets (default type Normal).")
+async def ticket_link(
+    ctx: Context,
+    ticket_id: int,
+    target_ticket_id: int,
+    link_type: str = "Normal",
+) -> dict[str, Any]:
+    user_id = _get_user_id(ctx)
+    state = _get_state()
+    async with state.session_factory() as session:
+        try:
+            async with session.begin():
+                await _assert_queue_permission(
+                    session, ticket_id=ticket_id, user_id=user_id, key="rw"
+                )
+                await _assert_queue_permission(
+                    session, ticket_id=target_ticket_id, user_id=user_id, key="rw"
+                )
+                await link_tickets(
+                    session,
+                    source_ticket_id=ticket_id,
+                    target_ticket_id=target_ticket_id,
+                    link_type=link_type,
+                    user_id=user_id,
+                )
+            return {
+                "ok": True,
+                "ticket_id": ticket_id,
+                "target_ticket_id": target_ticket_id,
+                "link_type": link_type,
+            }
+        except (TicketNotFound, TicketAccessDenied, InvalidInput) as e:
+            return {"error": str(e)}
 
 
 # ---------------------------------------------------------------------------

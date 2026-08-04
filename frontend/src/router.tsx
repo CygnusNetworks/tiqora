@@ -54,6 +54,11 @@ import { CustomerUserGroupsPage } from "@/routes/admin/CustomerUserGroupsPage";
 import { QueuesPage as AdminQueuesPage } from "@/routes/admin/QueuesPage";
 import { StatesPage } from "@/routes/admin/StatesPage";
 import { PrioritiesPage } from "@/routes/admin/PrioritiesPage";
+import { TypesPage } from "@/routes/admin/TypesPage";
+import { ServicesPage } from "@/routes/admin/ServicesPage";
+import { SlasPage } from "@/routes/admin/SlasPage";
+import { SystemAddressesPage } from "@/routes/admin/SystemAddressesPage";
+import { NotificationEventsPage } from "@/routes/admin/NotificationEventsPage";
 import { CustomerUsersPage } from "@/routes/admin/CustomerUsersPage";
 import { CustomerCompaniesPage } from "@/routes/admin/CustomerCompaniesPage";
 import { TemplatesPage } from "@/routes/admin/TemplatesPage";
@@ -506,6 +511,36 @@ const adminPrioritiesRoute = createRoute({
   component: PrioritiesPage,
 });
 
+const adminTypesRoute = createRoute({
+  getParentRoute: () => adminLayoutRoute,
+  path: "/types",
+  component: TypesPage,
+});
+
+const adminServicesRoute = createRoute({
+  getParentRoute: () => adminLayoutRoute,
+  path: "/services",
+  component: ServicesPage,
+});
+
+const adminSlasRoute = createRoute({
+  getParentRoute: () => adminLayoutRoute,
+  path: "/slas",
+  component: SlasPage,
+});
+
+const adminSystemAddressesRoute = createRoute({
+  getParentRoute: () => adminLayoutRoute,
+  path: "/system-addresses",
+  component: SystemAddressesPage,
+});
+
+const adminNotificationEventsRoute = createRoute({
+  getParentRoute: () => adminLayoutRoute,
+  path: "/notification-events",
+  component: NotificationEventsPage,
+});
+
 const adminCustomerUsersRoute = createRoute({
   getParentRoute: () => adminLayoutRoute,
   path: "/customer-users",
@@ -804,6 +839,11 @@ const routeTree = rootRoute.addChildren([
     adminQueuesRoute,
     adminStatesRoute,
     adminPrioritiesRoute,
+    adminTypesRoute,
+    adminServicesRoute,
+    adminSlasRoute,
+    adminSystemAddressesRoute,
+    adminNotificationEventsRoute,
     adminCustomerUsersRoute,
     adminCustomerCompaniesRoute,
     adminCustomerUserCustomersRoute,

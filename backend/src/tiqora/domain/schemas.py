@@ -228,8 +228,11 @@ class TicketPermissions(BaseModel):
 
 class TicketDetail(TicketListItem):
     type_id: int | None = None
+    type_name: str | None = None
     service_id: int | None = None
+    service_name: str | None = None
     sla_id: int | None = None
+    sla_name: str | None = None
     responsible_user_id: int | None = None
     archive_flag: int = 0
     create_by: int | None = None

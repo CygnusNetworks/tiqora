@@ -44,7 +44,11 @@ async def list_state_types(admin: AdminUser, session: DbSession) -> list[TicketS
 
 @router.get("/system-addresses", response_model=list[SystemAddressOut])
 async def list_system_addresses(admin: AdminUser, session: DbSession) -> list[SystemAddress]:
-    """Valid system addresses for queue / auto-response From pickers."""
+    """Valid system addresses for queue / auto-response From pickers.
+
+    Full CRUD (paginated) lives under :mod:`system_addresses`; this unpaginated
+    list stays for existing queue/auto-response pickers.
+    """
     _ = admin
     result = await session.execute(
         select(SystemAddress)

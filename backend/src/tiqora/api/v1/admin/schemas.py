@@ -231,8 +231,33 @@ class SystemAddressOut(BaseModel):
     id: int
     value0: str
     value1: str
+    value2: str | None = None
+    value3: str | None = None
+    queue_id: int | None = None
     comments: str | None = None
     valid_id: int
+    create_time: datetime | None = None
+    change_time: datetime | None = None
+
+
+class SystemAddressCreate(BaseModel):
+    value0: str  # email
+    value1: str  # real name
+    value2: str | None = None
+    value3: str | None = None
+    queue_id: int = 1
+    comments: str | None = None
+    valid_id: int = 1
+
+
+class SystemAddressUpdate(BaseModel):
+    value0: str | None = None
+    value1: str | None = None
+    value2: str | None = None
+    value3: str | None = None
+    queue_id: int | None = None
+    comments: str | None = None
+    valid_id: int | None = None
 
 
 class FollowUpPossibleOut(BaseModel):
@@ -786,6 +811,158 @@ class GenericAgentJobOut(BaseModel):
 
     job_name: str
     settings: dict[str, list[str]]
+
+
+class GenericAgentJobWrite(BaseModel):
+    """Create/replace a GenericAgent job as key → list-of-values (Znuny shape)."""
+
+    job_name: str
+    settings: dict[str, list[str]] = Field(default_factory=dict)
+
+
+class GenericAgentJobUpdate(BaseModel):
+    """Rename and/or replace settings. Omitted fields keep previous values."""
+
+    job_name: str | None = None
+    settings: dict[str, list[str]] | None = None
+
+
+# ---------------------------------------------------------------------------
+# Ticket type / service / SLA admin
+# ---------------------------------------------------------------------------
+
+
+class TicketTypeOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    name: str
+    valid_id: int
+    create_time: datetime | None = None
+    change_time: datetime | None = None
+
+
+class TicketTypeCreate(BaseModel):
+    name: str
+    valid_id: int = 1
+
+
+class TicketTypeUpdate(BaseModel):
+    name: str | None = None
+    valid_id: int | None = None
+
+
+class ServiceOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    name: str
+    comments: str | None = None
+    valid_id: int
+    create_time: datetime | None = None
+    change_time: datetime | None = None
+    sla_ids: list[int] = Field(default_factory=list)
+
+
+class ServiceCreate(BaseModel):
+    name: str
+    comments: str | None = None
+    valid_id: int = 1
+    sla_ids: list[int] = Field(default_factory=list)
+
+
+class ServiceUpdate(BaseModel):
+    name: str | None = None
+    comments: str | None = None
+    valid_id: int | None = None
+    sla_ids: list[int] | None = None
+
+
+class SlaOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    name: str
+    calendar_name: str | None = None
+    first_response_time: int
+    first_response_notify: int | None = None
+    update_time: int
+    update_notify: int | None = None
+    solution_time: int
+    solution_notify: int | None = None
+    comments: str | None = None
+    valid_id: int
+    create_time: datetime | None = None
+    change_time: datetime | None = None
+    service_ids: list[int] = Field(default_factory=list)
+
+
+class SlaCreate(BaseModel):
+    name: str
+    calendar_name: str | None = None
+    first_response_time: int = 0
+    first_response_notify: int | None = None
+    update_time: int = 0
+    update_notify: int | None = None
+    solution_time: int = 0
+    solution_notify: int | None = None
+    comments: str | None = None
+    valid_id: int = 1
+    service_ids: list[int] = Field(default_factory=list)
+
+
+class SlaUpdate(BaseModel):
+    name: str | None = None
+    calendar_name: str | None = None
+    first_response_time: int | None = None
+    first_response_notify: int | None = None
+    update_time: int | None = None
+    update_notify: int | None = None
+    solution_time: int | None = None
+    solution_notify: int | None = None
+    comments: str | None = None
+    valid_id: int | None = None
+    service_ids: list[int] | None = None
+
+
+# ---------------------------------------------------------------------------
+# Notification events (admin)
+# ---------------------------------------------------------------------------
+
+
+class NotificationMessageIn(BaseModel):
+    language: str = "en"
+    subject: str
+    text: str
+    content_type: str = "text/plain"
+
+
+class NotificationEventOut(BaseModel):
+    id: int
+    name: str
+    comments: str | None = None
+    valid_id: int
+    create_time: datetime | None = None
+    change_time: datetime | None = None
+    # event_key → list of values (Znuny multi-row items)
+    items: dict[str, list[str]] = Field(default_factory=dict)
+    messages: list[NotificationMessageIn] = Field(default_factory=list)
+
+
+class NotificationEventWrite(BaseModel):
+    name: str
+    comments: str | None = None
+    valid_id: int = 1
+    items: dict[str, list[str]] = Field(default_factory=dict)
+    messages: list[NotificationMessageIn] = Field(default_factory=list)
+
+
+class NotificationEventUpdate(BaseModel):
+    name: str | None = None
+    comments: str | None = None
+    valid_id: int | None = None
+    items: dict[str, list[str]] | None = None
+    messages: list[NotificationMessageIn] | None = None
 
 
 # ---------------------------------------------------------------------------

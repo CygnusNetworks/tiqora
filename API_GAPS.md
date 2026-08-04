@@ -1,6 +1,6 @@
 # API / MCP Coverage & Auth Gaps
 
-**Stand: 2026-07-27** — Status-Dokument zu REST/OpenAPI, MCP und Auth/Permissions.
+**Stand: 2026-08-04** — Status-Dokument zu REST/OpenAPI, MCP und Auth/Permissions.
 Analyse gegen Code (`backend/src/tiqora/…`) und OpenAPI (`packages/api-client/openapi.json`,
 `docs/api/openapi.json`).
 
@@ -14,7 +14,7 @@ Analyse gegen Code (`backend/src/tiqora/…`) und OpenAPI (`packages/api-client/
 
 ## Status-Übersicht (aktuell)
 
-### ✅ Geschlossen (P0 / P1)
+### ✅ Geschlossen (P0 / P1 / Parity 2026-08-04)
 
 | Gap | Erledigt | Kurz |
 |---|---|---|
@@ -25,11 +25,15 @@ Analyse gegen Code (`backend/src/tiqora/…`) und OpenAPI (`packages/api-client/
 | MCP Reference-Tools | 2026-07-21 | `list_queues`, `list_states`, `list_priorities`, `list_agents` |
 | MCP Write-Felder | 2026-07-21 | `ticket_set_title/customer/dynamic_field`, `ticket_lock`/`unlock` |
 | MCP TN-Lookup | 2026-07-21 | `ticket_get_by_number` |
-| MCP-Doc-Katalog (25 Tools) | 2026-07-21 | `docs/api/mcp.md`, `docs/ai-integration.md`, … |
+| MCP-Doc-Katalog (25 Tools) | 2026-07-21 | `docs/api/mcp.md`, `docs/ai-integration.md`, … — Katalog **erweitert** 2026-08-04 |
 | MCP-Mutation ohne Queue-Permission | 2026-07-24 | Minimal-Gate `_assert_queue_permission` + Regressionstests |
 | `ticket_update_queue` nur Quell-`move_into` | 2026-07-24 | Auch Ziel-Queue; gleicher Fix in `TicketWriteService.move_queue` (REST) |
 | `ticket_create` „Access denied“ bei unbekannter Queue | 2026-07-24 | Existenz vor Permission (`_assert_raw_queue_permission`) |
 | Znuny-ACL-Runtime vs. Doku | 2026-07-21 | Bewusst **group/role only** dokumentiert (Design-Doc + hier) |
+| Type / service / SLA native REST + write service | 2026-08-04 | `change_type/service/sla`; PATCH-Felder; Reference-Listen |
+| Mentions + Time Accounting REST | 2026-08-04 | `…/mentions`, `…/time-accounting` auf Ticket |
+| Admin: types/services/slas, system addresses write, notification events, GenericAgent write | 2026-08-04 | Shared Znuny-Tabellen |
+| MCP history / merge / link / type / service / sla | 2026-08-04 | Tools ergänzt (~31 Tools total) |
 
 ### 🟡 Noch offen
 
@@ -37,11 +41,9 @@ Analyse gegen Code (`backend/src/tiqora/…`) und OpenAPI (`packages/api-client/
 |---|---|---|---|
 | **P2** | MCP-Mutationen auf `TicketWriteService` umbauen | MCP | Inline-Gate ist sicher, dupliziert aber Check-Logik |
 | **P2** | MCP `ticket_reply` / SMTP-Delivery | MCP / Produkt | Rohe `add_article()` sendet keine Mail; Service-Pfad würde SMTP triggern — Produktentscheidung |
-| **P2** | `TicketWriteService.assign_owner` ohne `lock=`-Parameter | Domain | Relevant erst nach Umbau auf die Service-Klasse |
-| **P2** | MCP history / merge / link | MCP | Domain/REST vorhanden; im MCP nicht exponiert |
 | **P2** | MCP Tool-Allowlist pro Key | Schema + MCP | Defense-in-depth neben Group/Role und groben Scopes |
 | **P2** | Rate-Limit pro Key | Auth | Nicht implementiert |
-| **P3** | ACL Editor, GenericAgent / Postmaster Write | Admin REST | Explizit deferred (read-only Listen ok) |
+| **P3** | ACL Editor (Write) | Admin REST | List/detail only; Runtime group/role only |
 | **P3** | Session-Bearer auf MCP (nur Dev) | MCP | Optional; Prod eher nicht |
 
 ### ⏸ Deferred (Design)
@@ -96,8 +98,8 @@ jedes Ticket in jeder Queue mutieren.
 
 | Bereich | Bewertung |
 |---|---|
-| REST `/api/v1` + Portal + Compat (OpenAPI) | Breit abgedeckt (~238 Operations). Agent-UI, Admin, Portal weitgehend vollständig. |
-| MCP als AI-Subset | Sinnvolles Design. **25 Tools** (Tickets + KB + Customer + Reference + Write-Felder). Mutation-Tools mit Queue-Permission-Gate. |
+| REST `/api/v1` + Portal + Compat (OpenAPI) | Breit abgedeckt. Agent-UI, Admin (inkl. Type/Service/SLA, Notifications, GenericAgent write), Portal, Mentions/TA. |
+| MCP als AI-Subset | Sinnvolles Design. **~31 Tools** (Tickets inkl. history/merge/link/type/service/sla + KB + Customer + Reference). Mutation-Tools mit Queue-Permission-Gate. |
 | Auth-Modell | Key → User → Group/Role (`PermissionEngine`). Zusätzlich grobe Key-Scopes `read`/`write`/`mcp`/`*`. Keine feingranularen OAuth-Scopes. |
 | **API-Key-Lifecycle** | ✅ Admin-API, UI, CLI; Expiry + last_used + created_by + scopes. |
 | Znuny-ACL-Runtime | ⏸ group/role only (bewusst); Admin ACL read-only. |
@@ -243,8 +245,11 @@ Regenerieren: `cd backend && uv run tiqora openapi -o ../docs/api/openapi.json`.
 |---|---|---|
 | API-Key CRUD | ✅ Done | inkl. scopes / expires |
 | Key-Metadaten | ✅ Done | |
+| Type / service / SLA mutation + admin | ✅ Done | 2026-08-04 |
+| Mentions / time accounting | ✅ Done | ticket-scoped |
+| GenericAgent / notification / system-address write | ✅ Done | 2026-08-04 |
 | ACL Write/Editor | ⏸ P3 | Runtime-Eval ebenfalls deferred |
-| GenericAgent / Postmaster Write | ⏸ P3 | Nur List/Detail |
+| Postmaster Write | ✅ (seit früher) | CRUD vorhanden |
 | MCP-Tool-Katalog in OpenAPI | n/a | MCP spricht kein OpenAPI (bewusst); Katalog in Docs |
 
 MCP erscheint **nicht** in der OpenAPI-Spec — korrekt; Doku getrennt halten.
@@ -253,7 +258,7 @@ MCP erscheint **nicht** in der OpenAPI-Spec — korrekt; Doku getrennt halten.
 
 ## 6. MCP-Tool-Inventar vs. REST
 
-### Implementierte Tools (25) — Source of Truth: `mcp_server/server.py`
+### Implementierte Tools (~31) — Source of Truth: `mcp_server/server.py`
 
 | # | MCP Tool | Entspricht grob REST | Permission-Pfad (Ist) |
 |---|---|---|---|
@@ -272,18 +277,24 @@ MCP erscheint **nicht** in der OpenAPI-Spec — korrekt; Doku getrennt halten.
 | 13 | `ticket_set_dynamic_field` | `PATCH` DF | `rw` |
 | 14 | `ticket_lock` | `PATCH` lock | `rw` |
 | 15 | `ticket_unlock` | `PATCH` unlock | `rw` |
-| 16 | `list_queues` | `GET /api/v1/reference/queues` | Groups mit `ro`/`rw` |
-| 17 | `list_states` | `GET /api/v1/reference/states` | Auth only (global) |
-| 18 | `list_priorities` | `GET /api/v1/reference/priorities` | Auth only (global) |
-| 19 | `list_agents` | `GET /api/v1/reference/agents` | Auth only (global) |
-| 20 | `kb_search` | `GET /api/v1/kb/search` | KB permission groups |
-| 21 | `kb_get_article` | `GET /api/v1/kb/articles/{id}` | scoped get |
-| 22 | `kb_list` | `GET /api/v1/kb/articles` | list + group scope |
-| 23 | `kb_upsert_article` | `POST` / `PATCH` KB articles | write + scoped |
-| 24 | `kb_publish_article` | `POST …/publish` | publish |
-| 25 | `customer_lookup` | customer lookup | nur Auth |
+| 16 | `ticket_set_type` | `PATCH` `type_id` | `rw` |
+| 17 | `ticket_set_service` | `PATCH` `service_id` / clear | `rw` |
+| 18 | `ticket_set_sla` | `PATCH` `sla_id` / clear | `rw` |
+| 19 | `ticket_history` | `GET …/history` | `ro` |
+| 20 | `ticket_merge` | `POST …/merge` | `rw` on both |
+| 21 | `ticket_link` | `POST …/links` | `rw` on both |
+| 22 | `list_queues` | `GET /api/v1/reference/queues` | Groups mit `ro`/`rw` |
+| 23 | `list_states` | `GET /api/v1/reference/states` | Auth only (global) |
+| 24 | `list_priorities` | `GET /api/v1/reference/priorities` | Auth only (global) |
+| 25 | `list_agents` | `GET /api/v1/reference/agents` | Auth only (global) |
+| 26 | `kb_search` | `GET /api/v1/kb/search` | KB permission groups |
+| 27 | `kb_get_article` | `GET /api/v1/kb/articles/{id}` | scoped get |
+| 28 | `kb_list` | `GET /api/v1/kb/articles` | list + group scope |
+| 29 | `kb_upsert_article` | `POST` / `PATCH` KB articles | write + scoped |
+| 30 | `kb_publish_article` | `POST …/publish` | publish |
+| 31 | `customer_lookup` | customer lookup | nur Auth |
 
-> Mutation-Tools #4–#15 nutzen **nicht** `TicketWriteService`, sondern Modul-Funktionen +
+> Mutation-Tools nutzen **nicht** die Klasse `TicketWriteService`, sondern Modul-Funktionen +
 > explizites Queue-Permission-Gate in `mcp_server/server.py`. Refactor auf die
 > Service-Klasse: P2 (siehe Status-Übersicht).
 
@@ -291,25 +302,25 @@ MCP erscheint **nicht** in der OpenAPI-Spec — korrekt; Doku getrennt halten.
 
 | Dokument | Stand |
 |---|---|
-| `docs/api/mcp.md`, `docs/ai-integration.md`, `docs/architecture.md` | Synced auf **25 tools** |
+| `docs/api/mcp.md`, `docs/ai-integration.md` | ggf. manuell auf **~31 tools** nachziehen |
 
 ### MCP bewusst *nicht* gespiegelt (OK)
 
 Admin-CRUD, Portal, Calendar, Process/BPM, Stats/CSV, Channel-Gateways, SSE Events,
-Compat/SOAP, GDPR/Crypto-CLI — gehören an REST bzw. Ops, nicht an LLM-Tools.
+Compat/SOAP, GDPR/Crypto-CLI, Mentions/Time-Accounting-Admin — gehören an REST bzw. Ops,
+nicht an LLM-Tools.
 
 ### Noch nicht im MCP (Domain/REST vorhanden)
 
 | Fähigkeit | Domain/REST | Nutzen für Agents |
 |---|---|---|
-| History | `GET …/history` | „Was ist passiert?“ |
-| Merge / Link | ja | Dedup, Verknüpfung |
 | Responsible | `assign_responsible` | oft parallel zu Owner |
 | Attachments (Meta/Download) | REST | Kontext |
 | Watch / Archive / Forward / Bounce | write service | seltener |
+| Mentions / time accounting | REST 2026-08-04 | seltener für LLM |
 
-Bereits erledigt (früher hier gelistet): Reference-Listen, DF/Title/Customer, Lock/Unlock,
-TN-Lookup.
+Bereits erledigt: Reference-Listen, DF/Title/Customer, Lock/Unlock, TN-Lookup,
+**history / merge / link / type / service / sla**.
 
 ### MCP Qualitäts-/Sicherheitsnotizen
 
@@ -334,12 +345,14 @@ TN-Lookup.
 | ~~P1~~ | Key `expires_at` / `last_used_at` (+ MCP-Resolve-Parity) | Schema + Auth | ✅ 2026-07-21 |
 | ~~P2~~ | Doku/Decision „group/role only“ (Znuny-ACL) | Permissions | ✅ 2026-07-21 deferred + dokumentiert |
 | ~~P2~~ | MCP TN-lookup | MCP | ✅ `ticket_get_by_number` |
+| ~~P2~~ | MCP history / merge / link | MCP | ✅ 2026-08-04 |
+| ~~P2~~ | MCP type / service / sla | MCP | ✅ 2026-08-04 |
 | **P2** | MCP → `TicketWriteService` (Code-Duplikat) | MCP | 🟡 offen |
 | **P2** | MCP reply SMTP-Produktentscheidung | MCP | 🟡 offen |
-| **P2** | MCP history / merge / link | MCP | 🟡 offen |
 | **P2** | Tool-Allowlist pro Key | Schema + MCP | 🟡 optional |
 | **P2** | Rate-Limit pro Key | Auth | 🟡 offen |
-| **P3** | GenericAgent / Postmaster Write, ACL Editor | Admin REST | ⏸ deferred |
+| ~~P3~~ | GenericAgent / Postmaster Write | Admin REST | ✅ Write (Postmaster früher; GenericAgent 2026-08-04) |
+| **P3** | ACL Editor | Admin REST | ⏸ list-only |
 | **P3** | Session-Bearer auf MCP (nur Dev) | MCP | ⏸ optional |
 | ~~P3~~ | Scopes in Admin-UI / CLI setzen | UI, CLI | ✅ Area RO/RW + read-only preset (2026-07-28) |
 
@@ -375,18 +388,21 @@ curl -i "$TIQORA_MCP_URL/mcp/" \
 
 ## 9. Gesamturteil
 
-**Ja — für den dokumentierten AI-Triage-Pfad ist die Oberfläche rund.**
+**Ja — für den dokumentierten AI-Triage-Pfad und die Znuny-Kern-Parity ist die
+Oberfläche rund.**
 
-- **REST/OpenAPI:** Produktseitig stimmig; Admin-lastig, spiegelt das Feature-Set.
-- **MCP:** Schmale AI-Oberfläche (25 Tools) mit Queue-Permission-Gate und Key-Scopes.
-  Volle Admin-Parity wäre gefährlich und unnötig.
+- **REST/OpenAPI:** Produktseitig stimmig; Admin deckt Type/Service/SLA,
+  Notifications, GenericAgent write, Mentions/TA ab.
+- **MCP:** AI-Oberfläche (~31 Tools) mit Queue-Permission-Gate und Key-Scopes
+  inkl. history/merge/link/type/service/sla. Volle Admin-Parity im MCP wäre
+  gefährlich und unnötig.
 - **Auth:** Key bound to user + Group/Role (+ optionale Surface-Scopes) passt zu
   Znuny-Kompatibilität und Least Privilege.
 - **Was noch „nice to have“ ist (kein Blocker):**
   1. MCP-Mutationen über `TicketWriteService` (Clean Code + SMTP-Produktfrage)
-  2. history / merge / link (und ggf. responsible) im MCP
-  3. Optionale Tool-Allowlist / Rate-Limit pro Key
-  4. Scopes in UI/CLI sichtbar setzen
+  2. Optionale Tool-Allowlist / Rate-Limit pro Key
+  3. MCP `assign_responsible` / Mentions / Time-Accounting wenn Agents sie brauchen
+  4. ACL-Editor (Runtime weiter group/role only)
 
 ---
 
@@ -394,10 +410,9 @@ curl -i "$TIQORA_MCP_URL/mcp/" \
 
 1. **P2 Code:** MCP-Mutation-Tools auf `TicketWriteService` migrieren *nach*
    Produktentscheidung zu SMTP bei `ticket_reply`.
-2. **P2 MCP-Erweiterung:** `ticket_history`, merge/link (und ggf. `assign_responsible`)
-   nur wenn Agents die Workflows brauchen.
-3. **P2 Hardening:** Rate-Limit pro Key; optional Tool-Allowlist.
-4. **P3 UX:** Scopes + Expiry in Admin-UI/CLI explizit setzbar (API kann das schon).
+2. **P2 Hardening:** Rate-Limit pro Key; optional Tool-Allowlist.
+3. **P3:** ACL-Editor nur bei Produktbedarf; Runtime weiter group/role only.
+4. **Doku:** `docs/api/mcp.md` / `docs/ai-integration.md` auf ~31 Tools abgleichen.
 5. **Nicht planen,** solange kein Produktbedarf: Znuny-ACL-Runtime, feingranulare
    OAuth-Scopes, Session-Bearer auf MCP in Prod.
 

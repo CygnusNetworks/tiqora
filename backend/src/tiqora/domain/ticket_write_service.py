@@ -53,9 +53,12 @@ from tiqora.znuny.history import (
     add_pending_time,
     add_priority_update,
     add_responsible_update,
+    add_service_update,
+    add_sla_update,
     add_state_update,
     add_subscribe,
     add_title_update,
+    add_type_update,
     add_unsubscribe,
     history_add,
 )
@@ -271,6 +274,7 @@ async def _ticket_must_exist(session: AsyncSession, ticket_id: int) -> dict[str,
                 text(
                     "SELECT t.id, t.tn, t.queue_id, t.ticket_state_id, t.ticket_priority_id,"
                     " t.user_id, t.responsible_user_id, t.ticket_lock_id, t.type_id,"
+                    " t.service_id, t.sla_id,"
                     " t.customer_id, t.customer_user_id, t.archive_flag, t.title"
                     " FROM ticket t WHERE t.id = :tid LIMIT 1"
                 ),
@@ -802,6 +806,152 @@ async def change_priority(
     await ticket_accelerator_update(session, ticket_id, sysconfig)
     await invalidate_ticket_cache(session, ticket_id)
     await _emit_event(session, "TicketPriorityUpdate", ticket_id, {"priority_id": new_priority_id})
+
+
+async def _lookup_name_or_null(session: AsyncSession, table: str, row_id: int | None) -> str:
+    """Return row name, or the Znuny sentinel ``NULL`` when missing."""
+    if not row_id:
+        return "NULL"
+    try:
+        row = await _lookup_row(session, table, "id", int(row_id))
+    except InvalidInput:
+        return "NULL"
+    name = row.get("name")
+    return str(name) if name else "NULL"
+
+
+async def change_type(
+    session: AsyncSession,
+    *,
+    ticket_id: int,
+    new_type_id: int,
+    user_id: int,
+    sysconfig: SysConfig,
+) -> None:
+    """Change ticket type (Znuny TypeUpdate history)."""
+    del sysconfig
+    t = await _ticket_must_exist(session, ticket_id)
+    old_type_id = int(t["type_id"]) if t.get("type_id") is not None else 0
+    if old_type_id == int(new_type_id):
+        return
+    # Validate target exists.
+    new_type = await _lookup_name_or_null(session, "ticket_type", new_type_id)
+    if new_type == "NULL":
+        raise InvalidInput(f"unknown ticket type id {new_type_id}")
+    old_type = await _lookup_name_or_null(session, "ticket_type", old_type_id or None)
+
+    await session.execute(
+        text(
+            "UPDATE ticket SET type_id = :ty, change_time = current_timestamp,"
+            " change_by = :uid WHERE id = :tid"
+        ),
+        {"ty": new_type_id, "uid": user_id, "tid": ticket_id},
+    )
+    await add_type_update(
+        session,
+        ticket_id=ticket_id,
+        new_type=new_type,
+        new_type_id=new_type_id,
+        old_type=old_type,
+        old_type_id=old_type_id or "",
+        user_id=user_id,
+    )
+    await invalidate_ticket_cache(session, ticket_id)
+    await _emit_event(session, "TicketTypeUpdate", ticket_id, {"type_id": new_type_id})
+
+
+async def change_service(
+    session: AsyncSession,
+    *,
+    ticket_id: int,
+    new_service_id: int | None,
+    user_id: int,
+    sysconfig: SysConfig,
+) -> None:
+    """Change ticket service (Znuny ServiceUpdate history).
+
+    ``new_service_id=None`` clears the service (writes NULL to the column).
+    """
+    del sysconfig
+    t = await _ticket_must_exist(session, ticket_id)
+    old_svc_id = int(t["service_id"]) if t.get("service_id") is not None else 0
+    new_id = int(new_service_id) if new_service_id is not None else 0
+    if old_svc_id == new_id:
+        return
+    if new_service_id is not None:
+        new_svc = await _lookup_name_or_null(session, "service", new_service_id)
+        if new_svc == "NULL":
+            raise InvalidInput(f"unknown service id {new_service_id}")
+    else:
+        new_svc = "NULL"
+    old_svc = await _lookup_name_or_null(session, "service", old_svc_id or None)
+
+    await session.execute(
+        text(
+            "UPDATE ticket SET service_id = :s, change_time = current_timestamp,"
+            " change_by = :uid WHERE id = :tid"
+        ),
+        {"s": new_service_id, "uid": user_id, "tid": ticket_id},
+    )
+    await add_service_update(
+        session,
+        ticket_id=ticket_id,
+        new_service=new_svc,
+        new_service_id=new_id or "",
+        old_service=old_svc,
+        old_service_id=old_svc_id or "",
+        user_id=user_id,
+    )
+    await invalidate_ticket_cache(session, ticket_id)
+    await _emit_event(session, "TicketServiceUpdate", ticket_id, {"service_id": new_service_id})
+
+
+async def change_sla(
+    session: AsyncSession,
+    *,
+    ticket_id: int,
+    new_sla_id: int | None,
+    user_id: int,
+    sysconfig: SysConfig,
+) -> None:
+    """Change ticket SLA (Znuny SLAUpdate history).
+
+    ``new_sla_id=None`` clears the SLA. Callers should recompute escalation
+    after SLA changes when needed (compat GI does the same sequence).
+    """
+    t = await _ticket_must_exist(session, ticket_id)
+    old_sla_id = int(t["sla_id"]) if t.get("sla_id") is not None else 0
+    new_id = int(new_sla_id) if new_sla_id is not None else 0
+    if old_sla_id == new_id:
+        return
+    if new_sla_id is not None:
+        new_sla = await _lookup_name_or_null(session, "sla", new_sla_id)
+        if new_sla == "NULL":
+            raise InvalidInput(f"unknown sla id {new_sla_id}")
+    else:
+        new_sla = "NULL"
+    old_sla = await _lookup_name_or_null(session, "sla", old_sla_id or None)
+
+    await session.execute(
+        text(
+            "UPDATE ticket SET sla_id = :s, change_time = current_timestamp,"
+            " change_by = :uid WHERE id = :tid"
+        ),
+        {"s": new_sla_id, "uid": user_id, "tid": ticket_id},
+    )
+    await add_sla_update(
+        session,
+        ticket_id=ticket_id,
+        new_sla=new_sla,
+        new_sla_id=new_id or "",
+        old_sla=old_sla,
+        old_sla_id=old_sla_id or "",
+        user_id=user_id,
+    )
+    await escalation_index_build(session, ticket_id, sysconfig)
+    await ticket_accelerator_update(session, ticket_id, sysconfig)
+    await invalidate_ticket_cache(session, ticket_id)
+    await _emit_event(session, "TicketSLAUpdate", ticket_id, {"sla_id": new_sla_id})
 
 
 async def change_title(
@@ -1702,6 +1852,41 @@ class TicketWriteService:
             self._session,
             ticket_id=ticket_id,
             new_priority_id=new_priority_id,
+            user_id=user_id,
+            sysconfig=self._sysconfig,
+        )
+
+    async def change_type(self, user_id: int, ticket_id: int, new_type_id: int) -> None:
+        t = await _ticket_must_exist(self._session, ticket_id)
+        await self._assert_rw(user_id, int(t["queue_id"]))
+        await change_type(
+            self._session,
+            ticket_id=ticket_id,
+            new_type_id=new_type_id,
+            user_id=user_id,
+            sysconfig=self._sysconfig,
+        )
+
+    async def change_service(
+        self, user_id: int, ticket_id: int, new_service_id: int | None
+    ) -> None:
+        t = await _ticket_must_exist(self._session, ticket_id)
+        await self._assert_rw(user_id, int(t["queue_id"]))
+        await change_service(
+            self._session,
+            ticket_id=ticket_id,
+            new_service_id=new_service_id,
+            user_id=user_id,
+            sysconfig=self._sysconfig,
+        )
+
+    async def change_sla(self, user_id: int, ticket_id: int, new_sla_id: int | None) -> None:
+        t = await _ticket_must_exist(self._session, ticket_id)
+        await self._assert_rw(user_id, int(t["queue_id"]))
+        await change_sla(
+            self._session,
+            ticket_id=ticket_id,
+            new_sla_id=new_sla_id,
             user_id=user_id,
             sysconfig=self._sysconfig,
         )

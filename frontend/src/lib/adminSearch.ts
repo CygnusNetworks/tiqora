@@ -179,6 +179,30 @@ export const ADMIN_PAGES: AdminPageEntry[] = [
     keywords: ["priorität", "priority", "dringlichkeit"],
   },
   {
+    slug: "types",
+    route: "/admin/types",
+    group: "tickets",
+    nameKey: "admin.nav.types",
+    descriptionKey: "admin.pageDescriptions.types",
+    keywords: ["ticket type", "typ", "tickettyp"],
+  },
+  {
+    slug: "services",
+    route: "/admin/services",
+    group: "tickets",
+    nameKey: "admin.nav.services",
+    descriptionKey: "admin.pageDescriptions.services",
+    keywords: ["service", "dienst", "servicekatalog"],
+  },
+  {
+    slug: "slas",
+    route: "/admin/slas",
+    group: "tickets",
+    nameKey: "admin.nav.slas",
+    descriptionKey: "admin.pageDescriptions.slas",
+    keywords: ["sla", "service level", "reaktionszeit"],
+  },
+  {
     slug: "dynamic-fields",
     route: "/admin/dynamic-fields",
     group: "tickets",
@@ -301,6 +325,14 @@ export const ADMIN_PAGES: AdminPageEntry[] = [
     descriptionKey: "admin.pageDescriptions.postmasterFilters",
     keywords: ["filter", "eingang", "email rules", "x-header"],
   },
+  {
+    slug: "system-addresses",
+    route: "/admin/system-addresses",
+    group: "communication",
+    nameKey: "admin.nav.systemAddresses",
+    descriptionKey: "admin.pageDescriptions.systemAddresses",
+    keywords: ["system address", "from", "absender", "email address"],
+  },
 
   // ── Automatisierung ──────────────────────────────────────────────────
   {
@@ -310,6 +342,14 @@ export const ADMIN_PAGES: AdminPageEntry[] = [
     nameKey: "admin.nav.genericAgentJobs",
     descriptionKey: "admin.pageDescriptions.genericAgentJobs",
     keywords: ["automatisierung", "jobs", "cron", "genericagent", "scheduled tasks"],
+  },
+  {
+    slug: "notification-events",
+    route: "/admin/notification-events",
+    group: "automation",
+    nameKey: "admin.nav.notificationEvents",
+    descriptionKey: "admin.pageDescriptions.notificationEvents",
+    keywords: ["notification", "benachrichtigung", "events", "email notify"],
   },
   {
     slug: "webhooks",
