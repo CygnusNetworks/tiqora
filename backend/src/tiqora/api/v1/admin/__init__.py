@@ -43,6 +43,7 @@ from tiqora.api.v1.admin import (
     system,
     system_addresses,
     templates,
+    ticket_attribute_relations,
     types,
     users,
     webhooks,
@@ -66,6 +67,7 @@ admin_router.include_router(auto_responses.router)
 admin_router.include_router(dynamic_fields.router)
 admin_router.include_router(postmaster_filters.router)
 admin_router.include_router(acl.router)
+admin_router.include_router(ticket_attribute_relations.router)
 admin_router.include_router(readonly.router)
 admin_router.include_router(system_addresses.router)
 admin_router.include_router(notification_events.router)

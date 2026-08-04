@@ -34,6 +34,7 @@ import {
   type TimeAccountingSearch,
 } from "@/routes/agent/TimeAccountingReportPage";
 import { CustomerDetailPage } from "@/routes/agent/CustomerDetailPage";
+import { TicketAttributeRelationsPage } from "@/routes/admin/TicketAttributeRelationsPage";
 import { AgentShell } from "@/components/layout/AgentShell";
 import { PortalShell } from "@/components/layout/PortalShell";
 import { RequireAuth } from "@/auth/RequireAuth";
@@ -768,6 +769,12 @@ const adminAclDetailRoute = createRoute({
   component: AclDetailPage,
 });
 
+const adminTicketAttributeRelationsRoute = createRoute({
+  getParentRoute: () => adminLayoutRoute,
+  path: "/ticket-attribute-relations",
+  component: TicketAttributeRelationsPage,
+});
+
 const adminGenericAgentJobsRoute = createRoute({
   getParentRoute: () => adminLayoutRoute,
   path: "/generic-agent-jobs",
@@ -953,6 +960,7 @@ const routeTree = rootRoute.addChildren([
     adminPostmasterFiltersRoute,
     adminPostmasterFilterDetailRoute,
     adminAclRoute,
+    adminTicketAttributeRelationsRoute,
     adminAclDetailRoute,
     adminGenericAgentJobsRoute,
     adminGenericAgentJobDetailRoute,
