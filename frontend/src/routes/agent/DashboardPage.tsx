@@ -12,6 +12,7 @@ import { DashboardTicketRow } from "@/components/agent/dashboard/DashboardTicket
 import { Spinner } from "@/components/ui/Spinner";
 import { formatDateTime } from "@/lib/format";
 import { cn } from "@/lib/cn";
+import { getLastViews } from "@/lib/lastViews";
 
 /** Which set of tickets the single dashboard list currently shows. "all"
  * renders the grouped view; everything else is a flat filtered list. */
@@ -191,6 +192,39 @@ function GroupHeader({
 
 function EmptyRow({ label }: { label: string }) {
   return <p className="px-4 py-6 text-sm text-muted">{label}</p>;
+}
+
+/** localStorage-backed "recently viewed tickets" strip for the dashboard. */
+function RecentlyViewedSection() {
+  const { t } = useTranslation();
+  const [entries, setEntries] = useState(() => getLastViews());
+  useEffect(() => {
+    // Refresh when the dashboard remounts (e.g. after leaving zoom).
+    setEntries(getLastViews());
+  }, []);
+  if (entries.length === 0) return null;
+  return (
+    <section data-testid="dashboard-last-views" aria-label={t("dashboard.lastViews")}>
+      <h2 className="mb-3 text-xs font-semibold uppercase tracking-wide text-muted">
+        {t("dashboard.lastViews")}
+      </h2>
+      <ul className="flex flex-wrap gap-2">
+        {entries.slice(0, 8).map((e) => (
+          <li key={e.id}>
+            <Link
+              to="/agent/tickets/$ticketId"
+              params={{ ticketId: String(e.id) }}
+              className="inline-flex max-w-xs items-center gap-1.5 rounded-full border border-hairline bg-surface px-3 py-1.5 text-[12.5px] text-ink/90 transition-colors hover:bg-surface-subtle focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent"
+              data-testid={`last-view-${e.id}`}
+            >
+              <span className="font-mono text-[11px] text-muted">{e.tn || `#${e.id}`}</span>
+              <span className="truncate">{e.title || t("dashboard.lastViewsUntitled")}</span>
+            </Link>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
 }
 
 /** A group's or a single filter's row list: loading / empty / rows. */
@@ -500,6 +534,9 @@ export function DashboardPage() {
           />
         )}
       </div>
+
+      {/* Recently viewed tickets (localStorage), newest first. */}
+      <RecentlyViewedSection />
 
       {/* Reminders due — orthogonal to the chips/groups above (due-date driven,
           not ownership/state driven), kept as its own section. */}

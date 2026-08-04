@@ -383,7 +383,9 @@ export function ActionToolbar({ ticket }: { ticket: TicketDetail }) {
       <ToolbarButton
         label={t("ticket.toolbar.print")}
         icon={icons.print}
-        onClick={() => window.print()}
+        onClick={() => {
+          window.open(api.ticketPrintUrl(ticket.id), "_blank", "noopener,noreferrer");
+        }}
         testId="toolbar-print"
       />
       {/* New appointment — the calendar has no ticket-prefill route yet, so

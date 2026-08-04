@@ -228,6 +228,11 @@ class TicketService:
         state_type: str | None,
         owner_id: int | None,
         customer_id: str | None = None,
+        responsible_id: int | None = None,
+        service_id: int | None = None,
+        locked: bool | None = None,
+        watcher_user_id: int | None = None,
+        escalated: bool | None = None,
         include_archived: bool = False,
     ) -> Select[tuple[Ticket]] | None:
         """Build the permission-filtered, unordered ``Ticket`` select.
@@ -267,6 +272,54 @@ class TicketService:
             stmt = stmt.where(Ticket.user_id == owner_id)
         if customer_id is not None:
             stmt = stmt.where(Ticket.customer_id == customer_id)
+        if responsible_id is not None:
+            stmt = stmt.where(Ticket.responsible_user_id == responsible_id)
+        if service_id is not None:
+            stmt = stmt.where(Ticket.service_id == service_id)
+        if locked is not None:
+            lock_rows = await self._session.execute(select(TicketLockType.id, TicketLockType.name))
+            lock_map = {name: lid for lid, name in lock_rows.all()}
+            locked_ids = {lid for name, lid in lock_map.items() if name in {"lock", "tmp_lock"}}
+            unlock_id = lock_map.get("unlock")
+            if locked:
+                if not locked_ids:
+                    return None
+                stmt = stmt.where(Ticket.ticket_lock_id.in_(locked_ids))
+            else:
+                if unlock_id is None:
+                    return None
+                stmt = stmt.where(Ticket.ticket_lock_id == unlock_id)
+        if watcher_user_id is not None:
+            watched_ids = (
+                (
+                    await self._session.execute(
+                        select(TicketWatcher.ticket_id).where(
+                            TicketWatcher.user_id == watcher_user_id
+                        )
+                    )
+                )
+                .scalars()
+                .all()
+            )
+            if not watched_ids:
+                return None
+            stmt = stmt.where(Ticket.id.in_(set(watched_ids)))
+        if escalated:
+            now = int(time.time())
+            stmt = stmt.where(
+                or_(
+                    and_(Ticket.escalation_time > 0, Ticket.escalation_time < now),
+                    and_(
+                        Ticket.escalation_response_time > 0,
+                        Ticket.escalation_response_time < now,
+                    ),
+                    and_(Ticket.escalation_update_time > 0, Ticket.escalation_update_time < now),
+                    and_(
+                        Ticket.escalation_solution_time > 0,
+                        Ticket.escalation_solution_time < now,
+                    ),
+                )
+            )
         if state_type is not None:
             type_names = VIEW_STATE_TYPES.get(state_type, {state_type})
             state_ids = (
@@ -307,6 +360,11 @@ class TicketService:
         state_type: str | None = None,
         owner_id: int | None = None,
         customer_id: str | None = None,
+        responsible_id: int | None = None,
+        service_id: int | None = None,
+        locked: bool | None = None,
+        watcher_user_id: int | None = None,
+        escalated: bool | None = None,
         offset: int = 0,
         limit: int = 50,
         sort: str = "age",
@@ -320,6 +378,11 @@ class TicketService:
             state_type=state_type,
             owner_id=owner_id,
             customer_id=customer_id,
+            responsible_id=responsible_id,
+            service_id=service_id,
+            locked=locked,
+            watcher_user_id=watcher_user_id,
+            escalated=escalated,
             include_archived=include_archived,
         )
         if stmt is None:
@@ -466,6 +529,11 @@ class TicketService:
         state_type: str | None = None,
         owner_id: int | None = None,
         customer_id: str | None = None,
+        responsible_id: int | None = None,
+        service_id: int | None = None,
+        locked: bool | None = None,
+        watcher_user_id: int | None = None,
+        escalated: bool | None = None,
         sort: str = "age",
         order: str = "desc",
         batch_size: int = 500,
@@ -483,6 +551,11 @@ class TicketService:
             state_type=state_type,
             owner_id=owner_id,
             customer_id=customer_id,
+            responsible_id=responsible_id,
+            service_id=service_id,
+            locked=locked,
+            watcher_user_id=watcher_user_id,
+            escalated=escalated,
             include_archived=include_archived,
         )
         if stmt is None:

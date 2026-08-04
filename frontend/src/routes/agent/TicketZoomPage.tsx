@@ -14,6 +14,7 @@ import { SimilarTicketsPanel } from "@/components/agent/SimilarTicketsPanel";
 import { MentionsAndTimePanel } from "@/components/agent/MentionsAndTimePanel";
 import { TicketZoomOverflowMenu } from "@/components/agent/TicketZoomOverflowMenu";
 import { Spinner } from "@/components/ui/Spinner";
+import { recordTicketView } from "@/lib/lastViews";
 
 // Sliding presence renewal: comfortably inside the backend's 30s TTL (see
 // POST /api/v1/tickets/{id}/presence) so a normal heartbeat cadence never
@@ -47,6 +48,16 @@ export function TicketZoomPage() {
     queryFn: ({ signal }) => api.getTicketProcessState(ticketId, signal),
     enabled: validTicketId,
   });
+
+  // Remember recently viewed tickets for the dashboard "Last views" strip.
+  useEffect(() => {
+    if (!ticketQ.data) return;
+    recordTicketView({
+      id: ticketQ.data.id,
+      tn: ticketQ.data.tn,
+      title: ticketQ.data.title,
+    });
+  }, [ticketQ.data]);
 
   // Presence heartbeat: announce viewing/composing on mount, on mode
   // change, and on an interval well under the 30s server-side TTL.
