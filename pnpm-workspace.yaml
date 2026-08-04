@@ -1,3 +1,30 @@
 packages:
   - "frontend"
   - "packages/*"
+
+# --- Supply-Chain-Härtung -------------------------------------------------
+#
+# Karenzzeit (Minuten): pnpm loest keine Version auf, die juenger als 3 Tage
+# ist -- und prueft ausserdem bei JEDEM install das bestehende Lockfile gegen
+# diese Grenze. Die npm-Wuermer der letzten Monate (Shai-Hulud/TanStack im Mai
+# 2026, keyv im August 2026) waren jeweils nur Stunden online, bevor die
+# boesartigen Versionen auffielen und entfernt wurden; 3 Tage liegen weit
+# jenseits dieses Fensters. Gleicher Wert wie in auzui.
+#
+# Wenn ein SICHERHEITSFIX schneller eingespielt werden muss, den Wert einmalig
+# per Flag aushebeln statt ihn dauerhaft zu senken:
+#   pnpm update <paket> --config.minimumReleaseAge=0
+minimumReleaseAge: 4320
+
+# Lifecycle-Skripte (preinstall/postinstall) sind der Verbreitungsweg dieser
+# Wuermer -- der keyv-Wurm vom 2026-08-04 lief als "preinstall: node setup.mjs".
+# Unter dem bisherigen pnpm 9 liefen sie hier ungehindert; seit v10 blockiert
+# pnpm sie standardmaessig, und diese Liste ist die einzige Ausnahme.
+#
+# msw bringt ein postinstall mit (Service-Worker-Datei ins public/-Verzeichnis
+# kopieren). Es ist reines Test-Werkzeug und wird im Produktionsbuild nicht
+# gebraucht; falls die Mock-Tests die Worker-Datei vermissen, laesst sie sich
+# mit "pnpm exec msw init" erzeugen, statt hier ein Install-Skript zu erlauben.
+allowBuilds:
+  esbuild: false
+  msw: false

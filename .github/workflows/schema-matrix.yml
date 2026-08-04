@@ -16,6 +16,11 @@ concurrency:
   group: schema-matrix-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+# Voreinstellung fuer alle Jobs: nur lesen. Einzelne Jobs, die mehr
+# brauchen, deklarieren das selbst.
+permissions:
+  contents: read
+
 jobs:
   schema-matrix:
     name: Layer A schema matrix
@@ -31,11 +36,19 @@ jobs:
       # Nightly / schedule runs the full minor set; tags keep release anchors only.
       SCHEMA_MATRIX_FULL: ${{ github.event_name == 'schedule' && '1' || '0' }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v5
+      - name: Harden runner
+        # Ueberwacht ausgehende Verbindungen des Jobs. Bewusst "audit":
+        # blockiert nichts, meldet aber ungewoehnliche Ziele. Auf "block"
+        # umstellen erst, wenn die Allowlist aus den Audit-Berichten steht --
+        # sonst brechen Builds an harmlosen Zielen.
+        uses: step-security/harden-runner@f808768d1510423e83855289c910610ca9b43176  # v2.17.0
+        with:
+          egress-policy: audit
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4
+      - uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86  # v5
         with:
           enable-cache: true
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065  # v5
         with:
           python-version: "3.12"
       - name: Install dependencies
