@@ -30,6 +30,10 @@ vi.mock("@/lib/api", async () => {
       listQueues: vi.fn().mockResolvedValue([]),
       listTicketLinks: vi.fn().mockResolvedValue([]),
       listReferenceAgents: vi.fn().mockResolvedValue([]),
+      listReferenceTypes: vi.fn().mockResolvedValue([]),
+      listReferenceServices: vi.fn().mockResolvedValue([]),
+      listReferenceSlas: vi.fn().mockResolvedValue([]),
+      ticketAclFieldOptions: vi.fn().mockResolvedValue({}),
       searchReferenceCustomers: vi.fn().mockResolvedValue([]),
     },
   };
@@ -41,6 +45,19 @@ vi.mock("@/auth/AuthContext", () => ({
 
 vi.mock("@tanstack/react-router", () => ({
   useNavigate: () => vi.fn(),
+  Link: ({
+    children,
+    to,
+    ...rest
+  }: {
+    children: React.ReactNode;
+    to?: string;
+    [k: string]: unknown;
+  }) => (
+    <a href={typeof to === "string" ? to : "#"} {...rest}>
+      {children}
+    </a>
+  ),
 }));
 
 function makeTicket(overrides: Partial<TicketDetail> = {}): TicketDetail {
