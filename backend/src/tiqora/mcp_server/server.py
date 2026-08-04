@@ -1659,18 +1659,14 @@ async def ticket_set_service(
             async with session.begin():
                 _assert_mcp_write_scope()
                 svc = _write_service(session, state)
-                await svc.change_service(
-                    user_id, ticket_id, service_id if service_id else None
-                )
+                await svc.change_service(user_id, ticket_id, service_id if service_id else None)
             return {"ok": True, "ticket_id": ticket_id, "service_id": service_id}
         except (TicketNotFound, TicketAccessDenied, InvalidInput) as e:
             return {"error": str(e)}
 
 
 @mcp.tool(description="Change a ticket's SLA by SLA ID (0 or omit to clear).")
-async def ticket_set_sla(
-    ctx: Context, ticket_id: int, sla_id: int | None = None
-) -> dict[str, Any]:
+async def ticket_set_sla(ctx: Context, ticket_id: int, sla_id: int | None = None) -> dict[str, Any]:
     user_id = _get_user_id(ctx)
     state = _get_state()
     _assert_tool_allowed("ticket_set_sla")
@@ -1686,9 +1682,7 @@ async def ticket_set_sla(
 
 
 @mcp.tool(
-    description=(
-        "Return recent ticket history entries as a list of {type, name, create_time}."
-    )
+    description=("Return recent ticket history entries as a list of {type, name, create_time}.")
 )
 async def ticket_history(
     ctx: Context, ticket_id: int, limit: int = 30
@@ -1700,17 +1694,21 @@ async def ticket_history(
         try:
             await _assert_queue_permission(session, ticket_id=ticket_id, user_id=user_id, key="ro")
             rows = (
-                await session.execute(
-                    text(
-                        "SELECT tht.name AS history_type, th.name, th.create_time"
-                        " FROM ticket_history th"
-                        " JOIN ticket_history_type tht ON tht.id = th.history_type_id"
-                        " WHERE th.ticket_id = :tid"
-                        " ORDER BY th.id DESC LIMIT :lim"
-                    ),
-                    {"tid": ticket_id, "lim": max(1, min(limit, 200))},
+                (
+                    await session.execute(
+                        text(
+                            "SELECT tht.name AS history_type, th.name, th.create_time"
+                            " FROM ticket_history th"
+                            " JOIN ticket_history_type tht ON tht.id = th.history_type_id"
+                            " WHERE th.ticket_id = :tid"
+                            " ORDER BY th.id DESC LIMIT :lim"
+                        ),
+                        {"tid": ticket_id, "lim": max(1, min(limit, 200))},
+                    )
                 )
-            ).mappings().all()
+                .mappings()
+                .all()
+            )
             return [
                 {
                     "history_type": r["history_type"],
@@ -1724,9 +1722,7 @@ async def ticket_history(
 
 
 @mcp.tool(description="Merge merge_ticket_id into main_ticket_id (Znuny TicketMerge).")
-async def ticket_merge(
-    ctx: Context, main_ticket_id: int, merge_ticket_id: int
-) -> dict[str, Any]:
+async def ticket_merge(ctx: Context, main_ticket_id: int, merge_ticket_id: int) -> dict[str, Any]:
     user_id = _get_user_id(ctx)
     state = _get_state()
     _assert_tool_allowed("ticket_merge")

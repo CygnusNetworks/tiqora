@@ -135,6 +135,9 @@ OPTIONAL_LEGACY_TABLES: frozenset[str] = frozenset(
 )
 
 #: Model columns present only from certain profiles onward.
+#: Conformance skips these when the live DDL lacks them. Prefer *not* mapping
+#: purely cosmetic columns (e.g. ``dbcrud_uuid`` on oauth2 tables, 6.5+ only)
+#: so the same ORM works across 6.3–7.x without load_only adapters.
 OPTIONAL_LEGACY_COLUMNS: frozenset[tuple[str, str]] = frozenset(
     {
         ("mail_account", "authentication_type"),

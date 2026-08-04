@@ -798,9 +798,7 @@ async def _action_ticket_service_set(
 ) -> None:
     service_id = await _resolve_service_id(session, config.get("Service"), config.get("ServiceID"))
     if service_id is None and config.get("Service") is None and config.get("ServiceID") is None:
-        raise RequiredFieldMissing(
-            "TicketServiceSet: Config must set 'Service' or 'ServiceID'"
-        )
+        raise RequiredFieldMissing("TicketServiceSet: Config must set 'Service' or 'ServiceID'")
     await change_service(
         session,
         ticket_id=ticket_id,

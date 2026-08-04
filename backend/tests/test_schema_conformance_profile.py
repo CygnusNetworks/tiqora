@@ -228,14 +228,19 @@ def _assert_profile_conformance(sync_url: str, profile_id: str, dialect: str) ->
 
             for col in table.columns:
                 col_key = col.name.lower()
-                optional_oauth_col = col.name in {
+                is_optional_col = (meta_key, col.name) in OPTIONAL_LEGACY_COLUMNS or (
+                    physical,
+                    col.name,
+                ) in OPTIONAL_LEGACY_COLUMNS
+                # mail_account OAuth columns: only required when the profile has them
+                if is_optional_col and col.name in {
                     "authentication_type",
                     "oauth2_token_config_id",
-                } and (
-                    (meta_key, col.name) in OPTIONAL_LEGACY_COLUMNS
-                    or (physical, col.name) in OPTIONAL_LEGACY_COLUMNS
-                )
-                if optional_oauth_col and not detected.mail_account_has_oauth:
+                }:
+                    if not detected.mail_account_has_oauth:
+                        continue
+                elif is_optional_col and col_key not in db_cols:
+                    # Other optional columns: skip when absent on this tier
                     continue
                 if col_key not in db_cols:
                     errors.append(f"{physical}.{col.name}: column missing in DB")

@@ -343,15 +343,10 @@ async def deliver_agent_email_reply(
             sender = mail_sender
         elif resolved.enabled:
             oauth_gen = None
-            if (
-                resolved.auth_type == "oauth2_token"
-                and resolved.oauth2_token_config_id is not None
-            ):
+            if resolved.auth_type == "oauth2_token" and resolved.oauth2_token_config_id is not None:
                 from tiqora.domain.mail_outbound import make_oauth_token_generator
 
-                oauth_gen = make_oauth_token_generator(
-                    session, resolved.oauth2_token_config_id
-                )
+                oauth_gen = make_oauth_token_generator(session, resolved.oauth2_token_config_id)
             sender = SmtpMailSender.from_resolved(
                 resolved, sendmail_bcc=sendmail_bcc, oauth_token_generator=oauth_gen
             )

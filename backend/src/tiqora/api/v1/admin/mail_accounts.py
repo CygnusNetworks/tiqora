@@ -162,9 +162,7 @@ async def list_mail_accounts(
 
 
 @router.get("/{account_id}", response_model=MailAccountOut)
-async def get_mail_account(
-    account_id: int, admin: AdminUser, session: DbSession
-) -> MailAccountOut:
+async def get_mail_account(account_id: int, admin: AdminUser, session: DbSession) -> MailAccountOut:
     _ = admin
     row = (
         await session.execute(
@@ -243,8 +241,7 @@ async def update_mail_account(
     )
     oauth_id = (
         body.oauth2_token_config_id
-        if body.oauth2_token_config_id is not None
-        or body.authentication_type is not None
+        if body.oauth2_token_config_id is not None or body.authentication_type is not None
         else getattr(row, "oauth2_token_config_id", None)
     )
     if body.authentication_type == "password":
@@ -291,9 +288,7 @@ async def update_mail_account(
 
 
 @router.delete("/{account_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def deactivate_mail_account(
-    account_id: int, admin: AdminUser, session: DbSession
-) -> None:
+async def deactivate_mail_account(account_id: int, admin: AdminUser, session: DbSession) -> None:
     """Soft-deactivate (valid_id=2); matches other admin resources."""
     _ = admin
     row = await session.get(MailAccount, account_id)

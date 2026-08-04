@@ -1428,9 +1428,7 @@ async def delete_time_accounting(
             ticket = await _ticket_must_exist(session, ticket_id)
             await svc._assert_rw(user.id, int(ticket["queue_id"]))
             result = await session.execute(
-                text(
-                    "DELETE FROM time_accounting WHERE id = :eid AND ticket_id = :tid"
-                ),
+                text("DELETE FROM time_accounting WHERE id = :eid AND ticket_id = :tid"),
                 {"eid": entry_id, "tid": ticket_id},
             )
             if result.rowcount == 0:

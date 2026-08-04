@@ -263,9 +263,7 @@ async def patch_token_config(
 
 
 @router.delete("/{config_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def remove_token_config(
-    config_id: int, admin: AdminUser, session: DbSession
-) -> None:
+async def remove_token_config(config_id: int, admin: AdminUser, session: DbSession) -> None:
     _ = admin
     try:
         ensure_oauth2_available()
@@ -279,9 +277,7 @@ async def remove_token_config(
 
 
 @router.get("/{config_id}/authorize-url", response_model=AuthorizeUrlOut)
-async def authorize_url(
-    config_id: int, admin: AdminUser, session: DbSession
-) -> AuthorizeUrlOut:
+async def authorize_url(config_id: int, admin: AdminUser, session: DbSession) -> AuthorizeUrlOut:
     _ = admin
     try:
         ensure_oauth2_available()

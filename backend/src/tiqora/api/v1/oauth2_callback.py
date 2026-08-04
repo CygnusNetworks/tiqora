@@ -52,9 +52,7 @@ def _page(title: str, body: str, *, ok: bool) -> HTMLResponse:
 
 
 @router.get("/oauth2/callback", response_class=HTMLResponse)
-async def oauth2_authorization_callback(
-    request: Request, session: DbSession
-) -> HTMLResponse:
+async def oauth2_authorization_callback(request: Request, session: DbSession) -> HTMLResponse:
     """Exchange ``code`` for tokens; Znuny-compatible ``state=TokenConfigID{{n}}``."""
     params: dict[str, str] = {k: str(v) for k, v in request.query_params.multi_items()}
     # Prefer last value if duplicates.
@@ -73,13 +71,13 @@ async def oauth2_authorization_callback(
     except OAuth2MailError as exc:
         return _page(
             "Authorization failed",
-            f"{escape(str(exc))}<br/><br/><a href=\"{admin_link}\">Back to OAuth2 admin</a>",
+            f'{escape(str(exc))}<br/><br/><a href="{admin_link}">Back to OAuth2 admin</a>',
             ok=False,
         )
     except Exception as exc:  # noqa: BLE001
         return _page(
             "Authorization failed",
-            f"{escape(str(exc))}<br/><br/><a href=\"{admin_link}\">Back to OAuth2 admin</a>",
+            f'{escape(str(exc))}<br/><br/><a href="{admin_link}">Back to OAuth2 admin</a>',
             ok=False,
         )
 

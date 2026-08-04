@@ -43,9 +43,7 @@ async def _write_settings(
     await session.execute(delete(GenericAgentJobs).where(GenericAgentJobs.job_name == job_name))
     for key, values in settings.items():
         for value in values:
-            session.add(
-                GenericAgentJobs(job_name=job_name, job_key=key, job_value=value)
-            )
+            session.add(GenericAgentJobs(job_name=job_name, job_key=key, job_value=value))
 
 
 @router.put("", response_model=GenericAgentJobOut, status_code=status.HTTP_201_CREATED)
@@ -73,9 +71,7 @@ async def update_generic_agent_job(
     new_name = body.job_name or job_name
     settings = body.settings if body.settings is not None else existing.settings
     if new_name != job_name:
-        await session.execute(
-            delete(GenericAgentJobs).where(GenericAgentJobs.job_name == job_name)
-        )
+        await session.execute(delete(GenericAgentJobs).where(GenericAgentJobs.job_name == job_name))
     await _write_settings(session, new_name, settings)
     await invalidate_znuny_cache_types(session, GENERIC_AGENT_CACHE_TYPES)
     await session.commit()
@@ -85,9 +81,7 @@ async def update_generic_agent_job(
 
 
 @router.delete("/{job_name}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_generic_agent_job(
-    job_name: str, admin: AdminUser, session: DbSession
-) -> None:
+async def delete_generic_agent_job(job_name: str, admin: AdminUser, session: DbSession) -> None:
     _ = admin
     existing = await _load_job(session, job_name)
     if existing is None:
