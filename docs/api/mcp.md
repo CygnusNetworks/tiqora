@@ -65,7 +65,7 @@ missing trailing slash in a way that breaks concurrent MCP session setup;
 see the reverse-proxy notes in
 [`../deploy/docker-compose.md`](../deploy/docker-compose.md).)
 
-## Tools (~31)
+## Tools (~39)
 
 MCP deliberately does **not** mirror admin/portal/calendar/BPM/stats/GDPR —
 those stay on REST. Source of truth: `@mcp.tool` handlers in
@@ -85,6 +85,7 @@ only those tools may run. Rate limit: `TIQORA_API_KEY_RATE_LIMIT_*` (default
 | `ticket_get` | Full ticket detail as Markdown: fields, articles (plaintext), dynamic field values. `ticket_id` (required), `include_internal_notes` (default `true`). |
 | `ticket_get_by_number` | Same Markdown payload as `ticket_get`, resolved by Znuny ticket number (`tn`). |
 | `ticket_history` | Recent history rows (`type`, `name`, `create_time`). |
+| `list_attachments` | Attachment metadata for a ticket (no binary download). |
 
 ### Ticket write
 
@@ -97,13 +98,18 @@ only those tools may run. Rate limit: `TIQORA_API_KEY_RATE_LIMIT_*` (default
 | `ticket_update_queue` | Move ticket to a different queue by queue ID. |
 | `ticket_update_priority` | Change ticket priority by priority ID. |
 | `ticket_update_owner` | Reassign ticket owner by user ID. |
+| `ticket_set_responsible` | Assign responsible agent. |
 | `ticket_set_title` | Change ticket title. |
 | `ticket_set_customer` | Set `customer_user_id` / optional `customer_id`. |
 | `ticket_set_dynamic_field` | Set a dynamic field by name (error if field does not exist). |
 | `ticket_set_type` / `ticket_set_service` / `ticket_set_sla` | Type / service / SLA (Znuny history formats). |
 | `ticket_lock` / `ticket_unlock` | Lock or unlock a ticket. |
+| `ticket_watch` / `ticket_unwatch` | Subscribe / unsubscribe the agent (or given user) to a ticket. |
+| `ticket_archive` / `ticket_unarchive` | Set `archive_flag`. |
 | `ticket_merge` | Merge two tickets. |
 | `ticket_link` | Link two tickets (default type `Normal`). |
+| `ticket_forward` | Forward an article by email. |
+| `ticket_bounce` | Bounce an article by email. |
 
 ### Reference / discovery
 

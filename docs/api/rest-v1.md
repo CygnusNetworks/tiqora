@@ -264,14 +264,23 @@ permission model). All follow the same list/get/create/update pattern:
 | Queues | `/api/v1/admin/queues` |
 | States | `/api/v1/admin/states` |
 | Priorities | `/api/v1/admin/priorities` |
+| Types / Services / SLAs | `/api/v1/admin/types`, `…/services`, `…/slas` |
 | Customers | `/api/v1/admin/customers` |
 | Templates | `/api/v1/admin/templates` |
 | Auto-responses | `/api/v1/admin/auto-responses` |
 | Dynamic fields | `/api/v1/admin/dynamic-fields` |
-| Read-only reference data (ACLs, etc.) | `/api/v1/admin/readonly/*` |
+| Ticket ACL | `/api/v1/admin/acl` (YAML match/change; runtime via field-options) |
+| Ticket attribute relations | `/api/v1/admin/ticket-attribute-relations` (CSV) |
+| Postmaster filters | `/api/v1/admin/postmaster-filters` |
+| GenericAgent jobs | `/api/v1/admin/generic-agent` |
+| Notification events | `/api/v1/admin/notification-events` |
+| System addresses | `/api/v1/admin/system-addresses` |
+| API keys | `/api/v1/admin/api-keys` |
 | Webhooks | `/api/v1/admin/webhooks` |
 | Channels (SMS/WhatsApp/phone config) | `/api/v1/admin/channels` |
 
+Agent ticket pickers use `GET /api/v1/reference/…` and
+`GET /api/v1/tickets/{id}/field-options` (TicketACL + attribute relations).
 See `openapi.json` for the exact field set of each resource.
 
 ## Stats

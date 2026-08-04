@@ -70,8 +70,10 @@ appearing over time.
 ## 2. MCP as the primary AI interface
 
 `tiqora.mcp_server.server` runs a FastMCP streamable-HTTP server (default
-port `8001`, `tiqora mcp` / `tiqora-mcp` entry points) exposing **~31 tools**.
+port `8001`, `tiqora mcp` / `tiqora-mcp` entry points) exposing **~39 tools**.
 MCP deliberately does **not** mirror admin/portal/calendar/BPM/stats/GDPR.
+Mutations use `TicketWriteService` (queue permissions + SMTP parity for
+agent email replies). Optional per-key `tool:<name>` allowlist and rate limit.
 
 #### Ticket read
 
@@ -80,22 +82,23 @@ MCP deliberately does **not** mirror admin/portal/calendar/BPM/stats/GDPR.
 | `ticket_search` | Search tickets (Meilisearch-backed with DB fallback) by free text / filters. |
 | `ticket_get` | Full ticket detail: fields, articles, dynamic field values (Markdown). |
 | `ticket_get_by_number` | Same payload as `ticket_get`, resolved by Znuny ticket number (`tn`). |
+| `ticket_history` | Recent history rows. |
+| `list_attachments` | Attachment metadata (no binary download). |
 
 #### Ticket write
 
 | Tool | Purpose |
 |---|---|
 | `ticket_create` | Create a new ticket. Returns `TicketID` and `TicketNumber`. |
-| `ticket_reply` | Post a customer-visible reply article. |
+| `ticket_reply` | Post a customer-visible reply article (agent email → SMTP). |
 | `ticket_note` | Post an internal (agent-only) note article. |
-| `ticket_update_state` | Change ticket state by state ID. |
-| `ticket_update_queue` | Move ticket to a different queue by queue ID. |
-| `ticket_update_priority` | Change ticket priority by priority ID. |
-| `ticket_update_owner` | Reassign ticket owner by user ID. |
-| `ticket_set_title` | Change ticket title. |
-| `ticket_set_customer` | Set customer user / company on a ticket. |
-| `ticket_set_dynamic_field` | Set a dynamic field by name. |
-| `ticket_lock` / `ticket_unlock` | Lock or unlock a ticket. |
+| `ticket_update_state` / `ticket_update_queue` / `ticket_update_priority` / `ticket_update_owner` | Core mutations. |
+| `ticket_set_responsible` / `ticket_set_title` / `ticket_set_customer` / `ticket_set_dynamic_field` | Field updates. |
+| `ticket_set_type` / `ticket_set_service` / `ticket_set_sla` | Type / service / SLA. |
+| `ticket_lock` / `ticket_unlock` / `ticket_watch` / `ticket_unwatch` | Lock and watch. |
+| `ticket_archive` / `ticket_unarchive` | Archive flag. |
+| `ticket_merge` / `ticket_link` | Merge and link. |
+| `ticket_forward` / `ticket_bounce` | Email forward / bounce. |
 
 #### Reference / discovery
 
