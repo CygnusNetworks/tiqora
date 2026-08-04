@@ -10,18 +10,26 @@ const {
   patchTicket,
   listReferencePriorities,
   listReferenceStates,
+  listReferenceTypes,
+  listReferenceServices,
+  listReferenceSlas,
   listArticles,
   getReplyDraft,
   listQueues,
   listReferenceAgents,
+  ticketAclFieldOptions,
 } = vi.hoisted(() => ({
   patchTicket: vi.fn(),
   listReferencePriorities: vi.fn(),
   listReferenceStates: vi.fn(),
+  listReferenceTypes: vi.fn(),
+  listReferenceServices: vi.fn(),
+  listReferenceSlas: vi.fn(),
   listArticles: vi.fn(),
   getReplyDraft: vi.fn(),
   listQueues: vi.fn(),
   listReferenceAgents: vi.fn(),
+  ticketAclFieldOptions: vi.fn(),
 }));
 
 vi.mock("@/lib/api", async () => {
@@ -32,10 +40,14 @@ vi.mock("@/lib/api", async () => {
       patchTicket,
       listReferencePriorities,
       listReferenceStates,
+      listReferenceTypes,
+      listReferenceServices,
+      listReferenceSlas,
       listArticles,
       getReplyDraft,
       listQueues,
       listReferenceAgents,
+      ticketAclFieldOptions,
       listTemplates: vi.fn().mockResolvedValue([]),
       listTicketLinks: vi.fn().mockResolvedValue([]),
       searchReferenceCustomers: vi.fn().mockResolvedValue([]),
@@ -49,6 +61,21 @@ vi.mock("@/auth/AuthContext", () => ({
 
 vi.mock("@tanstack/react-router", () => ({
   useNavigate: () => vi.fn(),
+  Link: ({
+    children,
+    to,
+    params,
+    ...rest
+  }: {
+    children: React.ReactNode;
+    to?: string;
+    params?: Record<string, string>;
+    [k: string]: unknown;
+  }) => (
+    <a href={typeof to === "string" ? to : "#"} data-params={JSON.stringify(params ?? {})} {...rest}>
+      {children}
+    </a>
+  ),
 }));
 
 function wrap(ui: React.ReactElement) {
@@ -110,6 +137,17 @@ describe("TicketHeaderActions", () => {
       { id: 2, name: "closed successful", type_name: "closed" },
       { id: 8, name: "pending reminder", type_name: "pending reminder" },
     ]);
+    listReferenceTypes.mockReset().mockResolvedValue([{ id: 1, name: "Unclassified" }]);
+    listReferenceServices.mockReset().mockResolvedValue([]);
+    listReferenceSlas.mockReset().mockResolvedValue([]);
+    ticketAclFieldOptions.mockReset().mockResolvedValue({
+      state: {},
+      priority: {},
+      type: {},
+      service: {},
+      sla: {},
+      queue: {},
+    });
     listArticles.mockReset().mockResolvedValue([
       {
         id: 501,
