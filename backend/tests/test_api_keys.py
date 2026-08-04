@@ -45,6 +45,10 @@ class _FakeRedis:
 
 class _FakeSettings:
     session_ttl_seconds = 86400
+    # AuthService.resolve_api_key → ApiKeyRateLimiter reads these.
+    api_key_rate_limit_enabled = False
+    api_key_rate_limit_max = 120
+    api_key_rate_limit_window_seconds = 60
 
 
 def _to_async_url(sync_url: str) -> str:

@@ -948,7 +948,7 @@ async def change_sla(
         old_sla_id=old_sla_id or "",
         user_id=user_id,
     )
-    await escalation_index_build(session, ticket_id, sysconfig)
+    await escalation_index_build(session, ticket_id, user_id, sysconfig)
     await ticket_accelerator_update(session, ticket_id, sysconfig)
     await invalidate_ticket_cache(session, ticket_id)
     await _emit_event(session, "TicketSLAUpdate", ticket_id, {"sla_id": new_sla_id})

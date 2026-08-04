@@ -181,7 +181,9 @@ class TiqoraBearerAuth(BaseHTTPMiddleware):
                 headers={"Retry-After": "60"},
             )
 
-        user_id, scopes = resolved  # type: ignore[misc]
+        if not isinstance(resolved, tuple):
+            return JSONResponse({"error": "Unauthorized"}, status_code=401)
+        user_id, scopes = resolved
         # Scoped keys need mcp:ro/mcp:rw (or legacy mcp/write/*).
         from tiqora.domain.api_key_scopes import mcp_scopes_allow_connect
 
@@ -855,7 +857,10 @@ async def ticket_create(
 
 
 @mcp.tool(
-    description=("Add a reply article to a ticket. By default creates a customer-visible reply.")
+    description=(
+        "Add a reply article to a ticket. Default channel is email (customer-visible); "
+        "email replies require to_address (SMTP when outbound is enabled, else store-only)."
+    )
 )
 async def ticket_reply(
     ctx: Context,
@@ -864,6 +869,7 @@ async def ticket_reply(
     subject: str = "Re:",
     is_visible_for_customer: bool = True,
     channel: str = "email",
+    to_address: str | None = None,
 ) -> dict[str, Any]:
     """Add a reply to a ticket.
 
@@ -873,6 +879,7 @@ async def ticket_reply(
         subject: Reply subject line.
         is_visible_for_customer: Default True (customer-visible reply).
         channel: Communication channel: 'email', 'phone', 'note'.
+        to_address: Required for agent email channel (customer recipient).
     """
     user_id = _get_user_id(ctx)
     state = _get_state()
@@ -889,6 +896,7 @@ async def ticket_reply(
                     subject=subject,
                     body=body,
                     channel=channel,
+                    to_address=to_address,
                 )
                 # TicketWriteService.add_article: agent email channel triggers SMTP
                 # (REST parity — intentional product behaviour for MCP replies).

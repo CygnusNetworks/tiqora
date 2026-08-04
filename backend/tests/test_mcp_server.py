@@ -820,6 +820,9 @@ async def test_mcp_ticket_reply_customer_visible(mcp_mariadb: dict[str, Any]) ->
                             "ticket_id": ticket_id,
                             "body": "Reply body content",
                             "subject": "Re: Reply Test",
+                            # Agent email channel requires a recipient; SMTP is
+                            # off in tests so this store-only prepares + stores.
+                            "to_address": "customer@example.com",
                         },
                     )
                 )
@@ -832,7 +835,11 @@ async def test_mcp_ticket_reply_customer_visible(mcp_mariadb: dict[str, Any]) ->
                 bad_ticket_reply = _tool_data(
                     await client.call_tool(
                         "ticket_reply",
-                        {"ticket_id": 9_999_999, "body": "x"},
+                        {
+                            "ticket_id": 9_999_999,
+                            "body": "x",
+                            "to_address": "customer@example.com",
+                        },
                     )
                 )
                 assert "error" in bad_ticket_reply

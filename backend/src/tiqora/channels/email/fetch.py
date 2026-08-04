@@ -156,16 +156,18 @@ def _pop3_xoauth2(conn: poplib.POP3, login: str, access_token: str, *, split_met
     from tiqora.domain.oauth2_mail import assemble_sasl_xoauth2_b64
 
     b64 = assemble_sasl_xoauth2_b64(login, access_token)
+    # poplib has no public AUTH; _shortcmd is the internal command path.
+    shortcmd = conn._shortcmd  # type: ignore[attr-defined]  # noqa: SLF001
     if split_method:
         # Office 365: AUTH XOAUTH2 → then token line (Znuny SplitOAuth2MethodAndToken).
-        resp = conn._shortcmd("AUTH XOAUTH2")  # noqa: SLF001 — poplib has no public AUTH
+        resp = shortcmd("AUTH XOAUTH2")
         if not resp.startswith(b"+"):
             raise poplib.error_proto(resp)
-        resp2 = conn._shortcmd(b64)  # noqa: SLF001
+        resp2 = shortcmd(b64)
         if not resp2.startswith(b"+OK"):
             raise poplib.error_proto(resp2)
     else:
-        resp = conn._shortcmd(f"AUTH XOAUTH2 {b64}")  # noqa: SLF001
+        resp = shortcmd(f"AUTH XOAUTH2 {b64}")
         if not resp.startswith(b"+OK"):
             raise poplib.error_proto(resp)
 
