@@ -115,7 +115,8 @@
     "edit": "Edit",
     "save": "Save",
     "saved": "Saved",
-    "delete": "Delete"
+    "delete": "Delete",
+    "submit": "Submit"
   },
   "otp": {
     "verifying": "Verifying…",
@@ -1288,7 +1289,8 @@
       "services": "Services",
       "slas": "SLAs",
       "systemAddresses": "System addresses",
-      "notificationEvents": "Notification events"
+      "notificationEvents": "Notification events",
+      "ticketAttributeRelations": "Attribute relations"
     },
     "table": {
       "id": "ID",
@@ -2331,7 +2333,8 @@
       "services": "Manage services and link them to SLAs.",
       "slas": "Manage service level agreements and timers.",
       "systemAddresses": "Email addresses used as From for queues and auto-responses.",
-      "notificationEvents": "Configure event-driven agent notifications."
+      "notificationEvents": "Configure event-driven agent notifications.",
+      "ticketAttributeRelations": "Znuny-compatible service/queue (and similar) dependency matrices (CSV)."
     },
     "types": {
       "title_plural": "Ticket types",
@@ -2368,6 +2371,16 @@
       "event": "Event",
       "subject": "Subject",
       "body": "Body"
+    },
+    "tar": {
+      "title": "Ticket attribute relations",
+      "filename": "Filename",
+      "attributes": "Attributes",
+      "priority": "Priority",
+      "csv": "CSV data",
+      "new": "New relation",
+      "help": "CSV with header Attribute1;Attribute2 and value pairs (Znuny AdminTicketAttributeRelations). Used to restrict form pickers (e.g. Service → Queue).",
+      "confirmDelete": "Delete this relation?"
     }
   },
   "kb": {
@@ -2577,12 +2590,13 @@
   "process": {
     "widget": {
       "title": "Process",
-      "activity": "Current activity",
+      "activity": "Activity",
       "notInProcess": "This ticket is not part of any process.",
       "startButton": "Start process",
       "actions": "Available actions",
       "loadError": "Could not load process state.",
-      "noDialogs": "No actions available at this activity."
+      "noDialogs": "No actions available at this activity.",
+      "noCustomerDialogs": "No customer dialogs available at this step."
     },
     "start": {
       "title": "Start process",

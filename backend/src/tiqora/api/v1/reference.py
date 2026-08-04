@@ -451,22 +451,56 @@ async def collect_ticket_field_options(
     ticket_id: int | None = None,
     action: str | None = None,
     queue_id: int | None = None,
+    service_id: int | None = None,
+    type_id: int | None = None,
+    state_id: int | None = None,
+    priority_id: int | None = None,
+    sla_id: int | None = None,
 ) -> TicketFieldOptionsOut:
-    """Load base maps then apply Ticket ACL for each requested field."""
+    """Load base maps, apply Ticket ACL, then Ticket Attribute Relations."""
     from tiqora.domain.ticket_acl import filter_id_name_map
+    from tiqora.domain.ticket_attribute_relations import apply_attribute_relations_to_field_maps
 
     base = await _base_field_maps(session, user, fields, queue_id=queue_id)
     checks: dict[str, Any] | None = None
+    ticket_ctx: dict[str, Any] = {}
     if queue_id is not None:
         queue_row = await session.get(Queue, queue_id)
-        checks = {
-            "Ticket": {
-                "QueueID": str(queue_id),
-                **({"Queue": queue_row.name} if queue_row is not None else {}),
-            }
-        }
+        ticket_ctx["QueueID"] = str(queue_id)
+        if queue_row is not None:
+            ticket_ctx["Queue"] = queue_row.name
+        checks = {"Ticket": dict(ticket_ctx)}
+    if service_id is not None:
+        svc = await session.get(Service, service_id)
+        ticket_ctx["ServiceID"] = str(service_id)
+        if svc is not None:
+            ticket_ctx["Service"] = svc.name
+    if type_id is not None:
+        ty = await session.get(TicketType, type_id)
+        ticket_ctx["TypeID"] = str(type_id)
+        if ty is not None:
+            ticket_ctx["Type"] = ty.name
+    if state_id is not None:
+        st = await session.get(TicketState, state_id)
+        ticket_ctx["StateID"] = str(state_id)
+        if st is not None:
+            ticket_ctx["State"] = st.name
+    if priority_id is not None:
+        pr = await session.get(TicketPriority, priority_id)
+        ticket_ctx["PriorityID"] = str(priority_id)
+        if pr is not None:
+            ticket_ctx["Priority"] = pr.name
+    if sla_id is not None:
+        sla = await session.get(Sla, sla_id)
+        ticket_ctx["SLAID"] = str(sla_id)
+        if sla is not None:
+            ticket_ctx["SLA"] = sla.name
+    if checks is None and ticket_ctx:
+        checks = {"Ticket": dict(ticket_ctx)}
+    elif checks is not None and ticket_ctx:
+        checks["Ticket"].update(ticket_ctx)
 
-    result = TicketFieldOptionsOut()
+    acl_maps: dict[str, dict[int, str]] = {}
     for field, mapping in base.items():
         subtype = _FIELD_TO_SUBTYPE[field]
         filtered = await filter_id_name_map(
@@ -478,7 +512,16 @@ async def collect_ticket_field_options(
             action=action,
             checks=checks,
         )
-        setattr(result, field, {str(k): v for k, v in filtered.items()})
+        acl_maps[field] = filtered
+
+    if ticket_ctx:
+        acl_maps = await apply_attribute_relations_to_field_maps(
+            session, acl_maps, ticket_context=ticket_ctx
+        )
+
+    result = TicketFieldOptionsOut()
+    for field, mapping in acl_maps.items():
+        setattr(result, field, {str(k): v for k, v in mapping.items()})
     return result
 
 
@@ -495,11 +538,16 @@ async def ticket_field_options(
         description="Frontend Action for ACL Properties (e.g. AgentTicketPhone)",
     ),
     queue_id: int | None = Query(default=None, ge=1, description="Optional form QueueID context"),
+    service_id: int | None = Query(default=None, ge=1),
+    type_id: int | None = Query(default=None, ge=1),
+    state_id: int | None = Query(default=None, ge=1),
+    priority_id: int | None = Query(default=None, ge=1),
+    sla_id: int | None = Query(default=None, ge=1),
 ) -> TicketFieldOptionsOut:
-    """ACL-filtered field options for new-ticket forms (no ticket_id).
+    """ACL + attribute-relation filtered field options for new-ticket forms.
 
-    Group/role queue permissions still apply to the queue list; Ticket ACL
-    further restricts selectable values for the current agent and action.
+    Group/role queue permissions still apply to the queue list; Ticket ACL and
+    Ticket Attribute Relations further restrict selectable values.
     """
     requested = {f.strip().lower() for f in fields.split(",") if f.strip()}
     requested &= set(_FIELD_TO_SUBTYPE)
@@ -511,4 +559,9 @@ async def ticket_field_options(
         fields=requested,
         action=action,
         queue_id=queue_id,
+        service_id=service_id,
+        type_id=type_id,
+        state_id=state_id,
+        priority_id=priority_id,
+        sla_id=sla_id,
     )
