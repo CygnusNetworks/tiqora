@@ -131,11 +131,7 @@ async def test_mail_outbound(
 
     use_tls = resolved.security == "ssl"
     start_tls = True if resolved.security == "starttls" else False if use_tls else None
-    username = (
-        resolved.auth_user
-        if resolved.auth_type in ("password", "oauth2_token")
-        else None
-    )
+    username = resolved.auth_user if resolved.auth_type in ("password", "oauth2_token") else None
     password = resolved.auth_password if resolved.auth_type == "password" else None
     oauth_gen = None
     if resolved.auth_type == "oauth2_token":
@@ -143,10 +139,7 @@ async def test_mail_outbound(
             return MailOutboundTestOut(
                 ok=False,
                 message="OAuth2 token config not found",
-                detail=(
-                    f"No oauth2_token_config named "
-                    f"{resolved.oauth2_token_config_name!r}"
-                ),
+                detail=(f"No oauth2_token_config named {resolved.oauth2_token_config_name!r}"),
             )
         from tiqora.domain.mail_outbound import make_oauth_token_generator
 

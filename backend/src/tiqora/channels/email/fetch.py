@@ -151,9 +151,7 @@ def _imap_connect(account: MailAccount, auth: _AuthMaterial) -> imaplib.IMAP4:
     return conn
 
 
-def _pop3_xoauth2(
-    conn: poplib.POP3, login: str, access_token: str, *, split_method: bool
-) -> None:
+def _pop3_xoauth2(conn: poplib.POP3, login: str, access_token: str, *, split_method: bool) -> None:
     """Authenticate POP3 with XOAUTH2 (Gmail one-shot; Office365 split)."""
     from tiqora.domain.oauth2_mail import assemble_sasl_xoauth2_b64
 
@@ -349,9 +347,7 @@ async def fetch_account(
             )
         resolved = await _resolve_auth(session, account)
         if isinstance(resolved, str):
-            return FetchResult(
-                account_id=account.id, messages=[], oversized=0, errors=[resolved]
-            )
+            return FetchResult(account_id=account.id, messages=[], oversized=0, errors=[resolved])
         auth = resolved
     else:
         auth = _AuthMaterial(kind=AUTH_PASSWORD, password=account.pw or "")

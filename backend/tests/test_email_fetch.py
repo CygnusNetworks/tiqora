@@ -224,7 +224,10 @@ async def test_fetch_account_imap_oauth2(monkeypatch: pytest.MonkeyPatch) -> Non
     )
     # session is required for oauth but get_access_token is mocked
     result = await fetch_account(
-        account, max_size_kb=1024, leave_on_server=True, session=object()  # type: ignore[arg-type]
+        account,
+        max_size_kb=1024,
+        leave_on_server=True,
+        session=object(),  # type: ignore[arg-type]
     )
 
     assert result.errors == []
@@ -240,7 +243,10 @@ async def test_fetch_account_oauth2_missing_config_id() -> None:
         oauth2_token_config_id=None,
     )
     result = await fetch_account(
-        account, max_size_kb=1024, leave_on_server=True, session=object()  # type: ignore[arg-type]
+        account,
+        max_size_kb=1024,
+        leave_on_server=True,
+        session=object(),  # type: ignore[arg-type]
     )
     assert result.messages == []
     assert any("oauth2_token_config_id" in e for e in result.errors)

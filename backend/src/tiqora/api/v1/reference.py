@@ -155,9 +155,7 @@ async def list_slas(
 
     stmt = select(Sla).where(Sla.valid_id == _VALID).order_by(Sla.name)
     if service_id is not None:
-        linked = {
-            int(sla_id) for sid, sla_id in link_rows if int(sid) == int(service_id)
-        }
+        linked = {int(sla_id) for sid, sla_id in link_rows if int(sid) == int(service_id)}
         if not linked:
             return []
         stmt = stmt.where(Sla.id.in_(linked))

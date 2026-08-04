@@ -17,7 +17,6 @@ from __future__ import annotations
 
 import json
 import re
-import uuid
 from base64 import b64encode
 from copy import deepcopy
 from datetime import UTC, datetime, timedelta
@@ -504,15 +503,11 @@ async def _post_form(
     return resp.status_code, body
 
 
-async def get_config(
-    session: AsyncSession, config_id: int
-) -> OAuth2TokenConfig | None:
+async def get_config(session: AsyncSession, config_id: int) -> OAuth2TokenConfig | None:
     return await session.get(OAuth2TokenConfig, config_id)
 
 
-async def get_config_by_name(
-    session: AsyncSession, name: str
-) -> OAuth2TokenConfig | None:
+async def get_config_by_name(session: AsyncSession, name: str) -> OAuth2TokenConfig | None:
     row = (
         await session.execute(
             select(OAuth2TokenConfig).where(OAuth2TokenConfig.name == name).limit(1)
@@ -530,9 +525,7 @@ async def list_configs(
     return list((await session.execute(stmt)).scalars().all())
 
 
-async def get_token_row(
-    session: AsyncSession, config_id: int
-) -> OAuth2Token | None:
+async def get_token_row(session: AsyncSession, config_id: int) -> OAuth2Token | None:
     return (
         await session.execute(
             select(OAuth2Token).where(OAuth2Token.token_config_id == config_id).limit(1)
@@ -549,7 +542,6 @@ async def get_or_create_token_row(
     now = _utcnow_naive()
     row = OAuth2Token(
         token_config_id=config_id,
-        dbcrud_uuid=str(uuid.uuid4()),
         authorization_code=None,
         token=None,
         token_expiration_date=None,
@@ -581,7 +573,6 @@ async def create_config(
     row = OAuth2TokenConfig(
         name=name.strip(),
         config=dump_config_blob(config),
-        dbcrud_uuid=str(uuid.uuid4()),
         valid_id=VALID_ID_VALID if valid else VALID_ID_INVALID,
         create_time=now,
         create_by=user_id,
@@ -777,9 +768,7 @@ async def request_token_by_refresh_token(
     return token
 
 
-def _apply_mapped_to_token(
-    token: OAuth2Token, mapped: dict[str, Any], *, user_id: int
-) -> None:
+def _apply_mapped_to_token(token: OAuth2Token, mapped: dict[str, Any], *, user_id: int) -> None:
     # Only overwrite fields present in the response (Znuny issue #226).
     if "Token" in mapped:
         token.token = mapped["Token"]
@@ -918,9 +907,7 @@ def public_config_view(
         "valid": row.valid_id == VALID_ID_VALID,
         "token_status": token_status(token),
         "token_expiration_date": token.token_expiration_date if token else None,
-        "refresh_token_expiration_date": (
-            token.refresh_token_expiration_date if token else None
-        ),
+        "refresh_token_expiration_date": (token.refresh_token_expiration_date if token else None),
         "has_token": bool(token and token.token),
         "has_refresh_token": bool(token and token.refresh_token),
         "error_message": get_token_error_message(token) if token else "",
