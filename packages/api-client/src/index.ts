@@ -123,6 +123,8 @@ export {
   type MentionCreate,
   type TimeAccountingOut,
   type TimeAccountingCreate,
+  type TimeAccountingReportEntry,
+  type TimeAccountingReportOut,
   type TypeRef,
   type ServiceRef,
   type SlaRef,

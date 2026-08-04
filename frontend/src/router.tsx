@@ -25,6 +25,15 @@ import {
   KbArticleNewPage,
   KbArticleEditPage,
 } from "@/routes/agent/KbArticleEditorPage";
+import {
+  ServiceViewPage,
+  type ServiceViewSearch,
+} from "@/routes/agent/ServiceViewPage";
+import {
+  TimeAccountingReportPage,
+  type TimeAccountingSearch,
+} from "@/routes/agent/TimeAccountingReportPage";
+import { CustomerDetailPage } from "@/routes/agent/CustomerDetailPage";
 import { AgentShell } from "@/components/layout/AgentShell";
 import { PortalShell } from "@/components/layout/PortalShell";
 import { RequireAuth } from "@/auth/RequireAuth";
@@ -172,10 +181,28 @@ const agentQueuesRoute = createRoute({
         : typeof s.customer_id === "number"
           ? String(s.customer_id)
           : undefined;
+    const bool = (v: unknown): true | undefined =>
+      v === true || v === "true" || v === 1 || v === "1" ? true : undefined;
+    const view =
+      s.view === "locked" ||
+      s.view === "mine" ||
+      s.view === "responsible" ||
+      s.view === "watched" ||
+      s.view === "escalated" ||
+      s.view === "service"
+        ? s.view
+        : undefined;
     return {
       queue_id: num(s.queue_id),
       state_type: state,
       customer_id: customerId,
+      owner_id: num(s.owner_id),
+      responsible_id: num(s.responsible_id),
+      service_id: num(s.service_id),
+      locked: bool(s.locked),
+      watcher_user_id: num(s.watcher_user_id),
+      escalated: bool(s.escalated),
+      view,
       offset: num(s.offset),
       limit: num(s.limit),
       sort,
@@ -355,6 +382,62 @@ const agentTemplatesRoute = createRoute({
   getParentRoute: () => agentLayoutRoute,
   path: "/templates",
   component: AgentTemplatesPage,
+});
+
+const agentServicesRoute = createRoute({
+  getParentRoute: () => agentLayoutRoute,
+  path: "/services",
+  validateSearch: (s: Record<string, unknown>): ServiceViewSearch => {
+    const num = (v: unknown) =>
+      typeof v === "number"
+        ? v
+        : typeof v === "string" && v !== ""
+          ? Number(v)
+          : undefined;
+    const state =
+      s.state_type === "new" ||
+      s.state_type === "open" ||
+      s.state_type === "pending" ||
+      s.state_type === "closed" ||
+      s.state_type === "all"
+        ? s.state_type
+        : undefined;
+    return {
+      service_id: num(s.service_id),
+      state_type: state,
+      offset: num(s.offset),
+    };
+  },
+  component: ServiceViewPage,
+});
+
+const agentTimeAccountingRoute = createRoute({
+  getParentRoute: () => agentLayoutRoute,
+  path: "/time-accounting",
+  validateSearch: (s: Record<string, unknown>): TimeAccountingSearch => {
+    const num = (v: unknown) =>
+      typeof v === "number"
+        ? v
+        : typeof v === "string" && v !== ""
+          ? Number(v)
+          : undefined;
+    const isoDate = (v: unknown): string | undefined =>
+      typeof v === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : undefined;
+    return {
+      create_by: num(s.create_by),
+      ticket_id: num(s.ticket_id),
+      created_from: isoDate(s.created_from),
+      created_to: isoDate(s.created_to),
+      offset: num(s.offset),
+    };
+  },
+  component: TimeAccountingReportPage,
+});
+
+const agentCustomerRoute = createRoute({
+  getParentRoute: () => agentLayoutRoute,
+  path: "/customers/$login",
+  component: CustomerDetailPage,
 });
 
 // /portal/login: mounts its own CustomerAuthProvider (a separate session from
@@ -818,6 +901,9 @@ const routeTree = rootRoute.addChildren([
     agentStatsRoute,
     agentCalendarRoute,
     agentTemplatesRoute,
+    agentServicesRoute,
+    agentTimeAccountingRoute,
+    agentCustomerRoute,
   ]),
   portalLoginRoute,
   portalLayoutRoute.addChildren([

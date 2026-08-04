@@ -42,6 +42,11 @@
     "inbox": "Inbox",
     "myTickets": "My tickets",
     "watched": "Watched",
+    "locked": "Locked",
+    "responsible": "Responsible",
+    "escalated": "Escalated",
+    "services": "Services",
+    "timeAccounting": "Time accounting",
     "queues": "Queues",
     "knowledge": "Knowledge",
     "knowledgeBase": "Knowledge base",
@@ -56,6 +61,46 @@
     "queueSearch": "Filter queues…",
     "noQueueMatch": "No queues match.",
     "templates": "Templates"
+  },
+  "views": {
+    "mine": "My tickets",
+    "responsible": "Responsible",
+    "locked": "Locked tickets",
+    "watched": "Watched tickets",
+    "escalated": "Escalated tickets",
+    "service": "By service",
+    "serviceHint": "List tickets assigned to a service.",
+    "pickService": "Select a service…"
+  },
+  "customerCentre": {
+    "title": "Customer information",
+    "open": "Customer info",
+    "invalid": "Invalid customer login.",
+    "loadError": "Could not load this customer.",
+    "email": "Email",
+    "phone": "Phone",
+    "customerId": "Customer number",
+    "company": "Company",
+    "openCount": "{{count}} open",
+    "closedCount": "{{count}} closed",
+    "allTickets": "All tickets →",
+    "recentTickets": "Recent tickets"
+  },
+  "timeAccounting": {
+    "title": "Time accounting",
+    "hint": "Booked time units across tickets you can access.",
+    "filterUser": "Agent",
+    "allUsers": "All agents",
+    "filterFrom": "From",
+    "filterTo": "To",
+    "filterTicket": "Ticket ID",
+    "totalUnits": "Total: {{units}} units",
+    "rowCount": "{{count}} rows",
+    "empty": "No time-accounting entries match.",
+    "colWhen": "When",
+    "colTicket": "Ticket",
+    "colUser": "Agent",
+    "colUnits": "Units"
   },
   "common": {
     "prev": "Previous",
@@ -173,7 +218,9 @@
     "toPickUpEmpty": "No new tickets to pick up.",
     "remindersDue": "Reminders due",
     "remindersDueEmpty": "No reminders due.",
-    "queueShortcutsEmpty": "No queues with open or new tickets right now."
+    "queueShortcutsEmpty": "No queues with open or new tickets right now.",
+    "lastViews": "Recently viewed",
+    "lastViewsUntitled": "(no subject)"
   },
   "queue": {
     "sidebar": "Queues",

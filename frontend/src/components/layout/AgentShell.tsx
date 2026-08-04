@@ -351,15 +351,62 @@ function SidebarBody({ onNavigate }: { onNavigate?: () => void }) {
             onNavigate={onNavigate}
           />
           <NavItem
-            to="/agent"
+            to="/agent/queues"
+            search={{
+              state_type: "open",
+              owner_id: user?.id,
+              view: "mine",
+            }}
             label={t("sidebar.myTickets")}
             count={myCountsQ.data?.open}
             newCount={myCountsQ.data?.new}
             testId="agent-nav-my-tickets"
             onNavigate={onNavigate}
-            exact
           />
-          <NavItem to="/agent" label={t("sidebar.watched")} testId="agent-nav-watched" disabled />
+          <NavItem
+            to="/agent/queues"
+            search={{
+              state_type: "open",
+              responsible_id: user?.id,
+              view: "responsible",
+            }}
+            label={t("sidebar.responsible")}
+            testId="agent-nav-responsible"
+            onNavigate={onNavigate}
+            disabled={!user?.id}
+          />
+          <NavItem
+            to="/agent/queues"
+            search={{ state_type: "open", locked: true, view: "locked" }}
+            label={t("sidebar.locked")}
+            testId="agent-nav-locked"
+            onNavigate={onNavigate}
+          />
+          <NavItem
+            to="/agent/queues"
+            search={{
+              state_type: "open",
+              watcher_user_id: user?.id,
+              view: "watched",
+            }}
+            label={t("sidebar.watched")}
+            testId="agent-nav-watched"
+            onNavigate={onNavigate}
+            disabled={!user?.id}
+          />
+          <NavItem
+            to="/agent/queues"
+            search={{ state_type: "open", escalated: true, view: "escalated" }}
+            label={t("sidebar.escalated")}
+            testId="agent-nav-escalated"
+            onNavigate={onNavigate}
+          />
+          <NavItem
+            to="/agent/services"
+            label={t("sidebar.services")}
+            testId="agent-nav-services"
+            onNavigate={onNavigate}
+          />
         </NavGroup>
 
         <QueueNavSection
@@ -412,6 +459,12 @@ function SidebarBody({ onNavigate }: { onNavigate?: () => void }) {
             to="/agent/stats"
             label={t("sidebar.stats")}
             testId="agent-nav-stats"
+            onNavigate={onNavigate}
+          />
+          <NavItem
+            to="/agent/time-accounting"
+            label={t("sidebar.timeAccounting")}
+            testId="agent-nav-time-accounting"
             onNavigate={onNavigate}
           />
         </NavGroup>

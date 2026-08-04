@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { useNavigate } from "@tanstack/react-router";
+import { Link, useNavigate } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
 import { toBcp47 } from "@/i18n";
 import { api } from "@/lib/api";
@@ -423,7 +423,12 @@ export function TicketHeaderActions({
 
             <MenuSeparator />
             <MenuLabel>{t("ticket.actionsGroupMisc")}</MenuLabel>
-            <MenuItem testId="more-print" onSelect={() => window.print()}>
+            <MenuItem
+              testId="more-print"
+              onSelect={() => {
+                window.open(api.ticketPrintUrl(ticketId), "_blank", "noopener,noreferrer");
+              }}
+            >
               {t("ticket.toolbar.print")}
             </MenuItem>
             <MenuItem
@@ -471,6 +476,17 @@ export function TicketHeaderActions({
           disabledTitle={!perms.rw ? noPerm : undefined}
           onClick={perms.rw ? () => setDialog("customer") : undefined}
         />
+        {ticket.customer_user_id && (
+          <Link
+            to="/agent/customers/$login"
+            params={{ login: ticket.customer_user_id }}
+            className="text-xs font-medium text-accent hover:underline"
+            data-testid="ticket-customer-centre-link"
+            title={t("customerCentre.title")}
+          >
+            {t("customerCentre.open")}
+          </Link>
+        )}
         <span
           className="ml-auto inline-flex items-center gap-1 font-mono text-[11px] tabular-nums text-muted"
           data-testid="ticket-header-timestamps"
