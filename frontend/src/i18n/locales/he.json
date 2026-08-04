@@ -1223,7 +1223,9 @@
       "aiQueues": "מדיניות תורים",
       "aiAudit": "בקש ביקורת",
       "aiAcl": "גישה ומגבלות",
-      "collapse": "כווץ הניווט"
+      "collapse": "כווץ הניווט",
+      "mailAccounts": "חשבונות דואר",
+      "oauth2Tokens": "אסימוני OAuth2 (דואר)"
     },
     "table": {
       "id": "ID",
@@ -1698,7 +1700,10 @@
       "testTo": "שלח בדיקה לכתובת (אופציונלי)",
       "testSuccess": "הבדיקה הצליחה",
       "testFailure": "הבדיקה נכשלה",
-      "loadError": "טעינת ההגדרות נכשלה."
+      "loadError": "טעינת ההגדרות נכשלה.",
+      "authOAuth2": "אסימון OAuth2",
+      "oauth2TokenConfigName": "שם תצורת אסימון OAuth2",
+      "oauth2TokenConfigNameHelp": "שם של תצורת אסימון OAuth2 (זהה ל-Znuny SendmailModule::OAuth2TokenConfigName)."
     },
     "subjectConfig": {
       "title": "מספר הכרטיס בנושא",
@@ -2200,7 +2205,54 @@
       "aiMcp": "נהל שרתי MCP כמקורות כלים עבור ה-AI והפעל כלים.",
       "aiQueues": "הגדר התנהגות בינה מלאכותית לכל תור: אוטונומיה, מכסים, הסלמה.",
       "aiAudit": "ביקורת מלאה של כל בקשה/תגובה של LLM, עם חשיפת PII.",
-      "aiAcl": "הרשאות ומכסות בינה מלאכותית לכל קבוצה, תפקיד או סוכן."
+      "aiAcl": "הרשאות ומכסות בינה מלאכותית לכל קבוצה, תפקיד או סוכן.",
+      "mailAccounts": "תיבות דואר IMAP/POP נכנסות (סיסמה או OAuth2).",
+      "oauth2Tokens": "הגדרות אסימון OAuth2 עבור דואר של Microsoft/Google (תואם Znuny)."
+    },
+    "mailAccounts": {
+      "title_plural": "חשבונות דואר",
+      "authOAuth2": "אסימון OAuth2",
+      "new": "חשבון דואר חדש",
+      "login": "כניסה/מייל",
+      "password": "סיסמה",
+      "authPassword": "סיסמה",
+      "passwordHelp": "השאר ריק בעת העריכה כדי לשמור את הסיסמה הנוכחית. לא בשימוש עבור OAuth2.",
+      "host": "מארח",
+      "accountType": "הקלד",
+      "queue": "תור",
+      "imapFolder": "תיקיית IMAP",
+      "authType": "אימות",
+      "oauthConfig": "תצורת אסימון OAuth2",
+      "oauthConfigHelp": "נדרש כאשר האימות הוא OAuth2.",
+      "trusted": "מהימן",
+      "trustedHelp": "סמוך על כותרות X-OTRS מחשבון זה (סמנטיקה של Znuny).",
+      "comments": "הערה"
+    },
+    "oauth2": {
+      "title_plural": "אסימוני OAuth2 (דואר)",
+      "new": "תצורת אסימון חדשה",
+      "name": "שם",
+      "template": "תבנית ספק",
+      "templateNone": "מותאם אישית / אין",
+      "templateHelp": "מילוי מראש של כתובות URL והיקפים של בקשה של Microsoft או Google (תבניות Znuny).",
+      "clientId": "מזהה לקוח",
+      "clientSecret": "סוד הלקוח",
+      "clientSecretHelp": "השאר ריק בעת העריכה כדי לשמור את הסוד המאוחסן.",
+      "scope": "היקף",
+      "scopeHelp": "היקפי OAuth מופרדים מרווחים (כוללים גישה לא מקוונת עבור אסימוני רענון).",
+      "redirectUri": "כתובת URL להפניה מחדש",
+      "redirectUriHelp": "רשום את ה-URI המדויק הזה ב-Azure/Google. הגדר את TIQORA_PUBLIC_BASE_URL בייצור.",
+      "tokenStatus": "מצב אסימון",
+      "tokenStatusNone": "אין אסימון",
+      "tokenStatusValid": "תקף",
+      "tokenStatusExpired": "פג תוקף (ניתן לרענן)",
+      "tokenStatusNeedsReauth": "צריך אישור מחדש",
+      "tokenStatusError": "שגיאה",
+      "authorize": "הרשאה...",
+      "refresh": "רענן אסימון",
+      "working": "עובד…",
+      "authorizeOpened": "דף ההרשאה נפתח בכרטיסייה חדשה.",
+      "refreshSuccess": "טוקן רענן."
     }
   },
   "kb": {

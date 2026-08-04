@@ -1223,7 +1223,9 @@
       "aiQueues": "Kuyruk politikaları",
       "aiAudit": "Denetim iste",
       "aiAcl": "Erişim ve sınırlar",
-      "collapse": "Gezinmeyi daralt"
+      "collapse": "Gezinmeyi daralt",
+      "mailAccounts": "Posta hesapları",
+      "oauth2Tokens": "OAuth2 belirteçleri (posta)"
     },
     "table": {
       "id": "ID",
@@ -1698,7 +1700,10 @@
       "testTo": "Testi adrese gönder (isteğe bağlı)",
       "testSuccess": "Test başarılı oldu",
       "testFailure": "Test başarısız oldu",
-      "loadError": "Ayarlar yüklenemedi."
+      "loadError": "Ayarlar yüklenemedi.",
+      "authOAuth2": "OAuth2 jetonu",
+      "oauth2TokenConfigName": "OAuth2 belirteci yapılandırma adı",
+      "oauth2TokenConfigNameHelp": "OAuth2 belirteci yapılandırmasının adı (Znuny SendmailModule::OAuth2TokenConfigName ile aynı)."
     },
     "subjectConfig": {
       "title": "Konudaki bilet numarası",
@@ -2200,7 +2205,54 @@
       "aiMcp": "MCP sunucularını yapay zeka için araç kaynakları olarak yönetin ve araçları etkinleştirin.",
       "aiQueues": "Kuyruk başına AI davranışını yapılandırın: özerklik, sınırlar, üst kademeye yükseltme.",
       "aiAudit": "Her LLM isteğinin/yanıtının PII açıklamasıyla birlikte tam denetimi.",
-      "aiAcl": "Grup, rol veya temsilci başına AI izinleri ve kotaları."
+      "aiAcl": "Grup, rol veya temsilci başına AI izinleri ve kotaları.",
+      "mailAccounts": "Gelen IMAP/POP posta kutuları (şifre veya OAuth2).",
+      "oauth2Tokens": "Microsoft/Google posta için OAuth2 belirteci yapılandırmaları (Znuny uyumlu)."
+    },
+    "mailAccounts": {
+      "title_plural": "Posta hesapları",
+      "authOAuth2": "OAuth2 jetonu",
+      "new": "Yeni posta hesabı",
+      "login": "Giriş / e-posta",
+      "password": "Şifre",
+      "authPassword": "Şifre",
+      "passwordHelp": "Geçerli şifreyi korumak için düzenleme sırasında boş bırakın. OAuth2 için kullanılmaz.",
+      "host": "Sunucu",
+      "accountType": "Tür",
+      "queue": "Sıra",
+      "imapFolder": "IMAP klasörü",
+      "authType": "Kimlik doğrulama",
+      "oauthConfig": "OAuth2 belirteci yapılandırması",
+      "oauthConfigHelp": "Kimlik doğrulama OAuth2 olduğunda gereklidir.",
+      "trusted": "Güvenilir",
+      "trustedHelp": "Bu hesaptaki X-OTRS başlıklarına güvenin (Znuny semantiği).",
+      "comments": "Yorum"
+    },
+    "oauth2": {
+      "title_plural": "OAuth2 belirteçleri (posta)",
+      "new": "Yeni belirteç yapılandırması",
+      "name": "İsim",
+      "template": "Sağlayıcı şablonu",
+      "templateNone": "Özel / yok",
+      "templateHelp": "Microsoft veya Google istek URL'lerini ve kapsamlarını (Znuny şablonları) önceden doldurur.",
+      "clientId": "Müşteri Kimliği",
+      "clientSecret": "İstemci sırrı",
+      "clientSecretHelp": "Saklanan sırrı korumak için düzenleme sırasında boş bırakın.",
+      "scope": "Kapsam",
+      "scopeHelp": "Boşlukla ayrılmış OAuth kapsamları (yenileme belirteçleri için offline_access'i içerir).",
+      "redirectUri": "URI'yi yönlendir",
+      "redirectUriHelp": "Bu tam URI'yi Azure/Google'a kaydedin. Üretimde TIQORA_PUBLIC_BASE_URL'yi ayarlayın.",
+      "tokenStatus": "Jeton durumu",
+      "tokenStatusNone": "Belirteç yok",
+      "tokenStatusValid": "Geçerli",
+      "tokenStatusExpired": "Süresi dolmuş (yenilenebilir)",
+      "tokenStatusNeedsReauth": "Yeniden yetkilendirme gerekiyor",
+      "tokenStatusError": "Hata",
+      "authorize": "Yetki ver…",
+      "refresh": "Jetonu yenile",
+      "working": "Çalışıyor…",
+      "authorizeOpened": "Yetkilendirme sayfası yeni sekmede açıldı.",
+      "refreshSuccess": "Jeton yenilendi."
     }
   },
   "kb": {

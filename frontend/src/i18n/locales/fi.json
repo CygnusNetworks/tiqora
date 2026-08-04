@@ -1223,7 +1223,9 @@
       "aiQueues": "Jonokäytännöt",
       "aiAudit": "Pyydä auditointia",
       "aiAcl": "Pääsy ja rajoitukset",
-      "collapse": "Tiivistä navigointi"
+      "collapse": "Tiivistä navigointi",
+      "mailAccounts": "Postitilit",
+      "oauth2Tokens": "OAuth2-tunnukset (posti)"
     },
     "table": {
       "id": "ID",
@@ -1698,7 +1700,10 @@
       "testTo": "Lähetä testi osoitteeseen (valinnainen)",
       "testSuccess": "Testi onnistui",
       "testFailure": "Testi epäonnistui",
-      "loadError": "Asetusten lataaminen epäonnistui."
+      "loadError": "Asetusten lataaminen epäonnistui.",
+      "authOAuth2": "OAuth2-tunnus",
+      "oauth2TokenConfigName": "OAuth2-tunnuksen kokoonpanon nimi",
+      "oauth2TokenConfigNameHelp": "OAuth2-tunnuksen kokoonpanon nimi (sama kuin Znuny SendmailModule::OAuth2TokenConfigName)."
     },
     "subjectConfig": {
       "title": "Lipun numero aiheessa",
@@ -2200,7 +2205,54 @@
       "aiMcp": "Hallitse MCP-palvelimia tekoälyn työkalulähteinä ja ota työkalut käyttöön.",
       "aiQueues": "Configure AI behavior per queue: autonomy, caps, escalation.",
       "aiAudit": "Full audit of every LLM request/response, with PII reveal.",
-      "aiAcl": "Tekoälyluvat ja kiintiöt ryhmää, roolia tai agenttia kohti."
+      "aiAcl": "Tekoälyluvat ja kiintiöt ryhmää, roolia tai agenttia kohti.",
+      "mailAccounts": "Saapuvat IMAP/POP-postilaatikot (salasana tai OAuth2).",
+      "oauth2Tokens": "OAuth2-tunnuksen asetukset Microsoft/Google-sähköpostille (Znuny-yhteensopiva)."
+    },
+    "mailAccounts": {
+      "title_plural": "Postitilit",
+      "authOAuth2": "OAuth2-tunnus",
+      "new": "Uusi sähköpostitili",
+      "login": "Kirjautuminen / sähköposti",
+      "password": "Salasana",
+      "authPassword": "Salasana",
+      "passwordHelp": "Jätä tyhjäksi muokkauskohdassa, jos haluat säilyttää nykyisen salasanan. Ei käytössä OAuth2:ssa.",
+      "host": "Isäntä",
+      "accountType": "Kirjoita",
+      "queue": "Jono",
+      "imapFolder": "IMAP-kansio",
+      "authType": "Todennus",
+      "oauthConfig": "OAuth2-tunnuksen määritys",
+      "oauthConfigHelp": "Vaaditaan, kun todennus on OAuth2.",
+      "trusted": "Luotettu",
+      "trustedHelp": "Luota tämän tilin X-OTRS-otsikoihin (Znuny-semantiikka).",
+      "comments": "Kommentoi"
+    },
+    "oauth2": {
+      "title_plural": "OAuth2-tunnukset (posti)",
+      "new": "Uusi tunnuksen kokoonpano",
+      "name": "Nimi",
+      "template": "Palveluntarjoajan malli",
+      "templateNone": "Mukautettu / ei mitään",
+      "templateHelp": "Esitäyttää Microsoftin tai Googlen pyyntöjen URL-osoitteet ja laajuudet (Znuny-mallit).",
+      "clientId": "Asiakastunnus",
+      "clientSecret": "Asiakkaan salaisuus",
+      "clientSecretHelp": "Jätä tyhjäksi muokkauskohdassa säilyttääksesi tallennetun salaisuuden.",
+      "scope": "Laajuus",
+      "scopeHelp": "Välilyönnillä erotetut OAuth-alueet (mukaan lukien offline_access virkistystunnuksille).",
+      "redirectUri": "Uudelleenohjaus URI",
+      "redirectUriHelp": "Rekisteröi tämä tarkka URI Azuressa/Googlessa. Aseta TIQORA_PUBLIC_BASE_URL tuotannossa.",
+      "tokenStatus": "Tokenin tila",
+      "tokenStatusNone": "Ei merkkiä",
+      "tokenStatusValid": "Voimassa",
+      "tokenStatusExpired": "Vanhentunut (päivitettävä)",
+      "tokenStatusNeedsReauth": "Vaatii uudelleenluvan",
+      "tokenStatusError": "Virhe",
+      "authorize": "Valtuuta…",
+      "refresh": "Päivitä tunnus",
+      "working": "Työskentelee…",
+      "authorizeOpened": "Valtuutussivu avattiin uudelle välilehdelle.",
+      "refreshSuccess": "Token päivitetty."
     }
   },
   "kb": {

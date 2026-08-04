@@ -1223,7 +1223,9 @@
       "aiQueues": "隊列策略",
       "aiAudit": "請求審核",
       "aiAcl": "訪問和限制",
-      "collapse": "折疊導航"
+      "collapse": "折疊導航",
+      "mailAccounts": "郵件帳號",
+      "oauth2Tokens": "OAuth2 令牌（郵件）"
     },
     "table": {
       "id": "ID",
@@ -1698,7 +1700,10 @@
       "testTo": "將測試發送至地址（可選）",
       "testSuccess": "測試成功",
       "testFailure": "測試失敗",
-      "loadError": "無法載入設定。"
+      "loadError": "無法載入設定。",
+      "authOAuth2": "OAuth2 令牌",
+      "oauth2TokenConfigName": "OAuth2 令牌配置名稱",
+      "oauth2TokenConfigNameHelp": "OAuth2 令牌配置的名稱（與 Znuny SendmailModule::OAuth2TokenConfigName 相同）。"
     },
     "subjectConfig": {
       "title": "主題中的票號",
@@ -2200,7 +2205,54 @@
       "aiMcp": "管理 MCP 伺服器作為 AI 的工具來源並啟用工具。",
       "aiQueues": "配置每個佇列的 AI 行為：自治、上限、升級。",
       "aiAudit": "對每個法學碩士請求/回應進行全面審核，並揭露 PII。",
-      "aiAcl": "每個群組、角色或代理的 AI 權限和配額。"
+      "aiAcl": "每個群組、角色或代理的 AI 權限和配額。",
+      "mailAccounts": "傳入 IMAP/POP 信箱（密碼或 OAuth2）。",
+      "oauth2Tokens": "Microsoft/Google 郵件的 OAuth2 令牌配置（Znuny 相容）。"
+    },
+    "mailAccounts": {
+      "title_plural": "郵件帳號",
+      "authOAuth2": "OAuth2 令牌",
+      "new": "新郵件帳戶",
+      "login": "登入/電子郵件",
+      "password": "密碼",
+      "authPassword": "密碼",
+      "passwordHelp": "編輯時留空以保留目前密碼。不用於 OAuth2。",
+      "host": "主持人",
+      "accountType": "類型",
+      "queue": "佇列",
+      "imapFolder": "IMAP 資料夾",
+      "authType": "認證",
+      "oauthConfig": "OAuth2 令牌配置",
+      "oauthConfigHelp": "當身份驗證為 OAuth2 時需要。",
+      "trusted": "值得信賴",
+      "trustedHelp": "信任來自此帳戶的 X-OTRS 標頭（Zuny 語義）。",
+      "comments": "評論"
+    },
+    "oauth2": {
+      "title_plural": "OAuth2 令牌（郵件）",
+      "new": "新令牌配置",
+      "name": "名稱",
+      "template": "提供者模板",
+      "templateNone": "客製化/無",
+      "templateHelp": "預先填入 Microsoft 或 Google 請求 URL 和範圍（Zuny 範本）。",
+      "clientId": "客戶ID",
+      "clientSecret": "客戶秘密",
+      "clientSecretHelp": "編輯時留空以保持存儲的秘密。",
+      "scope": "適用範圍",
+      "scopeHelp": "以空格分隔的 OAuth 範圍（包括用於刷新令牌的離線存取）。",
+      "redirectUri": "重定向URI",
+      "redirectUriHelp": "在 Azure/Google 中註冊這個確切的 URI。在生產中設定 TIQORA_PUBLIC_BASE_URL。",
+      "tokenStatus": "代幣狀態",
+      "tokenStatusNone": "無令牌",
+      "tokenStatusValid": "有效",
+      "tokenStatusExpired": "已過期（可刷新）",
+      "tokenStatusNeedsReauth": "需要重新授權",
+      "tokenStatusError": "錯誤",
+      "authorize": "授權...",
+      "refresh": "刷新令牌",
+      "working": "工作…",
+      "authorizeOpened": "授權頁面在新分頁中開啟。",
+      "refreshSuccess": "令牌已刷新。"
     }
   },
   "kb": {

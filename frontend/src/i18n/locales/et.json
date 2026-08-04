@@ -1223,7 +1223,9 @@
       "aiQueues": "Järjekorraeeskirjad",
       "aiAudit": "Taotlege auditit",
       "aiAcl": "Juurdepääs ja piirangud",
-      "collapse": "Ahenda navigeerimist"
+      "collapse": "Ahenda navigeerimist",
+      "mailAccounts": "Meilikontod",
+      "oauth2Tokens": "OAuth2 märgid (post)"
     },
     "table": {
       "id": "ID",
@@ -1698,7 +1700,10 @@
       "testTo": "Saada test aadressile (valikuline)",
       "testSuccess": "Test õnnestus",
       "testFailure": "Test ebaõnnestus",
-      "loadError": "Seadete laadimine ebaõnnestus."
+      "loadError": "Seadete laadimine ebaõnnestus.",
+      "authOAuth2": "OAuth2 luba",
+      "oauth2TokenConfigName": "OAuth2 loa konfiguratsiooninimi",
+      "oauth2TokenConfigNameHelp": "OAuth2 loa konfiguratsiooni nimi (sama mis Znuny SendmailModule::OAuth2TokenConfigName)."
     },
     "subjectConfig": {
       "title": "Pileti number teemas",
@@ -2200,7 +2205,54 @@
       "aiMcp": "Hallake MCP-servereid tehisintellekti tööriistaallikatena ja lubage tööriistu.",
       "aiQueues": "Konfigureerige AI käitumist järjekorra kohta: autonoomia, piirangud, eskalatsioon.",
       "aiAudit": "Iga LLM-i päringu/vastuse täielik audit koos isikuandmete tuvastamisega.",
-      "aiAcl": "AI load ja kvoodid rühma, rolli või agendi kohta."
+      "aiAcl": "AI load ja kvoodid rühma, rolli või agendi kohta.",
+      "mailAccounts": "Sissetulevad IMAP/POP-postkastid (parool või OAuth2).",
+      "oauth2Tokens": "OAuth2 märgi konfiguratsioonid Microsofti/Google'i meili jaoks (Znuny-ühilduv)."
+    },
+    "mailAccounts": {
+      "title_plural": "Meilikontod",
+      "authOAuth2": "OAuth2 luba",
+      "new": "Uus meilikonto",
+      "login": "Sisselogimine / email",
+      "password": "Parool",
+      "authPassword": "Parool",
+      "passwordHelp": "Praeguse parooli säilitamiseks jätke muutmise juures tühjaks. Ei kasutata OAuth2 jaoks.",
+      "host": "Host",
+      "accountType": "Tüüp",
+      "queue": "Järjekord",
+      "imapFolder": "IMAP kaust",
+      "authType": "Autentimine",
+      "oauthConfig": "OAuth2 loa konfiguratsioon",
+      "oauthConfigHelp": "Nõutav, kui autentimine on OAuth2.",
+      "trusted": "Usaldusväärne",
+      "trustedHelp": "Usaldage selle konto X-OTRS-i päiseid (Znuny semantika).",
+      "comments": "Kommenteeri"
+    },
+    "oauth2": {
+      "title_plural": "OAuth2 märgid (post)",
+      "new": "Uus märgi konfiguratsioon",
+      "name": "Nimi",
+      "template": "Pakkuja mall",
+      "templateNone": "Kohandatud / mitte ühtegi",
+      "templateHelp": "Eeltäidetakse Microsofti või Google'i päringu URL-id ja ulatused (Znuny mallid).",
+      "clientId": "Kliendi ID",
+      "clientSecret": "Kliendi saladus",
+      "clientSecretHelp": "Salvestatud saladuse hoidmiseks jätke muutmise juures tühjaks.",
+      "scope": "Ulatus",
+      "scopeHelp": "Tühikuga eraldatud OAuthi ulatused (sh värskenduslubade jaoks offline_access).",
+      "redirectUri": "Ümbersuunamise URI",
+      "redirectUriHelp": "Registreerige see täpne URI Azure'is/Google'is. Määrake tootmises TIQORA_PUBLIC_BASE_URL.",
+      "tokenStatus": "Märgi olek",
+      "tokenStatusNone": "Token puudub",
+      "tokenStatusValid": "Kehtiv",
+      "tokenStatusExpired": "Aegunud (värskendatav)",
+      "tokenStatusNeedsReauth": "Vajab uuesti autoriseerimist",
+      "tokenStatusError": "Viga",
+      "authorize": "Volita…",
+      "refresh": "Värskenda tunnust",
+      "working": "Töötab…",
+      "authorizeOpened": "Autoriseerimisleht avati uuel vahelehel.",
+      "refreshSuccess": "Token on värskendatud."
     }
   },
   "kb": {

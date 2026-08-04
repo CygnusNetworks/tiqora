@@ -1223,7 +1223,9 @@
       "aiQueues": "Políticas de cola",
       "aiAudit": "Solicitar auditoría",
       "aiAcl": "Acceso y límites",
-      "collapse": "Contraer navegación"
+      "collapse": "Contraer navegación",
+      "mailAccounts": "cuentas de correo",
+      "oauth2Tokens": "Tokens OAuth2 (correo)"
     },
     "table": {
       "id": "ID",
@@ -1698,7 +1700,10 @@
       "testTo": "Enviar prueba a la dirección (opcional)",
       "testSuccess": "Prueba exitosa",
       "testFailure": "Prueba fallida",
-      "loadError": "No se pudo cargar la configuración."
+      "loadError": "No se pudo cargar la configuración.",
+      "authOAuth2": "token OAuth2",
+      "oauth2TokenConfigName": "Nombre de configuración del token OAuth2",
+      "oauth2TokenConfigNameHelp": "Nombre de una configuración de token OAuth2 (igual que Znuny SendmailModule::OAuth2TokenConfigName)."
     },
     "subjectConfig": {
       "title": "Número de billete en el asunto",
@@ -2200,7 +2205,54 @@
       "aiMcp": "Administre servidores MCP como fuentes de herramientas para la AI y habilite herramientas.",
       "aiQueues": "Configure el comportamiento de la AI por cola: autonomía, límites, escalamiento.",
       "aiAudit": "Auditoría completa de cada solicitud/respuesta de LLM, con revelación de PII.",
-      "aiAcl": "Permisos de AI y cuotas por grupo, rol o agente."
+      "aiAcl": "Permisos de AI y cuotas por grupo, rol o agente.",
+      "mailAccounts": "Buzones de correo IMAP/POP entrantes (contraseña u OAuth2).",
+      "oauth2Tokens": "Configuraciones de token OAuth2 para correo de Microsoft/Google (compatible con Znuny)."
+    },
+    "mailAccounts": {
+      "title_plural": "cuentas de correo",
+      "authOAuth2": "token OAuth2",
+      "new": "Nueva cuenta de correo",
+      "login": "Iniciar sesión / correo electrónico",
+      "password": "Contraseña",
+      "authPassword": "Contraseña",
+      "passwordHelp": "Déjelo en blanco al editar para mantener la contraseña actual. No se utiliza para OAuth2.",
+      "host": "Anfitrión",
+      "accountType": "Tipo",
+      "queue": "cola",
+      "imapFolder": "carpeta IMAP",
+      "authType": "Autenticación",
+      "oauthConfig": "Configuración del token OAuth2",
+      "oauthConfigHelp": "Requerido cuando la autenticación es OAuth2.",
+      "trusted": "Confiable",
+      "trustedHelp": "Confíe en los encabezados X-OTRS de esta cuenta (semántica de Znuny).",
+      "comments": "Comentario"
+    },
+    "oauth2": {
+      "title_plural": "Tokens OAuth2 (correo)",
+      "new": "Nueva configuración de token",
+      "name": "Nombre",
+      "template": "Plantilla de proveedor",
+      "templateNone": "Personalizado/ninguno",
+      "templateHelp": "Rellena previamente las URL y los ámbitos de solicitud de Microsoft o Google (plantillas de Znuny).",
+      "clientId": "ID de cliente",
+      "clientSecret": "secreto del cliente",
+      "clientSecretHelp": "Déjelo en blanco al editar para mantener el secreto almacenado.",
+      "scope": "Alcance",
+      "scopeHelp": "Ámbitos de OAuth separados por espacios (incluye offline_access para tokens de actualización).",
+      "redirectUri": "URI de redireccionamiento",
+      "redirectUriHelp": "Registre este URI exacto en Azure/Google. Establecer TIQORA_PUBLIC_BASE_URL en producción.",
+      "tokenStatus": "Estado del token",
+      "tokenStatusNone": "Sin ficha",
+      "tokenStatusValid": "Válido",
+      "tokenStatusExpired": "Caducado (actualizable)",
+      "tokenStatusNeedsReauth": "Necesita reautorización",
+      "tokenStatusError": "error",
+      "authorize": "Autorizar…",
+      "refresh": "Actualizar token",
+      "working": "Trabajando…",
+      "authorizeOpened": "La página de autorización se abrió en una nueva pestaña.",
+      "refreshSuccess": "Token actualizado."
     }
   },
   "kb": {

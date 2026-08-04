@@ -1223,7 +1223,9 @@
       "aiQueues": "سياسات قائمة الانتظار",
       "aiAudit": "طلب التدقيق",
       "aiAcl": "الوصول والحدود",
-      "collapse": "طي التنقل"
+      "collapse": "طي التنقل",
+      "mailAccounts": "حسابات البريد",
+      "oauth2Tokens": "رموز OAuth2 (البريد)"
     },
     "table": {
       "id": "ID",
@@ -1698,7 +1700,10 @@
       "testTo": "إرسال الاختبار إلى العنوان (اختياري)",
       "testSuccess": "نجح الاختبار",
       "testFailure": "فشل الاختبار",
-      "loadError": "فشل تحميل الإعدادات."
+      "loadError": "فشل تحميل الإعدادات.",
+      "authOAuth2": "رمز OAuth2",
+      "oauth2TokenConfigName": "اسم تكوين الرمز المميز OAuth2",
+      "oauth2TokenConfigNameHelp": "اسم تكوين الرمز المميز OAuth2 (مثل Znuny SendmailModule::OAuth2TokenConfigName)."
     },
     "subjectConfig": {
       "title": "رقم التذكرة في الموضوع",
@@ -2200,7 +2205,54 @@
       "aiMcp": "إدارة خوادم MCP كمصادر أدوات للذكاء الاصطناعي وتمكين الأدوات.",
       "aiQueues": "تكوين سلوك الذكاء الاصطناعي لكل قائمة انتظار: الاستقلالية، والحدود القصوى، والتصعيد.",
       "aiAudit": "تدقيق كامل لكل طلب/رد على LLM، مع الكشف عن معلومات تحديد الهوية الشخصية (PII).",
-      "aiAcl": "أذونات وحصص الذكاء الاصطناعي لكل مجموعة أو دور أو وكيل."
+      "aiAcl": "أذونات وحصص الذكاء الاصطناعي لكل مجموعة أو دور أو وكيل.",
+      "mailAccounts": "صناديق بريد IMAP/POP الواردة (كلمة المرور أو OAuth2).",
+      "oauth2Tokens": "تكوينات رمز OAuth2 لبريد Microsoft/Google (متوافق مع Znuny)."
+    },
+    "mailAccounts": {
+      "title_plural": "حسابات البريد",
+      "authOAuth2": "رمز OAuth2",
+      "new": "حساب بريدي جديد",
+      "login": "تسجيل الدخول / البريد الإلكتروني",
+      "password": "كلمة المرور",
+      "authPassword": "كلمة المرور",
+      "passwordHelp": "اتركه فارغًا عند التعديل للاحتفاظ بكلمة المرور الحالية. لا يستخدم لـ OAuth2.",
+      "host": "المضيف",
+      "accountType": "اكتب",
+      "queue": "قائمة الانتظار",
+      "imapFolder": "مجلد IMAP",
+      "authType": "المصادقة",
+      "oauthConfig": "تكوين رمز OAuth2",
+      "oauthConfigHelp": "مطلوب عندما تكون المصادقة OAuth2.",
+      "trusted": "موثوق به",
+      "trustedHelp": "ثق برؤوس X-OTRS من هذا الحساب (دلالات Znuny).",
+      "comments": "التعليق"
+    },
+    "oauth2": {
+      "title_plural": "رموز OAuth2 (البريد)",
+      "new": "تكوين رمزي جديد",
+      "name": "الاسم",
+      "template": "قالب الموفر",
+      "templateNone": "مخصص / لا يوجد",
+      "templateHelp": "يقوم بملء عناوين URL والنطاقات الخاصة بطلبات Microsoft أو Google مسبقًا (قوالب Znuny).",
+      "clientId": "معرف العميل",
+      "clientSecret": "سر العميل",
+      "clientSecretHelp": "اتركه فارغًا عند التعديل للحفاظ على السر المخزن.",
+      "scope": "النطاق",
+      "scopeHelp": "نطاقات OAuth مفصولة بمسافات (تتضمن الوصول دون اتصال لرموز التحديث).",
+      "redirectUri": "إعادة توجيه URI",
+      "redirectUriHelp": "قم بتسجيل URI هذا بالضبط في Azure/Google. قم بتعيين TIQORA_PUBLIC_BASE_URL في الإنتاج.",
+      "tokenStatus": "حالة الرمز المميز",
+      "tokenStatusNone": "لا رمز",
+      "tokenStatusValid": "صالح",
+      "tokenStatusExpired": "منتهية الصلاحية (قابلة للتحديث)",
+      "tokenStatusNeedsReauth": "يحتاج إلى إعادة التفويض",
+      "tokenStatusError": "خطأ",
+      "authorize": "تفويض…",
+      "refresh": "تحديث الرمز المميز",
+      "working": "العمل…",
+      "authorizeOpened": "تم فتح صفحة التفويض في علامة تبويب جديدة.",
+      "refreshSuccess": "تم تحديث الرمز المميز."
     }
   },
   "kb": {

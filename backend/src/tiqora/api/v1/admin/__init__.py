@@ -22,8 +22,10 @@ from tiqora.api.v1.admin import (
     dynamic_fields,
     gdpr,
     groups,
+    mail_accounts,
     mail_log,
     mail_outbound,
+    oauth2_tokens,
     placeholder_variables,
     postmaster_filters,
     priorities,
@@ -57,6 +59,8 @@ admin_router.include_router(webhooks.router)
 admin_router.include_router(api_keys.router)
 admin_router.include_router(channels.router)
 admin_router.include_router(mail_outbound.router)
+admin_router.include_router(mail_accounts.router)
+admin_router.include_router(oauth2_tokens.router)
 admin_router.include_router(mail_log.router)
 admin_router.include_router(gdpr.router)
 admin_router.include_router(subject_config.router)

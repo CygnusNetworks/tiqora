@@ -245,7 +245,7 @@ export type SystemInfoOut = Schemas["SystemInfoOut"];
 export type DaemonUpdate = Schemas["DaemonUpdate"];
 // Hand-written until openapi.json is regenerated (schemas also appear there).
 export type MailSecurity = "none" | "starttls" | "ssl";
-export type MailAuthType = "none" | "password";
+export type MailAuthType = "none" | "password" | "oauth2_token";
 export type MailOutboundOut = {
   enabled: boolean;
   host: string;
@@ -254,10 +254,105 @@ export type MailOutboundOut = {
   auth_type: MailAuthType;
   auth_user: string;
   has_password: boolean;
+  oauth2_token_config_name?: string;
   from_default: string;
   timeout_seconds: number;
   change_time?: string | null;
   change_by?: number | null;
+};
+
+/** Znuny-compatible OAuth2 mail token config (legacy oauth2_token_config). */
+export type OAuth2TokenConfigOut = {
+  id: number;
+  name: string;
+  config: Record<string, unknown>;
+  client_id: string;
+  has_client_secret: boolean;
+  scope: string;
+  valid: boolean;
+  token_status: string;
+  token_expiration_date?: string | null;
+  refresh_token_expiration_date?: string | null;
+  has_token: boolean;
+  has_refresh_token: boolean;
+  error_message: string;
+  create_time?: string | null;
+  create_by?: number | null;
+  change_time?: string | null;
+  change_by?: number | null;
+  redirect_uri: string;
+};
+export type OAuth2TokenConfigCreate = {
+  name: string;
+  config?: Record<string, unknown>;
+  valid?: boolean;
+  client_id?: string | null;
+  client_secret?: string | null;
+  scope?: string | null;
+  template_id?: string | null;
+};
+export type OAuth2TokenConfigUpdate = {
+  name?: string | null;
+  config?: Record<string, unknown> | null;
+  valid?: boolean | null;
+  client_id?: string | null;
+  client_secret?: string | null;
+  scope?: string | null;
+};
+export type OAuth2AuthorizeUrlOut = {
+  url: string;
+  redirect_uri: string;
+  state: string;
+};
+export type OAuth2ProviderTemplateOut = {
+  id: string;
+  name: string;
+  config: Record<string, unknown>;
+};
+
+export type MailAccountType = "IMAP" | "IMAPS" | "POP3" | "POP3S";
+export type MailAccountAuthType = "password" | "oauth2_token";
+export type MailAccountOut = {
+  id: number;
+  login: string;
+  host: string;
+  account_type: string;
+  queue_id: number;
+  trusted: boolean;
+  imap_folder?: string | null;
+  authentication_type: string;
+  oauth2_token_config_id?: number | null;
+  comments?: string | null;
+  valid: boolean;
+  has_password: boolean;
+  create_time?: string | null;
+  change_time?: string | null;
+};
+export type MailAccountCreate = {
+  login: string;
+  pw?: string | null;
+  host: string;
+  account_type?: MailAccountType;
+  queue_id: number;
+  trusted?: boolean;
+  imap_folder?: string | null;
+  authentication_type?: MailAccountAuthType;
+  oauth2_token_config_id?: number | null;
+  comments?: string | null;
+  valid?: boolean;
+};
+export type MailAccountUpdate = {
+  login?: string | null;
+  pw?: string | null;
+  host?: string | null;
+  account_type?: MailAccountType | null;
+  queue_id?: number | null;
+  trusted?: boolean | null;
+  imap_folder?: string | null;
+  authentication_type?: MailAccountAuthType | null;
+  oauth2_token_config_id?: number | null;
+  comments?: string | null;
+  valid?: boolean | null;
 };
 export type SubjectFormat = "Left" | "Right" | "None";
 export type SubjectHookZnunyOut = {
@@ -294,6 +389,7 @@ export type MailOutboundUpdate = {
   auth_user?: string | null;
   /** Write-only; omit or empty keeps the stored password. */
   auth_password?: string | null;
+  oauth2_token_config_name?: string | null;
   from_default?: string | null;
   timeout_seconds?: number | null;
 };
@@ -1959,6 +2055,32 @@ export class ApiClient {
 
   get adminWebhooks() {
     return this.adminCrud<WebhookOut, WebhookCreate, WebhookUpdate>("/api/v1/admin/webhooks");
+  }
+
+  /** Znuny-compatible OAuth2 mail token configs (legacy oauth2_token_config). */
+  get adminOAuth2TokenConfigs() {
+    const base = "/api/v1/admin/oauth2-token-configs";
+    const crud = this.adminCrud<
+      OAuth2TokenConfigOut,
+      OAuth2TokenConfigCreate,
+      OAuth2TokenConfigUpdate
+    >(base);
+    return {
+      ...crud,
+      templates: (signal?: AbortSignal) =>
+        this.request<OAuth2ProviderTemplateOut[]>("GET", `${base}/templates`, { signal }),
+      authorizeUrl: (id: number | string, signal?: AbortSignal) =>
+        this.request<OAuth2AuthorizeUrlOut>("GET", `${base}/${id}/authorize-url`, { signal }),
+      refresh: (id: number | string, signal?: AbortSignal) =>
+        this.request<OAuth2TokenConfigOut>("POST", `${base}/${id}/refresh`, { signal }),
+    };
+  }
+
+  /** Incoming mail accounts (legacy mail_account). */
+  get adminMailAccounts() {
+    return this.adminCrud<MailAccountOut, MailAccountCreate, MailAccountUpdate>(
+      "/api/v1/admin/mail-accounts",
+    );
   }
 
   /**

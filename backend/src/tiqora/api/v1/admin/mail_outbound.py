@@ -32,7 +32,7 @@ logger = structlog.get_logger(__name__)
 router = APIRouter(prefix="/mail", tags=["admin:mail"])
 
 MailSecurity = Literal["none", "starttls", "ssl"]
-MailAuthType = Literal["none", "password"]
+MailAuthType = Literal["none", "password", "oauth2_token"]
 
 
 class MailOutboundOut(BaseModel):
@@ -45,6 +45,7 @@ class MailOutboundOut(BaseModel):
     auth_type: MailAuthType
     auth_user: str
     has_password: bool
+    oauth2_token_config_name: str = ""
     from_default: str
     timeout_seconds: int
     change_time: datetime | None = None
@@ -60,6 +61,8 @@ class MailOutboundUpdate(BaseModel):
     auth_user: str | None = None
     # Write-only: omit or empty string keeps the stored password.
     auth_password: str | None = None
+    # Znuny SendmailModule::OAuth2TokenConfigName (legacy config name).
+    oauth2_token_config_name: str | None = None
     from_default: str | None = None
     timeout_seconds: int | None = Field(default=None, ge=1, le=600)
 
@@ -98,6 +101,7 @@ async def put_mail_outbound(
         security=body.security,
         auth_type=body.auth_type,
         auth_user=body.auth_user,
+        oauth2_token_config_name=body.oauth2_token_config_name,
         auth_password=body.auth_password,
         from_default=body.from_default,
         timeout_seconds=body.timeout_seconds,
@@ -127,8 +131,26 @@ async def test_mail_outbound(
 
     use_tls = resolved.security == "ssl"
     start_tls = True if resolved.security == "starttls" else False if use_tls else None
-    username = resolved.auth_user if resolved.auth_type == "password" else None
+    username = (
+        resolved.auth_user
+        if resolved.auth_type in ("password", "oauth2_token")
+        else None
+    )
     password = resolved.auth_password if resolved.auth_type == "password" else None
+    oauth_gen = None
+    if resolved.auth_type == "oauth2_token":
+        if not resolved.oauth2_token_config_id:
+            return MailOutboundTestOut(
+                ok=False,
+                message="OAuth2 token config not found",
+                detail=(
+                    f"No oauth2_token_config named "
+                    f"{resolved.oauth2_token_config_name!r}"
+                ),
+            )
+        from tiqora.domain.mail_outbound import make_oauth_token_generator
+
+        oauth_gen = make_oauth_token_generator(session, resolved.oauth2_token_config_id)
 
     try:
         if body.to_address and body.to_address.strip():
@@ -143,16 +165,19 @@ async def test_mail_outbound(
                 in_reply_to=None,
                 loop_hint=True,
             )
-            await aiosmtplib.send(
-                message,
-                hostname=resolved.host,
-                port=resolved.port,
-                username=username or None,
-                password=password or None,
-                timeout=float(resolved.timeout_seconds),
-                use_tls=use_tls,
-                start_tls=start_tls,
-            )
+            send_kwargs: dict[str, object] = {
+                "hostname": resolved.host,
+                "port": resolved.port,
+                "username": username or None,
+                "timeout": float(resolved.timeout_seconds),
+                "use_tls": use_tls,
+                "start_tls": start_tls,
+            }
+            if oauth_gen is not None:
+                send_kwargs["oauth_token_generator"] = oauth_gen
+            else:
+                send_kwargs["password"] = password or None
+            await aiosmtplib.send(message, **send_kwargs)  # type: ignore[arg-type]
             return MailOutboundTestOut(
                 ok=True,
                 message="SMTP connection, authentication, and test send succeeded",
@@ -165,10 +190,13 @@ async def test_mail_outbound(
             timeout=float(resolved.timeout_seconds),
             use_tls=use_tls,
             start_tls=start_tls,
+            username=username or None,
+            password=None if oauth_gen is not None else (password or None),
+            oauth_token_generator=oauth_gen,
         )
         async with smtp:
-            if username:
-                await smtp.login(username, password or "")
+            # login/XOAUTH2 happens on connect when credentials are set
+            await smtp.noop()
         return MailOutboundTestOut(
             ok=True,
             message="SMTP connection and authentication succeeded",

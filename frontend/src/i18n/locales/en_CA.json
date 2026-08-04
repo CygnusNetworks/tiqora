@@ -1223,7 +1223,9 @@
       "aiQueues": "Queue policies",
       "aiAudit": "Request audit",
       "aiAcl": "Access & limits",
-      "collapse": "Collapse navigation"
+      "collapse": "Collapse navigation",
+      "mailAccounts": "Mail accounts",
+      "oauth2Tokens": "OAuth2 tokens (mail)"
     },
     "table": {
       "id": "ID",
@@ -1706,7 +1708,10 @@
       "testTo": "Send test to address (optional)",
       "testSuccess": "Test succeeded",
       "testFailure": "Test failed",
-      "loadError": "Failed to load settings."
+      "loadError": "Failed to load settings.",
+      "authOAuth2": "OAuth2 token",
+      "oauth2TokenConfigName": "OAuth2 token config name",
+      "oauth2TokenConfigNameHelp": "Name of an OAuth2 token config (same as Znuny SendmailModule::OAuth2TokenConfigName)."
     },
     "subjectConfig": {
       "title": "Ticket number in subject",
@@ -2208,7 +2213,54 @@
       "aiMcp": "Manage MCP servers as tool sources for the AI and enable tools.",
       "aiQueues": "Configure AI behavior per queue: autonomy, caps, escalation.",
       "aiAudit": "Full audit of every LLM request/response, with PII reveal.",
-      "aiAcl": "AI permissions and quotas per group, role, or agent."
+      "aiAcl": "AI permissions and quotas per group, role, or agent.",
+      "mailAccounts": "Incoming IMAP/POP mailboxes (password or OAuth2).",
+      "oauth2Tokens": "OAuth2 token configs for Microsoft/Google mail (Znuny-compatible)."
+    },
+    "mailAccounts": {
+      "title_plural": "Mail accounts",
+      "new": "New mail account",
+      "login": "Login / email",
+      "password": "Password",
+      "passwordHelp": "Leave blank on edit to keep the current password. Not used for OAuth2.",
+      "host": "Host",
+      "accountType": "Type",
+      "queue": "Queue",
+      "imapFolder": "IMAP folder",
+      "authType": "Authentication",
+      "authPassword": "Password",
+      "authOAuth2": "OAuth2 token",
+      "oauthConfig": "OAuth2 token config",
+      "oauthConfigHelp": "Required when authentication is OAuth2.",
+      "trusted": "Trusted",
+      "trustedHelp": "Trust X-OTRS headers from this account (Znuny semantics).",
+      "comments": "Comment"
+    },
+    "oauth2": {
+      "title_plural": "OAuth2 tokens (mail)",
+      "new": "New token config",
+      "name": "Name",
+      "template": "Provider template",
+      "templateNone": "Custom / none",
+      "templateHelp": "Pre-fills Microsoft or Google request URLs and scopes (Znuny templates).",
+      "clientId": "Client ID",
+      "clientSecret": "Client secret",
+      "clientSecretHelp": "Leave blank on edit to keep the stored secret.",
+      "scope": "Scope",
+      "scopeHelp": "Space-separated OAuth scopes (include offline_access for refresh tokens).",
+      "redirectUri": "Redirect URI",
+      "redirectUriHelp": "Register this exact URI in Azure/Google. Set TIQORA_PUBLIC_BASE_URL in production.",
+      "tokenStatus": "Token status",
+      "tokenStatusNone": "No token",
+      "tokenStatusValid": "Valid",
+      "tokenStatusExpired": "Expired (refreshable)",
+      "tokenStatusNeedsReauth": "Needs re-authorization",
+      "tokenStatusError": "Error",
+      "authorize": "Authorize…",
+      "refresh": "Refresh token",
+      "working": "Working…",
+      "authorizeOpened": "Authorization page opened in a new tab.",
+      "refreshSuccess": "Token refreshed."
     }
   },
   "kb": {

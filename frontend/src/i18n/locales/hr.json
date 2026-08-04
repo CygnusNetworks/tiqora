@@ -1223,7 +1223,9 @@
       "aiQueues": "Pravila čekanja",
       "aiAudit": "Zatražite reviziju",
       "aiAcl": "Pristup i ograničenja",
-      "collapse": "Sažmi navigaciju"
+      "collapse": "Sažmi navigaciju",
+      "mailAccounts": "Mail računi",
+      "oauth2Tokens": "OAuth2 tokeni (pošta)"
     },
     "table": {
       "id": "ID",
@@ -1698,7 +1700,10 @@
       "testTo": "Pošalji test na adresu (nije obavezno)",
       "testSuccess": "Test je uspio",
       "testFailure": "Test nije uspio",
-      "loadError": "Učitavanje postavki nije uspjelo."
+      "loadError": "Učitavanje postavki nije uspjelo.",
+      "authOAuth2": "OAuth2 token",
+      "oauth2TokenConfigName": "Naziv konfiguracije tokena OAuth2",
+      "oauth2TokenConfigNameHelp": "Naziv konfiguracije OAuth2 tokena (isto kao Znuny SendmailModule::OAuth2TokenConfigName)."
     },
     "subjectConfig": {
       "title": "Broj karte u predmetu",
@@ -2200,7 +2205,54 @@
       "aiMcp": "Upravljajte MCP poslužiteljima kao izvorima alata za AI i omogućite alate.",
       "aiQueues": "Konfigurirajte ponašanje umjetne inteligencije po redu: autonomija, ograničenja, eskalacija.",
       "aiAudit": "Potpuna revizija svakog LLM zahtjeva/odgovora, s otkrivanjem PII.",
-      "aiAcl": "AI dozvole i kvote po grupi, ulozi ili agentu."
+      "aiAcl": "AI dozvole i kvote po grupi, ulozi ili agentu.",
+      "mailAccounts": "Dolazni IMAP/POP poštanski sandučići (lozinka ili OAuth2).",
+      "oauth2Tokens": "Konfiguracije OAuth2 tokena za Microsoft/Google mail (kompatibilno sa Znuny)."
+    },
+    "mailAccounts": {
+      "title_plural": "Mail računi",
+      "authOAuth2": "OAuth2 token",
+      "new": "Novi račun pošte",
+      "login": "Prijava / email",
+      "password": "Lozinka",
+      "authPassword": "Lozinka",
+      "passwordHelp": "Ostavite prazno za uređivanje kako biste zadržali trenutnu lozinku. Ne koristi se za OAuth2.",
+      "host": "Domaćin",
+      "accountType": "Vrsta",
+      "queue": "Red čekanja",
+      "imapFolder": "mapu IMAP",
+      "authType": "Autentifikacija",
+      "oauthConfig": "OAuth2 konfiguracija tokena",
+      "oauthConfigHelp": "Obavezno kada je provjera autentičnosti OAuth2.",
+      "trusted": "Pouzdan",
+      "trustedHelp": "Vjerujte X-OTRS zaglavljima s ovog računa (Znuny semantika).",
+      "comments": "Komentirajte"
+    },
+    "oauth2": {
+      "title_plural": "OAuth2 tokeni (pošta)",
+      "new": "Nova konfiguracija tokena",
+      "name": "Ime",
+      "template": "Predložak pružatelja usluga",
+      "templateNone": "Prilagođeno / ništa",
+      "templateHelp": "Unaprijed ispunjava URL-ove i opsege zahtjeva Microsofta ili Googlea (predlošci Znuny).",
+      "clientId": "ID klijenta",
+      "clientSecret": "Tajna klijenta",
+      "clientSecretHelp": "Ostavite prazno za uređivanje kako biste sačuvali pohranjenu tajnu.",
+      "scope": "Opseg",
+      "scopeHelp": "Opseg OAuth odvojen razmakom (uključuje offline_access za tokene osvježavanja).",
+      "redirectUri": "Preusmjeri URI",
+      "redirectUriHelp": "Registrirajte točan URI u Azure/Google. Postavite TIQORA_PUBLIC_BASE_URL u produkciju.",
+      "tokenStatus": "Status tokena",
+      "tokenStatusNone": "Nema tokena",
+      "tokenStatusValid": "Valjano",
+      "tokenStatusExpired": "Isteklo (može se osvježiti)",
+      "tokenStatusNeedsReauth": "Potrebna je ponovna autorizacija",
+      "tokenStatusError": "Greška",
+      "authorize": "Ovlasti…",
+      "refresh": "Osvježi token",
+      "working": "radi...",
+      "authorizeOpened": "Stranica za autorizaciju otvorena je u novoj kartici.",
+      "refreshSuccess": "Token osvježen."
     }
   },
   "kb": {

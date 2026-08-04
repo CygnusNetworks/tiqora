@@ -64,11 +64,16 @@ async def process_account(
     stats = {"fetched": 0, "created": 0, "followups": 0, "rejected": 0, "ignored": 0, "errors": 0}
 
     try:
-        fetch_result = await fetch_account(
-            account,
-            max_size_kb=await _max_email_size_kb(session_factory),
-            leave_on_server=leave_on_server,
-        )
+        max_size_kb = await _max_email_size_kb(session_factory)
+        # OAuth accounts need a DB session to load/refresh access tokens from
+        # the shared legacy ``oauth2_token`` table (Znuny-compatible).
+        async with session_factory() as session:
+            fetch_result = await fetch_account(
+                account,
+                max_size_kb=max_size_kb,
+                leave_on_server=leave_on_server,
+                session=session,
+            )
     except Exception:
         logger.exception("postmaster_fetch_failed", account_id=account_id)
         POSTMASTER_ERRORS.labels(stage="fetch").inc()

@@ -49,6 +49,7 @@ from tiqora.db.legacy.misc import (  # noqa: F401
     Mention,
     TimeAccounting,
 )
+from tiqora.db.legacy.oauth2 import OAuth2Token, OAuth2TokenConfig  # noqa: F401
 from tiqora.db.legacy.profile import (  # noqa: F401
     ALL_SCHEMA_PROFILES,
     DEFAULT_STATE_PRIORITY_COLOR,
@@ -208,4 +209,6 @@ __all__ = [
     "LinkType",
     "LinkObject",
     "MailAccount",
+    "OAuth2TokenConfig",
+    "OAuth2Token",
 ]

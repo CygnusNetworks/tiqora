@@ -1223,7 +1223,9 @@
       "aiQueues": "Chính sách xếp hàng",
       "aiAudit": "Yêu cầu kiểm tra",
       "aiAcl": "Quyền truy cập & giới hạn",
-      "collapse": "Thu gọn điều hướng"
+      "collapse": "Thu gọn điều hướng",
+      "mailAccounts": "Tài khoản thư",
+      "oauth2Tokens": "Mã thông báo OAuth2 (thư)"
     },
     "table": {
       "id": "ID",
@@ -1698,7 +1700,10 @@
       "testTo": "Gửi bài kiểm tra đến địa chỉ (tùy chọn)",
       "testSuccess": "Thử nghiệm thành công",
       "testFailure": "Kiểm tra không thành công",
-      "loadError": "Không tải được cài đặt."
+      "loadError": "Không tải được cài đặt.",
+      "authOAuth2": "Mã thông báo OAuth2",
+      "oauth2TokenConfigName": "Tên cấu hình mã thông báo OAuth2",
+      "oauth2TokenConfigNameHelp": "Tên của cấu hình mã thông báo OAuth2 (giống như Znuny SendmailModule::OAuth2TokenConfigName)."
     },
     "subjectConfig": {
       "title": "Số vé trong chủ đề",
@@ -2200,7 +2205,54 @@
       "aiMcp": "Quản lý máy chủ MCP làm nguồn công cụ cho AI và kích hoạt các công cụ.",
       "aiQueues": "Định cấu hình hành vi AI trên mỗi hàng đợi: quyền tự chủ, giới hạn, leo thang.",
       "aiAudit": "Kiểm tra toàn diện mọi yêu cầu/phản hồi LLM, có tiết lộ PII.",
-      "aiAcl": "Quyền và hạn ngạch AI cho mỗi nhóm, vai trò hoặc đại lý."
+      "aiAcl": "Quyền và hạn ngạch AI cho mỗi nhóm, vai trò hoặc đại lý.",
+      "mailAccounts": "Hộp thư IMAP/POP đến (mật khẩu hoặc OAuth2).",
+      "oauth2Tokens": "Cấu hình mã thông báo OAuth2 cho Microsoft/Google mail (tương thích với Znuny)."
+    },
+    "mailAccounts": {
+      "title_plural": "Tài khoản thư",
+      "authOAuth2": "Mã thông báo OAuth2",
+      "new": "Tài khoản thư mới",
+      "login": "Đăng nhập / email",
+      "password": "Mật khẩu",
+      "authPassword": "Mật khẩu",
+      "passwordHelp": "Để trống khi chỉnh sửa để giữ mật khẩu hiện tại. Không được sử dụng cho OAuth2.",
+      "host": "Máy chủ",
+      "accountType": "Loại",
+      "queue": "Hàng đợi",
+      "imapFolder": "thư mục IMAP",
+      "authType": "Xác thực",
+      "oauthConfig": "Cấu hình mã thông báo OAuth2",
+      "oauthConfigHelp": "Bắt buộc khi xác thực là OAuth2.",
+      "trusted": "đáng tin cậy",
+      "trustedHelp": "Tin cậy các tiêu đề X-OTRS từ tài khoản này (ngữ nghĩa Znuny).",
+      "comments": "Bình luận"
+    },
+    "oauth2": {
+      "title_plural": "Mã thông báo OAuth2 (thư)",
+      "new": "Cấu hình mã thông báo mới",
+      "name": "Tên",
+      "template": "Mẫu nhà cung cấp",
+      "templateNone": "Tùy chỉnh/không có",
+      "templateHelp": "Điền trước các URL và phạm vi yêu cầu của Microsoft hoặc Google (mẫu Znuny).",
+      "clientId": "ID khách hàng",
+      "clientSecret": "Bí mật của khách hàng",
+      "clientSecretHelp": "Để trống khi chỉnh sửa để giữ bí mật được lưu trữ.",
+      "scope": "Phạm vi",
+      "scopeHelp": "Phạm vi OAuth được phân tách bằng dấu cách (bao gồm offline_access cho mã thông báo làm mới).",
+      "redirectUri": "URI chuyển hướng",
+      "redirectUriHelp": "Đăng ký URI chính xác này trong Azure/Google. Đặt TIQORA_PUBLIC_BASE_URL trong quá trình sản xuất.",
+      "tokenStatus": "Trạng thái mã thông báo",
+      "tokenStatusNone": "Không có mã thông báo",
+      "tokenStatusValid": "hợp lệ",
+      "tokenStatusExpired": "Đã hết hạn (có thể làm mới)",
+      "tokenStatusNeedsReauth": "Cần ủy quyền lại",
+      "tokenStatusError": "Lỗi",
+      "authorize": "Ủy quyền…",
+      "refresh": "Làm mới mã thông báo",
+      "working": "Đang làm việc…",
+      "authorizeOpened": "Trang ủy quyền đã mở trong một tab mới.",
+      "refreshSuccess": "Đã làm mới mã thông báo."
     }
   },
   "kb": {

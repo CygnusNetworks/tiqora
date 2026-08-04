@@ -216,11 +216,14 @@ mail log/outbound, **postmaster filters**, **API keys**, AI admin
 **List / detail only:** ACL, GenericAgent jobs, processes (browse/detail),
 system addresses (picker).
 
-**Missing relative to Znuny admin breadth:** service, SLA, type, mail account,
+**Missing relative to Znuny admin breadth:** service, SLA, type,
 notification event, SysConfig, GI webservice admin, package manager, PGP/SMIME
 admin, session admin, support data, cloud services, appointment admin
-(calendar via agent UI), ticket attribute relations, OAuth2 token management,
-…
+(calendar via agent UI), ticket attribute relations, …
+
+**Present (Znuny-compatible):** mail account admin + OAuth2 token management
+(shared legacy `oauth2_token*` / `mail_account` tables; XOAUTH2 fetch + optional
+SMTP outbound via config name).
 
 ### Customer interface
 

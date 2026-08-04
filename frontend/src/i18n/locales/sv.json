@@ -1223,7 +1223,9 @@
       "aiQueues": "Köpolicys",
       "aiAudit": "Begäranderevision",
       "aiAcl": "Åtkomst och gränser",
-      "collapse": "Fäll ihop navigering"
+      "collapse": "Fäll ihop navigering",
+      "mailAccounts": "Mailkonton",
+      "oauth2Tokens": "OAuth2-tokens (e-post)"
     },
     "table": {
       "id": "ID",
@@ -1698,7 +1700,10 @@
       "testTo": "Skicka test till adress (valfritt)",
       "testSuccess": "Test lyckades",
       "testFailure": "Test misslyckades",
-      "loadError": "Kunde inte läsa in inställningar."
+      "loadError": "Kunde inte läsa in inställningar.",
+      "authOAuth2": "OAuth2-token",
+      "oauth2TokenConfigName": "Konfigurationsnamn för OAuth2-token",
+      "oauth2TokenConfigNameHelp": "Namnet på en OAuth2-tokenkonfiguration (samma som Znuny SendmailModule::OAuth2TokenConfigName)."
     },
     "subjectConfig": {
       "title": "Ärendenummer i ämne",
@@ -2200,7 +2205,54 @@
       "aiMcp": "Hantera MCP-servrar som verktygskällor för AI:n och aktivera verktyg.",
       "aiQueues": "Konfigurera AI-beteende per kö: autonomi, tak, eskalering.",
       "aiAudit": "Full revision av varje LLM-begäran/svar, med PII-avslöjande.",
-      "aiAcl": "AI-behörigheter och kvoter per grupp, roll eller agent."
+      "aiAcl": "AI-behörigheter och kvoter per grupp, roll eller agent.",
+      "mailAccounts": "Inkommande IMAP/POP-postlådor (lösenord eller OAuth2).",
+      "oauth2Tokens": "OAuth2-tokenkonfigurationer för Microsoft/Google-e-post (Znuny-kompatibel)."
+    },
+    "mailAccounts": {
+      "title_plural": "Mailkonton",
+      "authOAuth2": "OAuth2-token",
+      "new": "Nytt e-postkonto",
+      "login": "Logga in/maila",
+      "password": "Lösenord",
+      "authPassword": "Lösenord",
+      "passwordHelp": "Lämna tomt vid redigering för att behålla det nuvarande lösenordet. Används inte för OAuth2.",
+      "host": "Värd",
+      "accountType": "Typ",
+      "queue": "Kö",
+      "imapFolder": "IMAP-mapp",
+      "authType": "Autentisering",
+      "oauthConfig": "OAuth2-tokenkonfiguration",
+      "oauthConfigHelp": "Krävs när autentisering är OAuth2.",
+      "trusted": "Pålitlig",
+      "trustedHelp": "Lita på X-OTRS-rubriker från detta konto (Znuny-semantik).",
+      "comments": "Kommentera"
+    },
+    "oauth2": {
+      "title_plural": "OAuth2-tokens (e-post)",
+      "new": "Ny token-konfiguration",
+      "name": "Namn",
+      "template": "Leverantörsmall",
+      "templateNone": "Anpassad / ingen",
+      "templateHelp": "Förifyller Microsoft eller Google begär webbadresser och omfång (Znuny mallar).",
+      "clientId": "Klient-ID",
+      "clientSecret": "Klienthemlighet",
+      "clientSecretHelp": "Lämna tomt vid redigering för att hålla den lagrade hemligheten.",
+      "scope": "Omfattning",
+      "scopeHelp": "Mellanrumsseparerade OAuth-omfång (inkluderar offline_access för uppdateringstoken).",
+      "redirectUri": "Omdirigera URI",
+      "redirectUriHelp": "Registrera denna exakta URI i Azure/Google. Ställ in TIQORA_PUBLIC_BASE_URL i produktion.",
+      "tokenStatus": "Tokenstatus",
+      "tokenStatusNone": "Ingen token",
+      "tokenStatusValid": "Giltigt",
+      "tokenStatusExpired": "Utgått (uppdateringsbar)",
+      "tokenStatusNeedsReauth": "Behöver omauktorisering",
+      "tokenStatusError": "Fel",
+      "authorize": "Auktorisera...",
+      "refresh": "Uppdatera token",
+      "working": "Jobbar...",
+      "authorizeOpened": "Auktoriseringssidan öppnas på en ny flik.",
+      "refreshSuccess": "Token uppdaterad."
     }
   },
   "kb": {

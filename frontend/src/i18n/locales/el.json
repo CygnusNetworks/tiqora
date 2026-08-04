@@ -1223,7 +1223,9 @@
       "aiQueues": "Πολιτικές ουράς",
       "aiAudit": "Ζητήστε έλεγχο",
       "aiAcl": "Πρόσβαση και όρια",
-      "collapse": "Σύμπτυξη πλοήγησης"
+      "collapse": "Σύμπτυξη πλοήγησης",
+      "mailAccounts": "Λογαριασμοί αλληλογραφίας",
+      "oauth2Tokens": "Tokens OAuth2 (ταχυδρομείο)"
     },
     "table": {
       "id": "ID",
@@ -1698,7 +1700,10 @@
       "testTo": "Αποστολή δοκιμής στη διεύθυνση (προαιρετικό)",
       "testSuccess": "Η δοκιμή πέτυχε",
       "testFailure": "Η δοκιμή απέτυχε",
-      "loadError": "Αποτυχία φόρτωσης ρυθμίσεων."
+      "loadError": "Αποτυχία φόρτωσης ρυθμίσεων.",
+      "authOAuth2": "Token OAuth2",
+      "oauth2TokenConfigName": "Όνομα διαμόρφωσης διακριτικού OAuth2",
+      "oauth2TokenConfigNameHelp": "Όνομα μιας διαμόρφωσης διακριτικού OAuth2 (ίδιο με το Znuny SendmailModule::OAuth2TokenConfigName)."
     },
     "subjectConfig": {
       "title": "Αριθμός εισιτηρίου στο θέμα",
@@ -2200,7 +2205,54 @@
       "aiMcp": "Διαχειριστείτε τους διακομιστές MCP ως πηγές εργαλείων για το AI και ενεργοποιήστε τα εργαλεία.",
       "aiQueues": "Διαμόρφωση συμπεριφοράς AI ανά ουρά: αυτονομία, ανώτατα όρια, κλιμάκωση.",
       "aiAudit": "Πλήρης έλεγχος κάθε αιτήματος/απάντησης LLM, με αποκάλυψη PII.",
-      "aiAcl": "Άδειες και ποσοστώσεις AI ανά ομάδα, ρόλο ή πράκτορα."
+      "aiAcl": "Άδειες και ποσοστώσεις AI ανά ομάδα, ρόλο ή πράκτορα.",
+      "mailAccounts": "Εισερχόμενα γραμματοκιβώτια IMAP/POP (κωδικός πρόσβασης ή OAuth2).",
+      "oauth2Tokens": "Διαμορφώσεις διακριτικού OAuth2 για αλληλογραφία Microsoft/Google (συμβατό με Znuny)."
+    },
+    "mailAccounts": {
+      "title_plural": "Λογαριασμοί αλληλογραφίας",
+      "authOAuth2": "Token OAuth2",
+      "new": "Νέος λογαριασμός αλληλογραφίας",
+      "login": "Είσοδος / email",
+      "password": "Κωδικός πρόσβασης",
+      "authPassword": "Κωδικός πρόσβασης",
+      "passwordHelp": "Αφήστε κενό κατά την επεξεργασία για να διατηρήσετε τον τρέχοντα κωδικό πρόσβασης. Δεν χρησιμοποιείται για το OAuth2.",
+      "host": "οικοδεσπότης",
+      "accountType": "Τύπος",
+      "queue": "Ουρά",
+      "imapFolder": "φάκελο IMAP",
+      "authType": "Έλεγχος ταυτότητας",
+      "oauthConfig": "Διαμόρφωση διακριτικού OAuth2",
+      "oauthConfigHelp": "Απαιτείται όταν ο έλεγχος ταυτότητας είναι OAuth2.",
+      "trusted": "Έμπιστο",
+      "trustedHelp": "Εμπιστευτείτε τις κεφαλίδες X-OTRS από αυτόν τον λογαριασμό (Znuny semantics).",
+      "comments": "Σχόλιο"
+    },
+    "oauth2": {
+      "title_plural": "Tokens OAuth2 (ταχυδρομείο)",
+      "new": "Νέα διαμόρφωση διακριτικού",
+      "name": "Όνομα",
+      "template": "Πρότυπο παρόχου",
+      "templateNone": "Προσαρμοσμένο / κανένα",
+      "templateHelp": "Προγεμίζει διευθύνσεις URL και πεδία αιτημάτων Microsoft ή Google (πρότυπα Znuny).",
+      "clientId": "Αναγνωριστικό πελάτη",
+      "clientSecret": "Μυστικό πελάτη",
+      "clientSecretHelp": "Αφήστε το κενό κατά την επεξεργασία για να διατηρήσετε το αποθηκευμένο μυστικό.",
+      "scope": "Πεδίο εφαρμογής",
+      "scopeHelp": "Πεδία OAuth διαχωρισμένα σε διάστημα (συμπεριλαμβάνονται offline_access για διακριτικά ανανέωσης).",
+      "redirectUri": "Ανακατεύθυνση URI",
+      "redirectUriHelp": "Καταχωρίστε αυτό το ακριβές URI στο Azure/Google. Θέστε το TIQORA_PUBLIC_BASE_URL στην παραγωγή.",
+      "tokenStatus": "Κατάσταση διακριτικού",
+      "tokenStatusNone": "Χωρίς διακριτικό",
+      "tokenStatusValid": "Ισχύει",
+      "tokenStatusExpired": "Έληξε (με δυνατότητα ανανέωσης)",
+      "tokenStatusNeedsReauth": "Χρειάζεται εκ νέου εξουσιοδότηση",
+      "tokenStatusError": "Σφάλμα",
+      "authorize": "Εξουσιοδότηση…",
+      "refresh": "Ανανέωση διακριτικού",
+      "working": "Εργασία…",
+      "authorizeOpened": "Η σελίδα εξουσιοδότησης άνοιξε σε νέα καρτέλα.",
+      "refreshSuccess": "Το διακριτικό ανανεώθηκε."
     }
   },
   "kb": {

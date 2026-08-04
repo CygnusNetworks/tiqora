@@ -85,6 +85,10 @@ class Settings(BaseSettings):
         validation_alias="TIQORA_CORS_ORIGINS",
     )
     api_prefix: str = "/api/v1"
+    # Public origin for absolute URLs built server-side (OAuth2 mail redirect
+    # URI, …). Example: https://helpdesk.example.com — no trailing slash.
+    # Empty → fall back to the first CORS origin (dev) in domain helpers.
+    public_base_url: str = Field(default="", validation_alias="TIQORA_PUBLIC_BASE_URL")
 
     # Frontend SPA served by the api container itself (single image ships
     # backend + UI). Disable (TIQORA_SERVE_FRONTEND=0) to front with a

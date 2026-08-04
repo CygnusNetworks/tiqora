@@ -1223,7 +1223,9 @@
       "aiQueues": "Polítiques de cua",
       "aiAudit": "Sol·licitar auditoria",
       "aiAcl": "Accés i límits",
-      "collapse": "Redueix la navegació"
+      "collapse": "Redueix la navegació",
+      "mailAccounts": "Comptes de correu",
+      "oauth2Tokens": "Tokens OAuth2 (correu)"
     },
     "table": {
       "id": "ID",
@@ -1698,7 +1700,10 @@
       "testTo": "Envia la prova a l'adreça (opcional)",
       "testSuccess": "La prova ha estat correcta",
       "testFailure": "La prova ha fallat",
-      "loadError": "No s'ha pogut carregar la configuració."
+      "loadError": "No s'ha pogut carregar la configuració.",
+      "authOAuth2": "Token OAuth2",
+      "oauth2TokenConfigName": "Nom de configuració del testimoni OAuth2",
+      "oauth2TokenConfigNameHelp": "Nom d'una configuració de testimoni OAuth2 (igual que Znuny SendmailModule::OAuth2TokenConfigName)."
     },
     "subjectConfig": {
       "title": "Número de bitllet a l'assumpte",
@@ -2200,7 +2205,54 @@
       "aiMcp": "Gestioneu els servidors MCP com a fonts d'eines per a l'IA i activeu les eines.",
       "aiQueues": "Configura el comportament de l'IA per cua: autonomia, límits, escalada.",
       "aiAudit": "Auditoria completa de cada sol·licitud/resposta de LLM, amb revelació de PII.",
-      "aiAcl": "Permisos i quotes d'IA per grup, rol o agent."
+      "aiAcl": "Permisos i quotes d'IA per grup, rol o agent.",
+      "mailAccounts": "Bústies de correu IMAP/POP entrants (contrasenya o OAuth2).",
+      "oauth2Tokens": "Configuracions de testimoni OAuth2 per a correu de Microsoft/Google (compatible amb Znuny)."
+    },
+    "mailAccounts": {
+      "title_plural": "Comptes de correu",
+      "authOAuth2": "Token OAuth2",
+      "new": "Nou compte de correu",
+      "login": "Inici de sessió / correu electrònic",
+      "password": "Contrasenya",
+      "authPassword": "Contrasenya",
+      "passwordHelp": "Deixa en blanc a l'edició per mantenir la contrasenya actual. No s'utilitza per a OAuth2.",
+      "host": "Amfitrió",
+      "accountType": "Tipus",
+      "queue": "Cua",
+      "imapFolder": "Carpeta IMAP",
+      "authType": "Autenticació",
+      "oauthConfig": "Configuració del testimoni OAuth2",
+      "oauthConfigHelp": "Necessari quan l'autenticació és OAuth2.",
+      "trusted": "De confiança",
+      "trustedHelp": "Confieu en les capçaleres X-OTRS d'aquest compte (semàntica Znuny).",
+      "comments": "Comenta"
+    },
+    "oauth2": {
+      "title_plural": "Tokens OAuth2 (correu)",
+      "new": "Nova configuració del testimoni",
+      "name": "Nom",
+      "template": "Plantilla de proveïdor",
+      "templateNone": "Personalitzat / cap",
+      "templateHelp": "Emplena prèviament els URL i els àmbits de sol·licitud de Microsoft o Google (plantilles Znuny).",
+      "clientId": "ID de client",
+      "clientSecret": "Secret del client",
+      "clientSecretHelp": "Deixa en blanc a l'edició per mantenir el secret emmagatzemat.",
+      "scope": "Àmbit",
+      "scopeHelp": "Àmbits OAuth separats per espais (inclou offline_access per als testimonis d'actualització).",
+      "redirectUri": "URI de redirecció",
+      "redirectUriHelp": "Registreu aquest URI exacte a Azure/Google. Estableix TIQORA_PUBLIC_BASE_URL en producció.",
+      "tokenStatus": "Estat del testimoni",
+      "tokenStatusNone": "Sense testimoni",
+      "tokenStatusValid": "Vàlid",
+      "tokenStatusExpired": "Caducat (actualitzable)",
+      "tokenStatusNeedsReauth": "Necessita reautorització",
+      "tokenStatusError": "Error",
+      "authorize": "Autoritzar…",
+      "refresh": "Token d'actualització",
+      "working": "Treballant…",
+      "authorizeOpened": "La pàgina d'autorització s'ha obert en una pestanya nova.",
+      "refreshSuccess": "Token actualitzat."
     }
   },
   "kb": {

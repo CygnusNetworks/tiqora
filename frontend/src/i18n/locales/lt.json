@@ -1223,7 +1223,9 @@
       "aiQueues": "Eilių politika",
       "aiAudit": "Prašyti audito",
       "aiAcl": "Prieiga ir apribojimai",
-      "collapse": "Sutraukti navigaciją"
+      "collapse": "Sutraukti navigaciją",
+      "mailAccounts": "Pašto paskyros",
+      "oauth2Tokens": "OAuth2 prieigos raktai (paštas)"
     },
     "table": {
       "id": "ID",
@@ -1698,7 +1700,10 @@
       "testTo": "Siųsti testą adresu (neprivaloma)",
       "testSuccess": "Bandymas pavyko",
       "testFailure": "Bandymas nepavyko",
-      "loadError": "Nepavyko įkelti nustatymų."
+      "loadError": "Nepavyko įkelti nustatymų.",
+      "authOAuth2": "OAuth2 prieigos raktas",
+      "oauth2TokenConfigName": "OAuth2 prieigos rakto konfigūracijos pavadinimas",
+      "oauth2TokenConfigNameHelp": "OAuth2 prieigos rakto konfigūracijos pavadinimas (tas pats kaip Znuny SendmailModule::OAuth2TokenConfigName)."
     },
     "subjectConfig": {
       "title": "Bilieto numeris temoje",
@@ -2200,7 +2205,54 @@
       "aiMcp": "Tvarkykite MCP serverius kaip AI įrankių šaltinius ir įgalinkite įrankius.",
       "aiQueues": "Konfigūruokite AI elgesį eilėje: autonomiją, viršutines ribas, eskalavimą.",
       "aiAudit": "Visiškas kiekvienos LLM užklausos / atsakymo auditas, atskleidžiant AII.",
-      "aiAcl": "AI leidimai ir kvotos grupei, vaidmeniui ar agentui."
+      "aiAcl": "AI leidimai ir kvotos grupei, vaidmeniui ar agentui.",
+      "mailAccounts": "Gaunamos IMAP/POP pašto dėžutės (slaptažodis arba OAuth2).",
+      "oauth2Tokens": "„Microsoft“ / „Google“ pašto „OAuth2“ prieigos rakto konfigūracijos (suderinamas su „Znuny“)."
+    },
+    "mailAccounts": {
+      "title_plural": "Pašto paskyros",
+      "authOAuth2": "OAuth2 prieigos raktas",
+      "new": "Nauja pašto paskyra",
+      "login": "Prisijungimas / el",
+      "password": "Slaptažodis",
+      "authPassword": "Slaptažodis",
+      "passwordHelp": "Jei norite išsaugoti dabartinį slaptažodį, redagavimo lauką palikite tuščią. Nenaudojamas OAuth2.",
+      "host": "Šeimininkas",
+      "accountType": "Tipas",
+      "queue": "Eilė",
+      "imapFolder": "IMAP aplankas",
+      "authType": "Autentifikavimas",
+      "oauthConfig": "OAuth2 prieigos rakto konfigūracija",
+      "oauthConfigHelp": "Reikalingas, kai autentifikavimas yra OAuth2.",
+      "trusted": "Patikimas",
+      "trustedHelp": "Pasitikėkite šios paskyros X-OTRS antraštėmis (Znuny semantika).",
+      "comments": "komentuoti"
+    },
+    "oauth2": {
+      "title_plural": "OAuth2 prieigos raktai (paštas)",
+      "new": "Nauja prieigos rakto konfigūracija",
+      "name": "Vardas",
+      "template": "Teikėjo šablonas",
+      "templateNone": "Pasirinktinis / nėra",
+      "templateHelp": "Iš anksto užpildo „Microsoft“ arba „Google“ užklausų URL ir apimtis („Znuny“ šablonai).",
+      "clientId": "Kliento ID",
+      "clientSecret": "Kliento paslaptis",
+      "clientSecretHelp": "Redaguodami palikite tuščią, kad išsaugotumėte paslaptį.",
+      "scope": "Taikymo sritis",
+      "scopeHelp": "Tarpu atskirtos OAuth apimtys (įskaitant atnaujinimo prieigos raktus neprisijungus).",
+      "redirectUri": "Peradresuoti URI",
+      "redirectUriHelp": "Užregistruokite tikslų URI „Azure“ / „Google“. Nustatyti TIQORA_PUBLIC_BASE_URL gamyboje.",
+      "tokenStatus": "Žetono būsena",
+      "tokenStatusNone": "Jokio žetono",
+      "tokenStatusValid": "Galioja",
+      "tokenStatusExpired": "Baigėsi galiojimo laikas (atnaujinama)",
+      "tokenStatusNeedsReauth": "Reikia pakartotinio leidimo",
+      "tokenStatusError": "Klaida",
+      "authorize": "Įgalioti…",
+      "refresh": "Atnaujinti prieigos raktą",
+      "working": "Dirba…",
+      "authorizeOpened": "Leidimo puslapis atidarytas naujame skirtuke.",
+      "refreshSuccess": "Žetonas atnaujintas."
     }
   },
   "kb": {

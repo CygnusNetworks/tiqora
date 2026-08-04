@@ -1223,7 +1223,9 @@
       "aiQueues": "कतार नीतियां",
       "aiAudit": "ऑडिट का अनुरोध करें",
       "aiAcl": "पहुंच एवं सीमाएं",
-      "collapse": "नेविगेशन संक्षिप्त करें"
+      "collapse": "नेविगेशन संक्षिप्त करें",
+      "mailAccounts": "मेल खाते",
+      "oauth2Tokens": "OAuth2 टोकन (मेल)"
     },
     "table": {
       "id": "ID",
@@ -1698,7 +1700,10 @@
       "testTo": "पते पर परीक्षण भेजें (वैकल्पिक)",
       "testSuccess": "परीक्षण सफल रहा",
       "testFailure": "परीक्षण विफल रहा",
-      "loadError": "सेटिंग्स लोड करने में विफल."
+      "loadError": "सेटिंग्स लोड करने में विफल.",
+      "authOAuth2": "OAuth2 टोकन",
+      "oauth2TokenConfigName": "OAuth2 टोकन कॉन्फ़िगरेशन नाम",
+      "oauth2TokenConfigNameHelp": "OAuth2 टोकन कॉन्फ़िगरेशन का नाम (Znuny सेंडमेल मॉड्यूल::OAuth2TokenConfigName के समान)।"
     },
     "subjectConfig": {
       "title": "विषय में टिकट संख्या",
@@ -2200,7 +2205,54 @@
       "aiMcp": "एआई के लिए टूल स्रोत के रूप में एमसीपी सर्वर को प्रबंधित करें और टूल सक्षम करें।",
       "aiQueues": "प्रति कतार एआई व्यवहार कॉन्फ़िगर करें: स्वायत्तता, सीमाएँ, वृद्धि।",
       "aiAudit": "पीआईआई खुलासे के साथ प्रत्येक एलएलएम अनुरोध/प्रतिक्रिया का पूर्ण ऑडिट।",
-      "aiAcl": "प्रति समूह, भूमिका या एजेंट के लिए AI अनुमतियाँ और कोटा।"
+      "aiAcl": "प्रति समूह, भूमिका या एजेंट के लिए AI अनुमतियाँ और कोटा।",
+      "mailAccounts": "इनकमिंग IMAP/POP मेलबॉक्स (पासवर्ड या OAuth2)।",
+      "oauth2Tokens": "Microsoft/Google मेल के लिए OAuth2 टोकन कॉन्फ़िगरेशन (Znuny-संगत)।"
+    },
+    "mailAccounts": {
+      "title_plural": "मेल खाते",
+      "authOAuth2": "OAuth2 टोकन",
+      "new": "नया मेल खाता",
+      "login": "लॉगिन/ईमेल",
+      "password": "पासवर्ड",
+      "authPassword": "पासवर्ड",
+      "passwordHelp": "वर्तमान पासवर्ड रखने के लिए संपादन पर खाली छोड़ दें। OAuth2 के लिए उपयोग नहीं किया गया.",
+      "host": "मेज़बान",
+      "accountType": "प्रकार",
+      "queue": "कतार",
+      "imapFolder": "आईएमएपी फ़ोल्डर",
+      "authType": "प्रमाणीकरण",
+      "oauthConfig": "OAuth2 टोकन कॉन्फ़िगरेशन",
+      "oauthConfigHelp": "प्रमाणीकरण OAuth2 होने पर आवश्यक है.",
+      "trusted": "विश्वसनीय",
+      "trustedHelp": "इस खाते से X-OTRS हेडर पर भरोसा करें (Znuny शब्दार्थ)।",
+      "comments": "टिप्पणी करें"
+    },
+    "oauth2": {
+      "title_plural": "OAuth2 टोकन (मेल)",
+      "new": "नया टोकन कॉन्फ़िगरेशन",
+      "name": "नाम",
+      "template": "प्रदाता टेम्पलेट",
+      "templateNone": "कस्टम / कोई नहीं",
+      "templateHelp": "Microsoft या Google अनुरोध URL और स्कोप (Znuny टेम्प्लेट) को पहले से भर देता है।",
+      "clientId": "ग्राहक आईडी",
+      "clientSecret": "ग्राहक रहस्य",
+      "clientSecretHelp": "संग्रहित को गुप्त रखने के लिए संपादन पर खाली छोड़ दें।",
+      "scope": "दायरा",
+      "scopeHelp": "स्पेस से अलग किए गए OAuth स्कोप (रीफ्रेश टोकन के लिए ऑफ़लाइन_एक्सेस शामिल करें)।",
+      "redirectUri": "यूआरआई को पुनर्निर्देशित करें",
+      "redirectUriHelp": "इस सटीक URI को Azure/Google में पंजीकृत करें। उत्पादन में TIQORA_PUBLIC_BASE_URL सेट करें।",
+      "tokenStatus": "टोकन स्थिति",
+      "tokenStatusNone": "कोई टोकन नहीं",
+      "tokenStatusValid": "मान्य",
+      "tokenStatusExpired": "समाप्त (ताज़ा करने योग्य)",
+      "tokenStatusNeedsReauth": "पुनः प्राधिकरण की आवश्यकता है",
+      "tokenStatusError": "त्रुटि",
+      "authorize": "अधिकृत करें...",
+      "refresh": "टोकन ताज़ा करें",
+      "working": "काम कर रहा हूँ...",
+      "authorizeOpened": "प्राधिकरण पृष्ठ एक नए टैब में खुला।",
+      "refreshSuccess": "टोकन ताज़ा किया गया."
     }
   },
   "kb": {
