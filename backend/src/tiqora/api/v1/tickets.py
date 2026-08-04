@@ -1260,7 +1260,7 @@ async def delete_mention(
                 text("DELETE FROM mention WHERE id = :mid AND ticket_id = :tid"),
                 {"mid": mention_id, "tid": ticket_id},
             )
-            if result.rowcount == 0:
+            if int(getattr(result, "rowcount", 0) or 0) == 0:
                 raise WriteNotFound(f"mention {mention_id}")
     except (WriteAccessDenied, WriteNotFound, InvalidInput) as exc:
         raise _map_exc(exc) from exc
@@ -1431,7 +1431,7 @@ async def delete_time_accounting(
                 text("DELETE FROM time_accounting WHERE id = :eid AND ticket_id = :tid"),
                 {"eid": entry_id, "tid": ticket_id},
             )
-            if result.rowcount == 0:
+            if int(getattr(result, "rowcount", 0) or 0) == 0:
                 raise WriteNotFound(f"time_accounting {entry_id}")
     except (WriteAccessDenied, WriteNotFound, InvalidInput) as exc:
         raise _map_exc(exc) from exc
