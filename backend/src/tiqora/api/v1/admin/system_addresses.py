@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from fastapi import APIRouter, HTTPException, status
+from sqlalchemy import select
 
 from tiqora.api.deps import DbSession
 from tiqora.api.v1.admin.common import (
@@ -11,6 +12,7 @@ from tiqora.api.v1.admin.common import (
     now,
 )
 from tiqora.api.v1.admin.deps import AdminUser
+from tiqora.api.v1.admin.pagination import ListParamsDep, Page, apply_valid_filter, paginate
 from tiqora.api.v1.admin.schemas import (
     SystemAddressCreate,
     SystemAddressOut,
@@ -20,7 +22,17 @@ from tiqora.db.legacy.queue import SystemAddress
 
 router = APIRouter(prefix="/system-addresses", tags=["admin:system-addresses"])
 
-# List stays on readonly.list_system_addresses (unpaginated picker-friendly GET).
+
+@router.get("", response_model=Page[SystemAddressOut])
+async def list_system_addresses(
+    admin: AdminUser, session: DbSession, params: ListParamsDep
+) -> Page[SystemAddressOut]:
+    """Paginated list with valid/invalid/all filter (same as other admin CRUD)."""
+    _ = admin
+    stmt = apply_valid_filter(
+        select(SystemAddress), SystemAddress.valid_id, params.valid
+    ).order_by(SystemAddress.value1, SystemAddress.value0)
+    return await paginate(session, SystemAddressOut, stmt, params)
 
 
 @router.get("/{address_id}", response_model=SystemAddressOut)

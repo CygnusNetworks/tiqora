@@ -1,119 +1,101 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { api, type SystemAddressOut } from "@/lib/api";
-import { Button } from "@/components/ui/Button";
-
-const inputClass =
-  "rounded-md border border-line bg-surface px-3 py-2 text-sm text-ink outline-none focus:border-accent";
+import { toBcp47 } from "@/i18n";
+import {
+  api,
+  type SystemAddressOut,
+  type SystemAddressCreate,
+  type SystemAddressUpdate,
+} from "@/lib/api";
+import { AdminResourcePage } from "@/components/admin/AdminResourcePage";
+import type { FieldDef, FieldValues } from "@/components/admin/CrudDrawer";
+import type { DataTableColumn } from "@/components/admin/DataTable";
+import { formatDateTime } from "@/lib/format";
 
 export function SystemAddressesPage() {
-  const { t } = useTranslation();
-  const qc = useQueryClient();
-  const listQ = useQuery({
-    queryKey: ["admin", "system-addresses"],
-    queryFn: () => api.listSystemAddresses(),
-  });
-  const [email, setEmail] = useState("");
-  const [name, setName] = useState("");
+  const { t, i18n } = useTranslation();
+  const locale = toBcp47(i18n.language);
 
-  const createM = useMutation({
-    mutationFn: () =>
-      api.createSystemAddress({
-        value0: email,
-        value1: name || email,
-        queue_id: 1,
-        valid_id: 1,
-      }),
-    onSuccess: () => {
-      setEmail("");
-      setName("");
-      void qc.invalidateQueries({ queryKey: ["admin", "system-addresses"] });
+  const columns: DataTableColumn<SystemAddressOut>[] = [
+    { key: "id", header: t("admin.table.id"), mono: true, render: (r) => r.id },
+    { key: "email", header: t("admin.systemAddresses.email"), render: (r) => r.value0 },
+    { key: "name", header: t("admin.systemAddresses.name"), render: (r) => r.value1 },
+    {
+      key: "changed",
+      header: t("admin.table.changed"),
+      render: (r) => formatDateTime(r.change_time, locale),
     },
-  });
+  ];
 
-  const deactivateM = useMutation({
-    mutationFn: (id: number) => api.deleteSystemAddress(id),
-    onSuccess: () => void qc.invalidateQueries({ queryKey: ["admin", "system-addresses"] }),
-  });
-
-  const rows: SystemAddressOut[] = listQ.data ?? [];
+  const fields: FieldDef[] = [
+    {
+      name: "value0",
+      label: t("admin.systemAddresses.email"),
+      type: "text",
+      required: true,
+      help: {
+        title: t("admin.systemAddresses.email"),
+        description: t("admin.help.systemAddresses.email"),
+      },
+    },
+    {
+      name: "value1",
+      label: t("admin.systemAddresses.name"),
+      type: "text",
+      required: true,
+      help: {
+        title: t("admin.systemAddresses.name"),
+        description: t("admin.help.systemAddresses.name"),
+      },
+    },
+    {
+      name: "comments",
+      label: t("admin.table.comments"),
+      type: "textarea",
+    },
+    {
+      name: "valid_id",
+      label: t("admin.table.status"),
+      type: "select",
+      options: [
+        { value: 1, label: t("admin.table.valid") },
+        { value: 2, label: t("admin.table.invalid") },
+      ],
+      help: { title: t("admin.table.status"), description: t("admin.help.common.validId") },
+    },
+  ];
 
   return (
-    <div className="mx-auto max-w-4xl space-y-6 p-6" data-testid="system-addresses-page">
-      <div>
-        <h1 className="text-xl font-semibold text-ink">{t("admin.systemAddresses.title_plural")}</h1>
-        <p className="mt-1 text-sm text-muted">{t("admin.systemAddresses.subtitle")}</p>
-      </div>
-
-      <form
-        className="flex flex-wrap items-end gap-3 rounded-lg border border-line bg-surface p-4"
-        onSubmit={(e) => {
-          e.preventDefault();
-          if (email.trim()) createM.mutate();
-        }}
-      >
-        <label className="flex min-w-[12rem] flex-1 flex-col gap-1 text-sm">
-          <span>{t("admin.systemAddresses.email")}</span>
-          <input
-            className={inputClass}
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            required
-            type="email"
-          />
-        </label>
-        <label className="flex min-w-[12rem] flex-1 flex-col gap-1 text-sm">
-          <span>{t("admin.systemAddresses.realName")}</span>
-          <input
-            className={inputClass}
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-          />
-        </label>
-        <Button type="submit" disabled={createM.isPending}>
-          {t("admin.systemAddresses.new")}
-        </Button>
-      </form>
-
-      <div className="overflow-hidden rounded-lg border border-line">
-        <table className="w-full text-left text-sm">
-          <thead className="bg-surface-2 text-muted">
-            <tr>
-              <th className="px-3 py-2">ID</th>
-              <th className="px-3 py-2">{t("admin.systemAddresses.email")}</th>
-              <th className="px-3 py-2">{t("admin.systemAddresses.realName")}</th>
-              <th className="px-3 py-2" />
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((r) => (
-              <tr key={r.id} className="border-t border-line">
-                <td className="px-3 py-2 font-mono text-xs">{r.id}</td>
-                <td className="px-3 py-2">{r.value0}</td>
-                <td className="px-3 py-2">{r.value1}</td>
-                <td className="px-3 py-2 text-right">
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => deactivateM.mutate(r.id)}
-                  >
-                    {t("admin.table.deactivate")}
-                  </Button>
-                </td>
-              </tr>
-            ))}
-            {rows.length === 0 && !listQ.isLoading && (
-              <tr>
-                <td colSpan={4} className="px-3 py-6 text-center text-muted">
-                  {t("admin.table.empty")}
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
-    </div>
+    <AdminResourcePage
+      resourceKey="system-addresses"
+      title={t("admin.systemAddresses.title_plural")}
+      newLabel={t("admin.systemAddresses.new")}
+      api={api.adminSystemAddresses}
+      idOf={(r) => r.id}
+      columns={columns}
+      fields={fields}
+      toFormValues={(row) =>
+        row
+          ? {
+              value0: row.value0,
+              value1: row.value1,
+              comments: row.comments ?? "",
+              valid_id: row.valid_id,
+            }
+          : { valid_id: 1 }
+      }
+      toCreateBody={(v: FieldValues): SystemAddressCreate => ({
+        value0: (v.value0 as string).trim(),
+        value1: ((v.value1 as string) || (v.value0 as string)).trim(),
+        comments: (v.comments as string) || null,
+        queue_id: 1,
+        valid_id: Number(v.valid_id) || 1,
+      })}
+      toUpdateBody={(v: FieldValues): SystemAddressUpdate => ({
+        value0: (v.value0 as string).trim(),
+        value1: ((v.value1 as string) || (v.value0 as string)).trim(),
+        comments: (v.comments as string) || null,
+        valid_id: Number(v.valid_id) || 1,
+      })}
+    />
   );
 }

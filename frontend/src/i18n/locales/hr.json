@@ -1177,6 +1177,10 @@
         "filters": "Dodatni selektori dodatno sužavaju skup korisnika — svaki dodani filtar je AND s navedenim prijavama/tvrtkama i međusobno.",
         "negate": "Prebacivanje između \"odgovara\" (kupci gdje se uzorak podudara) i \"ne podudara se\" (≠, kupci kod kojih se NE podudara).",
         "validId": "\"Temp\" (valid_id 3) je Znunyjevo treće stanje valjanosti — obično potvrda računa na čekanju (npr. nepotvrđena samoregistracija), različito od običnog važećeg/nevažećeg."
+      },
+      "systemAddresses": {
+        "email": "Address used as the From email for queues and auto-responses.",
+        "name": "Display name shown next to the email (e.g. “Support <support@example.com>”)."
       }
     },
     "nav": {
@@ -2253,6 +2257,13 @@
       "working": "radi...",
       "authorizeOpened": "Stranica za autorizaciju otvorena je u novoj kartici.",
       "refreshSuccess": "Token osvježen."
+    },
+    "systemAddresses": {
+      "title_plural": "System addresses",
+      "subtitle": "From-addresses for queues and auto-responses. Invalid addresses stay listed so they can be re-enabled.",
+      "new": "Add address",
+      "email": "Email",
+      "name": "Name"
     }
   },
   "kb": {

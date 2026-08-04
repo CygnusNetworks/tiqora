@@ -1177,6 +1177,10 @@
         "filters": "추가 선택기는 고객 집합의 범위를 더욱 좁힙니다. 추가된 모든 필터는 위의 로그인/회사 및 서로 AND로 연결됩니다.",
         "negate": "\"일치\"(패턴이 일치하는 고객)와 \"일치하지 않음\"(≠, 일치하지 않는 고객) 사이를 전환합니다.",
         "validId": "\"Temp\"(valid_id 3)는 Znuny의 세 번째 유효성 상태입니다. 일반적으로 확인 보류 중인 계정(예: 확인되지 않은 자체 등록)이며 일반 유효/무효와 다릅니다."
+      },
+      "systemAddresses": {
+        "email": "Address used as the From email for queues and auto-responses.",
+        "name": "Display name shown next to the email (e.g. “Support <support@example.com>”)."
       }
     },
     "nav": {
@@ -2253,6 +2257,13 @@
       "working": "일하는 중…",
       "authorizeOpened": "새 탭에 승인 페이지가 열렸습니다.",
       "refreshSuccess": "토큰이 새로 고쳐졌습니다."
+    },
+    "systemAddresses": {
+      "title_plural": "System addresses",
+      "subtitle": "From-addresses for queues and auto-responses. Invalid addresses stay listed so they can be re-enabled.",
+      "new": "Add address",
+      "email": "Email",
+      "name": "Name"
     }
   },
   "kb": {

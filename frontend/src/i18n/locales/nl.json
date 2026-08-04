@@ -1177,6 +1177,10 @@
         "filters": "Extra selectors beperken de klantenset verder: elk toegevoegd filter wordt ANDed met de bovenstaande logins/bedrijven en met elkaar.",
         "negate": "Schakel tussen 'komt overeen' (klanten waarbij het patroon overeenkomt) en 'komt niet overeen' (≠, klanten waarbij het NIET overeenkomt).",
         "validId": "'Temp' (valid_id 3) is de derde geldigheidsstatus van Znuny - meestal een account in afwachting van bevestiging (bijvoorbeeld onbevestigde zelfregistratie), anders dan gewoon geldig/ongeldig."
+      },
+      "systemAddresses": {
+        "email": "Address used as the From email for queues and auto-responses.",
+        "name": "Display name shown next to the email (e.g. “Support <support@example.com>”)."
       }
     },
     "nav": {
@@ -2253,6 +2257,13 @@
       "working": "Werken…",
       "authorizeOpened": "Autorisatiepagina geopend in een nieuw tabblad.",
       "refreshSuccess": "Token vernieuwd."
+    },
+    "systemAddresses": {
+      "title_plural": "System addresses",
+      "subtitle": "From-addresses for queues and auto-responses. Invalid addresses stay listed so they can be re-enabled.",
+      "new": "Add address",
+      "email": "Email",
+      "name": "Name"
     }
   },
   "kb": {

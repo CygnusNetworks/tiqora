@@ -1177,6 +1177,10 @@
         "filters": "انتخابگرهای اضافی مجموعه مشتری را بیشتر محدود می‌کنند - هر فیلتر اضافه‌شده با ورود به سیستم/شرکت‌های بالا و با یکدیگر AND می‌شود.",
         "negate": "بین «منطبق‌ها» (مشتریانی که الگو مطابقت دارد) و «مطابقت ندارد» (≠، مشتریانی که مطابقت ندارد) جابه‌جا شوید.",
         "validId": "\"Temp\" (valid_id 3) سومین وضعیت اعتبار Znuny است - معمولاً یک حساب در انتظار تأیید (مثلاً ثبت نام خود تأیید نشده)، متمایز از معتبر/نامعتبر ساده."
+      },
+      "systemAddresses": {
+        "email": "Address used as the From email for queues and auto-responses.",
+        "name": "Display name shown next to the email (e.g. “Support <support@example.com>”)."
       }
     },
     "nav": {
@@ -2253,6 +2257,13 @@
       "working": "در حال کار…",
       "authorizeOpened": "صفحه مجوز در یک برگه جدید باز شد.",
       "refreshSuccess": "رمز به روز شد."
+    },
+    "systemAddresses": {
+      "title_plural": "System addresses",
+      "subtitle": "From-addresses for queues and auto-responses. Invalid addresses stay listed so they can be re-enabled.",
+      "new": "Add address",
+      "email": "Email",
+      "name": "Name"
     }
   },
   "kb": {

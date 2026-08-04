@@ -1177,6 +1177,10 @@
         "filters": "A további kiválasztók tovább szűkítik az ügyfélkészletet – minden hozzáadott szűrő ÉS a fenti bejelentkezési adatokkal/cégekkel és egymással együtt.",
         "negate": "Váltás a \"egyezik\" (az ügyfelek, akiknél a minta egyezik) és a \"nem egyezik\" (≠, ügyfelek, ahol NEM egyezik) között.",
         "validId": "A „Temp” (valid_id 3) a Znuny harmadik érvényességi állapota – jellemzően egy megerősítésre váró fiók (pl. meg nem erősített önregisztráció), amely különbözik az egyszerű érvényes/invalid állapottól."
+      },
+      "systemAddresses": {
+        "email": "Address used as the From email for queues and auto-responses.",
+        "name": "Display name shown next to the email (e.g. “Support <support@example.com>”)."
       }
     },
     "nav": {
@@ -2253,6 +2257,13 @@
       "working": "Dolgozik…",
       "authorizeOpened": "Az engedélyezési oldal új lapon nyílt meg.",
       "refreshSuccess": "Token frissítve."
+    },
+    "systemAddresses": {
+      "title_plural": "System addresses",
+      "subtitle": "From-addresses for queues and auto-responses. Invalid addresses stay listed so they can be re-enabled.",
+      "new": "Add address",
+      "email": "Email",
+      "name": "Name"
     }
   },
   "kb": {

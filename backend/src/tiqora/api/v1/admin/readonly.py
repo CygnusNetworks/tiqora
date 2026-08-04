@@ -17,10 +17,9 @@ from tiqora.api.v1.admin.schemas import (
     FollowUpPossibleOut,
     GenericAgentJobOut,
     StateTypeOut,
-    SystemAddressOut,
 )
 from tiqora.db.legacy.config import GenericAgentJobs
-from tiqora.db.legacy.queue import FollowUpPossible, SystemAddress
+from tiqora.db.legacy.queue import FollowUpPossible
 from tiqora.db.legacy.ticket import TicketStateType
 
 router = APIRouter(tags=["admin:readonly"])
@@ -37,20 +36,9 @@ async def list_state_types(admin: AdminUser, session: DbSession) -> list[TicketS
     return list(result.scalars().all())
 
 
-@router.get("/system-addresses", response_model=list[SystemAddressOut])
-async def list_system_addresses(admin: AdminUser, session: DbSession) -> list[SystemAddress]:
-    """Valid system addresses for queue / auto-response From pickers.
-
-    Full CRUD (paginated) lives under :mod:`system_addresses`; this unpaginated
-    list stays for existing queue/auto-response pickers.
-    """
-    _ = admin
-    result = await session.execute(
-        select(SystemAddress)
-        .where(SystemAddress.valid_id == _VALID)
-        .order_by(SystemAddress.value1, SystemAddress.value0)
-    )
-    return list(result.scalars().all())
+# system-addresses list/CRUD lives entirely in :mod:`system_addresses`
+# (paginated + valid filter). Queue/auto-response pickers use that endpoint
+# with ``valid=valid&page_size=500``.
 
 
 @router.get("/follow-up-possible", response_model=list[FollowUpPossibleOut])

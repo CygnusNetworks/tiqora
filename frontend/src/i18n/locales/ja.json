@@ -1177,6 +1177,10 @@
         "filters": "セレクターを追加すると、顧客セットがさらに絞り込まれます。追加されたすべてのフィルターは、上記のログイン/会社と、および相互にAND演算されます。",
         "negate": "「一致」(パターンが一致する顧客) と「一致しない」(≠、一致しない顧客) を切り替えます。",
         "validId": "「Temp」(valid_id 3) は、Znunyの3番目の有効性状態です。通常は確認待ちのアカウント (未確認の自己登録など) であり、単純な有効/無効とは異なります。"
+      },
+      "systemAddresses": {
+        "email": "Address used as the From email for queues and auto-responses.",
+        "name": "Display name shown next to the email (e.g. “Support <support@example.com>”)."
       }
     },
     "nav": {
@@ -2261,6 +2265,13 @@
       "working": "働いています…",
       "authorizeOpened": "新しいタブで認証ページが開きます。",
       "refreshSuccess": "トークンが更新されました。"
+    },
+    "systemAddresses": {
+      "title_plural": "System addresses",
+      "subtitle": "From-addresses for queues and auto-responses. Invalid addresses stay listed so they can be re-enabled.",
+      "new": "Add address",
+      "email": "Email",
+      "name": "Name"
     }
   },
   "kb": {

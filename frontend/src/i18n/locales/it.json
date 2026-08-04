@@ -1177,6 +1177,10 @@
         "filters": "Selettori aggiuntivi restringono ulteriormente il set di clienti: ogni filtro aggiunto viene messo in AND con gli accessi/aziende di cui sopra e tra loro.",
         "negate": "Alterna tra \"corrispondenze\" (clienti per cui il modello corrisponde) e \"non corrispondente\" (≠, clienti per cui NON corrisponde).",
         "validId": "\"Temp\" (valid_id 3) è il terzo stato di validità di Znuny, in genere un account in attesa di conferma (ad esempio autoregistrazione non confermata), distinto dal semplice valido/non valido."
+      },
+      "systemAddresses": {
+        "email": "Address used as the From email for queues and auto-responses.",
+        "name": "Display name shown next to the email (e.g. “Support <support@example.com>”)."
       }
     },
     "nav": {
@@ -2253,6 +2257,13 @@
       "working": "Lavorando…",
       "authorizeOpened": "La pagina di autorizzazione è stata aperta in una nuova scheda.",
       "refreshSuccess": "Token aggiornato."
+    },
+    "systemAddresses": {
+      "title_plural": "System addresses",
+      "subtitle": "From-addresses for queues and auto-responses. Invalid addresses stay listed so they can be re-enabled.",
+      "new": "Add address",
+      "email": "Email",
+      "name": "Name"
     }
   },
   "kb": {

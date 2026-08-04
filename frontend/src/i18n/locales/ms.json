@@ -1177,6 +1177,10 @@
         "filters": "Pemilih tambahan menyempitkan set pelanggan dengan lebih lanjut — setiap penapis yang ditambahkan diAND dengan log masuk/syarikat di atas dan antara satu sama lain.",
         "negate": "Togol antara \"padanan\" (pelanggan yang coraknya sepadan) dan \"tidak sepadan\" (≠, pelanggan yang TIDAK sepadan).",
         "validId": "\"Temp\" (valid_id 3) ialah keadaan kesahihan ketiga Znuny — biasanya pengesahan akaun belum selesai (cth. pendaftaran diri yang belum disahkan), berbeza daripada sah/tidak sah biasa."
+      },
+      "systemAddresses": {
+        "email": "Address used as the From email for queues and auto-responses.",
+        "name": "Display name shown next to the email (e.g. “Support <support@example.com>”)."
       }
     },
     "nav": {
@@ -2253,6 +2257,13 @@
       "working": "Bekerja…",
       "authorizeOpened": "Halaman kebenaran dibuka dalam tab baharu.",
       "refreshSuccess": "Token disegarkan."
+    },
+    "systemAddresses": {
+      "title_plural": "System addresses",
+      "subtitle": "From-addresses for queues and auto-responses. Invalid addresses stay listed so they can be re-enabled.",
+      "new": "Add address",
+      "email": "Email",
+      "name": "Name"
     }
   },
   "kb": {

@@ -1177,6 +1177,10 @@
         "filters": "Додаткові селектори ще більше звужують набір клієнтів — кожен доданий фільтр об’єднується AND із зазначеними вище логінами/компаніями та один з одним.",
         "negate": "Перемикання між «збігається» (клієнти, у яких шаблон збігається) і «не збігається» (≠, клієнти, у яких він НЕ збігається).",
         "validId": "«Тимчасовий» (valid_id 3) — це третій стан дійсності Znuny — зазвичай обліковий запис очікує підтвердження (наприклад, непідтверджена самореєстрація), відмінний від звичайного дійсного/недійсного."
+      },
+      "systemAddresses": {
+        "email": "Address used as the From email for queues and auto-responses.",
+        "name": "Display name shown next to the email (e.g. “Support <support@example.com>”)."
       }
     },
     "nav": {
@@ -2253,6 +2257,13 @@
       "working": "Робота…",
       "authorizeOpened": "Сторінка авторизації відкрилася в новій вкладці.",
       "refreshSuccess": "Токен оновлено."
+    },
+    "systemAddresses": {
+      "title_plural": "System addresses",
+      "subtitle": "From-addresses for queues and auto-responses. Invalid addresses stay listed so they can be re-enabled.",
+      "new": "Add address",
+      "email": "Email",
+      "name": "Name"
     }
   },
   "kb": {

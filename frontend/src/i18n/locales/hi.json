@@ -1177,6 +1177,10 @@
         "filters": "अतिरिक्त चयनकर्ता ग्राहक सेट को और अधिक सीमित कर देते हैं - प्रत्येक जोड़ा गया फ़िल्टर ऊपर दिए गए लॉगिन/कंपनियों के साथ और एक-दूसरे के साथ एंडेड होता है।",
         "negate": "\"मिलान\" (वे ग्राहक जहां पैटर्न मेल खाता है) और \"नहीं मेल खाता\" (≠, ग्राहक जहां यह मेल नहीं खाता है) के बीच टॉगल करें।",
         "validId": "\"Temp\" (valid_id 3) Znuny की तीसरी वैधता स्थिति है - आम तौर पर एक खाता जिसकी पुष्टि लंबित है (उदाहरण के लिए अपुष्ट स्व-पंजीकरण), जो सादे वैध/अमान्य से अलग है।"
+      },
+      "systemAddresses": {
+        "email": "Address used as the From email for queues and auto-responses.",
+        "name": "Display name shown next to the email (e.g. “Support <support@example.com>”)."
       }
     },
     "nav": {
@@ -2253,6 +2257,13 @@
       "working": "काम कर रहा हूँ...",
       "authorizeOpened": "प्राधिकरण पृष्ठ एक नए टैब में खुला।",
       "refreshSuccess": "टोकन ताज़ा किया गया."
+    },
+    "systemAddresses": {
+      "title_plural": "System addresses",
+      "subtitle": "From-addresses for queues and auto-responses. Invalid addresses stay listed so they can be re-enabled.",
+      "new": "Add address",
+      "email": "Email",
+      "name": "Name"
     }
   },
   "kb": {

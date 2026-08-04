@@ -1177,6 +1177,10 @@
         "filters": "Dodatkowe selektory jeszcze bardziej zawężają zestaw klientów — każdy dodany filtr jest poddawany operacji AND z powyższymi loginami/firmami i między sobą.",
         "negate": "Przełącz między „pasującymi” (klienci, dla których wzorzec pasuje) i „nie pasuje” (≠, klienci, dla których NIE pasuje).",
         "validId": "„Temp” (valid_id 3) to trzeci stan ważności Znuny — zazwyczaj konto oczekujące na potwierdzenie (np. niepotwierdzona samorejestracja), różniące się od zwykłego ważnego/nieprawidłowego."
+      },
+      "systemAddresses": {
+        "email": "Address used as the From email for queues and auto-responses.",
+        "name": "Display name shown next to the email (e.g. “Support <support@example.com>”)."
       }
     },
     "nav": {
@@ -2253,6 +2257,13 @@
       "working": "Pracuję…",
       "authorizeOpened": "Strona autoryzacji otworzyła się w nowej karcie.",
       "refreshSuccess": "Token odświeżony."
+    },
+    "systemAddresses": {
+      "title_plural": "System addresses",
+      "subtitle": "From-addresses for queues and auto-responses. Invalid addresses stay listed so they can be re-enabled.",
+      "new": "Add address",
+      "email": "Email",
+      "name": "Name"
     }
   },
   "kb": {

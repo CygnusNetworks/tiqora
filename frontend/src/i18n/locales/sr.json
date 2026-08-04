@@ -1177,6 +1177,10 @@
         "filters": "Додатни селектори додатно сужавају скуп купаца — сваки додатни филтер је И повезан са горе наведеним пријавама/компанијама и међусобно.",
         "negate": "Пребаците се између „подударања“ (клијенти код којих се образац подудара) и „не подудара се“ (=, купци код којих се НЕ поклапа).",
         "validId": "„Темп“ (валид_ид 3) је Знуни-јево треће стање ваљаности — обично налог који чека потврду (нпр. непотврђена саморегистрација), различито од обичног важећег/неважећег."
+      },
+      "systemAddresses": {
+        "email": "Address used as the From email for queues and auto-responses.",
+        "name": "Display name shown next to the email (e.g. “Support <support@example.com>”)."
       }
     },
     "nav": {
@@ -2253,6 +2257,13 @@
       "working": "Ради…",
       "authorizeOpened": "Страница ауторизације је отворена у новој картици.",
       "refreshSuccess": "Токен је освежен."
+    },
+    "systemAddresses": {
+      "title_plural": "System addresses",
+      "subtitle": "From-addresses for queues and auto-responses. Invalid addresses stay listed so they can be re-enabled.",
+      "new": "Add address",
+      "email": "Email",
+      "name": "Name"
     }
   },
   "kb": {

@@ -1177,6 +1177,10 @@
         "filters": "Допълнителните селектори допълнително стесняват набора от клиенти — всеки добавен филтър се добавя с И с данните за вход/компаниите по-горе и помежду си.",
         "negate": "Превключвайте между „съвпада“ (клиенти, при които моделът съвпада) и „не съвпада“ (≠, клиенти, при които НЕ съвпада).",
         "validId": "„Временен“ (valid_id 3) е третото състояние на валидност на Znuny — обикновено чакащо потвърждение на акаунт (напр. непотвърдена саморегистрация), различно от обикновения валиден/невалиден."
+      },
+      "systemAddresses": {
+        "email": "Address used as the From email for queues and auto-responses.",
+        "name": "Display name shown next to the email (e.g. “Support <support@example.com>”)."
       }
     },
     "nav": {
@@ -2253,6 +2257,13 @@
       "working": "Работи...",
       "authorizeOpened": "Страницата за оторизация се отвори в нов раздел.",
       "refreshSuccess": "Токенът е обновен."
+    },
+    "systemAddresses": {
+      "title_plural": "System addresses",
+      "subtitle": "From-addresses for queues and auto-responses. Invalid addresses stay listed so they can be re-enabled.",
+      "new": "Add address",
+      "email": "Email",
+      "name": "Name"
     }
   },
   "kb": {

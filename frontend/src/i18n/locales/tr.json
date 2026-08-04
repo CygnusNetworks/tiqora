@@ -1177,6 +1177,10 @@
         "filters": "Ek seçiciler müşteri kümesini daha da daraltır; eklenen her filtre, yukarıdaki giriş yapma bilgileri/şirketlerle ve birbirleriyle AND'lenir.",
         "negate": "\"Eşleşmeler\" (modelin eşleştiği müşteriler) ve \"eşleşmeyen müşteriler\" (≠, eşleşmediği müşteriler) arasında geçiş yapın.",
         "validId": "\"Temp\" (valid_id 3), Znuny'nin üçüncü geçerlilik durumudur; tipik olarak, düz geçerli/geçersizden farklı olarak onay bekleyen bir hesaptır (ör. onaylanmamış kişisel kayıt)."
+      },
+      "systemAddresses": {
+        "email": "Address used as the From email for queues and auto-responses.",
+        "name": "Display name shown next to the email (e.g. “Support <support@example.com>”)."
       }
     },
     "nav": {
@@ -2253,6 +2257,13 @@
       "working": "Çalışıyor…",
       "authorizeOpened": "Yetkilendirme sayfası yeni sekmede açıldı.",
       "refreshSuccess": "Jeton yenilendi."
+    },
+    "systemAddresses": {
+      "title_plural": "System addresses",
+      "subtitle": "From-addresses for queues and auto-responses. Invalid addresses stay listed so they can be re-enabled.",
+      "new": "Add address",
+      "email": "Email",
+      "name": "Name"
     }
   },
   "kb": {
