@@ -338,3 +338,175 @@ async def compose_context(
         signature_is_html="html" in (sig_ct or "").lower(),
         rich_text=rich_text,
     )
+
+
+# ---------------------------------------------------------------------------
+# ACL-filtered field options (new-ticket / form context — no ticket_id)
+# ---------------------------------------------------------------------------
+
+_FIELD_TO_SUBTYPE: dict[str, str] = {
+    "state": "State",
+    "queue": "Queue",
+    "priority": "Priority",
+    "type": "Type",
+    "service": "Service",
+    "sla": "SLA",
+}
+
+
+class TicketFieldOptionsOut(BaseModel):
+    """ACL-filtered id→name maps (string keys for JSON).
+
+    Only requested fields are populated; others are omitted (empty dict).
+    """
+
+    state: dict[str, str] = {}
+    queue: dict[str, str] = {}
+    priority: dict[str, str] = {}
+    type: dict[str, str] = {}
+    service: dict[str, str] = {}
+    sla: dict[str, str] = {}
+
+
+async def _base_field_maps(
+    session: DbSession,
+    user: CurrentUser,
+    fields: set[str],
+    *,
+    queue_id: int | None = None,
+) -> dict[str, dict[int, str]]:
+    """Unfiltered valid id→name maps for the requested fields.
+
+    Queues are still permission-gated (``ro``); ACL is additional filtering.
+    """
+    out: dict[str, dict[int, str]] = {}
+    if "state" in fields:
+        rows = (
+            await session.execute(
+                select(TicketState.id, TicketState.name)
+                .where(TicketState.valid_id == _VALID)
+                .order_by(TicketState.id)
+            )
+        ).all()
+        out["state"] = {int(r[0]): r[1] for r in rows}
+    if "priority" in fields:
+        rows = (
+            await session.execute(
+                select(TicketPriority.id, TicketPriority.name)
+                .where(TicketPriority.valid_id == _VALID)
+                .order_by(TicketPriority.id)
+            )
+        ).all()
+        out["priority"] = {int(r[0]): r[1] for r in rows}
+    if "type" in fields:
+        rows = (
+            await session.execute(
+                select(TicketType.id, TicketType.name)
+                .where(TicketType.valid_id == _VALID)
+                .order_by(TicketType.name)
+            )
+        ).all()
+        out["type"] = {int(r[0]): r[1] for r in rows}
+    if "service" in fields:
+        rows = (
+            await session.execute(
+                select(Service.id, Service.name)
+                .where(Service.valid_id == _VALID)
+                .order_by(Service.name)
+            )
+        ).all()
+        out["service"] = {int(r[0]): r[1] for r in rows}
+    if "sla" in fields:
+        rows = (
+            await session.execute(
+                select(Sla.id, Sla.name).where(Sla.valid_id == _VALID).order_by(Sla.name)
+            )
+        ).all()
+        out["sla"] = {int(r[0]): r[1] for r in rows}
+    if "queue" in fields:
+        pe = PermissionEngine(session)
+        group_ids = await pe.groups_for_permission(user.id, "ro")
+        if not group_ids:
+            out["queue"] = {}
+        else:
+            rows = (
+                await session.execute(
+                    select(Queue.id, Queue.name)
+                    .where(Queue.group_id.in_(group_ids), Queue.valid_id == _VALID)
+                    .order_by(Queue.name)
+                )
+            ).all()
+            out["queue"] = {int(r[0]): r[1] for r in rows}
+    _ = queue_id  # reserved for form-side Queue checks when callers pass it
+    return out
+
+
+async def collect_ticket_field_options(
+    session: DbSession,
+    user: CurrentUser,
+    *,
+    fields: set[str],
+    ticket_id: int | None = None,
+    action: str | None = None,
+    queue_id: int | None = None,
+) -> TicketFieldOptionsOut:
+    """Load base maps then apply Ticket ACL for each requested field."""
+    from tiqora.domain.ticket_acl import filter_id_name_map
+
+    base = await _base_field_maps(session, user, fields, queue_id=queue_id)
+    checks: dict | None = None
+    if queue_id is not None:
+        queue_row = await session.get(Queue, queue_id)
+        checks = {
+            "Ticket": {
+                "QueueID": str(queue_id),
+                **({"Queue": queue_row.name} if queue_row is not None else {}),
+            }
+        }
+
+    result = TicketFieldOptionsOut()
+    for field, mapping in base.items():
+        subtype = _FIELD_TO_SUBTYPE[field]
+        filtered = await filter_id_name_map(
+            session,
+            user_id=user.id,
+            items=mapping,
+            return_sub_type=subtype,
+            ticket_id=ticket_id,
+            action=action,
+            checks=checks,
+        )
+        setattr(result, field, {str(k): v for k, v in filtered.items()})
+    return result
+
+
+@router.get("/ticket-field-options", response_model=TicketFieldOptionsOut)
+async def ticket_field_options(
+    user: CurrentUser,
+    session: DbSession,
+    fields: str = Query(
+        "state,queue,priority,type,service,sla",
+        description="Comma-separated field names to return",
+    ),
+    action: str | None = Query(
+        "AgentTicketPhone",
+        description="Frontend Action for ACL Properties (e.g. AgentTicketPhone)",
+    ),
+    queue_id: int | None = Query(default=None, ge=1, description="Optional form QueueID context"),
+) -> TicketFieldOptionsOut:
+    """ACL-filtered field options for new-ticket forms (no ticket_id).
+
+    Group/role queue permissions still apply to the queue list; Ticket ACL
+    further restricts selectable values for the current agent and action.
+    """
+    requested = {f.strip().lower() for f in fields.split(",") if f.strip()}
+    requested &= set(_FIELD_TO_SUBTYPE)
+    if not requested:
+        return TicketFieldOptionsOut()
+    return await collect_ticket_field_options(
+        session,
+        user,
+        fields=requested,
+        action=action,
+        queue_id=queue_id,
+    )
