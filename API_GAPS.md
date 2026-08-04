@@ -35,6 +35,10 @@ Analyse gegen Code (`backend/src/tiqora/…`) und OpenAPI (`packages/api-client/
 | Admin: types/services/slas, system addresses write, notification events, GenericAgent write | 2026-08-04 | Shared Znuny-Tabellen |
 | MCP history / merge / link / type / service / sla | 2026-08-04 | Tools ergänzt |
 | MCP responsible / watch / archive / attachments / forward / bounce | 2026-08-04 | ~39 Tools total |
+| MCP-Mutationen auf `TicketWriteService` + SMTP-Parity | 2026-08-04 | gleiche Gates/Outbound wie REST |
+| MCP Tool-Allowlist pro Key | 2026-08-04 | `tool:<name>` in Key-Scopes |
+| Rate-Limit pro Key | 2026-08-04 | Redis fixed-window (`TIQORA_API_KEY_RATE_LIMIT_*`) |
+| PGP/S-MIME Admin list/import | 2026-08-04 | `/admin/crypto-keys` |
 | ACL admin CRUD + TicketACL runtime + field-options | 2026-08-04 | Znuny YAML match/change; picker filter (v0.5.8) |
 | Portal process CustomerInterface | 2026-08-04 | `/api/portal/process/*` + PortalProcessWidget (v0.5.9) |
 | Ticket attribute relations | 2026-08-04 | `acl_ticket_attribute_relations` admin CSV + field-options (v0.5.9) |
@@ -43,14 +47,9 @@ Analyse gegen Code (`backend/src/tiqora/…`) und OpenAPI (`packages/api-client/
 
 | Prio | Gap | Surface | Kommentar |
 |---|---|---|---|
-| ~~P2~~ | MCP-Mutationen auf `TicketWriteService` | MCP | ✅ 2026-08-04 (SMTP bei agent email reply = REST-Parity) |
-| ~~P2~~ | MCP Tool-Allowlist pro Key | Scopes | ✅ `tool:<name>` Tokens |
-| ~~P2~~ | Rate-Limit pro Key | Auth | ✅ Redis fixed-window (`TIQORA_API_KEY_RATE_LIMIT_*`) |
-| ~~P3~~ | ACL Editor (Write) + TicketACL runtime | Admin REST + Agent | ✅ CRUD + `domain/ticket_acl.py` + field-options (2026-08-04) |
-| **P3** | Session-Bearer auf MCP (nur Dev) | MCP | Optional; Prod eher nicht |
-| ~~P3~~ | PGP/S-MIME Admin list/import | Admin REST | ✅ `/admin/crypto-keys` |
-| ~~P3~~ | MCP responsible / watch / archive / attach / forward / bounce | MCP | ✅ ~39 Tools |
-| ~~P3~~ | Portal process + attribute relations | Portal / Admin | ✅ v0.5.9 |
+| **P3** | Session-Bearer auf MCP (nur Dev) | MCP | Optional; Prod eher nicht. Keys bleiben der vorgesehene Auth-Pfad. |
+
+Alles andere aus früheren „offen“-Listen steht unter **Geschlossen** (bzw. Gap-Matrix §7).
 
 ### ⏸ Deferred (Design)
 
@@ -58,6 +57,7 @@ Analyse gegen Code (`backend/src/tiqora/…`) und OpenAPI (`packages/api-client/
 |---|---|
 | OAuth2 Resource-Scopes | Nicht vorgesehen. Keys nutzen Area-RO/RW (`tickets:ro`/`tickets:rw`, …) plus Queue/Group des gebundenen Users — kein OAuth-Client-Modell. |
 | ACL vs. group/role | Queue access remains group/role; TicketACL filters selectable values/actions (Znuny TicketAcl parity). |
+| Session-Bearer auf MCP in Prod | Bewusst nicht; Dev-only optional (siehe Noch offen). |
 
 ---
 
