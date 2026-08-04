@@ -5,10 +5,11 @@ from __future__ import annotations
 import csv
 from collections.abc import AsyncGenerator
 from datetime import datetime
+from html import escape as html_escape
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Query, status
-from fastapi.responses import Response, StreamingResponse
+from fastapi.responses import HTMLResponse, Response, StreamingResponse
 from pydantic import BaseModel, Field
 
 from tiqora.api.attachment_response import safe_attachment_response
@@ -193,6 +194,15 @@ async def list_tickets(
     state_type: str | None = None,
     owner_id: int | None = None,
     customer_id: str | None = None,
+    responsible_id: int | None = None,
+    service_id: int | None = None,
+    locked: bool | None = Query(
+        None, description="True = lock/tmp_lock only; False = unlock only."
+    ),
+    watcher_user_id: int | None = Query(None, description="Tickets watched by this agent user id."),
+    escalated: bool | None = Query(
+        None, description="True = any escalation_* epoch already in the past."
+    ),
     offset: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=200),
     sort: str = Query("age"),
@@ -211,6 +221,11 @@ async def list_tickets(
         state_type=state_type,
         owner_id=owner_id,
         customer_id=customer_id,
+        responsible_id=responsible_id,
+        service_id=service_id,
+        locked=locked,
+        watcher_user_id=watcher_user_id,
+        escalated=True if escalated else None,
         offset=offset,
         limit=limit,
         sort=sort,
@@ -336,6 +351,11 @@ async def _export_tickets_csv_stream(
     state_type: str | None,
     owner_id: int | None,
     customer_id: str | None,
+    responsible_id: int | None = None,
+    service_id: int | None = None,
+    locked: bool | None = None,
+    watcher_user_id: int | None = None,
+    escalated: bool | None = None,
     sort: str,
     order: str,
     include_archived: bool = False,
@@ -352,6 +372,11 @@ async def _export_tickets_csv_stream(
         state_type=state_type,
         owner_id=owner_id,
         customer_id=customer_id,
+        responsible_id=responsible_id,
+        service_id=service_id,
+        locked=locked,
+        watcher_user_id=watcher_user_id,
+        escalated=escalated,
         sort=sort,
         order=order,
         include_archived=include_archived,
@@ -368,6 +393,11 @@ async def export_tickets_csv(
     state_type: str | None = None,
     owner_id: int | None = None,
     customer_id: str | None = None,
+    responsible_id: int | None = None,
+    service_id: int | None = None,
+    locked: bool | None = None,
+    watcher_user_id: int | None = None,
+    escalated: bool | None = None,
     sort: str = Query("age"),
     order: str = Query("desc"),
     include_archived: bool = Query(
@@ -394,6 +424,11 @@ async def export_tickets_csv(
             state_type=state_type,
             owner_id=owner_id,
             customer_id=customer_id,
+            responsible_id=responsible_id,
+            service_id=service_id,
+            locked=locked,
+            watcher_user_id=watcher_user_id,
+            escalated=True if escalated else None,
             sort=sort,
             order=order,
             include_archived=include_archived,
@@ -401,6 +436,118 @@ async def export_tickets_csv(
         media_type="text/csv; charset=utf-8",
         headers={"Content-Disposition": 'attachment; filename="tickets.csv"'},
     )
+
+
+class TimeAccountingReportEntry(BaseModel):
+    """One booked time row for the cross-ticket report."""
+
+    id: int
+    ticket_id: int
+    ticket_tn: str | None = None
+    ticket_title: str | None = None
+    article_id: int | None = None
+    time_unit: float
+    create_time: datetime | None = None
+    create_by: int
+    create_by_login: str | None = None
+
+
+class TimeAccountingReportOut(BaseModel):
+    items: list[TimeAccountingReportEntry]
+    total_units: float
+    offset: int
+    limit: int
+
+
+@router.get("/time-accounting", response_model=TimeAccountingReportOut)
+async def time_accounting_report(
+    user: CurrentUser,
+    session: DbSession,
+    create_by: int | None = None,
+    ticket_id: int | None = None,
+    created_from: datetime | None = None,
+    created_to: datetime | None = None,
+    offset: int = Query(0, ge=0),
+    limit: int = Query(100, ge=1, le=500),
+) -> TimeAccountingReportOut:
+    """Cross-ticket time-accounting report (permission-scoped via queue ``ro``).
+
+    Registered before ``/{ticket_id}`` so "time-accounting" is not parsed as a
+    ticket id. Only rows on tickets the agent can read are returned.
+    """
+    from sqlalchemy import func, select
+
+    from tiqora.db.legacy.misc import TimeAccounting
+    from tiqora.db.legacy.queue import Queue
+    from tiqora.db.legacy.ticket import Ticket
+    from tiqora.db.legacy.user import Users
+    from tiqora.permissions.engine import PermissionEngine as _PE
+
+    allowed_groups = await _PE(session).groups_for_permission(user.id, "ro")
+    if not allowed_groups:
+        return TimeAccountingReportOut(items=[], total_units=0.0, offset=offset, limit=limit)
+
+    filters = [
+        Queue.group_id.in_(list(allowed_groups)),
+        Queue.valid_id == 1,
+    ]
+    if create_by is not None:
+        filters.append(TimeAccounting.create_by == create_by)
+    if ticket_id is not None:
+        filters.append(TimeAccounting.ticket_id == ticket_id)
+    if created_from is not None:
+        filters.append(TimeAccounting.create_time >= created_from)
+    if created_to is not None:
+        filters.append(TimeAccounting.create_time <= created_to)
+
+    base = (
+        select(
+            TimeAccounting.id,
+            TimeAccounting.ticket_id,
+            Ticket.tn,
+            Ticket.title,
+            TimeAccounting.article_id,
+            TimeAccounting.time_unit,
+            TimeAccounting.create_time,
+            TimeAccounting.create_by,
+            Users.login,
+        )
+        .join(Ticket, Ticket.id == TimeAccounting.ticket_id)
+        .join(Queue, Queue.id == Ticket.queue_id)
+        .outerjoin(Users, Users.id == TimeAccounting.create_by)
+        .where(*filters)
+    )
+    sum_stmt = (
+        select(func.coalesce(func.sum(TimeAccounting.time_unit), 0))
+        .select_from(TimeAccounting)
+        .join(Ticket, Ticket.id == TimeAccounting.ticket_id)
+        .join(Queue, Queue.id == Ticket.queue_id)
+        .where(*filters)
+    )
+    rows = (
+        await session.execute(
+            base.order_by(TimeAccounting.create_time.desc(), TimeAccounting.id.desc())
+            .offset(offset)
+            .limit(limit)
+        )
+    ).all()
+    total_units = float((await session.execute(sum_stmt)).scalar_one())
+
+    items = [
+        TimeAccountingReportEntry(
+            id=int(r[0]),
+            ticket_id=int(r[1]),
+            ticket_tn=r[2],
+            ticket_title=r[3],
+            article_id=int(r[4]) if r[4] is not None else None,
+            time_unit=float(r[5]),
+            create_time=r[6],
+            create_by=int(r[7]),
+            create_by_login=r[8],
+        )
+        for r in rows
+    ]
+    return TimeAccountingReportOut(items=items, total_units=total_units, offset=offset, limit=limit)
 
 
 @router.get("/{ticket_id}", response_model=TicketDetail)
@@ -449,6 +596,127 @@ async def ticket_field_options(
         action=action,
     )
     return result.model_dump()
+
+
+@router.get("/{ticket_id}/print", response_class=HTMLResponse)
+async def print_ticket(
+    ticket_id: int,
+    user: CurrentUser,
+    session: DbSession,
+    include_history: bool = Query(False, description="Also render ticket history."),
+) -> HTMLResponse:
+    """Printable HTML for browser print / Save as PDF (Znuny AgentTicketPrint).
+
+    Returns a self-contained HTML document with ticket header metadata and
+    article bodies. Prefer this over embedding a PDF library.
+    """
+    svc = TicketService(session)
+    try:
+        ticket = await svc.get_ticket(user.id, ticket_id)
+        articles = await svc.list_articles(user.id, ticket_id)
+    except (TicketNotFound, TicketAccessDenied) as exc:
+        raise _map_exc(exc) from exc
+
+    article_blocks: list[str] = []
+    for art in articles:
+        try:
+            body = await svc.get_article_body(user.id, ticket_id, art.id)
+            if body.is_html:
+                body_html = body.body or ""
+            else:
+                body_html = f"<pre>{html_escape(body.body or '')}</pre>"
+        except Exception:
+            body_html = "<p><em>(body unavailable)</em></p>"
+        meta = (
+            f"<div class='meta'>"
+            f"<strong>#{art.id}</strong> · {html_escape(art.sender_type or '')} · "
+            f"{html_escape(str(art.create_time or ''))}<br/>"
+            f"<span>{html_escape(art.from_address or '')}</span>"
+            f"{' → ' + html_escape(art.to_address) if art.to_address else ''}"
+            f"</div>"
+        )
+        subject = html_escape(art.subject or "(no subject)")
+        article_blocks.append(
+            f"<section class='article'>{meta}<h3>{subject}</h3>"
+            f"<div class='body'>{body_html}</div></section>"
+        )
+
+    history_html = ""
+    if include_history:
+        try:
+            history = await svc.list_history(user.id, ticket_id)
+            rows = "".join(
+                f"<tr><td>{html_escape(str(h.create_time or ''))}</td>"
+                f"<td>{html_escape(h.history_type or '')}</td>"
+                f"<td>{html_escape(h.rendered or h.name or '')}</td>"
+                f"<td>{html_escape(h.create_by_login or str(h.create_by))}</td></tr>"
+                for h in history
+            )
+            history_html = (
+                "<h2>History</h2>"
+                "<table><thead><tr><th>When</th><th>Type</th>"
+                "<th>Detail</th><th>By</th></tr></thead>"
+                f"<tbody>{rows}</tbody></table>"
+            )
+        except Exception:
+            history_html = ""
+
+    title = html_escape(ticket.title or "")
+    tn = html_escape(ticket.tn or str(ticket.id))
+    owner = html_escape(ticket.owner_login or ticket.owner_name or "")
+    customer = (
+        f"{html_escape(ticket.customer_id or '')} "
+        f"{html_escape(ticket.customer_user_id or '')}"
+    ).strip()
+    css = (
+        "body{font-family:system-ui,sans-serif;margin:1.5rem;color:#111}"
+        "h1{font-size:1.25rem;margin:0 0 .25rem}"
+        "h2{font-size:1.05rem;margin:1.5rem 0 .5rem;border-bottom:1px solid #ddd;"
+        "padding-bottom:.25rem}"
+        "h3{font-size:.95rem;margin:.4rem 0}"
+        ".header{margin-bottom:1.25rem}"
+        ".grid{display:grid;grid-template-columns:8rem 1fr;gap:.25rem .75rem;"
+        "font-size:.875rem}"
+        ".grid dt{color:#555}"
+        ".article{border-top:1px solid #e5e5e5;padding:.75rem 0;"
+        "page-break-inside:avoid}"
+        ".meta{font-size:.8rem;color:#555;margin-bottom:.25rem}"
+        ".body{font-size:.9rem;line-height:1.45}"
+        ".body pre{white-space:pre-wrap;font-family:inherit;margin:0}"
+        "table{width:100%;border-collapse:collapse;font-size:.8rem}"
+        "th,td{text-align:left;padding:.3rem .4rem;border-bottom:1px solid #eee;"
+        "vertical-align:top}"
+        "@media print{body{margin:.5rem}.no-print{display:none}}"
+    )
+    html = f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<title>Ticket {tn} — {title}</title>
+<style>{css}</style>
+</head>
+<body>
+  <div class="header">
+    <p class="no-print"><button onclick="window.print()">Print</button></p>
+    <h1>Ticket {tn}</h1>
+    <p><strong>{title}</strong></p>
+    <dl class="grid">
+      <dt>Queue</dt><dd>{html_escape(ticket.queue_name or "")}</dd>
+      <dt>State</dt><dd>{html_escape(ticket.state or "")}</dd>
+      <dt>Priority</dt><dd>{html_escape(ticket.priority or "")}</dd>
+      <dt>Owner</dt><dd>{owner}</dd>
+      <dt>Customer</dt><dd>{customer}</dd>
+      <dt>Service</dt><dd>{html_escape(ticket.service_name or "")}</dd>
+      <dt>Created</dt><dd>{html_escape(str(ticket.create_time or ""))}</dd>
+      <dt>Changed</dt><dd>{html_escape(str(ticket.change_time or ""))}</dd>
+    </dl>
+  </div>
+  <h2>Articles ({len(article_blocks)})</h2>
+  {"".join(article_blocks) or "<p>No articles.</p>"}
+  {history_html}
+</body>
+</html>"""
+    return HTMLResponse(content=html)
 
 
 @router.get("/{ticket_id}/similar", response_model=SimilarTicketsOut)
@@ -528,9 +796,7 @@ async def get_article_plain_body(
     Requires ``ro``.
     """
     try:
-        plain = await TicketService(session).get_article_plain_body(
-            user.id, ticket_id, article_id
-        )
+        plain = await TicketService(session).get_article_plain_body(user.id, ticket_id, article_id)
     except (TicketNotFound, TicketAccessDenied) as exc:
         raise _map_exc(exc) from exc
     return ArticleBody(
@@ -953,9 +1219,7 @@ async def resend_article_endpoint(
     Resends the article body verbatim to ``to_address`` (history type Bounce).
     Requires ``rw``.
     """
-    return await bounce_article_endpoint(
-        ticket_id, article_id, body, user, session, settings
-    )
+    return await bounce_article_endpoint(ticket_id, article_id, body, user, session, settings)
 
 
 @router.post(

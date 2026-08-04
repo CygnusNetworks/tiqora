@@ -166,6 +166,24 @@ export type MentionOut = Schemas["MentionOut"];
 export type MentionCreate = Schemas["MentionCreate"];
 export type TimeAccountingOut = Schemas["TimeAccountingOut"];
 export type TimeAccountingCreate = Schemas["TimeAccountingCreate"];
+/** Hand-written: cross-ticket time-accounting report row (see GET /tickets/time-accounting). */
+export type TimeAccountingReportEntry = {
+  id: number;
+  ticket_id: number;
+  ticket_tn?: string | null;
+  ticket_title?: string | null;
+  article_id?: number | null;
+  time_unit: number;
+  create_time?: string | null;
+  create_by: number;
+  create_by_login?: string | null;
+};
+export type TimeAccountingReportOut = {
+  items: TimeAccountingReportEntry[];
+  total_units: number;
+  offset: number;
+  limit: number;
+};
 export type TypeRef = Schemas["TypeRefOut"];
 export type ServiceRef = Schemas["ServiceRefOut"];
 export type SlaRef = Schemas["SlaRefOut"];
@@ -1134,6 +1152,16 @@ export class ApiClient {
       state_type?: string;
       owner_id?: number;
       customer_id?: string;
+      /** Filter by responsible agent user id. */
+      responsible_id?: number;
+      /** Filter by service id. */
+      service_id?: number;
+      /** True = lock/tmp_lock only; False = unlock only. */
+      locked?: boolean;
+      /** Tickets watched by this agent user id. */
+      watcher_user_id?: number;
+      /** True = any escalation_* epoch already in the past. */
+      escalated?: boolean;
       offset?: number;
       limit?: number;
       sort?: string;
@@ -1402,6 +1430,11 @@ export class ApiClient {
       state_type?: string;
       owner_id?: number;
       customer_id?: string;
+      responsible_id?: number;
+      service_id?: number;
+      locked?: boolean;
+      watcher_user_id?: number;
+      escalated?: boolean;
       sort?: string;
       order?: string;
       /** Admins only — also export archived tickets (ignored for non-admins). */
@@ -2491,6 +2524,38 @@ export class ApiClient {
       "DELETE",
       `/api/v1/tickets/${ticketId}/mentions/${mentionId}`,
       { signal },
+    );
+  }
+
+  /**
+   * Cross-ticket time-accounting report (permission-scoped).
+   * Filters: create_by (agent), ticket_id, created_from/to (ISO datetime).
+   */
+  listTimeAccountingReport(
+    params: {
+      create_by?: number;
+      ticket_id?: number;
+      created_from?: string;
+      created_to?: string;
+      offset?: number;
+      limit?: number;
+    } = {},
+    signal?: AbortSignal,
+  ) {
+    return this.request<TimeAccountingReportOut>("GET", "/api/v1/tickets/time-accounting", {
+      query: params,
+      signal,
+    });
+  }
+
+  /** Printable HTML for a ticket (browser print / Save as PDF). */
+  ticketPrintUrl(ticketId: number, params: { include_history?: boolean } = {}): string {
+    const qs = new URLSearchParams();
+    if (params.include_history) qs.set("include_history", "true");
+    const suffix = qs.toString();
+    return joinUrl(
+      this.baseUrl,
+      `/api/v1/tickets/${ticketId}/print${suffix ? `?${suffix}` : ""}`,
     );
   }
 

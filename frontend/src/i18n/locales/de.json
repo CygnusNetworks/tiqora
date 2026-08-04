@@ -42,6 +42,11 @@
     "inbox": "Eingang",
     "myTickets": "Meine Tickets",
     "watched": "Beobachtet",
+    "locked": "Gesperrt",
+    "responsible": "Verantwortlich",
+    "escalated": "Eskaliert",
+    "services": "Services",
+    "timeAccounting": "Zeitabrechnung",
     "queues": "Queues",
     "knowledge": "Knowledge",
     "knowledgeBase": "Knowledge Base",
@@ -56,6 +61,46 @@
     "queueSearch": "Queues filtern…",
     "noQueueMatch": "Keine passenden Queues.",
     "templates": "Templates"
+  },
+  "views": {
+    "mine": "Meine Tickets",
+    "responsible": "Verantwortlich",
+    "locked": "Gesperrte Tickets",
+    "watched": "Beobachtete Tickets",
+    "escalated": "Eskalierte Tickets",
+    "service": "Nach Service",
+    "serviceHint": "Tickets eines Services anzeigen.",
+    "pickService": "Service wählen…"
+  },
+  "customerCentre": {
+    "title": "Kundeninformationen",
+    "open": "Kundeninfo",
+    "invalid": "Ungültiger Kunden-Login.",
+    "loadError": "Kunde konnte nicht geladen werden.",
+    "email": "E-Mail",
+    "phone": "Telefon",
+    "customerId": "Kundennummer",
+    "company": "Firma",
+    "openCount": "{{count}} offen",
+    "closedCount": "{{count}} geschlossen",
+    "allTickets": "Alle Tickets →",
+    "recentTickets": "Aktuelle Tickets"
+  },
+  "timeAccounting": {
+    "title": "Zeitabrechnung",
+    "hint": "Gebuchte Zeiteinheiten über Tickets, auf die Sie Zugriff haben.",
+    "filterUser": "Agent",
+    "allUsers": "Alle Agenten",
+    "filterFrom": "Von",
+    "filterTo": "Bis",
+    "filterTicket": "Ticket-ID",
+    "totalUnits": "Summe: {{units}} Einheiten",
+    "rowCount": "{{count}} Zeilen",
+    "empty": "Keine Zeiteinträge gefunden.",
+    "colWhen": "Wann",
+    "colTicket": "Ticket",
+    "colUser": "Agent",
+    "colUnits": "Einheiten"
   },
   "common": {
     "prev": "Zurück",
@@ -171,7 +216,9 @@
     "toPickUpEmpty": "Keine neuen Tickets zum Übernehmen.",
     "remindersDue": "Erinnerungen fällig",
     "remindersDueEmpty": "Keine fälligen Erinnerungen.",
-    "queueShortcutsEmpty": "Keine Queues mit offenen oder neuen Tickets."
+    "queueShortcutsEmpty": "Keine Queues mit offenen oder neuen Tickets.",
+    "lastViews": "Zuletzt angesehen",
+    "lastViewsUntitled": "(kein Betreff)"
   },
   "queue": {
     "sidebar": "Queues",

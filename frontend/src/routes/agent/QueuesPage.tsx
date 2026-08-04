@@ -25,6 +25,20 @@ export type QueuesSearch = {
   state_type?: StateTab;
   /** Exact-match filter on `customer_id`, set by clicking a ticket's customer cell. */
   customer_id?: string;
+  /** Owner agent user id (e.g. "my tickets"). */
+  owner_id?: number;
+  /** Responsible agent user id. */
+  responsible_id?: number;
+  /** Service id (service-centric view). */
+  service_id?: number;
+  /** True = only locked tickets. */
+  locked?: boolean;
+  /** Watcher agent user id (e.g. "my watched"). */
+  watcher_user_id?: number;
+  /** True = only tickets with a breached escalation epoch. */
+  escalated?: boolean;
+  /** Optional page title override key for preset views (i18n under views.*). */
+  view?: "locked" | "mine" | "responsible" | "watched" | "escalated" | "service";
   offset?: number;
   limit?: number;
   sort?: SortKey;
@@ -49,6 +63,12 @@ async function fetchMatchingTicketIds(
     queue_id?: number;
     state_type?: string;
     customer_id?: string;
+    owner_id?: number;
+    responsible_id?: number;
+    service_id?: number;
+    locked?: boolean;
+    watcher_user_id?: number;
+    escalated?: boolean;
     sort: SortKey;
     order: "asc" | "desc";
     include_archived?: boolean;
@@ -79,11 +99,35 @@ export function QueuesPage() {
   const queueId = search.queue_id ?? null;
   const stateType = (search.state_type ?? "open") as StateTab;
   const customerId = search.customer_id;
+  const ownerId = search.owner_id;
+  const responsibleId = search.responsible_id;
+  const serviceId = search.service_id;
+  const locked = search.locked;
+  const watcherUserId = search.watcher_user_id;
+  const escalated = search.escalated;
+  const view = search.view;
   const offset = search.offset ?? 0;
   const limit = search.limit ?? 50;
   const sort = (search.sort ?? "age") as SortKey;
   const order = (search.order ?? "desc") as "asc" | "desc";
   const includeArchived = isAdmin && search.include_archived === true;
+
+  const listParams = {
+    queue_id: queueId ?? undefined,
+    state_type: stateType === "all" ? undefined : stateType,
+    customer_id: customerId,
+    owner_id: ownerId,
+    responsible_id: responsibleId,
+    service_id: serviceId,
+    locked: locked || undefined,
+    watcher_user_id: watcherUserId,
+    escalated: escalated || undefined,
+    offset,
+    limit,
+    sort,
+    order,
+    include_archived: includeArchived || undefined,
+  };
 
   const setSearch = (patch: Partial<QueuesSearch>) => {
     void navigate({
@@ -131,7 +175,21 @@ export function QueuesPage() {
   // bulk action.
   useEffect(() => {
     clearSelection();
-  }, [queueId, stateType, customerId, offset, sort, order, includeArchived]);
+  }, [
+    queueId,
+    stateType,
+    customerId,
+    ownerId,
+    responsibleId,
+    serviceId,
+    locked,
+    watcherUserId,
+    escalated,
+    offset,
+    sort,
+    order,
+    includeArchived,
+  ]);
 
   // Success feedback auto-dismisses; errors stay until the next action.
   useEffect(() => {
@@ -159,21 +217,14 @@ export function QueuesPage() {
   });
 
   const ticketsQ = useQuery({
-    queryKey: [
-      "tickets",
-      { queueId, stateType, customerId, offset, limit, sort, order, includeArchived },
-    ],
-    queryFn: () =>
-      api.listTickets({
-        queue_id: queueId ?? undefined,
-        state_type: stateType === "all" ? undefined : stateType,
-        customer_id: customerId,
-        offset,
-        limit,
-        sort,
-        order,
-        include_archived: includeArchived || undefined,
-      }),
+    queryKey: ["tickets", listParams],
+    queryFn: () => api.listTickets(listParams),
+  });
+
+  const servicesQ = useQuery({
+    queryKey: ["reference", "services"],
+    queryFn: () => api.listReferenceServices(),
+    enabled: serviceId != null || view === "service",
   });
 
   const wantsReferenceData = selectMode || refDataRequested;
@@ -193,14 +244,22 @@ export function QueuesPage() {
     enabled: wantsReferenceData,
   });
 
-  const selectedQueueName =
-    queueId == null
-      ? t("sidebar.inbox")
-      : (() => {
-          const match = flattenQueues(queuesQ.data ?? []).find((q) => q.id === queueId);
-          if (!match) return t("sidebar.inbox");
-          return match.name.includes("::") ? (match.name.split("::").pop() ?? match.name) : match.name;
-        })();
+  const selectedQueueName = (() => {
+    if (view) {
+      const viewTitle = t(`views.${view}`, { defaultValue: "" });
+      if (viewTitle) {
+        if (view === "service" && serviceId != null) {
+          const svc = (servicesQ.data ?? []).find((s) => s.id === serviceId);
+          return svc ? `${viewTitle}: ${svc.name}` : viewTitle;
+        }
+        return viewTitle;
+      }
+    }
+    if (queueId == null) return t("sidebar.inbox");
+    const match = flattenQueues(queuesQ.data ?? []).find((q) => q.id === queueId);
+    if (!match) return t("sidebar.inbox");
+    return match.name.includes("::") ? (match.name.split("::").pop() ?? match.name) : match.name;
+  })();
 
   const items = ticketsQ.data?.items ?? [];
   const total = ticketsQ.data?.total ?? 0;
@@ -248,6 +307,12 @@ export function QueuesPage() {
           queue_id: queueId ?? undefined,
           state_type: stateType === "all" ? undefined : stateType,
           customer_id: customerId,
+          owner_id: ownerId,
+          responsible_id: responsibleId,
+          service_id: serviceId,
+          locked: locked || undefined,
+          watcher_user_id: watcherUserId,
+          escalated: escalated || undefined,
           sort,
           order,
           include_archived: includeArchived || undefined,
@@ -426,6 +491,12 @@ export function QueuesPage() {
                 queue_id: queueId ?? undefined,
                 state_type: stateType === "all" ? undefined : stateType,
                 customer_id: customerId,
+                owner_id: ownerId,
+                responsible_id: responsibleId,
+                service_id: serviceId,
+                locked: locked || undefined,
+                watcher_user_id: watcherUserId,
+                escalated: escalated || undefined,
                 sort,
                 order,
                 include_archived: includeArchived || undefined,
