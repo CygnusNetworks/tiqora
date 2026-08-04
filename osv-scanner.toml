@@ -1,0 +1,56 @@
+# Bekannte, bewusst zurueckgestellte Funde des OSV-Scanners.
+#
+# Sinn dieser Datei: der Supply-Chain-Workflow soll GRUEN starten. Ein Scanner,
+# der wegen Altlasten dauerhaft rot steht, wird nach zwei Wochen ignoriert --
+# und genau dann uebersieht man den einen Fund, auf den es ankommt.
+#
+# Jeder Eintrag hat ein ignoreUntil. Danach schlaegt der Scan wieder an, der
+# Fund kommt also automatisch zurueck auf den Tisch statt still zu verschwinden.
+# Neue Funde sind von dieser Datei nicht betroffen und brechen den Workflow
+# sofort.
+
+[[IgnoredVulns]]
+id = "GHSA-rgw5-rvv9-x895"
+ignoreUntil = 2026-09-03
+reason = """
+brace-expansion: DoS durch unbegrenzte Zwischenarrays. Transitiv ueber eslint,
+also reines Entwicklungswerkzeug; im Produktions-Image nicht enthalten.
+"""
+
+[[IgnoredVulns]]
+id = "GHSA-mh99-v99m-4gvg"
+ignoreUntil = 2026-09-03
+reason = """
+brace-expansion: DoS durch unbegrenzte Expansionslaenge. Gleicher Pfad und
+gleiche Bewertung wie GHSA-rgw5-rvv9-x895.
+"""
+
+[[IgnoredVulns]]
+id = "GHSA-52cp-r559-cp3m"
+ignoreUntil = 2026-09-03
+reason = """
+js-yaml: quadratische CPU-Last durch YAML-Merge-Key-Ketten. Nur im Build- und
+Test-Werkzeug, verarbeitet keine fremden YAML-Dokumente zur Laufzeit.
+"""
+
+[[IgnoredVulns]]
+id = "GHSA-fxqj-rqcc-2cmp"
+ignoreUntil = 2026-09-03
+reason = """
+PostCSS: unvollstaendiger Fix von GHSA-6g55-p6wh-862q. Laeuft ausschliesslich
+zur Build-Zeit ueber projekteigenes CSS.
+"""
+
+[[IgnoredVulns]]
+# Fuehrende Kennung dieser Schwachstelle; PYSEC-2026-3552 ist ein Alias und
+# wird vom Scanner darueber mit abgedeckt (ein eigener Eintrag dafuer wird als
+# "unused ignore" gemeldet).
+id = "GHSA-g6cj-pr64-35w5"
+ignoreUntil = 2026-08-18
+reason = """
+cryptography 49.0.0 -> 50.0.0. ANDERE KATEGORIE als die uebrigen Eintraege
+hier: Laufzeitabhaengigkeit des Backends, nicht nur Werkzeug, und mit CVSS 8.2
+die schwerwiegendste offene Meldung. Deshalb nur zwei Wochen zurueckgestellt,
+nicht vier -- ein Major-Update von cryptography gehoert in einen eigenen PR
+mit vollem Testlauf, aber es sollte zeitnah passieren.
+"""
