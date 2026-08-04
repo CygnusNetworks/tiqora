@@ -192,7 +192,9 @@ async def test_fetch_account_imap_oauth2(monkeypatch: pytest.MonkeyPatch) -> Non
     )
     auth_calls: list[tuple[str, object]] = []
 
-    def authenticate(self: _FakeImap, mechanism: str, authobject: object) -> tuple[str, list[bytes]]:
+    def authenticate(
+        self: _FakeImap, mechanism: str, authobject: object
+    ) -> tuple[str, list[bytes]]:
         auth_calls.append((mechanism, authobject))
         # Simulate imaplib calling the handler with an empty challenge.
         if callable(authobject):

@@ -99,7 +99,16 @@ async def get_current_user(
         # cookie — accepting them as Bearer let password-only compat tokens
         # authenticate the full /api/v1 surface (SECURITY_REVIEW_FABLE H-1).
         if raw.startswith("tiqora_"):
-            resolved = await auth.resolve_api_key(raw)
+            from tiqora.domain.auth import ApiKeyRateLimited
+
+            try:
+                resolved = await auth.resolve_api_key(raw)
+            except ApiKeyRateLimited as exc:
+                raise HTTPException(
+                    status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                    detail="API key rate limit exceeded",
+                    headers={"Retry-After": str(exc.retry_after)},
+                ) from exc
 
     # Discard the read-only transaction the auth lookups opened on the shared
     # request session so downstream endpoints start with a clean session.

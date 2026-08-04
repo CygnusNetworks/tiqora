@@ -65,11 +65,17 @@ missing trailing slash in a way that breaks concurrent MCP session setup;
 see the reverse-proxy notes in
 [`../deploy/docker-compose.md`](../deploy/docker-compose.md).)
 
-## Tools (25)
+## Tools (~31)
 
 MCP deliberately does **not** mirror admin/portal/calendar/BPM/stats/GDPR —
 those stay on REST. Source of truth: `@mcp.tool` handlers in
-`tiqora.mcp_server.server`.
+`tiqora.mcp_server.server`. Mutations go through `TicketWriteService` (same
+permission gates and, for agent email replies, SMTP outbound as REST).
+
+Optional **tool allowlist** on the API key: scopes may include
+`tool:ticket_search`, `tool:ticket_reply`, … — if any `tool:…` tokens are set,
+only those tools may run. Rate limit: `TIQORA_API_KEY_RATE_LIMIT_*` (default
+120 req / 60s per key).
 
 ### Ticket read
 
@@ -78,13 +84,14 @@ those stay on REST. Source of truth: `@mcp.tool` handlers in
 | `ticket_search` | Search tickets (Meilisearch-backed, DB fallback) by free text and/or filters: `queue_ids`, `state_type`, `customer_user_id`, `limit` (max 100). Returns permission-filtered ticket summaries. |
 | `ticket_get` | Full ticket detail as Markdown: fields, articles (plaintext), dynamic field values. `ticket_id` (required), `include_internal_notes` (default `true`). |
 | `ticket_get_by_number` | Same Markdown payload as `ticket_get`, resolved by Znuny ticket number (`tn`). |
+| `ticket_history` | Recent history rows (`type`, `name`, `create_time`). |
 
 ### Ticket write
 
 | Tool | Purpose |
 |---|---|
 | `ticket_create` | Create a new ticket. Returns `TicketID` and `TicketNumber`. |
-| `ticket_reply` | Post a customer-visible reply article. |
+| `ticket_reply` | Post a customer-visible reply article (**agent email channel sends SMTP**, REST parity). |
 | `ticket_note` | Post an internal (agent-only, not customer-visible) note article. |
 | `ticket_update_state` | Change ticket state by state ID. |
 | `ticket_update_queue` | Move ticket to a different queue by queue ID. |
@@ -93,7 +100,10 @@ those stay on REST. Source of truth: `@mcp.tool` handlers in
 | `ticket_set_title` | Change ticket title. |
 | `ticket_set_customer` | Set `customer_user_id` / optional `customer_id`. |
 | `ticket_set_dynamic_field` | Set a dynamic field by name (error if field does not exist). |
+| `ticket_set_type` / `ticket_set_service` / `ticket_set_sla` | Type / service / SLA (Znuny history formats). |
 | `ticket_lock` / `ticket_unlock` | Lock or unlock a ticket. |
+| `ticket_merge` | Merge two tickets. |
+| `ticket_link` | Link two tickets (default type `Normal`). |
 
 ### Reference / discovery
 

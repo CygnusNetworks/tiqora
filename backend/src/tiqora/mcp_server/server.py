@@ -48,7 +48,7 @@ from __future__ import annotations
 
 import hashlib
 from collections.abc import AsyncIterator
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, suppress
 from contextvars import ContextVar
 from datetime import datetime
 from typing import Any
@@ -75,24 +75,9 @@ from tiqora.domain.ticket_write_service import (
     TicketAccessDenied,
     TicketIn,
     TicketNotFound,
+    TicketWriteService,
     _queue_name,  # noqa: PLC2701 -- deliberate reuse, see _assert_queue_permission
     _ticket_must_exist,  # noqa: PLC2701 -- deliberate reuse, see _assert_queue_permission
-    add_article,
-    assign_owner,
-    change_priority,
-    change_service,
-    change_sla,
-    change_state,
-    change_title,
-    change_type,
-    create_ticket,
-    link_tickets,
-    lock_ticket,
-    merge_tickets,
-    move_queue,
-    set_customer,
-    unlock_ticket,
-    update_dynamic_field,
 )
 from tiqora.kb.schemas import ArticleIn as KbArticleIn
 from tiqora.kb.schemas import ArticleUpdateIn as KbArticleUpdateIn
@@ -131,8 +116,24 @@ class McpState:
         self.session_factory: async_sessionmaker[AsyncSession] = async_sessionmaker(
             self.engine, expire_on_commit=False
         )
+        self._redis: Any | None = None
+
+    async def redis(self) -> Any | None:
+        """Lazy Redis client for API-key rate limiting (optional)."""
+        if self._redis is not None:
+            return self._redis
+        try:
+            import redis.asyncio as redis_async
+
+            self._redis = redis_async.from_url(self.settings.redis_url)
+            return self._redis
+        except Exception:  # noqa: BLE001
+            return None
 
     async def aclose(self) -> None:
+        if self._redis is not None:
+            with suppress(Exception):
+                await self._redis.aclose()
         await self.engine.dispose()
 
     def sysconfig(self) -> SysConfig:
@@ -173,8 +174,14 @@ class TiqoraBearerAuth(BaseHTTPMiddleware):
         resolved = await _resolve_api_key(state.session_factory, raw_key)
         if resolved is None:
             return JSONResponse({"error": "Unauthorized"}, status_code=401)
+        if resolved == "rate_limited":
+            return JSONResponse(
+                {"error": "API key rate limit exceeded"},
+                status_code=429,
+                headers={"Retry-After": "60"},
+            )
 
-        user_id, scopes = resolved
+        user_id, scopes = resolved  # type: ignore[misc]
         # Scoped keys need mcp:ro/mcp:rw (or legacy mcp/write/*).
         from tiqora.domain.api_key_scopes import mcp_scopes_allow_connect
 
@@ -199,12 +206,14 @@ def _parse_api_key_scopes(raw: str | None) -> frozenset[str] | None:
 
 async def _resolve_api_key(
     factory: async_sessionmaker[AsyncSession], raw_key: str
-) -> tuple[int, frozenset[str] | None] | None:
+) -> tuple[int, frozenset[str] | None] | None | str:
     """Resolve tiqora_api_key to (user_id, scopes) via SHA-256 hash lookup.
 
     Parity with ``domain.auth.AuthService.resolve_api_key``: reject expired keys
     and stamp ``last_used_at`` (non-fatal if the metadata write fails).
     ``scopes`` is None when the key is unrestricted (legacy / empty column).
+
+    Returns the string ``"rate_limited"`` when the per-key throttle fires.
     """
     key_hash = hashlib.sha256(raw_key.encode("utf-8")).hexdigest()
     async with factory() as session:
@@ -221,6 +230,18 @@ async def _resolve_api_key(
         now = _utcnow()
         if row.expires_at is not None and row.expires_at <= now:
             return None
+        # Optional Redis throttle — soft-fail open if Redis is unavailable.
+        try:
+            from tiqora.security.ratelimit import ApiKeyRateLimiter
+
+            st = _mcp_state
+            if st is not None:
+                r = await st.redis()
+                decision = await ApiKeyRateLimiter(r, st.settings).check_and_incr(int(row.id))
+                if not decision.allowed:
+                    return "rate_limited"
+        except Exception:  # noqa: BLE001 — fail open
+            pass
         user = (
             await session.execute(select(Users).where(Users.id == row.user_id, Users.valid_id == 1))
         ).scalar_one_or_none()
@@ -273,27 +294,26 @@ def _assert_mcp_write_scope() -> None:
         raise TicketAccessDenied("API key lacks mcp:rw scope")
 
 
+def _write_service(session: AsyncSession, state: McpState) -> TicketWriteService:
+    """Permission-aware write path shared with REST (includes SMTP for email replies)."""
+    return TicketWriteService(
+        session,
+        state.session_factory,
+        state.sysconfig(),
+        mail_sender=None,
+    )
+
+
 async def _assert_queue_permission(
     session: AsyncSession, *, ticket_id: int, user_id: int, key: str
 ) -> None:
     """Raise ``TicketNotFound``/``TicketAccessDenied`` unless *user_id* holds
     *key* on *ticket_id*'s queue.
 
-    These MCP ticket-mutation tools call the raw ``ticket_write_service``
-    module functions directly rather than through the ``TicketWriteService``
-    class (whose methods run this same check internally via
-    ``self._assert``/``self._assert_rw``) — see API_GAPS.md §0 for the full
-    writeup of why, and the follow-up needed to fold this into a proper
-    ``TicketWriteService`` migration. This is the minimal permission gate so
-    these tools can't mutate a ticket in a queue the caller has no rights
-    on, without touching the raw functions themselves (in particular,
-    without routing ``ticket_reply``/``ticket_note`` through
-    ``TicketWriteService.add_article``, which would additionally trigger a
-    real outbound SMTP send for agent email replies — a behaviour change
-    that needs its own product decision, not a silent side effect of a
-    permission fix).
+    Used for tools that still need an explicit pre-check (e.g. history ``ro``,
+    merge/link dual-ticket). Mutations that go through :class:`TicketWriteService`
+    enforce the same gates inside the service class.
     """
-    # mcp:rw is also enforced inside _assert_raw_queue_permission.
     t = await _ticket_must_exist(session, ticket_id)
     await _assert_raw_queue_permission(
         session, queue_id=int(t["queue_id"]), user_id=user_id, key=key
@@ -318,6 +338,18 @@ async def _assert_raw_queue_permission(
     pe = PermissionEngine(session)
     if not await pe.check(user_id, queue_id, key):
         raise TicketAccessDenied(f"user {user_id} lacks {key!r} on queue {queue_id}")
+
+
+def _assert_tool_allowed(tool_name: str) -> None:
+    """When scopes include any ``tool:…`` token, only those tools may run."""
+    scopes = _current_api_key_scopes.get()
+    if scopes is None or "*" in scopes:
+        return
+    tool_tokens = {s[5:] for s in scopes if s.startswith("tool:")}
+    if not tool_tokens:
+        return
+    if tool_name not in tool_tokens:
+        raise TicketAccessDenied(f"API key tool allowlist excludes {tool_name!r}")
 
 
 # ---------------------------------------------------------------------------
@@ -776,6 +808,7 @@ async def ticket_create(
     """
     user_id = _get_user_id(ctx)
     state = _get_state()
+    _assert_tool_allowed("ticket_create")
 
     article: ArticleIn | None = None
     if body:
@@ -799,15 +832,11 @@ async def ticket_create(
     )
 
     async with state.session_factory() as session:
-        sysconfig = state.sysconfig()
         try:
             async with session.begin():
-                await _assert_raw_queue_permission(
-                    session, queue_id=queue_id, user_id=user_id, key="create"
-                )
-                ticket_id = await create_ticket(
-                    session, state.session_factory, sysconfig, params=ticket_in, user_id=user_id
-                )
+                _assert_mcp_write_scope()
+                svc = _write_service(session, state)
+                ticket_id = await svc.create_ticket(user_id, ticket_in)
             tn = (
                 await session.execute(
                     text("SELECT tn FROM ticket WHERE id = :tid LIMIT 1"), {"tid": ticket_id}
@@ -847,14 +876,13 @@ async def ticket_reply(
     """
     user_id = _get_user_id(ctx)
     state = _get_state()
+    _assert_tool_allowed("ticket_reply")
 
     async with state.session_factory() as session:
-        sysconfig = state.sysconfig()
         try:
             async with session.begin():
-                await _assert_queue_permission(
-                    session, ticket_id=ticket_id, user_id=user_id, key="note"
-                )
+                _assert_mcp_write_scope()
+                svc = _write_service(session, state)
                 article_in = ArticleIn(
                     sender_type="agent",
                     is_visible_for_customer=is_visible_for_customer,
@@ -862,13 +890,9 @@ async def ticket_reply(
                     body=body,
                     channel=channel,
                 )
-                article_id = await add_article(
-                    session,
-                    ticket_id=ticket_id,
-                    article=article_in,
-                    user_id=user_id,
-                    sysconfig=sysconfig,
-                )
+                # TicketWriteService.add_article: agent email channel triggers SMTP
+                # (REST parity — intentional product behaviour for MCP replies).
+                article_id = await svc.add_article(user_id, ticket_id, article_in)
             return {"article_id": article_id, "ticket_id": ticket_id}
         except TicketNotFound:
             return {"error": f"Ticket #{ticket_id} not found"}
@@ -903,14 +927,13 @@ async def ticket_note(
     """
     user_id = _get_user_id(ctx)
     state = _get_state()
+    _assert_tool_allowed("ticket_note")
 
     async with state.session_factory() as session:
-        sysconfig = state.sysconfig()
         try:
             async with session.begin():
-                await _assert_queue_permission(
-                    session, ticket_id=ticket_id, user_id=user_id, key="note"
-                )
+                _assert_mcp_write_scope()
+                svc = _write_service(session, state)
                 article_in = ArticleIn(
                     sender_type="agent",
                     is_visible_for_customer=is_visible_for_customer,
@@ -918,13 +941,7 @@ async def ticket_note(
                     body=body,
                     channel="note",
                 )
-                article_id = await add_article(
-                    session,
-                    ticket_id=ticket_id,
-                    article=article_in,
-                    user_id=user_id,
-                    sysconfig=sysconfig,
-                )
+                article_id = await svc.add_article(user_id, ticket_id, article_in)
             return {"article_id": article_id, "ticket_id": ticket_id}
         except (TicketNotFound, TicketAccessDenied, InvalidInput) as e:
             return {"error": str(e)}
@@ -949,21 +966,14 @@ async def ticket_update_state(
     """
     user_id = _get_user_id(ctx)
     state = _get_state()
+    _assert_tool_allowed("ticket_update_state")
 
     async with state.session_factory() as session:
-        sysconfig = state.sysconfig()
         try:
             async with session.begin():
-                await _assert_queue_permission(
-                    session, ticket_id=ticket_id, user_id=user_id, key="rw"
-                )
-                await change_state(
-                    session,
-                    ticket_id=ticket_id,
-                    new_state_id=state_id,
-                    user_id=user_id,
-                    sysconfig=sysconfig,
-                )
+                _assert_mcp_write_scope()
+                svc = _write_service(session, state)
+                await svc.change_state(user_id, ticket_id, state_id)
             return {"ok": True, "ticket_id": ticket_id, "state_id": state_id}
         except (TicketNotFound, TicketAccessDenied, InvalidInput) as e:
             return {"error": str(e)}
@@ -988,28 +998,14 @@ async def ticket_update_queue(
     """
     user_id = _get_user_id(ctx)
     state = _get_state()
+    _assert_tool_allowed("ticket_update_queue")
 
     async with state.session_factory() as session:
-        sysconfig = state.sysconfig()
         try:
             async with session.begin():
-                # Znuny: moving requires 'move_into' on the SOURCE queue and on
-                # the DESTINATION queue (Znuny builds the move-target list from
-                # the queues the agent holds 'move_into' on) — otherwise an
-                # agent could push tickets into queues they have no rights on.
-                await _assert_queue_permission(
-                    session, ticket_id=ticket_id, user_id=user_id, key="move_into"
-                )
-                await _assert_raw_queue_permission(
-                    session, queue_id=queue_id, user_id=user_id, key="move_into"
-                )
-                await move_queue(
-                    session,
-                    ticket_id=ticket_id,
-                    new_queue_id=queue_id,
-                    user_id=user_id,
-                    sysconfig=sysconfig,
-                )
+                _assert_mcp_write_scope()
+                svc = _write_service(session, state)
+                await svc.move_queue(user_id, ticket_id, queue_id)
             return {"ok": True, "ticket_id": ticket_id, "queue_id": queue_id}
         except (TicketNotFound, TicketAccessDenied, InvalidInput) as e:
             return {"error": str(e)}
@@ -1034,21 +1030,14 @@ async def ticket_update_priority(
     """
     user_id = _get_user_id(ctx)
     state = _get_state()
+    _assert_tool_allowed("ticket_update_priority")
 
     async with state.session_factory() as session:
-        sysconfig = state.sysconfig()
         try:
             async with session.begin():
-                await _assert_queue_permission(
-                    session, ticket_id=ticket_id, user_id=user_id, key="priority"
-                )
-                await change_priority(
-                    session,
-                    ticket_id=ticket_id,
-                    new_priority_id=priority_id,
-                    user_id=user_id,
-                    sysconfig=sysconfig,
-                )
+                _assert_mcp_write_scope()
+                svc = _write_service(session, state)
+                await svc.change_priority(user_id, ticket_id, priority_id)
             return {"ok": True, "ticket_id": ticket_id, "priority_id": priority_id}
         except (TicketNotFound, TicketAccessDenied, InvalidInput) as e:
             return {"error": str(e)}
@@ -1075,22 +1064,14 @@ async def ticket_update_owner(
     """
     user_id = _get_user_id(ctx)
     state = _get_state()
+    _assert_tool_allowed("ticket_update_owner")
 
     async with state.session_factory() as session:
-        sysconfig = state.sysconfig()
         try:
             async with session.begin():
-                await _assert_queue_permission(
-                    session, ticket_id=ticket_id, user_id=user_id, key="owner"
-                )
-                await assign_owner(
-                    session,
-                    ticket_id=ticket_id,
-                    new_owner_id=owner_id,
-                    user_id=user_id,
-                    sysconfig=sysconfig,
-                    lock=lock,
-                )
+                _assert_mcp_write_scope()
+                svc = _write_service(session, state)
+                await svc.assign_owner(user_id, ticket_id, owner_id, lock=lock)
             return {"ok": True, "ticket_id": ticket_id, "owner_id": owner_id}
         except (TicketNotFound, TicketAccessDenied, InvalidInput) as e:
             return {"error": str(e)}
@@ -1115,14 +1096,14 @@ async def ticket_set_title(
     """
     user_id = _get_user_id(ctx)
     state = _get_state()
+    _assert_tool_allowed("ticket_set_title")
 
     async with state.session_factory() as session:
         try:
             async with session.begin():
-                await _assert_queue_permission(
-                    session, ticket_id=ticket_id, user_id=user_id, key="rw"
-                )
-                await change_title(session, ticket_id=ticket_id, new_title=title, user_id=user_id)
+                _assert_mcp_write_scope()
+                svc = _write_service(session, state)
+                await svc.change_title(user_id, ticket_id, title)
             return {"ok": True, "ticket_id": ticket_id, "title": title[:255]}
         except (TicketNotFound, TicketAccessDenied, InvalidInput) as e:
             return {"error": str(e)}
@@ -1144,19 +1125,18 @@ async def ticket_set_customer(
     """
     user_id = _get_user_id(ctx)
     state = _get_state()
+    _assert_tool_allowed("ticket_set_customer")
 
     async with state.session_factory() as session:
         try:
             async with session.begin():
-                await _assert_queue_permission(
-                    session, ticket_id=ticket_id, user_id=user_id, key="rw"
-                )
-                await set_customer(
-                    session,
-                    ticket_id=ticket_id,
+                _assert_mcp_write_scope()
+                svc = _write_service(session, state)
+                await svc.set_customer(
+                    user_id,
+                    ticket_id,
                     customer_id=customer_id,
                     customer_user_id=customer_user_id,
-                    user_id=user_id,
                 )
             return {
                 "ok": True,
@@ -1189,14 +1169,13 @@ async def ticket_set_dynamic_field(
     """
     user_id = _get_user_id(ctx)
     state = _get_state()
+    _assert_tool_allowed("ticket_set_dynamic_field")
     values: list[str] = [] if value is None else [value]
 
     async with state.session_factory() as session:
         try:
             async with session.begin():
-                await _assert_queue_permission(
-                    session, ticket_id=ticket_id, user_id=user_id, key="rw"
-                )
+                _assert_mcp_write_scope()
                 field_id = (
                     await session.execute(
                         text(
@@ -1208,12 +1187,9 @@ async def ticket_set_dynamic_field(
                 ).scalar_one_or_none()
                 if field_id is None:
                     raise InvalidInput(f"Dynamic field {field_name!r} not found")
-                await update_dynamic_field(
-                    session,
-                    ticket_id=ticket_id,
-                    field_name=field_name,
-                    values=values,
-                    user_id=user_id,
+                svc = _write_service(session, state)
+                await svc.update_dynamic_field(
+                    user_id, ticket_id, field_name=field_name, values=values
                 )
             return {
                 "ok": True,
@@ -1242,17 +1218,14 @@ async def ticket_lock(
     """
     user_id = _get_user_id(ctx)
     state = _get_state()
+    _assert_tool_allowed("ticket_lock")
 
     async with state.session_factory() as session:
-        sysconfig = state.sysconfig()
         try:
             async with session.begin():
-                await _assert_queue_permission(
-                    session, ticket_id=ticket_id, user_id=user_id, key="rw"
-                )
-                await lock_ticket(
-                    session, ticket_id=ticket_id, user_id=user_id, sysconfig=sysconfig
-                )
+                _assert_mcp_write_scope()
+                svc = _write_service(session, state)
+                await svc.lock_ticket(user_id, ticket_id)
             return {"ok": True, "ticket_id": ticket_id, "lock": "lock"}
         except (TicketNotFound, TicketAccessDenied, InvalidInput) as e:
             return {"error": str(e)}
@@ -1270,17 +1243,14 @@ async def ticket_unlock(
     """
     user_id = _get_user_id(ctx)
     state = _get_state()
+    _assert_tool_allowed("ticket_unlock")
 
     async with state.session_factory() as session:
-        sysconfig = state.sysconfig()
         try:
             async with session.begin():
-                await _assert_queue_permission(
-                    session, ticket_id=ticket_id, user_id=user_id, key="rw"
-                )
-                await unlock_ticket(
-                    session, ticket_id=ticket_id, user_id=user_id, sysconfig=sysconfig
-                )
+                _assert_mcp_write_scope()
+                svc = _write_service(session, state)
+                await svc.unlock_ticket(user_id, ticket_id)
             return {"ok": True, "ticket_id": ticket_id, "lock": "unlock"}
         except (TicketNotFound, TicketAccessDenied, InvalidInput) as e:
             return {"error": str(e)}
@@ -1665,20 +1635,13 @@ async def kb_publish_article(
 async def ticket_set_type(ctx: Context, ticket_id: int, type_id: int) -> dict[str, Any]:
     user_id = _get_user_id(ctx)
     state = _get_state()
+    _assert_tool_allowed("ticket_set_type")
     async with state.session_factory() as session:
-        sysconfig = state.sysconfig()
         try:
             async with session.begin():
-                await _assert_queue_permission(
-                    session, ticket_id=ticket_id, user_id=user_id, key="rw"
-                )
-                await change_type(
-                    session,
-                    ticket_id=ticket_id,
-                    new_type_id=type_id,
-                    user_id=user_id,
-                    sysconfig=sysconfig,
-                )
+                _assert_mcp_write_scope()
+                svc = _write_service(session, state)
+                await svc.change_type(user_id, ticket_id, type_id)
             return {"ok": True, "ticket_id": ticket_id, "type_id": type_id}
         except (TicketNotFound, TicketAccessDenied, InvalidInput) as e:
             return {"error": str(e)}
@@ -1690,19 +1653,14 @@ async def ticket_set_service(
 ) -> dict[str, Any]:
     user_id = _get_user_id(ctx)
     state = _get_state()
+    _assert_tool_allowed("ticket_set_service")
     async with state.session_factory() as session:
-        sysconfig = state.sysconfig()
         try:
             async with session.begin():
-                await _assert_queue_permission(
-                    session, ticket_id=ticket_id, user_id=user_id, key="rw"
-                )
-                await change_service(
-                    session,
-                    ticket_id=ticket_id,
-                    new_service_id=service_id if service_id else None,
-                    user_id=user_id,
-                    sysconfig=sysconfig,
+                _assert_mcp_write_scope()
+                svc = _write_service(session, state)
+                await svc.change_service(
+                    user_id, ticket_id, service_id if service_id else None
                 )
             return {"ok": True, "ticket_id": ticket_id, "service_id": service_id}
         except (TicketNotFound, TicketAccessDenied, InvalidInput) as e:
@@ -1715,31 +1673,29 @@ async def ticket_set_sla(
 ) -> dict[str, Any]:
     user_id = _get_user_id(ctx)
     state = _get_state()
+    _assert_tool_allowed("ticket_set_sla")
     async with state.session_factory() as session:
-        sysconfig = state.sysconfig()
         try:
             async with session.begin():
-                await _assert_queue_permission(
-                    session, ticket_id=ticket_id, user_id=user_id, key="rw"
-                )
-                await change_sla(
-                    session,
-                    ticket_id=ticket_id,
-                    new_sla_id=sla_id if sla_id else None,
-                    user_id=user_id,
-                    sysconfig=sysconfig,
-                )
+                _assert_mcp_write_scope()
+                svc = _write_service(session, state)
+                await svc.change_sla(user_id, ticket_id, sla_id if sla_id else None)
             return {"ok": True, "ticket_id": ticket_id, "sla_id": sla_id}
         except (TicketNotFound, TicketAccessDenied, InvalidInput) as e:
             return {"error": str(e)}
 
 
-@mcp.tool(description="Return recent ticket history entries as a list of {type, name, create_time}.")
+@mcp.tool(
+    description=(
+        "Return recent ticket history entries as a list of {type, name, create_time}."
+    )
+)
 async def ticket_history(
     ctx: Context, ticket_id: int, limit: int = 30
 ) -> dict[str, Any] | list[dict[str, Any]]:
     user_id = _get_user_id(ctx)
     state = _get_state()
+    _assert_tool_allowed("ticket_history")
     async with state.session_factory() as session:
         try:
             await _assert_queue_permission(session, ticket_id=ticket_id, user_id=user_id, key="ro")
@@ -1773,23 +1729,13 @@ async def ticket_merge(
 ) -> dict[str, Any]:
     user_id = _get_user_id(ctx)
     state = _get_state()
+    _assert_tool_allowed("ticket_merge")
     async with state.session_factory() as session:
-        sysconfig = state.sysconfig()
         try:
             async with session.begin():
-                await _assert_queue_permission(
-                    session, ticket_id=main_ticket_id, user_id=user_id, key="rw"
-                )
-                await _assert_queue_permission(
-                    session, ticket_id=merge_ticket_id, user_id=user_id, key="rw"
-                )
-                await merge_tickets(
-                    session,
-                    main_ticket_id=main_ticket_id,
-                    merge_ticket_id=merge_ticket_id,
-                    user_id=user_id,
-                    sysconfig=sysconfig,
-                )
+                _assert_mcp_write_scope()
+                svc = _write_service(session, state)
+                await svc.merge_tickets(user_id, main_ticket_id, merge_ticket_id)
             return {
                 "ok": True,
                 "main_ticket_id": main_ticket_id,
@@ -1808,22 +1754,13 @@ async def ticket_link(
 ) -> dict[str, Any]:
     user_id = _get_user_id(ctx)
     state = _get_state()
+    _assert_tool_allowed("ticket_link")
     async with state.session_factory() as session:
         try:
             async with session.begin():
-                await _assert_queue_permission(
-                    session, ticket_id=ticket_id, user_id=user_id, key="rw"
-                )
-                await _assert_queue_permission(
-                    session, ticket_id=target_ticket_id, user_id=user_id, key="rw"
-                )
-                await link_tickets(
-                    session,
-                    source_ticket_id=ticket_id,
-                    target_ticket_id=target_ticket_id,
-                    link_type=link_type,
-                    user_id=user_id,
-                )
+                _assert_mcp_write_scope()
+                svc = _write_service(session, state)
+                await svc.link_tickets(user_id, ticket_id, target_ticket_id, link_type=link_type)
             return {
                 "ok": True,
                 "ticket_id": ticket_id,
