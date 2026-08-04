@@ -2419,29 +2419,35 @@ export class ApiClient {
     return this.adminGdpr.backupDownloadUrl(id);
   }
 
-  // Read-only reference lists for admin pickers (queue editor FKs, etc.).
-  listSystemAddresses(signal?: AbortSignal) {
-    return this.request<SystemAddressOut[]>("GET", "/api/v1/admin/system-addresses", {
+  /** Paginated admin CRUD (valid filter, edit/reactivate). */
+  get adminSystemAddresses() {
+    return this.adminCrud<SystemAddressOut, SystemAddressCreate, SystemAddressUpdate>(
+      "/api/v1/admin/system-addresses",
+    );
+  }
+
+  /**
+   * Valid system addresses for pickers (queues / auto-responses).
+   * Thin wrapper over the paginated list — only ``valid_id = 1`` rows.
+   */
+  async listSystemAddresses(signal?: AbortSignal) {
+    const page = await this.adminSystemAddresses.list(
+      { valid: "valid", pageSize: 500 },
       signal,
-    });
+    );
+    return page.items;
   }
 
   createSystemAddress(body: SystemAddressCreate, signal?: AbortSignal) {
-    return this.request<SystemAddressOut>("POST", "/api/v1/admin/system-addresses", {
-      body,
-      signal,
-    });
+    return this.adminSystemAddresses.create(body, signal);
   }
 
   updateSystemAddress(id: number, body: SystemAddressUpdate, signal?: AbortSignal) {
-    return this.request<SystemAddressOut>("PATCH", `/api/v1/admin/system-addresses/${id}`, {
-      body,
-      signal,
-    });
+    return this.adminSystemAddresses.update(id, body, signal);
   }
 
   deleteSystemAddress(id: number, signal?: AbortSignal) {
-    return this.request<void>("DELETE", `/api/v1/admin/system-addresses/${id}`, { signal });
+    return this.adminSystemAddresses.deactivate(id, signal);
   }
 
   listNotificationEvents(signal?: AbortSignal) {

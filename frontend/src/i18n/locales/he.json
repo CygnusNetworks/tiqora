@@ -1177,6 +1177,10 @@
         "filters": "בוררים נוספים מצמצמים את מערך הלקוחות עוד יותר - כל מסנן שנוסף מסומן עם כניסות/חברות למעלה ואחד עם השני.",
         "negate": "החלף בין \"התאמות\" (לקוחות שבהם הדפוס תואם) לבין \"לא תואם\" (≠, לקוחות שבהם היא לא תואמת).",
         "validId": "\"Temp\" (valid_id 3) הוא מצב התוקף השלישי של Znuny - בדרך כלל חשבון הממתין לאישור (למשל, רישום עצמי לא מאושר), להבדיל מתקף/לא חוקי רגיל."
+      },
+      "systemAddresses": {
+        "email": "Address used as the From email for queues and auto-responses.",
+        "name": "Display name shown next to the email (e.g. “Support <support@example.com>”)."
       }
     },
     "nav": {
@@ -2253,6 +2257,13 @@
       "working": "עובד…",
       "authorizeOpened": "דף ההרשאה נפתח בכרטיסייה חדשה.",
       "refreshSuccess": "טוקן רענן."
+    },
+    "systemAddresses": {
+      "title_plural": "System addresses",
+      "subtitle": "From-addresses for queues and auto-responses. Invalid addresses stay listed so they can be re-enabled.",
+      "new": "Add address",
+      "email": "Email",
+      "name": "Name"
     }
   },
   "kb": {

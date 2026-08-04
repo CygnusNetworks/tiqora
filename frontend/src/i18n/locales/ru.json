@@ -1177,6 +1177,10 @@
         "filters": "Дополнительные селекторы еще больше сужают набор клиентов — каждый добавленный фильтр объединяется с логинами/компаниями, указанными выше, и друг с другом.",
         "negate": "Переключайтесь между «совпадениями» (клиенты, у которых шаблон соответствует) и «не совпадениями» (≠ клиенты, которым НЕ соответствует).",
         "validId": "«Temp» (valid_id 3) — это третье состояние достоверности Znuny — обычно учетная запись ожидает подтверждения (например, неподтвержденная самостоятельная регистрация), в отличие от простого действия «действителен/недействителен»."
+      },
+      "systemAddresses": {
+        "email": "Address used as the From email for queues and auto-responses.",
+        "name": "Display name shown next to the email (e.g. “Support <support@example.com>”)."
       }
     },
     "nav": {
@@ -2253,6 +2257,13 @@
       "working": "Работаю…",
       "authorizeOpened": "Страница авторизации открылась в новой вкладке.",
       "refreshSuccess": "Токен обновлен."
+    },
+    "systemAddresses": {
+      "title_plural": "System addresses",
+      "subtitle": "From-addresses for queues and auto-responses. Invalid addresses stay listed so they can be re-enabled.",
+      "new": "Add address",
+      "email": "Email",
+      "name": "Name"
     }
   },
   "kb": {

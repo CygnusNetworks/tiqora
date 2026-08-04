@@ -1177,6 +1177,10 @@
         "filters": "تقوم المحددات الإضافية بتضييق نطاق مجموعة العملاء بشكل أكبر - يتم إضافة كل مرشح مضاف مع عمليات تسجيل الدخول/الشركات المذكورة أعلاه ومع بعضها البعض.",
         "negate": "قم بالتبديل بين \"التطابقات\" (العملاء الذين يتطابق معهم النمط) و\"التطابقات غير\" (≠، العملاء الذين لا يتطابقون معهم).",
         "validId": "\"Temp\" (valid_id 3) هي حالة الصلاحية الثالثة لـ Znuny - عادةً حساب في انتظار التأكيد (على سبيل المثال، تسجيل ذاتي غير مؤكد)، يختلف عن الصالح/غير الصالح العادي."
+      },
+      "systemAddresses": {
+        "email": "Address used as the From email for queues and auto-responses.",
+        "name": "Display name shown next to the email (e.g. “Support <support@example.com>”)."
       }
     },
     "nav": {
@@ -2253,6 +2257,13 @@
       "working": "العمل…",
       "authorizeOpened": "تم فتح صفحة التفويض في علامة تبويب جديدة.",
       "refreshSuccess": "تم تحديث الرمز المميز."
+    },
+    "systemAddresses": {
+      "title_plural": "System addresses",
+      "subtitle": "From-addresses for queues and auto-responses. Invalid addresses stay listed so they can be re-enabled.",
+      "new": "Add address",
+      "email": "Email",
+      "name": "Name"
     }
   },
   "kb": {

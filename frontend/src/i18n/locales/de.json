@@ -1234,6 +1234,10 @@
         "filters": "Zusätzliche Selektoren grenzen die Kundenmenge weiter ein — jeder hinzugefügte Filter wird UND-verknüpft mit Logins/Firmen oben und mit den übrigen Filtern.",
         "negate": "Umschalten zwischen „entspricht“ (Kunden, auf die das Muster zutrifft) und „entspricht nicht“ (≠, Kunden, auf die es NICHT zutrifft).",
         "validId": "„Temp“ (valid_id 3) ist Znunys dritter Gültigkeitsstatus — typischerweise ein Konto, das auf Bestätigung wartet (z. B. unbestätigte Selbstregistrierung), unterscheidet sich von schlicht gültig/ungültig."
+      },
+      "systemAddresses": {
+        "email": "Adresse, die als From-Adresse für Queues und Auto-Antworten genutzt wird.",
+        "name": "Anzeigename neben der E-Mail (z. B. „Support <support@example.com>“)."
       }
     },
     "nav": {
@@ -2353,10 +2357,10 @@
     },
     "systemAddresses": {
       "title_plural": "Systemadressen",
-      "subtitle": "Absenderadressen für Queues und Auto-Antworten.",
+      "subtitle": "Absenderadressen für Queues und Auto-Antworten. Ungültige Adressen bleiben sichtbar und können wieder aktiviert werden.",
       "new": "Adresse hinzufügen",
       "email": "E-Mail",
-      "realName": "Anzeigename"
+      "name": "Name"
     },
     "notificationEvents": {
       "title_plural": "Benachrichtigungen",

@@ -1177,6 +1177,10 @@
         "filters": "Οι πρόσθετοι επιλογείς περιορίζουν περαιτέρω το σετ πελατών — κάθε φίλτρο που προστίθεται AND συμπληρώνεται με τις συνδέσεις/εταιρείες παραπάνω και μεταξύ τους.",
         "negate": "Εναλλαγή μεταξύ \"αντιστοιχιών\" (πελάτες όπου το μοτίβο ταιριάζει) και \"δεν ταιριάζει\" (≠, πελάτες όπου ΔΕΝ ταιριάζει).",
         "validId": "Το \"Temp\" (valid_id 3) είναι η τρίτη κατάσταση εγκυρότητας του Znuny — συνήθως ένας λογαριασμός που εκκρεμεί επιβεβαίωση (π.χ. μη επιβεβαιωμένη αυτοεγγραφή), διαφορετική από την απλή έγκυρη/μη έγκυρη."
+      },
+      "systemAddresses": {
+        "email": "Address used as the From email for queues and auto-responses.",
+        "name": "Display name shown next to the email (e.g. “Support <support@example.com>”)."
       }
     },
     "nav": {
@@ -2253,6 +2257,13 @@
       "working": "Εργασία…",
       "authorizeOpened": "Η σελίδα εξουσιοδότησης άνοιξε σε νέα καρτέλα.",
       "refreshSuccess": "Το διακριτικό ανανεώθηκε."
+    },
+    "systemAddresses": {
+      "title_plural": "System addresses",
+      "subtitle": "From-addresses for queues and auto-responses. Invalid addresses stay listed so they can be re-enabled.",
+      "new": "Add address",
+      "email": "Email",
+      "name": "Name"
     }
   },
   "kb": {

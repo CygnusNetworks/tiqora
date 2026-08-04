@@ -1177,6 +1177,10 @@
         "filters": "Дополнителните избирачи дополнително го стеснуваат множеството на клиенти - секој додаден филтер е И се дополнува со најавувањата/компаниите горе и едни со други.",
         "negate": "Префрлете се помеѓу „се совпаѓа“ (клиенти каде што шемата се совпаѓа) и „не се совпаѓа“ (≠, клиенти каде што НЕ се совпаѓа).",
         "validId": "„Temp“ (valid_id 3) е третата состојба на важност на Znuny - вообичаено сметка чека потврда (на пр. непотврдена саморегистрација), различна од обичната валидна/неважечка."
+      },
+      "systemAddresses": {
+        "email": "Address used as the From email for queues and auto-responses.",
+        "name": "Display name shown next to the email (e.g. “Support <support@example.com>”)."
       }
     },
     "nav": {
@@ -2253,6 +2257,13 @@
       "working": "Работи…",
       "authorizeOpened": "Страницата за авторизација е отворена во нова картичка.",
       "refreshSuccess": "Токенот е освежен."
+    },
+    "systemAddresses": {
+      "title_plural": "System addresses",
+      "subtitle": "From-addresses for queues and auto-responses. Invalid addresses stay listed so they can be re-enabled.",
+      "new": "Add address",
+      "email": "Email",
+      "name": "Name"
     }
   },
   "kb": {

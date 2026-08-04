@@ -1177,6 +1177,10 @@
         "filters": "ตัวเลือกเพิ่มเติมจะจำกัดการตั้งค่าของลูกค้าให้แคบลง — ทุกตัวกรองที่เพิ่มจะถูก ANDed ด้วยการเข้าสู่ระบบ/บริษัทด้านบนและร่วมกัน",
         "negate": "สลับระหว่าง \"ตรงกัน\" (ลูกค้าที่มีรูปแบบตรงกัน) และ \"ไม่ตรงกัน\" (≠ ลูกค้าที่ไม่ตรงกัน)",
         "validId": "\"Temp\" (valid_id 3) คือสถานะความถูกต้องลำดับที่สามของ Znuny — โดยทั่วไปแล้วบัญชีที่รอการยืนยัน (เช่น การลงทะเบียนด้วยตนเองที่ยังไม่ยืนยัน) แตกต่างจากสถานะที่ถูกต้อง/ไม่ถูกต้องธรรมดา"
+      },
+      "systemAddresses": {
+        "email": "Address used as the From email for queues and auto-responses.",
+        "name": "Display name shown next to the email (e.g. “Support <support@example.com>”)."
       }
     },
     "nav": {
@@ -2253,6 +2257,13 @@
       "working": "กำลังทำงาน...",
       "authorizeOpened": "หน้าการอนุญาตเปิดขึ้นในแท็บใหม่",
       "refreshSuccess": "รีเฟรชโทเค็นแล้ว"
+    },
+    "systemAddresses": {
+      "title_plural": "System addresses",
+      "subtitle": "From-addresses for queues and auto-responses. Invalid addresses stay listed so they can be re-enabled.",
+      "new": "Add address",
+      "email": "Email",
+      "name": "Name"
     }
   },
   "kb": {

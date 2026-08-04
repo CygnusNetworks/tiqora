@@ -1177,6 +1177,10 @@
         "filters": "Lisävalitsimet kaventavat asiakasjoukkoa entisestään – jokainen lisätty suodatin JA-edetaan yllä olevilla kirjautumisilla/yrityksillä ja toistensa kanssa.",
         "negate": "Vaihda \"vastaavien\" (asiakkaat, joiden malli vastaa) ja \"ei täsmää\" (≠, asiakkaat, joissa se EI täsmää) välillä.",
         "validId": "\"Temp\" (valid_id 3) on Znunyn kolmas voimassaolotila – tyypillisesti tili odottaa vahvistusta (esim. vahvistamaton itserekisteröinti), joka eroaa tavallisesta kelvollinen/virheellinen."
+      },
+      "systemAddresses": {
+        "email": "Address used as the From email for queues and auto-responses.",
+        "name": "Display name shown next to the email (e.g. “Support <support@example.com>”)."
       }
     },
     "nav": {
@@ -2253,6 +2257,13 @@
       "working": "Työskentelee…",
       "authorizeOpened": "Valtuutussivu avattiin uudelle välilehdelle.",
       "refreshSuccess": "Token päivitetty."
+    },
+    "systemAddresses": {
+      "title_plural": "System addresses",
+      "subtitle": "From-addresses for queues and auto-responses. Invalid addresses stay listed so they can be re-enabled.",
+      "new": "Add address",
+      "email": "Email",
+      "name": "Name"
     }
   },
   "kb": {
