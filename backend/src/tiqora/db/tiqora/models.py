@@ -342,9 +342,7 @@ class TiqoraMailOutbound(TiqoraBase):
     # Fernet token; empty string means no password stored.
     auth_password: Mapped[str] = mapped_column(Text, nullable=False, default="")
     # Znuny SendmailModule::OAuth2TokenConfigName — name of oauth2_token_config.
-    oauth2_token_config_name: Mapped[str] = mapped_column(
-        String(250), nullable=False, default=""
-    )
+    oauth2_token_config_name: Mapped[str] = mapped_column(String(250), nullable=False, default="")
     from_default: Mapped[str] = mapped_column(String(255), nullable=False, default="")
     timeout_seconds: Mapped[int] = mapped_column(Integer, nullable=False, default=60)
     change_time: Mapped[datetime] = mapped_column(

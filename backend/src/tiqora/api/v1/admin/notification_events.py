@@ -124,13 +124,17 @@ async def list_notification_events(
 ) -> list[NotificationEventOut]:
     _ = admin
     rows = (
-        await session.execute(
-            text(
-                "SELECT id, name, comments, valid_id, create_time, change_time"
-                " FROM notification_event ORDER BY name"
+        (
+            await session.execute(
+                text(
+                    "SELECT id, name, comments, valid_id, create_time, change_time"
+                    " FROM notification_event ORDER BY name"
+                )
             )
         )
-    ).mappings().all()
+        .mappings()
+        .all()
+    )
     return [await _to_out(session, r) for r in rows]
 
 
@@ -140,14 +144,18 @@ async def get_notification_event(
 ) -> NotificationEventOut:
     _ = admin
     row = (
-        await session.execute(
-            text(
-                "SELECT id, name, comments, valid_id, create_time, change_time"
-                " FROM notification_event WHERE id = :id"
-            ),
-            {"id": notification_id},
+        (
+            await session.execute(
+                text(
+                    "SELECT id, name, comments, valid_id, create_time, change_time"
+                    " FROM notification_event WHERE id = :id"
+                ),
+                {"id": notification_id},
+            )
         )
-    ).mappings().first()
+        .mappings()
+        .first()
+    )
     if row is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Notification not found")
     return await _to_out(session, row)
@@ -179,8 +187,7 @@ async def create_notification_event(
             (
                 await session.execute(
                     text(
-                        "SELECT id FROM notification_event"
-                        " WHERE name = :n ORDER BY id DESC LIMIT 1"
+                        "SELECT id FROM notification_event WHERE name = :n ORDER BY id DESC LIMIT 1"
                     ),
                     {"n": body.name},
                 )

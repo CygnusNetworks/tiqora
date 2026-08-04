@@ -240,9 +240,7 @@ async def upsert_mail_outbound(
     return row
 
 
-def make_oauth_token_generator(
-    session: AsyncSession, config_id: int
-) -> OAuthTokenGenerator:
+def make_oauth_token_generator(session: AsyncSession, config_id: int) -> OAuthTokenGenerator:
     """Build an aiosmtplib ``oauth_token_generator`` for *config_id*."""
 
     async def _gen() -> str:

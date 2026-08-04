@@ -90,9 +90,7 @@ async def create_sla(body: SlaCreate, admin: AdminUser, session: DbSession) -> S
 
 
 @router.patch("/{sla_id}", response_model=SlaOut)
-async def update_sla(
-    sla_id: int, body: SlaUpdate, admin: AdminUser, session: DbSession
-) -> SlaOut:
+async def update_sla(sla_id: int, body: SlaUpdate, admin: AdminUser, session: DbSession) -> SlaOut:
     row = await session.get(Sla, sla_id)
     if row is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="SLA not found")

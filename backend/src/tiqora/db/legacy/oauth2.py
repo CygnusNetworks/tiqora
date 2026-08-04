@@ -17,13 +17,16 @@ from tiqora.db.legacy.types import LegacyDateTime as DateTime
 
 
 class OAuth2TokenConfig(LegacyBase):
-    """Znuny table ``oauth2_token_config``."""
+    """Znuny table ``oauth2_token_config``.
+
+    ``dbcrud_uuid`` exists on Znuny 6.5+ only and is intentionally unmapped so
+    the same ORM works against 6.3 fixtures/installs (column absent there).
+    """
 
     __tablename__ = "oauth2_token_config"
     __table_args__ = (UniqueConstraint("name", name="oauth2_token_config_name"),)
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True, nullable=False)
-    dbcrud_uuid: Mapped[str | None] = mapped_column(String(36), nullable=True)
     name: Mapped[str] = mapped_column(String(250), nullable=False)
     # JSON blob (Znuny ContentJSON); MEDIUMTEXT on MySQL, TEXT on PG.
     config: Mapped[str] = mapped_column(Text, nullable=False)
@@ -35,13 +38,15 @@ class OAuth2TokenConfig(LegacyBase):
 
 
 class OAuth2Token(LegacyBase):
-    """Znuny table ``oauth2_token`` — one row per token config (UNIQUE)."""
+    """Znuny table ``oauth2_token`` — one row per token config (UNIQUE).
+
+    ``dbcrud_uuid`` (6.5+) is unmapped — see :class:`OAuth2TokenConfig`.
+    """
 
     __tablename__ = "oauth2_token"
     __table_args__ = (UniqueConstraint("token_config_id", name="oauth2_token_config_id"),)
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True, nullable=False)
-    dbcrud_uuid: Mapped[str | None] = mapped_column(String(36), nullable=True)
     token_config_id: Mapped[int] = mapped_column(Integer, nullable=False)
     authorization_code: Mapped[str | None] = mapped_column(Text, nullable=True)
     token: Mapped[str | None] = mapped_column(Text, nullable=True)

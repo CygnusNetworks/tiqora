@@ -71,9 +71,7 @@ async def update_system_address(
 
 
 @router.delete("/{address_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def deactivate_system_address(
-    address_id: int, admin: AdminUser, session: DbSession
-) -> None:
+async def deactivate_system_address(address_id: int, admin: AdminUser, session: DbSession) -> None:
     row = await session.get(SystemAddress, address_id)
     if row is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Address not found")
