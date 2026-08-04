@@ -29,9 +29,9 @@ async def list_system_addresses(
 ) -> Page[SystemAddressOut]:
     """Paginated list with valid/invalid/all filter (same as other admin CRUD)."""
     _ = admin
-    stmt = apply_valid_filter(
-        select(SystemAddress), SystemAddress.valid_id, params.valid
-    ).order_by(SystemAddress.value1, SystemAddress.value0)
+    stmt = apply_valid_filter(select(SystemAddress), SystemAddress.valid_id, params.valid).order_by(
+        SystemAddress.value1, SystemAddress.value0
+    )
     return await paginate(session, SystemAddressOut, stmt, params)
 
 
