@@ -298,6 +298,18 @@ class Settings(BaseSettings):
         default=300, validation_alias="TIQORA_AUTH_RATE_LIMIT_LOCKOUT"
     )
 
+    # Per API-key request throttle (REST bearer + MCP). Redis fixed-window
+    # counter; disable with TIQORA_API_KEY_RATE_LIMIT_ENABLED=0.
+    api_key_rate_limit_enabled: bool = Field(
+        default=True, validation_alias="TIQORA_API_KEY_RATE_LIMIT_ENABLED"
+    )
+    api_key_rate_limit_max: int = Field(
+        default=120, validation_alias="TIQORA_API_KEY_RATE_LIMIT_MAX"
+    )
+    api_key_rate_limit_window_seconds: int = Field(
+        default=60, validation_alias="TIQORA_API_KEY_RATE_LIMIT_WINDOW"
+    )
+
     # Trusted reverse-proxy IPs whose X-Forwarded-For/X-Real-IP uvicorn honours so
     # request.client.host reflects the real client (not the proxy). REQUIRED behind
     # nginx, else the per-IP rate limit keys every request on the proxy IP and locks

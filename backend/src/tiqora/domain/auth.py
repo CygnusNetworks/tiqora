@@ -224,6 +224,14 @@ def generate_api_key() -> str:
     return f"tiqora_{secrets.token_urlsafe(32)}"
 
 
+class ApiKeyRateLimited(Exception):
+    """Raised when a bearer API key exceeds its request rate limit."""
+
+    def __init__(self, retry_after: int = 60) -> None:
+        self.retry_after = max(1, int(retry_after))
+        super().__init__(f"API key rate limit exceeded; retry after {self.retry_after}s")
+
+
 def parse_api_key_scopes(raw: str | None) -> frozenset[str] | None:
     """Parse scopes column; None/empty means unrestricted.
 
@@ -480,6 +488,14 @@ class AuthService:
         now = _utcnow()
         if row.expires_at is not None and row.expires_at <= now:
             return None
+        # Per-key fixed-window throttle (REST bearer). Fail open if Redis down.
+        from tiqora.security.ratelimit import ApiKeyRateLimiter
+
+        decision = await ApiKeyRateLimiter(self._sessions._client, self._settings).check_and_incr(
+            int(row.id)
+        )
+        if not decision.allowed:
+            raise ApiKeyRateLimited(decision.retry_after)
         user_result = await self._session.execute(
             select(Users).where(Users.id == row.user_id, Users.valid_id == 1)
         )

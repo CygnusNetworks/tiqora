@@ -590,12 +590,12 @@ Permission: ''
 
 UNSUP_TRANSITION_CONFIG_YAML = "ConditionLinking: and\n"
 
-# ArticleSend is a documented deferred/unsupported TransitionAction module
+# TicketCreate is a documented deferred/unsupported TransitionAction module
 # (see engine.py's module docstring) — never implemented, always skipped.
 UNSUP_TRANSITION_ACTION_CONFIG_YAML = """
 Config:
-  Subject: deferred
-Module: Kernel::System::ProcessManagement::TransitionAction::ArticleSend
+  Title: deferred
+Module: Kernel::System::ProcessManagement::TransitionAction::TicketCreate
 """
 
 
@@ -665,7 +665,7 @@ async def test_unsupported_transition_action_module_is_skipped_and_reported(
     mariadb_znuny_url: str,
 ) -> None:
     """A TransitionAction whose Module is not one of the implemented handlers
-    (e.g. ArticleSend) is skipped — logged, not applied, and its short
+    (e.g. TicketCreate) is skipped — logged, not applied, and its short
     module name is collected into ``unsupported_actions`` — while the
     transition itself still fires and the activity still advances (an
     unsupported action does not abort the whole submission).
@@ -702,7 +702,7 @@ async def test_unsupported_transition_action_module_is_skipped_and_reported(
 
     assert result.activity_changed is True
     assert result.new_activity_entity_id == UNSUP_ACTIVITY_B
-    assert result.unsupported_actions == ["ArticleSend"]
+    assert result.unsupported_actions == ["TicketCreate"]
 
 
 # ---------------------------------------------------------------------------
