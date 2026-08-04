@@ -1223,7 +1223,9 @@
       "aiQueues": "سیاست های صف",
       "aiAudit": "درخواست حسابرسی",
       "aiAcl": "دسترسی و محدودیت ها",
-      "collapse": "کوچک کردن پیمایش"
+      "collapse": "کوچک کردن پیمایش",
+      "mailAccounts": "حساب های پستی",
+      "oauth2Tokens": "توکن های OAuth2 (پست)"
     },
     "table": {
       "id": "ID",
@@ -1698,7 +1700,10 @@
       "testTo": "ارسال تست به آدرس (اختیاری)",
       "testSuccess": "تست با موفقیت انجام شد",
       "testFailure": "تست ناموفق بود",
-      "loadError": "تنظیمات بارگیری نشد."
+      "loadError": "تنظیمات بارگیری نشد.",
+      "authOAuth2": "توکن OAuth2",
+      "oauth2TokenConfigName": "نام پیکربندی نشانه OAuth2",
+      "oauth2TokenConfigNameHelp": "نام یک پیکربندی توکن OAuth2 (همانند Znuny SendmailModule::OAuth2TokenConfigName)."
     },
     "subjectConfig": {
       "title": "شماره بلیط در موضوع",
@@ -2200,7 +2205,54 @@
       "aiMcp": "سرورهای MCP را به عنوان منابع ابزار برای هوش مصنوعی مدیریت کنید و ابزارها را فعال کنید.",
       "aiQueues": "رفتار هوش مصنوعی را در هر صف پیکربندی کنید: خودمختاری، سقف، افزایش.",
       "aiAudit": "ممیزی کامل هر درخواست/پاسخ LLM، با فاش شدن PII.",
-      "aiAcl": "مجوزها و سهمیه های هوش مصنوعی در هر گروه، نقش یا نماینده."
+      "aiAcl": "مجوزها و سهمیه های هوش مصنوعی در هر گروه، نقش یا نماینده.",
+      "mailAccounts": "صندوق های پستی IMAP/POP ورودی (رمز عبور یا OAuth2).",
+      "oauth2Tokens": "تنظیمات رمز OAuth2 برای ایمیل مایکروسافت/گوگل (سازگار با Znuny)."
+    },
+    "mailAccounts": {
+      "title_plural": "حساب های پستی",
+      "authOAuth2": "توکن OAuth2",
+      "new": "حساب ایمیل جدید",
+      "login": "ورود / ایمیل",
+      "password": "رمز عبور",
+      "authPassword": "رمز عبور",
+      "passwordHelp": "برای حفظ رمز عبور فعلی، در ویرایش خالی بگذارید. برای OAuth2 استفاده نمی شود.",
+      "host": "میزبان",
+      "accountType": "تایپ کنید",
+      "queue": "صف",
+      "imapFolder": "پوشه IMAP",
+      "authType": "احراز هویت",
+      "oauthConfig": "پیکربندی نشانه OAuth2",
+      "oauthConfigHelp": "زمانی که احراز هویت OAuth2 باشد، لازم است.",
+      "trusted": "مورد اعتماد",
+      "trustedHelp": "به هدرهای X-OTRS از این حساب اعتماد کنید (معناشناسی Znuny).",
+      "comments": "نظر دهید"
+    },
+    "oauth2": {
+      "title_plural": "توکن های OAuth2 (پست)",
+      "new": "پیکربندی توکن جدید",
+      "name": "نام",
+      "template": "قالب ارائه دهنده",
+      "templateNone": "سفارشی / هیچ",
+      "templateHelp": "نشانی‌های اینترنتی و محدوده درخواست مایکروسافت یا Google را از قبل پر می‌کند (الگوهای Znuny).",
+      "clientId": "شناسه مشتری",
+      "clientSecret": "راز مشتری",
+      "clientSecretHelp": "برای حفظ راز ذخیره شده، در ویرایش خالی بگذارید.",
+      "scope": "دامنه",
+      "scopeHelp": "محدوده‌های OAuth جدا شده با فضا (شامل offline_access برای نشانه‌های تازه‌سازی).",
+      "redirectUri": "تغییر مسیر URI",
+      "redirectUriHelp": "این URI دقیق را در Azure/Google ثبت کنید. TIQORA_PUBLIC_BASE_URL را در مرحله تولید قرار دهید.",
+      "tokenStatus": "وضعیت توکن",
+      "tokenStatusNone": "بدون نشانه",
+      "tokenStatusValid": "معتبر است",
+      "tokenStatusExpired": "منقضی شده (قابل تجدید)",
+      "tokenStatusNeedsReauth": "نیاز به مجوز مجدد دارد",
+      "tokenStatusError": "خطا",
+      "authorize": "مجوز…",
+      "refresh": "نشانه تازه کردن",
+      "working": "در حال کار…",
+      "authorizeOpened": "صفحه مجوز در یک برگه جدید باز شد.",
+      "refreshSuccess": "رمز به روز شد."
     }
   },
   "kb": {

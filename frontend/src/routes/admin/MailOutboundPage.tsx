@@ -23,6 +23,7 @@ type FormState = {
   auth_type: MailAuthType;
   auth_user: string;
   auth_password: string;
+  oauth2_token_config_name: string;
   from_default: string;
   timeout_seconds: number;
 };
@@ -36,6 +37,7 @@ function toForm(row: MailOutboundOut): FormState {
     auth_type: row.auth_type,
     auth_user: row.auth_user,
     auth_password: "",
+    oauth2_token_config_name: row.oauth2_token_config_name ?? "",
     from_default: row.from_default,
     timeout_seconds: row.timeout_seconds,
   };
@@ -49,6 +51,7 @@ const emptyForm: FormState = {
   auth_type: "none",
   auth_user: "",
   auth_password: "",
+  oauth2_token_config_name: "",
   from_default: "",
   timeout_seconds: 60,
 };
@@ -111,6 +114,7 @@ export function MailOutboundPage() {
       security: form.security,
       auth_type: form.auth_type,
       auth_user: form.auth_user,
+      oauth2_token_config_name: form.oauth2_token_config_name,
       from_default: form.from_default,
       timeout_seconds: form.timeout_seconds,
     };
@@ -225,6 +229,7 @@ export function MailOutboundPage() {
               items={[
                 { value: "none", label: t("admin.mailOutbound.authNone") },
                 { value: "password", label: t("admin.mailOutbound.authPassword") },
+                { value: "oauth2_token", label: t("admin.mailOutbound.authOAuth2") },
               ]}
               value={form.auth_type}
               onChange={(v) => setForm((f) => ({ ...f, auth_type: v as MailAuthType }))}
@@ -243,6 +248,26 @@ export function MailOutboundPage() {
               autoComplete="username"
             />
           </label>
+
+          {form.auth_type === "oauth2_token" ? (
+            <label className="block text-sm sm:col-span-2">
+              <span className="mb-1 block text-muted">
+                {t("admin.mailOutbound.oauth2TokenConfigName")}
+              </span>
+              <input
+                data-testid="mail-outbound-oauth2-config-name"
+                type="text"
+                value={form.oauth2_token_config_name}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, oauth2_token_config_name: e.target.value }))
+                }
+                className="w-full rounded-md border border-hairline bg-surface-subtle px-3 py-1.5 text-sm text-ink"
+              />
+              <span className="mt-1 block text-xs text-muted">
+                {t("admin.mailOutbound.oauth2TokenConfigNameHelp")}
+              </span>
+            </label>
+          ) : null}
 
           <label className="block text-sm sm:col-span-2">
             <span className="mb-1 flex items-center gap-2 text-muted">

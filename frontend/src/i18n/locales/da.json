@@ -1223,7 +1223,9 @@
       "aiQueues": "Køpolitikker",
       "aiAudit": "Anmod om revision",
       "aiAcl": "Adgang og begrænsninger",
-      "collapse": "Skjul navigationen"
+      "collapse": "Skjul navigationen",
+      "mailAccounts": "Mail konti",
+      "oauth2Tokens": "OAuth2-tokens (mail)"
     },
     "table": {
       "id": "ID",
@@ -1698,7 +1700,10 @@
       "testTo": "Send test til adresse (valgfrit)",
       "testSuccess": "Testen lykkedes",
       "testFailure": "Test mislykkedes",
-      "loadError": "Indstillinger kunne ikke indlæses."
+      "loadError": "Indstillinger kunne ikke indlæses.",
+      "authOAuth2": "OAuth2-token",
+      "oauth2TokenConfigName": "OAuth2 token-konfigurationsnavn",
+      "oauth2TokenConfigNameHelp": "Navn på en OAuth2-tokenkonfiguration (samme som Znuny SendmailModule::OAuth2TokenConfigName)."
     },
     "subjectConfig": {
       "title": "Billetnummer i emne",
@@ -2200,7 +2205,54 @@
       "aiMcp": "Administrer MCP-servere som værktøjskilder til AI og aktivér værktøjer.",
       "aiQueues": "Konfigurer AI-adfærd pr. kø: autonomi, caps, eskalering.",
       "aiAudit": "Fuld revision af hver LLM-anmodning/svar med PII-afsløring.",
-      "aiAcl": "AI-tilladelser og kvoter pr. gruppe, rolle eller agent."
+      "aiAcl": "AI-tilladelser og kvoter pr. gruppe, rolle eller agent.",
+      "mailAccounts": "Indgående IMAP/POP-postkasser (adgangskode eller OAuth2).",
+      "oauth2Tokens": "OAuth2-tokenkonfigurationer for Microsoft/Google-mail (Znuny-kompatibel)."
+    },
+    "mailAccounts": {
+      "title_plural": "Mail konti",
+      "authOAuth2": "OAuth2-token",
+      "new": "Ny mailkonto",
+      "login": "Login / email",
+      "password": "Adgangskode",
+      "authPassword": "Adgangskode",
+      "passwordHelp": "Lad stå tomt ved redigering for at beholde den aktuelle adgangskode. Bruges ikke til OAuth2.",
+      "host": "vært",
+      "accountType": "Type",
+      "queue": "Kø",
+      "imapFolder": "IMAP mappe",
+      "authType": "Autentificering",
+      "oauthConfig": "OAuth2 token-konfiguration",
+      "oauthConfigHelp": "Påkrævet, når godkendelse er OAuth2.",
+      "trusted": "Betroet",
+      "trustedHelp": "Stol på X-OTRS-headere fra denne konto (Znuny-semantik).",
+      "comments": "Kommentar"
+    },
+    "oauth2": {
+      "title_plural": "OAuth2-tokens (mail)",
+      "new": "Ny token-konfiguration",
+      "name": "Navn",
+      "template": "Udbyder skabelon",
+      "templateNone": "Brugerdefineret / ingen",
+      "templateHelp": "Forudfylder Microsoft- eller Google-anmodningswebadresser og -omfang (Znuny-skabeloner).",
+      "clientId": "Klient-id",
+      "clientSecret": "Klientens hemmelighed",
+      "clientSecretHelp": "Lad stå tomt ved redigering for at holde den gemte hemmelighed.",
+      "scope": "Omfang",
+      "scopeHelp": "Mellemrumsseparerede OAuth-omfang (inkluderer offline_adgang til opdateringstokens).",
+      "redirectUri": "Omdiriger URI",
+      "redirectUriHelp": "Registrer denne nøjagtige URI i Azure/Google. Indstil TIQORA_PUBLIC_BASE_URL i produktion.",
+      "tokenStatus": "Token status",
+      "tokenStatusNone": "Ingen token",
+      "tokenStatusValid": "Gyldig",
+      "tokenStatusExpired": "Udløbet (kan opdateres)",
+      "tokenStatusNeedsReauth": "Kræver genautorisation",
+      "tokenStatusError": "Fejl",
+      "authorize": "Godkend...",
+      "refresh": "Opdater token",
+      "working": "Arbejder...",
+      "authorizeOpened": "Godkendelsesside åbnet i en ny fane.",
+      "refreshSuccess": "Token opdateret."
     }
   },
   "kb": {

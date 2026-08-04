@@ -1223,7 +1223,9 @@
       "aiQueues": "Várólista szabályzat",
       "aiAudit": "Kérjen auditot",
       "aiAcl": "Hozzáférés és korlátozások",
-      "collapse": "Navigáció összecsukása"
+      "collapse": "Navigáció összecsukása",
+      "mailAccounts": "Levelezési fiókok",
+      "oauth2Tokens": "OAuth2 tokenek (mail)"
     },
     "table": {
       "id": "ID",
@@ -1698,7 +1700,10 @@
       "testTo": "Teszt küldése a címre (nem kötelező)",
       "testSuccess": "A teszt sikerült",
       "testFailure": "A teszt sikertelen",
-      "loadError": "Nem sikerült betölteni a beállításokat."
+      "loadError": "Nem sikerült betölteni a beállításokat.",
+      "authOAuth2": "OAuth2 token",
+      "oauth2TokenConfigName": "OAuth2 token konfigurációs neve",
+      "oauth2TokenConfigNameHelp": "Egy OAuth2 token konfiguráció neve (ugyanaz, mint a Znuny SendmailModule::OAuth2TokenConfigName)."
     },
     "subjectConfig": {
       "title": "Jegyszám a tárgyban",
@@ -2200,7 +2205,54 @@
       "aiMcp": "Kezelje az MCP-kiszolgálókat az AI eszközforrásaként, és engedélyezze az eszközöket.",
       "aiQueues": "Konfigurálja az AI viselkedését soronként: autonómia, korlátok, eszkaláció.",
       "aiAudit": "Minden LLM-kérelem/válasz teljes körű ellenőrzése személyazonosításra alkalmas adatok visszafejtésével.",
-      "aiAcl": "AI engedélyek és kvóták csoportonként, szerepkörönként vagy ügyintézőnként."
+      "aiAcl": "AI engedélyek és kvóták csoportonként, szerepkörönként vagy ügyintézőnként.",
+      "mailAccounts": "Bejövő IMAP/POP postafiókok (jelszó vagy OAuth2).",
+      "oauth2Tokens": "OAuth2 token konfigurációk a Microsoft/Google mailhez (Znuny-kompatibilis)."
+    },
+    "mailAccounts": {
+      "title_plural": "Levelezési fiókok",
+      "authOAuth2": "OAuth2 token",
+      "new": "Új e-mail fiók",
+      "login": "Bejelentkezés / email",
+      "password": "Jelszó",
+      "authPassword": "Jelszó",
+      "passwordHelp": "Hagyja üresen a szerkesztésnél az aktuális jelszó megtartásához. Nem használt OAuth2-hez.",
+      "host": "Host",
+      "accountType": "Írja be",
+      "queue": "Sor",
+      "imapFolder": "IMAP mappa",
+      "authType": "Hitelesítés",
+      "oauthConfig": "OAuth2 token konfigurációja",
+      "oauthConfigHelp": "Szükséges, ha a hitelesítés OAuth2.",
+      "trusted": "Megbízható",
+      "trustedHelp": "Bízzon az X-OTRS fejlécekben ebből a fiókból (Znuny szemantika).",
+      "comments": "Megjegyzés"
+    },
+    "oauth2": {
+      "title_plural": "OAuth2 tokenek (mail)",
+      "new": "Új token konfiguráció",
+      "name": "Név",
+      "template": "Szolgáltató sablon",
+      "templateNone": "Egyedi / nincs",
+      "templateHelp": "Előre kitölti a Microsoft vagy a Google kérés URL-jét és hatókörét (Znuny-sablonok).",
+      "clientId": "Ügyfél-azonosító",
+      "clientSecret": "Ügyfél titka",
+      "clientSecretHelp": "Hagyja üresen a szerkesztésnél a tárolt titok megtartásához.",
+      "scope": "Hatály",
+      "scopeHelp": "Szóközökkel elválasztott OAuth-hatókörök (beleértve az offline_access értéket a frissítési tokenekhez).",
+      "redirectUri": "Átirányítási URI",
+      "redirectUriHelp": "Regisztrálja ezt a pontos URI-t az Azure-ban/Google-ban. Állítsa be a TIQORA_PUBLIC_BASE_URL címet éles környezetben.",
+      "tokenStatus": "Token állapota",
+      "tokenStatusNone": "Nincs token",
+      "tokenStatusValid": "Érvényes",
+      "tokenStatusExpired": "Lejárt (frissíthető)",
+      "tokenStatusNeedsReauth": "Újbóli engedélyezés szükséges",
+      "tokenStatusError": "Hiba",
+      "authorize": "Engedélyezze…",
+      "refresh": "Token frissítése",
+      "working": "Dolgozik…",
+      "authorizeOpened": "Az engedélyezési oldal új lapon nyílt meg.",
+      "refreshSuccess": "Token frissítve."
     }
   },
   "kb": {

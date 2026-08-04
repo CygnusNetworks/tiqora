@@ -200,11 +200,13 @@ in [`../parallel-operation.md`](../parallel-operation.md)):
    delete-after-fetch) lost mail.
    → [`../parallel-operation.md`](../parallel-operation.md#taking-over-mail-processing)
 
-   **OAuth2-mail caveat**: Tiqora's postmaster pipeline only implements
-   `password` mail-account authentication. If any mail account uses OAuth2
-   token auth, it **cannot** be taken over as-is — leave that specific
-   account on Znuny's daemon (or add OAuth2 support before migrating it) and
-   take over only the password-authenticated accounts.
+   **OAuth2 mail**: Tiqora supports Znuny-compatible OAuth2 accounts
+   (`authentication_type = oauth2_token`, shared `oauth2_token*` tables,
+   XOAUTH2). Authorize tokens once — the IdP redirect URI must match either
+   `TIQORA_PUBLIC_BASE_URL` + `/api/v1/oauth2/callback` or Znuny's CGI
+   callback (register both in the IdP app if you authorize from either side).
+   You can take over OAuth mail accounts like password ones, or leave them on
+   Znuny during cutover.
 
 For each function: disable the Znuny scheduler task, set the Tiqora flag,
 wait at least one poll interval, verify via the documented metric/behaviour,

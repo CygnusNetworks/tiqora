@@ -1223,7 +1223,9 @@
       "aiQueues": "Politiques de file d'attente",
       "aiAudit": "Demander un audit",
       "aiAcl": "Accès et limites",
-      "collapse": "Réduire la navigation"
+      "collapse": "Réduire la navigation",
+      "mailAccounts": "Comptes de messagerie",
+      "oauth2Tokens": "Jetons OAuth2 (courrier)"
     },
     "table": {
       "id": "ID",
@@ -1698,7 +1700,10 @@
       "testTo": "Envoyer le test à l'adresse (facultatif)",
       "testSuccess": "Test réussi",
       "testFailure": "Le test a échoué",
-      "loadError": "Échec du chargement des paramètres."
+      "loadError": "Échec du chargement des paramètres.",
+      "authOAuth2": "Jeton OAuth2",
+      "oauth2TokenConfigName": "Nom de configuration du jeton OAuth2",
+      "oauth2TokenConfigNameHelp": "Nom d'une configuration de jeton OAuth2 (identique à Znuny SendmailModule :: OAuth2TokenConfigName)."
     },
     "subjectConfig": {
       "title": "Numéro de billet dans le sujet",
@@ -2200,7 +2205,54 @@
       "aiMcp": "Gérez les serveurs MCP en tant que sources d'outils pour l'IA et activez les outils.",
       "aiQueues": "Configurez le comportement de l'IA par file d'attente : autonomie, plafonds, escalade.",
       "aiAudit": "Audit complet de chaque demande/réponse LLM, avec révélation des PII.",
-      "aiAcl": "Autorisations et quotas IA par groupe, rôle ou agent."
+      "aiAcl": "Autorisations et quotas IA par groupe, rôle ou agent.",
+      "mailAccounts": "Boîtes aux lettres IMAP/POP entrantes (mot de passe ou OAuth2).",
+      "oauth2Tokens": "Configurations de jetons OAuth2 pour Microsoft/Google Mail (compatible Znuny)."
+    },
+    "mailAccounts": {
+      "title_plural": "Comptes de messagerie",
+      "authOAuth2": "Jeton OAuth2",
+      "new": "Nouveau compte de messagerie",
+      "login": "Connexion / email",
+      "password": "Mot de passe",
+      "authPassword": "Mot de passe",
+      "passwordHelp": "Laissez vide lors de la modification pour conserver le mot de passe actuel. Non utilisé pour OAuth2.",
+      "host": "Hôte",
+      "accountType": "Taper",
+      "queue": "File d'attente",
+      "imapFolder": "Dossier IMAP",
+      "authType": "Authentification",
+      "oauthConfig": "Configuration du jeton OAuth2",
+      "oauthConfigHelp": "Obligatoire lorsque l'authentification est OAuth2.",
+      "trusted": "Confiance",
+      "trustedHelp": "Faites confiance aux en-têtes X-OTRS de ce compte (sémantique Znuny).",
+      "comments": "Commentaire"
+    },
+    "oauth2": {
+      "title_plural": "Jetons OAuth2 (courrier)",
+      "new": "Nouvelle configuration de jeton",
+      "name": "Nom",
+      "template": "Modèle de fournisseur",
+      "templateNone": "Personnalisé / aucun",
+      "templateHelp": "Pré-remplit les URL et les étendues des requêtes Microsoft ou Google (modèles Znuny).",
+      "clientId": "Identifiant client",
+      "clientSecret": "Secret client",
+      "clientSecretHelp": "Laissez vide lors de la modification pour conserver le secret stocké.",
+      "scope": "Portée",
+      "scopeHelp": "Portées OAuth séparées par des espaces (incluent offline_access pour les jetons d'actualisation).",
+      "redirectUri": "URI de redirection",
+      "redirectUriHelp": "Enregistrez cet URI exact dans Azure/Google. Définissez TIQORA_PUBLIC_BASE_URL en production.",
+      "tokenStatus": "Statut du jeton",
+      "tokenStatusNone": "Aucun jeton",
+      "tokenStatusValid": "Valide",
+      "tokenStatusExpired": "Expiré (actualisable)",
+      "tokenStatusNeedsReauth": "Nécessite une nouvelle autorisation",
+      "tokenStatusError": "Erreur",
+      "authorize": "Autoriser…",
+      "refresh": "Jeton d'actualisation",
+      "working": "Travailler…",
+      "authorizeOpened": "Page d'autorisation ouverte dans un nouvel onglet.",
+      "refreshSuccess": "Jeton rafraîchi."
     }
   },
   "kb": {

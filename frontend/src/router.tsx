@@ -67,6 +67,8 @@ import { AutoResponsesPage } from "@/routes/admin/AutoResponsesPage";
 import { DynamicFieldsPage } from "@/routes/admin/DynamicFieldsPage";
 import { WebhooksPage } from "@/routes/admin/WebhooksPage";
 import { MailOutboundPage } from "@/routes/admin/MailOutboundPage";
+import { MailAccountsPage } from "@/routes/admin/MailAccountsPage";
+import { OAuth2TokensPage } from "@/routes/admin/OAuth2TokensPage";
 import { MailLogPage } from "@/routes/admin/MailLogPage";
 import { SubjectConfigPage } from "@/routes/admin/SubjectConfigPage";
 import { DaemonsPage } from "@/routes/admin/DaemonsPage";
@@ -600,6 +602,18 @@ const adminMailOutboundRoute = createRoute({
   component: MailOutboundPage,
 });
 
+const adminMailAccountsRoute = createRoute({
+  getParentRoute: () => adminLayoutRoute,
+  path: "/mail-accounts",
+  component: MailAccountsPage,
+});
+
+const adminOAuth2TokensRoute = createRoute({
+  getParentRoute: () => adminLayoutRoute,
+  path: "/oauth2-tokens",
+  component: OAuth2TokensPage,
+});
+
 const adminMailLogRoute = createRoute({
   getParentRoute: () => adminLayoutRoute,
   path: "/mail-log",
@@ -806,6 +820,8 @@ const routeTree = rootRoute.addChildren([
     adminWebhooksRoute,
     adminApiKeysRoute,
     adminMailOutboundRoute,
+    adminMailAccountsRoute,
+    adminOAuth2TokensRoute,
     adminMailLogRoute,
     adminSubjectConfigRoute,
     adminPostmasterFiltersRoute,

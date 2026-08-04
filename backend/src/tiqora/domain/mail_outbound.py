@@ -5,10 +5,16 @@ replies (and the connection test) load that row first when ``enabled``; when
 missing or disabled they fall back to ``Settings.smtp_*`` /
 ``TIQORA_SMTP_ENABLED``. Passwords are Fernet-encrypted at rest via
 :mod:`tiqora.crypto.secret`.
+
+OAuth2 outbound (``auth_type=oauth2_token``) references a legacy
+``oauth2_token_config`` by **name** — same as Znuny
+``SendmailModule::OAuth2TokenConfigName`` — so tokens stay in the shared
+``oauth2_token`` table.
 """
 
 from __future__ import annotations
 
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Literal
@@ -22,13 +28,15 @@ from tiqora.db.tiqora.models import TiqoraMailOutbound
 SINGLETON_ID = 1
 
 MailSecurity = Literal["none", "starttls", "ssl"]
-MailAuthType = Literal["none", "password"]
+MailAuthType = Literal["none", "password", "oauth2_token"]
 MailConfigSource = Literal["db", "env", "none"]
+
+OAuthTokenGenerator = Callable[[], Awaitable[str]]
 
 
 @dataclass(frozen=True, slots=True)
 class ResolvedOutboundSmtp:
-    """Runtime SMTP config with decrypted password (memory only)."""
+    """Runtime SMTP config with decrypted password / OAuth handle (memory only)."""
 
     enabled: bool
     host: str
@@ -40,6 +48,8 @@ class ResolvedOutboundSmtp:
     from_default: str
     timeout_seconds: int
     source: MailConfigSource
+    oauth2_token_config_name: str = ""
+    oauth2_token_config_id: int | None = None
 
 
 def _normalize_security(value: str | None) -> MailSecurity:
@@ -53,7 +63,11 @@ def _normalize_security(value: str | None) -> MailSecurity:
 
 def _normalize_auth_type(value: str | None) -> MailAuthType:
     v = (value or "none").strip().lower()
-    return "password" if v == "password" else "none"
+    if v == "password":
+        return "password"
+    if v in ("oauth2_token", "oauth2", "xoauth2"):
+        return "oauth2_token"
+    return "none"
 
 
 async def get_mail_outbound_row(session: AsyncSession) -> TiqoraMailOutbound | None:
@@ -72,11 +86,24 @@ async def resolve_outbound_smtp(
         if row.auth_password:
             password = decrypt_secret(cfg.secret_key, row.auth_password) or ""
         auth_type = _normalize_auth_type(row.auth_type)
+        oauth_name = getattr(row, "oauth2_token_config_name", None) or ""
+        oauth_id: int | None = None
         if auth_type == "none":
             password = ""
             user = ""
+            oauth_name = ""
+        elif auth_type == "oauth2_token":
+            password = ""
+            user = row.auth_user or ""
+            if oauth_name:
+                from tiqora.domain.oauth2_mail import get_config_by_name
+
+                cfg_row = await get_config_by_name(session, oauth_name)
+                if cfg_row is not None:
+                    oauth_id = cfg_row.id
         else:
             user = row.auth_user or ""
+            oauth_name = ""
         return ResolvedOutboundSmtp(
             enabled=True,
             host=row.host or "localhost",
@@ -88,6 +115,8 @@ async def resolve_outbound_smtp(
             from_default=row.from_default or "",
             timeout_seconds=int(row.timeout_seconds or 60),
             source="db",
+            oauth2_token_config_name=oauth_name,
+            oauth2_token_config_id=oauth_id,
         )
     if cfg.smtp_enabled:
         return ResolvedOutboundSmtp(
@@ -127,6 +156,7 @@ def row_to_public_dict(row: TiqoraMailOutbound | None) -> dict[str, object]:
             "auth_type": "none",
             "auth_user": "",
             "has_password": False,
+            "oauth2_token_config_name": "",
             "from_default": "",
             "timeout_seconds": 60,
             "change_time": None,
@@ -140,6 +170,7 @@ def row_to_public_dict(row: TiqoraMailOutbound | None) -> dict[str, object]:
         "auth_type": _normalize_auth_type(row.auth_type),
         "auth_user": row.auth_user or "",
         "has_password": bool(row.auth_password),
+        "oauth2_token_config_name": getattr(row, "oauth2_token_config_name", None) or "",
         "from_default": row.from_default or "",
         "timeout_seconds": int(row.timeout_seconds or 60),
         "change_time": row.change_time,
@@ -159,6 +190,7 @@ async def upsert_mail_outbound(
     auth_type: str | None = None,
     auth_user: str | None = None,
     auth_password: str | None = None,
+    oauth2_token_config_name: str | None = None,
     from_default: str | None = None,
     timeout_seconds: int | None = None,
 ) -> TiqoraMailOutbound:
@@ -174,6 +206,7 @@ async def upsert_mail_outbound(
             auth_type="none",
             auth_user="",
             auth_password="",
+            oauth2_token_config_name="",
             from_default="",
             timeout_seconds=60,
         )
@@ -193,6 +226,8 @@ async def upsert_mail_outbound(
         row.auth_user = auth_user
     if auth_password is not None and auth_password != "":
         row.auth_password = encrypt_secret(settings.secret_key, auth_password)
+    if oauth2_token_config_name is not None:
+        row.oauth2_token_config_name = oauth2_token_config_name
     if from_default is not None:
         row.from_default = from_default
     if timeout_seconds is not None:
@@ -205,13 +240,28 @@ async def upsert_mail_outbound(
     return row
 
 
+def make_oauth_token_generator(
+    session: AsyncSession, config_id: int
+) -> OAuthTokenGenerator:
+    """Build an aiosmtplib ``oauth_token_generator`` for *config_id*."""
+
+    async def _gen() -> str:
+        from tiqora.domain.oauth2_mail import get_access_token
+
+        return await get_access_token(session, config_id=config_id, user_id=1)
+
+    return _gen
+
+
 __all__ = [
     "SINGLETON_ID",
     "MailAuthType",
     "MailConfigSource",
     "MailSecurity",
+    "OAuthTokenGenerator",
     "ResolvedOutboundSmtp",
     "get_mail_outbound_row",
+    "make_oauth_token_generator",
     "resolve_outbound_smtp",
     "row_to_public_dict",
     "upsert_mail_outbound",

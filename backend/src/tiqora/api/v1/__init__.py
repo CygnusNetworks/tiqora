@@ -13,6 +13,7 @@ from tiqora.api.v1 import (
     customers,
     events,
     kb,
+    oauth2_callback,
     process,
     queues,
     reference,
@@ -25,6 +26,7 @@ from tiqora.api.v1.admin import admin_router
 
 api_v1_router = APIRouter()
 api_v1_router.include_router(auth.router)
+api_v1_router.include_router(oauth2_callback.router)
 api_v1_router.include_router(agents.router)
 api_v1_router.include_router(calendar.router)
 api_v1_router.include_router(queues.router)

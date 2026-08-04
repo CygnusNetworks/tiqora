@@ -1223,7 +1223,9 @@
       "aiQueues": "นโยบายคิว",
       "aiAudit": "ร้องขอการตรวจสอบ",
       "aiAcl": "การเข้าถึงและขีดจำกัด",
-      "collapse": "ยุบการนำทาง"
+      "collapse": "ยุบการนำทาง",
+      "mailAccounts": "บัญชีเมล",
+      "oauth2Tokens": "โทเค็น OAuth2 (เมล)"
     },
     "table": {
       "id": "ID",
@@ -1698,7 +1700,10 @@
       "testTo": "ส่งแบบทดสอบไปยังที่อยู่ (ไม่บังคับ)",
       "testSuccess": "การทดสอบสำเร็จ",
       "testFailure": "การทดสอบล้มเหลว",
-      "loadError": "โหลดการตั้งค่าไม่สำเร็จ"
+      "loadError": "โหลดการตั้งค่าไม่สำเร็จ",
+      "authOAuth2": "โทเค็น OAuth2",
+      "oauth2TokenConfigName": "ชื่อการกำหนดค่าโทเค็น OAuth2",
+      "oauth2TokenConfigNameHelp": "ชื่อของการกำหนดค่าโทเค็น OAuth2 (เหมือนกับ Znuny SendmailModule::OAuth2TokenConfigName)"
     },
     "subjectConfig": {
       "title": "หมายเลขตั๋วในเรื่อง",
@@ -2200,7 +2205,54 @@
       "aiMcp": "จัดการเซิร์ฟเวอร์ MCP เป็นแหล่งเครื่องมือสำหรับ AI และเปิดใช้งานเครื่องมือ",
       "aiQueues": "กำหนดค่าพฤติกรรม AI ต่อคิว: ความเป็นอิสระ การจำกัด การยกระดับ",
       "aiAudit": "การตรวจสอบคำขอ/การตอบกลับ LLM ทั้งหมดโดยสมบูรณ์ พร้อมการเปิดเผย PII",
-      "aiAcl": "สิทธิ์และโควต้าของ AI ต่อกลุ่ม บทบาท หรือตัวแทน"
+      "aiAcl": "สิทธิ์และโควต้าของ AI ต่อกลุ่ม บทบาท หรือตัวแทน",
+      "mailAccounts": "กล่องจดหมาย IMAP/POP ขาเข้า (รหัสผ่านหรือ OAuth2)",
+      "oauth2Tokens": "การกำหนดค่าโทเค็น OAuth2 สำหรับอีเมล Microsoft/Google (เข้ากันได้กับ Znuny)"
+    },
+    "mailAccounts": {
+      "title_plural": "บัญชีเมล",
+      "authOAuth2": "โทเค็น OAuth2",
+      "new": "บัญชีเมลใหม่",
+      "login": "เข้าสู่ระบบ / อีเมล",
+      "password": "รหัสผ่าน",
+      "authPassword": "รหัสผ่าน",
+      "passwordHelp": "เว้นว่างไว้เมื่อแก้ไขเพื่อเก็บรหัสผ่านปัจจุบันไว้ ไม่ใช้สำหรับ OAuth2",
+      "host": "โฮสต์",
+      "accountType": "ประเภท",
+      "queue": "คิว",
+      "imapFolder": "โฟลเดอร์ IMAP",
+      "authType": "การรับรองความถูกต้อง",
+      "oauthConfig": "การกำหนดค่าโทเค็น OAuth2",
+      "oauthConfigHelp": "จำเป็นเมื่อการรับรองความถูกต้องเป็น OAuth2",
+      "trusted": "เชื่อถือได้",
+      "trustedHelp": "เชื่อถือส่วนหัว X-OTRS จากบัญชีนี้ (ความหมาย Znuny)",
+      "comments": "ความคิดเห็น"
+    },
+    "oauth2": {
+      "title_plural": "โทเค็น OAuth2 (เมล)",
+      "new": "การกำหนดค่าโทเค็นใหม่",
+      "name": "ชื่อ",
+      "template": "แม่แบบผู้ให้บริการ",
+      "templateNone": "กำหนดเอง / ไม่มี",
+      "templateHelp": "กรอก URL และขอบเขตคำขอของ Microsoft หรือ Google ล่วงหน้า (เทมเพลต Znuny)",
+      "clientId": "รหัสลูกค้า",
+      "clientSecret": "ความลับของลูกค้า",
+      "clientSecretHelp": "เว้นว่างไว้เมื่อแก้ไขเพื่อเก็บความลับที่เก็บไว้",
+      "scope": "ขอบเขต",
+      "scopeHelp": "ขอบเขต OAuth ที่คั่นด้วยช่องว่าง (รวม offline_access สำหรับโทเค็นการรีเฟรช)",
+      "redirectUri": "เปลี่ยนเส้นทาง URI",
+      "redirectUriHelp": "ลงทะเบียน URI ที่แน่นอนนี้ใน Azure/Google ตั้งค่า TIQORA_PUBLIC_BASE_URL ในการใช้งานจริง",
+      "tokenStatus": "สถานะโทเค็น",
+      "tokenStatusNone": "ไม่มีโทเค็น",
+      "tokenStatusValid": "ถูกต้อง",
+      "tokenStatusExpired": "หมดอายุ (รีเฟรชได้)",
+      "tokenStatusNeedsReauth": "จำเป็นต้องได้รับอนุญาตอีกครั้ง",
+      "tokenStatusError": "เกิดข้อผิดพลาด",
+      "authorize": "อนุญาต...",
+      "refresh": "รีเฟรชโทเค็น",
+      "working": "กำลังทำงาน...",
+      "authorizeOpened": "หน้าการอนุญาตเปิดขึ้นในแท็บใหม่",
+      "refreshSuccess": "รีเฟรชโทเค็นแล้ว"
     }
   },
   "kb": {

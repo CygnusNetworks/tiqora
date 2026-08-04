@@ -1223,7 +1223,9 @@
       "aiQueues": "Kebijakan antrian",
       "aiAudit": "Minta audit",
       "aiAcl": "Akses & batasan",
-      "collapse": "Ciutkan navigasi"
+      "collapse": "Ciutkan navigasi",
+      "mailAccounts": "Akun email",
+      "oauth2Tokens": "Token OAuth2 (email)"
     },
     "table": {
       "id": "ID",
@@ -1698,7 +1700,10 @@
       "testTo": "Kirim tes ke alamat (opsional)",
       "testSuccess": "Tes berhasil",
       "testFailure": "Tes gagal",
-      "loadError": "Gagal memuat pengaturan."
+      "loadError": "Gagal memuat pengaturan.",
+      "authOAuth2": "Token OAuth2",
+      "oauth2TokenConfigName": "Nama konfigurasi token OAuth2",
+      "oauth2TokenConfigNameHelp": "Nama konfigurasi token OAuth2 (sama dengan Znuny SendmailModule::OAuth2TokenConfigName)."
     },
     "subjectConfig": {
       "title": "Nomor tiket sesuai subjek",
@@ -2200,7 +2205,54 @@
       "aiMcp": "Kelola server MCP sebagai sumber alat untuk AI dan aktifkan alat.",
       "aiQueues": "Konfigurasikan perilaku AI per antrean: otonomi, pembatasan, eskalasi.",
       "aiAudit": "Audit penuh atas setiap permintaan/tanggapan LLM, dengan pengungkapan PII.",
-      "aiAcl": "Izin dan kuota AI per grup, peran, atau agen."
+      "aiAcl": "Izin dan kuota AI per grup, peran, atau agen.",
+      "mailAccounts": "Kotak surat IMAP/POP masuk (kata sandi atau OAuth2).",
+      "oauth2Tokens": "Konfigurasi token OAuth2 untuk Microsoft/Google mail (kompatibel dengan Znuny)."
+    },
+    "mailAccounts": {
+      "title_plural": "Akun email",
+      "authOAuth2": "Token OAuth2",
+      "new": "Akun email baru",
+      "login": "Masuk / email",
+      "password": "Kata sandi",
+      "authPassword": "Kata sandi",
+      "passwordHelp": "Biarkan kosong saat diedit untuk menyimpan kata sandi saat ini. Tidak digunakan untuk OAuth2.",
+      "host": "Tuan rumah",
+      "accountType": "Ketik",
+      "queue": "Antrian",
+      "imapFolder": "folder IMAP",
+      "authType": "Otentikasi",
+      "oauthConfig": "Konfigurasi token OAuth2",
+      "oauthConfigHelp": "Diperlukan ketika autentikasi adalah OAuth2.",
+      "trusted": "Tepercaya",
+      "trustedHelp": "Percayai header X-OTRS dari akun ini (semantik Znuny).",
+      "comments": "Komentar"
+    },
+    "oauth2": {
+      "title_plural": "Token OAuth2 (email)",
+      "new": "Konfigurasi token baru",
+      "name": "Nama",
+      "template": "Templat penyedia",
+      "templateNone": "Kustom / tidak ada",
+      "templateHelp": "Mengisi terlebih dahulu URL dan cakupan permintaan Microsoft atau Google (templat Znuny).",
+      "clientId": "ID Klien",
+      "clientSecret": "Rahasia klien",
+      "clientSecretHelp": "Biarkan kosong pada saat edit untuk menjaga rahasia yang tersimpan.",
+      "scope": "Ruang lingkup",
+      "scopeHelp": "Cakupan OAuth yang dipisahkan spasi (termasuk offline_access untuk token penyegaran).",
+      "redirectUri": "Arahkan ulang URI",
+      "redirectUriHelp": "Daftarkan URI persis ini di Azure/Google. Tetapkan TIQORA_PUBLIC_BASE_URL dalam produksi.",
+      "tokenStatus": "Status token",
+      "tokenStatusNone": "Tidak ada tanda",
+      "tokenStatusValid": "Sah",
+      "tokenStatusExpired": "Kedaluwarsa (dapat disegarkan)",
+      "tokenStatusNeedsReauth": "Perlu otorisasi ulang",
+      "tokenStatusError": "Kesalahan",
+      "authorize": "Otorisasi…",
+      "refresh": "Segarkan token",
+      "working": "Bekerja…",
+      "authorizeOpened": "Halaman otorisasi dibuka di tab baru.",
+      "refreshSuccess": "Token disegarkan."
     }
   },
   "kb": {

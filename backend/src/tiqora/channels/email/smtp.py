@@ -58,6 +58,7 @@ class SmtpMailSender:
         security: MailSecurity | None = None,
         timeout: float | None = None,
         sendmail_bcc: str | None = None,
+        oauth_token_generator: object | None = None,
     ) -> None:
         # Backward-compatible: ``SmtpMailSender(settings)`` still works.
         if settings is not None and host is None:
@@ -73,6 +74,7 @@ class SmtpMailSender:
         self._password = password or None
         self._security: MailSecurity = security or "none"
         self._timeout = float(timeout if timeout is not None else 60.0)
+        self._oauth_token_generator = oauth_token_generator
         # Znuny ``SendmailBcc``: extra envelope-only recipient on every send.
         # Mutable so callers that resolve SysConfig after construction can set it.
         self.sendmail_bcc = sendmail_bcc or None
@@ -82,8 +84,23 @@ class SmtpMailSender:
 
     @classmethod
     def from_resolved(
-        cls, cfg: ResolvedOutboundSmtp, *, sendmail_bcc: str | None = None
+        cls,
+        cfg: ResolvedOutboundSmtp,
+        *,
+        sendmail_bcc: str | None = None,
+        oauth_token_generator: object | None = None,
     ) -> SmtpMailSender:
+        if cfg.auth_type == "oauth2_token":
+            return cls(
+                host=cfg.host,
+                port=cfg.port,
+                username=cfg.auth_user or None,
+                password=None,
+                security=cfg.security,
+                timeout=float(cfg.timeout_seconds),
+                sendmail_bcc=sendmail_bcc,
+                oauth_token_generator=oauth_token_generator,
+            )
         user = cfg.auth_user if cfg.auth_type == "password" else None
         password = cfg.auth_password if cfg.auth_type == "password" else None
         return cls(
@@ -99,17 +116,20 @@ class SmtpMailSender:
     async def send(self, message: EmailMessage) -> None:
         use_tls = self._security == "ssl"
         start_tls = True if self._security == "starttls" else False if use_tls else None
-        recipients, _message_id = await aiosmtplib.send(
-            message,
-            hostname=self._host,
-            port=self._port,
-            username=self._username,
-            password=self._password,
-            timeout=self._timeout,
-            use_tls=use_tls,
-            start_tls=start_tls,
-            recipients=envelope_recipients(message, self.sendmail_bcc),
-        )
+        kwargs: dict[str, object] = {
+            "hostname": self._host,
+            "port": self._port,
+            "username": self._username,
+            "timeout": self._timeout,
+            "use_tls": use_tls,
+            "start_tls": start_tls,
+            "recipients": envelope_recipients(message, self.sendmail_bcc),
+        }
+        if self._oauth_token_generator is not None:
+            kwargs["oauth_token_generator"] = self._oauth_token_generator
+        else:
+            kwargs["password"] = self._password
+        recipients, _message_id = await aiosmtplib.send(message, **kwargs)  # type: ignore[arg-type]
         # aiosmtplib returns dict[recipient, SMTPResponse]; pick first for log.
         self.last_smtp_code = None
         self.last_smtp_detail = None

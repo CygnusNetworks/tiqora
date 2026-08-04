@@ -1223,7 +1223,9 @@
       "aiQueues": "Politicile de coadă",
       "aiAudit": "Solicitați audit",
       "aiAcl": "Acces și limite",
-      "collapse": "Restrângeți navigarea"
+      "collapse": "Restrângeți navigarea",
+      "mailAccounts": "Conturi de mail",
+      "oauth2Tokens": "Jetoane OAuth2 (e-mail)"
     },
     "table": {
       "id": "ID",
@@ -1698,7 +1700,10 @@
       "testTo": "Trimiteți testul la adresa (opțional)",
       "testSuccess": "Testul a reușit",
       "testFailure": "Testul a eșuat",
-      "loadError": "Nu s-au încărcat setările."
+      "loadError": "Nu s-au încărcat setările.",
+      "authOAuth2": "Token OAuth2",
+      "oauth2TokenConfigName": "Nume de configurare a simbolului OAuth2",
+      "oauth2TokenConfigNameHelp": "Numele unei configurații de simbol OAuth2 (la fel ca Znuny SendmailModule::OAuth2TokenConfigName)."
     },
     "subjectConfig": {
       "title": "Numărul biletului în subiect",
@@ -2200,7 +2205,54 @@
       "aiMcp": "Gestionați serverele MCP ca surse de instrumente pentru AI și activați instrumentele.",
       "aiQueues": "Configurați comportamentul AI pe coadă: autonomie, limite, escaladare.",
       "aiAudit": "Audit complet al fiecărei cereri/răspuns LLM, cu dezvăluirea informațiilor personale.",
-      "aiAcl": "Permisiuni și cote AI per grup, rol sau agent."
+      "aiAcl": "Permisiuni și cote AI per grup, rol sau agent.",
+      "mailAccounts": "Cutiile poștale IMAP/POP primite (parolă sau OAuth2).",
+      "oauth2Tokens": "Configurații de simbol OAuth2 pentru e-mail Microsoft/Google (compatibil cu Znuny)."
+    },
+    "mailAccounts": {
+      "title_plural": "Conturi de mail",
+      "authOAuth2": "Token OAuth2",
+      "new": "Cont de mail nou",
+      "login": "Autentificare/e-mail",
+      "password": "Parolă",
+      "authPassword": "Parolă",
+      "passwordHelp": "Lăsați necompletat la modificare pentru a păstra parola curentă. Nu este utilizat pentru OAuth2.",
+      "host": "Gazdă",
+      "accountType": "Tip",
+      "queue": "coadă",
+      "imapFolder": "folderul IMAP",
+      "authType": "Autentificare",
+      "oauthConfig": "Configurarea simbolului OAuth2",
+      "oauthConfigHelp": "Necesar când autentificarea este OAuth2.",
+      "trusted": "De încredere",
+      "trustedHelp": "Aveți încredere în anteturile X-OTRS din acest cont (semantică Znuny).",
+      "comments": "Comentariu"
+    },
+    "oauth2": {
+      "title_plural": "Jetoane OAuth2 (e-mail)",
+      "new": "Configurație nouă pentru token",
+      "name": "Nume",
+      "template": "Șablon de furnizor",
+      "templateNone": "Personalizat / niciunul",
+      "templateHelp": "Completează în prealabil adresele URL și domeniile solicitărilor Microsoft sau Google (șabloane Znuny).",
+      "clientId": "ID client",
+      "clientSecret": "Secretul clientului",
+      "clientSecretHelp": "Lăsați necompletat la editare pentru a păstra secretul stocat.",
+      "scope": "Domeniul de aplicare",
+      "scopeHelp": "Domenii OAuth separate prin spațiu (include accesul offline pentru tokenurile de reîmprospătare).",
+      "redirectUri": "URI de redirecționare",
+      "redirectUriHelp": "Înregistrați acest URI exact în Azure/Google. Setați TIQORA_PUBLIC_BASE_URL în producție.",
+      "tokenStatus": "Starea simbolului",
+      "tokenStatusNone": "Nici un simbol",
+      "tokenStatusValid": "Valabil",
+      "tokenStatusExpired": "Expirat (reîmprospătabil)",
+      "tokenStatusNeedsReauth": "Necesita reautorizare",
+      "tokenStatusError": "Eroare",
+      "authorize": "Autorizați…",
+      "refresh": "Jeton de reîmprospătare",
+      "working": "Lucrează…",
+      "authorizeOpened": "Pagina de autorizare s-a deschis într-o filă nouă.",
+      "refreshSuccess": "Token reîmprospătat."
     }
   },
   "kb": {
