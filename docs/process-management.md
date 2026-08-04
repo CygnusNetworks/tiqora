@@ -152,10 +152,16 @@ docstring in `api/v1/process.py`).
 
 | Supported | Deferred (treated as non-matching) |
 |---|---|
-| `String` (case-sensitive `eq`) | `GreaterThan` / `GreaterThanOrEqual` / `LessThan` / `LessThanOrEqual` |
-| `Regexp` | `Module`-based custom conditions |
+| `String` (case-sensitive `eq`) | `Module`-based custom conditions |
+| `Regexp` | |
 | `Contains` / `NotContains` (case-insensitive regex) | |
 | `Equal` / `NotEqual` (case-insensitive) | |
+| `GreaterThan` / `GreaterThanOrEqual` (also `GreaterThanEquals`) | |
+| `LessThan` / `LessThanOrEqual` (also `LessThanEquals`) | |
+
+Ordered compares follow Znuny `TransitionValidation::Base`: DateTime/Date
+values are converted to epoch seconds (`ValueValidate`), then both sides
+must be integers (`IsInteger`) or the condition does not match.
 
 An unsupported condition type logs a warning and evaluates to `False` — it
 never raises. See `_evaluate_field` in `engine.py` for the full semantics
@@ -165,9 +171,9 @@ never raises. See `_evaluate_field` in `engine.py` for the full semantics
 
 | Supported | Deferred (logged, no-op — collected into `unsupported_actions`) |
 |---|---|
-| `TicketStateSet` | `DynamicFieldPendingTimeSet` |
-| `TicketQueueSet` | `TicketCreate`, `ExecuteInvoker`, `Appointment*` (Create/Update/Remove), `ConfigItemUpdate` |
-| `TicketOwnerSet` | |
+| `TicketStateSet` | `ExecuteInvoker` |
+| `TicketQueueSet` | `Appointment*` (Create/Update/Remove) |
+| `TicketOwnerSet` | `ConfigItemUpdate` |
 | `TicketPrioritySet` | |
 | `TicketTitleSet` | |
 | `TicketCustomerSet` | |
@@ -176,6 +182,7 @@ never raises. See `_evaluate_field` in `engine.py` for the full semantics
 | `DynamicFieldSet` | |
 | `DynamicFieldRemove` | |
 | `DynamicFieldIncrement` | |
+| `DynamicFieldPendingTimeSet` | |
 | `TicketArticleCreate` | |
 | `ArticleSend` | (agent email via outbound reply path) |
 | `TicketTypeSet` | |
@@ -183,6 +190,7 @@ never raises. See `_evaluate_field` in `engine.py` for the full semantics
 | `TicketSLASet` | |
 | `TicketWatchSet` | |
 | `LinkAdd` | |
+| `TicketCreate` | (Title/Queue/State/Priority/…; optional `LinkAs` to parent) |
 
 An unsupported action does not abort the submission: the transition still
 fires and the activity still advances, but that one action is skipped and

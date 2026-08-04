@@ -37,16 +37,16 @@ by ``calendar/service.py``.
 
 Deferred/unsupported scope (documented, not silently missing)
 ---------------------------------------------------------------
-- Condition types ``GreaterThan(OrEqual)``/``LessThan(OrEqual)`` and any
-  ``Module``-based (custom Perl module) condition type: treated as
-  non-matching with a logged warning — see ``_evaluate_field``.
+- Condition type ``Module`` (custom Perl module) is treated as non-matching
+  with a logged warning — see ``_evaluate_field``. Ordered comparisons
+  (``GreaterThan`` / ``GreaterThanOrEqual`` / ``LessThan`` /
+  ``LessThanOrEqual``) are implemented per Znuny
+  ``TransitionValidation::Base``.
 - TransitionAction modules other than the implemented handlers (see
-  ``_ACTION_HANDLERS``: ticket field setters including Type/Service/SLA,
-  Watch, LinkAdd, DynamicFieldSet, TicketArticleCreate, …) — remaining
-  deferred: ``DynamicFieldRemove``/``Increment``/``PendingTimeSet``,
-  ``ArticleSend``, ``TicketCreate``, ``ExecuteInvoker``, ``Appointment*``,
-  ``ConfigItemUpdate``. Unsupported modules are logged and no-op'd, and
-  collected into ``ActivityDialogSubmitResult.unsupported_actions``.
+  ``_ACTION_HANDLERS``) — remaining deferred: ``ExecuteInvoker``,
+  ``Appointment*`` (Create/Update/Remove), ``ConfigItemUpdate``.
+  Unsupported modules are logged and no-op'd, and collected into
+  ``ActivityDialogSubmitResult.unsupported_actions``.
 - ``%<OTRS_TICKET_...>%``/``<OTRS_...>`` smart-tag placeholder substitution
   inside TransitionAction ``Config`` values (Znuny's
   ``TemplateGenerator::_Replace``, used e.g. by
@@ -67,8 +67,8 @@ from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
-from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select, text
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from tiqora.db.legacy.dynamic_field import DynamicField, DynamicFieldValue
 from tiqora.db.legacy.queue import Queue, Service, Sla
@@ -76,6 +76,7 @@ from tiqora.db.legacy.ticket import TicketPriority, TicketState, TicketType
 from tiqora.db.legacy.user import Users
 from tiqora.domain.ticket_write_service import (
     ArticleIn,
+    TicketIn,
     _priority_name,  # noqa: PLC2701 -- deliberate reuse, see module docstring
     _queue_name,  # noqa: PLC2701
     _state_name,  # noqa: PLC2701
@@ -89,6 +90,7 @@ from tiqora.domain.ticket_write_service import (
     change_state,
     change_title,
     change_type,
+    create_ticket,
     link_tickets,
     lock_ticket,
     move_queue,
@@ -115,6 +117,8 @@ from tiqora.process.ticket_state import (
     PROCESS_ID_DF_NAME,
     get_ticket_process_state,
 )
+from tiqora.znuny.cache_invalidation import invalidate_ticket_cache
+from tiqora.znuny.history import add_pending_time
 from tiqora.znuny.sysconfig import SysConfig
 
 logger = logging.getLogger(__name__)
@@ -254,6 +258,70 @@ async def get_ticket_attrs(session: AsyncSession, ticket_id: int) -> dict[str, s
     return attrs
 
 
+# DateTime / Date → epoch, matching TransitionValidation::Base::ValueValidate.
+_DATETIME_RE = re.compile(r"^(\d{4})-(\d{1,2})-(\d{1,2})\s(\d{1,2}):(\d{1,2})(?::(\d{1,2}))?$")
+_DATE_RE = re.compile(r"^(\d{4})-(\d{1,2})-(\d{1,2})$")
+# Znuny VariableCheck::IsInteger — optional leading '-', no leading zeros.
+_INTEGER_RE = re.compile(r"^(-)?(?:0|[1-9]\d*)$")
+# DynamicFieldPendingTimeSet offset: ``1d 5h 12m 500s`` (parts optional).
+_OFFSET_RE = re.compile(
+    r"^(?:(\d+)d\s*)?(?:(\d+)h\s*)?(?:(\d+)m\s*)?(?:(\d+)s\s*)?$",
+    re.IGNORECASE,
+)
+
+
+def _value_validate(raw: str) -> str | int:
+    """Port of ``TransitionValidation::Base::ValueValidate``.
+
+    DateTime (``YYYY-MM-DD HH:MM[:SS]``) and Date (``YYYY-MM-DD``) strings
+    become epoch seconds (UTC); everything else is returned as-is.
+    """
+    m = _DATETIME_RE.match(raw)
+    if m:
+        y, mo, d, h, mi, sec = m.groups()
+        dt = datetime(int(y), int(mo), int(d), int(h), int(mi), int(sec or 0), tzinfo=UTC)
+        return int(dt.timestamp())
+    m = _DATE_RE.match(raw)
+    if m:
+        y, mo, d = m.groups()
+        dt = datetime(int(y), int(mo), int(d), 0, 0, 0, tzinfo=UTC)
+        return int(dt.timestamp())
+    return raw
+
+
+def _as_integer(value: Any) -> int | None:
+    """Port of Znuny ``IsInteger`` after ValueValidate (ints or integer strings)."""
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, int):
+        return value
+    s = str(value).strip()
+    if _INTEGER_RE.match(s):
+        return int(s)
+    return None
+
+
+def _compare_ordered(value: str, match: Any, op: str) -> bool:
+    """Znuny GreaterThan/LessThan/… — integer compare after ValueValidate.
+
+    Both sides are ValueValidate'd (dates → epoch), then must both be
+    integers (``IsInteger``); otherwise the condition does not match.
+    """
+    check_i = _as_integer(_value_validate(str(value)))
+    match_i = _as_integer(_value_validate(str(match)))
+    if check_i is None or match_i is None:
+        return False
+    if op == "gt":
+        return check_i > match_i
+    if op == "gte":
+        return check_i >= match_i
+    if op == "lt":
+        return check_i < match_i
+    if op == "lte":
+        return check_i <= match_i
+    return False
+
+
 def _evaluate_field(match: Any, type_: str, value: str) -> bool:
     """Evaluate one ``Fields`` entry of a transition condition block.
 
@@ -264,7 +332,7 @@ def _evaluate_field(match: Any, type_: str, value: str) -> bool:
     Semantics verified against
     ``znuny-6.5.22/Kernel/System/ProcessManagement/TransitionValidation/*.pm``
     (String.pm / Regexp.pm / Base.pm's ``Contains``/``NotContains``/
-    ``Equal``/``NotEqual``):
+    ``Equal``/``NotEqual`` / ordered compares):
 
     - ``String``: exact match via Perl ``eq`` — case-SENSITIVE (the task
       brief's "case-insensitive" guess does not hold; ``String.pm`` compares
@@ -282,10 +350,12 @@ def _evaluate_field(match: Any, type_: str, value: str) -> bool:
       both sides and compare with ``eq``/``ne`` (for the plain-string case
       this engine operates on — Znuny's array-ref handling is not relevant
       to a flat string attribute dict).
-
-    GreaterThan(OrEqual)/LessThan(OrEqual) and any ``Module``-based
-    (custom Perl module) condition type are UNSUPPORTED/deferred: logged and
-    treated as non-matching (``False``), never raised.
+    - ``GreaterThan`` / ``GreaterThanOrEqual`` / ``LessThan`` /
+      ``LessThanOrEqual`` (and ``…Equals`` aliases): ValueValidate both
+      sides (DateTime/Date → epoch), then integer compare only — non-integer
+      values do not match (Znuny ``IsInteger`` gate).
+    - ``Module``-based (custom Perl module) conditions remain UNSUPPORTED:
+      logged and treated as non-matching (``False``), never raised.
     """
     type_lower = type_.lower()
 
@@ -323,6 +393,18 @@ def _evaluate_field(match: Any, type_: str, value: str) -> bool:
 
     if type_lower == "notequal":
         return value.lower() != str(match).lower()
+
+    if type_lower == "greaterthan":
+        return _compare_ordered(value, match, "gt")
+
+    if type_lower in ("greaterthanorequal", "greaterthanequals", "greaterthanequal"):
+        return _compare_ordered(value, match, "gte")
+
+    if type_lower == "lessthan":
+        return _compare_ordered(value, match, "lt")
+
+    if type_lower in ("lessthanorequal", "lessthanequals", "lessthanequal"):
+        return _compare_ordered(value, match, "lte")
 
     logger.warning("unsupported/deferred transition condition Type: %s", type_)
     return False
@@ -864,6 +946,300 @@ async def _action_link_add(
     )
 
 
+def _offset_to_seconds(offset: Any) -> int:
+    """Port of DynamicFieldPendingTimeSet::_Offset2Seconds (``1d 5h 12m 500s``)."""
+    if offset is None or offset == "":
+        return 0
+    raw = str(offset).strip()
+    m = _OFFSET_RE.match(raw)
+    if not m or not raw:
+        return 0
+    days, hours, minutes, seconds = (int(x or 0) for x in m.groups())
+    return days * 86400 + hours * 3600 + minutes * 60 + seconds
+
+
+async def _set_ticket_pending_time(
+    session: AsyncSession,
+    *,
+    ticket_id: int,
+    pending_time: datetime,
+    user_id: int,
+) -> None:
+    """Set ``ticket.until_time`` + ``SetPendingTime`` history (TicketPendingTimeSet)."""
+    if pending_time.tzinfo is None:
+        pending_time = pending_time.replace(tzinfo=UTC)
+    until_time = int(pending_time.timestamp())
+    await session.execute(
+        text(
+            "UPDATE ticket SET until_time = :ut,"
+            " change_time = current_timestamp, change_by = :uid WHERE id = :tid"
+        ),
+        {"ut": until_time, "uid": user_id, "tid": ticket_id},
+    )
+    await add_pending_time(
+        session,
+        ticket_id=ticket_id,
+        year=pending_time.year,
+        month=pending_time.month,
+        day=pending_time.day,
+        hour=pending_time.hour,
+        minute=pending_time.minute,
+        user_id=user_id,
+    )
+    await invalidate_ticket_cache(session, ticket_id)
+
+
+async def _action_dynamic_field_pending_time_set(
+    session: AsyncSession,
+    config: dict[str, Any],
+    ticket_id: int,
+    user_id: int,
+    sysconfig: SysConfig,
+) -> None:
+    """Port of DynamicFieldPendingTimeSet — pending time from a DF (+ optional Offset).
+
+    Config keys: ``DynamicField`` (required name without prefix), ``Offset``
+    (optional ``1d 5h 12m 500s``), ``State``/``StateID`` (optional state change
+    before setting pending time). Empty/missing DF value is a silent no-op
+    (Znuny returns early).
+    """
+    field = config.get("DynamicField")
+    if not field:
+        raise RequiredFieldMissing("DynamicFieldPendingTimeSet: Config must set 'DynamicField'")
+    attrs = await get_ticket_attrs(session, ticket_id)
+    raw = attrs.get(f"DynamicField_{field}", "") or attrs.get(str(field), "")
+    if not raw:
+        return
+    validated = _value_validate(str(raw).strip())
+    # After ValueValidate, datetimes are epoch ints; plain strings that are
+    # already epoch also work via _as_integer.
+    epoch = _as_integer(validated)
+    if epoch is None:
+        # Try a final parse for values ValueValidate did not rewrite.
+        try:
+            epoch = int(datetime.fromisoformat(str(raw).replace(" ", "T")).timestamp())
+        except (TypeError, ValueError):
+            logger.warning("DynamicFieldPendingTimeSet: cannot parse DF %r value %r", field, raw)
+            return
+    pending = datetime.fromtimestamp(epoch + _offset_to_seconds(config.get("Offset")), tz=UTC)
+
+    state_id = await _resolve_state_id(session, config.get("State"), config.get("StateID"))
+    if state_id is not None:
+        # Znuny: TicketStateSet then TicketPendingTimeSet separately.
+        await change_state(
+            session,
+            ticket_id=ticket_id,
+            new_state_id=int(state_id),
+            user_id=user_id,
+            sysconfig=sysconfig,
+            pending_time=None,
+        )
+    await _set_ticket_pending_time(
+        session, ticket_id=ticket_id, pending_time=pending, user_id=user_id
+    )
+
+
+def _session_factory_from(session: AsyncSession) -> async_sessionmaker[AsyncSession]:
+    """Build a short-lived session factory from an open session's bind.
+
+    ``create_ticket`` needs a factory for ``ticket_create_number`` (separate
+    short transactions on the counter table); process actions only receive the
+    caller's session.
+    """
+    return async_sessionmaker(session.get_bind(), expire_on_commit=False)
+
+
+async def _resolve_link_as(session: AsyncSession, link_as: str) -> tuple[str, str] | None:
+    """Map Znuny ``LinkAs`` (SourceName/TargetName) → (link_type_name, direction).
+
+    Direction is ``Source`` when the *new* ticket is the link source (parent
+    ticket is target), or ``Target`` when the original process ticket is the
+    source. Tiqora's ``link_type`` table only stores the type name; Znuny's
+    SourceName/TargetName come from SysConfig. Convention used here matches
+    Znuny defaults: ``Normal``/``Normal``, ``Parent``/``Child`` for
+    ``ParentChild``.
+    """
+    la = link_as.strip()
+    if not la:
+        return None
+    # Direct type-name match (e.g. LinkAs=Normal).
+    row = (
+        await session.execute(
+            text("SELECT name FROM link_type WHERE name = :n AND valid_id = 1 LIMIT 1"),
+            {"n": la},
+        )
+    ).first()
+    if row is not None:
+        return str(row[0]), "Source"
+    aliases: dict[str, tuple[str, str]] = {
+        "parent": ("ParentChild", "Source"),
+        "child": ("ParentChild", "Target"),
+    }
+    return aliases.get(la.lower())
+
+
+async def _action_ticket_create(
+    session: AsyncSession,
+    config: dict[str, Any],
+    ticket_id: int,
+    user_id: int,
+    sysconfig: SysConfig,
+) -> None:
+    """Port of TransitionAction::TicketCreate — spawn a linked sibling ticket.
+
+    Config keys (subset of Znuny): Title, Queue/QueueID, State/StateID,
+    Priority/PriorityID, CustomerID, CustomerUser/CustomerUserID, Owner/OwnerID,
+    Body, Subject, SenderType, IsVisibleForCustomer, CommunicationChannel,
+    LinkAs (optional link to the process ticket), DynamicField_* values.
+    Defaults for Queue/State/Lock/Priority come from Process::Default* sysconfig
+    keys when neither name nor ID is set.
+    """
+    title = config.get("Title")
+    if not title:
+        # Znuny TicketCreate requires Title; fail closed rather than invent one.
+        raise RequiredFieldMissing("TicketCreate: Config must set 'Title'")
+
+    queue_id = await _resolve_queue_id(session, config.get("Queue"), config.get("QueueID"))
+    if queue_id is None:
+        default_q = await sysconfig.get_str("Process::DefaultQueue", "Raw")
+        queue_id = await _resolve_queue_id(session, default_q, None)
+    if queue_id is None:
+        raise RequiredFieldMissing(
+            "TicketCreate: Config must set 'Queue' or 'QueueID' to a known queue"
+        )
+
+    state_id = await _resolve_state_id(session, config.get("State"), config.get("StateID"))
+    if state_id is None:
+        default_s = await sysconfig.get_str("Process::DefaultState", "new")
+        state_id = await _resolve_state_id(session, default_s, None)
+    if state_id is None:
+        raise RequiredFieldMissing(
+            "TicketCreate: Config must set 'State' or 'StateID' to a known state"
+        )
+
+    priority_id = await _resolve_priority_id(
+        session, config.get("Priority"), config.get("PriorityID")
+    )
+    if priority_id is None:
+        default_p = await sysconfig.get_str("Process::DefaultPriority", "3 normal")
+        priority_id = await _resolve_priority_id(session, default_p, None)
+    if priority_id is None:
+        raise RequiredFieldMissing(
+            "TicketCreate: Config must set 'Priority' or 'PriorityID' to a known priority"
+        )
+
+    owner_id = await _resolve_user_id(session, config.get("Owner"), config.get("OwnerID"))
+    if owner_id is None:
+        owner_id = user_id
+
+    responsible_id = await _resolve_user_id(
+        session, config.get("Responsible"), config.get("ResponsibleID")
+    )
+    type_id = await _resolve_type_id(session, config.get("Type"), config.get("TypeID"))
+    service_id = await _resolve_service_id(session, config.get("Service"), config.get("ServiceID"))
+    sla_id = await _resolve_sla_id(session, config.get("SLA"), config.get("SLAID"))
+
+    customer_id = config.get("CustomerID")
+    customer_user_id = config.get("CustomerUserID", config.get("CustomerUser"))
+    if customer_id is not None:
+        customer_id = str(customer_id)
+    if customer_user_id is not None:
+        customer_user_id = str(customer_user_id)
+
+    lock_raw = config.get("Lock")
+    lock_id = 1  # unlock
+    if lock_raw is not None and str(lock_raw).lower() == "lock":
+        lock_id = 2
+    elif config.get("LockID") is not None:
+        lock_id = int(config["LockID"])
+
+    archive_flag = 0
+    if str(config.get("ArchiveFlag") or "").lower() in ("y", "1", "true"):
+        archive_flag = 1
+
+    dynamic_fields: dict[str, list[str]] = {}
+    for key, value in config.items():
+        if not str(key).startswith("DynamicField_"):
+            continue
+        fname = str(key).removeprefix("DynamicField_")
+        values = value if isinstance(value, list) else [value]
+        dynamic_fields[fname] = [str(v) for v in values]
+
+    # Article only when SenderType + IsVisibleForCustomer are both present
+    # (Znuny TicketCreate.pm gate).
+    article: ArticleIn | None = None
+    if config.get("SenderType") is not None and config.get("IsVisibleForCustomer") is not None:
+        channel_raw = str(config.get("CommunicationChannel") or "Internal").lower()
+        channel = _ARTICLE_CHANNEL_MAP.get(channel_raw, "note")
+        article = ArticleIn(
+            sender_type=str(config["SenderType"]),
+            is_visible_for_customer=bool(config.get("IsVisibleForCustomer")),
+            subject=str(config.get("Subject") or title),
+            body=str(config.get("Body") or ""),
+            channel=channel,
+        )
+
+    params = TicketIn(
+        title=str(title)[:255],
+        queue_id=int(queue_id),
+        state_id=int(state_id),
+        priority_id=int(priority_id),
+        owner_id=int(owner_id),
+        lock_id=lock_id,
+        type_id=int(type_id) if type_id is not None else None,
+        service_id=int(service_id) if service_id is not None else None,
+        sla_id=int(sla_id) if sla_id is not None else None,
+        responsible_id=int(responsible_id) if responsible_id is not None else None,
+        customer_id=customer_id,
+        customer_user_id=customer_user_id,
+        archive_flag=archive_flag,
+        dynamic_fields=dynamic_fields,
+        article=article,
+    )
+
+    factory = _session_factory_from(session)
+    new_ticket_id = await create_ticket(
+        session,
+        factory,
+        sysconfig,
+        params=params,
+        user_id=user_id,
+    )
+
+    # Optional pending time on the *new* ticket (Znuny PendingTime / PendingTimeDiff).
+    pending_time: datetime | None = None
+    if config.get("PendingTime"):
+        validated = _value_validate(str(config["PendingTime"]).strip())
+        epoch = _as_integer(validated)
+        if epoch is not None:
+            pending_time = datetime.fromtimestamp(epoch, tz=UTC)
+    elif config.get("PendingTimeDiff") is not None:
+        pending_time = datetime.now(UTC) + timedelta(seconds=int(config["PendingTimeDiff"]))
+    if pending_time is not None:
+        await _set_ticket_pending_time(
+            session, ticket_id=new_ticket_id, pending_time=pending_time, user_id=user_id
+        )
+
+    link_as = config.get("LinkAs")
+    if link_as:
+        resolved = await _resolve_link_as(session, str(link_as))
+        if resolved is None:
+            logger.warning("TicketCreate: LinkAs %r is invalid; skipping link", link_as)
+        else:
+            link_type, direction = resolved
+            if direction == "Source":
+                source_id, target_id = new_ticket_id, ticket_id
+            else:
+                source_id, target_id = ticket_id, new_ticket_id
+            await link_tickets(
+                session,
+                source_ticket_id=source_id,
+                target_ticket_id=target_id,
+                link_type=link_type,
+                user_id=user_id,
+            )
+
+
 _ActionHandler = Callable[[AsyncSession, dict[str, Any], int, int, SysConfig], Awaitable[None]]
 
 _ACTION_HANDLERS: dict[str, _ActionHandler] = {
@@ -878,6 +1254,7 @@ _ACTION_HANDLERS: dict[str, _ActionHandler] = {
     "DynamicFieldSet": _action_dynamic_field_set,
     "DynamicFieldRemove": _action_dynamic_field_remove,
     "DynamicFieldIncrement": _action_dynamic_field_increment,
+    "DynamicFieldPendingTimeSet": _action_dynamic_field_pending_time_set,
     "TicketArticleCreate": _action_ticket_article_create,
     "ArticleSend": _action_article_send,
     "TicketTypeSet": _action_ticket_type_set,
@@ -885,11 +1262,12 @@ _ACTION_HANDLERS: dict[str, _ActionHandler] = {
     "TicketSLASet": _action_ticket_sla_set,
     "TicketWatchSet": _action_ticket_watch_set,
     "LinkAdd": _action_link_add,
+    "TicketCreate": _action_ticket_create,
 }
 """Implemented TransitionAction modules, keyed by the last ``::``-segment of
 ``TransitionActionConfig.module``. Remaining deferred modules include
-``DynamicFieldPendingTimeSet``, ``TicketCreate``, ``ExecuteInvoker``,
-``Appointment*``, ``ConfigItemUpdate`` — see :func:`execute_transition_action`."""
+``ExecuteInvoker``, ``Appointment*``, ``ConfigItemUpdate`` — see
+:func:`execute_transition_action`."""
 
 
 def _module_short_name(module: str) -> str:
