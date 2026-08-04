@@ -113,7 +113,9 @@
     "cancel": "Abbrechen",
     "help": "Hilfe",
     "edit": "Bearbeiten",
-    "save": "Speichern"
+    "save": "Speichern",
+    "submit": "Submit",
+    "delete": "Delete"
   },
   "otp": {
     "verifying": "Prüfe Code…",
@@ -1285,7 +1287,8 @@
       "services": "Services",
       "slas": "SLAs",
       "systemAddresses": "Systemadressen",
-      "notificationEvents": "Benachrichtigungen"
+      "notificationEvents": "Benachrichtigungen",
+      "ticketAttributeRelations": "Attribute relations"
     },
     "table": {
       "id": "ID",
@@ -2325,7 +2328,8 @@
       "services": "Services verwalten und mit SLAs verknüpfen.",
       "slas": "Service-Level-Agreements und Fristen verwalten.",
       "systemAddresses": "Absenderadressen für Queues und Auto-Antworten.",
-      "notificationEvents": "Ereignisbasierte Agenten-Benachrichtigungen konfigurieren."
+      "notificationEvents": "Ereignisbasierte Agenten-Benachrichtigungen konfigurieren.",
+      "ticketAttributeRelations": "Znuny-compatible service/queue (and similar) dependency matrices (CSV)."
     },
     "types": {
       "title_plural": "Ticket-Typen",
@@ -2362,6 +2366,16 @@
       "event": "Ereignis",
       "subject": "Betreff",
       "body": "Text"
+    },
+    "tar": {
+      "title": "Ticket attribute relations",
+      "filename": "Filename",
+      "attributes": "Attributes",
+      "priority": "Priority",
+      "csv": "CSV data",
+      "new": "New relation",
+      "help": "CSV with header Attribute1;Attribute2 and value pairs (Znuny AdminTicketAttributeRelations). Used to restrict form pickers (e.g. Service → Queue).",
+      "confirmDelete": "Delete this relation?"
     }
   },
   "kb": {
@@ -2571,12 +2585,13 @@
   "process": {
     "widget": {
       "title": "Prozess",
-      "activity": "Aktuelle Aktivität",
+      "activity": "Activity",
       "notInProcess": "Dieses Ticket ist Teil keines Prozesses.",
       "startButton": "Prozess starten",
       "actions": "Verfügbare Aktionen",
       "loadError": "Prozessstatus konnte nicht geladen werden.",
-      "noDialogs": "Keine Aktionen bei dieser Aktivität verfügbar."
+      "noDialogs": "Keine Aktionen bei dieser Aktivität verfügbar.",
+      "noCustomerDialogs": "No customer dialogs available at this step."
     },
     "start": {
       "title": "Prozess starten",

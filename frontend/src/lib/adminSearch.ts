@@ -219,6 +219,21 @@ export const ADMIN_PAGES: AdminPageEntry[] = [
     keywords: ["access control", "zugriffskontrolle", "berechtigung", "permissions"],
   },
   {
+    slug: "ticket-attribute-relations",
+    route: "/admin/ticket-attribute-relations",
+    group: "tickets",
+    nameKey: "admin.nav.ticketAttributeRelations",
+    descriptionKey: "admin.pageDescriptions.ticketAttributeRelations",
+    keywords: [
+      "attribute relations",
+      "ticket attribute",
+      "abhängigkeiten",
+      "service queue",
+      "csv",
+      "znuny",
+    ],
+  },
+  {
     slug: "processes",
     route: "/admin/processes",
     group: "tickets",

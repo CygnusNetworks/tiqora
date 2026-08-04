@@ -71,6 +71,31 @@ class Sessions(LegacyBase):
     serialized: Mapped[int] = mapped_column(SmallInteger, nullable=False)
 
 
+class AclTicketAttributeRelations(LegacyBase):
+    """Znuny table ``acl_ticket_attribute_relations``.
+
+    Stores CSV (or Excel base64) dependency matrices: header row =
+    Attribute1;Attribute2, data rows map values of attr1 → allowed attr2.
+    Shared with Znuny AdminTicketAttributeRelations — never Alembic-owned.
+    """
+
+    __tablename__ = "acl_ticket_attribute_relations"
+
+    id: Mapped[int] = mapped_column(
+        BigInteger, primary_key=True, autoincrement=True, nullable=False
+    )
+    filename: Mapped[str] = mapped_column(String(255), nullable=False)
+    attribute_1: Mapped[str] = mapped_column(String(200), nullable=False)
+    attribute_2: Mapped[str] = mapped_column(String(200), nullable=False)
+    # CSV text (or base64 Excel) — same as Znuny ``acl_data`` LONGBLOB→text.
+    acl_data: Mapped[str] = mapped_column(Text, nullable=False)
+    priority: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    create_time: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    create_by: Mapped[int] = mapped_column(Integer, nullable=False)
+    change_time: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    change_by: Mapped[int] = mapped_column(Integer, nullable=False)
+
+
 class MailQueue(LegacyBase):
     """Znuny table `mail_queue`."""
 

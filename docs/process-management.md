@@ -142,6 +142,10 @@ docstring in `api/v1/process.py`).
 - **Admin**: read-only `/admin/processes` list (`routes/admin/ProcessesPage.tsx`)
   and detail view (`routes/admin/ProcessDetailPage.tsx`) — browse processes,
   activities, dialogs, and transitions.
+- **Customer portal**: `PortalProcessWidget` + `/api/portal/process/*`
+  expose start/submit for dialogs whose YAML ``Interface`` includes
+  ``CustomerInterface`` (Znuny parity). Writes use system user id 1 (same
+  as other portal ticket writes).
 - **Out of scope**: there is no visual process *designer*. Processes must
   still be authored via Znuny's admin UI (`AdminProcessManagement`) or by
   writing directly to the `pm_*` tables / their YAML `config` columns.

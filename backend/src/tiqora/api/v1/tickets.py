@@ -583,7 +583,7 @@ async def ticket_field_options(
     from tiqora.api.v1.reference import collect_ticket_field_options
 
     try:
-        await TicketService(session).get_ticket(user.id, ticket_id)
+        detail = await TicketService(session).get_ticket(user.id, ticket_id)
     except (TicketNotFound, TicketAccessDenied) as exc:
         raise _map_exc(exc) from exc
 
@@ -594,6 +594,12 @@ async def ticket_field_options(
         fields=requested,
         ticket_id=ticket_id,
         action=action,
+        queue_id=getattr(detail, "queue_id", None),
+        service_id=getattr(detail, "service_id", None),
+        type_id=getattr(detail, "type_id", None),
+        state_id=getattr(detail, "state_id", None),
+        priority_id=getattr(detail, "priority_id", None),
+        sla_id=getattr(detail, "sla_id", None),
     )
     return result.model_dump()
 

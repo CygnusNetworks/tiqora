@@ -156,8 +156,9 @@ transport, session, or crypto edge cases.
 | PGP / S-MIME | engines + admin `/admin/crypto-keys` (import/audit); no Znuny-style full keyring UI |
 | System configuration | reader only; no deploy/edit UI (platform choice) |
 | ACL | ✅ admin CRUD + TicketACL runtime (`domain/ticket_acl.py`); group/role still for queue access |
-| Process designer / customer process UI | authoring stays Znuny or DB/YAML; **no** portal process UI |
+| Process designer / customer process UI | authoring stays Znuny or DB/YAML; **portal process UI** for CustomerInterface dialogs ✅ |
 | Process deferred actions | remaining: `ExecuteInvoker`, `Appointment*`, `ConfigItemUpdate`, condition `Module` |
+| Ticket attribute relations | ✅ admin CSV CRUD + picker filter (Service→Queue etc.) |
 | Time-accounting report | ✅ agent `/agent/time-accounting` + `GET /api/v1/tickets/time-accounting` |
 
 ### Integration & mail parity
@@ -247,7 +248,7 @@ SMTP outbound via config name).
 | Znuny | Tiqora portal |
 |---|---|
 | Overview, zoom, message, search, attachment | ✅ core |
-| Process | ❌ |
+| Process | ✅ CustomerInterface dialogs (start/submit) |
 | Preferences / accept | ⚠️ minimal |
 | Print | ❌ |
 
@@ -280,12 +281,11 @@ custom ops, GI admin ❌ — see §1.6 and
 
 Prioritised product roadmap only — not an automatic implementation mandate:
 
-1. **Process** — remaining `ExecuteInvoker` / `Appointment*` / `ConfigItemUpdate`
-   + optional designer (or keep authoring in Znuny)
-2. **Portal process UI** (customer interface activity dialogs)
-3. **Ticket attribute relations** + note-to-linked
-4. **Package manager / SysConfig UI** only if there is explicit demand
-5. Remainder (stats framework, GI side-effects, Module conditions, …)
+1. **Process designer** (or keep authoring in Znuny) + remaining actions
+   `ExecuteInvoker` / `Appointment*` / `ConfigItemUpdate` / condition `Module`
+2. **Note-to-linked** tickets
+3. **Package manager / SysConfig UI** only if there is explicit demand
+4. Remainder (stats framework, GI side-effects, …)
 
 Already done and removed from this list: GI Session/History/TimeAccounting/OOO;
 postmaster-filter CRUD; API-key lifecycle / MCP P1; **type/service/SLA E2E**;

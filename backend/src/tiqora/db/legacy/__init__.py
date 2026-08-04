@@ -20,6 +20,7 @@ from tiqora.db.legacy.article import (  # noqa: F401
 from tiqora.db.legacy.base import LegacyBase, legacy_metadata
 from tiqora.db.legacy.config import (  # noqa: F401
     Acl,
+    AclTicketAttributeRelations,
     GenericAgentJobs,
     GiWebserviceConfig,
     MailQueue,

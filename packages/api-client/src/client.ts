@@ -2659,9 +2659,18 @@ export class ApiClient {
     return this.request<void>("DELETE", `/api/v1/admin/acl/${aclId}`, { signal });
   }
 
-  /** ACL-filtered field options for new-ticket forms. */
+  /** ACL + attribute-relation filtered field options for new-ticket forms. */
   ticketFieldOptions(
-    params?: { fields?: string; action?: string; queueId?: number },
+    params?: {
+      fields?: string;
+      action?: string;
+      queueId?: number;
+      serviceId?: number;
+      typeId?: number;
+      stateId?: number;
+      priorityId?: number;
+      slaId?: number;
+    },
     signal?: AbortSignal,
   ) {
     return this.request<{
@@ -2676,6 +2685,11 @@ export class ApiClient {
         fields: params?.fields,
         action: params?.action,
         queue_id: params?.queueId,
+        service_id: params?.serviceId,
+        type_id: params?.typeId,
+        state_id: params?.stateId,
+        priority_id: params?.priorityId,
+        sla_id: params?.slaId,
       },
       signal,
     });
@@ -3010,6 +3024,111 @@ export class ApiClient {
       `/api/v1/process/ticket/${ticketId}/submit`,
       { body, signal },
     );
+  }
+
+  // ── Portal ProcessManagement (/api/portal/process) ─────────────────────
+
+  portalListProcesses(signal?: AbortSignal) {
+    return this.request<ProcessSummaryOut[]>("GET", "/api/portal/process/", { signal });
+  }
+
+  portalGetActivityDialog(activityDialogEntityId: string, signal?: AbortSignal) {
+    return this.request<ActivityDialogDetailOut>(
+      "GET",
+      `/api/portal/process/activity-dialog/${encodeURIComponent(activityDialogEntityId)}`,
+      { signal },
+    );
+  }
+
+  portalGetTicketProcessState(ticketId: number, signal?: AbortSignal) {
+    return this.request<TicketProcessStateOut>(
+      "GET",
+      `/api/portal/process/ticket/${ticketId}/state`,
+      { signal },
+    );
+  }
+
+  portalStartTicketProcess(ticketId: number, body: ProcessStartIn, signal?: AbortSignal) {
+    return this.request<TicketProcessStateOut>(
+      "POST",
+      `/api/portal/process/ticket/${ticketId}/start`,
+      { body, signal },
+    );
+  }
+
+  portalSubmitActivityDialog(
+    ticketId: number,
+    body: ActivityDialogSubmitIn,
+    signal?: AbortSignal,
+  ) {
+    return this.request<ActivityDialogSubmitOut>(
+      "POST",
+      `/api/portal/process/ticket/${ticketId}/submit`,
+      { body, signal },
+    );
+  }
+
+  // ── Admin Ticket Attribute Relations ───────────────────────────────────
+
+  listTicketAttributeRelations(signal?: AbortSignal) {
+    return this.request<
+      Array<{
+        id: number;
+        filename: string;
+        attribute_1: string;
+        attribute_2: string;
+        acl_data: string;
+        priority: number;
+        create_time?: string | null;
+        change_time?: string | null;
+      }>
+    >("GET", "/api/v1/admin/ticket-attribute-relations", { signal });
+  }
+
+  getTicketAttributeRelation(relationId: number, signal?: AbortSignal) {
+    return this.request<{
+      id: number;
+      filename: string;
+      attribute_1: string;
+      attribute_2: string;
+      acl_data: string;
+      priority: number;
+    }>("GET", `/api/v1/admin/ticket-attribute-relations/${relationId}`, { signal });
+  }
+
+  createTicketAttributeRelation(
+    body: { filename: string; acl_data: string; priority?: number },
+    signal?: AbortSignal,
+  ) {
+    return this.request<{
+      id: number;
+      filename: string;
+      attribute_1: string;
+      attribute_2: string;
+      acl_data: string;
+      priority: number;
+    }>("POST", "/api/v1/admin/ticket-attribute-relations", { body, signal });
+  }
+
+  updateTicketAttributeRelation(
+    relationId: number,
+    body: { filename?: string; acl_data?: string; priority?: number },
+    signal?: AbortSignal,
+  ) {
+    return this.request<{
+      id: number;
+      filename: string;
+      attribute_1: string;
+      attribute_2: string;
+      acl_data: string;
+      priority: number;
+    }>("PATCH", `/api/v1/admin/ticket-attribute-relations/${relationId}`, { body, signal });
+  }
+
+  deleteTicketAttributeRelation(relationId: number, signal?: AbortSignal) {
+    return this.request<void>("DELETE", `/api/v1/admin/ticket-attribute-relations/${relationId}`, {
+      signal,
+    });
   }
 }
 

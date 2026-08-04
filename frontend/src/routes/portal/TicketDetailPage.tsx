@@ -10,6 +10,7 @@ import { Spinner } from "@/components/ui/Spinner";
 import { Button } from "@/components/ui/Button";
 import { StateChip } from "@/components/ui/StatusChip";
 import { cn } from "@/lib/cn";
+import { PortalProcessWidget } from "@/components/portal/PortalProcessWidget";
 
 /**
  * Locally-known article bodies for this browser session.
@@ -146,6 +147,8 @@ export function TicketDetailPage() {
         isLoading={articlesQ.isLoading}
         locale={locale}
       />
+
+      <PortalProcessWidget ticketId={ticketId} />
 
       <form
         onSubmit={(e) => void onSubmitReply(e)}
