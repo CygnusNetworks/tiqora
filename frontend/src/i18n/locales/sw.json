@@ -1223,7 +1223,9 @@
       "aiQueues": "Sera za foleni",
       "aiAudit": "Omba ukaguzi",
       "aiAcl": "Ufikiaji na mipaka",
-      "collapse": "Kunja urambazaji"
+      "collapse": "Kunja urambazaji",
+      "mailAccounts": "Akaunti za barua",
+      "oauth2Tokens": "OAuth2 tokeni (barua)"
     },
     "table": {
       "id": "ID",
@@ -1698,7 +1700,10 @@
       "testTo": "Tuma jaribio kwa anwani (si lazima)",
       "testSuccess": "Jaribio limefaulu",
       "testFailure": "Jaribio limeshindwa",
-      "loadError": "Imeshindwa kupakia mipangilio."
+      "loadError": "Imeshindwa kupakia mipangilio.",
+      "authOAuth2": "Tokeni ya OAuth2",
+      "oauth2TokenConfigName": "Jina la usanidi wa tokeni ya OAuth2",
+      "oauth2TokenConfigNameHelp": "Jina la usanidi wa tokeni ya OAuth2 (sawa na moduli ya Znuny Sendmail::OAuth2TokenConfigName)."
     },
     "subjectConfig": {
       "title": "Nambari ya tikiti katika somo",
@@ -2200,7 +2205,54 @@
       "aiMcp": "Dhibiti seva za MCP kama vyanzo vya zana za AI na uwashe zana.",
       "aiQueues": "Sanidi tabia ya AI kwa kila foleni: uhuru, kofia, kupanda.",
       "aiAudit": "Ukaguzi kamili wa kila ombi/jibu la LLM, huku PII ikifichuliwa.",
-      "aiAcl": "Ruhusa za AI na sehemu kwa kila kikundi, jukumu, au wakala."
+      "aiAcl": "Ruhusa za AI na sehemu kwa kila kikundi, jukumu, au wakala.",
+      "mailAccounts": "Sanduku za barua za IMAP/POP zinazoingia (nenosiri au OAuth2).",
+      "oauth2Tokens": "Mipangilio ya tokeni ya OAuth2 kwa barua pepe ya Microsoft/Google (Inaendana na Znuny)."
+    },
+    "mailAccounts": {
+      "title_plural": "Akaunti za barua",
+      "authOAuth2": "Tokeni ya OAuth2",
+      "new": "Akaunti mpya ya barua",
+      "login": "Ingia / barua pepe",
+      "password": "Nenosiri",
+      "authPassword": "Nenosiri",
+      "passwordHelp": "Acha tupu unapohariri ili kuweka nenosiri la sasa. Haitumiki kwa OAuth2.",
+      "host": "Mwenyeji",
+      "accountType": "Aina",
+      "queue": "Foleni",
+      "imapFolder": "Folda ya IMAP",
+      "authType": "Uthibitishaji",
+      "oauthConfig": "Mipangilio ya tokeni ya OAuth2",
+      "oauthConfigHelp": "Inahitajika wakati uthibitishaji ni OAuth2.",
+      "trusted": "Inaaminika",
+      "trustedHelp": "Amini vichwa vya X-OTRS kutoka kwa akaunti hii (semantiki za Znuny).",
+      "comments": "Maoni"
+    },
+    "oauth2": {
+      "title_plural": "OAuth2 tokeni (barua)",
+      "new": "Mpangilio wa ishara mpya",
+      "name": "Jina",
+      "template": "Kiolezo cha mtoaji",
+      "templateNone": "Maalum / hakuna",
+      "templateHelp": "Hujaza mapema URL za ombi za Microsoft au Google na upeo (violezo vya Znuny).",
+      "clientId": "Kitambulisho cha Mteja",
+      "clientSecret": "Siri ya mteja",
+      "clientSecretHelp": "Acha wazi wakati wa kuhariri ili kuweka siri iliyohifadhiwa.",
+      "scope": "Upeo",
+      "scopeHelp": "Mawanda ya OAuth yaliyotenganishwa na nafasi (inajumuisha ufikiaji_wa_offline kwa tokeni za kuonyesha upya).",
+      "redirectUri": "Elekeza URI kwingine",
+      "redirectUriHelp": "Sajili URI hii kamili katika Azure/Google. Weka TIQORA_PUBLIC_BASE_URL katika toleo la umma.",
+      "tokenStatus": "Hali ya ishara",
+      "tokenStatusNone": "Hakuna ishara",
+      "tokenStatusValid": "Halali",
+      "tokenStatusExpired": "Muda wake umeisha (unaoonyeshwa upya)",
+      "tokenStatusNeedsReauth": "Inahitaji uidhinishaji upya",
+      "tokenStatusError": "Hitilafu",
+      "authorize": "Idhinisha...",
+      "refresh": "Onyesha upya tokeni",
+      "working": "Inafanya kazi...",
+      "authorizeOpened": "Ukurasa wa uidhinishaji umefunguliwa kwenye kichupo kipya.",
+      "refreshSuccess": "Tokeni imeonyeshwa upya."
     }
   },
   "kb": {

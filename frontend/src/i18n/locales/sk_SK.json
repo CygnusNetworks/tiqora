@@ -1223,7 +1223,9 @@
       "aiQueues": "Zásady frontu",
       "aiAudit": "Požiadať o audit",
       "aiAcl": "Prístup a limity",
-      "collapse": "Zbaliť navigáciu"
+      "collapse": "Zbaliť navigáciu",
+      "mailAccounts": "Poštové účty",
+      "oauth2Tokens": "Tokeny OAuth2 (pošta)"
     },
     "table": {
       "id": "ID",
@@ -1698,7 +1700,10 @@
       "testTo": "Odoslať test na adresu (voliteľné)",
       "testSuccess": "Test bol úspešný",
       "testFailure": "Test zlyhal",
-      "loadError": "Nepodarilo sa načítať nastavenia."
+      "loadError": "Nepodarilo sa načítať nastavenia.",
+      "authOAuth2": "Token OAuth2",
+      "oauth2TokenConfigName": "Názov konfigurácie tokenu OAuth2",
+      "oauth2TokenConfigNameHelp": "Názov konfigurácie tokenu OAuth2 (rovnaký ako Znuny SendmailModule::OAuth2TokenConfigName)."
     },
     "subjectConfig": {
       "title": "Číslo lístka v predmete",
@@ -2200,7 +2205,54 @@
       "aiMcp": "Spravujte servery MCP ako zdroje nástrojov pre AI a aktivujte nástroje.",
       "aiQueues": "Konfigurácia správania AI podľa frontu: autonómia, obmedzenia, eskalácia.",
       "aiAudit": "Úplný audit každej požiadavky/odpovede LLM s odhalením PII.",
-      "aiAcl": "Povolenia a kvóty AI na skupinu, rolu alebo agenta."
+      "aiAcl": "Povolenia a kvóty AI na skupinu, rolu alebo agenta.",
+      "mailAccounts": "Prichádzajúce poštové schránky IMAP/POP (heslo alebo OAuth2).",
+      "oauth2Tokens": "Konfigurácie tokenov OAuth2 pre poštu Microsoft/Google (kompatibilné so Znuny)."
+    },
+    "mailAccounts": {
+      "title_plural": "Poštové účty",
+      "authOAuth2": "Token OAuth2",
+      "new": "Nový poštový účet",
+      "login": "Prihlásenie / email",
+      "password": "heslo",
+      "authPassword": "heslo",
+      "passwordHelp": "Ak chcete zachovať aktuálne heslo, pri úprave ponechajte prázdne. Nepoužíva sa pre OAuth2.",
+      "host": "Hostiteľ",
+      "accountType": "Typ",
+      "queue": "Fronta",
+      "imapFolder": "priečinok IMAP",
+      "authType": "autentifikácia",
+      "oauthConfig": "Konfigurácia tokenu OAuth2",
+      "oauthConfigHelp": "Vyžaduje sa, keď je overenie OAuth2.",
+      "trusted": "dôveryhodný",
+      "trustedHelp": "Dôverujte hlavičkám X-OTRS z tohto účtu (sémantika Znuny).",
+      "comments": "Komentujte"
+    },
+    "oauth2": {
+      "title_plural": "Tokeny OAuth2 (pošta)",
+      "new": "Nová konfigurácia tokenu",
+      "name": "Meno",
+      "template": "Šablóna poskytovateľa",
+      "templateNone": "Vlastné / žiadne",
+      "templateHelp": "Predvyplní adresy URL a rozsahy žiadostí Microsoft alebo Google (šablóny Znuny).",
+      "clientId": "ID klienta",
+      "clientSecret": "Tajomstvo klienta",
+      "clientSecretHelp": "Ak chcete zachovať uložené tajomstvo, pri úprave ponechajte prázdne.",
+      "scope": "Rozsah",
+      "scopeHelp": "Rozsahy OAuth oddelené medzerou (vrátane prístupu offline_access pre obnovovacie tokeny).",
+      "redirectUri": "Presmerovať URI",
+      "redirectUriHelp": "Zaregistrujte presne tento URI v Azure/Google. Nastaviť TIQORA_PUBLIC_BASE_URL v produkcii.",
+      "tokenStatus": "Stav tokenu",
+      "tokenStatusNone": "Žiadny token",
+      "tokenStatusValid": "Platné",
+      "tokenStatusExpired": "Platnosť uplynula (obnoviteľné)",
+      "tokenStatusNeedsReauth": "Vyžaduje opätovnú autorizáciu",
+      "tokenStatusError": "Chyba",
+      "authorize": "Autorizovať…",
+      "refresh": "Obnoviť token",
+      "working": "Pracuje sa…",
+      "authorizeOpened": "Stránka autorizácie sa otvorila na novej karte.",
+      "refreshSuccess": "Token bol obnovený."
     }
   },
   "kb": {

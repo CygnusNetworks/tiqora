@@ -1223,7 +1223,9 @@
       "aiQueues": "Rindu politikas",
       "aiAudit": "Pieprasīt auditu",
       "aiAcl": "Piekļuve un ierobežojumi",
-      "collapse": "Sakļaut navigāciju"
+      "collapse": "Sakļaut navigāciju",
+      "mailAccounts": "Pasta konti",
+      "oauth2Tokens": "OAuth2 pilnvaras (pasts)"
     },
     "table": {
       "id": "ID",
@@ -1698,7 +1700,10 @@
       "testTo": "Sūtīt testu uz adresi (neobligāti)",
       "testSuccess": "Pārbaude izdevās",
       "testFailure": "Pārbaude neizdevās",
-      "loadError": "Neizdevās ielādēt iestatījumus."
+      "loadError": "Neizdevās ielādēt iestatījumus.",
+      "authOAuth2": "OAuth2 pilnvara",
+      "oauth2TokenConfigName": "OAuth2 pilnvaras konfigurācijas nosaukums",
+      "oauth2TokenConfigNameHelp": "OAuth2 pilnvaras konfigurācijas nosaukums (tāds pats kā Znuny SendmailModule::OAuth2TokenConfigName)."
     },
     "subjectConfig": {
       "title": "Biļetes numurs priekšmetā",
@@ -2200,7 +2205,54 @@
       "aiMcp": "Pārvaldiet MCP serverus kā AI rīku avotus un iespējojiet rīkus.",
       "aiQueues": "Konfigurējiet AI darbību katrā rindā: autonomija, ierobežojumi, eskalācija.",
       "aiAudit": "Pilnīgs katra LLM pieprasījuma/atbildes audits, atklājot PII.",
-      "aiAcl": "AI atļaujas un kvotas katrai grupai, lomai vai aģentam."
+      "aiAcl": "AI atļaujas un kvotas katrai grupai, lomai vai aģentam.",
+      "mailAccounts": "Ienākošās IMAP/POP pastkastes (parole vai OAuth2).",
+      "oauth2Tokens": "OAuth2 pilnvaras konfigurācijas Microsoft/Google pastam (saderīgas ar Znuny)."
+    },
+    "mailAccounts": {
+      "title_plural": "Pasta konti",
+      "authOAuth2": "OAuth2 pilnvara",
+      "new": "Jauns pasta konts",
+      "login": "Pieteikšanās / e-pasts",
+      "password": "Parole",
+      "authPassword": "Parole",
+      "passwordHelp": "Rediģēt atstājiet tukšu, lai saglabātu pašreizējo paroli. Netiek izmantots OAuth2.",
+      "host": "Uzņēmēja",
+      "accountType": "Tips",
+      "queue": "Rinda",
+      "imapFolder": "IMAP mape",
+      "authType": "Autentifikācija",
+      "oauthConfig": "OAuth2 pilnvaras konfigurācija",
+      "oauthConfigHelp": "Nepieciešams, ja autentifikācija ir OAuth2.",
+      "trusted": "Uzticams",
+      "trustedHelp": "Uzticieties X-OTRS galvenēm no šī konta (Znuny semantika).",
+      "comments": "komentēt"
+    },
+    "oauth2": {
+      "title_plural": "OAuth2 pilnvaras (pasts)",
+      "new": "Jauna marķiera konfigurācija",
+      "name": "Vārds",
+      "template": "Pakalpojumu sniedzēja veidne",
+      "templateNone": "Pielāgots / nav",
+      "templateHelp": "Iepriekš aizpilda Microsoft vai Google pieprasījumu URL un tvērumus (Znuny veidnes).",
+      "clientId": "Klienta ID",
+      "clientSecret": "Klienta noslēpums",
+      "clientSecretHelp": "Rediģējot, atstājiet tukšu, lai saglabātu saglabāto noslēpumu.",
+      "scope": "Darbības joma",
+      "scopeHelp": "Ar atstarpi atdalīti OAuth tvērumi (ietveriet offline_access atsvaidzināšanas pilnvarām).",
+      "redirectUri": "Novirzīt URI",
+      "redirectUriHelp": "Reģistrējiet tieši šo URI pakalpojumā Azure/Google. Iestatīt TIQORA_PUBLIC_BASE_URL ražošanas režīmā.",
+      "tokenStatus": "Žetona statuss",
+      "tokenStatusNone": "Nav marķiera",
+      "tokenStatusValid": "Derīgs",
+      "tokenStatusExpired": "Beidzies derīguma termiņš (atjaunojams)",
+      "tokenStatusNeedsReauth": "Nepieciešama atkārtota autorizācija",
+      "tokenStatusError": "Kļūda",
+      "authorize": "Autorizēt…",
+      "refresh": "Atsvaidzināt pilnvaru",
+      "working": "Strādā…",
+      "authorizeOpened": "Autorizācijas lapa ir atvērta jaunā cilnē.",
+      "refreshSuccess": "Tokens ir atsvaidzināts."
     }
   },
   "kb": {

@@ -183,6 +183,67 @@ async def test_fetch_account_imap_happy_path(monkeypatch: pytest.MonkeyPatch) ->
     assert fake.logout_called is True
 
 
+async def test_fetch_account_imap_oauth2(monkeypatch: pytest.MonkeyPatch) -> None:
+    """XOAUTH2 path uses authenticate instead of login."""
+    fake = _FakeImap(
+        uids=[b"1"],
+        sizes={b"1": 5},
+        bodies={b"1": b"From: a@example.com\r\n\r\nhi"},
+    )
+    auth_calls: list[tuple[str, object]] = []
+
+    def authenticate(self: _FakeImap, mechanism: str, authobject: object) -> tuple[str, list[bytes]]:
+        auth_calls.append((mechanism, authobject))
+        # Simulate imaplib calling the handler with an empty challenge.
+        if callable(authobject):
+            authobject(b"")
+        return ("OK", [b""])
+
+    fake.authenticate = authenticate.__get__(fake, _FakeImap)  # type: ignore[method-assign]
+    monkeypatch.setattr(imaplib, "IMAP4", _imap_factory(fake))
+
+    async def _fake_token(*_a: object, **_k: object) -> str:
+        return "access-token-xyz"
+
+    monkeypatch.setattr(
+        "tiqora.domain.oauth2_mail.get_access_token",
+        _fake_token,
+    )
+    monkeypatch.setattr(
+        "tiqora.domain.oauth2_mail.ensure_oauth2_available",
+        lambda: None,
+    )
+
+    account = _account(
+        account_type="IMAP",
+        authentication_type="oauth2_token",
+        oauth2_token_config_id=42,
+        pw="",
+    )
+    # session is required for oauth but get_access_token is mocked
+    result = await fetch_account(
+        account, max_size_kb=1024, leave_on_server=True, session=object()  # type: ignore[arg-type]
+    )
+
+    assert result.errors == []
+    assert len(result.messages) == 1
+    assert fake.login_calls == []
+    assert auth_calls and auth_calls[0][0] == "XOAUTH2"
+
+
+async def test_fetch_account_oauth2_missing_config_id() -> None:
+    account = _account(
+        account_type="IMAP",
+        authentication_type="oauth2_token",
+        oauth2_token_config_id=None,
+    )
+    result = await fetch_account(
+        account, max_size_kb=1024, leave_on_server=True, session=object()  # type: ignore[arg-type]
+    )
+    assert result.messages == []
+    assert any("oauth2_token_config_id" in e for e in result.errors)
+
+
 async def test_fetch_account_imap_uses_ssl_for_imaps(monkeypatch: pytest.MonkeyPatch) -> None:
     fake = _FakeImap()
     calls: list[tuple[str, int]] = []

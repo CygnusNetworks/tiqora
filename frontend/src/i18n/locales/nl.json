@@ -1223,7 +1223,9 @@
       "aiQueues": "Wachtrijbeleidsregels",
       "aiAudit": "Aanvraagaudit",
       "aiAcl": "Toegang en limieten",
-      "collapse": "Navigatie inklappen"
+      "collapse": "Navigatie inklappen",
+      "mailAccounts": "Mailaccounts",
+      "oauth2Tokens": "OAuth2-tokens (mail)"
     },
     "table": {
       "id": "ID",
@@ -1698,7 +1700,10 @@
       "testTo": "Test verzenden naar adres (optioneel)",
       "testSuccess": "Test geslaagd",
       "testFailure": "Test mislukt",
-      "loadError": "Kan instellingen niet laden."
+      "loadError": "Kan instellingen niet laden.",
+      "authOAuth2": "OAuth2-token",
+      "oauth2TokenConfigName": "OAuth2-tokenconfiguratienaam",
+      "oauth2TokenConfigNameHelp": "Naam van een OAuth2-tokenconfiguratie (hetzelfde als Znuny SendmailModule::OAuth2TokenConfigName)."
     },
     "subjectConfig": {
       "title": "Ticketnummer in onderwerp",
@@ -2200,7 +2205,54 @@
       "aiMcp": "Beheer MCP-servers als toolbronnen voor de AI en schakel tools in.",
       "aiQueues": "Configureer AI gedrag per wachtrij: autonomie, caps, escalatie.",
       "aiAudit": "Volledige audit van elk LLM verzoek/antwoord, met PII-onthulling.",
-      "aiAcl": "AI machtigingen en quota's per groep, rol of agent."
+      "aiAcl": "AI machtigingen en quota's per groep, rol of agent.",
+      "mailAccounts": "Inkomende IMAP/POP-mailboxen (wachtwoord of OAuth2).",
+      "oauth2Tokens": "OAuth2-tokenconfiguraties voor Microsoft/Google mail (Znuny-compatibel)."
+    },
+    "mailAccounts": {
+      "title_plural": "Mailaccounts",
+      "authOAuth2": "OAuth2-token",
+      "new": "Nieuw mailaccount",
+      "login": "Inloggen / e-mailen",
+      "password": "Wachtwoord",
+      "authPassword": "Wachtwoord",
+      "passwordHelp": "Laat dit leeg bij bewerken om het huidige wachtwoord te behouden. Niet gebruikt voor OAuth2.",
+      "host": "Gastheer",
+      "accountType": "Typ",
+      "queue": "Wachtrij",
+      "imapFolder": "IMAP-map",
+      "authType": "Authenticatie",
+      "oauthConfig": "OAuth2-tokenconfiguratie",
+      "oauthConfigHelp": "Vereist wanneer authenticatie OAuth2 is.",
+      "trusted": "Vertrouwd",
+      "trustedHelp": "Vertrouw X-OTRS-headers van dit account (Znuny-semantiek).",
+      "comments": "Commentaar"
+    },
+    "oauth2": {
+      "title_plural": "OAuth2-tokens (mail)",
+      "new": "Nieuwe tokenconfiguratie",
+      "name": "Naam",
+      "template": "Sjabloon voor aanbieder",
+      "templateNone": "Aangepast / geen",
+      "templateHelp": "Vult URL's en bereiken van Microsoft- of Google-verzoeken vooraf in (Znuny-sjablonen).",
+      "clientId": "Klant-ID",
+      "clientSecret": "Klantgeheim",
+      "clientSecretHelp": "Laat dit leeg bij bewerken om het opgeslagen geheim te behouden.",
+      "scope": "Reikwijdte",
+      "scopeHelp": "Door spaties gescheiden OAuth-bereiken (inclusief offline_access voor vernieuwingstokens).",
+      "redirectUri": "Omleidings-URI",
+      "redirectUriHelp": "Registreer deze exacte URI in Azure/Google. Zet TIQORA_PUBLIC_BASE_URL in productie.",
+      "tokenStatus": "Tokenstatus",
+      "tokenStatusNone": "Geen teken",
+      "tokenStatusValid": "Geldig",
+      "tokenStatusExpired": "Verlopen (vernieuwbaar)",
+      "tokenStatusNeedsReauth": "Er is opnieuw toestemming nodig",
+      "tokenStatusError": "Fout",
+      "authorize": "Autoriseren…",
+      "refresh": "Token vernieuwen",
+      "working": "Werken…",
+      "authorizeOpened": "Autorisatiepagina geopend in een nieuw tabblad.",
+      "refreshSuccess": "Token vernieuwd."
     }
   },
   "kb": {

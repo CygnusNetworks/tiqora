@@ -1223,7 +1223,9 @@
       "aiQueues": "대기열 정책",
       "aiAudit": "감사요청",
       "aiAcl": "액세스 및 제한",
-      "collapse": "탐색 접기"
+      "collapse": "탐색 접기",
+      "mailAccounts": "메일 계정",
+      "oauth2Tokens": "OAuth2 토큰(메일)"
     },
     "table": {
       "id": "ID",
@@ -1698,7 +1700,10 @@
       "testTo": "주소로 테스트 보내기(선택 사항)",
       "testSuccess": "테스트 성공",
       "testFailure": "테스트 실패",
-      "loadError": "설정을 로드하지 못했습니다."
+      "loadError": "설정을 로드하지 못했습니다.",
+      "authOAuth2": "OAuth2 토큰",
+      "oauth2TokenConfigName": "OAuth2 토큰 구성 이름",
+      "oauth2TokenConfigNameHelp": "OAuth2 토큰 구성의 이름(Znuny SendmailModule::OAuth2TokenConfigName과 동일)"
     },
     "subjectConfig": {
       "title": "제목의 티켓 번호",
@@ -2200,7 +2205,54 @@
       "aiMcp": "MCP 서버를 AI용 도구 소스로 관리하고 도구를 활성화합니다.",
       "aiQueues": "대기열별로 AI 동작을 구성합니다(자율성, 한도, 에스컬레이션).",
       "aiAudit": "PII 공개를 통해 모든 LLM 요청/응답에 대한 전체 감사를 수행합니다.",
-      "aiAcl": "그룹, 역할 또는 에이전트별 AI 권한 및 할당량."
+      "aiAcl": "그룹, 역할 또는 에이전트별 AI 권한 및 할당량.",
+      "mailAccounts": "수신 IMAP/POP 편지함(비밀번호 또는 OAuth2)",
+      "oauth2Tokens": "Microsoft/Google 메일용 OAuth2 토큰 구성(Znuny 호환)"
+    },
+    "mailAccounts": {
+      "title_plural": "메일 계정",
+      "authOAuth2": "OAuth2 토큰",
+      "new": "새 메일 계정",
+      "login": "로그인 / 이메일",
+      "password": "비밀번호",
+      "authPassword": "비밀번호",
+      "passwordHelp": "현재 비밀번호를 유지하려면 편집 시 공백으로 남겨두세요. OAuth2에는 사용되지 않습니다.",
+      "host": "호스트",
+      "accountType": "유형",
+      "queue": "대기열",
+      "imapFolder": "IMAP 폴더",
+      "authType": "인증",
+      "oauthConfig": "OAuth2 토큰 구성",
+      "oauthConfigHelp": "인증이 OAuth2인 경우 필수입니다.",
+      "trusted": "신뢰할 수 있는",
+      "trustedHelp": "이 계정의 X-OTRS 헤더를 신뢰하십시오(Znuny 의미론).",
+      "comments": "코멘트"
+    },
+    "oauth2": {
+      "title_plural": "OAuth2 토큰(메일)",
+      "new": "새 토큰 구성",
+      "name": "이름",
+      "template": "공급자 템플릿",
+      "templateNone": "사용자 정의 / 없음",
+      "templateHelp": "Microsoft 또는 Google 요청 URL 및 범위(Znuny 템플릿)를 미리 채웁니다.",
+      "clientId": "클라이언트 ID",
+      "clientSecret": "클라이언트 비밀번호",
+      "clientSecretHelp": "저장된 비밀을 유지하려면 편집 시 공백으로 남겨두세요.",
+      "scope": "범위",
+      "scopeHelp": "공백으로 구분된 OAuth 범위(새로 고침 토큰에 대한 오프라인_액세스 포함)",
+      "redirectUri": "리디렉션 URI",
+      "redirectUriHelp": "Azure/Google에 이 정확한 URI를 등록하세요. 프로덕션에서 TIQORA_PUBLIC_BASE_URL을 설정합니다.",
+      "tokenStatus": "토큰 상태",
+      "tokenStatusNone": "토큰 없음",
+      "tokenStatusValid": "유효",
+      "tokenStatusExpired": "만료됨(새로 고침 가능)",
+      "tokenStatusNeedsReauth": "재승인 필요",
+      "tokenStatusError": "오류",
+      "authorize": "승인…",
+      "refresh": "새로고침 토큰",
+      "working": "일하는 중…",
+      "authorizeOpened": "새 탭에 승인 페이지가 열렸습니다.",
+      "refreshSuccess": "토큰이 새로 고쳐졌습니다."
     }
   },
   "kb": {

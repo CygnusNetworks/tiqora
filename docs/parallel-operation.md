@@ -353,10 +353,14 @@ likely impact:
 - **Mail fetch transport**: blocking stdlib `imaplib`/`poplib` wrapped in
   `asyncio.to_thread`, not an async IMAP client or `Mail::IMAPClient`
   feature-for-feature port. OAuth2 mail account authentication
-  (`authentication_type = oauth2_token`) is **not implemented** — only
-  `password` auth. StartTLS is not offered for plain IMAP/POP3 (only the
-  implicit-TLS `IMAPS`/`POP3S` variants); Znuny supports both SSL and StartTLS
-  options per account.
+  (`authentication_type = oauth2_token`) uses the shared legacy
+  `oauth2_token` / `oauth2_token_config` tables (XOAUTH2 for IMAP/POP;
+  Znuny-compatible config JSON and `state=TokenConfigID{id}`). StartTLS is
+  not offered for plain IMAP/POP3 (only the implicit-TLS `IMAPS`/`POP3S`
+  variants); Znuny supports both SSL and StartTLS options per account.
+  In parallel operation, authorize tokens on **one** side only (Tiqora or
+  Znuny) so the redirect URI matches the IdP app registration; both daemons
+  can then consume/refresh the same token row.
 - **HTML→text conversion**: Znuny's `PostmasterAutoHTML2Text` uses a proper
   HTML-to-text converter; Tiqora's fallback (`channels/email/parser.py`) is a
   regex tag-strip. Formatting fidelity (lists, tables, links) is lost.

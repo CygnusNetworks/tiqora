@@ -1223,7 +1223,9 @@
       "aiQueues": "Dasar baris gilir",
       "aiAudit": "Minta audit",
       "aiAcl": "Akses & had",
-      "collapse": "Runtuhkan navigasi"
+      "collapse": "Runtuhkan navigasi",
+      "mailAccounts": "Akaun mel",
+      "oauth2Tokens": "Token OAuth2 (mel)"
     },
     "table": {
       "id": "ID",
@@ -1698,7 +1700,10 @@
       "testTo": "Hantar ujian ke alamat (pilihan)",
       "testSuccess": "Ujian berjaya",
       "testFailure": "Ujian gagal",
-      "loadError": "Gagal memuatkan tetapan."
+      "loadError": "Gagal memuatkan tetapan.",
+      "authOAuth2": "Token OAuth2",
+      "oauth2TokenConfigName": "nama konfigurasi token OAuth2",
+      "oauth2TokenConfigNameHelp": "Nama konfigurasi token OAuth2 (sama seperti Znuny SendmailModule::OAuth2TokenConfigName)."
     },
     "subjectConfig": {
       "title": "Nombor tiket dalam subjek",
@@ -2200,7 +2205,54 @@
       "aiMcp": "Urus pelayan MCP sebagai sumber alat untuk AI dan dayakan alatan.",
       "aiQueues": "Konfigurasikan gelagat AI bagi setiap baris gilir: autonomi, had, peningkatan.",
       "aiAudit": "Audit penuh bagi setiap permintaan/tindak balas LLM, dengan pendedahan PII.",
-      "aiAcl": "Keizinan dan kuota AI bagi setiap kumpulan, peranan atau ejen."
+      "aiAcl": "Keizinan dan kuota AI bagi setiap kumpulan, peranan atau ejen.",
+      "mailAccounts": "Peti mel IMAP/POP masuk (kata laluan atau OAuth2).",
+      "oauth2Tokens": "Konfigurasi token OAuth2 untuk mel Microsoft/Google (serasi Znuny)."
+    },
+    "mailAccounts": {
+      "title_plural": "Akaun mel",
+      "authOAuth2": "Token OAuth2",
+      "new": "Akaun mel baharu",
+      "login": "Log masuk / e-mel",
+      "password": "Kata laluan",
+      "authPassword": "Kata laluan",
+      "passwordHelp": "Biarkan kosong pada pengeditan untuk mengekalkan kata laluan semasa. Tidak digunakan untuk OAuth2.",
+      "host": "hos",
+      "accountType": "taip",
+      "queue": "Beratur",
+      "imapFolder": "folder IMAP",
+      "authType": "Pengesahan",
+      "oauthConfig": "Konfigurasi token OAuth2",
+      "oauthConfigHelp": "Diperlukan apabila pengesahan adalah OAuth2.",
+      "trusted": "Dipercayai",
+      "trustedHelp": "Percayai pengepala X-OTRS daripada akaun ini (semantik Znuny).",
+      "comments": "Komen"
+    },
+    "oauth2": {
+      "title_plural": "Token OAuth2 (mel)",
+      "new": "Konfigurasi token baharu",
+      "name": "Nama",
+      "template": "Templat pembekal",
+      "templateNone": "Adat / tiada",
+      "templateHelp": "Pra-isi Microsoft atau Google meminta URL dan skop (templat Znuny).",
+      "clientId": "ID Pelanggan",
+      "clientSecret": "Rahsia pelanggan",
+      "clientSecretHelp": "Biarkan kosong pada pengeditan untuk menyimpan rahsia yang disimpan.",
+      "scope": "Skop",
+      "scopeHelp": "Skop OAuth yang dipisahkan oleh ruang (termasuk offline_access untuk token muat semula).",
+      "redirectUri": "Ubah hala URI",
+      "redirectUriHelp": "Daftarkan URI tepat ini dalam Azure/Google. Tetapkan TIQORA_PUBLIC_BASE_URL dalam pengeluaran.",
+      "tokenStatus": "Status token",
+      "tokenStatusNone": "Tiada tanda",
+      "tokenStatusValid": "sah",
+      "tokenStatusExpired": "Tamat tempoh (boleh dimuat semula)",
+      "tokenStatusNeedsReauth": "Memerlukan kebenaran semula",
+      "tokenStatusError": "ralat",
+      "authorize": "Benarkan…",
+      "refresh": "Muat semula token",
+      "working": "Bekerja…",
+      "authorizeOpened": "Halaman kebenaran dibuka dalam tab baharu.",
+      "refreshSuccess": "Token disegarkan."
     }
   },
   "kb": {

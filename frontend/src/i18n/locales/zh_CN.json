@@ -1223,7 +1223,9 @@
       "aiQueues": "队列策略",
       "aiAudit": "请求审核",
       "aiAcl": "访问和限制",
-      "collapse": "折叠导航"
+      "collapse": "折叠导航",
+      "mailAccounts": "邮件账户",
+      "oauth2Tokens": "OAuth2 令牌（邮件）"
     },
     "table": {
       "id": "ID",
@@ -1698,7 +1700,10 @@
       "testTo": "将测试发送至地址（可选）",
       "testSuccess": "测试成功",
       "testFailure": "测试失败",
-      "loadError": "无法加载设置。"
+      "loadError": "无法加载设置。",
+      "authOAuth2": "OAuth2 令牌",
+      "oauth2TokenConfigName": "OAuth2 令牌配置名称",
+      "oauth2TokenConfigNameHelp": "OAuth2 令牌配置的名称（与 Znuny SendmailModule::OAuth2TokenConfigName 相同）。"
     },
     "subjectConfig": {
       "title": "主题中的工单号",
@@ -2200,7 +2205,54 @@
       "aiMcp": "管理 MCP 服务器作为 AI 的工具源并启用工具。",
       "aiQueues": "配置每个队列的 AI 行为：自治、上限、升级。",
       "aiAudit": "对每个法学硕士请求/响应进行全面审核，并披露 PII。",
-      "aiAcl": "每个组、角色或坐席的 AI 权限和配额。"
+      "aiAcl": "每个组、角色或坐席的 AI 权限和配额。",
+      "mailAccounts": "传入 IMAP/POP 邮箱（密码或 OAuth2）。",
+      "oauth2Tokens": "Microsoft/Google 邮件的 OAuth2 令牌配置（Znuny 兼容）。"
+    },
+    "mailAccounts": {
+      "title_plural": "邮件账户",
+      "authOAuth2": "OAuth2 令牌",
+      "new": "新邮件帐户",
+      "login": "登录/电子邮件",
+      "password": "密码",
+      "authPassword": "密码",
+      "passwordHelp": "编辑时留空以保留当前密码。不用于 OAuth2。",
+      "host": "主持人",
+      "accountType": "类型",
+      "queue": "队列",
+      "imapFolder": "IMAP 文件夹",
+      "authType": "认证",
+      "oauthConfig": "OAuth2 令牌配置",
+      "oauthConfigHelp": "当身份验证为 OAuth2 时需要。",
+      "trusted": "值得信赖",
+      "trustedHelp": "信任来自此帐户的 X-OTRS 标头（Zuny 语义）。",
+      "comments": "评论"
+    },
+    "oauth2": {
+      "title_plural": "OAuth2 令牌（邮件）",
+      "new": "新令牌配置",
+      "name": "名称",
+      "template": "提供商模板",
+      "templateNone": "定制/无",
+      "templateHelp": "预填充 Microsoft 或 Google 请求 URL 和范围（Zuny 模板）。",
+      "clientId": "客户ID",
+      "clientSecret": "客户秘密",
+      "clientSecretHelp": "编辑时留空以保持存储的秘密。",
+      "scope": "范围",
+      "scopeHelp": "以空格分隔的 OAuth 范围（包括用于刷新令牌的离线访问）。",
+      "redirectUri": "重定向URI",
+      "redirectUriHelp": "在 Azure/Google 中注册这个确切的 URI。在生产中设置 TIQORA_PUBLIC_BASE_URL。",
+      "tokenStatus": "代币状态",
+      "tokenStatusNone": "无令牌",
+      "tokenStatusValid": "有效",
+      "tokenStatusExpired": "已过期（可刷新）",
+      "tokenStatusNeedsReauth": "需要重新授权",
+      "tokenStatusError": "错误",
+      "authorize": "授权...",
+      "refresh": "刷新令牌",
+      "working": "工作…",
+      "authorizeOpened": "授权页面在新选项卡中打开。",
+      "refreshSuccess": "令牌已刷新。"
     }
   },
   "kb": {

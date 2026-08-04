@@ -1223,7 +1223,9 @@
       "aiQueues": "Политики за опашка",
       "aiAudit": "Поискайте одит",
       "aiAcl": "Достъп и ограничения",
-      "collapse": "Свиване на навигацията"
+      "collapse": "Свиване на навигацията",
+      "mailAccounts": "Пощенски акаунти",
+      "oauth2Tokens": "OAuth2 токени (поща)"
     },
     "table": {
       "id": "ID",
@@ -1698,7 +1700,10 @@
       "testTo": "Изпратете теста на адрес (по избор)",
       "testSuccess": "Тестът е успешен",
       "testFailure": "Тестът е неуспешен",
-      "loadError": "Неуспешно зареждане на настройките."
+      "loadError": "Неуспешно зареждане на настройките.",
+      "authOAuth2": "OAuth2 токен",
+      "oauth2TokenConfigName": "Име на конфигурацията на токена OAuth2",
+      "oauth2TokenConfigNameHelp": "Име на конфигурация на OAuth2 токен (същото като Znuny SendmailModule::OAuth2TokenConfigName)."
     },
     "subjectConfig": {
       "title": "Номер на билета в темата",
@@ -2200,7 +2205,54 @@
       "aiMcp": "Управлявайте MCP сървъри като източници на инструменти за AI и активирайте инструменти.",
       "aiQueues": "Конфигурирайте поведението на AI на опашка: автономност, ограничения, ескалация.",
       "aiAudit": "Пълен одит на всяка заявка/отговор за LLM с разкриване на PII.",
-      "aiAcl": "AI разрешения и квоти за група, роля или агент."
+      "aiAcl": "AI разрешения и квоти за група, роля или агент.",
+      "mailAccounts": "Входящи IMAP/POP пощенски кутии (парола или OAuth2).",
+      "oauth2Tokens": "Конфигурации на OAuth2 токени за поща на Microsoft/Google (съвместим със Znuny)."
+    },
+    "mailAccounts": {
+      "title_plural": "Пощенски акаунти",
+      "authOAuth2": "OAuth2 токен",
+      "new": "Нов имейл акаунт",
+      "login": "Вход / имейл",
+      "password": "Парола",
+      "authPassword": "Парола",
+      "passwordHelp": "Оставете празно при редактиране, за да запазите текущата парола. Не се използва за OAuth2.",
+      "host": "Домакин",
+      "accountType": "Тип",
+      "queue": "Опашка",
+      "imapFolder": "IMAP папка",
+      "authType": "Удостоверяване",
+      "oauthConfig": "Конфигурация на OAuth2 токен",
+      "oauthConfigHelp": "Изисква се, когато удостоверяването е OAuth2.",
+      "trusted": "Доверен",
+      "trustedHelp": "Доверете се на заглавките на X-OTRS от този акаунт (семантика на Znuny).",
+      "comments": "Коментирайте"
+    },
+    "oauth2": {
+      "title_plural": "OAuth2 токени (поща)",
+      "new": "Нова конфигурация на токена",
+      "name": "Име",
+      "template": "Шаблон за доставчик",
+      "templateNone": "Персонализирано / няма",
+      "templateHelp": "Предварително попълва Microsoft или Google URL адреси и обхвати (шаблони Znuny).",
+      "clientId": "ID на клиента",
+      "clientSecret": "Тайна на клиента",
+      "clientSecretHelp": "Оставете празно при редактиране, за да запазите съхранената тайна.",
+      "scope": "Обхват",
+      "scopeHelp": "OAuth обхвати, разделени с интервали (включете offline_access за опресняващи токени).",
+      "redirectUri": "URI за пренасочване",
+      "redirectUriHelp": "Регистрирайте този точен URI в Azure/Google. Задаване на TIQORA_PUBLIC_BASE_URL в производствена среда.",
+      "tokenStatus": "Състояние на токена",
+      "tokenStatusNone": "Няма жетон",
+      "tokenStatusValid": "Валиден",
+      "tokenStatusExpired": "Изтекъл (с възможност за опресняване)",
+      "tokenStatusNeedsReauth": "Нуждае се от преупълномощаване",
+      "tokenStatusError": "Грешка",
+      "authorize": "Упълномощаване...",
+      "refresh": "Опресняване на токена",
+      "working": "Работи...",
+      "authorizeOpened": "Страницата за оторизация се отвори в нов раздел.",
+      "refreshSuccess": "Токенът е обновен."
     }
   },
   "kb": {

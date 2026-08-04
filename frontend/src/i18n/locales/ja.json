@@ -1223,7 +1223,9 @@
       "aiQueues": "キューポリシー",
       "aiAudit": "監査を要求する",
       "aiAcl": "アクセスと制限",
-      "collapse": "ナビゲーションを折りたたむ"
+      "collapse": "ナビゲーションを折りたたむ",
+      "mailAccounts": "メールアカウント",
+      "oauth2Tokens": "OAuth2トークン（メール）"
     },
     "table": {
       "id": "ID",
@@ -1706,7 +1708,10 @@
       "testTo": "テストをアドレスに送信 (オプション)",
       "testSuccess": "テストは成功しました",
       "testFailure": "テストが失敗しました",
-      "loadError": "設定の読み込みに失敗しました。"
+      "loadError": "設定の読み込みに失敗しました。",
+      "authOAuth2": "OAuth2トークン",
+      "oauth2TokenConfigName": "OAuth2トークン構成名",
+      "oauth2TokenConfigNameHelp": "OAuth2 トークン構成の名前 (Znuny SendmailModule::OAuth2TokenConfigName と同じ)。"
     },
     "subjectConfig": {
       "title": "件名のチケット番号",
@@ -2208,7 +2213,54 @@
       "aiMcp": "MCPサーバーをAIのツール ソースとして管理し、ツールを有効にします。",
       "aiQueues": "キューごとにAIの動作を構成します: 自律性、上限、エスカレーション。",
       "aiAudit": "すべてのLLMリクエスト/レスポンスを完全に監査し、PIIを明らかにします。",
-      "aiAcl": "グループ、ロール、またはエージェントごとのAI権限と割り当て。"
+      "aiAcl": "グループ、ロール、またはエージェントごとのAI権限と割り当て。",
+      "mailAccounts": "受信 IMAP/POP メールボックス (パスワードまたは OAuth2)。",
+      "oauth2Tokens": "Microsoft/Google メール用の OAuth2 トークン構成 (Znuny 互換)。"
+    },
+    "mailAccounts": {
+      "title_plural": "メールアカウント",
+      "authOAuth2": "OAuth2トークン",
+      "new": "新しいメールアカウント",
+      "login": "ログイン/メールアドレス",
+      "password": "パスワード",
+      "authPassword": "パスワード",
+      "passwordHelp": "現在のパスワードを保持するには、編集時に空白のままにします。 OAuth2には使用されません。",
+      "host": "ホスト",
+      "accountType": "種類",
+      "queue": "キュー",
+      "imapFolder": "IMAPフォルダ",
+      "authType": "認証",
+      "oauthConfig": "OAuth2トークン構成",
+      "oauthConfigHelp": "認証がOAuth2の場合は必須です。",
+      "trusted": "信頼できる",
+      "trustedHelp": "このアカウントの X-OTRS ヘッダーを信頼します (Znuny セマンティクス)。",
+      "comments": "コメント"
+    },
+    "oauth2": {
+      "title_plural": "OAuth2トークン（メール）",
+      "new": "新しいトークン構成",
+      "name": "名前",
+      "template": "プロバイダーテンプレート",
+      "templateNone": "カスタム / なし",
+      "templateHelp": "Microsoft または Google のリクエスト URL とスコープ (Znuny テンプレート) を事前に入力します。",
+      "clientId": "クライアントID",
+      "clientSecret": "クライアントシークレット",
+      "clientSecretHelp": "保存された秘密を保持するには、編集時に空白のままにします。",
+      "scope": "範囲",
+      "scopeHelp": "スペースで区切られた OAuth スコープ (リフレッシュ トークンの offline_access を含む)。",
+      "redirectUri": "リダイレクトURI",
+      "redirectUriHelp": "この正確な URI を Azure/Google に登録します。本番環境で TIQORA_PUBLIC_BASE_URL を設定します。",
+      "tokenStatus": "トークンのステータス",
+      "tokenStatusNone": "トークンなし",
+      "tokenStatusValid": "有効",
+      "tokenStatusExpired": "期限切れ (更新可能)",
+      "tokenStatusNeedsReauth": "再認証が必要です",
+      "tokenStatusError": "エラー",
+      "authorize": "許可…",
+      "refresh": "リフレッシュトークン",
+      "working": "働いています…",
+      "authorizeOpened": "新しいタブで認証ページが開きます。",
+      "refreshSuccess": "トークンが更新されました。"
     }
   },
   "kb": {

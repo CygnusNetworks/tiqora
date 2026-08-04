@@ -1223,7 +1223,9 @@
       "aiQueues": "Політика черги",
       "aiAudit": "Запит на аудит",
       "aiAcl": "Доступ і обмеження",
-      "collapse": "Згорнути навігацію"
+      "collapse": "Згорнути навігацію",
+      "mailAccounts": "Поштові облікові записи",
+      "oauth2Tokens": "Маркери OAuth2 (пошта)"
     },
     "table": {
       "id": "ID",
@@ -1698,7 +1700,10 @@
       "testTo": "Надіслати тест на адресу (необов'язково)",
       "testSuccess": "Тест пройшов успішно",
       "testFailure": "Тест не вдалося",
-      "loadError": "Не вдалося завантажити налаштування."
+      "loadError": "Не вдалося завантажити налаштування.",
+      "authOAuth2": "Маркер OAuth2",
+      "oauth2TokenConfigName": "Назва конфігурації маркера OAuth2",
+      "oauth2TokenConfigNameHelp": "Назва конфігурації маркера OAuth2 (те саме, що Znuny SendmailModule::OAuth2TokenConfigName)."
     },
     "subjectConfig": {
       "title": "Номер квитка в темі",
@@ -2200,7 +2205,54 @@
       "aiMcp": "Керуйте серверами MCP як джерелами інструментів для ШІ та вмикайте інструменти.",
       "aiQueues": "Налаштуйте поведінку AI для черги: автономність, обмеження, ескалація.",
       "aiAudit": "Повний аудит кожного запиту/відповіді LLM із розкриттям ідентифікаційної інформації.",
-      "aiAcl": "Дозволи та квоти ШІ на групу, роль або агента."
+      "aiAcl": "Дозволи та квоти ШІ на групу, роль або агента.",
+      "mailAccounts": "Вхідні поштові скриньки IMAP/POP (пароль або OAuth2).",
+      "oauth2Tokens": "Конфігурації токенів OAuth2 для пошти Microsoft/Google (сумісний із Znuny)."
+    },
+    "mailAccounts": {
+      "title_plural": "Поштові облікові записи",
+      "authOAuth2": "Маркер OAuth2",
+      "new": "Новий обліковий запис електронної пошти",
+      "login": "Логін / електронна пошта",
+      "password": "Пароль",
+      "authPassword": "Пароль",
+      "passwordHelp": "Залиште порожнім під час редагування, щоб зберегти поточний пароль. Не використовується для OAuth2.",
+      "host": "Хост",
+      "accountType": "Тип",
+      "queue": "Черга",
+      "imapFolder": "папка IMAP",
+      "authType": "Аутентифікація",
+      "oauthConfig": "Конфігурація маркера OAuth2",
+      "oauthConfigHelp": "Необхідно, якщо автентифікація OAuth2.",
+      "trusted": "Довірений",
+      "trustedHelp": "Довіряти заголовкам X-OTRS з цього облікового запису (семантика Znuny).",
+      "comments": "коментар"
+    },
+    "oauth2": {
+      "title_plural": "Маркери OAuth2 (пошта)",
+      "new": "Нова конфігурація маркера",
+      "name": "Ім'я",
+      "template": "Шаблон провайдера",
+      "templateNone": "Спеціальний / немає",
+      "templateHelp": "Попередньо заповнює URL-адреси та області запитів Microsoft або Google (шаблони Znuny).",
+      "clientId": "ID клієнта",
+      "clientSecret": "Секрет клієнта",
+      "clientSecretHelp": "Залиште поле порожнім для редагування, щоб зберегти збережену таємницю.",
+      "scope": "Область застосування",
+      "scopeHelp": "Області OAuth, розділені пробілами (включно з offline_access для маркерів оновлення).",
+      "redirectUri": "URI перенаправлення",
+      "redirectUriHelp": "Зареєструйте цей точний URI в Azure/Google. Установіть TIQORA_PUBLIC_BASE_URL у робочому режимі.",
+      "tokenStatus": "Статус маркера",
+      "tokenStatusNone": "Жетона немає",
+      "tokenStatusValid": "Дійсний",
+      "tokenStatusExpired": "Термін дії минув (можна оновити)",
+      "tokenStatusNeedsReauth": "Потрібна повторна авторизація",
+      "tokenStatusError": "Помилка",
+      "authorize": "Авторизувати…",
+      "refresh": "Оновити маркер",
+      "working": "Робота…",
+      "authorizeOpened": "Сторінка авторизації відкрилася в новій вкладці.",
+      "refreshSuccess": "Токен оновлено."
     }
   },
   "kb": {

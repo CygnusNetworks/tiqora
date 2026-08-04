@@ -1223,7 +1223,9 @@
       "aiQueues": "Politike čakalne vrste",
       "aiAudit": "Zahtevaj revizijo",
       "aiAcl": "Dostop in omejitve",
-      "collapse": "Strni navigacijo"
+      "collapse": "Strni navigacijo",
+      "mailAccounts": "Poštni računi",
+      "oauth2Tokens": "OAuth2 žetoni (pošta)"
     },
     "table": {
       "id": "ID",
@@ -1698,7 +1700,10 @@
       "testTo": "Pošlji test na naslov (neobvezno)",
       "testSuccess": "Test uspel",
       "testFailure": "Test ni uspel",
-      "loadError": "Nastavitev ni bilo mogoče naložiti."
+      "loadError": "Nastavitev ni bilo mogoče naložiti.",
+      "authOAuth2": "žeton OAuth2",
+      "oauth2TokenConfigName": "Ime konfiguracije žetona OAuth2",
+      "oauth2TokenConfigNameHelp": "Ime konfiguracije žetona OAuth2 (enako kot Znuny SendmailModule::OAuth2TokenConfigName)."
     },
     "subjectConfig": {
       "title": "Številka vozovnice v zadevi",
@@ -2200,7 +2205,54 @@
       "aiMcp": "Upravljajte strežnike MCP kot vire orodij za AI in omogočite orodja.",
       "aiQueues": "Konfigurirajte vedenje AI na čakalno vrsto: avtonomija, omejitve, stopnjevanje.",
       "aiAudit": "Popolna revizija vsake zahteve/odgovora LLM z razkritjem PII.",
-      "aiAcl": "Dovoljenja in kvote AI na skupino, vlogo ali agenta."
+      "aiAcl": "Dovoljenja in kvote AI na skupino, vlogo ali agenta.",
+      "mailAccounts": "Dohodni nabiralniki IMAP/POP (geslo ali OAuth2).",
+      "oauth2Tokens": "Konfiguracije žetonov OAuth2 za Microsoft/Google pošto (združljivo z Znuny)."
+    },
+    "mailAccounts": {
+      "title_plural": "Poštni računi",
+      "authOAuth2": "žeton OAuth2",
+      "new": "Nov poštni račun",
+      "login": "Prijava / e-pošta",
+      "password": "Geslo",
+      "authPassword": "Geslo",
+      "passwordHelp": "Pri urejanju pustite prazno, da obdržite trenutno geslo. Ne uporablja se za OAuth2.",
+      "host": "Gostitelj",
+      "accountType": "Vrsta",
+      "queue": "Čakalna vrsta",
+      "imapFolder": "mapo IMAP",
+      "authType": "Preverjanje pristnosti",
+      "oauthConfig": "Konfiguracija žetona OAuth2",
+      "oauthConfigHelp": "Zahtevano, če je preverjanje pristnosti OAuth2.",
+      "trusted": "Zaupanja vreden",
+      "trustedHelp": "Zaupajte glavam X-OTRS iz tega računa (semantika Znuny).",
+      "comments": "Komentiraj"
+    },
+    "oauth2": {
+      "title_plural": "OAuth2 žetoni (pošta)",
+      "new": "Nova konfiguracija žetona",
+      "name": "Ime",
+      "template": "Predloga ponudnika",
+      "templateNone": "Po meri / brez",
+      "templateHelp": "Vnaprej izpolni Microsoftove ali Googlove URL-je in obsege (predloge Znuny).",
+      "clientId": "ID stranke",
+      "clientSecret": "Skrivnost stranke",
+      "clientSecretHelp": "Pri urejanju pustite prazno, da ohranite shranjeno skrivnost.",
+      "scope": "Področje uporabe",
+      "scopeHelp": "Območja OAuth, ločena s presledki (vključuje offline_access za žetone osveževanja).",
+      "redirectUri": "URI preusmeritve",
+      "redirectUriHelp": "Registrirajte točen URI v Azure/Google. Nastavite TIQORA_PUBLIC_BASE_URL v produkciji.",
+      "tokenStatus": "Status žetona",
+      "tokenStatusNone": "Brez žetona",
+      "tokenStatusValid": "Veljavno",
+      "tokenStatusExpired": "Potekel (lahko se osveži)",
+      "tokenStatusNeedsReauth": "Potrebna je ponovna avtorizacija",
+      "tokenStatusError": "Napaka",
+      "authorize": "Pooblasti ...",
+      "refresh": "Osveži žeton",
+      "working": "Delo ...",
+      "authorizeOpened": "Stran za avtorizacijo se je odprla v novem zavihku.",
+      "refreshSuccess": "Žeton osvežen."
     }
   },
   "kb": {
