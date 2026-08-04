@@ -78,14 +78,14 @@ future designer UI, not consulted by engine logic.
 
   No ``Condition`` key (or an empty one) means the transition matches
   unconditionally (standard Znuny semantics: an empty condition set is
-  vacuously true). Supported ``Type`` values for condition evaluation
-  (subtask 2's job — this module only preserves them) are String, Regexp,
-  Contains, NotContains, Equal, NotEqual, per
+  vacuously true). Supported ``Type`` values for condition evaluation are
+  String, Regexp, Contains, NotContains, Equal, NotEqual, GreaterThan,
+  GreaterThanOrEqual (also GreaterThanEquals), LessThan, LessThanOrEqual
+  (also LessThanEquals), per
   ``Kernel/System/ProcessManagement/TransitionValidation/*.pm``.
-  GreaterThan(OrEqual)/LessThan(OrEqual) and any ``Module``-based (custom
-  Perl module) condition type are UNSUPPORTED/deferred — this loader still
-  parses and preserves the raw ``type`` string, but downstream evaluation
-  code must treat unknown types as non-matching rather than crashing.
+  ``Module``-based (custom Perl module) condition types remain unsupported
+  — this loader still parses and preserves the raw ``type`` string;
+  evaluation treats unknown types as non-matching rather than crashing.
 
 ``pm_transition_action.config``::
 

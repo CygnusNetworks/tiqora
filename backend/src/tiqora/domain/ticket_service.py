@@ -17,6 +17,7 @@ from tiqora.db.legacy.article import (
     Article,
     ArticleDataMime,
     ArticleDataMimeAttachment,
+    ArticleDataMimePlain,
     ArticleSenderType,
 )
 from tiqora.db.legacy.customer import CustomerUser
@@ -865,6 +866,41 @@ class TicketService:
             ticket_id=ticket_id,
             article_id=article_id,
         )
+
+    async def get_article_plain_body(
+        self, user_id: int, ticket_id: int, article_id: int
+    ) -> RenderedArticleBody:
+        """Return ``article_data_mime_plain.body`` when present, else MIME body.
+
+        Znuny keeps a plaintext copy of the article in
+        ``article_data_mime_plain`` for search/index; agents may fetch it
+        explicitly (parity with article_data_mime_plain consumers).
+        """
+        await self._assert_ticket_ro(user_id, ticket_id)
+        art = (
+            await self._session.execute(
+                select(Article).where(Article.id == article_id, Article.ticket_id == ticket_id)
+            )
+        ).scalar_one_or_none()
+        if art is None:
+            raise TicketNotFound(article_id)
+        plain = (
+            await self._session.execute(
+                select(ArticleDataMimePlain).where(ArticleDataMimePlain.article_id == article_id)
+            )
+        ).scalar_one_or_none()
+        if plain is not None and plain.body is not None:
+            raw = plain.body
+            if isinstance(raw, bytes):
+                text_body = raw.decode("utf-8", errors="replace")
+            else:
+                text_body = str(raw)
+            return RenderedArticleBody(
+                content_type="text/plain; charset=utf-8",
+                is_html=False,
+                body=text_body,
+            )
+        return await self.get_article_body(user_id, ticket_id, article_id)
 
     async def list_attachments(
         self, user_id: int, ticket_id: int, article_id: int
