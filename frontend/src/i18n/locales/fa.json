@@ -325,6 +325,7 @@
     "replyAll": "به همه پاسخ دهید",
     "forward": "به جلو",
     "bounce": "پرش",
+    "splitAction": "تقسیم",
     "split": {
       "priority": "اولویت",
       "state": "ایالت",

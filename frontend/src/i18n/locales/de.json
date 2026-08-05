@@ -374,6 +374,7 @@
     "replyAll": "Allen antworten",
     "forward": "Weiterleiten",
     "bounce": "Umleiten",
+    "splitAction": "Ticket teilen",
     "split": {
       "priority": "Priorität",
       "state": "Status",

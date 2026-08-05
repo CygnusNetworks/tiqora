@@ -325,6 +325,7 @@
     "replyAll": "全員に返信",
     "forward": "進む",
     "bounce": "バウンス",
+    "splitAction": "分割",
     "split": {
       "priority": "優先度",
       "state": "ステータス",

@@ -325,6 +325,7 @@
     "replyAll": "ตอบกลับทั้งหมด",
     "forward": "ไปข้างหน้า",
     "bounce": "เด้ง",
+    "splitAction": "แยก",
     "split": {
       "priority": "ลำดับความสำคัญ",
       "state": "รัฐ",

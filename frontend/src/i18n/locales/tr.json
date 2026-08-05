@@ -325,6 +325,7 @@
     "replyAll": "Tümünü yanıtla",
     "forward": "İleri",
     "bounce": "Sıçrama",
+    "splitAction": "Böl",
     "split": {
       "priority": "Öncelik",
       "state": "Durum",

@@ -240,7 +240,7 @@ function ArticleActions({
         {t("ticket.bounce")}
       </Button>
       <Button size="sm" variant="ghost" onClick={() => setDialog("split")}>
-        {t("ticket.split")}
+        {t("ticket.splitAction")}
       </Button>
 
       {canNote && (

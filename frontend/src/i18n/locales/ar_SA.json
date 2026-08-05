@@ -325,6 +325,7 @@
     "replyAll": "الرد على الكل",
     "forward": "إلى الأمام",
     "bounce": "ترتد",
+    "splitAction": "تقسيم",
     "split": {
       "priority": "الأولوية",
       "state": "الدولة",
