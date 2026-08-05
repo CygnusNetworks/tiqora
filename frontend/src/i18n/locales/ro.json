@@ -325,6 +325,7 @@
     "replyAll": "Raspunde tuturor",
     "forward": "Înainte",
     "bounce": "Bounce",
+    "splitAction": "Împarte",
     "split": {
       "priority": "Prioritate",
       "state": "de stat",

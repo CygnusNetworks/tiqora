@@ -325,6 +325,7 @@
     "replyAll": "Ответить всем",
     "forward": "Переслать",
     "bounce": "Подпрыгивать",
+    "splitAction": "Разделить",
     "split": {
       "priority": "Приоритет",
       "state": "Статус",

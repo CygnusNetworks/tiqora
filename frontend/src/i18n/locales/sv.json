@@ -325,6 +325,7 @@
     "replyAll": "Svara alla",
     "forward": "Framåt",
     "bounce": "Studsa",
+    "splitAction": "Dela",
     "split": {
       "priority": "Prioritet",
       "state": "staten",

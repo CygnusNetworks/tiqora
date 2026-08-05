@@ -325,6 +325,7 @@
     "replyAll": "Odpovědět všem",
     "forward": "Přeposlat",
     "bounce": "Vrátit (bounce)",
+    "splitAction": "Rozdělit",
     "split": {
       "priority": "Priorita",
       "state": "Stav",

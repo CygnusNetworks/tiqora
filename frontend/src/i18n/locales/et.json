@@ -325,6 +325,7 @@
     "replyAll": "Vasta kõigile",
     "forward": "Edasi",
     "bounce": "Põrgatama",
+    "splitAction": "Tükelda",
     "split": {
       "priority": "Prioriteet",
       "state": "osariik",

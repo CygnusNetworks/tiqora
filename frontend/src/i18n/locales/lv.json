@@ -325,6 +325,7 @@
     "replyAll": "Atbildēt visiem",
     "forward": "Uz priekšu",
     "bounce": "Atlēciens",
+    "splitAction": "Sadalīt",
     "split": {
       "priority": "Prioritāte",
       "state": "valsts",

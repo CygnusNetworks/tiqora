@@ -325,6 +325,7 @@
     "replyAll": "모두 답장",
     "forward": "앞으로",
     "bounce": "바운스",
+    "splitAction": "분할",
     "split": {
       "priority": "우선순위",
       "state": "상태",

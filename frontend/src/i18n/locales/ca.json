@@ -325,6 +325,7 @@
     "replyAll": "Respon a tots",
     "forward": "Endavant",
     "bounce": "Rebot",
+    "splitAction": "Divideix",
     "split": {
       "priority": "Prioritat",
       "state": "Estat",

@@ -325,6 +325,7 @@
     "replyAll": "Reply all",
     "forward": "Forward",
     "bounce": "Bounce",
+    "splitAction": "Split",
     "split": {
       "priority": "Priority",
       "state": "State",

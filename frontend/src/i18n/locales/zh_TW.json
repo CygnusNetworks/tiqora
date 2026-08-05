@@ -325,6 +325,7 @@
     "replyAll": "全部回覆",
     "forward": "前進",
     "bounce": "彈跳",
+    "splitAction": "拆分",
     "split": {
       "priority": "優先權",
       "state": "狀態",

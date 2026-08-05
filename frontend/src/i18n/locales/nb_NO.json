@@ -325,6 +325,7 @@
     "replyAll": "Svar alle",
     "forward": "Fremover",
     "bounce": "Sprett",
+    "splitAction": "Del",
     "split": {
       "priority": "Prioritet",
       "state": "stat",

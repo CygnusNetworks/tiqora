@@ -325,6 +325,7 @@
     "replyAll": "Одговори свима",
     "forward": "Напред",
     "bounce": "Боунце",
+    "splitAction": "Подели",
     "split": {
       "priority": "Приоритет",
       "state": "Држава",

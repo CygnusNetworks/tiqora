@@ -325,6 +325,7 @@
     "replyAll": "Trả lời tất cả",
     "forward": "Chuyển tiếp",
     "bounce": "Trả lại",
+    "splitAction": "Tách",
     "split": {
       "priority": "Ưu tiên",
       "state": "tiểu bang",

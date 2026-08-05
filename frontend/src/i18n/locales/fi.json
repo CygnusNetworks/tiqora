@@ -325,6 +325,7 @@
     "replyAll": "Vastaa kaikkiin",
     "forward": "Eteenpäin",
     "bounce": "Pomppia",
+    "splitAction": "Jaa",
     "split": {
       "priority": "Prioriteetti",
       "state": "osavaltio",

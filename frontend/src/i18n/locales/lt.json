@@ -325,6 +325,7 @@
     "replyAll": "Atsakyti visiems",
     "forward": "Pirmyn",
     "bounce": "Atšokti",
+    "splitAction": "Skaidyti",
     "split": {
       "priority": "Pirmenybė",
       "state": "valstybė",

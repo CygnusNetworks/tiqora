@@ -325,6 +325,7 @@
     "replyAll": "Odpowiedz wszystkim",
     "forward": "Prześlij dalej",
     "bounce": "Odbij",
+    "splitAction": "Podziel",
     "split": {
       "priority": "Priorytet",
       "state": "Status",
