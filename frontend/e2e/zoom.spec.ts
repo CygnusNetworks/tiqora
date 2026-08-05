@@ -25,9 +25,11 @@ test.describe("ticket zoom", () => {
       "screenshot.png",
     );
 
-    // History moved into the ticket-zoom ⋯ overflow menu.
+    // History moved into the ticket-zoom ⋯ overflow menu. The menu is a
+    // portal with an entrance animation, so the item can still be detached
+    // when Playwright's stability check runs — force-click it.
     await page.getByTestId("ticket-zoom-overflow-trigger").click();
-    await page.getByTestId("overflow-tab-history").click();
+    await page.getByTestId("overflow-tab-history").click({ force: true });
     await expect(page.getByTestId("history-table")).toBeVisible();
   });
 });

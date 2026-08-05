@@ -241,13 +241,16 @@ export async function mockAdminApi(page: Page) {
       return;
     }
 
-    // Reference data feeding the queue form's required selects. System
-    // addresses and follow-up-possible are bare arrays; salutations and
-    // signatures are paginated like the other admin resources.
+    // Reference data feeding the queue form's required selects.
+    // follow-up-possible is a bare array; system addresses, salutations and
+    // signatures are paginated like the other admin resources
+    // (api.listSystemAddresses() unwraps the page's `items`).
     if (path.endsWith("/api/v1/admin/system-addresses") && method === "GET") {
-      await json(route, 200, [
-        { id: 1, value: "support@example.com", realname: "Support", valid_id: 1 },
-      ]);
+      await json(
+        route,
+        200,
+        pageOf([{ id: 1, value0: "support@example.com", value1: "Support", valid_id: 1 }]),
+      );
       return;
     }
     if (path.endsWith("/api/v1/admin/follow-up-possible") && method === "GET") {
