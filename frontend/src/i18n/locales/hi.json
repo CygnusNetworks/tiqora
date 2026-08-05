@@ -325,6 +325,7 @@
     "replyAll": "सभी उत्तर दें",
     "forward": "आगे",
     "bounce": "उछाल",
+    "splitAction": "विभाजित करें",
     "split": {
       "priority": "प्राथमिकता",
       "state": "राज्य",

@@ -325,6 +325,7 @@
     "replyAll": "Válasz mindenkinek",
     "forward": "Továbbítás",
     "bounce": "Ugrál",
+    "splitAction": "Felosztás",
     "split": {
       "priority": "Prioritás",
       "state": "Állapot",

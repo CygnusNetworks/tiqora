@@ -325,6 +325,7 @@
     "replyAll": "Allen beantwoorden",
     "forward": "Doorsturen",
     "bounce": "Bounce",
+    "splitAction": "Splitsen",
     "split": {
       "priority": "Prioriteit",
       "state": "Status",

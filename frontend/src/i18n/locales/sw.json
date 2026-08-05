@@ -325,6 +325,7 @@
     "replyAll": "Jibu wote",
     "forward": "Mbele",
     "bounce": "Bounce",
+    "splitAction": "Gawanya",
     "split": {
       "priority": "Kipaumbele",
       "state": "Jimbo",

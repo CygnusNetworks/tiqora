@@ -88,7 +88,7 @@ export function ArticleQuickActions({
         )}
       >
         <MenuItem onSelect={() => setDialog("bounce")}>{t("ticket.bounce")}</MenuItem>
-        <MenuItem onSelect={() => setDialog("split")}>{t("ticket.split")}</MenuItem>
+        <MenuItem onSelect={() => setDialog("split")}>{t("ticket.splitAction")}</MenuItem>
         {showDelete && (
           <MenuItem
             danger

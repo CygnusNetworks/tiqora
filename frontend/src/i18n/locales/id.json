@@ -325,6 +325,7 @@
     "replyAll": "Balas semuanya",
     "forward": "Maju",
     "bounce": "Bangkit",
+    "splitAction": "Pisahkan",
     "split": {
       "priority": "Prioritas",
       "state": "Negara",

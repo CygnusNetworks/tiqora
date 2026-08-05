@@ -325,6 +325,7 @@
     "replyAll": "Svar alle",
     "forward": "Fremad",
     "bounce": "Bounce",
+    "splitAction": "Opdel",
     "split": {
       "priority": "Prioritet",
       "state": "stat",
