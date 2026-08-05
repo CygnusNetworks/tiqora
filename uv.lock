@@ -3075,7 +3075,7 @@ requires-dist = [
     { name = "redis", specifier = ">=5.2.0" },
     { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.8.0" },
     { name = "spacy", specifier = ">=3.8,<3.9" },
-    { name = "sqlalchemy", extras = ["asyncio"], specifier = ">=2.0.36" },
+    { name = "sqlalchemy", extras = ["asyncio"], specifier = ">=2.0.51" },
     { name = "structlog", specifier = ">=24.4.0" },
     { name = "testcontainers", marker = "extra == 'dev'", specifier = ">=4.8.0" },
     { name = "types-defusedxml", marker = "extra == 'dev'", specifier = ">=0.7.0.20260504" },
