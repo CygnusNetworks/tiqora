@@ -8,6 +8,7 @@ protocol so tests can inject a capturing fake.
 
 from __future__ import annotations
 
+from email import policy as email_policy
 from email.message import EmailMessage
 from email.utils import getaddresses
 from typing import TYPE_CHECKING, Literal, Protocol
@@ -22,6 +23,23 @@ if TYPE_CHECKING:
 logger = structlog.get_logger(__name__)
 
 MailSecurity = Literal["none", "starttls", "ssl"]
+
+# RFC 5322 §2.1.1 allows 998 octets per line; 78 is only a recommendation.
+#
+# Why we raise it: ``In-Reply-To``/``References`` are not in CPython's header
+# registry, so they are folded as *unstructured* text. A single msg-id longer
+# than the line limit has no legal fold point, and on Python 3.12 the folder
+# falls back to RFC 2047 encoded-words:
+#
+#   In-Reply-To: =?utf-8?q?=3Ctrinity-40d5ad9f-...=40web.de=3E?=
+#
+# No mail client decodes that before matching Message-IDs, so threading breaks
+# for any correspondent with a long Message-ID (web.de/GMX "trinity-..." ids are
+# ~107 chars). CPython 3.13 stopped encoding such tokens, but we support 3.12+,
+# so the fix has to be version independent: with a 998 limit the id fits on one
+# line and is emitted raw — matching Znuny, which writes these headers unfolded.
+# Long References chains still fold legally at the whitespace between ids.
+_OUTBOUND_POLICY = email_policy.default.clone(max_line_length=998)
 
 
 class MailSender(Protocol):
@@ -191,7 +209,7 @@ def build_message(
     Agent replies pass ``loop_hint=False`` so recipients' ticket systems do not
     treat the message as automated mail.
     """
-    msg = EmailMessage()
+    msg = EmailMessage(policy=_OUTBOUND_POLICY)
     msg["From"] = from_addr
     msg["To"] = to_addrs
     if cc_addrs:

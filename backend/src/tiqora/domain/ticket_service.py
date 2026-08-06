@@ -1110,7 +1110,10 @@ class TicketService:
         composer preview. The signature is **not** part of ``body`` — the send
         pipeline appends it via ``prepare_outgoing_agent_email``.
         """
-        from tiqora.channels.email.outbound_reply import _queue_outbound_meta
+        from tiqora.channels.email.outbound_reply import (
+            _queue_outbound_meta,
+            build_references_chain,
+        )
         from tiqora.channels.email.placeholder import expand_placeholders
         from tiqora.znuny.sysconfig import SysConfig
 
@@ -1197,7 +1200,10 @@ class TicketService:
             body=body,
             is_html=False,
             in_reply_to=(mime.a_message_id if mime else None),
-            references=(mime.a_message_id if mime else None),
+            references=build_references_chain(
+                mime.a_references if mime else None,
+                mime.a_message_id if mime else None,
+            ),
             signature=signature,
             signature_is_html=signature_is_html,
         )

@@ -49,6 +49,44 @@ _SIGNATURE_MARKERS = (
 # Leading RFC-3676 sig delimiter: "--" or "-- " plus optional trailing whitespace.
 _LEADING_SIG_DELIMITER_RE = re.compile(r"^-- ?\s*$")
 
+# Keep References bounded. RFC 5322 sets no limit, but MUAs only need the thread
+# anchor plus the recent tail, and unbounded growth eventually hits header size
+# limits on receiving MTAs.
+_MAX_REFERENCES = 20
+
+
+def _bracket(message_id: str) -> str:
+    """Normalize a bare or angle-bracketed msg-id to ``<id>`` form."""
+    mid = (message_id or "").strip()
+    if not mid:
+        return ""
+    return mid if mid.startswith("<") else f"<{mid.strip('<>')}>"
+
+
+def build_references_chain(
+    parent_references: str | None, parent_message_id: str | None
+) -> str | None:
+    """Return the ``References`` value for a reply to a parent article.
+
+    Znuny (``AgentTicketCompose``) builds ``"$Article{References} $Article{MessageID}"``
+    — the parent's own chain plus the parent's Message-ID — so the thread stays
+    linked across more than one hop. Duplicates are dropped and the chain is
+    capped at :data:`_MAX_REFERENCES` (first id kept as the thread anchor).
+    """
+    ids: list[str] = []
+    for token in (parent_references or "").split():
+        mid = _bracket(token)
+        if mid and mid not in ids:
+            ids.append(mid)
+    parent = _bracket(parent_message_id or "")
+    if parent and parent not in ids:
+        ids.append(parent)
+    if not ids:
+        return None
+    if len(ids) > _MAX_REFERENCES:
+        ids = ids[:1] + ids[-(_MAX_REFERENCES - 1) :]
+    return " ".join(ids)
+
 
 class OutboundMailError(Exception):
     """SMTP delivery failed for an outgoing agent email reply."""
@@ -153,12 +191,17 @@ async def _queue_outbound_meta(
     return from_line, queue_name, sig_text, sig_ct
 
 
-async def _latest_customer_message_id(session: AsyncSession, ticket_id: int) -> str | None:
-    """Most recent customer-visible email Message-ID on the ticket (for In-Reply-To fallback)."""
+async def _latest_customer_thread_headers(
+    session: AsyncSession, ticket_id: int
+) -> tuple[str | None, str | None]:
+    """(Message-ID, References) of the newest customer email on the ticket.
+
+    Fallback for replies posted without explicit threading headers.
+    """
     row = (
         await session.execute(
             text(
-                "SELECT m.a_message_id FROM article a"
+                "SELECT m.a_message_id, m.a_references FROM article a"
                 " JOIN article_data_mime m ON m.article_id = a.id"
                 " JOIN article_sender_type st ON st.id = a.article_sender_type_id"
                 " JOIN communication_channel cc ON cc.id = a.communication_channel_id"
@@ -171,11 +214,10 @@ async def _latest_customer_message_id(session: AsyncSession, ticket_id: int) -> 
         )
     ).first()
     if row is None or not row[0]:
-        return None
-    mid = str(row[0]).strip()
-    if mid and not mid.startswith("<"):
-        mid = f"<{mid}>"
-    return mid or None
+        return None, None
+    mid = _bracket(str(row[0]))
+    refs = str(row[1]).strip() if row[1] else None
+    return (mid or None), (refs or None)
 
 
 async def prepare_outgoing_agent_email(
@@ -215,10 +257,13 @@ async def prepare_outgoing_agent_email(
 
     in_reply_to = article.in_reply_to
     references = article.references
+    parent_references: str | None = None
     if not (in_reply_to or "").strip():
-        in_reply_to = await _latest_customer_message_id(session, ticket_id)
+        in_reply_to, parent_references = await _latest_customer_thread_headers(session, ticket_id)
     if not (references or "").strip() and in_reply_to:
-        references = in_reply_to
+        # Full chain (parent's References + parent Message-ID), not just the
+        # parent id — see build_references_chain.
+        references = build_references_chain(parent_references, in_reply_to)
 
     from_address = article.from_address or from_line
     # Agent → customer email replies must be customer-visible (AgentTicketZoom + portal).
@@ -467,6 +512,7 @@ queue_outbound_meta = _queue_outbound_meta
 __all__ = [
     "OutboundMailError",
     "append_signature",
+    "build_references_chain",
     "deliver_agent_email_reply",
     "generate_message_id",
     "prepare_outgoing_agent_email",
