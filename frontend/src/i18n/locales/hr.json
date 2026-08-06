@@ -494,7 +494,17 @@
       "title": "Slične karte",
       "empty": "Nisu pronađene slične zatvorene karte.",
       "loadError": "Nije moguće učitati slične karte."
-    }
+    },
+    "draft": "Skica",
+    "draftUnsent": "Skica — nije poslano",
+    "draftNotSent": "nije poslano",
+    "draftResume": "Nastavi skicu",
+    "draftEdit": "Uredi",
+    "draftEmpty": "(još nema teksta)",
+    "draftEditedAt": "uređeno {{time}}",
+    "draftDiscard": "Odbaci skicu",
+    "draftDiscardConfirm": "Odbaciti ovaj neposlani odgovor? Tekst se ne može vratiti.",
+    "draftDiscardConfirmButton": "Odbaci"
   },
   "search": {
     "title": "Traži",

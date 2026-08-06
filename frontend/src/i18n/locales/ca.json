@@ -494,7 +494,17 @@
       "title": "Entrades similars",
       "empty": "No s'han trobat entrades tancades semblants.",
       "loadError": "No s'han pogut carregar bitllets semblants."
-    }
+    },
+    "draft": "Esborrany",
+    "draftUnsent": "Esborrany — no enviat",
+    "draftNotSent": "no enviat",
+    "draftResume": "Continua l'esborrany",
+    "draftEdit": "Edita",
+    "draftEmpty": "(encara sense text)",
+    "draftEditedAt": "editat {{time}}",
+    "draftDiscard": "Descarta l'esborrany",
+    "draftDiscardConfirm": "Voleu descartar aquesta resposta no enviada? El text no es podrà recuperar.",
+    "draftDiscardConfirmButton": "Descarta"
   },
   "search": {
     "title": "Cerca",

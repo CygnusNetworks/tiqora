@@ -494,7 +494,17 @@
       "title": "Ticket simili",
       "empty": "Nessun ticket chiuso simile trovato.",
       "loadError": "Impossibile caricare i ticket simili."
-    }
+    },
+    "draft": "Bozza",
+    "draftUnsent": "Bozza — non inviata",
+    "draftNotSent": "non inviata",
+    "draftResume": "Continua bozza",
+    "draftEdit": "Modifica",
+    "draftEmpty": "(nessun testo ancora)",
+    "draftEditedAt": "modificato {{time}}",
+    "draftDiscard": "Elimina bozza",
+    "draftDiscardConfirm": "Eliminare questa risposta non inviata? Il testo non potrà essere recuperato.",
+    "draftDiscardConfirmButton": "Elimina"
   },
   "search": {
     "title": "Cerca",

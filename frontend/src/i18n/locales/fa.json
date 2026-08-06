@@ -494,7 +494,17 @@
       "title": "بلیط های مشابه",
       "empty": "هیچ بلیط بسته مشابهی پیدا نشد.",
       "loadError": "بلیت‌های مشابه بارگیری نشد."
-    }
+    },
+    "draft": "پیش‌نویس",
+    "draftUnsent": "پیش‌نویس — ارسال نشده",
+    "draftNotSent": "ارسال نشده",
+    "draftResume": "ادامه پیش‌نویس",
+    "draftEdit": "ویرایش",
+    "draftEmpty": "(هنوز متنی وجود ندارد)",
+    "draftEditedAt": "ویرایش شده {{time}}",
+    "draftDiscard": "حذف پیش‌نویس",
+    "draftDiscardConfirm": "این پاسخ ارسال‌نشده حذف شود؟ متن قابل بازیابی نیست.",
+    "draftDiscardConfirmButton": "حذف"
   },
   "search": {
     "title": "جستجو کنید",

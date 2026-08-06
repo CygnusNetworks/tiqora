@@ -494,7 +494,17 @@
       "title": "ตั๋วที่คล้ายกัน",
       "empty": "ไม่พบตั๋วที่ปิดคล้ายกัน",
       "loadError": "ไม่สามารถโหลดตั๋วที่คล้ายกันได้"
-    }
+    },
+    "draft": "ฉบับร่าง",
+    "draftUnsent": "ฉบับร่าง — ยังไม่ได้ส่ง",
+    "draftNotSent": "ยังไม่ได้ส่ง",
+    "draftResume": "ทำฉบับร่างต่อ",
+    "draftEdit": "แก้ไข",
+    "draftEmpty": "(ยังไม่มีข้อความ)",
+    "draftEditedAt": "แก้ไขเมื่อ {{time}}",
+    "draftDiscard": "ทิ้งฉบับร่าง",
+    "draftDiscardConfirm": "ทิ้งคำตอบที่ยังไม่ได้ส่งนี้หรือไม่ ไม่สามารถกู้คืนข้อความได้",
+    "draftDiscardConfirmButton": "ทิ้ง"
   },
   "search": {
     "title": "ค้นหา",

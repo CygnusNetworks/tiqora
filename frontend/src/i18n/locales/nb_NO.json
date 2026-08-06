@@ -494,7 +494,17 @@
       "title": "Lignende billetter",
       "empty": "Ingen lignende lukkede billetter funnet.",
       "loadError": "Kunne ikke laste inn lignende billetter."
-    }
+    },
+    "draft": "Utkast",
+    "draftUnsent": "Utkast — ikke sendt",
+    "draftNotSent": "ikke sendt",
+    "draftResume": "Fortsett utkast",
+    "draftEdit": "Rediger",
+    "draftEmpty": "(ingen tekst ennå)",
+    "draftEditedAt": "redigert {{time}}",
+    "draftDiscard": "Forkast utkast",
+    "draftDiscardConfirm": "Forkaste dette usendte svaret? Teksten kan ikke gjenopprettes.",
+    "draftDiscardConfirmButton": "Forkast"
   },
   "search": {
     "title": "Søk",

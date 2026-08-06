@@ -1,9 +1,11 @@
+import { useState } from "react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { I18nextProvider } from "react-i18next";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import i18n from "@/i18n";
 import { ApiError } from "@/lib/api";
+import { getDraft, resetDraftsForTest } from "@/lib/replyDrafts";
 import { ReplyDialog } from "./ReplyDialog";
 
 const { getReplyDraft, listTemplates, createArticle } = vi.hoisted(() => ({
@@ -377,5 +379,143 @@ describe("ReplyDialog recipient toggles", () => {
     await waitFor(() => expect(createArticle).toHaveBeenCalled());
     const payload = createArticle.mock.calls[0][1] as { ai_draft_id: number | null };
     expect(payload.ai_draft_id).toBeNull();
+  });
+});
+
+/** Wrapper with a controllable `open` prop — the component stays mounted
+ * across close/reopen, mirroring how the real caller (ArticleList) uses it,
+ * so these tests can exercise "reopen after send" and "reopen after
+ * close-without-sending" against the same instance. */
+function ControlledReplyDialog({
+  ticketId,
+  articleId,
+  onCloseSpy,
+}: {
+  ticketId: number;
+  articleId: number;
+  onCloseSpy?: () => void;
+}) {
+  const [open, setOpen] = useState(true);
+  return (
+    <>
+      <button type="button" data-testid="reopen" onClick={() => setOpen(true)}>
+        reopen
+      </button>
+      <ReplyDialog
+        ticketId={ticketId}
+        articleId={articleId}
+        replyAll={false}
+        open={open}
+        onClose={() => {
+          setOpen(false);
+          onCloseSpy?.();
+        }}
+      />
+    </>
+  );
+}
+
+describe("ReplyDialog reset after send / persistence without send", () => {
+  beforeEach(() => {
+    getReplyDraft.mockReset();
+    listTemplates.mockReset().mockResolvedValue([]);
+    createArticle.mockReset().mockResolvedValue({ id: 99 });
+    window.localStorage.clear();
+    resetDraftsForTest();
+  });
+
+  it("resets body and subject to the server seed after a successful send, on reopen", async () => {
+    getReplyDraft.mockResolvedValue({
+      ...baseDraft,
+      to_address: "to@x.com",
+    });
+
+    wrap(<ControlledReplyDialog ticketId={7} articleId={11} />);
+
+    await waitFor(() => expect(screen.getByTestId("reply-dialog")).toBeTruthy());
+
+    const subjectInput = screen.getByDisplayValue("Re: Hello") as HTMLInputElement;
+    fireEvent.change(subjectInput, { target: { value: "Re: Changed subject" } });
+
+    const body = screen.getByTestId("reply-body") as HTMLTextAreaElement;
+    fireEvent.change(body, { target: { value: "My typed reply\n\n> quoted" } });
+
+    fireEvent.click(screen.getByTestId("reply-send"));
+
+    await waitFor(() => expect(createArticle).toHaveBeenCalled());
+    // Dialog closed after send.
+    await waitFor(() => expect(screen.queryByTestId("reply-dialog")).toBeNull());
+
+    // Reopen the same (still-mounted) component.
+    fireEvent.click(screen.getByTestId("reopen"));
+    await waitFor(() => expect(screen.getByTestId("reply-dialog")).toBeTruthy());
+
+    const reopenedBody = screen.getByTestId("reply-body") as HTMLTextAreaElement;
+    expect(reopenedBody.value).not.toContain("My typed reply");
+    expect(reopenedBody.value).toBe("\n\n> quoted");
+
+    const reopenedSubject = screen.getByDisplayValue("Re: Hello") as HTMLInputElement;
+    expect(reopenedSubject.value).not.toBe("Re: Changed subject");
+  });
+
+  it("clears the draft store after a successful send", async () => {
+    getReplyDraft.mockResolvedValue({
+      ...baseDraft,
+      to_address: "to@x.com",
+    });
+
+    wrap(<ControlledReplyDialog ticketId={7} articleId={11} />);
+
+    await waitFor(() => expect(screen.getByTestId("reply-dialog")).toBeTruthy());
+
+    const body = screen.getByTestId("reply-body") as HTMLTextAreaElement;
+    fireEvent.change(body, { target: { value: "My typed reply\n\n> quoted" } });
+
+    // Let the debounced draft-store write happen before sending, so we can
+    // be sure clearing (not "never having saved") is what emptied it.
+    await waitFor(
+      () => expect(getDraft(7, 11)).not.toBeNull(),
+      { timeout: 1000 },
+    );
+
+    fireEvent.click(screen.getByTestId("reply-send"));
+
+    await waitFor(() => expect(createArticle).toHaveBeenCalled());
+    await waitFor(() => expect(getDraft(7, 11)).toBeNull());
+  });
+
+  it("keeps typed text on close without sending, and restores it on reopen", async () => {
+    getReplyDraft.mockResolvedValue({
+      ...baseDraft,
+      to_address: "to@x.com",
+    });
+    const onCloseSpy = vi.fn();
+
+    wrap(<ControlledReplyDialog ticketId={8} articleId={12} onCloseSpy={onCloseSpy} />);
+
+    await waitFor(() => expect(screen.getByTestId("reply-dialog")).toBeTruthy());
+
+    const body = screen.getByTestId("reply-body") as HTMLTextAreaElement;
+    fireEvent.change(body, { target: { value: "Draft in progress\n\n> quoted" } });
+
+    // Close via Cancel, without sending.
+    fireEvent.click(screen.getByText(i18n.t("ticket.composerCancel")));
+    expect(onCloseSpy).toHaveBeenCalled();
+    expect(createArticle).not.toHaveBeenCalled();
+
+    await waitFor(() => expect(screen.queryByTestId("reply-dialog")).toBeNull());
+
+    // The debounced store write should have persisted the typed text.
+    await waitFor(
+      () => expect(getDraft(8, 12)?.body).toContain("Draft in progress"),
+      { timeout: 1000 },
+    );
+
+    // Reopen — the typed text must still be there.
+    fireEvent.click(screen.getByTestId("reopen"));
+    await waitFor(() => expect(screen.getByTestId("reply-dialog")).toBeTruthy());
+
+    const reopenedBody = screen.getByTestId("reply-body") as HTMLTextAreaElement;
+    expect(reopenedBody.value).toContain("Draft in progress");
   });
 });

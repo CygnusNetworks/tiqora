@@ -494,7 +494,17 @@
       "title": "Samanlaiset liput",
       "empty": "Vastaavia suljettuja lippuja ei löytynyt.",
       "loadError": "Samanlaisia lippuja ei voitu ladata."
-    }
+    },
+    "draft": "Luonnos",
+    "draftUnsent": "Luonnos — ei lähetetty",
+    "draftNotSent": "ei lähetetty",
+    "draftResume": "Jatka luonnosta",
+    "draftEdit": "Muokkaa",
+    "draftEmpty": "(ei vielä tekstiä)",
+    "draftEditedAt": "muokattu {{time}}",
+    "draftDiscard": "Hylkää luonnos",
+    "draftDiscardConfirm": "Hylätäänkö tämä lähettämätön vastaus? Tekstiä ei voi palauttaa.",
+    "draftDiscardConfirmButton": "Hylkää"
   },
   "search": {
     "title": "Etsi",

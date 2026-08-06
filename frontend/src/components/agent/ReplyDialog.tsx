@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { api, ApiError } from "@/lib/api";
@@ -6,7 +6,9 @@ import { Button } from "@/components/ui/Button";
 import { Dialog } from "@/components/ui/Dialog";
 import { SelectField } from "@/components/ui/SelectField";
 import { Spinner } from "@/components/ui/Spinner";
+import { useConfirm } from "@/components/ui/ConfirmDialog";
 import { cn } from "@/lib/cn";
+import { clearDraft, getDraft, saveDraft, useReplyDraft } from "@/lib/replyDrafts";
 import { ArticleBodyRenderer } from "./ArticleBodyRenderer";
 import {
   RecipientsField,
@@ -29,6 +31,12 @@ type Field = "to" | "cc" | "bcc";
  * collapsed and are still sent. The answer and quoted original share a SINGLE
  * editable body — the agent types above the quote in one field. The outgoing
  * article is created via the existing add_article path.
+ *
+ * Edits are mirrored into `@/lib/replyDrafts` (debounced) so closing without
+ * sending leaves a visible, restorable draft rather than silently stashing
+ * the text in component state: the article views render a placeholder for it
+ * and the reply buttons switch to "continue draft". Sending clears it;
+ * discarding is explicit and confirmed.
  */
 export function ReplyDialog({
   ticketId,
@@ -51,6 +59,7 @@ export function ReplyDialog({
 }) {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
+  const { confirm, dialog: confirmDialog } = useConfirm();
 
   const [to, setTo] = useState<Recipient[]>([]);
   const [cc, setCc] = useState<Recipient[]>([]);
@@ -65,6 +74,21 @@ export function ReplyDialog({
   // below an empty answer area and the agent edits the whole thing inline.
   const [body, setBody] = useState("");
   const [templateId, setTemplateId] = useState("");
+  // What the server-side reply draft seeded — the yardstick for "the agent
+  // actually typed something". Stays null until the draft query resolves, so
+  // nothing is persisted before there is anything to compare against.
+  const baselineRef = useRef<{
+    subject: string;
+    body: string;
+    to: string;
+    cc: string;
+  } | null>(null);
+  /** Which target the fields were seeded for — see the seeding effect. */
+  const seededKeyRef = useRef<string | null>(null);
+  /** Bumped on every successful send. A queued debounce write compares the
+   * value it was scheduled with and bails if a send happened meanwhile, so
+   * the last keystroke before "Send" can't resurrect the draft. */
+  const sendEpochRef = useRef(0);
 
   const setters: Record<Field, (r: Recipient[]) => void> = {
     to: setTo,
@@ -91,6 +115,8 @@ export function ReplyDialog({
     if (destKey === "bcc") setShowBcc(true);
   };
 
+  const storedDraft = useReplyDraft(ticketId, articleId);
+
   const draftQ = useQuery({
     queryKey: ["tickets", ticketId, "articles", articleId, "reply-draft", replyAll],
     queryFn: () => api.getReplyDraft(ticketId, articleId, replyAll),
@@ -103,25 +129,110 @@ export function ReplyDialog({
     enabled: open,
   });
 
-  // Seed the fields once the draft arrives.
+  // Seed the fields once the draft arrives — from a stored unsent draft when
+  // there is one, otherwise from the server's reply draft. The baseline is
+  // always the server version, so restoring a stored draft keeps it correctly
+  // marked as edited.
   useEffect(() => {
     const d = draftQ.data;
     if (!d) return;
-    const nextTo = parseRecipientList(d.to_address);
-    const nextCc = parseRecipientList(d.cc);
+    // `initialDraft` is an object literal at the call site (AiPanel), so it
+    // changes identity on every parent render — seed once per actual target
+    // instead, or an unrelated re-render would wipe whatever is being typed.
+    const seedKey = `${ticketId}:${articleId}:${replyAll}:${initialDraft?.id ?? ""}`;
+    if (seededKeyRef.current === seedKey) return;
+    seededKeyRef.current = seedKey;
+    const serverTo = parseRecipientList(d.to_address);
+    const serverCc = parseRecipientList(d.cc);
+    const serverSubject = initialDraft?.subject ?? d.subject;
+    // Answer on top (blank, or the AI draft's text), blank line, then the
+    // quoted original.
+    const serverBody = initialDraft ? `${initialDraft.body}\n\n${d.body}` : `\n\n${d.body}`;
+    baselineRef.current = {
+      subject: serverSubject,
+      body: serverBody,
+      to: joinRecipients(serverTo) ?? "",
+      cc: joinRecipients(serverCc) ?? "",
+    };
+
+    const stored = getDraft(ticketId, articleId);
+    const nextTo = stored ? parseRecipientList(stored.to) : serverTo;
+    const nextCc = stored ? parseRecipientList(stored.cc) : serverCc;
+    const nextBcc = stored ? parseRecipientList(stored.bcc) : [];
+    const nextReplyTo = stored?.replyTo ?? "";
     setTo(nextTo);
+    setCc(nextCc);
+    setBcc(nextBcc);
+    setReplyTo(nextReplyTo);
+    // Expand a section when it carries addresses; keep the rest collapsed.
+    setShowCc(nextCc.length > 0);
+    setShowBcc(nextBcc.length > 0);
+    setShowReplyTo(nextReplyTo.trim().length > 0);
+    setSubject(stored?.subject ?? serverSubject);
+    setBody(stored?.body ?? serverBody);
+  }, [draftQ.data, initialDraft, ticketId, articleId, replyAll]);
+
+  const aiDraftId = initialDraft?.id ?? null;
+
+  // Mirror edits into the draft store, debounced so typing doesn't thrash
+  // localStorage. Runs while closed too: the component stays mounted after a
+  // backdrop click, and this is what makes that state survive a reload.
+  useEffect(() => {
+    const epoch = sendEpochRef.current;
+    const timer = window.setTimeout(() => {
+      // A send that happened while this write was queued invalidates it —
+      // otherwise the last keystroke before "Send" would re-create the draft
+      // right after the reply went out.
+      if (sendEpochRef.current !== epoch) return;
+      const baseline = baselineRef.current;
+      if (!baseline) return;
+      const toStr = joinRecipients(to) ?? "";
+      const ccStr = joinRecipients(cc) ?? "";
+      const dirty =
+        body.trim() !== baseline.body.trim() ||
+        subject !== baseline.subject ||
+        toStr !== baseline.to ||
+        ccStr !== baseline.cc ||
+        bcc.length > 0 ||
+        replyTo.trim().length > 0;
+      if (dirty) {
+        saveDraft({
+          ticketId,
+          articleId,
+          replyAll,
+          subject,
+          body,
+          to: toStr,
+          cc: ccStr,
+          bcc: joinRecipients(bcc) ?? "",
+          replyTo,
+          aiDraftId,
+        });
+      } else {
+        // Edited back to the seeded state — no draft to advertise.
+        clearDraft(ticketId, articleId);
+      }
+    }, 400);
+    return () => window.clearTimeout(timer);
+  }, [ticketId, articleId, replyAll, subject, body, to, cc, bcc, replyTo, aiDraftId]);
+
+  /** Back to the server-seeded reply: blank answer above the quote, original
+   * recipients, no template applied. Shared by "send" and "discard". */
+  const resetToBaseline = () => {
+    const baseline = baselineRef.current;
+    if (!baseline) return;
+    const nextCc = parseRecipientList(baseline.cc);
+    setSubject(baseline.subject);
+    setBody(baseline.body);
+    setTo(parseRecipientList(baseline.to));
     setCc(nextCc);
     setBcc([]);
     setReplyTo("");
-    // Show Cc when the draft already has addresses; keep Bcc/Reply-To collapsed.
     setShowCc(nextCc.length > 0);
     setShowBcc(false);
     setShowReplyTo(false);
-    setSubject(initialDraft?.subject ?? d.subject);
-    // Answer on top (blank, or the AI draft's text), blank line, then the
-    // quoted original.
-    setBody(initialDraft ? `${initialDraft.body}\n\n${d.body}` : `\n\n${d.body}`);
-  }, [draftQ.data, initialDraft]);
+    setTemplateId("");
+  };
 
   const templates = templatesQ.data ?? [];
 
@@ -142,9 +253,17 @@ export function ReplyDialog({
         // Message-ID chain matches Znuny follow-up detection.
         in_reply_to: draftQ.data?.in_reply_to ?? null,
         references: draftQ.data?.references ?? null,
-        ai_draft_id: initialDraft?.id ?? null,
+        ai_draft_id: aiDraftId,
       }),
     onSuccess: () => {
+      // Sent — the draft is no longer pending, drop it before anything can
+      // re-render the placeholder.
+      sendEpochRef.current += 1;
+      clearDraft(ticketId, articleId);
+      // Reset the composer to what the server seeded. The component stays
+      // mounted after the dialog closes, so without this the next "Reply" on
+      // this article would open showing the message that was just sent.
+      resetToBaseline();
       void queryClient.invalidateQueries({
         queryKey: ["tickets", ticketId, "articles"],
       });
@@ -157,6 +276,21 @@ export function ReplyDialog({
       onClose();
     },
   });
+
+  // Discarding is deliberate and confirmed — closing the dialog keeps the
+  // draft, so this is the only way to lose typed text.
+  const onDiscardDraft = async () => {
+    const ok = await confirm({
+      title: t("ticket.draftDiscard"),
+      message: t("ticket.draftDiscardConfirm"),
+      confirmLabel: t("ticket.draftDiscardConfirmButton"),
+      variant: "danger",
+    });
+    if (!ok) return;
+    clearDraft(ticketId, articleId);
+    resetToBaseline();
+    onClose();
+  };
 
   const onPickTemplate = (id: string) => {
     setTemplateId(id);
@@ -193,6 +327,7 @@ export function ReplyDialog({
 
   return (
     <Dialog open={open} onClose={onClose} title={title} className={dialogWidth}>
+      {confirmDialog}
       {draftQ.isLoading ? (
         <div className="flex justify-center py-8">
           <Spinner />
@@ -364,6 +499,17 @@ export function ReplyDialog({
             </p>
           )}
           <div className="flex items-center justify-end gap-1.5 pt-1">
+            {storedDraft && (
+              <Button
+                variant="ghost"
+                size="sm"
+                data-testid="reply-discard-draft"
+                className="mr-auto hover:text-danger"
+                onClick={() => void onDiscardDraft()}
+              >
+                {t("ticket.draftDiscard")}
+              </Button>
+            )}
             <Button variant="ghost" size="sm" onClick={onClose}>
               {t("ticket.composerCancel")}
             </Button>

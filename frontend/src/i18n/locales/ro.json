@@ -494,7 +494,17 @@
       "title": "Bilete similare",
       "empty": "Nu s-au găsit bilete similare închise.",
       "loadError": "Nu s-au putut încărca bilete similare."
-    }
+    },
+    "draft": "Ciornă",
+    "draftUnsent": "Ciornă — netrimisă",
+    "draftNotSent": "netrimisă",
+    "draftResume": "Continuă ciorna",
+    "draftEdit": "Editează",
+    "draftEmpty": "(fără text încă)",
+    "draftEditedAt": "editat {{time}}",
+    "draftDiscard": "Renunță la ciornă",
+    "draftDiscardConfirm": "Renunți la acest răspuns netrimis? Textul nu va putea fi recuperat.",
+    "draftDiscardConfirmButton": "Renunță"
   },
   "search": {
     "title": "Caută",

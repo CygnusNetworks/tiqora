@@ -552,7 +552,17 @@
     "timeAccounting": "Time accounting",
     "timeUnits": "Time units",
     "addTime": "Book time",
-    "addMention": "Mention agent"
+    "addMention": "Mention agent",
+    "draft": "Draft",
+    "draftUnsent": "Draft — not sent",
+    "draftNotSent": "not sent",
+    "draftResume": "Continue draft",
+    "draftEdit": "Edit",
+    "draftEmpty": "(no text yet)",
+    "draftEditedAt": "edited {{time}}",
+    "draftDiscard": "Discard draft",
+    "draftDiscardConfirm": "Discard this unsent reply? The text cannot be recovered.",
+    "draftDiscardConfirmButton": "Discard"
   },
   "search": {
     "title": "Search",

@@ -494,7 +494,17 @@
       "title": "تذاكر مماثلة",
       "empty": "لم يتم العثور على تذاكر مغلقة مماثلة.",
       "loadError": "لا يمكن تحميل التذاكر المماثلة."
-    }
+    },
+    "draft": "مسودة",
+    "draftUnsent": "مسودة — لم يتم الإرسال",
+    "draftNotSent": "لم يتم الإرسال",
+    "draftResume": "متابعة المسودة",
+    "draftEdit": "تعديل",
+    "draftEmpty": "(لا يوجد نص بعد)",
+    "draftEditedAt": "تم التعديل {{time}}",
+    "draftDiscard": "تجاهل المسودة",
+    "draftDiscardConfirm": "هل تريد تجاهل هذا الرد غير المرسل؟ لا يمكن استعادة النص.",
+    "draftDiscardConfirmButton": "تجاهل"
   },
   "search": {
     "title": "بحث",

@@ -494,7 +494,17 @@
       "title": "Vé tương tự",
       "empty": "Không tìm thấy vé đã đóng tương tự.",
       "loadError": "Không thể tải vé tương tự."
-    }
+    },
+    "draft": "Bản nháp",
+    "draftUnsent": "Bản nháp — chưa gửi",
+    "draftNotSent": "chưa gửi",
+    "draftResume": "Tiếp tục bản nháp",
+    "draftEdit": "Chỉnh sửa",
+    "draftEmpty": "(chưa có nội dung)",
+    "draftEditedAt": "đã chỉnh sửa {{time}}",
+    "draftDiscard": "Hủy bản nháp",
+    "draftDiscardConfirm": "Hủy câu trả lời chưa gửi này? Không thể khôi phục nội dung.",
+    "draftDiscardConfirmButton": "Hủy"
   },
   "search": {
     "title": "Tìm kiếm",

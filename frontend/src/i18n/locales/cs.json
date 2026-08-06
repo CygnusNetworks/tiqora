@@ -494,7 +494,17 @@
       "title": "Podobné tikety",
       "empty": "Nebyly nalezeny žádné podobné uzavřené tikety.",
       "loadError": "Podobné tikety se nepodařilo načíst."
-    }
+    },
+    "draft": "Koncept",
+    "draftUnsent": "Koncept — neodesláno",
+    "draftNotSent": "neodesláno",
+    "draftResume": "Pokračovat v konceptu",
+    "draftEdit": "Upravit",
+    "draftEmpty": "(zatím žádný text)",
+    "draftEditedAt": "upraveno {{time}}",
+    "draftDiscard": "Zahodit koncept",
+    "draftDiscardConfirm": "Zahodit tuto neodeslanou odpověď? Text nelze obnovit.",
+    "draftDiscardConfirmButton": "Zahodit"
   },
   "search": {
     "title": "Hledat",

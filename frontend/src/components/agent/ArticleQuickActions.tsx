@@ -4,6 +4,7 @@ import type { ArticleListItem } from "@/lib/api";
 import { isInternalNote } from "@/lib/articleChannel";
 import { Button } from "@/components/ui/Button";
 import { Menu, MenuItem } from "@/components/ui/Menu";
+import { useReplyDraft } from "@/lib/replyDrafts";
 import { ReplyDialog } from "./ReplyDialog";
 import { BounceDialog, ForwardDialog, SplitDialog } from "./ArticleActionDialogs";
 import { useDeleteArticleNote } from "./useDeleteArticleNote";
@@ -43,6 +44,10 @@ export function ArticleQuickActions({
   const noPerm = t("ticket.toolbar.noPermission");
   const showDelete = canDelete && isInternalNote(article);
   const del = useDeleteArticleNote(ticketId, article.id);
+  // An unsent draft turns the reply button into a "continue" affordance —
+  // the compact (icon-only) variant keeps just the dot, there is no room
+  // for the longer label in the conversation view's hover island.
+  const hasDraft = Boolean(useReplyDraft(ticketId, article.id));
 
   return (
     <div className="flex flex-wrap items-center gap-1.5" data-testid={`article-actions-${article.id}`}>
@@ -52,10 +57,18 @@ export function ArticleQuickActions({
           variant="primary"
           disabled={!canNote}
           data-testid={replyTestId}
-          title={compact ? t("ticket.reply") : undefined}
+          data-has-draft={hasDraft ? "true" : undefined}
+          title={compact ? (hasDraft ? t("ticket.draftResume") : t("ticket.reply")) : undefined}
           onClick={() => setDialog("reply")}
         >
-          ↩ {!compact && t("ticket.reply")}
+          ↩ {!compact && (hasDraft ? t("ticket.draftResume") : t("ticket.reply"))}
+          {hasDraft && (
+            <span
+              aria-hidden
+              data-testid={`article-draft-dot-${article.id}`}
+              className="h-1.5 w-1.5 shrink-0 rounded-full bg-current"
+            />
+          )}
         </Button>
       </span>
       {hasMultipleRecipients && !compact && (

@@ -494,7 +494,17 @@
       "title": "Lignende billetter",
       "empty": "Ingen lignende lukkede billetter fundet.",
       "loadError": "Kunne ikke indlæse lignende billetter."
-    }
+    },
+    "draft": "Kladde",
+    "draftUnsent": "Kladde — ikke sendt",
+    "draftNotSent": "ikke sendt",
+    "draftResume": "Fortsæt kladde",
+    "draftEdit": "Rediger",
+    "draftEmpty": "(ingen tekst endnu)",
+    "draftEditedAt": "redigeret {{time}}",
+    "draftDiscard": "Kassér kladde",
+    "draftDiscardConfirm": "Kassér dette usendte svar? Teksten kan ikke gendannes.",
+    "draftDiscardConfirmButton": "Kassér"
   },
   "search": {
     "title": "Søg",

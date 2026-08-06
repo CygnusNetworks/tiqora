@@ -494,7 +494,17 @@
       "title": "Sarnased piletid",
       "empty": "Sarnaseid suletud pileteid ei leitud.",
       "loadError": "Sarnaseid pileteid ei saanud laadida."
-    }
+    },
+    "draft": "Mustand",
+    "draftUnsent": "Mustand — saatmata",
+    "draftNotSent": "saatmata",
+    "draftResume": "Jätka mustandit",
+    "draftEdit": "Muuda",
+    "draftEmpty": "(teksti veel pole)",
+    "draftEditedAt": "muudetud {{time}}",
+    "draftDiscard": "Loobu mustandist",
+    "draftDiscardConfirm": "Kas loobuda sellest saatmata vastusest? Teksti ei saa taastada.",
+    "draftDiscardConfirmButton": "Loobu"
   },
   "search": {
     "title": "Otsi",

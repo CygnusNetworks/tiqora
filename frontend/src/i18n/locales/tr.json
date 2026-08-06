@@ -494,7 +494,17 @@
       "title": "Benzer biletler",
       "empty": "Benzer kapalı bilet bulunamadı.",
       "loadError": "Benzer biletler yüklenemedi."
-    }
+    },
+    "draft": "Taslak",
+    "draftUnsent": "Taslak — gönderilmedi",
+    "draftNotSent": "gönderilmedi",
+    "draftResume": "Taslağa devam et",
+    "draftEdit": "Düzenle",
+    "draftEmpty": "(henüz metin yok)",
+    "draftEditedAt": "düzenlendi {{time}}",
+    "draftDiscard": "Taslağı sil",
+    "draftDiscardConfirm": "Gönderilmemiş bu yanıt silinsin mi? Metin geri getirilemez.",
+    "draftDiscardConfirmButton": "Sil"
   },
   "search": {
     "title": "Ara",

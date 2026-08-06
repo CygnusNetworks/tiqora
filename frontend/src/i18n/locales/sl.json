@@ -494,7 +494,17 @@
       "title": "Podobne vstopnice",
       "empty": "Ni podobnih zaprtih vstopnic.",
       "loadError": "Podobnih vstopnic ni bilo mogoče naložiti."
-    }
+    },
+    "draft": "Osnutek",
+    "draftUnsent": "Osnutek — ni poslano",
+    "draftNotSent": "ni poslano",
+    "draftResume": "Nadaljuj osnutek",
+    "draftEdit": "Uredi",
+    "draftEmpty": "(še ni besedila)",
+    "draftEditedAt": "urejeno {{time}}",
+    "draftDiscard": "Zavrzi osnutek",
+    "draftDiscardConfirm": "Zavreči ta neposlani odgovor? Besedila ni mogoče obnoviti.",
+    "draftDiscardConfirmButton": "Zavrzi"
   },
   "search": {
     "title": "Iskanje",

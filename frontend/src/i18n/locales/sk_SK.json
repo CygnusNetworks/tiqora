@@ -494,7 +494,17 @@
       "title": "Podobné lístky",
       "empty": "Nenašli sa žiadne podobné uzavreté lístky.",
       "loadError": "Podobné lístky sa nepodarilo načítať."
-    }
+    },
+    "draft": "Koncept",
+    "draftUnsent": "Koncept — neodoslané",
+    "draftNotSent": "neodoslané",
+    "draftResume": "Pokračovať v koncepte",
+    "draftEdit": "Upraviť",
+    "draftEmpty": "(zatiaľ žiadny text)",
+    "draftEditedAt": "upravené {{time}}",
+    "draftDiscard": "Zahodiť koncept",
+    "draftDiscardConfirm": "Zahodiť túto neodoslanú odpoveď? Text nie je možné obnoviť.",
+    "draftDiscardConfirmButton": "Zahodiť"
   },
   "search": {
     "title": "Hľadať",

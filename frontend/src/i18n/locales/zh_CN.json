@@ -494,7 +494,17 @@
       "title": "类似工单",
       "empty": "未找到类似的封闭工单。",
       "loadError": "无法加载类似的工单。"
-    }
+    },
+    "draft": "草稿",
+    "draftUnsent": "草稿 — 未发送",
+    "draftNotSent": "未发送",
+    "draftResume": "继续编写草稿",
+    "draftEdit": "编辑",
+    "draftEmpty": "(暂无内容)",
+    "draftEditedAt": "编辑于 {{time}}",
+    "draftDiscard": "放弃草稿",
+    "draftDiscardConfirm": "放弃这条未发送的回复？内容将无法恢复。",
+    "draftDiscardConfirmButton": "放弃"
   },
   "search": {
     "title": "搜索",

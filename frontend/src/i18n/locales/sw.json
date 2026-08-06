@@ -494,7 +494,17 @@
       "title": "Tikiti zinazofanana",
       "empty": "Hakuna tiketi sawa zilizofungwa zilizopatikana.",
       "loadError": "Haikuweza kupakia tiketi zinazofanana."
-    }
+    },
+    "draft": "Rasimu",
+    "draftUnsent": "Rasimu — haijatumwa",
+    "draftNotSent": "haijatumwa",
+    "draftResume": "Endelea na rasimu",
+    "draftEdit": "Hariri",
+    "draftEmpty": "(bado hakuna maandishi)",
+    "draftEditedAt": "imehaririwa {{time}}",
+    "draftDiscard": "Ondoa rasimu",
+    "draftDiscardConfirm": "Ungependa kuondoa jibu hili ambalo halijatumwa? Maandishi hayawezi kurejeshwa.",
+    "draftDiscardConfirmButton": "Ondoa"
   },
   "search": {
     "title": "Tafuta",

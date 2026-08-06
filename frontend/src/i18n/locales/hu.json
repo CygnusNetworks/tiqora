@@ -494,7 +494,17 @@
       "title": "Hasonló jegyek",
       "empty": "Nem található hasonló zárt jegy.",
       "loadError": "Nem sikerült betölteni a hasonló jegyeket."
-    }
+    },
+    "draft": "Piszkozat",
+    "draftUnsent": "Piszkozat — nincs elküldve",
+    "draftNotSent": "nincs elküldve",
+    "draftResume": "Piszkozat folytatása",
+    "draftEdit": "Szerkesztés",
+    "draftEmpty": "(még nincs szöveg)",
+    "draftEditedAt": "szerkesztve {{time}}",
+    "draftDiscard": "Piszkozat elvetése",
+    "draftDiscardConfirm": "Elveti ezt az el nem küldött választ? A szöveg nem állítható vissza.",
+    "draftDiscardConfirmButton": "Elvetés"
   },
   "search": {
     "title": "Keresés",

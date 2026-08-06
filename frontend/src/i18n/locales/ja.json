@@ -494,7 +494,17 @@
       "title": "同様のチケット",
       "empty": "同様のクローズされたチケットは見つかりませんでした。",
       "loadError": "同様のチケットをロードできませんでした。"
-    }
+    },
+    "draft": "下書き",
+    "draftUnsent": "下書き — 未送信",
+    "draftNotSent": "未送信",
+    "draftResume": "下書きを続ける",
+    "draftEdit": "編集",
+    "draftEmpty": "(まだテキストがありません)",
+    "draftEditedAt": "{{time}}に編集",
+    "draftDiscard": "下書きを破棄",
+    "draftDiscardConfirm": "この未送信の返信を破棄しますか？テキストは復元できません。",
+    "draftDiscardConfirmButton": "破棄"
   },
   "search": {
     "title": "検索",

@@ -16,7 +16,9 @@ import {
 import { cn } from "@/lib/cn";
 import { Avatar } from "@/components/ui/Avatar";
 import { ArticleBodyRenderer } from "./ArticleBodyRenderer";
+import { useTicketReplyDrafts } from "@/lib/replyDrafts";
 import { ArticleQuickActions } from "./ArticleQuickActions";
+import { DraftBubble } from "./DraftPlaceholder";
 import { SummaryMarker } from "./SummaryMarker";
 import { useSummaryBoundary } from "./useSummaryBoundary";
 import { useDeleteArticleNote } from "./useDeleteArticleNote";
@@ -57,6 +59,7 @@ export function ArticleConversationView({
   const { t } = useTranslation();
   const bottomRef = useRef<HTMLDivElement>(null);
   const { boundaryId, createdAt } = useSummaryBoundary(ticketId, articles);
+  const drafts = useTicketReplyDrafts(ticketId);
 
   // Scroll to the newest message whenever this view mounts (tab switch) or
   // the ticket changes. jsdom (tests) doesn't implement scrollIntoView.
@@ -108,6 +111,10 @@ export function ArticleConversationView({
           </section>
         ))
       )}
+      {/* After the last real article — where the reply will appear once sent. */}
+      {drafts.map((d) => (
+        <DraftBubble key={`draft-${d.articleId}`} draft={d} locale={locale} />
+      ))}
       <div ref={bottomRef} />
     </div>
   );

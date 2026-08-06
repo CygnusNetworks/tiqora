@@ -494,7 +494,17 @@
       "title": "समान टिकट",
       "empty": "कोई समान बंद टिकट नहीं मिला.",
       "loadError": "समान टिकटें लोड नहीं की जा सकीं."
-    }
+    },
+    "draft": "ड्राफ़्ट",
+    "draftUnsent": "ड्राफ़्ट — भेजा नहीं गया",
+    "draftNotSent": "भेजा नहीं गया",
+    "draftResume": "ड्राफ़्ट जारी रखें",
+    "draftEdit": "संपादित करें",
+    "draftEmpty": "(अभी तक कोई टेक्स्ट नहीं)",
+    "draftEditedAt": "{{time}} संपादित किया गया",
+    "draftDiscard": "ड्राफ़्ट हटाएं",
+    "draftDiscardConfirm": "इस न भेजे गए उत्तर को हटाएं? टेक्स्ट को पुनर्प्राप्त नहीं किया जा सकता।",
+    "draftDiscardConfirmButton": "हटाएं"
   },
   "search": {
     "title": "खोजें",

@@ -494,7 +494,17 @@
       "title": "Entradas similares",
       "empty": "No se encontraron tickets cerrados similares.",
       "loadError": "No se pudieron cargar entradas similares."
-    }
+    },
+    "draft": "Borrador",
+    "draftUnsent": "Borrador — no enviado",
+    "draftNotSent": "no enviado",
+    "draftResume": "Continuar borrador",
+    "draftEdit": "Editar",
+    "draftEmpty": "(aún sin texto)",
+    "draftEditedAt": "editado {{time}}",
+    "draftDiscard": "Descartar borrador",
+    "draftDiscardConfirm": "¿Deseas descartar esta respuesta no enviada? El texto no se podrá recuperar.",
+    "draftDiscardConfirmButton": "Descartar"
   },
   "search": {
     "title": "Buscar",

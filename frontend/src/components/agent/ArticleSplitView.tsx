@@ -16,7 +16,9 @@ import {
 import { cn } from "@/lib/cn";
 import { Avatar } from "@/components/ui/Avatar";
 import { Badge } from "@/components/ui/Badge";
+import { useTicketReplyDrafts } from "@/lib/replyDrafts";
 import { ArticleQuickActions } from "./ArticleQuickActions";
+import { DraftListRow } from "./DraftPlaceholder";
 import { ArticleBodyLoader, AttachmentList } from "./ArticleTimeline";
 import { SummaryMarker } from "./SummaryMarker";
 import { useSummaryBoundary } from "./useSummaryBoundary";
@@ -45,6 +47,7 @@ export function ArticleSplitView({
   const { t } = useTranslation();
   const { sorted, selectedId, setSelectedId, selected, onListKeyDown, descending } = state;
   const { boundaryId, createdAt } = useSummaryBoundary(ticketId, sorted);
+  const drafts = useTicketReplyDrafts(ticketId);
 
   if (sorted.length === 0) {
     return <p className="text-sm text-muted">{t("ticket.noArticles")}</p>;
@@ -60,6 +63,12 @@ export function ArticleSplitView({
         data-testid="article-list"
         className="max-h-[40vh] shrink-0 space-y-1 overflow-y-auto rounded-lg border border-hairline bg-surface p-1.5 md:max-h-none md:w-[300px]"
       >
+        {/* Unsent drafts pin to the top in either sort direction — they are
+            the most current thing on the ticket, and burying one below the
+            fold would defeat the point of showing it at all. */}
+        {drafts.map((d) => (
+          <DraftListRow key={`draft-${d.articleId}`} draft={d} locale={locale} />
+        ))}
         {sorted.map((a) => (
           <Fragment key={a.id}>
             {/* Marker sits between summarized and newer articles — above the

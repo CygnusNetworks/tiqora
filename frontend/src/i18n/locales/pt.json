@@ -494,7 +494,17 @@
       "title": "Ingressos semelhantes",
       "empty": "Nenhum ticket fechado semelhante foi encontrado.",
       "loadError": "Não foi possível carregar tickets semelhantes."
-    }
+    },
+    "draft": "Rascunho",
+    "draftUnsent": "Rascunho — não enviado",
+    "draftNotSent": "não enviado",
+    "draftResume": "Continuar rascunho",
+    "draftEdit": "Editar",
+    "draftEmpty": "(ainda sem texto)",
+    "draftEditedAt": "editado {{time}}",
+    "draftDiscard": "Descartar rascunho",
+    "draftDiscardConfirm": "Descartar esta resposta não enviada? O texto não poderá ser recuperado.",
+    "draftDiscardConfirmButton": "Descartar"
   },
   "search": {
     "title": "Pesquisar",
