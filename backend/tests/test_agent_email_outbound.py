@@ -307,6 +307,59 @@ def test_build_message_agent_headers() -> None:
     assert "X-OTRS-Loop" not in msg
 
 
+# Real web.de/GMX "trinity-..." id: 107 chars, no legal fold point. On Python
+# 3.12 the unstructured-header folder turned this into RFC 2047 encoded-words
+# ("=?utf-8?q?=3Ctrinity-...") which no MUA matches against a Message-ID, so
+# replies were not threaded with the customer's mail.
+_LONG_MID = (
+    "<trinity-40d5ad9f-c09b-4b90-8eae-e814de0fce7f-1785927016342"
+    "@trinity-msg-rest-webde-webde-live-845c6c87f5-pv8gw>"
+)
+
+
+def test_threading_headers_are_not_encoded_words() -> None:
+    """Long In-Reply-To/References msg-ids must be serialized raw (Znuny parity)."""
+    msg = build_message(
+        from_addr="Netadmin <netadmin@example.com>",
+        to_addrs="kunde@web.de",
+        cc_addrs=None,
+        subject="[Cygnus#2026080510000025] Re: Grüße aus Bonn",
+        body="Antwort",
+        content_type="text/plain; charset=utf-8",
+        in_reply_to=_LONG_MID,
+        references=f"{_LONG_MID} <second-{'x' * 80}@example.com>",
+        loop_hint=False,
+    )
+    raw = msg.as_string()
+    assert "=?utf-8?q?=3C" not in raw
+    # The id must appear verbatim on one line for MUA thread matching.
+    assert any(line.endswith(_LONG_MID) for line in raw.splitlines())
+    assert msg["In-Reply-To"] == _LONG_MID
+    # Non-ASCII subjects are still encoded (charset-driven, not length-driven).
+    assert "Subject: [Cygnus#2026080510000025] Re: =?utf-8?" in raw
+    # RFC 5322 hard limit per line.
+    assert max(len(line) for line in raw.splitlines()) <= 998
+
+
+def test_build_references_chain_extends_parent_chain() -> None:
+    from tiqora.channels.email.outbound_reply import build_references_chain
+
+    # Znuny: parent's References + parent Message-ID.
+    assert build_references_chain("<a@x> <b@x>", "<c@x>") == "<a@x> <b@x> <c@x>"
+    # Bare ids get bracketed, duplicates dropped.
+    assert build_references_chain("a@x", "<a@x>") == "<a@x>"
+    assert build_references_chain(None, "<c@x>") == "<c@x>"
+    assert build_references_chain(None, None) is None
+    # Capped, keeping the thread anchor plus the recent tail.
+    chain = " ".join(f"<id{i}@x>" for i in range(30))
+    capped = build_references_chain(chain, "<new@x>")
+    assert capped is not None
+    ids = capped.split()
+    assert len(ids) == 20
+    assert ids[0] == "<id0@x>"
+    assert ids[-1] == "<new@x>"
+
+
 # ---------------------------------------------------------------------------
 # DB integration
 # ---------------------------------------------------------------------------
