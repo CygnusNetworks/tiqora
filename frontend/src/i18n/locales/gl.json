@@ -494,7 +494,17 @@
       "title": "Entradas similares",
       "empty": "Non se atoparon entradas similares pechadas.",
       "loadError": "Non se puideron cargar billetes similares."
-    }
+    },
+    "draft": "Borrador",
+    "draftUnsent": "Borrador — non enviado",
+    "draftNotSent": "non enviado",
+    "draftResume": "Continuar co borrador",
+    "draftEdit": "Editar",
+    "draftEmpty": "(aínda sen texto)",
+    "draftEditedAt": "editado {{time}}",
+    "draftDiscard": "Descartar borrador",
+    "draftDiscardConfirm": "Queres descartar esta resposta non enviada? O texto non se poderá recuperar.",
+    "draftDiscardConfirmButton": "Descartar"
   },
   "search": {
     "title": "Busca",

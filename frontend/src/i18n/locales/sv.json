@@ -494,7 +494,17 @@
       "title": "Liknande ärenden",
       "empty": "Inga liknande stängda ärenden hittades.",
       "loadError": "Det gick inte att ladda liknande ärenden."
-    }
+    },
+    "draft": "Utkast",
+    "draftUnsent": "Utkast — ej skickat",
+    "draftNotSent": "ej skickat",
+    "draftResume": "Fortsätt utkast",
+    "draftEdit": "Redigera",
+    "draftEmpty": "(ingen text än)",
+    "draftEditedAt": "redigerat {{time}}",
+    "draftDiscard": "Ta bort utkast",
+    "draftDiscardConfirm": "Ta bort detta oskickade svar? Texten kan inte återställas.",
+    "draftDiscardConfirmButton": "Ta bort"
   },
   "search": {
     "title": "Sök",

@@ -494,7 +494,17 @@
       "title": "כרטיסים דומים",
       "empty": "לא נמצאו כרטיסים סגורים דומים.",
       "loadError": "לא ניתן היה לטעון כרטיסים דומים."
-    }
+    },
+    "draft": "טיוטה",
+    "draftUnsent": "טיוטה — לא נשלחה",
+    "draftNotSent": "לא נשלחה",
+    "draftResume": "המשך טיוטה",
+    "draftEdit": "עריכה",
+    "draftEmpty": "(אין טקסט עדיין)",
+    "draftEditedAt": "נערך {{time}}",
+    "draftDiscard": "מחיקת טיוטה",
+    "draftDiscardConfirm": "למחוק את התגובה שלא נשלחה? לא ניתן לשחזר את הטקסט.",
+    "draftDiscardConfirmButton": "מחיקה"
   },
   "search": {
     "title": "חפש",

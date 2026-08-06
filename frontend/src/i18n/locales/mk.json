@@ -494,7 +494,17 @@
       "title": "Слични билети",
       "empty": "Не се пронајдени слични затворени билети.",
       "loadError": "Не може да се вчитаат слични билети."
-    }
+    },
+    "draft": "Нацрт",
+    "draftUnsent": "Нацрт — не е испратено",
+    "draftNotSent": "не е испратено",
+    "draftResume": "Продолжи нацрт",
+    "draftEdit": "Уреди",
+    "draftEmpty": "(сè уште нема текст)",
+    "draftEditedAt": "уредено {{time}}",
+    "draftDiscard": "Отфрли нацрт",
+    "draftDiscardConfirm": "Да се отфрли овој неиспратен одговор? Текстот не може да се врати.",
+    "draftDiscardConfirmButton": "Отфрли"
   },
   "search": {
     "title": "Пребарување",

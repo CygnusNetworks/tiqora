@@ -494,7 +494,17 @@
       "title": "Сличне карте",
       "empty": "Нису пронађене сличне затворене карте.",
       "loadError": "Није могуће учитати сличне карте."
-    }
+    },
+    "draft": "Нацрт",
+    "draftUnsent": "Нацрт — није послато",
+    "draftNotSent": "није послато",
+    "draftResume": "Настави нацрт",
+    "draftEdit": "Уреди",
+    "draftEmpty": "(још нема текста)",
+    "draftEditedAt": "уређено {{time}}",
+    "draftDiscard": "Одбаци нацрт",
+    "draftDiscardConfirm": "Одбацити овај непослати одговор? Текст се не може вратити.",
+    "draftDiscardConfirmButton": "Одбаци"
   },
   "search": {
     "title": "Тражи",

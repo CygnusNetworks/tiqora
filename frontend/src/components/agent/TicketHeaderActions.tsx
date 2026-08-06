@@ -15,6 +15,7 @@ import { PriorityChip, StateChip } from "@/components/ui/StatusChip";
 import { formatDateTime } from "@/lib/format";
 import { escalationLevel, stateLabel } from "@/lib/status";
 import { cn } from "@/lib/cn";
+import { useReplyDraft } from "@/lib/replyDrafts";
 import { ReplyDialog } from "./ReplyDialog";
 import { articleSortKey } from "@/lib/article";
 import { flattenQueues } from "./QueueTree";
@@ -147,6 +148,10 @@ export function TicketHeaderActions({
   // independent trigger surface for the same dialogs.
   const [dialog, setDialog] = useState<"customer" | "pending" | "link" | "merge" | null>(null);
   const [replyOpen, setReplyOpen] = useState(false);
+  // Only badge the header button when the draft belongs to the article this
+  // button actually opens — a draft on some other article is advertised by
+  // the placeholder in the article view, not here.
+  const headerHasDraft = Boolean(useReplyDraft(ticketId, replyTarget?.id ?? -1));
 
   const toggleWatch = () => {
     if (!user) return;
@@ -367,9 +372,17 @@ export function TicketHeaderActions({
               size="sm"
               disabled={!canNote || !replyTarget}
               data-testid="ticket-actions-reply"
+              data-has-draft={headerHasDraft ? "true" : undefined}
               onClick={() => setReplyOpen(true)}
             >
-              ↩ {t("ticket.reply")}
+              ↩ {headerHasDraft ? t("ticket.draftResume") : t("ticket.reply")}
+              {headerHasDraft && (
+                <span
+                  aria-hidden
+                  data-testid="ticket-actions-reply-dot"
+                  className="h-1.5 w-1.5 shrink-0 rounded-full bg-current"
+                />
+              )}
             </Button>
           </span>
           <span title={!canNote ? noPerm : undefined} className="inline-flex">
