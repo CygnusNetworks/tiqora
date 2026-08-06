@@ -494,7 +494,17 @@
       "title": "Billets similaires",
       "empty": "Aucun ticket fermé similaire n'a été trouvé.",
       "loadError": "Impossible de charger des tickets similaires."
-    }
+    },
+    "draft": "Brouillon",
+    "draftUnsent": "Brouillon — non envoyé",
+    "draftNotSent": "non envoyé",
+    "draftResume": "Continuer le brouillon",
+    "draftEdit": "Modifier",
+    "draftEmpty": "(pas encore de texte)",
+    "draftEditedAt": "modifié {{time}}",
+    "draftDiscard": "Supprimer le brouillon",
+    "draftDiscardConfirm": "Voulez-vous supprimer cette réponse non envoyée? Le texte ne pourra pas être récupéré.",
+    "draftDiscardConfirmButton": "Supprimer"
   },
   "search": {
     "title": "Recherche",

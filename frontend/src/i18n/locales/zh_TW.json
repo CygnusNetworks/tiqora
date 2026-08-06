@@ -494,7 +494,17 @@
       "title": "類似門票",
       "empty": "未找到類似的封閉門票。",
       "loadError": "無法載入類似的票證。"
-    }
+    },
+    "draft": "草稿",
+    "draftUnsent": "草稿 — 尚未傳送",
+    "draftNotSent": "尚未傳送",
+    "draftResume": "繼續編輯草稿",
+    "draftEdit": "編輯",
+    "draftEmpty": "(尚無內容)",
+    "draftEditedAt": "編輯於 {{time}}",
+    "draftDiscard": "捨棄草稿",
+    "draftDiscardConfirm": "要捨棄這則尚未傳送的回覆嗎？內容將無法復原。",
+    "draftDiscardConfirmButton": "捨棄"
   },
   "search": {
     "title": "搜尋",

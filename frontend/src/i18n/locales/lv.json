@@ -494,7 +494,17 @@
       "title": "Līdzīgas biļetes",
       "empty": "Nav atrastas līdzīgas slēgtas biļetes.",
       "loadError": "Nevarēja ielādēt līdzīgas biļetes."
-    }
+    },
+    "draft": "Melnraksts",
+    "draftUnsent": "Melnraksts — nav nosūtīts",
+    "draftNotSent": "nav nosūtīts",
+    "draftResume": "Turpināt melnrakstu",
+    "draftEdit": "Rediģēt",
+    "draftEmpty": "(vēl nav teksta)",
+    "draftEditedAt": "rediģēts {{time}}",
+    "draftDiscard": "Atmest melnrakstu",
+    "draftDiscardConfirm": "Vai atmest šo nenosūtīto atbildi? Tekstu nevarēs atgūt.",
+    "draftDiscardConfirmButton": "Atmest"
   },
   "search": {
     "title": "Meklēt",

@@ -494,7 +494,17 @@
       "title": "Soortgelijke tickets",
       "empty": "Geen vergelijkbare gesloten tickets gevonden.",
       "loadError": "Kan soortgelijke tickets niet laden."
-    }
+    },
+    "draft": "Concept",
+    "draftUnsent": "Concept — niet verzonden",
+    "draftNotSent": "niet verzonden",
+    "draftResume": "Concept voortzetten",
+    "draftEdit": "Bewerken",
+    "draftEmpty": "(nog geen tekst)",
+    "draftEditedAt": "bewerkt {{time}}",
+    "draftDiscard": "Concept verwijderen",
+    "draftDiscardConfirm": "Dit niet-verzonden antwoord verwijderen? De tekst kan niet worden hersteld.",
+    "draftDiscardConfirmButton": "Verwijderen"
   },
   "search": {
     "title": "Zoeken",

@@ -494,7 +494,17 @@
       "title": "Panašūs bilietai",
       "empty": "Panašių uždarytų bilietų nerasta.",
       "loadError": "Nepavyko įkelti panašių bilietų."
-    }
+    },
+    "draft": "Juodraštis",
+    "draftUnsent": "Juodraštis — neišsiųsta",
+    "draftNotSent": "neišsiųsta",
+    "draftResume": "Tęsti juodraštį",
+    "draftEdit": "Redaguoti",
+    "draftEmpty": "(dar nėra teksto)",
+    "draftEditedAt": "redaguota {{time}}",
+    "draftDiscard": "Atmesti juodraštį",
+    "draftDiscardConfirm": "Atmesti šį neišsiųstą atsakymą? Teksto atkurti nepavyks.",
+    "draftDiscardConfirmButton": "Atmesti"
   },
   "search": {
     "title": "Ieškoti",

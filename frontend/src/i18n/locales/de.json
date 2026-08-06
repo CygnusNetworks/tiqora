@@ -551,7 +551,17 @@
     "timeAccounting": "Zeiterfassung",
     "timeUnits": "Zeiteinheiten",
     "addTime": "Zeit buchen",
-    "addMention": "Agent erwähnen"
+    "addMention": "Agent erwähnen",
+    "draft": "Entwurf",
+    "draftUnsent": "Entwurf — nicht gesendet",
+    "draftNotSent": "nicht gesendet",
+    "draftResume": "Entwurf fortsetzen",
+    "draftEdit": "Bearbeiten",
+    "draftEmpty": "(noch kein Text)",
+    "draftEditedAt": "bearbeitet {{time}}",
+    "draftDiscard": "Entwurf verwerfen",
+    "draftDiscardConfirm": "Diese nicht gesendete Antwort verwerfen? Der Text lässt sich nicht wiederherstellen.",
+    "draftDiscardConfirmButton": "Verwerfen"
   },
   "search": {
     "title": "Suche",

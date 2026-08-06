@@ -494,7 +494,17 @@
       "title": "Tiket serupa",
       "empty": "Tidak ditemukan tiket tertutup serupa.",
       "loadError": "Tidak dapat memuat tiket serupa."
-    }
+    },
+    "draft": "Draf",
+    "draftUnsent": "Draf — belum terkirim",
+    "draftNotSent": "belum terkirim",
+    "draftResume": "Lanjutkan draf",
+    "draftEdit": "Edit",
+    "draftEmpty": "(belum ada teks)",
+    "draftEditedAt": "diedit {{time}}",
+    "draftDiscard": "Buang draf",
+    "draftDiscardConfirm": "Buang balasan yang belum terkirim ini? Teks tidak dapat dipulihkan.",
+    "draftDiscardConfirmButton": "Buang"
   },
   "search": {
     "title": "Cari",

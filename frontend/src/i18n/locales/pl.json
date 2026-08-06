@@ -494,7 +494,17 @@
       "title": "Podobne tickety",
       "empty": "Nie znaleziono podobnych zamkniętych ticketów.",
       "loadError": "Nie udało się wczytać podobnych ticketów."
-    }
+    },
+    "draft": "Szkic",
+    "draftUnsent": "Szkic — niewysłany",
+    "draftNotSent": "niewysłany",
+    "draftResume": "Kontynuuj szkic",
+    "draftEdit": "Edytuj",
+    "draftEmpty": "(brak tekstu)",
+    "draftEditedAt": "edytowano {{time}}",
+    "draftDiscard": "Odrzuć szkic",
+    "draftDiscardConfirm": "Odrzucić tę niewysłaną odpowiedź? Tekstu nie będzie można odzyskać.",
+    "draftDiscardConfirmButton": "Odrzuć"
   },
   "search": {
     "title": "Szukaj",
