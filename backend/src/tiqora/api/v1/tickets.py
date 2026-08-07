@@ -123,6 +123,9 @@ class MutationRequest(BaseModel):
     title: str | None = None
     customer_id: str | None = None
     customer_user_id: str | None = None
+    # True when the client explicitly wants to unassign the customer. Needed
+    # because `customer_id = None` is indistinguishable from "not supplied".
+    clear_customer: bool | None = None
     owner_id: int | None = None
     responsible_id: int | None = None
     lock: str | None = None  # "lock" | "unlock"
@@ -1083,12 +1086,16 @@ async def patch_ticket(
                 )
             if body.title is not None:
                 await svc.change_title(user.id, ticket_id, body.title)
-            if body.customer_id is not None or body.customer_user_id is not None:
+            if (
+                body.customer_id is not None
+                or body.customer_user_id is not None
+                or body.clear_customer
+            ):
                 await svc.set_customer(
                     user.id,
                     ticket_id,
-                    customer_id=body.customer_id,
-                    customer_user_id=body.customer_user_id,
+                    customer_id=None if body.clear_customer else body.customer_id,
+                    customer_user_id=None if body.clear_customer else body.customer_user_id,
                 )
             if body.owner_id is not None:
                 await svc.assign_owner(user.id, ticket_id, body.owner_id)

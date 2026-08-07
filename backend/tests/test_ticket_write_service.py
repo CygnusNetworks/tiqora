@@ -34,6 +34,7 @@ from tiqora.domain.ticket_write_service import (
     create_ticket,
     lock_ticket,
     merge_tickets,
+    set_customer,
     unlock_ticket,
     unwatch_ticket,
     update_dynamic_field,
@@ -491,6 +492,56 @@ async def test_change_title_mariadb(mariadb_znuny_url: str) -> None:
             )
         ).first()
         assert t is not None and t[0] == "New Title"
+
+    await engine.dispose()
+
+
+@pytest.mark.db
+async def test_set_customer_assign_then_clear_mariadb(mariadb_znuny_url: str) -> None:
+    """set_customer writes both customer columns, and passing None for both
+    blanks them again — the path behind the API's `clear_customer` flag."""
+    url = _mysql_async(mariadb_znuny_url)
+    engine = create_async_engine(url)
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    sysconfig = _make_sysconfig()
+
+    async with factory() as session:
+        await _seed_tiqora_tables(session)
+
+    ticket_id = await _make_ticket(factory, sysconfig)
+
+    async def read() -> tuple[Any, Any]:
+        async with factory() as session:
+            row = (
+                await session.execute(
+                    text("SELECT customer_id, customer_user_id FROM ticket WHERE id = :tid"),
+                    {"tid": ticket_id},
+                )
+            ).first()
+        assert row is not None
+        return row[0], row[1]
+
+    async with factory() as session, session.begin():
+        await set_customer(
+            session,
+            ticket_id=ticket_id,
+            customer_id="ACME",
+            customer_user_id="bob",
+            user_id=1,
+        )
+    assert await read() == ("ACME", "bob")
+
+    async with factory() as session, session.begin():
+        await set_customer(
+            session,
+            ticket_id=ticket_id,
+            customer_id=None,
+            customer_user_id=None,
+            user_id=1,
+        )
+    cid, cuid = await read()
+    assert not cid
+    assert not cuid
 
     await engine.dispose()
 

@@ -576,6 +576,20 @@ export function CustomerPickerDialog({
             ) : null}
           </div>
         )}
+        {/* Undo the assignment — the counterpart of the "—" entry the service
+            and SLA pickers already offer. */}
+        {hasCurrent && (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="w-full justify-start text-danger hover:text-danger"
+            data-testid="customer-picker-clear"
+            disabled={patch.isPending}
+            onClick={() => patch.mutate({ clear_customer: true })}
+          >
+            {t("ticket.dialog.clearCustomer")}
+          </Button>
+        )}
         <input
           className={inputCls}
           value={q}

@@ -143,6 +143,13 @@ export function TicketHeaderActions({
   const responsibleAgent = agents.find((a) => a.id === ticket.responsible_user_id);
   const ownerName = ticket.owner_name || ticket.owner_login || "—";
   const customerLabel = ticket.customer_user_id || ticket.customer_id || "—";
+  // `ticket.customer_user_id` is a plain string column without a foreign key,
+  // so it can hold an address that matches no customer_user row (typical for
+  // tickets created from inbound mail). The backend only fills
+  // `customer_email` when the login actually resolved, which makes it the
+  // discriminator for "properly assigned".
+  const customerResolved = Boolean(ticket.customer_user_id && ticket.customer_email);
+  const customerUnresolved = Boolean(ticket.customer_user_id) && !ticket.customer_email;
 
   // Which modal dialog is open (null = none) — mirrors ActionToolbar's own
   // single-dialog-at-a-time state, kept separately since this is a second,
@@ -515,13 +522,19 @@ export function TicketHeaderActions({
         <PersonShell
           label={t("ticket.customer")}
           name={customerLabel}
-          email={ticket.customer_user_id}
+          email={ticket.customer_email}
           avatarTone="customer"
           testId="ticket-pill-customer"
           disabledTitle={!perms.rw ? noPerm : undefined}
+          muted={!ticket.customer_user_id}
+          unresolvedTitle={customerUnresolved ? t("ticket.customerUnresolved") : undefined}
           onClick={perms.rw ? () => setDialog("customer") : undefined}
         />
-        {ticket.customer_user_id && (
+        {/* Only link to the customer centre when the login actually resolves to
+            a customer_user record — `customer_user_id` is a free-text column
+            with no FK, so mail ingest can leave a raw address in it that would
+            dead-end the detail page on a 404. */}
+        {customerResolved && ticket.customer_user_id && (
           <Link
             to="/agent/customers/$login"
             params={{ login: ticket.customer_user_id }}
@@ -695,6 +708,7 @@ function PersonShell({
   testId,
   disabledTitle,
   muted,
+  unresolvedTitle,
   avatarTone = "accent",
   onClick,
   triggerRef,
@@ -706,6 +720,10 @@ function PersonShell({
   testId: string;
   disabledTitle?: string;
   muted?: boolean;
+  /** Set when the value does not resolve to a real record — renders a warning
+   * marker carrying this text, rather than presenting the value as a link-worthy
+   * entity. */
+  unresolvedTitle?: string;
   avatarTone?: "accent" | "customer";
   onClick?: () => void;
   triggerRef?: React.RefObject<HTMLButtonElement | null>;
@@ -716,7 +734,19 @@ function PersonShell({
     <>
       <Avatar initials={initialsOf(name)} email={email} size={20} tone={avatarTone} />
       <span className="text-muted">{label}</span>
-      <span className={cn("font-medium", muted ? "text-muted" : "text-ink")}>{name}</span>
+      <span className={cn("font-medium", muted || unresolvedTitle ? "text-muted" : "text-ink")}>
+        {name}
+      </span>
+      {unresolvedTitle && (
+        <span
+          aria-label={unresolvedTitle}
+          title={unresolvedTitle}
+          data-testid={`${testId}-unresolved`}
+          className="text-[10px] text-escalation"
+        >
+          ⚠
+        </span>
+      )}
       {interactive ? (
         <span aria-hidden className="text-muted">
           ⌄

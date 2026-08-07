@@ -87,14 +87,28 @@ export function UsersPage() {
     },
   ];
 
+  // Two tabs instead of three stacked sections: the form was tall enough to
+  // scroll, and "Status" appeared twice (once as a section heading, once as
+  // the field label). Account-shaped fields go left, person-shaped right.
+  const tabAccount = t("admin.users.tabAccount");
+  const tabPerson = t("admin.users.tabPerson");
+
   const fields: FieldDef[] = [
-    { name: "section_access", label: t("admin.users.sectionAccess"), type: "section" },
-    { name: "login", label: t("admin.users.login"), type: "text", required: true },
+    {
+      name: "login",
+      label: t("admin.users.login"),
+      type: "text",
+      required: true,
+      tab: tabAccount,
+    },
     {
       name: "password_mode",
       label: t("admin.users.passwordMode"),
       type: "select",
       hideOnEdit: true,
+      tab: tabAccount,
+      helpText: (v) =>
+        v.password_mode === "auto" ? t("admin.users.passwordModeAutoHelp") : undefined,
       options: [
         { value: "auto", label: t("admin.users.passwordModeAuto") },
         { value: "manual", label: t("admin.users.passwordModeManual") },
@@ -107,34 +121,45 @@ export function UsersPage() {
       helpText: t("admin.users.passwordHelp"),
       showIf: (v) => v.password_mode !== "auto",
       required: (v) => v.password_mode === "manual",
+      tab: tabAccount,
     },
-
-    { name: "section_contact", label: t("admin.users.sectionContact"), type: "section" },
-    { name: "first_name", label: t("admin.users.firstName"), type: "text", required: true },
-    { name: "last_name", label: t("admin.users.lastName"), type: "text", required: true },
-    { name: "title", label: t("admin.users.title"), type: "text", width: "half" },
-    {
-      name: "email",
-      label: t("admin.users.email"),
-      type: "text",
-      width: "half",
-      required: (v) => v.password_mode === "auto",
-      helpText: (v) =>
-        v.password_mode === "auto" ? t("admin.users.passwordModeAutoHelp") : undefined,
-    },
-    { name: "mobile", label: t("admin.users.mobile"), type: "text" },
-
-    { name: "section_status", label: t("admin.users.sectionStatus"), type: "section" },
     {
       name: "valid_id",
       label: t("admin.table.status"),
       type: "select",
+      tab: tabAccount,
       options: [
         { value: 1, label: t("admin.table.valid") },
         { value: 2, label: t("admin.table.invalid") },
       ],
       help: { title: t("admin.table.status"), description: t("admin.help.common.validId") },
     },
+
+    {
+      name: "first_name",
+      label: t("admin.users.firstName"),
+      type: "text",
+      required: true,
+      width: "half",
+      tab: tabPerson,
+    },
+    {
+      name: "last_name",
+      label: t("admin.users.lastName"),
+      type: "text",
+      required: true,
+      width: "half",
+      tab: tabPerson,
+    },
+    {
+      name: "email",
+      label: t("admin.users.email"),
+      type: "text",
+      required: (v) => v.password_mode === "auto",
+      tab: tabPerson,
+    },
+    { name: "mobile", label: t("admin.users.mobile"), type: "text", width: "half", tab: tabPerson },
+    { name: "title", label: t("admin.users.title"), type: "text", width: "half", tab: tabPerson },
   ];
 
   return (
