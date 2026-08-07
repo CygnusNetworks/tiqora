@@ -98,6 +98,8 @@ export {
   type EffectiveQueuePermission,
   type EffectivePermissionSource,
   type UserLanguageOut,
+  type UserDeletableOut,
+  type UserReference,
   type UserLanguageUpdate,
   type QueueOut,
   type QueueCreate,
