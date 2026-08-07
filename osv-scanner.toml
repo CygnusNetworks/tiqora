@@ -54,3 +54,25 @@ die schwerwiegendste offene Meldung. Deshalb nur zwei Wochen zurueckgestellt,
 nicht vier -- ein Major-Update von cryptography gehoert in einen eigenen PR
 mit vollem Testlauf, aber es sollte zeitnah passieren.
 """
+
+[[IgnoredVulns]]
+id = "GHSA-6hr6-w5qg-qmwg"
+ignoreUntil = 2026-08-21
+reason = """
+h2 4.3.0 -> 4.4.1 (CVSS 5.3). Kommt transitiv als optionale http2-Extra von
+httpx2 herein und ist im Backend-venv installiert, auch ohne dass tiqora
+selbst HTTP/2-Verbindungen aufbaut -- also Laufzeitabhaengigkeit, aber
+niedrigere Schwere als die cryptography-Meldung oben, daher zwei statt vier
+Wochen.
+"""
+
+[[IgnoredVulns]]
+id = "GHSA-5p4m-2wfm-xmqj"
+ignoreUntil = 2026-09-04
+reason = """
+js-yaml 4.2.0/4.3.0 -> 4.3.1 (CVSS 7.5, quadratische CPU-Last durch
+YAML-Merge-Key-Ketten -- gleiche Fund-Klasse wie GHSA-52cp-r559-cp3m oben).
+Kommt transitiv ueber eslint (@eslint/eslintrc) und @redocly/openapi-core
+(OpenAPI-Codegen) herein, beides reine Build-/Lint-Werkzeuge; im
+Produktions-Image nicht enthalten.
+"""
