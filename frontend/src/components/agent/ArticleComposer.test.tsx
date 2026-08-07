@@ -40,6 +40,9 @@ function wrap() {
 
 describe("ArticleComposer extras", () => {
   beforeEach(() => {
+    // The minutes/hours toggle persists to localStorage — start each test
+    // from the "min" default rather than leaking a prior test's choice.
+    window.localStorage.clear();
     createArticle.mockReset().mockResolvedValue({ id: 42 });
     createTicketMention.mockReset().mockResolvedValue({ id: 1 });
     createTicketTimeAccounting.mockReset().mockResolvedValue({ id: 1 });
@@ -72,10 +75,34 @@ describe("ArticleComposer extras", () => {
   it("books the minutes from the footer chip", async () => {
     wrap();
     fireEvent.change(screen.getByTestId("composer-body"), { target: { value: "Notiz" } });
+    // Minutes mode rounds to the nearest whole minute — no fractional bookings.
     fireEvent.change(screen.getByTestId("composer-time"), { target: { value: "7.5" } });
     fireEvent.click(screen.getByTestId("composer-send"));
     await waitFor(() =>
-      expect(createTicketTimeAccounting).toHaveBeenCalledWith(7, { time_unit: 7.5 }),
+      expect(createTicketTimeAccounting).toHaveBeenCalledWith(7, { time_unit: 8 }),
+    );
+  });
+
+  it("fills the time chip from a preset", async () => {
+    wrap();
+    fireEvent.change(screen.getByTestId("composer-body"), { target: { value: "Notiz" } });
+    fireEvent.click(screen.getByTestId("composer-time-presets-trigger"));
+    fireEvent.click(await screen.findByTestId("composer-time-preset-15"));
+    expect(screen.getByTestId("composer-time")).toHaveValue(15);
+    fireEvent.click(screen.getByTestId("composer-send"));
+    await waitFor(() =>
+      expect(createTicketTimeAccounting).toHaveBeenCalledWith(7, { time_unit: 15 }),
+    );
+  });
+
+  it("books hours converted to whole minutes when Std mode is selected", async () => {
+    wrap();
+    fireEvent.change(screen.getByTestId("composer-body"), { target: { value: "Notiz" } });
+    fireEvent.click(screen.getByTestId("composer-time-mode-hours"));
+    fireEvent.change(screen.getByTestId("composer-time"), { target: { value: "0.5" } });
+    fireEvent.click(screen.getByTestId("composer-send"));
+    await waitFor(() =>
+      expect(createTicketTimeAccounting).toHaveBeenCalledWith(7, { time_unit: 30 }),
     );
   });
 

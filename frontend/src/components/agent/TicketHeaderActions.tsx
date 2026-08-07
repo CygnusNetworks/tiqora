@@ -265,105 +265,114 @@ export function TicketHeaderActions({
             ))}
           </Menu>
         </span>
-        <span title={!perms.rw ? noPerm : undefined} className={cn(!perms.rw && "opacity-60")}>
-          <Menu
-            align="left"
-            panelTestId="ticket-pill-type-menu"
-            trigger={({ ref, toggleProps }) => (
-              <button
-                ref={ref}
-                type="button"
-                data-testid="ticket-pill-type"
-                disabled={!perms.rw}
-                {...toggleProps}
-                className="rounded-md border border-hairline bg-surface px-2 py-0.5 text-xs text-ink"
-              >
-                {ticket.type_name || t("ticket.type")}
-              </button>
-            )}
-          >
-            <MenuLabel>{t("ticket.type")}</MenuLabel>
-            {types.map((ty) => (
-              <MenuItem
-                key={ty.id}
-                selected={ty.id === ticket.type_id}
-                onSelect={() => patch.mutate({ type_id: ty.id })}
-              >
-                {ty.name}
-              </MenuItem>
-            ))}
-          </Menu>
-        </span>
-        <span title={!perms.rw ? noPerm : undefined} className={cn(!perms.rw && "opacity-60")}>
-          <Menu
-            align="left"
-            panelTestId="ticket-pill-service-menu"
-            trigger={({ ref, toggleProps }) => (
-              <button
-                ref={ref}
-                type="button"
-                data-testid="ticket-pill-service"
-                disabled={!perms.rw}
-                {...toggleProps}
-                className="rounded-md border border-hairline bg-surface px-2 py-0.5 text-xs text-ink"
-              >
-                {ticket.service_name || t("ticket.service")}
-              </button>
-            )}
-          >
-            <MenuLabel>{t("ticket.service")}</MenuLabel>
-            <MenuItem
-              selected={ticket.service_id == null}
-              onSelect={() => patch.mutate({ clear_service: true })}
+        {/* Type/Service/SLA pickers are only worth a header slot once the
+            system actually offers a choice — with ≤1 defined system-wide
+            there's nothing to pick, so each hides independently. */}
+        {(typesQ.data?.length ?? 0) > 1 && (
+          <span title={!perms.rw ? noPerm : undefined} className={cn(!perms.rw && "opacity-60")}>
+            <Menu
+              align="left"
+              panelTestId="ticket-pill-type-menu"
+              trigger={({ ref, toggleProps }) => (
+                <button
+                  ref={ref}
+                  type="button"
+                  data-testid="ticket-pill-type"
+                  disabled={!perms.rw}
+                  {...toggleProps}
+                  className="rounded-md border border-hairline bg-surface px-2 py-0.5 text-xs text-ink"
+                >
+                  {ticket.type_name || t("ticket.type")}
+                </button>
+              )}
             >
-              —
-            </MenuItem>
-            {services.map((s) => (
-              <MenuItem
-                key={s.id}
-                selected={s.id === ticket.service_id}
-                onSelect={() => patch.mutate({ service_id: s.id })}
-              >
-                {s.name}
-              </MenuItem>
-            ))}
-          </Menu>
-        </span>
-        <span title={!perms.rw ? noPerm : undefined} className={cn(!perms.rw && "opacity-60")}>
-          <Menu
-            align="left"
-            panelTestId="ticket-pill-sla-menu"
-            trigger={({ ref, toggleProps }) => (
-              <button
-                ref={ref}
-                type="button"
-                data-testid="ticket-pill-sla"
-                disabled={!perms.rw}
-                {...toggleProps}
-                className="rounded-md border border-hairline bg-surface px-2 py-0.5 text-xs text-ink"
-              >
-                {ticket.sla_name || t("ticket.sla")}
-              </button>
-            )}
-          >
-            <MenuLabel>{t("ticket.sla")}</MenuLabel>
-            <MenuItem
-              selected={ticket.sla_id == null}
-              onSelect={() => patch.mutate({ clear_sla: true })}
+              <MenuLabel>{t("ticket.type")}</MenuLabel>
+              {types.map((ty) => (
+                <MenuItem
+                  key={ty.id}
+                  selected={ty.id === ticket.type_id}
+                  onSelect={() => patch.mutate({ type_id: ty.id })}
+                >
+                  {ty.name}
+                </MenuItem>
+              ))}
+            </Menu>
+          </span>
+        )}
+        {(servicesQ.data?.length ?? 0) > 1 && (
+          <span title={!perms.rw ? noPerm : undefined} className={cn(!perms.rw && "opacity-60")}>
+            <Menu
+              align="left"
+              panelTestId="ticket-pill-service-menu"
+              trigger={({ ref, toggleProps }) => (
+                <button
+                  ref={ref}
+                  type="button"
+                  data-testid="ticket-pill-service"
+                  disabled={!perms.rw}
+                  {...toggleProps}
+                  className="rounded-md border border-hairline bg-surface px-2 py-0.5 text-xs text-ink"
+                >
+                  {ticket.service_name || t("ticket.service")}
+                </button>
+              )}
             >
-              —
-            </MenuItem>
-            {slas.map((s) => (
+              <MenuLabel>{t("ticket.service")}</MenuLabel>
               <MenuItem
-                key={s.id}
-                selected={s.id === ticket.sla_id}
-                onSelect={() => patch.mutate({ sla_id: s.id })}
+                selected={ticket.service_id == null}
+                onSelect={() => patch.mutate({ clear_service: true })}
               >
-                {s.name}
+                —
               </MenuItem>
-            ))}
-          </Menu>
-        </span>
+              {services.map((s) => (
+                <MenuItem
+                  key={s.id}
+                  selected={s.id === ticket.service_id}
+                  onSelect={() => patch.mutate({ service_id: s.id })}
+                >
+                  {s.name}
+                </MenuItem>
+              ))}
+            </Menu>
+          </span>
+        )}
+        {(slasQ.data?.length ?? 0) > 1 && (
+          <span title={!perms.rw ? noPerm : undefined} className={cn(!perms.rw && "opacity-60")}>
+            <Menu
+              align="left"
+              panelTestId="ticket-pill-sla-menu"
+              trigger={({ ref, toggleProps }) => (
+                <button
+                  ref={ref}
+                  type="button"
+                  data-testid="ticket-pill-sla"
+                  disabled={!perms.rw}
+                  {...toggleProps}
+                  className="rounded-md border border-hairline bg-surface px-2 py-0.5 text-xs text-ink"
+                >
+                  {ticket.sla_name || t("ticket.sla")}
+                </button>
+              )}
+            >
+              <MenuLabel>{t("ticket.sla")}</MenuLabel>
+              <MenuItem
+                selected={ticket.sla_id == null}
+                onSelect={() => patch.mutate({ clear_sla: true })}
+              >
+                —
+              </MenuItem>
+              {slas.map((s) => (
+                <MenuItem
+                  key={s.id}
+                  selected={s.id === ticket.sla_id}
+                  onSelect={() => patch.mutate({ sla_id: s.id })}
+                >
+                  {s.name}
+                </MenuItem>
+              ))}
+            </Menu>
+          </span>
+        )}
         <SlaChip ticket={ticket} />
 
         <span className="ml-auto flex items-center gap-2">

@@ -54,6 +54,9 @@ function wrap() {
 
 describe("TicketMetaCounters", () => {
   beforeEach(() => {
+    // The minutes/hours toggle persists to localStorage — start each test
+    // from the "min" default rather than leaking a prior test's choice.
+    window.localStorage.clear();
     listTicketMentions
       .mockReset()
       .mockResolvedValue([{ id: 11, user_id: 2, user_name: "Ada Lovelace", user_login: "ada" }]);
@@ -132,5 +135,27 @@ describe("TicketMetaCounters", () => {
     fireEvent.change(screen.getByTestId("ticket-time-units"), { target: { value: "0" } });
     expect(book).toBeDisabled();
     expect(createTicketTimeAccounting).not.toHaveBeenCalled();
+  });
+
+  it("fills the field from a preset button", async () => {
+    wrap();
+    fireEvent.click(await screen.findByTestId("ticket-counter-time"));
+    fireEvent.click(await screen.findByTestId("ticket-time-preset-30"));
+    expect(screen.getByTestId("ticket-time-units")).toHaveValue(30);
+    fireEvent.click(screen.getByTestId("ticket-time-book"));
+    await waitFor(() =>
+      expect(createTicketTimeAccounting).toHaveBeenCalledWith(7, { time_unit: 30 }),
+    );
+  });
+
+  it("books hours converted to whole minutes when Std mode is selected", async () => {
+    wrap();
+    fireEvent.click(await screen.findByTestId("ticket-counter-time"));
+    fireEvent.click(await screen.findByTestId("ticket-time-mode-hours"));
+    fireEvent.change(screen.getByTestId("ticket-time-units"), { target: { value: "1.5" } });
+    fireEvent.click(screen.getByTestId("ticket-time-book"));
+    await waitFor(() =>
+      expect(createTicketTimeAccounting).toHaveBeenCalledWith(7, { time_unit: 90 }),
+    );
   });
 });
