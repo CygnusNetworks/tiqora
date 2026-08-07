@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { api } from "@/lib/api";
@@ -8,7 +8,15 @@ import { usePopoverClose } from "@/components/ui/popoverContext";
 import { SelectField } from "@/components/ui/SelectField";
 import type { SelectMenuItem } from "@/components/ui/SelectMenu";
 import { cn } from "@/lib/cn";
-import { formatTimeUnits } from "@/lib/timeUnits";
+import {
+  displayToMinutes,
+  formatTimeUnits,
+  loadTimeUnitMode,
+  minutesToDisplay,
+  saveTimeUnitMode,
+  type TimeUnitMode,
+} from "@/lib/timeUnits";
+import { TimePresetButtons, TimeUnitToggle } from "./TimeUnitControls";
 
 /**
  * The ticket header's two right-hand counters: who is mentioned and how much
@@ -202,7 +210,10 @@ function TimePopover({ ticketId }: { ticketId: number }) {
   const { t } = useTranslation();
   const qc = useQueryClient();
   const closePopover = usePopoverClose();
-  const [units, setUnits] = useState("");
+  const [mode, setMode] = useState<TimeUnitMode>(() => loadTimeUnitMode());
+  const [text, setText] = useState("");
+
+  useEffect(() => saveTimeUnitMode(mode), [mode]);
 
   const timeQ = useQuery({
     queryKey: ["tickets", ticketId, "time-accounting"],
@@ -215,7 +226,7 @@ function TimePopover({ ticketId }: { ticketId: number }) {
   const bookM = useMutation({
     mutationFn: (value: number) => api.createTicketTimeAccounting(ticketId, { time_unit: value }),
     onSuccess: () => {
-      setUnits("");
+      setText("");
       invalidate();
       closePopover();
     },
@@ -227,8 +238,17 @@ function TimePopover({ ticketId }: { ticketId: number }) {
 
   const entries = timeQ.data ?? [];
   const total = entries.reduce((sum, r) => sum + Number(r.time_unit), 0);
-  const parsed = Number(units);
-  const canBook = units.trim() !== "" && Number.isFinite(parsed) && parsed > 0;
+  const parsed = displayToMinutes(text, mode);
+  const canBook = parsed !== null;
+
+  const handleModeChange = (nextMode: TimeUnitMode) => {
+    setMode(nextMode);
+    setText(parsed === null ? "" : minutesToDisplay(parsed, nextMode));
+  };
+
+  const handleBook = () => {
+    if (parsed !== null) bookM.mutate(parsed);
+  };
 
   return (
     <div className="space-y-2">
@@ -266,35 +286,45 @@ function TimePopover({ ticketId }: { ticketId: number }) {
         </ul>
       )}
       <div className="flex items-center gap-1.5">
-        <input
-          type="number"
-          min="0.01"
-          step="0.25"
-          inputMode="decimal"
-          value={units}
-          onChange={(e) => setUnits(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" && canBook) {
-              e.preventDefault();
-              bookM.mutate(parsed);
-            }
-          }}
-          placeholder="0"
-          aria-label={t("ticket.timeUnits")}
-          data-testid="ticket-time-units"
-          className="w-16 rounded border border-hairline bg-surface px-2 py-1 text-right font-mono text-xs tabular-nums text-ink focus:outline-none focus:ring-1 focus:ring-accent"
-        />
+        <TimeUnitToggle mode={mode} onChange={handleModeChange} size="sm" testId="ticket-time-mode" />
+        <div className="flex items-center gap-1 rounded border border-hairline bg-surface px-2 py-1">
+          <input
+            type="number"
+            min="0"
+            step={mode === "min" ? 1 : 0.25}
+            inputMode="decimal"
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && canBook) {
+                e.preventDefault();
+                handleBook();
+              }
+            }}
+            placeholder="0"
+            aria-label={t("ticket.timeUnits")}
+            data-testid="ticket-time-units"
+            className="w-20 border-none bg-transparent text-right font-mono text-xs tabular-nums text-ink focus:outline-none"
+          />
+          <span className="text-[10px] text-muted">
+            {mode === "min" ? t("ticket.timeUnitAbbrev") : t("ticket.timeUnitHoursAbbrev")}
+          </span>
+        </div>
         <Button
           variant="primary"
           size="sm"
           className="flex-1"
           data-testid="ticket-time-book"
           disabled={!canBook || bookM.isPending}
-          onClick={() => bookM.mutate(parsed)}
+          onClick={handleBook}
         >
           {t("ticket.addTime")}
         </Button>
       </div>
+      <TimePresetButtons
+        testId="ticket-time-preset"
+        onPick={(minutes) => setText(minutesToDisplay(minutes, mode))}
+      />
       <p className="text-[11px] text-muted">{t("ticket.timeComposerHint")}</p>
     </div>
   );
