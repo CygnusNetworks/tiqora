@@ -19173,6 +19173,27 @@
         "title": "UserCreate",
         "type": "object"
       },
+      "UserDeletableOut": {
+        "properties": {
+          "blocking": {
+            "items": {
+              "$ref": "#/components/schemas/UserReference"
+            },
+            "title": "Blocking",
+            "type": "array"
+          },
+          "deletable": {
+            "title": "Deletable",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "deletable",
+          "blocking"
+        ],
+        "title": "UserDeletableOut",
+        "type": "object"
+      },
       "UserLanguageOut": {
         "properties": {
           "language": {
@@ -19374,6 +19395,24 @@
           "change_time"
         ],
         "title": "UserOut",
+        "type": "object"
+      },
+      "UserReference": {
+        "properties": {
+          "column": {
+            "title": "Column",
+            "type": "string"
+          },
+          "table": {
+            "title": "Table",
+            "type": "string"
+          }
+        },
+        "required": [
+          "table",
+          "column"
+        ],
+        "title": "UserReference",
         "type": "object"
       },
       "UserUpdate": {
@@ -41460,6 +41499,81 @@
         ]
       }
     },
+    "/api/v1/admin/users/{user_id}/deletable": {
+      "get": {
+        "description": "Whether this agent can be hard-deleted, and what blocks it if not.",
+        "operationId": "get_user_deletable_api_v1_admin_users__user_id__deletable_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "user_id",
+            "required": true,
+            "schema": {
+              "title": "User Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserDeletableOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get User Deletable",
+        "tags": [
+          "admin:users"
+        ]
+      }
+    },
     "/api/v1/admin/users/{user_id}/effective-permissions": {
       "get": {
         "description": "Read-only breakdown of a user's resolved group/queue permissions.\n\nUnion of direct ``group_user`` grants and role-derived ``group_role``\ngrants (same rule as :class:`tiqora.permissions.engine.PermissionEngine`,\nreimplemented here to additionally track *where* each permission key\ncame from for display).",
@@ -41926,6 +42040,74 @@
           }
         },
         "summary": "Set User Language",
+        "tags": [
+          "admin:users"
+        ]
+      }
+    },
+    "/api/v1/admin/users/{user_id}/permanent": {
+      "delete": {
+        "description": "Hard-delete an agent that nothing references.\n\nDistinct from ``DELETE /{user_id}``, which soft-invalidates. Refuses with\n409 and the blocking tables when any row outside the agent's own settings\nstill points at them \u2014 the FKs would reject the statement anyway, but a\nnamed list is more useful than an integrity error.",
+        "operationId": "delete_user_permanently_api_v1_admin_users__user_id__permanent_delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "user_id",
+            "required": true,
+            "schema": {
+              "title": "User Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete User Permanently",
         "tags": [
           "admin:users"
         ]

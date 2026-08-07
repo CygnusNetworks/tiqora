@@ -815,6 +815,7 @@ export function resolveData(path: string, method: string): unknown | undefined {
   if (p.match(/\/admin\/customer-users\/[^/]+\/groups$/)) { const login = decodeURIComponent(p.split("/").slice(-2)[0]); return customerUserGroups[login] ?? []; }
   if (p.match(/\/admin\/users\/\d+\/effective-permissions$/)) return { roles: [], groups: [], queues: [] };
   if (p.match(/\/admin\/users\/\d+\/language$/)) return { language: null };
+  if (p.match(/\/admin\/users\/\d+\/deletable$/)) return { deletable: false, blocking: [{ table: "ticket", column: "create_by" }] };
   // Admin — GDPR
   if (p.endsWith("/admin/gdpr/preview") && method === "POST") return gdprPreview;
   if (p.endsWith("/admin/gdpr/jobs")) return page([]);

@@ -141,6 +141,8 @@ export type EffectiveGroupPermission = Schemas["EffectiveGroupPermission"];
 export type EffectiveQueuePermission = Schemas["EffectiveQueuePermission"];
 export type EffectivePermissionSource = Schemas["EffectivePermissionSource"];
 export type UserLanguageOut = Schemas["UserLanguageOut"];
+export type UserDeletableOut = Schemas["UserDeletableOut"];
+export type UserReference = Schemas["UserReference"];
 export type UserLanguageUpdate = Schemas["UserLanguageUpdate"];
 export type QueueOut = Schemas["QueueOut"];
 export type QueueCreate = Schemas["QueueCreate"];
@@ -1784,6 +1786,17 @@ export class ApiClient {
       `/api/v1/admin/users/${userId}/effective-permissions`,
       { signal },
     );
+  }
+
+  getUserDeletable(userId: number, signal?: AbortSignal) {
+    return this.request<UserDeletableOut>("GET", `/api/v1/admin/users/${userId}/deletable`, {
+      signal,
+    });
+  }
+
+  /** Hard delete — 409s with the blocking tables when still referenced. */
+  deleteUserPermanently(userId: number, signal?: AbortSignal) {
+    return this.request<void>("DELETE", `/api/v1/admin/users/${userId}/permanent`, { signal });
   }
 
   getUserLanguage(userId: number, signal?: AbortSignal) {

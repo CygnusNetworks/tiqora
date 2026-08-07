@@ -1486,7 +1486,14 @@
       "tabAccount": "Account",
       "tabPerson": "Person",
       "sourceInvalidHint": "This permission comes from an invalid role and therefore has no effect.",
-      "keyInactiveHint": "This permission is configured but not in force — its source or the group is invalid."
+      "keyInactiveHint": "This permission is configured but not in force — its source or the group is invalid.",
+      "deletePermanent": "Delete permanently",
+      "deleteTitle": "Permanently delete {{name}}?",
+      "deleteConfirm": "Delete permanently",
+      "deletableBody": "Nothing references {{name}}, so the account can be removed completely — along with its preferences, group and role assignment, and 2FA enrolment.",
+      "deleteIrreversible": "This cannot be undone.",
+      "deleteBlockedBody": "{{name}} cannot be deleted — these tables still reference the account:",
+      "deleteBlockedHint": "Set the account to \"Invalid\" instead, so tickets, articles and history stay attributable."
     },
     "groups": {
       "title_plural": "Groups",

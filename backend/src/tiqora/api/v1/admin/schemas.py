@@ -68,6 +68,17 @@ class UserLanguageOut(BaseModel):
     language: str | None
 
 
+class UserReference(BaseModel):
+    table: str
+    column: str
+
+
+class UserDeletableOut(BaseModel):
+    deletable: bool
+    """False when any row outside the agent's own settings still points at them."""
+    blocking: list[UserReference]
+
+
 class GroupAssignment(BaseModel):
     group_id: int
     permission_key: Literal["ro", "move_into", "create", "note", "owner", "priority", "rw"]

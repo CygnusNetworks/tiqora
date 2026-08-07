@@ -1484,7 +1484,14 @@
       "tabAccount": "Konto",
       "tabPerson": "Person",
       "sourceInvalidHint": "Diese Berechtigung stammt aus einer ungültigen Rolle und wirkt deshalb nicht.",
-      "keyInactiveHint": "Dieses Recht ist konfiguriert, wirkt aber nicht – die Quelle oder die Gruppe ist ungültig."
+      "keyInactiveHint": "Dieses Recht ist konfiguriert, wirkt aber nicht – die Quelle oder die Gruppe ist ungültig.",
+      "deletePermanent": "Endgültig löschen",
+      "deleteTitle": "{{name}} endgültig löschen?",
+      "deleteConfirm": "Endgültig löschen",
+      "deletableBody": "{{name}} wird nirgends referenziert und kann vollständig entfernt werden – zusammen mit Einstellungen, Gruppen- und Rollenzuordnung sowie 2FA-Einrichtung.",
+      "deleteIrreversible": "Das lässt sich nicht rückgängig machen.",
+      "deleteBlockedBody": "{{name}} kann nicht gelöscht werden – folgende Tabellen verweisen noch auf das Konto:",
+      "deleteBlockedHint": "Setze das Konto stattdessen auf „Ungültig“. So bleiben Tickets, Artikel und Historie zuordenbar."
     },
     "groups": {
       "title_plural": "Gruppen",

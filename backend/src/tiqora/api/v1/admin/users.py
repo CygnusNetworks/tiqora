@@ -35,14 +35,17 @@ from tiqora.api.v1.admin.schemas import (
     RoleAssignment,
     RoleOut,
     UserCreate,
+    UserDeletableOut,
     UserLanguageOut,
     UserOut,
+    UserReference,
     UserUpdate,
 )
 from tiqora.db.legacy.queue import Queue
 from tiqora.db.legacy.user import GroupRole, GroupUser, PermissionGroups, Roles, RoleUser, Users
 from tiqora.domain.auth import normalize_language_code
 from tiqora.domain.schemas import UserLanguageUpdate
+from tiqora.domain.user_delete import blocking_references, delete_user_rows
 from tiqora.domain.user_preferences import bulk_get_preferences, get_preference, set_preference
 from tiqora.domain.welcome_mail import WelcomeMailError, send_transactional_email
 from tiqora.permissions.engine import PERMISSION_KEYS
@@ -330,6 +333,52 @@ async def revoke_role(user_id: int, role_id: int, admin: AdminUser, session: DbS
         await session.delete(existing)
         await invalidate_znuny_cache_types(session, USER_ROLE_CACHE_TYPES)
         await session.commit()
+
+
+@router.get("/{user_id}/deletable", response_model=UserDeletableOut)
+async def get_user_deletable(
+    user_id: int, admin: AdminUser, session: DbSession
+) -> UserDeletableOut:
+    """Whether this agent can be hard-deleted, and what blocks it if not."""
+    _ = admin
+    user = await session.get(Users, user_id)
+    if user is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+    blocking = await blocking_references(session, user_id)
+    return UserDeletableOut(
+        deletable=not blocking,
+        blocking=[UserReference(table=r.table, column=r.column) for r in blocking],
+    )
+
+
+@router.delete("/{user_id}/permanent", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_user_permanently(user_id: int, admin: AdminUser, session: DbSession) -> None:
+    """Hard-delete an agent that nothing references.
+
+    Distinct from ``DELETE /{user_id}``, which soft-invalidates. Refuses with
+    409 and the blocking tables when any row outside the agent's own settings
+    still points at them — the FKs would reject the statement anyway, but a
+    named list is more useful than an integrity error.
+    """
+    user = await session.get(Users, user_id)
+    if user is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+    if user_id == admin.id:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT, detail="You cannot delete your own account"
+        )
+    blocking = await blocking_references(session, user_id)
+    if blocking:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                "User is still referenced by: "
+                + ", ".join(f"{r.table}.{r.column}" for r in blocking)
+            ),
+        )
+    await delete_user_rows(session, user_id)
+    await invalidate_znuny_cache_types(session, USER_CACHE_TYPES)
+    await session.commit()
 
 
 @router.get("/{user_id}/language", response_model=UserLanguageOut)
