@@ -9,7 +9,11 @@ import { Spinner } from "@/components/ui/Spinner";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
 import { cn } from "@/lib/cn";
 import { clearDraft, getDraft, saveDraft, useReplyDraft } from "@/lib/replyDrafts";
+import { postComposerExtras } from "@/lib/composerExtras";
+import type { PickedMention } from "@/lib/mentions";
 import { ArticleBodyRenderer } from "./ArticleBodyRenderer";
+import { ComposerTimeChip } from "./ComposerTimeChip";
+import { MentionTextarea } from "./MentionTextarea";
 import {
   RecipientsField,
   joinRecipients,
@@ -74,6 +78,12 @@ export function ReplyDialog({
   // below an empty answer area and the agent edits the whole thing inline.
   const [body, setBody] = useState("");
   const [templateId, setTemplateId] = useState("");
+  // Collected while writing, recorded after the article is created.
+  const [mentions, setMentions] = useState<PickedMention[]>([]);
+  const [timeUnits, setTimeUnits] = useState("");
+  /** Set when the article went out but a mention/time write did not — the
+   * dialog then offers a retry for those alone, never a second send. */
+  const [extrasFailed, setExtrasFailed] = useState<Array<"mentions" | "time">>([]);
   // What the server-side reply draft seeded — the yardstick for "the agent
   // actually typed something". Stays null until the draft query resolves, so
   // nothing is persisted before there is anything to compare against.
@@ -234,11 +244,22 @@ export function ReplyDialog({
     setTemplateId("");
   };
 
+  /** Everything recorded — reset the composer to the server-seeded reply and
+   * close. The component stays mounted after closing, so without this the next
+   * "Reply" on this article would open showing the message just sent. */
+  const finishSend = () => {
+    resetToBaseline();
+    setMentions([]);
+    setTimeUnits("");
+    setExtrasFailed([]);
+    onClose();
+  };
+
   const templates = templatesQ.data ?? [];
 
   const sendMutation = useMutation({
-    mutationFn: () =>
-      api.createArticle(ticketId, {
+    mutationFn: async () => {
+      await api.createArticle(ticketId, {
         sender_type: "agent",
         subject,
         body,
@@ -254,16 +275,16 @@ export function ReplyDialog({
         in_reply_to: draftQ.data?.in_reply_to ?? null,
         references: draftQ.data?.references ?? null,
         ai_draft_id: aiDraftId,
-      }),
-    onSuccess: () => {
+      });
+      // The reply is out; mentions and the booking follow and may fail on
+      // their own without costing the message.
+      return postComposerExtras(ticketId, { body, mentions, timeUnits, queryClient });
+    },
+    onSuccess: (extras) => {
       // Sent — the draft is no longer pending, drop it before anything can
       // re-render the placeholder.
       sendEpochRef.current += 1;
       clearDraft(ticketId, articleId);
-      // Reset the composer to what the server seeded. The component stays
-      // mounted after the dialog closes, so without this the next "Reply" on
-      // this article would open showing the message that was just sent.
-      resetToBaseline();
       void queryClient.invalidateQueries({
         queryKey: ["tickets", ticketId, "articles"],
       });
@@ -273,7 +294,28 @@ export function ReplyDialog({
         // out of the AI panel's open-drafts list.
         void queryClient.invalidateQueries({ queryKey: ["tickets", ticketId, "ai"] });
       }
-      onClose();
+      if (extras.failed.length > 0) {
+        // Keep the body — the retry re-reads the `@names` out of it.
+        setExtrasFailed(extras.failed);
+        return;
+      }
+      finishSend();
+    },
+  });
+
+  // Re-runs only the writes that failed, so a successful mention is never
+  // duplicated by retrying a failed booking.
+  const retryExtrasMutation = useMutation({
+    mutationFn: () =>
+      postComposerExtras(ticketId, {
+        body,
+        mentions: extrasFailed.includes("mentions") ? mentions : [],
+        timeUnits: extrasFailed.includes("time") ? timeUnits : "",
+        queryClient,
+      }),
+    onSuccess: (extras) => {
+      setExtrasFailed(extras.failed);
+      if (extras.failed.length === 0) finishSend();
     },
   });
 
@@ -289,6 +331,8 @@ export function ReplyDialog({
     if (!ok) return;
     clearDraft(ticketId, articleId);
     resetToBaseline();
+    setMentions([]);
+    setTimeUnits("");
     onClose();
   };
 
@@ -453,16 +497,22 @@ export function ReplyDialog({
               />
             </label>
           )}
-          <label className="block text-xs text-muted">
-            {t("ticket.replyAnswer")}
-            <textarea
-              className={`${inputCls} font-mono text-xs`}
-              rows={12}
+          <div className="text-xs text-muted">
+            <span className="block">{t("ticket.replyAnswer")}</span>
+            <MentionTextarea
               value={body}
-              data-testid="reply-body"
-              onChange={(e) => setBody(e.target.value)}
+              onChange={setBody}
+              mentions={mentions}
+              onMentionsChange={setMentions}
+              rows={12}
+              className="font-mono text-xs"
+              testId="reply-body"
+              ariaLabel={t("ticket.replyAnswer")}
+              // The article is already sent at this point; editing on would
+              // only resurrect a draft for a reply that no longer exists.
+              readOnly={extrasFailed.length > 0}
             />
-          </label>
+          </div>
           {/* Read-only signature preview — backend appends on send; do not
               put this into the editable body (would double on send). */}
           {Boolean(draftQ.data?.signature?.trim()) && (
@@ -498,30 +548,58 @@ export function ReplyDialog({
                 : t("ticket.replyError")}
             </p>
           )}
-          <div className="flex items-center justify-end gap-1.5 pt-1">
+          {extrasFailed.length > 0 && (
+            <p
+              className="rounded border border-escalation/30 bg-escalation/15 px-2 py-1 text-xs text-escalation"
+              data-testid="reply-extras-error"
+            >
+              {t(
+                extrasFailed.length === 2
+                  ? "ticket.extrasFailedBoth"
+                  : extrasFailed[0] === "mentions"
+                    ? "ticket.extrasFailedMentions"
+                    : "ticket.extrasFailedTime",
+              )}
+            </p>
+          )}
+          <div className="flex items-center gap-1.5 pt-1">
+            <ComposerTimeChip value={timeUnits} onChange={setTimeUnits} testId="reply-time" />
             {storedDraft && (
               <Button
                 variant="ghost"
                 size="sm"
                 data-testid="reply-discard-draft"
-                className="mr-auto hover:text-danger"
+                className="hover:text-danger"
                 onClick={() => void onDiscardDraft()}
               >
                 {t("ticket.draftDiscard")}
               </Button>
             )}
+            <span className="flex-1" />
             <Button variant="ghost" size="sm" onClick={onClose}>
               {t("ticket.composerCancel")}
             </Button>
-            <Button
-              variant="primary"
-              size="sm"
-              data-testid="reply-send"
-              disabled={!canSend}
-              onClick={() => sendMutation.mutate()}
-            >
-              {sendMutation.isPending ? t("ticket.replySending") : t("ticket.composerSend")}
-            </Button>
+            {extrasFailed.length > 0 ? (
+              <Button
+                variant="primary"
+                size="sm"
+                data-testid="reply-extras-retry"
+                disabled={retryExtrasMutation.isPending}
+                onClick={() => retryExtrasMutation.mutate()}
+              >
+                {t("ticket.extrasRetry")}
+              </Button>
+            ) : (
+              <Button
+                variant="primary"
+                size="sm"
+                data-testid="reply-send"
+                disabled={!canSend}
+                onClick={() => sendMutation.mutate()}
+              >
+                {sendMutation.isPending ? t("ticket.replySending") : t("ticket.composerSend")}
+              </Button>
+            )}
           </div>
         </div>
       )}

@@ -3095,6 +3095,31 @@ export interface paths {
         patch: operations["update_user_api_v1_admin_users__user_id__patch"];
         trace?: never;
     };
+    "/api/v1/admin/users/{user_id}/effective-permissions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Effective Permissions
+         * @description Read-only breakdown of a user's resolved group/queue permissions.
+         *
+         *     Union of direct ``group_user`` grants and role-derived ``group_role``
+         *     grants (same rule as :class:`tiqora.permissions.engine.PermissionEngine`,
+         *     reimplemented here to additionally track *where* each permission key
+         *     came from for display).
+         */
+        get: operations["get_effective_permissions_api_v1_admin_users__user_id__effective_permissions_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/users/{user_id}/groups": {
         parameters: {
             query?: never;
@@ -3131,6 +3156,28 @@ export interface paths {
         post?: never;
         /** Revoke Group */
         delete: operations["revoke_group_api_v1_admin_users__user_id__groups__group_id___permission_key__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/users/{user_id}/language": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get User Language
+         * @description Admin-facing mirror of the agent's own 'Persönliche Einstellungen'
+         *     language choice (``UserLanguage`` preference) — read side.
+         */
+        get: operations["get_user_language_api_v1_admin_users__user_id__language_get"];
+        /** Set User Language */
+        put: operations["set_user_language_api_v1_admin_users__user_id__language_put"];
+        post?: never;
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -8177,6 +8224,49 @@ export interface components {
             /** Values */
             values?: unknown[];
         };
+        /** EffectiveGroupPermission */
+        EffectiveGroupPermission: {
+            /** Group Id */
+            group_id: number;
+            /** Group Name */
+            group_name: string;
+            /** Keys */
+            keys: string[];
+            /** Sources */
+            sources: components["schemas"]["EffectivePermissionSource"][];
+        };
+        /** EffectivePermissionSource */
+        EffectivePermissionSource: {
+            /**
+             * Key
+             * @enum {string}
+             */
+            key: "ro" | "move_into" | "create" | "note" | "owner" | "priority" | "rw";
+            /** Via */
+            via: string;
+        };
+        /** EffectivePermissionsOut */
+        EffectivePermissionsOut: {
+            /** Groups */
+            groups: components["schemas"]["EffectiveGroupPermission"][];
+            /** Queues */
+            queues: components["schemas"]["EffectiveQueuePermission"][];
+            /** Roles */
+            roles: components["schemas"]["RoleOut"][];
+        };
+        /** EffectiveQueuePermission */
+        EffectiveQueuePermission: {
+            /** Group Id */
+            group_id: number;
+            /** Group Name */
+            group_name: string;
+            /** Keys */
+            keys: string[];
+            /** Queue Id */
+            queue_id: number;
+            /** Queue Name */
+            queue_name: string;
+        };
         /**
          * ErasureSelectorIn
          * @description Combinable AND filter for customer_user resolution.
@@ -12070,14 +12160,18 @@ export interface components {
         };
         /** UserCreate */
         UserCreate: {
+            /** Email */
+            email?: string | null;
             /** First Name */
             first_name: string;
             /** Last Name */
             last_name: string;
             /** Login */
             login: string;
+            /** Mobile */
+            mobile?: string | null;
             /** Password */
-            password: string;
+            password?: string | null;
             /** Title */
             title?: string | null;
             /**
@@ -12085,6 +12179,11 @@ export interface components {
              * @default 1
              */
             valid_id: number;
+        };
+        /** UserLanguageOut */
+        UserLanguageOut: {
+            /** Language */
+            language: string | null;
         };
         /**
          * UserLanguageUpdate
@@ -12129,6 +12228,8 @@ export interface components {
             change_time: string | null;
             /** Create Time */
             create_time: string | null;
+            /** Email */
+            email?: string | null;
             /** First Name */
             first_name: string;
             /** Id */
@@ -12137,6 +12238,8 @@ export interface components {
             last_name: string;
             /** Login */
             login: string;
+            /** Mobile */
+            mobile?: string | null;
             /** Title */
             title: string | null;
             /** Valid Id */
@@ -12144,12 +12247,16 @@ export interface components {
         };
         /** UserUpdate */
         UserUpdate: {
+            /** Email */
+            email?: string | null;
             /** First Name */
             first_name?: string | null;
             /** Last Name */
             last_name?: string | null;
             /** Login */
             login?: string | null;
+            /** Mobile */
+            mobile?: string | null;
             /** Password */
             password?: string | null;
             /** Title */
@@ -21941,6 +22048,41 @@ export interface operations {
             };
         };
     };
+    get_effective_permissions_api_v1_admin_users__user_id__effective_permissions_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                user_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EffectivePermissionsOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     get_user_groups_api_v1_admin_users__user_id__groups_get: {
         parameters: {
             query?: never;
@@ -22036,6 +22178,80 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_user_language_api_v1_admin_users__user_id__language_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                user_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserLanguageOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_user_language_api_v1_admin_users__user_id__language_put: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                user_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UserLanguageUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserLanguageOut"];
+                };
             };
             /** @description Validation Error */
             422: {

@@ -25,10 +25,13 @@ export type FieldDef = {
   name: string;
   label: string;
   type: FieldType;
-  required?: boolean;
+  /** Static, or computed from the form's current values (e.g. required only
+   * when a sibling toggle picks a certain mode). */
+  required?: boolean | ((values: FieldValues) => boolean);
   options?: FieldOption[];
   placeholder?: string;
-  helpText?: string;
+  /** Static, or computed from the form's current values. */
+  helpText?: string | ((values: FieldValues) => string | undefined);
   /**
    * When true, render the control in monospace (IDs, code snippets).
    * Default false — prose fields (signatures, templates, comments) use the
@@ -56,6 +59,11 @@ export type FieldDef = {
   }) => ReactNode;
   /** Hide this field for create (e.g. immutable identity fields shown read-only). */
   hideOnCreate?: boolean;
+  /** Hide this field for edit (e.g. a create-only "how to set the password" toggle). */
+  hideOnEdit?: boolean;
+  /** Conditionally show/hide based on other fields' current values (e.g. a
+   * password field hidden while "auto-generate" is selected). */
+  showIf?: (values: FieldValues) => boolean;
   /**
    * Opt-in ⓘ popover rendered next to the label — for fields whose meaning or
    * default isn't obvious from the label alone. Distinct from `helpText`
@@ -157,12 +165,23 @@ export function CrudDrawer({
     setErrors((prev) => (prev[name] ? { ...prev, [name]: false } : prev));
   };
 
-  const visibleFields = fields.filter((f) => !(mode === "create" && f.hideOnCreate));
+  const isRequired = (f: FieldDef): boolean =>
+    typeof f.required === "function" ? f.required(values) : Boolean(f.required);
+
+  const resolveHelpText = (f: FieldDef): string | undefined =>
+    typeof f.helpText === "function" ? f.helpText(values) : f.helpText;
+
+  const visibleFields = fields.filter(
+    (f) =>
+      !(mode === "create" && f.hideOnCreate) &&
+      !(mode === "edit" && f.hideOnEdit) &&
+      (f.showIf ? f.showIf(values) : true),
+  );
 
   const handleSubmit = async () => {
     const nextErrors: Record<string, boolean> = {};
     for (const f of visibleFields) {
-      if (f.required && isEmpty(values[f.name])) nextErrors[f.name] = true;
+      if (isRequired(f) && isEmpty(values[f.name])) nextErrors[f.name] = true;
     }
     setErrors(nextErrors);
     const firstInvalid = visibleFields.find((f) => nextErrors[f.name]);
@@ -194,7 +213,7 @@ export function CrudDrawer({
       >
         <span>
           {f.label}
-          {f.required && <span className="text-escalation"> *</span>}
+          {isRequired(f) && <span className="text-escalation"> *</span>}
         </span>
         {f.help && (
           <HelpPopover title={f.help.title} defaultHint={f.help.defaultHint} testId={`${id}-help`}>
@@ -215,7 +234,7 @@ export function CrudDrawer({
           <h3 className="border-b border-hairline pb-1 text-xs font-semibold uppercase tracking-wide text-muted">
             {f.label}
           </h3>
-          {f.helpText && <p className="mt-1 text-xs text-muted">{f.helpText}</p>}
+          {resolveHelpText(f) && <p className="mt-1 text-xs text-muted">{resolveHelpText(f)}</p>}
         </div>
       );
     }
@@ -300,7 +319,7 @@ export function CrudDrawer({
           values,
           controlId: id,
         })}
-        {f.helpText && <p className="mt-1 text-xs text-muted">{f.helpText}</p>}
+        {resolveHelpText(f) && <p className="mt-1 text-xs text-muted">{resolveHelpText(f)}</p>}
         {invalid && <p className="mt-1 text-xs text-escalation">{t("admin.form.required")}</p>}
       </div>
     );

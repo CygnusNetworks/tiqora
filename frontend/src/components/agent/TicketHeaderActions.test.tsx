@@ -49,6 +49,9 @@ vi.mock("@/lib/api", async () => {
       listReferenceAgents,
       ticketAclFieldOptions,
       listTemplates: vi.fn().mockResolvedValue([]),
+      // Queried by the header's @ / ⏱ counters.
+      listTicketMentions: vi.fn().mockResolvedValue([]),
+      listTicketTimeAccounting: vi.fn().mockResolvedValue([]),
       listTicketLinks: vi.fn().mockResolvedValue([]),
       searchReferenceCustomers: vi.fn().mockResolvedValue([]),
     },

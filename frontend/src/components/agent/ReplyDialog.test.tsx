@@ -8,10 +8,20 @@ import { ApiError } from "@/lib/api";
 import { getDraft, resetDraftsForTest } from "@/lib/replyDrafts";
 import { ReplyDialog } from "./ReplyDialog";
 
-const { getReplyDraft, listTemplates, createArticle } = vi.hoisted(() => ({
+const {
+  getReplyDraft,
+  listTemplates,
+  createArticle,
+  createTicketMention,
+  createTicketTimeAccounting,
+  listReferenceAgents,
+} = vi.hoisted(() => ({
   getReplyDraft: vi.fn(),
   listTemplates: vi.fn(),
   createArticle: vi.fn(),
+  createTicketMention: vi.fn(),
+  createTicketTimeAccounting: vi.fn(),
+  listReferenceAgents: vi.fn(),
 }));
 
 vi.mock("@/lib/api", async () => {
@@ -22,6 +32,9 @@ vi.mock("@/lib/api", async () => {
       getReplyDraft,
       listTemplates,
       createArticle,
+      createTicketMention,
+      createTicketTimeAccounting,
+      listReferenceAgents,
     },
   };
 });
@@ -517,5 +530,77 @@ describe("ReplyDialog reset after send / persistence without send", () => {
 
     const reopenedBody = screen.getByTestId("reply-body") as HTMLTextAreaElement;
     expect(reopenedBody.value).toContain("Draft in progress");
+  });
+});
+
+describe("ReplyDialog composer extras (mentions + time)", () => {
+  beforeEach(() => {
+    resetDraftsForTest();
+    getReplyDraft.mockReset().mockResolvedValue(baseDraft);
+    listTemplates.mockReset().mockResolvedValue([]);
+    createArticle.mockReset().mockResolvedValue({ id: 99 });
+    createTicketMention.mockReset().mockResolvedValue({ id: 1 });
+    createTicketTimeAccounting.mockReset().mockResolvedValue({ id: 1 });
+    listReferenceAgents
+      .mockReset()
+      .mockResolvedValue([{ id: 2, login: "ada", full_name: "Ada Lovelace" }]);
+  });
+
+  async function openDialog(onClose = vi.fn()) {
+    wrap(<ReplyDialog ticketId={1} articleId={2} replyAll={false} open onClose={onClose} />);
+    await waitFor(() => expect(screen.getByTestId("reply-dialog")).toBeTruthy());
+    return onClose;
+  }
+
+  it("books nothing extra for a plain reply", async () => {
+    const onClose = await openDialog();
+    fireEvent.change(screen.getByTestId("reply-body"), { target: { value: "Antwort" } });
+    fireEvent.click(screen.getByTestId("reply-send"));
+    await waitFor(() => expect(onClose).toHaveBeenCalled());
+    expect(createTicketTimeAccounting).not.toHaveBeenCalled();
+    expect(createTicketMention).not.toHaveBeenCalled();
+  });
+
+  it("books the minutes typed into the footer chip", async () => {
+    const onClose = await openDialog();
+    fireEvent.change(screen.getByTestId("reply-body"), { target: { value: "Antwort" } });
+    fireEvent.change(screen.getByTestId("reply-time"), { target: { value: "15" } });
+    fireEvent.click(screen.getByTestId("reply-send"));
+    await waitFor(() =>
+      expect(createTicketTimeAccounting).toHaveBeenCalledWith(1, { time_unit: 15 }),
+    );
+    expect(onClose).toHaveBeenCalled();
+  });
+
+  it("records an agent picked from the @ typeahead", async () => {
+    await openDialog();
+    const body = screen.getByTestId("reply-body") as HTMLTextAreaElement;
+    fireEvent.change(body, { target: { value: "bitte @ad" } });
+    body.setSelectionRange(9, 9);
+    fireEvent.keyUp(body, { key: "d" });
+    fireEvent.mouseDown(await screen.findByTestId("mention-option-2"));
+    await waitFor(() => expect(body.value).toContain("@Ada Lovelace"));
+    fireEvent.click(screen.getByTestId("reply-send"));
+    await waitFor(() => expect(createTicketMention).toHaveBeenCalledWith(1, { user_id: 2 }));
+  });
+
+  it("keeps the dialog open with a retry when only the booking fails", async () => {
+    createTicketTimeAccounting.mockRejectedValueOnce(new Error("boom"));
+    const onClose = await openDialog();
+    fireEvent.change(screen.getByTestId("reply-body"), { target: { value: "Antwort" } });
+    fireEvent.change(screen.getByTestId("reply-time"), { target: { value: "15" } });
+    fireEvent.click(screen.getByTestId("reply-send"));
+
+    // The reply itself went out exactly once and the dialog stays put.
+    await screen.findByTestId("reply-extras-error");
+    expect(createArticle).toHaveBeenCalledTimes(1);
+    expect(onClose).not.toHaveBeenCalled();
+    expect(screen.queryByTestId("reply-send")).toBeNull();
+
+    fireEvent.click(screen.getByTestId("reply-extras-retry"));
+    await waitFor(() => expect(onClose).toHaveBeenCalled());
+    // Retrying books the time; it never re-sends the article.
+    expect(createTicketTimeAccounting).toHaveBeenCalledTimes(2);
+    expect(createArticle).toHaveBeenCalledTimes(1);
   });
 });

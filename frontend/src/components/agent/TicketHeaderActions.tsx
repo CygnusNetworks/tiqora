@@ -17,6 +17,7 @@ import { escalationLevel, stateLabel } from "@/lib/status";
 import { cn } from "@/lib/cn";
 import { useReplyDraft } from "@/lib/replyDrafts";
 import { ReplyDialog } from "./ReplyDialog";
+import { TicketMetaCounters } from "./TicketMetaCounters";
 import { articleSortKey } from "@/lib/article";
 import { flattenQueues } from "./QueueTree";
 import { CustomerPickerDialog, LinkDialog, MergeDialog, PendingDialog } from "./ActionToolbar";
@@ -522,13 +523,16 @@ export function TicketHeaderActions({
             {t("customerCentre.open")}
           </Link>
         )}
-        <span
-          className="ml-auto inline-flex items-center gap-1 font-mono text-[11px] tabular-nums text-muted"
-          data-testid="ticket-header-timestamps"
-          title={`${t("ticket.created")}: ${formatDateTime(ticket.create_time, locale)} · ${t("ticket.changed")}: ${formatDateTime(ticket.change_time, locale)}`}
-        >
-          <span aria-hidden>⏱</span>
-          {formatDateTime(ticket.change_time, locale)}
+        {/* Counters and timestamp share the right edge: state first, then when. */}
+        <span className="ml-auto inline-flex items-center gap-2">
+          <TicketMetaCounters ticketId={ticketId} />
+          <span
+            className="inline-flex items-center gap-1 font-mono text-[11px] tabular-nums text-muted"
+            data-testid="ticket-header-timestamps"
+            title={`${t("ticket.created")}: ${formatDateTime(ticket.create_time, locale)} · ${t("ticket.changed")}: ${formatDateTime(ticket.change_time, locale)}`}
+          >
+            {formatDateTime(ticket.change_time, locale)}
+          </span>
         </span>
       </div>
 
