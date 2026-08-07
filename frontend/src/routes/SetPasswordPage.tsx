@@ -4,11 +4,10 @@ import { useNavigate, useSearch } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
 import { api, ApiError } from "@/lib/api";
 import { logoUrl } from "@/lib/assets";
+import { MAX_PASSWORD_LENGTH, MIN_PASSWORD_LENGTH } from "@/lib/passwordPolicy";
 import { Button } from "@/components/ui/Button";
 import { Spinner } from "@/components/ui/Spinner";
 
-/** Must match MIN_PASSWORD_LENGTH in backend `domain/password_setup.py`. */
-const MIN_PASSWORD_LENGTH = 8;
 
 /**
  * Public landing page for the one-time link a new agent receives by mail.
@@ -39,7 +38,10 @@ export function SetPasswordPage() {
   const tooShort = password.length > 0 && password.length < MIN_PASSWORD_LENGTH;
   const mismatch = confirm.length > 0 && password !== confirm;
   const canSubmit =
-    password.length >= MIN_PASSWORD_LENGTH && password === confirm && !submitting;
+    password.length >= MIN_PASSWORD_LENGTH &&
+    password.length <= MAX_PASSWORD_LENGTH &&
+    password === confirm &&
+    !submitting;
 
   const onSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -122,13 +124,17 @@ export function SetPasswordPage() {
             type="password"
             autoComplete="new-password"
             autoFocus
+            maxLength={MAX_PASSWORD_LENGTH}
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             data-testid="set-password-input"
             className="w-full rounded-md border border-hairline bg-surface-subtle px-3 py-2 text-sm text-ink focus:border-accent focus:outline-none"
           />
           <p className="text-xs text-muted">
-            {t("setPassword.minLength", { n: MIN_PASSWORD_LENGTH })}
+            {t("setPassword.lengthHint", {
+              min: MIN_PASSWORD_LENGTH,
+              max: MAX_PASSWORD_LENGTH,
+            })}
           </p>
         </div>
         <div className="space-y-1">
@@ -139,6 +145,7 @@ export function SetPasswordPage() {
             id="confirm-password"
             type="password"
             autoComplete="new-password"
+            maxLength={MAX_PASSWORD_LENGTH}
             value={confirm}
             onChange={(e) => setConfirm(e.target.value)}
             data-testid="set-password-confirm"
@@ -151,7 +158,10 @@ export function SetPasswordPage() {
           )}
           {tooShort && !mismatch && (
             <p className="text-xs text-danger">
-              {t("setPassword.minLength", { n: MIN_PASSWORD_LENGTH })}
+              {t("setPassword.lengthHint", {
+                min: MIN_PASSWORD_LENGTH,
+                max: MAX_PASSWORD_LENGTH,
+              })}
             </p>
           )}
         </div>

@@ -9,9 +9,16 @@ from __future__ import annotations
 
 import base64
 from datetime import datetime
-from typing import Any, Literal
+from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+
+from tiqora.domain.password_policy import MAX_PASSWORD_LENGTH, MIN_PASSWORD_LENGTH
+
+Password = Annotated[str, Field(min_length=MIN_PASSWORD_LENGTH, max_length=MAX_PASSWORD_LENGTH)]
+"""Admin-set passwords. Declared as a field constraint rather than checked in
+the handler so the bounds reach OpenAPI — and from there the generated client
+— instead of only existing as a 422 the frontend has to discover at runtime."""
 
 # ---------------------------------------------------------------------------
 # Users
@@ -37,8 +44,9 @@ class UserOut(BaseModel):
 
 class UserCreate(BaseModel):
     login: str
-    password: str | None = None
-    """Omit to auto-generate a random password and email it to *email*."""
+    password: Password | None = None
+    """Omit to invite instead: the agent receives a one-time link at *email*
+    and chooses their own password."""
     title: str | None = None
     first_name: str
     last_name: str
@@ -49,13 +57,13 @@ class UserCreate(BaseModel):
     @model_validator(mode="after")
     def _email_required_without_password(self) -> UserCreate:
         if not self.password and not self.email:
-            raise ValueError("email is required to send an auto-generated password")
+            raise ValueError("email is required to send a setup link")
         return self
 
 
 class UserUpdate(BaseModel):
     login: str | None = None
-    password: str | None = None
+    password: Password | None = None
     title: str | None = None
     first_name: str | None = None
     last_name: str | None = None
@@ -408,7 +416,7 @@ class CustomerUserAdminCreate(BaseModel):
     login: str
     email: str
     customer_id: str
-    password: str | None = None
+    password: Password | None = None
     title: str | None = None
     first_name: str
     last_name: str
@@ -427,7 +435,7 @@ class CustomerUserAdminUpdate(BaseModel):
     login: str | None = None
     email: str | None = None
     customer_id: str | None = None
-    password: str | None = None
+    password: Password | None = None
     title: str | None = None
     first_name: str | None = None
     last_name: str | None = None

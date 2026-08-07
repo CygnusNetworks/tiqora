@@ -6326,6 +6326,8 @@
           "password": {
             "anyOf": [
               {
+                "maxLength": 64,
+                "minLength": 12,
                 "type": "string"
               },
               {
@@ -6686,6 +6688,8 @@
           "password": {
             "anyOf": [
               {
+                "maxLength": 64,
+                "minLength": 12,
                 "type": "string"
               },
               {
@@ -19205,6 +19209,8 @@
           "password": {
             "anyOf": [
               {
+                "maxLength": 64,
+                "minLength": 12,
                 "type": "string"
               },
               {
@@ -19540,6 +19546,8 @@
           "password": {
             "anyOf": [
               {
+                "maxLength": 64,
+                "minLength": 12,
                 "type": "string"
               },
               {

@@ -11,6 +11,7 @@ from __future__ import annotations
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from tiqora.config import Settings
+from tiqora.domain.password_policy import MIN_PASSWORD_LENGTH
 from tiqora.domain.password_setup import TOKEN_TTL, issue_token, setup_url
 from tiqora.domain.welcome_mail import send_transactional_email
 
@@ -32,16 +33,20 @@ async def send_setup_invite(
     await send_transactional_email(
         session,
         to_addr=to_addr,
-        subject="Ihr Tiqora-Zugang: Passwort festlegen",
+        subject="Ihr Tiqora-Zugang: in zwei Schritten startklar",
         body=(
             f"Hallo {first_name},\n\n"
-            "für Sie wurde ein Tiqora-Zugang angelegt.\n\n"
-            f"Login: {login}\n\n"
-            "Bitte legen Sie über diesen Link Ihr Passwort fest:\n"
-            f"{url}\n\n"
-            f"Der Link ist {days} Tage gültig und kann einmal verwendet werden. "
-            "Danach fordern Sie bitte einen neuen bei Ihrer Administration an.\n\n"
-            "Wenn Sie diesen Zugang nicht erwartet haben, ignorieren Sie diese "
-            "E-Mail — ohne den Link lässt sich das Konto nicht verwenden."
+            "für Sie wurde ein Tiqora-Zugang angelegt. Zwei Schritte, dann "
+            "können Sie loslegen:\n\n"
+            "1. Passwort festlegen\n"
+            f"   {url}\n"
+            f"   Mindestens {MIN_PASSWORD_LENGTH} Zeichen. Der Link gilt "
+            f"{days} Tage und nur einmal.\n\n"
+            "2. Anmelden mit Ihrem Login\n"
+            f"   {login}\n\n"
+            "Falls der Link nicht mehr funktioniert, fordern Sie bitte einen "
+            "neuen bei Ihrer Administration an.\n\n"
+            "Sie haben keinen Zugang erwartet? Diese E-Mail können Sie "
+            "ignorieren — ohne den Link lässt sich das Konto nicht verwenden."
         ),
     )

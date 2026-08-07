@@ -12,6 +12,7 @@ import { UserDeleteDialog } from "@/components/admin/UserDeleteDialog";
 import { MenuItem } from "@/components/ui/Menu";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { formatDateTime } from "@/lib/format";
+import { MAX_PASSWORD_LENGTH, MIN_PASSWORD_LENGTH } from "@/lib/passwordPolicy";
 
 function ShieldIcon() {
   return (
@@ -149,7 +150,11 @@ export function UsersPage() {
       name: "password",
       label: t("admin.users.password"),
       type: "password",
-      helpText: t("admin.users.passwordHelp"),
+      maxLength: MAX_PASSWORD_LENGTH,
+      helpText: t("admin.users.passwordHelp", {
+        min: MIN_PASSWORD_LENGTH,
+        max: MAX_PASSWORD_LENGTH,
+      }),
       showIf: (v) => v.password_mode !== "auto",
       required: (v) => v.password_mode === "manual",
       tab: tabAccount,
