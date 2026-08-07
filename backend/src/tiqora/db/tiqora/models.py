@@ -186,6 +186,32 @@ class TiqoraUserTotp(TiqoraBase):
     )
 
 
+class TiqoraPasswordSetupToken(TiqoraBase):
+    """One-time, expiring link that lets a new agent choose their own password.
+
+    Replaces mailing a generated password in plaintext: the mail carries a
+    token, the account is created with an unusable random hash, and the
+    password only ever exists in the browser of the person setting it.
+
+    Only the SHA-256 of the token is stored, so a database leak does not
+    hand over working links. ``used`` is a timestamp rather than a flag to
+    keep a minimal audit trail; rows are not deleted on redemption.
+    """
+
+    __tablename__ = "tiqora_password_setup_token"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True, nullable=False)
+    user_id: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
+    token_hash: Mapped[str] = mapped_column(String(64), nullable=False, unique=True)
+    expires: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    used: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    created: Mapped[datetime] = mapped_column(
+        DateTime,
+        nullable=False,
+        server_default=func.now(),
+    )
+
+
 class TiqoraUserPasskey(TiqoraBase):
     """Per-agent WebAuthn passkey credential (alternative 2nd factor).
 

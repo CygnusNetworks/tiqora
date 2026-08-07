@@ -12,6 +12,7 @@ from urllib.parse import quote
 import structlog
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request, Response, status
 from fastapi.responses import HTMLResponse, RedirectResponse
+from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from tiqora.api.deps import (
@@ -24,6 +25,7 @@ from tiqora.api.deps import (
     get_auth_service,
     get_redis,
 )
+from tiqora.db.legacy.user import Users
 from tiqora.domain.auth import (
     AuthenticatedUser,
     AuthService,
@@ -35,6 +37,7 @@ from tiqora.domain.auth_config import AuthConfigService
 from tiqora.domain.auth_ldap import LdapAuthService
 from tiqora.domain.oidc import OIDCError, OIDCService
 from tiqora.domain.passkey import webauthn_enabled
+from tiqora.domain.password_setup import MIN_PASSWORD_LENGTH, redeem_token, resolve_token
 from tiqora.domain.schemas import (
     AuthMethodsOut,
     LoginRequest,
@@ -265,6 +268,67 @@ async def auth_methods(settings: AppSettings) -> AuthMethodsOut:
         ldap=settings.ldap_enabled,
         webauthn=webauthn_enabled(settings),
     )
+
+
+class PasswordSetupCheckOut(BaseModel):
+    """Whether a setup link is still usable, so the page can say so before the
+    visitor types a password. ``login`` is disclosed only for a valid token —
+    holding the token already implies access to that account's mailbox."""
+
+    valid: bool
+    login: str | None = None
+
+
+class PasswordSetupIn(BaseModel):
+    token: str
+    password: str
+
+
+@router.get("/password-setup/{token}", response_model=PasswordSetupCheckOut)
+async def check_password_setup(token: str, session: DbSession) -> PasswordSetupCheckOut:
+    """Public: is this one-time link still good?"""
+    user_id = await resolve_token(session, token)
+    if user_id is None:
+        return PasswordSetupCheckOut(valid=False)
+    user = await session.get(Users, user_id)
+    if user is None or user.valid_id != 1:
+        # The account was invalidated or deleted after the link went out.
+        return PasswordSetupCheckOut(valid=False)
+    return PasswordSetupCheckOut(valid=True, login=user.login)
+
+
+@router.post("/password-setup", status_code=status.HTTP_204_NO_CONTENT)
+async def complete_password_setup(
+    body: PasswordSetupIn, request: Request, settings: AppSettings, session: DbSession
+) -> None:
+    """Public: spend a one-time link and set the password.
+
+    Rate-limited per IP like the login endpoint — the token is the only
+    secret, so brute-forcing it must not be free. Keyed on a constant rather
+    than a login because the caller has not identified themselves yet.
+    """
+    redis_client = await get_redis(request)
+    limiter = AuthRateLimiter(redis_client, settings)
+    ip = client_ip(request)
+    pre = await limiter.check(login="__password_setup__", ip=ip)
+    if not pre.allowed:
+        raise _rate_limit_http_exception(pre)
+
+    if len(body.password) < MIN_PASSWORD_LENGTH:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"Password must be at least {MIN_PASSWORD_LENGTH} characters",
+        )
+
+    user_id = await redeem_token(session, body.token, body.password)
+    if user_id is None:
+        await limiter.record_failure(login="__password_setup__", ip=ip)
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="This link is no longer valid. Please request a new one.",
+        )
+    await session.commit()
+    await limiter.reset(login="__password_setup__", ip=ip)
 
 
 @router.post("/login", response_model=LoginResponse)

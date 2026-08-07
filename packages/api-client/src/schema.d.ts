@@ -3266,6 +3266,29 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/users/{user_id}/setup-link": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Resend Setup Link
+         * @description Issue a fresh password-setup link and mail it.
+         *
+         *     For the agent whose invite expired or never arrived. Supersedes any
+         *     outstanding link for that account, so the previous mail stops working.
+         */
+        post: operations["resend_setup_link_api_v1_admin_users__user_id__setup_link_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/webhooks": {
         parameters: {
             query?: never;
@@ -3584,6 +3607,50 @@ export interface paths {
          * @description Delete a passkey. Blocked when it is the last remaining 2FA factor under enforce.
          */
         delete: operations["passkey_delete_api_v1_auth_passkey__passkey_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/password-setup": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Complete Password Setup
+         * @description Public: spend a one-time link and set the password.
+         *
+         *     Rate-limited per IP like the login endpoint — the token is the only
+         *     secret, so brute-forcing it must not be free. Keyed on a constant rather
+         *     than a login because the caller has not identified themselves yet.
+         */
+        post: operations["complete_password_setup_api_v1_auth_password_setup_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/password-setup/{token}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Check Password Setup
+         * @description Public: is this one-time link still good?
+         */
+        get: operations["check_password_setup_api_v1_auth_password_setup__token__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -10099,6 +10166,25 @@ export interface components {
             id: number;
             /** Name */
             name: string;
+        };
+        /**
+         * PasswordSetupCheckOut
+         * @description Whether a setup link is still usable, so the page can say so before the
+         *     visitor types a password. ``login`` is disclosed only for a valid token —
+         *     holding the token already implies access to that account's mailbox.
+         */
+        PasswordSetupCheckOut: {
+            /** Login */
+            login?: string | null;
+            /** Valid */
+            valid: boolean;
+        };
+        /** PasswordSetupIn */
+        PasswordSetupIn: {
+            /** Password */
+            password: string;
+            /** Token */
+            token: string;
         };
         /** PgpImportIn */
         PgpImportIn: {
@@ -22514,6 +22600,39 @@ export interface operations {
             };
         };
     };
+    resend_setup_link_api_v1_admin_users__user_id__setup_link_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                user_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_webhooks_api_v1_admin_webhooks_get: {
         parameters: {
             query?: {
@@ -23135,6 +23254,68 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    complete_password_setup_api_v1_auth_password_setup_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PasswordSetupIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    check_password_setup_api_v1_auth_password_setup__token__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                token: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PasswordSetupCheckOut"];
+                };
             };
             /** @description Validation Error */
             422: {

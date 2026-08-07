@@ -1493,7 +1493,10 @@
       "deletableBody": "Nothing references {{name}}, so the account can be removed completely — along with its preferences, group and role assignment, and 2FA enrolment.",
       "deleteIrreversible": "This cannot be undone.",
       "deleteBlockedBody": "{{name}} cannot be deleted — these tables still reference the account:",
-      "deleteBlockedHint": "Set the account to \"Invalid\" instead, so tickets, articles and history stay attributable."
+      "deleteBlockedHint": "Set the account to \"Invalid\" instead, so tickets, articles and history stay attributable.",
+      "resendSetupLink": "Resend setup link",
+      "setupLinkSent": "Setup link sent.",
+      "setupLinkFailed": "Could not send the setup link."
     },
     "groups": {
       "title_plural": "Groups",
@@ -2728,5 +2731,18 @@
     "body": "Body",
     "editTitle": "Edit “{{name}}”",
     "saveError": "Could not save the template."
+  },
+  "setPassword": {
+    "subtitle": "Please choose a password for your account.",
+    "password": "New password",
+    "confirm": "Repeat password",
+    "minLength": "At least {{n}} characters.",
+    "mismatch": "The passwords do not match.",
+    "submit": "Set password",
+    "saving": "Saving…",
+    "done": "Password saved. You can sign in now.",
+    "invalid": "This link is no longer valid.",
+    "invalidHint": "Setup links are valid for 7 days and can be used once. Please ask your administrator for a new one.",
+    "toLogin": "Go to sign in"
   }
 }

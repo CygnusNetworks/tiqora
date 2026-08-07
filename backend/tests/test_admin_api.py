@@ -57,6 +57,7 @@ from tiqora.api.v1.admin.schemas import (
     TemplateAttachmentsReplace,
     UserCreate,
 )
+from tiqora.config import get_settings
 from tiqora.db.legacy.customer import CustomerUser
 from tiqora.db.tiqora.base import TiqoraBase
 from tiqora.domain.auth import AuthenticatedUser, AuthService, SessionStore
@@ -212,6 +213,7 @@ async def test_admin_user_create_bcrypt_login_roundtrip(
             ),
             admin_user,
             s,
+            get_settings(),
         )
         assert created.login == f"newagent.{ns}"
         assert created.valid_id == 1
@@ -969,6 +971,7 @@ async def test_admin_user_role_assignment_roundtrip(
             ),
             admin_user,
             s,
+            get_settings(),
         )
         role = await admin_roles.create_role(RoleCreate(name=f"role-{ns}"), admin_user, s)
 
@@ -1017,6 +1020,7 @@ async def test_admin_user_group_assignment_roundtrip(
             ),
             admin_user,
             s,
+            get_settings(),
         )
         group = await admin_groups.create_group(GroupCreate(name=f"grp-964-{ns}"), admin_user, s)
 
@@ -1627,6 +1631,7 @@ async def test_admin_group_users_reverse_get_roundtrip(
             ),
             admin_user,
             s,
+            get_settings(),
         )
         group = await admin_groups.create_group(GroupCreate(name=f"rev-gu-{ns}"), admin_user, s)
 
@@ -1676,6 +1681,7 @@ async def test_admin_role_users_reverse_get_roundtrip(
             ),
             admin_user,
             s,
+            get_settings(),
         )
         role = await admin_roles.create_role(RoleCreate(name=f"rev-ru-{ns}"), admin_user, s)
 
@@ -2103,6 +2109,7 @@ async def test_admin_usage_counts_on_list_and_bulk_assignment_counts(
             ),
             admin_user,
             s,
+            get_settings(),
         )
         group = await admin_groups.create_group(GroupCreate(name=f"cnt-g-{ns}"), admin_user, s)
         role = await admin_roles.create_role(RoleCreate(name=f"cnt-r-{ns}"), admin_user, s)
