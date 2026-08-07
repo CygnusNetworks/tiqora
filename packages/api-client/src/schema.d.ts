@@ -8234,6 +8234,8 @@ export interface components {
             keys: string[];
             /** Sources */
             sources: components["schemas"]["EffectivePermissionSource"][];
+            /** Valid Id */
+            valid_id: number;
         };
         /** EffectivePermissionSource */
         EffectivePermissionSource: {
@@ -8242,6 +8244,8 @@ export interface components {
              * @enum {string}
              */
             key: "ro" | "move_into" | "create" | "note" | "owner" | "priority" | "rw";
+            /** Valid Id */
+            valid_id: number;
             /** Via */
             via: string;
         };
@@ -8260,12 +8264,16 @@ export interface components {
             group_id: number;
             /** Group Name */
             group_name: string;
+            /** Group Valid Id */
+            group_valid_id: number;
             /** Keys */
             keys: string[];
             /** Queue Id */
             queue_id: number;
             /** Queue Name */
             queue_name: string;
+            /** Valid Id */
+            valid_id: number;
         };
         /**
          * ErasureSelectorIn
@@ -9410,6 +9418,8 @@ export interface components {
         MutationRequest: {
             /** Archive */
             archive?: boolean | null;
+            /** Clear Customer */
+            clear_customer?: boolean | null;
             /** Clear Service */
             clear_service?: boolean | null;
             /** Clear Sla */

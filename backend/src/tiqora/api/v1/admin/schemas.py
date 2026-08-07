@@ -137,11 +137,17 @@ class EffectivePermissionSource(BaseModel):
     key: Literal["ro", "move_into", "create", "note", "owner", "priority", "rw"]
     via: str
     """``"direct"`` or ``"Rolle: <name>"``."""
+    valid_id: int
+    """Validity of the *source*: always 1 for a direct grant, the role's
+    ``valid_id`` for a role-derived one. A grant via an invalid role is listed
+    but grants nothing (see :class:`tiqora.permissions.engine.PermissionEngine`)."""
 
 
 class EffectiveGroupPermission(BaseModel):
     group_id: int
     group_name: str
+    valid_id: int
+    """The group's validity — an invalid group grants nothing."""
     keys: list[str]
     sources: list[EffectivePermissionSource]
 
@@ -149,8 +155,13 @@ class EffectiveGroupPermission(BaseModel):
 class EffectiveQueuePermission(BaseModel):
     queue_id: int
     queue_name: str
+    valid_id: int
+    """The queue's own validity."""
     group_id: int
     group_name: str
+    group_valid_id: int
+    """Validity of the owning group. The permission is only effective when
+    both this and :attr:`valid_id` are 1."""
     keys: list[str]
 
 

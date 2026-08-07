@@ -58,12 +58,12 @@ _TEST_LOGINS = [
 
 
 def _delete_group_role_seed(conn: Any) -> None:
-    conn.execute(text("DELETE FROM queue WHERE id = 210"))
-    conn.execute(text("DELETE FROM group_user WHERE user_id = 200 OR group_id = 20"))
-    conn.execute(text("DELETE FROM group_role WHERE role_id = 60 OR group_id = 20"))
-    conn.execute(text("DELETE FROM role_user WHERE user_id = 200 OR role_id = 60"))
-    conn.execute(text("DELETE FROM roles WHERE id = 60"))
-    conn.execute(text("DELETE FROM permission_groups WHERE id = 20"))
+    conn.execute(text("DELETE FROM queue WHERE id IN (210, 211)"))
+    conn.execute(text("DELETE FROM group_user WHERE user_id = 200 OR group_id IN (20, 21)"))
+    conn.execute(text("DELETE FROM group_role WHERE role_id IN (60, 61) OR group_id IN (20, 21)"))
+    conn.execute(text("DELETE FROM role_user WHERE user_id = 200 OR role_id IN (60, 61)"))
+    conn.execute(text("DELETE FROM roles WHERE id IN (60, 61)"))
+    conn.execute(text("DELETE FROM permission_groups WHERE id IN (20, 21)"))
     conn.execute(text("DELETE FROM users WHERE id = 200"))
 
 
@@ -169,8 +169,69 @@ def _seed_group_role(sync_url: str) -> dict[str, Any]:
             ),
             {"t": NOW},
         )
+
+        # Invalid counterparts: an invalid group held directly, an invalid role
+        # granting on the *valid* group, and a valid queue inside the invalid
+        # group. None of these grant anything, but the admin view lists them.
+        conn.execute(
+            text(
+                "INSERT INTO permission_groups (id, name, valid_id,"
+                " create_time, create_by, change_time, change_by)"
+                " VALUES (21, 'group-effective-dead', 2, :t, 1, :t, 1)"
+            ),
+            {"t": NOW},
+        )
+        conn.execute(
+            text(
+                "INSERT INTO group_user (user_id, group_id, permission_key,"
+                " create_time, create_by, change_time, change_by)"
+                " VALUES (200, 21, 'rw', :t, 1, :t, 1)"
+            ),
+            {"t": NOW},
+        )
+        conn.execute(
+            text(
+                "INSERT INTO roles (id, name, valid_id,"
+                " create_time, create_by, change_time, change_by)"
+                " VALUES (61, 'effective-role-dead', 2, :t, 1, :t, 1)"
+            ),
+            {"t": NOW},
+        )
+        conn.execute(
+            text(
+                "INSERT INTO role_user (user_id, role_id,"
+                " create_time, create_by, change_time, change_by)"
+                " VALUES (200, 61, :t, 1, :t, 1)"
+            ),
+            {"t": NOW},
+        )
+        conn.execute(
+            text(
+                "INSERT INTO group_role (role_id, group_id, permission_key, permission_value,"
+                " create_time, create_by, change_time, change_by)"
+                " VALUES (61, 20, 'note', 1, :t, 1, :t, 1)"
+            ),
+            {"t": NOW},
+        )
+        conn.execute(
+            text(
+                "INSERT INTO queue (id, name, group_id, system_address_id, salutation_id,"
+                " signature_id, follow_up_id, follow_up_lock, valid_id,"
+                " create_time, create_by, change_time, change_by)"
+                " VALUES (211, 'effective-queue-dead-group', 21, 1, 1, 1, 1, 0, 1, :t, 1, :t, 1)"
+            ),
+            {"t": NOW},
+        )
     engine.dispose()
-    return {"user_id": 200, "group_id": 20, "role_id": 60, "queue_id": 210}
+    return {
+        "user_id": 200,
+        "group_id": 20,
+        "role_id": 60,
+        "queue_id": 210,
+        "dead_group_id": 21,
+        "dead_role_id": 61,
+        "dead_queue_id": 211,
+    }
 
 
 async def test_create_user_persists_email_and_mobile(mariadb_znuny_url: str) -> None:
@@ -331,14 +392,55 @@ async def test_effective_permissions_reports_direct_and_role_sources(
             assert any(r.id == ids["role_id"] for r in result.roles)
 
             group = next(g for g in result.groups if g.group_id == ids["group_id"])
-            assert set(group.keys) == {"ro", "rw"}
+            assert group.valid_id == 1
+            # "note" comes from the invalid role and is configured but not in
+            # force; it is still listed, flagged via its source's valid_id.
+            assert set(group.keys) == {"ro", "rw", "note"}
             vias = {s.via for s in group.sources}
             assert "direct" in vias
             assert any(v.startswith("Rolle:") for v in vias)
 
             queue = next(q for q in result.queues if q.queue_id == ids["queue_id"])
             assert queue.group_id == ids["group_id"]
-            assert set(queue.keys) == {"ro", "rw"}
+            assert queue.valid_id == 1
+            assert queue.group_valid_id == 1
+            assert set(queue.keys) == {"ro", "rw", "note"}
+    finally:
+        await engine.dispose()
+
+
+async def test_effective_permissions_lists_invalid_resources_flagged(
+    mariadb_znuny_url: str,
+) -> None:
+    """Invalid groups/roles/queues are returned rather than dropped, so the
+    admin UI can offer a valid/invalid/all filter over them."""
+    _ensure_tiqora_tables(mariadb_znuny_url)
+    ids = _seed_group_role(mariadb_znuny_url)
+    engine = create_async_engine(_mysql_async(mariadb_znuny_url))
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    try:
+        async with factory() as session:
+            result = await admin_users.get_effective_permissions(
+                ids["user_id"], _root_user(), session
+            )
+
+            dead_role = next(r for r in result.roles if r.id == ids["dead_role_id"])
+            assert dead_role.valid_id == 2
+
+            dead_group = next(g for g in result.groups if g.group_id == ids["dead_group_id"])
+            assert dead_group.valid_id == 2
+
+            # The valid group carries one source from the invalid role.
+            group = next(g for g in result.groups if g.group_id == ids["group_id"])
+            note_sources = [s for s in group.sources if s.key == "note"]
+            assert note_sources and all(s.valid_id == 2 for s in note_sources)
+            assert any(s.valid_id == 1 for s in group.sources)
+
+            # A valid queue inside an invalid group: the queue is fine, the
+            # permission is not.
+            dead_queue = next(q for q in result.queues if q.queue_id == ids["dead_queue_id"])
+            assert dead_queue.valid_id == 1
+            assert dead_queue.group_valid_id == 2
     finally:
         await engine.dispose()
 

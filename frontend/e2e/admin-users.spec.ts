@@ -12,12 +12,14 @@ test.describe("admin users", () => {
     await expect(page.getByTestId("admin-users-page")).toBeVisible();
     await expect(page.getByTestId("admin-row-1")).toContainText("agent");
 
-    // Create
+    // Create — the form is split across an Account and a Person tab, and the
+    // default password mode generates the password rather than asking for one.
     await page.getByTestId("admin-new-button").click();
     await page.getByTestId("admin-form-login").fill("bob");
-    await page.getByTestId("admin-form-password").fill("s3cret!");
+    await page.getByRole("tab", { name: "Person" }).click();
     await page.getByTestId("admin-form-first_name").fill("Bob");
     await page.getByTestId("admin-form-last_name").fill("Builder");
+    await page.getByTestId("admin-form-email").fill("bob@example.test");
     await page.getByTestId("admin-form-submit").click();
     await expect(page.getByTestId("admin-form")).not.toBeVisible();
     await expect(page.getByText("Bob Builder")).toBeVisible();
@@ -26,7 +28,10 @@ test.describe("admin users", () => {
     // portal, so click them off the page (only one menu is open at a time).
     const newRow = page.locator('[data-testid^="admin-row-"]', { hasText: "Bob Builder" });
     await newRow.getByTestId(/admin-row-menu-trigger-/).click();
-    await page.getByTestId(/admin-row-edit-/).click();
+    // Anchored: the menu also holds `admin-row-edit-settings-<id>`, which an
+    // unanchored /admin-row-edit-/ would match too.
+    await page.getByTestId(/^admin-row-edit-\d+$/).click();
+    await page.getByRole("tab", { name: "Person" }).click();
     await expect(page.getByTestId("admin-form-first_name")).toHaveValue("Bob");
     await page.getByTestId("admin-form-first_name").fill("Robert");
     await page.getByTestId("admin-form-submit").click();

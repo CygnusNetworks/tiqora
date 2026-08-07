@@ -557,7 +557,8 @@
       "customerEmail": "E-Mail",
       "customerFirstName": "Vorname",
       "customerLastName": "Nachname",
-      "customerLoginConflict": "Dieser Login existiert bereits. Bitte einen anderen Login wählen oder den bestehenden Kunden über die Suche zuweisen."
+      "customerLoginConflict": "Dieser Login existiert bereits. Bitte einen anderen Login wählen oder den bestehenden Kunden über die Suche zuweisen.",
+      "clearCustomer": "Kunde entfernen"
     },
     "inlineAttachments": "Eingebettete Bilder ({{count}})",
     "list": {
@@ -606,7 +607,8 @@
     "extrasFailedMentions": "Gesendet — die Erwähnung wurde nicht gespeichert.",
     "extrasFailedTime": "Gesendet — die Zeit wurde nicht gebucht.",
     "extrasFailedBoth": "Gesendet — Erwähnung und Zeitbuchung wurden nicht gespeichert.",
-    "extrasRetry": "Erneut versuchen"
+    "extrasRetry": "Erneut versuchen",
+    "customerUnresolved": "Zu dieser Adresse gibt es keinen Kundenbenutzer. Kundeninformationen sind daher nicht verfügbar."
   },
   "search": {
     "title": "Suche",
@@ -1462,9 +1464,6 @@
       "name": "Name",
       "email": "E-Mail",
       "mobile": "Mobiltelefon",
-      "sectionAccess": "Zugangsdaten",
-      "sectionContact": "Kontaktdaten",
-      "sectionStatus": "Status",
       "effectivePermissions": "Effektive Berechtigungen anzeigen",
       "effectivePermissionsTitle": "Effektive Berechtigungen für {{name}}",
       "effectivePermissionsDescription": "Zusammengeführte Rechte aus direkter Gruppenzuweisung und Rollen.",
@@ -1481,7 +1480,11 @@
       "editSettingsTitle": "Persönliche Einstellungen von {{name}}",
       "editSettingsDescription": "Die gleichen Einstellungen, die der Agent selbst unter „Persönliche Einstellungen“ sieht.",
       "languageLabel": "Sprache",
-      "languageSaved": "Sprache gespeichert."
+      "languageSaved": "Sprache gespeichert.",
+      "tabAccount": "Konto",
+      "tabPerson": "Person",
+      "sourceInvalidHint": "Diese Berechtigung stammt aus einer ungültigen Rolle und wirkt deshalb nicht.",
+      "keyInactiveHint": "Dieses Recht ist konfiguriert, wirkt aber nicht – die Quelle oder die Gruppe ist ungültig."
     },
     "groups": {
       "title_plural": "Gruppen",
