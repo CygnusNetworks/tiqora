@@ -3,6 +3,7 @@ import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { I18nextProvider } from "react-i18next";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import i18n from "@/i18n";
+import { MAX_PASSWORD_LENGTH, MIN_PASSWORD_LENGTH } from "@/lib/passwordPolicy";
 import { SetPasswordPage } from "./SetPasswordPage";
 
 const { checkPasswordSetup, completePasswordSetup } = vi.hoisted(() => ({
@@ -82,9 +83,16 @@ describe("SetPasswordPage", () => {
     await screen.findByTestId("set-password-form");
     const submit = screen.getByTestId("set-password-submit");
 
-    fireEvent.change(screen.getByTestId("set-password-input"), { target: { value: "short" } });
-    fireEvent.change(screen.getByTestId("set-password-confirm"), { target: { value: "short" } });
+    // One character below the minimum — the boundary is what can regress.
+    const justShort = "x".repeat(MIN_PASSWORD_LENGTH - 1);
+    fireEvent.change(screen.getByTestId("set-password-input"), { target: { value: justShort } });
+    fireEvent.change(screen.getByTestId("set-password-confirm"), { target: { value: justShort } });
     expect(submit).toBeDisabled();
+
+    const justLong = "x".repeat(MIN_PASSWORD_LENGTH);
+    fireEvent.change(screen.getByTestId("set-password-input"), { target: { value: justLong } });
+    fireEvent.change(screen.getByTestId("set-password-confirm"), { target: { value: justLong } });
+    expect(submit).toBeEnabled();
 
     fireEvent.change(screen.getByTestId("set-password-input"), {
       target: { value: "long-enough-1" },
@@ -95,5 +103,13 @@ describe("SetPasswordPage", () => {
     expect(screen.getByTestId("set-password-mismatch")).toBeInTheDocument();
     expect(submit).toBeDisabled();
     expect(completePasswordSetup).not.toHaveBeenCalled();
+  });
+
+  it("caps both fields at the maximum the backend accepts", async () => {
+    wrap();
+    await screen.findByTestId("set-password-form");
+    for (const id of ["set-password-input", "set-password-confirm"]) {
+      expect(screen.getByTestId(id)).toHaveAttribute("maxLength", String(MAX_PASSWORD_LENGTH));
+    }
   });
 });

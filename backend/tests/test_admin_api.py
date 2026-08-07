@@ -967,7 +967,10 @@ async def test_admin_user_role_assignment_roundtrip(
         )
         agent = await admin_users.create_user(
             UserCreate(
-                login=f"roleagent.{ns}", password="pw12345678", first_name="Role", last_name="Agent"
+                login=f"roleagent.{ns}",
+                password="pw1234567890ab",
+                first_name="Role",
+                last_name="Agent",
             ),
             admin_user,
             s,
@@ -1014,7 +1017,7 @@ async def test_admin_user_group_assignment_roundtrip(
         agent = await admin_users.create_user(
             UserCreate(
                 login=f"groupagent.964.{ns}",
-                password="pw12345678",
+                password="pw1234567890ab",
                 first_name="Group",
                 last_name="Agent",
             ),
@@ -1625,7 +1628,7 @@ async def test_admin_group_users_reverse_get_roundtrip(
         agent = await admin_users.create_user(
             UserCreate(
                 login=f"rev.gu.{ns}@example.com",
-                password="pw12345678",
+                password="pw1234567890ab",
                 first_name="Rev",
                 last_name="GroupUser",
             ),
@@ -1675,7 +1678,7 @@ async def test_admin_role_users_reverse_get_roundtrip(
         agent = await admin_users.create_user(
             UserCreate(
                 login=f"rev.ru.{ns}@example.com",
-                password="pw12345678",
+                password="pw1234567890ab",
                 first_name="Rev",
                 last_name="RoleUser",
             ),
@@ -2103,7 +2106,7 @@ async def test_admin_usage_counts_on_list_and_bulk_assignment_counts(
         agent = await admin_users.create_user(
             UserCreate(
                 login=f"cnt.agent.{ns}@example.com",
-                password="pw12345678",
+                password="pw1234567890ab",
                 first_name="Cnt",
                 last_name="Agent",
             ),

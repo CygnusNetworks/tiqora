@@ -18,6 +18,10 @@ from passlib.hash import apr_md5_crypt, des_crypt, md5_crypt
 # Default bcrypt work factor used by modern Znuny installs (AuthModule::DB::bcryptCost).
 DEFAULT_BCRYPT_COST: Final[int] = 12
 
+# bcrypt consumes at most 72 bytes of key material; everything beyond is
+# ignored by the algorithm itself, not by us.
+_BCRYPT_MAX_KEY_BYTES: Final[int] = 72
+
 # bcrypt / eksblowfish base64 alphabet (same as Crypt::Eksblowfish::Bcrypt).
 _BCRYPT_B64: Final[bytes] = b"./ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"
 
@@ -62,6 +66,12 @@ def _znuny_bcrypt_hash_part(password: bytes, cost: int, salt_ascii: str) -> str:
     """Return the 31-char bcrypt hash segment for Znuny ``BCRYPT:`` storage."""
     if len(salt_ascii) != 16:
         raise ValueError("Znuny bcrypt salt must be exactly 16 characters")
+    # bcrypt reads at most 72 bytes of key material. Perl's
+    # Crypt::Eksblowfish::Bcrypt (what Znuny hashes with) silently ignores the
+    # rest; the Python binding raises instead. Truncate so a legacy account
+    # whose password exceeds 72 bytes still verifies the way Znuny verified
+    # it, and so no password-setting path can 500 on an over-long input.
+    password = password[:_BCRYPT_MAX_KEY_BYTES]
     salt_bytes = salt_ascii.encode("ascii")
     # Modular crypt salt: $2a$cost$ + 22-char en_base64(16-byte salt)
     salt_mcf = f"$2a${cost:02d}${_bcrypt_en_base64(salt_bytes)}".encode("ascii")
