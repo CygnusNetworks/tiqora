@@ -74,11 +74,18 @@ async def _seed_tiqora_tables(session: AsyncSession) -> None:
             ticket_id BIGINT NOT NULL,
             user_id INT NOT NULL,
             action VARCHAR(200) NOT NULL,
+            article_id BIGINT NULL,
             title VARCHAR(255),
             content TEXT NOT NULL DEFAULT '{}',
             created DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
             changed DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
         )""",
+        # Both no-ops on a fresh CREATE, but bring a table left over from an
+        # older run up to 20260807_0030.
+        "ALTER TABLE tiqora_form_draft ADD COLUMN article_id BIGINT NULL",
+        "ALTER TABLE tiqora_form_draft ADD CONSTRAINT"
+        " uq_tiqora_form_draft_ticket_user_action_article"
+        " UNIQUE (ticket_id, user_id, action, article_id)",
     ]
     for ddl in dialects_ddl:
         with contextlib.suppress(Exception):

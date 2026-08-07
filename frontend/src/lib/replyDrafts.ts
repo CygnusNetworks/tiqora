@@ -1,8 +1,20 @@
-import { useMemo, useSyncExternalStore } from "react";
+import { useCallback, useMemo } from "react";
+import {
+  useMutation,
+  useQuery,
+  useQueryClient,
+  type QueryClient,
+} from "@tanstack/react-query";
+
+import {
+  COMPOSE_ACTION,
+  formDraftApi,
+  type FormDraftOut,
+} from "./formDraftApi";
 
 /**
- * Unsent reply drafts, keyed per ticket+article and persisted in
- * localStorage.
+ * Unsent reply drafts, keyed per ticket+article and stored server-side in
+ * `tiqora_form_draft`.
  *
  * `ReplyDialog` keeps its composer state in React, which survives a
  * backdrop click only as long as the component stays mounted — navigating
@@ -11,12 +23,12 @@ import { useMemo, useSyncExternalStore } from "react";
  * article views render a placeholder for it, and the reply buttons switch
  * to "continue draft".
  *
- * Writes are best-effort (a full/blocked localStorage must never break the
- * composer) but the in-memory snapshot always updates, so the current tab
- * stays consistent either way.
+ * Everything hangs off one query per ticket, so the placeholders, the
+ * button badges and the open dialog all read the same cache entry and a
+ * ticket costs exactly one request. Writes update that entry optimistically
+ * — the composer autosaves on a debounce and must not wait for a round trip
+ * to show a badge — and are reconciled with the server's row afterwards.
  */
-
-const STORAGE_KEY = "tiqora-reply-drafts";
 
 export type ReplyDraft = {
   ticketId: number;
@@ -36,145 +48,213 @@ export type ReplyDraft = {
   updatedAt: number;
 };
 
-type DraftMap = Record<string, ReplyDraft>;
+/** The part of a draft that travels in `FormDraftOut.content` as JSON. */
+type ReplyDraftContent = Omit<ReplyDraft, "ticketId" | "articleId" | "updatedAt">;
 
 export function draftKey(ticketId: number, articleId: number): string {
   return `${ticketId}:${articleId}`;
 }
 
-/* ── Store ─────────────────────────────────────────────────────────────── */
-
-let cache: DraftMap | null = null;
-const listeners = new Set<() => void>();
-
-function isDraft(value: unknown): value is ReplyDraft {
-  if (value === null || typeof value !== "object") return false;
-  const d = value as Partial<ReplyDraft>;
-  return (
-    typeof d.ticketId === "number" &&
-    typeof d.articleId === "number" &&
-    typeof d.body === "string" &&
-    typeof d.updatedAt === "number"
-  );
+export function ticketDraftsKey(ticketId: number) {
+  return ["ticket", ticketId, "form-drafts"] as const;
 }
 
-function read(): DraftMap {
-  if (cache) return cache;
-  if (typeof window === "undefined") {
-    cache = {};
-    return cache;
-  }
+/* ── Wire format ───────────────────────────────────────────────────────── */
+
+function str(value: unknown): string {
+  return typeof value === "string" ? value : "";
+}
+
+/**
+ * Rows we cannot make sense of are dropped rather than rendered as empty
+ * drafts — the column is free-form and an older build (or a direct API
+ * user) may have written something else entirely.
+ */
+function fromRow(row: FormDraftOut): ReplyDraft | null {
+  if (row.article_id === null) return null;
+  let parsed: unknown;
   try {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
-    const parsed: unknown = raw ? JSON.parse(raw) : {};
-    const out: DraftMap = {};
-    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
-      // Drop anything that doesn't look like a draft rather than trusting
-      // whatever an older build (or another tab) left behind.
-      for (const [k, v] of Object.entries(parsed)) if (isDraft(v)) out[k] = v;
-    }
-    cache = out;
+    parsed = JSON.parse(row.content);
   } catch {
-    cache = {};
+    return null;
   }
-  return cache;
-}
-
-function commit(next: DraftMap) {
-  cache = next;
-  if (typeof window !== "undefined") {
-    try {
-      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
-    } catch {
-      // Persistence is best-effort; the in-memory snapshot still stands.
-    }
-  }
-  for (const l of listeners) l();
-}
-
-function subscribe(listener: () => void): () => void {
-  listeners.add(listener);
-  return () => {
-    listeners.delete(listener);
+  if (parsed === null || typeof parsed !== "object") return null;
+  const c = parsed as Partial<ReplyDraftContent>;
+  if (typeof c.body !== "string") return null;
+  const changed = Date.parse(row.changed);
+  return {
+    ticketId: row.ticket_id,
+    articleId: row.article_id,
+    replyAll: c.replyAll === true,
+    subject: str(c.subject),
+    body: c.body,
+    to: str(c.to),
+    cc: str(c.cc),
+    bcc: str(c.bcc),
+    replyTo: str(c.replyTo),
+    aiDraftId: typeof c.aiDraftId === "number" ? c.aiDraftId : null,
+    updatedAt: Number.isNaN(changed) ? Date.now() : changed,
   };
 }
 
-/** Snapshot for `useSyncExternalStore` — the cached map is replaced (never
- * mutated) on every write, so its identity is a valid change signal. */
-function getSnapshot(): DraftMap {
-  return read();
+function toContent(draft: Omit<ReplyDraft, "updatedAt">): string {
+  const content: ReplyDraftContent = {
+    replyAll: draft.replyAll,
+    subject: draft.subject,
+    body: draft.body,
+    to: draft.to,
+    cc: draft.cc,
+    bcc: draft.bcc,
+    replyTo: draft.replyTo,
+    aiDraftId: draft.aiDraftId,
+  };
+  return JSON.stringify(content);
 }
 
-const EMPTY: DraftMap = {};
-
-/** No drafts server-side; a stable empty map keeps hydration quiet. */
-function getServerSnapshot(): DraftMap {
-  return EMPTY;
+function newestFirst(drafts: ReplyDraft[]): ReplyDraft[] {
+  return [...drafts].sort((a, b) => b.updatedAt - a.updatedAt);
 }
 
-/** Another tab wrote: drop the cache so the next read reloads from storage. */
-function onStorage(e: StorageEvent) {
-  if (e.key !== null && e.key !== STORAGE_KEY) return;
-  cache = null;
-  for (const l of listeners) l();
+function parseRows(rows: FormDraftOut[]): ReplyDraft[] {
+  const out: ReplyDraft[] = [];
+  for (const row of rows) {
+    if (row.action !== COMPOSE_ACTION) continue;
+    const draft = fromRow(row);
+    if (draft) out.push(draft);
+  }
+  return newestFirst(out);
 }
 
-if (typeof window !== "undefined") {
-  window.addEventListener("storage", onStorage);
+/* ── Cache helpers ─────────────────────────────────────────────────────── */
+
+function readCache(qc: QueryClient, ticketId: number): ReplyDraft[] {
+  return qc.getQueryData<ReplyDraft[]>(ticketDraftsKey(ticketId)) ?? [];
 }
 
-/* ── Reads/writes ──────────────────────────────────────────────────────── */
-
-export function getDraft(ticketId: number, articleId: number): ReplyDraft | null {
-  return read()[draftKey(ticketId, articleId)] ?? null;
+function writeCache(qc: QueryClient, ticketId: number, drafts: ReplyDraft[]) {
+  qc.setQueryData(ticketDraftsKey(ticketId), newestFirst(drafts));
 }
 
-/** Every draft for one ticket, newest edit first. */
-export function getTicketDrafts(ticketId: number): ReplyDraft[] {
-  return Object.values(read())
-    .filter((d) => d.ticketId === ticketId)
-    .sort((a, b) => b.updatedAt - a.updatedAt);
-}
-
-export function saveDraft(draft: Omit<ReplyDraft, "updatedAt">): void {
-  const next = { ...read() };
-  next[draftKey(draft.ticketId, draft.articleId)] = { ...draft, updatedAt: Date.now() };
-  commit(next);
-}
-
-export function clearDraft(ticketId: number, articleId: number): void {
-  const current = read();
-  const key = draftKey(ticketId, articleId);
-  if (!(key in current)) return;
-  const next = { ...current };
-  delete next[key];
-  commit(next);
-}
-
-/** Test seam — resets both the cache and the persisted map. */
-export function resetDraftsForTest(): void {
-  commit({});
+/** Synchronous read of an already-loaded draft (no fetch). */
+export function getDraft(
+  qc: QueryClient,
+  ticketId: number,
+  articleId: number,
+): ReplyDraft | null {
+  return readCache(qc, ticketId).find((d) => d.articleId === articleId) ?? null;
 }
 
 /* ── Hooks ─────────────────────────────────────────────────────────────── */
 
-/** Subscribes to one article's draft. */
-export function useReplyDraft(ticketId: number, articleId: number): ReplyDraft | null {
-  const drafts = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
-  return drafts[draftKey(ticketId, articleId)] ?? null;
+const EMPTY: ReplyDraft[] = [];
+
+function useTicketDraftsQuery(ticketId: number) {
+  return useQuery({
+    queryKey: ticketDraftsKey(ticketId),
+    queryFn: ({ signal }) => formDraftApi.list(ticketId, signal).then(parseRows),
+    // The composer is the only writer and updates the cache itself, so
+    // background refetching would only ever undo an in-flight edit.
+    staleTime: Infinity,
+    refetchOnWindowFocus: false,
+  });
 }
 
-/** Subscribes to every draft on one ticket, newest edit first. */
+/**
+ * Subscribes to every draft on one ticket, newest edit first. Mounting this
+ * anywhere on the ticket page is what loads the cache the other hooks and
+ * `getDraft` read; the shared query key means it costs one request per
+ * ticket no matter how many components ask.
+ */
 export function useTicketReplyDrafts(ticketId: number): ReplyDraft[] {
-  const drafts = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
-  // Memoised so the returned array keeps its identity between renders that
-  // don't change the store — consumers map over it into React children.
+  return useTicketDraftsQuery(ticketId).data ?? EMPTY;
+}
+
+/** Subscribes to one article's draft. */
+export function useReplyDraft(
+  ticketId: number,
+  articleId: number,
+): ReplyDraft | null {
+  const drafts = useTicketReplyDrafts(ticketId);
   return useMemo(
-    () =>
-      Object.values(drafts)
-        .filter((d) => d.ticketId === ticketId)
-        .sort((a, b) => b.updatedAt - a.updatedAt),
-    [drafts, ticketId],
+    () => drafts.find((d) => d.articleId === articleId) ?? null,
+    [drafts, articleId],
+  );
+}
+
+/**
+ * True once the ticket's drafts are known, so a composer may seed from
+ * them. Seeding earlier would show the server's fresh reply and then
+ * overwrite whatever the agent started typing when the draft arrives.
+ */
+export function useReplyDraftsLoaded(ticketId: number): boolean {
+  const { isSuccess, isError } = useTicketDraftsQuery(ticketId);
+  // On error we let the composer proceed from the server-rendered reply
+  // rather than block forever on a draft we will never get.
+  return isSuccess || isError;
+}
+
+export function useSaveReplyDraft() {
+  const qc = useQueryClient();
+  const mutation = useMutation({
+    mutationFn: (draft: Omit<ReplyDraft, "updatedAt">) =>
+      formDraftApi.upsert(draft.ticketId, {
+        action: COMPOSE_ACTION,
+        article_id: draft.articleId,
+        content: toContent(draft),
+      }),
+    onSuccess: (row, draft) => {
+      const saved = fromRow(row);
+      if (!saved) return;
+      // Adopt the server's `changed` timestamp, but only while the cache
+      // still holds the body we just sent — a later keystroke has already
+      // written a newer optimistic entry that must not be rolled back.
+      const current = getDraft(qc, draft.ticketId, draft.articleId);
+      if (!current || current.body !== draft.body) return;
+      writeCache(qc, draft.ticketId, [
+        ...readCache(qc, draft.ticketId).filter(
+          (d) => d.articleId !== draft.articleId,
+        ),
+        saved,
+      ]);
+    },
+  });
+  const { mutate } = mutation;
+  return useCallback(
+    (draft: Omit<ReplyDraft, "updatedAt">) => {
+      writeCache(qc, draft.ticketId, [
+        ...readCache(qc, draft.ticketId).filter(
+          (d) => d.articleId !== draft.articleId,
+        ),
+        { ...draft, updatedAt: Date.now() },
+      ]);
+      mutate(draft);
+    },
+    [qc, mutate],
+  );
+}
+
+export function useClearReplyDraft() {
+  const qc = useQueryClient();
+  const { mutate } = useMutation({
+    mutationFn: ({
+      ticketId,
+      articleId,
+    }: {
+      ticketId: number;
+      articleId: number;
+    }) => formDraftApi.remove(ticketId, COMPOSE_ACTION, articleId),
+  });
+  return useCallback(
+    (ticketId: number, articleId: number) => {
+      if (!getDraft(qc, ticketId, articleId)) return;
+      writeCache(
+        qc,
+        ticketId,
+        readCache(qc, ticketId).filter((d) => d.articleId !== articleId),
+      );
+      mutate({ ticketId, articleId });
+    },
+    [qc, mutate],
   );
 }
 

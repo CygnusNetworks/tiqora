@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { formatDateTime } from "@/lib/format";
-import { clearDraft, draftPreview, type ReplyDraft } from "@/lib/replyDrafts";
+import { draftPreview, useClearReplyDraft, type ReplyDraft } from "@/lib/replyDrafts";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
 import { Button } from "@/components/ui/Button";
 import { ReplyDialog } from "./ReplyDialog";
@@ -21,6 +21,7 @@ function useDraftActions(draft: ReplyDraft) {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const { confirm, dialog: confirmDialog } = useConfirm();
+  const clearDraft = useClearReplyDraft();
 
   const discard = async () => {
     const ok = await confirm({

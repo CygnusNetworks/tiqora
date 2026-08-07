@@ -3,14 +3,22 @@ import { render, screen, fireEvent, waitFor, within } from "@testing-library/rea
 import { I18nextProvider } from "react-i18next";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import i18n from "@/i18n";
-import { saveDraft, getDraft, resetDraftsForTest } from "@/lib/replyDrafts";
+import { getDraft, useTicketReplyDrafts, type ReplyDraft } from "@/lib/replyDrafts";
 import { DraftListRow, DraftBubble } from "./DraftPlaceholder";
 import { ArticleQuickActions } from "./ArticleQuickActions";
 
-const { getReplyDraft, listTemplates } = vi.hoisted(() => ({
+const { getReplyDraft, listTemplates, formDrafts } = vi.hoisted(() => ({
   getReplyDraft: vi.fn(),
   listTemplates: vi.fn(),
+  formDrafts: { list: vi.fn(), upsert: vi.fn(), remove: vi.fn() },
 }));
+
+// Drafts live on the server; serve them from an in-memory stand-in.
+vi.mock("@/lib/formDraftApi", async () => {
+  const actual =
+    await vi.importActual<typeof import("@/lib/formDraftApi")>("@/lib/formDraftApi");
+  return { ...actual, formDraftApi: formDrafts };
+});
 
 vi.mock("@/lib/api", async () => {
   const actual = await vi.importActual<typeof import("@/lib/api")>("@/lib/api");
@@ -42,37 +50,57 @@ const ARTICLE = {
 const DRAFT_BODY =
   "Thanks for reaching out, we will look into it.\n\n> On 2024-06-01, Jane wrote:\n> My printer is offline.";
 
+let qc: QueryClient;
+
 function wrap(ui: React.ReactElement) {
-  const queryClient = new QueryClient({
-    defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
-  });
   return render(
-    <QueryClientProvider client={queryClient}>
+    <QueryClientProvider client={qc}>
       <I18nextProvider i18n={i18n}>{ui}</I18nextProvider>
     </QueryClientProvider>,
   );
 }
 
-function makeDraft() {
-  saveDraft({
-    ticketId: 7,
-    articleId: 2,
-    replyAll: false,
-    subject: "Re: First",
-    body: DRAFT_BODY,
-    to: "jane.doe@example.com",
-    cc: "",
-    bcc: "",
-    replyTo: "",
-    aiDraftId: null,
-  });
-  return getDraft(7, 2)!;
+const DRAFT_CONTENT = {
+  replyAll: false,
+  subject: "Re: First",
+  body: DRAFT_BODY,
+  to: "jane.doe@example.com",
+  cc: "",
+  bcc: "",
+  replyTo: "",
+  aiDraftId: null,
+};
+
+/** The draft as the two placeholders receive it (a plain prop). */
+function makeDraft(): ReplyDraft {
+  return { ticketId: 7, articleId: 2, ...DRAFT_CONTENT, updatedAt: Date.now() };
+}
+
+/** Same draft, but served by the API so the hooks pick it up. */
+function serveDraft() {
+  formDrafts.list.mockResolvedValue([
+    {
+      id: 1,
+      ticket_id: 7,
+      user_id: 1,
+      action: "AgentTicketCompose",
+      article_id: 2,
+      title: null,
+      content: JSON.stringify(DRAFT_CONTENT),
+      created: "2026-08-07T10:00:00",
+      changed: "2026-08-07T10:00:00",
+    },
+  ]);
 }
 
 describe("DraftPlaceholder", () => {
   beforeEach(() => {
-    window.localStorage.clear();
-    resetDraftsForTest();
+    qc = new QueryClient({
+      defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+    });
+    formDrafts.list.mockReset().mockResolvedValue([]);
+    formDrafts.upsert.mockReset();
+    formDrafts.remove.mockReset().mockResolvedValue(undefined);
     getReplyDraft.mockReset().mockResolvedValue({
       to_address: "jane.doe@example.com",
       cc: "",
@@ -127,37 +155,41 @@ describe("DraftPlaceholder", () => {
   });
 
   it("discarding a draft removes it from the store after confirmation", async () => {
-    const draft = makeDraft();
-    const { rerender } = wrap(<DraftBubble draft={draft} locale="en" />);
+    serveDraft();
+    // Render the bubble the way the article views do — driven by the store,
+    // so the discard has to actually take effect for it to disappear.
+    function DraftsOfTicket() {
+      const drafts = useTicketReplyDrafts(7);
+      return (
+        <div data-testid="drafts">
+          {drafts.map((d) => (
+            <DraftBubble key={d.articleId} draft={d} locale="en" />
+          ))}
+        </div>
+      );
+    }
+    wrap(<DraftsOfTicket />);
 
-    expect(screen.getByTestId("conversation-draft-2")).toBeInTheDocument();
+    expect(await screen.findByTestId("conversation-draft-2")).toBeInTheDocument();
     fireEvent.click(screen.getByText("Discard draft"));
 
     const dialog = await screen.findByTestId("confirm-dialog");
     fireEvent.click(within(dialog).getByTestId("confirm-dialog-confirm"));
 
-    await waitFor(() => expect(getDraft(7, 2)).toBeNull());
-
-    // A consuming component re-rendering after the discard should no longer
-    // show the placeholder — simulate that by re-mounting for the current
-    // (now missing) draft.
-    rerender(
-      <QueryClientProvider client={new QueryClient()}>
-        <I18nextProvider i18n={i18n}>
-          <div data-testid="after-discard">
-            {getDraft(7, 2) ? <DraftBubble draft={getDraft(7, 2)!} locale="en" /> : null}
-          </div>
-        </I18nextProvider>
-      </QueryClientProvider>,
-    );
-    expect(screen.queryByTestId("conversation-draft-2")).toBeNull();
+    await waitFor(() => expect(screen.queryByTestId("conversation-draft-2")).toBeNull());
+    expect(getDraft(qc, 7, 2)).toBeNull();
+    expect(formDrafts.remove).toHaveBeenCalledWith(7, "AgentTicketCompose", 2);
   });
 });
 
 describe("ArticleQuickActions — draft affordance on the reply button", () => {
   beforeEach(() => {
-    window.localStorage.clear();
-    resetDraftsForTest();
+    qc = new QueryClient({
+      defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+    });
+    formDrafts.list.mockReset().mockResolvedValue([]);
+    formDrafts.upsert.mockReset();
+    formDrafts.remove.mockReset().mockResolvedValue(undefined);
     getReplyDraft.mockReset().mockResolvedValue({
       to_address: "jane.doe@example.com",
       cc: "",
@@ -187,8 +219,8 @@ describe("ArticleQuickActions — draft affordance on the reply button", () => {
     expect(screen.queryByTestId("article-draft-dot-2")).toBeNull();
   });
 
-  it("shows the 'continue draft' label, data-has-draft and the dot when a draft exists", () => {
-    makeDraft();
+  it("shows the 'continue draft' label, data-has-draft and the dot when a draft exists", async () => {
+    serveDraft();
     wrap(
       <ArticleQuickActions
         ticketId={7}
@@ -199,7 +231,7 @@ describe("ArticleQuickActions — draft affordance on the reply button", () => {
     );
 
     const button = screen.getByTestId("article-reader-reply");
-    expect(button).toHaveAttribute("data-has-draft", "true");
+    await waitFor(() => expect(button).toHaveAttribute("data-has-draft", "true"));
     expect(button).toHaveTextContent("Continue draft");
     expect(screen.getByTestId("article-draft-dot-2")).toBeInTheDocument();
   });

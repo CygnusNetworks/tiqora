@@ -115,6 +115,7 @@ async def _create_tiqora_tables(session: AsyncSession) -> None:
             ticket_id BIGINT NOT NULL,
             user_id INT NOT NULL,
             action VARCHAR(200) NOT NULL,
+            article_id BIGINT NULL,
             title VARCHAR(255),
             content TEXT NOT NULL DEFAULT '{}',
             created DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,

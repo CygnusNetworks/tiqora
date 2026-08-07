@@ -5,7 +5,7 @@ import { I18nextProvider } from "react-i18next";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import i18n from "@/i18n";
 import { ApiError } from "@/lib/api";
-import { getDraft, resetDraftsForTest } from "@/lib/replyDrafts";
+import { getDraft } from "@/lib/replyDrafts";
 import { ReplyDialog } from "./ReplyDialog";
 
 const {
@@ -15,6 +15,7 @@ const {
   createTicketMention,
   createTicketTimeAccounting,
   listReferenceAgents,
+  formDrafts,
 } = vi.hoisted(() => ({
   getReplyDraft: vi.fn(),
   listTemplates: vi.fn(),
@@ -22,6 +23,7 @@ const {
   createTicketMention: vi.fn(),
   createTicketTimeAccounting: vi.fn(),
   listReferenceAgents: vi.fn(),
+  formDrafts: { list: vi.fn(), upsert: vi.fn(), remove: vi.fn() },
 }));
 
 vi.mock("@/lib/api", async () => {
@@ -39,12 +41,40 @@ vi.mock("@/lib/api", async () => {
   };
 });
 
-function wrap(ui: React.ReactElement) {
-  const queryClient = new QueryClient({
+// Drafts live on the server; keep an in-memory stand-in so the composer's
+// autosave is observable without a backend.
+vi.mock("@/lib/formDraftApi", async () => {
+  const actual =
+    await vi.importActual<typeof import("@/lib/formDraftApi")>("@/lib/formDraftApi");
+  return { ...actual, formDraftApi: formDrafts };
+});
+
+let qc: QueryClient;
+
+beforeEach(() => {
+  qc = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   });
+  formDrafts.list.mockReset().mockResolvedValue([]);
+  formDrafts.upsert.mockReset().mockImplementation((ticketId, body) =>
+    Promise.resolve({
+      id: 1,
+      ticket_id: ticketId,
+      user_id: 1,
+      action: body.action,
+      article_id: body.article_id,
+      title: null,
+      content: body.content,
+      created: "2026-08-07T10:00:00",
+      changed: "2026-08-07T10:00:00",
+    }),
+  );
+  formDrafts.remove.mockReset().mockResolvedValue(undefined);
+});
+
+function wrap(ui: React.ReactElement) {
   return render(
-    <QueryClientProvider client={queryClient}>
+    <QueryClientProvider client={qc}>
       <I18nextProvider i18n={i18n}>{ui}</I18nextProvider>
     </QueryClientProvider>,
   );
@@ -433,8 +463,6 @@ describe("ReplyDialog reset after send / persistence without send", () => {
     getReplyDraft.mockReset();
     listTemplates.mockReset().mockResolvedValue([]);
     createArticle.mockReset().mockResolvedValue({ id: 99 });
-    window.localStorage.clear();
-    resetDraftsForTest();
   });
 
   it("resets body and subject to the server seed after a successful send, on reopen", async () => {
@@ -487,14 +515,14 @@ describe("ReplyDialog reset after send / persistence without send", () => {
     // Let the debounced draft-store write happen before sending, so we can
     // be sure clearing (not "never having saved") is what emptied it.
     await waitFor(
-      () => expect(getDraft(7, 11)).not.toBeNull(),
+      () => expect(getDraft(qc, 7, 11)).not.toBeNull(),
       { timeout: 1000 },
     );
 
     fireEvent.click(screen.getByTestId("reply-send"));
 
     await waitFor(() => expect(createArticle).toHaveBeenCalled());
-    await waitFor(() => expect(getDraft(7, 11)).toBeNull());
+    await waitFor(() => expect(getDraft(qc, 7, 11)).toBeNull());
   });
 
   it("keeps typed text on close without sending, and restores it on reopen", async () => {
@@ -520,7 +548,7 @@ describe("ReplyDialog reset after send / persistence without send", () => {
 
     // The debounced store write should have persisted the typed text.
     await waitFor(
-      () => expect(getDraft(8, 12)?.body).toContain("Draft in progress"),
+      () => expect(getDraft(qc, 8, 12)?.body).toContain("Draft in progress"),
       { timeout: 1000 },
     );
 
@@ -535,7 +563,6 @@ describe("ReplyDialog reset after send / persistence without send", () => {
 
 describe("ReplyDialog composer extras (mentions + time)", () => {
   beforeEach(() => {
-    resetDraftsForTest();
     getReplyDraft.mockReset().mockResolvedValue(baseDraft);
     listTemplates.mockReset().mockResolvedValue([]);
     createArticle.mockReset().mockResolvedValue({ id: 99 });

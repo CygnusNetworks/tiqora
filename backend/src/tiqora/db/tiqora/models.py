@@ -122,6 +122,12 @@ class TiqoraFormDraft(TiqoraBase):
     2. Writing invalid Storable data would corrupt Znuny's draft UI.
     3. After cutover (Phase 5) we own the table; until then we keep draft
        data in this separate table and surface it only via the Tiqora API.
+
+    Unlike Znuny we key drafts by ``article_id`` as well, because reply
+    drafts autosave per article: one agent can have unsent replies open on
+    several articles of the same ticket. Znuny instead tells its drafts
+    apart by a user-supplied ``title`` — there they are explicit, manually
+    named drafts, not an autosave.
     """
 
     __tablename__ = "tiqora_form_draft"
@@ -131,6 +137,10 @@ class TiqoraFormDraft(TiqoraBase):
     user_id: Mapped[int] = mapped_column(Integer, nullable=False)
     # Free-form action name (e.g. "AgentTicketNote", "AgentTicketCompose")
     action: Mapped[str] = mapped_column(String(200), nullable=False)
+    # Article the draft replies to. NULL = ticket-wide draft; NULLs count as
+    # distinct in the unique constraint below, so any number of those may
+    # coexist (the slot for Znuny-style named drafts).
+    article_id: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
     title: Mapped[str | None] = mapped_column(String(255), nullable=True)
     # JSON-encoded draft content (subject, body, to, cc, …)
     content: Mapped[str] = mapped_column(Text, nullable=False, default="{}")
@@ -145,7 +155,16 @@ class TiqoraFormDraft(TiqoraBase):
         server_default=func.now(),
     )
 
-    __table_args__ = (Index("ix_tiqora_form_draft_ticket_user", "ticket_id", "user_id"),)
+    __table_args__ = (
+        Index("ix_tiqora_form_draft_ticket_user", "ticket_id", "user_id"),
+        UniqueConstraint(
+            "ticket_id",
+            "user_id",
+            "action",
+            "article_id",
+            name="uq_tiqora_form_draft_ticket_user_action_article",
+        ),
+    )
 
 
 class TiqoraUserTotp(TiqoraBase):
