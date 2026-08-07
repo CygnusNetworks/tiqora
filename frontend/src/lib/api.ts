@@ -248,4 +248,10 @@ export type {
   AuthConfigUpdate,
   AuthConfigGlobalOut,
   AuthConfigGlobalUpdate,
+  EffectivePermissionsOut,
+  EffectiveGroupPermission,
+  EffectiveQueuePermission,
+  EffectivePermissionSource,
+  UserLanguageOut,
+  UserLanguageUpdate,
 } from "@tiqora/api-client";

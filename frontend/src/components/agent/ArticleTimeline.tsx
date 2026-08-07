@@ -8,7 +8,11 @@ import { fileTypeInfo } from "@/lib/filetype";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Spinner } from "@/components/ui/Spinner";
+import { postComposerExtras } from "@/lib/composerExtras";
+import type { PickedMention } from "@/lib/mentions";
 import { ArticleBodyRenderer } from "./ArticleBodyRenderer";
+import { ComposerTimeChip } from "./ComposerTimeChip";
+import { MentionTextarea } from "./MentionTextarea";
 import { ReplyDialog } from "./ReplyDialog";
 import {
   BounceDialog,
@@ -313,6 +317,11 @@ export function ArticleComposer({
   const [subject, setSubject] = useState("");
   const [body, setBody] = useState("");
   const [openedAtMaxId, setOpenedAtMaxId] = useState(0);
+  // An internal note is the most common place to pull a colleague in, so the
+  // mention picker and the minute chip live here rather than in a side panel.
+  const [mentions, setMentions] = useState<PickedMention[]>([]);
+  const [timeUnits, setTimeUnits] = useState("");
+  const [extrasFailed, setExtrasFailed] = useState<Array<"mentions" | "time">>([]);
 
   useEffect(() => {
     onComposingChange?.(open);
@@ -337,9 +346,18 @@ export function ArticleComposer({
     return () => window.cancelAnimationFrame(frame);
   }, [open]);
 
+  const finishSend = () => {
+    setOpen(false);
+    setSubject("");
+    setBody("");
+    setMentions([]);
+    setTimeUnits("");
+    setExtrasFailed([]);
+  };
+
   const sendMutation = useMutation({
-    mutationFn: () =>
-      api.createArticle(ticketId, {
+    mutationFn: async () => {
+      await api.createArticle(ticketId, {
         sender_type: "agent",
         subject: subject || t("ticket.composerNote"),
         body,
@@ -348,13 +366,33 @@ export function ArticleComposer({
         // per-article reply dialog.
         channel: "note",
         is_visible_for_customer: false,
-      }),
-    onSuccess: () => {
+      });
+      return postComposerExtras(ticketId, { body, mentions, timeUnits, queryClient });
+    },
+    onSuccess: (extras) => {
       void queryClient.invalidateQueries({ queryKey: ["tickets", ticketId, "articles"] });
       void queryClient.invalidateQueries({ queryKey: ["tickets", ticketId] });
-      setOpen(false);
-      setSubject("");
-      setBody("");
+      if (extras.failed.length > 0) {
+        // The note is saved; keep the composer open so the failed booking or
+        // mention can be retried on its own.
+        setExtrasFailed(extras.failed);
+        return;
+      }
+      finishSend();
+    },
+  });
+
+  const retryExtrasMutation = useMutation({
+    mutationFn: () =>
+      postComposerExtras(ticketId, {
+        body,
+        mentions: extrasFailed.includes("mentions") ? mentions : [],
+        timeUnits: extrasFailed.includes("time") ? timeUnits : "",
+        queryClient,
+      }),
+    onSuccess: (extras) => {
+      setExtrasFailed(extras.failed);
+      if (extras.failed.length === 0) finishSend();
     },
   });
 
@@ -399,27 +437,59 @@ export function ArticleComposer({
         placeholder={t("ticket.composerSubjectPlaceholder")}
         className="w-full rounded border border-hairline bg-surface px-2 py-1.5 text-sm text-ink placeholder:text-muted focus:outline-none focus:ring-1 focus:ring-accent"
       />
-      <textarea
-        ref={bodyRef}
+      <MentionTextarea
+        textareaRef={bodyRef}
         value={body}
-        onChange={(e) => setBody(e.target.value)}
+        onChange={setBody}
+        mentions={mentions}
+        onMentionsChange={setMentions}
         placeholder={t("ticket.composerBodyPlaceholder")}
+        ariaLabel={t("ticket.composerNote")}
+        testId="composer-body"
+        readOnly={extrasFailed.length > 0}
         rows={4}
-        className="w-full rounded border border-hairline bg-surface px-2 py-1.5 text-sm text-ink placeholder:text-muted focus:outline-none focus:ring-1 focus:ring-accent"
       />
-      <div className="flex items-center gap-1.5">
-        <Button
-          variant="primary"
-          size="sm"
-          data-testid="composer-send"
-          disabled={!body.trim() || sendMutation.isPending}
-          onClick={() => sendMutation.mutate()}
+      {extrasFailed.length > 0 && (
+        <p
+          className="rounded border border-escalation/30 bg-escalation/15 px-2 py-1 text-xs text-escalation"
+          data-testid="composer-extras-error"
         >
-          {t("ticket.composerSend")}
-        </Button>
+          {t(
+            extrasFailed.length === 2
+              ? "ticket.extrasFailedBoth"
+              : extrasFailed[0] === "mentions"
+                ? "ticket.extrasFailedMentions"
+                : "ticket.extrasFailedTime",
+          )}
+        </p>
+      )}
+      <div className="flex items-center gap-1.5">
+        <ComposerTimeChip value={timeUnits} onChange={setTimeUnits} testId="composer-time" />
+        <span className="flex-1" />
         <Button variant="ghost" size="sm" onClick={() => setOpen(false)}>
           {t("ticket.composerCancel")}
         </Button>
+        {extrasFailed.length > 0 ? (
+          <Button
+            variant="primary"
+            size="sm"
+            data-testid="composer-extras-retry"
+            disabled={retryExtrasMutation.isPending}
+            onClick={() => retryExtrasMutation.mutate()}
+          >
+            {t("ticket.extrasRetry")}
+          </Button>
+        ) : (
+          <Button
+            variant="primary"
+            size="sm"
+            data-testid="composer-send"
+            disabled={!body.trim() || sendMutation.isPending}
+            onClick={() => sendMutation.mutate()}
+          >
+            {t("ticket.composerSend")}
+          </Button>
+        )}
       </div>
     </div>
   );
