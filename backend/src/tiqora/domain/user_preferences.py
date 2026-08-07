@@ -52,9 +52,7 @@ async def set_preference(session: AsyncSession, user_id: int, key: str, value: s
     """Upsert *key* to *value*, or delete the row when *value* is empty/None."""
     if not value:
         await session.execute(
-            text(
-                "DELETE FROM user_preferences WHERE user_id = :uid AND preferences_key = :k"
-            ),
+            text("DELETE FROM user_preferences WHERE user_id = :uid AND preferences_key = :k"),
             {"uid": user_id, "k": key},
         )
         return

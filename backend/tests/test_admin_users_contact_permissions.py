@@ -11,7 +11,7 @@ from typing import Any
 import pytest
 from fastapi import HTTPException
 from pydantic import ValidationError
-from sqlalchemy import create_engine, text
+from sqlalchemy import bindparam, create_engine, text
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 from tiqora.api.v1.admin import users as admin_users
@@ -44,18 +44,73 @@ def _root_user() -> AuthenticatedUser:
     )
 
 
+# Logins created by `admin_users.create_user` across this module — deleted in
+# `_cleanup_after_test` below so the module passes the strict DB-leak check
+# (see conftest.py `_restore_db_between_modules`) on its own, not just via the
+# module-scoped restore.
+_TEST_LOGINS = [
+    "contact.test",
+    "autopw.test",
+    "failmail.test",
+    "update.contact",
+    "lang.test",
+]
+
+
+def _delete_group_role_seed(conn: Any) -> None:
+    conn.execute(text("DELETE FROM queue WHERE id = 210"))
+    conn.execute(text("DELETE FROM group_user WHERE user_id = 200 OR group_id = 20"))
+    conn.execute(text("DELETE FROM group_role WHERE role_id = 60 OR group_id = 20"))
+    conn.execute(text("DELETE FROM role_user WHERE user_id = 200 OR role_id = 60"))
+    conn.execute(text("DELETE FROM roles WHERE id = 60"))
+    conn.execute(text("DELETE FROM permission_groups WHERE id = 20"))
+    conn.execute(text("DELETE FROM users WHERE id = 200"))
+
+
+@pytest.fixture(autouse=True)
+def _cleanup_after_test(mariadb_znuny_url: str) -> Any:
+    """Delete everything this module's tests commit, so the module-scoped
+    restore in conftest.py finds nothing left over (``TIQORA_STRICT_DB_LEAKS``
+    fails a module that relies on the restore to clean up after it)."""
+    yield
+    engine = create_engine(mariadb_znuny_url)
+    try:
+        with engine.begin() as conn:
+            # `tiqora_*` tables are created (not restored) by conftest.py's
+            # snapshot/restore, so any row added by this module is a leak
+            # unless removed here — every admin-mutating call queues one.
+            conn.execute(text("DELETE FROM tiqora_cache_invalidation"))
+            rows = conn.execute(
+                text("SELECT id FROM users WHERE login IN :logins").bindparams(
+                    bindparam("logins", expanding=True)
+                ),
+                {"logins": _TEST_LOGINS},
+            ).all()
+            ids = [row[0] for row in rows]
+            if ids:
+                conn.execute(
+                    text("DELETE FROM user_preferences WHERE user_id IN :ids").bindparams(
+                        bindparam("ids", expanding=True)
+                    ),
+                    {"ids": ids},
+                )
+                conn.execute(
+                    text("DELETE FROM users WHERE id IN :ids").bindparams(
+                        bindparam("ids", expanding=True)
+                    ),
+                    {"ids": ids},
+                )
+            _delete_group_role_seed(conn)
+    finally:
+        engine.dispose()
+
+
 def _seed_group_role(sync_url: str) -> dict[str, Any]:
     """Direct + role-derived group permissions on a fresh agent, for the
     effective-permissions endpoint. Mirrors ``test_permissions.py``'s seed."""
     engine = create_engine(sync_url)
     with engine.begin() as conn:
-        conn.execute(text("DELETE FROM queue WHERE id = 210"))
-        conn.execute(text("DELETE FROM group_user WHERE user_id = 200 OR group_id = 20"))
-        conn.execute(text("DELETE FROM group_role WHERE role_id = 60 OR group_id = 20"))
-        conn.execute(text("DELETE FROM role_user WHERE user_id = 200 OR role_id = 60"))
-        conn.execute(text("DELETE FROM roles WHERE id = 60"))
-        conn.execute(text("DELETE FROM permission_groups WHERE id = 20"))
-        conn.execute(text("DELETE FROM users WHERE id = 200"))
+        _delete_group_role_seed(conn)
 
         conn.execute(
             text(
