@@ -37,7 +37,8 @@ from tiqora.domain.auth_config import AuthConfigService
 from tiqora.domain.auth_ldap import LdapAuthService
 from tiqora.domain.oidc import OIDCError, OIDCService
 from tiqora.domain.passkey import webauthn_enabled
-from tiqora.domain.password_setup import MIN_PASSWORD_LENGTH, redeem_token, resolve_token
+from tiqora.domain.password_policy import PasswordPolicyError, validate_password
+from tiqora.domain.password_setup import redeem_token, resolve_token
 from tiqora.domain.schemas import (
     AuthMethodsOut,
     LoginRequest,
@@ -314,11 +315,13 @@ async def complete_password_setup(
     if not pre.allowed:
         raise _rate_limit_http_exception(pre)
 
-    if len(body.password) < MIN_PASSWORD_LENGTH:
+    try:
+        validate_password(body.password)
+    except PasswordPolicyError as exc:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail=f"Password must be at least {MIN_PASSWORD_LENGTH} characters",
-        )
+            detail=str(exc),
+        ) from exc
 
     user_id = await redeem_token(session, body.token, body.password)
     if user_id is None:

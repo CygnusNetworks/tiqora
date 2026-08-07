@@ -29,11 +29,6 @@ TOKEN_TTL = timedelta(days=7)
 """Long enough to survive a weekend or a week of leave; the admin can always
 issue a fresh link from the user list."""
 
-MIN_PASSWORD_LENGTH = 8
-"""Floor for passwords chosen through a setup link. Deliberately modest —
-the point is to reject "a", not to impose a policy the product does not
-otherwise have (admin-set passwords are still unconstrained)."""
-
 
 def _utcnow() -> datetime:
     """Naive UTC — matches the DateTime columns, which store naive."""
@@ -94,7 +89,8 @@ async def resolve_token(session: AsyncSession, token: str) -> int | None:
 async def redeem_token(session: AsyncSession, token: str, new_password: str) -> int | None:
     """Set the password and spend the token. Returns the user id, or None when
     the token is unknown, already spent or expired. Caller owns the
-    transaction; validate the password length before calling."""
+    transaction and must have run
+    :func:`tiqora.domain.password_policy.validate_password` first."""
     digest = _digest(token)
     row = (
         await session.execute(

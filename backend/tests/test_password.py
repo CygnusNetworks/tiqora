@@ -120,3 +120,26 @@ def test_weak_strong_rehash_classification() -> None:
 )
 def test_detect_scheme_edge(stored: str, scheme: str) -> None:
     assert detect_scheme(stored) == scheme
+
+
+def test_passwords_beyond_bcrypt_key_limit_hash_instead_of_raising() -> None:
+    """bcrypt reads at most 72 bytes of key material. The Python binding
+    raises on longer input where Perl's Crypt::Eksblowfish (what Znuny hashes
+    with) ignores the tail, so we truncate — otherwise every password-setting
+    path 500s on a long passphrase, and a legacy Znuny account whose password
+    exceeded 72 bytes could never log in."""
+    long_password = "a" * 200
+    stored = hash_password(long_password, cost=9)
+    assert verify_password(long_password, stored)
+    # Same first 72 bytes → same hash, which is exactly bcrypt's semantics.
+    assert verify_password("a" * 72, stored)
+    assert not verify_password("a" * 71, stored)
+
+
+def test_multibyte_password_counts_bytes_not_characters() -> None:
+    """Truncation happens on UTF-8 octets (Znuny drops the UTF-8 flag before
+    hashing), so a 40-character umlaut password is 80 bytes and still hashes."""
+    password = "ä" * 40
+    assert len(password.encode("utf-8")) > 72
+    stored = hash_password(password, cost=9)
+    assert verify_password(password, stored)

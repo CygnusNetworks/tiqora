@@ -6326,6 +6326,8 @@
           "password": {
             "anyOf": [
               {
+                "maxLength": 64,
+                "minLength": 12,
                 "type": "string"
               },
               {
@@ -6686,6 +6688,8 @@
           "password": {
             "anyOf": [
               {
+                "maxLength": 64,
+                "minLength": 12,
                 "type": "string"
               },
               {
@@ -7213,6 +7217,17 @@
             "title": "Action",
             "type": "string"
           },
+          "article_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Article Id"
+          },
           "content": {
             "default": "{}",
             "title": "Content",
@@ -7241,6 +7256,17 @@
           "action": {
             "title": "Action",
             "type": "string"
+          },
+          "article_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Article Id"
           },
           "changed": {
             "format": "date-time",
@@ -7510,6 +7536,155 @@
           "name"
         ],
         "title": "DynamicFieldValueOut",
+        "type": "object"
+      },
+      "EffectiveGroupPermission": {
+        "properties": {
+          "group_id": {
+            "title": "Group Id",
+            "type": "integer"
+          },
+          "group_name": {
+            "title": "Group Name",
+            "type": "string"
+          },
+          "keys": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Keys",
+            "type": "array"
+          },
+          "sources": {
+            "items": {
+              "$ref": "#/components/schemas/EffectivePermissionSource"
+            },
+            "title": "Sources",
+            "type": "array"
+          },
+          "valid_id": {
+            "title": "Valid Id",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "group_id",
+          "group_name",
+          "valid_id",
+          "keys",
+          "sources"
+        ],
+        "title": "EffectiveGroupPermission",
+        "type": "object"
+      },
+      "EffectivePermissionSource": {
+        "properties": {
+          "key": {
+            "enum": [
+              "ro",
+              "move_into",
+              "create",
+              "note",
+              "owner",
+              "priority",
+              "rw"
+            ],
+            "title": "Key",
+            "type": "string"
+          },
+          "valid_id": {
+            "title": "Valid Id",
+            "type": "integer"
+          },
+          "via": {
+            "title": "Via",
+            "type": "string"
+          }
+        },
+        "required": [
+          "key",
+          "via",
+          "valid_id"
+        ],
+        "title": "EffectivePermissionSource",
+        "type": "object"
+      },
+      "EffectivePermissionsOut": {
+        "properties": {
+          "groups": {
+            "items": {
+              "$ref": "#/components/schemas/EffectiveGroupPermission"
+            },
+            "title": "Groups",
+            "type": "array"
+          },
+          "queues": {
+            "items": {
+              "$ref": "#/components/schemas/EffectiveQueuePermission"
+            },
+            "title": "Queues",
+            "type": "array"
+          },
+          "roles": {
+            "items": {
+              "$ref": "#/components/schemas/RoleOut"
+            },
+            "title": "Roles",
+            "type": "array"
+          }
+        },
+        "required": [
+          "roles",
+          "groups",
+          "queues"
+        ],
+        "title": "EffectivePermissionsOut",
+        "type": "object"
+      },
+      "EffectiveQueuePermission": {
+        "properties": {
+          "group_id": {
+            "title": "Group Id",
+            "type": "integer"
+          },
+          "group_name": {
+            "title": "Group Name",
+            "type": "string"
+          },
+          "group_valid_id": {
+            "title": "Group Valid Id",
+            "type": "integer"
+          },
+          "keys": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Keys",
+            "type": "array"
+          },
+          "queue_id": {
+            "title": "Queue Id",
+            "type": "integer"
+          },
+          "queue_name": {
+            "title": "Queue Name",
+            "type": "string"
+          },
+          "valid_id": {
+            "title": "Valid Id",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "queue_id",
+          "queue_name",
+          "valid_id",
+          "group_id",
+          "group_name",
+          "group_valid_id",
+          "keys"
+        ],
+        "title": "EffectiveQueuePermission",
         "type": "object"
       },
       "ErasureSelectorIn": {
@@ -10797,6 +10972,17 @@
             ],
             "title": "Archive"
           },
+          "clear_customer": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Clear Customer"
+          },
           "clear_service": {
             "anyOf": [
               {
@@ -12627,6 +12813,49 @@
           "name"
         ],
         "title": "PasskeyStatusOut",
+        "type": "object"
+      },
+      "PasswordSetupCheckOut": {
+        "description": "Whether a setup link is still usable, so the page can say so before the\nvisitor types a password. ``login`` is disclosed only for a valid token \u2014\nholding the token already implies access to that account's mailbox.",
+        "properties": {
+          "login": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Login"
+          },
+          "valid": {
+            "title": "Valid",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "valid"
+        ],
+        "title": "PasswordSetupCheckOut",
+        "type": "object"
+      },
+      "PasswordSetupIn": {
+        "properties": {
+          "password": {
+            "title": "Password",
+            "type": "string"
+          },
+          "token": {
+            "title": "Token",
+            "type": "string"
+          }
+        },
+        "required": [
+          "token",
+          "password"
+        ],
+        "title": "PasswordSetupIn",
         "type": "object"
       },
       "PgpImportIn": {
@@ -18943,6 +19172,17 @@
       },
       "UserCreate": {
         "properties": {
+          "email": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Email"
+          },
           "first_name": {
             "title": "First Name",
             "type": "string"
@@ -18955,9 +19195,29 @@
             "title": "Login",
             "type": "string"
           },
+          "mobile": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mobile"
+          },
           "password": {
-            "title": "Password",
-            "type": "string"
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "minLength": 12,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Password"
           },
           "title": {
             "anyOf": [
@@ -18978,11 +19238,51 @@
         },
         "required": [
           "login",
-          "password",
           "first_name",
           "last_name"
         ],
         "title": "UserCreate",
+        "type": "object"
+      },
+      "UserDeletableOut": {
+        "properties": {
+          "blocking": {
+            "items": {
+              "$ref": "#/components/schemas/UserReference"
+            },
+            "title": "Blocking",
+            "type": "array"
+          },
+          "deletable": {
+            "title": "Deletable",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "deletable",
+          "blocking"
+        ],
+        "title": "UserDeletableOut",
+        "type": "object"
+      },
+      "UserLanguageOut": {
+        "properties": {
+          "language": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Language"
+          }
+        },
+        "required": [
+          "language"
+        ],
+        "title": "UserLanguageOut",
         "type": "object"
       },
       "UserLanguageUpdate": {
@@ -19101,6 +19401,17 @@
             ],
             "title": "Create Time"
           },
+          "email": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Email"
+          },
           "first_name": {
             "title": "First Name",
             "type": "string"
@@ -19116,6 +19427,17 @@
           "login": {
             "title": "Login",
             "type": "string"
+          },
+          "mobile": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mobile"
           },
           "title": {
             "anyOf": [
@@ -19146,8 +19468,37 @@
         "title": "UserOut",
         "type": "object"
       },
+      "UserReference": {
+        "properties": {
+          "column": {
+            "title": "Column",
+            "type": "string"
+          },
+          "table": {
+            "title": "Table",
+            "type": "string"
+          }
+        },
+        "required": [
+          "table",
+          "column"
+        ],
+        "title": "UserReference",
+        "type": "object"
+      },
       "UserUpdate": {
         "properties": {
+          "email": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Email"
+          },
           "first_name": {
             "anyOf": [
               {
@@ -19181,9 +19532,22 @@
             ],
             "title": "Login"
           },
+          "mobile": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mobile"
+          },
           "password": {
             "anyOf": [
               {
+                "maxLength": 64,
+                "minLength": 12,
                 "type": "string"
               },
               {
@@ -41208,6 +41572,156 @@
         ]
       }
     },
+    "/api/v1/admin/users/{user_id}/deletable": {
+      "get": {
+        "description": "Whether this agent can be hard-deleted, and what blocks it if not.",
+        "operationId": "get_user_deletable_api_v1_admin_users__user_id__deletable_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "user_id",
+            "required": true,
+            "schema": {
+              "title": "User Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserDeletableOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get User Deletable",
+        "tags": [
+          "admin:users"
+        ]
+      }
+    },
+    "/api/v1/admin/users/{user_id}/effective-permissions": {
+      "get": {
+        "description": "Read-only breakdown of a user's resolved group/queue permissions.\n\nUnion of direct ``group_user`` grants and role-derived ``group_role``\ngrants (same rule as :class:`tiqora.permissions.engine.PermissionEngine`,\nreimplemented here to additionally track *where* each permission key\ncame from for display).",
+        "operationId": "get_effective_permissions_api_v1_admin_users__user_id__effective_permissions_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "user_id",
+            "required": true,
+            "schema": {
+              "title": "User Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EffectivePermissionsOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Effective Permissions",
+        "tags": [
+          "admin:users"
+        ]
+      }
+    },
     "/api/v1/admin/users/{user_id}/groups": {
       "get": {
         "description": "Groups the user has full (``rw``) access to \u2014 the Agent\u2194Groups editor's\nread side. The editor toggles the ``rw`` permission only (see\n:func:`assign_group`), so the read set is filtered to that key to stay\nconsistent with what the checkboxes write.",
@@ -41447,6 +41961,231 @@
         ]
       }
     },
+    "/api/v1/admin/users/{user_id}/language": {
+      "get": {
+        "description": "Admin-facing mirror of the agent's own 'Pers\u00f6nliche Einstellungen'\nlanguage choice (``UserLanguage`` preference) \u2014 read side.",
+        "operationId": "get_user_language_api_v1_admin_users__user_id__language_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "user_id",
+            "required": true,
+            "schema": {
+              "title": "User Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserLanguageOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get User Language",
+        "tags": [
+          "admin:users"
+        ]
+      },
+      "put": {
+        "operationId": "set_user_language_api_v1_admin_users__user_id__language_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "user_id",
+            "required": true,
+            "schema": {
+              "title": "User Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UserLanguageUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserLanguageOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Set User Language",
+        "tags": [
+          "admin:users"
+        ]
+      }
+    },
+    "/api/v1/admin/users/{user_id}/permanent": {
+      "delete": {
+        "description": "Hard-delete an agent that nothing references.\n\nDistinct from ``DELETE /{user_id}``, which soft-invalidates. Refuses with\n409 and the blocking tables when any row outside the agent's own settings\nstill points at them \u2014 the FKs would reject the statement anyway, but a\nnamed list is more useful than an integrity error.",
+        "operationId": "delete_user_permanently_api_v1_admin_users__user_id__permanent_delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "user_id",
+            "required": true,
+            "schema": {
+              "title": "User Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete User Permanently",
+        "tags": [
+          "admin:users"
+        ]
+      }
+    },
     "/api/v1/admin/users/{user_id}/roles": {
       "get": {
         "description": "Roles currently granted to *user_id* (for the assignment editor).",
@@ -41672,6 +42411,74 @@
           }
         },
         "summary": "Revoke Role",
+        "tags": [
+          "admin:users"
+        ]
+      }
+    },
+    "/api/v1/admin/users/{user_id}/setup-link": {
+      "post": {
+        "description": "Issue a fresh password-setup link and mail it.\n\nFor the agent whose invite expired or never arrived. Supersedes any\noutstanding link for that account, so the previous mail stops working.",
+        "operationId": "resend_setup_link_api_v1_admin_users__user_id__setup_link_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "user_id",
+            "required": true,
+            "schema": {
+              "title": "User Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Resend Setup Link",
         "tags": [
           "admin:users"
         ]
@@ -42878,6 +43685,84 @@
           }
         },
         "summary": "Passkey Delete",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/v1/auth/password-setup": {
+      "post": {
+        "description": "Public: spend a one-time link and set the password.\n\nRate-limited per IP like the login endpoint \u2014 the token is the only\nsecret, so brute-forcing it must not be free. Keyed on a constant rather\nthan a login because the caller has not identified themselves yet.",
+        "operationId": "complete_password_setup_api_v1_auth_password_setup_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PasswordSetupIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Complete Password Setup",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/v1/auth/password-setup/{token}": {
+      "get": {
+        "description": "Public: is this one-time link still good?",
+        "operationId": "check_password_setup_api_v1_auth_password_setup__token__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "token",
+            "required": true,
+            "schema": {
+              "title": "Token",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PasswordSetupCheckOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Check Password Setup",
         "tags": [
           "auth"
         ]
@@ -53191,7 +54076,7 @@
     },
     "/api/v1/tickets/{ticket_id}/drafts/{action}": {
       "delete": {
-        "description": "Delete a draft for (ticket, user, action).",
+        "description": "Delete one draft for (ticket, user, action, article).\n\nScoped to a single article so discarding one reply draft leaves the\nagent's drafts on the ticket's other articles alone.",
         "operationId": "delete_draft_api_v1_tickets__ticket_id__drafts__action__delete",
         "parameters": [
           {
@@ -53210,6 +54095,24 @@
             "schema": {
               "title": "Action",
               "type": "string"
+            }
+          },
+          {
+            "description": "Article the draft belongs to; omit for the ticket-wide draft.",
+            "in": "query",
+            "name": "article_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Article the draft belongs to; omit for the ticket-wide draft.",
+              "title": "Article Id"
             }
           },
           {
@@ -53266,7 +54169,7 @@
         ]
       },
       "put": {
-        "description": "Create or update a draft for (ticket, user, action).",
+        "description": "Create or update a draft for (ticket, user, action, article).",
         "operationId": "upsert_draft_api_v1_tickets__ticket_id__drafts__action__put",
         "parameters": [
           {

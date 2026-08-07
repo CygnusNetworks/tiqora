@@ -40,6 +40,9 @@ export type FieldDef = {
   mono?: boolean;
   /** Textarea row count (default 4). */
   rows?: number;
+  /** Hard cap for "text"/"password" inputs, where the backend enforces one
+   * too (e.g. the password length policy). */
+  maxLength?: number;
   /**
    * Layout width. Short scalar fields (numbers, small selects) read better
    * side by side; adjacent `half` fields share a row. Default "full".
@@ -283,6 +286,7 @@ export function CrudDrawer({
             id={id}
             data-testid={id}
             type={f.type === "password" ? "password" : "text"}
+            maxLength={f.maxLength}
             value={typeof value === "string" ? value : ""}
             placeholder={f.placeholder}
             aria-invalid={invalid || undefined}

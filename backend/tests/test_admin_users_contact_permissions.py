@@ -1,5 +1,5 @@
 """DB tests for the admin user CRUD additions: email/mobile persistence via
-``user_preferences``, auto-generated-password welcome mail, effective
+``user_preferences``, the setup-link invite mail, effective
 group/queue permissions, and admin-editable agent language — following the
 direct-router-call pattern used by ``test_admin_states.py``."""
 
@@ -263,7 +263,7 @@ async def test_create_user_persists_email_and_mobile(mariadb_znuny_url: str) -> 
             created = await admin_users.create_user(
                 UserCreate(
                     login="contact.test",
-                    password="s3cret-pw",
+                    password="s3cret-pw-1234",
                     first_name="Con",
                     last_name="Tact",
                     email="contact@example.test",
@@ -502,7 +502,7 @@ async def test_update_user_email_overwrite_and_clear(mariadb_znuny_url: str) -> 
             created = await admin_users.create_user(
                 UserCreate(
                     login="update.contact",
-                    password="s3cret-pw",
+                    password="s3cret-pw-1234",
                     first_name="Up",
                     last_name="Date",
                     email="old@example.test",
@@ -606,7 +606,7 @@ async def test_delete_user_permanently_removes_an_unreferenced_agent(
             created = await admin_users.create_user(
                 UserCreate(
                     login="contact.test",
-                    password="s3cret-pw",
+                    password="s3cret-pw-1234",
                     first_name="Del",
                     last_name="Etable",
                     email="del@example.test",
@@ -693,7 +693,7 @@ async def test_language_get_set_roundtrip(mariadb_znuny_url: str) -> None:
             created = await admin_users.create_user(
                 UserCreate(
                     login="lang.test",
-                    password="s3cret-pw",
+                    password="s3cret-pw-1234",
                     first_name="Lang",
                     last_name="Test",
                 ),

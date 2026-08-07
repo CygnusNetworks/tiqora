@@ -17,6 +17,7 @@ import { Button } from "@/components/ui/Button";
 import { Dialog } from "@/components/ui/Dialog";
 import { bulkInChunks } from "@/lib/bulk";
 import { formatDateTime } from "@/lib/format";
+import { MAX_PASSWORD_LENGTH, MIN_PASSWORD_LENGTH } from "@/lib/passwordPolicy";
 
 function useDebouncedValue<T>(value: T, delayMs: number): T {
   const [debounced, setDebounced] = useState(value);
@@ -120,7 +121,11 @@ export function CustomerUsersPage() {
       name: "password",
       label: t("admin.users.password"),
       type: "password",
-      helpText: t("admin.users.passwordHelp"),
+      maxLength: MAX_PASSWORD_LENGTH,
+      helpText: t("admin.users.passwordHelp", {
+        min: MIN_PASSWORD_LENGTH,
+        max: MAX_PASSWORD_LENGTH,
+      }),
     },
     { name: "first_name", label: t("admin.customerUsers.firstName"), type: "text", required: true },
     { name: "last_name", label: t("admin.customerUsers.lastName"), type: "text", required: true },
