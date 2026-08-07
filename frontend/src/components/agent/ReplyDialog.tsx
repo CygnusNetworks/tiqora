@@ -8,7 +8,13 @@ import { SelectField } from "@/components/ui/SelectField";
 import { Spinner } from "@/components/ui/Spinner";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
 import { cn } from "@/lib/cn";
-import { clearDraft, getDraft, saveDraft, useReplyDraft } from "@/lib/replyDrafts";
+import {
+  getDraft,
+  useClearReplyDraft,
+  useReplyDraft,
+  useReplyDraftsLoaded,
+  useSaveReplyDraft,
+} from "@/lib/replyDrafts";
 import { postComposerExtras } from "@/lib/composerExtras";
 import type { PickedMention } from "@/lib/mentions";
 import { ArticleBodyRenderer } from "./ArticleBodyRenderer";
@@ -126,6 +132,9 @@ export function ReplyDialog({
   };
 
   const storedDraft = useReplyDraft(ticketId, articleId);
+  const draftsLoaded = useReplyDraftsLoaded(ticketId);
+  const saveDraft = useSaveReplyDraft();
+  const clearDraft = useClearReplyDraft();
 
   const draftQ = useQuery({
     queryKey: ["tickets", ticketId, "articles", articleId, "reply-draft", replyAll],
@@ -146,6 +155,10 @@ export function ReplyDialog({
   useEffect(() => {
     const d = draftQ.data;
     if (!d) return;
+    // Drafts live on the server now, so wait for them: seeding from the
+    // server reply first and patching the stored draft in afterwards would
+    // overwrite anything typed in between.
+    if (!draftsLoaded) return;
     // `initialDraft` is an object literal at the call site (AiPanel), so it
     // changes identity on every parent render — seed once per actual target
     // instead, or an unrelated re-render would wipe whatever is being typed.
@@ -165,7 +178,7 @@ export function ReplyDialog({
       cc: joinRecipients(serverCc) ?? "",
     };
 
-    const stored = getDraft(ticketId, articleId);
+    const stored = getDraft(queryClient, ticketId, articleId);
     const nextTo = stored ? parseRecipientList(stored.to) : serverTo;
     const nextCc = stored ? parseRecipientList(stored.cc) : serverCc;
     const nextBcc = stored ? parseRecipientList(stored.bcc) : [];
@@ -180,13 +193,14 @@ export function ReplyDialog({
     setShowReplyTo(nextReplyTo.trim().length > 0);
     setSubject(stored?.subject ?? serverSubject);
     setBody(stored?.body ?? serverBody);
-  }, [draftQ.data, initialDraft, ticketId, articleId, replyAll]);
+  }, [draftQ.data, draftsLoaded, initialDraft, queryClient, ticketId, articleId, replyAll]);
 
   const aiDraftId = initialDraft?.id ?? null;
 
-  // Mirror edits into the draft store, debounced so typing doesn't thrash
-  // localStorage. Runs while closed too: the component stays mounted after a
-  // backdrop click, and this is what makes that state survive a reload.
+  // Mirror edits into the draft store, debounced so typing doesn't fire a
+  // request per keystroke. Runs while closed too: the component stays mounted
+  // after a backdrop click, and this is what makes that state survive a
+  // reload — or a move to another device.
   useEffect(() => {
     const epoch = sendEpochRef.current;
     const timer = window.setTimeout(() => {
@@ -224,7 +238,20 @@ export function ReplyDialog({
       }
     }, 400);
     return () => window.clearTimeout(timer);
-  }, [ticketId, articleId, replyAll, subject, body, to, cc, bcc, replyTo, aiDraftId]);
+  }, [
+    ticketId,
+    articleId,
+    replyAll,
+    subject,
+    body,
+    to,
+    cc,
+    bcc,
+    replyTo,
+    aiDraftId,
+    saveDraft,
+    clearDraft,
+  ]);
 
   /** Back to the server-seeded reply: blank answer above the quote, original
    * recipients, no template applied. Shared by "send" and "discard". */
