@@ -140,6 +140,8 @@ class MergeRequest(BaseModel):
 
 class DraftIn(BaseModel):
     action: str
+    # Article the draft replies to. Omitted/null = ticket-wide draft.
+    article_id: int | None = None
     title: str | None = None
     content: str = "{}"
 
@@ -149,6 +151,7 @@ class DraftOut(BaseModel):
     ticket_id: int
     user_id: int
     action: str
+    article_id: int | None = None
     title: str | None = None
     content: str
     created: datetime
@@ -1326,6 +1329,19 @@ async def create_ticket_link(
 # ---------------------------------------------------------------------------
 
 
+_DRAFT_COLUMNS = "id, ticket_id, user_id, action, article_id, title, content, created, changed"
+
+
+def _article_predicate(article_id: int | None) -> str:
+    """NULL-safe match on ``article_id``.
+
+    ``= :aid`` never matches NULL, and the portable spellings differ per
+    dialect (``<=>`` vs ``IS NOT DISTINCT FROM``), so branch in Python
+    instead. The parameter is only bound in the non-NULL case.
+    """
+    return "article_id IS NULL" if article_id is None else "article_id = :aid"
+
+
 @router.get("/{ticket_id}/drafts", response_model=list[DraftOut])
 async def list_drafts(
     ticket_id: int,
@@ -1339,7 +1355,7 @@ async def list_drafts(
         (
             await session.execute(
                 text(
-                    "SELECT id, ticket_id, user_id, action, title, content, created, changed"
+                    f"SELECT {_DRAFT_COLUMNS}"
                     " FROM tiqora_form_draft"
                     " WHERE ticket_id = :tid AND user_id = :uid ORDER BY changed DESC"
                 ),
@@ -1364,60 +1380,55 @@ async def upsert_draft(
     user: CurrentUser,
     session: DbSession,
 ) -> DraftOut:
-    """Create or update a draft for (ticket, user, action)."""
+    """Create or update a draft for (ticket, user, action, article)."""
     from sqlalchemy import text
+    from sqlalchemy.exc import IntegrityError
 
-    async with session.begin():
-        existing = (
-            await session.execute(
-                text(
-                    "SELECT id FROM tiqora_form_draft"
-                    " WHERE ticket_id = :tid AND user_id = :uid AND action = :act LIMIT 1"
-                ),
-                {"tid": ticket_id, "uid": user.id, "act": action},
-            )
-        ).first()
-        if existing is not None:
-            await session.execute(
-                text(
-                    "UPDATE tiqora_form_draft SET title = :title, content = :content,"
-                    " changed = current_timestamp"
-                    " WHERE ticket_id = :tid AND user_id = :uid AND action = :act"
-                ),
-                {
-                    "title": body.title,
-                    "content": body.content,
-                    "tid": ticket_id,
-                    "uid": user.id,
-                    "act": action,
-                },
-            )
-        else:
-            await session.execute(
-                text(
-                    "INSERT INTO tiqora_form_draft"
-                    " (ticket_id, user_id, action, title, content, created, changed)"
-                    " VALUES (:tid, :uid, :act, :title, :content,"
-                    " current_timestamp, current_timestamp)"
-                ),
-                {
-                    "tid": ticket_id,
-                    "uid": user.id,
-                    "act": action,
-                    "title": body.title,
-                    "content": body.content,
-                },
-            )
+    article_id = body.article_id
+    where = (
+        f"ticket_id = :tid AND user_id = :uid AND action = :act"
+        f" AND {_article_predicate(article_id)}"
+    )
+    params: dict[str, Any] = {"tid": ticket_id, "uid": user.id, "act": action}
+    if article_id is not None:
+        params["aid"] = article_id
+
+    update = text(
+        "UPDATE tiqora_form_draft SET title = :title, content = :content,"
+        f" changed = current_timestamp WHERE {where}"
+    )
+    update_params = {**params, "title": body.title, "content": body.content}
+
+    # UPDATE first, INSERT only if it matched nothing. A concurrent tab of
+    # the same agent can still slip its INSERT in between the two (the
+    # composer autosaves on a short debounce), which the unique constraint
+    # from 20260807_0030 turns into an IntegrityError instead of a duplicate
+    # row — retry as an UPDATE so the later write wins, as it would have
+    # without the race.
+    try:
+        async with session.begin():
+            result = await session.execute(update, update_params)
+            # CursorResult.rowcount is not on the generic Result type stub.
+            if int(getattr(result, "rowcount", 0) or 0) == 0:
+                await session.execute(
+                    text(
+                        "INSERT INTO tiqora_form_draft"
+                        " (ticket_id, user_id, action, article_id, title, content,"
+                        " created, changed)"
+                        " VALUES (:tid, :uid, :act, :aid_ins, :title, :content,"
+                        " current_timestamp, current_timestamp)"
+                    ),
+                    {**update_params, "aid_ins": article_id},
+                )
+    except IntegrityError:
+        async with session.begin():
+            await session.execute(update, update_params)
 
     row = (
         (
             await session.execute(
-                text(
-                    "SELECT id, ticket_id, user_id, action, title, content, created, changed"
-                    " FROM tiqora_form_draft"
-                    " WHERE ticket_id = :tid AND user_id = :uid AND action = :act LIMIT 1"
-                ),
-                {"tid": ticket_id, "uid": user.id, "act": action},
+                text(f"SELECT {_DRAFT_COLUMNS} FROM tiqora_form_draft WHERE {where} LIMIT 1"),
+                params,
             )
         )
         .mappings()
@@ -1434,17 +1445,30 @@ async def delete_draft(
     action: str,
     user: CurrentUser,
     session: DbSession,
+    article_id: int | None = Query(
+        default=None,
+        description="Article the draft belongs to; omit for the ticket-wide draft.",
+    ),
 ) -> None:
-    """Delete a draft for (ticket, user, action)."""
+    """Delete one draft for (ticket, user, action, article).
+
+    Scoped to a single article so discarding one reply draft leaves the
+    agent's drafts on the ticket's other articles alone.
+    """
     from sqlalchemy import text
+
+    params: dict[str, Any] = {"tid": ticket_id, "uid": user.id, "act": action}
+    if article_id is not None:
+        params["aid"] = article_id
 
     async with session.begin():
         await session.execute(
             text(
                 "DELETE FROM tiqora_form_draft"
                 " WHERE ticket_id = :tid AND user_id = :uid AND action = :act"
+                f" AND {_article_predicate(article_id)}"
             ),
-            {"tid": ticket_id, "uid": user.id, "act": action},
+            params,
         )
 
 

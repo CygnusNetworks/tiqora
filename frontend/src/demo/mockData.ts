@@ -777,6 +777,10 @@ export function resolveData(path: string, method: string): unknown | undefined {
   if (p.match(/\/api\/v1\/tickets\/\d+\/time-accounting/))
     return method === "GET" ? ticketTimeEntries : { id: 99 };
   if (p.match(/\/api\/v1\/tickets\/\d+\/attachments/) || p.match(/attachments/)) return [];
+  // Unsent reply drafts (tiqora_form_draft). The demo starts with none and
+  // accepts the composer's autosave without keeping it — the placeholders
+  // stay empty rather than erroring.
+  if (p.match(/\/api\/v1\/tickets\/\d+\/drafts/)) return method === "GET" ? [] : {};
   // AI subsystem (summary + drafts). The POST endpoints report success; the
   // panel then refetches state, which serves the fabricated summary/drafts.
   if (p.match(/\/api\/v1\/tickets\/\d+\/ai\/summarize$/) && method === "POST")
