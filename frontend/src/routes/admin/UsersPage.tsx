@@ -8,6 +8,7 @@ import type { FieldDef, FieldValues } from "@/components/admin/CrudDrawer";
 import type { DataTableColumn } from "@/components/admin/DataTable";
 import { EffectivePermissionsDialog } from "@/components/admin/EffectivePermissionsDialog";
 import { AgentSettingsDialog } from "@/components/admin/AgentSettingsDialog";
+import { UserDeleteDialog } from "@/components/admin/UserDeleteDialog";
 import { MenuItem } from "@/components/ui/Menu";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { formatDateTime } from "@/lib/format";
@@ -30,6 +31,20 @@ function KeyIcon() {
     <svg viewBox="0 0 24 24" width="14" height="14" fill="none" aria-hidden="true">
       <path
         d="M14.5 9.5a4 4 0 1 0-4 4h.5L14 16v2h2v-2h2v-2h1l1-1-1.5-1.5"
+        stroke="currentColor"
+        strokeWidth="1.7"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function TrashIcon() {
+  return (
+    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" aria-hidden="true">
+      <path
+        d="M4 7h16M9 7V5h6v2M6 7l1 13h10l1-13M10 11v6M14 11v6"
         stroke="currentColor"
         strokeWidth="1.7"
         strokeLinecap="round"
@@ -69,6 +84,7 @@ export function UsersPage() {
 
   const [permissionsTarget, setPermissionsTarget] = useState<UserOut | null>(null);
   const [settingsTarget, setSettingsTarget] = useState<UserOut | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<UserOut | null>(null);
 
   const columns: DataTableColumn<UserOut>[] = [
     { key: "id", header: t("admin.table.id"), mono: true, render: (r) => r.id },
@@ -201,6 +217,15 @@ export function UsersPage() {
               {t("admin.authConfig.reset2fa")}
             </span>
           </MenuItem>
+          <MenuItem
+            testId={`admin-row-delete-permanent-${row.id}`}
+            onSelect={() => setDeleteTarget(row)}
+          >
+            <span className="inline-flex items-center gap-2 text-danger">
+              <TrashIcon />
+              {t("admin.users.deletePermanent")}
+            </span>
+          </MenuItem>
         </>
       )}
       toFormValues={(row) =>
@@ -256,6 +281,11 @@ export function UsersPage() {
       onClose={() => setPermissionsTarget(null)}
     />
     <AgentSettingsDialog user={settingsTarget} onClose={() => setSettingsTarget(null)} />
+    <UserDeleteDialog
+      user={deleteTarget}
+      onClose={() => setDeleteTarget(null)}
+      onDeleted={() => setDeleteTarget(null)}
+    />
     </>
   );
 }

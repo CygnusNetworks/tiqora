@@ -3095,6 +3095,26 @@ export interface paths {
         patch: operations["update_user_api_v1_admin_users__user_id__patch"];
         trace?: never;
     };
+    "/api/v1/admin/users/{user_id}/deletable": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get User Deletable
+         * @description Whether this agent can be hard-deleted, and what blocks it if not.
+         */
+        get: operations["get_user_deletable_api_v1_admin_users__user_id__deletable_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/users/{user_id}/effective-permissions": {
         parameters: {
             query?: never;
@@ -3178,6 +3198,31 @@ export interface paths {
         put: operations["set_user_language_api_v1_admin_users__user_id__language_put"];
         post?: never;
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/users/{user_id}/permanent": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Delete User Permanently
+         * @description Hard-delete an agent that nothing references.
+         *
+         *     Distinct from ``DELETE /{user_id}``, which soft-invalidates. Refuses with
+         *     409 and the blocking tables when any row outside the agent's own settings
+         *     still points at them — the FKs would reject the statement anyway, but a
+         *     named list is more useful than an integrity error.
+         */
+        delete: operations["delete_user_permanently_api_v1_admin_users__user_id__permanent_delete"];
         options?: never;
         head?: never;
         patch?: never;
@@ -12190,6 +12235,13 @@ export interface components {
              */
             valid_id: number;
         };
+        /** UserDeletableOut */
+        UserDeletableOut: {
+            /** Blocking */
+            blocking: components["schemas"]["UserReference"][];
+            /** Deletable */
+            deletable: boolean;
+        };
         /** UserLanguageOut */
         UserLanguageOut: {
             /** Language */
@@ -12254,6 +12306,13 @@ export interface components {
             title: string | null;
             /** Valid Id */
             valid_id: number;
+        };
+        /** UserReference */
+        UserReference: {
+            /** Column */
+            column: string;
+            /** Table */
+            table: string;
         };
         /** UserUpdate */
         UserUpdate: {
@@ -22058,6 +22117,41 @@ export interface operations {
             };
         };
     };
+    get_user_deletable_api_v1_admin_users__user_id__deletable_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                user_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserDeletableOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     get_effective_permissions_api_v1_admin_users__user_id__effective_permissions_get: {
         parameters: {
             query?: never;
@@ -22262,6 +22356,39 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["UserLanguageOut"];
                 };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_user_permanently_api_v1_admin_users__user_id__permanent_delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                user_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {

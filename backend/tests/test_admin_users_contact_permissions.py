@@ -445,6 +445,96 @@ async def test_effective_permissions_lists_invalid_resources_flagged(
         await engine.dispose()
 
 
+async def test_delete_user_permanently_removes_an_unreferenced_agent(
+    mariadb_znuny_url: str,
+) -> None:
+    """A freshly created agent owns only preferences, so the hard delete both
+    reports it deletable and actually removes it."""
+    _ensure_tiqora_tables(mariadb_znuny_url)
+    engine = create_async_engine(_mysql_async(mariadb_znuny_url))
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    try:
+        async with factory() as session:
+            created = await admin_users.create_user(
+                UserCreate(
+                    login="contact.test",
+                    password="s3cret-pw",
+                    first_name="Del",
+                    last_name="Etable",
+                    email="del@example.test",
+                ),
+                _root_user(),
+                session,
+            )
+
+            report = await admin_users.get_user_deletable(created.id, _root_user(), session)
+            assert report.deletable is True
+            assert report.blocking == []
+
+            await admin_users.delete_user_permanently(created.id, _root_user(), session)
+
+            gone = await session.execute(
+                text("SELECT id FROM users WHERE id = :uid"), {"uid": created.id}
+            )
+            assert gone.scalar_one_or_none() is None
+            # The owned preference rows went with it.
+            prefs = await session.execute(
+                text("SELECT COUNT(*) FROM user_preferences WHERE user_id = :uid"),
+                {"uid": created.id},
+            )
+            assert prefs.scalar_one() == 0
+    finally:
+        await engine.dispose()
+
+
+async def test_delete_user_permanently_refuses_when_referenced(
+    mariadb_znuny_url: str,
+) -> None:
+    """The seeded agent authored a queue row (create_by), so the delete is
+    refused with the blocking table named rather than an integrity error."""
+    _ensure_tiqora_tables(mariadb_znuny_url)
+    ids = _seed_group_role(mariadb_znuny_url)
+    engine = create_async_engine(_mysql_async(mariadb_znuny_url))
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    try:
+        async with factory() as session:
+            # Make the agent the author of a queue — a classic blocking ref.
+            await session.execute(
+                text("UPDATE queue SET create_by = :uid WHERE id = :qid"),
+                {"uid": ids["user_id"], "qid": ids["queue_id"]},
+            )
+            await session.commit()
+
+            report = await admin_users.get_user_deletable(ids["user_id"], _root_user(), session)
+            assert report.deletable is False
+            assert any(r.table == "queue" and r.column == "create_by" for r in report.blocking)
+
+            with pytest.raises(HTTPException) as exc_info:
+                await admin_users.delete_user_permanently(ids["user_id"], _root_user(), session)
+            assert exc_info.value.status_code == 409
+            assert "queue.create_by" in str(exc_info.value.detail)
+
+            still_there = await session.execute(
+                text("SELECT id FROM users WHERE id = :uid"), {"uid": ids["user_id"]}
+            )
+            assert still_there.scalar_one_or_none() is not None
+    finally:
+        await engine.dispose()
+
+
+async def test_delete_user_permanently_refuses_self(mariadb_znuny_url: str) -> None:
+    _ensure_tiqora_tables(mariadb_znuny_url)
+    engine = create_async_engine(_mysql_async(mariadb_znuny_url))
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    try:
+        async with factory() as session:
+            with pytest.raises(HTTPException) as exc_info:
+                await admin_users.delete_user_permanently(1, _root_user(), session)
+            assert exc_info.value.status_code == 409
+    finally:
+        await engine.dispose()
+
+
 async def test_language_get_set_roundtrip(mariadb_znuny_url: str) -> None:
     _ensure_tiqora_tables(mariadb_znuny_url)
     engine = create_async_engine(_mysql_async(mariadb_znuny_url))
