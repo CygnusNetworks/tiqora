@@ -5423,13 +5423,16 @@ export interface paths {
         get?: never;
         /**
          * Upsert Draft
-         * @description Create or update a draft for (ticket, user, action).
+         * @description Create or update a draft for (ticket, user, action, article).
          */
         put: operations["upsert_draft_api_v1_tickets__ticket_id__drafts__action__put"];
         post?: never;
         /**
          * Delete Draft
-         * @description Delete a draft for (ticket, user, action).
+         * @description Delete one draft for (ticket, user, action, article).
+         *
+         *     Scoped to a single article so discarding one reply draft leaves the
+         *     agent's drafts on the ticket's other articles alone.
          */
         delete: operations["delete_draft_api_v1_tickets__ticket_id__drafts__action__delete"];
         options?: never;
@@ -8159,6 +8162,8 @@ export interface components {
         DraftIn: {
             /** Action */
             action: string;
+            /** Article Id */
+            article_id?: number | null;
             /**
              * Content
              * @default {}
@@ -8171,6 +8176,8 @@ export interface components {
         DraftOut: {
             /** Action */
             action: string;
+            /** Article Id */
+            article_id?: number | null;
             /**
              * Changed
              * Format: date-time
@@ -27172,7 +27179,10 @@ export interface operations {
     };
     delete_draft_api_v1_tickets__ticket_id__drafts__action__delete: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description Article the draft belongs to; omit for the ticket-wide draft. */
+                article_id?: number | null;
+            };
             header?: {
                 authorization?: string | null;
             };

@@ -7213,6 +7213,17 @@
             "title": "Action",
             "type": "string"
           },
+          "article_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Article Id"
+          },
           "content": {
             "default": "{}",
             "title": "Content",
@@ -7241,6 +7252,17 @@
           "action": {
             "title": "Action",
             "type": "string"
+          },
+          "article_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Article Id"
           },
           "changed": {
             "format": "date-time",
@@ -53857,7 +53879,7 @@
     },
     "/api/v1/tickets/{ticket_id}/drafts/{action}": {
       "delete": {
-        "description": "Delete a draft for (ticket, user, action).",
+        "description": "Delete one draft for (ticket, user, action, article).\n\nScoped to a single article so discarding one reply draft leaves the\nagent's drafts on the ticket's other articles alone.",
         "operationId": "delete_draft_api_v1_tickets__ticket_id__drafts__action__delete",
         "parameters": [
           {
@@ -53876,6 +53898,24 @@
             "schema": {
               "title": "Action",
               "type": "string"
+            }
+          },
+          {
+            "description": "Article the draft belongs to; omit for the ticket-wide draft.",
+            "in": "query",
+            "name": "article_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Article the draft belongs to; omit for the ticket-wide draft.",
+              "title": "Article Id"
             }
           },
           {
@@ -53932,7 +53972,7 @@
         ]
       },
       "put": {
-        "description": "Create or update a draft for (ticket, user, action).",
+        "description": "Create or update a draft for (ticket, user, action, article).",
         "operationId": "upsert_draft_api_v1_tickets__ticket_id__drafts__action__put",
         "parameters": [
           {
