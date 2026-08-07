@@ -498,6 +498,28 @@ export async function mockApi(page: Page) {
       return;
     }
 
+    // Header counters (@ / ⏱) query these on every ticket zoom.
+    if (path.match(/\/api\/v1\/tickets\/\d+\/mentions$/) && method === "GET") {
+      await json(route, 200, [
+        { id: 1, ticket_id: 1, user_id: 2, user_name: "Ada Lovelace", user_login: "ada" },
+      ]);
+      return;
+    }
+    if (path.match(/\/api\/v1\/tickets\/\d+\/mentions$/) && method === "POST") {
+      await json(route, 201, { id: 2, ticket_id: 1, user_id: 3 });
+      return;
+    }
+    if (path.match(/\/api\/v1\/tickets\/\d+\/time-accounting$/) && method === "GET") {
+      await json(route, 200, [
+        { id: 1, ticket_id: 1, time_unit: 15, create_by: 2, create_by_login: "ada" },
+      ]);
+      return;
+    }
+    if (path.match(/\/api\/v1\/tickets\/\d+\/time-accounting$/) && method === "POST") {
+      await json(route, 201, { id: 2, ticket_id: 1, time_unit: 5, create_by: 2 });
+      return;
+    }
+
     if (path.match(/\/api\/v1\/tickets\/\d+\/articles\/\d+\/body$/)) {
       await json(route, 200, articleBody);
       return;

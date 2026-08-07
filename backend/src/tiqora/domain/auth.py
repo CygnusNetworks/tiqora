@@ -32,6 +32,75 @@ def _utcnow() -> datetime:
     return datetime.utcnow()  # noqa: DTZ003 — intentional naive UTC for DB columns
 
 
+# Znuny-compatible language codes accepted for the ``UserLanguage`` preference.
+# Keep in sync with frontend/src/i18n/locales.ts SUPPORTED_LOCALES.
+USER_LANGUAGE_CODES = frozenset(
+    {
+        "en",
+        "de",
+        "ar_SA",
+        "bg",
+        "ca",
+        "cs",
+        "da",
+        "el",
+        "en_CA",
+        "en_GB",
+        "es",
+        "es_CO",
+        "es_MX",
+        "et",
+        "fa",
+        "fi",
+        "fr",
+        "fr_CA",
+        "gl",
+        "he",
+        "hi",
+        "hr",
+        "hu",
+        "id",
+        "it",
+        "ja",
+        "ko",
+        "lt",
+        "lv",
+        "mk",
+        "ms",
+        "nb_NO",
+        "nl",
+        "pl",
+        "pt",
+        "pt_BR",
+        "ro",
+        "ru",
+        "sk_SK",
+        "sl",
+        "sr",
+        "sv",
+        "sw",
+        "th_TH",
+        "tr",
+        "uk",
+        "vi_VN",
+        "zh_CN",
+        "zh_TW",
+    }
+)
+
+
+def normalize_language_code(raw: str) -> str | None:
+    """Normalise a BCP-47/Znuny language code and validate against
+    :data:`USER_LANGUAGE_CODES`. Returns ``None`` when unsupported."""
+    code = (raw or "").strip().replace("-", "_")
+    if "_" in code:
+        lang, _, region = code.partition("_")
+        code = f"{lang.lower()}_{region.upper()}"
+    else:
+        code = code.lower()
+    return code if code in USER_LANGUAGE_CODES else None
+
+
 def decode_preference_value(raw: object) -> str | None:
     """Decode ``user_preferences.preferences_value`` (MySQL LONGBLOB / PG TEXT).
 

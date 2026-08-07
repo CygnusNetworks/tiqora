@@ -7512,6 +7512,135 @@
         "title": "DynamicFieldValueOut",
         "type": "object"
       },
+      "EffectiveGroupPermission": {
+        "properties": {
+          "group_id": {
+            "title": "Group Id",
+            "type": "integer"
+          },
+          "group_name": {
+            "title": "Group Name",
+            "type": "string"
+          },
+          "keys": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Keys",
+            "type": "array"
+          },
+          "sources": {
+            "items": {
+              "$ref": "#/components/schemas/EffectivePermissionSource"
+            },
+            "title": "Sources",
+            "type": "array"
+          }
+        },
+        "required": [
+          "group_id",
+          "group_name",
+          "keys",
+          "sources"
+        ],
+        "title": "EffectiveGroupPermission",
+        "type": "object"
+      },
+      "EffectivePermissionSource": {
+        "properties": {
+          "key": {
+            "enum": [
+              "ro",
+              "move_into",
+              "create",
+              "note",
+              "owner",
+              "priority",
+              "rw"
+            ],
+            "title": "Key",
+            "type": "string"
+          },
+          "via": {
+            "title": "Via",
+            "type": "string"
+          }
+        },
+        "required": [
+          "key",
+          "via"
+        ],
+        "title": "EffectivePermissionSource",
+        "type": "object"
+      },
+      "EffectivePermissionsOut": {
+        "properties": {
+          "groups": {
+            "items": {
+              "$ref": "#/components/schemas/EffectiveGroupPermission"
+            },
+            "title": "Groups",
+            "type": "array"
+          },
+          "queues": {
+            "items": {
+              "$ref": "#/components/schemas/EffectiveQueuePermission"
+            },
+            "title": "Queues",
+            "type": "array"
+          },
+          "roles": {
+            "items": {
+              "$ref": "#/components/schemas/RoleOut"
+            },
+            "title": "Roles",
+            "type": "array"
+          }
+        },
+        "required": [
+          "roles",
+          "groups",
+          "queues"
+        ],
+        "title": "EffectivePermissionsOut",
+        "type": "object"
+      },
+      "EffectiveQueuePermission": {
+        "properties": {
+          "group_id": {
+            "title": "Group Id",
+            "type": "integer"
+          },
+          "group_name": {
+            "title": "Group Name",
+            "type": "string"
+          },
+          "keys": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Keys",
+            "type": "array"
+          },
+          "queue_id": {
+            "title": "Queue Id",
+            "type": "integer"
+          },
+          "queue_name": {
+            "title": "Queue Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "queue_id",
+          "queue_name",
+          "group_id",
+          "group_name",
+          "keys"
+        ],
+        "title": "EffectiveQueuePermission",
+        "type": "object"
+      },
       "ErasureSelectorIn": {
         "description": "Combinable AND filter for customer_user resolution.",
         "properties": {
@@ -18943,6 +19072,17 @@
       },
       "UserCreate": {
         "properties": {
+          "email": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Email"
+          },
           "first_name": {
             "title": "First Name",
             "type": "string"
@@ -18955,9 +19095,27 @@
             "title": "Login",
             "type": "string"
           },
+          "mobile": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mobile"
+          },
           "password": {
-            "title": "Password",
-            "type": "string"
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Password"
           },
           "title": {
             "anyOf": [
@@ -18978,11 +19136,30 @@
         },
         "required": [
           "login",
-          "password",
           "first_name",
           "last_name"
         ],
         "title": "UserCreate",
+        "type": "object"
+      },
+      "UserLanguageOut": {
+        "properties": {
+          "language": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Language"
+          }
+        },
+        "required": [
+          "language"
+        ],
+        "title": "UserLanguageOut",
         "type": "object"
       },
       "UserLanguageUpdate": {
@@ -19101,6 +19278,17 @@
             ],
             "title": "Create Time"
           },
+          "email": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Email"
+          },
           "first_name": {
             "title": "First Name",
             "type": "string"
@@ -19116,6 +19304,17 @@
           "login": {
             "title": "Login",
             "type": "string"
+          },
+          "mobile": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mobile"
           },
           "title": {
             "anyOf": [
@@ -19148,6 +19347,17 @@
       },
       "UserUpdate": {
         "properties": {
+          "email": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Email"
+          },
           "first_name": {
             "anyOf": [
               {
@@ -19180,6 +19390,17 @@
               }
             ],
             "title": "Login"
+          },
+          "mobile": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mobile"
           },
           "password": {
             "anyOf": [
@@ -41208,6 +41429,81 @@
         ]
       }
     },
+    "/api/v1/admin/users/{user_id}/effective-permissions": {
+      "get": {
+        "description": "Read-only breakdown of a user's resolved group/queue permissions.\n\nUnion of direct ``group_user`` grants and role-derived ``group_role``\ngrants (same rule as :class:`tiqora.permissions.engine.PermissionEngine`,\nreimplemented here to additionally track *where* each permission key\ncame from for display).",
+        "operationId": "get_effective_permissions_api_v1_admin_users__user_id__effective_permissions_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "user_id",
+            "required": true,
+            "schema": {
+              "title": "User Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EffectivePermissionsOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Effective Permissions",
+        "tags": [
+          "admin:users"
+        ]
+      }
+    },
     "/api/v1/admin/users/{user_id}/groups": {
       "get": {
         "description": "Groups the user has full (``rw``) access to \u2014 the Agent\u2194Groups editor's\nread side. The editor toggles the ``rw`` permission only (see\n:func:`assign_group`), so the read set is filtered to that key to stay\nconsistent with what the checkboxes write.",
@@ -41442,6 +41738,163 @@
           }
         },
         "summary": "Revoke Group",
+        "tags": [
+          "admin:users"
+        ]
+      }
+    },
+    "/api/v1/admin/users/{user_id}/language": {
+      "get": {
+        "description": "Admin-facing mirror of the agent's own 'Pers\u00f6nliche Einstellungen'\nlanguage choice (``UserLanguage`` preference) \u2014 read side.",
+        "operationId": "get_user_language_api_v1_admin_users__user_id__language_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "user_id",
+            "required": true,
+            "schema": {
+              "title": "User Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserLanguageOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get User Language",
+        "tags": [
+          "admin:users"
+        ]
+      },
+      "put": {
+        "operationId": "set_user_language_api_v1_admin_users__user_id__language_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "user_id",
+            "required": true,
+            "schema": {
+              "title": "User Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UserLanguageUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserLanguageOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Set User Language",
         "tags": [
           "admin:users"
         ]

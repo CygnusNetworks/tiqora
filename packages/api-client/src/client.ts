@@ -136,6 +136,12 @@ export type RoleCreate = Schemas["RoleCreate"];
 export type RoleUpdate = Schemas["RoleUpdate"];
 export type RoleAssignment = Schemas["RoleAssignment"];
 export type GroupRoleAssignment = Schemas["GroupRoleAssignment"];
+export type EffectivePermissionsOut = Schemas["EffectivePermissionsOut"];
+export type EffectiveGroupPermission = Schemas["EffectiveGroupPermission"];
+export type EffectiveQueuePermission = Schemas["EffectiveQueuePermission"];
+export type EffectivePermissionSource = Schemas["EffectivePermissionSource"];
+export type UserLanguageOut = Schemas["UserLanguageOut"];
+export type UserLanguageUpdate = Schemas["UserLanguageUpdate"];
 export type QueueOut = Schemas["QueueOut"];
 export type QueueCreate = Schemas["QueueCreate"];
 export type QueueUpdate = Schemas["QueueUpdate"];
@@ -1768,6 +1774,27 @@ export class ApiClient {
 
   revokeUserRole(userId: number, roleId: number, signal?: AbortSignal) {
     return this.request<void>("DELETE", `/api/v1/admin/users/${userId}/roles/${roleId}`, {
+      signal,
+    });
+  }
+
+  getUserEffectivePermissions(userId: number, signal?: AbortSignal) {
+    return this.request<EffectivePermissionsOut>(
+      "GET",
+      `/api/v1/admin/users/${userId}/effective-permissions`,
+      { signal },
+    );
+  }
+
+  getUserLanguage(userId: number, signal?: AbortSignal) {
+    return this.request<UserLanguageOut>("GET", `/api/v1/admin/users/${userId}/language`, {
+      signal,
+    });
+  }
+
+  setUserLanguage(userId: number, body: UserLanguageUpdate, signal?: AbortSignal) {
+    return this.request<UserLanguageOut>("PUT", `/api/v1/admin/users/${userId}/language`, {
+      body,
       signal,
     });
   }

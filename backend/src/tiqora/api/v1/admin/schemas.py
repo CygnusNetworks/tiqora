@@ -11,7 +11,7 @@ import base64
 from datetime import datetime
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 # ---------------------------------------------------------------------------
 # Users
@@ -29,15 +29,28 @@ class UserOut(BaseModel):
     valid_id: int
     create_time: datetime | None
     change_time: datetime | None
+    email: str | None = None
+    """From ``user_preferences`` (key ``UserEmail``) — not a ``users`` column."""
+    mobile: str | None = None
+    """From ``user_preferences`` (key ``UserMobile``) — not a ``users`` column."""
 
 
 class UserCreate(BaseModel):
     login: str
-    password: str
+    password: str | None = None
+    """Omit to auto-generate a random password and email it to *email*."""
     title: str | None = None
     first_name: str
     last_name: str
     valid_id: int = 1
+    email: str | None = None
+    mobile: str | None = None
+
+    @model_validator(mode="after")
+    def _email_required_without_password(self) -> UserCreate:
+        if not self.password and not self.email:
+            raise ValueError("email is required to send an auto-generated password")
+        return self
 
 
 class UserUpdate(BaseModel):
@@ -47,6 +60,12 @@ class UserUpdate(BaseModel):
     first_name: str | None = None
     last_name: str | None = None
     valid_id: int | None = None
+    email: str | None = None
+    mobile: str | None = None
+
+
+class UserLanguageOut(BaseModel):
+    language: str | None
 
 
 class GroupAssignment(BaseModel):
@@ -112,6 +131,33 @@ class RoleUpdate(BaseModel):
     name: str | None = None
     comments: str | None = None
     valid_id: int | None = None
+
+
+class EffectivePermissionSource(BaseModel):
+    key: Literal["ro", "move_into", "create", "note", "owner", "priority", "rw"]
+    via: str
+    """``"direct"`` or ``"Rolle: <name>"``."""
+
+
+class EffectiveGroupPermission(BaseModel):
+    group_id: int
+    group_name: str
+    keys: list[str]
+    sources: list[EffectivePermissionSource]
+
+
+class EffectiveQueuePermission(BaseModel):
+    queue_id: int
+    queue_name: str
+    group_id: int
+    group_name: str
+    keys: list[str]
+
+
+class EffectivePermissionsOut(BaseModel):
+    roles: list[RoleOut]
+    groups: list[EffectiveGroupPermission]
+    queues: list[EffectiveQueuePermission]
 
 
 class GroupRoleAssignment(BaseModel):

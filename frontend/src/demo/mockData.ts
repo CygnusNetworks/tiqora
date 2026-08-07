@@ -652,6 +652,28 @@ const onlineAgents = [
   { id: 3, login: "cmorris", full_name: "Chris Morris", avatar_url: null },
 ];
 
+// ── Mentions + time accounting (header counters, report page) ───────────────
+const ticketMentions = [
+  { id: 700, ticket_id: 100, user_id: 2, user_name: "Bianca Shah", user_login: "bshah", create_time: "2026-07-10T10:06:00Z" },
+];
+const ticketTimeEntries = [
+  { id: 710, ticket_id: 100, time_unit: 15, create_by: 1, create_by_login: "aturner", create_time: "2026-07-10T10:05:00Z" },
+  { id: 711, ticket_id: 100, time_unit: 7.5, create_by: 2, create_by_login: "bshah", create_time: "2026-07-11T14:20:00Z" },
+];
+// Spread across several days so the report's units-per-day bars have shape.
+const timeAccountingRows = [
+  { id: 710, ticket_id: 100, ticket_tn: "2026071000100", ticket_title: "Printer offline in building A", time_unit: 15, create_by: 1, create_by_login: "aturner", create_time: "2026-07-10T10:05:00Z" },
+  { id: 711, ticket_id: 100, ticket_tn: "2026071000100", ticket_title: "Printer offline in building A", time_unit: 7.5, create_by: 2, create_by_login: "bshah", create_time: "2026-07-11T14:20:00Z" },
+  { id: 712, ticket_id: 101, ticket_tn: "2026071000101", ticket_title: "VPN drops every few minutes", time_unit: 30, create_by: 1, create_by_login: "aturner", create_time: "2026-07-11T16:02:00Z" },
+  { id: 713, ticket_id: 102, ticket_tn: "2026071200102", ticket_title: "New starter needs a mailbox", time_unit: 12, create_by: 3, create_by_login: "cmorris", create_time: "2026-07-12T09:15:00Z" },
+  { id: 714, ticket_id: 101, ticket_tn: "2026071000101", ticket_title: "VPN drops every few minutes", time_unit: 45, create_by: 1, create_by_login: "aturner", create_time: "2026-07-14T11:40:00Z" },
+  { id: 715, ticket_id: 103, ticket_tn: "2026071500103", ticket_title: "Invoice export fails", time_unit: 20, create_by: 2, create_by_login: "bshah", create_time: "2026-07-15T13:05:00Z" },
+];
+const timeAccountingReport = {
+  items: timeAccountingRows,
+  total_units: timeAccountingRows.reduce((sum, r) => sum + r.time_unit, 0),
+};
+
 // ── Stats (14-day series, richer) ───────────────────────────────────────────
 const days = Array.from({ length: 14 }, (_, i) => `2026-07-${String(i + 8).padStart(2, "0")}`);
 const volume = { granularity: "day", points: days.map((d, i) => ({ bucket: d, created: 6 + ((i * 3) % 7), closed: 4 + ((i * 2) % 6) })) };
@@ -747,6 +769,13 @@ export function resolveData(path: string, method: string): unknown | undefined {
   if (p.match(/\/api\/v1\/tickets\/\d+\/articles$/)) { const tid = Number(p.split("/").slice(-2)[0]); return articlesByTicket[tid] ?? []; }
   if (p.match(/\/api\/v1\/tickets\/\d+\/history$/)) return historyEntries;
   if (p.match(/\/api\/v1\/tickets\/\d+\/presence/)) return method === "GET" ? [] : {};
+  // Header counters + the cross-ticket report they feed.
+  if (p.endsWith("/api/v1/tickets/time-accounting") && method === "GET")
+    return timeAccountingReport;
+  if (p.match(/\/api\/v1\/tickets\/\d+\/mentions/))
+    return method === "GET" ? ticketMentions : { id: 99 };
+  if (p.match(/\/api\/v1\/tickets\/\d+\/time-accounting/))
+    return method === "GET" ? ticketTimeEntries : { id: 99 };
   if (p.match(/\/api\/v1\/tickets\/\d+\/attachments/) || p.match(/attachments/)) return [];
   // AI subsystem (summary + drafts). The POST endpoints report success; the
   // panel then refetches state, which serves the fabricated summary/drafts.
@@ -780,6 +809,8 @@ export function resolveData(path: string, method: string): unknown | undefined {
   if (p.match(/\/admin\/groups\/\d+\/customer-users$/)) { const id = Number(p.split("/").slice(-2)[0]); return groupCustomerUsers[id] ?? []; }
   if (p.match(/\/admin\/groups\/\d+\/users$/)) { const id = Number(p.split("/").slice(-2)[0]); return groupUsers[id] ?? []; }
   if (p.match(/\/admin\/customer-users\/[^/]+\/groups$/)) { const login = decodeURIComponent(p.split("/").slice(-2)[0]); return customerUserGroups[login] ?? []; }
+  if (p.match(/\/admin\/users\/\d+\/effective-permissions$/)) return { roles: [], groups: [], queues: [] };
+  if (p.match(/\/admin\/users\/\d+\/language$/)) return { language: null };
   // Admin — GDPR
   if (p.endsWith("/admin/gdpr/preview") && method === "POST") return gdprPreview;
   if (p.endsWith("/admin/gdpr/jobs")) return page([]);
