@@ -7535,11 +7535,16 @@
             },
             "title": "Sources",
             "type": "array"
+          },
+          "valid_id": {
+            "title": "Valid Id",
+            "type": "integer"
           }
         },
         "required": [
           "group_id",
           "group_name",
+          "valid_id",
           "keys",
           "sources"
         ],
@@ -7561,6 +7566,10 @@
             "title": "Key",
             "type": "string"
           },
+          "valid_id": {
+            "title": "Valid Id",
+            "type": "integer"
+          },
           "via": {
             "title": "Via",
             "type": "string"
@@ -7568,7 +7577,8 @@
         },
         "required": [
           "key",
-          "via"
+          "via",
+          "valid_id"
         ],
         "title": "EffectivePermissionSource",
         "type": "object"
@@ -7615,6 +7625,10 @@
             "title": "Group Name",
             "type": "string"
           },
+          "group_valid_id": {
+            "title": "Group Valid Id",
+            "type": "integer"
+          },
           "keys": {
             "items": {
               "type": "string"
@@ -7629,13 +7643,19 @@
           "queue_name": {
             "title": "Queue Name",
             "type": "string"
+          },
+          "valid_id": {
+            "title": "Valid Id",
+            "type": "integer"
           }
         },
         "required": [
           "queue_id",
           "queue_name",
+          "valid_id",
           "group_id",
           "group_name",
+          "group_valid_id",
           "keys"
         ],
         "title": "EffectiveQueuePermission",
@@ -10925,6 +10945,17 @@
               }
             ],
             "title": "Archive"
+          },
+          "clear_customer": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Clear Customer"
           },
           "clear_service": {
             "anyOf": [

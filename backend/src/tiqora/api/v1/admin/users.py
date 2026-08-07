@@ -377,12 +377,16 @@ async def get_effective_permissions(
     if user is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
 
+    # Invalid roles/groups are returned too, flagged rather than dropped: the
+    # admin UI offers a valid/invalid/all filter over them, and a permission
+    # that exists in the DB but grants nothing is exactly what an admin
+    # debugging "why can't this agent see the queue" needs to see.
     roles = list(
         (
             await session.execute(
                 select(Roles)
                 .join(RoleUser, RoleUser.role_id == Roles.id)
-                .where(RoleUser.user_id == user_id, Roles.valid_id == 1)
+                .where(RoleUser.user_id == user_id)
             )
         )
         .scalars()
@@ -390,8 +394,8 @@ async def get_effective_permissions(
     )
     role_ids = [r.id for r in roles]
 
-    # group_id -> permission_key -> list of source labels
-    sources: dict[int, dict[PermissionKey, list[str]]] = {}
+    # group_id -> permission_key -> list of (source label, source valid_id)
+    sources: dict[int, dict[PermissionKey, list[tuple[str, int]]]] = {}
 
     direct_rows = await session.execute(
         select(GroupUser.group_id, GroupUser.permission_key).where(GroupUser.user_id == user_id)
@@ -399,11 +403,11 @@ async def get_effective_permissions(
     for group_id, key in direct_rows.all():
         if key in PERMISSION_KEYS:
             sources.setdefault(group_id, {}).setdefault(cast(PermissionKey, key), []).append(
-                "direct"
+                ("direct", 1)
             )
 
     if role_ids:
-        role_names = {r.id: r.name for r in roles}
+        roles_by_id = {r.id: r for r in roles}
         via_role_rows = await session.execute(
             select(GroupRole.group_id, GroupRole.permission_key, GroupRole.role_id).where(
                 GroupRole.role_id.in_(role_ids), GroupRole.permission_value == 1
@@ -411,9 +415,10 @@ async def get_effective_permissions(
         )
         for group_id, key, role_id in via_role_rows.all():
             if key in PERMISSION_KEYS:
-                label = f"Rolle: {role_names.get(role_id, role_id)}"
+                role = roles_by_id.get(role_id)
+                label = f"Rolle: {role.name if role else role_id}"
                 sources.setdefault(group_id, {}).setdefault(cast(PermissionKey, key), []).append(
-                    label
+                    (label, role.valid_id if role else 2)
                 )
 
     group_ids = list(sources.keys())
@@ -427,17 +432,18 @@ async def get_effective_permissions(
     groups_out: list[EffectiveGroupPermission] = []
     for group_id, keys_map in sources.items():
         group = groups_by_id.get(group_id)
-        if group is None or group.valid_id != 1:
+        if group is None:
             continue
         flat_sources = [
-            EffectivePermissionSource(key=key, via=via)
+            EffectivePermissionSource(key=key, via=via, valid_id=via_valid)
             for key, via_list in keys_map.items()
-            for via in via_list
+            for via, via_valid in via_list
         ]
         groups_out.append(
             EffectiveGroupPermission(
                 group_id=group_id,
                 group_name=group.name,
+                valid_id=group.valid_id,
                 keys=sorted(keys_map.keys()),
                 sources=flat_sources,
             )
@@ -447,9 +453,11 @@ async def get_effective_permissions(
     queues_out: list[EffectiveQueuePermission] = []
     if group_ids:
         queue_rows = await session.execute(
-            select(Queue.id, Queue.name, Queue.group_id).where(Queue.group_id.in_(group_ids))
+            select(Queue.id, Queue.name, Queue.group_id, Queue.valid_id).where(
+                Queue.group_id.in_(group_ids)
+            )
         )
-        for queue_id, queue_name, group_id in queue_rows.all():
+        for queue_id, queue_name, group_id, queue_valid_id in queue_rows.all():
             group = groups_by_id.get(group_id)
             keys_map = sources.get(group_id, {})
             if group is None or not keys_map:
@@ -458,8 +466,10 @@ async def get_effective_permissions(
                 EffectiveQueuePermission(
                     queue_id=queue_id,
                     queue_name=queue_name,
+                    valid_id=queue_valid_id,
                     group_id=group_id,
                     group_name=group.name,
+                    group_valid_id=group.valid_id,
                     keys=sorted(keys_map.keys()),
                 )
             )

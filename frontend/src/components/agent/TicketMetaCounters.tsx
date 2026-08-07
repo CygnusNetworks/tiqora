@@ -70,6 +70,10 @@ export function TicketMetaCounters({ ticketId }: { ticketId: number }) {
         align="right"
         label={t("ticket.timeAccounting")}
         panelTestId="ticket-time-panel"
+        // Wider than the default w-64: the unit toggle, the amount field and
+        // the book button do not fit on one 16rem row without the button
+        // wrapping mid-word.
+        panelClassName="w-80"
         trigger={({ ref, toggleProps }) => (
           <CounterChip
             ref={ref}
@@ -285,9 +289,16 @@ function TimePopover({ ticketId }: { ticketId: number }) {
           ))}
         </ul>
       )}
+      {/* Amount first, then the shortcuts that fill it, then the commit —
+          the button on its own row so its label can never wrap. */}
       <div className="flex items-center gap-1.5">
-        <TimeUnitToggle mode={mode} onChange={handleModeChange} size="sm" testId="ticket-time-mode" />
-        <div className="flex items-center gap-1 rounded border border-hairline bg-surface px-2 py-1">
+        <TimeUnitToggle
+          mode={mode}
+          onChange={handleModeChange}
+          size="sm"
+          testId="ticket-time-mode"
+        />
+        <div className="flex min-w-0 flex-1 items-center gap-1 rounded border border-hairline bg-surface px-2 py-1">
           <input
             type="number"
             min="0"
@@ -304,27 +315,27 @@ function TimePopover({ ticketId }: { ticketId: number }) {
             placeholder="0"
             aria-label={t("ticket.timeUnits")}
             data-testid="ticket-time-units"
-            className="w-20 border-none bg-transparent text-right font-mono text-xs tabular-nums text-ink focus:outline-none"
+            className="w-full min-w-0 border-none bg-transparent text-right font-mono text-xs tabular-nums text-ink focus:outline-none"
           />
-          <span className="text-[10px] text-muted">
+          <span className="shrink-0 text-[10px] text-muted">
             {mode === "min" ? t("ticket.timeUnitAbbrev") : t("ticket.timeUnitHoursAbbrev")}
           </span>
         </div>
-        <Button
-          variant="primary"
-          size="sm"
-          className="flex-1"
-          data-testid="ticket-time-book"
-          disabled={!canBook || bookM.isPending}
-          onClick={handleBook}
-        >
-          {t("ticket.addTime")}
-        </Button>
       </div>
       <TimePresetButtons
         testId="ticket-time-preset"
         onPick={(minutes) => setText(minutesToDisplay(minutes, mode))}
       />
+      <Button
+        variant="primary"
+        size="sm"
+        className="w-full"
+        data-testid="ticket-time-book"
+        disabled={!canBook || bookM.isPending}
+        onClick={handleBook}
+      >
+        {t("ticket.addTime")}
+      </Button>
       <p className="text-[11px] text-muted">{t("ticket.timeComposerHint")}</p>
     </div>
   );

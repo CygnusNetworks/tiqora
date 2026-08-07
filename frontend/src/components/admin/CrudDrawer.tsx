@@ -65,6 +65,13 @@ export type FieldDef = {
    * password field hidden while "auto-generate" is selected). */
   showIf?: (values: FieldValues) => boolean;
   /**
+   * Tab this field belongs to (already-translated label). When two or more
+   * distinct tabs occur across the visible fields the drawer renders a tab
+   * bar and shows one tab at a time; otherwise it lays every field out in a
+   * single column exactly as before.
+   */
+  tab?: string;
+  /**
    * Opt-in ⓘ popover rendered next to the label — for fields whose meaning or
    * default isn't obvious from the label alone. Distinct from `helpText`
    * (always-visible static hint below the control).
@@ -150,12 +157,14 @@ export function CrudDrawer({
   const [values, setValues] = useState<FieldValues>(initialValues);
   const [errors, setErrors] = useState<Record<string, boolean>>({});
   const [submitting, setSubmitting] = useState(false);
+  const [activeTab, setActiveTab] = useState<string | null>(null);
   const formRef = useRef<HTMLFormElement | null>(null);
 
   useEffect(() => {
     if (open) {
       setValues(initialValues);
       setErrors({});
+      setActiveTab(null);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
@@ -178,6 +187,30 @@ export function CrudDrawer({
       (f.showIf ? f.showIf(values) : true),
   );
 
+  // Tabs are opt-in: a resource that never sets `tab` renders exactly as
+  // before. Order follows first appearance in the field list.
+  const tabs: string[] = [];
+  for (const f of visibleFields) {
+    if (f.tab && !tabs.includes(f.tab)) tabs.push(f.tab);
+  }
+  const tabbed = tabs.length > 1;
+  const currentTab = tabbed ? (activeTab !== null && tabs.includes(activeTab) ? activeTab : tabs[0]) : null;
+  const fieldsInTab = (tab: string) => visibleFields.filter((f) => f.tab === tab);
+  const shownFields = currentTab === null ? visibleFields : fieldsInTab(currentTab);
+
+  /** Required-but-empty count, so a tab you cannot see can still ask for
+   * attention instead of only failing at save time. */
+  const missingIn = (tab: string) =>
+    fieldsInTab(tab).filter((f) => isRequired(f) && isEmpty(values[f.name])).length;
+
+  const focusField = (name: string) => {
+    const el = formRef.current?.querySelector<HTMLElement>(
+      `[data-testid="${testIdPrefix}-${name}"]`,
+    );
+    el?.focus();
+    el?.scrollIntoView({ block: "center" });
+  };
+
   const handleSubmit = async () => {
     const nextErrors: Record<string, boolean> = {};
     for (const f of visibleFields) {
@@ -186,11 +219,14 @@ export function CrudDrawer({
     setErrors(nextErrors);
     const firstInvalid = visibleFields.find((f) => nextErrors[f.name]);
     if (firstInvalid) {
-      const el = formRef.current?.querySelector<HTMLElement>(
-        `[data-testid="${testIdPrefix}-${firstInvalid.name}"]`,
-      );
-      el?.focus();
-      el?.scrollIntoView({ block: "center" });
+      // The offending field may sit on a tab that is not open — switch to it
+      // first, then focus once it has actually rendered.
+      if (firstInvalid.tab && firstInvalid.tab !== currentTab) {
+        setActiveTab(firstInvalid.tab);
+        requestAnimationFrame(() => focusField(firstInvalid.name));
+      } else {
+        focusField(firstInvalid.name);
+      }
       return;
     }
 
@@ -357,7 +393,7 @@ export function CrudDrawer({
     );
   };
 
-  const rows = layoutRows(visibleFields);
+  const rows = layoutRows(shownFields);
   const formId = `${testIdPrefix}-form`;
 
   return (
@@ -408,6 +444,49 @@ export function CrudDrawer({
         }}
         className="flex flex-col gap-3"
       >
+        {tabbed && (
+          <div
+            role="tablist"
+            aria-label={title}
+            className="-mt-1 flex gap-0.5 border-b border-hairline"
+          >
+            {tabs.map((tab, tabIdx) => {
+              const missing = missingIn(tab);
+              const on = tab === currentTab;
+              return (
+                <button
+                  key={tab}
+                  type="button"
+                  role="tab"
+                  aria-selected={on}
+                  // Index-based: the label is a translated string, so a
+                  // label-derived testid would change with the UI language.
+                  data-testid={`${testIdPrefix}-tab-${tabIdx}`}
+                  onClick={() => setActiveTab(tab)}
+                  className={cn(
+                    "-mb-px flex items-center gap-1.5 border-b-2 px-2.5 py-1.5 text-sm transition-colors duration-100",
+                    "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent",
+                    on
+                      ? "border-accent font-semibold text-accent"
+                      : "border-transparent font-medium text-muted hover:text-ink",
+                  )}
+                >
+                  {tab}
+                  {/* Only on tabs you cannot see — on the open tab the empty
+                      required field is right there, and the badge is noise. */}
+                  {!on && missing > 0 && (
+                    <span
+                      aria-label={t("admin.form.required")}
+                      className="flex h-4 min-w-4 items-center justify-center rounded-full bg-escalation px-1 text-[10px] font-bold text-white"
+                    >
+                      {missing}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        )}
         {rows.map((row, idx) =>
           row.kind === "field" ? (
             renderField(row.field)
