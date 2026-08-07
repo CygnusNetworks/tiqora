@@ -5,6 +5,7 @@ import {
   createRouter,
   redirect,
 } from "@tanstack/react-router";
+import { SetPasswordPage } from "@/routes/SetPasswordPage";
 import { LoginPage } from "@/routes/LoginPage";
 import { DashboardPage } from "@/routes/agent/DashboardPage";
 import { StatsPage } from "@/routes/agent/StatsPage";
@@ -132,6 +133,17 @@ const loginRoute = createRoute({
     sso_error: typeof s.sso_error === "string" ? s.sso_error : undefined,
   }),
   component: LoginPage,
+});
+
+// Public: the one-time link a new agent gets by mail. No auth gate — the
+// token in the query string is the credential.
+const setPasswordRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/set-password",
+  validateSearch: (s: Record<string, unknown>): { token?: string } => ({
+    token: typeof s.token === "string" ? s.token : undefined,
+  }),
+  component: SetPasswordPage,
 });
 
 const agentLayoutRoute = createRoute({
@@ -892,6 +904,7 @@ const catchAllRoute = createRoute({
 const routeTree = rootRoute.addChildren([
   indexRoute,
   loginRoute,
+  setPasswordRoute,
   agentLayoutRoute.addChildren([
     agentIndexRoute,
     agentQueuesRoute,

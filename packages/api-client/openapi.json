@@ -12811,6 +12811,49 @@
         "title": "PasskeyStatusOut",
         "type": "object"
       },
+      "PasswordSetupCheckOut": {
+        "description": "Whether a setup link is still usable, so the page can say so before the\nvisitor types a password. ``login`` is disclosed only for a valid token \u2014\nholding the token already implies access to that account's mailbox.",
+        "properties": {
+          "login": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Login"
+          },
+          "valid": {
+            "title": "Valid",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "valid"
+        ],
+        "title": "PasswordSetupCheckOut",
+        "type": "object"
+      },
+      "PasswordSetupIn": {
+        "properties": {
+          "password": {
+            "title": "Password",
+            "type": "string"
+          },
+          "token": {
+            "title": "Token",
+            "type": "string"
+          }
+        },
+        "required": [
+          "token",
+          "password"
+        ],
+        "title": "PasswordSetupIn",
+        "type": "object"
+      },
       "PgpImportIn": {
         "properties": {
           "ascii_armor": {
@@ -42365,6 +42408,74 @@
         ]
       }
     },
+    "/api/v1/admin/users/{user_id}/setup-link": {
+      "post": {
+        "description": "Issue a fresh password-setup link and mail it.\n\nFor the agent whose invite expired or never arrived. Supersedes any\noutstanding link for that account, so the previous mail stops working.",
+        "operationId": "resend_setup_link_api_v1_admin_users__user_id__setup_link_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "user_id",
+            "required": true,
+            "schema": {
+              "title": "User Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Resend Setup Link",
+        "tags": [
+          "admin:users"
+        ]
+      }
+    },
     "/api/v1/admin/webhooks": {
       "get": {
         "operationId": "list_webhooks_api_v1_admin_webhooks_get",
@@ -43566,6 +43677,84 @@
           }
         },
         "summary": "Passkey Delete",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/v1/auth/password-setup": {
+      "post": {
+        "description": "Public: spend a one-time link and set the password.\n\nRate-limited per IP like the login endpoint \u2014 the token is the only\nsecret, so brute-forcing it must not be free. Keyed on a constant rather\nthan a login because the caller has not identified themselves yet.",
+        "operationId": "complete_password_setup_api_v1_auth_password_setup_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PasswordSetupIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Complete Password Setup",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/v1/auth/password-setup/{token}": {
+      "get": {
+        "description": "Public: is this one-time link still good?",
+        "operationId": "check_password_setup_api_v1_auth_password_setup__token__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "token",
+            "required": true,
+            "schema": {
+              "title": "Token",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PasswordSetupCheckOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Check Password Setup",
         "tags": [
           "auth"
         ]

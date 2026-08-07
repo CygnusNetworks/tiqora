@@ -17,14 +17,23 @@ from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from tiqora.api.v1.admin import users as admin_users
 from tiqora.api.v1.admin.pagination import ListParams
 from tiqora.api.v1.admin.schemas import UserCreate, UserUpdate
+from tiqora.config import Settings
 from tiqora.db.tiqora.base import TiqoraBase
+from tiqora.domain import welcome_invite
 from tiqora.domain.auth import AuthenticatedUser
+from tiqora.domain.password_setup import redeem_token, resolve_token
 from tiqora.domain.schemas import UserLanguageUpdate
 from tiqora.domain.welcome_mail import WelcomeMailError
+from tiqora.znuny.password import verify_password
 
 pytestmark = pytest.mark.db
 
 NOW = datetime(2024, 1, 1, 12, 0, 0)
+
+
+def _settings() -> Settings:
+    """Settings with a known public base URL so the link is assertable."""
+    return Settings(TIQORA_PUBLIC_BASE_URL="https://tiqora.example")  # type: ignore[call-arg]
 
 
 def _mysql_async(url: str) -> str:
@@ -88,10 +97,21 @@ def _cleanup_after_test(mariadb_znuny_url: str) -> Any:
             ).all()
             ids = [row[0] for row in rows]
             if ids:
+                for table in ("user_preferences", "tiqora_password_setup_token"):
+                    conn.execute(
+                        text(f"DELETE FROM {table} WHERE user_id IN :ids").bindparams(  # noqa: S608
+                            bindparam("ids", expanding=True)
+                        ),
+                        {"ids": ids},
+                    )
+                # Redeeming a setup link stamps `change_by` with the user's own
+                # id; MySQL then refuses to delete that row (self-referencing
+                # FK). Repoint to root first — the production delete path
+                # reports this as a blocker instead, see `user_delete`.
                 conn.execute(
-                    text("DELETE FROM user_preferences WHERE user_id IN :ids").bindparams(
-                        bindparam("ids", expanding=True)
-                    ),
+                    text(
+                        "UPDATE users SET create_by = 1, change_by = 1 WHERE id IN :ids"
+                    ).bindparams(bindparam("ids", expanding=True)),
                     {"ids": ids},
                 )
                 conn.execute(
@@ -251,6 +271,7 @@ async def test_create_user_persists_email_and_mobile(mariadb_znuny_url: str) -> 
                 ),
                 _root_user(),
                 session,
+                _settings(),
             )
             assert created.email == "contact@example.test"
             assert created.mobile == "+49 151 000000"
@@ -275,9 +296,11 @@ async def test_create_user_without_password_requires_email() -> None:
         UserCreate(login="nopw", first_name="No", last_name="Pw")
 
 
-async def test_create_user_auto_generates_and_emails_password(
+async def test_create_user_without_password_mails_a_setup_link(
     mariadb_znuny_url: str, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    """Omitting the password creates an invite: the mail carries a one-time
+    link, never a credential, and the account cannot be logged into yet."""
     _ensure_tiqora_tables(mariadb_znuny_url)
     engine = create_async_engine(_mysql_async(mariadb_znuny_url))
     factory = async_sessionmaker(engine, expire_on_commit=False)
@@ -289,7 +312,7 @@ async def test_create_user_auto_generates_and_emails_password(
         sent["subject"] = subject
         sent["body"] = body
 
-    monkeypatch.setattr(admin_users, "send_transactional_email", fake_send)
+    monkeypatch.setattr(welcome_invite, "send_transactional_email", fake_send)
 
     try:
         async with factory() as session:
@@ -302,10 +325,133 @@ async def test_create_user_auto_generates_and_emails_password(
                 ),
                 _root_user(),
                 session,
+                _settings(),
             )
             assert created.email == "autopw@example.test"
             assert sent["to_addr"] == "autopw@example.test"
             assert created.login in sent["body"]
+            assert "/set-password?token=" in sent["body"]
+
+            # A token row exists, and only its hash is stored.
+            row = (
+                await session.execute(
+                    text(
+                        "SELECT token_hash, used FROM tiqora_password_setup_token"
+                        " WHERE user_id = :uid"
+                    ),
+                    {"uid": created.id},
+                )
+            ).first()
+            assert row is not None
+            token_hash, used = row
+            assert used is None
+            assert len(token_hash) == 64
+            assert token_hash not in sent["body"]
+
+            # The token in the mail resolves back to this user...
+            token = sent["body"].split("/set-password?token=")[1].split()[0]
+            assert await resolve_token(session, token) == created.id
+
+            # ...and the account has no usable password until it is redeemed.
+            pw = (
+                await session.execute(
+                    text("SELECT pw FROM users WHERE id = :uid"), {"uid": created.id}
+                )
+            ).scalar_one()
+            assert not verify_password("", pw)
+    finally:
+        await engine.dispose()
+
+
+async def test_redeem_setup_token_sets_password_and_spends_the_link(
+    mariadb_znuny_url: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _ensure_tiqora_tables(mariadb_znuny_url)
+    engine = create_async_engine(_mysql_async(mariadb_znuny_url))
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+
+    sent: dict[str, Any] = {}
+
+    async def fake_send(session: Any, *, to_addr: str, subject: str, body: str) -> None:
+        sent["body"] = body
+
+    monkeypatch.setattr(welcome_invite, "send_transactional_email", fake_send)
+
+    try:
+        async with factory() as session:
+            created = await admin_users.create_user(
+                UserCreate(
+                    login="autopw.test",
+                    first_name="Auto",
+                    last_name="Pw",
+                    email="autopw@example.test",
+                ),
+                _root_user(),
+                session,
+                _settings(),
+            )
+            token = sent["body"].split("/set-password?token=")[1].split()[0]
+
+            assert await redeem_token(session, token, "chosen-secret") == created.id
+            await session.commit()
+
+            pw = (
+                await session.execute(
+                    text("SELECT pw FROM users WHERE id = :uid"), {"uid": created.id}
+                )
+            ).scalar_one()
+            assert verify_password("chosen-secret", pw)
+
+            # Spent: a second attempt does nothing, and the token no longer resolves.
+            assert await redeem_token(session, token, "another-secret") is None
+            assert await resolve_token(session, token) is None
+
+            # Redeeming stamps the agent as their own last editor, which the
+            # hard delete correctly reports as a blocker rather than hitting a
+            # self-referencing FK error at DELETE time.
+            report = await admin_users.get_user_deletable(created.id, _root_user(), session)
+            assert report.deletable is False
+            assert any(r.table == "users" and r.column == "change_by" for r in report.blocking)
+    finally:
+        await engine.dispose()
+
+
+async def test_resend_setup_link_supersedes_the_previous_one(
+    mariadb_znuny_url: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _ensure_tiqora_tables(mariadb_znuny_url)
+    engine = create_async_engine(_mysql_async(mariadb_znuny_url))
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+
+    bodies: list[str] = []
+
+    async def fake_send(session: Any, *, to_addr: str, subject: str, body: str) -> None:
+        bodies.append(body)
+
+    monkeypatch.setattr(welcome_invite, "send_transactional_email", fake_send)
+
+    try:
+        async with factory() as session:
+            created = await admin_users.create_user(
+                UserCreate(
+                    login="autopw.test",
+                    first_name="Auto",
+                    last_name="Pw",
+                    email="autopw@example.test",
+                ),
+                _root_user(),
+                session,
+                _settings(),
+            )
+            first = bodies[0].split("/set-password?token=")[1].split()[0]
+
+            await admin_users.resend_setup_link(created.id, _root_user(), session, _settings())
+            second = bodies[1].split("/set-password?token=")[1].split()[0]
+            assert second != first
+
+            # Re-issuing moves the window rather than widening it.
+            assert await resolve_token(session, first) is None
+            assert await resolve_token(session, second) == created.id
     finally:
         await engine.dispose()
 
@@ -320,7 +466,7 @@ async def test_create_user_welcome_mail_failure_returns_502(
     async def failing_send(session: Any, *, to_addr: str, subject: str, body: str) -> None:
         raise WelcomeMailError("smtp disabled")
 
-    monkeypatch.setattr(admin_users, "send_transactional_email", failing_send)
+    monkeypatch.setattr(welcome_invite, "send_transactional_email", failing_send)
 
     try:
         async with factory() as session:
@@ -334,6 +480,7 @@ async def test_create_user_welcome_mail_failure_returns_502(
                     ),
                     _root_user(),
                     session,
+                    _settings(),
                 )
             assert exc_info.value.status_code == 502
 
@@ -362,6 +509,7 @@ async def test_update_user_email_overwrite_and_clear(mariadb_znuny_url: str) -> 
                 ),
                 _root_user(),
                 session,
+                _settings(),
             )
 
             updated = await admin_users.update_user(
@@ -465,6 +613,7 @@ async def test_delete_user_permanently_removes_an_unreferenced_agent(
                 ),
                 _root_user(),
                 session,
+                _settings(),
             )
 
             report = await admin_users.get_user_deletable(created.id, _root_user(), session)
@@ -550,6 +699,7 @@ async def test_language_get_set_roundtrip(mariadb_znuny_url: str) -> None:
                 ),
                 _root_user(),
                 session,
+                _settings(),
             )
 
             initial = await admin_users.get_user_language(created.id, _root_user(), session)

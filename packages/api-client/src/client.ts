@@ -142,6 +142,7 @@ export type EffectiveQueuePermission = Schemas["EffectiveQueuePermission"];
 export type EffectivePermissionSource = Schemas["EffectivePermissionSource"];
 export type UserLanguageOut = Schemas["UserLanguageOut"];
 export type UserDeletableOut = Schemas["UserDeletableOut"];
+export type PasswordSetupCheckOut = Schemas["PasswordSetupCheckOut"];
 export type UserReference = Schemas["UserReference"];
 export type UserLanguageUpdate = Schemas["UserLanguageUpdate"];
 export type QueueOut = Schemas["QueueOut"];
@@ -1786,6 +1787,28 @@ export class ApiClient {
       `/api/v1/admin/users/${userId}/effective-permissions`,
       { signal },
     );
+  }
+
+  /** Public: is this one-time password-setup link still usable? */
+  checkPasswordSetup(token: string, signal?: AbortSignal) {
+    return this.request<PasswordSetupCheckOut>(
+      "GET",
+      `/api/v1/auth/password-setup/${encodeURIComponent(token)}`,
+      { signal },
+    );
+  }
+
+  /** Public: spend the link and set the password. */
+  completePasswordSetup(token: string, password: string, signal?: AbortSignal) {
+    return this.request<void>("POST", "/api/v1/auth/password-setup", {
+      body: { token, password },
+      signal,
+    });
+  }
+
+  /** Admin: issue a fresh setup link and mail it, superseding the previous. */
+  resendSetupLink(userId: number, signal?: AbortSignal) {
+    return this.request<void>("POST", `/api/v1/admin/users/${userId}/setup-link`, { signal });
   }
 
   getUserDeletable(userId: number, signal?: AbortSignal) {

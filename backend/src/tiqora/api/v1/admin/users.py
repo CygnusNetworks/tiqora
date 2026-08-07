@@ -2,14 +2,13 @@
 
 from __future__ import annotations
 
-import secrets
 from typing import Literal, cast
 
 import structlog
 from fastapi import APIRouter, HTTPException, Query, status
 from sqlalchemy import select
 
-from tiqora.api.deps import DbSession
+from tiqora.api.deps import AppSettings, DbSession
 from tiqora.api.v1.admin.common import (
     USER_CACHE_TYPES,
     USER_GROUP_CACHE_TYPES,
@@ -44,10 +43,12 @@ from tiqora.api.v1.admin.schemas import (
 from tiqora.db.legacy.queue import Queue
 from tiqora.db.legacy.user import GroupRole, GroupUser, PermissionGroups, Roles, RoleUser, Users
 from tiqora.domain.auth import normalize_language_code
+from tiqora.domain.password_setup import unusable_password_hash
 from tiqora.domain.schemas import UserLanguageUpdate
 from tiqora.domain.user_delete import blocking_references, delete_user_rows
 from tiqora.domain.user_preferences import bulk_get_preferences, get_preference, set_preference
-from tiqora.domain.welcome_mail import WelcomeMailError, send_transactional_email
+from tiqora.domain.welcome_invite import send_setup_invite
+from tiqora.domain.welcome_mail import WelcomeMailError
 from tiqora.permissions.engine import PERMISSION_KEYS
 from tiqora.znuny.password import hash_password
 
@@ -114,18 +115,17 @@ async def get_user(user_id: int, admin: AdminUser, session: DbSession) -> UserOu
 
 
 @router.post("", response_model=UserOut, status_code=status.HTTP_201_CREATED)
-async def create_user(body: UserCreate, admin: AdminUser, session: DbSession) -> UserOut:
+async def create_user(
+    body: UserCreate, admin: AdminUser, session: DbSession, settings: AppSettings
+) -> UserOut:
     ts = now()
-    generated_password: str | None = None
-    password = body.password
-    if not password:
-        # UserCreate enforces email is set whenever password is omitted.
-        generated_password = secrets.token_urlsafe(12)
-        password = generated_password
-
+    # No password supplied means "invite": the account gets a hash of a secret
+    # nobody holds, and the agent chooses their own password through a
+    # one-time link. UserCreate enforces that email is set in that case.
+    invite = not body.password
     user = Users(
         login=body.login,
-        pw=hash_password(password),
+        pw=unusable_password_hash() if invite else hash_password(body.password or ""),
         title=body.title,
         first_name=body.first_name,
         last_name=body.last_name,
@@ -147,32 +147,40 @@ async def create_user(body: UserCreate, admin: AdminUser, session: DbSession) ->
     await session.commit()
     await session.refresh(user)
 
-    if generated_password is not None:
+    if invite:
         assert body.email is not None  # noqa: S101 — enforced by UserCreate validator
+        # Read the identifiers out before the try: a rollback in the handler
+        # expires the ORM instance, and touching it afterwards would trigger a
+        # lazy refresh from inside the error path.
+        new_user_id, new_login = user.id, user.login
         try:
-            await send_transactional_email(
+            await send_setup_invite(
                 session,
+                settings=settings,
+                user_id=new_user_id,
+                login=new_login,
+                first_name=body.first_name,
                 to_addr=body.email,
-                subject="Ihr Tiqora-Zugang wurde angelegt",
-                body=(
-                    f"Hallo {body.first_name},\n\n"
-                    "für Sie wurde ein Tiqora-Zugang angelegt.\n\n"
-                    f"Login: {body.login}\n"
-                    f"Passwort: {generated_password}\n\n"
-                    "Bitte melden Sie sich an und ändern Sie Ihr Passwort."
-                ),
             )
         except (WelcomeMailError, OSError) as exc:
+            # The account exists but has no usable password and no link out.
+            # Nothing secret to hand back now (that was the point) — the admin
+            # re-sends from the user list once mail works.
+            await session.rollback()
             logger.warning(
-                "admin.users.welcome_mail_failed", user_id=user.id, login=user.login, error=str(exc)
+                "admin.users.setup_invite_failed",
+                user_id=new_user_id,
+                login=new_login,
+                error=str(exc),
             )
             raise HTTPException(
                 status_code=status.HTTP_502_BAD_GATEWAY,
                 detail=(
-                    f"Benutzer wurde angelegt, aber die Willkommens-E-Mail konnte nicht "
-                    f"gesendet werden ({exc}). Generiertes Passwort: {generated_password}"
+                    f"Benutzer wurde angelegt, aber die Einladungs-E-Mail konnte nicht "
+                    f"gesendet werden ({exc}). Bitte den Setup-Link erneut senden."
                 ),
             ) from exc
+        await session.commit()
 
     return _with_preferences(user, body.email or None, body.mobile or None)
 
@@ -333,6 +341,43 @@ async def revoke_role(user_id: int, role_id: int, admin: AdminUser, session: DbS
         await session.delete(existing)
         await invalidate_znuny_cache_types(session, USER_ROLE_CACHE_TYPES)
         await session.commit()
+
+
+@router.post("/{user_id}/setup-link", status_code=status.HTTP_204_NO_CONTENT)
+async def resend_setup_link(
+    user_id: int, admin: AdminUser, session: DbSession, settings: AppSettings
+) -> None:
+    """Issue a fresh password-setup link and mail it.
+
+    For the agent whose invite expired or never arrived. Supersedes any
+    outstanding link for that account, so the previous mail stops working.
+    """
+    _ = admin
+    user = await session.get(Users, user_id)
+    if user is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+    email = await get_preference(session, user_id, "UserEmail")
+    if not email:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="This user has no e-mail address to send the link to",
+        )
+    try:
+        await send_setup_invite(
+            session,
+            settings=settings,
+            user_id=user_id,
+            login=user.login,
+            first_name=user.first_name,
+            to_addr=email,
+        )
+    except (WelcomeMailError, OSError) as exc:
+        await session.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"Could not send the setup link ({exc})",
+        ) from exc
+    await session.commit()
 
 
 @router.get("/{user_id}/deletable", response_model=UserDeletableOut)

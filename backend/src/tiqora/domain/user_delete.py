@@ -31,6 +31,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 # Rows that exist only because the agent does: deleting the account should
 # take them with it rather than refuse. Order matters — children first.
 OWNED: tuple[tuple[str, str], ...] = (
+    ("tiqora_password_setup_token", "user_id"),
     ("tiqora_user_totp", "user_id"),
     ("tiqora_user_passkey", "user_id"),
     ("tiqora_user_auth_config", "user_id"),
@@ -112,10 +113,13 @@ async def _has_rows(session: AsyncSession, ref: Reference, user_id: int) -> bool
     dialect = session.bind.dialect.name if session.bind is not None else ""
     table = _quote(dialect, ref.table)
     column = _quote(dialect, ref.column)
-    # `users` references itself (create_by/change_by). The account's own row
-    # must not count as a blocker for deleting that same account.
-    extra = " AND id <> :uid" if ref.table == "users" else ""
-    stmt = text(f"SELECT 1 FROM {table} WHERE {column} = :uid{extra} LIMIT 1")  # noqa: S608
+    # `users` references itself through create_by/change_by, and a row that
+    # points at *itself* is a genuine blocker: MySQL rejects the DELETE with
+    # errno 1451 rather than resolving the cycle. That is the right outcome —
+    # an agent whose own row records them as the last editor (e.g. after they
+    # redeemed a setup link) has used the account, so refusing beats a raw
+    # integrity error.
+    stmt = text(f"SELECT 1 FROM {table} WHERE {column} = :uid LIMIT 1")  # noqa: S608
     return (await session.execute(stmt, {"uid": user_id})).first() is not None
 
 
