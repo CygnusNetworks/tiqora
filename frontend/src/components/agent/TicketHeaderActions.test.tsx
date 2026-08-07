@@ -191,6 +191,34 @@ describe("TicketHeaderActions", () => {
     expect(screen.getByTestId("ticket-pill-customer")).toHaveTextContent("bob");
   });
 
+  it("hides the type/service/sla pills when the system defines ≤1 of each", async () => {
+    // beforeEach already mocks 1 type, 0 services, 0 slas.
+    wrap(<TicketHeaderActions ticket={makeTicket()} canNote onOpenNote={vi.fn()} />);
+    await screen.findByTestId("ticket-pill-state");
+    expect(screen.queryByTestId("ticket-pill-type")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("ticket-pill-service")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("ticket-pill-sla")).not.toBeInTheDocument();
+  });
+
+  it("shows the type/service/sla pills once the system defines more than one", async () => {
+    listReferenceTypes.mockResolvedValue([
+      { id: 1, name: "Unclassified" },
+      { id: 2, name: "Incident" },
+    ]);
+    listReferenceServices.mockResolvedValue([
+      { id: 1, name: "Hosting" },
+      { id: 2, name: "Consulting" },
+    ]);
+    listReferenceSlas.mockResolvedValue([
+      { id: 1, name: "Gold" },
+      { id: 2, name: "Silver" },
+    ]);
+    wrap(<TicketHeaderActions ticket={makeTicket()} canNote onOpenNote={vi.fn()} />);
+    expect(await screen.findByTestId("ticket-pill-type")).toHaveTextContent("Type");
+    expect(screen.getByTestId("ticket-pill-service")).toHaveTextContent("Service");
+    expect(screen.getByTestId("ticket-pill-sla")).toHaveTextContent("SLA");
+  });
+
   it("patches state directly from the status pill's menu", async () => {
     wrap(<TicketHeaderActions ticket={makeTicket()} canNote onOpenNote={vi.fn()} />);
     fireEvent.click(screen.getByTestId("ticket-pill-state"));
