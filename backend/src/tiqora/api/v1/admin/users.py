@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import secrets
-from typing import Literal
+from typing import Literal, cast
 
 import structlog
 from fastapi import APIRouter, HTTPException, Query, status
@@ -51,6 +51,11 @@ from tiqora.znuny.password import hash_password
 logger = structlog.get_logger(__name__)
 
 router = APIRouter(prefix="/users", tags=["admin:users"])
+
+# Matches EffectivePermissionSource.key / GroupAssignment.permission_key in
+# admin/schemas.py — narrows the DB-returned `str` once it's been checked
+# against PERMISSION_KEYS, instead of re-declaring the literal per call site.
+PermissionKey = Literal["ro", "move_into", "create", "note", "owner", "priority", "rw"]
 
 
 def _with_preferences(user: Users, email: str | None, mobile: str | None) -> UserOut:
@@ -386,14 +391,16 @@ async def get_effective_permissions(
     role_ids = [r.id for r in roles]
 
     # group_id -> permission_key -> list of source labels
-    sources: dict[int, dict[str, list[str]]] = {}
+    sources: dict[int, dict[PermissionKey, list[str]]] = {}
 
     direct_rows = await session.execute(
         select(GroupUser.group_id, GroupUser.permission_key).where(GroupUser.user_id == user_id)
     )
     for group_id, key in direct_rows.all():
         if key in PERMISSION_KEYS:
-            sources.setdefault(group_id, {}).setdefault(key, []).append("direct")
+            sources.setdefault(group_id, {}).setdefault(cast(PermissionKey, key), []).append(
+                "direct"
+            )
 
     if role_ids:
         role_names = {r.id: r.name for r in roles}
@@ -405,7 +412,9 @@ async def get_effective_permissions(
         for group_id, key, role_id in via_role_rows.all():
             if key in PERMISSION_KEYS:
                 label = f"Rolle: {role_names.get(role_id, role_id)}"
-                sources.setdefault(group_id, {}).setdefault(key, []).append(label)
+                sources.setdefault(group_id, {}).setdefault(cast(PermissionKey, key), []).append(
+                    label
+                )
 
     group_ids = list(sources.keys())
     groups_by_id: dict[int, PermissionGroups] = {}
