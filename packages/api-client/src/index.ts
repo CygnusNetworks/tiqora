@@ -99,6 +99,7 @@ export {
   type EffectivePermissionSource,
   type UserLanguageOut,
   type UserDeletableOut,
+  type PasswordSetupCheckOut,
   type UserReference,
   type UserLanguageUpdate,
   type QueueOut,

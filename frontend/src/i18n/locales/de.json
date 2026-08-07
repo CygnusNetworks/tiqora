@@ -1491,7 +1491,10 @@
       "deletableBody": "{{name}} wird nirgends referenziert und kann vollständig entfernt werden – zusammen mit Einstellungen, Gruppen- und Rollenzuordnung sowie 2FA-Einrichtung.",
       "deleteIrreversible": "Das lässt sich nicht rückgängig machen.",
       "deleteBlockedBody": "{{name}} kann nicht gelöscht werden – folgende Tabellen verweisen noch auf das Konto:",
-      "deleteBlockedHint": "Setze das Konto stattdessen auf „Ungültig“. So bleiben Tickets, Artikel und Historie zuordenbar."
+      "deleteBlockedHint": "Setze das Konto stattdessen auf „Ungültig“. So bleiben Tickets, Artikel und Historie zuordenbar.",
+      "resendSetupLink": "Setup-Link erneut senden",
+      "setupLinkSent": "Setup-Link wurde gesendet.",
+      "setupLinkFailed": "Setup-Link konnte nicht gesendet werden."
     },
     "groups": {
       "title_plural": "Gruppen",
@@ -2723,5 +2726,18 @@
     "body": "Text",
     "editTitle": "„{{name}}“ bearbeiten",
     "saveError": "Vorlage konnte nicht gespeichert werden."
+  },
+  "setPassword": {
+    "subtitle": "Bitte legen Sie ein Passwort für Ihr Konto fest.",
+    "password": "Neues Passwort",
+    "confirm": "Passwort wiederholen",
+    "minLength": "Mindestens {{n}} Zeichen.",
+    "mismatch": "Die Passwörter stimmen nicht überein.",
+    "submit": "Passwort festlegen",
+    "saving": "Wird gespeichert…",
+    "done": "Passwort gespeichert. Sie können sich jetzt anmelden.",
+    "invalid": "Dieser Link ist nicht mehr gültig.",
+    "invalidHint": "Setup-Links sind 7 Tage gültig und lassen sich einmal verwenden. Bitte fordern Sie einen neuen bei Ihrer Administration an.",
+    "toLogin": "Zur Anmeldung"
   }
 }

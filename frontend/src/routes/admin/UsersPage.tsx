@@ -40,6 +40,15 @@ function KeyIcon() {
   );
 }
 
+function MailIcon() {
+  return (
+    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" aria-hidden="true">
+      <rect x="3" y="5" width="18" height="14" rx="2" stroke="currentColor" strokeWidth="1.7" />
+      <path d="m3 7 9 6 9-6" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
 function TrashIcon() {
   return (
     <svg viewBox="0 0 24 24" width="14" height="14" fill="none" aria-hidden="true">
@@ -85,6 +94,12 @@ export function UsersPage() {
   const [permissionsTarget, setPermissionsTarget] = useState<UserOut | null>(null);
   const [settingsTarget, setSettingsTarget] = useState<UserOut | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<UserOut | null>(null);
+  const [linkToast, setLinkToast] = useState<string | null>(null);
+  const resendM = useMutation({
+    mutationFn: (userId: number) => api.resendSetupLink(userId),
+    onSuccess: () => setLinkToast(t("admin.users.setupLinkSent")),
+    onError: () => setLinkToast(t("admin.users.setupLinkFailed")),
+  });
 
   const columns: DataTableColumn<UserOut>[] = [
     { key: "id", header: t("admin.table.id"), mono: true, render: (r) => r.id },
@@ -218,6 +233,15 @@ export function UsersPage() {
             </span>
           </MenuItem>
           <MenuItem
+            testId={`admin-row-resend-setup-${row.id}`}
+            onSelect={() => resendM.mutate(row.id)}
+          >
+            <span className="inline-flex items-center gap-2">
+              <MailIcon />
+              {t("admin.users.resendSetupLink")}
+            </span>
+          </MenuItem>
+          <MenuItem
             testId={`admin-row-delete-permanent-${row.id}`}
             onSelect={() => setDeleteTarget(row)}
           >
@@ -281,6 +305,26 @@ export function UsersPage() {
       onClose={() => setPermissionsTarget(null)}
     />
     <AgentSettingsDialog user={settingsTarget} onClose={() => setSettingsTarget(null)} />
+    {linkToast && (
+      <div
+        role="status"
+        data-testid="admin-users-toast"
+        className="fixed bottom-4 left-1/2 z-50 -translate-x-1/2 rounded-md border border-hairline bg-surface px-3 py-2 text-sm text-ink shadow-lg"
+        onAnimationEnd={() => setLinkToast(null)}
+      >
+        <span className="inline-flex items-center gap-2">
+          {linkToast}
+          <button
+            type="button"
+            className="text-muted hover:text-ink"
+            aria-label={t("common.close")}
+            onClick={() => setLinkToast(null)}
+          >
+            ✕
+          </button>
+        </span>
+      </div>
+    )}
     <UserDeleteDialog
       user={deleteTarget}
       onClose={() => setDeleteTarget(null)}
