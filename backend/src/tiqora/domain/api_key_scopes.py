@@ -182,15 +182,21 @@ def expand_scopes(scopes: frozenset[str] | None) -> dict[str, ScopeLevel] | None
     return out
 
 
+def _is_always_allowed(path: str) -> bool:
+    for prefix in _ALWAYS_ALLOWED_PREFIXES:
+        if path == prefix or path.startswith(prefix + "/"):
+            return True
+    return False
+
+
 def path_to_area(path: str) -> str | None:
     """Map a request path to a scope area, or None if unscoped/always-open."""
     # Strip query string if callers pass full URL path+query
     path = path.split("?", 1)[0]
     if not path.startswith("/"):
         path = "/" + path
-    for prefix in _ALWAYS_ALLOWED_PREFIXES:
-        if path == prefix or path.startswith(prefix + "/"):
-            return None
+    if _is_always_allowed(path):
+        return None
     for prefix, area in _PATH_PREFIX_TO_AREA:
         if path == prefix or path.startswith(prefix + "/"):
             return area
@@ -214,6 +220,15 @@ def scopes_allow(
     expanded = expand_scopes(scopes)
     if expanded is None:
         return True
+    # Always-open identity/plumbing prefixes (e.g. /api/v1/auth): safe methods
+    # stay open for any valid key, but state-changing calls (TOTP enroll/confirm,
+    # passkey delete, ...) must NOT be reachable by a restricted/read-only key —
+    # otherwise a scoped key can mutate its own auth/2FA state (security review).
+    normalized = path.split("?", 1)[0]
+    if not normalized.startswith("/"):
+        normalized = "/" + normalized
+    if _is_always_allowed(normalized):
+        return not method_needs_rw(method)
     area = path_to_area(path)
     if area is None:
         return True
