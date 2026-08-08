@@ -55,6 +55,27 @@ def test_render_html_full_pipeline() -> None:
     assert "data-external-src" in rendered.body
 
 
+def test_external_image_gate_covers_bypass_forms() -> None:
+    # Protocol-relative and unquoted external image sources must also be gated
+    # (moved to run after nh3 normalisation) — otherwise a customer-emailed
+    # tracking pixel auto-loads in the agent's browser (security review).
+    for raw in (
+        '<img src="//tracker.example/p.gif">',  # protocol-relative
+        "<img src=http://tracker.example/p.gif>",  # unquoted
+        '<img src="https://tracker.example/p.gif">',  # baseline
+    ):
+        rendered = render_article_body(
+            body=raw,
+            content_type="text/html",
+            ticket_id=1,
+            article_id=2,
+        )
+        assert "data-external-src" in rendered.body, raw
+        assert "tracker.example" in rendered.body
+        # The live src must be neutralised until the user opts in.
+        assert 'src=""' in rendered.body or "src=''" in rendered.body, raw
+
+
 def test_render_plain_escaped() -> None:
     rendered = render_article_body(
         body='<b>not html</b> & "x"',

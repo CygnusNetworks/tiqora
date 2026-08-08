@@ -21,6 +21,18 @@ def test_state_roundtrip() -> None:
     assert m.parse_token_config_id_from_state(None) is None
 
 
+def test_state_nonce_roundtrip() -> None:
+    # Anti-CSRF nonce is embedded in state and recoverable; config id still parses
+    # for Znuny compatibility (security review).
+    state = m.state_for_config_id(7, "abc-DEF_123")
+    assert state == "TokenConfigID7.abc-DEF_123"
+    assert m.parse_token_config_id_from_state(state) == 7
+    assert m.parse_nonce_from_state(state) == "abc-DEF_123"
+    # Bare (nonce-less) state has no nonce.
+    assert m.parse_nonce_from_state("TokenConfigID7") is None
+    assert m.parse_nonce_from_state("nope") is None
+
+
 def test_sasl_xoauth2_raw_not_base64() -> None:
     raw = m.assemble_sasl_xoauth2_raw("user@example.com", "tok123")
     assert raw.startswith(b"user=user@example.com\x01auth=Bearer tok123")

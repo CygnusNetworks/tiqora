@@ -72,8 +72,11 @@ _CID_SRC_RE = re.compile(
     r"""(?P<prefix>\bsrc\s*=\s*["'])cid:(?P<cid>[^"']+)(?P<suffix>["'])""",
     re.IGNORECASE,
 )
+# Matches scheme-full (http(s)://) AND scheme-relative (//host/...) img sources.
+# Run AFTER nh3 sanitisation, which normalises every attribute to a quoted form,
+# so unquoted src=http://... in raw mail HTML is caught here too (security review).
 _IMG_SRC_RE = re.compile(
-    r"""<img\b([^>]*?)\bsrc\s*=\s*(?P<q>["'])(?P<src>https?://[^"']+)(?P=q)([^>]*)>""",
+    r"""<img\b([^>]*?)\bsrc\s*=\s*(?P<q>["'])(?P<src>(?:https?:)?//[^"']+)(?P=q)([^>]*)>""",
     re.IGNORECASE | re.DOTALL,
 )
 
@@ -163,9 +166,12 @@ def render_article_body(
     ct = (content_type or "text/plain").split(";", 1)[0].strip().lower()
     if ct in {"text/html", "application/xhtml+xml"}:
         rewritten = rewrite_cid_urls(text, ticket_id, article_id, base_path)
-        marked = mark_external_images(rewritten)
-        safe = sanitize_html(marked)
-        return RenderedArticleBody(content_type="text/html", body=safe, is_html=True)
+        # Sanitise FIRST so nh3 normalises all attributes to a quoted, well-formed
+        # shape, THEN gate external images — this closes the unquoted / scheme-
+        # relative (//host) tracker-pixel bypasses that survived regex-before-nh3.
+        safe = sanitize_html(rewritten)
+        marked = mark_external_images(safe)
+        return RenderedArticleBody(content_type="text/html", body=marked, is_html=True)
     return RenderedArticleBody(
         content_type="text/plain",
         body=html.escape(text),

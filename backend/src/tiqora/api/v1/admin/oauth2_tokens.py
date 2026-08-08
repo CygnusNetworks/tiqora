@@ -7,20 +7,22 @@ can operate in parallel against the same records.
 
 from __future__ import annotations
 
+import secrets
 from datetime import datetime
 from typing import Any
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, HTTPException, Request, status
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 
-from tiqora.api.deps import DbSession
+from tiqora.api.deps import DbSession, get_redis
 from tiqora.api.v1.admin.deps import AdminUser
 from tiqora.api.v1.admin.pagination import ListParamsDep, Page, window
 from tiqora.config import get_settings
 from tiqora.db.legacy.oauth2 import OAuth2TokenConfig
 from tiqora.domain.oauth2_mail import (
+    OAUTH2_STATE_TTL,
     OAuth2MailError,
     OAuth2NotAvailableError,
     build_authorization_url,
@@ -31,6 +33,7 @@ from tiqora.domain.oauth2_mail import (
     get_redirect_uri,
     get_token_row,
     list_provider_templates,
+    oauth2_state_redis_key,
     parse_config_blob,
     public_config_view,
     request_token_by_refresh_token,
@@ -277,7 +280,9 @@ async def remove_token_config(config_id: int, admin: AdminUser, session: DbSessi
 
 
 @router.get("/{config_id}/authorize-url", response_model=AuthorizeUrlOut)
-async def authorize_url(config_id: int, admin: AdminUser, session: DbSession) -> AuthorizeUrlOut:
+async def authorize_url(
+    config_id: int, admin: AdminUser, session: DbSession, request: Request
+) -> AuthorizeUrlOut:
     _ = admin
     try:
         ensure_oauth2_available()
@@ -287,8 +292,14 @@ async def authorize_url(config_id: int, admin: AdminUser, session: DbSession) ->
     if row is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not found")
     settings = get_settings()
+    # Random anti-CSRF nonce bound to this config, stored server-side. The public
+    # callback rejects any state whose nonce is not present in Redis, so an
+    # attacker cannot forge state=TokenConfigID{n} to inject their own token.
+    nonce = secrets.token_urlsafe(24)
+    redis_client = await get_redis(request)
+    await redis_client.set(oauth2_state_redis_key(row.id, nonce), "1", ex=OAUTH2_STATE_TTL)
     try:
-        url = build_authorization_url(row, settings=settings)
+        url = build_authorization_url(row, settings=settings, state_nonce=nonce)
     except OAuth2MailError as exc:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
@@ -296,7 +307,7 @@ async def authorize_url(config_id: int, admin: AdminUser, session: DbSession) ->
     return AuthorizeUrlOut(
         url=url,
         redirect_uri=get_redirect_uri(settings),
-        state=state_for_config_id(row.id),
+        state=state_for_config_id(row.id, nonce),
     )
 
 

@@ -103,6 +103,23 @@ def test_legacy_write_allows_mutate() -> None:
     assert scopes_allow(scopes, method="GET", path="/api/v1/kb")
 
 
+def test_restricted_key_cannot_mutate_auth_surface() -> None:
+    # /api/v1/auth is always-open for identity/plumbing, but a restricted key
+    # must NOT be able to POST/DELETE auth state (TOTP enroll/confirm, passkey
+    # delete). Safe methods stay open (security review regression).
+    scopes = parse_api_key_scopes(all_areas_read_only_scopes())
+    assert scopes is not None
+    assert scopes_allow(scopes, method="GET", path="/api/v1/auth/me")
+    assert not scopes_allow(scopes, method="POST", path="/api/v1/auth/totp/enroll")
+    assert not scopes_allow(scopes, method="POST", path="/api/v1/auth/totp/confirm")
+    assert not scopes_allow(scopes, method="DELETE", path="/api/v1/auth/passkey/5")
+    # A narrowly-scoped key is likewise blocked from mutating the auth surface.
+    narrow = parse_api_key_scopes("tickets:ro")
+    assert not scopes_allow(narrow, method="POST", path="/api/v1/auth/totp/enroll")
+    # Unrestricted keys retain full access.
+    assert scopes_allow(None, method="POST", path="/api/v1/auth/totp/enroll")
+
+
 def test_mcp_connect_and_write() -> None:
     assert mcp_scopes_allow_connect(None)
     assert mcp_scopes_allow_write(None)

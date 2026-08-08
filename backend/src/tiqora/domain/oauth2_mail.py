@@ -37,8 +37,15 @@ logger = structlog.get_logger(__name__)
 VALID_ID_VALID = 1
 VALID_ID_INVALID = 2
 
+# Redis-backed anti-CSRF nonce for the public authorization callback.
+OAUTH2_STATE_REDIS_PREFIX = "tiqora:oauth2:authstate:"
+OAUTH2_STATE_TTL = 600
+
 STATE_PREFIX = "TokenConfigID"
-STATE_RE = re.compile(r"\ATokenConfigID(\d+)\Z")
+# Optional ``.<nonce>`` suffix carries a per-authorization anti-CSRF token that
+# the public callback validates against Redis (security review). The bare
+# ``TokenConfigID<n>`` form stays parseable for Znuny compatibility.
+STATE_RE = re.compile(r"\ATokenConfigID(\d+)(?:\.([A-Za-z0-9_-]+))?\Z")
 
 REQUEST_AUTH_CODE = "AuthorizationCode"
 REQUEST_TOKEN_BY_CODE = "TokenByAuthorizationCode"
@@ -279,8 +286,13 @@ def get_redirect_uri(settings: Settings | None = None) -> str:
     return f"{base}{authorization_callback_path()}"
 
 
-def state_for_config_id(config_id: int) -> str:
-    return f"{STATE_PREFIX}{int(config_id)}"
+def oauth2_state_redis_key(config_id: int, nonce: str) -> str:
+    return f"{OAUTH2_STATE_REDIS_PREFIX}{int(config_id)}:{nonce}"
+
+
+def state_for_config_id(config_id: int, nonce: str | None = None) -> str:
+    base = f"{STATE_PREFIX}{int(config_id)}"
+    return f"{base}.{nonce}" if nonce else base
 
 
 def parse_token_config_id_from_state(state: str | None) -> int | None:
@@ -290,6 +302,16 @@ def parse_token_config_id_from_state(state: str | None) -> int | None:
     if not m:
         return None
     return int(m.group(1))
+
+
+def parse_nonce_from_state(state: str | None) -> str | None:
+    """Extract the anti-CSRF nonce from ``TokenConfigID<n>.<nonce>`` (or None)."""
+    if not state:
+        return None
+    m = STATE_RE.match(str(state))
+    if not m:
+        return None
+    return m.group(2)
 
 
 def assemble_sasl_xoauth2_raw(username: str, access_token: str) -> bytes:
@@ -379,6 +401,7 @@ def _assemble_request_data(
     request_type: str,
     settings: Settings | None,
     authorization_code: str | None = None,
+    state_nonce: str | None = None,
 ) -> tuple[str, dict[str, str]]:
     req = _request_config(config, request_type)
     url = req.get("URL")
@@ -418,7 +441,7 @@ def _assemble_request_data(
         elif key_s in token_fields and token_fields[key_s] is not None:
             value = str(token_fields[key_s])
         elif key_s == "State":
-            value = state_for_config_id(config_id)
+            value = state_for_config_id(config_id, state_nonce)
         elif key_s == "RedirectURL":
             value = get_redirect_uri(settings)
         data[str(param)] = value if value is not None else ""
@@ -643,6 +666,7 @@ def build_authorization_url(
     row: OAuth2TokenConfig,
     *,
     settings: Settings | None = None,
+    state_nonce: str | None = None,
 ) -> str:
     config = parse_config_blob(row.config)
     url, data = _assemble_request_data(
@@ -651,6 +675,7 @@ def build_authorization_url(
         config_id=row.id,
         request_type=REQUEST_AUTH_CODE,
         settings=settings,
+        state_nonce=state_nonce,
     )
     if not data:
         return url
