@@ -70,6 +70,7 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 
 _OIDC_STATE_PREFIX = "tiqora:oidc:state:"
 _OIDC_STATE_TTL = 300
+_OIDC_STATE_COOKIE = "tiqora_oidc_state"
 
 
 async def _load_user_language(session: AsyncSession, user_id: int) -> str | None:
@@ -754,7 +755,20 @@ async def oidc_login(request: Request, settings: AppSettings) -> RedirectRespons
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY, detail="OIDC provider unreachable"
         ) from exc
-    return RedirectResponse(url, status_code=status.HTTP_302_FOUND)
+    resp = RedirectResponse(url, status_code=status.HTTP_302_FOUND)
+    # Bind the state to THIS browser: the callback requires this cookie to match
+    # the returned state, so an attacker cannot replay a state/code they minted
+    # into a victim's session (OIDC login CSRF / session fixation — security review).
+    resp.set_cookie(
+        key=_OIDC_STATE_COOKIE,
+        value=state,
+        httponly=True,
+        secure=settings.session_cookie_secure,
+        samesite="lax",  # sent on the top-level IdP → callback redirect
+        max_age=_OIDC_STATE_TTL,
+        path="/",
+    )
+    return resp
 
 
 @router.get("/oidc/callback", response_model=LoginResponse)
@@ -774,11 +788,19 @@ async def oidc_callback(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Missing code/state")
     redis_client = await get_redis(request)
     state_key = f"{_OIDC_STATE_PREFIX}{state}"
-    if not await redis_client.get(state_key):
+    cookie_state = request.cookies.get(_OIDC_STATE_COOKIE)
+    # State must exist server-side AND match the per-browser cookie set at /login.
+    if (
+        not cookie_state
+        or not secrets.compare_digest(cookie_state, state)
+        or not await redis_client.get(state_key)
+    ):
+        response.delete_cookie(_OIDC_STATE_COOKIE, path="/")
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid or expired state"
         )
     await redis_client.delete(state_key)
+    response.delete_cookie(_OIDC_STATE_COOKIE, path="/")
 
     oidc = OIDCService(settings)
     try:

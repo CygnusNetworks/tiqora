@@ -16,12 +16,15 @@ from typing import Any
 from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse
 
-from tiqora.api.deps import DbSession
+from tiqora.api.deps import DbSession, get_redis
 from tiqora.config import get_settings
 from tiqora.domain.oauth2_mail import (
     OAuth2MailError,
     OAuth2NotAvailableError,
     handle_authorization_callback,
+    oauth2_state_redis_key,
+    parse_nonce_from_state,
+    parse_token_config_id_from_state,
 )
 
 router = APIRouter(tags=["oauth2"])
@@ -62,6 +65,38 @@ async def oauth2_authorization_callback(request: Request, session: DbSession) ->
 
     settings = get_settings()
     admin_link = "/admin/oauth2-tokens"
+
+    # Anti-CSRF: the state must carry a nonce that we minted at authorize time and
+    # stored in Redis. Without this, an unauthenticated attacker could POST their
+    # own code with a guessable state=TokenConfigID{n} and clobber the stored
+    # mail token (security review). Locate the state value among the params.
+    state_value = flat.get("state")
+    if state_value is None or parse_token_config_id_from_state(state_value) is None:
+        state_value = next(
+            (v for v in flat.values() if parse_token_config_id_from_state(v) is not None),
+            None,
+        )
+    config_id = parse_token_config_id_from_state(state_value)
+    nonce = parse_nonce_from_state(state_value)
+    if config_id is None or not nonce:
+        return _page(
+            "Authorization failed",
+            f'Invalid or missing authorization state.<br/><br/><a href="{admin_link}">'
+            "Back to OAuth2 admin</a>",
+            ok=False,
+        )
+    redis_client = await get_redis(request)
+    redis_key = oauth2_state_redis_key(config_id, nonce)
+    if not await redis_client.get(redis_key):
+        return _page(
+            "Authorization failed",
+            f'Authorization state expired or not recognised. Please restart the '
+            f'authorization from the admin UI.<br/><br/><a href="{admin_link}">'
+            "Back to OAuth2 admin</a>",
+            ok=False,
+        )
+    await redis_client.delete(redis_key)
+
     try:
         token = await handle_authorization_callback(
             session, query_params=flat, user_id=1, settings=settings
