@@ -241,6 +241,11 @@ class Settings(BaseSettings):
     ldap_access_attr: str = Field(default="memberUid", validation_alias="TIQORA_LDAP_ACCESS_ATTR")
     ldap_user_attr: str = Field(default="DN", validation_alias="TIQORA_LDAP_USER_ATTR")
 
+    # Customer portal master switch at deployment level. False hard-disables
+    # the portal: /api/portal/* answers 404 and the SPA sends "/" straight to
+    # the agent login, whatever `portal.enabled` says in tiqora_settings.
+    portal_enabled: bool = Field(default=True, validation_alias="TIQORA_PORTAL_ENABLED")
+
     # LDAP/AD customer (portal) auth (Phase 3c), mirroring
     # Kernel::System::CustomerAuth::LDAP. Same no-auto-provisioning rule:
     # the LDAP UID must match an existing, valid `customer_user.login`.
