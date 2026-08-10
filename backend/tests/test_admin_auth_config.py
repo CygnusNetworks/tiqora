@@ -110,11 +110,11 @@ async def test_list_put_reset_global(url_fixture: str, request: pytest.FixtureRe
         assert await totp.is_enabled(user_id) is False
 
         # Global toggle
-        g0 = await admin_auth_config.get_global_auth_config(admin, session)
+        g0 = await admin_auth_config.get_global_auth_config(admin, session, settings)
         assert g0.enforce_all is False
         assert g0.enforce_group_ids == []
         g1 = await admin_auth_config.put_global_auth_config(
-            AuthConfigGlobalUpdate(enforce_all=True), admin, session
+            AuthConfigGlobalUpdate(enforce_all=True), admin, session, settings
         )
         assert g1.enforce_all is True
         assert g1.enforce_group_ids == []
@@ -123,7 +123,7 @@ async def test_list_put_reset_global(url_fixture: str, request: pytest.FixtureRe
         assert await AuthConfigService(session).effective_enforce(user_id) is True
 
         await admin_auth_config.put_global_auth_config(
-            AuthConfigGlobalUpdate(enforce_all=False), admin, session
+            AuthConfigGlobalUpdate(enforce_all=False), admin, session, settings
         )
 
     await engine.dispose()
@@ -191,6 +191,7 @@ async def test_global_enforce_group_ids(url_fixture: str, request: pytest.Fixtur
     engine = create_async_engine(_to_async_url(sync_url))
     factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
     admin = _admin()
+    settings = Settings(secret_key="unit-test-secret-key")
 
     async with factory() as session:
         # Unknown group id → 422
@@ -199,6 +200,7 @@ async def test_global_enforce_group_ids(url_fixture: str, request: pytest.Fixtur
                 AuthConfigGlobalUpdate(enforce_all=False, enforce_group_ids=[9_999_999]),
                 admin,
                 session,
+                settings,
             )
         assert ei.value.status_code == 422
 
@@ -206,6 +208,7 @@ async def test_global_enforce_group_ids(url_fixture: str, request: pytest.Fixtur
             AuthConfigGlobalUpdate(enforce_all=False, enforce_group_ids=[group_id]),
             admin,
             session,
+            settings,
         )
         assert g.enforce_all is False
         assert g.enforce_group_ids == [group_id]
@@ -221,6 +224,7 @@ async def test_global_enforce_group_ids(url_fixture: str, request: pytest.Fixtur
             AuthConfigGlobalUpdate(enforce_all=False, enforce_group_ids=[]),
             admin,
             session,
+            settings,
         )
         assert g2.enforce_group_ids == []
         assert await svc.effective_enforce(user_id) is False
@@ -230,11 +234,13 @@ async def test_global_enforce_group_ids(url_fixture: str, request: pytest.Fixtur
             AuthConfigGlobalUpdate(enforce_all=False, enforce_group_ids=[group_id]),
             admin,
             session,
+            settings,
         )
         g3 = await admin_auth_config.put_global_auth_config(
             AuthConfigGlobalUpdate(enforce_all=True),
             admin,
             session,
+            settings,
         )
         assert g3.enforce_all is True
         assert g3.enforce_group_ids == [group_id]
@@ -243,6 +249,7 @@ async def test_global_enforce_group_ids(url_fixture: str, request: pytest.Fixtur
             AuthConfigGlobalUpdate(enforce_all=False, enforce_group_ids=[]),
             admin,
             session,
+            settings,
         )
 
     await engine.dispose()
