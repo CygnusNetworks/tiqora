@@ -1157,7 +1157,8 @@
         "enforceGroups": "Ngoài ra, buộc 2FA đối với mọi nhân viên là thành viên của bất kỳ nhóm nào được chọn ở đây — ngay cả khi chế độ \"Thực thi cho tất cả\" bị tắt.",
         "sso": "Cho phép tác nhân này xác thực thông qua đường dẫn SSO/nhà cung cấp danh tính bên ngoài. Không tự cấu hình nhà cung cấp SSO - chỉ liệu tác nhân này có thể sử dụng nó hay không.",
         "enforce": "Buộc 2FA cho tài khoản đại lý cá nhân này, độc lập với cài đặt chung ở trên.",
-        "reset": "Xóa vĩnh viễn cả đăng ký TOTP của đại lý và tất cả mật khẩu đã đăng ký. Sau đó, đại lý phải thiết lập 2FA từ đầu - không có trạng thái trung gian mềm."
+        "reset": "Xóa vĩnh viễn cả đăng ký TOTP của đại lý và tất cả mật khẩu đã đăng ký. Sau đó, đại lý phải thiết lập 2FA từ đầu - không có trạng thái trung gian mềm.",
+        "portalEnabled": "Turns the customer portal on or off for the whole installation. When off, the portal API answers 404, running customer sessions stop working, and the start page goes straight to the agent login. Customer records and email tickets are unaffected."
       },
       "queues": {
         "group": "Xác định ai có thể xem và làm việc với hàng đợi này — quyền truy cập được kiểm soát hoàn toàn thông qua nhóm, không bao giờ được cấp cho mỗi hàng đợi.",
@@ -2119,7 +2120,9 @@
       "reset2fa": "Đặt lại 2FA",
       "resetConfirmTitle": "Đặt lại xác thực hai yếu tố?",
       "resetConfirmBody": "Điều này vô hiệu hóa 2FA cho {{login}}. Họ sẽ cần phải đăng ký lại nếu việc thực thi vẫn được áp dụng.",
-      "empty": "Không tìm thấy đại lý nào."
+      "empty": "Không tìm thấy đại lý nào.",
+      "portalEnabled": "Customer portal available",
+      "portalLockedByEnv": "Disabled by this deployment (TIQORA_PORTAL_ENABLED)."
     },
     "gdpr": {
       "title": "Quyền riêng tư / GDPR",

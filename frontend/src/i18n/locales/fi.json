@@ -1157,7 +1157,8 @@
         "enforceGroups": "Lisäksi pakottaa 2FA:n jokaiselle agentille, joka kuuluu mihin tahansa täällä valittuun ryhmään – vaikka \"Pakota kaikille\" on pois päältä.",
         "sso": "Antaa tämän agentin todentaa ulkoisen SSO/identiteetintarjoajan polun kautta. Ei määritä itse SSO-palveluntarjoajaa – vain voiko tämä agentti käyttää sitä.",
         "enforce": "Pakottaa 2FA:n tälle yksittäiselle agenttitilille yllä olevista yleisistä asetuksista riippumatta.",
-        "reset": "Poistaa peruuttamattomasti sekä edustajan TOTP-rekisteröinnin että kaikki rekisteröidyt salasanat. Agentin on määritettävä 2FA tyhjästä jälkeenpäin – pehmeää välitilaa ei ole."
+        "reset": "Poistaa peruuttamattomasti sekä edustajan TOTP-rekisteröinnin että kaikki rekisteröidyt salasanat. Agentin on määritettävä 2FA tyhjästä jälkeenpäin – pehmeää välitilaa ei ole.",
+        "portalEnabled": "Turns the customer portal on or off for the whole installation. When off, the portal API answers 404, running customer sessions stop working, and the start page goes straight to the agent login. Customer records and email tickets are unaffected."
       },
       "queues": {
         "group": "Määrittää, kuka voi nähdä tämän jonon ja työskennellä – pääsyä ohjataan kokonaan ryhmän kautta, eikä sitä koskaan myönnetä jonoa kohden.",
@@ -2119,7 +2120,9 @@
       "reset2fa": "Nollaa 2FA",
       "resetConfirmTitle": "Nollataanko kaksivaiheinen todennus?",
       "resetConfirmBody": "Tämä poistaa 2FA:n käytöstä {{login}}:lle. Heidän on rekisteröidyttävä uudelleen, jos täytäntöönpano on edelleen voimassa.",
-      "empty": "Agentteja ei löytynyt."
+      "empty": "Agentteja ei löytynyt.",
+      "portalEnabled": "Customer portal available",
+      "portalLockedByEnv": "Disabled by this deployment (TIQORA_PORTAL_ENABLED)."
     },
     "gdpr": {
       "title": "Yksityisyys / GDPR",

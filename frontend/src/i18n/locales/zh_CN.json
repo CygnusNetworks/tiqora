@@ -1157,7 +1157,8 @@
         "enforceGroups": "此外，即使“对所有人强制执行”处于关闭状态，也会对属于此处选中的任何组成员的每个特工强制执行 2FA。",
         "sso": "允许此坐席通过外部 SSO/身份提供商路径进行身份验证。不配置 SSO 提供程序本身 — 仅配置此坐席是否可以使用它。",
         "enforce": "强制此个人坐席帐户执行 2FA，与上述全局设置无关。",
-        "reset": "不可逆地删除坐席的 TOTP 注册和所有注册的密钥。之后坐席必须从头开始设置 2FA——不存在软中间状态。"
+        "reset": "不可逆地删除坐席的 TOTP 注册和所有注册的密钥。之后坐席必须从头开始设置 2FA——不存在软中间状态。",
+        "portalEnabled": "Turns the customer portal on or off for the whole installation. When off, the portal API answers 404, running customer sessions stop working, and the start page goes straight to the agent login. Customer records and email tickets are unaffected."
       },
       "queues": {
         "group": "确定谁可以查看和操作此队列 - 访问权限完全通过组控制，而不是按队列授予。",
@@ -2119,7 +2120,9 @@
       "reset2fa": "重置2FA",
       "resetConfirmTitle": "重置双重身份验证？",
       "resetConfirmBody": "这会禁用 {{login}} 的 2FA。如果强制执行仍然适用，他们将需要重新注册。",
-      "empty": "没有找到坐席。"
+      "empty": "没有找到坐席。",
+      "portalEnabled": "Customer portal available",
+      "portalLockedByEnv": "Disabled by this deployment (TIQORA_PORTAL_ENABLED)."
     },
     "gdpr": {
       "title": "隐私/GDPR",

@@ -1157,7 +1157,8 @@
         "enforceGroups": "Additionally forces 2FA for every agent who is a member of any group checked here — even when \"Enforce for all\" is off.",
         "sso": "Allows this agent to authenticate via the external SSO/identity-provider path. Does not configure the SSO provider itself — only whether this agent may use it.",
         "enforce": "Forces 2FA for this individual agent account, independent of the global settings above.",
-        "reset": "Irreversibly deletes both the agent's TOTP enrollment and all registered passkeys. The agent must set up 2FA from scratch afterwards — there is no soft intermediate state."
+        "reset": "Irreversibly deletes both the agent's TOTP enrollment and all registered passkeys. The agent must set up 2FA from scratch afterwards — there is no soft intermediate state.",
+        "portalEnabled": "Turns the customer portal on or off for the whole installation. When off, the portal API answers 404, running customer sessions stop working, and the start page goes straight to the agent login. Customer records and email tickets are unaffected."
       },
       "queues": {
         "group": "Determines who can see and work this queue — access is controlled entirely through the group, never granted per queue.",
@@ -2127,7 +2128,9 @@
       "reset2fa": "Reset 2FA",
       "resetConfirmTitle": "Reset two-factor authentication?",
       "resetConfirmBody": "This disables 2FA for {{login}}. They will need to enroll again if enforcement still applies.",
-      "empty": "No agents found."
+      "empty": "No agents found.",
+      "portalEnabled": "Customer portal available",
+      "portalLockedByEnv": "Disabled by this deployment (TIQORA_PORTAL_ENABLED)."
     },
     "gdpr": {
       "title": "Privacy / GDPR",

@@ -1157,7 +1157,8 @@
         "enforceGroups": "นอกจากนี้ บังคับใช้ 2FA สำหรับตัวแทนทุกคนที่เป็นสมาชิกของกลุ่มใดๆ ที่ทำเครื่องหมายที่นี่ — แม้ว่าจะปิด \"บังคับใช้ทั้งหมด\" ก็ตาม",
         "sso": "อนุญาตให้ตัวแทนนี้ตรวจสอบสิทธิ์ผ่านเส้นทาง SSO/ผู้ให้บริการข้อมูลประจำตัวภายนอก ไม่กำหนดค่าผู้ให้บริการ SSO เอง — เฉพาะว่าตัวแทนนี้จะใช้งานได้หรือไม่",
         "enforce": "บังคับใช้ 2FA สำหรับบัญชีตัวแทนรายบุคคลนี้ โดยไม่ขึ้นอยู่กับการตั้งค่าส่วนกลางข้างต้น",
-        "reset": "ลบทั้งการลงทะเบียน TOTP ของตัวแทนและพาสคีย์ที่ลงทะเบียนทั้งหมดอย่างถาวร เอเจนต์จะต้องตั้งค่า 2FA ตั้งแต่เริ่มต้นหลังจากนั้น — ไม่มีสถานะกลางแบบซอฟต์"
+        "reset": "ลบทั้งการลงทะเบียน TOTP ของตัวแทนและพาสคีย์ที่ลงทะเบียนทั้งหมดอย่างถาวร เอเจนต์จะต้องตั้งค่า 2FA ตั้งแต่เริ่มต้นหลังจากนั้น — ไม่มีสถานะกลางแบบซอฟต์",
+        "portalEnabled": "Turns the customer portal on or off for the whole installation. When off, the portal API answers 404, running customer sessions stop working, and the start page goes straight to the agent login. Customer records and email tickets are unaffected."
       },
       "queues": {
         "group": "กำหนดว่าใครสามารถดูและทำงานคิวนี้ได้ - การเข้าถึงจะถูกควบคุมทั้งหมดผ่านกลุ่ม ไม่มีการอนุญาตต่อคิว",
@@ -2119,7 +2120,9 @@
       "reset2fa": "รีเซ็ต 2FA",
       "resetConfirmTitle": "รีเซ็ตการตรวจสอบสิทธิ์แบบสองปัจจัยหรือไม่",
       "resetConfirmBody": "สิ่งนี้จะปิดการใช้งาน 2FA สำหรับ {{login}} พวกเขาจะต้องลงทะเบียนอีกครั้งหากยังคงบังคับใช้อยู่",
-      "empty": "ไม่พบตัวแทน"
+      "empty": "ไม่พบตัวแทน",
+      "portalEnabled": "Customer portal available",
+      "portalLockedByEnv": "Disabled by this deployment (TIQORA_PORTAL_ENABLED)."
     },
     "gdpr": {
       "title": "ความเป็นส่วนตัว / GDPR",

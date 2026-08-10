@@ -1157,7 +1157,8 @@
         "enforceGroups": "Turklāt tiek piespiesta 2FA katram aģentam, kas ir jebkuras šeit atzīmētās grupas dalībnieks, pat ja ir izslēgta opcija “Piemērot visiem”.",
         "sso": "Ļauj šim aģentam autentificēties, izmantojot ārējo SSO/identitātes nodrošinātāja ceļu. Nekonfigurē pašu SSO nodrošinātāju — tikai to, vai šis aģents to drīkst izmantot.",
         "enforce": "Piespiež 2FA šim individuālajam aģenta kontam neatkarīgi no iepriekšminētajiem globālajiem iestatījumiem.",
-        "reset": "Neatgriezeniski dzēš gan aģenta TOTP reģistrāciju, gan visas reģistrētās piekļuves atslēgas. Aģentam pēc tam ir jāiestata 2FA no jauna — nav mīksta starpstāvokļa."
+        "reset": "Neatgriezeniski dzēš gan aģenta TOTP reģistrāciju, gan visas reģistrētās piekļuves atslēgas. Aģentam pēc tam ir jāiestata 2FA no jauna — nav mīksta starpstāvokļa.",
+        "portalEnabled": "Turns the customer portal on or off for the whole installation. When off, the portal API answers 404, running customer sessions stop working, and the start page goes straight to the agent login. Customer records and email tickets are unaffected."
       },
       "queues": {
         "group": "Nosaka, kas var redzēt un strādāt šajā rindā — piekļuve tiek pilnībā kontrolēta ar grupas starpniecību, vienai rindai tā nekad netiek piešķirta.",
@@ -2119,7 +2120,9 @@
       "reset2fa": "Atiestatīt 2FA",
       "resetConfirmTitle": "Vai atiestatīt divu faktoru autentifikāciju?",
       "resetConfirmBody": "Tas atspējo 2FA {{login}}. Ja izpilde joprojām ir spēkā, viņiem būs jāreģistrējas vēlreiz.",
-      "empty": "Nav atrasts neviens aģents."
+      "empty": "Nav atrasts neviens aģents.",
+      "portalEnabled": "Customer portal available",
+      "portalLockedByEnv": "Disabled by this deployment (TIQORA_PORTAL_ENABLED)."
     },
     "gdpr": {
       "title": "Privātums / GDPR",

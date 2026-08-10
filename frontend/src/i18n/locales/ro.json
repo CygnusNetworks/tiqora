@@ -1157,7 +1157,8 @@
         "enforceGroups": "În plus, forțează 2FA pentru fiecare agent care este membru al oricărui grup bifat aici - chiar și atunci când „Aplicați pentru toți” este dezactivat.",
         "sso": "Permite acestui agent să se autentifice prin calea externă SSO/furnizor de identitate. Nu configurează furnizorul SSO în sine - doar dacă acest agent îl poate folosi.",
         "enforce": "Forțează 2FA pentru acest cont de agent individual, independent de setările globale de mai sus.",
-        "reset": "Șterge ireversibil atât înregistrarea TOTP a agentului, cât și toate cheile de acces înregistrate. Agentul trebuie să configureze 2FA de la zero după aceea - nu există o stare intermediară moale."
+        "reset": "Șterge ireversibil atât înregistrarea TOTP a agentului, cât și toate cheile de acces înregistrate. Agentul trebuie să configureze 2FA de la zero după aceea - nu există o stare intermediară moale.",
+        "portalEnabled": "Turns the customer portal on or off for the whole installation. When off, the portal API answers 404, running customer sessions stop working, and the start page goes straight to the agent login. Customer records and email tickets are unaffected."
       },
       "queues": {
         "group": "Determină cine poate să vadă și să lucreze la această coadă — accesul este controlat în întregime prin intermediul grupului, nu este niciodată acordat pentru fiecare coadă.",
@@ -2119,7 +2120,9 @@
       "reset2fa": "Resetați 2FA",
       "resetConfirmTitle": "Resetați autentificarea cu doi factori?",
       "resetConfirmBody": "Aceasta dezactivează 2FA pentru {{login}}. Ei vor trebui să se înscrie din nou dacă aplicarea încă se aplică.",
-      "empty": "Nu s-au găsit agenți."
+      "empty": "Nu s-au găsit agenți.",
+      "portalEnabled": "Customer portal available",
+      "portalLockedByEnv": "Disabled by this deployment (TIQORA_PORTAL_ENABLED)."
     },
     "gdpr": {
       "title": "Confidențialitate / GDPR",
