@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/Button";
 import { Dialog } from "@/components/ui/Dialog";
 import { HelpPopover } from "@/components/ui/HelpPopover";
 import { Spinner } from "@/components/ui/Spinner";
+import { PORTAL_ENABLED_KEY } from "@/lib/usePortalEnabled";
 
 const LIST_KEY = ["admin", "auth-config"] as const;
 const GLOBAL_KEY = ["admin", "auth-config", "global"] as const;
@@ -87,6 +88,7 @@ export function AuthConfigPage() {
       }),
     onSuccess: (data) => {
       qc.setQueryData(GLOBAL_KEY, data);
+      qc.invalidateQueries({ queryKey: PORTAL_ENABLED_KEY });
       setGlobalDraft({
         enforce_all: data.enforce_all,
         enforce_group_ids: [...(data.enforce_group_ids ?? [])],
