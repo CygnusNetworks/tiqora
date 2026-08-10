@@ -37,6 +37,7 @@ from tiqora.domain.auth_config import AuthConfigService
 from tiqora.domain.auth_ldap import LdapAuthService
 from tiqora.domain.oidc import OIDCError, OIDCService
 from tiqora.domain.passkey import webauthn_enabled
+from tiqora.domain.portal_gate import portal_enabled as resolve_portal_enabled
 from tiqora.domain.password_policy import PasswordPolicyError, validate_password
 from tiqora.domain.password_setup import redeem_token, resolve_token
 from tiqora.domain.schemas import (
@@ -261,7 +262,7 @@ def _rate_limit_http_exception(decision: object) -> HTTPException:
 
 
 @router.get("/methods", response_model=AuthMethodsOut)
-async def auth_methods(settings: AppSettings) -> AuthMethodsOut:
+async def auth_methods(settings: AppSettings, session: DbSession) -> AuthMethodsOut:
     """Discovery endpoint the login page uses to decide which buttons to show."""
     return AuthMethodsOut(
         password=True,
@@ -269,6 +270,7 @@ async def auth_methods(settings: AppSettings) -> AuthMethodsOut:
         spnego=settings.spnego_enabled,
         ldap=settings.ldap_enabled,
         webauthn=webauthn_enabled(settings),
+        portal_enabled=await resolve_portal_enabled(session, settings),
     )
 
 

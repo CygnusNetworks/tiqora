@@ -76,6 +76,9 @@ class AuthMethodsOut(BaseModel):
     ldap: bool = False
     # True only when TIQORA_WEBAUTHN_RP_ID and TIQORA_WEBAUTHN_ORIGIN are set.
     webauthn: bool = False
+    # Whether the customer portal is available at all (see portal_gate). The
+    # landing page uses this to skip straight to the agent login.
+    portal_enabled: bool = True
 
 
 class TOTPEnrollOut(BaseModel):
