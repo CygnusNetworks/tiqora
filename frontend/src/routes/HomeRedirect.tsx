@@ -3,12 +3,14 @@ import { useAuth } from "@/auth/AuthContext";
 import { Spinner } from "@/components/ui/Spinner";
 import { useTranslation } from "react-i18next";
 import { Link } from "@tanstack/react-router";
+import { usePortalEnabled } from "@/lib/usePortalEnabled";
 
 export function HomeRedirect() {
   const { isAuthenticated, isLoading } = useAuth();
+  const { portalEnabled, isLoading: portalLoading } = usePortalEnabled();
   const { t } = useTranslation();
 
-  if (isLoading) {
+  if (isLoading || portalLoading) {
     return (
       <div className="flex min-h-screen items-center justify-center">
         <Spinner />
@@ -18,6 +20,11 @@ export function HomeRedirect() {
 
   if (isAuthenticated) {
     return <Navigate to="/agent" replace />;
+  }
+
+  // Without a customer portal the landing page offers a single choice — skip it.
+  if (!portalEnabled) {
+    return <Navigate to="/login" replace />;
   }
 
   return (
