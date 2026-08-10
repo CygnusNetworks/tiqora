@@ -37,9 +37,9 @@ from tiqora.domain.auth_config import AuthConfigService
 from tiqora.domain.auth_ldap import LdapAuthService
 from tiqora.domain.oidc import OIDCError, OIDCService
 from tiqora.domain.passkey import webauthn_enabled
-from tiqora.domain.portal_gate import portal_enabled as resolve_portal_enabled
 from tiqora.domain.password_policy import PasswordPolicyError, validate_password
 from tiqora.domain.password_setup import redeem_token, resolve_token
+from tiqora.domain.portal_gate import portal_enabled as resolve_portal_enabled
 from tiqora.domain.schemas import (
     AuthMethodsOut,
     LoginRequest,
