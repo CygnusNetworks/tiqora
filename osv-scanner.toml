@@ -8,71 +8,14 @@
 # Fund kommt also automatisch zurueck auf den Tisch statt still zu verschwinden.
 # Neue Funde sind von dieser Datei nicht betroffen und brechen den Workflow
 # sofort.
-
-[[IgnoredVulns]]
-id = "GHSA-rgw5-rvv9-x895"
-ignoreUntil = 2026-09-03
-reason = """
-brace-expansion: DoS durch unbegrenzte Zwischenarrays. Transitiv ueber eslint,
-also reines Entwicklungswerkzeug; im Produktions-Image nicht enthalten.
-"""
-
-[[IgnoredVulns]]
-id = "GHSA-mh99-v99m-4gvg"
-ignoreUntil = 2026-09-03
-reason = """
-brace-expansion: DoS durch unbegrenzte Expansionslaenge. Gleicher Pfad und
-gleiche Bewertung wie GHSA-rgw5-rvv9-x895.
-"""
-
-[[IgnoredVulns]]
-id = "GHSA-52cp-r559-cp3m"
-ignoreUntil = 2026-09-03
-reason = """
-js-yaml: quadratische CPU-Last durch YAML-Merge-Key-Ketten. Nur im Build- und
-Test-Werkzeug, verarbeitet keine fremden YAML-Dokumente zur Laufzeit.
-"""
-
-[[IgnoredVulns]]
-id = "GHSA-fxqj-rqcc-2cmp"
-ignoreUntil = 2026-09-03
-reason = """
-PostCSS: unvollstaendiger Fix von GHSA-6g55-p6wh-862q. Laeuft ausschliesslich
-zur Build-Zeit ueber projekteigenes CSS.
-"""
-
-[[IgnoredVulns]]
-# Fuehrende Kennung dieser Schwachstelle; PYSEC-2026-3552 ist ein Alias und
-# wird vom Scanner darueber mit abgedeckt (ein eigener Eintrag dafuer wird als
-# "unused ignore" gemeldet).
-id = "GHSA-g6cj-pr64-35w5"
-ignoreUntil = 2026-08-18
-reason = """
-cryptography 49.0.0 -> 50.0.0. ANDERE KATEGORIE als die uebrigen Eintraege
-hier: Laufzeitabhaengigkeit des Backends, nicht nur Werkzeug, und mit CVSS 8.2
-die schwerwiegendste offene Meldung. Deshalb nur zwei Wochen zurueckgestellt,
-nicht vier -- ein Major-Update von cryptography gehoert in einen eigenen PR
-mit vollem Testlauf, aber es sollte zeitnah passieren.
-"""
-
-[[IgnoredVulns]]
-id = "GHSA-6hr6-w5qg-qmwg"
-ignoreUntil = 2026-08-21
-reason = """
-h2 4.3.0 -> 4.4.1 (CVSS 5.3). Kommt transitiv als optionale http2-Extra von
-httpx2 herein und ist im Backend-venv installiert, auch ohne dass tiqora
-selbst HTTP/2-Verbindungen aufbaut -- also Laufzeitabhaengigkeit, aber
-niedrigere Schwere als die cryptography-Meldung oben, daher zwei statt vier
-Wochen.
-"""
-
-[[IgnoredVulns]]
-id = "GHSA-5p4m-2wfm-xmqj"
-ignoreUntil = 2026-09-04
-reason = """
-js-yaml 4.2.0/4.3.0 -> 4.3.1 (CVSS 7.5, quadratische CPU-Last durch
-YAML-Merge-Key-Ketten -- gleiche Fund-Klasse wie GHSA-52cp-r559-cp3m oben).
-Kommt transitiv ueber eslint (@eslint/eslintrc) und @redocly/openapi-core
-(OpenAPI-Codegen) herein, beides reine Build-/Lint-Werkzeuge; im
-Produktions-Image nicht enthalten.
-"""
+#
+# Stand 2026-08-10: keine zurueckgestellten Funde. Alle zuvor hier gelisteten
+# GHSAs (brace-expansion, js-yaml, postcss, cryptography, h2) wurden durch
+# Patch-Bumps und pnpm-overrides behoben.
+#
+# [[IgnoredVulns]]
+# id = "GHSA-..."
+# ignoreUntil = 2026-MM-DD
+# reason = """
+# ...
+# """
