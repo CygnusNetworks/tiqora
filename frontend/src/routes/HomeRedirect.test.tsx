@@ -11,6 +11,13 @@ vi.mock("@/auth/AuthContext", () => ({
   useAuth: () => ({ isAuthenticated, isLoading }),
 }));
 
+let portalEnabled = true;
+let portalLoading = false;
+
+vi.mock("@/lib/usePortalEnabled", () => ({
+  usePortalEnabled: () => ({ portalEnabled, isLoading: portalLoading }),
+}));
+
 const navigateMock = vi.fn();
 vi.mock("@tanstack/react-router", () => ({
   Navigate: ({ to }: { to: string }) => {
@@ -37,6 +44,8 @@ describe("HomeRedirect", () => {
     navigateMock.mockClear();
     isAuthenticated = false;
     isLoading = false;
+    portalEnabled = true;
+    portalLoading = false;
   });
 
   it("shows a spinner while auth state is loading", () => {
@@ -60,5 +69,26 @@ describe("HomeRedirect", () => {
     expect(loginLink).toHaveAttribute("href", "/login");
     const portalLink = screen.getByRole("link", { name: i18n.t("nav.portal") });
     expect(portalLink).toHaveAttribute("href", "/portal");
+  });
+
+  it("shows a spinner while the portal state is still unknown", () => {
+    portalLoading = true;
+    renderPage();
+    expect(screen.getByRole("status")).toBeInTheDocument();
+    expect(screen.queryByTestId("navigate-stub")).toBeNull();
+  });
+
+  it("skips the landing page and goes straight to the agent login when the portal is off", () => {
+    portalEnabled = false;
+    renderPage();
+    expect(screen.getByTestId("navigate-stub")).toHaveTextContent("/login");
+    expect(navigateMock).toHaveBeenCalledWith("/login");
+  });
+
+  it("still prefers the agent app over the login when already authenticated", () => {
+    portalEnabled = false;
+    isAuthenticated = true;
+    renderPage();
+    expect(navigateMock).toHaveBeenCalledWith("/agent");
   });
 });
