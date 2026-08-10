@@ -1284,12 +1284,19 @@ class AuthConfigUpdate(BaseModel):
 class AuthConfigGlobalOut(BaseModel):
     enforce_all: bool
     enforce_group_ids: list[int] = []
+    # Customer portal master switch (tiqora_settings "portal.enabled").
+    portal_enabled: bool = True
+    # True when TIQORA_PORTAL_ENABLED=false forces the portal off. The UI then
+    # renders the switch disabled, and PUT rejects changes with 409.
+    portal_locked_by_env: bool = False
 
 
 class AuthConfigGlobalUpdate(BaseModel):
     enforce_all: bool
     # When omitted (None), the stored enforce_group_ids list is left unchanged.
     enforce_group_ids: list[int] | None = None
+    # When omitted (None), portal.enabled is left unchanged.
+    portal_enabled: bool | None = None
 
 
 # ---------------------------------------------------------------------------
