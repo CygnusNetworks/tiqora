@@ -7476,6 +7476,16 @@ export interface components {
              * @default []
              */
             enforce_group_ids: number[];
+            /**
+             * Portal Enabled
+             * @default true
+             */
+            portal_enabled: boolean;
+            /**
+             * Portal Locked By Env
+             * @default false
+             */
+            portal_locked_by_env: boolean;
         };
         /** AuthConfigGlobalUpdate */
         AuthConfigGlobalUpdate: {
@@ -7483,6 +7493,8 @@ export interface components {
             enforce_all: boolean;
             /** Enforce Group Ids */
             enforce_group_ids?: number[] | null;
+            /** Portal Enabled */
+            portal_enabled?: boolean | null;
         };
         /** AuthConfigUpdate */
         AuthConfigUpdate: {
@@ -7508,6 +7520,11 @@ export interface components {
              * @default true
              */
             password: boolean;
+            /**
+             * Portal Enabled
+             * @default true
+             */
+            portal_enabled: boolean;
             /**
              * Spnego
              * @default false

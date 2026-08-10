@@ -4783,6 +4783,16 @@
             },
             "title": "Enforce Group Ids",
             "type": "array"
+          },
+          "portal_enabled": {
+            "default": true,
+            "title": "Portal Enabled",
+            "type": "boolean"
+          },
+          "portal_locked_by_env": {
+            "default": false,
+            "title": "Portal Locked By Env",
+            "type": "boolean"
           }
         },
         "required": [
@@ -4810,6 +4820,17 @@
               }
             ],
             "title": "Enforce Group Ids"
+          },
+          "portal_enabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Portal Enabled"
           }
         },
         "required": [
@@ -4861,6 +4882,11 @@
           "password": {
             "default": true,
             "title": "Password",
+            "type": "boolean"
+          },
+          "portal_enabled": {
+            "default": true,
+            "title": "Portal Enabled",
             "type": "boolean"
           },
           "spnego": {
