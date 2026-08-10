@@ -33,7 +33,7 @@
     "admin": "管理員",
     "theme": "主題",
     "language": "語言",
-    "dashboard": "儀表板",
+    "dashboard": "工作台",
     "queues": "佇列",
     "kb": "知識庫"
   },
@@ -55,7 +55,12 @@
     "showActiveQueues": "顯示活躍",
     "queueSearch": "過濾隊列...",
     "noQueueMatch": "沒有隊列匹配。",
-    "templates": "範本"
+    "templates": "範本",
+    "locked": "已鎖定",
+    "responsible": "負責人",
+    "escalated": "已升級",
+    "services": "服務",
+    "timeAccounting": "工時統計"
   },
   "common": {
     "prev": "上一頁",
@@ -68,7 +73,10 @@
     "cancel": "取消",
     "help": "幫助",
     "edit": "編輯",
-    "save": "儲存"
+    "save": "儲存",
+    "saved": "已儲存",
+    "delete": "刪除",
+    "submit": "提交"
   },
   "otp": {
     "verifying": "正在驗證...",
@@ -171,7 +179,9 @@
     "toPickUpEmpty": "沒有新票可供領取。",
     "remindersDue": "提醒到期",
     "remindersDueEmpty": "沒有到期提醒。",
-    "queueShortcutsEmpty": "目前未開票或新票無需排隊。"
+    "queueShortcutsEmpty": "目前未開票或新票無需排隊。",
+    "lastViews": "最近檢視",
+    "lastViewsUntitled": "（無主旨）"
   },
   "queue": {
     "sidebar": "佇列",
@@ -482,7 +492,8 @@
       "customerEmail": "電子郵件",
       "customerFirstName": "名字",
       "customerLastName": "姓氏",
-      "customerLoginConflict": "該登入名已存在。選擇不同的登入名，或透過搜尋分配現有客戶。"
+      "customerLoginConflict": "該登入名已存在。選擇不同的登入名，或透過搜尋分配現有客戶。",
+      "clearCustomer": "移除客戶"
     },
     "inlineAttachments": "嵌入影像 ({{count}})",
     "list": {
@@ -504,7 +515,35 @@
     "draftEditedAt": "編輯於 {{time}}",
     "draftDiscard": "捨棄草稿",
     "draftDiscardConfirm": "要捨棄這則尚未傳送的回覆嗎？內容將無法復原。",
-    "draftDiscardConfirmButton": "捨棄"
+    "draftDiscardConfirmButton": "捨棄",
+    "type": "類型",
+    "service": "服務",
+    "sla": "SLA",
+    "mentions": "提及",
+    "timeAccounting": "工時",
+    "timeUnits": "時間單位",
+    "addTime": "登記時間",
+    "addMention": "提及客服",
+    "mentionsCount": "提及：{{n}}",
+    "mentionsEmpty": "無人被提及",
+    "mentionRemove": "移除提及",
+    "mentionSuggestions": "客服",
+    "timeUnitAbbrev": "分",
+    "timeUnitHoursAbbrev": "小時",
+    "timeUnitsShort": "{{units}} 分",
+    "timeAccountingTotal": "已登記時間：{{units}} 分",
+    "timeRemove": "移除登記",
+    "timeUnitMode": "時間單位",
+    "timeUnitMin": "分",
+    "timeUnitHours": "小時",
+    "timePresets": "快速選取",
+    "timeComposerHint": "回覆時在編寫區頁尾登記。",
+    "timeChipHint": "傳送時登記",
+    "extrasFailedMentions": "已傳送 — 提及未儲存。",
+    "extrasFailedTime": "已傳送 — 時間未登記。",
+    "extrasFailedBoth": "已傳送 — 提及與時間登記皆未儲存。",
+    "extrasRetry": "重試",
+    "customerUnresolved": "沒有與此地址相符的客戶紀錄，因此無法顯示客戶詳情。"
   },
   "search": {
     "title": "搜尋",
@@ -1143,7 +1182,8 @@
       },
       "acl": {
         "match": "此 ACL 套用的條件（例如目前佇列、狀態、表單欄位）。只有當此處列出的每個條件都匹配時，才會套用右側的變更。",
-        "change": "一旦條件匹配，ACL 就會發揮作用 - 通常它會限製或強製表單中可用的選擇（例如，僅允許某些後續狀態）。"
+        "change": "一旦條件匹配，ACL 就會發揮作用 - 通常它會限製或強製表單中可用的選擇（例如，僅允許某些後續狀態）。",
+        "stopAfterMatch": "勾選後，此 ACL 有效相符後不再評估後續 ACL（Znuny StopAfterMatch）。"
       },
       "mailOutbound": {
         "host": "外寄郵件的 SMTP 伺服器主機名稱。必須可以透過以下連接埠從該伺服器（DNS + 防火牆）存取。",
@@ -1190,8 +1230,8 @@
         "validId": "「Temp」（valid_id 3）是 Znuny 的第三個有效性狀態－通常是一個待確認的帳戶（例如未經確認的自我註冊），與普通的有效/無效不同。"
       },
       "systemAddresses": {
-        "email": "Address used as the From email for queues and auto-responses.",
-        "name": "Display name shown next to the email (e.g. “Support <support@example.com>”)."
+        "email": "用作佇列與自動回覆寄件者的地址。",
+        "name": "顯示在電子郵件旁的名稱（例如「Support <support@example.com>」）。"
       }
     },
     "nav": {
@@ -1240,7 +1280,13 @@
       "aiAcl": "訪問和限制",
       "collapse": "折疊導航",
       "mailAccounts": "郵件帳號",
-      "oauth2Tokens": "OAuth2 令牌（郵件）"
+      "oauth2Tokens": "OAuth2 令牌（郵件）",
+      "types": "工單類型",
+      "services": "服務",
+      "slas": "SLA",
+      "systemAddresses": "系統地址",
+      "notificationEvents": "通知事件",
+      "ticketAttributeRelations": "屬性關係"
     },
     "table": {
       "id": "ID",
@@ -1347,7 +1393,44 @@
       "title": "標題",
       "firstName": "名字",
       "lastName": "姓氏",
-      "name": "名稱"
+      "name": "名稱",
+      "passwordMode": "密碼指派",
+      "passwordModeManual": "手動設定",
+      "passwordModeAuto": "邀請：以郵件傳送設定連結",
+      "passwordModeAutoHelp": "儲存時會向下方信箱傳送一次性連結，由客服自行設定密碼。",
+      "email": "電子郵件",
+      "mobile": "手機",
+      "effectivePermissions": "檢視有效權限",
+      "effectivePermissionsTitle": "{{name}} 的有效權限",
+      "effectivePermissionsDescription": "來自直接群組指派與角色的合併權限。",
+      "rolesHeading": "角色",
+      "groupsHeading": "群組權限",
+      "queuesHeading": "佇列",
+      "noRoles": "未指派角色。",
+      "noGroups": "無群組權限。",
+      "noQueues": "無關聯佇列。",
+      "viaDirect": "直接",
+      "permissionColumn": "權限",
+      "sourceColumn": "來源",
+      "editSettings": "編輯個人設定",
+      "editSettingsTitle": "{{name}} 的個人設定",
+      "editSettingsDescription": "與客服在「個人設定」中看到的內容相同。",
+      "languageLabel": "語言",
+      "languageSaved": "語言已儲存。",
+      "tabAccount": "帳戶",
+      "tabPerson": "人員",
+      "sourceInvalidHint": "此權限來自無效角色，因此不生效。",
+      "keyInactiveHint": "此權限已設定但未生效 — 來源或群組無效。",
+      "deletePermanent": "永久刪除",
+      "deleteTitle": "永久刪除 {{name}}？",
+      "deleteConfirm": "永久刪除",
+      "deletableBody": "沒有任何內容引用 {{name}}，可連同偏好、群組與角色指派及 2FA 一併徹底刪除。",
+      "deleteIrreversible": "此操作無法復原。",
+      "deleteBlockedBody": "無法刪除 {{name}} — 以下資料表仍引用該帳戶：",
+      "deleteBlockedHint": "請改為將帳戶設為「無效」，以便工單、文章與歷史仍可歸屬。",
+      "resendSetupLink": "重新傳送設定連結",
+      "setupLinkSent": "設定連結已傳送。",
+      "setupLinkFailed": "無法傳送設定連結。"
     },
     "groups": {
       "title_plural": "團體",
@@ -1561,7 +1644,10 @@
       "name": "名稱",
       "description": "描述",
       "match": "比賽",
-      "change": "改變"
+      "change": "改變",
+      "new": "新增 ACL",
+      "stopAfterMatch": "相符後停止",
+      "confirmDelete": "刪除 ACL「{{name}}」？此操作無法復原。"
     },
     "genericAgentJobs": {
       "title_plural": "通用代理職位",
@@ -2222,7 +2308,13 @@
       "aiAudit": "對每個法學碩士請求/回應進行全面審核，並揭露 PII。",
       "aiAcl": "每個群組、角色或代理的 AI 權限和配額。",
       "mailAccounts": "傳入 IMAP/POP 信箱（密碼或 OAuth2）。",
-      "oauth2Tokens": "Microsoft/Google 郵件的 OAuth2 令牌配置（Znuny 相容）。"
+      "oauth2Tokens": "Microsoft/Google 郵件的 OAuth2 令牌配置（Znuny 相容）。",
+      "types": "管理用於分類的工單類型。",
+      "services": "管理服務並將其關聯到 SLA。",
+      "slas": "管理服務等級協議與時限。",
+      "systemAddresses": "用作佇列與自動回覆寄件者的電子郵件地址。",
+      "notificationEvents": "設定由事件觸發的客服通知。",
+      "ticketAttributeRelations": "Znuny 相容的相依矩陣（如服務→佇列），CSV 格式。"
     },
     "mailAccounts": {
       "title_plural": "郵件帳號",
@@ -2270,11 +2362,50 @@
       "refreshSuccess": "令牌已刷新。"
     },
     "systemAddresses": {
-      "title_plural": "System addresses",
-      "subtitle": "From-addresses for queues and auto-responses. Invalid addresses stay listed so they can be re-enabled.",
-      "new": "Add address",
-      "email": "Email",
-      "name": "Name"
+      "title_plural": "系統地址",
+      "subtitle": "佇列與自動回覆的寄件者地址。無效地址仍會列出以便重新啟用。",
+      "new": "新增地址",
+      "email": "電子郵件",
+      "name": "名稱"
+    },
+    "types": {
+      "title_plural": "工單類型",
+      "new": "新增類型",
+      "name": "名稱"
+    },
+    "services": {
+      "title_plural": "服務",
+      "new": "新增服務",
+      "name": "名稱",
+      "slaCount": "SLA"
+    },
+    "slas": {
+      "title_plural": "SLA",
+      "new": "新增 SLA",
+      "name": "名稱",
+      "firstResponseTime": "首次回應（分鐘）",
+      "updateTime": "更新（分鐘）",
+      "solutionTime": "解決（分鐘）",
+      "calendar": "行事曆"
+    },
+    "notificationEvents": {
+      "title_plural": "通知事件",
+      "subtitle": "事件觸發時，會向客服傳送相符的通知。",
+      "new": "建立通知",
+      "name": "名稱",
+      "event": "事件",
+      "subject": "主旨",
+      "body": "內文"
+    },
+    "tar": {
+      "title": "工單屬性關係",
+      "filename": "檔名",
+      "attributes": "屬性",
+      "priority": "優先順序",
+      "csv": "CSV 資料",
+      "new": "新增關係",
+      "help": "含表頭 Attribute1;Attribute2 與值對的 CSV（Znuny AdminTicketAttributeRelations）。用來限制表單選項（如 服務 → 佇列）。",
+      "confirmDelete": "刪除此關係？"
     }
   },
   "kb": {
@@ -2489,7 +2620,8 @@
       "startButton": "啟動進程",
       "actions": "可用的操作",
       "loadError": "無法載入進程狀態。",
-      "noDialogs": "此活動中沒有可用的操作。"
+      "noDialogs": "此活動中沒有可用的操作。",
+      "noCustomerDialogs": "此步驟沒有可用的客戶對話。"
     },
     "start": {
       "title": "啟動進程",
@@ -2525,5 +2657,84 @@
     "body": "身體",
     "editTitle": "編輯“{{name}}”",
     "saveError": "無法儲存模板。"
+  },
+  "views": {
+    "mine": "我的工單",
+    "responsible": "負責人",
+    "locked": "已鎖定的工單",
+    "watched": "關注的工單",
+    "escalated": "已升級的工單",
+    "service": "依服務",
+    "serviceHint": "列出指派給某服務的工單。",
+    "pickService": "選取服務…"
+  },
+  "customerCentre": {
+    "title": "客戶資訊",
+    "open": "客戶資訊",
+    "invalid": "客戶登入無效。",
+    "loadError": "無法載入此客戶。",
+    "email": "電子郵件",
+    "phone": "電話",
+    "customerId": "客戶編號",
+    "company": "公司",
+    "openCount": "{{count}} 個未關閉",
+    "closedCount": "{{count}} 個已關閉",
+    "allTickets": "全部工單 →",
+    "recentTickets": "最近的工單"
+  },
+  "timeAccounting": {
+    "title": "工時統計",
+    "hint": "您可存取的工單上已登記的時間單位。",
+    "filterUser": "客服",
+    "allUsers": "全部客服",
+    "filterFrom": "從",
+    "filterTo": "到",
+    "filterTicket": "工單 ID",
+    "empty": "沒有符合的工時紀錄。",
+    "colWhen": "時間",
+    "colTicket": "工單",
+    "colUser": "客服",
+    "colUnits": "單位",
+    "presetsLabel": "時段",
+    "presets": {
+      "today": "今天",
+      "yesterday": "昨天",
+      "thisWeek": "本週",
+      "lastWeek": "上週",
+      "thisMonth": "本月",
+      "lastMonth": "上月",
+      "thisQuarter": "本季",
+      "lastQuarter": "上季",
+      "thisYear": "今年",
+      "lastYear": "去年"
+    },
+    "kpiUnits": "時間單位",
+    "kpiEntries": "筆數",
+    "kpiTickets": "工單",
+    "kpiAgents": "客服",
+    "rangeBetween": "{{from}} – {{to}}",
+    "rangeFrom": "自 {{from}}",
+    "rangeTo": "至 {{to}}",
+    "chartTitle": "每日單位",
+    "chartBar": "{{date}}：{{units}} 單位",
+    "dayUnknown": "無日期",
+    "emptyHint": "擴大時段，或清除客服與工單篩選。",
+    "clearFilters": "清除篩選",
+    "pageRange": "{{from}}–{{to}}",
+    "pageScope": "本頁",
+    "chartPeak": "峰值 {{units}}"
+  },
+  "setPassword": {
+    "subtitle": "請為您的帳戶設定密碼。",
+    "password": "新密碼",
+    "confirm": "確認密碼",
+    "lengthHint": "{{min}} 到 {{max}} 個字元。",
+    "mismatch": "兩次輸入的密碼不一致。",
+    "submit": "設定密碼",
+    "saving": "儲存中…",
+    "done": "密碼已儲存。您現在可以登入。",
+    "invalid": "此連結已失效。",
+    "invalidHint": "設定連結有效期 7 天且僅可使用一次。請向管理員索取新連結。",
+    "toLogin": "前往登入"
   }
 }

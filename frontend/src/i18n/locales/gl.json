@@ -33,7 +33,7 @@
     "admin": "Admin",
     "theme": "Tema",
     "language": "Linguaxe",
-    "dashboard": "Panel de control",
+    "dashboard": "Panel",
     "queues": "Colas",
     "kb": "Base de coñecemento"
   },
@@ -55,7 +55,12 @@
     "showActiveQueues": "Mostrar activo",
     "queueSearch": "Filtrar filas...",
     "noQueueMatch": "Non hai filas coincidentes.",
-    "templates": "Modelos"
+    "templates": "Modelos",
+    "locked": "Bloqueado",
+    "responsible": "Responsable",
+    "escalated": "Escalado",
+    "services": "Servizos",
+    "timeAccounting": "Contabilización de tempo"
   },
   "common": {
     "prev": "Anterior",
@@ -68,7 +73,10 @@
     "cancel": "Cancelar",
     "help": "Axuda",
     "edit": "Editar",
-    "save": "Gardar"
+    "save": "Gardar",
+    "saved": "Gardado",
+    "delete": "Eliminar",
+    "submit": "Enviar"
   },
   "otp": {
     "verifying": "Verificando…",
@@ -171,7 +179,9 @@
     "toPickUpEmpty": "Non hai entradas novas para recoller.",
     "remindersDue": "Recordatorios pendentes",
     "remindersDueEmpty": "Non hai recordatorios pendentes.",
-    "queueShortcutsEmpty": "Non hai colas con entradas abertas ou novas neste momento."
+    "queueShortcutsEmpty": "Non hai colas con entradas abertas ou novas neste momento.",
+    "lastViews": "Vistos recentemente",
+    "lastViewsUntitled": "(sen asunto)"
   },
   "queue": {
     "sidebar": "Colas",
@@ -352,7 +362,7 @@
     "recipientName": "Nome",
     "recipientEmail": "Correo electrónico",
     "recipientRemove": "Eliminar",
-    "recipientConfirm": "OK",
+    "recipientConfirm": "Aceptar",
     "replyToRequired": "É necesario polo menos un Para o destinatario.",
     "replySubject": "Asunto",
     "replyTemplate": "Modelo",
@@ -482,7 +492,8 @@
       "customerEmail": "Correo electrónico",
       "customerFirstName": "Nome de pila",
       "customerLastName": "Apelido",
-      "customerLoginConflict": "Este inicio de sesión xa existe. Escolla un inicio de sesión diferente ou asigne o cliente existente mediante a busca."
+      "customerLoginConflict": "Este inicio de sesión xa existe. Escolla un inicio de sesión diferente ou asigne o cliente existente mediante a busca.",
+      "clearCustomer": "Quitar cliente"
     },
     "inlineAttachments": "Imaxes inseridas ({{count}})",
     "list": {
@@ -504,7 +515,35 @@
     "draftEditedAt": "editado {{time}}",
     "draftDiscard": "Descartar borrador",
     "draftDiscardConfirm": "Queres descartar esta resposta non enviada? O texto non se poderá recuperar.",
-    "draftDiscardConfirmButton": "Descartar"
+    "draftDiscardConfirmButton": "Descartar",
+    "type": "Tipo",
+    "service": "Servizo",
+    "sla": "SLA",
+    "mentions": "Mencións",
+    "timeAccounting": "Tempo rexistrado",
+    "timeUnits": "Unidades de tempo",
+    "addTime": "Rexistrar tempo",
+    "addMention": "Mencionar axente",
+    "mentionsCount": "Mencións: {{n}}",
+    "mentionsEmpty": "Ninguén mencionado",
+    "mentionRemove": "Quitar mención",
+    "mentionSuggestions": "Axentes",
+    "timeUnitAbbrev": "min",
+    "timeUnitHoursAbbrev": "h",
+    "timeUnitsShort": "{{units}} min",
+    "timeAccountingTotal": "Tempo rexistrado: {{units}} min",
+    "timeRemove": "Eliminar rexistro",
+    "timeUnitMode": "Unidade de tempo",
+    "timeUnitMin": "Min",
+    "timeUnitHours": "H",
+    "timePresets": "Selección rápida",
+    "timeComposerHint": "Ao responder, rexístreo no pe do compositor.",
+    "timeChipHint": "Rexístrase ao enviar",
+    "extrasFailedMentions": "Enviado — a mención non se gardou.",
+    "extrasFailedTime": "Enviado — o tempo non se rexistrou.",
+    "extrasFailedBoth": "Enviado — non se gardaron nin a mención nin o rexistro de tempo.",
+    "extrasRetry": "Tentar de novo",
+    "customerUnresolved": "Ningún rexistro de cliente coincide con este enderezo; os detalles non están dispoñibles."
   },
   "search": {
     "title": "Busca",
@@ -1143,7 +1182,8 @@
       },
       "acl": {
         "match": "Condicións nas que se aplica esta ACL (por exemplo, cola actual, estado, campo de formulario). O cambio da dereita só se aplica cando todos os criterios enumerados aquí coinciden.",
-        "change": "O efecto da ACL unha vez que as súas condicións coinciden: normalmente restrinxe ou forza as opcións dispoñibles nos formularios (por exemplo, só se permiten certos estados de seguimento)."
+        "change": "O efecto da ACL unha vez que as súas condicións coinciden: normalmente restrinxe ou forza as opcións dispoñibles nos formularios (por exemplo, só se permiten certos estados de seguimento).",
+        "stopAfterMatch": "Se está marcado, non se avalían máis ACL tras un emparellamento produtivo (StopAfterMatch de Znuny)."
       },
       "mailOutbound": {
         "host": "Nome de host do servidor SMTP para o correo saínte. Debe ser accesible desde este servidor (DNS + firewall) no porto seguinte.",
@@ -1190,8 +1230,8 @@
         "validId": "\"Temp\" (valid_id 3) é o terceiro estado de validez de Znuny, normalmente unha conta pendente de confirmación (por exemplo, rexistro automático non confirmado), distinto de válido/inválido."
       },
       "systemAddresses": {
-        "email": "Address used as the From email for queues and auto-responses.",
-        "name": "Display name shown next to the email (e.g. “Support <support@example.com>”)."
+        "email": "Enderezo usado como From para colas e auto-respostas.",
+        "name": "Nome amosado xunto ao correo (p. ex. “Support <support@example.com>”)."
       }
     },
     "nav": {
@@ -1240,7 +1280,13 @@
       "aiAcl": "Acceso e límites",
       "collapse": "Contraer navegación",
       "mailAccounts": "Contas de correo",
-      "oauth2Tokens": "Tokens OAuth2 (correo)"
+      "oauth2Tokens": "Tokens OAuth2 (correo)",
+      "types": "Tipos de ticket",
+      "services": "Servizos",
+      "slas": "SLA",
+      "systemAddresses": "Enderezos do sistema",
+      "notificationEvents": "Eventos de notificación",
+      "ticketAttributeRelations": "Relacións de atributos"
     },
     "table": {
       "id": "ID",
@@ -1347,7 +1393,44 @@
       "title": "Título",
       "firstName": "Nome de pila",
       "lastName": "Apelido",
-      "name": "Nome"
+      "name": "Nome",
+      "passwordMode": "Asignación de contrasinal",
+      "passwordModeManual": "Establecer manualmente",
+      "passwordModeAuto": "Invitar: enviar unha ligazón por correo",
+      "passwordModeAutoHelp": "Ao gardar, unha ligazón dun só uso vai ao correo de abaixo. O axente elixe o contrasinal.",
+      "email": "Correo",
+      "mobile": "Teléfono móbil",
+      "effectivePermissions": "Ver permisos efectivos",
+      "effectivePermissionsTitle": "Permisos efectivos de {{name}}",
+      "effectivePermissionsDescription": "Dereitos combinados de asignación directa a grupos e roles.",
+      "rolesHeading": "Roles",
+      "groupsHeading": "Permisos de grupo",
+      "queuesHeading": "Colas",
+      "noRoles": "Sen roles asignados.",
+      "noGroups": "Sen permisos de grupo.",
+      "noQueues": "Sen colas asignadas.",
+      "viaDirect": "Directo",
+      "permissionColumn": "Permisos",
+      "sourceColumn": "Orixe",
+      "editSettings": "Editar a configuración persoal",
+      "editSettingsTitle": "Configuración persoal de {{name}}",
+      "editSettingsDescription": "A mesma configuración que o axente ve en «Configuración persoal».",
+      "languageLabel": "Idioma",
+      "languageSaved": "Idioma gardado.",
+      "tabAccount": "Conta",
+      "tabPerson": "Persoa",
+      "sourceInvalidHint": "Este permiso provén dun rol non válido e por tanto non ten efecto.",
+      "keyInactiveHint": "Este permiso está configurado pero non está en vigor — a orixe ou o grupo non é válido.",
+      "deletePermanent": "Eliminar permanentemente",
+      "deleteTitle": "Eliminar permanentemente a {{name}}?",
+      "deleteConfirm": "Eliminar permanentemente",
+      "deletableBody": "Nada referencia a {{name}}; a conta pódese eliminar por completo con preferencias, grupos, roles e 2FA.",
+      "deleteIrreversible": "Non se pode desfacer.",
+      "deleteBlockedBody": "Non se pode eliminar a {{name}} — estas táboas aínda referencian a conta:",
+      "deleteBlockedHint": "Estableza a conta como «Non válida» para que tickets, artigos e historial sigan sendo atribuíbles.",
+      "resendSetupLink": "Reenviar a ligazón de configuración",
+      "setupLinkSent": "Ligazón de configuración enviada.",
+      "setupLinkFailed": "Non se puido enviar a ligazón de configuración."
     },
     "groups": {
       "title_plural": "Grupos",
@@ -1561,7 +1644,10 @@
       "name": "Nome",
       "description": "Descrición",
       "match": "Partido",
-      "change": "Cambiar"
+      "change": "Cambiar",
+      "new": "Nova ACL",
+      "stopAfterMatch": "Deter tras coincidencia",
+      "confirmDelete": "Eliminar a ACL “{{name}}”? Non se pode desfacer."
     },
     "genericAgentJobs": {
       "title_plural": "Traballos de axentes xenéricos",
@@ -1768,7 +1854,7 @@
       "app": {
         "product": "Produto",
         "version": "Versión",
-        "gitSha": "Git commit",
+        "gitSha": "Commit Git",
         "buildTime": "Construír",
         "environment": "Medio ambiente",
         "python": "Python",
@@ -2055,7 +2141,7 @@
         "companyId": "Empresa (customer_id)",
         "companyIdPh": "p.ex. ACME",
         "loginRegex": "Iniciar sesión regex",
-        "customerIdRegex": "customer_id regex",
+        "customerIdRegex": "regex de customer_id",
         "emailRegex": "Expresión regular de correo electrónico",
         "changedAfter": "Cambiado despois",
         "changedBefore": "Cambiou antes",
@@ -2222,7 +2308,13 @@
       "aiAudit": "Auditoría completa de todas as solicitudes/respostas de LLM, con revelación de PII.",
       "aiAcl": "Permisos e cotas de IA por grupo, rol ou axente.",
       "mailAccounts": "Caixas de correo IMAP/POP entrantes (contrasinal ou OAuth2).",
-      "oauth2Tokens": "Configuración de token OAuth2 para correo de Microsoft/Google (compatible con Znuny)."
+      "oauth2Tokens": "Configuración de token OAuth2 para correo de Microsoft/Google (compatible con Znuny).",
+      "types": "Xestionar os tipos de ticket usados para a clasificación.",
+      "services": "Xestionar servizos e ligalos aos SLA.",
+      "slas": "Xestionar os acordos de nivel de servizo e os prazos.",
+      "systemAddresses": "Enderezos de correo usados como From para colas e auto-respostas.",
+      "notificationEvents": "Configurar as notificacións a axentes baseadas en eventos.",
+      "ticketAttributeRelations": "Matrices de dependencia compatibles con Znuny (servizo/cola etc.) en CSV."
     },
     "mailAccounts": {
       "title_plural": "Contas de correo",
@@ -2270,11 +2362,50 @@
       "refreshSuccess": "Token actualizado."
     },
     "systemAddresses": {
-      "title_plural": "System addresses",
-      "subtitle": "From-addresses for queues and auto-responses. Invalid addresses stay listed so they can be re-enabled.",
-      "new": "Add address",
-      "email": "Email",
-      "name": "Name"
+      "title_plural": "Enderezos do sistema",
+      "subtitle": "Enderezos From para colas e auto-respostas. Os non válidos quedan listados para poder reactivalos.",
+      "new": "Engadir enderezo",
+      "email": "Correo",
+      "name": "Nome"
+    },
+    "types": {
+      "title_plural": "Tipos de ticket",
+      "new": "Novo tipo",
+      "name": "Nome"
+    },
+    "services": {
+      "title_plural": "Servizos",
+      "new": "Novo servizo",
+      "name": "Nome",
+      "slaCount": "SLA"
+    },
+    "slas": {
+      "title_plural": "SLA",
+      "new": "Novo SLA",
+      "name": "Nome",
+      "firstResponseTime": "Primeira resposta (min)",
+      "updateTime": "Actualización (min)",
+      "solutionTime": "Solución (min)",
+      "calendar": "Calendario"
+    },
+    "notificationEvents": {
+      "title_plural": "Eventos de notificación",
+      "subtitle": "Cando se disparan eventos, envíanse aos axentes as notificacións coincidentes.",
+      "new": "Crear notificación",
+      "name": "Nome",
+      "event": "Evento",
+      "subject": "Asunto",
+      "body": "Corpo"
+    },
+    "tar": {
+      "title": "Relacións de atributos de ticket",
+      "filename": "Nome do ficheiro",
+      "attributes": "Atributos",
+      "priority": "Prioridade",
+      "csv": "Datos CSV",
+      "new": "Nova relación",
+      "help": "CSV con cabeceira Attribute1;Attribute2 e pares de valores (Znuny AdminTicketAttributeRelations). Restrinxe selectores de formularios (p. ex. Servizo → Cola).",
+      "confirmDelete": "Eliminar esta relación?"
     }
   },
   "kb": {
@@ -2489,7 +2620,8 @@
       "startButton": "Iniciar proceso",
       "actions": "Accións dispoñibles",
       "loadError": "Non se puido cargar o estado do proceso.",
-      "noDialogs": "Non hai accións dispoñibles nesta actividade."
+      "noDialogs": "Non hai accións dispoñibles nesta actividade.",
+      "noCustomerDialogs": "Non hai diálogos de cliente dispoñibles neste paso."
     },
     "start": {
       "title": "Iniciar proceso",
@@ -2525,5 +2657,84 @@
     "body": "Corpo",
     "editTitle": "Editar \"{{name}}\"",
     "saveError": "Non se puido gardar o modelo."
+  },
+  "views": {
+    "mine": "Os meus tickets",
+    "responsible": "Responsable",
+    "locked": "Tickets bloqueados",
+    "watched": "Tickets observados",
+    "escalated": "Tickets escalados",
+    "service": "Por servizo",
+    "serviceHint": "Listar tickets asignados a un servizo.",
+    "pickService": "Seleccionar un servizo…"
+  },
+  "customerCentre": {
+    "title": "Información do cliente",
+    "open": "Info. do cliente",
+    "invalid": "Inicio de sesión de cliente non válido.",
+    "loadError": "Non se puido cargar este cliente.",
+    "email": "Correo",
+    "phone": "Teléfono",
+    "customerId": "Número de cliente",
+    "company": "Empresa",
+    "openCount": "{{count}} abertos",
+    "closedCount": "{{count}} pechados",
+    "allTickets": "Todos os tickets →",
+    "recentTickets": "Tickets recentes"
+  },
+  "timeAccounting": {
+    "title": "Contabilización de tempo",
+    "hint": "Unidades de tempo rexistradas nos tickets aos que ten acceso.",
+    "filterUser": "Axente",
+    "allUsers": "Todos os axentes",
+    "filterFrom": "Desde",
+    "filterTo": "Ata",
+    "filterTicket": "ID do ticket",
+    "empty": "Non hai entradas de tempo coincidentes.",
+    "colWhen": "Cando",
+    "colTicket": "Ticket",
+    "colUser": "Axente",
+    "colUnits": "Unidades",
+    "presetsLabel": "Período",
+    "presets": {
+      "today": "Hoxe",
+      "yesterday": "Onte",
+      "thisWeek": "Esta semana",
+      "lastWeek": "Semana pasada",
+      "thisMonth": "Este mes",
+      "lastMonth": "Mes pasado",
+      "thisQuarter": "Este trimestre",
+      "lastQuarter": "Trimestre pasado",
+      "thisYear": "Este ano",
+      "lastYear": "Ano pasado"
+    },
+    "kpiUnits": "Unidades de tempo",
+    "kpiEntries": "Rexistros",
+    "kpiTickets": "Tickets",
+    "kpiAgents": "Axentes",
+    "rangeBetween": "{{from}} – {{to}}",
+    "rangeFrom": "desde {{from}}",
+    "rangeTo": "ata {{to}}",
+    "chartTitle": "Unidades por día",
+    "chartBar": "{{date}}: {{units}} unidades",
+    "dayUnknown": "Sen data",
+    "emptyHint": "Amplíe o período ou limpe os filtros de axente e ticket.",
+    "clearFilters": "Limpar filtros",
+    "pageRange": "{{from}}–{{to}}",
+    "pageScope": "nesta páxina",
+    "chartPeak": "pico {{units}}"
+  },
+  "setPassword": {
+    "subtitle": "Escolla un contrasinal para a súa conta.",
+    "password": "Novo contrasinal",
+    "confirm": "Repetir o contrasinal",
+    "lengthHint": "Entre {{min}} e {{max}} caracteres.",
+    "mismatch": "Os contrasinais non coinciden.",
+    "submit": "Establecer o contrasinal",
+    "saving": "Gardando…",
+    "done": "Contrasinal gardado. Xa pode iniciar sesión.",
+    "invalid": "Esta ligazón xa non é válida.",
+    "invalidHint": "As ligazóns de configuración valen 7 días e úsanse unha vez. Pida unha nova á administración.",
+    "toLogin": "Ir ao inicio de sesión"
   }
 }

@@ -33,7 +33,7 @@
     "admin": "Quản trị viên",
     "theme": "chủ đề",
     "language": "Ngôn ngữ",
-    "dashboard": "Trang tổng quan",
+    "dashboard": "Bảng điều khiển",
     "queues": "Hàng đợi",
     "kb": "Cơ sở tri thức"
   },
@@ -55,7 +55,12 @@
     "showActiveQueues": "Hiển thị hoạt động",
     "queueSearch": "Lọc hàng đợi…",
     "noQueueMatch": "Không có hàng đợi nào phù hợp.",
-    "templates": "Mẫu"
+    "templates": "Mẫu",
+    "locked": "Đã khóa",
+    "responsible": "Phụ trách",
+    "escalated": "Đã leo thang",
+    "services": "Dịch vụ",
+    "timeAccounting": "Ghi nhận thời gian"
   },
   "common": {
     "prev": "trước đó",
@@ -68,7 +73,10 @@
     "cancel": "Hủy bỏ",
     "help": "Trợ giúp",
     "edit": "Chỉnh sửa",
-    "save": "Lưu"
+    "save": "Lưu",
+    "saved": "Đã lưu",
+    "delete": "Xóa",
+    "submit": "Gửi"
   },
   "otp": {
     "verifying": "Đang xác minh…",
@@ -171,7 +179,9 @@
     "toPickUpEmpty": "Không có vé mới để nhận.",
     "remindersDue": "Lời nhắc đến hạn",
     "remindersDueEmpty": "Không có lời nhắc nào đến hạn.",
-    "queueShortcutsEmpty": "Hiện tại không có hàng đợi nào có vé mở hoặc vé mới."
+    "queueShortcutsEmpty": "Hiện tại không có hàng đợi nào có vé mở hoặc vé mới.",
+    "lastViews": "Đã xem gần đây",
+    "lastViewsUntitled": "(không có tiêu đề)"
   },
   "queue": {
     "sidebar": "Hàng đợi",
@@ -482,7 +492,8 @@
       "customerEmail": "Email",
       "customerFirstName": "Tên",
       "customerLastName": "Họ",
-      "customerLoginConflict": "Thông tin đăng nhập này đã tồn tại. Thay vào đó, hãy chọn thông tin đăng nhập khác hoặc chỉ định khách hàng hiện tại thông qua tìm kiếm."
+      "customerLoginConflict": "Thông tin đăng nhập này đã tồn tại. Thay vào đó, hãy chọn thông tin đăng nhập khác hoặc chỉ định khách hàng hiện tại thông qua tìm kiếm.",
+      "clearCustomer": "Gỡ khách hàng"
     },
     "inlineAttachments": "Hình ảnh được nhúng ({{count}})",
     "list": {
@@ -504,7 +515,35 @@
     "draftEditedAt": "đã chỉnh sửa {{time}}",
     "draftDiscard": "Hủy bản nháp",
     "draftDiscardConfirm": "Hủy câu trả lời chưa gửi này? Không thể khôi phục nội dung.",
-    "draftDiscardConfirmButton": "Hủy"
+    "draftDiscardConfirmButton": "Hủy",
+    "type": "Loại",
+    "service": "Dịch vụ",
+    "sla": "SLA",
+    "mentions": "Nhắc đến",
+    "timeAccounting": "Ghi nhận thời gian",
+    "timeUnits": "Đơn vị thời gian",
+    "addTime": "Ghi thời gian",
+    "addMention": "Nhắc nhân viên",
+    "mentionsCount": "Nhắc đến: {{n}}",
+    "mentionsEmpty": "Chưa nhắc ai",
+    "mentionRemove": "Gỡ nhắc đến",
+    "mentionSuggestions": "Nhân viên",
+    "timeUnitAbbrev": "phút",
+    "timeUnitHoursAbbrev": "giờ",
+    "timeUnitsShort": "{{units}} phút",
+    "timeAccountingTotal": "Thời gian đã ghi: {{units}} phút",
+    "timeRemove": "Xóa bản ghi",
+    "timeUnitMode": "Đơn vị thời gian",
+    "timeUnitMin": "Phút",
+    "timeUnitHours": "Giờ",
+    "timePresets": "Chọn nhanh",
+    "timeComposerHint": "Khi trả lời, ghi ở chân trình soạn thảo.",
+    "timeChipHint": "Ghi khi gửi",
+    "extrasFailedMentions": "Đã gửi — phần nhắc đến chưa được lưu.",
+    "extrasFailedTime": "Đã gửi — thời gian chưa được ghi.",
+    "extrasFailedBoth": "Đã gửi — cả nhắc đến và ghi thời gian đều chưa lưu.",
+    "extrasRetry": "Thử lại",
+    "customerUnresolved": "Không có hồ sơ khách hàng khớp địa chỉ này, nên không có chi tiết khách hàng."
   },
   "search": {
     "title": "Tìm kiếm",
@@ -1143,7 +1182,8 @@
       },
       "acl": {
         "match": "Các điều kiện áp dụng ACL này (ví dụ: hàng đợi hiện tại, trạng thái, trường biểu mẫu). Thay đổi ở bên phải chỉ được áp dụng khi mọi tiêu chí được liệt kê ở đây đều phù hợp.",
-        "change": "Hiệu ứng của ACL sau khi các điều kiện của nó phù hợp - thông thường, nó hạn chế hoặc bắt buộc các lựa chọn có sẵn trong các biểu mẫu (ví dụ: chỉ cho phép một số trạng thái theo dõi nhất định)."
+        "change": "Hiệu ứng của ACL sau khi các điều kiện của nó phù hợp - thông thường, nó hạn chế hoặc bắt buộc các lựa chọn có sẵn trong các biểu mẫu (ví dụ: chỉ cho phép một số trạng thái theo dõi nhất định).",
+        "stopAfterMatch": "Khi chọn, sau khi ACL này khớp hiệu lực sẽ không đánh giá ACL khác (Znuny StopAfterMatch)."
       },
       "mailOutbound": {
         "host": "Tên máy chủ máy chủ SMTP cho thư đi. Phải có thể truy cập được từ máy chủ này (DNS + tường lửa) trên cổng bên dưới.",
@@ -1190,8 +1230,8 @@
         "validId": "\"Temp\" (valid_id 3) là trạng thái hiệu lực thứ ba của Znuny - thường là tài khoản đang chờ xác nhận (ví dụ: tự đăng ký chưa được xác nhận), khác với hợp lệ/không hợp lệ."
       },
       "systemAddresses": {
-        "email": "Address used as the From email for queues and auto-responses.",
-        "name": "Display name shown next to the email (e.g. “Support <support@example.com>”)."
+        "email": "Địa chỉ dùng làm From cho hàng đợi và trả lời tự động.",
+        "name": "Tên hiển thị cạnh email (vd. “Support <support@example.com>”)."
       }
     },
     "nav": {
@@ -1240,7 +1280,13 @@
       "aiAcl": "Quyền truy cập & giới hạn",
       "collapse": "Thu gọn điều hướng",
       "mailAccounts": "Tài khoản thư",
-      "oauth2Tokens": "Mã thông báo OAuth2 (thư)"
+      "oauth2Tokens": "Mã thông báo OAuth2 (thư)",
+      "types": "Loại ticket",
+      "services": "Dịch vụ",
+      "slas": "SLA",
+      "systemAddresses": "Địa chỉ hệ thống",
+      "notificationEvents": "Sự kiện thông báo",
+      "ticketAttributeRelations": "Quan hệ thuộc tính"
     },
     "table": {
       "id": "ID",
@@ -1347,7 +1393,44 @@
       "title": "Tiêu đề",
       "firstName": "Tên",
       "lastName": "Họ",
-      "name": "Tên"
+      "name": "Tên",
+      "passwordMode": "Cách gán mật khẩu",
+      "passwordModeManual": "Đặt thủ công",
+      "passwordModeAuto": "Mời: gửi liên kết thiết lập qua email",
+      "passwordModeAutoHelp": "Khi lưu, một liên kết dùng một lần gửi tới email bên dưới. Nhân viên tự chọn mật khẩu.",
+      "email": "Email",
+      "mobile": "Điện thoại di động",
+      "effectivePermissions": "Xem quyền hiệu lực",
+      "effectivePermissionsTitle": "Quyền hiệu lực của {{name}}",
+      "effectivePermissionsDescription": "Quyền gộp từ gán nhóm trực tiếp và vai trò.",
+      "rolesHeading": "Vai trò",
+      "groupsHeading": "Quyền nhóm",
+      "queuesHeading": "Hàng đợi",
+      "noRoles": "Chưa gán vai trò.",
+      "noGroups": "Không có quyền nhóm.",
+      "noQueues": "Chưa gán hàng đợi.",
+      "viaDirect": "Trực tiếp",
+      "permissionColumn": "Quyền",
+      "sourceColumn": "Nguồn",
+      "editSettings": "Sửa cài đặt cá nhân",
+      "editSettingsTitle": "Cài đặt cá nhân của {{name}}",
+      "editSettingsDescription": "Cùng cài đặt mà nhân viên thấy trong “Cài đặt cá nhân”.",
+      "languageLabel": "Ngôn ngữ",
+      "languageSaved": "Đã lưu ngôn ngữ.",
+      "tabAccount": "Tài khoản",
+      "tabPerson": "Cá nhân",
+      "sourceInvalidHint": "Quyền này đến từ vai trò không hợp lệ nên không có hiệu lực.",
+      "keyInactiveHint": "Quyền đã cấu hình nhưng không có hiệu lực — nguồn hoặc nhóm không hợp lệ.",
+      "deletePermanent": "Xóa vĩnh viễn",
+      "deleteTitle": "Xóa vĩnh viễn {{name}}?",
+      "deleteConfirm": "Xóa vĩnh viễn",
+      "deletableBody": "Không có gì tham chiếu {{name}}; có thể xóa hẳn tài khoản kèm tùy chọn, nhóm, vai trò và 2FA.",
+      "deleteIrreversible": "Không thể hoàn tác.",
+      "deleteBlockedBody": "Không thể xóa {{name}} — các bảng sau vẫn tham chiếu tài khoản:",
+      "deleteBlockedHint": "Hãy đặt tài khoản thành “Không hợp lệ” để ticket, bài viết và lịch sử vẫn gán được.",
+      "resendSetupLink": "Gửi lại liên kết thiết lập",
+      "setupLinkSent": "Đã gửi liên kết thiết lập.",
+      "setupLinkFailed": "Không gửi được liên kết thiết lập."
     },
     "groups": {
       "title_plural": "Nhóm",
@@ -1561,7 +1644,10 @@
       "name": "Tên",
       "description": "Mô tả",
       "match": "Trận đấu",
-      "change": "Thay đổi"
+      "change": "Thay đổi",
+      "new": "ACL mới",
+      "stopAfterMatch": "Dừng sau khi khớp",
+      "confirmDelete": "Xóa ACL “{{name}}”? Không thể hoàn tác."
     },
     "genericAgentJobs": {
       "title_plural": "Việc làm đại lý tổng hợp",
@@ -2222,7 +2308,13 @@
       "aiAudit": "Kiểm tra toàn diện mọi yêu cầu/phản hồi LLM, có tiết lộ PII.",
       "aiAcl": "Quyền và hạn ngạch AI cho mỗi nhóm, vai trò hoặc đại lý.",
       "mailAccounts": "Hộp thư IMAP/POP đến (mật khẩu hoặc OAuth2).",
-      "oauth2Tokens": "Cấu hình mã thông báo OAuth2 cho Microsoft/Google mail (tương thích với Znuny)."
+      "oauth2Tokens": "Cấu hình mã thông báo OAuth2 cho Microsoft/Google mail (tương thích với Znuny).",
+      "types": "Quản lý loại ticket dùng để phân loại.",
+      "services": "Quản lý dịch vụ và liên kết với SLA.",
+      "slas": "Quản lý thỏa thuận mức dịch vụ và thời hạn.",
+      "systemAddresses": "Địa chỉ email dùng làm From cho hàng đợi và trả lời tự động.",
+      "notificationEvents": "Cấu hình thông báo nhân viên theo sự kiện.",
+      "ticketAttributeRelations": "Ma trận phụ thuộc tương thích Znuny (dịch vụ/hàng đợi…) dạng CSV."
     },
     "mailAccounts": {
       "title_plural": "Tài khoản thư",
@@ -2270,11 +2362,50 @@
       "refreshSuccess": "Đã làm mới mã thông báo."
     },
     "systemAddresses": {
-      "title_plural": "System addresses",
-      "subtitle": "From-addresses for queues and auto-responses. Invalid addresses stay listed so they can be re-enabled.",
-      "new": "Add address",
+      "title_plural": "Địa chỉ hệ thống",
+      "subtitle": "Địa chỉ From cho hàng đợi và trả lời tự động. Địa chỉ không hợp lệ vẫn hiện để bật lại.",
+      "new": "Thêm địa chỉ",
       "email": "Email",
-      "name": "Name"
+      "name": "Tên"
+    },
+    "types": {
+      "title_plural": "Loại ticket",
+      "new": "Loại mới",
+      "name": "Tên"
+    },
+    "services": {
+      "title_plural": "Dịch vụ",
+      "new": "Dịch vụ mới",
+      "name": "Tên",
+      "slaCount": "SLA"
+    },
+    "slas": {
+      "title_plural": "SLA",
+      "new": "SLA mới",
+      "name": "Tên",
+      "firstResponseTime": "Phản hồi đầu (phút)",
+      "updateTime": "Cập nhật (phút)",
+      "solutionTime": "Giải quyết (phút)",
+      "calendar": "Lịch"
+    },
+    "notificationEvents": {
+      "title_plural": "Sự kiện thông báo",
+      "subtitle": "Khi sự kiện xảy ra, thông báo khớp sẽ được gửi tới nhân viên.",
+      "new": "Tạo thông báo",
+      "name": "Tên",
+      "event": "Sự kiện",
+      "subject": "Tiêu đề",
+      "body": "Nội dung"
+    },
+    "tar": {
+      "title": "Quan hệ thuộc tính ticket",
+      "filename": "Tên tệp",
+      "attributes": "Thuộc tính",
+      "priority": "Ưu tiên",
+      "csv": "Dữ liệu CSV",
+      "new": "Quan hệ mới",
+      "help": "CSV có tiêu đề Attribute1;Attribute2 và các cặp giá trị (Znuny AdminTicketAttributeRelations). Hạn chế bộ chọn form (vd. Dịch vụ → Hàng đợi).",
+      "confirmDelete": "Xóa quan hệ này?"
     }
   },
   "kb": {
@@ -2489,7 +2620,8 @@
       "startButton": "Bắt đầu quá trình",
       "actions": "Hành động có sẵn",
       "loadError": "Không thể tải trạng thái quá trình.",
-      "noDialogs": "Không có hành động nào có sẵn tại hoạt động này."
+      "noDialogs": "Không có hành động nào có sẵn tại hoạt động này.",
+      "noCustomerDialogs": "Không có hộp thoại khách hàng ở bước này."
     },
     "start": {
       "title": "Bắt đầu quá trình",
@@ -2525,5 +2657,84 @@
     "body": "Thân hình",
     "editTitle": "Chỉnh sửa “{{name}}”",
     "saveError": "Không thể lưu mẫu."
+  },
+  "views": {
+    "mine": "Ticket của tôi",
+    "responsible": "Phụ trách",
+    "locked": "Ticket đã khóa",
+    "watched": "Ticket đang theo dõi",
+    "escalated": "Ticket đã leo thang",
+    "service": "Theo dịch vụ",
+    "serviceHint": "Liệt kê ticket gán cho một dịch vụ.",
+    "pickService": "Chọn dịch vụ…"
+  },
+  "customerCentre": {
+    "title": "Thông tin khách hàng",
+    "open": "TT khách hàng",
+    "invalid": "Đăng nhập khách hàng không hợp lệ.",
+    "loadError": "Không tải được khách hàng này.",
+    "email": "Email",
+    "phone": "Điện thoại",
+    "customerId": "Mã khách hàng",
+    "company": "Công ty",
+    "openCount": "{{count}} đang mở",
+    "closedCount": "{{count}} đã đóng",
+    "allTickets": "Tất cả ticket →",
+    "recentTickets": "Ticket gần đây"
+  },
+  "timeAccounting": {
+    "title": "Ghi nhận thời gian",
+    "hint": "Đơn vị thời gian đã ghi trên các ticket bạn có quyền truy cập.",
+    "filterUser": "Nhân viên",
+    "allUsers": "Tất cả nhân viên",
+    "filterFrom": "Từ",
+    "filterTo": "Đến",
+    "filterTicket": "ID ticket",
+    "empty": "Không có mục thời gian phù hợp.",
+    "colWhen": "Thời điểm",
+    "colTicket": "Ticket",
+    "colUser": "Nhân viên",
+    "colUnits": "Đơn vị",
+    "presetsLabel": "Khoảng thời gian",
+    "presets": {
+      "today": "Hôm nay",
+      "yesterday": "Hôm qua",
+      "thisWeek": "Tuần này",
+      "lastWeek": "Tuần trước",
+      "thisMonth": "Tháng này",
+      "lastMonth": "Tháng trước",
+      "thisQuarter": "Quý này",
+      "lastQuarter": "Quý trước",
+      "thisYear": "Năm nay",
+      "lastYear": "Năm trước"
+    },
+    "kpiUnits": "Đơn vị thời gian",
+    "kpiEntries": "Bản ghi",
+    "kpiTickets": "Ticket",
+    "kpiAgents": "Nhân viên",
+    "rangeBetween": "{{from}} – {{to}}",
+    "rangeFrom": "từ {{from}}",
+    "rangeTo": "đến {{to}}",
+    "chartTitle": "Đơn vị mỗi ngày",
+    "chartBar": "{{date}}: {{units}} đơn vị",
+    "dayUnknown": "Không có ngày",
+    "emptyHint": "Mở rộng khoảng thời gian hoặc xóa bộ lọc nhân viên và ticket.",
+    "clearFilters": "Xóa bộ lọc",
+    "pageRange": "{{from}}–{{to}}",
+    "pageScope": "trên trang này",
+    "chartPeak": "đỉnh {{units}}"
+  },
+  "setPassword": {
+    "subtitle": "Vui lòng chọn mật khẩu cho tài khoản của bạn.",
+    "password": "Mật khẩu mới",
+    "confirm": "Nhập lại mật khẩu",
+    "lengthHint": "Từ {{min}} đến {{max}} ký tự.",
+    "mismatch": "Mật khẩu không khớp.",
+    "submit": "Đặt mật khẩu",
+    "saving": "Đang lưu…",
+    "done": "Đã lưu mật khẩu. Bạn có thể đăng nhập ngay.",
+    "invalid": "Liên kết này không còn hiệu lực.",
+    "invalidHint": "Liên kết thiết lập có hiệu lực 7 ngày và dùng một lần. Hãy xin liên kết mới từ quản trị.",
+    "toLogin": "Đến trang đăng nhập"
   }
 }

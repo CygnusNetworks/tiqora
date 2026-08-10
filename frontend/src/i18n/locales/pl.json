@@ -33,7 +33,7 @@
     "admin": "Administrator",
     "theme": "Motyw",
     "language": "Język",
-    "dashboard": "Pulpit nawigacyjny",
+    "dashboard": "Pulpit",
     "queues": "Kolejki",
     "kb": "Baza wiedzy"
   },
@@ -55,7 +55,12 @@
     "showActiveQueues": "Pokaż aktywne",
     "queueSearch": "Filtruj kolejki…",
     "noQueueMatch": "Żadna kolejka nie pasuje.",
-    "templates": "Szablony"
+    "templates": "Szablony",
+    "locked": "Zablokowane",
+    "responsible": "Odpowiedzialny",
+    "escalated": "Eskalowane",
+    "services": "Usługi",
+    "timeAccounting": "Ewidencja czasu"
   },
   "common": {
     "prev": "Poprzedni",
@@ -68,7 +73,10 @@
     "cancel": "Anuluj",
     "help": "Pomoc",
     "edit": "Edytuj",
-    "save": "Zapisz"
+    "save": "Zapisz",
+    "saved": "Zapisano",
+    "delete": "Usuń",
+    "submit": "Wyślij"
   },
   "otp": {
     "verifying": "Weryfikuję…",
@@ -171,7 +179,9 @@
     "toPickUpEmpty": "Nie ma możliwości odbioru nowych ticketów.",
     "remindersDue": "Terminy przypomnień",
     "remindersDueEmpty": "Brak terminów przypomnień.",
-    "queueShortcutsEmpty": "W tej chwili nie ma kolejek z otwartymi lub nowymi ticketami."
+    "queueShortcutsEmpty": "W tej chwili nie ma kolejek z otwartymi lub nowymi ticketami.",
+    "lastViews": "Ostatnio przeglądane",
+    "lastViewsUntitled": "(brak tematu)"
   },
   "queue": {
     "sidebar": "Kolejki",
@@ -482,7 +492,8 @@
       "customerEmail": "E-mail",
       "customerFirstName": "Imię",
       "customerLastName": "Nazwisko",
-      "customerLoginConflict": "Ten login już istnieje. Wybierz inny lub przypisz istniejącego klienta przez wyszukiwanie."
+      "customerLoginConflict": "Ten login już istnieje. Wybierz inny lub przypisz istniejącego klienta przez wyszukiwanie.",
+      "clearCustomer": "Usuń klienta"
     },
     "inlineAttachments": "Osadzone obrazy ({{count}})",
     "list": {
@@ -504,7 +515,35 @@
     "draftEditedAt": "edytowano {{time}}",
     "draftDiscard": "Odrzuć szkic",
     "draftDiscardConfirm": "Odrzucić tę niewysłaną odpowiedź? Tekstu nie będzie można odzyskać.",
-    "draftDiscardConfirmButton": "Odrzuć"
+    "draftDiscardConfirmButton": "Odrzuć",
+    "type": "Typ",
+    "service": "Usługa",
+    "sla": "SLA",
+    "mentions": "Wzmianki",
+    "timeAccounting": "Ewidencja czasu",
+    "timeUnits": "Jednostki czasu",
+    "addTime": "Zaksięguj czas",
+    "addMention": "Wspomnij agenta",
+    "mentionsCount": "Wzmianki: {{n}}",
+    "mentionsEmpty": "Nikt nie wspomniany",
+    "mentionRemove": "Usuń wzmiankę",
+    "mentionSuggestions": "Agenci",
+    "timeUnitAbbrev": "min",
+    "timeUnitHoursAbbrev": "godz.",
+    "timeUnitsShort": "{{units}} min",
+    "timeAccountingTotal": "Zaksięgowany czas: {{units}} min",
+    "timeRemove": "Usuń wpis",
+    "timeUnitMode": "Jednostka czasu",
+    "timeUnitMin": "Min",
+    "timeUnitHours": "Godz.",
+    "timePresets": "Szybki wybór",
+    "timeComposerHint": "Przy odpowiedzi zaksięguj w stopce edytora.",
+    "timeChipHint": "Zaksięgowane przy wysyłce",
+    "extrasFailedMentions": "Wysłano — wzmianka nie została zapisana.",
+    "extrasFailedTime": "Wysłano — czas nie został zaksięgowany.",
+    "extrasFailedBoth": "Wysłano — ani wzmianka, ani księgowanie czasu nie zostały zapisane.",
+    "extrasRetry": "Spróbuj ponownie",
+    "customerUnresolved": "Żaden rekord klienta nie pasuje do tego adresu — dane klienta są niedostępne."
   },
   "search": {
     "title": "Szukaj",
@@ -1143,7 +1182,8 @@
       },
       "acl": {
         "match": "Warunki, w jakich ma zastosowanie ta lista ACL (np. bieżąca kolejka, stan, pole formularza). Zmiana po prawej stronie zostanie zastosowana tylko wtedy, gdy spełnią się wszystkie wymienione tutaj kryteria.",
-        "change": "Efekt listy ACL po spełnieniu jej warunków — zazwyczaj ogranicza lub wymusza wybory dostępne w formularzach (np. dozwolone są tylko niektóre stany uzupełniające)."
+        "change": "Efekt listy ACL po spełnieniu jej warunków — zazwyczaj ogranicza lub wymusza wybory dostępne w formularzach (np. dozwolone są tylko niektóre stany uzupełniające).",
+        "stopAfterMatch": "Gdy zaznaczone, po skutecznym dopasowaniu tej ACL nie są już oceniane kolejne (Znuny StopAfterMatch)."
       },
       "mailOutbound": {
         "host": "SMTP nazwa hosta serwera dla poczty wychodzącej. Musi być osiągalny z tego serwera (DNS + zapora sieciowa) na porcie poniżej.",
@@ -1190,8 +1230,8 @@
         "validId": "„Temp” (valid_id 3) to trzeci stan ważności Znuny — zazwyczaj konto oczekujące na potwierdzenie (np. niepotwierdzona samorejestracja), różniące się od zwykłego ważnego/nieprawidłowego."
       },
       "systemAddresses": {
-        "email": "Address used as the From email for queues and auto-responses.",
-        "name": "Display name shown next to the email (e.g. “Support <support@example.com>”)."
+        "email": "Adres używany jako From dla kolejek i auto-odpowiedzi.",
+        "name": "Nazwa wyświetlana obok e-maila (np. „Support <support@example.com>”)."
       }
     },
     "nav": {
@@ -1240,7 +1280,13 @@
       "aiAcl": "Dostęp i limity",
       "collapse": "Zwiń nawigację",
       "mailAccounts": "Konta pocztowe",
-      "oauth2Tokens": "Tokeny OAuth2 (poczta)"
+      "oauth2Tokens": "Tokeny OAuth2 (poczta)",
+      "types": "Typy zgłoszeń",
+      "services": "Usługi",
+      "slas": "SLA",
+      "systemAddresses": "Adresy systemowe",
+      "notificationEvents": "Zdarzenia powiadomień",
+      "ticketAttributeRelations": "Relacje atrybutów"
     },
     "table": {
       "id": "ID",
@@ -1347,7 +1393,44 @@
       "title": "Tytuł",
       "firstName": "Imię",
       "lastName": "Nazwisko",
-      "name": "Imię"
+      "name": "Imię",
+      "passwordMode": "Nadawanie hasła",
+      "passwordModeManual": "Ustaw ręcznie",
+      "passwordModeAuto": "Zaproszenie: wyślij link e-mailem",
+      "passwordModeAutoHelp": "Przy zapisie jednorazowy link trafia na poniższy e-mail. Agent ustawia własne hasło.",
+      "email": "E-mail",
+      "mobile": "Telefon komórkowy",
+      "effectivePermissions": "Pokaż uprawnienia efektywne",
+      "effectivePermissionsTitle": "Uprawnienia efektywne: {{name}}",
+      "effectivePermissionsDescription": "Połączone prawa z grup bezpośrednich i ról.",
+      "rolesHeading": "Role",
+      "groupsHeading": "Uprawnienia grup",
+      "queuesHeading": "Kolejki",
+      "noRoles": "Brak przypisanych ról.",
+      "noGroups": "Brak uprawnień grup.",
+      "noQueues": "Brak przypisanych kolejek.",
+      "viaDirect": "Bezpośrednio",
+      "permissionColumn": "Uprawnienia",
+      "sourceColumn": "Źródło",
+      "editSettings": "Edytuj ustawienia osobiste",
+      "editSettingsTitle": "Ustawienia osobiste: {{name}}",
+      "editSettingsDescription": "Te same ustawienia, które agent widzi w «Ustawieniach osobistych».",
+      "languageLabel": "Język",
+      "languageSaved": "Język zapisany.",
+      "tabAccount": "Konto",
+      "tabPerson": "Osoba",
+      "sourceInvalidHint": "To uprawnienie pochodzi z nieprawidłowej roli i dlatego nie działa.",
+      "keyInactiveHint": "To uprawnienie jest skonfigurowane, ale nie obowiązuje — źródło lub grupa jest nieprawidłowa.",
+      "deletePermanent": "Usuń trwale",
+      "deleteTitle": "Trwale usunąć {{name}}?",
+      "deleteConfirm": "Usuń trwale",
+      "deletableBody": "Nic nie odwołuje się do {{name}}; konto można usunąć w całości wraz z preferencjami, grupami, rolami i 2FA.",
+      "deleteIrreversible": "Tego nie da się cofnąć.",
+      "deleteBlockedBody": "{{name}} nie może zostać usunięty — te tabele nadal odwołują się do konta:",
+      "deleteBlockedHint": "Ustaw konto na «Nieprawidłowe», aby zgłoszenia, artykuły i historia pozostały przypisywalne.",
+      "resendSetupLink": "Wyślij ponownie link konfiguracji",
+      "setupLinkSent": "Wysłano link konfiguracji.",
+      "setupLinkFailed": "Nie udało się wysłać linku konfiguracji."
     },
     "groups": {
       "title_plural": "Grupy",
@@ -1561,7 +1644,10 @@
       "name": "Imię",
       "description": "Opis",
       "match": "Dopasowanie",
-      "change": "Zmień"
+      "change": "Zmień",
+      "new": "Nowa ACL",
+      "stopAfterMatch": "Zatrzymaj po dopasowaniu",
+      "confirmDelete": "Usunąć ACL „{{name}}”? Tego nie da się cofnąć."
     },
     "genericAgentJobs": {
       "title_plural": "Ogólne zadania agenta",
@@ -2222,7 +2308,13 @@
       "aiAudit": "Pełny audyt każdego LLM żądania/odpowiedzi z ujawnieniem PII.",
       "aiAcl": "AI uprawnień i przydziałów na grupę, rolę lub agenta.",
       "mailAccounts": "Przychodzące skrzynki pocztowe IMAP/POP (hasło lub OAuth2).",
-      "oauth2Tokens": "Konfiguracje tokena OAuth2 dla poczty Microsoft/Google (kompatybilne z Znuny)."
+      "oauth2Tokens": "Konfiguracje tokena OAuth2 dla poczty Microsoft/Google (kompatybilne z Znuny).",
+      "types": "Zarządzaj typami zgłoszeń używanymi do klasyfikacji.",
+      "services": "Zarządzaj usługami i powiąż je z SLA.",
+      "slas": "Zarządzaj umowami SLA i terminami.",
+      "systemAddresses": "Adresy e-mail używane jako From dla kolejek i auto-odpowiedzi.",
+      "notificationEvents": "Konfiguruj powiadomienia agentów oparte na zdarzeniach.",
+      "ticketAttributeRelations": "Macierze zależności zgodne z Znuny (usługa/kolejka itd.) w CSV."
     },
     "mailAccounts": {
       "title_plural": "Konta pocztowe",
@@ -2270,11 +2362,50 @@
       "refreshSuccess": "Token odświeżony."
     },
     "systemAddresses": {
-      "title_plural": "System addresses",
-      "subtitle": "From-addresses for queues and auto-responses. Invalid addresses stay listed so they can be re-enabled.",
-      "new": "Add address",
-      "email": "Email",
-      "name": "Name"
+      "title_plural": "Adresy systemowe",
+      "subtitle": "Adresy From dla kolejek i auto-odpowiedzi. Nieprawidłowe pozostają na liście, by je ponownie włączyć.",
+      "new": "Dodaj adres",
+      "email": "E-mail",
+      "name": "Nazwa"
+    },
+    "types": {
+      "title_plural": "Typy zgłoszeń",
+      "new": "Nowy typ",
+      "name": "Nazwa"
+    },
+    "services": {
+      "title_plural": "Usługi",
+      "new": "Nowa usługa",
+      "name": "Nazwa",
+      "slaCount": "SLA"
+    },
+    "slas": {
+      "title_plural": "SLA",
+      "new": "Nowe SLA",
+      "name": "Nazwa",
+      "firstResponseTime": "Pierwsza odpowiedź (min)",
+      "updateTime": "Aktualizacja (min)",
+      "solutionTime": "Rozwiązanie (min)",
+      "calendar": "Kalendarz"
+    },
+    "notificationEvents": {
+      "title_plural": "Zdarzenia powiadomień",
+      "subtitle": "Gdy wystąpią zdarzenia, pasujące powiadomienia trafiają do agentów.",
+      "new": "Utwórz powiadomienie",
+      "name": "Nazwa",
+      "event": "Zdarzenie",
+      "subject": "Temat",
+      "body": "Treść"
+    },
+    "tar": {
+      "title": "Relacje atrybutów zgłoszeń",
+      "filename": "Nazwa pliku",
+      "attributes": "Atrybuty",
+      "priority": "Priorytet",
+      "csv": "Dane CSV",
+      "new": "Nowa relacja",
+      "help": "CSV z nagłówkiem Attribute1;Attribute2 i parami wartości (Znuny AdminTicketAttributeRelations). Ogranicza listy w formularzach (np. Usługa → Kolejka).",
+      "confirmDelete": "Usunąć tę relację?"
     }
   },
   "kb": {
@@ -2489,7 +2620,8 @@
       "startButton": "Uruchom proces",
       "actions": "Dostępne akcje",
       "loadError": "Nie udało się wczytać stanu procesu.",
-      "noDialogs": "Brak dostępnych akcji w tej aktywności."
+      "noDialogs": "Brak dostępnych akcji w tej aktywności.",
+      "noCustomerDialogs": "Brak dostępnych dialogów klienta na tym etapie."
     },
     "start": {
       "title": "Uruchom proces",
@@ -2525,5 +2657,84 @@
     "body": "Ciało",
     "editTitle": "Edytuj „{{name}}”",
     "saveError": "Nie udało się zapisać szablonu."
+  },
+  "views": {
+    "mine": "Moje zgłoszenia",
+    "responsible": "Odpowiedzialny",
+    "locked": "Zablokowane zgłoszenia",
+    "watched": "Obserwowane zgłoszenia",
+    "escalated": "Eskalowane zgłoszenia",
+    "service": "Według usługi",
+    "serviceHint": "Lista zgłoszeń przypisanych do usługi.",
+    "pickService": "Wybierz usługę…"
+  },
+  "customerCentre": {
+    "title": "Informacje o kliencie",
+    "open": "Info o kliencie",
+    "invalid": "Nieprawidłowy login klienta.",
+    "loadError": "Nie udało się wczytać tego klienta.",
+    "email": "E-mail",
+    "phone": "Telefon",
+    "customerId": "Numer klienta",
+    "company": "Firma",
+    "openCount": "{{count}} otwarte",
+    "closedCount": "{{count}} zamknięte",
+    "allTickets": "Wszystkie zgłoszenia →",
+    "recentTickets": "Ostatnie zgłoszenia"
+  },
+  "timeAccounting": {
+    "title": "Ewidencja czasu",
+    "hint": "Zaksięgowane jednostki czasu w zgłoszeniach, do których masz dostęp.",
+    "filterUser": "Agent",
+    "allUsers": "Wszyscy agenci",
+    "filterFrom": "Od",
+    "filterTo": "Do",
+    "filterTicket": "ID zgłoszenia",
+    "empty": "Brak pasujących wpisów czasu.",
+    "colWhen": "Kiedy",
+    "colTicket": "Zgłoszenie",
+    "colUser": "Agent",
+    "colUnits": "Jednostki",
+    "presetsLabel": "Okres",
+    "presets": {
+      "today": "Dziś",
+      "yesterday": "Wczoraj",
+      "thisWeek": "Ten tydzień",
+      "lastWeek": "Ubiegły tydzień",
+      "thisMonth": "Ten miesiąc",
+      "lastMonth": "Ubiegły miesiąc",
+      "thisQuarter": "Ten kwartał",
+      "lastQuarter": "Ubiegły kwartał",
+      "thisYear": "Ten rok",
+      "lastYear": "Ubiegły rok"
+    },
+    "kpiUnits": "Jednostki czasu",
+    "kpiEntries": "Wpisy",
+    "kpiTickets": "Zgłoszenia",
+    "kpiAgents": "Agenci",
+    "rangeBetween": "{{from}} – {{to}}",
+    "rangeFrom": "od {{from}}",
+    "rangeTo": "do {{to}}",
+    "chartTitle": "Jednostki na dzień",
+    "chartBar": "{{date}}: {{units}} jedn.",
+    "dayUnknown": "Brak daty",
+    "emptyHint": "Poszerz okres lub wyczyść filtry agenta i zgłoszenia.",
+    "clearFilters": "Wyczyść filtry",
+    "pageRange": "{{from}}–{{to}}",
+    "pageScope": "na tej stronie",
+    "chartPeak": "szczyt {{units}}"
+  },
+  "setPassword": {
+    "subtitle": "Wybierz hasło do konta.",
+    "password": "Nowe hasło",
+    "confirm": "Powtórz hasło",
+    "lengthHint": "Od {{min}} do {{max}} znaków.",
+    "mismatch": "Hasła nie są zgodne.",
+    "submit": "Ustaw hasło",
+    "saving": "Zapisywanie…",
+    "done": "Hasło zapisane. Możesz się zalogować.",
+    "invalid": "Ten link jest już nieważny.",
+    "invalidHint": "Linki konfiguracji są ważne 7 dni i jednorazowe. Poproś administratora o nowy.",
+    "toLogin": "Przejdź do logowania"
   }
 }

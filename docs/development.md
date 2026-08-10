@@ -235,11 +235,11 @@ pnpm dev
 
 Route stubs: `/agent`, `/portal`, `/admin`. i18n: **49 locales** (Znuny’s 48
 `.po` codes + plain `en`) — registry in `src/i18n/locales.ts`, full JSON under
-`src/i18n/locales/*.json`. Commands: `pnpm i18n:check`, `pnpm i18n:scaffold`,
-`pnpm i18n:translate -- --all-znuny --force`. Theme via `data-theme` on
-`<html>`; UI language sets `lang` + `dir` and persists to Znuny `UserLanguage`
-when logged in. Comparison with Znuny and the full code list:
-[i18n.md](./i18n.md).
+`src/i18n/locales/*.json`. Commands: `pnpm i18n:check`, `pnpm i18n:scaffold`
+(translations are maintained by hand; there is no machine-translate pipeline).
+Theme via `data-theme` on `<html>`; UI language sets `lang` + `dir` and
+persists to Znuny `UserLanguage` when logged in. Comparison with Znuny and the
+full code list: [i18n.md](./i18n.md).
 
 ## Environment files
 

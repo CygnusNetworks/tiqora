@@ -33,7 +33,7 @@
     "admin": "المشرف",
     "theme": "الموضوع",
     "language": "اللغة",
-    "dashboard": "لوحة القيادة",
+    "dashboard": "لوحة التحكم",
     "queues": "قوائم الانتظار",
     "kb": "قاعدة المعرفة"
   },
@@ -55,7 +55,12 @@
     "showActiveQueues": "إظهار نشط",
     "queueSearch": "طوابير التصفية...",
     "noQueueMatch": "لا توجد قوائم انتظار متطابقة.",
-    "templates": "قوالب"
+    "templates": "قوالب",
+    "locked": "مقفل",
+    "responsible": "المسؤول",
+    "escalated": "مُصعَّد",
+    "services": "الخدمات",
+    "timeAccounting": "تسجيل الوقت"
   },
   "common": {
     "prev": "السابق",
@@ -68,7 +73,10 @@
     "cancel": "إلغاء",
     "help": "مساعدة",
     "edit": "تحرير",
-    "save": "حفظ"
+    "save": "حفظ",
+    "saved": "تم الحفظ",
+    "delete": "حذف",
+    "submit": "إرسال"
   },
   "otp": {
     "verifying": "جارٍ التحقق…",
@@ -171,7 +179,9 @@
     "toPickUpEmpty": "لا توجد تذاكر جديدة لالتقاط.",
     "remindersDue": "التذكيرات مستحقة",
     "remindersDueEmpty": "لا توجد تذكيرات مستحقة.",
-    "queueShortcutsEmpty": "لا توجد طوابير مع التذاكر المفتوحة أو الجديدة في الوقت الحالي."
+    "queueShortcutsEmpty": "لا توجد طوابير مع التذاكر المفتوحة أو الجديدة في الوقت الحالي.",
+    "lastViews": "شوهدت مؤخرًا",
+    "lastViewsUntitled": "(بدون موضوع)"
   },
   "queue": {
     "sidebar": "قوائم الانتظار",
@@ -482,9 +492,10 @@
       "customerEmail": "البريد الإلكتروني",
       "customerFirstName": "الاسم الأول",
       "customerLastName": "الاسم الأخير",
-      "customerLoginConflict": "تسجيل الدخول هذا موجود بالفعل. Choose a different login, or assign the existing customer via search instead."
+      "customerLoginConflict": "تسجيل الدخول هذا موجود بالفعل. Choose a different login, or assign the existing customer via search instead.",
+      "clearCustomer": "إزالة العميل"
     },
-    "inlineAttachments": "Embedded images ({{count}})",
+    "inlineAttachments": "صور مضمّنة ({{count}})",
     "list": {
       "attachments_one": "1 مرفق",
       "attachments_other": "{{count}} المرفقات",
@@ -504,7 +515,35 @@
     "draftEditedAt": "تم التعديل {{time}}",
     "draftDiscard": "تجاهل المسودة",
     "draftDiscardConfirm": "هل تريد تجاهل هذا الرد غير المرسل؟ لا يمكن استعادة النص.",
-    "draftDiscardConfirmButton": "تجاهل"
+    "draftDiscardConfirmButton": "تجاهل",
+    "type": "النوع",
+    "service": "الخدمة",
+    "sla": "SLA",
+    "mentions": "الإشارات",
+    "timeAccounting": "تسجيل الوقت",
+    "timeUnits": "وحدات الوقت",
+    "addTime": "تسجيل وقت",
+    "addMention": "إشارة إلى وكيل",
+    "mentionsCount": "الإشارات: {{n}}",
+    "mentionsEmpty": "لم يُشار إلى أحد",
+    "mentionRemove": "إزالة الإشارة",
+    "mentionSuggestions": "الوكلاء",
+    "timeUnitAbbrev": "د",
+    "timeUnitHoursAbbrev": "س",
+    "timeUnitsShort": "{{units}} د",
+    "timeAccountingTotal": "الوقت المسجّل: {{units}} د",
+    "timeRemove": "إزالة القيد",
+    "timeUnitMode": "وحدة الوقت",
+    "timeUnitMin": "د",
+    "timeUnitHours": "س",
+    "timePresets": "اختيار سريع",
+    "timeComposerHint": "عند الرد سجّله في تذييل المحرّر.",
+    "timeChipHint": "يُسجَّل عند الإرسال",
+    "extrasFailedMentions": "أُرسل — لم تُحفظ الإشارة.",
+    "extrasFailedTime": "أُرسل — لم يُسجَّل الوقت.",
+    "extrasFailedBoth": "أُرسل — لم تُحفظ الإشارة ولا تسجيل الوقت.",
+    "extrasRetry": "أعد المحاولة",
+    "customerUnresolved": "لا يوجد سجل عميل يطابق هذا العنوان، لذا تفاصيل العميل غير متاحة."
   },
   "search": {
     "title": "بحث",
@@ -512,24 +551,24 @@
     "placeholder": "البحث عن التذاكر...",
     "commandHint": "بحث أو أمر...",
     "submit": "بحث",
-    "hint": "Enter a ticket number, subject, or body text.",
+    "hint": "أدخل رقم تذكرة أو موضوعًا أو نصًا.",
     "results": "{{total}} نتائج لـ “{{query}}”",
     "noResults": "لا توجد تذاكر مطابقة.",
     "groupTickets": "التذاكر",
     "groupKb": "قاعدة المعرفة",
     "smart": {
-      "placeholder": "Search – or queue:, owner:, status:, customer:, from:, to: …",
+      "placeholder": "بحث – أو queue:، owner:، status:، customer:، from:، to: …",
       "fulltext": "ابحث عن \"{{text}}\" كنص كامل",
       "filterHint": "تصفية",
       "dateHint": "التاريخ كـ YYYY-MM-DD",
       "from": "من",
       "to": "ل",
-      "paletteHint": "Type for live results – queue:, owner:, status:, customer: become filters.",
+      "paletteHint": "اكتب لنتائج فورية – queue:، owner:، status:، customer: تصبح عوامل تصفية.",
       "viewAll": "عرض كافة النتائج",
       "noQueueMatch": "لا توجد قائمة انتظار تطابق \"{{frag}}\"",
       "noOwnerMatch": "لا يوجد مالك مطابق لـ \"{{frag}}\"",
       "noCustomerMatch": "لا يوجد عميل مطابق لـ \"{{frag}}\"",
-      "customerHint": "Type a customer number or name (min. 2 characters)",
+      "customerHint": "اكتب رقم عميل أو اسمًا (حرفان على الأقل)",
       "loading": "البحث…"
     },
     "presets": {
@@ -588,7 +627,7 @@
     "priority": "الأولوية",
     "state": "الدولة",
     "message": "رسالة",
-    "validationError": "Please fill in queue, subject, priority, state, and message.",
+    "validationError": "يُرجى تعبئة الطابور والموضوع والأولوية والحالة والرسالة.",
     "submitError": "تعذر إنشاء التذكرة. يرجى المحاولة مرة أخرى.",
     "submit": "إنشاء تذكرة",
     "cancel": "إلغاء",
@@ -622,7 +661,7 @@
   },
   "agent": {
     "title": "مساحة عمل الوكيل",
-    "placeholder": "Queue views, ticket zoom, and compose will appear here (Phase 1+)."
+    "placeholder": "ستظهر هنا عروض الطوابير وتكبير التذكرة والإنشاء (المرحلة 1+)."
   },
   "portal": {
     "title": "بوابة العملاء",
@@ -652,7 +691,7 @@
     },
     "newTicket": {
       "title": "تذكرة جديدة",
-      "intro": "Tell us what's going on and we'll get back to you as soon as we can.",
+      "intro": "أخبرنا بما يحدث وسنعاود التواصل في أقرب وقت ممكن.",
       "subject": "الموضوع",
       "message": "رسالة",
       "submit": "إرسال تذكرة",
@@ -1143,7 +1182,8 @@
       },
       "acl": {
         "match": "الشروط التي تنطبق بموجبها قائمة التحكم بالوصول (ACL) هذه (على سبيل المثال، قائمة الانتظار الحالية، الحالة، حقل النموذج). يتم تطبيق التغيير الموجود على اليمين فقط عندما يتطابق كل معيار مدرج هنا.",
-        "change": "تأثير قائمة التحكم بالوصول (ACL) بمجرد مطابقة شروطها - عادةً ما يقيد أو يفرض الاختيارات المتاحة في النماذج (على سبيل المثال، يُسمح فقط بحالات متابعة معينة)."
+        "change": "تأثير قائمة التحكم بالوصول (ACL) بمجرد مطابقة شروطها - عادةً ما يقيد أو يفرض الاختيارات المتاحة في النماذج (على سبيل المثال، يُسمح فقط بحالات متابعة معينة).",
+        "stopAfterMatch": "عند التحديد لا تُقيَّم مزيد من قواعد ACL بعد تطابق منتج لهذه القاعدة (Znuny StopAfterMatch)."
       },
       "mailOutbound": {
         "host": "اسم مضيف خادم SMTP للبريد الصادر. يجب أن يكون من الممكن الوصول إليه من هذا الخادم (DNS + جدار الحماية) على المنفذ أدناه.",
@@ -1190,8 +1230,8 @@
         "validId": "\"Temp\" (valid_id 3) هي حالة الصلاحية الثالثة لـ Znuny - عادةً حساب في انتظار التأكيد (على سبيل المثال، تسجيل ذاتي غير مؤكد)، يختلف عن الصالح/غير الصالح العادي."
       },
       "systemAddresses": {
-        "email": "Address used as the From email for queues and auto-responses.",
-        "name": "Display name shown next to the email (e.g. “Support <support@example.com>”)."
+        "email": "العنوان المستخدم كمرسل (From) للطوابير والردود التلقائية.",
+        "name": "الاسم المعروض بجانب البريد (مثل «Support <support@example.com>»)."
       }
     },
     "nav": {
@@ -1240,7 +1280,13 @@
       "aiAcl": "الوصول والحدود",
       "collapse": "طي التنقل",
       "mailAccounts": "حسابات البريد",
-      "oauth2Tokens": "رموز OAuth2 (البريد)"
+      "oauth2Tokens": "رموز OAuth2 (البريد)",
+      "types": "أنواع التذاكر",
+      "services": "الخدمات",
+      "slas": "اتفاقيات الخدمة",
+      "systemAddresses": "عناوين النظام",
+      "notificationEvents": "أحداث الإشعار",
+      "ticketAttributeRelations": "علاقات السمات"
     },
     "table": {
       "id": "ID",
@@ -1347,7 +1393,44 @@
       "title": "العنوان",
       "firstName": "الاسم الأول",
       "lastName": "الاسم الأخير",
-      "name": "الاسم"
+      "name": "الاسم",
+      "passwordMode": "تعيين كلمة المرور",
+      "passwordModeManual": "تعيين يدويًا",
+      "passwordModeAuto": "دعوة: إرسال رابط الإعداد بالبريد",
+      "passwordModeAutoHelp": "عند الحفظ يُرسل رابط لمرة واحدة إلى البريد أدناه. يختار الوكيل كلمة مروره بنفسه.",
+      "email": "البريد الإلكتروني",
+      "mobile": "الهاتف المحمول",
+      "effectivePermissions": "عرض الصلاحيات الفعلية",
+      "effectivePermissionsTitle": "الصلاحيات الفعلية لـ {{name}}",
+      "effectivePermissionsDescription": "صلاحيات مدمجة من التعيين المباشر للمجموعات والأدوار.",
+      "rolesHeading": "الأدوار",
+      "groupsHeading": "صلاحيات المجموعات",
+      "queuesHeading": "الطوابير",
+      "noRoles": "لا أدوار معيَّنة.",
+      "noGroups": "لا صلاحيات مجموعات.",
+      "noQueues": "لا طوابير معيَّنة.",
+      "viaDirect": "مباشر",
+      "permissionColumn": "الصلاحيات",
+      "sourceColumn": "المصدر",
+      "editSettings": "تحرير الإعدادات الشخصية",
+      "editSettingsTitle": "الإعدادات الشخصية لـ {{name}}",
+      "editSettingsDescription": "نفس الإعدادات التي يراها الوكيل تحت «الإعدادات الشخصية».",
+      "languageLabel": "اللغة",
+      "languageSaved": "تم حفظ اللغة.",
+      "tabAccount": "الحساب",
+      "tabPerson": "الشخص",
+      "sourceInvalidHint": "هذه الصلاحية من دور غير صالح ولذلك لا أثر لها.",
+      "keyInactiveHint": "هذه الصلاحية مُعدّة لكنها غير سارية — المصدر أو المجموعة غير صالح.",
+      "deletePermanent": "حذف نهائي",
+      "deleteTitle": "حذف {{name}} نهائيًا؟",
+      "deleteConfirm": "حذف نهائي",
+      "deletableBody": "لا شيء يشير إلى {{name}}؛ يمكن إزالة الحساب بالكامل مع التفضيلات والمجموعات والأدوار و2FA.",
+      "deleteIrreversible": "لا يمكن التراجع عن ذلك.",
+      "deleteBlockedBody": "لا يمكن حذف {{name}} — هذه الجداول ما زالت تشير إلى الحساب:",
+      "deleteBlockedHint": "اضبط الحساب على «غير صالح» بدلًا من ذلك لتبقى التذاكر والمقالات والسجل قابلة للإسناد.",
+      "resendSetupLink": "إعادة إرسال رابط الإعداد",
+      "setupLinkSent": "تم إرسال رابط الإعداد.",
+      "setupLinkFailed": "تعذّر إرسال رابط الإعداد."
     },
     "groups": {
       "title_plural": "المجموعات",
@@ -1561,7 +1644,10 @@
       "name": "الاسم",
       "description": "الوصف",
       "match": "مباراة",
-      "change": "التغيير"
+      "change": "التغيير",
+      "new": "ACL جديدة",
+      "stopAfterMatch": "إيقاف بعد التطابق",
+      "confirmDelete": "حذف ACL «{{name}}»؟ لا يمكن التراجع عن ذلك."
     },
     "genericAgentJobs": {
       "title_plural": "وظائف الوكيل العام",
@@ -2222,7 +2308,13 @@
       "aiAudit": "تدقيق كامل لكل طلب/رد على LLM، مع الكشف عن معلومات تحديد الهوية الشخصية (PII).",
       "aiAcl": "أذونات وحصص الذكاء الاصطناعي لكل مجموعة أو دور أو وكيل.",
       "mailAccounts": "صناديق بريد IMAP/POP الواردة (كلمة المرور أو OAuth2).",
-      "oauth2Tokens": "تكوينات رمز OAuth2 لبريد Microsoft/Google (متوافق مع Znuny)."
+      "oauth2Tokens": "تكوينات رمز OAuth2 لبريد Microsoft/Google (متوافق مع Znuny).",
+      "types": "إدارة أنواع التذاكر المستخدمة للتصنيف.",
+      "services": "إدارة الخدمات وربطها باتفاقيات مستوى الخدمة.",
+      "slas": "إدارة اتفاقيات مستوى الخدمة والمُهَل.",
+      "systemAddresses": "عناوين بريد تُستخدم كمرسل للطوابير والردود التلقائية.",
+      "notificationEvents": "تهيئة إشعارات الوكلاء المستندة إلى الأحداث.",
+      "ticketAttributeRelations": "مصفوفات تبعيات متوافقة مع Znuny (خدمة/طابور وغيرها) بصيغة CSV."
     },
     "mailAccounts": {
       "title_plural": "حسابات البريد",
@@ -2270,11 +2362,50 @@
       "refreshSuccess": "تم تحديث الرمز المميز."
     },
     "systemAddresses": {
-      "title_plural": "System addresses",
-      "subtitle": "From-addresses for queues and auto-responses. Invalid addresses stay listed so they can be re-enabled.",
-      "new": "Add address",
-      "email": "Email",
-      "name": "Name"
+      "title_plural": "عناوين النظام",
+      "subtitle": "عناوين From للطوابير والردود التلقائية. تبقى غير الصالحة مدرجة لإعادة تفعيلها.",
+      "new": "إضافة عنوان",
+      "email": "البريد الإلكتروني",
+      "name": "الاسم"
+    },
+    "types": {
+      "title_plural": "أنواع التذاكر",
+      "new": "نوع جديد",
+      "name": "الاسم"
+    },
+    "services": {
+      "title_plural": "الخدمات",
+      "new": "خدمة جديدة",
+      "name": "الاسم",
+      "slaCount": "SLA"
+    },
+    "slas": {
+      "title_plural": "اتفاقيات الخدمة",
+      "new": "اتفاقية خدمة جديدة",
+      "name": "الاسم",
+      "firstResponseTime": "أول رد (د)",
+      "updateTime": "تحديث (د)",
+      "solutionTime": "الحل (د)",
+      "calendar": "التقويم"
+    },
+    "notificationEvents": {
+      "title_plural": "أحداث الإشعار",
+      "subtitle": "عند وقوع الأحداث تُرسل الإشعارات المطابقة إلى الوكلاء.",
+      "new": "إنشاء إشعار",
+      "name": "الاسم",
+      "event": "الحدث",
+      "subject": "الموضوع",
+      "body": "النص"
+    },
+    "tar": {
+      "title": "علاقات سمات التذاكر",
+      "filename": "اسم الملف",
+      "attributes": "السمات",
+      "priority": "الأولوية",
+      "csv": "بيانات CSV",
+      "new": "علاقة جديدة",
+      "help": "CSV برأس Attribute1;Attribute2 وأزواج قيم (Znuny AdminTicketAttributeRelations). يقيّد قوائم النماذج (مثل الخدمة → الطابور).",
+      "confirmDelete": "حذف هذه العلاقة؟"
     }
   },
   "kb": {
@@ -2489,7 +2620,8 @@
       "startButton": "ابدأ العملية",
       "actions": "الإجراءات المتاحة",
       "loadError": "تعذر تحميل حالة العملية.",
-      "noDialogs": "لا توجد إجراءات متاحة في هذا النشاط."
+      "noDialogs": "لا توجد إجراءات متاحة في هذا النشاط.",
+      "noCustomerDialogs": "لا تتوفر حوارات عميل في هذه الخطوة."
     },
     "start": {
       "title": "ابدأ العملية",
@@ -2525,5 +2657,84 @@
     "body": "الجسم",
     "editTitle": "تحرير \"{{name}}\"",
     "saveError": "لا يمكن حفظ القالب."
+  },
+  "views": {
+    "mine": "تذاكري",
+    "responsible": "المسؤول",
+    "locked": "تذاكر مقفلة",
+    "watched": "تذاكر مراقَبة",
+    "escalated": "تذاكر مُصعَّدة",
+    "service": "حسب الخدمة",
+    "serviceHint": "عرض التذاكر المرتبطة بخدمة.",
+    "pickService": "اختر خدمة…"
+  },
+  "customerCentre": {
+    "title": "معلومات العميل",
+    "open": "معلومات العميل",
+    "invalid": "تسجيل دخول العميل غير صالح.",
+    "loadError": "تعذّر تحميل هذا العميل.",
+    "email": "البريد الإلكتروني",
+    "phone": "الهاتف",
+    "customerId": "رقم العميل",
+    "company": "الشركة",
+    "openCount": "{{count}} مفتوحة",
+    "closedCount": "{{count}} مغلقة",
+    "allTickets": "كل التذاكر →",
+    "recentTickets": "التذاكر الأخيرة"
+  },
+  "timeAccounting": {
+    "title": "تسجيل الوقت",
+    "hint": "وحدات الوقت المسجّلة على التذاكر التي يمكنك الوصول إليها.",
+    "filterUser": "الوكيل",
+    "allUsers": "كل الوكلاء",
+    "filterFrom": "من",
+    "filterTo": "إلى",
+    "filterTicket": "معرّف التذكرة",
+    "empty": "لا توجد إدخالات وقت مطابقة.",
+    "colWhen": "متى",
+    "colTicket": "تذكرة",
+    "colUser": "الوكيل",
+    "colUnits": "الوحدات",
+    "presetsLabel": "الفترة",
+    "presets": {
+      "today": "اليوم",
+      "yesterday": "أمس",
+      "thisWeek": "هذا الأسبوع",
+      "lastWeek": "الأسبوع الماضي",
+      "thisMonth": "هذا الشهر",
+      "lastMonth": "الشهر الماضي",
+      "thisQuarter": "هذا الربع",
+      "lastQuarter": "الربع الماضي",
+      "thisYear": "هذه السنة",
+      "lastYear": "السنة الماضية"
+    },
+    "kpiUnits": "وحدات الوقت",
+    "kpiEntries": "القيود",
+    "kpiTickets": "التذاكر",
+    "kpiAgents": "الوكلاء",
+    "rangeBetween": "{{from}} – {{to}}",
+    "rangeFrom": "من {{from}}",
+    "rangeTo": "حتى {{to}}",
+    "chartTitle": "الوحدات يوميًا",
+    "chartBar": "{{date}}: {{units}} وحدات",
+    "dayUnknown": "بدون تاريخ",
+    "emptyHint": "وسّع الفترة أو امسح عوامل تصفية الوكيل والتذكرة.",
+    "clearFilters": "مسح عوامل التصفية",
+    "pageRange": "{{from}}–{{to}}",
+    "pageScope": "في هذه الصفحة",
+    "chartPeak": "الذروة {{units}}"
+  },
+  "setPassword": {
+    "subtitle": "يُرجى اختيار كلمة مرور لحسابك.",
+    "password": "كلمة مرور جديدة",
+    "confirm": "أعد كلمة المرور",
+    "lengthHint": "بين {{min}} و{{max}} حرفًا.",
+    "mismatch": "كلمتا المرور غير متطابقتين.",
+    "submit": "تعيين كلمة المرور",
+    "saving": "جارٍ الحفظ…",
+    "done": "تم حفظ كلمة المرور. يمكنك تسجيل الدخول الآن.",
+    "invalid": "هذا الرابط لم يعد صالحًا.",
+    "invalidHint": "روابط الإعداد صالحة 7 أيام وتُستخدم مرة واحدة. اطلب رابطًا جديدًا من الإدارة.",
+    "toLogin": "الانتقال لتسجيل الدخول"
   }
 }

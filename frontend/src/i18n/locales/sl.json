@@ -55,7 +55,12 @@
     "showActiveQueues": "Pokaži aktivno",
     "queueSearch": "Filtriraj čakalne vrste ...",
     "noQueueMatch": "Nobena čakalna vrsta se ne ujema.",
-    "templates": "Predloge"
+    "templates": "Predloge",
+    "locked": "Zaklenjeno",
+    "responsible": "Odgovoren",
+    "escalated": "Eskalirano",
+    "services": "Storitve",
+    "timeAccounting": "Evidenca časa"
   },
   "common": {
     "prev": "Prejšnja",
@@ -68,7 +73,10 @@
     "cancel": "Prekliči",
     "help": "pomoč",
     "edit": "Uredi",
-    "save": "Shrani"
+    "save": "Shrani",
+    "saved": "Shranjeno",
+    "delete": "Izbriši",
+    "submit": "Pošlji"
   },
   "otp": {
     "verifying": "Preverjanje ...",
@@ -171,7 +179,9 @@
     "toPickUpEmpty": "Ni novih vstopnic za prevzem.",
     "remindersDue": "Rok za opomine",
     "remindersDueEmpty": "Ni zapadlih opominov.",
-    "queueShortcutsEmpty": "Trenutno ni čakalnih vrst z odprtimi ali novimi vstopnicami."
+    "queueShortcutsEmpty": "Trenutno ni čakalnih vrst z odprtimi ali novimi vstopnicami.",
+    "lastViews": "Nedavno ogledano",
+    "lastViewsUntitled": "(brez zadeve)"
   },
   "queue": {
     "sidebar": "Čakalne vrste",
@@ -352,7 +362,7 @@
     "recipientName": "Ime",
     "recipientEmail": "E-pošta",
     "recipientRemove": "Odstrani",
-    "recipientConfirm": "OK",
+    "recipientConfirm": "V redu",
     "replyToRequired": "Potreben je vsaj en prejemnik Za.",
     "replySubject": "Predmet",
     "replyTemplate": "Predloga",
@@ -370,7 +380,7 @@
     "splitQueue": "Ciljna čakalna vrsta",
     "splitNewTitle": "Nov naslov vstopnice (neobvezno)",
     "ai": {
-      "title": "AI Assist",
+      "title": "AI pomoč",
       "help": {
         "summary": "Ustvarjeno iz člankov vstopnice s konfiguriranim modelom čakalne vrste in shranjeno samo v stanju vstopnice, nikoli kot opomba — nikoli se ne pošlje stranki sama.",
         "drafts": "Generirano z modelom iz vstopnice do sedaj. Vsak osnutek je svoj zapis - nič se ne pošlje samodejno; morate ga odpreti in izrecno poslati ali zavreči."
@@ -482,7 +492,8 @@
       "customerEmail": "E-pošta",
       "customerFirstName": "Ime",
       "customerLastName": "Priimek",
-      "customerLoginConflict": "Ta prijava že obstaja. Izberite drugo prijavo ali namesto tega dodelite obstoječo stranko prek iskanja."
+      "customerLoginConflict": "Ta prijava že obstaja. Izberite drugo prijavo ali namesto tega dodelite obstoječo stranko prek iskanja.",
+      "clearCustomer": "Odstrani stranko"
     },
     "inlineAttachments": "Vdelane slike ({{count}})",
     "list": {
@@ -504,7 +515,35 @@
     "draftEditedAt": "urejeno {{time}}",
     "draftDiscard": "Zavrzi osnutek",
     "draftDiscardConfirm": "Zavreči ta neposlani odgovor? Besedila ni mogoče obnoviti.",
-    "draftDiscardConfirmButton": "Zavrzi"
+    "draftDiscardConfirmButton": "Zavrzi",
+    "type": "Vrsta",
+    "service": "Storitev",
+    "sla": "SLA",
+    "mentions": "Omembe",
+    "timeAccounting": "Evidenca časa",
+    "timeUnits": "Časovne enote",
+    "addTime": "Vnesi čas",
+    "addMention": "Omeni agenta",
+    "mentionsCount": "Omembe: {{n}}",
+    "mentionsEmpty": "Nihče ni omenjen",
+    "mentionRemove": "Odstrani omembo",
+    "mentionSuggestions": "Agenti",
+    "timeUnitAbbrev": "min",
+    "timeUnitHoursAbbrev": "h",
+    "timeUnitsShort": "{{units}} min",
+    "timeAccountingTotal": "Vneseni čas: {{units}} min",
+    "timeRemove": "Odstrani vnos",
+    "timeUnitMode": "Časovna enota",
+    "timeUnitMin": "Min",
+    "timeUnitHours": "H",
+    "timePresets": "Hitra izbira",
+    "timeComposerHint": "Ob odgovoru vnesite v nogo urejevalnika.",
+    "timeChipHint": "Vpiše se ob pošiljanju",
+    "extrasFailedMentions": "Poslano — omemba ni bila shranjena.",
+    "extrasFailedTime": "Poslano — čas ni bil vnesen.",
+    "extrasFailedBoth": "Poslano — niti omemba niti vnos časa nista bila shranjena.",
+    "extrasRetry": "Poskusi znova",
+    "customerUnresolved": "Za ta naslov ni zapisa stranke, zato podrobnosti niso na voljo."
   },
   "search": {
     "title": "Iskanje",
@@ -800,7 +839,7 @@
         "new": "Nov odjemalec MCP",
         "name": "Ime",
         "url": "URL",
-        "authToken": "Auth token",
+        "authToken": "Auth žeton",
         "authTokenSetHelp": "Žeton je shranjen. Pustite prazno, da ostane.",
         "authTokenHelp": "Shranjeno šifrirano in nikoli več prikazano.",
         "empty": "Ustvarjen še ni noben odjemalec MCP.",
@@ -1006,7 +1045,7 @@
           "error": "Napaka",
           "copy": "Kopiraj",
           "download": "Prenos",
-          "runId": "Run ID",
+          "runId": "ID zagona",
           "trigger": "Sprožilec",
           "piiSummary": "{{count}} Zamenjave PII",
           "revealPii": "Prikaži PII",
@@ -1051,7 +1090,7 @@
         "title": "Tester pravil",
         "toolPlaceholder": "Ime orodja, npr. netadmin:diagnose_connection",
         "samplePlaceholder": "Vzorec rezultata orodja kot JSON, npr. {\"lock_code\": \"COPYR\"}",
-        "run": "Test",
+        "run": "Preizkusi",
         "invalid": "Pravila neveljavna",
         "hit": "Hit — stopnjevanje",
         "noHit": "Brez zadetka",
@@ -1143,7 +1182,8 @@
       },
       "acl": {
         "match": "Pogoji, pod katerimi velja ta ACL (npr. trenutna čakalna vrsta, stanje, polje obrazca). Sprememba na desni se uporabi le, če se ujemajo vsi tukaj navedeni kriteriji.",
-        "change": "Učinek ACL, ko se njegovi pogoji ujemajo – običajno omejuje ali vsiljuje izbire, ki so na voljo v obrazcih (npr. dovoljena so samo nekatera stanja spremljanja)."
+        "change": "Učinek ACL, ko se njegovi pogoji ujemajo – običajno omejuje ali vsiljuje izbire, ki so na voljo v obrazcih (npr. dovoljena so samo nekatera stanja spremljanja).",
+        "stopAfterMatch": "Če je označeno, se po produktivnem ujemanju ne ocenjujejo nadaljnji ACL-ji (Znuny StopAfterMatch)."
       },
       "mailOutbound": {
         "host": "Ime gostitelja strežnika SMTP za odhodno pošto. Mora biti dosegljiv s tega strežnika (DNS + požarni zid) na spodnjih vratih.",
@@ -1190,8 +1230,8 @@
         "validId": "»Začasno« (valid_id 3) je tretje stanje veljavnosti Znunyja — običajno čaka potrditev računa (npr. nepotrjena samoregistracija), ki se razlikuje od navadnega veljavnega/neveljavnega."
       },
       "systemAddresses": {
-        "email": "Address used as the From email for queues and auto-responses.",
-        "name": "Display name shown next to the email (e.g. “Support <support@example.com>”)."
+        "email": "Naslov, uporabljen kot From za vrste in samodejne odgovore.",
+        "name": "Prikazano ime ob e-naslovu (npr. »Support <support@example.com>«)."
       }
     },
     "nav": {
@@ -1240,7 +1280,13 @@
       "aiAcl": "Dostop in omejitve",
       "collapse": "Strni navigacijo",
       "mailAccounts": "Poštni računi",
-      "oauth2Tokens": "OAuth2 žetoni (pošta)"
+      "oauth2Tokens": "OAuth2 žetoni (pošta)",
+      "types": "Vrste zahtevkov",
+      "services": "Storitve",
+      "slas": "SLA",
+      "systemAddresses": "Sistemski naslovi",
+      "notificationEvents": "Dogodki obvestil",
+      "ticketAttributeRelations": "Odnosi atributov"
     },
     "table": {
       "id": "ID",
@@ -1347,7 +1393,44 @@
       "title": "Naslov",
       "firstName": "Ime",
       "lastName": "Priimek",
-      "name": "Ime"
+      "name": "Ime",
+      "passwordMode": "Dodelitev gesla",
+      "passwordModeManual": "Nastavi ročno",
+      "passwordModeAuto": "Povabilo: pošlji povezavo po e-pošti",
+      "passwordModeAutoHelp": "Ob shranjevanju gre enkratna povezava na e-naslov spodaj. Agent geslo izbere sam.",
+      "email": "E-pošta",
+      "mobile": "Mobilni telefon",
+      "effectivePermissions": "Prikaži dejanske pravice",
+      "effectivePermissionsTitle": "Dejanske pravice za {{name}}",
+      "effectivePermissionsDescription": "Združene pravice iz neposrednih skupin in vlog.",
+      "rolesHeading": "Vloge",
+      "groupsHeading": "Skupinske pravice",
+      "queuesHeading": "Vrste",
+      "noRoles": "Ni dodeljenih vlog.",
+      "noGroups": "Ni skupinskih pravic.",
+      "noQueues": "Ni dodeljenih vrst.",
+      "viaDirect": "Neposredno",
+      "permissionColumn": "Pravice",
+      "sourceColumn": "Vir",
+      "editSettings": "Uredi osebne nastavitve",
+      "editSettingsTitle": "Osebne nastavitve: {{name}}",
+      "editSettingsDescription": "Enake nastavitve, kot jih agent vidi pod »Osebne nastavitve«.",
+      "languageLabel": "Jezik",
+      "languageSaved": "Jezik shranjen.",
+      "tabAccount": "Račun",
+      "tabPerson": "Oseba",
+      "sourceInvalidHint": "Ta pravica izvira iz neveljavne vloge in zato nima učinka.",
+      "keyInactiveHint": "Ta pravica je nastavljena, a ne velja — vir ali skupina je neveljavna.",
+      "deletePermanent": "Trajno izbriši",
+      "deleteTitle": "Trajno izbrisati {{name}}?",
+      "deleteConfirm": "Trajno izbriši",
+      "deletableBody": "Nič se ne sklicuje na {{name}}; račun je mogoče popolnoma odstraniti s nastavitvami, skupinami, vlogami in 2FA.",
+      "deleteIrreversible": "Tega ni mogoče razveljaviti.",
+      "deleteBlockedBody": "{{name}} ni mogoče izbrisati — te tabele se še sklicujejo na račun:",
+      "deleteBlockedHint": "Nastavite račun na »Neveljavno«, da zahtevki, članki in zgodovina ostanejo pripisljivi.",
+      "resendSetupLink": "Ponovno pošlji povezavo za nastavitev",
+      "setupLinkSent": "Povezava za nastavitev poslana.",
+      "setupLinkFailed": "Povezave za nastavitev ni bilo mogoče poslati."
     },
     "groups": {
       "title_plural": "Skupine",
@@ -1537,8 +1620,8 @@
       "key": "Ključ",
       "value": "Vrednost",
       "valuePlaceholder": "Regex ali vrednost",
-      "stop": "Stop",
-      "stopYes": "Stop",
+      "stop": "Ustavi",
+      "stopYes": "Ustavi",
       "stopAfterMatch": "Ustavite se po tekmi",
       "stopHelp": "Ko je nastavljeno, po ujemanju s tem filtrom za sporočilo niso ocenjeni nobeni nadaljnji filtri PostMaster.",
       "matchCount": "Ujemanje",
@@ -1561,7 +1644,10 @@
       "name": "Ime",
       "description": "Opis",
       "match": "Ujemanje",
-      "change": "spremeniti"
+      "change": "spremeniti",
+      "new": "Nov ACL",
+      "stopAfterMatch": "Ustavi po ujemanju",
+      "confirmDelete": "Izbrisati ACL „{{name}}”? Tega ni mogoče razveljaviti."
     },
     "genericAgentJobs": {
       "title_plural": "Generična delovna mesta agentov",
@@ -1702,7 +1788,7 @@
       "authPassword": "Uporabniško ime/geslo",
       "authUser": "Uporabniško ime",
       "authPasswordField": "Geslo",
-      "passwordSet": "set",
+      "passwordSet": "nastavljeno",
       "passwordPlaceholder": "Pustite prazno, da ostanete na tekočem",
       "fromDefault": "Privzeti naslov pošiljatelja",
       "timeoutSeconds": "Časovna omejitev (sekunde)",
@@ -2222,7 +2308,13 @@
       "aiAudit": "Popolna revizija vsake zahteve/odgovora LLM z razkritjem PII.",
       "aiAcl": "Dovoljenja in kvote AI na skupino, vlogo ali agenta.",
       "mailAccounts": "Dohodni nabiralniki IMAP/POP (geslo ali OAuth2).",
-      "oauth2Tokens": "Konfiguracije žetonov OAuth2 za Microsoft/Google pošto (združljivo z Znuny)."
+      "oauth2Tokens": "Konfiguracije žetonov OAuth2 za Microsoft/Google pošto (združljivo z Znuny).",
+      "types": "Upravljajte vrste zahtevkov za klasifikacijo.",
+      "services": "Upravljajte storitve in jih povežite s SLA.",
+      "slas": "Upravljajte SLA dogovore in roke.",
+      "systemAddresses": "E-naslovi kot From za vrste in samodejne odgovore.",
+      "notificationEvents": "Nastavite obvestila agentom na podlagi dogodkov.",
+      "ticketAttributeRelations": "Matrike odvisnosti, združljive z Znuny (storitev/vrsta ipd.), CSV."
     },
     "mailAccounts": {
       "title_plural": "Poštni računi",
@@ -2270,11 +2362,50 @@
       "refreshSuccess": "Žeton osvežen."
     },
     "systemAddresses": {
-      "title_plural": "System addresses",
-      "subtitle": "From-addresses for queues and auto-responses. Invalid addresses stay listed so they can be re-enabled.",
-      "new": "Add address",
-      "email": "Email",
-      "name": "Name"
+      "title_plural": "Sistemski naslovi",
+      "subtitle": "From naslovi za vrste in samodejne odgovore. Neveljavni ostanejo na seznamu za ponovno omogočitev.",
+      "new": "Dodaj naslov",
+      "email": "E-pošta",
+      "name": "Ime"
+    },
+    "types": {
+      "title_plural": "Vrste zahtevkov",
+      "new": "Nova vrsta",
+      "name": "Ime"
+    },
+    "services": {
+      "title_plural": "Storitve",
+      "new": "Nova storitev",
+      "name": "Ime",
+      "slaCount": "SLA"
+    },
+    "slas": {
+      "title_plural": "SLA",
+      "new": "Nov SLA",
+      "name": "Ime",
+      "firstResponseTime": "Prvi odziv (min)",
+      "updateTime": "Posodobitev (min)",
+      "solutionTime": "Rešitev (min)",
+      "calendar": "Koledar"
+    },
+    "notificationEvents": {
+      "title_plural": "Dogodki obvestil",
+      "subtitle": "Ob dogodkih se ujemajoča obvestila pošljejo agentom.",
+      "new": "Ustvari obvestilo",
+      "name": "Ime",
+      "event": "Dogodek",
+      "subject": "Zadeva",
+      "body": "Telo"
+    },
+    "tar": {
+      "title": "Odnosi atributov zahtevkov",
+      "filename": "Ime datoteke",
+      "attributes": "Atributi",
+      "priority": "Prioriteta",
+      "csv": "CSV podatki",
+      "new": "Nov odnos",
+      "help": "CSV z glavo Attribute1;Attribute2 in pari vrednosti (Znuny AdminTicketAttributeRelations). Omejuje izbire v obrazcih (npr. Storitev → Vrsta).",
+      "confirmDelete": "Izbrisati ta odnos?"
     }
   },
   "kb": {
@@ -2489,7 +2620,8 @@
       "startButton": "Začni postopek",
       "actions": "Razpoložljiva dejanja",
       "loadError": "Ni bilo mogoče naložiti stanja procesa.",
-      "noDialogs": "Pri tej dejavnosti ni na voljo nobenih dejanj."
+      "noDialogs": "Pri tej dejavnosti ni na voljo nobenih dejanj.",
+      "noCustomerDialogs": "Na tem koraku ni na voljo nobenih dialogov za stranke."
     },
     "start": {
       "title": "Začni postopek",
@@ -2525,5 +2657,84 @@
     "body": "Telo",
     "editTitle": "Uredi »{{name}}«",
     "saveError": "Predloge ni bilo mogoče shraniti."
+  },
+  "views": {
+    "mine": "Moji zahtevki",
+    "responsible": "Odgovoren",
+    "locked": "Zaklenjeni zahtevki",
+    "watched": "Spremljani zahtevki",
+    "escalated": "Eskalirani zahtevki",
+    "service": "Po storitvi",
+    "serviceHint": "Seznam zahtevkov, dodeljenih storitvi.",
+    "pickService": "Izberite storitev…"
+  },
+  "customerCentre": {
+    "title": "Podatki o stranki",
+    "open": "Stranka",
+    "invalid": "Neveljavna prijava stranke.",
+    "loadError": "Stranke ni bilo mogoče naložiti.",
+    "email": "E-pošta",
+    "phone": "Telefon",
+    "customerId": "Številka stranke",
+    "company": "Podjetje",
+    "openCount": "{{count}} odprtih",
+    "closedCount": "{{count}} zaprtih",
+    "allTickets": "Vsi zahtevki →",
+    "recentTickets": "Nedavni zahtevki"
+  },
+  "timeAccounting": {
+    "title": "Evidenca časa",
+    "hint": "Zabeležene časovne enote na zahtevkih, do katerih imate dostop.",
+    "filterUser": "Agent",
+    "allUsers": "Vsi agenti",
+    "filterFrom": "Od",
+    "filterTo": "Do",
+    "filterTicket": "ID zahtevka",
+    "empty": "Ni ujemajočih vnosov časa.",
+    "colWhen": "Kdaj",
+    "colTicket": "Zahtevek",
+    "colUser": "Agent",
+    "colUnits": "Enote",
+    "presetsLabel": "Obdobje",
+    "presets": {
+      "today": "Danes",
+      "yesterday": "Včeraj",
+      "thisWeek": "Ta teden",
+      "lastWeek": "Prejšnji teden",
+      "thisMonth": "Ta mesec",
+      "lastMonth": "Prejšnji mesec",
+      "thisQuarter": "To četrtletje",
+      "lastQuarter": "Prejšnje četrtletje",
+      "thisYear": "Letos",
+      "lastYear": "Lansko leto"
+    },
+    "kpiUnits": "Časovne enote",
+    "kpiEntries": "Vnosi",
+    "kpiTickets": "Zahtevki",
+    "kpiAgents": "Agenti",
+    "rangeBetween": "{{from}} – {{to}}",
+    "rangeFrom": "od {{from}}",
+    "rangeTo": "do {{to}}",
+    "chartTitle": "Enote na dan",
+    "chartBar": "{{date}}: {{units}} enot",
+    "dayUnknown": "Brez datuma",
+    "emptyHint": "Razširite obdobje ali počistite filtre agenta in zahtevka.",
+    "clearFilters": "Počisti filtre",
+    "pageRange": "{{from}}–{{to}}",
+    "pageScope": "na tej strani",
+    "chartPeak": "vrh {{units}}"
+  },
+  "setPassword": {
+    "subtitle": "Izberite geslo za svoj račun.",
+    "password": "Novo geslo",
+    "confirm": "Ponovi geslo",
+    "lengthHint": "Med {{min}} in {{max}} znaki.",
+    "mismatch": "Gesli se ne ujemata.",
+    "submit": "Nastavi geslo",
+    "saving": "Shranjevanje…",
+    "done": "Geslo shranjeno. Zdaj se lahko prijavite.",
+    "invalid": "Ta povezava ni več veljavna.",
+    "invalidHint": "Povezave za nastavitev veljajo 7 dni in se uporabijo enkrat. Zahtevajte novo pri administraciji.",
+    "toLogin": "Na prijavo"
   }
 }

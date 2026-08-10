@@ -55,7 +55,12 @@
     "showActiveQueues": "Tunjukkan aktif",
     "queueSearch": "Tapis baris gilir…",
     "noQueueMatch": "Tiada baris gilir sepadan.",
-    "templates": "templat"
+    "templates": "templat",
+    "locked": "Dikunci",
+    "responsible": "Bertanggungjawab",
+    "escalated": "Dieskalasi",
+    "services": "Perkhidmatan",
+    "timeAccounting": "Perakaunan masa"
   },
   "common": {
     "prev": "Sebelumnya",
@@ -68,7 +73,10 @@
     "cancel": "Batal",
     "help": "Tolong",
     "edit": "Sunting",
-    "save": "Jimat"
+    "save": "Simpan",
+    "saved": "Disimpan",
+    "delete": "Padam",
+    "submit": "Hantar"
   },
   "otp": {
     "verifying": "Mengesahkan…",
@@ -171,7 +179,9 @@
     "toPickUpEmpty": "Tiada tiket baru untuk diambil.",
     "remindersDue": "Peringatan perlu dibayar",
     "remindersDueEmpty": "Tiada peringatan perlu dibayar.",
-    "queueShortcutsEmpty": "Tiada beratur dengan tiket terbuka atau baharu sekarang."
+    "queueShortcutsEmpty": "Tiada beratur dengan tiket terbuka atau baharu sekarang.",
+    "lastViews": "Dilihat baru-baru ini",
+    "lastViewsUntitled": "(tiada subjek)"
   },
   "queue": {
     "sidebar": "Beratur",
@@ -482,7 +492,8 @@
       "customerEmail": "E-mel",
       "customerFirstName": "nama pertama",
       "customerLastName": "nama keluarga",
-      "customerLoginConflict": "Log masuk ini sudah wujud. Pilih log masuk lain atau tetapkan pelanggan sedia ada melalui carian sebaliknya."
+      "customerLoginConflict": "Log masuk ini sudah wujud. Pilih log masuk lain atau tetapkan pelanggan sedia ada melalui carian sebaliknya.",
+      "clearCustomer": "Buang pelanggan"
     },
     "inlineAttachments": "Imej terbenam ({{count}})",
     "list": {
@@ -504,7 +515,35 @@
     "draftEditedAt": "disunting {{time}}",
     "draftDiscard": "Buang draf",
     "draftDiscardConfirm": "Buang balasan yang belum dihantar ini? Teks tidak boleh dipulihkan.",
-    "draftDiscardConfirmButton": "Buang"
+    "draftDiscardConfirmButton": "Buang",
+    "type": "Jenis",
+    "service": "Perkhidmatan",
+    "sla": "SLA",
+    "mentions": "Sebutan",
+    "timeAccounting": "Perakaunan masa",
+    "timeUnits": "Unit masa",
+    "addTime": "Rekod masa",
+    "addMention": "Sebut ejen",
+    "mentionsCount": "Sebutan: {{n}}",
+    "mentionsEmpty": "Tiada siapa disebut",
+    "mentionRemove": "Buang sebutan",
+    "mentionSuggestions": "Ejen",
+    "timeUnitAbbrev": "min",
+    "timeUnitHoursAbbrev": "j",
+    "timeUnitsShort": "{{units}} min",
+    "timeAccountingTotal": "Masa direkod: {{units}} min",
+    "timeRemove": "Buang entri",
+    "timeUnitMode": "Unit masa",
+    "timeUnitMin": "Min",
+    "timeUnitHours": "J",
+    "timePresets": "Pilihan pantas",
+    "timeComposerHint": "Apabila membalas, rekod di pengaki penyusun.",
+    "timeChipHint": "Direkod semasa hantar",
+    "extrasFailedMentions": "Dihantar — sebutan tidak disimpan.",
+    "extrasFailedTime": "Dihantar — masa tidak direkod.",
+    "extrasFailedBoth": "Dihantar — sebutan mahupun rekod masa tidak disimpan.",
+    "extrasRetry": "Cuba lagi",
+    "customerUnresolved": "Tiada rekod pelanggan sepadan dengan alamat ini, jadi butiran tidak tersedia."
   },
   "search": {
     "title": "Cari",
@@ -1143,7 +1182,8 @@
       },
       "acl": {
         "match": "Keadaan di mana ACL ini digunakan (cth. baris gilir semasa, keadaan, medan borang). Perubahan di sebelah kanan hanya digunakan apabila setiap kriteria yang disenaraikan di sini sepadan.",
-        "change": "Kesan ACL setelah syaratnya sepadan — biasanya ia menyekat atau memaksa pilihan yang tersedia dalam bentuk (mis. hanya keadaan susulan tertentu yang dibenarkan)."
+        "change": "Kesan ACL setelah syaratnya sepadan — biasanya ia menyekat atau memaksa pilihan yang tersedia dalam bentuk (mis. hanya keadaan susulan tertentu yang dibenarkan).",
+        "stopAfterMatch": "Jika ditanda, ACL lain tidak dinilai selepas padanan produktif (Znuny StopAfterMatch)."
       },
       "mailOutbound": {
         "host": "Nama hos pelayan SMTP untuk mel keluar. Mesti boleh dicapai daripada pelayan ini (DNS + firewall) pada port di bawah.",
@@ -1190,8 +1230,8 @@
         "validId": "\"Temp\" (valid_id 3) ialah keadaan kesahihan ketiga Znuny — biasanya pengesahan akaun belum selesai (cth. pendaftaran diri yang belum disahkan), berbeza daripada sah/tidak sah biasa."
       },
       "systemAddresses": {
-        "email": "Address used as the From email for queues and auto-responses.",
-        "name": "Display name shown next to the email (e.g. “Support <support@example.com>”)."
+        "email": "Alamat yang digunakan sebagai From untuk barisan dan balasan auto.",
+        "name": "Nama paparan di sebelah e-mel (cth. “Support <support@example.com>”)."
       }
     },
     "nav": {
@@ -1240,7 +1280,13 @@
       "aiAcl": "Akses & had",
       "collapse": "Runtuhkan navigasi",
       "mailAccounts": "Akaun mel",
-      "oauth2Tokens": "Token OAuth2 (mel)"
+      "oauth2Tokens": "Token OAuth2 (mel)",
+      "types": "Jenis tiket",
+      "services": "Perkhidmatan",
+      "slas": "SLA",
+      "systemAddresses": "Alamat sistem",
+      "notificationEvents": "Peristiwa pemberitahuan",
+      "ticketAttributeRelations": "Hubungan atribut"
     },
     "table": {
       "id": "ID",
@@ -1347,7 +1393,44 @@
       "title": "Tajuk",
       "firstName": "nama pertama",
       "lastName": "nama keluarga",
-      "name": "Nama"
+      "name": "Nama",
+      "passwordMode": "Tugasan kata laluan",
+      "passwordModeManual": "Tetapkan secara manual",
+      "passwordModeAuto": "Jemput: e-mel pautan persediaan",
+      "passwordModeAutoHelp": "Apabila disimpan, pautan sekali guna dihantar ke e-mel di bawah. Ejen memilih kata laluan sendiri.",
+      "email": "E-mel",
+      "mobile": "Telefon bimbit",
+      "effectivePermissions": "Lihat keizinan berkesan",
+      "effectivePermissionsTitle": "Keizinan berkesan untuk {{name}}",
+      "effectivePermissionsDescription": "Hak digabung daripada penugasan kumpulan terus dan peranan.",
+      "rolesHeading": "Peranan",
+      "groupsHeading": "Keizinan kumpulan",
+      "queuesHeading": "Barisan",
+      "noRoles": "Tiada peranan ditetapkan.",
+      "noGroups": "Tiada keizinan kumpulan.",
+      "noQueues": "Tiada barisan ditetapkan.",
+      "viaDirect": "Terus",
+      "permissionColumn": "Keizinan",
+      "sourceColumn": "Sumber",
+      "editSettings": "Edit tetapan peribadi",
+      "editSettingsTitle": "Tetapan peribadi {{name}}",
+      "editSettingsDescription": "Tetapan sama yang ejen lihat di “Tetapan peribadi”.",
+      "languageLabel": "Bahasa",
+      "languageSaved": "Bahasa disimpan.",
+      "tabAccount": "Akaun",
+      "tabPerson": "Orang",
+      "sourceInvalidHint": "Keizinan ini datang daripada peranan tidak sah maka tiada kesan.",
+      "keyInactiveHint": "Keizinan dikonfigurasikan tetapi tidak berkuat kuasa — sumber atau kumpulan tidak sah.",
+      "deletePermanent": "Padam kekal",
+      "deleteTitle": "Padam kekal {{name}}?",
+      "deleteConfirm": "Padam kekal",
+      "deletableBody": "Tiada yang merujuk {{name}}; akaun boleh dibuang sepenuhnya dengan keutamaan, kumpulan, peranan dan 2FA.",
+      "deleteIrreversible": "Tidak boleh dibuat asal.",
+      "deleteBlockedBody": "{{name}} tidak boleh dipadam — jadual berikut masih merujuk akaun:",
+      "deleteBlockedHint": "Tetapkan akaun kepada “Tidak sah” supaya tiket, artikel dan sejarah kekal boleh dikaitkan.",
+      "resendSetupLink": "Hantar semula pautan persediaan",
+      "setupLinkSent": "Pautan persediaan dihantar.",
+      "setupLinkFailed": "Tidak dapat menghantar pautan persediaan."
     },
     "groups": {
       "title_plural": "Kumpulan",
@@ -1561,7 +1644,10 @@
       "name": "Nama",
       "description": "Penerangan",
       "match": "Perlawanan",
-      "change": "Berubah"
+      "change": "Berubah",
+      "new": "ACL baharu",
+      "stopAfterMatch": "Berhenti selepas padan",
+      "confirmDelete": "Padam ACL “{{name}}”? Tindakan ini tidak boleh dibuat asal."
     },
     "genericAgentJobs": {
       "title_plural": "Pekerjaan ejen generik",
@@ -2222,7 +2308,13 @@
       "aiAudit": "Audit penuh bagi setiap permintaan/tindak balas LLM, dengan pendedahan PII.",
       "aiAcl": "Keizinan dan kuota AI bagi setiap kumpulan, peranan atau ejen.",
       "mailAccounts": "Peti mel IMAP/POP masuk (kata laluan atau OAuth2).",
-      "oauth2Tokens": "Konfigurasi token OAuth2 untuk mel Microsoft/Google (serasi Znuny)."
+      "oauth2Tokens": "Konfigurasi token OAuth2 untuk mel Microsoft/Google (serasi Znuny).",
+      "types": "Urus jenis tiket yang digunakan untuk pengelasan.",
+      "services": "Urus perkhidmatan dan kaitkan dengan SLA.",
+      "slas": "Urus perjanjian tahap perkhidmatan dan pemasa.",
+      "systemAddresses": "Alamat e-mel sebagai From untuk barisan dan balasan auto.",
+      "notificationEvents": "Konfigurasikan pemberitahuan ejen berasaskan peristiwa.",
+      "ticketAttributeRelations": "Matriks kebergantungan serasi Znuny (perkhidmatan/barisan dsb.) dalam CSV."
     },
     "mailAccounts": {
       "title_plural": "Akaun mel",
@@ -2270,11 +2362,50 @@
       "refreshSuccess": "Token disegarkan."
     },
     "systemAddresses": {
-      "title_plural": "System addresses",
-      "subtitle": "From-addresses for queues and auto-responses. Invalid addresses stay listed so they can be re-enabled.",
-      "new": "Add address",
-      "email": "Email",
-      "name": "Name"
+      "title_plural": "Alamat sistem",
+      "subtitle": "Alamat From untuk barisan dan balasan auto. Yang tidak sah kekal disenaraikan supaya boleh diaktifkan semula.",
+      "new": "Tambah alamat",
+      "email": "E-mel",
+      "name": "Nama"
+    },
+    "types": {
+      "title_plural": "Jenis tiket",
+      "new": "Jenis baharu",
+      "name": "Nama"
+    },
+    "services": {
+      "title_plural": "Perkhidmatan",
+      "new": "Perkhidmatan baharu",
+      "name": "Nama",
+      "slaCount": "SLA"
+    },
+    "slas": {
+      "title_plural": "SLA",
+      "new": "SLA baharu",
+      "name": "Nama",
+      "firstResponseTime": "Balasan pertama (min)",
+      "updateTime": "Kemas kini (min)",
+      "solutionTime": "Penyelesaian (min)",
+      "calendar": "Kalendar"
+    },
+    "notificationEvents": {
+      "title_plural": "Peristiwa pemberitahuan",
+      "subtitle": "Apabila peristiwa berlaku, pemberitahuan sepadan dihantar kepada ejen.",
+      "new": "Cipta pemberitahuan",
+      "name": "Nama",
+      "event": "Peristiwa",
+      "subject": "Subjek",
+      "body": "Isi"
+    },
+    "tar": {
+      "title": "Hubungan atribut tiket",
+      "filename": "Nama fail",
+      "attributes": "Atribut",
+      "priority": "Keutamaan",
+      "csv": "Data CSV",
+      "new": "Hubungan baharu",
+      "help": "CSV dengan pengepala Attribute1;Attribute2 dan pasangan nilai (Znuny AdminTicketAttributeRelations). Mengehadkan pemilih borang (cth. Perkhidmatan → Barisan).",
+      "confirmDelete": "Padam hubungan ini?"
     }
   },
   "kb": {
@@ -2443,7 +2574,7 @@
     },
     "weekday": {
       "mon": "isn",
-      "tue": "Tue",
+      "tue": "Sel",
       "wed": "Rabu",
       "thu": "Kha",
       "fri": "Jum",
@@ -2489,7 +2620,8 @@
       "startButton": "Mulakan proses",
       "actions": "Tindakan yang tersedia",
       "loadError": "Tidak dapat memuatkan keadaan proses.",
-      "noDialogs": "Tiada tindakan tersedia pada aktiviti ini."
+      "noDialogs": "Tiada tindakan tersedia pada aktiviti ini.",
+      "noCustomerDialogs": "Tiada dialog pelanggan pada langkah ini."
     },
     "start": {
       "title": "Mulakan proses",
@@ -2525,5 +2657,84 @@
     "body": "Badan",
     "editTitle": "Edit “{{name}}”",
     "saveError": "Tidak dapat menyimpan templat."
+  },
+  "views": {
+    "mine": "Tiket saya",
+    "responsible": "Bertanggungjawab",
+    "locked": "Tiket dikunci",
+    "watched": "Tiket dipantau",
+    "escalated": "Tiket dieskalasi",
+    "service": "Mengikut perkhidmatan",
+    "serviceHint": "Senaraikan tiket yang ditetapkan kepada perkhidmatan.",
+    "pickService": "Pilih perkhidmatan…"
+  },
+  "customerCentre": {
+    "title": "Maklumat pelanggan",
+    "open": "Info pelanggan",
+    "invalid": "Log masuk pelanggan tidak sah.",
+    "loadError": "Tidak dapat memuatkan pelanggan ini.",
+    "email": "E-mel",
+    "phone": "Telefon",
+    "customerId": "Nombor pelanggan",
+    "company": "Syarikat",
+    "openCount": "{{count}} terbuka",
+    "closedCount": "{{count}} ditutup",
+    "allTickets": "Semua tiket →",
+    "recentTickets": "Tiket terbaru"
+  },
+  "timeAccounting": {
+    "title": "Perakaunan masa",
+    "hint": "Unit masa yang direkod pada tiket yang anda boleh akses.",
+    "filterUser": "Ejen",
+    "allUsers": "Semua ejen",
+    "filterFrom": "Dari",
+    "filterTo": "Hingga",
+    "filterTicket": "ID tiket",
+    "empty": "Tiada entri masa yang sepadan.",
+    "colWhen": "Bila",
+    "colTicket": "Tiket",
+    "colUser": "Ejen",
+    "colUnits": "Unit",
+    "presetsLabel": "Tempoh",
+    "presets": {
+      "today": "Hari ini",
+      "yesterday": "Semalam",
+      "thisWeek": "Minggu ini",
+      "lastWeek": "Minggu lepas",
+      "thisMonth": "Bulan ini",
+      "lastMonth": "Bulan lepas",
+      "thisQuarter": "Suku ini",
+      "lastQuarter": "Suku lepas",
+      "thisYear": "Tahun ini",
+      "lastYear": "Tahun lepas"
+    },
+    "kpiUnits": "Unit masa",
+    "kpiEntries": "Entri",
+    "kpiTickets": "Tiket",
+    "kpiAgents": "Ejen",
+    "rangeBetween": "{{from}} – {{to}}",
+    "rangeFrom": "dari {{from}}",
+    "rangeTo": "hingga {{to}}",
+    "chartTitle": "Unit sehari",
+    "chartBar": "{{date}}: {{units}} unit",
+    "dayUnknown": "Tiada tarikh",
+    "emptyHint": "Luaskan tempoh atau kosongkan penapis ejen dan tiket.",
+    "clearFilters": "Kosongkan penapis",
+    "pageRange": "{{from}}–{{to}}",
+    "pageScope": "pada halaman ini",
+    "chartPeak": "puncak {{units}}"
+  },
+  "setPassword": {
+    "subtitle": "Sila pilih kata laluan untuk akaun anda.",
+    "password": "Kata laluan baharu",
+    "confirm": "Ulang kata laluan",
+    "lengthHint": "Antara {{min}} dan {{max}} aksara.",
+    "mismatch": "Kata laluan tidak sepadan.",
+    "submit": "Tetapkan kata laluan",
+    "saving": "Menyimpan…",
+    "done": "Kata laluan disimpan. Anda boleh log masuk sekarang.",
+    "invalid": "Pautan ini tidak lagi sah.",
+    "invalidHint": "Pautan persediaan sah 7 hari dan sekali guna. Minta yang baharu daripada pentadbir.",
+    "toLogin": "Ke log masuk"
   }
 }

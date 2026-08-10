@@ -140,8 +140,9 @@
     "help": "Hilfe",
     "edit": "Bearbeiten",
     "save": "Speichern",
-    "submit": "Submit",
-    "delete": "Delete"
+    "submit": "Absenden",
+    "delete": "Löschen",
+    "saved": "Gespeichert"
   },
   "otp": {
     "verifying": "Prüfe Code…",
@@ -1247,7 +1248,8 @@
       },
       "acl": {
         "match": "Bedingungen, unter denen diese ACL greift (z. B. aktuelle Queue, Status, Formularfeld). Nur wenn alle hier hinterlegten Kriterien zutreffen, wird die Änderung rechts angewendet.",
-        "change": "Wirkung der ACL, sobald die Bedingungen zutreffen — typischerweise werden dadurch Auswahlmöglichkeiten in Formularen eingeschränkt oder erzwungen (z. B. nur bestimmte Folgestatus erlaubt)."
+        "change": "Wirkung der ACL, sobald die Bedingungen zutreffen — typischerweise werden dadurch Auswahlmöglichkeiten in Formularen eingeschränkt oder erzwungen (z. B. nur bestimmte Folgestatus erlaubt).",
+        "stopAfterMatch": "Wenn aktiv, werden nach einem produktiven Treffer dieser ACL keine weiteren ACLs mehr ausgewertet (Znuny StopAfterMatch)."
       },
       "mailOutbound": {
         "host": "Hostname des SMTP-Servers für ausgehende Mail. Muss von diesem Server aus über den unten angegebenen Port erreichbar sein (DNS + Firewall).",
@@ -1350,7 +1352,7 @@
       "slas": "SLAs",
       "systemAddresses": "Systemadressen",
       "notificationEvents": "Benachrichtigungen",
-      "ticketAttributeRelations": "Attribute relations"
+      "ticketAttributeRelations": "Attribut­beziehungen"
     },
     "table": {
       "id": "ID",
@@ -1708,7 +1710,10 @@
       "name": "Name",
       "description": "Beschreibung",
       "match": "Match",
-      "change": "Change"
+      "change": "Change",
+      "new": "Neue ACL",
+      "stopAfterMatch": "Nach Treffer stoppen",
+      "confirmDelete": "ACL „{{name}}“ löschen? Das lässt sich nicht rückgängig machen."
     },
     "genericAgentJobs": {
       "title_plural": "GenericAgent-Jobs",
@@ -2428,7 +2433,7 @@
       "slas": "Service-Level-Agreements und Fristen verwalten.",
       "systemAddresses": "Absenderadressen für Queues und Auto-Antworten.",
       "notificationEvents": "Ereignisbasierte Agenten-Benachrichtigungen konfigurieren.",
-      "ticketAttributeRelations": "Znuny-compatible service/queue (and similar) dependency matrices (CSV)."
+      "ticketAttributeRelations": "Znuny-kompatible Abhängigkeitsmatrizen (z. B. Service → Queue) im CSV-Format."
     },
     "types": {
       "title_plural": "Ticket-Typen",
@@ -2467,14 +2472,14 @@
       "body": "Text"
     },
     "tar": {
-      "title": "Ticket attribute relations",
-      "filename": "Filename",
-      "attributes": "Attributes",
-      "priority": "Priority",
-      "csv": "CSV data",
-      "new": "New relation",
-      "help": "CSV with header Attribute1;Attribute2 and value pairs (Znuny AdminTicketAttributeRelations). Used to restrict form pickers (e.g. Service → Queue).",
-      "confirmDelete": "Delete this relation?"
+      "title": "Ticket-Attributbeziehungen",
+      "filename": "Dateiname",
+      "attributes": "Attribute",
+      "priority": "Priorität",
+      "csv": "CSV-Daten",
+      "new": "Neue Beziehung",
+      "help": "CSV mit Kopfzeile Attribute1;Attribute2 und Wertepaaren (Znuny AdminTicketAttributeRelations). Beschränkt Formularauswahlen (z. B. Service → Queue).",
+      "confirmDelete": "Diese Beziehung löschen?"
     }
   },
   "kb": {
@@ -2555,7 +2560,7 @@
       "name": "Name",
       "parent": "Übergeordnete Kategorie",
       "noParent": "Keine (oberste Ebene)",
-      "slug": "Slug (optional)",
+      "slug": "Slug (fakultativ)",
       "slugPlaceholder": "wird aus dem Namen erzeugt",
       "sort": "Sortierung",
       "customerVisible": "Für Kunden sichtbar",
@@ -2690,7 +2695,7 @@
       "actions": "Verfügbare Aktionen",
       "loadError": "Prozessstatus konnte nicht geladen werden.",
       "noDialogs": "Keine Aktionen bei dieser Aktivität verfügbar.",
-      "noCustomerDialogs": "No customer dialogs available at this step."
+      "noCustomerDialogs": "In diesem Schritt sind keine Kundendialoge verfügbar."
     },
     "start": {
       "title": "Prozess starten",

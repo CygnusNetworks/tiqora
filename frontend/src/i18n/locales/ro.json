@@ -33,7 +33,7 @@
     "admin": "Admin",
     "theme": "Temă",
     "language": "Limba",
-    "dashboard": "Tabloul de bord",
+    "dashboard": "Panou",
     "queues": "Cozile",
     "kb": "Baza de cunoștințe"
   },
@@ -55,7 +55,12 @@
     "showActiveQueues": "Arată activ",
     "queueSearch": "Cozile de filtrare...",
     "noQueueMatch": "Nicio coadă nu se potrivește.",
-    "templates": "Șabloane"
+    "templates": "Șabloane",
+    "locked": "Blocat",
+    "responsible": "Responsabil",
+    "escalated": "Escalat",
+    "services": "Servicii",
+    "timeAccounting": "Pontaj"
   },
   "common": {
     "prev": "Anterior",
@@ -68,7 +73,10 @@
     "cancel": "Anulează",
     "help": "Ajutor",
     "edit": "Editați",
-    "save": "Salvați"
+    "save": "Salvează",
+    "saved": "Salvat",
+    "delete": "Șterge",
+    "submit": "Trimite"
   },
   "otp": {
     "verifying": "Se verifică...",
@@ -171,7 +179,9 @@
     "toPickUpEmpty": "Nu există bilete noi de ridicat.",
     "remindersDue": "Mementouri datorate",
     "remindersDueEmpty": "Nu sunt datorate mementouri.",
-    "queueShortcutsEmpty": "Fără cozi cu bilete deschise sau noi chiar acum."
+    "queueShortcutsEmpty": "Fără cozi cu bilete deschise sau noi chiar acum.",
+    "lastViews": "Vizualizate recent",
+    "lastViewsUntitled": "(fără subiect)"
   },
   "queue": {
     "sidebar": "Cozile",
@@ -324,7 +334,7 @@
     "reply": "Răspunde",
     "replyAll": "Raspunde tuturor",
     "forward": "Înainte",
-    "bounce": "Bounce",
+    "bounce": "Redirecționează",
     "splitAction": "Împarte",
     "split": {
       "priority": "Prioritate",
@@ -370,7 +380,7 @@
     "splitQueue": "Coada țintă",
     "splitNewTitle": "Titlu nou bilet (opțional)",
     "ai": {
-      "title": "AI Assist",
+      "title": "Asistență IA",
       "help": {
         "summary": "Generat din articolele biletului de modelul configurat al cozii și stocat numai pe starea biletului, niciodată ca notă - nu este niciodată trimis clientului singur.",
         "drafts": "Generat de modelul din biletul de până acum. Fiecare schiță este propria sa înregistrare — nimic nu este trimis automat; trebuie să-l deschideți și să îl trimiteți sau să îl renunțați în mod explicit."
@@ -450,14 +460,14 @@
       "email": "E-mail",
       "pending": "În așteptare",
       "watch": "Privește",
-      "unwatch": "Unwatch",
+      "unwatch": "Nu mai urmări",
       "close": "Închide",
       "misc": "Diverse",
       "lock": "Blocare",
       "unlock": "Deblocați",
       "fields": "Câmpuri libere",
       "historyView": "istorie",
-      "link": "Link",
+      "link": "Leagă",
       "merge": "Îmbinați",
       "appointment": "Noua numire",
       "move": "Mișcă-te",
@@ -482,7 +492,8 @@
       "customerEmail": "E-mail",
       "customerFirstName": "Prenume",
       "customerLastName": "Nume de familie",
-      "customerLoginConflict": "Această autentificare există deja. Alegeți o altă autentificare sau atribuiți clientul existent prin căutare."
+      "customerLoginConflict": "Această autentificare există deja. Alegeți o altă autentificare sau atribuiți clientul existent prin căutare.",
+      "clearCustomer": "Elimină clientul"
     },
     "inlineAttachments": "Imagini încorporate ({{count}})",
     "list": {
@@ -504,7 +515,35 @@
     "draftEditedAt": "editat {{time}}",
     "draftDiscard": "Renunță la ciornă",
     "draftDiscardConfirm": "Renunți la acest răspuns netrimis? Textul nu va putea fi recuperat.",
-    "draftDiscardConfirmButton": "Renunță"
+    "draftDiscardConfirmButton": "Renunță",
+    "type": "Tip",
+    "service": "Serviciu",
+    "sla": "SLA",
+    "mentions": "Mențiuni",
+    "timeAccounting": "Pontaj",
+    "timeUnits": "Unități de timp",
+    "addTime": "Înregistrează timp",
+    "addMention": "Menționează agent",
+    "mentionsCount": "Mențiuni: {{n}}",
+    "mentionsEmpty": "Nimeni menționat",
+    "mentionRemove": "Elimină mențiunea",
+    "mentionSuggestions": "Agenți",
+    "timeUnitAbbrev": "min",
+    "timeUnitHoursAbbrev": "h",
+    "timeUnitsShort": "{{units}} min",
+    "timeAccountingTotal": "Timp înregistrat: {{units}} min",
+    "timeRemove": "Elimină înregistrarea",
+    "timeUnitMode": "Unitate de timp",
+    "timeUnitMin": "Min",
+    "timeUnitHours": "H",
+    "timePresets": "Selectare rapidă",
+    "timeComposerHint": "La răspuns, înregistrați-l în subsolul compozitorului.",
+    "timeChipHint": "Se înregistrează la trimitere",
+    "extrasFailedMentions": "Trimis — mențiunea nu a fost salvată.",
+    "extrasFailedTime": "Trimis — timpul nu a fost înregistrat.",
+    "extrasFailedBoth": "Trimis — nici mențiunea, nici înregistrarea de timp nu au fost salvate.",
+    "extrasRetry": "Încearcă din nou",
+    "customerUnresolved": "Nicio înregistrare de client nu corespunde acestei adrese; detaliile nu sunt disponibile."
   },
   "search": {
     "title": "Caută",
@@ -602,7 +641,7 @@
     "noCustomerResults": "Nu s-au găsit clienți.",
     "from": "De la",
     "directionLabel": "Direcția",
-    "directionIn": "Inbound",
+    "directionIn": "Intrare",
     "directionOut": "Ieșire",
     "submitSend": "Creați și trimiteți",
     "sendError": "E-mailul nu a putut fi trimis. Biletul a fost deja creat - vă rugăm să reîncercați să trimiteți răspunsul de acolo.",
@@ -1006,8 +1045,8 @@
           "error": "Eroare",
           "copy": "Copiere",
           "download": "Descărcați",
-          "runId": "Run ID",
-          "trigger": "Trigger",
+          "runId": "ID rulare",
+          "trigger": "Declanșator",
           "piiSummary": "{{count}} înlocuiri PII",
           "revealPii": "Afișați PII",
           "revealPiiError": "PII nu a putut fi dezvăluită.",
@@ -1143,7 +1182,8 @@
       },
       "acl": {
         "match": "Condiții în care se aplică acest ACL (de exemplu, coada curentă, stare, câmp de formular). Modificarea din dreapta se aplică numai atunci când fiecare criteriu enumerat aici se potrivește.",
-        "change": "Efectul ACL odată ce condițiile sale se potrivesc - de obicei restricționează sau forțează alegerile disponibile în formulare (de exemplu, sunt permise doar anumite stări ulterioare)."
+        "change": "Efectul ACL odată ce condițiile sale se potrivesc - de obicei restricționează sau forțează alegerile disponibile în formulare (de exemplu, sunt permise doar anumite stări ulterioare).",
+        "stopAfterMatch": "Dacă este bifat, după o potrivire productivă nu se mai evaluează alte ACL-uri (StopAfterMatch Znuny)."
       },
       "mailOutbound": {
         "host": "Nume de gazdă a serverului SMTP pentru e-mailurile trimise. Trebuie să fie accesibil de pe acest server (DNS + firewall) pe portul de mai jos.",
@@ -1190,8 +1230,8 @@
         "validId": "„Temp” (valid_id 3) este a treia stare de valabilitate a lui Znuny – de obicei un cont în așteptarea confirmării (de exemplu, auto-înregistrare neconfirmată), diferit de simplu valid/invalid."
       },
       "systemAddresses": {
-        "email": "Address used as the From email for queues and auto-responses.",
-        "name": "Display name shown next to the email (e.g. “Support <support@example.com>”)."
+        "email": "Adresa folosită ca From pentru cozi și auto-răspunsuri.",
+        "name": "Numele afișat lângă e-mail (ex. „Support <support@example.com>”)."
       }
     },
     "nav": {
@@ -1240,13 +1280,19 @@
       "aiAcl": "Acces și limite",
       "collapse": "Restrângeți navigarea",
       "mailAccounts": "Conturi de mail",
-      "oauth2Tokens": "Jetoane OAuth2 (e-mail)"
+      "oauth2Tokens": "Jetoane OAuth2 (e-mail)",
+      "types": "Tipuri de tichete",
+      "services": "Servicii",
+      "slas": "SLA-uri",
+      "systemAddresses": "Adrese de sistem",
+      "notificationEvents": "Evenimente de notificare",
+      "ticketAttributeRelations": "Relații de atribute"
     },
     "table": {
       "id": "ID",
       "status": "Stare",
       "valid": "Valabil",
-      "invalid": "Invalid",
+      "invalid": "Nevalid",
       "comments": "Comentarii",
       "changed": "Schimbat",
       "actions": "Acțiuni",
@@ -1259,7 +1305,7 @@
     "filter": {
       "label": "Valabilitate",
       "valid": "Valabil",
-      "invalid": "Invalid",
+      "invalid": "Nevalid",
       "all": "Toate"
     },
     "search": "Caută",
@@ -1347,7 +1393,44 @@
       "title": "Titlu",
       "firstName": "Prenume",
       "lastName": "Nume de familie",
-      "name": "Nume"
+      "name": "Nume",
+      "passwordMode": "Atribuire parolă",
+      "passwordModeManual": "Setare manuală",
+      "passwordModeAuto": "Invitație: trimite un link pe e-mail",
+      "passwordModeAutoHelp": "La salvare un link unic merge la e-mailul de mai jos. Agentul își alege parola.",
+      "email": "E-mail",
+      "mobile": "Telefon mobil",
+      "effectivePermissions": "Vezi permisiunile efective",
+      "effectivePermissionsTitle": "Permisiuni efective pentru {{name}}",
+      "effectivePermissionsDescription": "Drepturi combinate din grupuri directe și roluri.",
+      "rolesHeading": "Roluri",
+      "groupsHeading": "Permisiuni de grup",
+      "queuesHeading": "Cozi",
+      "noRoles": "Niciun rol atribuit.",
+      "noGroups": "Nicio permisiune de grup.",
+      "noQueues": "Nicio coadă atribuită.",
+      "viaDirect": "Direct",
+      "permissionColumn": "Permisiuni",
+      "sourceColumn": "Sursă",
+      "editSettings": "Editează setările personale",
+      "editSettingsTitle": "Setări personale pentru {{name}}",
+      "editSettingsDescription": "Aceleași setări pe care agentul le vede la «Setări personale».",
+      "languageLabel": "Limbă",
+      "languageSaved": "Limba a fost salvată.",
+      "tabAccount": "Cont",
+      "tabPerson": "Persoană",
+      "sourceInvalidHint": "Această permisiune vine dintr-un rol nevalid și deci nu are efect.",
+      "keyInactiveHint": "Această permisiune e configurată dar nu e în vigoare — sursa sau grupul e nevalid.",
+      "deletePermanent": "Șterge definitiv",
+      "deleteTitle": "Ștergeți definitiv {{name}}?",
+      "deleteConfirm": "Șterge definitiv",
+      "deletableBody": "Nimic nu referă {{name}}; contul poate fi eliminat complet, cu preferințe, grupuri, roluri și 2FA.",
+      "deleteIrreversible": "Acțiunea este ireversibilă.",
+      "deleteBlockedBody": "{{name}} nu poate fi șters — aceste tabele încă referă contul:",
+      "deleteBlockedHint": "Setați contul pe «Invalid» ca tichetele, articolele și istoricul să rămână atribuibile.",
+      "resendSetupLink": "Retrimite linkul de configurare",
+      "setupLinkSent": "Linkul de configurare a fost trimis.",
+      "setupLinkFailed": "Linkul de configurare nu a putut fi trimis."
     },
     "groups": {
       "title_plural": "Grupuri",
@@ -1414,7 +1497,7 @@
       "city": "Orașul",
       "country": "Țara",
       "bulk": {
-        "valid": "Set valid",
+        "valid": "Setează valid",
         "invalid": "Set nevalid",
         "temp": "Temporar invalid",
         "company": "Atribuiți companie...",
@@ -1561,7 +1644,10 @@
       "name": "Nume",
       "description": "Descriere",
       "match": "Se potrivește",
-      "change": "Schimbare"
+      "change": "Schimbare",
+      "new": "ACL nou",
+      "stopAfterMatch": "Oprește după potrivire",
+      "confirmDelete": "Ștergeți ACL „{{name}}”? Acțiunea este ireversibilă."
     },
     "genericAgentJobs": {
       "title_plural": "Joburi de agent generic",
@@ -1670,7 +1756,7 @@
         "channels": "Canale",
         "events": "Evenimente / SSE",
         "agents": "Agenți",
-        "admin": "Admin API",
+        "admin": "API admin",
         "mcp": "Server MCP",
         "compat": "Znuny GenericInterface"
       }
@@ -1702,7 +1788,7 @@
       "authPassword": "Nume de utilizator/parolă",
       "authUser": "Nume de utilizator",
       "authPasswordField": "Parolă",
-      "passwordSet": "set",
+      "passwordSet": "setat",
       "passwordPlaceholder": "Lăsați necompletat pentru a rămâne la curent",
       "fromDefault": "Adresă implicită de la",
       "timeoutSeconds": "Timeout (secunde)",
@@ -1768,7 +1854,7 @@
       "app": {
         "product": "Produs",
         "version": "Versiune",
-        "gitSha": "Git commit",
+        "gitSha": "Commit Git",
         "buildTime": "Construiește",
         "environment": "Mediul",
         "python": "Python",
@@ -1899,7 +1985,7 @@
       "from": "De la",
       "to": "Pentru a",
       "all": "Toate",
-      "dirIn": "Inbound",
+      "dirIn": "Intrare",
       "dirOut": "Ieșire",
       "time": "timpul",
       "fromTo": "De la → Către",
@@ -1984,7 +2070,7 @@
       "noMatches": "Fără meciuri.",
       "assignedCount": "{{count}} atribuit",
       "counterpartFor": "{{counterpart}} pentru {{anchor}}",
-      "invalid": "invalid"
+      "invalid": "nevalid"
     },
     "queueVariables": {
       "title_plural": "Variabilele de coadă",
@@ -2138,7 +2224,7 @@
       "runSuccessDetail": "Job #{{id}} · stare: {{status}} · {{count}} autentificare(e).",
       "viewJobs": "Vedeți locurile de muncă",
       "jobsEmpty": "Nu există încă locuri de muncă GDPR.",
-      "jobDetail": "Job #{{id}} — selector",
+      "jobDetail": "Sarcină #{{id}} — selector",
       "col": {
         "login": "Autentificare",
         "email": "E-mail",
@@ -2222,7 +2308,13 @@
       "aiAudit": "Audit complet al fiecărei cereri/răspuns LLM, cu dezvăluirea informațiilor personale.",
       "aiAcl": "Permisiuni și cote AI per grup, rol sau agent.",
       "mailAccounts": "Cutiile poștale IMAP/POP primite (parolă sau OAuth2).",
-      "oauth2Tokens": "Configurații de simbol OAuth2 pentru e-mail Microsoft/Google (compatibil cu Znuny)."
+      "oauth2Tokens": "Configurații de simbol OAuth2 pentru e-mail Microsoft/Google (compatibil cu Znuny).",
+      "types": "Gestionați tipurile de tichete folosite la clasificare.",
+      "services": "Gestionați serviciile și legați-le de SLA-uri.",
+      "slas": "Gestionați acordurile de nivel de serviciu și termenele.",
+      "systemAddresses": "Adrese e-mail folosite ca From pentru cozi și auto-răspunsuri.",
+      "notificationEvents": "Configurați notificările agenților declanșate de evenimente.",
+      "ticketAttributeRelations": "Matrici de dependență compatibile Znuny (serviciu/coadă etc.) în CSV."
     },
     "mailAccounts": {
       "title_plural": "Conturi de mail",
@@ -2270,11 +2362,50 @@
       "refreshSuccess": "Token reîmprospătat."
     },
     "systemAddresses": {
-      "title_plural": "System addresses",
-      "subtitle": "From-addresses for queues and auto-responses. Invalid addresses stay listed so they can be re-enabled.",
-      "new": "Add address",
-      "email": "Email",
-      "name": "Name"
+      "title_plural": "Adrese de sistem",
+      "subtitle": "Adrese From pentru cozi și auto-răspunsuri. Cele nevalide rămân listate pentru reactivare.",
+      "new": "Adaugă adresă",
+      "email": "E-mail",
+      "name": "Nume"
+    },
+    "types": {
+      "title_plural": "Tipuri de tichete",
+      "new": "Tip nou",
+      "name": "Nume"
+    },
+    "services": {
+      "title_plural": "Servicii",
+      "new": "Serviciu nou",
+      "name": "Nume",
+      "slaCount": "SLA-uri"
+    },
+    "slas": {
+      "title_plural": "SLA-uri",
+      "new": "SLA nou",
+      "name": "Nume",
+      "firstResponseTime": "Primul răspuns (min)",
+      "updateTime": "Actualizare (min)",
+      "solutionTime": "Soluție (min)",
+      "calendar": "Calendar"
+    },
+    "notificationEvents": {
+      "title_plural": "Evenimente de notificare",
+      "subtitle": "Când apar evenimente, notificările potrivite sunt trimise agenților.",
+      "new": "Creează notificare",
+      "name": "Nume",
+      "event": "Eveniment",
+      "subject": "Subiect",
+      "body": "Conținut"
+    },
+    "tar": {
+      "title": "Relații de atribute tichet",
+      "filename": "Nume fișier",
+      "attributes": "Atribute",
+      "priority": "Prioritate",
+      "csv": "Date CSV",
+      "new": "Relație nouă",
+      "help": "CSV cu antet Attribute1;Attribute2 și perechi de valori (Znuny AdminTicketAttributeRelations). Restricționează selectoarele din formulare (ex. Serviciu → Coadă).",
+      "confirmDelete": "Ștergeți această relație?"
     }
   },
   "kb": {
@@ -2489,7 +2620,8 @@
       "startButton": "Începeți procesul",
       "actions": "Acțiuni disponibile",
       "loadError": "Nu s-a putut încărca starea procesului.",
-      "noDialogs": "Nu există acțiuni disponibile la această activitate."
+      "noDialogs": "Nu există acțiuni disponibile la această activitate.",
+      "noCustomerDialogs": "Niciun dialog client disponibil în acest pas."
     },
     "start": {
       "title": "Începeți procesul",
@@ -2525,5 +2657,84 @@
     "body": "Corpul",
     "editTitle": "Editați „{{name}}”",
     "saveError": "Nu s-a putut salva șablonul."
+  },
+  "views": {
+    "mine": "Tichetele mele",
+    "responsible": "Responsabil",
+    "locked": "Tichete blocate",
+    "watched": "Tichete urmărite",
+    "escalated": "Tichete escaladate",
+    "service": "După serviciu",
+    "serviceHint": "Listează tichetele asociate unui serviciu.",
+    "pickService": "Selectați un serviciu…"
+  },
+  "customerCentre": {
+    "title": "Informații client",
+    "open": "Info client",
+    "invalid": "Autentificare client nevalidă.",
+    "loadError": "Clientul nu a putut fi încărcat.",
+    "email": "E-mail",
+    "phone": "Telefon",
+    "customerId": "Număr client",
+    "company": "Companie",
+    "openCount": "{{count}} deschise",
+    "closedCount": "{{count}} închise",
+    "allTickets": "Toate tichetele →",
+    "recentTickets": "Tichete recente"
+  },
+  "timeAccounting": {
+    "title": "Pontaj",
+    "hint": "Unități de timp înregistrate pe tichetele la care aveți acces.",
+    "filterUser": "Agent",
+    "allUsers": "Toți agenții",
+    "filterFrom": "De la",
+    "filterTo": "Până la",
+    "filterTicket": "ID tichet",
+    "empty": "Nicio înregistrare de timp nu se potrivește.",
+    "colWhen": "Când",
+    "colTicket": "Tichet",
+    "colUser": "Agent",
+    "colUnits": "Unități",
+    "presetsLabel": "Perioadă",
+    "presets": {
+      "today": "Azi",
+      "yesterday": "Ieri",
+      "thisWeek": "Săptămâna aceasta",
+      "lastWeek": "Săptămâna trecută",
+      "thisMonth": "Luna aceasta",
+      "lastMonth": "Luna trecută",
+      "thisQuarter": "Trimestrul acesta",
+      "lastQuarter": "Trimestrul trecut",
+      "thisYear": "Anul acesta",
+      "lastYear": "Anul trecut"
+    },
+    "kpiUnits": "Unități de timp",
+    "kpiEntries": "Înregistrări",
+    "kpiTickets": "Tichete",
+    "kpiAgents": "Agenți",
+    "rangeBetween": "{{from}} – {{to}}",
+    "rangeFrom": "de la {{from}}",
+    "rangeTo": "până la {{to}}",
+    "chartTitle": "Unități pe zi",
+    "chartBar": "{{date}}: {{units}} unități",
+    "dayUnknown": "Fără dată",
+    "emptyHint": "Extindeți perioada sau goliți filtrele de agent și tichet.",
+    "clearFilters": "Golește filtrele",
+    "pageRange": "{{from}}–{{to}}",
+    "pageScope": "pe această pagină",
+    "chartPeak": "vârf {{units}}"
+  },
+  "setPassword": {
+    "subtitle": "Alegeți o parolă pentru contul dvs.",
+    "password": "Parolă nouă",
+    "confirm": "Repetați parola",
+    "lengthHint": "Între {{min}} și {{max}} caractere.",
+    "mismatch": "Parolele nu coincid.",
+    "submit": "Setează parola",
+    "saving": "Se salvează…",
+    "done": "Parola a fost salvată. Vă puteți autentifica.",
+    "invalid": "Acest link nu mai este valid.",
+    "invalidHint": "Linkurile de configurare sunt valabile 7 zile și se folosesc o dată. Cereți unul nou administrației.",
+    "toLogin": "Mergi la autentificare"
   }
 }

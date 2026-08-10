@@ -55,7 +55,12 @@
     "showActiveQueues": "Actieve tonen",
     "queueSearch": "Wachtrijen filteren…",
     "noQueueMatch": "Geen wachtrijen gevonden.",
-    "templates": "Sjablonen"
+    "templates": "Sjablonen",
+    "locked": "Vergrendeld",
+    "responsible": "Verantwoordelijke",
+    "escalated": "Geëscaleerd",
+    "services": "Services",
+    "timeAccounting": "Tijdregistratie"
   },
   "common": {
     "prev": "Vorige",
@@ -68,7 +73,10 @@
     "cancel": "Annuleren",
     "help": "Help",
     "edit": "Bewerken",
-    "save": "Opslaan"
+    "save": "Opslaan",
+    "saved": "Opgeslagen",
+    "delete": "Verwijderen",
+    "submit": "Verzenden"
   },
   "otp": {
     "verifying": "Verifiëren…",
@@ -171,7 +179,9 @@
     "toPickUpEmpty": "Geen nieuwe tickets om op te pakken.",
     "remindersDue": "Vervallen herinneringen",
     "remindersDueEmpty": "Geen vervallen herinneringen.",
-    "queueShortcutsEmpty": "Momenteel geen wachtrijen met open of nieuwe tickets."
+    "queueShortcutsEmpty": "Momenteel geen wachtrijen met open of nieuwe tickets.",
+    "lastViews": "Recent bekeken",
+    "lastViewsUntitled": "(geen onderwerp)"
   },
   "queue": {
     "sidebar": "Wachtrijen",
@@ -324,7 +334,7 @@
     "reply": "Antwoord",
     "replyAll": "Allen beantwoorden",
     "forward": "Doorsturen",
-    "bounce": "Bounce",
+    "bounce": "Doorsturen",
     "splitAction": "Splitsen",
     "split": {
       "priority": "Prioriteit",
@@ -482,7 +492,8 @@
       "customerEmail": "E-mail",
       "customerFirstName": "Voornaam",
       "customerLastName": "Achternaam",
-      "customerLoginConflict": "Deze login bestaat al. Kies een andere login, of wijs de bestaande klant toe via de zoekopdracht."
+      "customerLoginConflict": "Deze login bestaat al. Kies een andere login, of wijs de bestaande klant toe via de zoekopdracht.",
+      "clearCustomer": "Klant verwijderen"
     },
     "inlineAttachments": "Ingesloten afbeeldingen ({{count}})",
     "list": {
@@ -504,7 +515,35 @@
     "draftEditedAt": "bewerkt {{time}}",
     "draftDiscard": "Concept verwijderen",
     "draftDiscardConfirm": "Dit niet-verzonden antwoord verwijderen? De tekst kan niet worden hersteld.",
-    "draftDiscardConfirmButton": "Verwijderen"
+    "draftDiscardConfirmButton": "Verwijderen",
+    "type": "Type",
+    "service": "Service",
+    "sla": "SLA",
+    "mentions": "Vermeldingen",
+    "timeAccounting": "Tijdregistratie",
+    "timeUnits": "Tijdseenheden",
+    "addTime": "Tijd boeken",
+    "addMention": "Agent vermelden",
+    "mentionsCount": "Vermeldingen: {{n}}",
+    "mentionsEmpty": "Niemand vermeld",
+    "mentionRemove": "Vermelding verwijderen",
+    "mentionSuggestions": "Agenten",
+    "timeUnitAbbrev": "min",
+    "timeUnitHoursAbbrev": "u",
+    "timeUnitsShort": "{{units}} min",
+    "timeAccountingTotal": "Geboekte tijd: {{units}} min",
+    "timeRemove": "Boeking verwijderen",
+    "timeUnitMode": "Tijdseenheid",
+    "timeUnitMin": "Min",
+    "timeUnitHours": "U",
+    "timePresets": "Snelkeuze",
+    "timeComposerHint": "Boek het bij beantwoorden in de voettekst van de composer.",
+    "timeChipHint": "Wordt geboekt bij verzenden",
+    "extrasFailedMentions": "Verzonden — de vermelding is niet opgeslagen.",
+    "extrasFailedTime": "Verzonden — de tijd is niet geboekt.",
+    "extrasFailedBoth": "Verzonden — noch de vermelding noch de tijdboeking is opgeslagen.",
+    "extrasRetry": "Opnieuw proberen",
+    "customerUnresolved": "Geen klantrecord komt overeen met dit adres; klantgegevens zijn niet beschikbaar."
   },
   "search": {
     "title": "Zoeken",
@@ -772,7 +811,7 @@
         "baseUrl": "Basis-URL",
         "defaultModel": "Standaardmodel",
         "flags": "Vlaggen",
-        "flagTools": "Tool calling",
+        "flagTools": "Toolaanroepen",
         "flagStreaming": "Streaming",
         "flagEu": "EU-gehost",
         "flagVision": "Vision",
@@ -1022,7 +1061,7 @@
           "revealed": "Persoonsgegevens inbegrepen",
           "generated": "Gegenereerd",
           "feature": "Functie",
-          "provider": "Provider · Model",
+          "provider": "Provider · model",
           "status": "Status",
           "willIncludePii": "PDF bevat persoonsgegevens"
         }
@@ -1143,7 +1182,8 @@
       },
       "acl": {
         "match": "Voorwaarden waaronder deze ACL van toepassing is (bijvoorbeeld huidige wachtrij, status, formulierveld). De wijziging aan de rechterkant wordt alleen toegepast als elk hier vermeld criterium overeenkomt.",
-        "change": "Het effect van de ACL zodra de voorwaarden overeenkomen - beperkt of dwingt doorgaans de keuzes die beschikbaar zijn in formulieren (bijvoorbeeld alleen bepaalde vervolgstatussen zijn toegestaan)."
+        "change": "Het effect van de ACL zodra de voorwaarden overeenkomen - beperkt of dwingt doorgaans de keuzes die beschikbaar zijn in formulieren (bijvoorbeeld alleen bepaalde vervolgstatussen zijn toegestaan).",
+        "stopAfterMatch": "Indien aangevinkt worden na een productieve match geen verdere ACL’s meer geëvalueerd (Znuny StopAfterMatch)."
       },
       "mailOutbound": {
         "host": "SMTP serverhostnaam voor uitgaande e-mail. Moet bereikbaar zijn vanaf deze server (DNS + firewall) op de onderstaande poort.",
@@ -1190,8 +1230,8 @@
         "validId": "'Temp' (valid_id 3) is de derde geldigheidsstatus van Znuny - meestal een account in afwachting van bevestiging (bijvoorbeeld onbevestigde zelfregistratie), anders dan gewoon geldig/ongeldig."
       },
       "systemAddresses": {
-        "email": "Address used as the From email for queues and auto-responses.",
-        "name": "Display name shown next to the email (e.g. “Support <support@example.com>”)."
+        "email": "Adres dat als From voor wachtrijen en auto-antwoorden wordt gebruikt.",
+        "name": "Weergavenaam naast het e-mailadres (bijv. “Support <support@example.com>”)."
       }
     },
     "nav": {
@@ -1240,7 +1280,13 @@
       "aiAcl": "Toegang en limieten",
       "collapse": "Navigatie inklappen",
       "mailAccounts": "Mailaccounts",
-      "oauth2Tokens": "OAuth2-tokens (mail)"
+      "oauth2Tokens": "OAuth2-tokens (mail)",
+      "types": "Tickettypen",
+      "services": "Services",
+      "slas": "SLA’s",
+      "systemAddresses": "Systeemadressen",
+      "notificationEvents": "Notificatiegebeurtenissen",
+      "ticketAttributeRelations": "Attribuut­relaties"
     },
     "table": {
       "id": "ID",
@@ -1347,7 +1393,44 @@
       "title": "Aanspreektitel",
       "firstName": "Voornaam",
       "lastName": "Achternaam",
-      "name": "Naam"
+      "name": "Naam",
+      "passwordMode": "Wachtwoordtoewijzing",
+      "passwordModeManual": "Handmatig instellen",
+      "passwordModeAuto": "Uitnodigen: stuur een link per e-mail",
+      "passwordModeAutoHelp": "Bij opslaan gaat een eenmalige link naar het e-mailadres hieronder. De agent kiest zelf een wachtwoord.",
+      "email": "E-mail",
+      "mobile": "Mobiele telefoon",
+      "effectivePermissions": "Effectieve rechten tonen",
+      "effectivePermissionsTitle": "Effectieve rechten voor {{name}}",
+      "effectivePermissionsDescription": "Samengevoegde rechten uit directe groepen en rollen.",
+      "rolesHeading": "Rollen",
+      "groupsHeading": "Groepsrechten",
+      "queuesHeading": "Wachtrijen",
+      "noRoles": "Geen rollen toegewezen.",
+      "noGroups": "Geen groepsrechten.",
+      "noQueues": "Geen gekoppelde wachtrijen.",
+      "viaDirect": "Direct",
+      "permissionColumn": "Rechten",
+      "sourceColumn": "Bron",
+      "editSettings": "Persoonlijke instellingen bewerken",
+      "editSettingsTitle": "Persoonlijke instellingen van {{name}}",
+      "editSettingsDescription": "Dezelfde instellingen die de agent zelf ziet onder «Persoonlijke instellingen».",
+      "languageLabel": "Taal",
+      "languageSaved": "Taal opgeslagen.",
+      "tabAccount": "Account",
+      "tabPerson": "Persoon",
+      "sourceInvalidHint": "Dit recht komt uit een ongeldige rol en heeft daardoor geen effect.",
+      "keyInactiveHint": "Dit recht is geconfigureerd maar niet van kracht — bron of groep is ongeldig.",
+      "deletePermanent": "Definitief verwijderen",
+      "deleteTitle": "{{name}} definitief verwijderen?",
+      "deleteConfirm": "Definitief verwijderen",
+      "deletableBody": "Niets verwijst naar {{name}}; het account kan volledig worden verwijderd, inclusief voorkeuren, groepen, rollen en 2FA.",
+      "deleteIrreversible": "Dit kan niet ongedaan worden gemaakt.",
+      "deleteBlockedBody": "{{name}} kan niet worden verwijderd — deze tabellen verwijzen nog naar het account:",
+      "deleteBlockedHint": "Zet het account op «Ongeldig» zodat tickets, artikelen en geschiedenis toewijsbaar blijven.",
+      "resendSetupLink": "Setup-link opnieuw sturen",
+      "setupLinkSent": "Setup-link verzonden.",
+      "setupLinkFailed": "Setup-link kon niet worden verzonden."
     },
     "groups": {
       "title_plural": "Groepen",
@@ -1537,8 +1620,8 @@
       "key": "Sleutel",
       "value": "Waarde",
       "valuePlaceholder": "Regex of waarde",
-      "stop": "Stop",
-      "stopYes": "Stop",
+      "stop": "Stoppen",
+      "stopYes": "Stoppen",
       "stopAfterMatch": "Stoppen na match",
       "stopHelp": "Indien ingesteld worden er na een match van dit filter geen verdere PostMaster-filters meer geëvalueerd voor het bericht.",
       "matchCount": "Match",
@@ -1561,7 +1644,10 @@
       "name": "Naam",
       "description": "Beschrijving",
       "match": "Match",
-      "change": "Wijziging"
+      "change": "Wijziging",
+      "new": "Nieuwe ACL",
+      "stopAfterMatch": "Stoppen na match",
+      "confirmDelete": "ACL “{{name}}” verwijderen? Dit kan niet ongedaan worden gemaakt."
     },
     "genericAgentJobs": {
       "title_plural": "Generic agent-taken",
@@ -1671,7 +1757,7 @@
         "events": "Evenementen / SSE",
         "agents": "Agenten",
         "admin": "Beheer API",
-        "mcp": "MCP server",
+        "mcp": "MCP-server",
         "compat": "Znuny Generieke interface"
       }
     },
@@ -1768,7 +1854,7 @@
       "app": {
         "product": "Product",
         "version": "Versie",
-        "gitSha": "Git commit",
+        "gitSha": "Git-commit",
         "buildTime": "Bouw",
         "environment": "Milieu",
         "python": "Python",
@@ -1968,7 +2054,7 @@
       "empty": "Kies hierboven een wachtrij om de automatische reacties te bewerken.",
       "autoResponses": "Automatische reacties",
       "assigned": "Toegewezen",
-      "typeId": "Type ID",
+      "typeId": "Type-ID",
       "noAutoResponses": "Er bestaan nog geen geldige automatische reacties."
     },
     "assignmentEditor": {
@@ -2222,7 +2308,13 @@
       "aiAudit": "Volledige audit van elk LLM verzoek/antwoord, met PII-onthulling.",
       "aiAcl": "AI machtigingen en quota's per groep, rol of agent.",
       "mailAccounts": "Inkomende IMAP/POP-mailboxen (wachtwoord of OAuth2).",
-      "oauth2Tokens": "OAuth2-tokenconfiguraties voor Microsoft/Google mail (Znuny-compatibel)."
+      "oauth2Tokens": "OAuth2-tokenconfiguraties voor Microsoft/Google mail (Znuny-compatibel).",
+      "types": "Beheer tickettypen die voor classificatie worden gebruikt.",
+      "services": "Beheer services en koppel ze aan SLA’s.",
+      "slas": "Beheer service level agreements en termijnen.",
+      "systemAddresses": "E-mailadressen als From voor wachtrijen en auto-antwoorden.",
+      "notificationEvents": "Configureer event-gestuurde agentnotificaties.",
+      "ticketAttributeRelations": "Znuny-compatibele afhankelijkheidsmatrices (service/wachtrij e.d.) als CSV."
     },
     "mailAccounts": {
       "title_plural": "Mailaccounts",
@@ -2270,11 +2362,50 @@
       "refreshSuccess": "Token vernieuwd."
     },
     "systemAddresses": {
-      "title_plural": "System addresses",
-      "subtitle": "From-addresses for queues and auto-responses. Invalid addresses stay listed so they can be re-enabled.",
-      "new": "Add address",
-      "email": "Email",
-      "name": "Name"
+      "title_plural": "Systeemadressen",
+      "subtitle": "From-adressen voor wachtrijen en auto-antwoorden. Ongeldige adressen blijven zichtbaar om opnieuw te activeren.",
+      "new": "Adres toevoegen",
+      "email": "E-mail",
+      "name": "Naam"
+    },
+    "types": {
+      "title_plural": "Tickettypen",
+      "new": "Nieuw type",
+      "name": "Naam"
+    },
+    "services": {
+      "title_plural": "Services",
+      "new": "Nieuwe service",
+      "name": "Naam",
+      "slaCount": "SLA’s"
+    },
+    "slas": {
+      "title_plural": "SLA’s",
+      "new": "Nieuwe SLA",
+      "name": "Naam",
+      "firstResponseTime": "Eerste reactie (min)",
+      "updateTime": "Update (min)",
+      "solutionTime": "Oplossing (min)",
+      "calendar": "Kalender"
+    },
+    "notificationEvents": {
+      "title_plural": "Notificatiegebeurtenissen",
+      "subtitle": "Bij gebeurtenissen worden bijpassende notificaties naar agenten gestuurd.",
+      "new": "Notificatie aanmaken",
+      "name": "Naam",
+      "event": "Gebeurtenis",
+      "subject": "Onderwerp",
+      "body": "Inhoud"
+    },
+    "tar": {
+      "title": "Ticketattribuutrelaties",
+      "filename": "Bestandsnaam",
+      "attributes": "Attributen",
+      "priority": "Prioriteit",
+      "csv": "CSV-gegevens",
+      "new": "Nieuwe relatie",
+      "help": "CSV met kop Attribute1;Attribute2 en waardeparen (Znuny AdminTicketAttributeRelations). Beperkt formulierkeuzes (bijv. Service → Wachtrij).",
+      "confirmDelete": "Deze relatie verwijderen?"
     }
   },
   "kb": {
@@ -2489,7 +2620,8 @@
       "startButton": "Proces starten",
       "actions": "Beschikbare acties",
       "loadError": "Kan processtatus niet laden.",
-      "noDialogs": "Er zijn geen acties beschikbaar bij deze activiteit."
+      "noDialogs": "Er zijn geen acties beschikbaar bij deze activiteit.",
+      "noCustomerDialogs": "Geen klantdialogen beschikbaar in deze stap."
     },
     "start": {
       "title": "Proces starten",
@@ -2525,5 +2657,84 @@
     "body": "Inhoud",
     "editTitle": "„{{name}}” bewerken",
     "saveError": "Kan de sjabloon niet opslaan."
+  },
+  "views": {
+    "mine": "Mijn tickets",
+    "responsible": "Verantwoordelijke",
+    "locked": "Vergrendelde tickets",
+    "watched": "Gevolgde tickets",
+    "escalated": "Geëscaleerde tickets",
+    "service": "Per service",
+    "serviceHint": "Toon tickets die aan een service zijn toegewezen.",
+    "pickService": "Selecteer een service…"
+  },
+  "customerCentre": {
+    "title": "Klantinformatie",
+    "open": "Klantinfo",
+    "invalid": "Ongeldige klantlogin.",
+    "loadError": "Deze klant kon niet worden geladen.",
+    "email": "E-mail",
+    "phone": "Telefoon",
+    "customerId": "Klantnummer",
+    "company": "Bedrijf",
+    "openCount": "{{count}} open",
+    "closedCount": "{{count}} gesloten",
+    "allTickets": "Alle tickets →",
+    "recentTickets": "Recente tickets"
+  },
+  "timeAccounting": {
+    "title": "Tijdregistratie",
+    "hint": "Geboekte tijdseenheden op tickets waartoe u toegang heeft.",
+    "filterUser": "Agent",
+    "allUsers": "Alle agenten",
+    "filterFrom": "Van",
+    "filterTo": "Tot",
+    "filterTicket": "Ticket-ID",
+    "empty": "Geen tijdregistraties gevonden.",
+    "colWhen": "Wanneer",
+    "colTicket": "Ticket",
+    "colUser": "Agent",
+    "colUnits": "Eenheden",
+    "presetsLabel": "Periode",
+    "presets": {
+      "today": "Vandaag",
+      "yesterday": "Gisteren",
+      "thisWeek": "Deze week",
+      "lastWeek": "Vorige week",
+      "thisMonth": "Deze maand",
+      "lastMonth": "Vorige maand",
+      "thisQuarter": "Dit kwartaal",
+      "lastQuarter": "Vorig kwartaal",
+      "thisYear": "Dit jaar",
+      "lastYear": "Vorig jaar"
+    },
+    "kpiUnits": "Tijdseenheden",
+    "kpiEntries": "Boekingen",
+    "kpiTickets": "Tickets",
+    "kpiAgents": "Agenten",
+    "rangeBetween": "{{from}} – {{to}}",
+    "rangeFrom": "vanaf {{from}}",
+    "rangeTo": "tot {{to}}",
+    "chartTitle": "Eenheden per dag",
+    "chartBar": "{{date}}: {{units}} eenheden",
+    "dayUnknown": "Geen datum",
+    "emptyHint": "Verruim de periode of wis de agent- en ticketfilters.",
+    "clearFilters": "Filters wissen",
+    "pageRange": "{{from}}–{{to}}",
+    "pageScope": "op deze pagina",
+    "chartPeak": "piek {{units}}"
+  },
+  "setPassword": {
+    "subtitle": "Kies een wachtwoord voor uw account.",
+    "password": "Nieuw wachtwoord",
+    "confirm": "Wachtwoord herhalen",
+    "lengthHint": "Tussen {{min}} en {{max}} tekens.",
+    "mismatch": "De wachtwoorden komen niet overeen.",
+    "submit": "Wachtwoord instellen",
+    "saving": "Opslaan…",
+    "done": "Wachtwoord opgeslagen. U kunt nu inloggen.",
+    "invalid": "Deze link is niet meer geldig.",
+    "invalidHint": "Setup-links zijn 7 dagen geldig en eenmalig te gebruiken. Vraag een nieuwe bij de beheerder.",
+    "toLogin": "Naar inloggen"
   }
 }

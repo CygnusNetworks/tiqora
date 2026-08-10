@@ -33,7 +33,7 @@
     "admin": "Админ",
     "theme": "Тема",
     "language": "език",
-    "dashboard": "Табло за управление",
+    "dashboard": "Табло",
     "queues": "Опашки",
     "kb": "База знания"
   },
@@ -55,7 +55,12 @@
     "showActiveQueues": "Покажи активно",
     "queueSearch": "Филтриране на опашки...",
     "noQueueMatch": "Няма съвпадение на опашки.",
-    "templates": "Шаблони"
+    "templates": "Шаблони",
+    "locked": "Заключени",
+    "responsible": "Отговорен",
+    "escalated": "Ескалирани",
+    "services": "Услуги",
+    "timeAccounting": "Отчитане на време"
   },
   "common": {
     "prev": "Предишен",
@@ -68,7 +73,10 @@
     "cancel": "Отказ",
     "help": "Помощ",
     "edit": "Редактиране",
-    "save": "Запазване"
+    "save": "Запази",
+    "saved": "Запазено",
+    "delete": "Изтриване",
+    "submit": "Изпрати"
   },
   "otp": {
     "verifying": "Проверка...",
@@ -171,7 +179,9 @@
     "toPickUpEmpty": "Няма нови билети за вземане.",
     "remindersDue": "Дължими напомняния",
     "remindersDueEmpty": "Няма дължими напомняния.",
-    "queueShortcutsEmpty": "В момента няма опашки с отворени или нови билети."
+    "queueShortcutsEmpty": "В момента няма опашки с отворени или нови билети.",
+    "lastViews": "Наскоро разгледани",
+    "lastViewsUntitled": "(без тема)"
   },
   "queue": {
     "sidebar": "Опашки",
@@ -370,7 +380,7 @@
     "splitQueue": "Целева опашка",
     "splitNewTitle": "Ново заглавие на билета (по избор)",
     "ai": {
-      "title": "AI Assist",
+      "title": "КИ помощ",
       "help": {
         "summary": "Генерира се от статиите на билета от конфигурирания модел на опашката и се съхранява само в състоянието на билета, никога като бележка — никога не се изпраща на клиента самостоятелно.",
         "drafts": "Генерирано от модела от билета досега. Всяка чернова е собствен запис — нищо не се изпраща автоматично; трябва да го отворите и изрично да го изпратите или отхвърлите."
@@ -482,7 +492,8 @@
       "customerEmail": "Имейл",
       "customerFirstName": "Първо име",
       "customerLastName": "Фамилия",
-      "customerLoginConflict": "Това влизане вече съществува. Изберете друго име за вход или вместо това задайте съществуващия клиент чрез търсене."
+      "customerLoginConflict": "Това влизане вече съществува. Изберете друго име за вход или вместо това задайте съществуващия клиент чрез търсене.",
+      "clearCustomer": "Премахване на клиента"
     },
     "inlineAttachments": "Вградени изображения ({{count}})",
     "list": {
@@ -504,7 +515,35 @@
     "draftEditedAt": "редактирано {{time}}",
     "draftDiscard": "Изхвърли чернова",
     "draftDiscardConfirm": "Да се отхвърли ли този неизпратен отговор? Текстът не може да бъде възстановен.",
-    "draftDiscardConfirmButton": "Отхвърли"
+    "draftDiscardConfirmButton": "Отхвърли",
+    "type": "Тип",
+    "service": "Услуга",
+    "sla": "SLA",
+    "mentions": "Споменавания",
+    "timeAccounting": "Отчитане на време",
+    "timeUnits": "Времеви единици",
+    "addTime": "Отчитане на време",
+    "addMention": "Споменаване на агент",
+    "mentionsCount": "Споменавания: {{n}}",
+    "mentionsEmpty": "Никой не е споменат",
+    "mentionRemove": "Премахване на споменаването",
+    "mentionSuggestions": "Агенти",
+    "timeUnitAbbrev": "мин",
+    "timeUnitHoursAbbrev": "ч",
+    "timeUnitsShort": "{{units}} мин",
+    "timeAccountingTotal": "Отчетено време: {{units}} мин",
+    "timeRemove": "Премахване на записа",
+    "timeUnitMode": "Времева единица",
+    "timeUnitMin": "Мин",
+    "timeUnitHours": "Ч",
+    "timePresets": "Бърз избор",
+    "timeComposerHint": "При отговор го отчитайте в долната част на редактора.",
+    "timeChipHint": "Отчита се при изпращане",
+    "extrasFailedMentions": "Изпратено — споменаването не беше запазено.",
+    "extrasFailedTime": "Изпратено — времето не беше отчетено.",
+    "extrasFailedBoth": "Изпратено — нито споменаването, нито отчитането на време бяха запазени.",
+    "extrasRetry": "Опитай отново",
+    "customerUnresolved": "Няма клиентски запис за този адрес, затова данните не са налични."
   },
   "search": {
     "title": "Търсене",
@@ -1006,7 +1045,7 @@
           "error": "Грешка",
           "copy": "копие",
           "download": "Изтегляне",
-          "runId": "Run ID",
+          "runId": "ID на изпълнение",
           "trigger": "Тригер",
           "piiSummary": "{{count}} Замени на PII",
           "revealPii": "Показване на PII",
@@ -1143,7 +1182,8 @@
       },
       "acl": {
         "match": "Условия, при които се прилага този ACL (напр. текуща опашка, състояние, поле на формуляр). Промяната вдясно се прилага само когато всеки критерий, изброен тук, съвпада.",
-        "change": "Ефектът на ACL, след като условията му съвпадат — обикновено той ограничава или налага изборите, налични във формуляри (напр. разрешени са само определени последващи състояния)."
+        "change": "Ефектът на ACL, след като условията му съвпадат — обикновено той ограничава или налага изборите, налични във формуляри (напр. разрешени са само определени последващи състояния).",
+        "stopAfterMatch": "Ако е отметнато, след продуктивно съвпадение не се оценяват повече ACL (Znuny StopAfterMatch)."
       },
       "mailOutbound": {
         "host": "Име на хост на SMTP сървър за изходяща поща. Трябва да бъде достъпен от този сървър (DNS + защитна стена) на порта по-долу.",
@@ -1190,8 +1230,8 @@
         "validId": "„Временен“ (valid_id 3) е третото състояние на валидност на Znuny — обикновено чакащо потвърждение на акаунт (напр. непотвърдена саморегистрация), различно от обикновения валиден/невалиден."
       },
       "systemAddresses": {
-        "email": "Address used as the From email for queues and auto-responses.",
-        "name": "Display name shown next to the email (e.g. “Support <support@example.com>”)."
+        "email": "Адрес, използван като From за опашки и авто-отговори.",
+        "name": "Показвано име до имейла (напр. „Support <support@example.com>“)."
       }
     },
     "nav": {
@@ -1240,7 +1280,13 @@
       "aiAcl": "Достъп и ограничения",
       "collapse": "Свиване на навигацията",
       "mailAccounts": "Пощенски акаунти",
-      "oauth2Tokens": "OAuth2 токени (поща)"
+      "oauth2Tokens": "OAuth2 токени (поща)",
+      "types": "Типове тикети",
+      "services": "Услуги",
+      "slas": "SLA",
+      "systemAddresses": "Системни адреси",
+      "notificationEvents": "Събития за известия",
+      "ticketAttributeRelations": "Връзки между атрибути"
     },
     "table": {
       "id": "ID",
@@ -1347,7 +1393,44 @@
       "title": "Заглавие",
       "firstName": "Първо име",
       "lastName": "Фамилия",
-      "name": "Име"
+      "name": "Име",
+      "passwordMode": "Задаване на парола",
+      "passwordModeManual": "Ръчно задаване",
+      "passwordModeAuto": "Покана: изпращане на връзка по имейл",
+      "passwordModeAutoHelp": "При запис еднократна връзка отива на имейла по-долу. Агентът избира паролата си.",
+      "email": "Имейл",
+      "mobile": "Мобилен телефон",
+      "effectivePermissions": "Ефективни права",
+      "effectivePermissionsTitle": "Ефективни права за {{name}}",
+      "effectivePermissionsDescription": "Обединени права от директни групи и роли.",
+      "rolesHeading": "Роли",
+      "groupsHeading": "Групови права",
+      "queuesHeading": "Опашки",
+      "noRoles": "Няма зададени роли.",
+      "noGroups": "Няма групови права.",
+      "noQueues": "Няма свързани опашки.",
+      "viaDirect": "Директно",
+      "permissionColumn": "Права",
+      "sourceColumn": "Източник",
+      "editSettings": "Редакция на лични настройки",
+      "editSettingsTitle": "Лични настройки на {{name}}",
+      "editSettingsDescription": "Същите настройки, които агентът вижда в «Лични настройки».",
+      "languageLabel": "Език",
+      "languageSaved": "Езикът е запазен.",
+      "tabAccount": "Акаунт",
+      "tabPerson": "Лице",
+      "sourceInvalidHint": "Това право идва от невалидна роля и затова няма ефект.",
+      "keyInactiveHint": "Това право е конфигурирано, но не важи — източникът или групата е невалидна.",
+      "deletePermanent": "Изтриване завинаги",
+      "deleteTitle": "Окончателно изтриване на {{name}}?",
+      "deleteConfirm": "Изтриване завинаги",
+      "deletableBody": "Нищо не реферира {{name}}; акаунтът може да се премахне напълно с настройки, групи, роли и 2FA.",
+      "deleteIrreversible": "Действието е необратимо.",
+      "deleteBlockedBody": "{{name}} не може да се изтрие — тези таблици все още сочат към акаунта:",
+      "deleteBlockedHint": "Задайте акаунта на «Невалиден», за да останат тикети, статии и история приписваеми.",
+      "resendSetupLink": "Повторно изпращане на връзката за настройка",
+      "setupLinkSent": "Връзката за настройка е изпратена.",
+      "setupLinkFailed": "Връзката за настройка не можа да бъде изпратена."
     },
     "groups": {
       "title_plural": "Групи",
@@ -1561,7 +1644,10 @@
       "name": "Име",
       "description": "Описание",
       "match": "Съвпадение",
-      "change": "промяна"
+      "change": "промяна",
+      "new": "Нов ACL",
+      "stopAfterMatch": "Спиране след съвпадение",
+      "confirmDelete": "Изтриване на ACL „{{name}}“? Действието е необратимо."
     },
     "genericAgentJobs": {
       "title_plural": "Общи работни места на агенти",
@@ -2222,7 +2308,13 @@
       "aiAudit": "Пълен одит на всяка заявка/отговор за LLM с разкриване на PII.",
       "aiAcl": "AI разрешения и квоти за група, роля или агент.",
       "mailAccounts": "Входящи IMAP/POP пощенски кутии (парола или OAuth2).",
-      "oauth2Tokens": "Конфигурации на OAuth2 токени за поща на Microsoft/Google (съвместим със Znuny)."
+      "oauth2Tokens": "Конфигурации на OAuth2 токени за поща на Microsoft/Google (съвместим със Znuny).",
+      "types": "Управление на типовете тикети за класификация.",
+      "services": "Управление на услуги и връзка със SLA.",
+      "slas": "Управление на SLA и срокове.",
+      "systemAddresses": "Имейл адреси като From за опашки и авто-отговори.",
+      "notificationEvents": "Конфигуриране на известия към агенти по събития.",
+      "ticketAttributeRelations": "Матрици на зависимости, съвместими със Znuny (услуга/опашка и др.), CSV."
     },
     "mailAccounts": {
       "title_plural": "Пощенски акаунти",
@@ -2270,11 +2362,50 @@
       "refreshSuccess": "Токенът е обновен."
     },
     "systemAddresses": {
-      "title_plural": "System addresses",
-      "subtitle": "From-addresses for queues and auto-responses. Invalid addresses stay listed so they can be re-enabled.",
-      "new": "Add address",
-      "email": "Email",
-      "name": "Name"
+      "title_plural": "Системни адреси",
+      "subtitle": "From адреси за опашки и авто-отговори. Невалидните остават в списъка за повторно активиране.",
+      "new": "Добавяне на адрес",
+      "email": "Имейл",
+      "name": "Име"
+    },
+    "types": {
+      "title_plural": "Типове тикети",
+      "new": "Нов тип",
+      "name": "Име"
+    },
+    "services": {
+      "title_plural": "Услуги",
+      "new": "Нова услуга",
+      "name": "Име",
+      "slaCount": "SLA"
+    },
+    "slas": {
+      "title_plural": "SLA",
+      "new": "Нов SLA",
+      "name": "Име",
+      "firstResponseTime": "Първа реакция (мин)",
+      "updateTime": "Актуализация (мин)",
+      "solutionTime": "Решение (мин)",
+      "calendar": "Календар"
+    },
+    "notificationEvents": {
+      "title_plural": "Събития за известия",
+      "subtitle": "При събития се изпращат съответните известия до агентите.",
+      "new": "Създаване на известие",
+      "name": "Име",
+      "event": "Събитие",
+      "subject": "Тема",
+      "body": "Текст"
+    },
+    "tar": {
+      "title": "Връзки между атрибути на тикети",
+      "filename": "Име на файл",
+      "attributes": "Атрибути",
+      "priority": "Приоритет",
+      "csv": "CSV данни",
+      "new": "Нова връзка",
+      "help": "CSV със заглавие Attribute1;Attribute2 и двойки стойности (Znuny AdminTicketAttributeRelations). Ограничава избори във форми (напр. Услуга → Опашка).",
+      "confirmDelete": "Изтриване на тази връзка?"
     }
   },
   "kb": {
@@ -2489,7 +2620,8 @@
       "startButton": "Стартирайте процеса",
       "actions": "Налични действия",
       "loadError": "Състоянието на процеса не можа да се зареди.",
-      "noDialogs": "Няма налични действия при тази дейност."
+      "noDialogs": "Няма налични действия при тази дейност.",
+      "noCustomerDialogs": "На тази стъпка няма налични клиентски диалози."
     },
     "start": {
       "title": "Стартирайте процеса",
@@ -2525,5 +2657,84 @@
     "body": "Тяло",
     "editTitle": "Редактиране на „{{name}}“",
     "saveError": "Шаблонът не можа да бъде запазен."
+  },
+  "views": {
+    "mine": "Моите тикети",
+    "responsible": "Отговорен",
+    "locked": "Заключени тикети",
+    "watched": "Наблюдавани тикети",
+    "escalated": "Ескалирани тикети",
+    "service": "По услуга",
+    "serviceHint": "Списък с тикети, свързани с услуга.",
+    "pickService": "Изберете услуга…"
+  },
+  "customerCentre": {
+    "title": "Информация за клиента",
+    "open": "Клиент",
+    "invalid": "Невалиден клиентски вход.",
+    "loadError": "Клиентът не можа да бъде зареден.",
+    "email": "Имейл",
+    "phone": "Телефон",
+    "customerId": "Клиентски номер",
+    "company": "Фирма",
+    "openCount": "{{count}} отворени",
+    "closedCount": "{{count}} затворени",
+    "allTickets": "Всички тикети →",
+    "recentTickets": "Скорошни тикети"
+  },
+  "timeAccounting": {
+    "title": "Отчитане на време",
+    "hint": "Отчетени времеви единици по тикети, до които имате достъп.",
+    "filterUser": "Агент",
+    "allUsers": "Всички агенти",
+    "filterFrom": "От",
+    "filterTo": "До",
+    "filterTicket": "ID на тикет",
+    "empty": "Няма съответстващи записи за време.",
+    "colWhen": "Кога",
+    "colTicket": "Тикет",
+    "colUser": "Агент",
+    "colUnits": "Единици",
+    "presetsLabel": "Период",
+    "presets": {
+      "today": "Днес",
+      "yesterday": "Вчера",
+      "thisWeek": "Тази седмица",
+      "lastWeek": "Миналата седмица",
+      "thisMonth": "Този месец",
+      "lastMonth": "Миналият месец",
+      "thisQuarter": "Това тримесечие",
+      "lastQuarter": "Миналото тримесечие",
+      "thisYear": "Тази година",
+      "lastYear": "Миналата година"
+    },
+    "kpiUnits": "Времеви единици",
+    "kpiEntries": "Записи",
+    "kpiTickets": "Тикети",
+    "kpiAgents": "Агенти",
+    "rangeBetween": "{{from}} – {{to}}",
+    "rangeFrom": "от {{from}}",
+    "rangeTo": "до {{to}}",
+    "chartTitle": "Единици на ден",
+    "chartBar": "{{date}}: {{units}} ед.",
+    "dayUnknown": "Без дата",
+    "emptyHint": "Разширете периода или изчистете филтрите за агент и тикет.",
+    "clearFilters": "Изчистване на филтрите",
+    "pageRange": "{{from}}–{{to}}",
+    "pageScope": "на тази страница",
+    "chartPeak": "връх {{units}}"
+  },
+  "setPassword": {
+    "subtitle": "Изберете парола за акаунта си.",
+    "password": "Нова парола",
+    "confirm": "Повторете паролата",
+    "lengthHint": "Между {{min}} и {{max}} знака.",
+    "mismatch": "Паролите не съвпадат.",
+    "submit": "Задаване на парола",
+    "saving": "Запазване…",
+    "done": "Паролата е запазена. Можете да влезете.",
+    "invalid": "Тази връзка вече не е валидна.",
+    "invalidHint": "Връзките за настройка важат 7 дни и се ползват веднъж. Поискайте нова от администрацията.",
+    "toLogin": "Към входа"
   }
 }

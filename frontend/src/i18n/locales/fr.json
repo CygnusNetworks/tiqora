@@ -55,7 +55,12 @@
     "showActiveQueues": "Afficher actif",
     "queueSearch": "Filtrer les files d'attente…",
     "noQueueMatch": "Aucune file d'attente ne correspond.",
-    "templates": "Modèles"
+    "templates": "Modèles",
+    "locked": "Verrouillé",
+    "responsible": "Responsable",
+    "escalated": "Escaladé",
+    "services": "Services",
+    "timeAccounting": "Comptabilisation du temps"
   },
   "common": {
     "prev": "Précédent",
@@ -68,7 +73,10 @@
     "cancel": "Annuler",
     "help": "Aide",
     "edit": "Modifier",
-    "save": "Sauvegarder"
+    "save": "Enregistrer",
+    "saved": "Enregistré",
+    "delete": "Supprimer",
+    "submit": "Envoyer"
   },
   "otp": {
     "verifying": "Vérification…",
@@ -171,7 +179,9 @@
     "toPickUpEmpty": "Pas de nouveaux tickets à récupérer.",
     "remindersDue": "Rappels dus",
     "remindersDueEmpty": "Aucun rappel n'est dû.",
-    "queueShortcutsEmpty": "Aucune file d'attente avec des tickets ouverts ou nouveaux pour le moment."
+    "queueShortcutsEmpty": "Aucune file d'attente avec des tickets ouverts ou nouveaux pour le moment.",
+    "lastViews": "Consultés récemment",
+    "lastViewsUntitled": "(sans objet)"
   },
   "queue": {
     "sidebar": "Files d'attente",
@@ -482,7 +492,8 @@
       "customerEmail": "E-mail",
       "customerFirstName": "Prénom",
       "customerLastName": "Nom de famille",
-      "customerLoginConflict": "Cette connexion existe déjà. Choisissez une autre connexion ou attribuez plutôt le client existant via la recherche."
+      "customerLoginConflict": "Cette connexion existe déjà. Choisissez une autre connexion ou attribuez plutôt le client existant via la recherche.",
+      "clearCustomer": "Retirer le client"
     },
     "inlineAttachments": "Images intégrées ({{count}})",
     "list": {
@@ -504,7 +515,35 @@
     "draftEditedAt": "modifié {{time}}",
     "draftDiscard": "Supprimer le brouillon",
     "draftDiscardConfirm": "Supprimer cette réponse non envoyée ? Le texte ne pourra pas être récupéré.",
-    "draftDiscardConfirmButton": "Supprimer"
+    "draftDiscardConfirmButton": "Supprimer",
+    "type": "Type",
+    "service": "Service",
+    "sla": "SLA",
+    "mentions": "Mentions",
+    "timeAccounting": "Temps saisi",
+    "timeUnits": "Unités de temps",
+    "addTime": "Saisir du temps",
+    "addMention": "Mentionner un agent",
+    "mentionsCount": "Mentions : {{n}}",
+    "mentionsEmpty": "Personne n’est mentionné",
+    "mentionRemove": "Retirer la mention",
+    "mentionSuggestions": "Agents",
+    "timeUnitAbbrev": "min",
+    "timeUnitHoursAbbrev": "h",
+    "timeUnitsShort": "{{units}} min",
+    "timeAccountingTotal": "Temps saisi : {{units}} min",
+    "timeRemove": "Supprimer la saisie",
+    "timeUnitMode": "Unité de temps",
+    "timeUnitMin": "Min",
+    "timeUnitHours": "H",
+    "timePresets": "Sélection rapide",
+    "timeComposerHint": "Lors d’une réponse, saisissez-le dans le pied du composeur.",
+    "timeChipHint": "Saisi à l’envoi",
+    "extrasFailedMentions": "Envoyé — la mention n’a pas été enregistrée.",
+    "extrasFailedTime": "Envoyé — le temps n’a pas été saisi.",
+    "extrasFailedBoth": "Envoyé — ni la mention ni la saisie de temps n’ont été enregistrées.",
+    "extrasRetry": "Réessayer",
+    "customerUnresolved": "Aucun enregistrement client ne correspond à cette adresse ; les détails client sont indisponibles."
   },
   "search": {
     "title": "Recherche",
@@ -990,7 +1029,7 @@
         "retentionSave": "Sauvegarder",
         "retentionCancel": "Annuler",
         "piiKind": {
-          "EMAIL": "email",
+          "EMAIL": "e-mail",
           "MAC": "Adresse MAC",
           "IPV4": "Adresse IP",
           "IPV6": "Adresse IP",
@@ -1143,7 +1182,8 @@
       },
       "acl": {
         "match": "Conditions dans lesquelles cette ACL s'applique (par exemple, file d'attente actuelle, état, champ de formulaire). Le changement à droite n'est appliqué que lorsque tous les critères répertoriés ici correspondent.",
-        "change": "L'effet de l'ACL une fois que ses conditions correspondent - généralement, elle restreint ou force les choix disponibles dans les formulaires (par exemple, seuls certains états de suivi sont autorisés)."
+        "change": "L'effet de l'ACL une fois que ses conditions correspondent - généralement, elle restreint ou force les choix disponibles dans les formulaires (par exemple, seuls certains états de suivi sont autorisés).",
+        "stopAfterMatch": "Si coché, aucune autre ACL n’est évaluée après qu’elle ait correspondu de façon productive (StopAfterMatch Znuny)."
       },
       "mailOutbound": {
         "host": "Nom d'hôte du serveur SMTP pour le courrier sortant. Doit être joignable depuis ce serveur (DNS + pare-feu) sur le port ci-dessous.",
@@ -1190,8 +1230,8 @@
         "validId": "\"Temp\" (valid_id 3) est le troisième état de validité de Znuny - généralement un compte en attente de confirmation (par exemple, une auto-inscription non confirmée), distinct du simple valide/invalide."
       },
       "systemAddresses": {
-        "email": "Address used as the From email for queues and auto-responses.",
-        "name": "Display name shown next to the email (e.g. “Support <support@example.com>”)."
+        "email": "Adresse utilisée comme expéditeur (From) pour files et réponses auto.",
+        "name": "Nom affiché à côté de l’e-mail (ex. « Support <support@example.com> »)."
       }
     },
     "nav": {
@@ -1208,7 +1248,7 @@
       "customerCompanies": "Sociétés clientes",
       "customerUserCustomers": "Mission d'entreprise",
       "templates": "Modèles",
-      "salutations": "Salutations",
+      "salutations": "Formules d’appel",
       "signatures": "Signatures",
       "autoResponses": "Réponses automatiques",
       "postmasterFilters": "Filtres Postmaster",
@@ -1240,7 +1280,13 @@
       "aiAcl": "Accès et limites",
       "collapse": "Réduire la navigation",
       "mailAccounts": "Comptes de messagerie",
-      "oauth2Tokens": "Jetons OAuth2 (courrier)"
+      "oauth2Tokens": "Jetons OAuth2 (courrier)",
+      "types": "Types de ticket",
+      "services": "Services",
+      "slas": "SLA",
+      "systemAddresses": "Adresses système",
+      "notificationEvents": "Événements de notification",
+      "ticketAttributeRelations": "Relations d’attributs"
     },
     "table": {
       "id": "ID",
@@ -1347,7 +1393,44 @@
       "title": "Titre",
       "firstName": "Prénom",
       "lastName": "Nom de famille",
-      "name": "Nom"
+      "name": "Nom",
+      "passwordMode": "Attribution du mot de passe",
+      "passwordModeManual": "Définir manuellement",
+      "passwordModeAuto": "Invitation : envoyer un lien par e-mail",
+      "passwordModeAutoHelp": "À l’enregistrement, un lien à usage unique part vers l’e-mail ci-dessous. L’agent choisit son mot de passe.",
+      "email": "E-mail",
+      "mobile": "Téléphone mobile",
+      "effectivePermissions": "Voir les droits effectifs",
+      "effectivePermissionsTitle": "Droits effectifs pour {{name}}",
+      "effectivePermissionsDescription": "Droits fusionnés des groupes directs et des rôles.",
+      "rolesHeading": "Rôles",
+      "groupsHeading": "Droits de groupe",
+      "queuesHeading": "Files",
+      "noRoles": "Aucun rôle attribué.",
+      "noGroups": "Aucun droit de groupe.",
+      "noQueues": "Aucune file associée.",
+      "viaDirect": "Direct",
+      "permissionColumn": "Droits",
+      "sourceColumn": "Source",
+      "editSettings": "Modifier les paramètres personnels",
+      "editSettingsTitle": "Paramètres personnels de {{name}}",
+      "editSettingsDescription": "Les mêmes paramètres que l’agent voit sous « Paramètres personnels ».",
+      "languageLabel": "Langue",
+      "languageSaved": "Langue enregistrée.",
+      "tabAccount": "Compte",
+      "tabPerson": "Personne",
+      "sourceInvalidHint": "Cette autorisation provient d’un rôle non valide et n’a donc aucun effet.",
+      "keyInactiveHint": "Ce droit est configuré mais inactif — sa source ou le groupe est non valide.",
+      "deletePermanent": "Supprimer définitivement",
+      "deleteTitle": "Supprimer définitivement {{name}} ?",
+      "deleteConfirm": "Supprimer définitivement",
+      "deletableBody": "Rien ne référence {{name}} : le compte peut être entièrement supprimé, avec préférences, groupes, rôles et inscription 2FA.",
+      "deleteIrreversible": "Cette action est irréversible.",
+      "deleteBlockedBody": "{{name}} ne peut pas être supprimé — ces tables référencent encore le compte :",
+      "deleteBlockedHint": "Mettez plutôt le compte sur « Non valide » pour que tickets, articles et historique restent attribuables.",
+      "resendSetupLink": "Renvoyer le lien de configuration",
+      "setupLinkSent": "Lien de configuration envoyé.",
+      "setupLinkFailed": "Impossible d’envoyer le lien de configuration."
     },
     "groups": {
       "title_plural": "Groupes",
@@ -1367,8 +1450,8 @@
       "groupId": "Groupe",
       "systemAddress": "Adresse du système",
       "systemAddressId": "Adresse du système",
-      "salutation": "Salutation",
-      "salutationId": "Salutation",
+      "salutation": "Formule d’appel",
+      "salutationId": "Formule d’appel",
       "signature": "Signature",
       "signatureId": "Signature",
       "followUp": "Possibilité de suivi",
@@ -1485,7 +1568,7 @@
       }
     },
     "salutations": {
-      "title_plural": "Salutations",
+      "title_plural": "Formules d’appel",
       "new": "Nouvelle salutation",
       "name": "Nom",
       "text": "Texte"
@@ -1561,7 +1644,10 @@
       "name": "Nom",
       "description": "Descriptif",
       "match": "Correspondance",
-      "change": "Changement"
+      "change": "Changement",
+      "new": "Nouvelle ACL",
+      "stopAfterMatch": "Arrêter après correspondance",
+      "confirmDelete": "Supprimer l’ACL « {{name}} » ? Cette action est irréversible."
     },
     "genericAgentJobs": {
       "title_plural": "Tâches d'agent générique",
@@ -2222,7 +2308,13 @@
       "aiAudit": "Audit complet de chaque demande/réponse LLM, avec révélation des PII.",
       "aiAcl": "Autorisations et quotas IA par groupe, rôle ou agent.",
       "mailAccounts": "Boîtes aux lettres IMAP/POP entrantes (mot de passe ou OAuth2).",
-      "oauth2Tokens": "Configurations de jetons OAuth2 pour Microsoft/Google Mail (compatible Znuny)."
+      "oauth2Tokens": "Configurations de jetons OAuth2 pour Microsoft/Google Mail (compatible Znuny).",
+      "types": "Gérer les types de ticket utilisés pour la classification.",
+      "services": "Gérer les services et les lier aux SLA.",
+      "slas": "Gérer les accords de niveau de service et les délais.",
+      "systemAddresses": "Adresses e-mail utilisées comme expéditeur pour files et réponses auto.",
+      "notificationEvents": "Configurer les notifications agents déclenchées par des événements.",
+      "ticketAttributeRelations": "Matrices de dépendances compatibles Znuny (service/file, etc.) au format CSV."
     },
     "mailAccounts": {
       "title_plural": "Comptes de messagerie",
@@ -2270,11 +2362,50 @@
       "refreshSuccess": "Jeton rafraîchi."
     },
     "systemAddresses": {
-      "title_plural": "System addresses",
-      "subtitle": "From-addresses for queues and auto-responses. Invalid addresses stay listed so they can be re-enabled.",
-      "new": "Add address",
-      "email": "Email",
-      "name": "Name"
+      "title_plural": "Adresses système",
+      "subtitle": "Adresses d’expéditeur pour files et réponses auto. Les adresses non valides restent listées pour pouvoir être réactivées.",
+      "new": "Ajouter une adresse",
+      "email": "E-mail",
+      "name": "Nom"
+    },
+    "types": {
+      "title_plural": "Types de ticket",
+      "new": "Nouveau type",
+      "name": "Nom"
+    },
+    "services": {
+      "title_plural": "Services",
+      "new": "Nouveau service",
+      "name": "Nom",
+      "slaCount": "SLA"
+    },
+    "slas": {
+      "title_plural": "SLA",
+      "new": "Nouveau SLA",
+      "name": "Nom",
+      "firstResponseTime": "Première réponse (min)",
+      "updateTime": "Mise à jour (min)",
+      "solutionTime": "Résolution (min)",
+      "calendar": "Calendrier"
+    },
+    "notificationEvents": {
+      "title_plural": "Événements de notification",
+      "subtitle": "Lorsqu’un événement se produit, les notifications correspondantes sont envoyées aux agents.",
+      "new": "Créer une notification",
+      "name": "Nom",
+      "event": "Événement",
+      "subject": "Objet",
+      "body": "Corps"
+    },
+    "tar": {
+      "title": "Relations d’attributs de ticket",
+      "filename": "Nom de fichier",
+      "attributes": "Attributs",
+      "priority": "Priorité",
+      "csv": "Données CSV",
+      "new": "Nouvelle relation",
+      "help": "CSV avec en-tête Attribute1;Attribute2 et paires de valeurs (Znuny AdminTicketAttributeRelations). Limite les listes des formulaires (ex. Service → File).",
+      "confirmDelete": "Supprimer cette relation ?"
     }
   },
   "kb": {
@@ -2489,7 +2620,8 @@
       "startButton": "Démarrer le processus",
       "actions": "Actions disponibles",
       "loadError": "Impossible de charger l'état du processus.",
-      "noDialogs": "Aucune action disponible pour cette activité."
+      "noDialogs": "Aucune action disponible pour cette activité.",
+      "noCustomerDialogs": "Aucun dialogue client n’est disponible à cette étape."
     },
     "start": {
       "title": "Démarrer le processus",
@@ -2525,5 +2657,84 @@
     "body": "Corps",
     "editTitle": "Modifier « {{name}} »",
     "saveError": "Impossible d'enregistrer le modèle."
+  },
+  "views": {
+    "mine": "Mes tickets",
+    "responsible": "Responsable",
+    "locked": "Tickets verrouillés",
+    "watched": "Tickets suivis",
+    "escalated": "Tickets escaladés",
+    "service": "Par service",
+    "serviceHint": "Lister les tickets associés à un service.",
+    "pickService": "Choisir un service…"
+  },
+  "customerCentre": {
+    "title": "Informations client",
+    "open": "Infos client",
+    "invalid": "Identifiant client non valide.",
+    "loadError": "Impossible de charger ce client.",
+    "email": "E-mail",
+    "phone": "Téléphone",
+    "customerId": "Numéro client",
+    "company": "Entreprise",
+    "openCount": "{{count}} ouverts",
+    "closedCount": "{{count}} fermés",
+    "allTickets": "Tous les tickets →",
+    "recentTickets": "Tickets récents"
+  },
+  "timeAccounting": {
+    "title": "Comptabilisation du temps",
+    "hint": "Unités de temps saisies sur les tickets auxquels vous avez accès.",
+    "filterUser": "Agent",
+    "allUsers": "Tous les agents",
+    "filterFrom": "Du",
+    "filterTo": "Au",
+    "filterTicket": "ID du ticket",
+    "empty": "Aucune saisie de temps ne correspond.",
+    "colWhen": "Quand",
+    "colTicket": "Ticket",
+    "colUser": "Agent",
+    "colUnits": "Unités",
+    "presetsLabel": "Période",
+    "presets": {
+      "today": "Aujourd'hui",
+      "yesterday": "Hier",
+      "thisWeek": "Cette semaine",
+      "lastWeek": "Semaine dernière",
+      "thisMonth": "Ce mois-ci",
+      "lastMonth": "Mois dernier",
+      "thisQuarter": "Ce trimestre",
+      "lastQuarter": "Trimestre dernier",
+      "thisYear": "Cette année",
+      "lastYear": "Année dernière"
+    },
+    "kpiUnits": "Unités de temps",
+    "kpiEntries": "Saisies",
+    "kpiTickets": "Tickets",
+    "kpiAgents": "Agents",
+    "rangeBetween": "{{from}} – {{to}}",
+    "rangeFrom": "à partir du {{from}}",
+    "rangeTo": "jusqu’au {{to}}",
+    "chartTitle": "Unités par jour",
+    "chartBar": "{{date}} : {{units}} unités",
+    "dayUnknown": "Sans date",
+    "emptyHint": "Élargissez la période ou effacez les filtres agent et ticket.",
+    "clearFilters": "Effacer les filtres",
+    "pageRange": "{{from}}–{{to}}",
+    "pageScope": "sur cette page",
+    "chartPeak": "pic {{units}}"
+  },
+  "setPassword": {
+    "subtitle": "Veuillez choisir un mot de passe pour votre compte.",
+    "password": "Nouveau mot de passe",
+    "confirm": "Répéter le mot de passe",
+    "lengthHint": "Entre {{min}} et {{max}} caractères.",
+    "mismatch": "Les mots de passe ne correspondent pas.",
+    "submit": "Définir le mot de passe",
+    "saving": "Enregistrement…",
+    "done": "Mot de passe enregistré. Vous pouvez vous connecter.",
+    "invalid": "Ce lien n’est plus valide.",
+    "invalidHint": "Les liens de configuration sont valables 7 jours et à usage unique. Demandez-en un nouveau à votre administration.",
+    "toLogin": "Aller à la connexion"
   }
 }

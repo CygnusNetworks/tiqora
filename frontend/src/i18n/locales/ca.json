@@ -33,7 +33,7 @@
     "admin": "Admin",
     "theme": "Tema",
     "language": "Llengua",
-    "dashboard": "Tauler de control",
+    "dashboard": "Tauler",
     "queues": "Cues",
     "kb": "Base de coneixement"
   },
@@ -55,7 +55,12 @@
     "showActiveQueues": "Mostra actiu",
     "queueSearch": "Filtra les cues...",
     "noQueueMatch": "No coincideix cap cua.",
-    "templates": "Plantilles"
+    "templates": "Plantilles",
+    "locked": "Bloquejat",
+    "responsible": "Responsable",
+    "escalated": "Escalat",
+    "services": "Serveis",
+    "timeAccounting": "Comptabilització de temps"
   },
   "common": {
     "prev": "Anterior",
@@ -68,7 +73,10 @@
     "cancel": "Cancel·la",
     "help": "Ajuda",
     "edit": "Edita",
-    "save": "Desa"
+    "save": "Desa",
+    "saved": "Desat",
+    "delete": "Suprimeix",
+    "submit": "Envia"
   },
   "otp": {
     "verifying": "S'està verificant…",
@@ -171,7 +179,9 @@
     "toPickUpEmpty": "No hi ha entrades noves per recollir.",
     "remindersDue": "Recordatoris pendents",
     "remindersDueEmpty": "No hi ha recordatoris pendents.",
-    "queueShortcutsEmpty": "No hi ha cues amb entrades obertes o noves ara mateix."
+    "queueShortcutsEmpty": "No hi ha cues amb entrades obertes o noves ara mateix.",
+    "lastViews": "Vistos fa poc",
+    "lastViewsUntitled": "(sense assumpte)"
   },
   "queue": {
     "sidebar": "Cues",
@@ -452,7 +462,7 @@
       "watch": "Mira",
       "unwatch": "Deixa de mirar",
       "close": "Tancar",
-      "misc": "Misc",
+      "misc": "Diversos",
       "lock": "Bloqueig",
       "unlock": "Desbloqueja",
       "fields": "Camps lliures",
@@ -482,7 +492,8 @@
       "customerEmail": "Correu electrònic",
       "customerFirstName": "Nom de pila",
       "customerLastName": "Cognom",
-      "customerLoginConflict": "Aquest inici de sessió ja existeix. Trieu un inici de sessió diferent o assigneu el client existent mitjançant la cerca."
+      "customerLoginConflict": "Aquest inici de sessió ja existeix. Trieu un inici de sessió diferent o assigneu el client existent mitjançant la cerca.",
+      "clearCustomer": "Treu el client"
     },
     "inlineAttachments": "Imatges incrustades ({{count}})",
     "list": {
@@ -504,7 +515,35 @@
     "draftEditedAt": "editat {{time}}",
     "draftDiscard": "Descarta l'esborrany",
     "draftDiscardConfirm": "Voleu descartar aquesta resposta no enviada? El text no es podrà recuperar.",
-    "draftDiscardConfirmButton": "Descarta"
+    "draftDiscardConfirmButton": "Descarta",
+    "type": "Tipus",
+    "service": "Servei",
+    "sla": "SLA",
+    "mentions": "Mencions",
+    "timeAccounting": "Temps registrat",
+    "timeUnits": "Unitats de temps",
+    "addTime": "Registra temps",
+    "addMention": "Menciona un agent",
+    "mentionsCount": "Mencions: {{n}}",
+    "mentionsEmpty": "Ningú esmentat",
+    "mentionRemove": "Treu la menció",
+    "mentionSuggestions": "Agents",
+    "timeUnitAbbrev": "min",
+    "timeUnitHoursAbbrev": "h",
+    "timeUnitsShort": "{{units}} min",
+    "timeAccountingTotal": "Temps registrat: {{units}} min",
+    "timeRemove": "Elimina el registre",
+    "timeUnitMode": "Unitat de temps",
+    "timeUnitMin": "Min",
+    "timeUnitHours": "H",
+    "timePresets": "Selecció ràpida",
+    "timeComposerHint": "En respondre, registreu-ho al peu del compositor.",
+    "timeChipHint": "Es registra en enviar",
+    "extrasFailedMentions": "Enviat — la menció no s'ha desat.",
+    "extrasFailedTime": "Enviat — el temps no s'ha registrat.",
+    "extrasFailedBoth": "Enviat — no s'han desat ni la menció ni el registre de temps.",
+    "extrasRetry": "Torna-ho a provar",
+    "customerUnresolved": "Cap registre de client no coincideix amb aquesta adreça; els detalls no estan disponibles."
   },
   "search": {
     "title": "Cerca",
@@ -864,7 +903,7 @@
         "promptReplaceConfirmMessage": "L'indicador actual del sistema se substituirà pel contingut del fitxer. Continuar?",
         "summaryArticleThreshold": "Llindar de l'article",
         "summaryCharThreshold": "Llindar de caràcters",
-        "summaryIncrementalMinArticles": "Min. articles (incremental)",
+        "summaryIncrementalMinArticles": "Mín. d'articles (incremental)",
         "summaryIncrementalMinChars": "Min. caràcters (incremental)",
         "maxClarifications": "Màxim aclariments/tiquet",
         "maxAutoReplies": "Màxim de respostes automàtiques/ticket",
@@ -946,7 +985,7 @@
           "requests": "Sol·licituds",
           "tokens": "Total de fitxes",
           "errorRate": "Taxa d'error",
-          "topModel": "Top model",
+          "topModel": "Model principal",
           "cost": "Cost",
           "costUnavailable": "No hi ha preus configurats ni monedes mixtes"
         },
@@ -1143,7 +1182,8 @@
       },
       "acl": {
         "match": "Condicions en què s'aplica aquesta ACL (p. ex., cua actual, estat, camp de formulari). El canvi de la dreta només s'aplica quan tots els criteris enumerats aquí coincideixen.",
-        "change": "L'efecte de l'ACL una vegada que les seves condicions coincideixen, normalment restringeix o força les opcions disponibles als formularis (per exemple, només es permeten determinats estats de seguiment)."
+        "change": "L'efecte de l'ACL una vegada que les seves condicions coincideixen, normalment restringeix o força les opcions disponibles als formularis (per exemple, només es permeten determinats estats de seguiment).",
+        "stopAfterMatch": "Si es marca, no s'avaluen més ACL després d'una coincidència productiva (StopAfterMatch de Znuny)."
       },
       "mailOutbound": {
         "host": "Nom d'amfitrió del servidor SMTP per al correu de sortida. S'ha de poder accedir des d'aquest servidor (DNS + tallafoc) al port següent.",
@@ -1190,8 +1230,8 @@
         "validId": "\"Temp\" (valid_id 3) és el tercer estat de validesa de Znuny, normalment un compte pendent de confirmació (p. ex., autoregistre no confirmat), diferent de vàlid/no vàlid."
       },
       "systemAddresses": {
-        "email": "Address used as the From email for queues and auto-responses.",
-        "name": "Display name shown next to the email (e.g. “Support <support@example.com>”)."
+        "email": "Adreça usada com a From per a cues i respostes automàtiques.",
+        "name": "Nom mostrat al costat del correu (p. ex. «Support <support@example.com>»)."
       }
     },
     "nav": {
@@ -1240,7 +1280,13 @@
       "aiAcl": "Accés i límits",
       "collapse": "Redueix la navegació",
       "mailAccounts": "Comptes de correu",
-      "oauth2Tokens": "Tokens OAuth2 (correu)"
+      "oauth2Tokens": "Tokens OAuth2 (correu)",
+      "types": "Tipus de tiquet",
+      "services": "Serveis",
+      "slas": "SLA",
+      "systemAddresses": "Adreces del sistema",
+      "notificationEvents": "Esdeveniments de notificació",
+      "ticketAttributeRelations": "Relacions d'atributs"
     },
     "table": {
       "id": "ID",
@@ -1347,7 +1393,44 @@
       "title": "Títol",
       "firstName": "Nom de pila",
       "lastName": "Cognom",
-      "name": "Nom"
+      "name": "Nom",
+      "passwordMode": "Assignació de contrasenya",
+      "passwordModeManual": "Defineix manualment",
+      "passwordModeAuto": "Invitació: envia un enllaç per correu",
+      "passwordModeAutoHelp": "En desar, un enllaç d'un sol ús va al correu de sota. L'agent tria la contrasenya.",
+      "email": "Correu",
+      "mobile": "Telèfon mòbil",
+      "effectivePermissions": "Mostra els permisos efectius",
+      "effectivePermissionsTitle": "Permisos efectius de {{name}}",
+      "effectivePermissionsDescription": "Drets fusionats d'assignació directa a grups i rols.",
+      "rolesHeading": "Rols",
+      "groupsHeading": "Permisos de grup",
+      "queuesHeading": "Cues",
+      "noRoles": "Cap rol assignat.",
+      "noGroups": "Cap permís de grup.",
+      "noQueues": "Cap cua assignada.",
+      "viaDirect": "Directe",
+      "permissionColumn": "Permisos",
+      "sourceColumn": "Origen",
+      "editSettings": "Edita la configuració personal",
+      "editSettingsTitle": "Configuració personal de {{name}}",
+      "editSettingsDescription": "La mateixa configuració que l'agent veu a «Configuració personal».",
+      "languageLabel": "Llengua",
+      "languageSaved": "Llengua desada.",
+      "tabAccount": "Compte",
+      "tabPerson": "Persona",
+      "sourceInvalidHint": "Aquest permís ve d'un rol no vàlid i per tant no té efecte.",
+      "keyInactiveHint": "Aquest permís està configurat però no està en vigor — l'origen o el grup no és vàlid.",
+      "deletePermanent": "Suprimeix definitivament",
+      "deleteTitle": "Suprimir definitivament {{name}}?",
+      "deleteConfirm": "Suprimeix definitivament",
+      "deletableBody": "Res no referencia {{name}}; el compte es pot eliminar completament amb preferències, grups, rols i 2FA.",
+      "deleteIrreversible": "No es pot desfer.",
+      "deleteBlockedBody": "No es pot suprimir {{name}} — aquestes taules encara referencien el compte:",
+      "deleteBlockedHint": "Poseu el compte com a «No vàlid» perquè tiquets, articles i historial segueixin sent atribuïbles.",
+      "resendSetupLink": "Torna a enviar l'enllaç de configuració",
+      "setupLinkSent": "Enllaç de configuració enviat.",
+      "setupLinkFailed": "No s'ha pogut enviar l'enllaç de configuració."
     },
     "groups": {
       "title_plural": "Grups",
@@ -1561,7 +1644,10 @@
       "name": "Nom",
       "description": "Descripció",
       "match": "Partit",
-      "change": "Canviar"
+      "change": "Canviar",
+      "new": "ACL nova",
+      "stopAfterMatch": "Atura després de coincidència",
+      "confirmDelete": "Suprimir l'ACL «{{name}}»? No es pot desfer."
     },
     "genericAgentJobs": {
       "title_plural": "Feines d'agent genèric",
@@ -1768,7 +1854,7 @@
       "app": {
         "product": "Producte",
         "version": "Versió",
-        "gitSha": "Git commit",
+        "gitSha": "Commit Git",
         "buildTime": "Construir",
         "environment": "Medi ambient",
         "python": "Python",
@@ -2055,7 +2141,7 @@
         "companyId": "Empresa (customer_id)",
         "companyIdPh": "p. ex. ACME",
         "loginRegex": "Inici de sessió regex",
-        "customerIdRegex": "customer_id regex",
+        "customerIdRegex": "regex de customer_id",
         "emailRegex": "Expressió regular de correu electrònic",
         "changedAfter": "Canviat després",
         "changedBefore": "Canviat abans",
@@ -2222,7 +2308,13 @@
       "aiAudit": "Auditoria completa de cada sol·licitud/resposta de LLM, amb revelació de PII.",
       "aiAcl": "Permisos i quotes d'IA per grup, rol o agent.",
       "mailAccounts": "Bústies de correu IMAP/POP entrants (contrasenya o OAuth2).",
-      "oauth2Tokens": "Configuracions de testimoni OAuth2 per a correu de Microsoft/Google (compatible amb Znuny)."
+      "oauth2Tokens": "Configuracions de testimoni OAuth2 per a correu de Microsoft/Google (compatible amb Znuny).",
+      "types": "Gestioneu els tipus de tiquet usats per a la classificació.",
+      "services": "Gestioneu serveis i enllaceu-los amb els SLA.",
+      "slas": "Gestioneu els acords de nivell de servei i els terminis.",
+      "systemAddresses": "Adreces de correu usades com a From per a cues i respostes automàtiques.",
+      "notificationEvents": "Configureu les notificacions als agents basades en esdeveniments.",
+      "ticketAttributeRelations": "Matrius de dependència compatibles amb Znuny (servei/cua, etc.) en CSV."
     },
     "mailAccounts": {
       "title_plural": "Comptes de correu",
@@ -2270,11 +2362,50 @@
       "refreshSuccess": "Token actualitzat."
     },
     "systemAddresses": {
-      "title_plural": "System addresses",
-      "subtitle": "From-addresses for queues and auto-responses. Invalid addresses stay listed so they can be re-enabled.",
-      "new": "Add address",
-      "email": "Email",
-      "name": "Name"
+      "title_plural": "Adreces del sistema",
+      "subtitle": "Adreces From per a cues i respostes automàtiques. Les no vàlides queden llistades per poder reactivar-les.",
+      "new": "Afegeix una adreça",
+      "email": "Correu",
+      "name": "Nom"
+    },
+    "types": {
+      "title_plural": "Tipus de tiquet",
+      "new": "Tipus nou",
+      "name": "Nom"
+    },
+    "services": {
+      "title_plural": "Serveis",
+      "new": "Servei nou",
+      "name": "Nom",
+      "slaCount": "SLA"
+    },
+    "slas": {
+      "title_plural": "SLA",
+      "new": "SLA nou",
+      "name": "Nom",
+      "firstResponseTime": "Primera resposta (min)",
+      "updateTime": "Actualització (min)",
+      "solutionTime": "Solució (min)",
+      "calendar": "Calendari"
+    },
+    "notificationEvents": {
+      "title_plural": "Esdeveniments de notificació",
+      "subtitle": "Quan es disparen esdeveniments, s'envien als agents les notificacions coincidents.",
+      "new": "Crea una notificació",
+      "name": "Nom",
+      "event": "Esdeveniment",
+      "subject": "Assumpte",
+      "body": "Cos"
+    },
+    "tar": {
+      "title": "Relacions d'atributs de tiquet",
+      "filename": "Nom del fitxer",
+      "attributes": "Atributs",
+      "priority": "Prioritat",
+      "csv": "Dades CSV",
+      "new": "Relació nova",
+      "help": "CSV amb capçalera Attribute1;Attribute2 i parells de valors (Znuny AdminTicketAttributeRelations). Restringeix selectors de formularis (p. ex. Servei → Cua).",
+      "confirmDelete": "Suprimir aquesta relació?"
     }
   },
   "kb": {
@@ -2489,7 +2620,8 @@
       "startButton": "Inicia el procés",
       "actions": "Accions disponibles",
       "loadError": "No s'ha pogut carregar l'estat del procés.",
-      "noDialogs": "No hi ha cap acció disponible en aquesta activitat."
+      "noDialogs": "No hi ha cap acció disponible en aquesta activitat.",
+      "noCustomerDialogs": "No hi ha diàlegs de client disponibles en aquest pas."
     },
     "start": {
       "title": "Inicia el procés",
@@ -2525,5 +2657,84 @@
     "body": "Cos",
     "editTitle": "Edita \"{{name}}\"",
     "saveError": "No s'ha pogut desar la plantilla."
+  },
+  "views": {
+    "mine": "Els meus tiquets",
+    "responsible": "Responsable",
+    "locked": "Tiquets bloquejats",
+    "watched": "Tiquets observats",
+    "escalated": "Tiquets escalats",
+    "service": "Per servei",
+    "serviceHint": "Llista els tiquets assignats a un servei.",
+    "pickService": "Seleccioneu un servei…"
+  },
+  "customerCentre": {
+    "title": "Informació del client",
+    "open": "Info. del client",
+    "invalid": "Inici de sessió de client no vàlid.",
+    "loadError": "No s'ha pogut carregar aquest client.",
+    "email": "Correu",
+    "phone": "Telèfon",
+    "customerId": "Número de client",
+    "company": "Empresa",
+    "openCount": "{{count}} oberts",
+    "closedCount": "{{count}} tancats",
+    "allTickets": "Tots els tiquets →",
+    "recentTickets": "Tiquets recents"
+  },
+  "timeAccounting": {
+    "title": "Comptabilització de temps",
+    "hint": "Unitats de temps registrades als tiquets als quals teniu accés.",
+    "filterUser": "Agent",
+    "allUsers": "Tots els agents",
+    "filterFrom": "Des de",
+    "filterTo": "Fins a",
+    "filterTicket": "ID del tiquet",
+    "empty": "No hi ha entrades de temps coincidents.",
+    "colWhen": "Quan",
+    "colTicket": "Tiquet",
+    "colUser": "Agent",
+    "colUnits": "Unitats",
+    "presetsLabel": "Període",
+    "presets": {
+      "today": "Avui",
+      "yesterday": "Ahir",
+      "thisWeek": "Aquesta setmana",
+      "lastWeek": "Setmana passada",
+      "thisMonth": "Aquest mes",
+      "lastMonth": "Mes passat",
+      "thisQuarter": "Aquest trimestre",
+      "lastQuarter": "Trimestre passat",
+      "thisYear": "Aquest any",
+      "lastYear": "Any passat"
+    },
+    "kpiUnits": "Unitats de temps",
+    "kpiEntries": "Registres",
+    "kpiTickets": "Tiquets",
+    "kpiAgents": "Agents",
+    "rangeBetween": "{{from}} – {{to}}",
+    "rangeFrom": "des de {{from}}",
+    "rangeTo": "fins a {{to}}",
+    "chartTitle": "Unitats per dia",
+    "chartBar": "{{date}}: {{units}} unitats",
+    "dayUnknown": "Sense data",
+    "emptyHint": "Amplieu el període o esborreu els filtres d'agent i tiquet.",
+    "clearFilters": "Esborra els filtres",
+    "pageRange": "{{from}}–{{to}}",
+    "pageScope": "en aquesta pàgina",
+    "chartPeak": "pic {{units}}"
+  },
+  "setPassword": {
+    "subtitle": "Trieu una contrasenya per al vostre compte.",
+    "password": "Contrasenya nova",
+    "confirm": "Repeteix la contrasenya",
+    "lengthHint": "Entre {{min}} i {{max}} caràcters.",
+    "mismatch": "Les contrasenyes no coincideixen.",
+    "submit": "Defineix la contrasenya",
+    "saving": "S'està desant…",
+    "done": "Contrasenya desada. Ja podeu iniciar sessió.",
+    "invalid": "Aquest enllaç ja no és vàlid.",
+    "invalidHint": "Els enllaços de configuració valen 7 dies i s'usen un cop. Demaneu-ne un de nou a l'administració.",
+    "toLogin": "Ves a l'inici de sessió"
   }
 }

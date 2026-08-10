@@ -55,7 +55,12 @@
     "showActiveQueues": "Onyesha hai",
     "queueSearch": "Chuja foleni...",
     "noQueueMatch": "Hakuna foleni zinazolingana.",
-    "templates": "Violezo"
+    "templates": "Violezo",
+    "locked": "Imefungwa",
+    "responsible": "Anayehusika",
+    "escalated": "Imeongezwa kiwango",
+    "services": "Huduma",
+    "timeAccounting": "Uhasibu wa muda"
   },
   "common": {
     "prev": "Iliyotangulia",
@@ -68,7 +73,10 @@
     "cancel": "Ghairi",
     "help": "Msaada",
     "edit": "Hariri",
-    "save": "Hifadhi"
+    "save": "Hifadhi",
+    "saved": "Imehifadhiwa",
+    "delete": "Futa",
+    "submit": "Wasilisha"
   },
   "otp": {
     "verifying": "Inathibitisha...",
@@ -171,7 +179,9 @@
     "toPickUpEmpty": "Hakuna tikiti mpya za kuchukua.",
     "remindersDue": "Vikumbusho vinastahili",
     "remindersDueEmpty": "Hakuna vikumbusho vinavyohitajika.",
-    "queueShortcutsEmpty": "Hakuna foleni zilizo na tikiti wazi au mpya kwa sasa."
+    "queueShortcutsEmpty": "Hakuna foleni zilizo na tikiti wazi au mpya kwa sasa.",
+    "lastViews": "Zilizoangaliwa hivi karibuni",
+    "lastViewsUntitled": "(hakuna mada)"
   },
   "queue": {
     "sidebar": "Foleni",
@@ -324,7 +334,7 @@
     "reply": "Jibu",
     "replyAll": "Jibu wote",
     "forward": "Mbele",
-    "bounce": "Bounce",
+    "bounce": "Elekeza",
     "splitAction": "Gawanya",
     "split": {
       "priority": "Kipaumbele",
@@ -482,7 +492,8 @@
       "customerEmail": "Barua pepe",
       "customerFirstName": "Jina la kwanza",
       "customerLastName": "Jina la mwisho",
-      "customerLoginConflict": "Kuingia huku tayari kunapatikana. Chagua njia tofauti ya kuingia, au mpe mteja aliyepo kupitia utafutaji badala yake."
+      "customerLoginConflict": "Kuingia huku tayari kunapatikana. Chagua njia tofauti ya kuingia, au mpe mteja aliyepo kupitia utafutaji badala yake.",
+      "clearCustomer": "Ondoa mteja"
     },
     "inlineAttachments": "Picha zilizopachikwa ({{count}})",
     "list": {
@@ -504,7 +515,35 @@
     "draftEditedAt": "imehaririwa {{time}}",
     "draftDiscard": "Ondoa rasimu",
     "draftDiscardConfirm": "Ungependa kuondoa jibu hili ambalo halijatumwa? Maandishi hayawezi kurejeshwa.",
-    "draftDiscardConfirmButton": "Ondoa"
+    "draftDiscardConfirmButton": "Ondoa",
+    "type": "Aina",
+    "service": "Huduma",
+    "sla": "SLA",
+    "mentions": "Kutajwa",
+    "timeAccounting": "Uhasibu wa muda",
+    "timeUnits": "Vipimo vya muda",
+    "addTime": "Rekodi muda",
+    "addMention": "Taja wakala",
+    "mentionsCount": "Kutajwa: {{n}}",
+    "mentionsEmpty": "Hakuna aliyetajwa",
+    "mentionRemove": "Ondoa kutajwa",
+    "mentionSuggestions": "Wakala",
+    "timeUnitAbbrev": "dak",
+    "timeUnitHoursAbbrev": "saa",
+    "timeUnitsShort": "dak {{units}}",
+    "timeAccountingTotal": "Muda uliorekodiwa: dak {{units}}",
+    "timeRemove": "Ondoa ingizo",
+    "timeUnitMode": "Kipimo cha muda",
+    "timeUnitMin": "Dak",
+    "timeUnitHours": "Saa",
+    "timePresets": "Chaguo la haraka",
+    "timeComposerHint": "Unapojibu, rekodi kwenye kijachini cha kiandishi.",
+    "timeChipHint": "Itarekodiwa unapotuma",
+    "extrasFailedMentions": "Imetumwa — kutajwa hakuhifadhiwa.",
+    "extrasFailedTime": "Imetumwa — muda haukurekodiwa.",
+    "extrasFailedBoth": "Imetumwa — wala kutajwa wala kurekodi muda hakuhifadhiwa.",
+    "extrasRetry": "Jaribu tena",
+    "customerUnresolved": "Hakuna rekodi ya mteja inayolingana na anwani hii, kwa hivyo maelezo hayapatikani."
   },
   "search": {
     "title": "Tafuta",
@@ -602,7 +641,7 @@
     "noCustomerResults": "Hakuna wateja waliopatikana.",
     "from": "Kutoka",
     "directionLabel": "Mwelekeo",
-    "directionIn": "Inbound",
+    "directionIn": "Inayoingia",
     "directionOut": "Nje",
     "submitSend": "Unda na utume",
     "sendError": "Barua pepe haikuweza kutumwa. Tikiti ilikuwa tayari imeundwa - tafadhali jaribu tena kutuma jibu kutoka hapo.",
@@ -841,7 +880,7 @@
           "autonomy": "Kujitegemea",
           "prompt": "Agizo la mfumo",
           "summary": "Vizingiti vya muhtasari",
-          "caps": "Caps",
+          "caps": "Mipaka",
           "disclosure": "Ufichuzi na faragha",
           "identity": "Utambulisho",
           "language": "Lugha"
@@ -876,7 +915,7 @@
         "emptyUnlimited": "tupu = isiyo na kikomo",
         "disclosureEnabled": "Ufumbuzi wa AI umewashwa",
         "disclosureTextPlaceholder": "Tupu = tumia maandishi chaguomsingi ya kimataifa",
-        "piiMasking": "PII masking",
+        "piiMasking": "Ufunikaji wa PII",
         "identityMode": {
           "ticket_customer_id": "Mteja wa tikiti",
           "clarify_schema": "Fafanua schema",
@@ -1143,7 +1182,8 @@
       },
       "acl": {
         "match": "Masharti ambayo ACL hii inatumika (k.m. foleni ya sasa, jimbo, sehemu ya fomu). Mabadiliko yaliyo upande wa kulia yanatumika tu wakati kila kigezo kilichoorodheshwa hapa kinalingana.",
-        "change": "Athari za ACL mara tu masharti yake yanapolingana - kwa kawaida huzuia au hulazimisha chaguo zinazopatikana katika fomu (k.m. ni baadhi ya nchi za ufuatiliaji zinazoruhusiwa)."
+        "change": "Athari za ACL mara tu masharti yake yanapolingana - kwa kawaida huzuia au hulazimisha chaguo zinazopatikana katika fomu (k.m. ni baadhi ya nchi za ufuatiliaji zinazoruhusiwa).",
+        "stopAfterMatch": "Ikichaguliwa, hakuna ACL nyingine zinazotathminiwa baada ya mechi yenye tija (Znuny StopAfterMatch)."
       },
       "mailOutbound": {
         "host": "Jina la mpangishi wa seva ya SMTP kwa barua zinazotoka. Lazima ipatikane kutoka kwa seva hii (DNS + firewall) kwenye mlango ulio hapa chini.",
@@ -1190,8 +1230,8 @@
         "validId": "\"Temp\" (id_id 3) ni hali ya tatu ya uhalali ya Znuny - kwa kawaida akaunti inasubiri uthibitisho (k.m. kujiandikisha bila kuthibitishwa), tofauti na halali au batili."
       },
       "systemAddresses": {
-        "email": "Address used as the From email for queues and auto-responses.",
-        "name": "Display name shown next to the email (e.g. “Support <support@example.com>”)."
+        "email": "Anwani inayotumika kama From kwa foleni na majibu otomatiki.",
+        "name": "Jina linaloonekana kando ya barua pepe (k.m. “Support <support@example.com>”)."
       }
     },
     "nav": {
@@ -1240,7 +1280,13 @@
       "aiAcl": "Ufikiaji na mipaka",
       "collapse": "Kunja urambazaji",
       "mailAccounts": "Akaunti za barua",
-      "oauth2Tokens": "OAuth2 tokeni (barua)"
+      "oauth2Tokens": "OAuth2 tokeni (barua)",
+      "types": "Aina za tiketi",
+      "services": "Huduma",
+      "slas": "SLA",
+      "systemAddresses": "Anwani za mfumo",
+      "notificationEvents": "Matukio ya arifa",
+      "ticketAttributeRelations": "Mahusiano ya sifa"
     },
     "table": {
       "id": "ID",
@@ -1347,7 +1393,44 @@
       "title": "Kichwa",
       "firstName": "Jina la kwanza",
       "lastName": "Jina la mwisho",
-      "name": "Jina"
+      "name": "Jina",
+      "passwordMode": "Utoaji wa nenosiri",
+      "passwordModeManual": "Weka kwa mikono",
+      "passwordModeAuto": "Mwaliko: tuma kiungo cha usanidi kwa barua pepe",
+      "passwordModeAutoHelp": "Unapohifadhi, kiungo cha mara moja huenda kwa barua pepe hapa chini. Wakala huchagua nenosiri mwenyewe.",
+      "email": "Barua pepe",
+      "mobile": "Simu ya mkononi",
+      "effectivePermissions": "Ona ruhusa halisi",
+      "effectivePermissionsTitle": "Ruhusa halisi za {{name}}",
+      "effectivePermissionsDescription": "Haki zilizounganishwa kutoka ugawaji wa moja kwa moja wa vikundi na majukumu.",
+      "rolesHeading": "Majukumu",
+      "groupsHeading": "Ruhusa za kikundi",
+      "queuesHeading": "Foleni",
+      "noRoles": "Hakuna majukumu yaliyokabidhiwa.",
+      "noGroups": "Hakuna ruhusa za kikundi.",
+      "noQueues": "Hakuna foleni zilizokabidhiwa.",
+      "viaDirect": "Moja kwa moja",
+      "permissionColumn": "Ruhusa",
+      "sourceColumn": "Chanzo",
+      "editSettings": "Hariri mipangilio ya kibinafsi",
+      "editSettingsTitle": "Mipangilio ya kibinafsi ya {{name}}",
+      "editSettingsDescription": "Mipangilio ile ile ambayo wakala huona chini ya “Mipangilio ya kibinafsi”.",
+      "languageLabel": "Lugha",
+      "languageSaved": "Lugha imehifadhiwa.",
+      "tabAccount": "Akaunti",
+      "tabPerson": "Mtu",
+      "sourceInvalidHint": "Ruhusa hii inatoka kwa jukumu batili hivyo haina athari.",
+      "keyInactiveHint": "Ruhusa imesanidiwa lakini haitumiki — chanzo au kikundi si sahihi.",
+      "deletePermanent": "Futa kabisa",
+      "deleteTitle": "Futa {{name}} kabisa?",
+      "deleteConfirm": "Futa kabisa",
+      "deletableBody": "Hakuna kinachorejelea {{name}}; akaunti inaweza kuondolewa kabisa pamoja na mapendeleo, vikundi, majukumu na 2FA.",
+      "deleteIrreversible": "Hii haiwezi kutenduliwa.",
+      "deleteBlockedBody": "Haiwezekani kufuta {{name}} — jedwali hizi bado zinarejelea akaunti:",
+      "deleteBlockedHint": "Weka akaunti kuwa “Batili” ili tiketi, makala na historia zibaki zinazoweza kuhusishwa.",
+      "resendSetupLink": "Tuma tena kiungo cha usanidi",
+      "setupLinkSent": "Kiungo cha usanidi kimetumwa.",
+      "setupLinkFailed": "Imeshindikana kutuma kiungo cha usanidi."
     },
     "groups": {
       "title_plural": "Vikundi",
@@ -1561,7 +1644,10 @@
       "name": "Jina",
       "description": "Maelezo",
       "match": "Mechi",
-      "change": "Badilika"
+      "change": "Badilika",
+      "new": "ACL mpya",
+      "stopAfterMatch": "Simama baada ya mechi",
+      "confirmDelete": "Futa ACL “{{name}}”? Hii haiwezi kutenduliwa."
     },
     "genericAgentJobs": {
       "title_plural": "Kazi za wakala wa jumla",
@@ -1790,7 +1876,7 @@
         "disconnected": "kukatika",
         "size": "Ukubwa",
         "latency": "Kuchelewa",
-        "legacySchema": "OTRS/Znuny schema",
+        "legacySchema": "Skimu ya OTRS/Znuny",
         "groupsTable": "Jedwali la vikundi",
         "schemaSource": "Chanzo"
       },
@@ -1899,7 +1985,7 @@
       "from": "Kutoka",
       "to": "Kwa",
       "all": "Wote",
-      "dirIn": "Inbound",
+      "dirIn": "Inayoingia",
       "dirOut": "Nje",
       "time": "Wakati",
       "fromTo": "Kutoka → Hadi",
@@ -2222,7 +2308,13 @@
       "aiAudit": "Ukaguzi kamili wa kila ombi/jibu la LLM, huku PII ikifichuliwa.",
       "aiAcl": "Ruhusa za AI na sehemu kwa kila kikundi, jukumu, au wakala.",
       "mailAccounts": "Sanduku za barua za IMAP/POP zinazoingia (nenosiri au OAuth2).",
-      "oauth2Tokens": "Mipangilio ya tokeni ya OAuth2 kwa barua pepe ya Microsoft/Google (Inaendana na Znuny)."
+      "oauth2Tokens": "Mipangilio ya tokeni ya OAuth2 kwa barua pepe ya Microsoft/Google (Inaendana na Znuny).",
+      "types": "Dhibiti aina za tiketi zinazotumika kwa uainishaji.",
+      "services": "Dhibiti huduma na uziunganishe na SLA.",
+      "slas": "Dhibiti makubaliano ya kiwango cha huduma na muda.",
+      "systemAddresses": "Anwani za barua pepe zinazotumika kama From kwa foleni na majibu otomatiki.",
+      "notificationEvents": "Sanidi arifa za wakala zinazoendeshwa na matukio.",
+      "ticketAttributeRelations": "Matriki za utegemezi zinazolingana na Znuny (huduma/foleni n.k.) kwa CSV."
     },
     "mailAccounts": {
       "title_plural": "Akaunti za barua",
@@ -2270,11 +2362,50 @@
       "refreshSuccess": "Tokeni imeonyeshwa upya."
     },
     "systemAddresses": {
-      "title_plural": "System addresses",
-      "subtitle": "From-addresses for queues and auto-responses. Invalid addresses stay listed so they can be re-enabled.",
-      "new": "Add address",
-      "email": "Email",
-      "name": "Name"
+      "title_plural": "Anwani za mfumo",
+      "subtitle": "Anwani za From kwa foleni na majibu otomatiki. Zisizo sahihi hubaki kwenye orodha ili ziweze kuwashwa tena.",
+      "new": "Ongeza anwani",
+      "email": "Barua pepe",
+      "name": "Jina"
+    },
+    "types": {
+      "title_plural": "Aina za tiketi",
+      "new": "Aina mpya",
+      "name": "Jina"
+    },
+    "services": {
+      "title_plural": "Huduma",
+      "new": "Huduma mpya",
+      "name": "Jina",
+      "slaCount": "SLA"
+    },
+    "slas": {
+      "title_plural": "SLA",
+      "new": "SLA mpya",
+      "name": "Jina",
+      "firstResponseTime": "Jibu la kwanza (dak)",
+      "updateTime": "Sasisho (dak)",
+      "solutionTime": "Suluhisho (dak)",
+      "calendar": "Kalenda"
+    },
+    "notificationEvents": {
+      "title_plural": "Matukio ya arifa",
+      "subtitle": "Matukio yanapotokea, arifa zinazolingana hutumwa kwa wakala.",
+      "new": "Unda arifa",
+      "name": "Jina",
+      "event": "Tukio",
+      "subject": "Mada",
+      "body": "Mwili"
+    },
+    "tar": {
+      "title": "Mahusiano ya sifa za tiketi",
+      "filename": "Jina la faili",
+      "attributes": "Sifa",
+      "priority": "Kipaumbele",
+      "csv": "Data za CSV",
+      "new": "Uhusiano mpya",
+      "help": "CSV yenye kichwa Attribute1;Attribute2 na jozi za thamani (Znuny AdminTicketAttributeRelations). Huzuia vichaguzi vya fomu (k.m. Huduma → Foleni).",
+      "confirmDelete": "Futa uhusiano huu?"
     }
   },
   "kb": {
@@ -2380,7 +2511,7 @@
       "queue": "Foleni",
       "dateFrom": "Kutoka",
       "dateTo": "Kwa",
-      "granularity": "Granularity",
+      "granularity": "Ukubwa wa muda",
       "granularityOptions": {
         "day": "Siku",
         "week": "Wiki",
@@ -2442,12 +2573,12 @@
       "agenda": "Ajenda"
     },
     "weekday": {
-      "mon": "Mon",
+      "mon": "Jt",
       "tue": "Jumanne",
       "wed": "Jumatano",
       "thu": "Alhamisi",
       "fri": "Ijumaa",
-      "sat": "Sat",
+      "sat": "Jmosi",
       "sun": "Jua"
     },
     "more": "+{{count}} zaidi",
@@ -2489,7 +2620,8 @@
       "startButton": "Anza mchakato",
       "actions": "Vitendo vinavyopatikana",
       "loadError": "Haikuweza kupakia hali ya mchakato.",
-      "noDialogs": "Hakuna vitendo vinavyopatikana katika shughuli hii."
+      "noDialogs": "Hakuna vitendo vinavyopatikana katika shughuli hii.",
+      "noCustomerDialogs": "Hakuna mazungumzo ya mteja yanayopatikana katika hatua hii."
     },
     "start": {
       "title": "Anza mchakato",
@@ -2525,5 +2657,84 @@
     "body": "Mwili",
     "editTitle": "Hariri \"{{name}}\"",
     "saveError": "Haikuweza kuhifadhi kiolezo."
+  },
+  "views": {
+    "mine": "Tiketi zangu",
+    "responsible": "Anayehusika",
+    "locked": "Tiketi zilizofungwa",
+    "watched": "Tiketi zinazofuatiliwa",
+    "escalated": "Tiketi zilizongezwa kiwango",
+    "service": "Kwa huduma",
+    "serviceHint": "Orodhesha tiketi zilizopewa huduma.",
+    "pickService": "Chagua huduma…"
+  },
+  "customerCentre": {
+    "title": "Taarifa za mteja",
+    "open": "Taarifa za mteja",
+    "invalid": "Kuingia kwa mteja si sahihi.",
+    "loadError": "Imeshindikana kupakia mteja huyu.",
+    "email": "Barua pepe",
+    "phone": "Simu",
+    "customerId": "Nambari ya mteja",
+    "company": "Kampuni",
+    "openCount": "{{count}} wazi",
+    "closedCount": "{{count}} zimefungwa",
+    "allTickets": "Tiketi zote →",
+    "recentTickets": "Tiketi za hivi karibuni"
+  },
+  "timeAccounting": {
+    "title": "Uhasibu wa muda",
+    "hint": "Vipimo vya muda vilivyorekodiwa kwenye tiketi unazoweza kufikia.",
+    "filterUser": "Wakala",
+    "allUsers": "Wakala wote",
+    "filterFrom": "Kutoka",
+    "filterTo": "Hadi",
+    "filterTicket": "Kitambulisho cha tiketi",
+    "empty": "Hakuna ingizo la muda linalolingana.",
+    "colWhen": "Lini",
+    "colTicket": "Tiketi",
+    "colUser": "Wakala",
+    "colUnits": "Vipimo",
+    "presetsLabel": "Kipindi",
+    "presets": {
+      "today": "Leo",
+      "yesterday": "Jana",
+      "thisWeek": "Wiki hii",
+      "lastWeek": "Wiki iliyopita",
+      "thisMonth": "Mwezi huu",
+      "lastMonth": "Mwezi uliopita",
+      "thisQuarter": "Robo hii",
+      "lastQuarter": "Robo iliyopita",
+      "thisYear": "Mwaka huu",
+      "lastYear": "Mwaka uliopita"
+    },
+    "kpiUnits": "Vipimo vya muda",
+    "kpiEntries": "Ingizo",
+    "kpiTickets": "Tiketi",
+    "kpiAgents": "Wakala",
+    "rangeBetween": "{{from}} – {{to}}",
+    "rangeFrom": "kutoka {{from}}",
+    "rangeTo": "hadi {{to}}",
+    "chartTitle": "Vipimo kwa siku",
+    "chartBar": "{{date}}: vipimo {{units}}",
+    "dayUnknown": "Hakuna tarehe",
+    "emptyHint": "Panua kipindi au futa vichujio vya wakala na tiketi.",
+    "clearFilters": "Futa vichujio",
+    "pageRange": "{{from}}–{{to}}",
+    "pageScope": "kwenye ukurasa huu",
+    "chartPeak": "kilele {{units}}"
+  },
+  "setPassword": {
+    "subtitle": "Tafadhali chagua nenosiri la akaunti yako.",
+    "password": "Nenosiri jipya",
+    "confirm": "Rudia nenosiri",
+    "lengthHint": "Kati ya herufi {{min}} na {{max}}.",
+    "mismatch": "Manenosiri hayalingani.",
+    "submit": "Weka nenosiri",
+    "saving": "Inahifadhi…",
+    "done": "Nenosiri limehifadhiwa. Unaweza kuingia sasa.",
+    "invalid": "Kiungo hiki hakitumiki tena.",
+    "invalidHint": "Viungo vya usanidi ni halali siku 7 na hutumika mara moja. Omba kipya kutoka kwa usimamizi.",
+    "toLogin": "Nenda kwenye kuingia"
   }
 }

@@ -33,7 +33,7 @@
     "admin": "Admin",
     "theme": "Tema",
     "language": "Språk",
-    "dashboard": "Dashbord",
+    "dashboard": "Oversikt",
     "queues": "Køer",
     "kb": "Kunnskapsgrunnlag"
   },
@@ -55,7 +55,12 @@
     "showActiveQueues": "Vis aktive",
     "queueSearch": "Filtrer køer...",
     "noQueueMatch": "Ingen køer samsvarer.",
-    "templates": "Maler"
+    "templates": "Maler",
+    "locked": "Låst",
+    "responsible": "Ansvarlig",
+    "escalated": "Eskalert",
+    "services": "Tjenester",
+    "timeAccounting": "Tidsregistrering"
   },
   "common": {
     "prev": "Forrige",
@@ -68,7 +73,10 @@
     "cancel": "Avbryt",
     "help": "Hjelp",
     "edit": "Rediger",
-    "save": "Lagre"
+    "save": "Lagre",
+    "saved": "Lagret",
+    "delete": "Slett",
+    "submit": "Send"
   },
   "otp": {
     "verifying": "Bekrefter …",
@@ -171,7 +179,9 @@
     "toPickUpEmpty": "Ingen nye billetter å hente.",
     "remindersDue": "Påminnelser forfaller",
     "remindersDueEmpty": "Ingen påminnelser forfaller.",
-    "queueShortcutsEmpty": "Ingen køer med åpne eller nye billetter akkurat nå."
+    "queueShortcutsEmpty": "Ingen køer med åpne eller nye billetter akkurat nå.",
+    "lastViews": "Sist sett",
+    "lastViewsUntitled": "(uten emne)"
   },
   "queue": {
     "sidebar": "Køer",
@@ -370,7 +380,7 @@
     "splitQueue": "Målkø",
     "splitNewTitle": "Ny billetttittel (valgfritt)",
     "ai": {
-      "title": "AI Assist",
+      "title": "AI-hjelp",
       "help": {
         "summary": "Generert fra billettens artikler av køens konfigurerte modell og lagret kun i billetttilstanden, aldri som et notat – det blir aldri sendt til kunden på egen hånd.",
         "drafts": "Generert av modellen fra billetten så langt. Hvert utkast er sin egen post — ingenting sendes automatisk; du må åpne den og eksplisitt sende eller forkaste den."
@@ -457,7 +467,7 @@
       "unlock": "Lås opp",
       "fields": "Frie felt",
       "historyView": "Historie",
-      "link": "Link",
+      "link": "Koble",
       "merge": "Slå sammen",
       "appointment": "Ny avtale",
       "move": "Flytt",
@@ -482,7 +492,8 @@
       "customerEmail": "E-post",
       "customerFirstName": "Fornavn",
       "customerLastName": "Etternavn",
-      "customerLoginConflict": "Denne påloggingen eksisterer allerede. Velg en annen pålogging, eller tilordne den eksisterende kunden via søk i stedet."
+      "customerLoginConflict": "Denne påloggingen eksisterer allerede. Velg en annen pålogging, eller tilordne den eksisterende kunden via søk i stedet.",
+      "clearCustomer": "Fjern kunde"
     },
     "inlineAttachments": "Innebygde bilder ({{count}})",
     "list": {
@@ -504,7 +515,35 @@
     "draftEditedAt": "redigert {{time}}",
     "draftDiscard": "Forkast utkast",
     "draftDiscardConfirm": "Forkaste dette usendte svaret? Teksten kan ikke gjenopprettes.",
-    "draftDiscardConfirmButton": "Forkast"
+    "draftDiscardConfirmButton": "Forkast",
+    "type": "Type",
+    "service": "Tjeneste",
+    "sla": "SLA",
+    "mentions": "Omtaler",
+    "timeAccounting": "Tidsregistrering",
+    "timeUnits": "Tidsenheter",
+    "addTime": "Registrer tid",
+    "addMention": "Nevn agent",
+    "mentionsCount": "Omtaler: {{n}}",
+    "mentionsEmpty": "Ingen omtalt",
+    "mentionRemove": "Fjern omtale",
+    "mentionSuggestions": "Agenter",
+    "timeUnitAbbrev": "min",
+    "timeUnitHoursAbbrev": "t",
+    "timeUnitsShort": "{{units}} min",
+    "timeAccountingTotal": "Registrert tid: {{units}} min",
+    "timeRemove": "Fjern registrering",
+    "timeUnitMode": "Tidsenhet",
+    "timeUnitMin": "Min",
+    "timeUnitHours": "T",
+    "timePresets": "Hurtigvalg",
+    "timeComposerHint": "Registrer det i bunnteksten når du svarer.",
+    "timeChipHint": "Registreres ved sending",
+    "extrasFailedMentions": "Sendt — omtalen ble ikke lagret.",
+    "extrasFailedTime": "Sendt — tiden ble ikke registrert.",
+    "extrasFailedBoth": "Sendt — verken omtale eller tidsregistrering ble lagret.",
+    "extrasRetry": "Prøv igjen",
+    "customerUnresolved": "Ingen kundepost matcher denne adressen, så kundedetaljer er utilgjengelige."
   },
   "search": {
     "title": "Søk",
@@ -769,7 +808,7 @@
           "openai_compat": "OpenAI-kompatibel",
           "anthropic": "Antropisk"
         },
-        "baseUrl": "Base URL",
+        "baseUrl": "Base-URL",
         "defaultModel": "Standardmodell",
         "flags": "Flagg",
         "flagTools": "Verktøykalling",
@@ -800,7 +839,7 @@
         "new": "Ny MCP-klient",
         "name": "Navn",
         "url": "URL",
-        "authToken": "Auth token",
+        "authToken": "Auth-token",
         "authTokenSetHelp": "Et token er lagret. La stå tomt for å beholde det.",
         "authTokenHelp": "Lagret kryptert og aldri vist igjen.",
         "empty": "Ingen MCP-klienter opprettet ennå.",
@@ -841,7 +880,7 @@
           "autonomy": "Autonomi",
           "prompt": "Systemmelding",
           "summary": "Oppsummerende terskler",
-          "caps": "Caps",
+          "caps": "Tak",
           "disclosure": "Avsløring og personvern",
           "identity": "Identitet",
           "language": "Språk"
@@ -1143,7 +1182,8 @@
       },
       "acl": {
         "match": "Betingelser som denne tilgangskontrollisten gjelder (f.eks. gjeldende kø, tilstand, skjemafelt). Endringen til høyre brukes bare når alle kriteriene som er oppført her samsvarer.",
-        "change": "ACLs effekt når betingelsene samsvarer – vanligvis begrenser eller tvinger den valgene som er tilgjengelige i skjemaer (f.eks. er det bare visse oppfølgingstilstander som er tillatt)."
+        "change": "ACLs effekt når betingelsene samsvarer – vanligvis begrenser eller tvinger den valgene som er tilgjengelige i skjemaer (f.eks. er det bare visse oppfølgingstilstander som er tillatt).",
+        "stopAfterMatch": "Hvis avkrysset evalueres ingen flere ACL etter et produktivt treff (Znuny StopAfterMatch)."
       },
       "mailOutbound": {
         "host": "SMTP-serverens vertsnavn for utgående e-post. Må være tilgjengelig fra denne serveren (DNS + brannmur) på porten nedenfor.",
@@ -1190,8 +1230,8 @@
         "validId": "\"Temp\" (valid_id 3) er Znunys tredje gyldighetstilstand – vanligvis en konto som venter på bekreftelse (f.eks. ubekreftet egenregistrering), forskjellig fra vanlig gyldig/ugyldig."
       },
       "systemAddresses": {
-        "email": "Address used as the From email for queues and auto-responses.",
-        "name": "Display name shown next to the email (e.g. “Support <support@example.com>”)."
+        "email": "Adresse brukt som From for køer og autosvar.",
+        "name": "Visningsnavn ved siden av e-posten (f.eks. «Support <support@example.com>»)."
       }
     },
     "nav": {
@@ -1240,7 +1280,13 @@
       "aiAcl": "Tilgang og begrensninger",
       "collapse": "Skjul navigasjonen",
       "mailAccounts": "E-postkontoer",
-      "oauth2Tokens": "OAuth2-tokens (e-post)"
+      "oauth2Tokens": "OAuth2-tokens (e-post)",
+      "types": "Sakstyper",
+      "services": "Tjenester",
+      "slas": "SLA",
+      "systemAddresses": "Systemadresser",
+      "notificationEvents": "Varslingshendelser",
+      "ticketAttributeRelations": "Attributtrelasjoner"
     },
     "table": {
       "id": "ID",
@@ -1347,7 +1393,44 @@
       "title": "Tittel",
       "firstName": "Fornavn",
       "lastName": "Etternavn",
-      "name": "Navn"
+      "name": "Navn",
+      "passwordMode": "Passordtildeling",
+      "passwordModeManual": "Angi manuelt",
+      "passwordModeAuto": "Invitasjon: send lenke på e-post",
+      "passwordModeAutoHelp": "Ved lagring går en engangslenke til e-postadressen under. Agenten velger passord selv.",
+      "email": "E-post",
+      "mobile": "Mobiltelefon",
+      "effectivePermissions": "Vis effektive rettigheter",
+      "effectivePermissionsTitle": "Effektive rettigheter for {{name}}",
+      "effectivePermissionsDescription": "Sammenslåtte rettigheter fra direkte grupper og roller.",
+      "rolesHeading": "Roller",
+      "groupsHeading": "Gruppetillatelser",
+      "queuesHeading": "Køer",
+      "noRoles": "Ingen roller tildelt.",
+      "noGroups": "Ingen gruppetillatelser.",
+      "noQueues": "Ingen tildelte køer.",
+      "viaDirect": "Direkte",
+      "permissionColumn": "Rettigheter",
+      "sourceColumn": "Kilde",
+      "editSettings": "Rediger personlige innstillinger",
+      "editSettingsTitle": "Personlige innstillinger for {{name}}",
+      "editSettingsDescription": "De samme innstillingene agenten ser under «Personlige innstillinger».",
+      "languageLabel": "Språk",
+      "languageSaved": "Språk lagret.",
+      "tabAccount": "Konto",
+      "tabPerson": "Person",
+      "sourceInvalidHint": "Denne rettigheten kommer fra en ugyldig rolle og har derfor ingen effekt.",
+      "keyInactiveHint": "Rettigheten er konfigurert men ikke i kraft — kilde eller gruppe er ugyldig.",
+      "deletePermanent": "Slett permanent",
+      "deleteTitle": "Slette {{name}} permanent?",
+      "deleteConfirm": "Slett permanent",
+      "deletableBody": "Ingenting refererer {{name}}; kontoen kan fjernes helt med innstillinger, grupper, roller og 2FA.",
+      "deleteIrreversible": "Dette kan ikke angres.",
+      "deleteBlockedBody": "{{name}} kan ikke slettes — disse tabellene refererer fortsatt kontoen:",
+      "deleteBlockedHint": "Sett kontoen til «Ugyldig» slik at saker, artikler og historikk forblir tilordnbare.",
+      "resendSetupLink": "Send oppsettslenke på nytt",
+      "setupLinkSent": "Oppsettslenke sendt.",
+      "setupLinkFailed": "Kunne ikke sende oppsettslenke."
     },
     "groups": {
       "title_plural": "Grupper",
@@ -1561,7 +1644,10 @@
       "name": "Navn",
       "description": "Beskrivelse",
       "match": "Match",
-      "change": "Endre"
+      "change": "Endre",
+      "new": "Ny ACL",
+      "stopAfterMatch": "Stopp etter treff",
+      "confirmDelete": "Slett ACL «{{name}}»? Dette kan ikke angres."
     },
     "genericAgentJobs": {
       "title_plural": "Generisk agent jobber",
@@ -1670,7 +1756,7 @@
         "channels": "Kanaler",
         "events": "Arrangementer / SSE",
         "agents": "Agenter",
-        "admin": "Admin API",
+        "admin": "Admin-API",
         "mcp": "MCP-server",
         "compat": "Znuny Generic Interface"
       }
@@ -1725,7 +1811,7 @@
       "description": "Prefiks og plassering av billettnummer i utgående e-postemner. Sletting av et felt arver den aktive Znuny SysConfig-verdien på nytt.",
       "enabled": "Legg til hekte til utgående emner",
       "hook": "Krokprefiks",
-      "divider": "Divider (HookDivider)",
+      "divider": "Skilletegn (HookDivider)",
       "subjectFormat": "Posisjon",
       "formatLeft": "Venstre ([Hook#TN] emne)",
       "formatRight": "Høyre (emne [Hook#TN])",
@@ -1768,7 +1854,7 @@
       "app": {
         "product": "Produkt",
         "version": "Versjon",
-        "gitSha": "Git commit",
+        "gitSha": "Git-commit",
         "buildTime": "Bygg",
         "environment": "Miljø",
         "python": "Python",
@@ -1777,7 +1863,7 @@
         "serverTime": "Servertid"
       },
       "services": {
-        "service": "Service",
+        "service": "Tjeneste",
         "enabled": "Aktivert",
         "enabledOn": "På",
         "enabledOff": "Av",
@@ -1826,7 +1912,7 @@
       "loadError": "Kunne ikke laste inn tjenester.",
       "columns": {
         "status": "Status",
-        "service": "Service",
+        "service": "Tjeneste",
         "enabled": "Aktivert",
         "schedule": "Intervall",
         "lastOk": "Siste suksess",
@@ -2222,7 +2308,13 @@
       "aiAudit": "Full revisjon av hver LLM-forespørsel/svar, med PII-avsløring.",
       "aiAcl": "AI-tillatelser og kvoter per gruppe, rolle eller agent.",
       "mailAccounts": "Innkommende IMAP/POP-postbokser (passord eller OAuth2).",
-      "oauth2Tokens": "OAuth2-tokenkonfigurasjoner for Microsoft/Google-e-post (Znuny-kompatibel)."
+      "oauth2Tokens": "OAuth2-tokenkonfigurasjoner for Microsoft/Google-e-post (Znuny-kompatibel).",
+      "types": "Administrer sakstyper som brukes til klassifisering.",
+      "services": "Administrer tjenester og knytt dem til SLA.",
+      "slas": "Administrer tjenestenivåavtaler og frister.",
+      "systemAddresses": "E-postadresser som From for køer og autosvar.",
+      "notificationEvents": "Konfigurer hendelsesdrevne agentvarsler.",
+      "ticketAttributeRelations": "Znuny-kompatible avhengighetsmatriser (tjeneste/kø m.m.) som CSV."
     },
     "mailAccounts": {
       "title_plural": "E-postkontoer",
@@ -2270,11 +2362,50 @@
       "refreshSuccess": "Token er oppdatert."
     },
     "systemAddresses": {
-      "title_plural": "System addresses",
-      "subtitle": "From-addresses for queues and auto-responses. Invalid addresses stay listed so they can be re-enabled.",
-      "new": "Add address",
-      "email": "Email",
-      "name": "Name"
+      "title_plural": "Systemadresser",
+      "subtitle": "From-adresser for køer og autosvar. Ugyldige forblir i listen slik at de kan aktiveres igjen.",
+      "new": "Legg til adresse",
+      "email": "E-post",
+      "name": "Navn"
+    },
+    "types": {
+      "title_plural": "Sakstyper",
+      "new": "Ny type",
+      "name": "Navn"
+    },
+    "services": {
+      "title_plural": "Tjenester",
+      "new": "Ny tjeneste",
+      "name": "Navn",
+      "slaCount": "SLA"
+    },
+    "slas": {
+      "title_plural": "SLA",
+      "new": "Ny SLA",
+      "name": "Navn",
+      "firstResponseTime": "Første svar (min)",
+      "updateTime": "Oppdatering (min)",
+      "solutionTime": "Løsning (min)",
+      "calendar": "Kalender"
+    },
+    "notificationEvents": {
+      "title_plural": "Varslingshendelser",
+      "subtitle": "Når hendelser inntreffer, sendes matchende varsler til agenter.",
+      "new": "Opprett varsel",
+      "name": "Navn",
+      "event": "Hendelse",
+      "subject": "Emne",
+      "body": "Brødtekst"
+    },
+    "tar": {
+      "title": "Saksattributtrelasjoner",
+      "filename": "Filnavn",
+      "attributes": "Attributter",
+      "priority": "Prioritet",
+      "csv": "CSV-data",
+      "new": "Ny relasjon",
+      "help": "CSV med overskrift Attribute1;Attribute2 og verdi-par (Znuny AdminTicketAttributeRelations). Begrenser skjemavalg (f.eks. Tjeneste → Kø).",
+      "confirmDelete": "Slette denne relasjonen?"
     }
   },
   "kb": {
@@ -2489,7 +2620,8 @@
       "startButton": "Start prosessen",
       "actions": "Tilgjengelige handlinger",
       "loadError": "Kunne ikke laste inn prosesstilstand.",
-      "noDialogs": "Ingen handlinger tilgjengelig for denne aktiviteten."
+      "noDialogs": "Ingen handlinger tilgjengelig for denne aktiviteten.",
+      "noCustomerDialogs": "Ingen kundedialoger tilgjengelig i dette steget."
     },
     "start": {
       "title": "Start prosessen",
@@ -2525,5 +2657,84 @@
     "body": "Kropp",
     "editTitle": "Rediger «{{name}}»",
     "saveError": "Kunne ikke lagre malen."
+  },
+  "views": {
+    "mine": "Mine saker",
+    "responsible": "Ansvarlig",
+    "locked": "Låste saker",
+    "watched": "Overvåkede saker",
+    "escalated": "Eskalerte saker",
+    "service": "Etter tjeneste",
+    "serviceHint": "Vis saker knyttet til en tjeneste.",
+    "pickService": "Velg en tjeneste…"
+  },
+  "customerCentre": {
+    "title": "Kundeinformasjon",
+    "open": "Kundeinfo",
+    "invalid": "Ugyldig kundepålogging.",
+    "loadError": "Kunden kunne ikke lastes.",
+    "email": "E-post",
+    "phone": "Telefon",
+    "customerId": "Kundenummer",
+    "company": "Bedrift",
+    "openCount": "{{count}} åpne",
+    "closedCount": "{{count}} lukkede",
+    "allTickets": "Alle saker →",
+    "recentTickets": "Nylige saker"
+  },
+  "timeAccounting": {
+    "title": "Tidsregistrering",
+    "hint": "Registrerte tidsenheter på saker du har tilgang til.",
+    "filterUser": "Agent",
+    "allUsers": "Alle agenter",
+    "filterFrom": "Fra",
+    "filterTo": "Til",
+    "filterTicket": "Saks-ID",
+    "empty": "Ingen tidsregistreringer treffer.",
+    "colWhen": "Når",
+    "colTicket": "Sak",
+    "colUser": "Agent",
+    "colUnits": "Enheter",
+    "presetsLabel": "Periode",
+    "presets": {
+      "today": "I dag",
+      "yesterday": "I går",
+      "thisWeek": "Denne uken",
+      "lastWeek": "Forrige uke",
+      "thisMonth": "Denne måneden",
+      "lastMonth": "Forrige måned",
+      "thisQuarter": "Dette kvartalet",
+      "lastQuarter": "Forrige kvartal",
+      "thisYear": "I år",
+      "lastYear": "I fjor"
+    },
+    "kpiUnits": "Tidsenheter",
+    "kpiEntries": "Registreringer",
+    "kpiTickets": "Saker",
+    "kpiAgents": "Agenter",
+    "rangeBetween": "{{from}} – {{to}}",
+    "rangeFrom": "fra {{from}}",
+    "rangeTo": "til {{to}}",
+    "chartTitle": "Enheter per dag",
+    "chartBar": "{{date}}: {{units}} enheter",
+    "dayUnknown": "Ingen dato",
+    "emptyHint": "Utvid perioden, eller tøm agent- og saksfiltre.",
+    "clearFilters": "Tøm filtre",
+    "pageRange": "{{from}}–{{to}}",
+    "pageScope": "på denne siden",
+    "chartPeak": "topp {{units}}"
+  },
+  "setPassword": {
+    "subtitle": "Velg et passord for kontoen din.",
+    "password": "Nytt passord",
+    "confirm": "Gjenta passord",
+    "lengthHint": "Mellom {{min}} og {{max}} tegn.",
+    "mismatch": "Passordene er ikke like.",
+    "submit": "Angi passord",
+    "saving": "Lagrer…",
+    "done": "Passord lagret. Du kan logge inn nå.",
+    "invalid": "Denne lenken er ikke lenger gyldig.",
+    "invalidHint": "Oppsettslenker gjelder i 7 dager og kan brukes én gang. Be administrasjonen om en ny.",
+    "toLogin": "Gå til innlogging"
   }
 }

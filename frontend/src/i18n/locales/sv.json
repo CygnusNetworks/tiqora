@@ -55,7 +55,12 @@
     "showActiveQueues": "Visa aktiva",
     "queueSearch": "Filtrera köer...",
     "noQueueMatch": "Inga köer matchar.",
-    "templates": "Mallar"
+    "templates": "Mallar",
+    "locked": "Låsta",
+    "responsible": "Ansvarig",
+    "escalated": "Eskalerade",
+    "services": "Tjänster",
+    "timeAccounting": "Tidredovisning"
   },
   "common": {
     "prev": "Föregående",
@@ -68,7 +73,10 @@
     "cancel": "Avbryt",
     "help": "Hjälp",
     "edit": "Redigera",
-    "save": "Spara"
+    "save": "Spara",
+    "saved": "Sparat",
+    "delete": "Ta bort",
+    "submit": "Skicka"
   },
   "otp": {
     "verifying": "Verifierar...",
@@ -171,7 +179,9 @@
     "toPickUpEmpty": "Inga nya ärenden att hämta.",
     "remindersDue": "Påminnelser kommer",
     "remindersDueEmpty": "Inga påminnelser.",
-    "queueShortcutsEmpty": "Inga köer med öppna eller nya ärenden just nu."
+    "queueShortcutsEmpty": "Inga köer med öppna eller nya ärenden just nu.",
+    "lastViews": "Senast visade",
+    "lastViewsUntitled": "(inget ämne)"
   },
   "queue": {
     "sidebar": "Köer",
@@ -370,7 +380,7 @@
     "splitQueue": "Målkö",
     "splitNewTitle": "Ny ärendetitel (valfritt)",
     "ai": {
-      "title": "AI Assist",
+      "title": "AI-stöd",
       "help": {
         "summary": "Genereras från ärendets artiklar av köns konfigurerade modell och lagras endast i ärendetillståndet, aldrig som en anteckning – den skickas aldrig till kunden på egen hand.",
         "drafts": "Genererad av modellen från ärendet hittills. Varje utkast är sitt eget register — ingenting skickas automatiskt; du måste öppna den och uttryckligen skicka eller kassera den."
@@ -482,7 +492,8 @@
       "customerEmail": "E-post",
       "customerFirstName": "Förnamn",
       "customerLastName": "Efternamn",
-      "customerLoginConflict": "Denna inloggning finns redan. Välj en annan inloggning eller tilldela den befintliga kunden via sök istället."
+      "customerLoginConflict": "Denna inloggning finns redan. Välj en annan inloggning eller tilldela den befintliga kunden via sök istället.",
+      "clearCustomer": "Ta bort kund"
     },
     "inlineAttachments": "Inbäddade bilder ({{count}})",
     "list": {
@@ -504,7 +515,35 @@
     "draftEditedAt": "redigerat {{time}}",
     "draftDiscard": "Ta bort utkast",
     "draftDiscardConfirm": "Ta bort detta oskickade svar? Texten kan inte återställas.",
-    "draftDiscardConfirmButton": "Ta bort"
+    "draftDiscardConfirmButton": "Ta bort",
+    "type": "Typ",
+    "service": "Tjänst",
+    "sla": "SLA",
+    "mentions": "Omnämnanden",
+    "timeAccounting": "Tidredovisning",
+    "timeUnits": "Tidsenheter",
+    "addTime": "Boka tid",
+    "addMention": "Nämn handläggare",
+    "mentionsCount": "Omnämnanden: {{n}}",
+    "mentionsEmpty": "Ingen omnämnd",
+    "mentionRemove": "Ta bort omnämnande",
+    "mentionSuggestions": "Handläggare",
+    "timeUnitAbbrev": "min",
+    "timeUnitHoursAbbrev": "tim",
+    "timeUnitsShort": "{{units}} min",
+    "timeAccountingTotal": "Bokförd tid: {{units}} min",
+    "timeRemove": "Ta bort bokning",
+    "timeUnitMode": "Tidsenhet",
+    "timeUnitMin": "Min",
+    "timeUnitHours": "Tim",
+    "timePresets": "Snabbval",
+    "timeComposerHint": "Boka i sidfoten när du svarar.",
+    "timeChipHint": "Bokas vid sändning",
+    "extrasFailedMentions": "Skickat — omnämnandet sparades inte.",
+    "extrasFailedTime": "Skickat — tiden bokades inte.",
+    "extrasFailedBoth": "Skickat — varken omnämnande eller tidsbokning sparades.",
+    "extrasRetry": "Försök igen",
+    "customerUnresolved": "Ingen kundpost matchar adressen, så kunduppgifter saknas."
   },
   "search": {
     "title": "Sök",
@@ -1143,7 +1182,8 @@
       },
       "acl": {
         "match": "Villkor under vilka den här ACL:n gäller (t.ex. aktuell kö, status, formulärfält). Ändringen till höger tillämpas bara när alla listade kriterier matchar.",
-        "change": "ACL:ns effekt när villkoren matchar — typiskt begränsar eller tvingar den valen i formulär (t.ex. bara vissa uppföljningsstatusar tillåtna)."
+        "change": "ACL:ns effekt när villkoren matchar — typiskt begränsar eller tvingar den valen i formulär (t.ex. bara vissa uppföljningsstatusar tillåtna).",
+        "stopAfterMatch": "Om ikryssad utvärderas inga fler ACL efter en produktiv träff (Znuny StopAfterMatch)."
       },
       "mailOutbound": {
         "host": "SMTP-serverns värdnamn för utgående e-post. Måste vara nåbar från den här servern (DNS + brandvägg) på porten nedan.",
@@ -1190,8 +1230,8 @@
         "validId": "\"Temp\" (valid_id 3) är Znunys tredje giltighetsstatus — typiskt ett konto som väntar på bekräftelse (t.ex. obekräftad självregistrering), skilt från vanlig giltig/ogiltig."
       },
       "systemAddresses": {
-        "email": "Address used as the From email for queues and auto-responses.",
-        "name": "Display name shown next to the email (e.g. “Support <support@example.com>”)."
+        "email": "Adress som används som From för köer och autosvar.",
+        "name": "Visningsnamn bredvid e-postadressen (t.ex. ”Support <support@example.com>”)."
       }
     },
     "nav": {
@@ -1240,7 +1280,13 @@
       "aiAcl": "Åtkomst och gränser",
       "collapse": "Fäll ihop navigering",
       "mailAccounts": "Mailkonton",
-      "oauth2Tokens": "OAuth2-tokens (e-post)"
+      "oauth2Tokens": "OAuth2-tokens (e-post)",
+      "types": "Ärendetyper",
+      "services": "Tjänster",
+      "slas": "SLA",
+      "systemAddresses": "Systemadresser",
+      "notificationEvents": "Aviserings­händelser",
+      "ticketAttributeRelations": "Attribut­relationer"
     },
     "table": {
       "id": "ID",
@@ -1347,7 +1393,44 @@
       "title": "Titel",
       "firstName": "Förnamn",
       "lastName": "Efternamn",
-      "name": "Namn"
+      "name": "Namn",
+      "passwordMode": "Lösenordstilldelning",
+      "passwordModeManual": "Ange manuellt",
+      "passwordModeAuto": "Inbjudan: skicka länk via e-post",
+      "passwordModeAutoHelp": "Vid sparning skickas en engångslänk till e-postadressen nedan. Handläggaren väljer lösenord själv.",
+      "email": "E-post",
+      "mobile": "Mobiltelefon",
+      "effectivePermissions": "Visa effektiva behörigheter",
+      "effectivePermissionsTitle": "Effektiva behörigheter för {{name}}",
+      "effectivePermissionsDescription": "Sammanslagna rättigheter från direkta grupper och roller.",
+      "rolesHeading": "Roller",
+      "groupsHeading": "Grupprättigheter",
+      "queuesHeading": "Köer",
+      "noRoles": "Inga roller tilldelade.",
+      "noGroups": "Inga grupprättigheter.",
+      "noQueues": "Inga tilldelade köer.",
+      "viaDirect": "Direkt",
+      "permissionColumn": "Behörigheter",
+      "sourceColumn": "Källa",
+      "editSettings": "Redigera personliga inställningar",
+      "editSettingsTitle": "Personliga inställningar för {{name}}",
+      "editSettingsDescription": "Samma inställningar som handläggaren ser under ”Personliga inställningar”.",
+      "languageLabel": "Språk",
+      "languageSaved": "Språk sparat.",
+      "tabAccount": "Konto",
+      "tabPerson": "Person",
+      "sourceInvalidHint": "Denna behörighet kommer från en ogiltig roll och har därför ingen effekt.",
+      "keyInactiveHint": "Behörigheten är konfigurerad men gäller inte — källan eller gruppen är ogiltig.",
+      "deletePermanent": "Ta bort permanent",
+      "deleteTitle": "Ta bort {{name}} permanent?",
+      "deleteConfirm": "Ta bort permanent",
+      "deletableBody": "Inget refererar {{name}}; kontot kan tas bort helt med inställningar, grupper, roller och 2FA.",
+      "deleteIrreversible": "Detta går inte att ångra.",
+      "deleteBlockedBody": "{{name}} kan inte tas bort — dessa tabeller refererar fortfarande kontot:",
+      "deleteBlockedHint": "Sätt kontot till ”Ogiltig” så att ärenden, artiklar och historik förblir hänförbara.",
+      "resendSetupLink": "Skicka installationslänk igen",
+      "setupLinkSent": "Installationslänk skickad.",
+      "setupLinkFailed": "Kunde inte skicka installationslänk."
     },
     "groups": {
       "title_plural": "Grupper",
@@ -1458,7 +1541,7 @@
       "groups": {
         "ticket": "Ärende",
         "customer": "Kund",
-        "agent": "Agent",
+        "agent": "Handläggare",
         "queue": "Kö"
       },
       "items": {
@@ -1561,7 +1644,10 @@
       "name": "Namn",
       "description": "Beskrivning",
       "match": "Matchning",
-      "change": "Ändring"
+      "change": "Ändring",
+      "new": "Ny ACL",
+      "stopAfterMatch": "Stoppa efter träff",
+      "confirmDelete": "Ta bort ACL ”{{name}}”? Detta går inte att ångra."
     },
     "genericAgentJobs": {
       "title_plural": "GenericAgent-jobb",
@@ -2222,7 +2308,13 @@
       "aiAudit": "Full revision av varje LLM-begäran/svar, med PII-avslöjande.",
       "aiAcl": "AI-behörigheter och kvoter per grupp, roll eller agent.",
       "mailAccounts": "Inkommande IMAP/POP-postlådor (lösenord eller OAuth2).",
-      "oauth2Tokens": "OAuth2-tokenkonfigurationer för Microsoft/Google-e-post (Znuny-kompatibel)."
+      "oauth2Tokens": "OAuth2-tokenkonfigurationer för Microsoft/Google-e-post (Znuny-kompatibel).",
+      "types": "Hantera ärendetyper som används för klassificering.",
+      "services": "Hantera tjänster och koppla dem till SLA.",
+      "slas": "Hantera servicenivåavtal och tider.",
+      "systemAddresses": "E-postadresser som From för köer och autosvar.",
+      "notificationEvents": "Konfigurera händelsestyrda aviseringar till handläggare.",
+      "ticketAttributeRelations": "Znuny-kompatibla beroendematriser (tjänst/kö m.m.) i CSV."
     },
     "mailAccounts": {
       "title_plural": "Mailkonton",
@@ -2270,11 +2362,50 @@
       "refreshSuccess": "Token uppdaterad."
     },
     "systemAddresses": {
-      "title_plural": "System addresses",
-      "subtitle": "From-addresses for queues and auto-responses. Invalid addresses stay listed so they can be re-enabled.",
-      "new": "Add address",
-      "email": "Email",
-      "name": "Name"
+      "title_plural": "Systemadresser",
+      "subtitle": "From-adresser för köer och autosvar. Ogiltiga står kvar i listan så de kan aktiveras igen.",
+      "new": "Lägg till adress",
+      "email": "E-post",
+      "name": "Namn"
+    },
+    "types": {
+      "title_plural": "Ärendetyper",
+      "new": "Ny typ",
+      "name": "Namn"
+    },
+    "services": {
+      "title_plural": "Tjänster",
+      "new": "Ny tjänst",
+      "name": "Namn",
+      "slaCount": "SLA"
+    },
+    "slas": {
+      "title_plural": "SLA",
+      "new": "Nytt SLA",
+      "name": "Namn",
+      "firstResponseTime": "Första svar (min)",
+      "updateTime": "Uppdatering (min)",
+      "solutionTime": "Lösning (min)",
+      "calendar": "Kalender"
+    },
+    "notificationEvents": {
+      "title_plural": "Aviserings­händelser",
+      "subtitle": "När händelser inträffar skickas matchande aviseringar till handläggare.",
+      "new": "Skapa avisering",
+      "name": "Namn",
+      "event": "Händelse",
+      "subject": "Ämne",
+      "body": "Brödtext"
+    },
+    "tar": {
+      "title": "Ärendeattributrelationer",
+      "filename": "Filnamn",
+      "attributes": "Attribut",
+      "priority": "Prioritet",
+      "csv": "CSV-data",
+      "new": "Ny relation",
+      "help": "CSV med rubrik Attribute1;Attribute2 och värdepar (Znuny AdminTicketAttributeRelations). Begränsar formulärval (t.ex. Tjänst → Kö).",
+      "confirmDelete": "Ta bort den här relationen?"
     }
   },
   "kb": {
@@ -2489,7 +2620,8 @@
       "startButton": "Starta processen",
       "actions": "Tillgängliga åtgärder",
       "loadError": "Det gick inte att ladda processtillstånd.",
-      "noDialogs": "Inga tillgängliga åtgärder vid denna aktivitet."
+      "noDialogs": "Inga tillgängliga åtgärder vid denna aktivitet.",
+      "noCustomerDialogs": "Inga kunddialoger tillgängliga i det här steget."
     },
     "start": {
       "title": "Starta processen",
@@ -2525,5 +2657,84 @@
     "body": "Kropp",
     "editTitle": "Redigera \"{{name}}\"",
     "saveError": "Det gick inte att spara mallen."
+  },
+  "views": {
+    "mine": "Mina ärenden",
+    "responsible": "Ansvarig",
+    "locked": "Låsta ärenden",
+    "watched": "Bevakade ärenden",
+    "escalated": "Eskalerade ärenden",
+    "service": "Per tjänst",
+    "serviceHint": "Lista ärenden kopplade till en tjänst.",
+    "pickService": "Välj en tjänst…"
+  },
+  "customerCentre": {
+    "title": "Kundinformation",
+    "open": "Kundinfo",
+    "invalid": "Ogiltig kundinloggning.",
+    "loadError": "Kunden kunde inte läsas in.",
+    "email": "E-post",
+    "phone": "Telefon",
+    "customerId": "Kundnummer",
+    "company": "Företag",
+    "openCount": "{{count}} öppna",
+    "closedCount": "{{count}} stängda",
+    "allTickets": "Alla ärenden →",
+    "recentTickets": "Senaste ärenden"
+  },
+  "timeAccounting": {
+    "title": "Tidredovisning",
+    "hint": "Bokförda tidsenheter på ärenden du har åtkomst till.",
+    "filterUser": "Handläggare",
+    "allUsers": "Alla handläggare",
+    "filterFrom": "Från",
+    "filterTo": "Till",
+    "filterTicket": "Ärende-ID",
+    "empty": "Inga tidposter matchar.",
+    "colWhen": "När",
+    "colTicket": "Ärende",
+    "colUser": "Handläggare",
+    "colUnits": "Enheter",
+    "presetsLabel": "Period",
+    "presets": {
+      "today": "I dag",
+      "yesterday": "I går",
+      "thisWeek": "Denna vecka",
+      "lastWeek": "Förra veckan",
+      "thisMonth": "Denna månad",
+      "lastMonth": "Förra månaden",
+      "thisQuarter": "Detta kvartal",
+      "lastQuarter": "Förra kvartalet",
+      "thisYear": "I år",
+      "lastYear": "Förra året"
+    },
+    "kpiUnits": "Tidsenheter",
+    "kpiEntries": "Bokningar",
+    "kpiTickets": "Ärenden",
+    "kpiAgents": "Handläggare",
+    "rangeBetween": "{{from}} – {{to}}",
+    "rangeFrom": "från {{from}}",
+    "rangeTo": "till {{to}}",
+    "chartTitle": "Enheter per dag",
+    "chartBar": "{{date}}: {{units}} enheter",
+    "dayUnknown": "Inget datum",
+    "emptyHint": "Utöka perioden eller rensa agent- och ärendefilter.",
+    "clearFilters": "Rensa filter",
+    "pageRange": "{{from}}–{{to}}",
+    "pageScope": "på den här sidan",
+    "chartPeak": "topp {{units}}"
+  },
+  "setPassword": {
+    "subtitle": "Välj ett lösenord för ditt konto.",
+    "password": "Nytt lösenord",
+    "confirm": "Upprepa lösenord",
+    "lengthHint": "Mellan {{min}} och {{max}} tecken.",
+    "mismatch": "Lösenorden stämmer inte överens.",
+    "submit": "Ange lösenord",
+    "saving": "Sparar…",
+    "done": "Lösenord sparat. Du kan logga in nu.",
+    "invalid": "Den här länken är inte längre giltig.",
+    "invalidHint": "Installationslänkar gäller i 7 dagar och kan användas en gång. Be din administration om en ny.",
+    "toLogin": "Gå till inloggning"
   }
 }

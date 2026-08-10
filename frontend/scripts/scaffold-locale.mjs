@@ -9,7 +9,7 @@
  * After scaffolding:
  *   1. Mark the locale `translated: true` in src/i18n/locales.ts
  *   2. Add an eager import or localeLoaders entry in src/i18n/index.ts
- *   3. Translate the strings (or run MT + review)
+ *   3. Translate all strings by hand (no machine-translation pipeline)
  *   4. Run: node scripts/check-i18n-keys.mjs
  */
 import { copyFileSync, existsSync, readFileSync, writeFileSync } from "node:fs";

@@ -33,7 +33,7 @@
     "admin": "Admin",
     "theme": "Téma",
     "language": "Jazyk",
-    "dashboard": "Dashboard",
+    "dashboard": "Prehľad",
     "queues": "Fronty",
     "kb": "Znalostná báza"
   },
@@ -55,7 +55,12 @@
     "showActiveQueues": "Zobraziť aktívne",
     "queueSearch": "Filtrovať fronty…",
     "noQueueMatch": "Žiadne porady sa nezhodujú.",
-    "templates": "Šablóny"
+    "templates": "Šablóny",
+    "locked": "Uzamknuté",
+    "responsible": "Zodpovedný",
+    "escalated": "Eskalované",
+    "services": "Služby",
+    "timeAccounting": "Evidencia času"
   },
   "common": {
     "prev": "Predchádzajúce",
@@ -68,7 +73,10 @@
     "cancel": "Zrušiť",
     "help": "Pomoc",
     "edit": "Upraviť",
-    "save": "Uložiť"
+    "save": "Uložiť",
+    "saved": "Uložené",
+    "delete": "Odstrániť",
+    "submit": "Odoslať"
   },
   "otp": {
     "verifying": "Overuje sa…",
@@ -171,7 +179,9 @@
     "toPickUpEmpty": "Žiadne nové lístky na vyzdvihnutie.",
     "remindersDue": "Pripomenutia splatné",
     "remindersDueEmpty": "Žiadne splatné pripomienky.",
-    "queueShortcutsEmpty": "Momentálne žiadne rady s otvorenými alebo novými lístkami."
+    "queueShortcutsEmpty": "Momentálne žiadne rady s otvorenými alebo novými lístkami.",
+    "lastViews": "Nedávno zobrazené",
+    "lastViewsUntitled": "(bez predmetu)"
   },
   "queue": {
     "sidebar": "Fronty",
@@ -179,7 +189,7 @@
     "empty": "Nie sú k dispozícii žiadne fronty.",
     "openBadge": "{{count}} otvorené",
     "metaLine": "Všetky fronty · zoradené podľa naliehavosti",
-    "exportCsv": "Export CSV",
+    "exportCsv": "Exportovať CSV",
     "newCount": "{{count}} nové",
     "customerFilter": "Zákazník: {{customerId}}",
     "clearCustomerFilter": "Vymazať zákaznícky filter",
@@ -350,7 +360,7 @@
     "replyReplyTo": "Odpovedať",
     "recipientAddHint": "Meno <address@example.com>",
     "recipientName": "Meno",
-    "recipientEmail": "Email",
+    "recipientEmail": "E-mail",
     "recipientRemove": "Odstrániť",
     "recipientConfirm": "OK",
     "replyToRequired": "Vyžaduje sa aspoň jeden príjemca.",
@@ -370,7 +380,7 @@
     "splitQueue": "Cieľový rad",
     "splitNewTitle": "Nový názov lístka (voliteľné)",
     "ai": {
-      "title": "AI Assist",
+      "title": "AI asistencia",
       "help": {
         "summary": "Vygenerované z článkov lístka podľa nakonfigurovaného modelu frontu a uložené iba v stave lístka, nikdy nie ako poznámka – nikdy sa neodošle zákazníkovi samostatne.",
         "drafts": "Doteraz vygenerované modelom z tiketu. Každý koncept je vlastným záznamom – nič sa neposiela automaticky; musíte ho otvoriť a výslovne odoslať alebo zlikvidovať."
@@ -447,12 +457,12 @@
       "note": "Poznámka",
       "phoneInbound": "Telefón (in)",
       "phoneOutbound": "Telefón (von)",
-      "email": "Email",
+      "email": "E-mail",
       "pending": "Čaká na spracovanie",
       "watch": "Sledujte",
       "unwatch": "Prestať pozerať",
       "close": "Zavrieť",
-      "misc": "Misc",
+      "misc": "Rôzne",
       "lock": "Zamknúť",
       "unlock": "Odomknúť",
       "fields": "Voľné polia",
@@ -479,10 +489,11 @@
       "back": "Späť",
       "newCustomer": "Vytvorte nového zákazníka",
       "customerLogin": "Prihláste sa",
-      "customerEmail": "Email",
+      "customerEmail": "E-mail",
       "customerFirstName": "Krstné meno",
       "customerLastName": "Priezvisko",
-      "customerLoginConflict": "Toto prihlásenie už existuje. Vyberte iné prihlasovacie meno alebo namiesto toho priraďte existujúceho zákazníka pomocou vyhľadávania."
+      "customerLoginConflict": "Toto prihlásenie už existuje. Vyberte iné prihlasovacie meno alebo namiesto toho priraďte existujúceho zákazníka pomocou vyhľadávania.",
+      "clearCustomer": "Odstrániť zákazníka"
     },
     "inlineAttachments": "Vložené obrázky ({{count}})",
     "list": {
@@ -504,7 +515,35 @@
     "draftEditedAt": "upravené {{time}}",
     "draftDiscard": "Zahodiť koncept",
     "draftDiscardConfirm": "Zahodiť túto neodoslanú odpoveď? Text nie je možné obnoviť.",
-    "draftDiscardConfirmButton": "Zahodiť"
+    "draftDiscardConfirmButton": "Zahodiť",
+    "type": "Typ",
+    "service": "Služba",
+    "sla": "SLA",
+    "mentions": "Zmienky",
+    "timeAccounting": "Evidencia času",
+    "timeUnits": "Časové jednotky",
+    "addTime": "Zaznamenať čas",
+    "addMention": "Spomenúť agenta",
+    "mentionsCount": "Zmienky: {{n}}",
+    "mentionsEmpty": "Nikto nespomenutý",
+    "mentionRemove": "Odstrániť zmienku",
+    "mentionSuggestions": "Agenti",
+    "timeUnitAbbrev": "min",
+    "timeUnitHoursAbbrev": "h",
+    "timeUnitsShort": "{{units}} min",
+    "timeAccountingTotal": "Zaznamenaný čas: {{units}} min",
+    "timeRemove": "Odstrániť záznam",
+    "timeUnitMode": "Časová jednotka",
+    "timeUnitMin": "Min",
+    "timeUnitHours": "H",
+    "timePresets": "Rýchly výber",
+    "timeComposerHint": "Pri odpovedi zaznamenajte v päte editora.",
+    "timeChipHint": "Zaznamená sa pri odoslaní",
+    "extrasFailedMentions": "Odoslané — zmienka nebola uložená.",
+    "extrasFailedTime": "Odoslané — čas nebol zaznamenaný.",
+    "extrasFailedBoth": "Odoslané — neuložila sa ani zmienka, ani záznam času.",
+    "extrasRetry": "Skúsiť znova",
+    "customerUnresolved": "K tejto adrese neexistuje zákaznícky záznam, detaily nie sú k dispozícii."
   },
   "search": {
     "title": "Hľadať",
@@ -737,7 +776,7 @@
         "subjectType": {
           "label": "Typ predmetu",
           "group": "Skupina",
-          "role": "Role",
+          "role": "Rola",
           "user": "Používateľ"
         },
         "subjectId": "ID subjektu",
@@ -946,7 +985,7 @@
           "requests": "Žiadosti",
           "tokens": "Celkom tokenov",
           "errorRate": "Chybovosť",
-          "topModel": "Top model",
+          "topModel": "Najpoužívanejší model",
           "cost": "náklady",
           "costUnavailable": "Žiadne nakonfigurované ceny ani zmiešané meny"
         },
@@ -990,7 +1029,7 @@
         "retentionSave": "Uložiť",
         "retentionCancel": "Zrušiť",
         "piiKind": {
-          "EMAIL": "email",
+          "EMAIL": "e-mail",
           "MAC": "MAC adresu",
           "IPV4": "IP adresa",
           "IPV6": "IP adresa",
@@ -1051,7 +1090,7 @@
         "title": "Tester pravidiel",
         "toolPlaceholder": "Názov nástroja, napr. netadmin:diagnose_connection",
         "samplePlaceholder": "Vzorový výsledok nástroja ako JSON, napr. {\"lock_code\": \"COPYR\"}",
-        "run": "Test",
+        "run": "Testovať",
         "invalid": "Pravidlá sú neplatné",
         "hit": "Hit — eskalácia",
         "noHit": "Žiadny zásah",
@@ -1143,7 +1182,8 @@
       },
       "acl": {
         "match": "Podmienky, za ktorých platí tento zoznam prístupových práv (napr. aktuálny rad, stav, pole formulára). Zmena na pravej strane sa použije len vtedy, keď sa zhoduje každé tu uvedené kritérium.",
-        "change": "Účinok zoznamu prístupových práv, keď sa jeho podmienky zhodujú – zvyčajne obmedzuje alebo vynucuje voľby dostupné vo formulároch (napr. povolené sú len určité následné stavy)."
+        "change": "Účinok zoznamu prístupových práv, keď sa jeho podmienky zhodujú – zvyčajne obmedzuje alebo vynucuje voľby dostupné vo formulároch (napr. povolené sú len určité následné stavy).",
+        "stopAfterMatch": "Ak je začiarknuté, po produktívnej zhode sa ďalšie ACL nevyhodnocujú (Znuny StopAfterMatch)."
       },
       "mailOutbound": {
         "host": "Názov hostiteľa servera SMTP pre odchádzajúcu poštu. Musí byť dostupný z tohto servera (DNS + firewall) na porte nižšie.",
@@ -1190,8 +1230,8 @@
         "validId": "„Temp“ (valid_id 3) je tretí stav platnosti Znuny – zvyčajne účet čakajúci na potvrdenie (napr. nepotvrdená samoregistrácia), odlišný od obyčajného platného/neplatného."
       },
       "systemAddresses": {
-        "email": "Address used as the From email for queues and auto-responses.",
-        "name": "Display name shown next to the email (e.g. “Support <support@example.com>”)."
+        "email": "Adresa používaná ako From pre fronty a auto-odpovede.",
+        "name": "Zobrazované meno vedľa e-mailu (napr. „Support <support@example.com>“)."
       }
     },
     "nav": {
@@ -1240,7 +1280,13 @@
       "aiAcl": "Prístup a limity",
       "collapse": "Zbaliť navigáciu",
       "mailAccounts": "Poštové účty",
-      "oauth2Tokens": "Tokeny OAuth2 (pošta)"
+      "oauth2Tokens": "Tokeny OAuth2 (pošta)",
+      "types": "Typy ticketov",
+      "services": "Služby",
+      "slas": "SLA",
+      "systemAddresses": "Systémové adresy",
+      "notificationEvents": "Notifikačné udalosti",
+      "ticketAttributeRelations": "Vzťahy atribútov"
     },
     "table": {
       "id": "ID",
@@ -1312,7 +1358,7 @@
     "roleGroupAssignments": {
       "title": "Skupiny rolí",
       "subtitle": "Vyberte rolu a nastavte, ktorým skupinám udeľuje prístup.",
-      "role": "Role",
+      "role": "Rola",
       "selectRole": "Vyberte rolu…",
       "empty": "Vyberte rolu vyššie a upravte jej skupiny.",
       "groups": "skupiny",
@@ -1347,7 +1393,44 @@
       "title": "Názov",
       "firstName": "Krstné meno",
       "lastName": "Priezvisko",
-      "name": "Meno"
+      "name": "Meno",
+      "passwordMode": "Pridelenie hesla",
+      "passwordModeManual": "Nastaviť ručne",
+      "passwordModeAuto": "Pozvať: odoslať odkaz e-mailom",
+      "passwordModeAutoHelp": "Pri uložení odíde jednorazový odkaz na e-mail nižšie. Agent si heslo zvolí sám.",
+      "email": "E-mail",
+      "mobile": "Mobilný telefón",
+      "effectivePermissions": "Zobraziť efektívne oprávnenia",
+      "effectivePermissionsTitle": "Efektívne oprávnenia pre {{name}}",
+      "effectivePermissionsDescription": "Zlúčené oprávnenia z priamych skupín a rolí.",
+      "rolesHeading": "Roly",
+      "groupsHeading": "Oprávnenia skupín",
+      "queuesHeading": "Fronty",
+      "noRoles": "Žiadne roly priradené.",
+      "noGroups": "Žiadne oprávnenia skupín.",
+      "noQueues": "Žiadne priradené fronty.",
+      "viaDirect": "Priamo",
+      "permissionColumn": "Oprávnenia",
+      "sourceColumn": "Zdroj",
+      "editSettings": "Upraviť osobné nastavenia",
+      "editSettingsTitle": "Osobné nastavenia: {{name}}",
+      "editSettingsDescription": "Rovnaké nastavenia, ktoré agent vidí v «Osobných nastaveniach».",
+      "languageLabel": "Jazyk",
+      "languageSaved": "Jazyk uložený.",
+      "tabAccount": "Účet",
+      "tabPerson": "Osoba",
+      "sourceInvalidHint": "Toto oprávnenie pochádza z neplatnej roly, a preto nefunguje.",
+      "keyInactiveHint": "Toto oprávnenie je nastavené, ale neplatí — zdroj alebo skupina je neplatná.",
+      "deletePermanent": "Odstrániť natrvalo",
+      "deleteTitle": "Odstrániť {{name}} natrvalo?",
+      "deleteConfirm": "Odstrániť natrvalo",
+      "deletableBody": "Na {{name}} nič neodkazuje; účet možno odstrániť úplne vrátane nastavení, skupín, rolí a 2FA.",
+      "deleteIrreversible": "Túto akciu nemožno vrátiť.",
+      "deleteBlockedBody": "{{name}} nemožno odstrániť — tieto tabuľky na účet stále odkazujú:",
+      "deleteBlockedHint": "Nastavte účet na «Neplatný», aby tickety, články a história zostali priraditeľné.",
+      "resendSetupLink": "Znova odoslať odkaz na nastavenie",
+      "setupLinkSent": "Odkaz na nastavenie odoslaný.",
+      "setupLinkFailed": "Odkaz na nastavenie sa nepodarilo odoslať."
     },
     "groups": {
       "title_plural": "skupiny",
@@ -1404,7 +1487,7 @@
       "title_plural": "Používatelia zákazníkov",
       "new": "Nový užívateľ zákazníka",
       "login": "Prihláste sa",
-      "email": "Email",
+      "email": "E-mail",
       "customerId": "ID zákazníka",
       "firstName": "Krstné meno",
       "lastName": "Priezvisko",
@@ -1561,7 +1644,10 @@
       "name": "Meno",
       "description": "Popis",
       "match": "Zápas",
-      "change": "Zmeniť"
+      "change": "Zmeniť",
+      "new": "Nová ACL",
+      "stopAfterMatch": "Zastaviť po zhode",
+      "confirmDelete": "Odstrániť ACL „{{name}}“? Túto akciu nemožno vrátiť."
     },
     "genericAgentJobs": {
       "title_plural": "Všeobecné úlohy agentov",
@@ -2135,13 +2221,13 @@
       "confirmTypePrompt": "Zadajte „{{word}}“ na potvrdenie:",
       "confirmSubmit": "Utekaj teraz",
       "runSuccess": "Úloha začala úspešne.",
-      "runSuccessDetail": "Job #{{id}} · status: {{status}} · {{count}} login(s).",
+      "runSuccessDetail": "Úloha #{{id}} · stav: {{status}} · {{count}} prihlásení.",
       "viewJobs": "Zobraziť úlohy",
       "jobsEmpty": "Zatiaľ žiadne pracovné miesta GDPR.",
       "jobDetail": "Úloha #{{id}} — selektor",
       "col": {
         "login": "Prihláste sa",
-        "email": "Email",
+        "email": "E-mail",
         "customerId": "customer_id",
         "mode": "Režim",
         "status": "Stav",
@@ -2222,7 +2308,13 @@
       "aiAudit": "Úplný audit každej požiadavky/odpovede LLM s odhalením PII.",
       "aiAcl": "Povolenia a kvóty AI na skupinu, rolu alebo agenta.",
       "mailAccounts": "Prichádzajúce poštové schránky IMAP/POP (heslo alebo OAuth2).",
-      "oauth2Tokens": "Konfigurácie tokenov OAuth2 pre poštu Microsoft/Google (kompatibilné so Znuny)."
+      "oauth2Tokens": "Konfigurácie tokenov OAuth2 pre poštu Microsoft/Google (kompatibilné so Znuny).",
+      "types": "Spravujte typy ticketov na klasifikáciu.",
+      "services": "Spravujte služby a prepojte ich so SLA.",
+      "slas": "Spravujte dohody o úrovni služieb a lehoty.",
+      "systemAddresses": "E-mailové adresy používané ako From pre fronty a auto-odpovede.",
+      "notificationEvents": "Konfigurujte notifikácie agentov riadené udalosťami.",
+      "ticketAttributeRelations": "Matice závislostí kompatibilné so Znuny (služba/fronta atď.) vo formáte CSV."
     },
     "mailAccounts": {
       "title_plural": "Poštové účty",
@@ -2270,11 +2362,50 @@
       "refreshSuccess": "Token bol obnovený."
     },
     "systemAddresses": {
-      "title_plural": "System addresses",
-      "subtitle": "From-addresses for queues and auto-responses. Invalid addresses stay listed so they can be re-enabled.",
-      "new": "Add address",
-      "email": "Email",
-      "name": "Name"
+      "title_plural": "Systémové adresy",
+      "subtitle": "Adresy From pre fronty a auto-odpovede. Neplatné zostávajú v zozname na opätovné zapnutie.",
+      "new": "Pridať adresu",
+      "email": "E-mail",
+      "name": "Názov"
+    },
+    "types": {
+      "title_plural": "Typy ticketov",
+      "new": "Nový typ",
+      "name": "Názov"
+    },
+    "services": {
+      "title_plural": "Služby",
+      "new": "Nová služba",
+      "name": "Názov",
+      "slaCount": "SLA"
+    },
+    "slas": {
+      "title_plural": "SLA",
+      "new": "Nové SLA",
+      "name": "Názov",
+      "firstResponseTime": "Prvá reakcia (min)",
+      "updateTime": "Aktualizácia (min)",
+      "solutionTime": "Riešenie (min)",
+      "calendar": "Kalendár"
+    },
+    "notificationEvents": {
+      "title_plural": "Notifikačné udalosti",
+      "subtitle": "Pri udalostiach sa agentom odosielajú zodpovedajúce notifikácie.",
+      "new": "Vytvoriť notifikáciu",
+      "name": "Názov",
+      "event": "Udalosť",
+      "subject": "Predmet",
+      "body": "Telo"
+    },
+    "tar": {
+      "title": "Vzťahy atribútov ticketov",
+      "filename": "Názov súboru",
+      "attributes": "Atribúty",
+      "priority": "Priorita",
+      "csv": "Dáta CSV",
+      "new": "Nový vzťah",
+      "help": "CSV s hlavičkou Attribute1;Attribute2 a pármi hodnôt (Znuny AdminTicketAttributeRelations). Obmedzuje výbery vo formulároch (napr. Služba → Fronta).",
+      "confirmDelete": "Odstrániť tento vzťah?"
     }
   },
   "kb": {
@@ -2375,7 +2506,7 @@
     "title": "Správy",
     "subtitle": "Objem lístkov, nevybavené veci, SLA a pracovné zaťaženie vo vašich frontoch.",
     "empty": "Žiadne údaje pre aktuálne filtre.",
-    "exportCsv": "Export CSV",
+    "exportCsv": "Exportovať CSV",
     "filters": {
       "queue": "Fronta",
       "dateFrom": "Od",
@@ -2489,7 +2620,8 @@
       "startButton": "Spustiť proces",
       "actions": "Dostupné akcie",
       "loadError": "Stav procesu sa nepodarilo načítať.",
-      "noDialogs": "Pri tejto aktivite nie sú dostupné žiadne akcie."
+      "noDialogs": "Pri tejto aktivite nie sú dostupné žiadne akcie.",
+      "noCustomerDialogs": "V tomto kroku nie sú k dispozícii žiadne zákaznícke dialógy."
     },
     "start": {
       "title": "Spustiť proces",
@@ -2525,5 +2657,84 @@
     "body": "Telo",
     "editTitle": "Upraviť „{{name}}“",
     "saveError": "Šablónu sa nepodarilo uložiť."
+  },
+  "views": {
+    "mine": "Moje tickety",
+    "responsible": "Zodpovedný",
+    "locked": "Uzamknuté tickety",
+    "watched": "Sledované tickety",
+    "escalated": "Eskalované tickety",
+    "service": "Podľa služby",
+    "serviceHint": "Zoznam ticketov priradených k službe.",
+    "pickService": "Vyberte službu…"
+  },
+  "customerCentre": {
+    "title": "Informácie o zákazníkovi",
+    "open": "Zákazník",
+    "invalid": "Neplatné prihlásenie zákazníka.",
+    "loadError": "Tohto zákazníka sa nepodarilo načítať.",
+    "email": "E-mail",
+    "phone": "Telefón",
+    "customerId": "Číslo zákazníka",
+    "company": "Spoločnosť",
+    "openCount": "{{count}} otvorených",
+    "closedCount": "{{count}} uzavretých",
+    "allTickets": "Všetky tickety →",
+    "recentTickets": "Nedávne tickety"
+  },
+  "timeAccounting": {
+    "title": "Evidencia času",
+    "hint": "Zaznamenané časové jednotky pri ticketoch, ku ktorým máte prístup.",
+    "filterUser": "Agent",
+    "allUsers": "Všetci agenti",
+    "filterFrom": "Od",
+    "filterTo": "Do",
+    "filterTicket": "ID ticketu",
+    "empty": "Žiadne časové záznamy nevyhovujú.",
+    "colWhen": "Kedy",
+    "colTicket": "Ticket",
+    "colUser": "Agent",
+    "colUnits": "Jednotky",
+    "presetsLabel": "Obdobie",
+    "presets": {
+      "today": "Dnes",
+      "yesterday": "Včera",
+      "thisWeek": "Tento týždeň",
+      "lastWeek": "Minulý týždeň",
+      "thisMonth": "Tento mesiac",
+      "lastMonth": "Minulý mesiac",
+      "thisQuarter": "Tento štvrťrok",
+      "lastQuarter": "Minulý štvrťrok",
+      "thisYear": "Tento rok",
+      "lastYear": "Minulý rok"
+    },
+    "kpiUnits": "Časové jednotky",
+    "kpiEntries": "Záznamy",
+    "kpiTickets": "Tickety",
+    "kpiAgents": "Agenti",
+    "rangeBetween": "{{from}} – {{to}}",
+    "rangeFrom": "od {{from}}",
+    "rangeTo": "do {{to}}",
+    "chartTitle": "Jednotky za deň",
+    "chartBar": "{{date}}: {{units}} jednotiek",
+    "dayUnknown": "Bez dátumu",
+    "emptyHint": "Rozšírte obdobie alebo zrušte filtre agenta a ticketu.",
+    "clearFilters": "Zrušiť filtre",
+    "pageRange": "{{from}}–{{to}}",
+    "pageScope": "na tejto stránke",
+    "chartPeak": "vrchol {{units}}"
+  },
+  "setPassword": {
+    "subtitle": "Zvoľte heslo pre svoj účet.",
+    "password": "Nové heslo",
+    "confirm": "Zopakovať heslo",
+    "lengthHint": "Medzi {{min}} a {{max}} znakmi.",
+    "mismatch": "Heslá sa nezhodujú.",
+    "submit": "Nastaviť heslo",
+    "saving": "Ukladanie…",
+    "done": "Heslo uložené. Teraz sa môžete prihlásiť.",
+    "invalid": "Tento odkaz už nie je platný.",
+    "invalidHint": "Odkazy na nastavenie platia 7 dní a dajú sa použiť raz. Požiadajte administráciu o nový.",
+    "toLogin": "Prejsť na prihlásenie"
   }
 }
