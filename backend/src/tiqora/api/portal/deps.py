@@ -16,6 +16,7 @@ from tiqora.domain.customer_auth import (
     CustomerAuthService,
     CustomerSessionStore,
 )
+from tiqora.domain.portal_gate import portal_enabled
 from tiqora.domain.portal_ticket_service import PortalTicketService
 from tiqora.znuny.sysconfig import SysConfig
 
@@ -71,6 +72,16 @@ async def get_portal_ticket_service(
 CurrentCustomer = Annotated[AuthenticatedCustomer, Depends(get_current_customer)]
 PortalService = Annotated[PortalTicketService, Depends(get_portal_ticket_service)]
 
+
+async def require_portal_enabled(session: DbSession, settings: AppSettings) -> None:
+    """Router dependency: hide the whole portal API while the portal is off.
+
+    404 rather than 403 — a disabled portal does not advertise its existence.
+    """
+    if not await portal_enabled(session, settings):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not Found")
+
+
 __all__ = [
     "AppSettings",
     "CurrentCustomer",
@@ -80,4 +91,5 @@ __all__ = [
     "get_customer_auth_service",
     "get_customer_session_store",
     "get_portal_ticket_service",
+    "require_portal_enabled",
 ]
