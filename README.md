@@ -321,6 +321,19 @@ make test
 make lint
 ```
 
+### Toggling the customer portal
+
+The customer portal is on by default. There are two ways to turn it off:
+
+- **In the admin UI**, on the *Authentication / 2FA* page → "Customer portal available".
+  Takes effect immediately: `/api/portal/*` starts answering 404, running customer sessions
+  stop working, and `/`, `/portal`, and `/portal/login` all redirect to the agent login.
+- **At deployment level**, with `TIQORA_PORTAL_ENABLED=false`. This is a hard-off that the
+  admin switch cannot override; the UI control is disabled while it's active, and a write
+  attempt against the API returns 409.
+
+Customer records, customer companies, and email tickets are unaffected either way.
+
 ## Tech stack
 
 | Layer | Choice | Rationale |
