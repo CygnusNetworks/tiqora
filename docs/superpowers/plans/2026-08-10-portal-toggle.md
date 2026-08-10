@@ -17,6 +17,7 @@
 - Das Frontend **fails open**: schlägt `/auth/methods` fehl, gilt das Portal als aktiviert. Die Sicherheit hängt am Backend-Gate.
 - **Keine Alembic-Migration.** `tiqora_settings` ist eine bestehende Key/Value-Tabelle.
 - Nach jeder Änderung an einem Pydantic-Request/Response-Modell muss `packages/api-client/openapi.json` regeneriert werden (Task 5), sonst wird die CI mit einem tsc-Fehler im Frontend rot. `packages/api-client/src/schema.d.ts` ist generiert — niemals von Hand editieren.
+- **Ausführungsreihenfolge:** Task 9 läuft direkt nach Task 5, danach 6 → 7 → 8 → 10 → 11. Grund: Task 5 macht den Frontend-Type-Check rot (siehe dort), und erst Task 9 macht ihn wieder grün. Die Tasks 6–8 sind von 9 unabhängig.
 - Jeder neue UI-String muss in **allen 49** Locale-Dateien unter `frontend/src/i18n/locales/` existieren, sonst schlägt `pnpm --filter tiqora-frontend i18n:check` fehl.
 - Backend-Tests laufen mit `cd backend && uv run python -m pytest` (nicht `uv run pytest` — das zieht ein veraltetes Python-3.9-pytest).
 - Kunden-Stammdaten, Kundenverwaltung im Admin und das Znuny-Kundeninterface werden **nicht** angefasst.
@@ -628,7 +629,11 @@ Expected: Treffer in `AuthMethodsOut`, `AuthConfigGlobalOut` und `AuthConfigGlob
 - [ ] **Step 3: Type-check the frontend against the new client**
 
 Run: `npm exec -y pnpm@9 -- --filter tiqora-frontend lint`
-Expected: PASS — das bestehende Frontend nutzt die neuen Felder noch nicht, additive Felder brechen nichts.
+Expected: **FAIL** mit zwei `TS2345` in `AuthConfigPage.tsx:48` und `:86`.
+
+Das ist erwartet und kein Fehler dieser Task. `openapi-typescript` macht Properties mit einem `default` im generierten Response-Typ verpflichtend, obwohl `openapi.json` sie nicht in `required` führt. Die beiden Stellen bauen `AuthConfigGlobalOut`-Objekte und müssen die neuen Felder mitsetzen — das erledigt **Task 9**, der deshalb unmittelbar nach dieser Task ausgeführt wird. Erst danach ist der Type-Check wieder grün.
+
+Als Folge davon sind `portal_enabled` und `portal_locked_by_env` im TS-Typ **non-nullable** — in Task 9 also ohne `??`-Guard verwenden.
 
 - [ ] **Step 4: Commit**
 
@@ -1249,10 +1254,8 @@ In `frontend/src/routes/admin/AuthConfigPage.tsx` direkt hinter dem `enforce_all
               <input
                 type="checkbox"
                 data-testid="auth-config-portal-enabled"
-                // Pydantic defaults make both fields optional in the generated
-                // TS type, so guard rather than render an uncontrolled input.
-                checked={globalDraft.portal_enabled ?? true}
-                disabled={globalDraft.portal_locked_by_env ?? false}
+                checked={globalDraft.portal_enabled}
+                disabled={globalDraft.portal_locked_by_env}
                 onChange={(e) =>
                   setGlobalDraft((prev) =>
                     prev ? { ...prev, portal_enabled: e.target.checked } : prev,
@@ -1268,7 +1271,7 @@ In `frontend/src/routes/admin/AuthConfigPage.tsx` direkt hinter dem `enforce_all
                 {t("admin.help.authConfig.portalEnabled")}
               </HelpPopover>
             </label>
-            {(globalDraft.portal_locked_by_env ?? false) && (
+            {globalDraft.portal_locked_by_env && (
               <p className="text-sm text-muted">
                 {t("admin.authConfig.portalLockedByEnv")}
               </p>
