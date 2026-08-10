@@ -1221,6 +1221,7 @@
       "authConfig": {
         "enforceAll": "Erzwingt Zwei-Faktor-Authentifizierung (TOTP) für alle Agenten-Konten, unabhängig von der Gruppen-Auswahl und den einzelnen Haken pro Agent unten.",
         "enforceGroups": "Erzwingt 2FA zusätzlich für alle Agenten, die Mitglied einer hier markierten Gruppe sind — auch wenn „Für alle erzwingen“ aus ist.",
+        "portalEnabled": "Schaltet das Kundenportal für die gesamte Installation ein oder aus. Ist es aus, antwortet die Portal-API mit 404, laufende Kundensitzungen funktionieren nicht mehr, und die Startseite springt direkt auf den Agenten-Login. Kundendaten und E-Mail-Tickets bleiben unberührt.",
         "sso": "Erlaubt diesem Agenten die Anmeldung über den externen SSO/Identity-Provider-Pfad. Konfiguriert nicht den SSO-Provider selbst, sondern nur, ob dieser Agent ihn nutzen darf.",
         "enforce": "Erzwingt 2FA für dieses einzelne Agenten-Konto, unabhängig von den globalen Einstellungen oben.",
         "reset": "Löscht sowohl die TOTP-Registrierung als auch alle registrierten Passkeys dieses Agenten unwiderruflich. Der Agent muss die Einrichtung danach komplett neu durchlaufen — es gibt keinen weichen Zwischenzustand."
@@ -2223,6 +2224,8 @@
       "globalHeading": "Globale 2FA-Richtlinie",
       "enforceAll": "2FA für alle Agenten erzwingen",
       "enforceGroups": "2FA für Gruppen erzwingen",
+      "portalEnabled": "Kundenportal verfügbar",
+      "portalLockedByEnv": "Durch dieses Deployment abgeschaltet (TIQORA_PORTAL_ENABLED).",
       "noGroups": "Keine gültigen Gruppen gefunden.",
       "saveGlobal": "Globale Richtlinie speichern",
       "globalSaved": "Globale Richtlinie gespeichert.",

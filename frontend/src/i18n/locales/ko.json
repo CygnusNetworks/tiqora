@@ -1157,7 +1157,8 @@
         "enforceGroups": "또한 여기에서 선택한 그룹의 구성원인 모든 에이전트에 대해 2FA를 강제 적용합니다. \"모두 적용\"이 꺼져 있는 경우에도 마찬가지입니다.",
         "sso": "이 에이전트가 외부 SSO/ID 제공자 경로를 통해 인증할 수 있도록 허용합니다. SSO 공급자 자체를 구성하지 않고 이 에이전트가 이를 사용할 수 있는지 여부만 구성합니다.",
         "enforce": "위의 전역 설정과 관계없이 이 개별 에이전트 계정에 대해 2FA를 강제합니다.",
-        "reset": "에이전트의 TOTP 등록과 등록된 모든 암호 키를 모두 영구적으로 삭제합니다. 에이전트는 나중에 처음부터 2FA를 설정해야 합니다. 소프트 중간 상태는 없습니다."
+        "reset": "에이전트의 TOTP 등록과 등록된 모든 암호 키를 모두 영구적으로 삭제합니다. 에이전트는 나중에 처음부터 2FA를 설정해야 합니다. 소프트 중간 상태는 없습니다.",
+        "portalEnabled": "Turns the customer portal on or off for the whole installation. When off, the portal API answers 404, running customer sessions stop working, and the start page goes straight to the agent login. Customer records and email tickets are unaffected."
       },
       "queues": {
         "group": "이 대기열을 보고 작업할 수 있는 사람을 결정합니다. 액세스는 전적으로 그룹을 통해 제어되며 대기열별로 부여되지는 않습니다.",
@@ -2119,7 +2120,9 @@
       "reset2fa": "2FA 재설정",
       "resetConfirmTitle": "이중 인증을 재설정하시겠습니까?",
       "resetConfirmBody": "이렇게 하면 {{login}}에 대한 2FA가 비활성화됩니다. 집행이 여전히 적용되는 경우 다시 등록해야 합니다.",
-      "empty": "에이전트를 찾을 수 없습니다."
+      "empty": "에이전트를 찾을 수 없습니다.",
+      "portalEnabled": "Customer portal available",
+      "portalLockedByEnv": "Disabled by this deployment (TIQORA_PORTAL_ENABLED)."
     },
     "gdpr": {
       "title": "개인정보 보호/GDPR",

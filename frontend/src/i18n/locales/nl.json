@@ -1157,7 +1157,8 @@
         "enforceGroups": "Bovendien wordt 2FA afgedwongen voor elke agent die lid is van een groep die hier is aangevinkt, zelfs als 'Afdwingen voor iedereen' is uitgeschakeld.",
         "sso": "Hiermee kan deze agent zich verifiëren via het externe pad SSO/identity-provider. Configureert de SSO-provider zelf niet, alleen of deze agent deze mag gebruiken.",
         "enforce": "Forceert 2FA voor dit individuele agentaccount, onafhankelijk van de bovenstaande globale instellingen.",
-        "reset": "Verwijdert onomkeerbaar zowel de TOTP-inschrijving van de agent als alle geregistreerde passkeys. De agent moet 2FA daarna helemaal opnieuw instellen; er is geen zachte tussenstatus."
+        "reset": "Verwijdert onomkeerbaar zowel de TOTP-inschrijving van de agent als alle geregistreerde passkeys. De agent moet 2FA daarna helemaal opnieuw instellen; er is geen zachte tussenstatus.",
+        "portalEnabled": "Turns the customer portal on or off for the whole installation. When off, the portal API answers 404, running customer sessions stop working, and the start page goes straight to the agent login. Customer records and email tickets are unaffected."
       },
       "queues": {
         "group": "Bepaalt wie deze wachtrij kan zien en bewerken. De toegang wordt volledig door de groep beheerd en wordt nooit per wachtrij verleend.",
@@ -2119,7 +2120,9 @@
       "reset2fa": "2FA resetten",
       "resetConfirmTitle": "Tweefactorauthenticatie opnieuw instellen?",
       "resetConfirmBody": "Hierdoor wordt 2FA uitgeschakeld voor {{login}}. Als de handhaving nog steeds van toepassing is, moeten ze zich opnieuw inschrijven.",
-      "empty": "Geen agenten gevonden."
+      "empty": "Geen agenten gevonden.",
+      "portalEnabled": "Customer portal available",
+      "portalLockedByEnv": "Disabled by this deployment (TIQORA_PORTAL_ENABLED)."
     },
     "gdpr": {
       "title": "Privacy / AVG",

@@ -1157,7 +1157,8 @@
         "enforceGroups": "Ek olarak, burada işaretlenen herhangi bir grubun üyesi olan her temsilci için 2FA'yı zorunlu kılar - \"Herkes için uygula\" kapalı olsa bile.",
         "sso": "Bu temsilcinin harici SSO/kimlik sağlayıcı yolu aracılığıyla kimlik doğrulaması yapmasına izin verir. SSO sağlayıcısını kendisi yapılandırmaz; yalnızca bu temsilcinin onu kullanıp kullanamayacağı.",
         "enforce": "Yukarıdaki genel ayarlardan bağımsız olarak bu bireysel temsilci hesabı için 2FA'yı zorunlu kılar.",
-        "reset": "Hem temsilcinin TOTP kaydını hem de tüm kayıtlı passkey'lernı geri döndürülemez şekilde siler. Aracının daha sonra sıfırdan 2FA kurması gerekir; yumuşak bir ara durum yoktur."
+        "reset": "Hem temsilcinin TOTP kaydını hem de tüm kayıtlı passkey'lernı geri döndürülemez şekilde siler. Aracının daha sonra sıfırdan 2FA kurması gerekir; yumuşak bir ara durum yoktur.",
+        "portalEnabled": "Turns the customer portal on or off for the whole installation. When off, the portal API answers 404, running customer sessions stop working, and the start page goes straight to the agent login. Customer records and email tickets are unaffected."
       },
       "queues": {
         "group": "Bu kuyruğu kimlerin görebileceğini ve çalışabileceğini belirler; erişim tamamen grup tarafından kontrol edilir, hiçbir zaman kuyruk başına verilmez.",
@@ -2119,7 +2120,9 @@
       "reset2fa": "2FA'yı sıfırla",
       "resetConfirmTitle": "İki adımlı doğrulama sıfırlansın mı?",
       "resetConfirmBody": "Bu, {{login}} için 2FA'yı devre dışı bırakır. Eğer yaptırım hâlâ geçerliyse, yeniden kaydolmaları gerekecektir.",
-      "empty": "Hiçbir temsilci bulunamadı."
+      "empty": "Hiçbir temsilci bulunamadı.",
+      "portalEnabled": "Customer portal available",
+      "portalLockedByEnv": "Disabled by this deployment (TIQORA_PORTAL_ENABLED)."
     },
     "gdpr": {
       "title": "Gizlilik / GDPR",

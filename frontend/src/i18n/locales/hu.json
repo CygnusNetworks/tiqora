@@ -1157,7 +1157,8 @@
         "enforceGroups": "Ezenkívül kényszeríti a 2FA-t minden olyan ügyintézőre, aki bármely itt bejelölt csoport tagja – még akkor is, ha az „Enforce for all” ki van kapcsolva.",
         "sso": "Lehetővé teszi, hogy ez az ügyintéző a külső SSO/identitásszolgáltatói útvonalon hitelesítsen. Nem konfigurálja magát az SSO-szolgáltatót — csak azt, hogy ez az ügyintéző használhatja-e.",
         "enforce": "A fenti globális beállításoktól függetlenül kényszeríti a 2FA-t ehhez az egyéni ügyintézőfiókhoz.",
-        "reset": "Visszafordíthatatlanul törli mind az ügyintéző TOTP-regisztrációját, mind az összes regisztrált jelszót. Az ügyintézőnek utána a semmiből kell beállítania a 2FA-t – nincs lágy köztes állapot."
+        "reset": "Visszafordíthatatlanul törli mind az ügyintéző TOTP-regisztrációját, mind az összes regisztrált jelszót. Az ügyintézőnek utána a semmiből kell beállítania a 2FA-t – nincs lágy köztes állapot.",
+        "portalEnabled": "Turns the customer portal on or off for the whole installation. When off, the portal API answers 404, running customer sessions stop working, and the start page goes straight to the agent login. Customer records and email tickets are unaffected."
       },
       "queues": {
         "group": "Meghatározza, hogy ki láthatja és kezelheti ezt a várólistát – a hozzáférést teljes egészében a csoporton keresztül szabályozzák, soha nem adják meg soronként.",
@@ -2119,7 +2120,9 @@
       "reset2fa": "2FA visszaállítása",
       "resetConfirmTitle": "Visszaállítja a kéttényezős hitelesítést?",
       "resetConfirmBody": "Ez letiltja a 2FA-t a {{login}} számára. Ha a végrehajtás továbbra is érvényes, újra be kell jelentkezniük.",
-      "empty": "Nem található ügyintéző."
+      "empty": "Nem található ügyintéző.",
+      "portalEnabled": "Customer portal available",
+      "portalLockedByEnv": "Disabled by this deployment (TIQORA_PORTAL_ENABLED)."
     },
     "gdpr": {
       "title": "Adatvédelem / GDPR",

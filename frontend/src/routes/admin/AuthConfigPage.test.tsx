@@ -59,7 +59,12 @@ describe("AuthConfigPage", () => {
     groupsList.mockReset();
 
     list.mockResolvedValue({ items: [agent], total: 1, page: 1, page_size: 500 });
-    getGlobal.mockResolvedValue({ enforce_all: false, enforce_group_ids: [] });
+    getGlobal.mockResolvedValue({
+      enforce_all: false,
+      enforce_group_ids: [],
+      portal_enabled: true,
+      portal_locked_by_env: false,
+    });
     groupsList.mockResolvedValue({
       items: [
         { id: 10, name: "group-a", valid_id: 1 },
@@ -71,7 +76,12 @@ describe("AuthConfigPage", () => {
     });
     update.mockResolvedValue({ ...agent, sso_eligible: true });
     reset2fa.mockResolvedValue(undefined);
-    putGlobal.mockResolvedValue({ enforce_all: true, enforce_group_ids: [10] });
+    putGlobal.mockResolvedValue({
+      enforce_all: true,
+      enforce_group_ids: [10],
+      portal_enabled: true,
+      portal_locked_by_env: false,
+    });
   });
 
   it("renders agent rows and toggles call update API", async () => {
@@ -122,7 +132,51 @@ describe("AuthConfigPage", () => {
       expect(putGlobal).toHaveBeenCalledWith({
         enforce_all: true,
         enforce_group_ids: [10],
+        portal_enabled: true,
       });
     });
+  });
+
+  it("saves the customer portal switch", async () => {
+    getGlobal.mockResolvedValue({
+      enforce_all: false,
+      enforce_group_ids: [],
+      portal_enabled: true,
+      portal_locked_by_env: false,
+    });
+    putGlobal.mockResolvedValue({
+      enforce_all: false,
+      enforce_group_ids: [],
+      portal_enabled: false,
+      portal_locked_by_env: false,
+    });
+    renderPage();
+
+    const box = await screen.findByTestId("auth-config-portal-enabled");
+    expect(box).toBeChecked();
+    fireEvent.click(box);
+    fireEvent.click(screen.getByTestId("auth-config-global-save"));
+
+    await waitFor(() =>
+      expect(putGlobal).toHaveBeenCalledWith(
+        expect.objectContaining({ portal_enabled: false }),
+      ),
+    );
+  });
+
+  it("locks the switch when the deployment disabled the portal", async () => {
+    getGlobal.mockResolvedValue({
+      enforce_all: false,
+      enforce_group_ids: [],
+      portal_enabled: false,
+      portal_locked_by_env: true,
+    });
+    renderPage();
+
+    const box = await screen.findByTestId("auth-config-portal-enabled");
+    expect(box).toBeDisabled();
+    expect(
+      screen.getByText(i18n.t("admin.authConfig.portalLockedByEnv")),
+    ).toBeInTheDocument();
   });
 });

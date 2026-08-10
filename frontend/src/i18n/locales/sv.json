@@ -1157,7 +1157,8 @@
         "enforceGroups": "Tvingar dessutom 2FA för varje agent som är medlem i någon av de markerade grupperna här — även när \"Kräv för alla\" är av.",
         "sso": "Tillåter den här agenten att autentisera via den externa SSO-/identitetsleverantörsvägen. Konfigurerar inte SSO-leverantören i sig — bara om den här agenten får använda den.",
         "enforce": "Tvingar 2FA för det här enskilda agentkontot, oberoende av de globala inställningarna ovan.",
-        "reset": "Raderar oåterkalleligt både agentens TOTP-registrering och alla registrerade passkeys. Agenten måste sätta upp 2FA från början efteråt — det finns inget mjukt mellansteg."
+        "reset": "Raderar oåterkalleligt både agentens TOTP-registrering och alla registrerade passkeys. Agenten måste sätta upp 2FA från början efteråt — det finns inget mjukt mellansteg.",
+        "portalEnabled": "Turns the customer portal on or off for the whole installation. When off, the portal API answers 404, running customer sessions stop working, and the start page goes straight to the agent login. Customer records and email tickets are unaffected."
       },
       "queues": {
         "group": "Avgör vem som kan se och arbeta i den här kön — åtkomst styrs helt via gruppen, beviljas aldrig per kö.",
@@ -2119,7 +2120,9 @@
       "reset2fa": "Återställ 2FA",
       "resetConfirmTitle": "Återställa tvåfaktorsautentisering?",
       "resetConfirmBody": "Detta inaktiverar 2FA för {{login}}. Hen behöver registrera sig igen om kravet fortfarande gäller.",
-      "empty": "Inga agenter hittades."
+      "empty": "Inga agenter hittades.",
+      "portalEnabled": "Customer portal available",
+      "portalLockedByEnv": "Disabled by this deployment (TIQORA_PORTAL_ENABLED)."
     },
     "gdpr": {
       "title": "Integritet / GDPR",
