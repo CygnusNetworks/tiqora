@@ -41,6 +41,7 @@ import { PortalShell } from "@/components/layout/PortalShell";
 import { RequireAuth } from "@/auth/RequireAuth";
 import { RequirePortalAuth } from "@/auth/RequirePortalAuth";
 import { CustomerAuthProvider } from "@/auth/CustomerAuthContext";
+import { RequirePortalEnabled } from "@/components/portal/RequirePortalEnabled";
 import { HomeRedirect } from "@/routes/HomeRedirect";
 import { PortalLoginPage } from "@/routes/portal/PortalLoginPage";
 import {
@@ -463,9 +464,11 @@ const portalLoginRoute = createRoute({
     next: typeof s.next === "string" ? s.next : undefined,
   }),
   component: () => (
-    <CustomerAuthProvider>
-      <PortalLoginPage />
-    </CustomerAuthProvider>
+    <RequirePortalEnabled>
+      <CustomerAuthProvider>
+        <PortalLoginPage />
+      </CustomerAuthProvider>
+    </RequirePortalEnabled>
   ),
 });
 
@@ -474,13 +477,15 @@ const portalLayoutRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/portal",
   component: () => (
-    <CustomerAuthProvider>
-      <RequirePortalAuth>
-        <PortalShell>
-          <Outlet />
-        </PortalShell>
-      </RequirePortalAuth>
-    </CustomerAuthProvider>
+    <RequirePortalEnabled>
+      <CustomerAuthProvider>
+        <RequirePortalAuth>
+          <PortalShell>
+            <Outlet />
+          </PortalShell>
+        </RequirePortalAuth>
+      </CustomerAuthProvider>
+    </RequirePortalEnabled>
   ),
 });
 
