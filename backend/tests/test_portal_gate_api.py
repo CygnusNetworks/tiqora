@@ -143,3 +143,25 @@ async def test_putting_portal_enabled_while_env_locks_it_conflicts() -> None:
         )
     assert exc.value.status_code == 409
     assert session.added == []
+
+
+@pytest.mark.asyncio
+async def test_putting_only_2fa_settings_succeeds_while_env_locks_the_portal() -> None:
+    """portal_enabled omitted (None) means "leave unchanged" — the 409 must not fire."""
+    from tiqora.api.v1.admin.auth_config import put_global_auth_config
+    from tiqora.api.v1.admin.schemas import AuthConfigGlobalUpdate
+    from tiqora.domain.settings_store import KEY_PORTAL_ENABLED
+
+    # No stored row: put_global_auth_config still needs to upsert enforce_all,
+    # which this fake session honors by recording an add() when there's nothing
+    # to update in place.
+    session = _RecordingSession(None)
+    out = await put_global_auth_config(
+        body=AuthConfigGlobalUpdate(enforce_all=True),
+        admin=None,
+        session=session,
+        settings=Settings(environment="test", portal_enabled=False),
+    )
+    assert out.portal_enabled is False
+    assert out.portal_locked_by_env is True
+    assert all(getattr(obj, "key", None) != KEY_PORTAL_ENABLED for obj in session.added)
