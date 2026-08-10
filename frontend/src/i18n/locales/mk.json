@@ -55,7 +55,12 @@
     "showActiveQueues": "Прикажи активни",
     "queueSearch": "Филтрирајте ги редиците…",
     "noQueueMatch": "Не се совпаѓаат редици.",
-    "templates": "Шаблони"
+    "templates": "Шаблони",
+    "locked": "Заклучено",
+    "responsible": "Одговорен",
+    "escalated": "Ескалирано",
+    "services": "Услуги",
+    "timeAccounting": "Евиденција на време"
   },
   "common": {
     "prev": "Претходна",
@@ -68,7 +73,10 @@
     "cancel": "Откажи",
     "help": "Помош",
     "edit": "Уреди",
-    "save": "Зачувај"
+    "save": "Зачувај",
+    "saved": "Зачувано",
+    "delete": "Избриши",
+    "submit": "Испрати"
   },
   "otp": {
     "verifying": "Се потврдува…",
@@ -171,7 +179,9 @@
     "toPickUpEmpty": "Нема нови билети за подигање.",
     "remindersDue": "Доспеваат потсетници",
     "remindersDueEmpty": "Нема доспеани потсетници.",
-    "queueShortcutsEmpty": "Нема редици со отворени или нови билети во моментов."
+    "queueShortcutsEmpty": "Нема редици со отворени или нови билети во моментов.",
+    "lastViews": "Неодамна прегледано",
+    "lastViewsUntitled": "(без наслов)"
   },
   "queue": {
     "sidebar": "Редици",
@@ -482,7 +492,8 @@
       "customerEmail": "Е-пошта",
       "customerFirstName": "Име",
       "customerLastName": "Презиме",
-      "customerLoginConflict": "Ова најавување веќе постои. Изберете различно најавување или наместо тоа доделете го постоечкиот клиент преку пребарување."
+      "customerLoginConflict": "Ова најавување веќе постои. Изберете различно најавување или наместо тоа доделете го постоечкиот клиент преку пребарување.",
+      "clearCustomer": "Отстрани клиент"
     },
     "inlineAttachments": "Вградени слики ({{count}})",
     "list": {
@@ -504,7 +515,35 @@
     "draftEditedAt": "уредено {{time}}",
     "draftDiscard": "Отфрли нацрт",
     "draftDiscardConfirm": "Да се отфрли овој неиспратен одговор? Текстот не може да се врати.",
-    "draftDiscardConfirmButton": "Отфрли"
+    "draftDiscardConfirmButton": "Отфрли",
+    "type": "Тип",
+    "service": "Услуга",
+    "sla": "SLA",
+    "mentions": "Споменувања",
+    "timeAccounting": "Евиденција на време",
+    "timeUnits": "Временски единици",
+    "addTime": "Евидентирај време",
+    "addMention": "Спомени агент",
+    "mentionsCount": "Споменувања: {{n}}",
+    "mentionsEmpty": "Никој не е споменат",
+    "mentionRemove": "Отстрани спомнување",
+    "mentionSuggestions": "Агенти",
+    "timeUnitAbbrev": "мин",
+    "timeUnitHoursAbbrev": "ч",
+    "timeUnitsShort": "{{units}} мин",
+    "timeAccountingTotal": "Евидентирано време: {{units}} мин",
+    "timeRemove": "Отстрани запис",
+    "timeUnitMode": "Временска единица",
+    "timeUnitMin": "Мин",
+    "timeUnitHours": "Ч",
+    "timePresets": "Брз избор",
+    "timeComposerHint": "При одговор евидентирајте во подножјето на уредувачот.",
+    "timeChipHint": "Се евидентира при испраќање",
+    "extrasFailedMentions": "Испратено — спомнувањето не беше зачувано.",
+    "extrasFailedTime": "Испратено — времето не беше евидентирано.",
+    "extrasFailedBoth": "Испратено — ни спомнувањето ни евиденцијата на време не беа зачувани.",
+    "extrasRetry": "Обиди се повторно",
+    "customerUnresolved": "Нема запис за клиент за оваа адреса, податоците не се достапни."
   },
   "search": {
     "title": "Пребарување",
@@ -1143,7 +1182,8 @@
       },
       "acl": {
         "match": "Услови под кои се применува овој ACL (на пр. тековна редица, состојба, поле за формулари). Промената на десната страна се применува само кога секој критериум наведен овде се совпаѓа.",
-        "change": "Ефектот на ACL штом ќе се совпаднат неговите услови - обично ги ограничува или принудува изборите достапни во форми (на пример, дозволени само одредени состојби на следење)."
+        "change": "Ефектот на ACL штом ќе се совпаднат неговите услови - обично ги ограничува или принудува изборите достапни во форми (на пример, дозволени само одредени состојби на следење).",
+        "stopAfterMatch": "Ако е означено, по продуктивно совпаѓање не се оценуваат други ACL (Znuny StopAfterMatch)."
       },
       "mailOutbound": {
         "host": "Име на домаќин на SMTP сервер за појдовна пошта. Мора да биде достапно од овој сервер (DNS + заштитен ѕид) на портата подолу.",
@@ -1190,8 +1230,8 @@
         "validId": "„Temp“ (valid_id 3) е третата состојба на важност на Znuny - вообичаено сметка чека потврда (на пр. непотврдена саморегистрација), различна од обичната валидна/неважечка."
       },
       "systemAddresses": {
-        "email": "Address used as the From email for queues and auto-responses.",
-        "name": "Display name shown next to the email (e.g. “Support <support@example.com>”)."
+        "email": "Адреса што се користи како From за редици и авто-одговори.",
+        "name": "Прикажано име покрај е-адресата (нпр. „Support <support@example.com>“)."
       }
     },
     "nav": {
@@ -1240,7 +1280,13 @@
       "aiAcl": "Пристап и ограничувања",
       "collapse": "Собери ја навигацијата",
       "mailAccounts": "Сметки за пошта",
-      "oauth2Tokens": "OAuth2 токени (пошта)"
+      "oauth2Tokens": "OAuth2 токени (пошта)",
+      "types": "Типови тикети",
+      "services": "Услуги",
+      "slas": "SLA",
+      "systemAddresses": "Системски адреси",
+      "notificationEvents": "Настани за известувања",
+      "ticketAttributeRelations": "Односи на атрибути"
     },
     "table": {
       "id": "ID",
@@ -1347,7 +1393,44 @@
       "title": "Наслов",
       "firstName": "Име",
       "lastName": "Презиме",
-      "name": "Име"
+      "name": "Име",
+      "passwordMode": "Доделување лозинка",
+      "passwordModeManual": "Постави рачно",
+      "passwordModeAuto": "Покана: испрати врска по е-пошта",
+      "passwordModeAutoHelp": "При зачувување еднократна врска оди на е-адресата подолу. Агентот самиот избира лозинка.",
+      "email": "Е-пошта",
+      "mobile": "Мобилен телефон",
+      "effectivePermissions": "Прикажи ефективни права",
+      "effectivePermissionsTitle": "Ефективни права за {{name}}",
+      "effectivePermissionsDescription": "Објединети права од директни групи и улоги.",
+      "rolesHeading": "Улоги",
+      "groupsHeading": "Групни права",
+      "queuesHeading": "Редици",
+      "noRoles": "Нема доделени улоги.",
+      "noGroups": "Нема групни права.",
+      "noQueues": "Нема доделени редици.",
+      "viaDirect": "Директно",
+      "permissionColumn": "Права",
+      "sourceColumn": "Извор",
+      "editSettings": "Уреди лични поставки",
+      "editSettingsTitle": "Лични поставки: {{name}}",
+      "editSettingsDescription": "Истите поставки што агентот ги гледа под «Лични поставки».",
+      "languageLabel": "Јазик",
+      "languageSaved": "Јазикот е зачуван.",
+      "tabAccount": "Сметка",
+      "tabPerson": "Лице",
+      "sourceInvalidHint": "Ова право доаѓа од неважечка улога и затоа нема ефект.",
+      "keyInactiveHint": "Ова право е конфигурирано, но не важи — изворот или групата е неважечка.",
+      "deletePermanent": "Трајно избриши",
+      "deleteTitle": "Трајно да се избрише {{name}}?",
+      "deleteConfirm": "Трајно избриши",
+      "deletableBody": "Ништо не реферира {{name}}; сметката може целосно да се отстрани со поставки, групи, улоги и 2FA.",
+      "deleteIrreversible": "Ова не може да се врати.",
+      "deleteBlockedBody": "{{name}} не може да се избрише — овие табели сè уште реферираат на сметката:",
+      "deleteBlockedHint": "Поставете ја сметката на «Неважечка» за тикетите, статиите и историјата да останат приписливи.",
+      "resendSetupLink": "Повторно испрати врска за поставување",
+      "setupLinkSent": "Врската за поставување е испратена.",
+      "setupLinkFailed": "Врската за поставување не можеше да се испрати."
     },
     "groups": {
       "title_plural": "Групи",
@@ -1561,7 +1644,10 @@
       "name": "Име",
       "description": "Опис",
       "match": "Натпревар",
-      "change": "Промена"
+      "change": "Промена",
+      "new": "Нов ACL",
+      "stopAfterMatch": "Запри по совпаѓање",
+      "confirmDelete": "Да се избрише ACL „{{name}}”? Ова не може да се врати."
     },
     "genericAgentJobs": {
       "title_plural": "Генерички работни места за агенти",
@@ -2222,7 +2308,13 @@
       "aiAudit": "Целосна ревизија на секое барање/одговор за LLM, со откривање на PII.",
       "aiAcl": "Дозволи и квоти за вештачка интелигенција по група, улога или агент.",
       "mailAccounts": "Дојдовни IMAP/POP поштенски сандачиња (лозинка или OAuth2).",
-      "oauth2Tokens": "Конфигурации на токен OAuth2 за пошта на Microsoft/Google (компатибилен со Znuny)."
+      "oauth2Tokens": "Конфигурации на токен OAuth2 за пошта на Microsoft/Google (компатибилен со Znuny).",
+      "types": "Управувајте со типови тикети за класификација.",
+      "services": "Управувајте со услуги и поврзете ги со SLA.",
+      "slas": "Управувајте со SLA и рокови.",
+      "systemAddresses": "Е-адреси како From за редици и авто-одговори.",
+      "notificationEvents": "Конфигурирајте известувања до агенти врз основа на настани.",
+      "ticketAttributeRelations": "Матрици на зависност компатибилни со Znuny (услуга/редица итн.), CSV."
     },
     "mailAccounts": {
       "title_plural": "Сметки за пошта",
@@ -2270,11 +2362,50 @@
       "refreshSuccess": "Токенот е освежен."
     },
     "systemAddresses": {
-      "title_plural": "System addresses",
-      "subtitle": "From-addresses for queues and auto-responses. Invalid addresses stay listed so they can be re-enabled.",
-      "new": "Add address",
-      "email": "Email",
-      "name": "Name"
+      "title_plural": "Системски адреси",
+      "subtitle": "From адреси за редици и авто-одговори. Неважечките остануваат на списокот за повторно овозможување.",
+      "new": "Додај адреса",
+      "email": "Е-пошта",
+      "name": "Име"
+    },
+    "types": {
+      "title_plural": "Типови тикети",
+      "new": "Нов тип",
+      "name": "Име"
+    },
+    "services": {
+      "title_plural": "Услуги",
+      "new": "Нова услуга",
+      "name": "Име",
+      "slaCount": "SLA"
+    },
+    "slas": {
+      "title_plural": "SLA",
+      "new": "Нов SLA",
+      "name": "Име",
+      "firstResponseTime": "Прв одговор (мин)",
+      "updateTime": "Ажурирање (мин)",
+      "solutionTime": "Решение (мин)",
+      "calendar": "Календар"
+    },
+    "notificationEvents": {
+      "title_plural": "Настани за известувања",
+      "subtitle": "Кога ќе се случат настани, соодветните известувања се испраќаат до агенти.",
+      "new": "Креирај известување",
+      "name": "Име",
+      "event": "Настан",
+      "subject": "Наслов",
+      "body": "Текст"
+    },
+    "tar": {
+      "title": "Односи на атрибути на тикети",
+      "filename": "Име на датотека",
+      "attributes": "Атрибути",
+      "priority": "Приоритет",
+      "csv": "CSV податоци",
+      "new": "Нов однос",
+      "help": "CSV со заглавје Attribute1;Attribute2 и парови вредности (Znuny AdminTicketAttributeRelations). Го ограничува изборот во обрасци (нпр. Услуга → Редица).",
+      "confirmDelete": "Да се избрише овој однос?"
     }
   },
   "kb": {
@@ -2489,7 +2620,8 @@
       "startButton": "Започнете го процесот",
       "actions": "Достапни дејства",
       "loadError": "Не може да се вчита состојбата на процесот.",
-      "noDialogs": "Нема достапни дејства за оваа активност."
+      "noDialogs": "Нема достапни дејства за оваа активност.",
+      "noCustomerDialogs": "На овој чекор нема достапни дијалози за клиенти."
     },
     "start": {
       "title": "Започнете го процесот",
@@ -2525,5 +2657,84 @@
     "body": "Тело",
     "editTitle": "Уреди „{{name}}“",
     "saveError": "Не може да се зачува шаблонот."
+  },
+  "views": {
+    "mine": "Мои тикети",
+    "responsible": "Одговорен",
+    "locked": "Заклучени тикети",
+    "watched": "Следени тикети",
+    "escalated": "Ескалирани тикети",
+    "service": "По услуга",
+    "serviceHint": "Листа на тикети доделени на услуга.",
+    "pickService": "Изберете услуга…"
+  },
+  "customerCentre": {
+    "title": "Информации за клиент",
+    "open": "Клиент",
+    "invalid": "Неважечка најава на клиент.",
+    "loadError": "Клиентот не можеше да се вчита.",
+    "email": "Е-пошта",
+    "phone": "Телефон",
+    "customerId": "Број на клиент",
+    "company": "Компанија",
+    "openCount": "{{count}} отворени",
+    "closedCount": "{{count}} затворени",
+    "allTickets": "Сите тикети →",
+    "recentTickets": "Скорешни тикети"
+  },
+  "timeAccounting": {
+    "title": "Евиденција на време",
+    "hint": "Евидентирани временски единици на тикети до кои имате пристап.",
+    "filterUser": "Агент",
+    "allUsers": "Сите агенти",
+    "filterFrom": "Од",
+    "filterTo": "До",
+    "filterTicket": "ИД на тикет",
+    "empty": "Нема соодветни записи за време.",
+    "colWhen": "Кога",
+    "colTicket": "Тикет",
+    "colUser": "Агент",
+    "colUnits": "Единици",
+    "presetsLabel": "Период",
+    "presets": {
+      "today": "Денес",
+      "yesterday": "Вчера",
+      "thisWeek": "Оваа недела",
+      "lastWeek": "Минатата недела",
+      "thisMonth": "Овој месец",
+      "lastMonth": "Минатиот месец",
+      "thisQuarter": "Овој квартал",
+      "lastQuarter": "Минатиот квартал",
+      "thisYear": "Оваа година",
+      "lastYear": "Минатата година"
+    },
+    "kpiUnits": "Временски единици",
+    "kpiEntries": "Записи",
+    "kpiTickets": "Тикети",
+    "kpiAgents": "Агенти",
+    "rangeBetween": "{{from}} – {{to}}",
+    "rangeFrom": "од {{from}}",
+    "rangeTo": "до {{to}}",
+    "chartTitle": "Единици на ден",
+    "chartBar": "{{date}}: {{units}} единици",
+    "dayUnknown": "Без датум",
+    "emptyHint": "Проширете го периодот или исчистете ги филтрите за агент и тикет.",
+    "clearFilters": "Исчисти филтри",
+    "pageRange": "{{from}}–{{to}}",
+    "pageScope": "на оваа страница",
+    "chartPeak": "врв {{units}}"
+  },
+  "setPassword": {
+    "subtitle": "Изберете лозинка за вашата сметка.",
+    "password": "Нова лозинка",
+    "confirm": "Повтори лозинка",
+    "lengthHint": "Помеѓу {{min}} и {{max}} знаци.",
+    "mismatch": "Лозинките не се совпаѓаат.",
+    "submit": "Постави лозинка",
+    "saving": "Зачувување…",
+    "done": "Лозинката е зачувана. Сега можете да се најавите.",
+    "invalid": "Оваа врска повеќе не е важечка.",
+    "invalidHint": "Врските за поставување важат 7 дена и се користат еднаш. Барајте нова од администрацијата.",
+    "toLogin": "Кон најава"
   }
 }

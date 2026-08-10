@@ -33,7 +33,7 @@
     "admin": "Admin",
     "theme": "Teema",
     "language": "Keel",
-    "dashboard": "Armatuurlaud",
+    "dashboard": "Töölaud",
     "queues": "Järjekorrad",
     "kb": "Teadmistebaas"
   },
@@ -55,7 +55,12 @@
     "showActiveQueues": "Näita aktiivset",
     "queueSearch": "Filtreeri järjekorrad…",
     "noQueueMatch": "Ükski järjekord ei vasta.",
-    "templates": "Mallid"
+    "templates": "Mallid",
+    "locked": "Lukustatud",
+    "responsible": "Vastutaja",
+    "escalated": "Eskaleeritud",
+    "services": "Teenused",
+    "timeAccounting": "Ajaarvestus"
   },
   "common": {
     "prev": "Eelmine",
@@ -68,7 +73,10 @@
     "cancel": "Tühista",
     "help": "Abi",
     "edit": "Muuda",
-    "save": "Salvesta"
+    "save": "Salvesta",
+    "saved": "Salvestatud",
+    "delete": "Kustuta",
+    "submit": "Saada"
   },
   "otp": {
     "verifying": "Kinnitamine…",
@@ -171,7 +179,9 @@
     "toPickUpEmpty": "Uusi pileteid pole vaja võtta.",
     "remindersDue": "Tulevad meeldetuletused",
     "remindersDueEmpty": "Meeldetuletusi ei tule.",
-    "queueShortcutsEmpty": "Praegu pole avatud või uute piletitega järjekordi."
+    "queueShortcutsEmpty": "Praegu pole avatud või uute piletitega järjekordi.",
+    "lastViews": "Viimati vaadatud",
+    "lastViewsUntitled": "(teema puudub)"
   },
   "queue": {
     "sidebar": "Järjekorrad",
@@ -344,7 +354,7 @@
     "historySortAsc": "Vanim enne",
     "historySortDesc": "Kõige uuemad enne",
     "replyDialogTitle": "Vasta",
-    "replyTo": "To",
+    "replyTo": "Kellele",
     "replyCc": "Cc",
     "replyBcc": "Pimekoopia",
     "replyReplyTo": "Vastus",
@@ -457,7 +467,7 @@
       "unlock": "Avage lukustus",
       "fields": "Vabad väljad",
       "historyView": "Ajalugu",
-      "link": "Link",
+      "link": "Seo",
       "merge": "Ühendage",
       "appointment": "Uus kohtumine",
       "move": "Liiguta",
@@ -482,7 +492,8 @@
       "customerEmail": "Meil",
       "customerFirstName": "Eesnimi",
       "customerLastName": "Perekonnanimi",
-      "customerLoginConflict": "See sisselogimine on juba olemas. Valige mõni muu sisselogimisnimi või määrake selle asemel olemasolev klient otsingu kaudu."
+      "customerLoginConflict": "See sisselogimine on juba olemas. Valige mõni muu sisselogimisnimi või määrake selle asemel olemasolev klient otsingu kaudu.",
+      "clearCustomer": "Eemalda klient"
     },
     "inlineAttachments": "Manustatud pildid ({{count}})",
     "list": {
@@ -504,7 +515,35 @@
     "draftEditedAt": "muudetud {{time}}",
     "draftDiscard": "Loobu mustandist",
     "draftDiscardConfirm": "Kas loobuda sellest saatmata vastusest? Teksti ei saa taastada.",
-    "draftDiscardConfirmButton": "Loobu"
+    "draftDiscardConfirmButton": "Loobu",
+    "type": "Tüüp",
+    "service": "Teenus",
+    "sla": "SLA",
+    "mentions": "Mainimised",
+    "timeAccounting": "Ajaarvestus",
+    "timeUnits": "Ajaühikud",
+    "addTime": "Broneeri aeg",
+    "addMention": "Maini agenti",
+    "mentionsCount": "Mainimised: {{n}}",
+    "mentionsEmpty": "Kedagi ei mainita",
+    "mentionRemove": "Eemalda mainimine",
+    "mentionSuggestions": "Agendid",
+    "timeUnitAbbrev": "min",
+    "timeUnitHoursAbbrev": "h",
+    "timeUnitsShort": "{{units}} min",
+    "timeAccountingTotal": "Broneeritud aeg: {{units}} min",
+    "timeRemove": "Eemalda kanne",
+    "timeUnitMode": "Ajaühik",
+    "timeUnitMin": "Min",
+    "timeUnitHours": "H",
+    "timePresets": "Kiirvalik",
+    "timeComposerHint": "Vastamisel broneerige koostaja jaluses.",
+    "timeChipHint": "Broneeritakse saatmisel",
+    "extrasFailedMentions": "Saadetud — mainimist ei salvestatud.",
+    "extrasFailedTime": "Saadetud — aega ei broneeritud.",
+    "extrasFailedBoth": "Saadetud — ei mainimist ega ajakannet ei salvestatud.",
+    "extrasRetry": "Proovi uuesti",
+    "customerUnresolved": "Selle aadressiga ei sobi ükski kliendikirje, andmed pole saadaval."
   },
   "search": {
     "title": "Otsi",
@@ -523,7 +562,7 @@
       "filterHint": "Filter",
       "dateHint": "Kuupäev AAAA-KK-PP",
       "from": "Alates",
-      "to": "To",
+      "to": "Kellele",
       "paletteHint": "Reaalajas tulemuste jaoks tippige – järjekord:, omanik:, olek:, klient: muutu filtriteks.",
       "viewAll": "Kuva kõik tulemused",
       "noQueueMatch": "Ükski järjekord ei vastaks „{{frag}}”",
@@ -800,7 +839,7 @@
         "new": "Uus MCP klient",
         "name": "Nimi",
         "url": "URL",
-        "authToken": "Auth token",
+        "authToken": "Auth märgis",
         "authTokenSetHelp": "Token on salvestatud. Selle säilitamiseks jätke tühjaks.",
         "authTokenHelp": "Salvestatud krüpteeritult ja seda ei kuvata enam kunagi.",
         "empty": "MCP-kliente pole veel loodud.",
@@ -841,7 +880,7 @@
           "autonomy": "Autonoomia",
           "prompt": "Süsteemi viip",
           "summary": "Kokkuvõtlikud künnised",
-          "caps": "Caps",
+          "caps": "Piirangud",
           "disclosure": "Avalikustamine ja privaatsus",
           "identity": "Identiteet",
           "language": "Keel"
@@ -1051,7 +1090,7 @@
         "title": "Reeglite testija",
         "toolPlaceholder": "Tööriista nimi, nt. netadmin:diagnose_connection",
         "samplePlaceholder": "Tööriista näidistulemus JSON-na, nt. {\"lock_code\": \"COPYR\"}",
-        "run": "Test",
+        "run": "Testi",
         "invalid": "Reeglid kehtetud",
         "hit": "Tabamus – eskalatsioon",
         "noHit": "Ei tabanud",
@@ -1143,7 +1182,8 @@
       },
       "acl": {
         "match": "Tingimused, mille korral see ACL kehtib (nt praegune järjekord, olek, vormiväli). Parempoolset muudatust rakendatakse ainult siis, kui kõik siin loetletud kriteeriumid vastavad.",
-        "change": "ACL-i mõju, kui selle tingimused ühtivad – tavaliselt piirab või sunnib see vormides saadaolevaid valikuid (nt lubatud on ainult teatud järelkontrolli olekud)."
+        "change": "ACL-i mõju, kui selle tingimused ühtivad – tavaliselt piirab või sunnib see vormides saadaolevaid valikuid (nt lubatud on ainult teatud järelkontrolli olekud).",
+        "stopAfterMatch": "Kui märgitud, ei hinnata pärast produktiivset vastet enam teisi ACL-e (Znuny StopAfterMatch)."
       },
       "mailOutbound": {
         "host": "SMTP-serveri hostinimi väljamineva kirja jaoks. Peab olema sellest serverist (DNS + tulemüür) kättesaadav allolevas pordis.",
@@ -1190,8 +1230,8 @@
         "validId": "\"Temp\" (valid_id 3) on Znuny kolmas kehtivusolek – tavaliselt on konto, mis ootab kinnitust (nt kinnitamata eneseregistreerimine), mis erineb tavalisest kehtivusest/kehtetusest."
       },
       "systemAddresses": {
-        "email": "Address used as the From email for queues and auto-responses.",
-        "name": "Display name shown next to the email (e.g. “Support <support@example.com>”)."
+        "email": "Aadress, mida kasutatakse From-aadressina järjekordadele ja automaatvastustele.",
+        "name": "Kuvatav nimi e-posti kõrval (nt „Support <support@example.com>“)."
       }
     },
     "nav": {
@@ -1240,7 +1280,13 @@
       "aiAcl": "Juurdepääs ja piirangud",
       "collapse": "Ahenda navigeerimist",
       "mailAccounts": "Meilikontod",
-      "oauth2Tokens": "OAuth2 märgid (post)"
+      "oauth2Tokens": "OAuth2 märgid (post)",
+      "types": "Piletitüübid",
+      "services": "Teenused",
+      "slas": "SLA-d",
+      "systemAddresses": "Süsteemiaadressid",
+      "notificationEvents": "Teavitussündmused",
+      "ticketAttributeRelations": "Atribuudiseosed"
     },
     "table": {
       "id": "ID",
@@ -1347,7 +1393,44 @@
       "title": "Pealkiri",
       "firstName": "Eesnimi",
       "lastName": "Perekonnanimi",
-      "name": "Nimi"
+      "name": "Nimi",
+      "passwordMode": "Parooli määramine",
+      "passwordModeManual": "Määra käsitsi",
+      "passwordModeAuto": "Kutse: saada link e-postiga",
+      "passwordModeAutoHelp": "Salvestamisel läheb ühekordne link allolevale e-postile. Agent valib parooli ise.",
+      "email": "E-post",
+      "mobile": "Mobiiltelefon",
+      "effectivePermissions": "Kuva tegelikud õigused",
+      "effectivePermissionsTitle": "Tegelikud õigused: {{name}}",
+      "effectivePermissionsDescription": "Otsegruppide ja rollide liidetud õigused.",
+      "rolesHeading": "Rollid",
+      "groupsHeading": "Grupiõigused",
+      "queuesHeading": "Järjekorrad",
+      "noRoles": "Rolle pole määratud.",
+      "noGroups": "Grupiõigusi pole.",
+      "noQueues": "Järjekordi pole seotud.",
+      "viaDirect": "Otse",
+      "permissionColumn": "Õigused",
+      "sourceColumn": "Allikas",
+      "editSettings": "Muuda isiklikke seadeid",
+      "editSettingsTitle": "{{name}} isiklikud seaded",
+      "editSettingsDescription": "Samad seaded, mida agent näeb jaotises «Isiklikud seaded».",
+      "languageLabel": "Keel",
+      "languageSaved": "Keel salvestatud.",
+      "tabAccount": "Konto",
+      "tabPerson": "Isik",
+      "sourceInvalidHint": "See õigus pärineb kehtetust rollist ja seega ei kehti.",
+      "keyInactiveHint": "Õigus on seadistatud, kuid ei kehti — allikas või grupp on kehtetu.",
+      "deletePermanent": "Kustuta jäädavalt",
+      "deleteTitle": "Kas kustutada {{name}} jäädavalt?",
+      "deleteConfirm": "Kustuta jäädavalt",
+      "deletableBody": "Midagi ei viita kasutajale {{name}}; konto saab täielikult eemaldada koos seadetega, gruppide, rollide ja 2FA-ga.",
+      "deleteIrreversible": "Seda ei saa tagasi võtta.",
+      "deleteBlockedBody": "{{name}} ei saa kustutada — need tabelid viitavad kontole endiselt:",
+      "deleteBlockedHint": "Määrake konto «Kehtetuks», et piletid, artiklid ja ajalugu jääksid seostatavaks.",
+      "resendSetupLink": "Saada seadistuslink uuesti",
+      "setupLinkSent": "Seadistuslink saadetud.",
+      "setupLinkFailed": "Seadistuslinki ei saanud saata."
     },
     "groups": {
       "title_plural": "Rühmad",
@@ -1561,7 +1644,10 @@
       "name": "Nimi",
       "description": "Kirjeldus",
       "match": "Matš",
-      "change": "Muuda"
+      "change": "Muuda",
+      "new": "Uus ACL",
+      "stopAfterMatch": "Peata pärast vastet",
+      "confirmDelete": "Kas kustutada ACL „{{name}}”? Seda ei saa tagasi võtta."
     },
     "genericAgentJobs": {
       "title_plural": "Üldised agentide töökohad",
@@ -1897,7 +1983,7 @@
       "search": "Otsi",
       "searchPlaceholder": "Alates, kuni või teema…",
       "from": "Alates",
-      "to": "To",
+      "to": "Kellele",
       "all": "Kõik",
       "dirIn": "Sissetulev",
       "dirOut": "Väljaminev",
@@ -2109,7 +2195,7 @@
         "after": "Pärast",
         "unchanged": "muutmata",
         "deleteTable": "Tabel",
-        "deleteCount": "Count",
+        "deleteCount": "Arv",
         "deleteEmpty": "Ühtegi kirjet ei kustutataks.",
         "anonymizeEmpty": "Anonüümseks muudetavaid välju ei leitud."
       },
@@ -2145,7 +2231,7 @@
         "customerId": "kliendi_id",
         "mode": "Režiim",
         "status": "Olek",
-        "resolved": "Count",
+        "resolved": "Arv",
         "created": "Loodud",
         "backupExpires": "Varunda kuni",
         "actions": "Tegevused"
@@ -2222,7 +2308,13 @@
       "aiAudit": "Iga LLM-i päringu/vastuse täielik audit koos isikuandmete tuvastamisega.",
       "aiAcl": "AI load ja kvoodid rühma, rolli või agendi kohta.",
       "mailAccounts": "Sissetulevad IMAP/POP-postkastid (parool või OAuth2).",
-      "oauth2Tokens": "OAuth2 märgi konfiguratsioonid Microsofti/Google'i meili jaoks (Znuny-ühilduv)."
+      "oauth2Tokens": "OAuth2 märgi konfiguratsioonid Microsofti/Google'i meili jaoks (Znuny-ühilduv).",
+      "types": "Halda klassifitseerimiseks kasutatavaid piletitüüpe.",
+      "services": "Halda teenuseid ja seo need SLA-dega.",
+      "slas": "Halda teenustaseme lepinguid ja tähtaegu.",
+      "systemAddresses": "From-e-posti aadressid järjekordadele ja automaatvastustele.",
+      "notificationEvents": "Seadista sündmustepõhised agenditeavitused.",
+      "ticketAttributeRelations": "Znuny-ühilduvad sõltuvusmaatriksid (teenus/järjekord jms) CSV-na."
     },
     "mailAccounts": {
       "title_plural": "Meilikontod",
@@ -2270,11 +2362,50 @@
       "refreshSuccess": "Token on värskendatud."
     },
     "systemAddresses": {
-      "title_plural": "System addresses",
-      "subtitle": "From-addresses for queues and auto-responses. Invalid addresses stay listed so they can be re-enabled.",
-      "new": "Add address",
-      "email": "Email",
-      "name": "Name"
+      "title_plural": "Süsteemiaadressid",
+      "subtitle": "From-aadressid järjekordadele ja automaatvastustele. Kehtetud jäävad nimekirja, et neid saaks uuesti lubada.",
+      "new": "Lisa aadress",
+      "email": "E-post",
+      "name": "Nimi"
+    },
+    "types": {
+      "title_plural": "Piletitüübid",
+      "new": "Uus tüüp",
+      "name": "Nimi"
+    },
+    "services": {
+      "title_plural": "Teenused",
+      "new": "Uus teenus",
+      "name": "Nimi",
+      "slaCount": "SLA-d"
+    },
+    "slas": {
+      "title_plural": "SLA-d",
+      "new": "Uus SLA",
+      "name": "Nimi",
+      "firstResponseTime": "Esimene vastus (min)",
+      "updateTime": "Uuendus (min)",
+      "solutionTime": "Lahendus (min)",
+      "calendar": "Kalender"
+    },
+    "notificationEvents": {
+      "title_plural": "Teavitussündmused",
+      "subtitle": "Sündmuste korral saadetakse sobivad teavitused agentidele.",
+      "new": "Loo teavitus",
+      "name": "Nimi",
+      "event": "Sündmus",
+      "subject": "Teema",
+      "body": "Sisu"
+    },
+    "tar": {
+      "title": "Piletiatribuudiseosed",
+      "filename": "Failinimi",
+      "attributes": "Atribuudid",
+      "priority": "Prioriteet",
+      "csv": "CSV-andmed",
+      "new": "Uus seos",
+      "help": "CSV päisega Attribute1;Attribute2 ja väärtuspaaridega (Znuny AdminTicketAttributeRelations). Piirab vormivalikuid (nt Teenus → Järjekord).",
+      "confirmDelete": "Kas kustutada see seos?"
     }
   },
   "kb": {
@@ -2379,7 +2510,7 @@
     "filters": {
       "queue": "Järjekord",
       "dateFrom": "Alates",
-      "dateTo": "To",
+      "dateTo": "Kellele",
       "granularity": "Granulaarsus",
       "granularityOptions": {
         "day": "päev",
@@ -2489,7 +2620,8 @@
       "startButton": "Käivitage protsess",
       "actions": "Saadaolevad toimingud",
       "loadError": "Protsessi olekut ei saanud laadida.",
-      "noDialogs": "Selle tegevuse jaoks pole ühtegi toimingut saadaval."
+      "noDialogs": "Selle tegevuse jaoks pole ühtegi toimingut saadaval.",
+      "noCustomerDialogs": "Selles etapis pole kliendidialooge saadaval."
     },
     "start": {
       "title": "Käivitage protsess",
@@ -2525,5 +2657,84 @@
     "body": "Keha",
     "editTitle": "Redigeeri \"{{name}}\"",
     "saveError": "Malli ei saanud salvestada."
+  },
+  "views": {
+    "mine": "Minu piletid",
+    "responsible": "Vastutaja",
+    "locked": "Lukustatud piletid",
+    "watched": "Jälgitavad piletid",
+    "escalated": "Eskaleeritud piletid",
+    "service": "Teenuse järgi",
+    "serviceHint": "Kuva teenusega seotud piletid.",
+    "pickService": "Vali teenus…"
+  },
+  "customerCentre": {
+    "title": "Kliendiinfo",
+    "open": "Klient",
+    "invalid": "Vigane kliendi sisselogimine.",
+    "loadError": "Klienti ei saanud laadida.",
+    "email": "E-post",
+    "phone": "Telefon",
+    "customerId": "Kliendinumber",
+    "company": "Ettevõte",
+    "openCount": "{{count}} avatud",
+    "closedCount": "{{count}} suletud",
+    "allTickets": "Kõik piletid →",
+    "recentTickets": "Hiljutised piletid"
+  },
+  "timeAccounting": {
+    "title": "Ajaarvestus",
+    "hint": "Broneeritud ajaühikud piletitel, millele teil on juurdepääs.",
+    "filterUser": "Agent",
+    "allUsers": "Kõik agendid",
+    "filterFrom": "Alates",
+    "filterTo": "Kuni",
+    "filterTicket": "Pileti ID",
+    "empty": "Ühtegi ajatõiget ei leitud.",
+    "colWhen": "Millal",
+    "colTicket": "Pilet",
+    "colUser": "Agent",
+    "colUnits": "Ühikud",
+    "presetsLabel": "Ajavahemik",
+    "presets": {
+      "today": "Täna",
+      "yesterday": "Eile",
+      "thisWeek": "See nädal",
+      "lastWeek": "Eelmine nädal",
+      "thisMonth": "See kuu",
+      "lastMonth": "Eelmine kuu",
+      "thisQuarter": "See kvartal",
+      "lastQuarter": "Eelmine kvartal",
+      "thisYear": "See aasta",
+      "lastYear": "Eelmine aasta"
+    },
+    "kpiUnits": "Ajaühikud",
+    "kpiEntries": "Kanded",
+    "kpiTickets": "Piletid",
+    "kpiAgents": "Agendid",
+    "rangeBetween": "{{from}} – {{to}}",
+    "rangeFrom": "alates {{from}}",
+    "rangeTo": "kuni {{to}}",
+    "chartTitle": "Ühikud päevas",
+    "chartBar": "{{date}}: {{units}} ühikut",
+    "dayUnknown": "Kuupäev puudub",
+    "emptyHint": "Laiendage ajavahemikku või tühjendage agendi ja pileti filtrid.",
+    "clearFilters": "Tühjenda filtrid",
+    "pageRange": "{{from}}–{{to}}",
+    "pageScope": "sellel lehel",
+    "chartPeak": "tipp {{units}}"
+  },
+  "setPassword": {
+    "subtitle": "Valige oma konto parool.",
+    "password": "Uus parool",
+    "confirm": "Korda parooli",
+    "lengthHint": "{{min}} kuni {{max}} märki.",
+    "mismatch": "Paroolid ei ühti.",
+    "submit": "Määra parool",
+    "saving": "Salvestamine…",
+    "done": "Parool salvestatud. Saate sisse logida.",
+    "invalid": "See link ei kehti enam.",
+    "invalidHint": "Seadistuslingid kehtivad 7 päeva ja on ühekordsed. Paluge administratsioonilt uus.",
+    "toLogin": "Mine sisselogimisele"
   }
 }

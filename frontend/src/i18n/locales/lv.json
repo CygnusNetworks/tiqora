@@ -33,7 +33,7 @@
     "admin": "Administrators",
     "theme": "Tēma",
     "language": "Valoda",
-    "dashboard": "Informācijas panelis",
+    "dashboard": "Panelis",
     "queues": "Rindas",
     "kb": "Zināšanu bāze"
   },
@@ -55,7 +55,12 @@
     "showActiveQueues": "Rādīt aktīvo",
     "queueSearch": "Filtrēt rindas…",
     "noQueueMatch": "Neviena rinda neatbilst.",
-    "templates": "Veidnes"
+    "templates": "Veidnes",
+    "locked": "Bloķēti",
+    "responsible": "Atbildīgais",
+    "escalated": "Eskalēti",
+    "services": "Pakalpojumi",
+    "timeAccounting": "Laika uzskaite"
   },
   "common": {
     "prev": "Iepriekšējais",
@@ -68,7 +73,10 @@
     "cancel": "Atcelt",
     "help": "Palīdzība",
     "edit": "Rediģēt",
-    "save": "Saglabāt"
+    "save": "Saglabāt",
+    "saved": "Saglabāts",
+    "delete": "Dzēst",
+    "submit": "Iesniegt"
   },
   "otp": {
     "verifying": "Notiek pārbaude…",
@@ -171,7 +179,9 @@
     "toPickUpEmpty": "Nav jaunu biļešu, ko paņemt.",
     "remindersDue": "Atgādinājumu termiņš",
     "remindersDueEmpty": "Nav nekādu atgādinājumu.",
-    "queueShortcutsEmpty": "Pašlaik nav rindu ar atvērtām vai jaunām biļetēm."
+    "queueShortcutsEmpty": "Pašlaik nav rindu ar atvērtām vai jaunām biļetēm.",
+    "lastViews": "Nesen skatītie",
+    "lastViewsUntitled": "(nav temata)"
   },
   "queue": {
     "sidebar": "Rindas",
@@ -482,7 +492,8 @@
       "customerEmail": "E-pasts",
       "customerFirstName": "Vārds",
       "customerLastName": "Uzvārds",
-      "customerLoginConflict": "Šī pieteikšanās jau pastāv. Izvēlieties citu pieteikumvārdu vai tā vietā piešķiriet esošo klientu, izmantojot meklēšanu."
+      "customerLoginConflict": "Šī pieteikšanās jau pastāv. Izvēlieties citu pieteikumvārdu vai tā vietā piešķiriet esošo klientu, izmantojot meklēšanu.",
+      "clearCustomer": "Noņemt klientu"
     },
     "inlineAttachments": "Iegultie attēli ({{count}})",
     "list": {
@@ -504,7 +515,35 @@
     "draftEditedAt": "rediģēts {{time}}",
     "draftDiscard": "Atmest melnrakstu",
     "draftDiscardConfirm": "Vai atmest šo nenosūtīto atbildi? Tekstu nevarēs atgūt.",
-    "draftDiscardConfirmButton": "Atmest"
+    "draftDiscardConfirmButton": "Atmest",
+    "type": "Tips",
+    "service": "Pakalpojums",
+    "sla": "SLA",
+    "mentions": "Pieminējumi",
+    "timeAccounting": "Laika uzskaite",
+    "timeUnits": "Laika vienības",
+    "addTime": "Reģistrēt laiku",
+    "addMention": "Pieminēt aģentu",
+    "mentionsCount": "Pieminējumi: {{n}}",
+    "mentionsEmpty": "Neviens nav pieminēts",
+    "mentionRemove": "Noņemt pieminējumu",
+    "mentionSuggestions": "Aģenti",
+    "timeUnitAbbrev": "min",
+    "timeUnitHoursAbbrev": "h",
+    "timeUnitsShort": "{{units}} min",
+    "timeAccountingTotal": "Reģistrētais laiks: {{units}} min",
+    "timeRemove": "Noņemt ierakstu",
+    "timeUnitMode": "Laika vienība",
+    "timeUnitMin": "Min",
+    "timeUnitHours": "H",
+    "timePresets": "Ātrā izvēle",
+    "timeComposerHint": "Atbildot reģistrējiet redaktora kājenē.",
+    "timeChipHint": "Reģistrē nosūtot",
+    "extrasFailedMentions": "Nosūtīts — pieminējums netika saglabāts.",
+    "extrasFailedTime": "Nosūtīts — laiks netika reģistrēts.",
+    "extrasFailedBoth": "Nosūtīts — ne pieminējums, ne laika ieraksts netika saglabāts.",
+    "extrasRetry": "Mēģināt vēlreiz",
+    "customerUnresolved": "Šai adresei nav klienta ieraksta, tāpēc dati nav pieejami."
   },
   "search": {
     "title": "Meklēt",
@@ -1143,7 +1182,8 @@
       },
       "acl": {
         "match": "Nosacījumi, saskaņā ar kuriem tiek piemērots šis ACL (piemēram, pašreizējā rinda, stāvoklis, veidlapas lauks). Labajā pusē esošās izmaiņas tiek piemērotas tikai tad, ja atbilst visi šeit uzskaitītie kritēriji.",
-        "change": "ACL ietekme, tiklīdz tās nosacījumi sakrīt — parasti tas ierobežo vai uzspiež veidlapās pieejamās izvēles iespējas (piemēram, ir atļauti tikai daži turpmākie stāvokļi)."
+        "change": "ACL ietekme, tiklīdz tās nosacījumi sakrīt — parasti tas ierobežo vai uzspiež veidlapās pieejamās izvēles iespējas (piemēram, ir atļauti tikai daži turpmākie stāvokļi).",
+        "stopAfterMatch": "Ja atzīmēts, pēc produktīvas atbilstības citas ACL vairs netiek vērtētas (Znuny StopAfterMatch)."
       },
       "mailOutbound": {
         "host": "SMTP servera resursdatora nosaukums izejošajam pastam. Jābūt sasniedzamam no šī servera (DNS + ugunsmūris) tālāk norādītajā portā.",
@@ -1190,8 +1230,8 @@
         "validId": "“Temp” (valid_id 3) ir Znuny trešais derīguma stāvoklis — parasti konts gaida apstiprinājumu (piemēram, neapstiprināta pašreģistrācija), kas atšķiras no vienkārša derīguma/nederīga."
       },
       "systemAddresses": {
-        "email": "Address used as the From email for queues and auto-responses.",
-        "name": "Display name shown next to the email (e.g. “Support <support@example.com>”)."
+        "email": "Adrese, ko izmanto kā From rindām un autoatbildēm.",
+        "name": "Rādāmais vārds blakus e-pastam (piem. “Support <support@example.com>”)."
       }
     },
     "nav": {
@@ -1240,7 +1280,13 @@
       "aiAcl": "Piekļuve un ierobežojumi",
       "collapse": "Sakļaut navigāciju",
       "mailAccounts": "Pasta konti",
-      "oauth2Tokens": "OAuth2 pilnvaras (pasts)"
+      "oauth2Tokens": "OAuth2 pilnvaras (pasts)",
+      "types": "Pieteikumu tipi",
+      "services": "Pakalpojumi",
+      "slas": "SLA",
+      "systemAddresses": "Sistēmas adreses",
+      "notificationEvents": "Paziņojumu notikumi",
+      "ticketAttributeRelations": "Atribūtu saites"
     },
     "table": {
       "id": "ID",
@@ -1347,7 +1393,44 @@
       "title": "Nosaukums",
       "firstName": "Vārds",
       "lastName": "Uzvārds",
-      "name": "Vārds"
+      "name": "Vārds",
+      "passwordMode": "Paroles piešķiršana",
+      "passwordModeManual": "Iestatīt manuāli",
+      "passwordModeAuto": "Ielūgums: sūtīt saiti e-pastā",
+      "passwordModeAutoHelp": "Saglabājot vienreizēja saite iet uz e-pastu zemāk. Aģents paroli izvēlas pats.",
+      "email": "E-pasts",
+      "mobile": "Mobilais tālrunis",
+      "effectivePermissions": "Rādīt efektīvās tiesības",
+      "effectivePermissionsTitle": "Efektīvās tiesības: {{name}}",
+      "effectivePermissionsDescription": "Apvienotās tiesības no tiešajām grupām un lomām.",
+      "rolesHeading": "Lomas",
+      "groupsHeading": "Grupu tiesības",
+      "queuesHeading": "Rindas",
+      "noRoles": "Nav piešķirtu lomu.",
+      "noGroups": "Nav grupu tiesību.",
+      "noQueues": "Nav piešķirtu rindu.",
+      "viaDirect": "Tieši",
+      "permissionColumn": "Tiesības",
+      "sourceColumn": "Avots",
+      "editSettings": "Rediģēt personīgos iestatījumus",
+      "editSettingsTitle": "{{name}} personīgie iestatījumi",
+      "editSettingsDescription": "Tie paši iestatījumi, ko aģents redz sadaļā “Personīgie iestatījumi”.",
+      "languageLabel": "Valoda",
+      "languageSaved": "Valoda saglabāta.",
+      "tabAccount": "Konts",
+      "tabPerson": "Persona",
+      "sourceInvalidHint": "Šīs tiesības nāk no nederīgas lomas un tāpēc nedarbojas.",
+      "keyInactiveHint": "Tiesības ir konfigurētas, bet nav spēkā — avots vai grupa ir nederīga.",
+      "deletePermanent": "Dzēst pavisam",
+      "deleteTitle": "Dzēst {{name}} pavisam?",
+      "deleteConfirm": "Dzēst pavisam",
+      "deletableBody": "Nekas nereflektē uz {{name}}; kontu var pilnībā noņemt ar iestatījumiem, grupām, lomām un 2FA.",
+      "deleteIrreversible": "To nevar atsaukt.",
+      "deleteBlockedBody": "{{name}} nevar izdzēst — šīs tabulas joprojām atsaucas uz kontu:",
+      "deleteBlockedHint": "Iestatiet kontu uz “Nederīgs”, lai pieteikumi, raksti un vēsture paliktu attiecināmi.",
+      "resendSetupLink": "Nosūtīt iestatīšanas saiti vēlreiz",
+      "setupLinkSent": "Iestatīšanas saite nosūtīta.",
+      "setupLinkFailed": "Neizdevās nosūtīt iestatīšanas saiti."
     },
     "groups": {
       "title_plural": "Grupas",
@@ -1537,8 +1620,8 @@
       "key": "Atslēga",
       "value": "Vērtība",
       "valuePlaceholder": "Regex vai vērtība",
-      "stop": "Stop",
-      "stopYes": "Stop",
+      "stop": "Apturēt",
+      "stopYes": "Apturēt",
       "stopAfterMatch": "Apstāties pēc spēles",
       "stopHelp": "Ja tas ir iestatīts, pēc šī filtra atbilstības ziņojumam netiek novērtēti citi PostMaster filtri.",
       "matchCount": "Match",
@@ -1561,7 +1644,10 @@
       "name": "Vārds",
       "description": "Apraksts",
       "match": "Match",
-      "change": "Mainīt"
+      "change": "Mainīt",
+      "new": "Jauna ACL",
+      "stopAfterMatch": "Apturēt pēc atbilstības",
+      "confirmDelete": "Dzēst ACL “{{name}}”? To nevar atsaukt."
     },
     "genericAgentJobs": {
       "title_plural": "Vispārēji aģentu darbi",
@@ -2222,7 +2308,13 @@
       "aiAudit": "Pilnīgs katra LLM pieprasījuma/atbildes audits, atklājot PII.",
       "aiAcl": "AI atļaujas un kvotas katrai grupai, lomai vai aģentam.",
       "mailAccounts": "Ienākošās IMAP/POP pastkastes (parole vai OAuth2).",
-      "oauth2Tokens": "OAuth2 pilnvaras konfigurācijas Microsoft/Google pastam (saderīgas ar Znuny)."
+      "oauth2Tokens": "OAuth2 pilnvaras konfigurācijas Microsoft/Google pastam (saderīgas ar Znuny).",
+      "types": "Pārvaldiet klasifikācijai izmantotos pieteikumu tipus.",
+      "services": "Pārvaldiet pakalpojumus un saistiet ar SLA.",
+      "slas": "Pārvaldiet pakalpojumu līmeņa līgumus un termiņus.",
+      "systemAddresses": "From e-pasta adreses rindām un autoatbildēm.",
+      "notificationEvents": "Konfigurējiet notikumu balstītus aģentu paziņojumus.",
+      "ticketAttributeRelations": "Ar Znuny saderenīgas atkarību matrices (pakalpojums/rinda u.c.) CSV formātā."
     },
     "mailAccounts": {
       "title_plural": "Pasta konti",
@@ -2270,11 +2362,50 @@
       "refreshSuccess": "Tokens ir atsvaidzināts."
     },
     "systemAddresses": {
-      "title_plural": "System addresses",
-      "subtitle": "From-addresses for queues and auto-responses. Invalid addresses stay listed so they can be re-enabled.",
-      "new": "Add address",
-      "email": "Email",
-      "name": "Name"
+      "title_plural": "Sistēmas adreses",
+      "subtitle": "From adreses rindām un autoatbildēm. Nederīgās paliek sarakstā, lai tās varētu atkal iespējot.",
+      "new": "Pievienot adresi",
+      "email": "E-pasts",
+      "name": "Nosaukums"
+    },
+    "types": {
+      "title_plural": "Pieteikumu tipi",
+      "new": "Jauns tips",
+      "name": "Nosaukums"
+    },
+    "services": {
+      "title_plural": "Pakalpojumi",
+      "new": "Jauns pakalpojums",
+      "name": "Nosaukums",
+      "slaCount": "SLA"
+    },
+    "slas": {
+      "title_plural": "SLA",
+      "new": "Jauns SLA",
+      "name": "Nosaukums",
+      "firstResponseTime": "Pirmā atbilde (min)",
+      "updateTime": "Atjauninājums (min)",
+      "solutionTime": "Risinājums (min)",
+      "calendar": "Kalendārs"
+    },
+    "notificationEvents": {
+      "title_plural": "Paziņojumu notikumi",
+      "subtitle": "Notikumiem iestājoties atbilstošie paziņojumi tiek sūtīti aģentiem.",
+      "new": "Izveidot paziņojumu",
+      "name": "Nosaukums",
+      "event": "Notikums",
+      "subject": "Temats",
+      "body": "Teksts"
+    },
+    "tar": {
+      "title": "Pieteikumu atribūtu saites",
+      "filename": "Faila nosaukums",
+      "attributes": "Atribūti",
+      "priority": "Prioritāte",
+      "csv": "CSV dati",
+      "new": "Jauna saite",
+      "help": "CSV ar galveni Attribute1;Attribute2 un vērtību pāriem (Znuny AdminTicketAttributeRelations). Ierobežo veidlapu izvēles (piem. Pakalpojums → Rinda).",
+      "confirmDelete": "Dzēst šo saiti?"
     }
   },
   "kb": {
@@ -2489,7 +2620,8 @@
       "startButton": "Sāciet procesu",
       "actions": "Pieejamās darbības",
       "loadError": "Nevarēja ielādēt procesa stāvokli.",
-      "noDialogs": "Šai darbībai nav pieejamas nekādas darbības."
+      "noDialogs": "Šai darbībai nav pieejamas nekādas darbības.",
+      "noCustomerDialogs": "Šajā solī nav pieejamu klienta dialogu."
     },
     "start": {
       "title": "Sāciet procesu",
@@ -2525,5 +2657,84 @@
     "body": "Ķermenis",
     "editTitle": "Rediģēt “{{name}}”",
     "saveError": "Nevarēja saglabāt veidni."
+  },
+  "views": {
+    "mine": "Mani pieteikumi",
+    "responsible": "Atbildīgais",
+    "locked": "Bloķētie pieteikumi",
+    "watched": "Novērotie pieteikumi",
+    "escalated": "Eskalētie pieteikumi",
+    "service": "Pēc pakalpojuma",
+    "serviceHint": "Rādīt pakalpojumam piesaistītos pieteikumus.",
+    "pickService": "Izvēlieties pakalpojumu…"
+  },
+  "customerCentre": {
+    "title": "Klienta informācija",
+    "open": "Klients",
+    "invalid": "Nederīga klienta pieteikšanās.",
+    "loadError": "Klientu neizdevās ielādēt.",
+    "email": "E-pasts",
+    "phone": "Tālrunis",
+    "customerId": "Klienta numurs",
+    "company": "Uzņēmums",
+    "openCount": "{{count}} atvērti",
+    "closedCount": "{{count}} aizvērti",
+    "allTickets": "Visi pieteikumi →",
+    "recentTickets": "Jaunākie pieteikumi"
+  },
+  "timeAccounting": {
+    "title": "Laika uzskaite",
+    "hint": "Reģistrētās laika vienības pieteikumos, kuriem jums ir piekļuve.",
+    "filterUser": "Aģents",
+    "allUsers": "Visi aģenti",
+    "filterFrom": "No",
+    "filterTo": "Līdz",
+    "filterTicket": "Pieteikuma ID",
+    "empty": "Nav atbilstošu laika ierakstu.",
+    "colWhen": "Kad",
+    "colTicket": "Pieteikums",
+    "colUser": "Aģents",
+    "colUnits": "Vienības",
+    "presetsLabel": "Periods",
+    "presets": {
+      "today": "Šodien",
+      "yesterday": "Vakar",
+      "thisWeek": "Šī nedēļa",
+      "lastWeek": "Pagājusī nedēļa",
+      "thisMonth": "Šis mēnesis",
+      "lastMonth": "Pagājušais mēnesis",
+      "thisQuarter": "Šis ceturksnis",
+      "lastQuarter": "Pagājušais ceturksnis",
+      "thisYear": "Šis gads",
+      "lastYear": "Pagājušais gads"
+    },
+    "kpiUnits": "Laika vienības",
+    "kpiEntries": "Ieraksti",
+    "kpiTickets": "Pieteikumi",
+    "kpiAgents": "Aģenti",
+    "rangeBetween": "{{from}} – {{to}}",
+    "rangeFrom": "no {{from}}",
+    "rangeTo": "līdz {{to}}",
+    "chartTitle": "Vienības dienā",
+    "chartBar": "{{date}}: {{units}} vienības",
+    "dayUnknown": "Bez datuma",
+    "emptyHint": "Paplašiniet periodu vai notīriet aģenta un pieteikuma filtrus.",
+    "clearFilters": "Notīrīt filtrus",
+    "pageRange": "{{from}}–{{to}}",
+    "pageScope": "šajā lapā",
+    "chartPeak": "maks. {{units}}"
+  },
+  "setPassword": {
+    "subtitle": "Izvēlieties paroli savam kontam.",
+    "password": "Jauna parole",
+    "confirm": "Atkārtojiet paroli",
+    "lengthHint": "No {{min}} līdz {{max}} rakstzīmēm.",
+    "mismatch": "Paroles nesakrīt.",
+    "submit": "Iestatīt paroli",
+    "saving": "Saglabā…",
+    "done": "Parole saglabāta. Varat pierakstīties.",
+    "invalid": "Šī saite vairs nav derīga.",
+    "invalidHint": "Iestatīšanas saites ir derīgas 7 dienas un vienreizējas. Lūdziet jaunu administrācijai.",
+    "toLogin": "Uz pierakstīšanos"
   }
 }

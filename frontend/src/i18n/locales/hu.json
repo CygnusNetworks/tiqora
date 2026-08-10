@@ -33,7 +33,7 @@
     "admin": "Adminisztráció",
     "theme": "téma",
     "language": "Nyelv",
-    "dashboard": "Irányítópult",
+    "dashboard": "Vezérlőpult",
     "queues": "Várólisták",
     "kb": "Tudásbázis"
   },
@@ -55,7 +55,12 @@
     "showActiveQueues": "Aktív megjelenítése",
     "queueSearch": "Várólisták szűrése…",
     "noQueueMatch": "Egyetlen sor sem egyezik.",
-    "templates": "Sablonok"
+    "templates": "Sablonok",
+    "locked": "Zárolt",
+    "responsible": "Felelős",
+    "escalated": "Eszkalált",
+    "services": "Szolgáltatások",
+    "timeAccounting": "Időelszámolás"
   },
   "common": {
     "prev": "Előző",
@@ -68,7 +73,10 @@
     "cancel": "Mégsem",
     "help": "Súgó",
     "edit": "Szerkesztés",
-    "save": "Mentés"
+    "save": "Mentés",
+    "saved": "Mentve",
+    "delete": "Törlés",
+    "submit": "Küldés"
   },
   "otp": {
     "verifying": "Ellenőrzés…",
@@ -171,7 +179,9 @@
     "toPickUpEmpty": "Nincs új jegy.",
     "remindersDue": "Emlékeztetők esedékes",
     "remindersDueEmpty": "Nincs esedékes emlékeztető.",
-    "queueShortcutsEmpty": "Jelenleg nincs sorban állás nyitott vagy új jegyekkel."
+    "queueShortcutsEmpty": "Jelenleg nincs sorban állás nyitott vagy új jegyekkel.",
+    "lastViews": "Nemrég megtekintett",
+    "lastViewsUntitled": "(nincs tárgy)"
   },
   "queue": {
     "sidebar": "Várólisták",
@@ -482,7 +492,8 @@
       "customerEmail": "E-mail",
       "customerFirstName": "Keresztnév",
       "customerLastName": "Vezetéknév",
-      "customerLoginConflict": "Ez a bejelentkezés már létezik. Válasszon másik bejelentkezési nevet, vagy rendelje hozzá a meglévő ügyfelet kereséssel."
+      "customerLoginConflict": "Ez a bejelentkezés már létezik. Válasszon másik bejelentkezési nevet, vagy rendelje hozzá a meglévő ügyfelet kereséssel.",
+      "clearCustomer": "Ügyfél eltávolítása"
     },
     "inlineAttachments": "Beágyazott képek ({{count}})",
     "list": {
@@ -504,7 +515,35 @@
     "draftEditedAt": "szerkesztve {{time}}",
     "draftDiscard": "Piszkozat elvetése",
     "draftDiscardConfirm": "Elveti ezt az el nem küldött választ? A szöveg nem állítható vissza.",
-    "draftDiscardConfirmButton": "Elvetés"
+    "draftDiscardConfirmButton": "Elvetés",
+    "type": "Típus",
+    "service": "Szolgáltatás",
+    "sla": "SLA",
+    "mentions": "Említések",
+    "timeAccounting": "Időelszámolás",
+    "timeUnits": "Időegységek",
+    "addTime": "Idő rögzítése",
+    "addMention": "Ügyintéző említése",
+    "mentionsCount": "Említések: {{n}}",
+    "mentionsEmpty": "Senki nincs megemlítve",
+    "mentionRemove": "Említés eltávolítása",
+    "mentionSuggestions": "Ügyintézők",
+    "timeUnitAbbrev": "perc",
+    "timeUnitHoursAbbrev": "ó",
+    "timeUnitsShort": "{{units}} perc",
+    "timeAccountingTotal": "Rögzített idő: {{units}} perc",
+    "timeRemove": "Bejegyzés törlése",
+    "timeUnitMode": "Időegység",
+    "timeUnitMin": "Perc",
+    "timeUnitHours": "Ó",
+    "timePresets": "Gyorsválasztó",
+    "timeComposerHint": "Válasznál a szerkesztő láblécében rögzítse.",
+    "timeChipHint": "Küldéskor rögzül",
+    "extrasFailedMentions": "Elküldve — az említés nem mentődött.",
+    "extrasFailedTime": "Elküldve — az idő nem került rögzítésre.",
+    "extrasFailedBoth": "Elküldve — sem az említés, sem az időrögzítés nem mentődött.",
+    "extrasRetry": "Újra",
+    "customerUnresolved": "Ehhez a címhez nincs ügyfélrekord, ezért az ügyféladatok nem érhetők el."
   },
   "search": {
     "title": "Keresés",
@@ -913,7 +952,7 @@
         "replyLanguageNone": "Nincs alapértelmezett",
         "replyLanguage": {
           "de": "német",
-          "en": "English"
+          "en": "Angol"
         },
         "allowedStateTypes": "Engedélyezett állapottípusok",
         "piiNer": "Személynevek automatikus észlelése (NER)",
@@ -1143,7 +1182,8 @@
       },
       "acl": {
         "match": "Feltételek, amelyek mellett ez az ACL vonatkozik (pl. aktuális sor, állapot, űrlapmező). A jobb oldali módosítás csak akkor kerül alkalmazásra, ha minden itt felsorolt ​​feltétel egyezik.",
-        "change": "Az ACL hatása, ha a feltételei teljesülnek — jellemzően korlátozza vagy kényszeríti az űrlapokon elérhető választásokat (pl. csak bizonyos utóutókövetési állapotok engedélyezettek)."
+        "change": "Az ACL hatása, ha a feltételei teljesülnek — jellemzően korlátozza vagy kényszeríti az űrlapokon elérhető választásokat (pl. csak bizonyos utóutókövetési állapotok engedélyezettek).",
+        "stopAfterMatch": "Ha be van jelölve, produktív egyezés után nem futnak további ACL-ek (Znuny StopAfterMatch)."
       },
       "mailOutbound": {
         "host": "SMTP-kiszolgáló gazdagépneve a kimenő levelekhez. Elérhetőnek kell lennie erről a szerverről (DNS + tűzfal) az alábbi porton.",
@@ -1190,8 +1230,8 @@
         "validId": "A „Temp” (valid_id 3) a Znuny harmadik érvényességi állapota – jellemzően egy megerősítésre váró fiók (pl. meg nem erősített önregisztráció), amely különbözik az egyszerű érvényes/invalid állapottól."
       },
       "systemAddresses": {
-        "email": "Address used as the From email for queues and auto-responses.",
-        "name": "Display name shown next to the email (e.g. “Support <support@example.com>”)."
+        "email": "A sorok és automatikus válaszok From-címeként használt cím.",
+        "name": "Megjelenített név az e-mail mellett (pl. „Support <support@example.com>”)."
       }
     },
     "nav": {
@@ -1240,7 +1280,13 @@
       "aiAcl": "Hozzáférés és korlátozások",
       "collapse": "Navigáció összecsukása",
       "mailAccounts": "Levelezési fiókok",
-      "oauth2Tokens": "OAuth2 tokenek (mail)"
+      "oauth2Tokens": "OAuth2 tokenek (mail)",
+      "types": "Jegytípusok",
+      "services": "Szolgáltatások",
+      "slas": "SLA-k",
+      "systemAddresses": "Rendszercímek",
+      "notificationEvents": "Értesítési események",
+      "ticketAttributeRelations": "Attribútumkapcsolatok"
     },
     "table": {
       "id": "ID",
@@ -1347,7 +1393,44 @@
       "title": "Cím",
       "firstName": "Keresztnév",
       "lastName": "Vezetéknév",
-      "name": "Név"
+      "name": "Név",
+      "passwordMode": "Jelszó kiosztása",
+      "passwordModeManual": "Kézi megadás",
+      "passwordModeAuto": "Meghívó: beállító hivatkozás e-mailben",
+      "passwordModeAutoHelp": "Mentéskor egyszer használatos hivatkozás megy az alábbi e-mailre. Az ügyintéző maga ad jelszót.",
+      "email": "E-mail",
+      "mobile": "Mobiltelefon",
+      "effectivePermissions": "Effektív jogosultságok",
+      "effectivePermissionsTitle": "Effektív jogosultságok: {{name}}",
+      "effectivePermissionsDescription": "Közvetlen csoportokból és szerepkörökből összevont jogok.",
+      "rolesHeading": "Szerepkörök",
+      "groupsHeading": "Csoportjogosultságok",
+      "queuesHeading": "Sorok",
+      "noRoles": "Nincs szerepkör hozzárendelve.",
+      "noGroups": "Nincs csoportjogosultság.",
+      "noQueues": "Nincs hozzárendelt sor.",
+      "viaDirect": "Közvetlen",
+      "permissionColumn": "Jogosultságok",
+      "sourceColumn": "Forrás",
+      "editSettings": "Személyes beállítások szerkesztése",
+      "editSettingsTitle": "{{name}} személyes beállításai",
+      "editSettingsDescription": "Ugyanazok a beállítások, amelyeket az ügyintéző a „Személyes beállítások” alatt lát.",
+      "languageLabel": "Nyelv",
+      "languageSaved": "Nyelv mentve.",
+      "tabAccount": "Fiók",
+      "tabPerson": "Személy",
+      "sourceInvalidHint": "Ez a jogosultság érvénytelen szerepkörből jön, ezért hatástalan.",
+      "keyInactiveHint": "Ez a jog be van állítva, de nem érvényes – a forrás vagy a csoport érvénytelen.",
+      "deletePermanent": "Végleges törlés",
+      "deleteTitle": "Végleg törli {{name}} fiókját?",
+      "deleteConfirm": "Végleges törlés",
+      "deletableBody": "{{name}} sehol sincs hivatkozva; a fiók teljesen törölhető, preferenciákkal, csoportokkal, szerepkörökkel és 2FA-val.",
+      "deleteIrreversible": "Ez nem vonható vissza.",
+      "deleteBlockedBody": "{{name}} nem törölhető – ezek a táblák még hivatkoznak a fiókra:",
+      "deleteBlockedHint": "Állítsa a fiókot „Érvénytelen” értékre, hogy a jegyek, cikkek és az előzmények hozzárendelhetők maradjanak.",
+      "resendSetupLink": "Beállító hivatkozás újraküldése",
+      "setupLinkSent": "Beállító hivatkozás elküldve.",
+      "setupLinkFailed": "A beállító hivatkozást nem sikerült elküldeni."
     },
     "groups": {
       "title_plural": "Csoportok",
@@ -1561,7 +1644,10 @@
       "name": "Név",
       "description": "Leírás",
       "match": "Egyezés",
-      "change": "Változás"
+      "change": "Változás",
+      "new": "Új ACL",
+      "stopAfterMatch": "Megállítás egyezés után",
+      "confirmDelete": "Törli az ACL „{{name}}” szabályt? Ez nem vonható vissza."
     },
     "genericAgentJobs": {
       "title_plural": "Általános ügyintézői munkák",
@@ -2055,7 +2141,7 @@
         "companyId": "Vállalat (customer_id)",
         "companyIdPh": "pl. ACME",
         "loginRegex": "Regex bejelentkezés",
-        "customerIdRegex": "customer_id regex",
+        "customerIdRegex": "customer_id-regex",
         "emailRegex": "E-mail regex",
         "changedAfter": "Utána változott",
         "changedBefore": "Korábban változott",
@@ -2222,7 +2308,13 @@
       "aiAudit": "Minden LLM-kérelem/válasz teljes körű ellenőrzése személyazonosításra alkalmas adatok visszafejtésével.",
       "aiAcl": "AI engedélyek és kvóták csoportonként, szerepkörönként vagy ügyintézőnként.",
       "mailAccounts": "Bejövő IMAP/POP postafiókok (jelszó vagy OAuth2).",
-      "oauth2Tokens": "OAuth2 token konfigurációk a Microsoft/Google mailhez (Znuny-kompatibilis)."
+      "oauth2Tokens": "OAuth2 token konfigurációk a Microsoft/Google mailhez (Znuny-kompatibilis).",
+      "types": "A besoroláshoz használt jegytípusok kezelése.",
+      "services": "Szolgáltatások kezelése és összekapcsolása SLA-kkal.",
+      "slas": "Szolgáltatási szintű megállapodások és határidők kezelése.",
+      "systemAddresses": "A sorok és automatikus válaszok From-címei.",
+      "notificationEvents": "Eseményvezérelt ügynök-értesítések beállítása.",
+      "ticketAttributeRelations": "Znuny-kompatibilis függőségi mátrixok (pl. szolgáltatás → sor) CSV-ben."
     },
     "mailAccounts": {
       "title_plural": "Levelezési fiókok",
@@ -2270,11 +2362,50 @@
       "refreshSuccess": "Token frissítve."
     },
     "systemAddresses": {
-      "title_plural": "System addresses",
-      "subtitle": "From-addresses for queues and auto-responses. Invalid addresses stay listed so they can be re-enabled.",
-      "new": "Add address",
-      "email": "Email",
-      "name": "Name"
+      "title_plural": "Rendszercímek",
+      "subtitle": "From-címek sorokhoz és automatikus válaszokhoz. Az érvénytelenek listán maradnak, hogy újra aktiválhatók legyenek.",
+      "new": "Cím hozzáadása",
+      "email": "E-mail",
+      "name": "Név"
+    },
+    "types": {
+      "title_plural": "Jegytípusok",
+      "new": "Új típus",
+      "name": "Név"
+    },
+    "services": {
+      "title_plural": "Szolgáltatások",
+      "new": "Új szolgáltatás",
+      "name": "Név",
+      "slaCount": "SLA-k"
+    },
+    "slas": {
+      "title_plural": "SLA-k",
+      "new": "Új SLA",
+      "name": "Név",
+      "firstResponseTime": "Első válasz (perc)",
+      "updateTime": "Frissítés (perc)",
+      "solutionTime": "Megoldás (perc)",
+      "calendar": "Naptár"
+    },
+    "notificationEvents": {
+      "title_plural": "Értesítési események",
+      "subtitle": "Eseményekkor a megfelelő értesítések eljutnak az ügyintézőkhöz.",
+      "new": "Értesítés létrehozása",
+      "name": "Név",
+      "event": "Esemény",
+      "subject": "Tárgy",
+      "body": "Törzs"
+    },
+    "tar": {
+      "title": "Jegyattribútum-kapcsolatok",
+      "filename": "Fájlnév",
+      "attributes": "Attribútumok",
+      "priority": "Prioritás",
+      "csv": "CSV-adatok",
+      "new": "Új kapcsolat",
+      "help": "CSV Attribute1;Attribute2 fejléccel és értékpárokkal (Znuny AdminTicketAttributeRelations). Űrlapválasztókat korlátoz (pl. Szolgáltatás → Sor).",
+      "confirmDelete": "Törli ezt a kapcsolatot?"
     }
   },
   "kb": {
@@ -2489,7 +2620,8 @@
       "startButton": "Indítsa el a folyamatot",
       "actions": "Elérhető műveletek",
       "loadError": "Nem sikerült betölteni a folyamat állapotát.",
-      "noDialogs": "Ehhez a tevékenységhez nem állnak rendelkezésre műveletek."
+      "noDialogs": "Ehhez a tevékenységhez nem állnak rendelkezésre műveletek.",
+      "noCustomerDialogs": "Ezen a lépésen nincsenek ügyfélpárbeszédek."
     },
     "start": {
       "title": "Indítsa el a folyamatot",
@@ -2525,5 +2657,84 @@
     "body": "Törzs",
     "editTitle": "„{{name}}” szerkesztése",
     "saveError": "Nem sikerült menteni a sablont."
+  },
+  "views": {
+    "mine": "Saját jegyek",
+    "responsible": "Felelős",
+    "locked": "Zárolt jegyek",
+    "watched": "Figyelt jegyek",
+    "escalated": "Eszkalált jegyek",
+    "service": "Szolgáltatás szerint",
+    "serviceHint": "Egy szolgáltatáshoz rendelt jegyek listája.",
+    "pickService": "Válasszon szolgáltatást…"
+  },
+  "customerCentre": {
+    "title": "Ügyféladatok",
+    "open": "Ügyfélinfo",
+    "invalid": "Érvénytelen ügyfél-bejelentkezés.",
+    "loadError": "Az ügyfelet nem sikerült betölteni.",
+    "email": "E-mail",
+    "phone": "Telefon",
+    "customerId": "Ügyfélszám",
+    "company": "Cég",
+    "openCount": "{{count}} nyitott",
+    "closedCount": "{{count}} lezárt",
+    "allTickets": "Összes jegy →",
+    "recentTickets": "Legutóbbi jegyek"
+  },
+  "timeAccounting": {
+    "title": "Időelszámolás",
+    "hint": "A hozzáférhető jegyeken rögzített idõegységek.",
+    "filterUser": "Ügyintéző",
+    "allUsers": "Minden ügyintéző",
+    "filterFrom": "Tól",
+    "filterTo": "Ig",
+    "filterTicket": "Jegyazonosító",
+    "empty": "Nincs megfelelő időbejegyzés.",
+    "colWhen": "Mikor",
+    "colTicket": "Jegy",
+    "colUser": "Ügyintéző",
+    "colUnits": "Egységek",
+    "presetsLabel": "Időszak",
+    "presets": {
+      "today": "Ma",
+      "yesterday": "Tegnap",
+      "thisWeek": "Ez a hét",
+      "lastWeek": "Múlt hét",
+      "thisMonth": "Ez a hónap",
+      "lastMonth": "Múlt hónap",
+      "thisQuarter": "Ez a negyedév",
+      "lastQuarter": "Múlt negyedév",
+      "thisYear": "Ez az év",
+      "lastYear": "Múlt év"
+    },
+    "kpiUnits": "Időegységek",
+    "kpiEntries": "Bejegyzések",
+    "kpiTickets": "Jegyek",
+    "kpiAgents": "Ügyintézők",
+    "rangeBetween": "{{from}} – {{to}}",
+    "rangeFrom": "{{from}}-tól",
+    "rangeTo": "{{to}}-ig",
+    "chartTitle": "Egység / nap",
+    "chartBar": "{{date}}: {{units}} egység",
+    "dayUnknown": "Nincs dátum",
+    "emptyHint": "Bővítse az időszakot, vagy törölje az ügynök- és jegy-szűrőket.",
+    "clearFilters": "Szűrők törlése",
+    "pageRange": "{{from}}–{{to}}",
+    "pageScope": "ezen az oldalon",
+    "chartPeak": "csúcs {{units}}"
+  },
+  "setPassword": {
+    "subtitle": "Válasszon jelszót a fiókjához.",
+    "password": "Új jelszó",
+    "confirm": "Jelszó ismét",
+    "lengthHint": "{{min}} és {{max}} karakter között.",
+    "mismatch": "A jelszavak nem egyeznek.",
+    "submit": "Jelszó beállítása",
+    "saving": "Mentés…",
+    "done": "Jelszó mentve. Most bejelentkezhet.",
+    "invalid": "Ez a hivatkozás már nem érvényes.",
+    "invalidHint": "A beállító hivatkozások 7 napig érvényesek és egyszer használhatók. Kérjen újat az adminisztrációtól.",
+    "toLogin": "Bejelentkezéshez"
   }
 }

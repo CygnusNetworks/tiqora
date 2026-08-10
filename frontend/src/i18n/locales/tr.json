@@ -33,7 +33,7 @@
     "admin": "Yönetim",
     "theme": "Tema",
     "language": "Dil",
-    "dashboard": "Gösterge paneli",
+    "dashboard": "Panel",
     "queues": "Kuyruklar",
     "kb": "Bilgi bankası"
   },
@@ -55,7 +55,12 @@
     "showActiveQueues": "Aktif olanları göster",
     "queueSearch": "Kuyrukları filtrele…",
     "noQueueMatch": "Eşleşen kuyruk yok.",
-    "templates": "Şablonlar"
+    "templates": "Şablonlar",
+    "locked": "Kilitli",
+    "responsible": "Sorumlu",
+    "escalated": "Yükseltilmiş",
+    "services": "Hizmetler",
+    "timeAccounting": "Zaman kaydı"
   },
   "common": {
     "prev": "Önceki",
@@ -68,7 +73,10 @@
     "cancel": "İptal",
     "help": "Yardım",
     "edit": "Düzenle",
-    "save": "Kaydet"
+    "save": "Kaydet",
+    "saved": "Kaydedildi",
+    "delete": "Sil",
+    "submit": "Gönder"
   },
   "otp": {
     "verifying": "Doğrulanıyor…",
@@ -171,7 +179,9 @@
     "toPickUpEmpty": "Alınacak yeni bilet yok.",
     "remindersDue": "Hatırlatmaların zamanı geldi",
     "remindersDueEmpty": "Hiçbir hatırlatmanın zamanı gelmedi.",
-    "queueShortcutsEmpty": "Şu anda açık veya yeni biletli kuyruk yok."
+    "queueShortcutsEmpty": "Şu anda açık veya yeni biletli kuyruk yok.",
+    "lastViews": "Son görüntülenenler",
+    "lastViewsUntitled": "(konu yok)"
   },
   "queue": {
     "sidebar": "Kuyruklar",
@@ -352,7 +362,7 @@
     "recipientName": "Ad",
     "recipientEmail": "E-posta",
     "recipientRemove": "Kaldır",
-    "recipientConfirm": "OK",
+    "recipientConfirm": "Tamam",
     "replyToRequired": "En az bir Alıcıya gerekli.",
     "replySubject": "Konu",
     "replyTemplate": "Şablon",
@@ -482,7 +492,8 @@
       "customerEmail": "E-posta",
       "customerFirstName": "Ad",
       "customerLastName": "Soyadı",
-      "customerLoginConflict": "Bu giriş zaten mevcut. Farklı bir giriş seçin veya bunun yerine mevcut müşteriyi arama yoluyla atayın."
+      "customerLoginConflict": "Bu giriş zaten mevcut. Farklı bir giriş seçin veya bunun yerine mevcut müşteriyi arama yoluyla atayın.",
+      "clearCustomer": "Müşteriyi kaldır"
     },
     "inlineAttachments": "Gömülü resimler ({{count}})",
     "list": {
@@ -504,7 +515,35 @@
     "draftEditedAt": "düzenlendi {{time}}",
     "draftDiscard": "Taslağı sil",
     "draftDiscardConfirm": "Gönderilmemiş bu yanıt silinsin mi? Metin geri getirilemez.",
-    "draftDiscardConfirmButton": "Sil"
+    "draftDiscardConfirmButton": "Sil",
+    "type": "Tür",
+    "service": "Hizmet",
+    "sla": "SLA",
+    "mentions": "Bahsetmeler",
+    "timeAccounting": "Zaman kaydı",
+    "timeUnits": "Zaman birimleri",
+    "addTime": "Zaman kaydet",
+    "addMention": "Temsilciden bahset",
+    "mentionsCount": "Bahsetme: {{n}}",
+    "mentionsEmpty": "Kimse anılmadı",
+    "mentionRemove": "Bahsetmeyi kaldır",
+    "mentionSuggestions": "Temsilciler",
+    "timeUnitAbbrev": "dk",
+    "timeUnitHoursAbbrev": "sa",
+    "timeUnitsShort": "{{units}} dk",
+    "timeAccountingTotal": "Kaydedilen süre: {{units}} dk",
+    "timeRemove": "Kaydı sil",
+    "timeUnitMode": "Zaman birimi",
+    "timeUnitMin": "Dk",
+    "timeUnitHours": "Sa",
+    "timePresets": "Hızlı seçim",
+    "timeComposerHint": "Yanıtlarken düzenleyicinin altbilgisinden kaydedin.",
+    "timeChipHint": "Gönderimde kaydedilir",
+    "extrasFailedMentions": "Gönderildi — bahsetme kaydedilmedi.",
+    "extrasFailedTime": "Gönderildi — zaman kaydedilmedi.",
+    "extrasFailedBoth": "Gönderildi — ne bahsetme ne de zaman kaydı kaydedildi.",
+    "extrasRetry": "Yeniden dene",
+    "customerUnresolved": "Bu adrese uyan müşteri kaydı yok; müşteri ayrıntıları kullanılamıyor."
   },
   "search": {
     "title": "Ara",
@@ -1143,7 +1182,8 @@
       },
       "acl": {
         "match": "Bu ACL'nin geçerli olduğu koşullar (ör. mevcut kuyruk, durum, form alanı). Sağdaki değişiklik yalnızca burada listelenen her kriter eşleştiğinde uygulanır.",
-        "change": "ACL'nin koşulları eşleştiğinde etkisi olur; genellikle formlarda mevcut olan seçenekleri kısıtlar veya zorlar (örneğin, yalnızca belirli takip durumlarına izin verilir)."
+        "change": "ACL'nin koşulları eşleştiğinde etkisi olur; genellikle formlarda mevcut olan seçenekleri kısıtlar veya zorlar (örneğin, yalnızca belirli takip durumlarına izin verilir).",
+        "stopAfterMatch": "İşaretliyse, üretken bir eşleşmeden sonra başka ACL değerlendirilmez (Znuny StopAfterMatch)."
       },
       "mailOutbound": {
         "host": "Giden posta için SMTP sunucusu ana bilgisayar adı. Aşağıdaki bağlantı noktasındaki bu sunucudan (DNS + güvenlik duvarı) erişilebilir olmalıdır.",
@@ -1190,8 +1230,8 @@
         "validId": "\"Temp\" (valid_id 3), Znuny'nin üçüncü geçerlilik durumudur; tipik olarak, düz geçerli/geçersizden farklı olarak onay bekleyen bir hesaptır (ör. onaylanmamış kişisel kayıt)."
       },
       "systemAddresses": {
-        "email": "Address used as the From email for queues and auto-responses.",
-        "name": "Display name shown next to the email (e.g. “Support <support@example.com>”)."
+        "email": "Kuyruklar ve otomatik yanıtlar için From olarak kullanılan adres.",
+        "name": "E-postanın yanında görünen ad (örn. “Support <support@example.com>”)."
       }
     },
     "nav": {
@@ -1240,7 +1280,13 @@
       "aiAcl": "Erişim ve sınırlar",
       "collapse": "Gezinmeyi daralt",
       "mailAccounts": "Posta hesapları",
-      "oauth2Tokens": "OAuth2 belirteçleri (posta)"
+      "oauth2Tokens": "OAuth2 belirteçleri (posta)",
+      "types": "Bilet türleri",
+      "services": "Hizmetler",
+      "slas": "SLA’lar",
+      "systemAddresses": "Sistem adresleri",
+      "notificationEvents": "Bildirim olayları",
+      "ticketAttributeRelations": "Öznitelik ilişkileri"
     },
     "table": {
       "id": "ID",
@@ -1347,7 +1393,44 @@
       "title": "Başlık",
       "firstName": "Ad",
       "lastName": "Soyadı",
-      "name": "Ad"
+      "name": "Ad",
+      "passwordMode": "Parola atama",
+      "passwordModeManual": "Elle ayarla",
+      "passwordModeAuto": "Davet: e-posta ile kurulum bağlantısı",
+      "passwordModeAutoHelp": "Kaydedince aşağıdaki e-postaya tek kullanımlık bağlantı gider. Temsilci parolasını kendisi seçer.",
+      "email": "E-posta",
+      "mobile": "Cep telefonu",
+      "effectivePermissions": "Etkin izinleri göster",
+      "effectivePermissionsTitle": "{{name}} için etkin izinler",
+      "effectivePermissionsDescription": "Doğrudan grup ataması ve rollerden birleşik haklar.",
+      "rolesHeading": "Roller",
+      "groupsHeading": "Grup izinleri",
+      "queuesHeading": "Kuyruklar",
+      "noRoles": "Atanmış rol yok.",
+      "noGroups": "Grup izni yok.",
+      "noQueues": "Atanmış kuyruk yok.",
+      "viaDirect": "Doğrudan",
+      "permissionColumn": "İzinler",
+      "sourceColumn": "Kaynak",
+      "editSettings": "Kişisel ayarları düzenle",
+      "editSettingsTitle": "{{name}} kişisel ayarları",
+      "editSettingsDescription": "Temsilcinin “Kişisel ayarlar”da gördüğü ayarların aynısı.",
+      "languageLabel": "Dil",
+      "languageSaved": "Dil kaydedildi.",
+      "tabAccount": "Hesap",
+      "tabPerson": "Kişi",
+      "sourceInvalidHint": "Bu izin geçersiz bir rolden gelir ve bu yüzden etkisizdir.",
+      "keyInactiveHint": "Bu izin yapılandırılmış ama yürürlükte değil — kaynak veya grup geçersiz.",
+      "deletePermanent": "Kalıcı sil",
+      "deleteTitle": "{{name}} kalıcı silinsin mi?",
+      "deleteConfirm": "Kalıcı sil",
+      "deletableBody": "{{name}} hiçbir yerde referans almıyor; hesap tercihler, gruplar, roller ve 2FA ile tamamen silinebilir.",
+      "deleteIrreversible": "Bu geri alınamaz.",
+      "deleteBlockedBody": "{{name}} silinemez — şu tablolar hâlâ hesaba başvuruyor:",
+      "deleteBlockedHint": "Hesabı “Geçersiz” yapın; böylece biletler, makaleler ve geçmiş atanabilir kalır.",
+      "resendSetupLink": "Kurulum bağlantısını yeniden gönder",
+      "setupLinkSent": "Kurulum bağlantısı gönderildi.",
+      "setupLinkFailed": "Kurulum bağlantısı gönderilemedi."
     },
     "groups": {
       "title_plural": "Gruplar",
@@ -1561,7 +1644,10 @@
       "name": "Ad",
       "description": "Açıklama",
       "match": "Maç",
-      "change": "Değiştir"
+      "change": "Değiştir",
+      "new": "Yeni ACL",
+      "stopAfterMatch": "Eşleşmeden sonra dur",
+      "confirmDelete": "“{{name}}” ACL silinsin mi? Bu geri alınamaz."
     },
     "genericAgentJobs": {
       "title_plural": "Genel temsilci işleri",
@@ -2222,7 +2308,13 @@
       "aiAudit": "Her LLM isteğinin/yanıtının PII açıklamasıyla birlikte tam denetimi.",
       "aiAcl": "Grup, rol veya temsilci başına AI izinleri ve kotaları.",
       "mailAccounts": "Gelen IMAP/POP posta kutuları (şifre veya OAuth2).",
-      "oauth2Tokens": "Microsoft/Google posta için OAuth2 belirteci yapılandırmaları (Znuny uyumlu)."
+      "oauth2Tokens": "Microsoft/Google posta için OAuth2 belirteci yapılandırmaları (Znuny uyumlu).",
+      "types": "Sınıflandırma için kullanılan bilet türlerini yönetin.",
+      "services": "Hizmetleri yönetin ve SLA’lara bağlayın.",
+      "slas": "Hizmet düzeyi anlaşmalarını ve süreleri yönetin.",
+      "systemAddresses": "Kuyruklar ve otomatik yanıtlar için From e-posta adresleri.",
+      "notificationEvents": "Olay tabanlı temsilci bildirimlerini yapılandırın.",
+      "ticketAttributeRelations": "Znuny uyumlu bağımlılık matrisleri (hizmet/kuyruk vb.) CSV olarak."
     },
     "mailAccounts": {
       "title_plural": "Posta hesapları",
@@ -2270,11 +2362,50 @@
       "refreshSuccess": "Jeton yenilendi."
     },
     "systemAddresses": {
-      "title_plural": "System addresses",
-      "subtitle": "From-addresses for queues and auto-responses. Invalid addresses stay listed so they can be re-enabled.",
-      "new": "Add address",
-      "email": "Email",
-      "name": "Name"
+      "title_plural": "Sistem adresleri",
+      "subtitle": "Kuyruklar ve otomatik yanıtlar için From adresleri. Geçersizler yeniden etkinleştirilebilsin diye listede kalır.",
+      "new": "Adres ekle",
+      "email": "E-posta",
+      "name": "Ad"
+    },
+    "types": {
+      "title_plural": "Bilet türleri",
+      "new": "Yeni tür",
+      "name": "Ad"
+    },
+    "services": {
+      "title_plural": "Hizmetler",
+      "new": "Yeni hizmet",
+      "name": "Ad",
+      "slaCount": "SLA"
+    },
+    "slas": {
+      "title_plural": "SLA’lar",
+      "new": "Yeni SLA",
+      "name": "Ad",
+      "firstResponseTime": "İlk yanıt (dk)",
+      "updateTime": "Güncelleme (dk)",
+      "solutionTime": "Çözüm (dk)",
+      "calendar": "Takvim"
+    },
+    "notificationEvents": {
+      "title_plural": "Bildirim olayları",
+      "subtitle": "Olaylar tetiklenince eşleşen bildirimler temsilcilere gönderilir.",
+      "new": "Bildirim oluştur",
+      "name": "Ad",
+      "event": "Olay",
+      "subject": "Konu",
+      "body": "Gövde"
+    },
+    "tar": {
+      "title": "Bilet öznitelik ilişkileri",
+      "filename": "Dosya adı",
+      "attributes": "Öznitelikler",
+      "priority": "Öncelik",
+      "csv": "CSV verileri",
+      "new": "Yeni ilişki",
+      "help": "Attribute1;Attribute2 başlıklı ve değer çiftli CSV (Znuny AdminTicketAttributeRelations). Form seçicilerini kısıtlar (örn. Hizmet → Kuyruk).",
+      "confirmDelete": "Bu ilişki silinsin mi?"
     }
   },
   "kb": {
@@ -2489,7 +2620,8 @@
       "startButton": "Süreci başlat",
       "actions": "Kullanılabilir eylemler",
       "loadError": "Süreç durumu yüklenemedi.",
-      "noDialogs": "Bu aktivitede herhangi bir işlem mevcut değil."
+      "noDialogs": "Bu aktivitede herhangi bir işlem mevcut değil.",
+      "noCustomerDialogs": "Bu adımda müşteri diyalogu yok."
     },
     "start": {
       "title": "Süreci başlat",
@@ -2525,5 +2657,84 @@
     "body": "Gövde",
     "editTitle": "“{{name}}”ı düzenle",
     "saveError": "Şablon kaydedilemedi."
+  },
+  "views": {
+    "mine": "Biletlerim",
+    "responsible": "Sorumlu",
+    "locked": "Kilitli biletler",
+    "watched": "İzlenen biletler",
+    "escalated": "Yükseltilmiş biletler",
+    "service": "Hizmete göre",
+    "serviceHint": "Bir hizmete atanmış biletleri listele.",
+    "pickService": "Bir hizmet seçin…"
+  },
+  "customerCentre": {
+    "title": "Müşteri bilgileri",
+    "open": "Müşteri",
+    "invalid": "Geçersiz müşteri oturumu.",
+    "loadError": "Bu müşteri yüklenemedi.",
+    "email": "E-posta",
+    "phone": "Telefon",
+    "customerId": "Müşteri numarası",
+    "company": "Şirket",
+    "openCount": "{{count}} açık",
+    "closedCount": "{{count}} kapalı",
+    "allTickets": "Tüm biletler →",
+    "recentTickets": "Son biletler"
+  },
+  "timeAccounting": {
+    "title": "Zaman kaydı",
+    "hint": "Erişiminiz olan biletlerde kaydedilen zaman birimleri.",
+    "filterUser": "Temsilci",
+    "allUsers": "Tüm temsilciler",
+    "filterFrom": "Başlangıç",
+    "filterTo": "Bitiş",
+    "filterTicket": "Bilet kimliği",
+    "empty": "Eşleşen zaman kaydı yok.",
+    "colWhen": "Ne zaman",
+    "colTicket": "Bilet",
+    "colUser": "Temsilci",
+    "colUnits": "Birimler",
+    "presetsLabel": "Dönem",
+    "presets": {
+      "today": "Bugün",
+      "yesterday": "Dün",
+      "thisWeek": "Bu hafta",
+      "lastWeek": "Geçen hafta",
+      "thisMonth": "Bu ay",
+      "lastMonth": "Geçen ay",
+      "thisQuarter": "Bu çeyrek",
+      "lastQuarter": "Geçen çeyrek",
+      "thisYear": "Bu yıl",
+      "lastYear": "Geçen yıl"
+    },
+    "kpiUnits": "Zaman birimleri",
+    "kpiEntries": "Kayıtlar",
+    "kpiTickets": "Biletler",
+    "kpiAgents": "Temsilciler",
+    "rangeBetween": "{{from}} – {{to}}",
+    "rangeFrom": "{{from}} itibaren",
+    "rangeTo": "{{to}} tarihine kadar",
+    "chartTitle": "Günlük birimler",
+    "chartBar": "{{date}}: {{units}} birim",
+    "dayUnknown": "Tarih yok",
+    "emptyHint": "Dönemi genişletin veya temsilci ve bilet süzgeçlerini temizleyin.",
+    "clearFilters": "Süzgeçleri temizle",
+    "pageRange": "{{from}}–{{to}}",
+    "pageScope": "bu sayfada",
+    "chartPeak": "zirve {{units}}"
+  },
+  "setPassword": {
+    "subtitle": "Hesabınız için bir parola seçin.",
+    "password": "Yeni parola",
+    "confirm": "Parolayı yinele",
+    "lengthHint": "{{min}} ile {{max}} karakter arasında.",
+    "mismatch": "Parolalar eşleşmiyor.",
+    "submit": "Parolayı ayarla",
+    "saving": "Kaydediliyor…",
+    "done": "Parola kaydedildi. Şimdi oturum açabilirsiniz.",
+    "invalid": "Bu bağlantı artık geçerli değil.",
+    "invalidHint": "Kurulum bağlantıları 7 gün geçerlidir ve bir kez kullanılır. Yönetimden yenisini isteyin.",
+    "toLogin": "Oturum açmaya git"
   }
 }

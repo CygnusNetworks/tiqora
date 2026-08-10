@@ -55,7 +55,12 @@
     "showActiveQueues": "显示活动",
     "queueSearch": "筛选队列…",
     "noQueueMatch": "没有匹配的队列。",
-    "templates": "模板"
+    "templates": "模板",
+    "locked": "已锁定",
+    "responsible": "负责人",
+    "escalated": "已升级",
+    "services": "服务",
+    "timeAccounting": "工时统计"
   },
   "common": {
     "prev": "上一页",
@@ -68,7 +73,10 @@
     "cancel": "取消",
     "help": "帮助",
     "edit": "编辑",
-    "save": "保存"
+    "save": "保存",
+    "saved": "已保存",
+    "delete": "删除",
+    "submit": "提交"
   },
   "otp": {
     "verifying": "验证中…",
@@ -171,7 +179,9 @@
     "toPickUpEmpty": "没有待领取的新建工单。",
     "remindersDue": "到期提醒",
     "remindersDueEmpty": "没有到期提醒。",
-    "queueShortcutsEmpty": "当前没有含处理中或新建工单的队列。"
+    "queueShortcutsEmpty": "当前没有含处理中或新建工单的队列。",
+    "lastViews": "最近查看",
+    "lastViewsUntitled": "（无主题）"
   },
   "queue": {
     "sidebar": "队列",
@@ -482,7 +492,8 @@
       "customerEmail": "邮箱",
       "customerFirstName": "名",
       "customerLastName": "姓",
-      "customerLoginConflict": "该登录名已存在。选择不同的登录名，或通过搜索分配现有客户。"
+      "customerLoginConflict": "该登录名已存在。选择不同的登录名，或通过搜索分配现有客户。",
+      "clearCustomer": "移除客户"
     },
     "inlineAttachments": "嵌入图像 ({{count}})",
     "list": {
@@ -504,7 +515,35 @@
     "draftEditedAt": "编辑于 {{time}}",
     "draftDiscard": "放弃草稿",
     "draftDiscardConfirm": "放弃这条未发送的回复？内容将无法恢复。",
-    "draftDiscardConfirmButton": "放弃"
+    "draftDiscardConfirmButton": "放弃",
+    "type": "类型",
+    "service": "服务",
+    "sla": "SLA",
+    "mentions": "提及",
+    "timeAccounting": "工时",
+    "timeUnits": "时间单位",
+    "addTime": "登记时间",
+    "addMention": "提及坐席",
+    "mentionsCount": "提及：{{n}}",
+    "mentionsEmpty": "无人被提及",
+    "mentionRemove": "移除提及",
+    "mentionSuggestions": "坐席",
+    "timeUnitAbbrev": "分",
+    "timeUnitHoursAbbrev": "小时",
+    "timeUnitsShort": "{{units}} 分",
+    "timeAccountingTotal": "已登记时间：{{units}} 分",
+    "timeRemove": "移除登记",
+    "timeUnitMode": "时间单位",
+    "timeUnitMin": "分",
+    "timeUnitHours": "小时",
+    "timePresets": "快速选择",
+    "timeComposerHint": "回复时在编写区页脚登记。",
+    "timeChipHint": "发送时登记",
+    "extrasFailedMentions": "已发送 — 提及未保存。",
+    "extrasFailedTime": "已发送 — 时间未登记。",
+    "extrasFailedBoth": "已发送 — 提及与时间登记均未保存。",
+    "extrasRetry": "重试",
+    "customerUnresolved": "没有与此地址匹配的客户记录，因此无法显示客户详情。"
   },
   "search": {
     "title": "搜索",
@@ -913,7 +952,7 @@
         "replyLanguageNone": "无默认值",
         "replyLanguage": {
           "de": "德语",
-          "en": "English"
+          "en": "英语"
         },
         "allowedStateTypes": "允许的状态类型",
         "piiNer": "自动检测人名 (NER)",
@@ -1143,7 +1182,8 @@
       },
       "acl": {
         "match": "此 ACL 应用的条件（例如当前队列、状态、表单字段）。仅当此处列出的每个条件都匹配时，才会应用右侧的更改。",
-        "change": "一旦条件匹配，ACL 就会发挥作用 - 通常它会限制或强制表单中可用的选择（例如，仅允许某些后续状态）。"
+        "change": "一旦条件匹配，ACL 就会发挥作用 - 通常它会限制或强制表单中可用的选择（例如，仅允许某些后续状态）。",
+        "stopAfterMatch": "勾选后，此 ACL 有效匹配后不再评估后续 ACL（Znuny StopAfterMatch）。"
       },
       "mailOutbound": {
         "host": "外发邮件的 SMTP 服务器主机名。必须可以通过以下端口从该服务器（DNS + 防火墙）访问。",
@@ -1190,8 +1230,8 @@
         "validId": "“Temp”（valid_id 3）是 Znuny 的第三种有效性状态——通常是一个待确认的帐户（例如未经确认的自我注册），与普通的有效/无效不同。"
       },
       "systemAddresses": {
-        "email": "Address used as the From email for queues and auto-responses.",
-        "name": "Display name shown next to the email (e.g. “Support <support@example.com>”)."
+        "email": "用作队列与自动回复发件人的地址。",
+        "name": "显示在电子邮件旁的名称（例如 “Support <support@example.com>”）。"
       }
     },
     "nav": {
@@ -1240,7 +1280,13 @@
       "aiAcl": "访问和限制",
       "collapse": "折叠导航",
       "mailAccounts": "邮件账户",
-      "oauth2Tokens": "OAuth2 令牌（邮件）"
+      "oauth2Tokens": "OAuth2 令牌（邮件）",
+      "types": "工单类型",
+      "services": "服务",
+      "slas": "SLA",
+      "systemAddresses": "系统地址",
+      "notificationEvents": "通知事件",
+      "ticketAttributeRelations": "属性关系"
     },
     "table": {
       "id": "ID",
@@ -1347,7 +1393,44 @@
       "title": "标题",
       "firstName": "名",
       "lastName": "姓",
-      "name": "名称"
+      "name": "名称",
+      "passwordMode": "密码分配",
+      "passwordModeManual": "手动设置",
+      "passwordModeAuto": "邀请：通过邮件发送设置链接",
+      "passwordModeAutoHelp": "保存时会向下方邮箱发送一次性链接，由坐席自行设置密码。",
+      "email": "电子邮件",
+      "mobile": "手机",
+      "effectivePermissions": "查看有效权限",
+      "effectivePermissionsTitle": "{{name}} 的有效权限",
+      "effectivePermissionsDescription": "来自直接组分配与角色的合并权限。",
+      "rolesHeading": "角色",
+      "groupsHeading": "组权限",
+      "queuesHeading": "队列",
+      "noRoles": "未分配角色。",
+      "noGroups": "无组权限。",
+      "noQueues": "无关联队列。",
+      "viaDirect": "直接",
+      "permissionColumn": "权限",
+      "sourceColumn": "来源",
+      "editSettings": "编辑个人设置",
+      "editSettingsTitle": "{{name}} 的个人设置",
+      "editSettingsDescription": "与坐席在「个人设置」中看到的内容相同。",
+      "languageLabel": "语言",
+      "languageSaved": "语言已保存。",
+      "tabAccount": "账户",
+      "tabPerson": "人员",
+      "sourceInvalidHint": "此权限来自无效角色，因此不生效。",
+      "keyInactiveHint": "此权限已配置但未生效 — 来源或组无效。",
+      "deletePermanent": "永久删除",
+      "deleteTitle": "永久删除 {{name}}？",
+      "deleteConfirm": "永久删除",
+      "deletableBody": "没有任何内容引用 {{name}}，可连同偏好、组与角色分配及 2FA 一并彻底删除。",
+      "deleteIrreversible": "此操作无法撤销。",
+      "deleteBlockedBody": "无法删除 {{name}} — 以下表仍引用该账户：",
+      "deleteBlockedHint": "请改为将账户设为「无效」，以便工单、文章与历史仍可归属。",
+      "resendSetupLink": "重新发送设置链接",
+      "setupLinkSent": "设置链接已发送。",
+      "setupLinkFailed": "无法发送设置链接。"
     },
     "groups": {
       "title_plural": "组",
@@ -1561,7 +1644,10 @@
       "name": "名称",
       "description": "描述",
       "match": "比赛",
-      "change": "更改"
+      "change": "更改",
+      "new": "新建 ACL",
+      "stopAfterMatch": "匹配后停止",
+      "confirmDelete": "删除 ACL “{{name}}”？此操作无法撤销。"
     },
     "genericAgentJobs": {
       "title_plural": "通用代理任务",
@@ -2222,7 +2308,13 @@
       "aiAudit": "对每个法学硕士请求/响应进行全面审核，并披露 PII。",
       "aiAcl": "每个组、角色或坐席的 AI 权限和配额。",
       "mailAccounts": "传入 IMAP/POP 邮箱（密码或 OAuth2）。",
-      "oauth2Tokens": "Microsoft/Google 邮件的 OAuth2 令牌配置（Znuny 兼容）。"
+      "oauth2Tokens": "Microsoft/Google 邮件的 OAuth2 令牌配置（Znuny 兼容）。",
+      "types": "管理用于分类的工单类型。",
+      "services": "管理服务并将其关联到 SLA。",
+      "slas": "管理服务级别协议与时限。",
+      "systemAddresses": "用作队列与自动回复发件人的电子邮件地址。",
+      "notificationEvents": "配置由事件触发的坐席通知。",
+      "ticketAttributeRelations": "Znuny 兼容的依赖矩阵（如服务→队列），CSV 格式。"
     },
     "mailAccounts": {
       "title_plural": "邮件账户",
@@ -2270,11 +2362,50 @@
       "refreshSuccess": "令牌已刷新。"
     },
     "systemAddresses": {
-      "title_plural": "System addresses",
-      "subtitle": "From-addresses for queues and auto-responses. Invalid addresses stay listed so they can be re-enabled.",
-      "new": "Add address",
-      "email": "Email",
-      "name": "Name"
+      "title_plural": "系统地址",
+      "subtitle": "队列与自动回复的发件人地址。无效地址仍会列出以便重新启用。",
+      "new": "添加地址",
+      "email": "电子邮件",
+      "name": "名称"
+    },
+    "types": {
+      "title_plural": "工单类型",
+      "new": "新建类型",
+      "name": "名称"
+    },
+    "services": {
+      "title_plural": "服务",
+      "new": "新建服务",
+      "name": "名称",
+      "slaCount": "SLA"
+    },
+    "slas": {
+      "title_plural": "SLA",
+      "new": "新建 SLA",
+      "name": "名称",
+      "firstResponseTime": "首次响应（分钟）",
+      "updateTime": "更新（分钟）",
+      "solutionTime": "解决（分钟）",
+      "calendar": "日历"
+    },
+    "notificationEvents": {
+      "title_plural": "通知事件",
+      "subtitle": "事件触发时，会向坐席发送匹配的通知。",
+      "new": "创建通知",
+      "name": "名称",
+      "event": "事件",
+      "subject": "主题",
+      "body": "正文"
+    },
+    "tar": {
+      "title": "工单属性关系",
+      "filename": "文件名",
+      "attributes": "属性",
+      "priority": "优先级",
+      "csv": "CSV 数据",
+      "new": "新建关系",
+      "help": "带表头 Attribute1;Attribute2 与值对的 CSV（Znuny AdminTicketAttributeRelations）。用于限制表单选项（如 服务 → 队列）。",
+      "confirmDelete": "删除此关系？"
     }
   },
   "kb": {
@@ -2489,7 +2620,8 @@
       "startButton": "启动流程",
       "actions": "可用的操作",
       "loadError": "无法加载进程状态。",
-      "noDialogs": "此活动中暂无可用操作。"
+      "noDialogs": "此活动中暂无可用操作。",
+      "noCustomerDialogs": "此步骤没有可用的客户对话框。"
     },
     "start": {
       "title": "启动流程",
@@ -2525,5 +2657,84 @@
     "body": "身体",
     "editTitle": "编辑“{{name}}”",
     "saveError": "无法保存模板。"
+  },
+  "views": {
+    "mine": "我的工单",
+    "responsible": "负责人",
+    "locked": "已锁定的工单",
+    "watched": "关注的工单",
+    "escalated": "已升级的工单",
+    "service": "按服务",
+    "serviceHint": "列出分配给某服务的工单。",
+    "pickService": "选择服务…"
+  },
+  "customerCentre": {
+    "title": "客户信息",
+    "open": "客户信息",
+    "invalid": "客户登录无效。",
+    "loadError": "无法加载该客户。",
+    "email": "电子邮件",
+    "phone": "电话",
+    "customerId": "客户编号",
+    "company": "公司",
+    "openCount": "{{count}} 个未关闭",
+    "closedCount": "{{count}} 个已关闭",
+    "allTickets": "全部工单 →",
+    "recentTickets": "最近的工单"
+  },
+  "timeAccounting": {
+    "title": "工时统计",
+    "hint": "您可访问的工单上已登记的时间单位。",
+    "filterUser": "坐席",
+    "allUsers": "全部坐席",
+    "filterFrom": "从",
+    "filterTo": "到",
+    "filterTicket": "工单 ID",
+    "empty": "没有匹配的工时记录。",
+    "colWhen": "时间",
+    "colTicket": "工单",
+    "colUser": "坐席",
+    "colUnits": "单位",
+    "presetsLabel": "时段",
+    "presets": {
+      "today": "今天",
+      "yesterday": "昨天",
+      "thisWeek": "本周",
+      "lastWeek": "上周",
+      "thisMonth": "本月",
+      "lastMonth": "上月",
+      "thisQuarter": "本季度",
+      "lastQuarter": "上季度",
+      "thisYear": "今年",
+      "lastYear": "去年"
+    },
+    "kpiUnits": "时间单位",
+    "kpiEntries": "条目",
+    "kpiTickets": "工单",
+    "kpiAgents": "坐席",
+    "rangeBetween": "{{from}} – {{to}}",
+    "rangeFrom": "自 {{from}}",
+    "rangeTo": "至 {{to}}",
+    "chartTitle": "每日单位",
+    "chartBar": "{{date}}：{{units}} 单位",
+    "dayUnknown": "无日期",
+    "emptyHint": "扩大时段，或清除坐席与工单筛选。",
+    "clearFilters": "清除筛选",
+    "pageRange": "{{from}}–{{to}}",
+    "pageScope": "本页",
+    "chartPeak": "峰值 {{units}}"
+  },
+  "setPassword": {
+    "subtitle": "请为您的账户设置密码。",
+    "password": "新密码",
+    "confirm": "确认密码",
+    "lengthHint": "{{min}} 到 {{max}} 个字符。",
+    "mismatch": "两次输入的密码不一致。",
+    "submit": "设置密码",
+    "saving": "保存中…",
+    "done": "密码已保存。您现在可以登录。",
+    "invalid": "此链接已失效。",
+    "invalidHint": "设置链接有效期 7 天且仅可使用一次。请向管理员索取新链接。",
+    "toLogin": "前往登录"
   }
 }

@@ -55,7 +55,12 @@
     "showActiveQueues": "Zobrazit aktivní",
     "queueSearch": "Filtrovat fronty…",
     "noQueueMatch": "Žádná fronta neodpovídá.",
-    "templates": "Šablony"
+    "templates": "Šablony",
+    "locked": "Uzamčeno",
+    "responsible": "Odpovědný",
+    "escalated": "Eskalováno",
+    "services": "Služby",
+    "timeAccounting": "Evidence času"
   },
   "common": {
     "prev": "Předchozí",
@@ -68,7 +73,10 @@
     "cancel": "Zrušit",
     "help": "Nápověda",
     "edit": "Upravit",
-    "save": "Uložit"
+    "save": "Uložit",
+    "saved": "Uloženo",
+    "delete": "Smazat",
+    "submit": "Odeslat"
   },
   "otp": {
     "verifying": "Ověřování…",
@@ -171,7 +179,9 @@
     "toPickUpEmpty": "Žádné nové tikety k převzetí.",
     "remindersDue": "Splatné připomínky",
     "remindersDueEmpty": "Žádné splatné připomínky.",
-    "queueShortcutsEmpty": "Momentálně žádné fronty s otevřenými nebo novými tikety."
+    "queueShortcutsEmpty": "Momentálně žádné fronty s otevřenými nebo novými tikety.",
+    "lastViews": "Nedávno zobrazené",
+    "lastViewsUntitled": "(bez předmětu)"
   },
   "queue": {
     "sidebar": "Fronty",
@@ -179,7 +189,7 @@
     "empty": "Žádné fronty nejsou k dispozici.",
     "openBadge": "{{count}} otevřených",
     "metaLine": "Všechny fronty · seřazeno podle naléhavosti",
-    "exportCsv": "Export CSV",
+    "exportCsv": "Exportovat CSV",
     "newCount": "{{count}} nových",
     "customerFilter": "Zákazník: {{customerId}}",
     "clearCustomerFilter": "Zrušit filtr zákazníka",
@@ -482,7 +492,8 @@
       "customerEmail": "E-mail",
       "customerFirstName": "Jméno",
       "customerLastName": "Příjmení",
-      "customerLoginConflict": "Tento login již existuje. Zvolte jiný, nebo přiřaďte existujícího zákazníka přes vyhledávání."
+      "customerLoginConflict": "Tento login již existuje. Zvolte jiný, nebo přiřaďte existujícího zákazníka přes vyhledávání.",
+      "clearCustomer": "Odebrat zákazníka"
     },
     "inlineAttachments": "Vložené obrázky ({{count}})",
     "list": {
@@ -504,7 +515,35 @@
     "draftEditedAt": "upraveno {{time}}",
     "draftDiscard": "Zahodit koncept",
     "draftDiscardConfirm": "Zahodit tuto neodeslanou odpověď? Text nelze obnovit.",
-    "draftDiscardConfirmButton": "Zahodit"
+    "draftDiscardConfirmButton": "Zahodit",
+    "type": "Typ",
+    "service": "Služba",
+    "sla": "SLA",
+    "mentions": "Zmínky",
+    "timeAccounting": "Evidence času",
+    "timeUnits": "Časové jednotky",
+    "addTime": "Zapsat čas",
+    "addMention": "Zmínit agenta",
+    "mentionsCount": "Zmínky: {{n}}",
+    "mentionsEmpty": "Nikdo nezmíněn",
+    "mentionRemove": "Odebrat zmínku",
+    "mentionSuggestions": "Agenti",
+    "timeUnitAbbrev": "min",
+    "timeUnitHoursAbbrev": "h",
+    "timeUnitsShort": "{{units}} min",
+    "timeAccountingTotal": "Zapsaný čas: {{units}} min",
+    "timeRemove": "Odebrat záznam",
+    "timeUnitMode": "Časová jednotka",
+    "timeUnitMin": "Min",
+    "timeUnitHours": "H",
+    "timePresets": "Rychlý výběr",
+    "timeComposerHint": "Při odpovědi zapište v zápatí editoru.",
+    "timeChipHint": "Zapíše se při odeslání",
+    "extrasFailedMentions": "Odesláno — zmínka nebyla uložena.",
+    "extrasFailedTime": "Odesláno — čas nebyl zapsán.",
+    "extrasFailedBoth": "Odesláno — neuložila se ani zmínka, ani zápis času.",
+    "extrasRetry": "Zkusit znovu",
+    "customerUnresolved": "K této adrese neexistuje zákaznický záznam, detaily nejsou k dispozici."
   },
   "search": {
     "title": "Hledat",
@@ -769,7 +808,7 @@
           "openai_compat": "Kompatibilní s OpenAI",
           "anthropic": "Anthropic"
         },
-        "baseUrl": "Base URL",
+        "baseUrl": "Základní URL",
         "defaultModel": "Výchozí model",
         "flags": "Příznaky",
         "flagTools": "Volání nástrojů",
@@ -962,7 +1001,7 @@
           "draft": "Koncept",
           "summary": "Shrnutí",
           "auto_reply": "Auto-odpověď",
-          "vision": "Vision",
+          "vision": "Vize",
           "test": "Test připojení"
         },
         "allFeatures": "Všechny funkce",
@@ -1006,7 +1045,7 @@
           "error": "Chyba",
           "copy": "Kopírovat",
           "download": "Stáhnout",
-          "runId": "Run ID",
+          "runId": "ID běhu",
           "trigger": "Spouštěč",
           "piiSummary": "{{count}} nahrazení PII",
           "revealPii": "Zobrazit PII",
@@ -1017,7 +1056,7 @@
           "rawResponse": "Odpověď"
         },
         "pdf": {
-          "export": "Export PDF",
+          "export": "Exportovat PDF",
           "masked": "PII maskováno",
           "revealed": "Včetně osobních údajů",
           "generated": "Vygenerováno",
@@ -1051,7 +1090,7 @@
         "title": "Tester pravidel",
         "toolPlaceholder": "Název nástroje, např. netadmin:diagnose_connection",
         "samplePlaceholder": "Ukázkový výsledek nástroje jako JSON, např. {\"lock_code\": \"COPYR\"}",
-        "run": "Test",
+        "run": "Testovat",
         "invalid": "Pravidla neplatná",
         "hit": "Zásah — eskalace",
         "noHit": "Bez zásahu",
@@ -1143,7 +1182,8 @@
       },
       "acl": {
         "match": "Podmínky, za kterých se tato ACL uplatní (např. aktuální fronta, stav, pole formuláře). Změna vpravo se provede jen když sedí všechna zde uvedená kritéria.",
-        "change": "Účinek ACL po splnění podmínek — typicky omezí nebo vynutí volby ve formulářích (např. jen určité follow-up stavy)."
+        "change": "Účinek ACL po splnění podmínek — typicky omezí nebo vynutí volby ve formulářích (např. jen určité follow-up stavy).",
+        "stopAfterMatch": "Pokud je zaškrtnuto, po produktivní shodě se další ACL nehodnotí (Znuny StopAfterMatch)."
       },
       "mailOutbound": {
         "host": "Hostname SMTP serveru pro odchozí poštu. Musí být z tohoto serveru dostupný (DNS + firewall) na portu níže.",
@@ -1190,8 +1230,8 @@
         "validId": "„Temp“ (valid_id 3) je třetí stav platnosti ve Znuny — typicky účet čekající na potvrzení (např. nepotvrzená self-registrace), odlišný od prostého platný/neplatný."
       },
       "systemAddresses": {
-        "email": "Address used as the From email for queues and auto-responses.",
-        "name": "Display name shown next to the email (e.g. “Support <support@example.com>”)."
+        "email": "Adresa používaná jako From pro fronty a auto-odpovědi.",
+        "name": "Zobrazované jméno vedle e-mailu (např. „Support <support@example.com>“)."
       }
     },
     "nav": {
@@ -1220,7 +1260,7 @@
       "processes": "Procesy",
       "mailOutbound": "E-mail (odchozí)",
       "mailLog": "Komunikační log",
-      "subjectConfig": "Subject hook",
+      "subjectConfig": "Háček předmětu",
       "customerUserGroups": "Zákazníci ↔ Skupiny",
       "attachments": "Přílohy",
       "templateAttachments": "Šablony↔Přílohy",
@@ -1240,7 +1280,13 @@
       "aiAcl": "Přístup a limity",
       "collapse": "Sbalit navigaci",
       "mailAccounts": "Poštovní účty",
-      "oauth2Tokens": "Tokeny OAuth2 (e-mail)"
+      "oauth2Tokens": "Tokeny OAuth2 (e-mail)",
+      "types": "Typy ticketů",
+      "services": "Služby",
+      "slas": "SLA",
+      "systemAddresses": "Systémové adresy",
+      "notificationEvents": "Notifikační události",
+      "ticketAttributeRelations": "Vztahy atributů"
     },
     "table": {
       "id": "ID",
@@ -1347,7 +1393,44 @@
       "title": "Titul",
       "firstName": "Jméno",
       "lastName": "Příjmení",
-      "name": "Jméno"
+      "name": "Jméno",
+      "passwordMode": "Přidělení hesla",
+      "passwordModeManual": "Nastavit ručně",
+      "passwordModeAuto": "Pozvat: odeslat odkaz e-mailem",
+      "passwordModeAutoHelp": "Při uložení odejde jednorázový odkaz na e-mail níže. Agent si heslo zvolí sám.",
+      "email": "E-mail",
+      "mobile": "Mobilní telefon",
+      "effectivePermissions": "Zobrazit efektivní oprávnění",
+      "effectivePermissionsTitle": "Efektivní oprávnění pro {{name}}",
+      "effectivePermissionsDescription": "Sloučená oprávnění z přímých skupin a rolí.",
+      "rolesHeading": "Role",
+      "groupsHeading": "Oprávnění skupin",
+      "queuesHeading": "Fronty",
+      "noRoles": "Žádné role přiřazeny.",
+      "noGroups": "Žádná oprávnění skupin.",
+      "noQueues": "Žádné přiřazené fronty.",
+      "viaDirect": "Přímo",
+      "permissionColumn": "Oprávnění",
+      "sourceColumn": "Zdroj",
+      "editSettings": "Upravit osobní nastavení",
+      "editSettingsTitle": "Osobní nastavení: {{name}}",
+      "editSettingsDescription": "Stejná nastavení, která agent vidí v «Osobním nastavení».",
+      "languageLabel": "Jazyk",
+      "languageSaved": "Jazyk uložen.",
+      "tabAccount": "Účet",
+      "tabPerson": "Osoba",
+      "sourceInvalidHint": "Toto oprávnění pochází z neplatné role, a proto nefunguje.",
+      "keyInactiveHint": "Toto oprávnění je nastaveno, ale neplatí — zdroj nebo skupina je neplatná.",
+      "deletePermanent": "Smazat trvale",
+      "deleteTitle": "Smazat {{name}} trvale?",
+      "deleteConfirm": "Smazat trvale",
+      "deletableBody": "Na {{name}} nic neodkazuje; účet lze smazat úplně včetně nastavení, skupin, rolí a 2FA.",
+      "deleteIrreversible": "Tuto akci nelze vrátit.",
+      "deleteBlockedBody": "{{name}} nelze smazat — tyto tabulky na účet stále odkazují:",
+      "deleteBlockedHint": "Nastavte účet na «Neplatný», aby tickety, články a historie zůstaly přiřaditelné.",
+      "resendSetupLink": "Znovu odeslat odkaz pro nastavení",
+      "setupLinkSent": "Odkaz pro nastavení odeslán.",
+      "setupLinkFailed": "Odkaz pro nastavení se nepodařilo odeslat."
     },
     "groups": {
       "title_plural": "Skupiny",
@@ -1500,7 +1583,7 @@
       "title_plural": "Auto odpovědi",
       "new": "Nová auto odpověď",
       "name": "Název",
-      "typeId": "Type ID",
+      "typeId": "ID typu",
       "subject": "Předmět",
       "body": "Tělo",
       "usage": "Použití",
@@ -1561,7 +1644,10 @@
       "name": "Název",
       "description": "Popis",
       "match": "Match",
-      "change": "Change"
+      "change": "Change",
+      "new": "Nová ACL",
+      "stopAfterMatch": "Zastavit po shodě",
+      "confirmDelete": "Smazat ACL „{{name}}“? Tuto akci nelze vrátit."
     },
     "genericAgentJobs": {
       "title_plural": "Úlohy Generic Agent",
@@ -1875,7 +1961,7 @@
           "description": "Jednou denně aplikuje nakonfigurovaná pravidla retence."
         },
         "gdpr_erasure_purge": {
-          "name": "GDPR erasure purge",
+          "name": "GDPR – pročištění výmazu",
           "description": "Jednou denně odstraňuje prošlé erasure zálohy."
         },
         "ai_worker": {
@@ -1887,7 +1973,7 @@
           "description": "Jednou denně maže řádky LLM audit logu po uplynutí nastavené retence."
         }
       },
-      "takeoverBadge": "Takeover"
+      "takeoverBadge": "Převzetí"
     },
     "mailLog": {
       "title": "Log e-mailové komunikace",
@@ -1968,7 +2054,7 @@
       "empty": "Vyberte frontu výše pro úpravu jejích auto odpovědí.",
       "autoResponses": "Auto odpovědi",
       "assigned": "Přiřazeno",
-      "typeId": "Type ID",
+      "typeId": "ID typu",
       "noAutoResponses": "Zatím neexistují žádné platné auto odpovědi."
     },
     "assignmentEditor": {
@@ -2008,7 +2094,7 @@
       "columnName": "Název sloupce",
       "columnNameHelp": "Sloupec z customer_user / customer_company (návrhy z DB).",
       "tagName": "Název tagu",
-      "tagNameHelp": "Placeholder: <OTRS_CUSTOMER_DATA_{Tag}>",
+      "tagNameHelp": "Zástupný symbol: <OTRS_CUSTOMER_DATA_{Tag}>",
       "label": "Štítek",
       "enabled": "Zapnuto"
     },
@@ -2222,7 +2308,13 @@
       "aiAudit": "Plný audit každého LLM požadavku/odpovědi s odhalením PII.",
       "aiAcl": "AI oprávnění a kvóty podle skupiny, role nebo agenta.",
       "mailAccounts": "Příchozí poštovní schránky IMAP/POP (heslo nebo OAuth2).",
-      "oauth2Tokens": "Konfigurace tokenu OAuth2 pro poštu Microsoft/Google (kompatibilní se Znuny)."
+      "oauth2Tokens": "Konfigurace tokenu OAuth2 pro poštu Microsoft/Google (kompatibilní se Znuny).",
+      "types": "Spravujte typy ticketů pro klasifikaci.",
+      "services": "Spravujte služby a propojte je se SLA.",
+      "slas": "Spravujte dohody o úrovni služeb a lhůty.",
+      "systemAddresses": "E-mailové adresy používané jako From pro fronty a auto-odpovědi.",
+      "notificationEvents": "Konfigurujte událostmi řízené notifikace agentů.",
+      "ticketAttributeRelations": "Matice závislostí kompatibilní se Znuny (služba/fronta aj.) ve formátu CSV."
     },
     "mailAccounts": {
       "title_plural": "Poštovní účty",
@@ -2270,11 +2362,50 @@
       "refreshSuccess": "Token obnoven."
     },
     "systemAddresses": {
-      "title_plural": "System addresses",
-      "subtitle": "From-addresses for queues and auto-responses. Invalid addresses stay listed so they can be re-enabled.",
-      "new": "Add address",
-      "email": "Email",
-      "name": "Name"
+      "title_plural": "Systémové adresy",
+      "subtitle": "Adresy From pro fronty a auto-odpovědi. Neplatné zůstávají v seznamu pro opětovné zapnutí.",
+      "new": "Přidat adresu",
+      "email": "E-mail",
+      "name": "Název"
+    },
+    "types": {
+      "title_plural": "Typy ticketů",
+      "new": "Nový typ",
+      "name": "Název"
+    },
+    "services": {
+      "title_plural": "Služby",
+      "new": "Nová služba",
+      "name": "Název",
+      "slaCount": "SLA"
+    },
+    "slas": {
+      "title_plural": "SLA",
+      "new": "Nové SLA",
+      "name": "Název",
+      "firstResponseTime": "První reakce (min)",
+      "updateTime": "Aktualizace (min)",
+      "solutionTime": "Řešení (min)",
+      "calendar": "Kalendář"
+    },
+    "notificationEvents": {
+      "title_plural": "Notifikační události",
+      "subtitle": "Při událostech se agentům odesílají odpovídající notifikace.",
+      "new": "Vytvořit notifikaci",
+      "name": "Název",
+      "event": "Událost",
+      "subject": "Předmět",
+      "body": "Tělo"
+    },
+    "tar": {
+      "title": "Vztahy atributů ticketů",
+      "filename": "Název souboru",
+      "attributes": "Atributy",
+      "priority": "Priorita",
+      "csv": "Data CSV",
+      "new": "Nový vztah",
+      "help": "CSV s hlavičkou Attribute1;Attribute2 a páry hodnot (Znuny AdminTicketAttributeRelations). Omezuje výběry ve formulářích (např. Služba → Fronta).",
+      "confirmDelete": "Smazat tento vztah?"
     }
   },
   "kb": {
@@ -2375,7 +2506,7 @@
     "title": "Reporty",
     "subtitle": "Objem tiketů, backlog, SLA a zátěž napříč frontami.",
     "empty": "Pro aktuální filtry nejsou data.",
-    "exportCsv": "Export CSV",
+    "exportCsv": "Exportovat CSV",
     "filters": {
       "queue": "Fronta",
       "dateFrom": "Od",
@@ -2478,7 +2609,7 @@
       "Yearly": "Ročně"
     },
     "subscribe": "Odebírat (ICS)",
-    "exportIcs": "Export .ics",
+    "exportIcs": "Exportovat .ics",
     "linkedTickets": "Propojené tikety"
   },
   "process": {
@@ -2489,7 +2620,8 @@
       "startButton": "Spustit proces",
       "actions": "Dostupné akce",
       "loadError": "Stav procesu se nepodařilo načíst.",
-      "noDialogs": "Pro tuto aktivitu nejsou k dispozici žádné akce."
+      "noDialogs": "Pro tuto aktivitu nejsou k dispozici žádné akce.",
+      "noCustomerDialogs": "V tomto kroku nejsou k dispozici žádné zákaznické dialogy."
     },
     "start": {
       "title": "Spustit proces",
@@ -2525,5 +2657,84 @@
     "body": "Tělo",
     "editTitle": "Upravit „{{name}}“",
     "saveError": "Šablonu se nepodařilo uložit."
+  },
+  "views": {
+    "mine": "Moje tickety",
+    "responsible": "Odpovědný",
+    "locked": "Uzamčené tickety",
+    "watched": "Sledované tickety",
+    "escalated": "Eskalované tickety",
+    "service": "Podle služby",
+    "serviceHint": "Seznam ticketů přiřazených ke službě.",
+    "pickService": "Vyberte službu…"
+  },
+  "customerCentre": {
+    "title": "Informace o zákazníkovi",
+    "open": "Zákazník",
+    "invalid": "Neplatné přihlášení zákazníka.",
+    "loadError": "Tohoto zákazníka se nepodařilo načíst.",
+    "email": "E-mail",
+    "phone": "Telefon",
+    "customerId": "Číslo zákazníka",
+    "company": "Společnost",
+    "openCount": "{{count}} otevřených",
+    "closedCount": "{{count}} uzavřených",
+    "allTickets": "Všechny tickety →",
+    "recentTickets": "Nedávné tickety"
+  },
+  "timeAccounting": {
+    "title": "Evidence času",
+    "hint": "Zapsané časové jednotky u ticketů, ke kterým máte přístup.",
+    "filterUser": "Agent",
+    "allUsers": "Všichni agenti",
+    "filterFrom": "Od",
+    "filterTo": "Do",
+    "filterTicket": "ID ticketu",
+    "empty": "Žádné časové záznamy neodpovídají.",
+    "colWhen": "Kdy",
+    "colTicket": "Ticket",
+    "colUser": "Agent",
+    "colUnits": "Jednotky",
+    "presetsLabel": "Období",
+    "presets": {
+      "today": "Dnes",
+      "yesterday": "Včera",
+      "thisWeek": "Tento týden",
+      "lastWeek": "Minulý týden",
+      "thisMonth": "Tento měsíc",
+      "lastMonth": "Minulý měsíc",
+      "thisQuarter": "Toto čtvrtletí",
+      "lastQuarter": "Minulé čtvrtletí",
+      "thisYear": "Tento rok",
+      "lastYear": "Minulý rok"
+    },
+    "kpiUnits": "Časové jednotky",
+    "kpiEntries": "Záznamy",
+    "kpiTickets": "Tickety",
+    "kpiAgents": "Agenti",
+    "rangeBetween": "{{from}} – {{to}}",
+    "rangeFrom": "od {{from}}",
+    "rangeTo": "do {{to}}",
+    "chartTitle": "Jednotky za den",
+    "chartBar": "{{date}}: {{units}} jednotek",
+    "dayUnknown": "Bez data",
+    "emptyHint": "Rozšiřte období nebo zrušte filtry agenta a ticketu.",
+    "clearFilters": "Zrušit filtry",
+    "pageRange": "{{from}}–{{to}}",
+    "pageScope": "na této stránce",
+    "chartPeak": "vrchol {{units}}"
+  },
+  "setPassword": {
+    "subtitle": "Zvolte heslo pro svůj účet.",
+    "password": "Nové heslo",
+    "confirm": "Zopakovat heslo",
+    "lengthHint": "Mezi {{min}} a {{max}} znaky.",
+    "mismatch": "Hesla se neshodují.",
+    "submit": "Nastavit heslo",
+    "saving": "Ukládání…",
+    "done": "Heslo uloženo. Nyní se můžete přihlásit.",
+    "invalid": "Tento odkaz již není platný.",
+    "invalidHint": "Odkazy pro nastavení platí 7 dní a lze je použít jednou. Požádejte administraci o nový.",
+    "toLogin": "Přejít k přihlášení"
   }
 }

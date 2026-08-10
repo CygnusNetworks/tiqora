@@ -55,7 +55,12 @@
     "showActiveQueues": "Show active",
     "queueSearch": "Filter queues…",
     "noQueueMatch": "No queues match.",
-    "templates": "Templates"
+    "templates": "Templates",
+    "locked": "Locked",
+    "responsible": "Responsible",
+    "escalated": "Escalated",
+    "services": "Services",
+    "timeAccounting": "Time accounting"
   },
   "common": {
     "prev": "Previous",
@@ -68,7 +73,10 @@
     "cancel": "Cancel",
     "help": "Help",
     "edit": "Edit",
-    "save": "Save"
+    "save": "Save",
+    "saved": "Saved",
+    "delete": "Delete",
+    "submit": "Submit"
   },
   "otp": {
     "verifying": "Verifying…",
@@ -171,7 +179,9 @@
     "toPickUpEmpty": "No new tickets to pick up.",
     "remindersDue": "Reminders due",
     "remindersDueEmpty": "No reminders due.",
-    "queueShortcutsEmpty": "No queues with open or new tickets right now."
+    "queueShortcutsEmpty": "No queues with open or new tickets right now.",
+    "lastViews": "Recently viewed",
+    "lastViewsUntitled": "(no subject)"
   },
   "queue": {
     "sidebar": "Queues",
@@ -482,7 +492,8 @@
       "customerEmail": "Email",
       "customerFirstName": "First name",
       "customerLastName": "Last name",
-      "customerLoginConflict": "This login already exists. Choose a different login, or assign the existing customer via search instead."
+      "customerLoginConflict": "This login already exists. Choose a different login, or assign the existing customer via search instead.",
+      "clearCustomer": "Remove customer"
     },
     "inlineAttachments": "Embedded images ({{count}})",
     "list": {
@@ -504,7 +515,35 @@
     "draftEditedAt": "edited {{time}}",
     "draftDiscard": "Discard draft",
     "draftDiscardConfirm": "Discard this unsent reply? The text cannot be recovered.",
-    "draftDiscardConfirmButton": "Discard"
+    "draftDiscardConfirmButton": "Discard",
+    "type": "Type",
+    "service": "Service",
+    "sla": "SLA",
+    "mentions": "Mentions",
+    "timeAccounting": "Time accounting",
+    "timeUnits": "Time units",
+    "addTime": "Book time",
+    "addMention": "Mention agent",
+    "mentionsCount": "Mentions: {{n}}",
+    "mentionsEmpty": "Nobody mentioned",
+    "mentionRemove": "Remove mention",
+    "mentionSuggestions": "Agents",
+    "timeUnitAbbrev": "min",
+    "timeUnitHoursAbbrev": "hr",
+    "timeUnitsShort": "{{units}} min",
+    "timeAccountingTotal": "Time booked: {{units}} min",
+    "timeRemove": "Remove booking",
+    "timeUnitMode": "Time unit",
+    "timeUnitMin": "Min",
+    "timeUnitHours": "Hr",
+    "timePresets": "Quick pick",
+    "timeComposerHint": "When replying, book it in the composer footer.",
+    "timeChipHint": "Booked when you send",
+    "extrasFailedMentions": "Sent — the mention was not saved.",
+    "extrasFailedTime": "Sent — the time was not booked.",
+    "extrasFailedBoth": "Sent — neither the mention nor the booking was saved.",
+    "extrasRetry": "Try again",
+    "customerUnresolved": "No customer record matches this address, so customer details are unavailable."
   },
   "search": {
     "title": "Search",
@@ -1143,7 +1182,8 @@
       },
       "acl": {
         "match": "Conditions under which this ACL applies (e.g. current queue, state, form field). The change on the right is only applied when every criterion listed here matches.",
-        "change": "The ACL's effect once its conditions match — typically it restricts or forces the choices available in forms (e.g. only certain follow-up states allowed)."
+        "change": "The ACL's effect once its conditions match — typically it restricts or forces the choices available in forms (e.g. only certain follow-up states allowed).",
+        "stopAfterMatch": "When checked, no further ACLs are evaluated after this one matches productively (Znuny StopAfterMatch)."
       },
       "mailOutbound": {
         "host": "SMTP server hostname for outgoing mail. Must be reachable from this server (DNS + firewall) on the port below.",
@@ -1240,7 +1280,13 @@
       "aiAcl": "Access & limits",
       "collapse": "Collapse navigation",
       "mailAccounts": "Mail accounts",
-      "oauth2Tokens": "OAuth2 tokens (mail)"
+      "oauth2Tokens": "OAuth2 tokens (mail)",
+      "types": "Ticket types",
+      "services": "Services",
+      "slas": "SLAs",
+      "systemAddresses": "System addresses",
+      "notificationEvents": "Notification events",
+      "ticketAttributeRelations": "Attribute relations"
     },
     "table": {
       "id": "ID",
@@ -1347,7 +1393,44 @@
       "title": "Title",
       "firstName": "First name",
       "lastName": "Last name",
-      "name": "Name"
+      "name": "Name",
+      "passwordMode": "Password assignment",
+      "passwordModeManual": "Set manually",
+      "passwordModeAuto": "Invite: email a setup link",
+      "passwordModeAutoHelp": "On save a one-time link goes to the email address below. The agent chooses their own password.",
+      "email": "Email",
+      "mobile": "Mobile phone",
+      "effectivePermissions": "View effective permissions",
+      "effectivePermissionsTitle": "Effective permissions for {{name}}",
+      "effectivePermissionsDescription": "Merged rights from direct group assignment and roles.",
+      "rolesHeading": "Roles",
+      "groupsHeading": "Group permissions",
+      "queuesHeading": "Queues",
+      "noRoles": "No roles assigned.",
+      "noGroups": "No group permissions.",
+      "noQueues": "No assigned queues.",
+      "viaDirect": "Direct",
+      "permissionColumn": "Permissions",
+      "sourceColumn": "Source",
+      "editSettings": "Edit personal settings",
+      "editSettingsTitle": "Personal settings for {{name}}",
+      "editSettingsDescription": "The same settings the agent sees themselves under \"Personal settings\".",
+      "languageLabel": "Language",
+      "languageSaved": "Language saved.",
+      "tabAccount": "Account",
+      "tabPerson": "Person",
+      "sourceInvalidHint": "This permission comes from an invalid role and therefore has no effect.",
+      "keyInactiveHint": "This permission is configured but not in force — its source or the group is invalid.",
+      "deletePermanent": "Delete permanently",
+      "deleteTitle": "Permanently delete {{name}}?",
+      "deleteConfirm": "Delete permanently",
+      "deletableBody": "Nothing references {{name}}, so the account can be removed completely — along with its preferences, group and role assignment, and 2FA enrolment.",
+      "deleteIrreversible": "This cannot be undone.",
+      "deleteBlockedBody": "{{name}} cannot be deleted — these tables still reference the account:",
+      "deleteBlockedHint": "Set the account to \"Invalid\" instead, so tickets, articles and history stay attributable.",
+      "resendSetupLink": "Resend setup link",
+      "setupLinkSent": "Setup link sent.",
+      "setupLinkFailed": "Could not send the setup link."
     },
     "groups": {
       "title_plural": "Groups",
@@ -1561,7 +1644,10 @@
       "name": "Name",
       "description": "Description",
       "match": "Match",
-      "change": "Change"
+      "change": "Change",
+      "new": "New ACL",
+      "stopAfterMatch": "Stop after match",
+      "confirmDelete": "Delete ACL “{{name}}”? This cannot be undone."
     },
     "genericAgentJobs": {
       "title_plural": "Generic agent jobs",
@@ -2230,7 +2316,13 @@
       "aiAudit": "Full audit of every LLM request/response, with PII reveal.",
       "aiAcl": "AI permissions and quotas per group, role, or agent.",
       "mailAccounts": "Incoming IMAP/POP mailboxes (password or OAuth2).",
-      "oauth2Tokens": "OAuth2 token configs for Microsoft/Google mail (Znuny-compatible)."
+      "oauth2Tokens": "OAuth2 token configs for Microsoft/Google mail (Znuny-compatible).",
+      "types": "Manage ticket types used for classification.",
+      "services": "Manage services and link them to SLAs.",
+      "slas": "Manage service level agreements and timers.",
+      "systemAddresses": "Email addresses used as From for queues and auto-responses.",
+      "notificationEvents": "Configure event-driven agent notifications.",
+      "ticketAttributeRelations": "Znuny-compatible service/queue (and similar) dependency matrices (CSV)."
     },
     "mailAccounts": {
       "title_plural": "Mail accounts",
@@ -2283,6 +2375,45 @@
       "new": "Add address",
       "email": "Email",
       "name": "Name"
+    },
+    "types": {
+      "title_plural": "Ticket types",
+      "new": "New type",
+      "name": "Name"
+    },
+    "services": {
+      "title_plural": "Services",
+      "new": "New service",
+      "name": "Name",
+      "slaCount": "SLAs"
+    },
+    "slas": {
+      "title_plural": "SLAs",
+      "new": "New SLA",
+      "name": "Name",
+      "firstResponseTime": "First response (min)",
+      "updateTime": "Update (min)",
+      "solutionTime": "Solution (min)",
+      "calendar": "Calendar"
+    },
+    "notificationEvents": {
+      "title_plural": "Notification events",
+      "subtitle": "When events fire, matching notifications are sent to agents.",
+      "new": "Create notification",
+      "name": "Name",
+      "event": "Event",
+      "subject": "Subject",
+      "body": "Body"
+    },
+    "tar": {
+      "title": "Ticket attribute relations",
+      "filename": "Filename",
+      "attributes": "Attributes",
+      "priority": "Priority",
+      "csv": "CSV data",
+      "new": "New relation",
+      "help": "CSV with header Attribute1;Attribute2 and value pairs (Znuny AdminTicketAttributeRelations). Used to restrict form pickers (e.g. Service → Queue).",
+      "confirmDelete": "Delete this relation?"
     }
   },
   "kb": {
@@ -2497,7 +2628,8 @@
       "startButton": "Start process",
       "actions": "Available actions",
       "loadError": "Could not load process state.",
-      "noDialogs": "No actions available at this activity."
+      "noDialogs": "No actions available at this activity.",
+      "noCustomerDialogs": "No customer dialogs available at this step."
     },
     "start": {
       "title": "Start process",
@@ -2533,5 +2665,84 @@
     "body": "Body",
     "editTitle": "Edit “{{name}}”",
     "saveError": "Could not save the template."
+  },
+  "views": {
+    "mine": "My tickets",
+    "responsible": "Responsible",
+    "locked": "Locked tickets",
+    "watched": "Watched tickets",
+    "escalated": "Escalated tickets",
+    "service": "By service",
+    "serviceHint": "List tickets assigned to a service.",
+    "pickService": "Select a service…"
+  },
+  "customerCentre": {
+    "title": "Customer information",
+    "open": "Customer info",
+    "invalid": "Invalid customer login.",
+    "loadError": "Could not load this customer.",
+    "email": "Email",
+    "phone": "Phone",
+    "customerId": "Customer number",
+    "company": "Company",
+    "openCount": "{{count}} open",
+    "closedCount": "{{count}} closed",
+    "allTickets": "All tickets →",
+    "recentTickets": "Recent tickets"
+  },
+  "timeAccounting": {
+    "title": "Time accounting",
+    "hint": "Booked time units across tickets you can access.",
+    "filterUser": "Agent",
+    "allUsers": "All agents",
+    "filterFrom": "From",
+    "filterTo": "To",
+    "filterTicket": "Ticket ID",
+    "empty": "No time-accounting entries match.",
+    "colWhen": "When",
+    "colTicket": "Ticket",
+    "colUser": "Agent",
+    "colUnits": "Units",
+    "presetsLabel": "Period",
+    "presets": {
+      "today": "Today",
+      "yesterday": "Yesterday",
+      "thisWeek": "This week",
+      "lastWeek": "Last week",
+      "thisMonth": "This month",
+      "lastMonth": "Last month",
+      "thisQuarter": "This quarter",
+      "lastQuarter": "Last quarter",
+      "thisYear": "This year",
+      "lastYear": "Last year"
+    },
+    "kpiUnits": "Time units",
+    "kpiEntries": "Bookings",
+    "kpiTickets": "Tickets",
+    "kpiAgents": "Agents",
+    "rangeBetween": "{{from}} – {{to}}",
+    "rangeFrom": "from {{from}}",
+    "rangeTo": "until {{to}}",
+    "chartTitle": "Units per day",
+    "chartBar": "{{date}}: {{units}} units",
+    "dayUnknown": "No date",
+    "emptyHint": "Widen the period or clear the agent and ticket filters.",
+    "clearFilters": "Clear filters",
+    "pageRange": "{{from}}–{{to}}",
+    "pageScope": "on this page",
+    "chartPeak": "peak {{units}}"
+  },
+  "setPassword": {
+    "subtitle": "Please choose a password for your account.",
+    "password": "New password",
+    "confirm": "Repeat password",
+    "lengthHint": "Between {{min}} and {{max}} characters.",
+    "mismatch": "The passwords do not match.",
+    "submit": "Set password",
+    "saving": "Saving…",
+    "done": "Password saved. You can sign in now.",
+    "invalid": "This link is no longer valid.",
+    "invalidHint": "Setup links are valid for 7 days and can be used once. Please ask your administrator for a new one.",
+    "toLogin": "Go to sign in"
   }
 }

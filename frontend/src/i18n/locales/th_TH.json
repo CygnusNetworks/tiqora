@@ -55,7 +55,12 @@
     "showActiveQueues": "แสดงการใช้งาน",
     "queueSearch": "กรองคิว...",
     "noQueueMatch": "ไม่มีคิวที่ตรงกัน",
-    "templates": "เทมเพลต"
+    "templates": "เทมเพลต",
+    "locked": "ล็อกแล้ว",
+    "responsible": "ผู้รับผิดชอบ",
+    "escalated": "เลื่อนระดับ",
+    "services": "บริการ",
+    "timeAccounting": "บันทึกเวลา"
   },
   "common": {
     "prev": "ก่อนหน้า",
@@ -68,7 +73,10 @@
     "cancel": "ยกเลิก",
     "help": "ช่วยด้วย",
     "edit": "แก้ไข",
-    "save": "บันทึก"
+    "save": "บันทึก",
+    "saved": "บันทึกแล้ว",
+    "delete": "ลบ",
+    "submit": "ส่ง"
   },
   "otp": {
     "verifying": "กำลังยืนยัน...",
@@ -171,7 +179,9 @@
     "toPickUpEmpty": "ไม่มีตั๋วใหม่ให้รับ",
     "remindersDue": "การแจ้งเตือนถึงกำหนด",
     "remindersDueEmpty": "ไม่มีการแจ้งเตือนที่ครบกำหนด",
-    "queueShortcutsEmpty": "ไม่มีคิวสำหรับตั๋วเปิดหรือตั๋วใหม่ในขณะนี้"
+    "queueShortcutsEmpty": "ไม่มีคิวสำหรับตั๋วเปิดหรือตั๋วใหม่ในขณะนี้",
+    "lastViews": "ดูล่าสุด",
+    "lastViewsUntitled": "(ไม่มีหัวเรื่อง)"
   },
   "queue": {
     "sidebar": "คิว",
@@ -482,7 +492,8 @@
       "customerEmail": "อีเมล",
       "customerFirstName": "ชื่อ",
       "customerLastName": "นามสกุล",
-      "customerLoginConflict": "ข้อมูลเข้าสู่ระบบนี้มีอยู่แล้ว เลือกข้อมูลเข้าสู่ระบบอื่น หรือมอบหมายลูกค้าปัจจุบันผ่านการค้นหาแทน"
+      "customerLoginConflict": "ข้อมูลเข้าสู่ระบบนี้มีอยู่แล้ว เลือกข้อมูลเข้าสู่ระบบอื่น หรือมอบหมายลูกค้าปัจจุบันผ่านการค้นหาแทน",
+      "clearCustomer": "ลบลูกค้า"
     },
     "inlineAttachments": "รูปภาพที่ฝัง ({{count}})",
     "list": {
@@ -504,7 +515,35 @@
     "draftEditedAt": "แก้ไขเมื่อ {{time}}",
     "draftDiscard": "ทิ้งฉบับร่าง",
     "draftDiscardConfirm": "ทิ้งคำตอบที่ยังไม่ได้ส่งนี้หรือไม่ ไม่สามารถกู้คืนข้อความได้",
-    "draftDiscardConfirmButton": "ทิ้ง"
+    "draftDiscardConfirmButton": "ทิ้ง",
+    "type": "ประเภท",
+    "service": "บริการ",
+    "sla": "SLA",
+    "mentions": "การกล่าวถึง",
+    "timeAccounting": "บันทึกเวลา",
+    "timeUnits": "หน่วยเวลา",
+    "addTime": "บันทึกเวลา",
+    "addMention": "กล่าวถึงเจ้าหน้าที่",
+    "mentionsCount": "การกล่าวถึง: {{n}}",
+    "mentionsEmpty": "ไม่มีใครถูกกล่าวถึง",
+    "mentionRemove": "ลบการกล่าวถึง",
+    "mentionSuggestions": "เจ้าหน้าที่",
+    "timeUnitAbbrev": "นาที",
+    "timeUnitHoursAbbrev": "ชม.",
+    "timeUnitsShort": "{{units}} นาที",
+    "timeAccountingTotal": "เวลาที่บันทึก: {{units}} นาที",
+    "timeRemove": "ลบรายการ",
+    "timeUnitMode": "หน่วยเวลา",
+    "timeUnitMin": "นาที",
+    "timeUnitHours": "ชม.",
+    "timePresets": "เลือกด่วน",
+    "timeComposerHint": "เมื่อตอบ ให้บันทึกที่ส่วนท้ายของช่องเขียน",
+    "timeChipHint": "บันทึกเมื่อส่ง",
+    "extrasFailedMentions": "ส่งแล้ว — การกล่าวถึงไม่ได้ถูกบันทึก",
+    "extrasFailedTime": "ส่งแล้ว — เวลาไม่ได้ถูกบันทึก",
+    "extrasFailedBoth": "ส่งแล้ว — ทั้งการกล่าวถึงและการบันทึกเวลาไม่ได้ถูกบันทึก",
+    "extrasRetry": "ลองอีกครั้ง",
+    "customerUnresolved": "ไม่มีระเบียนลูกค้าที่ตรงกับที่อยู่นี้ จึงไม่สามารถแสดงรายละเอียดลูกค้าได้"
   },
   "search": {
     "title": "ค้นหา",
@@ -1143,7 +1182,8 @@
       },
       "acl": {
         "match": "เงื่อนไขที่ ACL นี้ใช้ (เช่น คิวปัจจุบัน สถานะ ฟิลด์แบบฟอร์ม) การเปลี่ยนแปลงทางด้านขวาจะมีผลเฉพาะเมื่อทุกเกณฑ์ที่แสดงที่นี่ตรงกันเท่านั้น",
-        "change": "ผลกระทบของ ACL เมื่อเงื่อนไขตรงกัน โดยทั่วไปแล้วจะจำกัดหรือบังคับตัวเลือกที่มีอยู่ในรูปแบบ (เช่น อนุญาตเฉพาะสถานะติดตามผลบางสถานะเท่านั้น)"
+        "change": "ผลกระทบของ ACL เมื่อเงื่อนไขตรงกัน โดยทั่วไปแล้วจะจำกัดหรือบังคับตัวเลือกที่มีอยู่ในรูปแบบ (เช่น อนุญาตเฉพาะสถานะติดตามผลบางสถานะเท่านั้น)",
+        "stopAfterMatch": "เมื่อเลือกแล้ว จะไม่ประเมิน ACL ถัดไปหลัง ACL นี้จับคู่ได้จริง (Znuny StopAfterMatch)"
       },
       "mailOutbound": {
         "host": "ชื่อโฮสต์เซิร์ฟเวอร์ SMTP สำหรับเมลขาออก ต้องสามารถเข้าถึงได้จากเซิร์ฟเวอร์นี้ (DNS + ไฟร์วอลล์) บนพอร์ตด้านล่าง",
@@ -1190,8 +1230,8 @@
         "validId": "\"Temp\" (valid_id 3) คือสถานะความถูกต้องลำดับที่สามของ Znuny — โดยทั่วไปแล้วบัญชีที่รอการยืนยัน (เช่น การลงทะเบียนด้วยตนเองที่ยังไม่ยืนยัน) แตกต่างจากสถานะที่ถูกต้อง/ไม่ถูกต้องธรรมดา"
       },
       "systemAddresses": {
-        "email": "Address used as the From email for queues and auto-responses.",
-        "name": "Display name shown next to the email (e.g. “Support <support@example.com>”)."
+        "email": "ที่อยู่ที่ใช้เป็น From สำหรับคิวและการตอบอัตโนมัติ",
+        "name": "ชื่อที่แสดงข้างอีเมล (เช่น “Support <support@example.com>”)"
       }
     },
     "nav": {
@@ -1240,7 +1280,13 @@
       "aiAcl": "การเข้าถึงและขีดจำกัด",
       "collapse": "ยุบการนำทาง",
       "mailAccounts": "บัญชีเมล",
-      "oauth2Tokens": "โทเค็น OAuth2 (เมล)"
+      "oauth2Tokens": "โทเค็น OAuth2 (เมล)",
+      "types": "ประเภทตั๋ว",
+      "services": "บริการ",
+      "slas": "SLA",
+      "systemAddresses": "ที่อยู่ระบบ",
+      "notificationEvents": "เหตุการณ์การแจ้งเตือน",
+      "ticketAttributeRelations": "ความสัมพันธ์แอตทริบิวต์"
     },
     "table": {
       "id": "ID",
@@ -1347,7 +1393,44 @@
       "title": "ชื่อเรื่อง",
       "firstName": "ชื่อ",
       "lastName": "นามสกุล",
-      "name": "ชื่อ"
+      "name": "ชื่อ",
+      "passwordMode": "การกำหนดรหัสผ่าน",
+      "passwordModeManual": "ตั้งด้วยตนเอง",
+      "passwordModeAuto": "เชิญ: ส่งลิงก์ตั้งค่าทางอีเมล",
+      "passwordModeAutoHelp": "เมื่อบันทึก จะส่งลิงก์ใช้ครั้งเดียวไปยังอีเมลด้านล่าง เจ้าหน้าที่จะตั้งรหัสผ่านเอง",
+      "email": "อีเมล",
+      "mobile": "โทรศัพท์มือถือ",
+      "effectivePermissions": "ดูสิทธิ์ที่มีผล",
+      "effectivePermissionsTitle": "สิทธิ์ที่มีผลของ {{name}}",
+      "effectivePermissionsDescription": "สิทธิ์ที่รวมจากการมอบหมายกลุ่มโดยตรงและบทบาท",
+      "rolesHeading": "บทบาท",
+      "groupsHeading": "สิทธิ์กลุ่ม",
+      "queuesHeading": "คิว",
+      "noRoles": "ยังไม่ได้มอบหมายบทบาท",
+      "noGroups": "ไม่มีสิทธิ์กลุ่ม",
+      "noQueues": "ไม่มีคิวที่กำหนด",
+      "viaDirect": "โดยตรง",
+      "permissionColumn": "สิทธิ์",
+      "sourceColumn": "แหล่งที่มา",
+      "editSettings": "แก้ไขการตั้งค่าส่วนตัว",
+      "editSettingsTitle": "การตั้งค่าส่วนตัวของ {{name}}",
+      "editSettingsDescription": "การตั้งค่าเดียวกับที่เจ้าหน้าที่เห็นใน “การตั้งค่าส่วนตัว”",
+      "languageLabel": "ภาษา",
+      "languageSaved": "บันทึกภาษาแล้ว",
+      "tabAccount": "บัญชี",
+      "tabPerson": "บุคคล",
+      "sourceInvalidHint": "สิทธิ์นี้มาจากบทบาทที่ไม่ถูกต้อง จึงไม่มีผล",
+      "keyInactiveHint": "สิทธิ์นี้ตั้งค่าแล้วแต่ไม่มีผล — แหล่งที่มาหรือกลุ่มไม่ถูกต้อง",
+      "deletePermanent": "ลบถาวร",
+      "deleteTitle": "ลบ {{name}} ถาวร?",
+      "deleteConfirm": "ลบถาวร",
+      "deletableBody": "ไม่มีสิ่งใดอ้างถึง {{name}} จึงลบบัญชีออกได้ทั้งหมดพร้อมค่ากำหนด กลุ่ม บทบาท และ 2FA",
+      "deleteIrreversible": "ย้อนกลับไม่ได้",
+      "deleteBlockedBody": "ลบ {{name}} ไม่ได้ — ตารางเหล่านี้ยังอ้างถึงบัญชี:",
+      "deleteBlockedHint": "ตั้งบัญชีเป็น “ไม่ถูกต้อง” แทน เพื่อให้ตั๋ว บทความ และประวัติยังระบุเจ้าของได้",
+      "resendSetupLink": "ส่งลิงก์ตั้งค่าอีกครั้ง",
+      "setupLinkSent": "ส่งลิงก์ตั้งค่าแล้ว",
+      "setupLinkFailed": "ส่งลิงก์ตั้งค่าไม่ได้"
     },
     "groups": {
       "title_plural": "กลุ่ม",
@@ -1561,7 +1644,10 @@
       "name": "ชื่อ",
       "description": "คำอธิบาย",
       "match": "ตรงกัน",
-      "change": "เปลี่ยน"
+      "change": "เปลี่ยน",
+      "new": "ACL ใหม่",
+      "stopAfterMatch": "หยุดหลังจับคู่",
+      "confirmDelete": "ลบ ACL “{{name}}”? การกระทำนี้ย้อนกลับไม่ได้"
     },
     "genericAgentJobs": {
       "title_plural": "งานตัวแทนทั่วไป",
@@ -2222,7 +2308,13 @@
       "aiAudit": "การตรวจสอบคำขอ/การตอบกลับ LLM ทั้งหมดโดยสมบูรณ์ พร้อมการเปิดเผย PII",
       "aiAcl": "สิทธิ์และโควต้าของ AI ต่อกลุ่ม บทบาท หรือตัวแทน",
       "mailAccounts": "กล่องจดหมาย IMAP/POP ขาเข้า (รหัสผ่านหรือ OAuth2)",
-      "oauth2Tokens": "การกำหนดค่าโทเค็น OAuth2 สำหรับอีเมล Microsoft/Google (เข้ากันได้กับ Znuny)"
+      "oauth2Tokens": "การกำหนดค่าโทเค็น OAuth2 สำหรับอีเมล Microsoft/Google (เข้ากันได้กับ Znuny)",
+      "types": "จัดการประเภทตั๋วที่ใช้ในการจำแนก",
+      "services": "จัดการบริการและเชื่อมกับ SLA",
+      "slas": "จัดการข้อตกลงระดับบริการและตัวจับเวลา",
+      "systemAddresses": "ที่อยู่อีเมลที่ใช้เป็น From สำหรับคิวและการตอบอัตโนมัติ",
+      "notificationEvents": "กำหนดค่าการแจ้งเตือนเจ้าหน้าที่ตามเหตุการณ์",
+      "ticketAttributeRelations": "เมทริกซ์ความขึ้นต่อกันที่เข้ากันกับ Znuny (บริการ→คิว ฯลฯ) แบบ CSV"
     },
     "mailAccounts": {
       "title_plural": "บัญชีเมล",
@@ -2270,11 +2362,50 @@
       "refreshSuccess": "รีเฟรชโทเค็นแล้ว"
     },
     "systemAddresses": {
-      "title_plural": "System addresses",
-      "subtitle": "From-addresses for queues and auto-responses. Invalid addresses stay listed so they can be re-enabled.",
-      "new": "Add address",
-      "email": "Email",
-      "name": "Name"
+      "title_plural": "ที่อยู่ระบบ",
+      "subtitle": "ที่อยู่ From สำหรับคิวและการตอบอัตโนมัติ ที่อยู่ที่ไม่ถูกต้องยังคงแสดงเพื่อเปิดใช้ใหม่ได้",
+      "new": "เพิ่มที่อยู่",
+      "email": "อีเมล",
+      "name": "ชื่อ"
+    },
+    "types": {
+      "title_plural": "ประเภทตั๋ว",
+      "new": "ประเภทใหม่",
+      "name": "ชื่อ"
+    },
+    "services": {
+      "title_plural": "บริการ",
+      "new": "บริการใหม่",
+      "name": "ชื่อ",
+      "slaCount": "SLA"
+    },
+    "slas": {
+      "title_plural": "SLA",
+      "new": "SLA ใหม่",
+      "name": "ชื่อ",
+      "firstResponseTime": "ตอบครั้งแรก (นาที)",
+      "updateTime": "อัปเดต (นาที)",
+      "solutionTime": "แก้ปัญหา (นาที)",
+      "calendar": "ปฏิทิน"
+    },
+    "notificationEvents": {
+      "title_plural": "เหตุการณ์การแจ้งเตือน",
+      "subtitle": "เมื่อเกิดเหตุการณ์ จะส่งการแจ้งเตือนที่ตรงกันไปยังเจ้าหน้าที่",
+      "new": "สร้างการแจ้งเตือน",
+      "name": "ชื่อ",
+      "event": "เหตุการณ์",
+      "subject": "หัวเรื่อง",
+      "body": "เนื้อหา"
+    },
+    "tar": {
+      "title": "ความสัมพันธ์แอตทริบิวต์ตั๋ว",
+      "filename": "ชื่อไฟล์",
+      "attributes": "แอตทริบิวต์",
+      "priority": "ลำดับความสำคัญ",
+      "csv": "ข้อมูล CSV",
+      "new": "ความสัมพันธ์ใหม่",
+      "help": "CSV ที่มีหัว Attribute1;Attribute2 และคู่ค่า (Znuny AdminTicketAttributeRelations) ใช้จำกัดตัวเลือกในฟอร์ม (เช่น บริการ → คิว)",
+      "confirmDelete": "ลบความสัมพันธ์นี้?"
     }
   },
   "kb": {
@@ -2489,7 +2620,8 @@
       "startButton": "เริ่มกระบวนการ",
       "actions": "การดำเนินการที่มีอยู่",
       "loadError": "ไม่สามารถโหลดสถานะกระบวนการได้",
-      "noDialogs": "ไม่มีการดำเนินการใดๆ ในกิจกรรมนี้"
+      "noDialogs": "ไม่มีการดำเนินการใดๆ ในกิจกรรมนี้",
+      "noCustomerDialogs": "ไม่มีไดอะล็อกลูกค้าในขั้นตอนนี้"
     },
     "start": {
       "title": "เริ่มกระบวนการ",
@@ -2525,5 +2657,84 @@
     "body": "ร่างกาย",
     "editTitle": "แก้ไข “{{name}}”",
     "saveError": "ไม่สามารถบันทึกเทมเพลตได้"
+  },
+  "views": {
+    "mine": "ตั๋วของฉัน",
+    "responsible": "ผู้รับผิดชอบ",
+    "locked": "ตั๋วที่ล็อก",
+    "watched": "ตั๋วที่ติดตาม",
+    "escalated": "ตั๋วที่เลื่อนระดับ",
+    "service": "ตามบริการ",
+    "serviceHint": "แสดงตั๋วที่ผูกกับบริการ",
+    "pickService": "เลือกบริการ…"
+  },
+  "customerCentre": {
+    "title": "ข้อมูลลูกค้า",
+    "open": "ข้อมูลลูกค้า",
+    "invalid": "ชื่อเข้าใช้ลูกค้าไม่ถูกต้อง",
+    "loadError": "โหลดลูกค้านี้ไม่ได้",
+    "email": "อีเมล",
+    "phone": "โทรศัพท์",
+    "customerId": "หมายเลขลูกค้า",
+    "company": "บริษัท",
+    "openCount": "เปิด {{count}}",
+    "closedCount": "ปิด {{count}}",
+    "allTickets": "ตั๋วทั้งหมด →",
+    "recentTickets": "ตั๋วล่าสุด"
+  },
+  "timeAccounting": {
+    "title": "บันทึกเวลา",
+    "hint": "หน่วยเวลาที่บันทึกบนตั๋วที่คุณเข้าถึงได้",
+    "filterUser": "เจ้าหน้าที่",
+    "allUsers": "เจ้าหน้าที่ทั้งหมด",
+    "filterFrom": "จาก",
+    "filterTo": "ถึง",
+    "filterTicket": "รหัสตั๋ว",
+    "empty": "ไม่พบบันทึกเวลาที่ตรงเงื่อนไข",
+    "colWhen": "เมื่อ",
+    "colTicket": "ตั๋ว",
+    "colUser": "เจ้าหน้าที่",
+    "colUnits": "หน่วย",
+    "presetsLabel": "ช่วงเวลา",
+    "presets": {
+      "today": "วันนี้",
+      "yesterday": "เมื่อวาน",
+      "thisWeek": "สัปดาห์นี้",
+      "lastWeek": "สัปดาห์ที่แล้ว",
+      "thisMonth": "เดือนนี้",
+      "lastMonth": "เดือนที่แล้ว",
+      "thisQuarter": "ไตรมาสนี้",
+      "lastQuarter": "ไตรมาสที่แล้ว",
+      "thisYear": "ปีนี้",
+      "lastYear": "ปีที่แล้ว"
+    },
+    "kpiUnits": "หน่วยเวลา",
+    "kpiEntries": "รายการ",
+    "kpiTickets": "ตั๋ว",
+    "kpiAgents": "เจ้าหน้าที่",
+    "rangeBetween": "{{from}} – {{to}}",
+    "rangeFrom": "ตั้งแต่ {{from}}",
+    "rangeTo": "ถึง {{to}}",
+    "chartTitle": "หน่วยต่อวัน",
+    "chartBar": "{{date}}: {{units}} หน่วย",
+    "dayUnknown": "ไม่มีวันที่",
+    "emptyHint": "ขยายช่วงเวลา หรือล้างตัวกรองเจ้าหน้าที่และตั๋ว",
+    "clearFilters": "ล้างตัวกรอง",
+    "pageRange": "{{from}}–{{to}}",
+    "pageScope": "ในหน้านี้",
+    "chartPeak": "สูงสุด {{units}}"
+  },
+  "setPassword": {
+    "subtitle": "โปรดเลือกรหัสผ่านสำหรับบัญชีของคุณ",
+    "password": "รหัสผ่านใหม่",
+    "confirm": "ยืนยันรหัสผ่าน",
+    "lengthHint": "ระหว่าง {{min}} ถึง {{max}} ตัวอักษร",
+    "mismatch": "รหัสผ่านไม่ตรงกัน",
+    "submit": "ตั้งรหัสผ่าน",
+    "saving": "กำลังบันทึก…",
+    "done": "บันทึกรหัสผ่านแล้ว คุณสามารถเข้าสู่ระบบได้",
+    "invalid": "ลิงก์นี้ใช้ไม่ได้อีกต่อไป",
+    "invalidHint": "ลิงก์ตั้งค่าใช้ได้ 7 วัน และใช้ได้ครั้งเดียว โปรดขอใหม่จากผู้ดูแล",
+    "toLogin": "ไปหน้าเข้าสู่ระบบ"
   }
 }

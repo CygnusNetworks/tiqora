@@ -55,7 +55,12 @@
     "showActiveQueues": "सक्रिय दिखाएँ",
     "queueSearch": "कतारें फ़िल्टर करें...",
     "noQueueMatch": "कोई कतार मेल नहीं खाती.",
-    "templates": "टेम्पलेट्स"
+    "templates": "टेम्पलेट्स",
+    "locked": "लॉक",
+    "responsible": "उत्तरदायी",
+    "escalated": "एस्केलेटेड",
+    "services": "सेवाएँ",
+    "timeAccounting": "समय लेखांकन"
   },
   "common": {
     "prev": "पिछला",
@@ -68,7 +73,10 @@
     "cancel": "रद्द करें",
     "help": "मदद",
     "edit": "संपादित करें",
-    "save": "सहेजें"
+    "save": "सहेजें",
+    "saved": "सहेजा गया",
+    "delete": "हटाएँ",
+    "submit": "जमा करें"
   },
   "otp": {
     "verifying": "सत्यापन किया जा रहा है...",
@@ -171,7 +179,9 @@
     "toPickUpEmpty": "लेने के लिए कोई नया टिकट नहीं.",
     "remindersDue": "अनुस्मारक देय हैं",
     "remindersDueEmpty": "कोई अनुस्मारक देय नहीं.",
-    "queueShortcutsEmpty": "अभी खुले या नए टिकटों के साथ कोई कतार नहीं है।"
+    "queueShortcutsEmpty": "अभी खुले या नए टिकटों के साथ कोई कतार नहीं है।",
+    "lastViews": "हाल ही में देखे गए",
+    "lastViewsUntitled": "(कोई विषय नहीं)"
   },
   "queue": {
     "sidebar": "कतारें",
@@ -482,7 +492,8 @@
       "customerEmail": "ईमेल",
       "customerFirstName": "पहला नाम",
       "customerLastName": "अंतिम नाम",
-      "customerLoginConflict": "यह लॉगिन पहले से मौजूद है. एक अलग लॉगिन चुनें, या इसके बजाय खोज के माध्यम से मौजूदा ग्राहक को असाइन करें।"
+      "customerLoginConflict": "यह लॉगिन पहले से मौजूद है. एक अलग लॉगिन चुनें, या इसके बजाय खोज के माध्यम से मौजूदा ग्राहक को असाइन करें।",
+      "clearCustomer": "ग्राहक हटाएँ"
     },
     "inlineAttachments": "एंबेडेड छवियां ({{count}})",
     "list": {
@@ -504,7 +515,35 @@
     "draftEditedAt": "{{time}} संपादित किया गया",
     "draftDiscard": "ड्राफ़्ट हटाएं",
     "draftDiscardConfirm": "इस न भेजे गए उत्तर को हटाएं? टेक्स्ट को पुनर्प्राप्त नहीं किया जा सकता।",
-    "draftDiscardConfirmButton": "हटाएं"
+    "draftDiscardConfirmButton": "हटाएं",
+    "type": "प्रकार",
+    "service": "सेवा",
+    "sla": "SLA",
+    "mentions": "उल्लेख",
+    "timeAccounting": "समय लेखांकन",
+    "timeUnits": "समय इकाइयाँ",
+    "addTime": "समय बुक करें",
+    "addMention": "एजेंट का उल्लेख करें",
+    "mentionsCount": "उल्लेख: {{n}}",
+    "mentionsEmpty": "किसी का उल्लेख नहीं",
+    "mentionRemove": "उल्लेख हटाएँ",
+    "mentionSuggestions": "एजेंट",
+    "timeUnitAbbrev": "मि",
+    "timeUnitHoursAbbrev": "घं",
+    "timeUnitsShort": "{{units}} मि",
+    "timeAccountingTotal": "बुक किया गया समय: {{units}} मि",
+    "timeRemove": "प्रविष्टि हटाएँ",
+    "timeUnitMode": "समय इकाई",
+    "timeUnitMin": "मि",
+    "timeUnitHours": "घं",
+    "timePresets": "त्वरित चयन",
+    "timeComposerHint": "उत्तर देते समय कंपोज़र फ़ुटर में बुक करें।",
+    "timeChipHint": "भेजते समय बुक होगा",
+    "extrasFailedMentions": "भेजा गया — उल्लेख सहेजा नहीं गया।",
+    "extrasFailedTime": "भेजा गया — समय बुक नहीं हुआ।",
+    "extrasFailedBoth": "भेजा गया — न उल्लेख और न समय बुकिंग सहेजी गई।",
+    "extrasRetry": "फिर कोशिश करें",
+    "customerUnresolved": "इस पते से मेल खाता कोई ग्राहक रिकॉर्ड नहीं, इसलिए विवरण उपलब्ध नहीं।"
   },
   "search": {
     "title": "खोजें",
@@ -1143,7 +1182,8 @@
       },
       "acl": {
         "match": "वे स्थितियाँ जिनके अंतर्गत यह ACL लागू होता है (जैसे वर्तमान कतार, स्थिति, प्रपत्र फ़ील्ड)। दाईं ओर परिवर्तन केवल तभी लागू होता है जब यहां सूचीबद्ध प्रत्येक मानदंड मेल खाता है।",
-        "change": "एक बार इसकी शर्तें मेल खाने पर एसीएल का प्रभाव पड़ता है - आम तौर पर यह फॉर्म में उपलब्ध विकल्पों को प्रतिबंधित या बाध्य करता है (उदाहरण के लिए केवल कुछ अनुवर्ती राज्यों की अनुमति)।"
+        "change": "एक बार इसकी शर्तें मेल खाने पर एसीएल का प्रभाव पड़ता है - आम तौर पर यह फॉर्म में उपलब्ध विकल्पों को प्रतिबंधित या बाध्य करता है (उदाहरण के लिए केवल कुछ अनुवर्ती राज्यों की अनुमति)।",
+        "stopAfterMatch": "चयनित होने पर, उत्पादक मिलान के बाद अन्य ACL का मूल्यांकन नहीं होता (Znuny StopAfterMatch)।"
       },
       "mailOutbound": {
         "host": "आउटगोइंग मेल के लिए एसएमटीपी सर्वर होस्टनाम। नीचे दिए गए पोर्ट पर इस सर्वर (DNS + फ़ायरवॉल) से पहुंच योग्य होना चाहिए।",
@@ -1190,8 +1230,8 @@
         "validId": "\"Temp\" (valid_id 3) Znuny की तीसरी वैधता स्थिति है - आम तौर पर एक खाता जिसकी पुष्टि लंबित है (उदाहरण के लिए अपुष्ट स्व-पंजीकरण), जो सादे वैध/अमान्य से अलग है।"
       },
       "systemAddresses": {
-        "email": "Address used as the From email for queues and auto-responses.",
-        "name": "Display name shown next to the email (e.g. “Support <support@example.com>”)."
+        "email": "कतारों व स्वतः-उत्तरों के From हेतु प्रयुक्त पता।",
+        "name": "ईमेल के साथ दिखाया गया नाम (जैसे “Support <support@example.com>”)।"
       }
     },
     "nav": {
@@ -1240,7 +1280,13 @@
       "aiAcl": "पहुंच एवं सीमाएं",
       "collapse": "नेविगेशन संक्षिप्त करें",
       "mailAccounts": "मेल खाते",
-      "oauth2Tokens": "OAuth2 टोकन (मेल)"
+      "oauth2Tokens": "OAuth2 टोकन (मेल)",
+      "types": "टिकट प्रकार",
+      "services": "सेवाएँ",
+      "slas": "SLA",
+      "systemAddresses": "सिस्टम पते",
+      "notificationEvents": "अधिसूचना इवेंट",
+      "ticketAttributeRelations": "विशेषता संबंध"
     },
     "table": {
       "id": "ID",
@@ -1347,7 +1393,44 @@
       "title": "शीर्षक",
       "firstName": "पहला नाम",
       "lastName": "अंतिम नाम",
-      "name": "नाम"
+      "name": "नाम",
+      "passwordMode": "पासवर्ड असाइनमेंट",
+      "passwordModeManual": "मैन्युअल सेट करें",
+      "passwordModeAuto": "आमंत्रण: सेटअप लिंक ईमेल करें",
+      "passwordModeAutoHelp": "सहेजने पर नीचे दिए ईमेल पर एकबारगी लिंक जाता है। एजेंट स्वयं पासवर्ड चुनता है।",
+      "email": "ईमेल",
+      "mobile": "मोबाइल फ़ोन",
+      "effectivePermissions": "प्रभावी अनुमतियाँ देखें",
+      "effectivePermissionsTitle": "{{name}} की प्रभावी अनुमतियाँ",
+      "effectivePermissionsDescription": "प्रत्यक्ष समूह असाइनमेंट और भूमिकाओं से विलयित अधिकार।",
+      "rolesHeading": "भूमिकाएँ",
+      "groupsHeading": "समूह अनुमतियाँ",
+      "queuesHeading": "कतारें",
+      "noRoles": "कोई भूमिका असाइन नहीं।",
+      "noGroups": "कोई समूह अनुमति नहीं।",
+      "noQueues": "कोई असाइन कतार नहीं।",
+      "viaDirect": "प्रत्यक्ष",
+      "permissionColumn": "अनुमतियाँ",
+      "sourceColumn": "स्रोत",
+      "editSettings": "व्यक्तिगत सेटिंग संपादित करें",
+      "editSettingsTitle": "{{name}} की व्यक्तिगत सेटिंग",
+      "editSettingsDescription": "वही सेटिंग जो एजेंट «व्यक्तिगत सेटिंग» में देखता है।",
+      "languageLabel": "भाषा",
+      "languageSaved": "भाषा सहेजी गई।",
+      "tabAccount": "खाता",
+      "tabPerson": "व्यक्ति",
+      "sourceInvalidHint": "यह अनुमति अमान्य भूमिका से है, इसलिए प्रभावी नहीं।",
+      "keyInactiveHint": "यह अनुमति कॉन्फ़िगर है पर लागू नहीं — स्रोत या समूह अमान्य।",
+      "deletePermanent": "स्थायी रूप से हटाएँ",
+      "deleteTitle": "{{name}} को स्थायी रूप से हटाएँ?",
+      "deleteConfirm": "स्थायी रूप से हटाएँ",
+      "deletableBody": "{{name}} का कोई संदर्भ नहीं; खाता प्राथमिकताएँ, समूह, भूमिकाएँ और 2FA सहित पूरी तरह हटाया जा सकता है।",
+      "deleteIrreversible": "इसे पूर्ववत नहीं किया जा सकता।",
+      "deleteBlockedBody": "{{name}} हटाया नहीं जा सकता — ये तालिकाएँ अभी भी खाते का संदर्भ देती हैं:",
+      "deleteBlockedHint": "खाते को «अमान्य» करें ताकि टिकट, लेख और इतिहास आरोपणीय रहें।",
+      "resendSetupLink": "सेटअप लिंक पुनः भेजें",
+      "setupLinkSent": "सेटअप लिंक भेजा गया।",
+      "setupLinkFailed": "सेटअप लिंक नहीं भेजा जा सका।"
     },
     "groups": {
       "title_plural": "समूह",
@@ -1561,7 +1644,10 @@
       "name": "नाम",
       "description": "विवरण",
       "match": "मिलान",
-      "change": "परिवर्तन"
+      "change": "परिवर्तन",
+      "new": "नई ACL",
+      "stopAfterMatch": "मिलान के बाद रोकें",
+      "confirmDelete": "ACL “{{name}}” हटाएँ? इसे पूर्ववत नहीं किया जा सकता।"
     },
     "genericAgentJobs": {
       "title_plural": "जेनेरिक एजेंट नौकरियां",
@@ -2222,7 +2308,13 @@
       "aiAudit": "पीआईआई खुलासे के साथ प्रत्येक एलएलएम अनुरोध/प्रतिक्रिया का पूर्ण ऑडिट।",
       "aiAcl": "प्रति समूह, भूमिका या एजेंट के लिए AI अनुमतियाँ और कोटा।",
       "mailAccounts": "इनकमिंग IMAP/POP मेलबॉक्स (पासवर्ड या OAuth2)।",
-      "oauth2Tokens": "Microsoft/Google मेल के लिए OAuth2 टोकन कॉन्फ़िगरेशन (Znuny-संगत)।"
+      "oauth2Tokens": "Microsoft/Google मेल के लिए OAuth2 टोकन कॉन्फ़िगरेशन (Znuny-संगत)।",
+      "types": "वर्गीकरण हेतु प्रयुक्त टिकट प्रकार प्रबंधित करें।",
+      "services": "सेवाएँ प्रबंधित करें और उन्हें SLA से जोड़ें।",
+      "slas": "सेवा स्तर समझौते और समयसीमा प्रबंधित करें।",
+      "systemAddresses": "कतारों व स्वतः-उत्तरों के From हेतु ईमेल पते।",
+      "notificationEvents": "इवेंट-संचालित एजेंट अधिसूचनाएँ कॉन्फ़िगर करें।",
+      "ticketAttributeRelations": "Znuny-संगत निर्भरता मैट्रिक्स (सेवा/कतार आदि) CSV में।"
     },
     "mailAccounts": {
       "title_plural": "मेल खाते",
@@ -2270,11 +2362,50 @@
       "refreshSuccess": "टोकन ताज़ा किया गया."
     },
     "systemAddresses": {
-      "title_plural": "System addresses",
-      "subtitle": "From-addresses for queues and auto-responses. Invalid addresses stay listed so they can be re-enabled.",
-      "new": "Add address",
-      "email": "Email",
-      "name": "Name"
+      "title_plural": "सिस्टम पते",
+      "subtitle": "कतारों व स्वतः-उत्तरों के From पते। अमान्य सूची में रहकर पुनः सक्षम किए जा सकते हैं।",
+      "new": "पता जोड़ें",
+      "email": "ईमेल",
+      "name": "नाम"
+    },
+    "types": {
+      "title_plural": "टिकट प्रकार",
+      "new": "नया प्रकार",
+      "name": "नाम"
+    },
+    "services": {
+      "title_plural": "सेवाएँ",
+      "new": "नई सेवा",
+      "name": "नाम",
+      "slaCount": "SLA"
+    },
+    "slas": {
+      "title_plural": "SLA",
+      "new": "नया SLA",
+      "name": "नाम",
+      "firstResponseTime": "पहली प्रतिक्रिया (मि)",
+      "updateTime": "अद्यतन (मि)",
+      "solutionTime": "समाधान (मि)",
+      "calendar": "कैलेंडर"
+    },
+    "notificationEvents": {
+      "title_plural": "अधिसूचना इवेंट",
+      "subtitle": "इवेंट होने पर मिलान वाली अधिसूचनाएँ एजेंटों को भेजी जाती हैं।",
+      "new": "अधिसूचना बनाएँ",
+      "name": "नाम",
+      "event": "इवेंट",
+      "subject": "विषय",
+      "body": "मुख्य भाग"
+    },
+    "tar": {
+      "title": "टिकट विशेषता संबंध",
+      "filename": "फ़ाइल नाम",
+      "attributes": "विशेषताएँ",
+      "priority": "प्राथमिकता",
+      "csv": "CSV डेटा",
+      "new": "नया संबंध",
+      "help": "शीर्षक Attribute1;Attribute2 और मान-युग्म वाला CSV (Znuny AdminTicketAttributeRelations)। फॉर्म चयन सीमित करता है (जैसे सेवा → कतार)।",
+      "confirmDelete": "यह संबंध हटाएँ?"
     }
   },
   "kb": {
@@ -2489,7 +2620,8 @@
       "startButton": "प्रक्रिया प्रारंभ करें",
       "actions": "उपलब्ध क्रियाएं",
       "loadError": "प्रक्रिया स्थिति लोड नहीं हो सकी.",
-      "noDialogs": "इस गतिविधि पर कोई कार्रवाई उपलब्ध नहीं है."
+      "noDialogs": "इस गतिविधि पर कोई कार्रवाई उपलब्ध नहीं है.",
+      "noCustomerDialogs": "इस चरण पर कोई ग्राहक संवाद उपलब्ध नहीं।"
     },
     "start": {
       "title": "प्रक्रिया प्रारंभ करें",
@@ -2525,5 +2657,84 @@
     "body": "शरीर",
     "editTitle": "“{{name}}” संपादित करें",
     "saveError": "टेम्प्लेट सहेजा नहीं जा सका."
+  },
+  "views": {
+    "mine": "मेरे टिकट",
+    "responsible": "उत्तरदायी",
+    "locked": "लॉक टिकट",
+    "watched": "देखे जा रहे टिकट",
+    "escalated": "एस्केलेटेड टिकट",
+    "service": "सेवा के अनुसार",
+    "serviceHint": "किसी सेवा को सौंपे गए टिकट सूचीबद्ध करें।",
+    "pickService": "सेवा चुनें…"
+  },
+  "customerCentre": {
+    "title": "ग्राहक जानकारी",
+    "open": "ग्राहक",
+    "invalid": "अमान्य ग्राहक लॉगिन।",
+    "loadError": "यह ग्राहक लोड नहीं हो सका।",
+    "email": "ईमेल",
+    "phone": "फ़ोन",
+    "customerId": "ग्राहक संख्या",
+    "company": "कंपनी",
+    "openCount": "{{count}} खुले",
+    "closedCount": "{{count}} बंद",
+    "allTickets": "सभी टिकट →",
+    "recentTickets": "हाल के टिकट"
+  },
+  "timeAccounting": {
+    "title": "समय लेखांकन",
+    "hint": "उन टिकटों पर बुक की गई समय इकाइयाँ जिन तक आपकी पहुँच है।",
+    "filterUser": "एजेंट",
+    "allUsers": "सभी एजेंट",
+    "filterFrom": "से",
+    "filterTo": "तक",
+    "filterTicket": "टिकट ID",
+    "empty": "कोई मेल खाता समय-लेखांकन प्रविष्टि नहीं।",
+    "colWhen": "कब",
+    "colTicket": "टिकट",
+    "colUser": "एजेंट",
+    "colUnits": "इकाइयाँ",
+    "presetsLabel": "अवधि",
+    "presets": {
+      "today": "आज",
+      "yesterday": "कल",
+      "thisWeek": "इस सप्ताह",
+      "lastWeek": "पिछला सप्ताह",
+      "thisMonth": "इस माह",
+      "lastMonth": "पिछला माह",
+      "thisQuarter": "यह तिमाही",
+      "lastQuarter": "पिछली तिमाही",
+      "thisYear": "इस वर्ष",
+      "lastYear": "पिछला वर्ष"
+    },
+    "kpiUnits": "समय इकाइयाँ",
+    "kpiEntries": "प्रविष्टियाँ",
+    "kpiTickets": "टिकट",
+    "kpiAgents": "एजेंट",
+    "rangeBetween": "{{from}} – {{to}}",
+    "rangeFrom": "{{from}} से",
+    "rangeTo": "{{to}} तक",
+    "chartTitle": "प्रति दिन इकाइयाँ",
+    "chartBar": "{{date}}: {{units}} इकाइयाँ",
+    "dayUnknown": "कोई तिथि नहीं",
+    "emptyHint": "अवधि बढ़ाएँ या एजेंट व टिकट फ़िल्टर साफ़ करें।",
+    "clearFilters": "फ़िल्टर साफ़ करें",
+    "pageRange": "{{from}}–{{to}}",
+    "pageScope": "इस पृष्ठ पर",
+    "chartPeak": "शिखर {{units}}"
+  },
+  "setPassword": {
+    "subtitle": "कृपया अपने खाते के लिए पासवर्ड चुनें।",
+    "password": "नया पासवर्ड",
+    "confirm": "पासवर्ड दोहराएँ",
+    "lengthHint": "{{min}} से {{max}} वर्ण।",
+    "mismatch": "पासवर्ड मेल नहीं खाते।",
+    "submit": "पासवर्ड सेट करें",
+    "saving": "सहेजा जा रहा है…",
+    "done": "पासवर्ड सहेजा गया। अब आप साइन इन कर सकते हैं।",
+    "invalid": "यह लिंक अब मान्य नहीं है।",
+    "invalidHint": "सेटअप लिंक 7 दिन मान्य और एकबारगी हैं। व्यवस्थापक से नया माँगें।",
+    "toLogin": "साइन इन पर जाएँ"
   }
 }

@@ -33,7 +33,7 @@
     "admin": "מנהל מערכת",
     "theme": "נושא",
     "language": "שפה",
-    "dashboard": "לוח מחוונים",
+    "dashboard": "לוח בקרה",
     "queues": "תורים",
     "kb": "בסיס ידע"
   },
@@ -55,7 +55,12 @@
     "showActiveQueues": "הצג פעיל",
     "queueSearch": "סינון תורים...",
     "noQueueMatch": "אין תורים תואמים.",
-    "templates": "תבניות"
+    "templates": "תבניות",
+    "locked": "נעול",
+    "responsible": "אחראי",
+    "escalated": "הועלה",
+    "services": "שירותים",
+    "timeAccounting": "רישום זמן"
   },
   "common": {
     "prev": "הקודם",
@@ -68,7 +73,10 @@
     "cancel": "בטל",
     "help": "עזרה",
     "edit": "ערוך",
-    "save": "שמור"
+    "save": "שמור",
+    "saved": "נשמר",
+    "delete": "מחק",
+    "submit": "שלח"
   },
   "otp": {
     "verifying": "מאמת...",
@@ -171,7 +179,9 @@
     "toPickUpEmpty": "אין כרטיסים חדשים לאיסוף.",
     "remindersDue": "תזכורות מועדות",
     "remindersDueEmpty": "אין תזכורות.",
-    "queueShortcutsEmpty": "אין תורים עם כרטיסים פתוחים או חדשים כרגע."
+    "queueShortcutsEmpty": "אין תורים עם כרטיסים פתוחים או חדשים כרגע.",
+    "lastViews": "נצפו לאחרונה",
+    "lastViewsUntitled": "(ללא נושא)"
   },
   "queue": {
     "sidebar": "תורים",
@@ -370,7 +380,7 @@
     "splitQueue": "תור יעד",
     "splitNewTitle": "כותרת כרטיס חדשה (אופציונלי)",
     "ai": {
-      "title": "AI Assist",
+      "title": "סיוע AI",
       "help": {
         "summary": "נוצר מהמאמרים של הכרטיס על ידי המודל המוגדר של התור ומאוחסן רק במצב הכרטיס, לעולם לא כהערה - הוא לעולם לא נשלח ללקוח בעצמו.",
         "drafts": "נוצר על ידי הדגם מהכרטיס עד כה. כל טיוטה היא הרשומה שלה - שום דבר לא נשלח אוטומטית; עליך לפתוח אותו ולשלוח או לבטל אותו במפורש."
@@ -482,7 +492,8 @@
       "customerEmail": "דוא\"ל",
       "customerFirstName": "שם פרטי",
       "customerLastName": "שם משפחה",
-      "customerLoginConflict": "התחברות זו כבר קיימת. בחר כניסה אחרת, או הקצה את הלקוח הקיים באמצעות חיפוש במקום זאת."
+      "customerLoginConflict": "התחברות זו כבר קיימת. בחר כניסה אחרת, או הקצה את הלקוח הקיים באמצעות חיפוש במקום זאת.",
+      "clearCustomer": "הסרת לקוח"
     },
     "inlineAttachments": "תמונות מוטבעות ({{count}})",
     "list": {
@@ -504,7 +515,35 @@
     "draftEditedAt": "נערך {{time}}",
     "draftDiscard": "מחיקת טיוטה",
     "draftDiscardConfirm": "למחוק את התגובה שלא נשלחה? לא ניתן לשחזר את הטקסט.",
-    "draftDiscardConfirmButton": "מחיקה"
+    "draftDiscardConfirmButton": "מחיקה",
+    "type": "סוג",
+    "service": "שירות",
+    "sla": "SLA",
+    "mentions": "אזכורים",
+    "timeAccounting": "רישום זמן",
+    "timeUnits": "יחידות זמן",
+    "addTime": "רישום זמן",
+    "addMention": "אזכור נציג",
+    "mentionsCount": "אזכורים: {{n}}",
+    "mentionsEmpty": "אף אחד לא הוזכר",
+    "mentionRemove": "הסרת אזכור",
+    "mentionSuggestions": "נציגים",
+    "timeUnitAbbrev": "דק׳",
+    "timeUnitHoursAbbrev": "שע׳",
+    "timeUnitsShort": "{{units}} דק׳",
+    "timeAccountingTotal": "זמן שנרשם: {{units}} דק׳",
+    "timeRemove": "הסרת רישום",
+    "timeUnitMode": "יחידת זמן",
+    "timeUnitMin": "דק׳",
+    "timeUnitHours": "שע׳",
+    "timePresets": "בחירה מהירה",
+    "timeComposerHint": "בעת מענה רשמו בכותרת התחתונה של העורך.",
+    "timeChipHint": "נרשם בשליחה",
+    "extrasFailedMentions": "נשלח — האזכור לא נשמר.",
+    "extrasFailedTime": "נשלח — הזמן לא נרשם.",
+    "extrasFailedBoth": "נשלח — לא האזכור ולא רישום הזמן נשמרו.",
+    "extrasRetry": "נסו שוב",
+    "customerUnresolved": "אין רשומת לקוח התואמת לכתובת זו, ולכן הפרטים אינם זמינים."
   },
   "search": {
     "title": "חפש",
@@ -1143,7 +1182,8 @@
       },
       "acl": {
         "match": "תנאים שלפיהם ACL זה חל (למשל תור נוכחי, מצב, שדה טופס). השינוי מימין מיושם רק כאשר כל קריטריון המופיע כאן תואם.",
-        "change": "השפעת ה-ACL ברגע שהתנאים שלו תואמים - בדרך כלל היא מגבילה או מאלצת את האפשרויות הזמינות בטפסים (למשל, רק מצבי מעקב מסוימים מותרים)."
+        "change": "השפעת ה-ACL ברגע שהתנאים שלו תואמים - בדרך כלל היא מגבילה או מאלצת את האפשרויות הזמינות בטפסים (למשל, רק מצבי מעקב מסוימים מותרים).",
+        "stopAfterMatch": "כשמסומן, לאחר התאמה אפקטיבית לא מוערכות ACL נוספות (Znuny StopAfterMatch)."
       },
       "mailOutbound": {
         "host": "שם מארח של שרת SMTP עבור דואר יוצא. חייב להיות נגיש מהשרת הזה (DNS + חומת אש) ביציאה למטה.",
@@ -1190,8 +1230,8 @@
         "validId": "\"Temp\" (valid_id 3) הוא מצב התוקף השלישי של Znuny - בדרך כלל חשבון הממתין לאישור (למשל, רישום עצמי לא מאושר), להבדיל מתקף/לא חוקי רגיל."
       },
       "systemAddresses": {
-        "email": "Address used as the From email for queues and auto-responses.",
-        "name": "Display name shown next to the email (e.g. “Support <support@example.com>”)."
+        "email": "כתובת המשמשת כ־From לתורים ומענים אוטומטיים.",
+        "name": "שם תצוגה ליד הדוא״ל (למשל ”Support <support@example.com>“)."
       }
     },
     "nav": {
@@ -1240,7 +1280,13 @@
       "aiAcl": "גישה ומגבלות",
       "collapse": "כווץ הניווט",
       "mailAccounts": "חשבונות דואר",
-      "oauth2Tokens": "אסימוני OAuth2 (דואר)"
+      "oauth2Tokens": "אסימוני OAuth2 (דואר)",
+      "types": "סוגי פניות",
+      "services": "שירותים",
+      "slas": "הסכמי שירות",
+      "systemAddresses": "כתובות מערכת",
+      "notificationEvents": "אירועי התראה",
+      "ticketAttributeRelations": "יחסי תכונות"
     },
     "table": {
       "id": "ID",
@@ -1347,7 +1393,44 @@
       "title": "כותרת",
       "firstName": "שם פרטי",
       "lastName": "שם משפחה",
-      "name": "שם"
+      "name": "שם",
+      "passwordMode": "הקצאת סיסמה",
+      "passwordModeManual": "הגדרה ידנית",
+      "passwordModeAuto": "הזמנה: שליחת קישור הגדרה בדוא״ל",
+      "passwordModeAutoHelp": "בשמירה נשלח קישור חד־פעמי לדוא״ל למטה. הנציג בוחר סיסמה בעצמו.",
+      "email": "דוא״ל",
+      "mobile": "טלפון נייד",
+      "effectivePermissions": "הצגת הרשאות בפועל",
+      "effectivePermissionsTitle": "הרשאות בפועל עבור {{name}}",
+      "effectivePermissionsDescription": "הרשאות ממוזגות מהקצאת קבוצות ישירה ומתפקידים.",
+      "rolesHeading": "תפקידים",
+      "groupsHeading": "הרשאות קבוצה",
+      "queuesHeading": "תורים",
+      "noRoles": "לא הוקצו תפקידים.",
+      "noGroups": "אין הרשאות קבוצה.",
+      "noQueues": "לא הוקצו תורים.",
+      "viaDirect": "ישיר",
+      "permissionColumn": "הרשאות",
+      "sourceColumn": "מקור",
+      "editSettings": "עריכת הגדרות אישיות",
+      "editSettingsTitle": "הגדרות אישיות של {{name}}",
+      "editSettingsDescription": "אותן ההגדרות שהנציג רואה תחת ”הגדרות אישיות”.",
+      "languageLabel": "שפה",
+      "languageSaved": "השפה נשמרה.",
+      "tabAccount": "חשבון",
+      "tabPerson": "אדם",
+      "sourceInvalidHint": "הרשאה זו מגיעה מתפקיד לא תקף ולכן אין לה תוקף.",
+      "keyInactiveHint": "ההרשאה מוגדרת אך אינה בתוקף — המקור או הקבוצה אינם תקפים.",
+      "deletePermanent": "מחיקה לצמיתות",
+      "deleteTitle": "למחוק את {{name}} לצמיתות?",
+      "deleteConfirm": "מחיקה לצמיתות",
+      "deletableBody": "שום דבר לא מפנה אל {{name}}; ניתן להסיר את החשבון לגמרי עם העדפות, קבוצות, תפקידים ו־2FA.",
+      "deleteIrreversible": "לא ניתן לבטל.",
+      "deleteBlockedBody": "לא ניתן למחוק את {{name}} — הטבלאות הבאות עדיין מפנות לחשבון:",
+      "deleteBlockedHint": "הגדירו את החשבון כ”לא תקף” כדי שפניות, מאמרים והיסטוריה יישארו ניתנים לייחוס.",
+      "resendSetupLink": "שליחה חוזרת של קישור הגדרה",
+      "setupLinkSent": "קישור ההגדרה נשלח.",
+      "setupLinkFailed": "לא ניתן לשלוח את קישור ההגדרה."
     },
     "groups": {
       "title_plural": "קבוצות",
@@ -1561,7 +1644,10 @@
       "name": "שם",
       "description": "תיאור",
       "match": "התאמה",
-      "change": "שנה"
+      "change": "שנה",
+      "new": "ACL חדשה",
+      "stopAfterMatch": "עצירה אחרי התאמה",
+      "confirmDelete": "למחוק את ACL ”{{name}}”? לא ניתן לבטל."
     },
     "genericAgentJobs": {
       "title_plural": "משרות סוכן גנרי",
@@ -1768,7 +1854,7 @@
       "app": {
         "product": "מוצר",
         "version": "גרסה",
-        "gitSha": "Git commit",
+        "gitSha": "קומיט Git",
         "buildTime": "בנה",
         "environment": "סביבה",
         "python": "פייתון",
@@ -2222,7 +2308,13 @@
       "aiAudit": "ביקורת מלאה של כל בקשה/תגובה של LLM, עם חשיפת PII.",
       "aiAcl": "הרשאות ומכסות בינה מלאכותית לכל קבוצה, תפקיד או סוכן.",
       "mailAccounts": "תיבות דואר IMAP/POP נכנסות (סיסמה או OAuth2).",
-      "oauth2Tokens": "הגדרות אסימון OAuth2 עבור דואר של Microsoft/Google (תואם Znuny)."
+      "oauth2Tokens": "הגדרות אסימון OAuth2 עבור דואר של Microsoft/Google (תואם Znuny).",
+      "types": "ניהול סוגי פניות לסיווג.",
+      "services": "ניהול שירותים וקישורם להסכמי שירות.",
+      "slas": "ניהול הסכמי רמת שירות וזמנים.",
+      "systemAddresses": "כתובות דוא״ל כ־From לתורים ומענים אוטומטיים.",
+      "notificationEvents": "הגדרת התראות לנציגים לפי אירועים.",
+      "ticketAttributeRelations": "מטריצות תלות תואמות Znuny (שירות/תור וכד') ב־CSV."
     },
     "mailAccounts": {
       "title_plural": "חשבונות דואר",
@@ -2270,11 +2362,50 @@
       "refreshSuccess": "טוקן רענן."
     },
     "systemAddresses": {
-      "title_plural": "System addresses",
-      "subtitle": "From-addresses for queues and auto-responses. Invalid addresses stay listed so they can be re-enabled.",
-      "new": "Add address",
-      "email": "Email",
-      "name": "Name"
+      "title_plural": "כתובות מערכת",
+      "subtitle": "כתובות From לתורים ומענים אוטומטיים. לא תקפות נשארות ברשימה כדי שניתן יהיה להפעילן מחדש.",
+      "new": "הוספת כתובת",
+      "email": "דוא״ל",
+      "name": "שם"
+    },
+    "types": {
+      "title_plural": "סוגי פניות",
+      "new": "סוג חדש",
+      "name": "שם"
+    },
+    "services": {
+      "title_plural": "שירותים",
+      "new": "שירות חדש",
+      "name": "שם",
+      "slaCount": "SLA"
+    },
+    "slas": {
+      "title_plural": "הסכמי שירות",
+      "new": "הסכם שירות חדש",
+      "name": "שם",
+      "firstResponseTime": "מענה ראשון (דק׳)",
+      "updateTime": "עדכון (דק׳)",
+      "solutionTime": "פתרון (דק׳)",
+      "calendar": "יומן"
+    },
+    "notificationEvents": {
+      "title_plural": "אירועי התראה",
+      "subtitle": "כאשר אירועים מתרחשים, התראות תואמות נשלחות לנציגים.",
+      "new": "יצירת התראה",
+      "name": "שם",
+      "event": "אירוע",
+      "subject": "נושא",
+      "body": "גוף"
+    },
+    "tar": {
+      "title": "יחסי תכונות פנייה",
+      "filename": "שם קובץ",
+      "attributes": "תכונות",
+      "priority": "עדיפות",
+      "csv": "נתוני CSV",
+      "new": "יחס חדש",
+      "help": "CSV עם כותרת Attribute1;Attribute2 וזוגות ערכים (Znuny AdminTicketAttributeRelations). מגביל בוחרי טופס (למשל שירות → תור).",
+      "confirmDelete": "למחוק יחס זה?"
     }
   },
   "kb": {
@@ -2489,7 +2620,8 @@
       "startButton": "התחל תהליך",
       "actions": "פעולות זמינות",
       "loadError": "לא ניתן לטעון את מצב התהליך.",
-      "noDialogs": "אין פעולות זמינות בפעילות זו."
+      "noDialogs": "אין פעולות זמינות בפעילות זו.",
+      "noCustomerDialogs": "אין דיאלוגי לקוח זמינים בשלב זה."
     },
     "start": {
       "title": "התחל תהליך",
@@ -2525,5 +2657,84 @@
     "body": "גוף",
     "editTitle": "ערוך את \"{{name}}\"",
     "saveError": "לא ניתן לשמור את התבנית."
+  },
+  "views": {
+    "mine": "הפניות שלי",
+    "responsible": "אחראי",
+    "locked": "פניות נעולות",
+    "watched": "פניות במעקב",
+    "escalated": "פניות שהועלו",
+    "service": "לפי שירות",
+    "serviceHint": "הצגת פניות המשויכות לשירות.",
+    "pickService": "בחרו שירות…"
+  },
+  "customerCentre": {
+    "title": "פרטי לקוח",
+    "open": "פרטי לקוח",
+    "invalid": "כניסת לקוח לא תקפה.",
+    "loadError": "לא ניתן לטעון את הלקוח.",
+    "email": "דוא״ל",
+    "phone": "טלפון",
+    "customerId": "מספר לקוח",
+    "company": "חברה",
+    "openCount": "{{count}} פתוחים",
+    "closedCount": "{{count}} סגורים",
+    "allTickets": "כל הפניות →",
+    "recentTickets": "פניות אחרונות"
+  },
+  "timeAccounting": {
+    "title": "רישום זמן",
+    "hint": "יחידות זמן שנרשמו בפניות שיש לכם גישה אליהן.",
+    "filterUser": "נציג",
+    "allUsers": "כל הנציגים",
+    "filterFrom": "מ־",
+    "filterTo": "עד",
+    "filterTicket": "מזהה פנייה",
+    "empty": "אין רשומות זמן תואמות.",
+    "colWhen": "מתי",
+    "colTicket": "פנייה",
+    "colUser": "נציג",
+    "colUnits": "יחידות",
+    "presetsLabel": "תקופה",
+    "presets": {
+      "today": "היום",
+      "yesterday": "אתמול",
+      "thisWeek": "השבוע",
+      "lastWeek": "שבוע שעבר",
+      "thisMonth": "החודש",
+      "lastMonth": "חודש שעבר",
+      "thisQuarter": "הרבעון הנוכחי",
+      "lastQuarter": "רבעון קודם",
+      "thisYear": "השנה",
+      "lastYear": "שנה שעברה"
+    },
+    "kpiUnits": "יחידות זמן",
+    "kpiEntries": "רישומים",
+    "kpiTickets": "פניות",
+    "kpiAgents": "נציגים",
+    "rangeBetween": "{{from}} – {{to}}",
+    "rangeFrom": "מ־{{from}}",
+    "rangeTo": "עד {{to}}",
+    "chartTitle": "יחידות ליום",
+    "chartBar": "{{date}}: {{units}} יחידות",
+    "dayUnknown": "ללא תאריך",
+    "emptyHint": "הרחיבו את התקופה או נקו את מסנני הנציג והפנייה.",
+    "clearFilters": "ניקוי מסננים",
+    "pageRange": "{{from}}–{{to}}",
+    "pageScope": "בעמוד זה",
+    "chartPeak": "שיא {{units}}"
+  },
+  "setPassword": {
+    "subtitle": "נא לבחור סיסמה לחשבון.",
+    "password": "סיסמה חדשה",
+    "confirm": "חזרה על הסיסמה",
+    "lengthHint": "בין {{min}} ל־{{max}} תווים.",
+    "mismatch": "הסיסמאות אינן תואמות.",
+    "submit": "הגדרת סיסמה",
+    "saving": "שומר…",
+    "done": "הסיסמה נשמרה. אפשר להיכנס כעת.",
+    "invalid": "קישור זה אינו תקף עוד.",
+    "invalidHint": "קישורי הגדרה תקפים 7 ימים וחד־פעמיים. בקשו קישור חדש מהמנהלים.",
+    "toLogin": "מעבר להתחברות"
   }
 }

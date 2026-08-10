@@ -33,7 +33,7 @@
     "admin": "Admin",
     "theme": "tema",
     "language": "Kalba",
-    "dashboard": "Prietaisų skydelis",
+    "dashboard": "Valdymo skydas",
     "queues": "Eilės",
     "kb": "Žinių bazė"
   },
@@ -55,7 +55,12 @@
     "showActiveQueues": "Rodyti aktyvų",
     "queueSearch": "Filtruoti eiles…",
     "noQueueMatch": "Neatitinka nė viena eilė.",
-    "templates": "Šablonai"
+    "templates": "Šablonai",
+    "locked": "Užrakinta",
+    "responsible": "Atsakingas",
+    "escalated": "Eskaluota",
+    "services": "Paslaugos",
+    "timeAccounting": "Laiko apskaita"
   },
   "common": {
     "prev": "Ankstesnis",
@@ -68,7 +73,10 @@
     "cancel": "Atšaukti",
     "help": "Pagalba",
     "edit": "Redaguoti",
-    "save": "Išsaugoti"
+    "save": "Išsaugoti",
+    "saved": "Išsaugota",
+    "delete": "Ištrinti",
+    "submit": "Pateikti"
   },
   "otp": {
     "verifying": "Tikrinama…",
@@ -171,7 +179,9 @@
     "toPickUpEmpty": "Naujų bilietų pasiimti nėra.",
     "remindersDue": "Priminimai",
     "remindersDueEmpty": "Priminimų nėra.",
-    "queueShortcutsEmpty": "Šiuo metu nėra eilių su atidarytais ar naujais bilietais."
+    "queueShortcutsEmpty": "Šiuo metu nėra eilių su atidarytais ar naujais bilietais.",
+    "lastViews": "Neseniai peržiūrėti",
+    "lastViewsUntitled": "(be temos)"
   },
   "queue": {
     "sidebar": "Eilės",
@@ -227,43 +237,43 @@
     "created": "Sukurta",
     "queue": "Eilė",
     "noTickets": "Nėra šio filtro atitinkančių bilietų.",
-    "senderNoCustomer": "Sender of the first article — no customer assigned",
-    "filterByCustomer": "Show only this customer's tickets",
-    "pagination": "{{from}}–{{to}} of {{total}}",
+    "senderNoCustomer": "Siuntėjas pirmo straipsnio — klientas nepriskirtas",
+    "filterByCustomer": "Rodyti tik šio kliento bilietus",
+    "pagination": "{{from}}–{{to}} iš {{total}}",
     "escalated": "Eskaluojamas",
     "slaCountdown": "SLA {{value}}",
-    "escResponse": "Response SLA",
+    "escResponse": "Atsakymo SLA",
     "escUpdate": "Atnaujinti SLA",
     "escSolution": "Sprendimas SLA",
     "queuesRoot": "Eilės",
-    "slaOverdue": "{{label}} overdue · {{duration}}",
-    "slaDue": "{{label}} due in {{duration}}",
+    "slaOverdue": "{{label}} vėluoja · {{duration}}",
+    "slaDue": "{{label}} per {{duration}}",
     "durationDays_one": "1 diena",
     "durationDays_other": "{{count}} dienų",
-    "durationHours_one": "1 hr",
-    "durationHours_other": "{{count}} hrs",
+    "durationHours_one": "1 val.",
+    "durationHours_other": "{{count}} val.",
     "durationMinutes_one": "1 min",
     "durationMinutes_other": "{{count}} min",
     "dynamicFields": "Dinaminiai laukai",
-    "noTitle": "(no title)",
+    "noTitle": "(be pavadinimo)",
     "articles": "Straipsniai",
     "history": "Istorija",
-    "noArticles": "No articles on this ticket.",
-    "noHistory": "No history entries.",
+    "noArticles": "Šiame biliete nėra straipsnių.",
+    "noHistory": "Nėra istorijos įrašų.",
     "noSubject": "(be temos)",
     "unknownSender": "nežinomas",
-    "visibleCustomer": "Customer-visible",
+    "visibleCustomer": "Matoma klientui",
     "internal": "Vidinis",
     "attachments": "Priedai",
     "articleBody": "Straipsnio korpusas",
-    "externalImagesBlocked": "External images are blocked for privacy.",
+    "externalImagesBlocked": "Išoriniai vaizdai blokuojami privatumo sumetimais.",
     "loadExternalImages": "Įkelti išorinius vaizdus",
     "historyTime": "Laikas",
     "historyType": "Tipas",
     "historyName": "Įėjimas",
     "historyBy": "Autorius",
     "invalidId": "Neteisingas bilieto ID",
-    "loadError": "Could not load this ticket.",
+    "loadError": "Nepavyko įkelti šio bilieto.",
     "presenceViewing": "žiūrėjimas",
     "presenceComposing": "komponavimas",
     "composerReply": "Atsakyti",
@@ -272,7 +282,7 @@
     "composerBodyPlaceholder": "Rašyti žinutę…",
     "composerSend": "Siųsti",
     "composerCancel": "Atšaukti",
-    "composeWarning": "Another agent replied since you started composing.",
+    "composeWarning": "Kitas agentas atsakė, kol jūs rašėte.",
     "sortNewestFirst": "Pirmiausia naujausi",
     "sortOldestFirst": "Pirmas seniausias",
     "moreActions": "Daugiau",
@@ -287,12 +297,12 @@
     "filterNotes": "Pastabos",
     "readerDetails": "Detalės",
     "articleVisibleTooltip": "Matoma klientui",
-    "articleInternalTooltip": "Internal article, not visible to the customer",
+    "articleInternalTooltip": "Vidinis straipsnis, klientui nematomas",
     "viewSplit": "Laiko juosta",
     "viewConversation": "Pokalbis",
     "viewAuto": "Auto",
-    "viewAutoHint": "Automatically chosen from the predominant channel",
-    "sortDisabledInConversation": "The conversation view is always chronological",
+    "viewAutoHint": "Automatiškai parinkta pagal vyraujantį kanalą",
+    "sortDisabledInConversation": "Pokalbio rodinyje visada chronologiškai",
     "showFull": "Rodyti visą pranešimą",
     "showLess": "Rodyti mažiau",
     "internalNote": "Vidinė pastaba",
@@ -331,14 +341,14 @@
       "state": "valstybė",
       "customer": "Klientas",
       "changeCustomer": "Keisti",
-      "customerSearch": "Search customer (login/name)…",
+      "customerSearch": "Ieškoti kliento (prisijungimas/vardas)…",
       "customerInherit": "Paveldėtas iš šaltinio bilietas"
     },
     "deleteNote": "Ištrinti pastabą",
     "deleteNoteConfirm": "Delete this internal note? To negalima anuliuoti.",
     "deleteNoteConfirmButton": "Ištrinti",
     "deleteNoteError": "Could not delete the note. Bandykite dar kartą.",
-    "deleteNoteErrorNotInternal": "Only internal notes not visible to the customer can be deleted.",
+    "deleteNoteErrorNotInternal": "Ištrinti galima tik vidines, klientui nematomas pastabas.",
     "more": "Daugiau",
     "historyRendered": "Renginys",
     "historySortAsc": "Pirmas seniausias",
@@ -368,12 +378,12 @@
     "bounceNewState": "Nustatyti būseną (pasirenkama)",
     "splitDialogTitle": "Padalinta į naują bilietą",
     "splitQueue": "Tikslinė eilė",
-    "splitNewTitle": "New ticket title (optional)",
+    "splitNewTitle": "Naujo bilieto pavadinimas (neprivaloma)",
     "ai": {
       "title": "AI pagalba",
       "help": {
         "summary": "Sugeneruotas iš bilieto straipsnių pagal eilės sukonfigūruotą modelį ir saugomas tik bilieto būsenoje, niekada kaip pastaba – jis niekada nėra siunčiamas klientui atskirai.",
-        "drafts": "Generated by the model from the ticket so far. Each draft is its own record — nothing is sent automatically; you must open it and explicitly send or discard it."
+        "drafts": "Modelis sukūrė iš bilieto eigos. Kiekvienas juodraštis — atskiras įrašas; niekas nesiunčiama automatiškai — atidarykite ir aiškiai išsiųskite arba atmeskite."
       },
       "summaryLabel": "Santrauka",
       "summarizeButton": "Apibendrinti",
@@ -390,10 +400,10 @@
         "reply": "Atsakymo juodraštis",
         "clarify": "Paaiškinimo juodraštis"
       },
-      "summaryUpToDate": "Already up to date — no new articles since the last summary.",
+      "summaryUpToDate": "Jau atnaujinta — nuo paskutinės santraukos naujų straipsnių nėra.",
       "draftsLabel": "Juodraščiai",
       "createDraftButton": "Sukurti juodraštį",
-      "createDraftHint": "This can take up to a minute…",
+      "createDraftHint": "Tai gali užtrukti iki minutės…",
       "draftsEmpty": "Dar nėra AI juodraščių.",
       "draftKind": {
         "reply": "Atsakyti",
@@ -412,12 +422,12 @@
       "discardDraft": "Išmesti",
       "discardConfirm": "Išmesti šį AI juodraštį? To negalima anuliuoti.",
       "errorLocked": "AI bėgimas jau aktyvus šiam bilietui. Netrukus bandykite dar kartą.",
-      "errorForbidden": "You don't have permission to use this AI feature.",
+      "errorForbidden": "Neturite teisės naudoti šios DI funkcijos.",
       "errorRateLimited": "Limitas pasiektas – bandykite dar kartą vėliau.",
       "errorDisabled": "Ši AI funkcija šiuo metu išjungta.",
       "errorGeneric": "Kažkas nutiko. Bandykite dar kartą.",
       "adminDeleteDraft": "Ištrinti visam laikui",
-      "adminDeleteDraftHint": "Admin: permanently delete this draft from the database",
+      "adminDeleteDraftHint": "Admin: visam laikui ištrinti šį juodraštį iš duomenų bazės",
       "adminDeleteConfirm": "Visam laikui ištrinti šį AI juodraštį? To negalima anuliuoti.",
       "detailLabel": "Taikymo sritis",
       "moreActions": "Daugiau veiksmų",
@@ -426,8 +436,8 @@
         "detailed": "Išsamus"
       },
       "adminDeleteSummary": "Ištrinti santrauką",
-      "adminDeleteSummaryHint": "Admin: delete the stored AI summary — the next run starts from scratch",
-      "adminDeleteSummaryConfirm": "Permanently delete this ticket's stored AI summary? The next run will summarize the ticket from scratch.",
+      "adminDeleteSummaryHint": "Admin: ištrinti saugomą DI santrauką — kitas paleidimas prasidės iš naujo",
+      "adminDeleteSummaryConfirm": "Visam laikui ištrinti šio bilieto saugomą DI santrauką? Kitas paleidimas apibendrins bilietą iš naujo.",
       "draftStatus": {
         "accepted": "Priimta",
         "discarded": "Išmesta",
@@ -482,7 +492,8 @@
       "customerEmail": "El. paštas",
       "customerFirstName": "Vardas",
       "customerLastName": "Pavardė",
-      "customerLoginConflict": "Šis prisijungimas jau yra. Pasirinkite kitą prisijungimo vardą arba priskirkite esamą klientą naudodami paiešką."
+      "customerLoginConflict": "Šis prisijungimas jau yra. Pasirinkite kitą prisijungimo vardą arba priskirkite esamą klientą naudodami paiešką.",
+      "clearCustomer": "Pašalinti klientą"
     },
     "inlineAttachments": "Įterpti vaizdai ({{count}})",
     "list": {
@@ -504,7 +515,35 @@
     "draftEditedAt": "redaguota {{time}}",
     "draftDiscard": "Atmesti juodraštį",
     "draftDiscardConfirm": "Atmesti šį neišsiųstą atsakymą? Teksto atkurti nepavyks.",
-    "draftDiscardConfirmButton": "Atmesti"
+    "draftDiscardConfirmButton": "Atmesti",
+    "type": "Tipas",
+    "service": "Paslauga",
+    "sla": "SLA",
+    "mentions": "Paminėjimai",
+    "timeAccounting": "Laiko apskaita",
+    "timeUnits": "Laiko vienetai",
+    "addTime": "Įrašyti laiką",
+    "addMention": "Paminėti agentą",
+    "mentionsCount": "Paminėjimai: {{n}}",
+    "mentionsEmpty": "Niekas nepaminėtas",
+    "mentionRemove": "Pašalinti paminėjimą",
+    "mentionSuggestions": "Agentai",
+    "timeUnitAbbrev": "min",
+    "timeUnitHoursAbbrev": "val.",
+    "timeUnitsShort": "{{units}} min",
+    "timeAccountingTotal": "Įrašytas laikas: {{units}} min",
+    "timeRemove": "Pašalinti įrašą",
+    "timeUnitMode": "Laiko vienetas",
+    "timeUnitMin": "Min",
+    "timeUnitHours": "Val.",
+    "timePresets": "Greitas pasirinkimas",
+    "timeComposerHint": "Atsakant įrašykite redaktoriaus poraštėje.",
+    "timeChipHint": "Įrašoma siunčiant",
+    "extrasFailedMentions": "Išsiųsta — paminėjimas neišsaugotas.",
+    "extrasFailedTime": "Išsiųsta — laikas neįrašytas.",
+    "extrasFailedBoth": "Išsiųsta — nei paminėjimas, nei laiko įrašas neišsaugoti.",
+    "extrasRetry": "Bandyti dar kartą",
+    "customerUnresolved": "Šiam adresui nėra kliento įrašo, todėl duomenys nepasiekiami."
   },
   "search": {
     "title": "Ieškoti",
@@ -841,7 +880,7 @@
           "autonomy": "Autonomija",
           "prompt": "Sistemos raginimas",
           "summary": "Suvestinės slenksčiai",
-          "caps": "Caps",
+          "caps": "Lubos",
           "disclosure": "Atskleidimas ir privatumas",
           "identity": "Tapatybė",
           "language": "Kalba"
@@ -1143,7 +1182,8 @@
       },
       "acl": {
         "match": "Sąlygos, kurioms esant taikomas šis ACL (pvz., dabartinė eilė, būsena, formos laukas). Dešinėje esantis pakeitimas taikomas tik tada, kai atitinka visi čia išvardyti kriterijai.",
-        "change": "ACL poveikis, kai sutampa jo sąlygos – paprastai jis apriboja arba verčia pasirinkti formas (pvz., leidžiamos tik tam tikros tolesnės būsenos)."
+        "change": "ACL poveikis, kai sutampa jo sąlygos – paprastai jis apriboja arba verčia pasirinkti formas (pvz., leidžiamos tik tam tikros tolesnės būsenos).",
+        "stopAfterMatch": "Jei pažymėta, po produktyvaus atitikimo kitos ACL nebevertinamos (Znuny StopAfterMatch)."
       },
       "mailOutbound": {
         "host": "SMTP serverio pagrindinio kompiuterio pavadinimas siunčiamam paštui. Turi būti pasiekiamas iš šio serverio (DNS + ugniasienė) toliau pateiktame prievade.",
@@ -1190,8 +1230,8 @@
         "validId": "„Temp“ (valid_id 3) yra trečioji „Znuny“ galiojimo būsena – paprastai paskyra, laukianti patvirtinimo (pvz., nepatvirtinta savarankiška registracija), skiriasi nuo paprastos galiojančios / netinkamos."
       },
       "systemAddresses": {
-        "email": "Address used as the From email for queues and auto-responses.",
-        "name": "Display name shown next to the email (e.g. “Support <support@example.com>”)."
+        "email": "Adresas, naudojamas kaip From eilėms ir autoatsakymams.",
+        "name": "Rodomas vardas šalia el. pašto (pvz. „Support <support@example.com>“)."
       }
     },
     "nav": {
@@ -1240,7 +1280,13 @@
       "aiAcl": "Prieiga ir apribojimai",
       "collapse": "Sutraukti navigaciją",
       "mailAccounts": "Pašto paskyros",
-      "oauth2Tokens": "OAuth2 prieigos raktai (paštas)"
+      "oauth2Tokens": "OAuth2 prieigos raktai (paštas)",
+      "types": "Bilietų tipai",
+      "services": "Paslaugos",
+      "slas": "SLA",
+      "systemAddresses": "Sistemos adresai",
+      "notificationEvents": "Pranešimų įvykiai",
+      "ticketAttributeRelations": "Atributų ryšiai"
     },
     "table": {
       "id": "ID",
@@ -1280,7 +1326,7 @@
       "next": "Kitas",
       "page": "Puslapis {{page}} iš {{total}}",
       "pageSize": "Per puslapį",
-      "showing": "{{from}}–{{to}} of {{total}}",
+      "showing": "{{from}}–{{to}} iš {{total}}",
       "all": "Visi"
     },
     "list": {
@@ -1347,7 +1393,44 @@
       "title": "Pavadinimas",
       "firstName": "Vardas",
       "lastName": "Pavardė",
-      "name": "Vardas"
+      "name": "Vardas",
+      "passwordMode": "Slaptažodžio priskyrimas",
+      "passwordModeManual": "Nustatyti rankiniu būdu",
+      "passwordModeAuto": "Kvietimas: siųsti nuorodą el. paštu",
+      "passwordModeAutoHelp": "Išsaugant vienkartinė nuoroda eina į el. paštą žemiau. Agentas slaptažodį pasirenka pats.",
+      "email": "El. paštas",
+      "mobile": "Mobilusis telefonas",
+      "effectivePermissions": "Rodyti faktines teises",
+      "effectivePermissionsTitle": "Faktinės teisės: {{name}}",
+      "effectivePermissionsDescription": "Sujungtos teisės iš tiesioginių grupių ir vaidmenų.",
+      "rolesHeading": "Vaidmenys",
+      "groupsHeading": "Grupių teisės",
+      "queuesHeading": "Eilės",
+      "noRoles": "Nėra priskirtų vaidmenų.",
+      "noGroups": "Nėra grupių teisių.",
+      "noQueues": "Nėra priskirtų eilių.",
+      "viaDirect": "Tiesiogiai",
+      "permissionColumn": "Teisės",
+      "sourceColumn": "Šaltinis",
+      "editSettings": "Redaguoti asmeninius nustatymus",
+      "editSettingsTitle": "{{name}} asmeniniai nustatymai",
+      "editSettingsDescription": "Tie patys nustatymai, kuriuos agentas mato skiltyje «Asmeniniai nustatymai».",
+      "languageLabel": "Kalba",
+      "languageSaved": "Kalba išsaugota.",
+      "tabAccount": "Paskyra",
+      "tabPerson": "Asmuo",
+      "sourceInvalidHint": "Ši teisė kyla iš netinkamo vaidmens ir todėl neveikia.",
+      "keyInactiveHint": "Teisė sukonfigūruota, bet neveikia — šaltinis ar grupė netinkama.",
+      "deletePermanent": "Ištrinti visam laikui",
+      "deleteTitle": "Visam laikui ištrinti {{name}}?",
+      "deleteConfirm": "Ištrinti visam laikui",
+      "deletableBody": "Nieko nenuorodo į {{name}}; paskyrą galima visiškai pašalinti su nuostatomis, grupėmis, vaidmenimis ir 2FA.",
+      "deleteIrreversible": "Veiksmo anuliuoti negalima.",
+      "deleteBlockedBody": "{{name}} negalima ištrinti — šios lentelės vis dar nurodo paskyrą:",
+      "deleteBlockedHint": "Nustatykite paskyrą į «Netinkama», kad bilietai, straipsniai ir istorija liktų priskirtini.",
+      "resendSetupLink": "Iš naujo siųsti sąrankos nuorodą",
+      "setupLinkSent": "Sąrankos nuoroda išsiųsta.",
+      "setupLinkFailed": "Nepavyko išsiųsti sąrankos nuorodos."
     },
     "groups": {
       "title_plural": "Grupės",
@@ -1561,7 +1644,10 @@
       "name": "Vardas",
       "description": "Aprašymas",
       "match": "Rungtynės",
-      "change": "Keisti"
+      "change": "Keisti",
+      "new": "Nauja ACL",
+      "stopAfterMatch": "Stabdyti po atitikimo",
+      "confirmDelete": "Ištrinti ACL „{{name}}“? Veiksmo anuliuoti negalima."
     },
     "genericAgentJobs": {
       "title_plural": "Bendrieji agentų darbai",
@@ -2222,7 +2308,13 @@
       "aiAudit": "Visiškas kiekvienos LLM užklausos / atsakymo auditas, atskleidžiant AII.",
       "aiAcl": "AI leidimai ir kvotos grupei, vaidmeniui ar agentui.",
       "mailAccounts": "Gaunamos IMAP/POP pašto dėžutės (slaptažodis arba OAuth2).",
-      "oauth2Tokens": "„Microsoft“ / „Google“ pašto „OAuth2“ prieigos rakto konfigūracijos (suderinamas su „Znuny“)."
+      "oauth2Tokens": "„Microsoft“ / „Google“ pašto „OAuth2“ prieigos rakto konfigūracijos (suderinamas su „Znuny“).",
+      "types": "Tvarkykite klasifikavimui naudojamus bilietų tipus.",
+      "services": "Tvarkykite paslaugas ir susiekite jas su SLA.",
+      "slas": "Tvarkykite paslaugų lygio sutartis ir terminus.",
+      "systemAddresses": "From el. pašto adresai eilėms ir autoatsakymams.",
+      "notificationEvents": "Konfigūruokite įvykiais grįstus agentų pranešimus.",
+      "ticketAttributeRelations": "Su Znuny suderinamos priklausomybių matricos (paslauga/eilė ir pan.) CSV."
     },
     "mailAccounts": {
       "title_plural": "Pašto paskyros",
@@ -2270,11 +2362,50 @@
       "refreshSuccess": "Žetonas atnaujintas."
     },
     "systemAddresses": {
-      "title_plural": "System addresses",
-      "subtitle": "From-addresses for queues and auto-responses. Invalid addresses stay listed so they can be re-enabled.",
-      "new": "Add address",
-      "email": "Email",
-      "name": "Name"
+      "title_plural": "Sistemos adresai",
+      "subtitle": "From adresai eilėms ir autoatsakymams. Netinkami lieka sąraše, kad būtų galima vėl įjungti.",
+      "new": "Pridėti adresą",
+      "email": "El. paštas",
+      "name": "Pavadinimas"
+    },
+    "types": {
+      "title_plural": "Bilietų tipai",
+      "new": "Naujas tipas",
+      "name": "Pavadinimas"
+    },
+    "services": {
+      "title_plural": "Paslaugos",
+      "new": "Nauja paslauga",
+      "name": "Pavadinimas",
+      "slaCount": "SLA"
+    },
+    "slas": {
+      "title_plural": "SLA",
+      "new": "Naujas SLA",
+      "name": "Pavadinimas",
+      "firstResponseTime": "Pirmas atsakymas (min)",
+      "updateTime": "Atnaujinimas (min)",
+      "solutionTime": "Sprendimas (min)",
+      "calendar": "Kalendorius"
+    },
+    "notificationEvents": {
+      "title_plural": "Pranešimų įvykiai",
+      "subtitle": "Įvykus įvykiams atitinkami pranešimai siunčiami agentams.",
+      "new": "Sukurti pranešimą",
+      "name": "Pavadinimas",
+      "event": "Įvykis",
+      "subject": "Tema",
+      "body": "Tekstas"
+    },
+    "tar": {
+      "title": "Bilietų atributų ryšiai",
+      "filename": "Failo pavadinimas",
+      "attributes": "Atributai",
+      "priority": "Prioritetas",
+      "csv": "CSV duomenys",
+      "new": "Naujas ryšys",
+      "help": "CSV su antrašte Attribute1;Attribute2 ir reikšmių poromis (Znuny AdminTicketAttributeRelations). Ribojamos formų parinktys (pvz. Paslauga → Eilė).",
+      "confirmDelete": "Ištrinti šį ryšį?"
     }
   },
   "kb": {
@@ -2489,7 +2620,8 @@
       "startButton": "Pradėti procesą",
       "actions": "Galimi veiksmai",
       "loadError": "Nepavyko įkelti proceso būsenos.",
-      "noDialogs": "Su šia veikla nėra jokių veiksmų."
+      "noDialogs": "Su šia veikla nėra jokių veiksmų.",
+      "noCustomerDialogs": "Šiame žingsnyje nėra kliento dialogų."
     },
     "start": {
       "title": "Pradėti procesą",
@@ -2525,5 +2657,84 @@
     "body": "Kūnas",
     "editTitle": "Redaguoti „{{name}}“",
     "saveError": "Nepavyko išsaugoti šablono."
+  },
+  "views": {
+    "mine": "Mano bilietai",
+    "responsible": "Atsakingas",
+    "locked": "Užrakinti bilietai",
+    "watched": "Stebimi bilietai",
+    "escalated": "Eskaluoti bilietai",
+    "service": "Pagal paslaugą",
+    "serviceHint": "Rodyti paslaugai priskirtus bilietus.",
+    "pickService": "Pasirinkite paslaugą…"
+  },
+  "customerCentre": {
+    "title": "Kliento informacija",
+    "open": "Klientas",
+    "invalid": "Netinkamas kliento prisijungimas.",
+    "loadError": "Kliento įkelti nepavyko.",
+    "email": "El. paštas",
+    "phone": "Telefonas",
+    "customerId": "Kliento numeris",
+    "company": "Įmonė",
+    "openCount": "{{count}} atvirų",
+    "closedCount": "{{count}} uždarytų",
+    "allTickets": "Visi bilietai →",
+    "recentTickets": "Naujausi bilietai"
+  },
+  "timeAccounting": {
+    "title": "Laiko apskaita",
+    "hint": "Įrašyti laiko vienetai bilietuose, prie kurių turite prieigą.",
+    "filterUser": "Agentas",
+    "allUsers": "Visi agentai",
+    "filterFrom": "Nuo",
+    "filterTo": "Iki",
+    "filterTicket": "Bilieto ID",
+    "empty": "Nėra atitinkančių laiko įrašų.",
+    "colWhen": "Kada",
+    "colTicket": "Bilietas",
+    "colUser": "Agentas",
+    "colUnits": "Vienetai",
+    "presetsLabel": "Laikotarpis",
+    "presets": {
+      "today": "Šiandien",
+      "yesterday": "Vakar",
+      "thisWeek": "Ši savaitė",
+      "lastWeek": "Praėjusi savaitė",
+      "thisMonth": "Šis mėnuo",
+      "lastMonth": "Praėjęs mėnuo",
+      "thisQuarter": "Šis ketvirtis",
+      "lastQuarter": "Praėjęs ketvirtis",
+      "thisYear": "Šie metai",
+      "lastYear": "Praėję metai"
+    },
+    "kpiUnits": "Laiko vienetai",
+    "kpiEntries": "Įrašai",
+    "kpiTickets": "Bilietai",
+    "kpiAgents": "Agentai",
+    "rangeBetween": "{{from}} – {{to}}",
+    "rangeFrom": "nuo {{from}}",
+    "rangeTo": "iki {{to}}",
+    "chartTitle": "Vienetai per dieną",
+    "chartBar": "{{date}}: {{units}} vnt.",
+    "dayUnknown": "Be datos",
+    "emptyHint": "Išplėskite laikotarpį arba išvalykite agento ir bilieto filtrus.",
+    "clearFilters": "Išvalyti filtrus",
+    "pageRange": "{{from}}–{{to}}",
+    "pageScope": "šiame puslapyje",
+    "chartPeak": "pikas {{units}}"
+  },
+  "setPassword": {
+    "subtitle": "Pasirinkite slaptažodį savo paskyrai.",
+    "password": "Naujas slaptažodis",
+    "confirm": "Pakartokite slaptažodį",
+    "lengthHint": "Nuo {{min}} iki {{max}} simbolių.",
+    "mismatch": "Slaptažodžiai nesutampa.",
+    "submit": "Nustatyti slaptažodį",
+    "saving": "Saugoma…",
+    "done": "Slaptažodis išsaugotas. Galite prisijungti.",
+    "invalid": "Ši nuoroda nebegalioja.",
+    "invalidHint": "Sąrankos nuorodos galioja 7 dienas ir naudojamos vieną kartą. Prašykite naujos administracijos.",
+    "toLogin": "Eiti į prisijungimą"
   }
 }
