@@ -438,6 +438,8 @@ export async function mockApi(page: Page) {
         oidc: false,
         spnego: false,
         ldap: false,
+        webauthn: false,
+        portal_enabled: true,
       });
       return;
     }
