@@ -33,7 +33,7 @@
     "admin": "مدیر",
     "theme": "موضوع",
     "language": "زبان",
-    "dashboard": "داشبورد",
+    "dashboard": "پیشخوان",
     "queues": "صف ها",
     "kb": "پایگاه دانش"
   },
@@ -55,7 +55,12 @@
     "showActiveQueues": "نمایش فعال",
     "queueSearch": "صف های فیلتر…",
     "noQueueMatch": "هیچ صفی مطابقت ندارد.",
-    "templates": "قالب ها"
+    "templates": "قالب ها",
+    "locked": "قفل‌شده",
+    "responsible": "مسئول",
+    "escalated": "ارتقا یافته",
+    "services": "خدمات",
+    "timeAccounting": "ثبت زمان"
   },
   "common": {
     "prev": "قبلی",
@@ -68,7 +73,10 @@
     "cancel": "لغو کنید",
     "help": "کمک کنید",
     "edit": "ویرایش کنید",
-    "save": "ذخیره کنید"
+    "save": "ذخیره",
+    "saved": "ذخیره شد",
+    "delete": "حذف",
+    "submit": "ارسال"
   },
   "otp": {
     "verifying": "در حال تأیید…",
@@ -171,7 +179,9 @@
     "toPickUpEmpty": "بلیت جدیدی برای تحویل وجود ندارد.",
     "remindersDue": "یادآوری های موعد",
     "remindersDueEmpty": "بدون نیاز به یادآوری",
-    "queueShortcutsEmpty": "در حال حاضر هیچ صفی با بلیط های باز یا جدید وجود ندارد."
+    "queueShortcutsEmpty": "در حال حاضر هیچ صفی با بلیط های باز یا جدید وجود ندارد.",
+    "lastViews": "بازدیدهای اخیر",
+    "lastViewsUntitled": "(بدون موضوع)"
   },
   "queue": {
     "sidebar": "صف ها",
@@ -370,7 +380,7 @@
     "splitQueue": "صف هدف",
     "splitNewTitle": "عنوان بلیط جدید (اختیاری)",
     "ai": {
-      "title": "AI Assist",
+      "title": "دستیار هوش مصنوعی",
       "help": {
         "summary": "از مقالات بلیط توسط مدل پیکربندی شده صف تولید شده و فقط در وضعیت بلیط ذخیره می شود، هرگز به عنوان یادداشت - هرگز به تنهایی برای مشتری ارسال نمی شود.",
         "drafts": "تولید شده توسط مدل از بلیط تاکنون. هر پیش نویس رکورد خودش است - هیچ چیزی به طور خودکار ارسال نمی شود. باید آن را باز کنید و صریحاً آن را بفرستید یا دور بریزید."
@@ -482,7 +492,8 @@
       "customerEmail": "ایمیل",
       "customerFirstName": "نام کوچک",
       "customerLastName": "نام خانوادگی",
-      "customerLoginConflict": "این ورود از قبل وجود دارد. ورود دیگری را انتخاب کنید یا به جای آن مشتری موجود را از طریق جستجو اختصاص دهید."
+      "customerLoginConflict": "این ورود از قبل وجود دارد. ورود دیگری را انتخاب کنید یا به جای آن مشتری موجود را از طریق جستجو اختصاص دهید.",
+      "clearCustomer": "حذف مشتری"
     },
     "inlineAttachments": "تصاویر جاسازی شده ({{count}})",
     "list": {
@@ -504,7 +515,35 @@
     "draftEditedAt": "ویرایش شده {{time}}",
     "draftDiscard": "حذف پیش‌نویس",
     "draftDiscardConfirm": "این پاسخ ارسال‌نشده حذف شود؟ متن قابل بازیابی نیست.",
-    "draftDiscardConfirmButton": "حذف"
+    "draftDiscardConfirmButton": "حذف",
+    "type": "نوع",
+    "service": "خدمت",
+    "sla": "SLA",
+    "mentions": "اشاره‌ها",
+    "timeAccounting": "ثبت زمان",
+    "timeUnits": "واحدهای زمانی",
+    "addTime": "ثبت زمان",
+    "addMention": "اشاره به کارشناس",
+    "mentionsCount": "اشاره‌ها: {{n}}",
+    "mentionsEmpty": "کسی اشاره نشده",
+    "mentionRemove": "حذف اشاره",
+    "mentionSuggestions": "کارشناسان",
+    "timeUnitAbbrev": "د",
+    "timeUnitHoursAbbrev": "س",
+    "timeUnitsShort": "{{units}} د",
+    "timeAccountingTotal": "زمان ثبت‌شده: {{units}} د",
+    "timeRemove": "حذف ثبت",
+    "timeUnitMode": "واحد زمان",
+    "timeUnitMin": "د",
+    "timeUnitHours": "س",
+    "timePresets": "انتخاب سریع",
+    "timeComposerHint": "هنگام پاسخ در پاورقی ویرایشگر ثبت کنید.",
+    "timeChipHint": "هنگام ارسال ثبت می‌شود",
+    "extrasFailedMentions": "ارسال شد — اشاره ذخیره نشد.",
+    "extrasFailedTime": "ارسال شد — زمان ثبت نشد.",
+    "extrasFailedBoth": "ارسال شد — نه اشاره و نه ثبت زمان ذخیره شد.",
+    "extrasRetry": "دوباره تلاش کنید",
+    "customerUnresolved": "هیچ پروندهٔ مشتری با این نشانی مطابقت ندارد؛ جزئیات در دسترس نیست."
   },
   "search": {
     "title": "جستجو کنید",
@@ -1143,7 +1182,8 @@
       },
       "acl": {
         "match": "شرایطی که تحت آن این ACL اعمال می شود (به عنوان مثال صف فعلی، وضعیت، فیلد فرم). تغییر سمت راست تنها زمانی اعمال می شود که همه معیارهای فهرست شده در اینجا مطابقت داشته باشند.",
-        "change": "اثر ACL زمانی که شرایط آن مطابقت داشته باشد - معمولاً انتخاب‌های موجود در اشکال را محدود یا مجبور می‌کند (مثلاً فقط حالت‌های پیگیری خاصی مجاز است)."
+        "change": "اثر ACL زمانی که شرایط آن مطابقت داشته باشد - معمولاً انتخاب‌های موجود در اشکال را محدود یا مجبور می‌کند (مثلاً فقط حالت‌های پیگیری خاصی مجاز است).",
+        "stopAfterMatch": "در صورت علامت‌گذاری، پس از تطبیق مولد این ACL دیگر ACLها ارزیابی نمی‌شوند (Znuny StopAfterMatch)."
       },
       "mailOutbound": {
         "host": "نام میزبان سرور SMTP برای نامه های خروجی. باید از این سرور (DNS + فایروال) در پورت زیر قابل دسترسی باشد.",
@@ -1190,8 +1230,8 @@
         "validId": "\"Temp\" (valid_id 3) سومین وضعیت اعتبار Znuny است - معمولاً یک حساب در انتظار تأیید (مثلاً ثبت نام خود تأیید نشده)، متمایز از معتبر/نامعتبر ساده."
       },
       "systemAddresses": {
-        "email": "Address used as the From email for queues and auto-responses.",
-        "name": "Display name shown next to the email (e.g. “Support <support@example.com>”)."
+        "email": "نشانی‌ای که به‌عنوان From برای صف‌ها و پاسخ‌های خودکار به‌کار می‌رود.",
+        "name": "نام نمایشی کنار ایمیل (مثلاً «Support <support@example.com>»)."
       }
     },
     "nav": {
@@ -1240,7 +1280,13 @@
       "aiAcl": "دسترسی و محدودیت ها",
       "collapse": "کوچک کردن پیمایش",
       "mailAccounts": "حساب های پستی",
-      "oauth2Tokens": "توکن های OAuth2 (پست)"
+      "oauth2Tokens": "توکن های OAuth2 (پست)",
+      "types": "انواع تیکت",
+      "services": "خدمات",
+      "slas": "SLA",
+      "systemAddresses": "نشانی‌های سامانه",
+      "notificationEvents": "رویدادهای اعلان",
+      "ticketAttributeRelations": "روابط ویژگی‌ها"
     },
     "table": {
       "id": "ID",
@@ -1347,7 +1393,44 @@
       "title": "عنوان",
       "firstName": "نام کوچک",
       "lastName": "نام خانوادگی",
-      "name": "نام"
+      "name": "نام",
+      "passwordMode": "تخصیص گذرواژه",
+      "passwordModeManual": "تنظیم دستی",
+      "passwordModeAuto": "دعوت: ارسال پیوند راه‌اندازی با ایمیل",
+      "passwordModeAutoHelp": "با ذخیره، پیوند یک‌بارمصرف به ایمیل زیر می‌رود. کارشناس گذرواژه را خودش انتخاب می‌کند.",
+      "email": "ایمیل",
+      "mobile": "تلفن همراه",
+      "effectivePermissions": "نمایش مجوزهای مؤثر",
+      "effectivePermissionsTitle": "مجوزهای مؤثر برای {{name}}",
+      "effectivePermissionsDescription": "حقوق ادغام‌شده از انتساب مستقیم گروه و نقش‌ها.",
+      "rolesHeading": "نقش‌ها",
+      "groupsHeading": "مجوزهای گروه",
+      "queuesHeading": "صف‌ها",
+      "noRoles": "نقشی تخصیص داده نشده.",
+      "noGroups": "مجوز گروهی نیست.",
+      "noQueues": "صفی تخصیص داده نشده.",
+      "viaDirect": "مستقیم",
+      "permissionColumn": "مجوزها",
+      "sourceColumn": "منبع",
+      "editSettings": "ویرایش تنظیمات شخصی",
+      "editSettingsTitle": "تنظیمات شخصی {{name}}",
+      "editSettingsDescription": "همان تنظیماتی که کارشناس در «تنظیمات شخصی» می‌بیند.",
+      "languageLabel": "زبان",
+      "languageSaved": "زبان ذخیره شد.",
+      "tabAccount": "حساب",
+      "tabPerson": "شخص",
+      "sourceInvalidHint": "این مجوز از نقش نامعتبر می‌آید و اثر ندارد.",
+      "keyInactiveHint": "این مجوز پیکربندی شده اما اعمال نمی‌شود — منبع یا گروه نامعتبر است.",
+      "deletePermanent": "حذف دائمی",
+      "deleteTitle": "{{name}} برای همیشه حذف شود؟",
+      "deleteConfirm": "حذف دائمی",
+      "deletableBody": "هیچ ارجاعی به {{name}} نیست؛ حساب با ترجیحات، گروه‌ها، نقش‌ها و ۲FA کاملاً حذف می‌شود.",
+      "deleteIrreversible": "این کار برگشت‌پذیر نیست.",
+      "deleteBlockedBody": "{{name}} را نمی‌توان حذف کرد — این جدول‌ها هنوز به حساب ارجاع می‌دهند:",
+      "deleteBlockedHint": "به‌جای آن حساب را «نامعتبر» کنید تا تیکت‌ها، مقالات و تاریخچه قابل انتساب بمانند.",
+      "resendSetupLink": "ارسال دوبارهٔ پیوند راه‌اندازی",
+      "setupLinkSent": "پیوند راه‌اندازی ارسال شد.",
+      "setupLinkFailed": "ارسال پیوند راه‌اندازی ممکن نشد."
     },
     "groups": {
       "title_plural": "گروه ها",
@@ -1561,7 +1644,10 @@
       "name": "نام",
       "description": "توضیحات",
       "match": "مطابقت دادن",
-      "change": "تغییر دهید"
+      "change": "تغییر دهید",
+      "new": "ACL جدید",
+      "stopAfterMatch": "توقف پس از تطبیق",
+      "confirmDelete": "ACL «{{name}}» حذف شود؟ این کار برگشت‌پذیر نیست."
     },
     "genericAgentJobs": {
       "title_plural": "مشاغل نمایندگی عمومی",
@@ -1670,7 +1756,7 @@
         "channels": "کانال ها",
         "events": "رویدادها / SSE",
         "agents": "عوامل",
-        "admin": "Admin API",
+        "admin": "API مدیریت",
         "mcp": "سرور MCP",
         "compat": "رابط عمومی Znuny"
       }
@@ -1768,7 +1854,7 @@
       "app": {
         "product": "محصول",
         "version": "نسخه",
-        "gitSha": "Git commit",
+        "gitSha": "کامیت Git",
         "buildTime": "ساخت",
         "environment": "محیط زیست",
         "python": "پایتون",
@@ -2055,7 +2141,7 @@
         "companyId": "شرکت (شناسه_مشتری)",
         "companyIdPh": "به عنوان مثال ACME",
         "loginRegex": "Regex وارد شوید",
-        "customerIdRegex": "customer_id regex",
+        "customerIdRegex": "regex customer_id",
         "emailRegex": "ایمیل regex",
         "changedAfter": "بعد تغییر کرد",
         "changedBefore": "قبلا تغییر کرده است",
@@ -2222,7 +2308,13 @@
       "aiAudit": "ممیزی کامل هر درخواست/پاسخ LLM، با فاش شدن PII.",
       "aiAcl": "مجوزها و سهمیه های هوش مصنوعی در هر گروه، نقش یا نماینده.",
       "mailAccounts": "صندوق های پستی IMAP/POP ورودی (رمز عبور یا OAuth2).",
-      "oauth2Tokens": "تنظیمات رمز OAuth2 برای ایمیل مایکروسافت/گوگل (سازگار با Znuny)."
+      "oauth2Tokens": "تنظیمات رمز OAuth2 برای ایمیل مایکروسافت/گوگل (سازگار با Znuny).",
+      "types": "مدیریت انواع تیکت مورد استفاده برای طبقه‌بندی.",
+      "services": "مدیریت خدمات و پیوند آن‌ها به SLA.",
+      "slas": "مدیریت توافق‌های سطح خدمت و مهلت‌ها.",
+      "systemAddresses": "نشانی‌های ایمیل به‌عنوان From برای صف‌ها و پاسخ‌های خودکار.",
+      "notificationEvents": "پیکربندی اعلان‌های کارشناسان بر پایهٔ رویداد.",
+      "ticketAttributeRelations": "ماتریس‌های وابستگی سازگار با Znuny (خدمت/صف و مشابه) به صورت CSV."
     },
     "mailAccounts": {
       "title_plural": "حساب های پستی",
@@ -2270,11 +2362,50 @@
       "refreshSuccess": "رمز به روز شد."
     },
     "systemAddresses": {
-      "title_plural": "System addresses",
-      "subtitle": "From-addresses for queues and auto-responses. Invalid addresses stay listed so they can be re-enabled.",
-      "new": "Add address",
-      "email": "Email",
-      "name": "Name"
+      "title_plural": "نشانی‌های سامانه",
+      "subtitle": "نشانی‌های From برای صف‌ها و پاسخ‌های خودکار. نامعتبرها در فهرست می‌مانند تا دوباره فعال شوند.",
+      "new": "افزودن نشانی",
+      "email": "ایمیل",
+      "name": "نام"
+    },
+    "types": {
+      "title_plural": "انواع تیکت",
+      "new": "نوع جدید",
+      "name": "نام"
+    },
+    "services": {
+      "title_plural": "خدمات",
+      "new": "خدمت جدید",
+      "name": "نام",
+      "slaCount": "SLA"
+    },
+    "slas": {
+      "title_plural": "SLA",
+      "new": "SLA جدید",
+      "name": "نام",
+      "firstResponseTime": "اولین پاسخ (د)",
+      "updateTime": "به‌روزرسانی (د)",
+      "solutionTime": "حل (د)",
+      "calendar": "تقویم"
+    },
+    "notificationEvents": {
+      "title_plural": "رویدادهای اعلان",
+      "subtitle": "با رخ‌دادن رویدادها، اعلان‌های منطبق به کارشناسان فرستاده می‌شود.",
+      "new": "ایجاد اعلان",
+      "name": "نام",
+      "event": "رویداد",
+      "subject": "موضوع",
+      "body": "متن"
+    },
+    "tar": {
+      "title": "روابط ویژگی‌های تیکت",
+      "filename": "نام پرونده",
+      "attributes": "ویژگی‌ها",
+      "priority": "اولویت",
+      "csv": "دادهٔ CSV",
+      "new": "رابطهٔ جدید",
+      "help": "CSV با سرستون Attribute1;Attribute2 و جفت‌مقدارها (Znuny AdminTicketAttributeRelations). انتخاب‌گرهای فرم را محدود می‌کند (مثلاً خدمت → صف).",
+      "confirmDelete": "این رابطه حذف شود؟"
     }
   },
   "kb": {
@@ -2489,7 +2620,8 @@
       "startButton": "فرآیند را شروع کنید",
       "actions": "اقدامات موجود",
       "loadError": "وضعیت فرآیند بارگیری نشد.",
-      "noDialogs": "هیچ اقدامی در این فعالیت موجود نیست."
+      "noDialogs": "هیچ اقدامی در این فعالیت موجود نیست.",
+      "noCustomerDialogs": "در این گام هیچ گفت‌وگوی مشتری در دسترس نیست."
     },
     "start": {
       "title": "فرآیند را شروع کنید",
@@ -2525,5 +2657,84 @@
     "body": "بدن",
     "editTitle": "ویرایش \"{{name}}\"",
     "saveError": "نمی توان الگو را ذخیره کرد."
+  },
+  "views": {
+    "mine": "تیکت‌های من",
+    "responsible": "مسئول",
+    "locked": "تیکت‌های قفل‌شده",
+    "watched": "تیکت‌های تحت نظر",
+    "escalated": "تیکت‌های ارتقا یافته",
+    "service": "بر اساس خدمت",
+    "serviceHint": "فهرست تیکت‌های مرتبط با یک خدمت.",
+    "pickService": "یک خدمت انتخاب کنید…"
+  },
+  "customerCentre": {
+    "title": "اطلاعات مشتری",
+    "open": "اطلاعات مشتری",
+    "invalid": "ورود مشتری نامعتبر است.",
+    "loadError": "بارگذاری این مشتری ممکن نشد.",
+    "email": "ایمیل",
+    "phone": "تلفن",
+    "customerId": "شماره مشتری",
+    "company": "شرکت",
+    "openCount": "{{count}} باز",
+    "closedCount": "{{count}} بسته‌شده",
+    "allTickets": "همه تیکت‌ها →",
+    "recentTickets": "تیکت‌های اخیر"
+  },
+  "timeAccounting": {
+    "title": "ثبت زمان",
+    "hint": "واحدهای زمانی ثبت‌شده روی تیکت‌هایی که به آن‌ها دسترسی دارید.",
+    "filterUser": "کارشناس",
+    "allUsers": "همه کارشناسان",
+    "filterFrom": "از",
+    "filterTo": "تا",
+    "filterTicket": "شناسه تیکت",
+    "empty": "هیچ ثبت زمانی منطبقی نیست.",
+    "colWhen": "زمان",
+    "colTicket": "تیکت",
+    "colUser": "کارشناس",
+    "colUnits": "واحدها",
+    "presetsLabel": "بازه",
+    "presets": {
+      "today": "امروز",
+      "yesterday": "دیروز",
+      "thisWeek": "این هفته",
+      "lastWeek": "هفتهٔ گذشته",
+      "thisMonth": "این ماه",
+      "lastMonth": "ماه گذشته",
+      "thisQuarter": "این فصل",
+      "lastQuarter": "فصل گذشته",
+      "thisYear": "امسال",
+      "lastYear": "سال گذشته"
+    },
+    "kpiUnits": "واحدهای زمانی",
+    "kpiEntries": "ثبت‌ها",
+    "kpiTickets": "تیکت‌ها",
+    "kpiAgents": "کارشناسان",
+    "rangeBetween": "{{from}} – {{to}}",
+    "rangeFrom": "از {{from}}",
+    "rangeTo": "تا {{to}}",
+    "chartTitle": "واحد در روز",
+    "chartBar": "{{date}}: {{units}} واحد",
+    "dayUnknown": "بدون تاریخ",
+    "emptyHint": "بازه را گسترده‌تر کنید یا پالایهٔ کارشناس و تیکت را پاک کنید.",
+    "clearFilters": "پاک‌کردن پالایه‌ها",
+    "pageRange": "{{from}}–{{to}}",
+    "pageScope": "در این صفحه",
+    "chartPeak": "اوج {{units}}"
+  },
+  "setPassword": {
+    "subtitle": "لطفاً برای حساب خود گذرواژه‌ای برگزینید.",
+    "password": "گذرواژهٔ جدید",
+    "confirm": "تکرار گذرواژه",
+    "lengthHint": "بین {{min}} و {{max}} نویسه.",
+    "mismatch": "گذرواژه‌ها یکسان نیستند.",
+    "submit": "تنظیم گذرواژه",
+    "saving": "در حال ذخیره…",
+    "done": "گذرواژه ذخیره شد. اکنون می‌توانید وارد شوید.",
+    "invalid": "این پیوند دیگر معتبر نیست.",
+    "invalidHint": "پیوندهای راه‌اندازی ۷ روز اعتبار دارند و یک‌بارمصرف‌اند. از مدیریت یکی تازه بخواهید.",
+    "toLogin": "رفتن به ورود"
   }
 }

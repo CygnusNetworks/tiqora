@@ -33,7 +33,7 @@
     "admin": "адмін",
     "theme": "Тема",
     "language": "Мова",
-    "dashboard": "Приладова панель",
+    "dashboard": "Панель",
     "queues": "Черги",
     "kb": "База знань"
   },
@@ -55,7 +55,12 @@
     "showActiveQueues": "Показати активний",
     "queueSearch": "Фільтрувати черги…",
     "noQueueMatch": "Жодна черга не збігається.",
-    "templates": "Шаблони"
+    "templates": "Шаблони",
+    "locked": "Заблоковані",
+    "responsible": "Відповідальний",
+    "escalated": "Ескальовані",
+    "services": "Сервіси",
+    "timeAccounting": "Облік часу"
   },
   "common": {
     "prev": "Попередній",
@@ -68,7 +73,10 @@
     "cancel": "Скасувати",
     "help": "Довідка",
     "edit": "Редагувати",
-    "save": "зберегти"
+    "save": "Зберегти",
+    "saved": "Збережено",
+    "delete": "Видалити",
+    "submit": "Надіслати"
   },
   "otp": {
     "verifying": "Перевірка…",
@@ -160,7 +168,7 @@
     "chipAll": "все",
     "kpiMyOpen": "Мій відкритий",
     "kpiMyNew": "Мій новий",
-    "kpiUnownedNew": "To pick up",
+    "kpiUnownedNew": "До взяття",
     "kpiEscalated": "Ескалація",
     "groupTakeover": "Вхідні команди (забрати)",
     "escalationStrip": "{{count}} підвищені квитки — найстаріші для {{duration}}",
@@ -171,7 +179,9 @@
     "toPickUpEmpty": "Немає нових квитків.",
     "remindersDue": "Термін нагадування",
     "remindersDueEmpty": "Немає нагадувань.",
-    "queueShortcutsEmpty": "Зараз немає черг з відкритими або новими квитками."
+    "queueShortcutsEmpty": "Зараз немає черг з відкритими або новими квитками.",
+    "lastViews": "Нещодавно переглянуті",
+    "lastViewsUntitled": "(без теми)"
   },
   "queue": {
     "sidebar": "Черги",
@@ -370,7 +380,7 @@
     "splitQueue": "Цільова черга",
     "splitNewTitle": "Нова назва квитка (необов’язково)",
     "ai": {
-      "title": "AI Assist",
+      "title": "ШІ-підтримка",
       "help": {
         "summary": "Створюється зі статей квитка налаштованою моделлю черги та зберігається лише в стані квитка, ніколи не як примітка — вона ніколи не надсилається клієнту самостійно.",
         "drafts": "Згенеровано моделлю з квитка. Кожна чернетка — це окремий запис — нічого не надсилається автоматично; ви повинні відкрити його та явно надіслати або відхилити."
@@ -482,7 +492,8 @@
       "customerEmail": "Електронна пошта",
       "customerFirstName": "ім'я",
       "customerLastName": "Прізвище",
-      "customerLoginConflict": "Цей логін вже існує. Виберіть інший логін або натомість призначте наявного клієнта через пошук."
+      "customerLoginConflict": "Цей логін вже існує. Виберіть інший логін або натомість призначте наявного клієнта через пошук.",
+      "clearCustomer": "Прибрати клієнта"
     },
     "inlineAttachments": "Вбудовані зображення ({{count}})",
     "list": {
@@ -504,7 +515,35 @@
     "draftEditedAt": "змінено {{time}}",
     "draftDiscard": "Видалити чернетку",
     "draftDiscardConfirm": "Видалити цю неадіслану відповідь? Текст неможливо буде відновити.",
-    "draftDiscardConfirmButton": "Видалити"
+    "draftDiscardConfirmButton": "Видалити",
+    "type": "Тип",
+    "service": "Сервіс",
+    "sla": "SLA",
+    "mentions": "Згадки",
+    "timeAccounting": "Облік часу",
+    "timeUnits": "Одиниці часу",
+    "addTime": "Облікувати час",
+    "addMention": "Згадати агента",
+    "mentionsCount": "Згадки: {{n}}",
+    "mentionsEmpty": "Нікого не згадано",
+    "mentionRemove": "Прибрати згадку",
+    "mentionSuggestions": "Агенти",
+    "timeUnitAbbrev": "хв",
+    "timeUnitHoursAbbrev": "год",
+    "timeUnitsShort": "{{units}} хв",
+    "timeAccountingTotal": "Облікований час: {{units}} хв",
+    "timeRemove": "Видалити запис",
+    "timeUnitMode": "Одиниця часу",
+    "timeUnitMin": "Хв",
+    "timeUnitHours": "Год",
+    "timePresets": "Швидкий вибір",
+    "timeComposerHint": "Під час відповіді обліковуйте час унизу редактора.",
+    "timeChipHint": "Обліковується під час надсилання",
+    "extrasFailedMentions": "Надіслано — згадку не збережено.",
+    "extrasFailedTime": "Надіслано — час не обліковано.",
+    "extrasFailedBoth": "Надіслано — ані згадку, ані облік часу не збережено.",
+    "extrasRetry": "Повторити",
+    "customerUnresolved": "Немає запису клієнта з цією адресою — відомості недоступні."
   },
   "search": {
     "title": "Пошук",
@@ -954,7 +993,7 @@
         "periodToday": "Сьогодні",
         "period7d": "7 днів",
         "period30d": "30 днів",
-        "periodCustom": "Custom",
+        "periodCustom": "Власний",
         "provider": "Провайдер",
         "allProviders": "Всі провайдери",
         "feature": {
@@ -1143,7 +1182,8 @@
       },
       "acl": {
         "match": "Умови, за яких застосовується цей ACL (наприклад, поточна черга, стан, поле форми). Зміна праворуч застосовується лише тоді, коли збігаються всі перелічені тут критерії.",
-        "change": "Ефект ACL після збігу його умов — як правило, він обмежує або змушує вибір, доступний у формах (наприклад, дозволено лише певні стани подальших дій)."
+        "change": "Ефект ACL після збігу його умов — як правило, він обмежує або змушує вибір, доступний у формах (наприклад, дозволено лише певні стани подальших дій).",
+        "stopAfterMatch": "Якщо позначено, після продуктивного спрацювання подальші ACL не оцінюються (Znuny StopAfterMatch)."
       },
       "mailOutbound": {
         "host": "Ім’я хоста SMTP-сервера для вихідної пошти. Повинен бути доступний із цього сервера (DNS + брандмауер) через вказаний нижче порт.",
@@ -1190,8 +1230,8 @@
         "validId": "«Тимчасовий» (valid_id 3) — це третій стан дійсності Znuny — зазвичай обліковий запис очікує підтвердження (наприклад, непідтверджена самореєстрація), відмінний від звичайного дійсного/недійсного."
       },
       "systemAddresses": {
-        "email": "Address used as the From email for queues and auto-responses.",
-        "name": "Display name shown next to the email (e.g. “Support <support@example.com>”)."
+        "email": "Адреса, що використовується як From для черг і автовідповідей.",
+        "name": "Відображуване ім’я поруч з e-mail (напр. «Support <support@example.com>»)."
       }
     },
     "nav": {
@@ -1240,7 +1280,13 @@
       "aiAcl": "Доступ і обмеження",
       "collapse": "Згорнути навігацію",
       "mailAccounts": "Поштові облікові записи",
-      "oauth2Tokens": "Маркери OAuth2 (пошта)"
+      "oauth2Tokens": "Маркери OAuth2 (пошта)",
+      "types": "Типи заявок",
+      "services": "Сервіси",
+      "slas": "SLA",
+      "systemAddresses": "Системні адреси",
+      "notificationEvents": "Події сповіщень",
+      "ticketAttributeRelations": "Зв’язки атрибутів"
     },
     "table": {
       "id": "ID",
@@ -1347,7 +1393,44 @@
       "title": "Назва",
       "firstName": "ім'я",
       "lastName": "Прізвище",
-      "name": "Ім'я"
+      "name": "Ім'я",
+      "passwordMode": "Призначення пароля",
+      "passwordModeManual": "Задати вручну",
+      "passwordModeAuto": "Запрошення: надіслати посилання ел. поштою",
+      "passwordModeAutoHelp": "Під час збереження на e-mail нижче йде одноразове посилання. Агент обирає пароль сам.",
+      "email": "Ел. пошта",
+      "mobile": "Мобільний телефон",
+      "effectivePermissions": "Показати ефективні права",
+      "effectivePermissionsTitle": "Ефективні права: {{name}}",
+      "effectivePermissionsDescription": "Об’єднані права з прямих груп і ролей.",
+      "rolesHeading": "Ролі",
+      "groupsHeading": "Права груп",
+      "queuesHeading": "Черги",
+      "noRoles": "Ролі не призначено.",
+      "noGroups": "Немає прав груп.",
+      "noQueues": "Немає пов’язаних черг.",
+      "viaDirect": "Безпосередньо",
+      "permissionColumn": "Права",
+      "sourceColumn": "Джерело",
+      "editSettings": "Змінити особисті налаштування",
+      "editSettingsTitle": "Особисті налаштування: {{name}}",
+      "editSettingsDescription": "Ті самі налаштування, що агент бачить у «Особистих налаштуваннях».",
+      "languageLabel": "Мова",
+      "languageSaved": "Мову збережено.",
+      "tabAccount": "Обліковий запис",
+      "tabPerson": "Особа",
+      "sourceInvalidHint": "Це право з недійсної ролі і тому не діє.",
+      "keyInactiveHint": "Право налаштовано, але не діє — джерело або група недійсні.",
+      "deletePermanent": "Видалити остаточно",
+      "deleteTitle": "Остаточно видалити {{name}}?",
+      "deleteConfirm": "Видалити остаточно",
+      "deletableBody": "На {{name}} нічого не посилається; обліковий запис можна повністю видалити разом із налаштуваннями, групами, ролями та 2FA.",
+      "deleteIrreversible": "Це незворотно.",
+      "deleteBlockedBody": "{{name}} не можна видалити — на обліковий запис ще посилаються таблиці:",
+      "deleteBlockedHint": "Позначте обліковий запис як «Недійсний», щоб заявки, статті й історія лишалися прив’язаними.",
+      "resendSetupLink": "Надіслати посилання налаштування знову",
+      "setupLinkSent": "Посилання налаштування надіслано.",
+      "setupLinkFailed": "Не вдалося надіслати посилання налаштування."
     },
     "groups": {
       "title_plural": "Групи",
@@ -1561,7 +1644,10 @@
       "name": "Ім'я",
       "description": "опис",
       "match": "Матч",
-      "change": "Зміна"
+      "change": "Зміна",
+      "new": "Нова ACL",
+      "stopAfterMatch": "Зупинити після спрацювання",
+      "confirmDelete": "Видалити ACL «{{name}}»? Це незворотно."
     },
     "genericAgentJobs": {
       "title_plural": "Загальні вакансії агента",
@@ -1652,7 +1738,7 @@
       "scopes": "Доступ",
       "scopesUnrestricted": "Без обмежень",
       "scopesReadOnly": "Тільки для читання",
-      "scopesCustom": "Custom",
+      "scopesCustom": "Власний",
       "scopesHelp": "Unrestricted використовує повні привілеї агента пов’язаного користувача. Лише читання дозволяє GET у кожній області. Спеціальний вибір RO або RW для кожної області API.",
       "scopesArea": "Площа",
       "scopesOff": "Вимкнено",
@@ -1768,7 +1854,7 @@
       "app": {
         "product": "Продукт",
         "version": "Версія",
-        "gitSha": "Git commit",
+        "gitSha": "Git-коміт",
         "buildTime": "Будувати",
         "environment": "Навколишнє середовище",
         "python": "Python",
@@ -2222,7 +2308,13 @@
       "aiAudit": "Повний аудит кожного запиту/відповіді LLM із розкриттям ідентифікаційної інформації.",
       "aiAcl": "Дозволи та квоти ШІ на групу, роль або агента.",
       "mailAccounts": "Вхідні поштові скриньки IMAP/POP (пароль або OAuth2).",
-      "oauth2Tokens": "Конфігурації токенів OAuth2 для пошти Microsoft/Google (сумісний із Znuny)."
+      "oauth2Tokens": "Конфігурації токенів OAuth2 для пошти Microsoft/Google (сумісний із Znuny).",
+      "types": "Керування типами заявок для класифікації.",
+      "services": "Керування сервісами та прив’язка до SLA.",
+      "slas": "Керування угодами про рівень сервісу та термінами.",
+      "systemAddresses": "Адреси From для черг і автовідповідей.",
+      "notificationEvents": "Налаштування сповіщень агентів за подіями.",
+      "ticketAttributeRelations": "Сумісні з Znuny матриці залежностей (сервіс/черга тощо) у CSV."
     },
     "mailAccounts": {
       "title_plural": "Поштові облікові записи",
@@ -2270,11 +2362,50 @@
       "refreshSuccess": "Токен оновлено."
     },
     "systemAddresses": {
-      "title_plural": "System addresses",
-      "subtitle": "From-addresses for queues and auto-responses. Invalid addresses stay listed so they can be re-enabled.",
-      "new": "Add address",
-      "email": "Email",
-      "name": "Name"
+      "title_plural": "Системні адреси",
+      "subtitle": "Адреси From для черг і автовідповідей. Недійсні лишаються в списку, щоб їх можна було знову увімкнути.",
+      "new": "Додати адресу",
+      "email": "Ел. пошта",
+      "name": "Назва"
+    },
+    "types": {
+      "title_plural": "Типи заявок",
+      "new": "Новий тип",
+      "name": "Назва"
+    },
+    "services": {
+      "title_plural": "Сервіси",
+      "new": "Новий сервіс",
+      "name": "Назва",
+      "slaCount": "SLA"
+    },
+    "slas": {
+      "title_plural": "SLA",
+      "new": "Нове SLA",
+      "name": "Назва",
+      "firstResponseTime": "Перша відповідь (хв)",
+      "updateTime": "Оновлення (хв)",
+      "solutionTime": "Розв’язання (хв)",
+      "calendar": "Календар"
+    },
+    "notificationEvents": {
+      "title_plural": "Події сповіщень",
+      "subtitle": "За подій агентам надсилаються відповідні сповіщення.",
+      "new": "Створити сповіщення",
+      "name": "Назва",
+      "event": "Подія",
+      "subject": "Тема",
+      "body": "Текст"
+    },
+    "tar": {
+      "title": "Зв’язки атрибутів заявок",
+      "filename": "Ім’я файлу",
+      "attributes": "Атрибути",
+      "priority": "Пріоритет",
+      "csv": "Дані CSV",
+      "new": "Новий зв’язок",
+      "help": "CSV із заголовком Attribute1;Attribute2 і парами значень (Znuny AdminTicketAttributeRelations). Обмежує вибір у формах (напр. Сервіс → Черга).",
+      "confirmDelete": "Видалити цей зв’язок?"
     }
   },
   "kb": {
@@ -2489,7 +2620,8 @@
       "startButton": "Почати процес",
       "actions": "Доступні дії",
       "loadError": "Не вдалося завантажити стан процесу.",
-      "noDialogs": "Немає доступних дій у цій діяльності."
+      "noDialogs": "Немає доступних дій у цій діяльності.",
+      "noCustomerDialogs": "На цьому кроці немає доступних клієнтських діалогів."
     },
     "start": {
       "title": "Почати процес",
@@ -2525,5 +2657,84 @@
     "body": "Тіло",
     "editTitle": "Редагувати «{{name}}»",
     "saveError": "Не вдалося зберегти шаблон."
+  },
+  "views": {
+    "mine": "Мої заявки",
+    "responsible": "Відповідальний",
+    "locked": "Заблоковані заявки",
+    "watched": "Спостережувані заявки",
+    "escalated": "Ескальовані заявки",
+    "service": "За сервісом",
+    "serviceHint": "Список заявок, прив’язаних до сервісу.",
+    "pickService": "Оберіть сервіс…"
+  },
+  "customerCentre": {
+    "title": "Відомості про клієнта",
+    "open": "Клієнт",
+    "invalid": "Недійсний логін клієнта.",
+    "loadError": "Не вдалося завантажити клієнта.",
+    "email": "Ел. пошта",
+    "phone": "Телефон",
+    "customerId": "Номер клієнта",
+    "company": "Компанія",
+    "openCount": "{{count}} відкритих",
+    "closedCount": "{{count}} закритих",
+    "allTickets": "Усі заявки →",
+    "recentTickets": "Нещодавні заявки"
+  },
+  "timeAccounting": {
+    "title": "Облік часу",
+    "hint": "Обліковані одиниці часу за доступними вам заявками.",
+    "filterUser": "Агент",
+    "allUsers": "Усі агенти",
+    "filterFrom": "З",
+    "filterTo": "До",
+    "filterTicket": "ID заявки",
+    "empty": "Немає відповідних записів обліку часу.",
+    "colWhen": "Коли",
+    "colTicket": "Заявка",
+    "colUser": "Агент",
+    "colUnits": "Одиниці",
+    "presetsLabel": "Період",
+    "presets": {
+      "today": "Сьогодні",
+      "yesterday": "Вчора",
+      "thisWeek": "Цей тиждень",
+      "lastWeek": "Минулий тиждень",
+      "thisMonth": "Цей місяць",
+      "lastMonth": "Минулий місяць",
+      "thisQuarter": "Цей квартал",
+      "lastQuarter": "Минулий квартал",
+      "thisYear": "Цей рік",
+      "lastYear": "Минулий рік"
+    },
+    "kpiUnits": "Одиниці часу",
+    "kpiEntries": "Записи",
+    "kpiTickets": "Заявки",
+    "kpiAgents": "Агенти",
+    "rangeBetween": "{{from}} – {{to}}",
+    "rangeFrom": "з {{from}}",
+    "rangeTo": "до {{to}}",
+    "chartTitle": "Одиниці на день",
+    "chartBar": "{{date}}: {{units}} од.",
+    "dayUnknown": "Без дати",
+    "emptyHint": "Розширте період або скиньте фільтри агента й заявки.",
+    "clearFilters": "Скинути фільтри",
+    "pageRange": "{{from}}–{{to}}",
+    "pageScope": "на цій сторінці",
+    "chartPeak": "пік {{units}}"
+  },
+  "setPassword": {
+    "subtitle": "Оберіть пароль для свого облікового запису.",
+    "password": "Новий пароль",
+    "confirm": "Повторіть пароль",
+    "lengthHint": "Від {{min}} до {{max}} символів.",
+    "mismatch": "Паролі не збігаються.",
+    "submit": "Встановити пароль",
+    "saving": "Збереження…",
+    "done": "Пароль збережено. Можна ввійти.",
+    "invalid": "Це посилання більше недійсне.",
+    "invalidHint": "Посилання налаштування діють 7 днів і одноразові. Попросіть нове в адміністрації.",
+    "toLogin": "До входу"
   }
 }

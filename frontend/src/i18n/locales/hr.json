@@ -39,7 +39,7 @@
   },
   "sidebar": {
     "workspace": "Radni prostor",
-    "inbox": "Inbox",
+    "inbox": "Ulazni sandučić",
     "myTickets": "Moje karte",
     "watched": "Gledao",
     "queues": "Redovi čekanja",
@@ -55,7 +55,12 @@
     "showActiveQueues": "Prikaži aktivno",
     "queueSearch": "Filtriraj redove…",
     "noQueueMatch": "Nijedan red čekanja ne odgovara.",
-    "templates": "Predlošci"
+    "templates": "Predlošci",
+    "locked": "Zaključano",
+    "responsible": "Odgovoran",
+    "escalated": "Eskalirano",
+    "services": "Usluge",
+    "timeAccounting": "Evidencija vremena"
   },
   "common": {
     "prev": "Prethodno",
@@ -68,7 +73,10 @@
     "cancel": "Odustani",
     "help": "pomoć",
     "edit": "Uredi",
-    "save": "spremiti"
+    "save": "Spremi",
+    "saved": "Spremljeno",
+    "delete": "Izbriši",
+    "submit": "Pošalji"
   },
   "otp": {
     "verifying": "Provjera...",
@@ -171,7 +179,9 @@
     "toPickUpEmpty": "Nema novih ulaznica za preuzimanje.",
     "remindersDue": "Dospjeli opomene",
     "remindersDueEmpty": "Nema dospjelih podsjetnika.",
-    "queueShortcutsEmpty": "Trenutačno nema čekanja u redu s otvorenim ili novim ulaznicama."
+    "queueShortcutsEmpty": "Trenutačno nema čekanja u redu s otvorenim ili novim ulaznicama.",
+    "lastViews": "Nedavno pregledano",
+    "lastViewsUntitled": "(bez predmeta)"
   },
   "queue": {
     "sidebar": "Redovi čekanja",
@@ -352,7 +362,7 @@
     "recipientName": "Ime",
     "recipientEmail": "E-mail",
     "recipientRemove": "Ukloniti",
-    "recipientConfirm": "OK",
+    "recipientConfirm": "U redu",
     "replyToRequired": "Potreban je barem jedan primatelj.",
     "replySubject": "Predmet",
     "replyTemplate": "Predložak",
@@ -457,7 +467,7 @@
       "unlock": "Otključaj",
       "fields": "Slobodna polja",
       "historyView": "Povijest",
-      "link": "Link",
+      "link": "Poveži",
       "merge": "Spojiti",
       "appointment": "Novi termin",
       "move": "kreni",
@@ -472,7 +482,7 @@
       "linkTargetId": "Link na ID ulaznice",
       "linkType": "Vrsta veze",
       "apptTitle": "Naslov",
-      "apptStart": "Start",
+      "apptStart": "Početak",
       "apptEnd": "Kraj",
       "genericError": "Radnja nije uspjela. Molimo pokušajte ponovo.",
       "currentCustomer": "Trenutni",
@@ -482,7 +492,8 @@
       "customerEmail": "E-mail",
       "customerFirstName": "Ime",
       "customerLastName": "Prezime",
-      "customerLoginConflict": "Ova prijava već postoji. Odaberite drugu prijavu ili umjesto toga dodijelite postojećeg kupca putem pretraživanja."
+      "customerLoginConflict": "Ova prijava već postoji. Odaberite drugu prijavu ili umjesto toga dodijelite postojećeg kupca putem pretraživanja.",
+      "clearCustomer": "Ukloni korisnika"
     },
     "inlineAttachments": "Ugrađene slike ({{count}})",
     "list": {
@@ -504,7 +515,35 @@
     "draftEditedAt": "uređeno {{time}}",
     "draftDiscard": "Odbaci skicu",
     "draftDiscardConfirm": "Odbaciti ovaj neposlani odgovor? Tekst se ne može vratiti.",
-    "draftDiscardConfirmButton": "Odbaci"
+    "draftDiscardConfirmButton": "Odbaci",
+    "type": "Vrsta",
+    "service": "Usluga",
+    "sla": "SLA",
+    "mentions": "Spominjanja",
+    "timeAccounting": "Evidencija vremena",
+    "timeUnits": "Vremenske jedinice",
+    "addTime": "Evidentiraj vrijeme",
+    "addMention": "Spomeni agenta",
+    "mentionsCount": "Spominjanja: {{n}}",
+    "mentionsEmpty": "Nitko nije spomenut",
+    "mentionRemove": "Ukloni spominjanje",
+    "mentionSuggestions": "Agenti",
+    "timeUnitAbbrev": "min",
+    "timeUnitHoursAbbrev": "h",
+    "timeUnitsShort": "{{units}} min",
+    "timeAccountingTotal": "Evidentirano vrijeme: {{units}} min",
+    "timeRemove": "Ukloni unos",
+    "timeUnitMode": "Vremenska jedinica",
+    "timeUnitMin": "Min",
+    "timeUnitHours": "H",
+    "timePresets": "Brzi odabir",
+    "timeComposerHint": "Pri odgovoru evidentirajte u podnožju sastavljača.",
+    "timeChipHint": "Evidentira se pri slanju",
+    "extrasFailedMentions": "Poslano — spominjanje nije spremljeno.",
+    "extrasFailedTime": "Poslano — vrijeme nije evidentirano.",
+    "extrasFailedBoth": "Poslano — ni spominjanje ni evidencija vremena nisu spremljeni.",
+    "extrasRetry": "Pokušaj ponovno",
+    "customerUnresolved": "Nema korisničkog zapisa za ovu adresu, stoga podaci nisu dostupni."
   },
   "search": {
     "title": "Traži",
@@ -954,7 +993,7 @@
         "periodToday": "Danas",
         "period7d": "7 dana",
         "period30d": "30 dana",
-        "periodCustom": "Custom",
+        "periodCustom": "Prilagođeno",
         "provider": "Davatelj",
         "allProviders": "Svi pružatelji usluga",
         "feature": {
@@ -1143,7 +1182,8 @@
       },
       "acl": {
         "match": "Uvjeti pod kojima se ovaj ACL primjenjuje (npr. trenutni red čekanja, stanje, polje obrasca). Promjena s desne strane primjenjuje se samo kada se podudaraju svi ovdje navedeni kriteriji.",
-        "change": "Učinak ACL-a kada se njegovi uvjeti podudaraju — obično ograničava ili nameće izbore dostupne u obrascima (npr. dopuštena su samo određena stanja praćenja)."
+        "change": "Učinak ACL-a kada se njegovi uvjeti podudaraju — obično ograničava ili nameće izbore dostupne u obrascima (npr. dopuštena su samo određena stanja praćenja).",
+        "stopAfterMatch": "Ako je označeno, nakon produktivnog podudaranja ne procjenjuju se daljnje ACL-ove (Znuny StopAfterMatch)."
       },
       "mailOutbound": {
         "host": "Naziv hosta SMTP poslužitelja za odlaznu poštu. Mora biti dostupan s ovog poslužitelja (DNS + vatrozid) na priključku ispod.",
@@ -1190,8 +1230,8 @@
         "validId": "\"Temp\" (valid_id 3) je Znunyjevo treće stanje valjanosti — obično potvrda računa na čekanju (npr. nepotvrđena samoregistracija), različito od običnog važećeg/nevažećeg."
       },
       "systemAddresses": {
-        "email": "Address used as the From email for queues and auto-responses.",
-        "name": "Display name shown next to the email (e.g. “Support <support@example.com>”)."
+        "email": "Adresa korištena kao From za redove i auto-odgovore.",
+        "name": "Prikazano ime uz e-adresu (npr. „Support <support@example.com>”)."
       }
     },
     "nav": {
@@ -1240,7 +1280,13 @@
       "aiAcl": "Pristup i ograničenja",
       "collapse": "Sažmi navigaciju",
       "mailAccounts": "Mail računi",
-      "oauth2Tokens": "OAuth2 tokeni (pošta)"
+      "oauth2Tokens": "OAuth2 tokeni (pošta)",
+      "types": "Vrste tiketa",
+      "services": "Usluge",
+      "slas": "SLA",
+      "systemAddresses": "Sustavne adrese",
+      "notificationEvents": "Događaji obavijesti",
+      "ticketAttributeRelations": "Odnosi atributa"
     },
     "table": {
       "id": "ID",
@@ -1347,7 +1393,44 @@
       "title": "Naslov",
       "firstName": "Ime",
       "lastName": "Prezime",
-      "name": "Ime"
+      "name": "Ime",
+      "passwordMode": "Dodjela lozinke",
+      "passwordModeManual": "Postavi ručno",
+      "passwordModeAuto": "Pozivnica: pošalji poveznicu e-poštom",
+      "passwordModeAutoHelp": "Pri spremanju jednokratna poveznica ide na e-adresu ispod. Agent sam bira lozinku.",
+      "email": "E-pošta",
+      "mobile": "Mobitel",
+      "effectivePermissions": "Prikaži efektivna prava",
+      "effectivePermissionsTitle": "Efektivna prava za {{name}}",
+      "effectivePermissionsDescription": "Spojena prava iz izravnih grupa i uloga.",
+      "rolesHeading": "Uloge",
+      "groupsHeading": "Grupna prava",
+      "queuesHeading": "Redovi",
+      "noRoles": "Nema dodijeljenih uloga.",
+      "noGroups": "Nema grupnih prava.",
+      "noQueues": "Nema dodijeljenih redova.",
+      "viaDirect": "Izravno",
+      "permissionColumn": "Prava",
+      "sourceColumn": "Izvor",
+      "editSettings": "Uredi osobne postavke",
+      "editSettingsTitle": "Osobne postavke: {{name}}",
+      "editSettingsDescription": "Iste postavke koje agent vidi pod «Osobne postavke».",
+      "languageLabel": "Jezik",
+      "languageSaved": "Jezik je spremljen.",
+      "tabAccount": "Račun",
+      "tabPerson": "Osoba",
+      "sourceInvalidHint": "Ovo pravo dolazi iz nevažeće uloge i stoga nema učinka.",
+      "keyInactiveHint": "Ovo pravo je konfigurirano, ali ne vrijedi — izvor ili grupa nisu valjani.",
+      "deletePermanent": "Trajno izbriši",
+      "deleteTitle": "Trajno izbrisati {{name}}?",
+      "deleteConfirm": "Trajno izbriši",
+      "deletableBody": "Ništa ne referencira {{name}}; račun se može potpuno ukloniti s postavkama, grupama, ulogama i 2FA.",
+      "deleteIrreversible": "Ovo se ne može poništiti.",
+      "deleteBlockedBody": "{{name}} se ne može izbrisati — ove tablice još referenciraju račun:",
+      "deleteBlockedHint": "Postavite račun na «Nevažeći» da tiketi, članci i povijest ostanu pripisivi.",
+      "resendSetupLink": "Ponovno pošalji poveznicu za postavljanje",
+      "setupLinkSent": "Poveznica za postavljanje je poslana.",
+      "setupLinkFailed": "Poveznicu za postavljanje nije moguće poslati."
     },
     "groups": {
       "title_plural": "grupe",
@@ -1561,7 +1644,10 @@
       "name": "Ime",
       "description": "Opis",
       "match": "Podudaranje",
-      "change": "Promjena"
+      "change": "Promjena",
+      "new": "Nova ACL",
+      "stopAfterMatch": "Zaustavi nakon podudaranja",
+      "confirmDelete": "Izbrisati ACL „{{name}}”? Ovo se ne može poništiti."
     },
     "genericAgentJobs": {
       "title_plural": "Generički agentski poslovi",
@@ -1652,7 +1738,7 @@
       "scopes": "Pristup",
       "scopesUnrestricted": "Neograničeno",
       "scopesReadOnly": "Samo za čitanje",
-      "scopesCustom": "Custom",
+      "scopesCustom": "Prilagođeno",
       "scopesHelp": "Unrestricted koristi pune privilegije agenta vezanog korisnika. Samo za čitanje omogućuje GET na svakom području. Prilagođeni odabiri RO ili RW po API području.",
       "scopesArea": "Površina",
       "scopesOff": "Isključeno",
@@ -2025,7 +2111,7 @@
       "agentsHeading": "Agenti",
       "login": "Prijava",
       "name": "Ime",
-      "totpStatus": "2FA status",
+      "totpStatus": "Status 2FA",
       "totpActive": "aktivan",
       "totpInactive": "—",
       "ssoEligible": "SSO prihvatljiv",
@@ -2222,7 +2308,13 @@
       "aiAudit": "Potpuna revizija svakog LLM zahtjeva/odgovora, s otkrivanjem PII.",
       "aiAcl": "AI dozvole i kvote po grupi, ulozi ili agentu.",
       "mailAccounts": "Dolazni IMAP/POP poštanski sandučići (lozinka ili OAuth2).",
-      "oauth2Tokens": "Konfiguracije OAuth2 tokena za Microsoft/Google mail (kompatibilno sa Znuny)."
+      "oauth2Tokens": "Konfiguracije OAuth2 tokena za Microsoft/Google mail (kompatibilno sa Znuny).",
+      "types": "Upravljajte vrstama tiketa za klasifikaciju.",
+      "services": "Upravljajte uslugama i povežite ih sa SLA-ovima.",
+      "slas": "Upravljajte SLA ugovorima i rokovima.",
+      "systemAddresses": "E-adrese kao From za redove i auto-odgovore.",
+      "notificationEvents": "Konfigurirajte obavijesti agentima na temelju događaja.",
+      "ticketAttributeRelations": "Matrice ovisnosti kompatibilne sa Znunyjem (usluga/red itd.) u CSV-u."
     },
     "mailAccounts": {
       "title_plural": "Mail računi",
@@ -2270,11 +2362,50 @@
       "refreshSuccess": "Token osvježen."
     },
     "systemAddresses": {
-      "title_plural": "System addresses",
-      "subtitle": "From-addresses for queues and auto-responses. Invalid addresses stay listed so they can be re-enabled.",
-      "new": "Add address",
-      "email": "Email",
-      "name": "Name"
+      "title_plural": "Sustavne adrese",
+      "subtitle": "From adrese za redove i auto-odgovore. Nevažeće ostaju na popisu radi ponovnog omogućavanja.",
+      "new": "Dodaj adresu",
+      "email": "E-pošta",
+      "name": "Naziv"
+    },
+    "types": {
+      "title_plural": "Vrste tiketa",
+      "new": "Nova vrsta",
+      "name": "Naziv"
+    },
+    "services": {
+      "title_plural": "Usluge",
+      "new": "Nova usluga",
+      "name": "Naziv",
+      "slaCount": "SLA"
+    },
+    "slas": {
+      "title_plural": "SLA",
+      "new": "Novi SLA",
+      "name": "Naziv",
+      "firstResponseTime": "Prvi odgovor (min)",
+      "updateTime": "Ažuriranje (min)",
+      "solutionTime": "Rješenje (min)",
+      "calendar": "Kalendar"
+    },
+    "notificationEvents": {
+      "title_plural": "Događaji obavijesti",
+      "subtitle": "Kad se dogode događaji, odgovarajuće obavijesti šalju se agentima.",
+      "new": "Stvori obavijest",
+      "name": "Naziv",
+      "event": "Događaj",
+      "subject": "Predmet",
+      "body": "Tijelo"
+    },
+    "tar": {
+      "title": "Odnosi atributa tiketa",
+      "filename": "Naziv datoteke",
+      "attributes": "Atributi",
+      "priority": "Prioritet",
+      "csv": "CSV podaci",
+      "new": "Novi odnos",
+      "help": "CSV s zaglavljem Attribute1;Attribute2 i parovima vrijednosti (Znuny AdminTicketAttributeRelations). Ograničava izbore u obrascima (npr. Usluga → Red).",
+      "confirmDelete": "Izbrisati ovaj odnos?"
     }
   },
   "kb": {
@@ -2455,7 +2586,7 @@
     "form": {
       "titleLabel": "Naslov",
       "calendar": "Kalendar",
-      "start": "Start",
+      "start": "Početak",
       "end": "Kraj",
       "allDay": "Cijeli dan",
       "location": "Lokacija",
@@ -2489,12 +2620,13 @@
       "startButton": "Pokreni proces",
       "actions": "Dostupne akcije",
       "loadError": "Nije moguće učitati stanje procesa.",
-      "noDialogs": "U ovoj aktivnosti nema dostupnih radnji."
+      "noDialogs": "U ovoj aktivnosti nema dostupnih radnji.",
+      "noCustomerDialogs": "Na ovom koraku nema dostupnih korisničkih dijaloga."
     },
     "start": {
       "title": "Pokreni proces",
       "selectLabel": "Proces",
-      "submit": "Start",
+      "submit": "Početak",
       "cancel": "Odustani",
       "loadError": "Nije moguće učitati procese.",
       "startError": "Nije moguće pokrenuti proces.",
@@ -2525,5 +2657,84 @@
     "body": "Tijelo",
     "editTitle": "Uredi “{{name}}”",
     "saveError": "Nije moguće spremiti predložak."
+  },
+  "views": {
+    "mine": "Moji tiketi",
+    "responsible": "Odgovoran",
+    "locked": "Zaključani tiketi",
+    "watched": "Praćeni tiketi",
+    "escalated": "Eskalirani tiketi",
+    "service": "Po usluzi",
+    "serviceHint": "Popis tiketa dodijeljenih usluzi.",
+    "pickService": "Odaberite uslugu…"
+  },
+  "customerCentre": {
+    "title": "Podaci o korisniku",
+    "open": "Korisnik",
+    "invalid": "Nevažeća prijava korisnika.",
+    "loadError": "Korisnika nije moguće učitati.",
+    "email": "E-pošta",
+    "phone": "Telefon",
+    "customerId": "Broj korisnika",
+    "company": "Tvrtka",
+    "openCount": "{{count}} otvorenih",
+    "closedCount": "{{count}} zatvorenih",
+    "allTickets": "Svi tiketi →",
+    "recentTickets": "Nedavni tiketi"
+  },
+  "timeAccounting": {
+    "title": "Evidencija vremena",
+    "hint": "Evidentirane vremenske jedinice na tiketima kojima imate pristup.",
+    "filterUser": "Agent",
+    "allUsers": "Svi agenti",
+    "filterFrom": "Od",
+    "filterTo": "Do",
+    "filterTicket": "ID tiketa",
+    "empty": "Nema odgovarajućih unosa vremena.",
+    "colWhen": "Kada",
+    "colTicket": "Tiket",
+    "colUser": "Agent",
+    "colUnits": "Jedinice",
+    "presetsLabel": "Razdoblje",
+    "presets": {
+      "today": "Danas",
+      "yesterday": "Jučer",
+      "thisWeek": "Ovaj tjedan",
+      "lastWeek": "Prošli tjedan",
+      "thisMonth": "Ovaj mjesec",
+      "lastMonth": "Prošli mjesec",
+      "thisQuarter": "Ovo tromjesečje",
+      "lastQuarter": "Prošlo tromjesečje",
+      "thisYear": "Ova godina",
+      "lastYear": "Prošla godina"
+    },
+    "kpiUnits": "Vremenske jedinice",
+    "kpiEntries": "Unosi",
+    "kpiTickets": "Tiketi",
+    "kpiAgents": "Agenti",
+    "rangeBetween": "{{from}} – {{to}}",
+    "rangeFrom": "od {{from}}",
+    "rangeTo": "do {{to}}",
+    "chartTitle": "Jedinice po danu",
+    "chartBar": "{{date}}: {{units}} jed.",
+    "dayUnknown": "Bez datuma",
+    "emptyHint": "Proširite razdoblje ili očistite filtre agenta i tiketa.",
+    "clearFilters": "Očisti filtre",
+    "pageRange": "{{from}}–{{to}}",
+    "pageScope": "na ovoj stranici",
+    "chartPeak": "vrh {{units}}"
+  },
+  "setPassword": {
+    "subtitle": "Odaberite lozinku za svoj račun.",
+    "password": "Nova lozinka",
+    "confirm": "Ponovi lozinku",
+    "lengthHint": "Između {{min}} i {{max}} znakova.",
+    "mismatch": "Lozinke se ne podudaraju.",
+    "submit": "Postavi lozinku",
+    "saving": "Spremanje…",
+    "done": "Lozinka je spremljena. Sada se možete prijaviti.",
+    "invalid": "Ova poveznica više nije valjana.",
+    "invalidHint": "Poveznice za postavljanje vrijede 7 dana i koriste se jednom. Zatražite novu od administracije.",
+    "toLogin": "Na prijavu"
   }
 }

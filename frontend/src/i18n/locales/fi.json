@@ -33,7 +33,7 @@
     "admin": "Admin",
     "theme": "Teema",
     "language": "Kieli",
-    "dashboard": "Kojelauta",
+    "dashboard": "Hallintapaneeli",
     "queues": "Jonot",
     "kb": "Tietopohja"
   },
@@ -55,7 +55,12 @@
     "showActiveQueues": "Näytä aktiivinen",
     "queueSearch": "Suodata jonoja…",
     "noQueueMatch": "Ei vastaavia jonoja.",
-    "templates": "Mallit"
+    "templates": "Mallit",
+    "locked": "Lukittu",
+    "responsible": "Vastuuhenkilö",
+    "escalated": "Eskaloitu",
+    "services": "Palvelut",
+    "timeAccounting": "Ajan kirjaus"
   },
   "common": {
     "prev": "Edellinen",
@@ -68,7 +73,10 @@
     "cancel": "Peruuta",
     "help": "Apua",
     "edit": "Muokkaa",
-    "save": "Tallenna"
+    "save": "Tallenna",
+    "saved": "Tallennettu",
+    "delete": "Poista",
+    "submit": "Lähetä"
   },
   "otp": {
     "verifying": "Vahvistetaan…",
@@ -171,7 +179,9 @@
     "toPickUpEmpty": "Ei uusia lippuja noudettavaksi.",
     "remindersDue": "Muistutukset erääntyvät",
     "remindersDueEmpty": "Ei muistutuksia.",
-    "queueShortcutsEmpty": "Ei jonoja avoimilla tai uusilla lipuilla juuri nyt."
+    "queueShortcutsEmpty": "Ei jonoja avoimilla tai uusilla lipuilla juuri nyt.",
+    "lastViews": "Viimeksi katsotut",
+    "lastViewsUntitled": "(ei aihetta)"
   },
   "queue": {
     "sidebar": "Jonot",
@@ -370,7 +380,7 @@
     "splitQueue": "Kohdejono",
     "splitNewTitle": "Uusi lipun otsikko (valinnainen)",
     "ai": {
-      "title": "AI Assist",
+      "title": "Tekoälyapu",
       "help": {
         "summary": "Luodaan lipun artikkeleista jonon konfiguroidun mallin mukaan ja tallennetaan vain lipun tilaan, ei koskaan huomautuksena – sitä ei koskaan lähetetä asiakkaalle itsestään.",
         "drafts": "Mallin luoma lipusta tähän mennessä. Jokainen luonnos on oma tietuensa – mitään ei lähetetä automaattisesti; sinun on avattava se ja lähetettävä tai hävitettävä se."
@@ -482,7 +492,8 @@
       "customerEmail": "Sähköposti",
       "customerFirstName": "Etunimi",
       "customerLastName": "Sukunimi",
-      "customerLoginConflict": "Tämä kirjautuminen on jo olemassa. Valitse toinen kirjautumistunnus tai määritä olemassa oleva asiakas sen sijaan haun kautta."
+      "customerLoginConflict": "Tämä kirjautuminen on jo olemassa. Valitse toinen kirjautumistunnus tai määritä olemassa oleva asiakas sen sijaan haun kautta.",
+      "clearCustomer": "Poista asiakas"
     },
     "inlineAttachments": "Upotetut kuvat ({{count}})",
     "list": {
@@ -504,7 +515,35 @@
     "draftEditedAt": "muokattu {{time}}",
     "draftDiscard": "Hylkää luonnos",
     "draftDiscardConfirm": "Hylätäänkö tämä lähettämätön vastaus? Tekstiä ei voi palauttaa.",
-    "draftDiscardConfirmButton": "Hylkää"
+    "draftDiscardConfirmButton": "Hylkää",
+    "type": "Tyyppi",
+    "service": "Palvelu",
+    "sla": "SLA",
+    "mentions": "Maininnat",
+    "timeAccounting": "Ajan kirjaus",
+    "timeUnits": "Aikayksiköt",
+    "addTime": "Kirjaa aika",
+    "addMention": "Mainitse agentti",
+    "mentionsCount": "Maininnat: {{n}}",
+    "mentionsEmpty": "Ei mainintoja",
+    "mentionRemove": "Poista maininta",
+    "mentionSuggestions": "Agentit",
+    "timeUnitAbbrev": "min",
+    "timeUnitHoursAbbrev": "t",
+    "timeUnitsShort": "{{units}} min",
+    "timeAccountingTotal": "Kirjattu aika: {{units}} min",
+    "timeRemove": "Poista kirjaus",
+    "timeUnitMode": "Aikayksikkö",
+    "timeUnitMin": "Min",
+    "timeUnitHours": "T",
+    "timePresets": "Pikavalinta",
+    "timeComposerHint": "Kirjaa vastatessa koostajan alatunnisteeseen.",
+    "timeChipHint": "Kirjataan lähetyksessä",
+    "extrasFailedMentions": "Lähetetty — mainintaa ei tallennettu.",
+    "extrasFailedTime": "Lähetetty — aikaa ei kirjattu.",
+    "extrasFailedBoth": "Lähetetty — mainintaa eikä aikakirjausta tallennettu.",
+    "extrasRetry": "Yritä uudelleen",
+    "customerUnresolved": "Tähän osoitteeseen ei löydy asiakastietuetta, joten tiedot eivät ole saatavilla."
   },
   "search": {
     "title": "Etsi",
@@ -522,7 +561,7 @@
       "fulltext": "Hae ”{{text}}” kokotekstinä",
       "filterHint": "Suodata",
       "dateHint": "Päivämäärä VVVV-KK-PP",
-      "from": "From",
+      "from": "Lähettäjä",
       "to": "Vastaanottaja",
       "paletteHint": "Kirjoita live-tuloksiin – jono:, omistaja:, tila:, asiakas: tule suodattimiksi.",
       "viewAll": "Näytä kaikki tulokset",
@@ -600,7 +639,7 @@
     "customerChange": "muuttaa",
     "skipCustomer": "Jatka ilman asiakasta",
     "noCustomerResults": "Asiakkaita ei löytynyt.",
-    "from": "From",
+    "from": "Lähettäjä",
     "directionLabel": "Suunta",
     "directionIn": "Saapuva",
     "directionOut": "Lähtevä",
@@ -841,7 +880,7 @@
           "autonomy": "Autonomia",
           "prompt": "Järjestelmäkehote",
           "summary": "Yhteenveto rajat",
-          "caps": "Caps",
+          "caps": "Katot",
           "disclosure": "Paljastus ja yksityisyys",
           "identity": "Identiteetti",
           "language": "Kieli"
@@ -1143,7 +1182,8 @@
       },
       "acl": {
         "match": "Ehdot, joissa tätä ACL-luetteloa sovelletaan (esim. nykyinen jono, tila, lomakekenttä). Oikealla oleva muutos otetaan käyttöön vain, kun kaikki tässä luetellut kriteerit vastaavat.",
-        "change": "ACL:n vaikutus, kun sen ehdot vastaavat – tyypillisesti se rajoittaa tai pakottaa lomakkeissa käytettävissä olevia valintoja (esim. vain tietyt seurantatilat ovat sallittuja)."
+        "change": "ACL:n vaikutus, kun sen ehdot vastaavat – tyypillisesti se rajoittaa tai pakottaa lomakkeissa käytettävissä olevia valintoja (esim. vain tietyt seurantatilat ovat sallittuja).",
+        "stopAfterMatch": "Jos valittu, muita ACL-sääntöjä ei arvioida tuottavan osuman jälkeen (Znuny StopAfterMatch)."
       },
       "mailOutbound": {
         "host": "SMTP-palvelimen isäntänimi lähteville posteille. On oltava tavoitettavissa tältä palvelimelta (DNS + palomuuri) alla olevasta portista.",
@@ -1190,8 +1230,8 @@
         "validId": "\"Temp\" (valid_id 3) on Znunyn kolmas voimassaolotila – tyypillisesti tili odottaa vahvistusta (esim. vahvistamaton itserekisteröinti), joka eroaa tavallisesta kelvollinen/virheellinen."
       },
       "systemAddresses": {
-        "email": "Address used as the From email for queues and auto-responses.",
-        "name": "Display name shown next to the email (e.g. “Support <support@example.com>”)."
+        "email": "Osoite, jota käytetään From-osoitteena jonoille ja automaattivastauksille.",
+        "name": "Näyttönimi sähköpostin vieressä (esim. ”Support <support@example.com>”)."
       }
     },
     "nav": {
@@ -1240,7 +1280,13 @@
       "aiAcl": "Pääsy ja rajoitukset",
       "collapse": "Tiivistä navigointi",
       "mailAccounts": "Postitilit",
-      "oauth2Tokens": "OAuth2-tunnukset (posti)"
+      "oauth2Tokens": "OAuth2-tunnukset (posti)",
+      "types": "Tikettityypit",
+      "services": "Palvelut",
+      "slas": "SLA:t",
+      "systemAddresses": "Järjestelmäosoitteet",
+      "notificationEvents": "Ilmoitustapahtumat",
+      "ticketAttributeRelations": "Attribuuttisuhteet"
     },
     "table": {
       "id": "ID",
@@ -1347,7 +1393,44 @@
       "title": "Otsikko",
       "firstName": "Etunimi",
       "lastName": "Sukunimi",
-      "name": "Nimi"
+      "name": "Nimi",
+      "passwordMode": "Salasanan määrittely",
+      "passwordModeManual": "Aseta manuaalisesti",
+      "passwordModeAuto": "Kutsu: lähetä linkki sähköpostitse",
+      "passwordModeAutoHelp": "Tallennuksessa kertakäyttöinen linkki menee alla olevaan sähköpostiin. Agentti valitsee salasanan itse.",
+      "email": "Sähköposti",
+      "mobile": "Matkapuhelin",
+      "effectivePermissions": "Näytä todelliset oikeudet",
+      "effectivePermissionsTitle": "Todelliset oikeudet: {{name}}",
+      "effectivePermissionsDescription": "Yhdistetyt oikeudet suorista ryhmistä ja rooleista.",
+      "rolesHeading": "Roolit",
+      "groupsHeading": "Ryhmäoikeudet",
+      "queuesHeading": "Jonot",
+      "noRoles": "Ei rooleja.",
+      "noGroups": "Ei ryhmäoikeuksia.",
+      "noQueues": "Ei liitettyjä jonoja.",
+      "viaDirect": "Suoraan",
+      "permissionColumn": "Oikeudet",
+      "sourceColumn": "Lähde",
+      "editSettings": "Muokkaa henkilökohtaisia asetuksia",
+      "editSettingsTitle": "{{name}} — henkilökohtaiset asetukset",
+      "editSettingsDescription": "Samat asetukset, jotka agentti näkee kohdassa ”Henkilökohtaiset asetukset”.",
+      "languageLabel": "Kieli",
+      "languageSaved": "Kieli tallennettu.",
+      "tabAccount": "Tili",
+      "tabPerson": "Henkilö",
+      "sourceInvalidHint": "Tämä oikeus tulee virheellisestä roolista, joten sillä ei ole vaikutusta.",
+      "keyInactiveHint": "Oikeus on määritetty mutta ei voimassa — lähde tai ryhmä on virheellinen.",
+      "deletePermanent": "Poista pysyvästi",
+      "deleteTitle": "Poistetaanko {{name}} pysyvästi?",
+      "deleteConfirm": "Poista pysyvästi",
+      "deletableBody": "Mikään ei viittaa käyttäjään {{name}}; tili voidaan poistaa kokonaan asetuksineen, ryhmineen, rooleineen ja 2FA:ineen.",
+      "deleteIrreversible": "Tätä ei voi perua.",
+      "deleteBlockedBody": "{{name}} ei voi poistaa — nämä taulut viittaavat yhä tiliin:",
+      "deleteBlockedHint": "Aseta tili tilaan ”Virheellinen”, jotta tiketit, artikkelit ja historia pysyvät kohdistettavina.",
+      "resendSetupLink": "Lähetä asennuslinkki uudelleen",
+      "setupLinkSent": "Asennuslinkki lähetetty.",
+      "setupLinkFailed": "Asennuslinkkiä ei voitu lähettää."
     },
     "groups": {
       "title_plural": "ryhmät",
@@ -1410,7 +1493,7 @@
       "lastName": "Sukunimi",
       "name": "Nimi",
       "phone": "Puhelin",
-      "street": "Street",
+      "street": "Katuosoite",
       "city": "Kaupunki",
       "country": "Maa",
       "bulk": {
@@ -1561,7 +1644,10 @@
       "name": "Nimi",
       "description": "Kuvaus",
       "match": "Ottelu",
-      "change": "Muuta"
+      "change": "Muuta",
+      "new": "Uusi ACL",
+      "stopAfterMatch": "Pysäytä osuman jälkeen",
+      "confirmDelete": "Poistetaanko ACL ”{{name}}”? Tätä ei voi perua."
     },
     "genericAgentJobs": {
       "title_plural": "Yleiset agenttityöt",
@@ -1670,7 +1756,7 @@
         "channels": "Kanavat",
         "events": "Tapahtumat / SSE",
         "agents": "Agentit",
-        "admin": "Admin API",
+        "admin": "Hallinta-API",
         "mcp": "MCP-palvelin",
         "compat": "Znuny GenericInterface"
       }
@@ -1896,13 +1982,13 @@
       "status": "Tila",
       "search": "Etsi",
       "searchPlaceholder": "From, to tai aihe…",
-      "from": "From",
+      "from": "Lähettäjä",
       "to": "Vastaanottaja",
       "all": "Kaikki",
       "dirIn": "Saapuva",
       "dirOut": "Lähtevä",
       "time": "Aika",
-      "fromTo": "From → To",
+      "fromTo": "Lähettäjä → Vastaanottaja",
       "subject": "Aihe",
       "ticket": "Lippu",
       "queue": "Jono",
@@ -2009,7 +2095,7 @@
       "columnNameHelp": "Sarake Customer_user / customer_company (ehdotukset tietokannasta).",
       "tagName": "Tunnisteen nimi",
       "tagNameHelp": "Paikkamerkki: <OTRS_CUSTOMER_DATA_{Tag}>",
-      "label": "Label",
+      "label": "Nimike",
       "enabled": "Käytössä"
     },
     "authConfig": {
@@ -2109,7 +2195,7 @@
         "after": "jälkeen",
         "unchanged": "muuttumattomana",
         "deleteTable": "Taulukko",
-        "deleteCount": "Count",
+        "deleteCount": "Määrä",
         "deleteEmpty": "Tietueita ei poistettaisi.",
         "anonymizeEmpty": "Anonymisoitavia kenttiä ei löytynyt."
       },
@@ -2135,7 +2221,7 @@
       "confirmTypePrompt": "Vahvista kirjoittamalla “{{word}}”:",
       "confirmSubmit": "Juokse nyt",
       "runSuccess": "Työ alkoi onnistuneesti.",
-      "runSuccessDetail": "Job #{{id}} · status: {{status}} · {{count}} login(s).",
+      "runSuccessDetail": "Työ #{{id}} · tila: {{status}} · {{count}} kirjautuminen/ta.",
       "viewJobs": "Näytä työpaikat",
       "jobsEmpty": "Ei vielä GDPR-työpaikkoja.",
       "jobDetail": "Työ #{{id}} — valitsin",
@@ -2145,7 +2231,7 @@
         "customerId": "asiakastunnus",
         "mode": "tila",
         "status": "Tila",
-        "resolved": "Count",
+        "resolved": "Määrä",
         "created": "Luotu",
         "backupExpires": "Varmuuskopioi asti",
         "actions": "Toiminnot"
@@ -2173,7 +2259,7 @@
     "dashboard": {
       "agents": "Agentit",
       "queues": "Jonot",
-      "daemons": "Daemons",
+      "daemons": "Taustapalvelut",
       "daemonsActive": "{{active}}/{{total}} aktiivinen",
       "daemonsErrors": "{{count}} virheillä"
     },
@@ -2188,10 +2274,10 @@
       "customerCompanies": "Hallitse asiakasyrityksiä ja niiden perustietoja.",
       "customerUserCustomers": "Määritä asiakaskäyttäjiä yrityksille.",
       "customerUserGroups": "Määritä asiakaskäyttäjät ryhmiin.",
-      "authConfig": "Control SSO eligibility and 2FA enforcement per agent.",
+      "authConfig": "Hallitse SSO-kelpoisuutta ja 2FA-pakkoa agenttikohtaisesti.",
       "queues": "Määritä jonot, omistajuus ja eskalointiajat.",
       "queueTemplates": "Määritä malleja jonoihin, joissa ne ovat käytettävissä.",
-      "queueAutoResponses": "Assign auto responses to the queues that trigger them.",
+      "queueAutoResponses": "Liitä automaattivastaukset jonoille, jotka ne laukaisevat.",
       "queueVariables": "Säilytä jonojen paikkamerkkimuuttujia.",
       "states": "Hallitse lippujen tiloja ja niiden tilalogiikkaa.",
       "priorities": "Hallitse lippujen prioriteetteja.",
@@ -2205,24 +2291,30 @@
       "salutations": "Hallitse tervehdyksiä vastausmalleille.",
       "autoResponses": "Hallitse automaattisia vastauksia (esim. kuittaus, poissaolo).",
       "mailOutbound": "Määritä lähtevän SMTP-palvelimen ja lähettäjän osoite.",
-      "subjectConfig": "Configure the subject format and ticket-number hook.",
+      "subjectConfig": "Määritä aiherivin muoto ja tikettinumerokoukku.",
       "postmasterFilters": "Noudata saapuvan postin käsittelyä koskevia sääntöjä.",
       "genericAgentJobs": "Hallitse ajoitettuja GenericAgent-automaatiotöitä.",
       "webhooks": "Hallitse lipputapahtumien lähteviä webhookeja.",
       "apiKeys": "Hallinnoi ulkoisten integraatioiden API-avaimia.",
-      "daemons": "Control the status and intervals of background daemons.",
+      "daemons": "Hallitse taustapalveluiden tilaa ja aikavälejä.",
       "systemInfo": "Koko asennuksen yleiskatsaus: versio, palvelut, tietovarastot, säiliöt ja kuorma.",
       "gdpr": "GDPR-pyynnöt: pääsy, anonymisointi ja poistaminen varmuuskopioimalla.",
       "mailLog": "Tarkista saapuvan ja lähtevän sähköpostin toimitusyritykset.",
       "customerFields": "Säilytä paikkamerkkimuuttujat asiakaskäyttäjille.",
       "ai": "Hallitse AI-alijärjestelmän toimintatilaa, paljastamista ja kulunvalvontaa.",
-      "aiProviders": "Manage and test LLM providers (OpenAI-compatible, Anthropic).",
+      "aiProviders": "Hallitse ja testaa LLM-tarjoajia (OpenAI-yhteensopiva, Anthropic).",
       "aiMcp": "Hallitse MCP-palvelimia tekoälyn työkalulähteinä ja ota työkalut käyttöön.",
-      "aiQueues": "Configure AI behavior per queue: autonomy, caps, escalation.",
-      "aiAudit": "Full audit of every LLM request/response, with PII reveal.",
+      "aiQueues": "Määritä tekoälyn toiminta jonokohtaisesti: autonomia, rajat, eskalointi.",
+      "aiAudit": "Täysi auditointi jokaisesta LLM-pyynnöstä ja -vastauksesta, PII-paljastuksella.",
       "aiAcl": "Tekoälyluvat ja kiintiöt ryhmää, roolia tai agenttia kohti.",
       "mailAccounts": "Saapuvat IMAP/POP-postilaatikot (salasana tai OAuth2).",
-      "oauth2Tokens": "OAuth2-tunnuksen asetukset Microsoft/Google-sähköpostille (Znuny-yhteensopiva)."
+      "oauth2Tokens": "OAuth2-tunnuksen asetukset Microsoft/Google-sähköpostille (Znuny-yhteensopiva).",
+      "types": "Hallitse luokittelussa käytettäviä tikettityyppejä.",
+      "services": "Hallitse palveluita ja linkitä ne SLA:ihin.",
+      "slas": "Hallitse palvelutasosopimuksia ja määräaikoja.",
+      "systemAddresses": "From-sähköpostiosoitteet jonoille ja automaattivastauksille.",
+      "notificationEvents": "Määritä tapahtumapohjaiset agentti-ilmoitukset.",
+      "ticketAttributeRelations": "Znuny-yhteensopivat riippuvuusmatriisit (palvelu/jono jne.) CSV:nä."
     },
     "mailAccounts": {
       "title_plural": "Postitilit",
@@ -2270,11 +2362,50 @@
       "refreshSuccess": "Token päivitetty."
     },
     "systemAddresses": {
-      "title_plural": "System addresses",
-      "subtitle": "From-addresses for queues and auto-responses. Invalid addresses stay listed so they can be re-enabled.",
-      "new": "Add address",
-      "email": "Email",
-      "name": "Name"
+      "title_plural": "Järjestelmäosoitteet",
+      "subtitle": "From-osoitteet jonoille ja automaattivastauksille. Virheelliset pysyvät listalla uudelleenaktivointia varten.",
+      "new": "Lisää osoite",
+      "email": "Sähköposti",
+      "name": "Nimi"
+    },
+    "types": {
+      "title_plural": "Tikettityypit",
+      "new": "Uusi tyyppi",
+      "name": "Nimi"
+    },
+    "services": {
+      "title_plural": "Palvelut",
+      "new": "Uusi palvelu",
+      "name": "Nimi",
+      "slaCount": "SLA:t"
+    },
+    "slas": {
+      "title_plural": "SLA:t",
+      "new": "Uusi SLA",
+      "name": "Nimi",
+      "firstResponseTime": "Ensimmäinen vastaus (min)",
+      "updateTime": "Päivitys (min)",
+      "solutionTime": "Ratkaisu (min)",
+      "calendar": "Kalenteri"
+    },
+    "notificationEvents": {
+      "title_plural": "Ilmoitustapahtumat",
+      "subtitle": "Tapahtumien yhteydessä lähetetään vastaavat ilmoitukset agenteille.",
+      "new": "Luo ilmoitus",
+      "name": "Nimi",
+      "event": "Tapahtuma",
+      "subject": "Aihe",
+      "body": "Sisältö"
+    },
+    "tar": {
+      "title": "Tikettiattribuuttisuhteet",
+      "filename": "Tiedostonimi",
+      "attributes": "Attribuutit",
+      "priority": "Prioriteetti",
+      "csv": "CSV-tiedot",
+      "new": "Uusi suhde",
+      "help": "CSV otsikolla Attribute1;Attribute2 ja arvopareilla (Znuny AdminTicketAttributeRelations). Rajoittaa lomakevalintoja (esim. Palvelu → Jono).",
+      "confirmDelete": "Poistetaanko tämä suhde?"
     }
   },
   "kb": {
@@ -2286,7 +2417,7 @@
     "tagBarLess": "vähemmän",
     "allCategories": "Kaikki luokat",
     "noCategories": "Ei vielä luokkia.",
-    "empty": "No articles match this filter.",
+    "empty": "Mikään artikkeli ei vastaa tätä suodatinta.",
     "newArticle": "Uusi artikkeli",
     "editArticle": "Muokkaa artikkelia",
     "edit": "Muokkaa",
@@ -2298,11 +2429,11 @@
     "version": "Versio {{version}}",
     "versionHistory": "Versiohistoria",
     "noVersions": "Ei aiempia versioita.",
-    "viewingVersion": "Viewing version {{version}} (read-only)",
+    "viewingVersion": "Näytetään versio {{version}} (vain luku)",
     "viewCurrent": "Näytä nykyinen",
     "backToBrowse": "Takaisin tietopohjaan",
     "loadError": "Tätä artikkelia ei voitu ladata.",
-    "validationError": "Please fill in a title, slug, category, and content.",
+    "validationError": "Täytä otsikko, slug, kategoria ja sisältö.",
     "submitError": "Could not save this article. Yritä uudelleen.",
     "publishError": "Could not publish this article. Yritä uudelleen.",
     "publishConfirmTitle": "Julkaise artikkeli?",
@@ -2315,12 +2446,12 @@
       "archived": "Arkistoitu"
     },
     "help": {
-      "category": "Groups the article in the knowledge-base sidebar and narrows which articles an AI queue policy can pull in via its category-ID filter.",
+      "category": "Ryhmittelee artikkelin tietopankin sivupalkissa ja rajaa, mitkä artikkelit tekoälyjonon käytäntö voi noutaa kategoria-ID-suodattimellaan.",
       "language": "The article's content language. Agentit ja tekoälytietohaku voivat suodattaa sen mukaan, joten sekakielinen sisältö tulisi jakaa erillisiin kielikohtaisiin artikkeleihin.",
       "state": "\"Luonnos\"/\"Tarkistus\" näkyvät vain tässä editorissa; vain \"Julkaistut\" artikkelit näkyvät asiakashaussa, ja niitä voidaan käyttää tekoälytietokontekstina. \"Archived\" hides it from both without deleting it.",
       "tags": "Pilkuilla erotetut tunnisteet, joita käytetään selaamiseen ja hakuun – myös tekoälyn jonokäytännön \"KB-tunnisteet\" -asetuksen koukku, joka vastaa sen päättämiseksi, mitkä artikkelit syöttävät mallia.",
-      "categoryParent": "Places the category as a subcategory. The tree is navigation only — permissions are not inherited; every category has its own groups.",
-      "categorySlug": "URL slug of the category. Leave empty to derive it from the name automatically (collisions get a numeric suffix).",
+      "categoryParent": "Asettaa kategorian alikategoriaksi. Puu on vain navigaatiota — oikeuksia ei periydy; jokaisella kategorialla on omat ryhmänsä.",
+      "categorySlug": "Kategorian URL-slug. Jätä tyhjäksi, niin se johdetaan nimestä automaattisesti (törmäyksiin numeropääte).",
       "categorySort": "Lajittele sijainti sen tasolla – pienemmät numerot tulevat ensin.",
       "categoryCustomerVisible": "Tämän kategorian julkaistut artikkelit näkyvät asiakasportaalissa. Unchecked keeps the category internal only."
     },
@@ -2338,7 +2469,7 @@
     "slug": {
       "editSlug": "Muokkaa etanaa",
       "useAuto": "Käytä automaattista",
-      "autoPlaceholder": "auto-generated from title"
+      "autoPlaceholder": "luodaan otsikosta automaattisesti"
     },
     "attachments": {
       "title": "Liitteet",
@@ -2346,7 +2477,7 @@
       "delete": "Poista",
       "empty": "Ei vielä liitteitä.",
       "uploadFailed": "Could not upload this file. Yritä uudelleen.",
-      "tooLarge": "This file is too large (max 25 MB)."
+      "tooLarge": "Tämä tiedosto on liian suuri (enintään 25 Mt)."
     },
     "category": {
       "title": "Luokat",
@@ -2361,24 +2492,24 @@
       "customerVisible": "Näkyy asiakkaille",
       "active": "Aktiivinen",
       "groups": "Luparyhmät",
-      "groupsHelp": "Restrict this category to these groups. Leave empty to make it visible to all agents.",
-      "noGroups": "You have no groups you may assign.",
+      "groupsHelp": "Rajoita tämä kategoria näihin ryhmiin. Jätä tyhjäksi, jotta se näkyy kaikille agenteille.",
+      "noGroups": "Sinulla ei ole ryhmiä, joita voisit määrittää.",
       "empty": "Ei vielä luokkia. Create one to get started.",
       "saveError": "Could not save this category. Yritä uudelleen."
     },
     "createFirstCategory": "Luo ensimmäinen luokka",
     "manageCategories": "Hallinnoi luokkia",
     "newCategory": "Uusi kategoria",
-    "editorNoCategories": "Saving an article requires a category — none exist yet."
+    "editorNoCategories": "Artikkelin tallentaminen vaatii kategorian — yhtään ei ole vielä."
   },
   "stats": {
     "title": "Raportit",
-    "subtitle": "Ticket volume, backlog, SLA and workload across your queues.",
-    "empty": "No data for the current filters.",
+    "subtitle": "Tikettivolyymi, jono, SLA ja kuorma jonoissasi.",
+    "empty": "Ei dataa nykyisillä suodattimilla.",
     "exportCsv": "Vie CSV",
     "filters": {
       "queue": "Jono",
-      "dateFrom": "From",
+      "dateFrom": "Lähettäjä",
       "dateTo": "Vastaanottaja",
       "granularity": "Rakeisuus",
       "granularityOptions": {
@@ -2448,10 +2579,10 @@
       "thu": "to",
       "fri": "pe",
       "sat": "la",
-      "sun": "Sun"
+      "sun": "su"
     },
     "more": "+{{count}} lisää",
-    "empty": "No appointments in this range.",
+    "empty": "Ei tapaamisia tällä aikavälillä.",
     "form": {
       "titleLabel": "Otsikko",
       "calendar": "Kalenteri",
@@ -2489,7 +2620,8 @@
       "startButton": "Aloita prosessi",
       "actions": "Käytettävissä olevat toiminnot",
       "loadError": "Prosessin tilaa ei voitu ladata.",
-      "noDialogs": "Toimintoja ei ole käytettävissä tälle tapahtumalle."
+      "noDialogs": "Toimintoja ei ole käytettävissä tälle tapahtumalle.",
+      "noCustomerDialogs": "Tässä vaiheessa ei ole asiakasdialogeja."
     },
     "start": {
       "title": "Aloita prosessi",
@@ -2525,5 +2657,84 @@
     "body": "Runko",
     "editTitle": "Muokkaa ”{{name}}”",
     "saveError": "Mallia ei voitu tallentaa."
+  },
+  "views": {
+    "mine": "Omat tiketit",
+    "responsible": "Vastuuhenkilö",
+    "locked": "Lukitut tiketit",
+    "watched": "Seuratut tiketit",
+    "escalated": "Eskaloidut tiketit",
+    "service": "Palvelun mukaan",
+    "serviceHint": "Luettele palveluun liitetyt tiketit.",
+    "pickService": "Valitse palvelu…"
+  },
+  "customerCentre": {
+    "title": "Asiakastiedot",
+    "open": "Asiakas",
+    "invalid": "Virheellinen asiakaskirjautuminen.",
+    "loadError": "Asiakasta ei voitu ladata.",
+    "email": "Sähköposti",
+    "phone": "Puhelin",
+    "customerId": "Asiakasnumero",
+    "company": "Yritys",
+    "openCount": "{{count}} avointa",
+    "closedCount": "{{count}} suljettua",
+    "allTickets": "Kaikki tiketit →",
+    "recentTickets": "Viimeisimmät tiketit"
+  },
+  "timeAccounting": {
+    "title": "Ajan kirjaus",
+    "hint": "Kirjatut aikayksiköt tiketeissä, joihin sinulla on pääsy.",
+    "filterUser": "Agentti",
+    "allUsers": "Kaikki agentit",
+    "filterFrom": "Alkaen",
+    "filterTo": "Asti",
+    "filterTicket": "Tiketti-ID",
+    "empty": "Ei vastaavia aikakirjauksia.",
+    "colWhen": "Milloin",
+    "colTicket": "Tiketti",
+    "colUser": "Agentti",
+    "colUnits": "Yksiköt",
+    "presetsLabel": "Aikaväli",
+    "presets": {
+      "today": "Tänään",
+      "yesterday": "Eilen",
+      "thisWeek": "Tämä viikko",
+      "lastWeek": "Viime viikko",
+      "thisMonth": "Tämä kuukausi",
+      "lastMonth": "Viime kuukausi",
+      "thisQuarter": "Tämä vuosineljännes",
+      "lastQuarter": "Viime vuosineljännes",
+      "thisYear": "Tämä vuosi",
+      "lastYear": "Viime vuosi"
+    },
+    "kpiUnits": "Aikayksiköt",
+    "kpiEntries": "Kirjaukset",
+    "kpiTickets": "Tiketit",
+    "kpiAgents": "Agentit",
+    "rangeBetween": "{{from}} – {{to}}",
+    "rangeFrom": "alkaen {{from}}",
+    "rangeTo": "asti {{to}}",
+    "chartTitle": "Yksiköt päivässä",
+    "chartBar": "{{date}}: {{units}} yksikköä",
+    "dayUnknown": "Ei päivämäärää",
+    "emptyHint": "Laajenna ajanjaksoa tai tyhjennä agentti- ja tikettisuodattimet.",
+    "clearFilters": "Tyhjennä suodattimet",
+    "pageRange": "{{from}}–{{to}}",
+    "pageScope": "tällä sivulla",
+    "chartPeak": "huippu {{units}}"
+  },
+  "setPassword": {
+    "subtitle": "Valitse salasana tilillesi.",
+    "password": "Uusi salasana",
+    "confirm": "Toista salasana",
+    "lengthHint": "{{min}}–{{max}} merkkiä.",
+    "mismatch": "Salasanat eivät täsmää.",
+    "submit": "Aseta salasana",
+    "saving": "Tallennetaan…",
+    "done": "Salasana tallennettu. Voit kirjautua sisään.",
+    "invalid": "Tämä linkki ei ole enää voimassa.",
+    "invalidHint": "Asennuslinkit ovat voimassa 7 päivää ja kertakäyttöisiä. Pyydä uusi ylläpidolta.",
+    "toLogin": "Siirry kirjautumiseen"
   }
 }

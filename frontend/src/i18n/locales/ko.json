@@ -55,7 +55,12 @@
     "showActiveQueues": "활성 표시",
     "queueSearch": "대기열 필터링…",
     "noQueueMatch": "일치하는 대기열이 없습니다.",
-    "templates": "템플릿"
+    "templates": "템플릿",
+    "locked": "잠김",
+    "responsible": "담당자",
+    "escalated": "에스컬레이션",
+    "services": "서비스",
+    "timeAccounting": "시간 기록"
   },
   "common": {
     "prev": "이전",
@@ -68,7 +73,10 @@
     "cancel": "취소",
     "help": "도움말",
     "edit": "편집",
-    "save": "저장"
+    "save": "저장",
+    "saved": "저장됨",
+    "delete": "삭제",
+    "submit": "제출"
   },
   "otp": {
     "verifying": "확인 중…",
@@ -171,7 +179,9 @@
     "toPickUpEmpty": "새로 픽업할 티켓이 없습니다.",
     "remindersDue": "알림 기한",
     "remindersDueEmpty": "알림 기한이 없습니다.",
-    "queueShortcutsEmpty": "현재 공개된 티켓이나 신규 티켓이 있는 대기열이 없습니다."
+    "queueShortcutsEmpty": "현재 공개된 티켓이나 신규 티켓이 있는 대기열이 없습니다.",
+    "lastViews": "최근 본 항목",
+    "lastViewsUntitled": "(제목 없음)"
   },
   "queue": {
     "sidebar": "대기열",
@@ -482,7 +492,8 @@
       "customerEmail": "이메일",
       "customerFirstName": "이름",
       "customerLastName": "성",
-      "customerLoginConflict": "이 로그인은 이미 존재합니다. 다른 로그인을 선택하거나 대신 검색을 통해 기존 고객을 할당하세요."
+      "customerLoginConflict": "이 로그인은 이미 존재합니다. 다른 로그인을 선택하거나 대신 검색을 통해 기존 고객을 할당하세요.",
+      "clearCustomer": "고객 제거"
     },
     "inlineAttachments": "삽입된 이미지({{count}})",
     "list": {
@@ -504,7 +515,35 @@
     "draftEditedAt": "{{time}}에 편집됨",
     "draftDiscard": "임시 저장 삭제",
     "draftDiscardConfirm": "전송되지 않은 이 답변을 삭제하시겠습니까? 텍스트는 복구할 수 없습니다.",
-    "draftDiscardConfirmButton": "삭제"
+    "draftDiscardConfirmButton": "삭제",
+    "type": "유형",
+    "service": "서비스",
+    "sla": "SLA",
+    "mentions": "멘션",
+    "timeAccounting": "시간 기록",
+    "timeUnits": "시간 단위",
+    "addTime": "시간 기록",
+    "addMention": "상담원 멘션",
+    "mentionsCount": "멘션: {{n}}",
+    "mentionsEmpty": "멘션 없음",
+    "mentionRemove": "멘션 제거",
+    "mentionSuggestions": "상담원",
+    "timeUnitAbbrev": "분",
+    "timeUnitHoursAbbrev": "시간",
+    "timeUnitsShort": "{{units}}분",
+    "timeAccountingTotal": "기록된 시간: {{units}}분",
+    "timeRemove": "기록 삭제",
+    "timeUnitMode": "시간 단위",
+    "timeUnitMin": "분",
+    "timeUnitHours": "시간",
+    "timePresets": "빠른 선택",
+    "timeComposerHint": "회신 시 작성 영역 바닥글에서 기록하세요.",
+    "timeChipHint": "보낼 때 기록",
+    "extrasFailedMentions": "전송됨 — 멘션이 저장되지 않았습니다.",
+    "extrasFailedTime": "전송됨 — 시간이 기록되지 않았습니다.",
+    "extrasFailedBoth": "전송됨 — 멘션과 시간 기록이 모두 저장되지 않았습니다.",
+    "extrasRetry": "다시 시도",
+    "customerUnresolved": "이 주소와 일치하는 고객 레코드가 없어 고객 정보를 사용할 수 없습니다."
   },
   "search": {
     "title": "검색",
@@ -1143,7 +1182,8 @@
       },
       "acl": {
         "match": "이 ACL이 적용되는 조건(예: 현재 대기열, 상태, 양식 필드) 오른쪽의 변경 사항은 여기에 나열된 모든 기준이 일치하는 경우에만 적용됩니다.",
-        "change": "조건이 일치하면 ACL의 효과는 일반적으로 양식에서 사용 가능한 선택을 제한하거나 강제합니다(예: 특정 후속 상태만 허용됨)."
+        "change": "조건이 일치하면 ACL의 효과는 일반적으로 양식에서 사용 가능한 선택을 제한하거나 강제합니다(예: 특정 후속 상태만 허용됨).",
+        "stopAfterMatch": "선택하면 이 ACL이 실질적으로 일치한 뒤 이후 ACL은 평가하지 않습니다(Znuny StopAfterMatch)."
       },
       "mailOutbound": {
         "host": "보내는 메일의 SMTP 서버 호스트 이름입니다. 아래 포트를 통해 이 서버(DNS + 방화벽)에서 연결할 수 있어야 합니다.",
@@ -1190,8 +1230,8 @@
         "validId": "\"Temp\"(valid_id 3)는 Znuny의 세 번째 유효성 상태입니다. 일반적으로 확인 보류 중인 계정(예: 확인되지 않은 자체 등록)이며 일반 유효/무효와 다릅니다."
       },
       "systemAddresses": {
-        "email": "Address used as the From email for queues and auto-responses.",
-        "name": "Display name shown next to the email (e.g. “Support <support@example.com>”)."
+        "email": "대기열·자동 응답의 From으로 쓰는 주소.",
+        "name": "이메일 옆에 표시되는 이름(예: “Support <support@example.com>”)."
       }
     },
     "nav": {
@@ -1240,7 +1280,13 @@
       "aiAcl": "액세스 및 제한",
       "collapse": "탐색 접기",
       "mailAccounts": "메일 계정",
-      "oauth2Tokens": "OAuth2 토큰(메일)"
+      "oauth2Tokens": "OAuth2 토큰(메일)",
+      "types": "티켓 유형",
+      "services": "서비스",
+      "slas": "SLA",
+      "systemAddresses": "시스템 주소",
+      "notificationEvents": "알림 이벤트",
+      "ticketAttributeRelations": "속성 관계"
     },
     "table": {
       "id": "ID",
@@ -1347,7 +1393,44 @@
       "title": "제목",
       "firstName": "이름",
       "lastName": "성",
-      "name": "이름"
+      "name": "이름",
+      "passwordMode": "비밀번호 지정",
+      "passwordModeManual": "수동 설정",
+      "passwordModeAuto": "초대: 설정 링크 이메일 발송",
+      "passwordModeAutoHelp": "저장 시 아래 이메일로 일회용 링크가 가며, 상담원이 직접 비밀번호를 정합니다.",
+      "email": "이메일",
+      "mobile": "휴대전화",
+      "effectivePermissions": "유효 권한 보기",
+      "effectivePermissionsTitle": "{{name}}의 유효 권한",
+      "effectivePermissionsDescription": "직접 그룹 배정과 역할을 합친 권한입니다.",
+      "rolesHeading": "역할",
+      "groupsHeading": "그룹 권한",
+      "queuesHeading": "대기열",
+      "noRoles": "할당된 역할이 없습니다.",
+      "noGroups": "그룹 권한이 없습니다.",
+      "noQueues": "배정된 대기열이 없습니다.",
+      "viaDirect": "직접",
+      "permissionColumn": "권한",
+      "sourceColumn": "출처",
+      "editSettings": "개인 설정 편집",
+      "editSettingsTitle": "{{name}}의 개인 설정",
+      "editSettingsDescription": "상담원이 “개인 설정”에서 보는 것과 동일합니다.",
+      "languageLabel": "언어",
+      "languageSaved": "언어가 저장되었습니다.",
+      "tabAccount": "계정",
+      "tabPerson": "개인",
+      "sourceInvalidHint": "이 권한은 유효하지 않은 역할에서 오므로 적용되지 않습니다.",
+      "keyInactiveHint": "이 권한은 구성됐지만 적용되지 않습니다 — 출처 또는 그룹이 유효하지 않습니다.",
+      "deletePermanent": "영구 삭제",
+      "deleteTitle": "{{name}}을(를) 영구 삭제할까요?",
+      "deleteConfirm": "영구 삭제",
+      "deletableBody": "{{name}}을(를) 참조하는 항목이 없어 환경설정·그룹·역할·2FA 등록과 함께 완전히 삭제할 수 있습니다.",
+      "deleteIrreversible": "되돌릴 수 없습니다.",
+      "deleteBlockedBody": "{{name}}을(를) 삭제할 수 없습니다 — 다음 테이블이 아직 계정을 참조합니다:",
+      "deleteBlockedHint": "대신 계정을 “무효”로 두어 티켓·기사·이력이 귀속될 수 있게 하세요.",
+      "resendSetupLink": "설정 링크 다시 보내기",
+      "setupLinkSent": "설정 링크를 보냈습니다.",
+      "setupLinkFailed": "설정 링크를 보내지 못했습니다."
     },
     "groups": {
       "title_plural": "그룹",
@@ -1561,7 +1644,10 @@
       "name": "이름",
       "description": "설명",
       "match": "경기",
-      "change": "변경"
+      "change": "변경",
+      "new": "새 ACL",
+      "stopAfterMatch": "일치 후 중지",
+      "confirmDelete": "ACL “{{name}}”을(를) 삭제할까요? 되돌릴 수 없습니다."
     },
     "genericAgentJobs": {
       "title_plural": "일반 에이전트 작업",
@@ -2222,7 +2308,13 @@
       "aiAudit": "PII 공개를 통해 모든 LLM 요청/응답에 대한 전체 감사를 수행합니다.",
       "aiAcl": "그룹, 역할 또는 에이전트별 AI 권한 및 할당량.",
       "mailAccounts": "수신 IMAP/POP 편지함(비밀번호 또는 OAuth2)",
-      "oauth2Tokens": "Microsoft/Google 메일용 OAuth2 토큰 구성(Znuny 호환)"
+      "oauth2Tokens": "Microsoft/Google 메일용 OAuth2 토큰 구성(Znuny 호환)",
+      "types": "분류에 사용하는 티켓 유형을 관리합니다.",
+      "services": "서비스를 관리하고 SLA에 연결합니다.",
+      "slas": "서비스 수준 계약과 기한을 관리합니다.",
+      "systemAddresses": "대기열과 자동 응답의 From으로 쓰는 이메일 주소.",
+      "notificationEvents": "이벤트 기반 상담원 알림을 구성합니다.",
+      "ticketAttributeRelations": "Znuny 호환 의존성 행렬(서비스→대기열 등)을 CSV로 관리합니다."
     },
     "mailAccounts": {
       "title_plural": "메일 계정",
@@ -2270,11 +2362,50 @@
       "refreshSuccess": "토큰이 새로 고쳐졌습니다."
     },
     "systemAddresses": {
-      "title_plural": "System addresses",
-      "subtitle": "From-addresses for queues and auto-responses. Invalid addresses stay listed so they can be re-enabled.",
-      "new": "Add address",
-      "email": "Email",
-      "name": "Name"
+      "title_plural": "시스템 주소",
+      "subtitle": "대기열·자동 응답용 From 주소. 무효 주소도 다시 켤 수 있도록 목록에 남습니다.",
+      "new": "주소 추가",
+      "email": "이메일",
+      "name": "이름"
+    },
+    "types": {
+      "title_plural": "티켓 유형",
+      "new": "새 유형",
+      "name": "이름"
+    },
+    "services": {
+      "title_plural": "서비스",
+      "new": "새 서비스",
+      "name": "이름",
+      "slaCount": "SLA"
+    },
+    "slas": {
+      "title_plural": "SLA",
+      "new": "새 SLA",
+      "name": "이름",
+      "firstResponseTime": "첫 응답(분)",
+      "updateTime": "업데이트(분)",
+      "solutionTime": "해결(분)",
+      "calendar": "캘린더"
+    },
+    "notificationEvents": {
+      "title_plural": "알림 이벤트",
+      "subtitle": "이벤트가 발생하면 일치하는 알림이 상담원에게 전송됩니다.",
+      "new": "알림 만들기",
+      "name": "이름",
+      "event": "이벤트",
+      "subject": "제목",
+      "body": "본문"
+    },
+    "tar": {
+      "title": "티켓 속성 관계",
+      "filename": "파일 이름",
+      "attributes": "속성",
+      "priority": "우선순위",
+      "csv": "CSV 데이터",
+      "new": "새 관계",
+      "help": "헤더 Attribute1;Attribute2와 값 쌍의 CSV(Znuny AdminTicketAttributeRelations). 폼 선택 제한에 사용(예: 서비스 → 대기열).",
+      "confirmDelete": "이 관계를 삭제할까요?"
     }
   },
   "kb": {
@@ -2489,7 +2620,8 @@
       "startButton": "프로세스 시작",
       "actions": "사용 가능한 작업",
       "loadError": "프로세스 상태를 로드할 수 없습니다.",
-      "noDialogs": "이 활동에는 수행할 수 있는 작업이 없습니다."
+      "noDialogs": "이 활동에는 수행할 수 있는 작업이 없습니다.",
+      "noCustomerDialogs": "이 단계에서는 고객 대화 상자가 없습니다."
     },
     "start": {
       "title": "프로세스 시작",
@@ -2525,5 +2657,84 @@
     "body": "본체",
     "editTitle": "'{{name}}' 수정",
     "saveError": "템플릿을 저장할 수 없습니다."
+  },
+  "views": {
+    "mine": "내 티켓",
+    "responsible": "담당자",
+    "locked": "잠긴 티켓",
+    "watched": "관심 티켓",
+    "escalated": "에스컬레이션된 티켓",
+    "service": "서비스별",
+    "serviceHint": "서비스에 배정된 티켓을 표시합니다.",
+    "pickService": "서비스 선택…"
+  },
+  "customerCentre": {
+    "title": "고객 정보",
+    "open": "고객 정보",
+    "invalid": "잘못된 고객 로그인입니다.",
+    "loadError": "이 고객을 불러오지 못했습니다.",
+    "email": "이메일",
+    "phone": "전화",
+    "customerId": "고객 번호",
+    "company": "회사",
+    "openCount": "미결 {{count}}",
+    "closedCount": "종료 {{count}}",
+    "allTickets": "모든 티켓 →",
+    "recentTickets": "최근 티켓"
+  },
+  "timeAccounting": {
+    "title": "시간 기록",
+    "hint": "접근 가능한 티켓에 기록된 시간 단위입니다.",
+    "filterUser": "상담원",
+    "allUsers": "모든 상담원",
+    "filterFrom": "시작",
+    "filterTo": "종료",
+    "filterTicket": "티켓 ID",
+    "empty": "일치하는 시간 기록이 없습니다.",
+    "colWhen": "일시",
+    "colTicket": "티켓",
+    "colUser": "상담원",
+    "colUnits": "단위",
+    "presetsLabel": "기간",
+    "presets": {
+      "today": "오늘",
+      "yesterday": "어제",
+      "thisWeek": "이번 주",
+      "lastWeek": "지난주",
+      "thisMonth": "이번 달",
+      "lastMonth": "지난달",
+      "thisQuarter": "이번 분기",
+      "lastQuarter": "지난 분기",
+      "thisYear": "올해",
+      "lastYear": "작년"
+    },
+    "kpiUnits": "시간 단위",
+    "kpiEntries": "건수",
+    "kpiTickets": "티켓",
+    "kpiAgents": "상담원",
+    "rangeBetween": "{{from}} – {{to}}",
+    "rangeFrom": "{{from}}부터",
+    "rangeTo": "{{to}}까지",
+    "chartTitle": "일별 단위",
+    "chartBar": "{{date}}: {{units}}단위",
+    "dayUnknown": "날짜 없음",
+    "emptyHint": "기간을 넓히거나 상담원·티켓 필터를 지우세요.",
+    "clearFilters": "필터 지우기",
+    "pageRange": "{{from}}–{{to}}",
+    "pageScope": "이 페이지",
+    "chartPeak": "최고 {{units}}"
+  },
+  "setPassword": {
+    "subtitle": "계정 비밀번호를 선택하세요.",
+    "password": "새 비밀번호",
+    "confirm": "비밀번호 확인",
+    "lengthHint": "{{min}}~{{max}}자.",
+    "mismatch": "비밀번호가 일치하지 않습니다.",
+    "submit": "비밀번호 설정",
+    "saving": "저장 중…",
+    "done": "비밀번호가 저장되었습니다. 이제 로그인할 수 있습니다.",
+    "invalid": "이 링크는 더 이상 유효하지 않습니다.",
+    "invalidHint": "설정 링크는 7일간 유효하며 한 번만 사용할 수 있습니다. 관리자에게 새 링크를 요청하세요.",
+    "toLogin": "로그인으로"
   }
 }

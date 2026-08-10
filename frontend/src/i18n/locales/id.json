@@ -55,7 +55,12 @@
     "showActiveQueues": "Tampilkan aktif",
     "queueSearch": "Filter antrean…",
     "noQueueMatch": "Tidak ada antrian yang cocok.",
-    "templates": "Templat"
+    "templates": "Templat",
+    "locked": "Terkunci",
+    "responsible": "Penanggung jawab",
+    "escalated": "Dieskalasi",
+    "services": "Layanan",
+    "timeAccounting": "Pencatatan waktu"
   },
   "common": {
     "prev": "Sebelumnya",
@@ -68,7 +73,10 @@
     "cancel": "Batalkan",
     "help": "Bantuan",
     "edit": "Sunting",
-    "save": "Simpan"
+    "save": "Simpan",
+    "saved": "Tersimpan",
+    "delete": "Hapus",
+    "submit": "Kirim"
   },
   "otp": {
     "verifying": "Memverifikasi…",
@@ -171,7 +179,9 @@
     "toPickUpEmpty": "Tidak ada tiket baru untuk diambil.",
     "remindersDue": "Pengingat jatuh tempo",
     "remindersDueEmpty": "Tidak ada pengingat yang jatuh tempo.",
-    "queueShortcutsEmpty": "Tidak ada antrian dengan tiket terbuka atau baru saat ini."
+    "queueShortcutsEmpty": "Tidak ada antrian dengan tiket terbuka atau baru saat ini.",
+    "lastViews": "Baru dilihat",
+    "lastViewsUntitled": "(tanpa subjek)"
   },
   "queue": {
     "sidebar": "Antrian",
@@ -482,7 +492,8 @@
       "customerEmail": "Surel",
       "customerFirstName": "Nama depan",
       "customerLastName": "Nama belakang",
-      "customerLoginConflict": "Login ini sudah ada. Pilih login lain, atau tetapkan pelanggan yang sudah ada melalui pencarian."
+      "customerLoginConflict": "Login ini sudah ada. Pilih login lain, atau tetapkan pelanggan yang sudah ada melalui pencarian.",
+      "clearCustomer": "Hapus pelanggan"
     },
     "inlineAttachments": "Gambar tersemat ({{count}})",
     "list": {
@@ -504,7 +515,35 @@
     "draftEditedAt": "diedit {{time}}",
     "draftDiscard": "Buang draf",
     "draftDiscardConfirm": "Buang balasan yang belum terkirim ini? Teks tidak dapat dipulihkan.",
-    "draftDiscardConfirmButton": "Buang"
+    "draftDiscardConfirmButton": "Buang",
+    "type": "Jenis",
+    "service": "Layanan",
+    "sla": "SLA",
+    "mentions": "Sebutan",
+    "timeAccounting": "Pencatatan waktu",
+    "timeUnits": "Satuan waktu",
+    "addTime": "Catat waktu",
+    "addMention": "Sebut agen",
+    "mentionsCount": "Sebutan: {{n}}",
+    "mentionsEmpty": "Tidak ada yang disebut",
+    "mentionRemove": "Hapus sebutan",
+    "mentionSuggestions": "Agen",
+    "timeUnitAbbrev": "mnt",
+    "timeUnitHoursAbbrev": "j",
+    "timeUnitsShort": "{{units}} mnt",
+    "timeAccountingTotal": "Waktu tercatat: {{units}} mnt",
+    "timeRemove": "Hapus entri",
+    "timeUnitMode": "Satuan waktu",
+    "timeUnitMin": "Mnt",
+    "timeUnitHours": "J",
+    "timePresets": "Pilihan cepat",
+    "timeComposerHint": "Saat membalas, catat di kaki penyusun.",
+    "timeChipHint": "Dicatat saat dikirim",
+    "extrasFailedMentions": "Terkirim — sebutan tidak disimpan.",
+    "extrasFailedTime": "Terkirim — waktu tidak dicatat.",
+    "extrasFailedBoth": "Terkirim — sebutan maupun pencatatan waktu tidak disimpan.",
+    "extrasRetry": "Coba lagi",
+    "customerUnresolved": "Tidak ada data pelanggan yang cocok dengan alamat ini, sehingga detail tidak tersedia."
   },
   "search": {
     "title": "Cari",
@@ -1143,7 +1182,8 @@
       },
       "acl": {
         "match": "Kondisi di mana ACL ini berlaku (misalnya antrian saat ini, negara bagian, bidang formulir). Perubahan di sebelah kanan hanya diterapkan jika semua kriteria yang tercantum di sini cocok.",
-        "change": "Efek ACL setelah ketentuannya cocok — biasanya membatasi atau memaksa pilihan yang tersedia dalam bentuk (misalnya, hanya status tindak lanjut tertentu yang diperbolehkan)."
+        "change": "Efek ACL setelah ketentuannya cocok — biasanya membatasi atau memaksa pilihan yang tersedia dalam bentuk (misalnya, hanya status tindak lanjut tertentu yang diperbolehkan).",
+        "stopAfterMatch": "Jika dicentang, ACL lain tidak dievaluasi setelah ACL ini cocok secara produktif (Znuny StopAfterMatch)."
       },
       "mailOutbound": {
         "host": "Nama host server SMTP untuk email keluar. Harus dapat dijangkau dari server ini (DNS + firewall) pada port di bawah.",
@@ -1190,8 +1230,8 @@
         "validId": "\"Temp\" (valid_id 3) adalah status validitas ketiga Znuny — biasanya akun yang menunggu konfirmasi (misalnya, registrasi mandiri yang belum dikonfirmasi), berbeda dari valid/tidak valid biasa."
       },
       "systemAddresses": {
-        "email": "Address used as the From email for queues and auto-responses.",
-        "name": "Display name shown next to the email (e.g. “Support <support@example.com>”)."
+        "email": "Alamat yang dipakai sebagai From untuk antrean dan balasan otomatis.",
+        "name": "Nama tampilan di samping email (mis. “Support <support@example.com>”)."
       }
     },
     "nav": {
@@ -1240,7 +1280,13 @@
       "aiAcl": "Akses & batasan",
       "collapse": "Ciutkan navigasi",
       "mailAccounts": "Akun email",
-      "oauth2Tokens": "Token OAuth2 (email)"
+      "oauth2Tokens": "Token OAuth2 (email)",
+      "types": "Jenis tiket",
+      "services": "Layanan",
+      "slas": "SLA",
+      "systemAddresses": "Alamat sistem",
+      "notificationEvents": "Peristiwa notifikasi",
+      "ticketAttributeRelations": "Relasi atribut"
     },
     "table": {
       "id": "ID",
@@ -1347,7 +1393,44 @@
       "title": "Judul",
       "firstName": "Nama depan",
       "lastName": "Nama belakang",
-      "name": "Nama"
+      "name": "Nama",
+      "passwordMode": "Penetapan kata sandi",
+      "passwordModeManual": "Atur manual",
+      "passwordModeAuto": "Undang: kirim tautan penyiapan lewat email",
+      "passwordModeAutoHelp": "Saat disimpan, tautan sekali pakai dikirim ke email di bawah. Agen memilih kata sandinya sendiri.",
+      "email": "Email",
+      "mobile": "Ponsel",
+      "effectivePermissions": "Lihat izin efektif",
+      "effectivePermissionsTitle": "Izin efektif untuk {{name}}",
+      "effectivePermissionsDescription": "Hak gabungan dari penugasan grup langsung dan peran.",
+      "rolesHeading": "Peran",
+      "groupsHeading": "Izin grup",
+      "queuesHeading": "Antrean",
+      "noRoles": "Tidak ada peran yang ditetapkan.",
+      "noGroups": "Tidak ada izin grup.",
+      "noQueues": "Tidak ada antrean yang ditetapkan.",
+      "viaDirect": "Langsung",
+      "permissionColumn": "Izin",
+      "sourceColumn": "Sumber",
+      "editSettings": "Edit pengaturan pribadi",
+      "editSettingsTitle": "Pengaturan pribadi {{name}}",
+      "editSettingsDescription": "Pengaturan yang sama yang dilihat agen di “Pengaturan pribadi”.",
+      "languageLabel": "Bahasa",
+      "languageSaved": "Bahasa disimpan.",
+      "tabAccount": "Akun",
+      "tabPerson": "Orang",
+      "sourceInvalidHint": "Izin ini berasal dari peran tidak valid sehingga tidak berlaku.",
+      "keyInactiveHint": "Izin dikonfigurasi tetapi tidak berlaku — sumber atau grup tidak valid.",
+      "deletePermanent": "Hapus permanen",
+      "deleteTitle": "Hapus permanen {{name}}?",
+      "deleteConfirm": "Hapus permanen",
+      "deletableBody": "Tidak ada yang mereferensikan {{name}}; akun dapat dihapus sepenuhnya beserta preferensi, grup, peran, dan 2FA.",
+      "deleteIrreversible": "Tidak dapat dibatalkan.",
+      "deleteBlockedBody": "{{name}} tidak dapat dihapus — tabel berikut masih mereferensikan akun:",
+      "deleteBlockedHint": "Tetapkan akun ke “Tidak valid” agar tiket, artikel, dan riwayat tetap dapat diatribusikan.",
+      "resendSetupLink": "Kirim ulang tautan penyiapan",
+      "setupLinkSent": "Tautan penyiapan terkirim.",
+      "setupLinkFailed": "Tidak dapat mengirim tautan penyiapan."
     },
     "groups": {
       "title_plural": "Grup",
@@ -1561,7 +1644,10 @@
       "name": "Nama",
       "description": "Deskripsi",
       "match": "Cocok",
-      "change": "Perubahan"
+      "change": "Perubahan",
+      "new": "ACL baru",
+      "stopAfterMatch": "Berhenti setelah cocok",
+      "confirmDelete": "Hapus ACL “{{name}}”? Tindakan ini tidak dapat dibatalkan."
     },
     "genericAgentJobs": {
       "title_plural": "Pekerjaan agen generik",
@@ -2222,7 +2308,13 @@
       "aiAudit": "Audit penuh atas setiap permintaan/tanggapan LLM, dengan pengungkapan PII.",
       "aiAcl": "Izin dan kuota AI per grup, peran, atau agen.",
       "mailAccounts": "Kotak surat IMAP/POP masuk (kata sandi atau OAuth2).",
-      "oauth2Tokens": "Konfigurasi token OAuth2 untuk Microsoft/Google mail (kompatibel dengan Znuny)."
+      "oauth2Tokens": "Konfigurasi token OAuth2 untuk Microsoft/Google mail (kompatibel dengan Znuny).",
+      "types": "Kelola jenis tiket yang dipakai untuk klasifikasi.",
+      "services": "Kelola layanan dan tautkan ke SLA.",
+      "slas": "Kelola perjanjian tingkat layanan dan timer.",
+      "systemAddresses": "Alamat email sebagai From untuk antrean dan balasan otomatis.",
+      "notificationEvents": "Konfigurasikan notifikasi agen berbasis peristiwa.",
+      "ticketAttributeRelations": "Matriks dependensi kompatibel Znuny (layanan/antrean dll.) berformat CSV."
     },
     "mailAccounts": {
       "title_plural": "Akun email",
@@ -2270,11 +2362,50 @@
       "refreshSuccess": "Token disegarkan."
     },
     "systemAddresses": {
-      "title_plural": "System addresses",
-      "subtitle": "From-addresses for queues and auto-responses. Invalid addresses stay listed so they can be re-enabled.",
-      "new": "Add address",
+      "title_plural": "Alamat sistem",
+      "subtitle": "Alamat From untuk antrean dan balasan otomatis. Yang tidak valid tetap tercantum agar bisa diaktifkan lagi.",
+      "new": "Tambah alamat",
       "email": "Email",
-      "name": "Name"
+      "name": "Nama"
+    },
+    "types": {
+      "title_plural": "Jenis tiket",
+      "new": "Jenis baru",
+      "name": "Nama"
+    },
+    "services": {
+      "title_plural": "Layanan",
+      "new": "Layanan baru",
+      "name": "Nama",
+      "slaCount": "SLA"
+    },
+    "slas": {
+      "title_plural": "SLA",
+      "new": "SLA baru",
+      "name": "Nama",
+      "firstResponseTime": "Respons pertama (mnt)",
+      "updateTime": "Pembaruan (mnt)",
+      "solutionTime": "Solusi (mnt)",
+      "calendar": "Kalender"
+    },
+    "notificationEvents": {
+      "title_plural": "Peristiwa notifikasi",
+      "subtitle": "Saat peristiwa terjadi, notifikasi yang cocok dikirim ke agen.",
+      "new": "Buat notifikasi",
+      "name": "Nama",
+      "event": "Peristiwa",
+      "subject": "Subjek",
+      "body": "Isi"
+    },
+    "tar": {
+      "title": "Relasi atribut tiket",
+      "filename": "Nama berkas",
+      "attributes": "Atribut",
+      "priority": "Prioritas",
+      "csv": "Data CSV",
+      "new": "Relasi baru",
+      "help": "CSV dengan header Attribute1;Attribute2 dan pasangan nilai (Znuny AdminTicketAttributeRelations). Membatasi pemilih formulir (mis. Layanan → Antrean).",
+      "confirmDelete": "Hapus relasi ini?"
     }
   },
   "kb": {
@@ -2489,7 +2620,8 @@
       "startButton": "Mulai proses",
       "actions": "Tindakan yang tersedia",
       "loadError": "Tidak dapat memuat status proses.",
-      "noDialogs": "Tidak ada tindakan yang tersedia pada aktivitas ini."
+      "noDialogs": "Tidak ada tindakan yang tersedia pada aktivitas ini.",
+      "noCustomerDialogs": "Tidak ada dialog pelanggan pada langkah ini."
     },
     "start": {
       "title": "Mulai proses",
@@ -2525,5 +2657,84 @@
     "body": "Tubuh",
     "editTitle": "Sunting “{{name}}”",
     "saveError": "Tidak dapat menyimpan template."
+  },
+  "views": {
+    "mine": "Tiket saya",
+    "responsible": "Penanggung jawab",
+    "locked": "Tiket terkunci",
+    "watched": "Tiket dipantau",
+    "escalated": "Tiket dieskalasi",
+    "service": "Menurut layanan",
+    "serviceHint": "Daftar tiket yang ditetapkan ke layanan.",
+    "pickService": "Pilih layanan…"
+  },
+  "customerCentre": {
+    "title": "Informasi pelanggan",
+    "open": "Info pelanggan",
+    "invalid": "Login pelanggan tidak valid.",
+    "loadError": "Tidak dapat memuat pelanggan ini.",
+    "email": "Email",
+    "phone": "Telepon",
+    "customerId": "Nomor pelanggan",
+    "company": "Perusahaan",
+    "openCount": "{{count}} terbuka",
+    "closedCount": "{{count}} ditutup",
+    "allTickets": "Semua tiket →",
+    "recentTickets": "Tiket terbaru"
+  },
+  "timeAccounting": {
+    "title": "Pencatatan waktu",
+    "hint": "Satuan waktu yang dibukukan pada tiket yang dapat Anda akses.",
+    "filterUser": "Agen",
+    "allUsers": "Semua agen",
+    "filterFrom": "Dari",
+    "filterTo": "Sampai",
+    "filterTicket": "ID tiket",
+    "empty": "Tidak ada entri waktu yang cocok.",
+    "colWhen": "Kapan",
+    "colTicket": "Tiket",
+    "colUser": "Agen",
+    "colUnits": "Satuan",
+    "presetsLabel": "Periode",
+    "presets": {
+      "today": "Hari ini",
+      "yesterday": "Kemarin",
+      "thisWeek": "Minggu ini",
+      "lastWeek": "Minggu lalu",
+      "thisMonth": "Bulan ini",
+      "lastMonth": "Bulan lalu",
+      "thisQuarter": "Kuartal ini",
+      "lastQuarter": "Kuartal lalu",
+      "thisYear": "Tahun ini",
+      "lastYear": "Tahun lalu"
+    },
+    "kpiUnits": "Satuan waktu",
+    "kpiEntries": "Entri",
+    "kpiTickets": "Tiket",
+    "kpiAgents": "Agen",
+    "rangeBetween": "{{from}} – {{to}}",
+    "rangeFrom": "dari {{from}}",
+    "rangeTo": "sampai {{to}}",
+    "chartTitle": "Satuan per hari",
+    "chartBar": "{{date}}: {{units}} satuan",
+    "dayUnknown": "Tanpa tanggal",
+    "emptyHint": "Perlebar periode atau hapus filter agen dan tiket.",
+    "clearFilters": "Hapus filter",
+    "pageRange": "{{from}}–{{to}}",
+    "pageScope": "di halaman ini",
+    "chartPeak": "puncak {{units}}"
+  },
+  "setPassword": {
+    "subtitle": "Pilih kata sandi untuk akun Anda.",
+    "password": "Kata sandi baru",
+    "confirm": "Ulangi kata sandi",
+    "lengthHint": "Antara {{min}} dan {{max}} karakter.",
+    "mismatch": "Kata sandi tidak cocok.",
+    "submit": "Atur kata sandi",
+    "saving": "Menyimpan…",
+    "done": "Kata sandi disimpan. Anda dapat masuk sekarang.",
+    "invalid": "Tautan ini tidak lagi valid.",
+    "invalidHint": "Tautan penyiapan berlaku 7 hari dan sekali pakai. Minta yang baru ke administrator.",
+    "toLogin": "Ke masuk"
   }
 }
