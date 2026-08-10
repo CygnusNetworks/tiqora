@@ -1157,7 +1157,8 @@
         "enforceGroups": "Dodatno vsili 2FA za vsakega agenta, ki je član katere koli skupine, označene tukaj – tudi če je možnost »Uveljavi za vse« izklopljena.",
         "sso": "Temu posredniku dovoljuje preverjanje pristnosti prek zunanje poti SSO/ponudnika identitete. Ne konfigurira samega ponudnika SSO — samo, ali ga ta agent lahko uporablja.",
         "enforce": "Vsili 2FA za ta račun posameznega agenta, neodvisno od zgornjih globalnih nastavitev.",
-        "reset": "Nepovratno izbriše agentov vpis TOTP in vsa registrirana gesla. Agent mora nato nastaviti 2FA od začetka - ni mehkega vmesnega stanja."
+        "reset": "Nepovratno izbriše agentov vpis TOTP in vsa registrirana gesla. Agent mora nato nastaviti 2FA od začetka - ni mehkega vmesnega stanja.",
+        "portalEnabled": "Turns the customer portal on or off for the whole installation. When off, the portal API answers 404, running customer sessions stop working, and the start page goes straight to the agent login. Customer records and email tickets are unaffected."
       },
       "queues": {
         "group": "Določa, kdo lahko vidi in dela to čakalno vrsto – dostop je v celoti nadzorovan prek skupine, nikoli ni odobren za posamezno čakalno vrsto.",
@@ -2119,7 +2120,9 @@
       "reset2fa": "Ponastavi 2FA",
       "resetConfirmTitle": "Ponastaviti dvostopenjsko avtentikacijo?",
       "resetConfirmBody": "To onemogoči 2FA za {{login}}. Če še vedno velja izvršba, se bodo morali znova vpisati.",
-      "empty": "Ni najdenih agentov."
+      "empty": "Ni najdenih agentov.",
+      "portalEnabled": "Customer portal available",
+      "portalLockedByEnv": "Disabled by this deployment (TIQORA_PORTAL_ENABLED)."
     },
     "gdpr": {
       "title": "Zasebnost / GDPR",

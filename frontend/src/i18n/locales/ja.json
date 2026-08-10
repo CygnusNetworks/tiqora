@@ -1157,7 +1157,8 @@
         "enforceGroups": "さらに、「全員に強制」がオフの場合でも、ここでチェックしたグループのメンバーであるすべてのエージェントに2FAを強制します。",
         "sso": "このエージェントが外部SSO/アイデンティティ プロバイダー パス経由で認証できるようにします。 SSOプロバイダー自体を構成するのではなく、このエージェントがそれを使用できるかどうかのみを構成します。",
         "enforce": "上記のグローバル設定とは関係なく、この個々のエージェント アカウントに対して2FAを強制します。",
-        "reset": "エージェントのTOTP登録とすべての登録されたパスキーの両方を元に戻せない状態で削除します。エージェントはその後、2FAを最初からセットアップする必要があります。ソフトな中間状態はありません。"
+        "reset": "エージェントのTOTP登録とすべての登録されたパスキーの両方を元に戻せない状態で削除します。エージェントはその後、2FAを最初からセットアップする必要があります。ソフトな中間状態はありません。",
+        "portalEnabled": "Turns the customer portal on or off for the whole installation. When off, the portal API answers 404, running customer sessions stop working, and the start page goes straight to the agent login. Customer records and email tickets are unaffected."
       },
       "queues": {
         "group": "このキューを表示および操作できる人を決定します。アクセスはグループを通じて完全に制御され、キューごとに許可されることはありません。",
@@ -2127,7 +2128,9 @@
       "reset2fa": "2FAをリセット",
       "resetConfirmTitle": "二要素認証をリセットしますか？",
       "resetConfirmBody": "これにより、{{login}} の2FAが無効になります。強制がまだ適用される場合は、再度登録する必要があります。",
-      "empty": "エージェントが見つかりませんでした。"
+      "empty": "エージェントが見つかりませんでした。",
+      "portalEnabled": "Customer portal available",
+      "portalLockedByEnv": "Disabled by this deployment (TIQORA_PORTAL_ENABLED)."
     },
     "gdpr": {
       "title": "プライバシー / GDPR",

@@ -1157,7 +1157,8 @@
         "enforceGroups": "علاوه بر این، 2FA را برای هر عاملی که عضو هر گروهی است که در اینجا علامت زده شده است - حتی زمانی که «اجرا برای همه» خاموش است.",
         "sso": "به این عامل اجازه می دهد تا از طریق مسیر خارجی SSO/identity-provider احراز هویت کند. خود ارائه دهنده SSO را پیکربندی نمی کند - فقط این که آیا این عامل می تواند از آن استفاده کند.",
         "enforce": "2FA را برای این حساب عامل فردی، مستقل از تنظیمات کلی بالا، مجبور می کند.",
-        "reset": "هم ثبت نام TOTP نماینده و هم همه کلیدهای عبور ثبت شده را به صورت برگشت ناپذیر حذف می کند. عامل باید پس از آن 2FA را از ابتدا راه اندازی کند - حالت میانی نرم وجود ندارد."
+        "reset": "هم ثبت نام TOTP نماینده و هم همه کلیدهای عبور ثبت شده را به صورت برگشت ناپذیر حذف می کند. عامل باید پس از آن 2FA را از ابتدا راه اندازی کند - حالت میانی نرم وجود ندارد.",
+        "portalEnabled": "Turns the customer portal on or off for the whole installation. When off, the portal API answers 404, running customer sessions stop working, and the start page goes straight to the agent login. Customer records and email tickets are unaffected."
       },
       "queues": {
         "group": "تعیین می کند چه کسی می تواند این صف را ببیند و کار کند - دسترسی به طور کامل از طریق گروه کنترل می شود، هرگز در هر صف اعطا نمی شود.",
@@ -2119,7 +2120,9 @@
       "reset2fa": "2FA را بازنشانی کنید",
       "resetConfirmTitle": "احراز هویت دو مرحله ای بازنشانی شود؟",
       "resetConfirmBody": "این 2FA را برای {{login}} غیرفعال می کند. در صورتی که اجرا همچنان اعمال شود، باید دوباره ثبت نام کنند.",
-      "empty": "هیچ عاملی پیدا نشد"
+      "empty": "هیچ عاملی پیدا نشد",
+      "portalEnabled": "Customer portal available",
+      "portalLockedByEnv": "Disabled by this deployment (TIQORA_PORTAL_ENABLED)."
     },
     "gdpr": {
       "title": "حریم خصوصی / GDPR",

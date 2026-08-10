@@ -1157,7 +1157,8 @@
         "enforceGroups": "Pia hulazimisha 2FA kwa kila wakala ambaye ni mwanachama wa kikundi chochote kilichowekwa alama hapa - hata wakati \"Tekeleza kwa wote\" imezimwa.",
         "sso": "Huruhusu wakala huyu kuthibitisha kupitia njia ya nje ya SSO/kitambulisho-mtoa huduma. Haisanidi mtoa huduma wa SSO yenyewe - ikiwa tu wakala huyu anaweza kuitumia.",
         "enforce": "Hulazimisha 2FA kwa akaunti hii ya wakala binafsi, bila ya mipangilio ya kimataifa iliyo hapo juu.",
-        "reset": "Hufuta uandikishaji wa TOTP wa wakala na misimbo yote ya siri iliyosajiliwa. Wakala lazima atengeneze 2FA kutoka mwanzo baadaye - hakuna hali laini ya kati."
+        "reset": "Hufuta uandikishaji wa TOTP wa wakala na misimbo yote ya siri iliyosajiliwa. Wakala lazima atengeneze 2FA kutoka mwanzo baadaye - hakuna hali laini ya kati.",
+        "portalEnabled": "Turns the customer portal on or off for the whole installation. When off, the portal API answers 404, running customer sessions stop working, and the start page goes straight to the agent login. Customer records and email tickets are unaffected."
       },
       "queues": {
         "group": "Huamua ni nani anayeweza kuona na kufanya kazi kwenye foleni hii - ufikiaji unadhibitiwa kupitia kikundi, hautolewi kwa kila foleni.",
@@ -2119,7 +2120,9 @@
       "reset2fa": "Weka upya 2FA",
       "resetConfirmTitle": "Ungependa kuweka upya uthibitishaji wa vipengele viwili?",
       "resetConfirmBody": "Hii inalemaza 2FA kwa {{login}}. Watahitaji kujiandikisha tena ikiwa sheria bado itatumika.",
-      "empty": "Hakuna mawakala waliopatikana."
+      "empty": "Hakuna mawakala waliopatikana.",
+      "portalEnabled": "Customer portal available",
+      "portalLockedByEnv": "Disabled by this deployment (TIQORA_PORTAL_ENABLED)."
     },
     "gdpr": {
       "title": "Faragha / GDPR",

@@ -1157,7 +1157,8 @@
         "enforceGroups": "Ademais, obriga a 2FA para cada axente que é membro de calquera grupo marcado aquí, mesmo cando \"Aplicar para todos\" estea desactivado.",
         "sso": "Permite que este axente se autentique a través da ruta SSO/proveedor de identidade externa. Non configura o propio provedor SSO, só se este axente pode usalo.",
         "enforce": "Forza 2FA para esta conta de axente individual, independentemente da configuración global anterior.",
-        "reset": "Elimina de forma irreversible tanto a inscrición TOTP do axente como todas as claves de acceso rexistradas. O axente debe configurar 2FA desde cero despois: non hai un estado intermedio suave."
+        "reset": "Elimina de forma irreversible tanto a inscrición TOTP do axente como todas as claves de acceso rexistradas. O axente debe configurar 2FA desde cero despois: non hai un estado intermedio suave.",
+        "portalEnabled": "Turns the customer portal on or off for the whole installation. When off, the portal API answers 404, running customer sessions stop working, and the start page goes straight to the agent login. Customer records and email tickets are unaffected."
       },
       "queues": {
         "group": "Determina quen pode ver e traballar nesta cola: o acceso está controlado completamente a través do grupo, nunca se concede por cola.",
@@ -2119,7 +2120,9 @@
       "reset2fa": "Restablecer 2FA",
       "resetConfirmTitle": "Queres restablecer a autenticación de dous factores?",
       "resetConfirmBody": "Isto desactiva 2FA para {{login}}. Deberán inscribirse de novo se aínda se aplica a execución.",
-      "empty": "Non se atoparon axentes."
+      "empty": "Non se atoparon axentes.",
+      "portalEnabled": "Customer portal available",
+      "portalLockedByEnv": "Disabled by this deployment (TIQORA_PORTAL_ENABLED)."
     },
     "gdpr": {
       "title": "Privacidade/GDPR",

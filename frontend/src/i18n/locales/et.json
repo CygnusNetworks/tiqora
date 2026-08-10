@@ -1157,7 +1157,8 @@
         "enforceGroups": "Lisaks sunnib 2FA iga agendi jaoks, kes on mis tahes siin märgitud grupi liige – isegi kui suvand \"Jõusta kõigile\" on välja lülitatud.",
         "sso": "Võimaldab sellel agendil autentida välise SSO/identiteedipakkuja tee kaudu. Ei konfigureeri SSO pakkujat ennast – ainult seda, kas see agent võib seda kasutada.",
         "enforce": "Sunnib selle individuaalse agendikonto jaoks 2FA, sõltumata ülaltoodud globaalsetest sätetest.",
-        "reset": "Kustutab pöördumatult nii agendi TOTP-registreeringu kui ka kõik registreeritud paroolid. Agent peab 2FA pärast nullist üles seadma — pehmet vaheolekut pole."
+        "reset": "Kustutab pöördumatult nii agendi TOTP-registreeringu kui ka kõik registreeritud paroolid. Agent peab 2FA pärast nullist üles seadma — pehmet vaheolekut pole.",
+        "portalEnabled": "Turns the customer portal on or off for the whole installation. When off, the portal API answers 404, running customer sessions stop working, and the start page goes straight to the agent login. Customer records and email tickets are unaffected."
       },
       "queues": {
         "group": "Määrab, kes saab seda järjekorda näha ja töötada – juurdepääsu kontrollitakse täielikult grupi kaudu, mitte kunagi järjekorra kohta.",
@@ -2119,7 +2120,9 @@
       "reset2fa": "Lähtestage 2FA",
       "resetConfirmTitle": "Kas lähtestada kahefaktoriline autentimine?",
       "resetConfirmBody": "See keelab 2FA väärtuse {{login}} jaoks. Kui jõustamine ikka veel kehtib, peavad nad uuesti registreeruma.",
-      "empty": "Agente ei leitud."
+      "empty": "Agente ei leitud.",
+      "portalEnabled": "Customer portal available",
+      "portalLockedByEnv": "Disabled by this deployment (TIQORA_PORTAL_ENABLED)."
     },
     "gdpr": {
       "title": "Privaatsus / GDPR",

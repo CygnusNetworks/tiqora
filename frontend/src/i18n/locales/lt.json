@@ -1157,7 +1157,8 @@
         "enforceGroups": "Be to, priverčia 2FA kiekvienam agentui, kuris yra bet kurios čia pažymėtos grupės narys, net kai išjungta parinktis „Taikyti visiems“.",
         "sso": "Leidžia šiam agentui autentifikuoti išorinį SSO / tapatybės teikėjo kelią. Nekonfigūruoja paties SSO teikėjo – tik tai, ar šis agentas gali juo naudotis.",
         "enforce": "Priverčia 2FA šiai individualiai agento paskyrai, nepriklausomai nuo pirmiau nurodytų visuotinių nustatymų.",
-        "reset": "Negrįžtamai ištrina agento TOTP registraciją ir visus registruotus prieigos raktus. Po to agentas turi nustatyti 2FA nuo nulio – nėra minkštos tarpinės būsenos."
+        "reset": "Negrįžtamai ištrina agento TOTP registraciją ir visus registruotus prieigos raktus. Po to agentas turi nustatyti 2FA nuo nulio – nėra minkštos tarpinės būsenos.",
+        "portalEnabled": "Turns the customer portal on or off for the whole installation. When off, the portal API answers 404, running customer sessions stop working, and the start page goes straight to the agent login. Customer records and email tickets are unaffected."
       },
       "queues": {
         "group": "Nustato, kas gali matyti ir dirbti šioje eilėje – prieiga kontroliuojama tik per grupę, niekada nesuteikiama vienai eilei.",
@@ -2119,7 +2120,9 @@
       "reset2fa": "Iš naujo nustatykite 2FA",
       "resetConfirmTitle": "Iš naujo nustatyti dviejų veiksnių autentifikavimą?",
       "resetConfirmBody": "Tai išjungia 2FA {{login}}. Jei vykdymas vis dar taikomas, jie turės užsiregistruoti dar kartą.",
-      "empty": "Agentų nerasta."
+      "empty": "Agentų nerasta.",
+      "portalEnabled": "Customer portal available",
+      "portalLockedByEnv": "Disabled by this deployment (TIQORA_PORTAL_ENABLED)."
     },
     "gdpr": {
       "title": "Privatumas / GDPR",

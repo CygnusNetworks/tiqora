@@ -48,6 +48,8 @@ export function AuthConfigPage() {
       setGlobalDraft({
         enforce_all: globalQ.data.enforce_all,
         enforce_group_ids: [...(globalQ.data.enforce_group_ids ?? [])],
+        portal_enabled: globalQ.data.portal_enabled,
+        portal_locked_by_env: globalQ.data.portal_locked_by_env,
       });
     }
   }, [globalQ.data]);
@@ -80,12 +82,16 @@ export function AuthConfigPage() {
       api.adminAuthConfig.putGlobal({
         enforce_all: body.enforce_all,
         enforce_group_ids: body.enforce_group_ids,
+        // Omitted while the deployment locks it — the API would answer 409.
+        portal_enabled: body.portal_locked_by_env ? undefined : body.portal_enabled,
       }),
     onSuccess: (data) => {
       qc.setQueryData(GLOBAL_KEY, data);
       setGlobalDraft({
         enforce_all: data.enforce_all,
         enforce_group_ids: [...(data.enforce_group_ids ?? [])],
+        portal_enabled: data.portal_enabled,
+        portal_locked_by_env: data.portal_locked_by_env,
       });
       setGlobalMsg(t("admin.authConfig.globalSaved"));
     },
@@ -238,6 +244,33 @@ export function AuthConfigPage() {
                 {t("admin.help.authConfig.enforceAll")}
               </HelpPopover>
             </label>
+
+            <label className="flex items-center gap-2 text-sm text-ink">
+              <input
+                type="checkbox"
+                data-testid="auth-config-portal-enabled"
+                checked={globalDraft.portal_enabled}
+                disabled={globalDraft.portal_locked_by_env}
+                onChange={(e) =>
+                  setGlobalDraft((prev) =>
+                    prev ? { ...prev, portal_enabled: e.target.checked } : prev,
+                  )
+                }
+                className="rounded border-hairline"
+              />
+              {t("admin.authConfig.portalEnabled")}
+              <HelpPopover
+                title={t("admin.authConfig.portalEnabled")}
+                testId="auth-config-help-portal-enabled"
+              >
+                {t("admin.help.authConfig.portalEnabled")}
+              </HelpPopover>
+            </label>
+            {globalDraft.portal_locked_by_env && (
+              <p className="text-sm text-muted">
+                {t("admin.authConfig.portalLockedByEnv")}
+              </p>
+            )}
 
             <div>
               <p className="mb-2 flex items-center gap-1.5 text-sm text-muted">
