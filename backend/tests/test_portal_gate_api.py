@@ -73,3 +73,18 @@ async def test_an_enabled_portal_answers_401_not_404_without_a_session_cookie() 
     app = _build_app(stored=None)
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         assert (await client.get("/api/portal/auth/me")).status_code == 401
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("stored", "env_enabled", "expected"),
+    [("0", True, False), ("1", True, True), (None, True, True), ("1", False, False)],
+)
+async def test_auth_methods_reports_the_portal_state(
+    stored: str | None, env_enabled: bool, expected: bool
+) -> None:
+    app = _build_app(stored=stored, env_enabled=env_enabled)
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        resp = await client.get("/api/v1/auth/methods")
+        assert resp.status_code == 200
+        assert resp.json()["portal_enabled"] is expected
