@@ -5,7 +5,7 @@ from contextlib import asynccontextmanager
 
 import redis.asyncio as redis
 import structlog
-from fastapi import FastAPI, HTTPException, Response
+from fastapi import Depends, FastAPI, HTTPException, Response
 from fastapi.middleware.cors import CORSMiddleware
 from prometheus_client import CONTENT_TYPE_LATEST, Counter, Histogram, generate_latest
 from starlette.requests import Request
@@ -14,6 +14,7 @@ from starlette.responses import Response as StarletteResponse
 from tiqora import __version__
 from tiqora.api.compat.router import compat_router, mount_dynamic_compat_routes
 from tiqora.api.portal import portal_router
+from tiqora.api.portal.deps import require_portal_enabled
 from tiqora.api.spa import mount_spa, spa_is_available
 from tiqora.api.v1 import api_v1_router
 from tiqora.config import Settings, get_settings
@@ -246,7 +247,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     app.include_router(api_v1_router, prefix=cfg.api_prefix)
     app.include_router(compat_router)
-    app.include_router(portal_router, prefix="/api/portal")
+    app.include_router(
+        portal_router,
+        prefix="/api/portal",
+        dependencies=[Depends(require_portal_enabled)],
+    )
 
     @app.get("/health", tags=["ops"])
     async def health() -> dict[str, str]:
