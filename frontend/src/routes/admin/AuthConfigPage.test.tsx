@@ -179,4 +179,28 @@ describe("AuthConfigPage", () => {
       screen.getByText(i18n.t("admin.authConfig.portalLockedByEnv")),
     ).toBeInTheDocument();
   });
+
+  it("omits portal_enabled from the save body when the deployment locked it", async () => {
+    getGlobal.mockResolvedValue({
+      enforce_all: false,
+      enforce_group_ids: [],
+      portal_enabled: false,
+      portal_locked_by_env: true,
+    });
+    putGlobal.mockResolvedValue({
+      enforce_all: false,
+      enforce_group_ids: [],
+      portal_enabled: false,
+      portal_locked_by_env: true,
+    });
+    renderPage();
+
+    await screen.findByTestId("auth-config-portal-enabled");
+    fireEvent.click(screen.getByTestId("auth-config-global-save"));
+
+    await waitFor(() => expect(putGlobal).toHaveBeenCalled());
+    expect(putGlobal).toHaveBeenCalledWith(
+      expect.not.objectContaining({ portal_enabled: expect.anything() }),
+    );
+  });
 });
