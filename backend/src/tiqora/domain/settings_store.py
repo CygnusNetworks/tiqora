@@ -99,6 +99,11 @@ KEY_AI_AUDIT_CLEANUP_ENABLED = "daemon.ai_audit_cleanup.enabled"
 # tiqora_primary. Manual assist and summaries are unaffected.
 KEY_AI_AUTO_REPLY_PAUSED = "ai.auto_reply.paused"
 
+# Customer portal master switch (runtime, admin-editable). The deployment-level
+# TIQORA_PORTAL_ENABLED is a hard off that this row cannot override — see
+# tiqora.domain.portal_gate for the single resolution point. Default ON.
+KEY_PORTAL_ENABLED = "portal.enabled"
+
 
 async def get_setting_bool(session: AsyncSession, key: str, default: bool = False) -> bool:
     raw = await get_setting(session, key)
