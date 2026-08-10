@@ -21,16 +21,27 @@ from tiqora.domain.auth_config import (
     get_enforce_group_ids,
     set_enforce_group_ids,
 )
-from tiqora.domain.settings_store import KEY_TOTP_ENFORCE_ALL, get_setting_bool, set_setting
+from tiqora.domain.portal_gate import portal_enabled, portal_locked_by_env
+from tiqora.domain.settings_store import (
+    KEY_PORTAL_ENABLED,
+    KEY_TOTP_ENFORCE_ALL,
+    get_setting_bool,
+    set_setting,
+)
 from tiqora.domain.totp import TOTPService
 
 router = APIRouter(prefix="/auth-config", tags=["admin:auth-config"])
 
 
-async def _global_out(session: DbSession) -> AuthConfigGlobalOut:
+async def _global_out(session: DbSession, settings: AppSettings) -> AuthConfigGlobalOut:
     enforce_all = await get_setting_bool(session, KEY_TOTP_ENFORCE_ALL, default=False)
     group_ids = await get_enforce_group_ids(session)
-    return AuthConfigGlobalOut(enforce_all=enforce_all, enforce_group_ids=group_ids)
+    return AuthConfigGlobalOut(
+        enforce_all=enforce_all,
+        enforce_group_ids=group_ids,
+        portal_enabled=await portal_enabled(session, settings),
+        portal_locked_by_env=portal_locked_by_env(settings),
+    )
 
 
 async def _validate_group_ids(session: DbSession, group_ids: list[int]) -> None:
@@ -52,22 +63,35 @@ async def _validate_group_ids(session: DbSession, group_ids: list[int]) -> None:
 
 
 @router.get("/global", response_model=AuthConfigGlobalOut)
-async def get_global_auth_config(admin: AdminUser, session: DbSession) -> AuthConfigGlobalOut:
+async def get_global_auth_config(
+    admin: AdminUser, session: DbSession, settings: AppSettings
+) -> AuthConfigGlobalOut:
     _ = admin
-    return await _global_out(session)
+    return await _global_out(session, settings)
 
 
 @router.put("/global", response_model=AuthConfigGlobalOut)
 async def put_global_auth_config(
-    body: AuthConfigGlobalUpdate, admin: AdminUser, session: DbSession
+    body: AuthConfigGlobalUpdate,
+    admin: AdminUser,
+    session: DbSession,
+    settings: AppSettings,
 ) -> AuthConfigGlobalOut:
     _ = admin
     if body.enforce_group_ids is not None:
         await _validate_group_ids(session, body.enforce_group_ids)
+    if body.portal_enabled is not None and portal_locked_by_env(settings):
+        # Storing the row would be a lie: the env hard-off wins at read time.
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="customer portal is disabled by deployment (TIQORA_PORTAL_ENABLED)",
+        )
     await set_setting(session, KEY_TOTP_ENFORCE_ALL, "1" if body.enforce_all else "0")
     if body.enforce_group_ids is not None:
         await set_enforce_group_ids(session, body.enforce_group_ids)
-    return await _global_out(session)
+    if body.portal_enabled is not None:
+        await set_setting(session, KEY_PORTAL_ENABLED, "1" if body.portal_enabled else "0")
+    return await _global_out(session, settings)
 
 
 @router.get("", response_model=Page[AuthConfigAgentOut])
