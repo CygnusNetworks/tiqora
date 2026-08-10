@@ -88,3 +88,58 @@ async def test_auth_methods_reports_the_portal_state(
         resp = await client.get("/api/v1/auth/methods")
         assert resp.status_code == 200
         assert resp.json()["portal_enabled"] is expected
+
+
+class _RecordingSession(_FakeSession):
+    """Fake session that also captures set_setting() upserts."""
+
+    def __init__(self, stored: str | None) -> None:
+        super().__init__(stored)
+        self.added: list[Any] = []
+        self.committed = False
+
+    def add(self, obj: Any) -> None:
+        self.added.append(obj)
+
+    async def commit(self) -> None:
+        self.committed = True
+
+
+@pytest.mark.asyncio
+async def test_global_auth_config_reports_portal_state_and_env_lock() -> None:
+    from tiqora.api.v1.admin.auth_config import get_global_auth_config
+
+    out = await get_global_auth_config(
+        admin=None,
+        session=_FakeSession("0"),
+        settings=Settings(environment="test", portal_enabled=True),
+    )
+    assert out.portal_enabled is False
+    assert out.portal_locked_by_env is False
+
+    locked = await get_global_auth_config(
+        admin=None,
+        session=_FakeSession("1"),
+        settings=Settings(environment="test", portal_enabled=False),
+    )
+    assert locked.portal_enabled is False
+    assert locked.portal_locked_by_env is True
+
+
+@pytest.mark.asyncio
+async def test_putting_portal_enabled_while_env_locks_it_conflicts() -> None:
+    from fastapi import HTTPException
+
+    from tiqora.api.v1.admin.auth_config import put_global_auth_config
+    from tiqora.api.v1.admin.schemas import AuthConfigGlobalUpdate
+
+    session = _RecordingSession("1")
+    with pytest.raises(HTTPException) as exc:
+        await put_global_auth_config(
+            body=AuthConfigGlobalUpdate(enforce_all=False, portal_enabled=True),
+            admin=None,
+            session=session,
+            settings=Settings(environment="test", portal_enabled=False),
+        )
+    assert exc.value.status_code == 409
+    assert session.added == []
