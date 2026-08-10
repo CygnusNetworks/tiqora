@@ -119,6 +119,8 @@ services:
       # TIQORA_METRICS_ENABLED: "false"
       # Optional: enforce CSP (default is report-only — safer for SPA)
       # TIQORA_CSP_ENFORCE: "true"
+      # Optional: hard-disable the customer portal (also locks the admin switch)
+      # TIQORA_PORTAL_ENABLED: "false"
       # Kerberos / SPNEGO (optional). Image ships gssapi + libkrb5; stays inert
       # until enabled. Prod SPN: HTTP/tiqora.cygnusnetworks.de@CYGNUSNETWORKS.DE
       # TIQORA_SPNEGO_ENABLED: "true"

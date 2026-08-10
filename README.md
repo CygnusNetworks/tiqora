@@ -332,7 +332,10 @@ The customer portal is on by default. There are two ways to turn it off:
   admin switch cannot override; the UI control is disabled while it's active, and a write
   attempt against the API returns 409.
 
-Customer records, customer companies, and email tickets are unaffected either way.
+Customer records, customer companies, and email tickets are unaffected either way. The
+Znuny-compat GenericInterface (`/znuny-compat/*`) is also unaffected — it's an integration
+API, not part of the portal, so customers with credentials can still reach their own
+tickets through it while the portal is off.
 
 ## Tech stack
 
