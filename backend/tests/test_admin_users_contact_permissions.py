@@ -20,7 +20,7 @@ from tiqora.api.v1.admin.schemas import UserCreate, UserUpdate
 from tiqora.config import Settings
 from tiqora.db.tiqora.base import TiqoraBase
 from tiqora.domain import welcome_invite
-from tiqora.domain.auth import AuthenticatedUser
+from tiqora.domain.auth import AuthenticatedUser, SessionStore
 from tiqora.domain.password_setup import redeem_token, resolve_token
 from tiqora.domain.schemas import UserLanguageUpdate
 from tiqora.domain.welcome_mail import WelcomeMailError
@@ -34,6 +34,49 @@ NOW = datetime(2024, 1, 1, 12, 0, 0)
 def _settings() -> Settings:
     """Settings with a known public base URL so the link is assertable."""
     return Settings(TIQORA_PUBLIC_BASE_URL="https://tiqora.example")  # type: ignore[call-arg]
+
+
+class _FakeRedis:
+    """Enough of Redis for SessionStore.revoke_user_sessions (M-2)."""
+
+    def __init__(self) -> None:
+        self._store: dict[str, str] = {}
+        self._sets: dict[str, set[str]] = {}
+
+    async def set(self, key: str, value: str, ex: int | None = None) -> None:
+        self._store[key] = value
+
+    async def get(self, key: str) -> str | None:
+        return self._store.get(key)
+
+    async def expire(self, key: str, ttl: int) -> None:
+        return None
+
+    async def delete(self, *keys: str) -> None:
+        for key in keys:
+            self._store.pop(key, None)
+            self._sets.pop(key, None)
+
+    async def sadd(self, key: str, *members: str) -> int:
+        self._sets.setdefault(key, set()).update(members)
+        return len(members)
+
+    async def smembers(self, key: str) -> set[str]:
+        return set(self._sets.get(key, set()))
+
+
+def _fake_request(redis: _FakeRedis | None = None) -> Any:
+    """Request double for routes that reach app.state.redis (session revocation)."""
+    from types import SimpleNamespace
+
+    client = redis if redis is not None else _FakeRedis()
+    return SimpleNamespace(
+        app=SimpleNamespace(state=SimpleNamespace(redis=client, settings=_settings())),
+        state=SimpleNamespace(),
+        cookies={},
+        headers={},
+        client=SimpleNamespace(host="127.0.0.1"),
+    )
 
 
 def _mysql_async(url: str) -> str:
@@ -513,12 +556,22 @@ async def test_update_user_email_overwrite_and_clear(mariadb_znuny_url: str) -> 
             )
 
             updated = await admin_users.update_user(
-                created.id, UserUpdate(email="new@example.test"), _root_user(), session
+                created.id,
+                UserUpdate(email="new@example.test"),
+                _fake_request(),
+                _root_user(),
+                session,
+                _settings(),
             )
             assert updated.email == "new@example.test"
 
             cleared = await admin_users.update_user(
-                created.id, UserUpdate(email=""), _root_user(), session
+                created.id,
+                UserUpdate(email=""),
+                _fake_request(),
+                _root_user(),
+                session,
+                _settings(),
             )
             assert cleared.email is None
     finally:
@@ -718,5 +771,86 @@ async def test_language_get_set_roundtrip(mariadb_znuny_url: str) -> None:
                     created.id, UserLanguageUpdate(language="not-a-lang"), _root_user(), session
                 )
             assert exc_info.value.status_code == 422
+    finally:
+        await engine.dispose()
+
+
+async def test_admin_password_reset_revokes_live_sessions(mariadb_znuny_url: str) -> None:
+    """Resetting a password is incident response: the stolen cookie must die
+    with the credential it was taken with (security review M-2)."""
+    _ensure_tiqora_tables(mariadb_znuny_url)
+    engine = create_async_engine(_mysql_async(mariadb_znuny_url))
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    redis = _FakeRedis()
+    settings = _settings()
+    try:
+        async with factory() as session:
+            created = await admin_users.create_user(
+                UserCreate(
+                    login="revoke.me",
+                    password="s3cret-pw-1234",
+                    first_name="Rev",
+                    last_name="Oke",
+                ),
+                _root_user(),
+                session,
+                settings,
+            )
+
+            store = SessionStore(redis, settings)  # type: ignore[arg-type]
+            victim = await store.create(created.id, "revoke.me")
+            bystander = await store.create(created.id + 1, "someone.else")
+            assert await store.get(victim) is not None
+
+            await admin_users.update_user(
+                created.id,
+                UserUpdate(password="a-brand-new-pw-5678"),
+                _fake_request(redis),
+                _root_user(),
+                session,
+                settings,
+            )
+
+            assert await store.get(victim) is None
+            # Only that account's sessions are touched.
+            assert await store.get(bystander) is not None
+    finally:
+        await engine.dispose()
+
+
+async def test_admin_update_without_password_keeps_sessions(mariadb_znuny_url: str) -> None:
+    """Editing a name or email is not a credential change and must not log
+    the agent out of every device."""
+    _ensure_tiqora_tables(mariadb_znuny_url)
+    engine = create_async_engine(_mysql_async(mariadb_znuny_url))
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    redis = _FakeRedis()
+    settings = _settings()
+    try:
+        async with factory() as session:
+            created = await admin_users.create_user(
+                UserCreate(
+                    login="keep.session",
+                    password="s3cret-pw-1234",
+                    first_name="Keep",
+                    last_name="Session",
+                ),
+                _root_user(),
+                session,
+                settings,
+            )
+            store = SessionStore(redis, settings)  # type: ignore[arg-type]
+            token = await store.create(created.id, "keep.session")
+
+            await admin_users.update_user(
+                created.id,
+                UserUpdate(first_name="Renamed"),
+                _fake_request(redis),
+                _root_user(),
+                session,
+                settings,
+            )
+
+            assert await store.get(token) is not None
     finally:
         await engine.dispose()

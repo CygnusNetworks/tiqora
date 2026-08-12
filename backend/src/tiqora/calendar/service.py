@@ -326,8 +326,27 @@ class CalendarService:
         return digest
 
     async def verify_feed_token(self, calendar_id: int, login: str, token: str) -> bool:
+        """Authorize an unauthenticated ICS subscription request.
+
+        The token alone is not enough. Znuny's ``PublicCalendar.pm`` also
+        resolves the login to a real user, loads the calendar *as that user*
+        (which applies the group permission) and rejects invalid calendars — so
+        we do the same. Without those checks the feed URL outlived every form of
+        revocation: the token is ``md5(login + salt_string)`` and the salt never
+        rotates, so a de-provisioned agent, or one whose calendar group was
+        taken away, kept reading the calendar forever (security review M-1).
+        """
         cal = await self._session.get(Calendar, calendar_id)
-        if cal is None:
+        if cal is None or cal.valid_id != 1:
             return False
         expected = hashlib.md5(f"{login}-{cal.salt_string}".encode()).hexdigest()  # noqa: S324
-        return secrets.compare_digest(expected, token)
+        if not secrets.compare_digest(expected, token):
+            return False
+        user = (
+            await self._session.execute(
+                select(Users.id).where(Users.login == login, Users.valid_id == 1)
+            )
+        ).scalar_one_or_none()
+        if user is None:
+            return False
+        return cal.group_id in await self._perms.groups_for_permission(int(user), "ro")

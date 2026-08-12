@@ -130,18 +130,20 @@ services:
       # TIQORA_GIT_SHA: ${TIQORA_GIT_SHA:-}
       # TIQORA_BUILD_TIME: ${TIQORA_BUILD_TIME:-}
     volumes:
-      # Docker socket for the admin System-Info page's container/healthcheck view.
-      # WITHOUT this mount the page still works — the "Container" section just
-      # reports "socket not mounted" and everything else (versions, services,
-      # datastores, host load) is unaffected. The System-Info code only READS
-      # (list containers + inspect health); it never mutates.
-      # SECURITY: a raw docker.sock is effectively root on the host. The ":ro"
-      # bind only makes the socket *file* read-only, NOT the Docker API — a
-      # compromised api container could still control Docker. For a hardened
-      # deployment, put a read-only socket proxy (e.g. tecnativa/docker-socket-proxy
-      # with CONTAINERS=1 and everything else 0) in front and point DOCKER_HOST at
-      # it instead of bind-mounting the socket directly.
-      - /var/run/docker.sock:/var/run/docker.sock:ro
+      # OPT-IN: Docker socket for the admin System-Info page's container /
+      # healthcheck view. Left commented on purpose — the page works without it
+      # and only the "Container" section degrades to "socket not mounted";
+      # versions, services, datastores and host load are unaffected. The
+      # System-Info code only READS (list containers + inspect health).
+      #
+      # SECURITY: a raw docker.sock is effectively root on the host, so any RCE
+      # in the api container becomes host compromise. The ":ro" bind only makes
+      # the socket *file* read-only, NOT the Docker API. That is too much
+      # authority to hand over by default for one informational panel — enable
+      # it deliberately, and prefer a read-only socket proxy (e.g.
+      # tecnativa/docker-socket-proxy with CONTAINERS=1 and everything else 0)
+      # with DOCKER_HOST pointed at it rather than the line below.
+      # - /var/run/docker.sock:/var/run/docker.sock:ro
       # Service keytab (read-only). Export from KDC for the SPN above.
       # - ./secrets/tiqora.keytab:/etc/tiqora/tiqora.keytab:ro
       # Optional: for a pure acceptor, krb5.conf is usually not required
