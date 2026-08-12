@@ -29,6 +29,7 @@ from tiqora.db.legacy.user import Users
 from tiqora.domain.auth import (
     AuthenticatedUser,
     AuthService,
+    SessionStore,
     decode_preference_value,
     normalize_language_code,
     user_to_dict,
@@ -36,7 +37,7 @@ from tiqora.domain.auth import (
 from tiqora.domain.auth_config import AuthConfigService
 from tiqora.domain.auth_ldap import LdapAuthService
 from tiqora.domain.oidc import OIDCError, OIDCService
-from tiqora.domain.passkey import webauthn_enabled
+from tiqora.domain.passkey import two_factor_enabled, webauthn_enabled
 from tiqora.domain.password_policy import PasswordPolicyError, validate_password
 from tiqora.domain.password_setup import redeem_token, resolve_token
 from tiqora.domain.portal_gate import portal_enabled as resolve_portal_enabled
@@ -49,6 +50,7 @@ from tiqora.domain.schemas import (
     PasskeyRegisterFinishIn,
     PasskeyStatusOut,
     TOTPCodeIn,
+    TOTPEnrollIn,
     TOTPEnrollOut,
     TOTPStatusOut,
     UserLanguageUpdate,
@@ -61,6 +63,7 @@ from tiqora.domain.spnego import (
     principal_to_login,
 )
 from tiqora.domain.template_permission import TemplatePermissionService
+from tiqora.domain.totp import TOTPStepUpRequired
 from tiqora.domain.totp_qr import totp_qr_svg
 from tiqora.permissions.engine import PermissionEngine
 from tiqora.security.ratelimit import AuthRateLimiter, client_ip
@@ -334,6 +337,12 @@ async def complete_password_setup(
             detail="This link is no longer valid. Please request a new one.",
         )
     await session.commit()
+    # Setting a password through a one-time link is also a recovery path: drop
+    # any session that predates the new credential (security review M-2).
+    try:
+        await SessionStore(redis_client, settings).revoke_user_sessions(user_id)
+    except Exception as exc:  # noqa: BLE001 — password already committed
+        logger.warning("password_setup_session_revoke_failed", user_id=user_id, error=str(exc))
     await limiter.reset(login="__password_setup__", ip=ip)
 
 
@@ -484,7 +493,43 @@ async def totp_verify(
 
 
 @router.post("/totp/enroll", response_model=TOTPEnrollOut)
-async def totp_enroll(user: EnrollableUser, totp: TOTPServiceDep) -> TOTPEnrollOut:
+async def totp_enroll(
+    user: EnrollableUser,
+    totp: TOTPServiceDep,
+    request: Request,
+    settings: AppSettings,
+    body: TOTPEnrollIn | None = None,
+) -> TOTPEnrollOut:
+    """Start (or replace) a TOTP enrollment.
+
+    Replacing an *active* factor needs ``current_code`` from the authenticator
+    already enrolled — an authenticated session alone is not enough, or a
+    hijacked session could swap the second factor for one it controls
+    (security review H-2). Wrong codes are throttled like any other 2FA guess.
+    """
+    if await totp.is_enabled(user.id):
+        redis_client = await get_redis(request)
+        limiter = AuthRateLimiter(redis_client, settings)
+        ip = client_ip(request)
+        rl_key = f"2fa:{user.login}"
+        pre = await limiter.check(login=rl_key, ip=ip)
+        if not pre.allowed:
+            raise _rate_limit_http_exception(pre)
+        try:
+            secret, uri = await totp.enroll(
+                user.id, user.login, current_code=(body.current_code if body else None)
+            )
+        except TOTPStepUpRequired as exc:
+            locked = await limiter.record_failure(login=rl_key, ip=ip)
+            if locked is not None:
+                raise _rate_limit_http_exception(locked) from exc
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=str(exc),
+            ) from exc
+        await limiter.reset(login=rl_key, ip=ip)
+        return TOTPEnrollOut(secret=secret, otpauth_uri=uri)
+
     secret, uri = await totp.enroll(user.id, user.login)
     return TOTPEnrollOut(secret=secret, otpauth_uri=uri)
 
@@ -564,15 +609,54 @@ def _session_token_from_request(request: Request, settings: AppSettings) -> str 
     return request.cookies.get(settings.session_cookie_name)
 
 
+async def _require_recent_auth(
+    request: Request,
+    settings: AppSettings,
+    user_id: int,
+    totp: TOTPServiceDep,
+    webauthn: WebAuthnServiceDep,
+) -> None:
+    """Gate second-factor changes on a *recently authenticated* session (H-2).
+
+    A long-lived session cookie proves the browser once logged in, not that the
+    person at the keyboard is the account owner — so registering or removing a
+    passkey (a persistent credential that survives a password reset) demands a
+    login within ``step_up_max_age_seconds``.
+
+    Skipped entirely while the account has no second factor yet: first-time and
+    forced enrollment must stay frictionless, and there is nothing to protect.
+    """
+    if not await two_factor_enabled(totp, webauthn, user_id):
+        return
+    # A restricted ENROLL session only exists immediately after a password
+    # login, and cannot reach anything else — it is recent by construction.
+    if getattr(request.state, "enroll_token", None):
+        return
+    token = _session_token_from_request(request, settings)
+    if not token:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="No session")
+    redis_client = await get_redis(request)
+    age = await SessionStore(redis_client, settings).seconds_since_auth(token)
+    # Unknown age → treat as stale: the safe answer must not depend on Redis
+    # bookkeeping having survived a deploy.
+    if age is None or age > settings.step_up_max_age_seconds:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="reauthentication_required",
+        )
+
+
 @router.post("/passkey/register/begin")
 async def passkey_register_begin(
     request: Request,
     user: EnrollableUser,
     webauthn: WebAuthnServiceDep,
+    totp: TOTPServiceDep,
     settings: AppSettings,
 ) -> dict[str, Any]:
     """Start passkey registration (full session or restricted ENROLL session)."""
     _require_webauthn(settings)
+    await _require_recent_auth(request, settings, user.id, totp, webauthn)
     token = _session_token_from_request(request, settings)
     if not token:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="No session")
@@ -587,10 +671,12 @@ async def passkey_register_finish(
     user: EnrollableUser,
     auth: Annotated[AuthService, Depends(get_auth_service)],
     webauthn: WebAuthnServiceDep,
+    totp: TOTPServiceDep,
     settings: AppSettings,
 ) -> PasskeyStatusOut:
     """Finish passkey registration. Promotes an ENROLL session to a full session."""
     _require_webauthn(settings)
+    await _require_recent_auth(request, settings, user.id, totp, webauthn)
     token = _session_token_from_request(request, settings)
     if not token:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="No session")
@@ -635,14 +721,21 @@ async def passkey_list(
 @router.delete("/passkey/{passkey_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def passkey_delete(
     passkey_id: int,
+    request: Request,
     user: CurrentUser,
     webauthn: WebAuthnServiceDep,
     totp: TOTPServiceDep,
     settings: AppSettings,
     session: DbSession,
 ) -> Response:
-    """Delete a passkey. Blocked when it is the last remaining 2FA factor under enforce."""
+    """Delete a passkey. Blocked when it is the last remaining 2FA factor under enforce.
+
+    Removing a factor needs the same recently-authenticated session as adding
+    one — otherwise a hijacked session could strip the account back down to a
+    single factor it already controls.
+    """
     _require_webauthn(settings)
+    await _require_recent_auth(request, settings, user.id, totp, webauthn)
     row = await webauthn.get_by_id(user.id, passkey_id)
     if row is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Passkey not found")
@@ -748,10 +841,14 @@ async def oidc_login(request: Request, settings: AppSettings) -> RedirectRespons
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="OIDC is not enabled")
     redis_client = await get_redis(request)
     state = secrets.token_urlsafe(24)
-    await redis_client.set(f"{_OIDC_STATE_PREFIX}{state}", "1", ex=_OIDC_STATE_TTL)
     oidc = OIDCService(settings)
+    # PKCE when the provider advertises S256 (security review L-5). The verifier
+    # is stored server-side under the state key, so it never touches the browser
+    # and the callback can only redeem a code it actually initiated.
+    code_verifier = secrets.token_urlsafe(64) if await oidc.supports_pkce() else None
+    await redis_client.set(f"{_OIDC_STATE_PREFIX}{state}", code_verifier or "1", ex=_OIDC_STATE_TTL)
     try:
-        url = await oidc.authorize_url(state)
+        url = await oidc.authorize_url(state, code_verifier=code_verifier)
     except Exception as exc:  # noqa: BLE001
         logger.warning("oidc_discovery_failed", error=str(exc))
         raise HTTPException(
@@ -791,12 +888,9 @@ async def oidc_callback(
     redis_client = await get_redis(request)
     state_key = f"{_OIDC_STATE_PREFIX}{state}"
     cookie_state = request.cookies.get(_OIDC_STATE_COOKIE)
+    stored_state = await redis_client.get(state_key)
     # State must exist server-side AND match the per-browser cookie set at /login.
-    if (
-        not cookie_state
-        or not secrets.compare_digest(cookie_state, state)
-        or not await redis_client.get(state_key)
-    ):
+    if not cookie_state or not secrets.compare_digest(cookie_state, state) or not stored_state:
         response.delete_cookie(_OIDC_STATE_COOKIE, path="/")
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid or expired state"
@@ -804,9 +898,15 @@ async def oidc_callback(
     await redis_client.delete(state_key)
     response.delete_cookie(_OIDC_STATE_COOKIE, path="/")
 
+    # "1" is the sentinel for a flow started without PKCE (provider does not
+    # advertise S256); anything else is the code_verifier.
+    if isinstance(stored_state, bytes):
+        stored_state = stored_state.decode("utf-8")
+    code_verifier = None if stored_state == "1" else str(stored_state)
+
     oidc = OIDCService(settings)
     try:
-        claims = await oidc.fetch_claims(code)
+        claims = await oidc.fetch_claims(code, code_verifier=code_verifier)
     except OIDCError as exc:
         logger.warning("oidc_exchange_failed", error=str(exc))
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=str(exc)) from exc

@@ -9,6 +9,7 @@ are covered against mariadb + postgres.
 from __future__ import annotations
 
 import json
+import time
 import uuid
 from datetime import datetime
 from types import SimpleNamespace
@@ -46,6 +47,7 @@ def _unique_cred_raw() -> bytes:
 class _FakeRedis:
     def __init__(self) -> None:
         self._store: dict[str, str] = {}
+        self._sets: dict[str, set[str]] = {}
 
     async def set(self, key: str, value: str, ex: int | None = None) -> None:
         self._store[key] = value
@@ -59,6 +61,34 @@ class _FakeRedis:
     async def delete(self, *keys: str) -> None:
         for key in keys:
             self._store.pop(key, None)
+
+    async def sadd(self, key: str, *members: str) -> int:
+        bucket = self._sets.setdefault(key, set())
+        before = len(bucket)
+        bucket.update(members)
+        return len(bucket) - before
+
+    async def smembers(self, key: str) -> set[str]:
+        return set(self._sets.get(key, set()))
+
+
+async def _recently_authenticated_request(
+    redis: _FakeRedis, settings: Settings, user_id: int, login: str
+) -> Any:
+    """A Request double whose session was just authenticated.
+
+    Passkey changes go through ``_require_recent_auth`` ("sudo mode",
+    security review H-2), which needs the session token and the auth-time
+    marker that ``SessionStore.create`` writes.
+    """
+    token = await SessionStore(redis, settings).create(user_id, login)  # type: ignore[arg-type]
+    return SimpleNamespace(
+        state=SimpleNamespace(session_token=token),
+        cookies={settings.session_cookie_name: token},
+        headers={},
+        client=SimpleNamespace(host="203.0.113.5"),
+        app=SimpleNamespace(state=SimpleNamespace(redis=redis, settings=settings)),
+    )
 
 
 def _to_async_url(sync_url: str) -> str:
@@ -417,15 +447,16 @@ async def test_delete_last_factor_blocked_under_enforce(
             id=user_id, login=login, first_name="P", last_name="K", auth_method="session"
         )
 
+        req = await _recently_authenticated_request(redis, settings, user_id, login)
         with pytest.raises(HTTPException) as ei:
-            await auth_api.passkey_delete(int(row.id), user, svc, totp, settings, session)
+            await auth_api.passkey_delete(int(row.id), req, user, svc, totp, settings, session)
         assert ei.value.status_code == 400
         assert "last 2FA factor" in str(ei.value.detail)
         assert await svc.has_passkey(user_id) is True
 
         # With enforce off, delete succeeds.
         await AuthConfigService(session).set(user_id, enforce_2fa=False)
-        resp = await auth_api.passkey_delete(int(row.id), user, svc, totp, settings, session)
+        resp = await auth_api.passkey_delete(int(row.id), req, user, svc, totp, settings, session)
         assert resp.status_code == 204
         assert await svc.has_passkey(user_id) is False
 
@@ -484,9 +515,16 @@ async def test_admin_reset_2fa_clears_passkeys(
 async def test_auth_methods_webauthn_flag() -> None:
     from tiqora.api.v1.auth import auth_methods
 
-    off = await auth_methods(Settings())  # type: ignore[arg-type]
+    # portal_enabled=False short-circuits the DB read in portal_enabled(),
+    # so the discovery route can be exercised without a live session.
+    def _cfg(**kw: Any) -> Settings:
+        return Settings(portal_enabled=False, **kw)
+
+    off = await auth_methods(_cfg(), None)  # type: ignore[arg-type]
     assert off.webauthn is False
-    on = await auth_methods(_settings())  # type: ignore[arg-type]
+    on = await auth_methods(  # type: ignore[arg-type]
+        _cfg(webauthn_rp_id=RP_ID, webauthn_origin=ORIGIN), None
+    )
     assert on.webauthn is True
 
 
@@ -571,3 +609,72 @@ def test_model_table_name() -> None:
     assert TiqoraUserPasskey.__tablename__ == "tiqora_user_passkey"
     # Quiet unused import of json if mypy complains about structure.
     assert json.dumps({"ok": True})
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("url_fixture", ["mariadb_znuny_url", "postgres_znuny_url"])
+async def test_passkey_delete_requires_recent_auth(
+    url_fixture: str,
+    request: pytest.FixtureRequest,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A long-lived session cookie is not enough to remove a second factor.
+
+    It proves the browser logged in once, not that the owner is present now, so
+    passkey changes need an authentication inside step_up_max_age_seconds
+    (security review H-2).
+    """
+    from fastapi import HTTPException
+
+    import tiqora.domain.passkey as passkey_mod
+    from tiqora.api.v1 import auth as auth_api
+    from tiqora.domain.auth import AuthenticatedUser
+
+    sync_url: str = request.getfixturevalue(url_fixture)
+    user_id, login = _seed_user(sync_url)
+    engine = create_async_engine(_to_async_url(sync_url))
+    factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+    settings = Settings(
+        secret_key="unit-test-secret-key",
+        webauthn_rp_id=RP_ID,
+        webauthn_origin=ORIGIN,
+        step_up_max_age_seconds=900,
+    )
+    redis = _FakeRedis()
+    cred_raw = _unique_cred_raw()
+    monkeypatch.setattr(
+        passkey_mod,
+        "verify_registration_response",
+        lambda **_kw: _fake_verified_registration(credential_id=cred_raw, sign_count=1),
+    )
+
+    async with factory() as session:
+        svc = WebAuthnService(session, redis, settings)  # type: ignore[arg-type]
+        totp = TOTPService(session, settings)
+        await svc.begin_registration(user_id=user_id, login=login, session_token="reg")
+        row = await svc.finish_registration(
+            user_id=user_id, session_token="reg", credential=_cred_payload(cred_raw)
+        )
+        assert row is not None
+        user = AuthenticatedUser(
+            id=user_id, login=login, first_name="P", last_name="K", auth_method="session"
+        )
+
+        req = await _recently_authenticated_request(redis, settings, user_id, login)
+        # Backdate the authentication past the step-up window.
+        store = SessionStore(redis, settings)  # type: ignore[arg-type]
+        token = req.state.session_token
+        await redis.set(store._auth_at_key(token), str(int(time.time()) - 3600))  # noqa: SLF001
+
+        with pytest.raises(HTTPException) as ei:
+            await auth_api.passkey_delete(int(row.id), req, user, svc, totp, settings, session)
+        assert ei.value.status_code == 403
+        assert ei.value.detail == "reauthentication_required"
+        assert await svc.has_passkey(user_id) is True
+
+        # A freshly authenticated session goes through.
+        fresh = await _recently_authenticated_request(redis, settings, user_id, login)
+        resp = await auth_api.passkey_delete(int(row.id), fresh, user, svc, totp, settings, session)
+        assert resp.status_code == 204
+
+    await engine.dispose()
