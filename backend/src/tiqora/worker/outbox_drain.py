@@ -17,7 +17,11 @@ from tiqora.config import Settings, get_settings
 from tiqora.db.engine import get_session_factory
 from tiqora.domain.search import SearchIndexService
 from tiqora.domain.settings_store import KEY_OUTBOX_ENABLED, get_setting_bool
-from tiqora.events.pubsub import get_pubsub_redis, publish_ticket_event
+from tiqora.events.pubsub import (
+    get_pubsub_redis,
+    publish_ticket_event,
+    resolve_ticket_queue_ids,
+)
 from tiqora.worker.webhooks import dispatch_webhooks
 
 logger = structlog.get_logger(__name__)
@@ -83,8 +87,14 @@ async def drain_outbox(
     try:
         pubsub_client = get_pubsub_redis(cfg)
         distinct_events = sorted({(int(r[2]), str(r[1])) for r in rows})
+        queue_by_ticket = await resolve_ticket_queue_ids(factory, ticket_ids)
         for ticket_id, event_type in distinct_events:
-            await publish_ticket_event(pubsub_client, ticket_id, event_type)
+            await publish_ticket_event(
+                pubsub_client,
+                ticket_id,
+                event_type,
+                queue_id=queue_by_ticket.get(ticket_id),
+            )
     except Exception:  # noqa: BLE001 — pub/sub notification must not fail the drain
         logger.exception("pubsub_publish_error")
 

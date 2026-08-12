@@ -13,7 +13,7 @@ from fastapi.responses import PlainTextResponse
 from pydantic import BaseModel
 
 from tiqora.api.deps import CurrentUser, DbSession
-from tiqora.channels.common import channel_enabled, channel_setting
+from tiqora.channels.common import channel_enabled, channel_setting, verify_shared_secret
 from tiqora.channels.whatsapp.service import (
     CHANNEL_NAME,
     build_gateway,
@@ -69,7 +69,9 @@ async def verify_webhook(
     """Meta's webhook subscription handshake."""
     await _require_enabled(session)
     expected_token = await channel_setting(session, CHANNEL_NAME, "verify_token")
-    if hub_mode != "subscribe" or not expected_token or hub_verify_token != expected_token:
+    # Constant-time compare: the verify token is a shared secret, and `!=`
+    # short-circuits on the first differing byte (security review L-3).
+    if hub_mode != "subscribe" or not verify_shared_secret(expected_token, hub_verify_token):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="verify_token mismatch")
     return PlainTextResponse(hub_challenge or "")
 

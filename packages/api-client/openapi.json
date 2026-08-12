@@ -17523,6 +17523,24 @@
         "title": "TOTPCodeIn",
         "type": "object"
       },
+      "TOTPEnrollIn": {
+        "description": "Body for ``POST /auth/totp/enroll``.\n\n``current_code`` is only required when a TOTP factor is already enabled \u2014\nre-enrolling then means replacing a live second factor, which must be\nproven, not merely requested from an authenticated session.",
+        "properties": {
+          "current_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Current Code"
+          }
+        },
+        "title": "TOTPEnrollIn",
+        "type": "object"
+      },
       "TOTPEnrollOut": {
         "properties": {
           "otpauth_uri": {
@@ -43650,7 +43668,7 @@
     },
     "/api/v1/auth/passkey/{passkey_id}": {
       "delete": {
-        "description": "Delete a passkey. Blocked when it is the last remaining 2FA factor under enforce.",
+        "description": "Delete a passkey. Blocked when it is the last remaining 2FA factor under enforce.\n\nRemoving a factor needs the same recently-authenticated session as adding\none \u2014 otherwise a hijacked session could strip the account back down to a\nsingle factor it already controls.",
         "operationId": "passkey_delete_api_v1_auth_passkey__passkey_id__delete",
         "parameters": [
           {
@@ -44011,6 +44029,7 @@
     },
     "/api/v1/auth/totp/enroll": {
       "post": {
+        "description": "Start (or replace) a TOTP enrollment.\n\nReplacing an *active* factor needs ``current_code`` from the authenticator\nalready enrolled \u2014 an authenticated session alone is not enough, or a\nhijacked session could swap the second factor for one it controls\n(security review H-2). Wrong codes are throttled like any other 2FA guess.",
         "operationId": "totp_enroll_api_v1_auth_totp_enroll_post",
         "parameters": [
           {
@@ -44046,6 +44065,23 @@
             }
           }
         ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/TOTPEnrollIn"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Body"
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
             "content": {

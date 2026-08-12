@@ -90,7 +90,7 @@ async def oauth2_authorization_callback(request: Request, session: DbSession) ->
     if not await redis_client.get(redis_key):
         return _page(
             "Authorization failed",
-            f'Authorization state expired or not recognised. Please restart the '
+            f"Authorization state expired or not recognised. Please restart the "
             f'authorization from the admin UI.<br/><br/><a href="{admin_link}">'
             "Back to OAuth2 admin</a>",
             ok=False,

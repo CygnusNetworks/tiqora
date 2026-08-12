@@ -66,14 +66,52 @@ def get_pubsub_redis(settings: Settings | None = None) -> redis.Redis:
     return _client
 
 
-async def publish_ticket_event(redis_client: redis.Redis, ticket_id: int, event_type: str) -> None:
-    """Publish a ``ticket_changed`` notification. Best-effort — never raises."""
+async def publish_ticket_event(
+    redis_client: redis.Redis,
+    ticket_id: int,
+    event_type: str,
+    *,
+    queue_id: int | None = None,
+) -> None:
+    """Publish a ``ticket_changed`` notification. Best-effort — never raises.
+
+    ``queue_id`` lets the SSE endpoint scope the message to agents who may read
+    that queue. Publishers should always supply it: a message without one is
+    dropped rather than broadcast, because "ticket 4711 changed just now" is
+    itself information about a ticket the recipient may not be allowed to see
+    (security review L-2).
+    """
     payload: dict[str, Any] = {
         "type": "ticket_changed",
         "ticket_id": ticket_id,
         "event": event_type,
     }
+    if queue_id is not None:
+        payload["queue_id"] = int(queue_id)
     await _publish(redis_client, payload)
+
+
+async def resolve_ticket_queue_ids(session_factory: Any, ticket_ids: list[int]) -> dict[int, int]:
+    """Map ``{ticket_id: queue_id}`` for SSE scoping. Never raises.
+
+    Returns whatever it could resolve; callers treat a missing entry as "do not
+    broadcast this one".
+    """
+    if not ticket_ids:
+        return {}
+    from sqlalchemy import select
+
+    from tiqora.db.legacy.ticket import Ticket
+
+    try:
+        async with session_factory() as session:
+            rows = await session.execute(
+                select(Ticket.id, Ticket.queue_id).where(Ticket.id.in_(ticket_ids))
+            )
+            return {int(tid): int(qid) for tid, qid in rows.all()}
+    except Exception:  # noqa: BLE001 — scoping lookup must not break a publisher
+        logger.warning("ticket_queue_lookup_failed", ticket_count=len(ticket_ids))
+        return {}
 
 
 async def publish_presence_changed(redis_client: redis.Redis, ticket_id: int) -> None:

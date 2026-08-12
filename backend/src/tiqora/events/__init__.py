@@ -5,6 +5,7 @@ from tiqora.events.pubsub import (
     get_pubsub_redis,
     publish_presence_changed,
     publish_ticket_event,
+    resolve_ticket_queue_ids,
 )
 
 __all__ = [
@@ -12,4 +13,5 @@ __all__ = [
     "get_pubsub_redis",
     "publish_presence_changed",
     "publish_ticket_event",
+    "resolve_ticket_queue_ids",
 ]

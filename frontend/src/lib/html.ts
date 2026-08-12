@@ -4,21 +4,40 @@
  * (`ArticleBodyRenderer` un-escapes the HTML branch itself before handing it
  * to the iframe) — so a plain-text preview built directly from a non-HTML
  * body still needs entity decoding, or it shows literal `&gt;`/`&amp;`.
+ *
+ * Parsing happens in an inert document (see `parseInert`), so these are safe on
+ * raw untrusted input and do not depend on the server having sanitised it first
+ * (security review L-6).
  */
 
 /**
+ * Parse `html` into an inert document and return its root element.
+ *
+ * `document.createElement("div").innerHTML = html` looks detached but the node
+ * belongs to the *live* document, so the parser still kicks off subresource
+ * loads — `<img src=x onerror=...>` fires there. `DOMParser` builds a separate,
+ * inert document that never loads or executes anything, which is what makes
+ * these helpers safe for untrusted article bodies rather than merely safe for
+ * the sanitised ones they happen to get today.
+ */
+function parseInert(html: string): HTMLElement | null {
+  try {
+    return new DOMParser().parseFromString(html, "text/html").body;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Strip tags/entities from an HTML fragment for a short preview string.
- * Uses a detached DOM node so entities decode correctly; `<script>` content
- * inserted via `innerHTML` is inert (never executed) and only `textContent`
- * is read back out, so this is safe for untrusted article bodies.
+ * Only `textContent` is read back out.
  */
 export function stripHtml(html: string): string {
-  if (typeof document === "undefined") {
+  const body = typeof DOMParser === "undefined" ? null : parseInert(html);
+  if (body === null) {
     return html.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
   }
-  const div = document.createElement("div");
-  div.innerHTML = html;
-  return (div.textContent || "").replace(/\s+/g, " ").trim();
+  return (body.textContent || "").replace(/\s+/g, " ").trim();
 }
 
 /**
@@ -29,7 +48,8 @@ export function stripHtml(html: string): string {
  * the 5 basic entities when there is no `document` (SSR).
  */
 export function decodeEntities(text: string): string {
-  if (typeof document === "undefined") {
+  const body = typeof DOMParser === "undefined" ? null : parseInert(text);
+  if (body === null) {
     return text
       .replace(/&amp;/g, "&")
       .replace(/&lt;/g, "<")
@@ -37,7 +57,5 @@ export function decodeEntities(text: string): string {
       .replace(/&quot;/g, '"')
       .replace(/&#39;/g, "'");
   }
-  const div = document.createElement("div");
-  div.innerHTML = text;
-  return div.textContent || "";
+  return body.textContent || "";
 }

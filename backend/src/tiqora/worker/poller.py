@@ -24,6 +24,7 @@ from tiqora.events.pubsub import (
     get_pubsub_redis,
     publish_new_ticket_in_queue,
     publish_ticket_event,
+    resolve_ticket_queue_ids,
 )
 from tiqora.worker.indexer import reindex_ticket_ids
 
@@ -174,8 +175,11 @@ async def poll_once(
             # "this ticket changed" without a precise cause.
             try:
                 pubsub_client = get_pubsub_redis(cfg)
+                queue_by_ticket = await resolve_ticket_queue_ids(factory, sorted(ticket_ids))
                 for tid in sorted(ticket_ids):
-                    await publish_ticket_event(pubsub_client, tid, "poller")
+                    await publish_ticket_event(
+                        pubsub_client, tid, "poller", queue_id=queue_by_ticket.get(tid)
+                    )
                 # Richer per-queue notification for genuinely-new tickets /
                 # customer replies (the SSE endpoint filters these to each
                 # agent's readable queues).

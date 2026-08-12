@@ -11,6 +11,7 @@ from typing import Any
 from fastapi import APIRouter, HTTPException, Query, status
 from fastapi.responses import HTMLResponse, Response, StreamingResponse
 from pydantic import BaseModel, Field
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from tiqora.api.attachment_response import safe_attachment_response
 from tiqora.api.deps import AppSettings, CurrentUser, DbSession
@@ -1349,6 +1350,27 @@ def _article_predicate(article_id: int | None) -> str:
     return "article_id IS NULL" if article_id is None else "article_id = :aid"
 
 
+async def _assert_draft_ticket_readable(
+    session: AsyncSession, user_id: int, ticket_id: int
+) -> None:
+    """Require ``ro`` on the ticket a draft is being stored against (L-1).
+
+    Drafts are per-agent, but without this any authenticated agent could park
+    content against — and confirm the existence of — a ticket they cannot see.
+
+    Rolls the read-only lookup back before returning: it autobegins a
+    transaction on the shared request session, and the draft writers open their
+    own ``async with session.begin()`` right after (same dance as
+    ``api.deps.get_current_user``).
+    """
+    try:
+        await TicketService(session)._assert_ticket_ro(user_id, ticket_id)  # noqa: SLF001
+    except (TicketAccessDenied, TicketNotFound) as exc:
+        raise _map_exc(exc) from exc
+    finally:
+        await session.rollback()
+
+
 @router.get("/{ticket_id}/drafts", response_model=list[DraftOut])
 async def list_drafts(
     ticket_id: int,
@@ -1357,6 +1379,8 @@ async def list_drafts(
 ) -> list[DraftOut]:
     """List form drafts for a ticket (current user only)."""
     from sqlalchemy import text
+
+    await _assert_draft_ticket_readable(session, user.id, ticket_id)
 
     rows = (
         (
@@ -1390,6 +1414,8 @@ async def upsert_draft(
     """Create or update a draft for (ticket, user, action, article)."""
     from sqlalchemy import text
     from sqlalchemy.exc import IntegrityError
+
+    await _assert_draft_ticket_readable(session, user.id, ticket_id)
 
     article_id = body.article_id
     where = (
@@ -1463,6 +1489,8 @@ async def delete_draft(
     agent's drafts on the ticket's other articles alone.
     """
     from sqlalchemy import text
+
+    await _assert_draft_ticket_readable(session, user.id, ticket_id)
 
     params: dict[str, Any] = {"tid": ticket_id, "uid": user.id, "act": action}
     if article_id is not None:
