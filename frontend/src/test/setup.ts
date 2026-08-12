@@ -1,5 +1,10 @@
 import "@testing-library/jest-dom/vitest";
 
+// jsdom doesn't implement scrollIntoView; components call it on focus
+if (typeof Element.prototype.scrollIntoView !== "function") {
+  Element.prototype.scrollIntoView = () => {};
+}
+
 // jsdom/Node may lack a full localStorage in some vitest environments
 if (typeof globalThis.localStorage === "undefined" || !globalThis.localStorage) {
   const store = new Map<string, string>();
