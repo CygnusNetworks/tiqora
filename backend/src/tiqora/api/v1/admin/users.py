@@ -5,10 +5,10 @@ from __future__ import annotations
 from typing import Literal, cast
 
 import structlog
-from fastapi import APIRouter, HTTPException, Query, status
+from fastapi import APIRouter, HTTPException, Query, Request, status
 from sqlalchemy import select
 
-from tiqora.api.deps import AppSettings, DbSession
+from tiqora.api.deps import AppSettings, DbSession, get_redis
 from tiqora.api.v1.admin.common import (
     USER_CACHE_TYPES,
     USER_GROUP_CACHE_TYPES,
@@ -42,7 +42,7 @@ from tiqora.api.v1.admin.schemas import (
 )
 from tiqora.db.legacy.queue import Queue
 from tiqora.db.legacy.user import GroupRole, GroupUser, PermissionGroups, Roles, RoleUser, Users
-from tiqora.domain.auth import normalize_language_code
+from tiqora.domain.auth import SessionStore, normalize_language_code
 from tiqora.domain.password_setup import unusable_password_hash
 from tiqora.domain.schemas import UserLanguageUpdate
 from tiqora.domain.user_delete import blocking_references, delete_user_rows
@@ -187,7 +187,12 @@ async def create_user(
 
 @router.patch("/{user_id}", response_model=UserOut)
 async def update_user(
-    user_id: int, body: UserUpdate, admin: AdminUser, session: DbSession
+    user_id: int,
+    body: UserUpdate,
+    request: Request,
+    admin: AdminUser,
+    session: DbSession,
+    settings: AppSettings,
 ) -> UserOut:
     user = await session.get(Users, user_id)
     if user is None:
@@ -197,10 +202,12 @@ async def update_user(
     email = data.pop("email", None)
     mobile_set = "mobile" in data
     mobile = data.pop("mobile", None)
+    password_changed = False
     if "password" in data:
         password = data.pop("password")
         if password:
             user.pw = hash_password(password)
+            password_changed = True
     for field, value in data.items():
         setattr(user, field, value)
     user.change_time = now()
@@ -214,6 +221,24 @@ async def update_user(
     await invalidate_znuny_cache_types(session, USER_CACHE_TYPES)
     await session.commit()
     await session.refresh(user)
+
+    # A password reset is usually incident response: kick every live session of
+    # that account, or the attacker's stolen cookie simply outlives the
+    # credential it was taken with (security review M-2). Never let a Redis
+    # hiccup fail the password write that already committed.
+    if password_changed:
+        try:
+            revoked = await SessionStore(await get_redis(request), settings).revoke_user_sessions(
+                user_id
+            )
+            logger.info(
+                "admin.users.sessions_revoked",
+                user_id=user_id,
+                revoked=revoked,
+                reason="password_changed",
+            )
+        except Exception as exc:  # noqa: BLE001 — password already changed
+            logger.warning("admin.users.session_revoke_failed", user_id=user_id, error=str(exc))
 
     out_email = (
         (email or None) if email_set else await get_preference(session, user_id, "UserEmail")

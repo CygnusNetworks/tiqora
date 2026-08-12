@@ -182,6 +182,15 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     )
 
     @app.middleware("http")
+    async def upload_size_limit_middleware(
+        request: Request, call_next: CallNext
+    ) -> StarletteResponse:
+        """M-4: refuse oversized bodies before Starlette spools them to disk."""
+        from tiqora.api.uploads import body_size_limit_middleware
+
+        return await body_size_limit_middleware(request, call_next)
+
+    @app.middleware("http")
     async def csrf_origin_check_middleware(
         request: Request, call_next: CallNext
     ) -> StarletteResponse:

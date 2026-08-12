@@ -4,6 +4,7 @@ appointment CRUD, recurrence expansion, ticket linking, and ICS export.
 
 from __future__ import annotations
 
+import hashlib
 import uuid
 from datetime import datetime, timedelta
 from typing import Any
@@ -110,6 +111,7 @@ def _seed(sync_url: str) -> dict[str, Any]:
         "agent_id": base + 1,
         "denied_agent_id": base + 2,
         "agent_login": f"cal.agent.{ns}",
+        "denied_agent_login": f"cal.denied.{ns}",
         "allowed_calendar_id": base + 20,
         "denied_calendar_id": base + 21,
         "ticket_id": base + 40,
@@ -325,6 +327,79 @@ async def test_ics_export_and_feed_token(mariadb_znuny_url: str) -> None:
         assert await svc.verify_feed_token(ids["allowed_calendar_id"], ids["agent_login"], token)
         assert not await svc.verify_feed_token(
             ids["allowed_calendar_id"], ids["agent_login"], "wrong"
+        )
+
+    await engine.dispose()
+
+
+@pytest.mark.db
+@pytest.mark.asyncio
+async def test_feed_token_requires_live_permission(mariadb_znuny_url: str) -> None:
+    """The ICS token authorizes nothing on its own (security review M-1).
+
+    ``md5(login + salt_string)`` never changes, so a token handed out once used
+    to be a permanent, unrevocable grant. Znuny's PublicCalendar.pm resolves the
+    login and re-applies the group permission on every request; so must we.
+    """
+    ids = _seed(mariadb_znuny_url)
+    engine, factory = await _session_factory(mariadb_znuny_url)
+
+    async with factory() as session:
+        svc = CalendarService(session)
+        calendar_id = ids["allowed_calendar_id"]
+        token = await svc.feed_token(calendar_id, ids["agent_id"])
+        assert await svc.verify_feed_token(calendar_id, ids["agent_login"], token)
+
+        # An agent without `ro` on the calendar group cannot mint a working URL
+        # even though the token formula is public and the salt is shared.
+        denied_login = ids["denied_agent_login"]
+        denied_token = hashlib.md5(  # noqa: S324 — mirrors the Znuny formula
+            f"{denied_login}-salt-abc".encode()
+        ).hexdigest()
+        assert not await svc.verify_feed_token(calendar_id, denied_login, denied_token)
+
+        # An unknown login with a correctly-formed token is refused too.
+        ghost_token = hashlib.md5(b"ghost.agent-salt-abc").hexdigest()  # noqa: S324
+        assert not await svc.verify_feed_token(calendar_id, "ghost.agent", ghost_token)
+
+    # Revoking the group membership must revoke the feed with it.
+    sync_engine = create_engine(mariadb_znuny_url)
+    with sync_engine.begin() as conn:
+        conn.execute(text("DELETE FROM group_user WHERE user_id = :uid"), {"uid": ids["agent_id"]})
+    sync_engine.dispose()
+
+    async with factory() as session:
+        svc = CalendarService(session)
+        assert not await svc.verify_feed_token(
+            ids["allowed_calendar_id"], ids["agent_login"], token
+        )
+
+    await engine.dispose()
+
+
+@pytest.mark.db
+@pytest.mark.asyncio
+async def test_feed_token_refused_for_invalid_calendar(mariadb_znuny_url: str) -> None:
+    """An invalidated calendar stops serving, matching Znuny's ValidID check."""
+    ids = _seed(mariadb_znuny_url)
+    engine, factory = await _session_factory(mariadb_znuny_url)
+
+    async with factory() as session:
+        token = await CalendarService(session).feed_token(
+            ids["allowed_calendar_id"], ids["agent_id"]
+        )
+
+    sync_engine = create_engine(mariadb_znuny_url)
+    with sync_engine.begin() as conn:
+        conn.execute(
+            text("UPDATE calendar SET valid_id = 2 WHERE id = :cid"),
+            {"cid": ids["allowed_calendar_id"]},
+        )
+    sync_engine.dispose()
+
+    async with factory() as session:
+        assert not await CalendarService(session).verify_feed_token(
+            ids["allowed_calendar_id"], ids["agent_login"], token
         )
 
     await engine.dispose()
