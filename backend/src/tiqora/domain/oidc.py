@@ -57,22 +57,46 @@ class OIDCService:
             self._discovery = resp.json()
         return self._discovery
 
-    async def authorize_url(self, state: str) -> str:
+    async def supports_pkce(self) -> bool:
+        """Whether the provider advertises PKCE with S256.
+
+        Only sent when advertised: a provider that does not know the parameter
+        may reject the whole authorization request, and PKCE is defense in depth
+        here (the client is confidential and holds a secret), not the primary
+        control.
+        """
+        try:
+            disc = await self.discover()
+        except (OIDCError, httpx.HTTPError):
+            return False
+        methods = disc.get("code_challenge_methods_supported")
+        return isinstance(methods, list) and "S256" in methods
+
+    async def authorize_url(self, state: str, *, code_verifier: str | None = None) -> str:
+        """Build the authorization URL, binding *code_verifier* via PKCE S256.
+
+        With PKCE the authorization code is useless to anyone who did not start
+        the flow, so an intercepted code (proxy logs, a leaky redirect chain)
+        cannot be redeemed (security review L-5).
+        """
         disc = await self.discover()
         client = AsyncOAuth2Client(
             client_id=self._settings.oidc_client_id,
             client_secret=self._settings.oidc_client_secret,
             scope=self._settings.oidc_scopes,
             redirect_uri=self._settings.oidc_redirect_uri,
+            code_challenge_method="S256" if code_verifier else None,
             transport=self._transport,
         )
         try:
-            url, _ = client.create_authorization_url(disc["authorization_endpoint"], state=state)
+            url, _ = client.create_authorization_url(
+                disc["authorization_endpoint"], state=state, code_verifier=code_verifier
+            )
             return str(url)
         finally:
             await client.aclose()
 
-    async def fetch_claims(self, code: str) -> dict[str, Any]:
+    async def fetch_claims(self, code: str, *, code_verifier: str | None = None) -> dict[str, Any]:
         """Exchange *code* for tokens and return the userinfo claims dict."""
         disc = await self.discover()
         token_endpoint = disc.get("token_endpoint")
@@ -90,6 +114,8 @@ class OIDCService:
                 "code": code,
                 "redirect_uri": self._settings.oidc_redirect_uri,
             }
+            if code_verifier:
+                form["code_verifier"] = code_verifier
             post_headers = dict(token_headers)
             post_headers["Content-Type"] = "application/x-www-form-urlencoded"
             async with httpx.AsyncClient(
