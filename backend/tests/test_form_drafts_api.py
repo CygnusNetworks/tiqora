@@ -258,4 +258,7 @@ async def test_drafts_require_ticket_read_access(mariadb_znuny_url: str) -> None
         ).scalar_one()
     assert count == 0
 
+    async with factory() as session, session.begin():
+        await _unseed_readable_ticket(session)
+
     await engine.dispose()
