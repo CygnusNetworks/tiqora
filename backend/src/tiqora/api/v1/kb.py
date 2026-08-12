@@ -15,6 +15,7 @@ from fastapi import APIRouter, File, HTTPException, Query, UploadFile, status
 from fastapi.responses import Response
 
 from tiqora.api.deps import AppSettings, CurrentUser, DbSession
+from tiqora.api.uploads import MAX_ATTACHMENT_BYTES, read_upload_within_limit
 from tiqora.kb.schemas import (
     ArticleIn,
     ArticleOut,
@@ -36,7 +37,6 @@ from tiqora.kb.service import KbForbidden, KbNotFound, KbService
 router = APIRouter(prefix="/kb", tags=["kb"])
 
 #: Max KB attachment size (bytes). Stored inline in the DB, so kept modest.
-MAX_ATTACHMENT_BYTES = 25 * 1024 * 1024
 
 
 def _map_exc(exc: Exception) -> HTTPException:
@@ -314,12 +314,7 @@ async def upload_attachment(
     settings: AppSettings,
     file: UploadFile = File(...),  # noqa: B008
 ) -> AttachmentOut:
-    content = await file.read()
-    if len(content) > MAX_ATTACHMENT_BYTES:
-        raise HTTPException(
-            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
-            detail=f"attachment exceeds {MAX_ATTACHMENT_BYTES} bytes",
-        )
+    content = await read_upload_within_limit(file, MAX_ATTACHMENT_BYTES)
     svc = KbService(session, settings)
     try:
         async with session.begin():

@@ -13,6 +13,7 @@ from fastapi.responses import Response
 
 from tiqora.api.attachment_response import safe_attachment_response
 from tiqora.api.portal.deps import CurrentCustomer, PortalService
+from tiqora.api.uploads import MAX_ATTACHMENT_BYTES, read_upload_within_limit
 from tiqora.domain.portal_ticket_service import (
     PortalFollowUpRejected,
     PortalTicketAccessDenied,
@@ -21,9 +22,6 @@ from tiqora.domain.portal_ticket_service import (
 from tiqora.domain.schemas import PortalAttachmentUploadResponse
 
 router = APIRouter(prefix="/tickets", tags=["portal-attachments"])
-
-# Cap a single portal upload so a customer can't exhaust memory with one request.
-_MAX_UPLOAD_BYTES = 25 * 1024 * 1024  # 25 MiB
 
 
 def _map_exc(exc: Exception) -> HTTPException:
@@ -51,12 +49,9 @@ async def upload_attachment(
     file: UploadFile = File(...),  # noqa: B008
     note: str = Form(default=""),
 ) -> PortalAttachmentUploadResponse:
-    content = await file.read()
-    if len(content) > _MAX_UPLOAD_BYTES:
-        raise HTTPException(
-            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
-            detail=f"Attachment exceeds the {_MAX_UPLOAD_BYTES // (1024 * 1024)} MiB limit",
-        )
+    # Bounded read: the old `await file.read()` then length-check pulled the
+    # whole (possibly huge) part into memory before rejecting it.
+    content = await read_upload_within_limit(file, MAX_ATTACHMENT_BYTES)
     body = note or f"(attachment: {file.filename or 'file'})"
     try:
         article_id, _reopened = await svc.reply(
