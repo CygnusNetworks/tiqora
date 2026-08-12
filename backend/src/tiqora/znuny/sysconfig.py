@@ -43,6 +43,13 @@ ZNUNY_SETTING_DEFAULTS: Final[dict[str, Any]] = {
     "PostmasterUserID": 1,
     # Envelope-only archive copy of all outgoing mail (Defaults.pm: empty).
     "SendmailBcc": "",
+    # Session lifetime — Kernel/Config/Files/XML/Framework.xml defaults. Used by
+    # the compat GenericInterface to reject Znuny session ids that Znuny's own
+    # Kernel::System::AuthSession::DB::CheckSessionID would already refuse. Rows
+    # linger in `sessions` until the cleanup daemon runs, so presence of a row
+    # is NOT proof of validity.
+    "SessionMaxTime": 57600,
+    "SessionMaxIdleTime": 7200,
 }
 
 # Settings Tiqora currently needs typed accessors for.
@@ -209,6 +216,16 @@ class SysConfig:
 
     async def postmaster_user_id(self) -> int:
         return int(await self.get("PostmasterUserID", 1) or 1)
+
+    # --- session lifetime (compat GenericInterface) ---
+
+    async def session_max_time(self) -> int:
+        """``SessionMaxTime`` — absolute session lifetime in seconds."""
+        return int(await self.get("SessionMaxTime", 57600) or 57600)
+
+    async def session_max_idle_time(self) -> int:
+        """``SessionMaxIdleTime`` — idle timeout in seconds."""
+        return int(await self.get("SessionMaxIdleTime", 7200) or 7200)
 
     async def tiqora_settings(self) -> dict[str, Any]:
         """All settings currently required by Tiqora core."""

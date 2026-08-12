@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import base64
 import contextlib
+import time
 from datetime import datetime
 from typing import Any
 
@@ -31,6 +32,7 @@ from tiqora.api.compat.operations import (
     op_ticket_search,
     op_ticket_update,
 )
+from tiqora.config import Settings
 from tiqora.db.tiqora.base import TiqoraBase
 from tiqora.domain.auth import SessionStore
 from tiqora.znuny.password import hash_password
@@ -151,7 +153,13 @@ def _seed_compat_data(sync_url: str) -> dict[str, Any]:
         TiqoraBase.metadata.create_all(conn)
 
         # Idempotent cleanup of our block (shared session-scoped DB).
-        conn.execute(text("DELETE FROM sessions WHERE session_id = 'TESTSESSIONID123'"))
+        conn.execute(
+            text(
+                "DELETE FROM sessions WHERE session_id IN"
+                " ('TESTSESSIONID123', 'TESTSESSIONIDLE', 'TESTSESSIONOLD',"
+                "  'TESTSESSIONNOSTAMP')"
+            )
+        )
         conn.execute(text("DELETE FROM dynamic_field WHERE id = 99"))
         conn.execute(text("DELETE FROM customer_user WHERE login = 'cust.user1'"))
         conn.execute(text("DELETE FROM queue WHERE id = 50"))
@@ -244,20 +252,47 @@ def _seed_compat_data(sync_url: str) -> dict[str, Any]:
                 {"t": NOW},
             )
 
-        # Seed a Znuny-style session entry (for SessionID auth test)
+        # Seed Znuny-style session entries (for SessionID auth tests). The
+        # lifetime stamps are what Znuny's CheckSessionID gates on, so every
+        # fixture session carries them explicitly — a row without them is
+        # treated as expired (see _znuny_session_expired).
+        now_epoch = int(time.time())
+        seeded_sessions: dict[str, dict[str, str]] = {
+            # Fresh: inside both SessionMaxIdleTime (2h) and SessionMaxTime (16h).
+            "TESTSESSIONID123": {
+                "UserLastRequest": str(now_epoch),
+                "UserSessionStart": str(now_epoch),
+                "UserRemoteAddr": "203.0.113.10",
+            },
+            # Idle too long: last request 3h ago (> SessionMaxIdleTime 7200s).
+            "TESTSESSIONIDLE": {
+                "UserLastRequest": str(now_epoch - 3 * 3600),
+                "UserSessionStart": str(now_epoch - 3 * 3600),
+            },
+            # Active but too old: started 20h ago (> SessionMaxTime 57600s).
+            "TESTSESSIONOLD": {
+                "UserLastRequest": str(now_epoch),
+                "UserSessionStart": str(now_epoch - 20 * 3600),
+            },
+            # Pre-fix shape: no lifetime stamps at all.
+            "TESTSESSIONNOSTAMP": {},
+        }
         with contextlib.suppress(Exception):
-            for key, val in [
-                ("UserID", "300"),
-                ("UserLogin", "compat.agent"),
-                ("UserType", "User"),
-            ]:
-                conn.execute(
-                    text(
-                        "INSERT INTO sessions (session_id, data_key, data_value, serialized)"
-                        " VALUES ('TESTSESSIONID123', :k, :v, 0)"
-                    ),
-                    {"k": key, "v": val},
-                )
+            for session_id, extra in seeded_sessions.items():
+                values = {
+                    "UserID": "300",
+                    "UserLogin": "compat.agent",
+                    "UserType": "User",
+                    **extra,
+                }
+                for key, val in values.items():
+                    conn.execute(
+                        text(
+                            "INSERT INTO sessions (session_id, data_key, data_value, serialized)"
+                            " VALUES (:sid, :k, :v, 0)"
+                        ),
+                        {"sid": session_id, "k": key, "v": val},
+                    )
 
     return ids
 
@@ -416,6 +451,40 @@ async def test_session_id_auth_ticket_search(compat_mariadb: dict[str, Any]) -> 
     # Should return a list (possibly empty) without an Error key
     assert "Error" not in result, f"Got error instead of ticket IDs: {result}"
     assert "TicketID" in result
+    await engine.dispose()
+
+
+@pytest.mark.db
+@pytest.mark.parametrize(
+    ("session_id", "why"),
+    [
+        ("TESTSESSIONIDLE", "idle beyond SessionMaxIdleTime"),
+        ("TESTSESSIONOLD", "older than SessionMaxTime"),
+        ("TESTSESSIONNOSTAMP", "no lifetime stamps to vouch for it"),
+    ],
+)
+async def test_session_id_auth_rejects_expired(
+    compat_mariadb: dict[str, Any], session_id: str, why: str
+) -> None:
+    """A session row Znuny's CheckSessionID would refuse must not authenticate.
+
+    Rows survive in `sessions` until Znuny's cleanup daemon runs, so presence
+    of a row is not proof of validity — without the expiry gate an abandoned
+    session id stayed usable against the compat API indefinitely.
+    """
+    engine = create_async_engine(compat_mariadb["async_url"])
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    store = _make_session_store()
+
+    async with factory() as session:
+        result = await op_ticket_search(
+            {"SessionID": session_id, "QueueIDs": [compat_mariadb["queue_id"]]},
+            session,
+            store,
+        )
+
+    assert "Error" in result, f"expired session ({why}) was accepted: {result}"
+    assert result["Error"]["ErrorCode"].endswith("AuthFail")
     await engine.dispose()
 
 
@@ -1379,5 +1448,44 @@ async def test_compat_password_rejects_2fa_agent_non_2fa_still_works(
             store,
         )
         assert "SessionID" in ok2, ok2
+
+    await engine.dispose()
+
+
+@pytest.mark.db
+async def test_session_remote_ip_binding_is_opt_in(compat_mariadb: dict[str, Any]) -> None:
+    """The remote-IP check must not fire by default.
+
+    Znuny stores the address *its own* webserver saw; behind a reverse proxy
+    Tiqora's socket peer differs, so enforcing Znuny's SessionCheckRemoteIP
+    value would reject perfectly valid sessions. It is therefore opt-in via
+    TIQORA_COMPAT_SESSION_CHECK_REMOTE_IP (security review H-1).
+    """
+    from tiqora.api.compat.operations import _lookup_session
+
+    engine = create_async_engine(compat_mariadb["async_url"])
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    # The fixture bound TESTSESSIONID123 to 203.0.113.10.
+    mismatched = "198.51.100.99"
+
+    async with factory() as session:
+        default_cfg = Settings(environment="test")
+        assert default_cfg.compat_session_check_remote_ip is False
+        allowed = await _lookup_session(
+            session, "TESTSESSIONID123", remote_addr=mismatched, settings=default_cfg
+        )
+        assert allowed is not None, "default config must not enforce the IP binding"
+
+        strict_cfg = Settings(environment="test", compat_session_check_remote_ip=True)
+        denied = await _lookup_session(
+            session, "TESTSESSIONID123", remote_addr=mismatched, settings=strict_cfg
+        )
+        assert denied is None
+
+        # Matching address still passes under the strict config.
+        ok = await _lookup_session(
+            session, "TESTSESSIONID123", remote_addr="203.0.113.10", settings=strict_cfg
+        )
+        assert ok is not None
 
     await engine.dispose()
