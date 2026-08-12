@@ -106,6 +106,8 @@ _TEST_LOGINS = [
     "failmail.test",
     "update.contact",
     "lang.test",
+    "revoke.me",
+    "keep.session",
 ]
 
 
