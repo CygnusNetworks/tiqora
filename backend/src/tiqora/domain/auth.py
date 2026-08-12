@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import contextlib
 import hashlib
 import secrets
+import time
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
@@ -20,6 +22,14 @@ from tiqora.znuny.password import hash_password, is_weak_scheme, needs_rehash, v
 SESSION_KEY_PREFIX = "tiqora:session:"
 SESSION_AVATAR_KEY_PREFIX = "tiqora:session:avatar:"
 SESSION_BORN_KEY_PREFIX = "tiqora:session:born:"
+# Wall-clock of the authentication event that produced the session. Never
+# renewed by touch() — "recent" must mean recently *authenticated*, not
+# recently active, or the marker would be worthless for step-up (H-2).
+SESSION_AUTH_AT_KEY_PREFIX = "tiqora:session:authat:"
+# Reverse index token-set per user, so a password change can revoke every live
+# session of that account (M-2). Sessions are keyed by opaque token only, so
+# without this there is no way to enumerate them.
+SESSION_USER_INDEX_KEY_PREFIX = "tiqora:session:user:"
 
 # A never-matching bcrypt hash so authentication does the same bcrypt work for a
 # non-existent login as for a wrong password — closes the username-enumeration
@@ -155,6 +165,8 @@ class SessionStore:
         self._prefix = SESSION_KEY_PREFIX
         self._avatar_prefix = SESSION_AVATAR_KEY_PREFIX
         self._born_prefix = SESSION_BORN_KEY_PREFIX
+        self._auth_at_prefix = SESSION_AUTH_AT_KEY_PREFIX
+        self._user_index_prefix = SESSION_USER_INDEX_KEY_PREFIX
 
     def _key(self, token: str) -> str:
         return f"{self._prefix}{token}"
@@ -165,6 +177,12 @@ class SessionStore:
     def _born_key(self, token: str) -> str:
         return f"{self._born_prefix}{token}"
 
+    def _auth_at_key(self, token: str) -> str:
+        return f"{self._auth_at_prefix}{token}"
+
+    def _user_index_key(self, user_id: int) -> str:
+        return f"{self._user_index_prefix}{user_id}"
+
     async def create(self, user_id: int, login: str, *, avatar_url: str | None = None) -> str:
         token = secrets.token_urlsafe(32)
         payload = f"{user_id}:{login}"
@@ -173,9 +191,65 @@ class SessionStore:
         # session dies session_absolute_ttl_seconds after creation regardless of
         # activity (L-2).
         await self._client.set(self._born_key(token), "1", ex=self._absolute_ttl)
+        # Authentication timestamp for step-up checks (H-2), same fixed TTL.
+        await self._client.set(
+            self._auth_at_key(token), str(int(time.time())), ex=self._absolute_ttl
+        )
+        # Reverse index so revoke_user_sessions() can find this token (M-2).
+        with contextlib.suppress(Exception):
+            index_key = self._user_index_key(user_id)
+            await self._client.sadd(index_key, token)
+            await self._client.expire(index_key, self._absolute_ttl)
         if avatar_url:
             await self._client.set(self._avatar_key(token), avatar_url, ex=self._ttl)
         return token
+
+    async def seconds_since_auth(self, token: str) -> int | None:
+        """Age of the authentication event behind *token*, or ``None`` if unknown.
+
+        ``None`` means the session predates this marker (rolling upgrade) or its
+        key expired — callers decide how to treat that; the step-up helper
+        treats it as "too old" so the safe answer does not depend on Redis
+        bookkeeping surviving a deploy.
+        """
+        raw = await self._client.get(self._auth_at_key(token))
+        if raw is None:
+            return None
+        if isinstance(raw, bytes):
+            raw = raw.decode("utf-8")
+        try:
+            return max(0, int(time.time()) - int(str(raw).strip()))
+        except (TypeError, ValueError):
+            return None
+
+    async def revoke_user_sessions(self, user_id: int, *, keep_token: str | None = None) -> int:
+        """Delete every live session of *user_id*; return how many were removed.
+
+        Used after a password change so a stolen session cannot outlive the
+        credential it was obtained with (M-2). ``keep_token`` spares the caller's
+        own session, which is what a self-service password change wants.
+        """
+        index_key = self._user_index_key(user_id)
+        try:
+            members = await self._client.smembers(index_key)
+        except Exception:  # noqa: BLE001 — a missing index must not break the write
+            return 0
+        removed = 0
+        for raw in members or set():
+            token = raw.decode("utf-8") if isinstance(raw, bytes) else str(raw)
+            if keep_token is not None and token == keep_token:
+                continue
+            await self.delete(token)
+            removed += 1
+        if keep_token is not None:
+            with contextlib.suppress(Exception):
+                await self._client.delete(index_key)
+                await self._client.sadd(index_key, keep_token)
+                await self._client.expire(index_key, self._absolute_ttl)
+        else:
+            with contextlib.suppress(Exception):
+                await self._client.delete(index_key)
+        return removed
 
     async def get(self, token: str) -> tuple[int, str] | None:
         # Absolute-lifetime gate: once the (non-renewed) born marker has expired,
@@ -208,7 +282,12 @@ class SessionStore:
         await self._client.expire(self._avatar_key(token), self._ttl)
 
     async def delete(self, token: str) -> None:
-        await self._client.delete(self._key(token), self._avatar_key(token), self._born_key(token))
+        await self._client.delete(
+            self._key(token),
+            self._avatar_key(token),
+            self._born_key(token),
+            self._auth_at_key(token),
+        )
 
     async def create_pending(self, user_id: int, login: str, ttl_seconds: int) -> str:
         """Create a short-lived 'pending 2FA' session (not resolvable by :meth:`get`).

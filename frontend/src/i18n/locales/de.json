@@ -216,6 +216,7 @@
     "passkeyDeleteConfirm": "Passkey „{{name}}“ wirklich entfernen?",
     "passkeyAddError": "Passkey konnte nicht hinzugefügt werden.",
     "passkeyDeleteError": "Passkey konnte nicht entfernt werden.",
+    "passkeyReauthRequired": "Aus Sicherheitsgründen bitte erneut anmelden, bevor Passkeys geändert werden.",
     "passkeyDeleteLastError": "Der letzte 2FA-Faktor kann nicht entfernt werden, solange 2FA erzwungen ist.",
     "passkeyUnsupported": "Dieser Browser unterstützt keine Passkeys (WebAuthn)."
   },

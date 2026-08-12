@@ -86,6 +86,17 @@ class TOTPEnrollOut(BaseModel):
     otpauth_uri: str
 
 
+class TOTPEnrollIn(BaseModel):
+    """Body for ``POST /auth/totp/enroll``.
+
+    ``current_code`` is only required when a TOTP factor is already enabled —
+    re-enrolling then means replacing a live second factor, which must be
+    proven, not merely requested from an authenticated session.
+    """
+
+    current_code: str | None = None
+
+
 class TOTPCodeIn(BaseModel):
     code: str
 

@@ -18,7 +18,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 from tiqora.config import Settings
 from tiqora.db.tiqora.base import TiqoraBase
 from tiqora.domain.auth import AuthService, SessionStore
-from tiqora.domain.totp import TOTPService
+from tiqora.domain.totp import TOTPService, TOTPStepUpRequired
 from tiqora.znuny.password import hash_password
 
 pytestmark = pytest.mark.db
@@ -30,6 +30,7 @@ PW_HASH = hash_password("secret123")
 class _FakeRedis:
     def __init__(self) -> None:
         self._store: dict[str, str] = {}
+        self._sets: dict[str, set[str]] = {}
 
     async def set(self, key: str, value: str, ex: int | None = None) -> None:
         self._store[key] = value
@@ -43,6 +44,16 @@ class _FakeRedis:
     async def delete(self, *keys: str) -> None:
         for key in keys:
             self._store.pop(key, None)
+            self._sets.pop(key, None)
+
+    async def sadd(self, key: str, *members: str) -> int:
+        bucket = self._sets.setdefault(key, set())
+        before = len(bucket)
+        bucket.update(members)
+        return len(bucket) - before
+
+    async def smembers(self, key: str) -> set[str]:
+        return set(self._sets.get(key, set()))
 
 
 def _to_async_url(sync_url: str) -> str:
@@ -349,5 +360,134 @@ async def test_force_disable_without_code(url_fixture: str, request: pytest.Fixt
         assert await totp.force_disable(user_id) is True
         assert await totp.is_enabled(user_id) is False
         assert await totp.force_disable(user_id) is False
+
+    await engine.dispose()
+
+
+# ---------------------------------------------------------------------------
+# Re-enrollment step-up (security review H-2)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("url_fixture", ["mariadb_znuny_url", "postgres_znuny_url"])
+async def test_reenroll_without_current_code_is_refused(
+    url_fixture: str, request: pytest.FixtureRequest
+) -> None:
+    """A session alone must not be able to replace a live second factor.
+
+    Before the fix ``enroll()`` cleared ``enabled`` on the way in, so merely
+    *calling* it turned 2FA off — a hijacked session could downgrade the
+    account without ever completing the enrollment.
+    """
+    sync_url: str = request.getfixturevalue(url_fixture)
+    user_id, login = _seed_user(sync_url)
+    engine = create_async_engine(_to_async_url(sync_url))
+    factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+    settings = Settings(secret_key="unit-test-secret-key")
+
+    async with factory() as session:
+        totp = TOTPService(session, settings, _FakeRedis())
+        secret, _ = await totp.enroll(user_id, login)
+        assert await totp.confirm(user_id, pyotp.TOTP(secret).now()) is True
+        assert await totp.is_enabled(user_id) is True
+
+        with pytest.raises(TOTPStepUpRequired):
+            await totp.enroll(user_id, login)
+        with pytest.raises(TOTPStepUpRequired):
+            await totp.enroll(user_id, login, current_code="000000")
+
+        # The live factor survived both attempts, secret unchanged.
+        assert await totp.is_enabled(user_id) is True
+        assert await totp.verify(user_id, pyotp.TOTP(secret).now()) is True
+
+    await engine.dispose()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("url_fixture", ["mariadb_znuny_url", "postgres_znuny_url"])
+async def test_reenroll_with_current_code_keeps_old_factor_until_confirm(
+    url_fixture: str, request: pytest.FixtureRequest
+) -> None:
+    """With a valid current code the swap is allowed — but only lands on confirm.
+
+    An abandoned re-enrollment must leave the original authenticator working.
+    """
+    sync_url: str = request.getfixturevalue(url_fixture)
+    user_id, login = _seed_user(sync_url)
+    engine = create_async_engine(_to_async_url(sync_url))
+    factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+    settings = Settings(secret_key="unit-test-secret-key")
+
+    async with factory() as session:
+        totp = TOTPService(session, settings, _FakeRedis())
+        old_secret, _ = await totp.enroll(user_id, login)
+        assert await totp.confirm(user_id, pyotp.TOTP(old_secret).now()) is True
+
+        new_secret, uri = await totp.enroll(
+            user_id, login, current_code=pyotp.TOTP(old_secret).now()
+        )
+        assert new_secret != old_secret
+        assert login in uri
+
+        # Pending only: the live row still holds the OLD secret, untouched.
+        assert await totp.is_enabled(user_id) is True
+        live_row = await totp._get_row(user_id)  # noqa: SLF001 — asserting storage, not behaviour
+        assert live_row is not None
+        assert totp._decrypt(live_row.secret) == old_secret  # noqa: SLF001
+        # A code from the old authenticator does not confirm the pending one.
+        assert await totp.confirm(user_id, pyotp.TOTP(old_secret).now()) is False
+        assert await totp.is_enabled(user_id) is True
+
+        assert await totp.confirm(user_id, pyotp.TOTP(new_secret).now()) is True
+        live_row = await totp._get_row(user_id)  # noqa: SLF001
+        assert live_row is not None
+        assert totp._decrypt(live_row.secret) == new_secret  # noqa: SLF001
+
+    await engine.dispose()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("url_fixture", ["mariadb_znuny_url", "postgres_znuny_url"])
+async def test_first_enrollment_needs_no_step_up(
+    url_fixture: str, request: pytest.FixtureRequest
+) -> None:
+    """Nothing to protect yet — forced/first-time enrollment stays frictionless."""
+    sync_url: str = request.getfixturevalue(url_fixture)
+    user_id, login = _seed_user(sync_url)
+    engine = create_async_engine(_to_async_url(sync_url))
+    factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+    settings = Settings(secret_key="unit-test-secret-key")
+
+    async with factory() as session:
+        totp = TOTPService(session, settings, _FakeRedis())
+        secret, _ = await totp.enroll(user_id, login)
+        # Re-running an *unconfirmed* enrollment is also fine (user lost the QR).
+        secret2, _ = await totp.enroll(user_id, login)
+        assert secret2 != secret
+        assert await totp.confirm(user_id, pyotp.TOTP(secret2).now()) is True
+
+    await engine.dispose()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("url_fixture", ["mariadb_znuny_url", "postgres_znuny_url"])
+async def test_disable_consumes_timestep(url_fixture: str, request: pytest.FixtureRequest) -> None:
+    """A code already spent on a login cannot also be spent to switch 2FA off (L-4)."""
+    sync_url: str = request.getfixturevalue(url_fixture)
+    user_id, login = _seed_user(sync_url)
+    engine = create_async_engine(_to_async_url(sync_url))
+    factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+    settings = Settings(secret_key="unit-test-secret-key")
+
+    async with factory() as session:
+        totp = TOTPService(session, settings, _FakeRedis())
+        secret, _ = await totp.enroll(user_id, login)
+        assert await totp.confirm(user_id, pyotp.TOTP(secret).now()) is True
+
+        code = pyotp.TOTP(secret).now()
+        assert await totp.verify(user_id, code) is True  # spends this timestep
+        assert await totp.disable(user_id, code) is False
+        assert await totp.is_enabled(user_id) is True
 
     await engine.dispose()

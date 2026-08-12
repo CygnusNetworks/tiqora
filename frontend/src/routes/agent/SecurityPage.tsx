@@ -19,6 +19,18 @@ function browserSupportsWebAuthn(): boolean {
 }
 
 /**
+ * The backend refuses passkey changes from a session that authenticated too
+ * long ago ("sudo mode", see _require_recent_auth). It signals that with a 403
+ * carrying the `reauthentication_required` detail, which reaches us as the
+ * ApiError message — a plain 403 means something else and keeps its own text.
+ */
+function isReauthRequired(err: unknown): boolean {
+  return (
+    err instanceof ApiError && err.status === 403 && err.message === "reauthentication_required"
+  );
+}
+
+/**
  * Agent account security: TOTP 2FA enrollment with a backend-rendered SVG
  * QR code (GET /api/v1/auth/totp/enroll/qr, cookie-authenticated — plain
  * <img src> works because /api is same-origin, see vite.config.ts proxy),
@@ -103,6 +115,8 @@ export function SecurityPage() {
     onError: (err: unknown) => {
       if (err instanceof ApiError && err.status === 400) {
         setPasskeyError(t("security.passkeyDeleteLastError"));
+      } else if (isReauthRequired(err)) {
+        setPasskeyError(t("security.passkeyReauthRequired"));
       } else {
         setPasskeyError(t("security.passkeyDeleteError"));
       }
@@ -146,7 +160,11 @@ export function SecurityPage() {
       if (err instanceof Error && /cancel|abort|notallowed/i.test(err.name + err.message)) {
         return;
       }
-      setPasskeyError(t("security.passkeyAddError"));
+      setPasskeyError(
+        isReauthRequired(err)
+          ? t("security.passkeyReauthRequired")
+          : t("security.passkeyAddError"),
+      );
     } finally {
       setAddingPasskey(false);
     }
