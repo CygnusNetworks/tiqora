@@ -285,6 +285,14 @@ class Settings(BaseSettings):
     totp_pending_ttl_seconds: int = Field(default=300, validation_alias="TIQORA_TOTP_PENDING_TTL")
     totp_issuer: str = Field(default="Tiqora", validation_alias="TIQORA_TOTP_ISSUER")
 
+    # "Sudo mode" for changes to an account's own second factor: how long after
+    # the actual login a session may still register or delete a passkey
+    # (security review H-2). Past this, the agent must log in again — an
+    # authenticated session alone must not be enough to bolt a persistent
+    # second factor onto someone else's account. Only enforced when the account
+    # already has a factor; first-time enrollment stays frictionless.
+    step_up_max_age_seconds: int = Field(default=900, validation_alias="TIQORA_STEP_UP_MAX_AGE")
+
     # Password-auth rate limit / lockout (M-7 / H-01). Disable for unit tests
     # that hammer login (TIQORA_AUTH_RATE_LIMIT_ENABLED=0).
     auth_rate_limit_enabled: bool = Field(
@@ -338,6 +346,19 @@ class Settings(BaseSettings):
     # requests match automatically; API-key Authorization is exempt.
     csrf_origin_check_enabled: bool = Field(
         default=True, validation_alias="TIQORA_CSRF_ORIGIN_CHECK_ENABLED"
+    )
+
+    # Znuny's SessionCheckRemoteIP for session ids presented to the compat
+    # GenericInterface. OFF by default and deliberately NOT derived from the
+    # Znuny SysConfig value: Znuny stores the address *its own* webserver saw
+    # ($ENV{REMOTE_ADDR}), and Tiqora usually sits behind a different proxy, so
+    # enforcing it would reject valid sessions wherever the two peers disagree.
+    # Turn it on only when Tiqora and Znuny observe the same client address —
+    # e.g. TIQORA_TRUSTED_PROXIES is configured and both sit behind the same
+    # reverse proxy. The idle / absolute expiry checks are always enforced and
+    # are the actual fix for stale Znuny sessions (security review H-1).
+    compat_session_check_remote_ip: bool = Field(
+        default=False, validation_alias="TIQORA_COMPAT_SESSION_CHECK_REMOTE_IP"
     )
 
     # WebAuthn passkeys as an alternative 2nd factor (Phase 3c). Disabled unless

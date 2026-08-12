@@ -201,8 +201,12 @@ async def _auth_from_params(
 
     session_id = (data.get("SessionID") or "").strip()
     if session_id:
-        # Validate against Znuny sessions table (key-value: UserID, UserLogin, UserType)
-        result = await _lookup_session(session, session_id)
+        # Validate against Znuny sessions table (key-value: UserID, UserLogin,
+        # UserType) — including the idle/absolute expiry and remote-IP binding
+        # Znuny's own CheckSessionID enforces.
+        result = await _lookup_session(
+            session, session_id, remote_addr=_peer_addr(request), settings=cfg
+        )
         if result is not None:
             return result
         # Fall back to Tiqora's own session store: a SessionID issued by the
@@ -284,18 +288,80 @@ async def _auth_from_params(
     return _err(f"{op_prefix}.AuthFail", "No UserLogin, CustomerUserLogin, or SessionID provided!")
 
 
-async def _lookup_session(session: AsyncSession, session_id: str) -> tuple[int, str, str] | None:
+def _peer_addr(request: Any | None) -> str | None:
+    """Client address for the Znuny remote-IP session binding.
+
+    ``client_ip`` falls back to the literal ``"unknown"`` when no peer can be
+    determined; that must not be compared against a stored address or every
+    session would fail the binding check. Return ``None`` instead so the caller
+    skips the comparison.
+    """
+    if request is None:
+        return None
+    addr = client_ip(request)
+    return addr if addr and addr != "unknown" else None
+
+
+def _session_epoch(raw: str | None) -> int | None:
+    """Parse a Znuny session timestamp (epoch seconds) from the kv table."""
+    if raw is None:
+        return None
+    try:
+        return int(str(raw).strip())
+    except (TypeError, ValueError):
+        return None
+
+
+def _znuny_session_expired(
+    data: dict[str, str],
+    *,
+    now: int,
+    max_idle_time: int,
+    max_time: int,
+) -> bool:
+    """Whether Znuny's ``CheckSessionID`` would refuse this session.
+
+    Ports the two time gates of ``Kernel::System::AuthSession::DB::CheckSessionID``
+    (Znuny 6.x). Rows survive in the ``sessions`` table until
+    ``SessionDeleteIfTimeToOld`` fires on a Znuny-side request or the cleanup
+    daemon runs, so the mere presence of a row proves nothing — without these
+    checks an abandoned session id stayed valid in Tiqora indefinitely.
+
+    A session whose timestamps are missing or unparseable is treated as expired:
+    a row we cannot date is a row we cannot vouch for.
+    """
+    last_request = _session_epoch(data.get("UserLastRequest"))
+    if last_request is None or (now - max_idle_time) >= last_request:
+        return True
+    session_start = _session_epoch(data.get("UserSessionStart"))
+    return session_start is None or (now - max_time) >= session_start
+
+
+async def _lookup_session(
+    session: AsyncSession,
+    session_id: str,
+    *,
+    sysconfig: SysConfig | None = None,
+    remote_addr: str | None = None,
+    settings: Settings | None = None,
+) -> tuple[int, str, str] | None:
     """Look up a Znuny session row in the `sessions` key-value table.
 
     The table has: session_id, data_key, data_value
-    We need UserID, UserLogin, and UserType.
+    We need UserID, UserLogin, UserType, and the two lifetime stamps.
+
+    Idle/absolute expiry and the optional remote-IP binding are enforced here
+    exactly as Znuny's own ``CheckSessionID`` does — see
+    :func:`_znuny_session_expired`.
     """
     rows = (
         await session.execute(
             text(
                 "SELECT data_key, data_value FROM sessions"
                 " WHERE session_id = :sid"
-                "  AND data_key IN ('UserID', 'UserLogin', 'UserType')"
+                "  AND data_key IN ('UserID', 'UserLogin', 'UserType',"
+                "                   'UserLastRequest', 'UserSessionStart',"
+                "                   'UserRemoteAddr')"
             ),
             {"sid": session_id},
         )
@@ -308,6 +374,34 @@ async def _lookup_session(session: AsyncSession, session_id: str) -> tuple[int, 
     user_type = data.get("UserType", _AGENT_USER_TYPE)
     if not user_login:
         return None
+
+    cfg = sysconfig if sysconfig is not None else SysConfig(session)
+    if _znuny_session_expired(
+        data,
+        now=int(datetime.now(UTC).timestamp()),
+        max_idle_time=await cfg.session_max_idle_time(),
+        max_time=await cfg.session_max_time(),
+    ):
+        logger.info("compat_session_expired", session_id_prefix=session_id[:8])
+        return None
+
+    # Remote-IP binding (Znuny SessionCheckRemoteIP). Opt-in via
+    # TIQORA_COMPAT_SESSION_CHECK_REMOTE_IP rather than read from the Znuny
+    # SysConfig: Znuny recorded the address *its* webserver saw, which differs
+    # from Tiqora's socket peer in most reverse-proxy setups, so honouring the
+    # Znuny value would reject valid sessions. Also skipped when no peer address
+    # is available, so internal dispatch is not locked out by a missing value.
+    app_cfg = settings if settings is not None else get_settings()
+    if remote_addr and app_cfg.compat_session_check_remote_ip:
+        bound_addr = data.get("UserRemoteAddr")
+        if bound_addr and bound_addr != remote_addr:
+            logger.warning(
+                "compat_session_remote_ip_mismatch",
+                session_id_prefix=session_id[:8],
+                expected=bound_addr,
+                actual=remote_addr,
+            )
+            return None
     # Customer sessions: never treat UserID as an agent principal for ACL.
     if user_type == _CUSTOMER_USER_TYPE:
         return (_CUSTOMER_SENTINEL_USER_ID, user_login, _CUSTOMER_USER_TYPE)
