@@ -71,21 +71,35 @@ def _presence_key(ticket_id: int, user_id: int) -> str:
 # ---------------------------------------------------------------------------
 
 
+# Message types that carry ticket-specific information and are therefore only
+# delivered to agents who may read the ticket's queue. ``presence_changed`` is
+# scoped by its own endpoint (the payload deliberately carries no state and the
+# follow-up GET enforces `ro`), so it is not listed here.
+_QUEUE_SCOPED_EVENT_TYPES = frozenset({"ticket_new_in_queue", "ticket_changed"})
+
+
 def _should_forward(raw: str, allowed_queue_ids: set[int]) -> bool:
     """Whether one raw pub/sub payload should reach *this* connection.
 
-    Only ``ticket_new_in_queue`` is filtered — it is dropped when its
-    ``queue_id`` is not among the agent's readable queues. Every other
-    message type (and any payload that isn't valid JSON) passes through, so
-    a filter miss never silently swallows unrelated events. Extracted as a
-    pure function so the per-queue gate is unit-testable without a live SSE
+    Queue-scoped message types are dropped unless their ``queue_id`` is one the
+    agent can read. ``ticket_changed`` counts as queue-scoped: "ticket 4711
+    changed just now" is information about a ticket, so broadcasting it to every
+    authenticated agent leaked activity metadata across queue boundaries
+    (security review L-2). A queue-scoped message that arrives *without* a
+    ``queue_id`` is dropped rather than broadcast — the frontend still
+    reconciles through its normal refetch path, so failing closed here costs
+    latency, not correctness.
+
+    Everything else (and any payload that isn't valid JSON) passes through, so a
+    filter miss never silently swallows unrelated events. Extracted as a pure
+    function so the per-queue gate is unit-testable without a live SSE
     connection.
     """
     try:
         payload = json.loads(raw)
     except (ValueError, TypeError):
         return True
-    if not isinstance(payload, dict) or payload.get("type") != "ticket_new_in_queue":
+    if not isinstance(payload, dict) or payload.get("type") not in _QUEUE_SCOPED_EVENT_TYPES:
         return True
     return payload.get("queue_id") in allowed_queue_ids
 

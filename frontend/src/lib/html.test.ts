@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { decodeEntities, stripHtml } from "./html";
 
 describe("stripHtml", () => {
@@ -30,5 +30,29 @@ describe("decodeEntities", () => {
     // decodeEntities is used on the plain-text branch, where a literal
     // "<" is not markup — it must survive, not be parsed away.
     expect(decodeEntities("Preis &lt; 5€")).toBe("Preis < 5€");
+  });
+});
+
+describe("inert parsing (security review L-6)", () => {
+  it("does not run an inline event handler while stripping tags", () => {
+    // `document.createElement("div").innerHTML = ...` belongs to the live
+    // document and fires img/onerror; DOMParser's document never loads.
+    const spy = vi.fn();
+    (globalThis as unknown as { __xss__: () => void }).__xss__ = spy;
+    const payload = '<img src="x" onerror="window.__xss__()">danger';
+    expect(stripHtml(payload)).toBe("danger");
+    expect(spy).not.toHaveBeenCalled();
+  });
+
+  it("does not run an inline event handler while decoding entities", () => {
+    const spy = vi.fn();
+    (globalThis as unknown as { __xss2__: () => void }).__xss2__ = spy;
+    expect(decodeEntities('<img src="x" onerror="window.__xss2__()">')).toBe("");
+    expect(spy).not.toHaveBeenCalled();
+  });
+
+  it("still decodes and strips correctly after the switch", () => {
+    expect(stripHtml("<p>Hi &amp; bye</p>")).toBe("Hi & bye");
+    expect(decodeEntities("a &lt; b")).toBe("a < b");
   });
 });

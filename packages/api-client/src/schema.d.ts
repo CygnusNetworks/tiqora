@@ -3605,6 +3605,10 @@ export interface paths {
         /**
          * Passkey Delete
          * @description Delete a passkey. Blocked when it is the last remaining 2FA factor under enforce.
+         *
+         *     Removing a factor needs the same recently-authenticated session as adding
+         *     one — otherwise a hijacked session could strip the account back down to a
+         *     single factor it already controls.
          */
         delete: operations["passkey_delete_api_v1_auth_passkey__passkey_id__delete"];
         options?: never;
@@ -3729,7 +3733,15 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Totp Enroll */
+        /**
+         * Totp Enroll
+         * @description Start (or replace) a TOTP enrollment.
+         *
+         *     Replacing an *active* factor needs ``current_code`` from the authenticator
+         *     already enrolled — an authenticated session alone is not enough, or a
+         *     hijacked session could swap the second factor for one it controls
+         *     (security review H-2). Wrong codes are throttled like any other 2FA guess.
+         */
         post: operations["totp_enroll_api_v1_auth_totp_enroll_post"];
         delete?: never;
         options?: never;
@@ -11669,6 +11681,18 @@ export interface components {
         TOTPCodeIn: {
             /** Code */
             code: string;
+        };
+        /**
+         * TOTPEnrollIn
+         * @description Body for ``POST /auth/totp/enroll``.
+         *
+         *     ``current_code`` is only required when a TOTP factor is already enabled —
+         *     re-enrolling then means replacing a live second factor, which must be
+         *     proven, not merely requested from an authenticated session.
+         */
+        TOTPEnrollIn: {
+            /** Current Code */
+            current_code?: string | null;
         };
         /** TOTPEnrollOut */
         TOTPEnrollOut: {
@@ -23463,7 +23487,11 @@ export interface operations {
                 tiqora_session?: string | null;
             };
         };
-        requestBody?: never;
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["TOTPEnrollIn"] | null;
+            };
+        };
         responses: {
             /** @description Successful Response */
             200: {

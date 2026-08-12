@@ -205,13 +205,22 @@ async def test_sse_stream_forwards_published_message() -> None:
     from tiqora.api.v1.events import _event_stream
 
     fake_redis = _FakeRedis()
-    generator = _event_stream(cast(Any, _FakeRequest()), cast(Any, fake_redis), set())
+    # ticket_changed is queue-scoped now, so the connection needs `ro` on the
+    # ticket's queue for the message to be delivered at all.
+    generator = _event_stream(cast(Any, _FakeRequest()), cast(Any, fake_redis), {7})
 
     async def _publish_soon() -> None:
         await asyncio.sleep(0.05)
         await fake_redis.publish(
             TIQORA_EVENTS_CHANNEL,
-            json.dumps({"type": "ticket_changed", "ticket_id": 42, "event": "TicketCreate"}),
+            json.dumps(
+                {
+                    "type": "ticket_changed",
+                    "ticket_id": 42,
+                    "event": "TicketCreate",
+                    "queue_id": 7,
+                }
+            ),
         )
 
     publisher = asyncio.create_task(_publish_soon())
@@ -223,7 +232,12 @@ async def test_sse_stream_forwards_published_message() -> None:
 
     assert chunk.startswith(b"data:")
     body = json.loads(chunk.split(b"data:", 1)[1].strip())
-    assert body == {"type": "ticket_changed", "ticket_id": 42, "event": "TicketCreate"}
+    assert body == {
+        "type": "ticket_changed",
+        "ticket_id": 42,
+        "event": "TicketCreate",
+        "queue_id": 7,
+    }
 
 
 @pytest.mark.asyncio
@@ -273,13 +287,32 @@ def test_should_forward_filters_new_ticket_by_queue() -> None:
 def test_should_forward_passes_other_types_and_malformed() -> None:
     from tiqora.api.v1.events import _should_forward
 
-    # No allowed queues at all, yet non-notification types still pass.
     empty: set[int] = set()
-    assert _should_forward(json.dumps({"type": "ticket_changed", "ticket_id": 1}), empty) is True
+    # presence_changed carries no ticket state and is gated by its own endpoint.
     assert _should_forward(json.dumps({"type": "presence_changed", "ticket_id": 1}), empty) is True
     # Malformed / non-dict payloads never get swallowed by the filter.
     assert _should_forward("not json", empty) is True
     assert _should_forward(json.dumps([1, 2, 3]), empty) is True
+
+
+def test_ticket_changed_is_queue_scoped() -> None:
+    """ "Ticket 4711 changed just now" is itself information about a ticket, so
+    it must not reach agents who cannot read that queue (security review L-2)."""
+    from tiqora.api.v1.events import _should_forward
+
+    msg = json.dumps({"type": "ticket_changed", "ticket_id": 1, "queue_id": 5})
+    assert _should_forward(msg, {5}) is True
+    assert _should_forward(msg, {6}) is False
+    assert _should_forward(msg, set()) is False
+
+
+def test_ticket_changed_without_queue_id_is_dropped() -> None:
+    """Fail closed: an unscoped message would otherwise be a broadcast. The
+    frontend still reconciles via its normal refetch path."""
+    from tiqora.api.v1.events import _should_forward
+
+    msg = json.dumps({"type": "ticket_changed", "ticket_id": 1})
+    assert _should_forward(msg, {5}) is False
 
 
 @pytest.mark.asyncio
