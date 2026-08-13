@@ -594,4 +594,54 @@ describe("AiPanel", () => {
     };
     expect(payload.ai_draft_id).toBe(9);
   });
+
+  it("opens the reply editor in Telegram mode when the AI draft's based-on article is a Telegram article", async () => {
+    listArticles.mockResolvedValue([
+      {
+        ...fakeArticle(3),
+        communication_channel_id: 42,
+        communication_channel_name: "Telegram",
+      },
+    ]);
+    getReplyDraft.mockResolvedValue({
+      to_address: null,
+      cc: "",
+      subject: "",
+      body: "quoted",
+      in_reply_to: null,
+      references: null,
+      signature: "",
+      signature_is_html: false,
+    });
+    getState.mockResolvedValue({
+      ...baseState,
+      manual_assist_available: true,
+      drafts: [
+        {
+          ...baseDraft,
+          id: 9,
+          kind: "reply",
+          subject: null,
+          body: "AI drafted answer",
+          source: "manual",
+        },
+      ],
+    });
+
+    wrap(<AiPanel ticketId={1} canNote />);
+
+    await waitFor(() => expect(screen.getByTestId("ai-panel-draft-use-9")).toBeTruthy());
+    fireEvent.click(screen.getByTestId("ai-panel-draft-use-9"));
+
+    await waitFor(() => expect(screen.getByTestId("reply-dialog")).toBeTruthy());
+    expect(screen.getByTestId("reply-telegram-hint")).toBeInTheDocument();
+    expect(screen.queryByTestId("reply-to")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId("reply-send"));
+
+    await waitFor(() => expect(createArticle).toHaveBeenCalled());
+    const payload = createArticle.mock.calls[0][1] as { channel: string; to_address: string | null };
+    expect(payload.channel).toBe("telegram");
+    expect(payload.to_address).toBeNull();
+  });
 });

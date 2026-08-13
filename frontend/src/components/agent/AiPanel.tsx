@@ -10,6 +10,7 @@ import {
   type SummaryDetail,
 } from "@/lib/ticketAiApi";
 import { articleSortKey } from "@/lib/article";
+import { channelNameOf } from "@/lib/articleChannel";
 import { formatDateTime } from "@/lib/format";
 import { cn } from "@/lib/cn";
 import { Button } from "@/components/ui/Button";
@@ -203,6 +204,8 @@ export function AiPanel({
     [...articles].sort((a, b) => articleSortKey(b) - articleSortKey(a))[0]
       ?.id ??
     null;
+  const replyArticle =
+    replyArticleId != null ? articles.find((a) => a.id === replyArticleId) : undefined;
 
   return (
     <div
@@ -642,6 +645,7 @@ export function AiPanel({
             subject: replyDraft.subject,
             body: replyDraft.body,
           }}
+          channelName={replyArticle ? channelNameOf(replyArticle) : undefined}
         />
       )}
 

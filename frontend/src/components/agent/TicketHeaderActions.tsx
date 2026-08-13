@@ -16,6 +16,7 @@ import { formatDateTime } from "@/lib/format";
 import { escalationLevel, stateLabel } from "@/lib/status";
 import { cn } from "@/lib/cn";
 import { useReplyDraft } from "@/lib/replyDrafts";
+import { channelNameOf } from "@/lib/articleChannel";
 import { ReplyDialog } from "./ReplyDialog";
 import { TicketMetaCounters } from "./TicketMetaCounters";
 import { articleSortKey } from "@/lib/article";
@@ -565,6 +566,7 @@ export function TicketHeaderActions({
           replyAll={false}
           open={replyOpen}
           onClose={() => setReplyOpen(false)}
+          channelName={channelNameOf(replyTarget)}
         />
       )}
       {dialog === "customer" && (
