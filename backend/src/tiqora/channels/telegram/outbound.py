@@ -61,12 +61,16 @@ def _plaintext_body(article: ArticleIn) -> str:
     return body
 
 
-async def _resolve_chat_id(session: AsyncSession, ticket_id: int) -> int:
+async def resolve_chat_id(session: AsyncSession, ticket_id: int) -> int:
     """Resolve the Telegram chat_id to reply into.
 
     (1) the ticket's mapped contact (``tiqora_telegram_contact.customer_user_login``
     == ``ticket.customer_user_id``), (2) fallback: the most recent inbound
     Telegram article on the ticket, chat_id parsed from its ``a_from`` local-part.
+
+    Public (not ``_``-prefixed) so other AI-runtime callers (e.g. the
+    typing-indicator task in :mod:`tiqora.ai.runtime`) can resolve the same
+    chat_id without duplicating this lookup.
     """
     ticket_row = (
         await session.execute(
@@ -110,7 +114,11 @@ async def _resolve_chat_id(session: AsyncSession, ticket_id: int) -> int:
     raise TelegramDeliveryError(f"Cannot resolve Telegram chat_id for ticket {ticket_id}")
 
 
-async def _build_gateway(session: AsyncSession) -> TelegramGateway:
+async def build_gateway(session: AsyncSession) -> TelegramGateway:
+    """Construct a :class:`TelegramGateway` from the channel's configured
+    ``bot_token`` — shared by :func:`deliver_agent_telegram_reply` and the
+    AI-runtime typing-indicator task (:mod:`tiqora.ai.runtime`), which both
+    need a gateway when none is injected (production; tests inject a fake)."""
     bot_token = await channel_setting(session, CHANNEL_NAME, "bot_token")
     if not bot_token:
         raise TelegramDeliveryError("Telegram channel has no bot_token configured")
@@ -135,8 +143,8 @@ async def deliver_agent_telegram_reply(
     if not await channel_enabled(session, CHANNEL_NAME):
         raise TelegramDeliveryError("Telegram channel is disabled")
 
-    gw = gateway if gateway is not None else await _build_gateway(session)
-    chat_id = await _resolve_chat_id(session, ticket_id)
+    gw = gateway if gateway is not None else await build_gateway(session)
+    chat_id = await resolve_chat_id(session, ticket_id)
     body = _plaintext_body(article)
 
     try:
@@ -167,4 +175,4 @@ async def deliver_agent_telegram_reply(
     return article_id
 
 
-__all__ = ["TelegramDeliveryError", "deliver_agent_telegram_reply"]
+__all__ = ["TelegramDeliveryError", "deliver_agent_telegram_reply", "resolve_chat_id"]

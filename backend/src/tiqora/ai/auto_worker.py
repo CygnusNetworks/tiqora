@@ -53,7 +53,7 @@ from tiqora.ai.context import (
     get_or_create_state,
     ticket_snapshot,
 )
-from tiqora.ai.gate import is_auto_reply_paused, is_tiqora_primary
+from tiqora.ai.gate import TIQORA_ONLY_CHANNELS, is_auto_reply_paused, is_tiqora_primary
 from tiqora.ai.kb_wiring import build_llm_client, kb_bundle, kb_get_article_fn, kb_search_fn
 from tiqora.ai.listfields import parse_str_list
 from tiqora.ai.models import FEATURE_AUTO_REPLY, TiqoraAiQueuePolicy, TiqoraAiUsage
@@ -196,7 +196,11 @@ async def _cap_reason(
 
 
 async def _process_customer_article_event(
-    session: AsyncSession, settings: Settings, event: _OutboxEvent
+    session: AsyncSession,
+    settings: Settings,
+    event: _OutboxEvent,
+    *,
+    source_channel: str | None = None,
 ) -> AgentRunResult | None:
     """Handle one ``ArticleCreate`` outbox event. Returns the agent run
     result iff the auto-reply runtime was actually invoked (``None`` for
@@ -268,6 +272,7 @@ async def _process_customer_article_event(
         kb_bundle=bundle,
         kb_search_fn=kb_search_fn(session, settings, policy.service_user_id),
         kb_get_article_fn=kb_get_article_fn(session, settings, policy.service_user_id),
+        source_channel=source_channel,
     )
 
 
@@ -306,7 +311,9 @@ async def run_auto_tick(
     factory = session_factory or get_session_factory()
 
     async with factory() as session:
-        gate_open = await is_tiqora_primary(session) and not await is_auto_reply_paused(session)
+        primary = await is_tiqora_primary(session)
+        paused = await is_auto_reply_paused(session)
+        gate_open = primary and not paused
         watermark = await get_setting_int(session, KEY_AI_OUTBOX_WATERMARK, 0)
         batch = await _next_outbox_batch(session, watermark, _BATCH_SIZE)
 
@@ -319,6 +326,7 @@ async def run_auto_tick(
         "summaries": 0,
         "errors": 0,
         "gate_open": int(gate_open),
+        "tiqora_only_replies": 0,
     }
     last_id = watermark
     touched_ticket_ids: set[int] = set()
@@ -329,14 +337,25 @@ async def run_auto_tick(
         if event.event_type != "ArticleCreate":
             continue
         touched_ticket_ids.add(event.ticket_id)
-        if not gate_open:
-            # Auto-reply is gated; still counted as "seen" so the watermark
-            # advances and the ticket is still eligible for auto-summary
-            # below (summaries are never gated).
+        source_channel = event.payload.get("channel")
+        is_tiqora_only_channel = (source_channel or "").lower() in TIQORA_ONLY_CHANNELS
+        # Per-event gate (plan §3.0 v1.1 relaxation, Phase E): outside
+        # tiqora_primary, only events on a channel with no Znuny counterpart
+        # (see TIQORA_ONLY_CHANNELS) are still processed. The kill-switch
+        # always wins over both.
+        should_process = not paused and (primary or is_tiqora_only_channel)
+        if not should_process:
+            # Skipped (gated or paused); still counted as "seen" so the
+            # watermark advances and the ticket is still eligible for
+            # auto-summary below (summaries are never gated).
             continue
+        if not primary and is_tiqora_only_channel:
+            totals["tiqora_only_replies"] += 1
         try:
             async with factory() as session:
-                result = await _process_customer_article_event(session, cfg, event)
+                result = await _process_customer_article_event(
+                    session, cfg, event, source_channel=source_channel
+                )
             if result is not None and result.status == "sent":
                 totals["auto_replies"] += 1
         except AgentRunError:

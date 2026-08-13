@@ -25,6 +25,7 @@ from tiqora.ai.auto_worker import run_auto_tick
 from tiqora.ai.gate import (
     OPERATION_MODE_PARALLEL,
     OPERATION_MODE_TIQORA_PRIMARY,
+    set_auto_reply_paused,
     set_operation_mode,
 )
 from tiqora.ai.llm import LlmClient
@@ -179,13 +180,24 @@ def _add_article(sync_url: str, *, ticket_id: int, sender_type: str, body: str) 
 
 
 def _insert_outbox_event(
-    sync_url: str, *, ticket_id: int, event_type: str, article_id: int | None
+    sync_url: str,
+    *,
+    ticket_id: int,
+    event_type: str,
+    article_id: int | None,
+    channel: str | None = None,
 ) -> int:
     engine = create_engine(sync_url)
     with engine.begin() as conn:
         import json
 
-        payload = json.dumps({"article_id": article_id}) if article_id is not None else "{}"
+        if article_id is not None:
+            body: dict[str, Any] = {"article_id": article_id}
+            if channel is not None:
+                body["channel"] = channel
+            payload = json.dumps(body)
+        else:
+            payload = "{}"
         conn.execute(
             text(
                 "INSERT INTO tiqora_event_outbox"
@@ -644,4 +656,120 @@ async def test_counters_incremented_only_on_real_send(
             assert state is not None
             assert state.auto_reply_count == 0
     finally:
+        await engine.dispose()
+
+
+async def test_telegram_channel_event_processed_in_parallel_operation(
+    mariadb_znuny_url: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Plan §3.0 / T5 relaxation: an ArticleCreate event whose outbox payload
+    channel is "telegram" is processed even while the install is in
+    ``parallel`` operation — Telegram has no Znuny counterpart to
+    double-answer alongside (see TIQORA_ONLY_CHANNELS)."""
+    seed = _seed_ticket(mariadb_znuny_url, ns=13)
+    article_id = _add_article(
+        mariadb_znuny_url, ticket_id=seed["ticket_id"], sender_type="customer", body="Help!"
+    )
+    _insert_outbox_event(
+        mariadb_znuny_url,
+        ticket_id=seed["ticket_id"],
+        event_type="ArticleCreate",
+        article_id=article_id,
+        channel="telegram",
+    )
+    engine = create_async_engine(_mysql_async(mariadb_znuny_url))
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    try:
+        async with factory() as session:
+            await _setup_policy(session, seed=seed, autonomy=AUTONOMY_FULL)
+            await set_operation_mode(session, OPERATION_MODE_PARALLEL)
+
+        _patch_llm(monkeypatch, ScriptedLlm([_propose_response("reply", "Telegram answer.")]))
+        totals = await run_auto_tick(settings=get_settings(), session_factory=factory)
+        assert totals["gate_open"] == 0  # not tiqora_primary
+        assert totals["auto_replies"] == 1
+        assert totals["tiqora_only_replies"] == 1
+    finally:
+        async with factory() as session:
+            await set_operation_mode(session, OPERATION_MODE_TIQORA_PRIMARY)
+        await engine.dispose()
+
+
+async def test_email_channel_event_not_processed_in_parallel_operation(
+    mariadb_znuny_url: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The channel exception is narrow: an email-sourced (or channel-less)
+    event stays gated in ``parallel`` operation, exactly as before T5."""
+    seed = _seed_ticket(mariadb_znuny_url, ns=14)
+    article_id = _add_article(
+        mariadb_znuny_url, ticket_id=seed["ticket_id"], sender_type="customer", body="Help!"
+    )
+    _insert_outbox_event(
+        mariadb_znuny_url,
+        ticket_id=seed["ticket_id"],
+        event_type="ArticleCreate",
+        article_id=article_id,
+        channel="email",
+    )
+    engine = create_async_engine(_mysql_async(mariadb_znuny_url))
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    try:
+        async with factory() as session:
+            await _setup_policy(session, seed=seed, autonomy=AUTONOMY_FULL)
+            await set_operation_mode(session, OPERATION_MODE_PARALLEL)
+            watermark_before = await get_setting_int(session, KEY_AI_OUTBOX_WATERMARK, 0)
+
+        _patch_llm(monkeypatch, ScriptedLlm([_propose_response("reply", "Should not run.")]))
+        totals = await run_auto_tick(settings=get_settings(), session_factory=factory)
+        assert totals["gate_open"] == 0
+        assert totals["auto_replies"] == 0
+        assert totals["tiqora_only_replies"] == 0
+
+        # Watermark still advances (events are drained regardless of gating).
+        async with factory() as session:
+            watermark_after = await get_setting_int(session, KEY_AI_OUTBOX_WATERMARK, 0)
+        assert watermark_after > watermark_before
+    finally:
+        async with factory() as session:
+            await set_operation_mode(session, OPERATION_MODE_TIQORA_PRIMARY)
+        await engine.dispose()
+
+
+async def test_kill_switch_blocks_telegram_channel_event_too(
+    mariadb_znuny_url: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The global kill-switch (plan #10) always wins over the channel
+    exception — a paused install must not auto-reply on Telegram either,
+    but the watermark still advances past the event."""
+    seed = _seed_ticket(mariadb_znuny_url, ns=15)
+    article_id = _add_article(
+        mariadb_znuny_url, ticket_id=seed["ticket_id"], sender_type="customer", body="Help!"
+    )
+    _insert_outbox_event(
+        mariadb_znuny_url,
+        ticket_id=seed["ticket_id"],
+        event_type="ArticleCreate",
+        article_id=article_id,
+        channel="telegram",
+    )
+    engine = create_async_engine(_mysql_async(mariadb_znuny_url))
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    try:
+        async with factory() as session:
+            await _setup_policy(session, seed=seed, autonomy=AUTONOMY_FULL)
+            await set_operation_mode(session, OPERATION_MODE_TIQORA_PRIMARY)
+            await set_auto_reply_paused(session, True)
+            watermark_before = await get_setting_int(session, KEY_AI_OUTBOX_WATERMARK, 0)
+
+        _patch_llm(monkeypatch, ScriptedLlm([_propose_response("reply", "Should not run.")]))
+        totals = await run_auto_tick(settings=get_settings(), session_factory=factory)
+        assert totals["auto_replies"] == 0
+        assert totals["tiqora_only_replies"] == 0
+
+        async with factory() as session:
+            watermark_after = await get_setting_int(session, KEY_AI_OUTBOX_WATERMARK, 0)
+        assert watermark_after > watermark_before
+    finally:
+        async with factory() as session:
+            await set_auto_reply_paused(session, False)
         await engine.dispose()

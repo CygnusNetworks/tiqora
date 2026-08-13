@@ -10,6 +10,8 @@ until the outbox-driven worker lands in Phase D.
 
 from __future__ import annotations
 
+import asyncio
+import contextlib
 import json
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
@@ -91,6 +93,8 @@ logger = structlog.get_logger(__name__)
 
 _LOCK_MAX_AGE = timedelta(minutes=15)
 DEFAULT_MAX_TOOL_ROUNDS = 8
+_TELEGRAM_CHANNEL = "telegram"
+_TYPING_INTERVAL_SECONDS = 4.0
 
 TRIGGER_MANUAL = "manual"
 TRIGGER_AUTO = "auto"
@@ -357,6 +361,44 @@ def _disclosure_footer(default_text: str, override_text: str | None) -> str:
     return (override_text or default_text or "").strip()
 
 
+async def _typing_loop(gateway: Any, chat_id: int) -> None:
+    """Send a Telegram "typing" chat action roughly every
+    :data:`_TYPING_INTERVAL_SECONDS`, forever, until the task is cancelled by
+    the caller (:func:`run_ticket_agent`'s ``finally``). Any error from the
+    gateway call is only debug-logged — a failed typing indicator must never
+    fail (or even affect) the agent run."""
+    while True:
+        try:
+            await gateway.send_chat_action(chat_id, "typing")
+        except Exception as exc:  # noqa: BLE001 — best-effort, never fatal
+            logger.debug("ai_typing_indicator_send_failed", chat_id=chat_id, error=str(exc))
+        await asyncio.sleep(_TYPING_INTERVAL_SECONDS)
+
+
+async def _maybe_start_typing_indicator(
+    session: AsyncSession, ticket_id: int, *, gateway: Any = None
+) -> asyncio.Task[None] | None:
+    """Resolve the Telegram chat_id + gateway and start the background
+    typing-indicator task, or return ``None`` (no indicator) on any failure —
+    e.g. the channel is disabled, has no bot_token, or the chat_id can't be
+    resolved (see :func:`tiqora.channels.telegram.outbound.resolve_chat_id`).
+    Never raises: a missing typing indicator is cosmetic, not a run failure.
+    """
+    from tiqora.channels.telegram.outbound import (
+        TelegramDeliveryError,
+        build_gateway,
+        resolve_chat_id,
+    )
+
+    try:
+        chat_id = await resolve_chat_id(session, ticket_id)
+        gw = gateway if gateway is not None else await build_gateway(session)
+    except TelegramDeliveryError as exc:
+        logger.debug("ai_typing_indicator_unavailable", ticket_id=ticket_id, error=str(exc))
+        return None
+    return asyncio.ensure_future(_typing_loop(gw, chat_id))
+
+
 async def run_ticket_agent(
     session: AsyncSession,
     *,
@@ -374,6 +416,8 @@ async def run_ticket_agent(
     kb_get_article_fn: Any = None,
     kb_bundle: str | None = None,
     vision_llm_factory: Any = None,
+    source_channel: str | None = None,
+    telegram_gateway: Any = None,
 ) -> AgentRunResult:
     """Run the agent once for one ticket (plan §3.4 steps 1-12).
 
@@ -383,7 +427,13 @@ async def run_ticket_agent(
     (a sync ``() -> LlmClient``) is an injectable seam for the attachment
     vision pre-pass — production omits it and the queue policy's
     ``vision_provider_id`` is resolved automatically; tests inject a fake to
-    assert on the vision prompt without a real endpoint.
+    assert on the vision prompt without a real endpoint. ``source_channel``
+    is the triggering article's channel (from the outbox event payload,
+    auto-worker only) — passed through to the gate re-check below so a
+    Telegram-sourced run is exempt from the ``operation_mode`` check (see
+    ``tiqora.ai.gate``). ``telegram_gateway`` is an injectable seam for the
+    typing-indicator task (tests); production omits it and a gateway is
+    built lazily from the channel config only when actually needed.
     """
     # 1. Readiness gate — auto-reply only (plan §3.0 v1.1 relaxation, Phase
     # E). Manual Assist always runs regardless of operation_mode: it only
@@ -391,13 +441,17 @@ async def run_ticket_agent(
     # customer-visible send.
     if trigger == TRIGGER_AUTO:
         try:
-            await require_feature_allowed(session, FEATURE_AUTO_REPLY)
+            await require_feature_allowed(
+                session, FEATURE_AUTO_REPLY, source_channel=source_channel
+            )
         except AiGateError as exc:
             raise AgentRunError(str(exc)) from exc
 
     # 2. Per-ticket lock
     lock_owner = f"{worker_instance}:{run_id}"
     await _acquire_lock(session, ticket_id, lock_owner)
+
+    typing_task: asyncio.Task[None] | None = None
 
     try:
         try:
@@ -438,6 +492,18 @@ async def run_ticket_agent(
         articles = await load_articles(session, ticket_id)
         customer_articles = [a for a in articles if a.sender_type == "customer"]
         based_on_article_id = customer_articles[-1].id if customer_articles else None
+
+        # Typing indicator (auto-trigger, Telegram source only): resolved
+        # synchronously (chat_id + gateway) via the *same* session before the
+        # background task starts, because AsyncSession is not safe for
+        # concurrent use across tasks — the loop below never touches the
+        # session again, only the gateway. Best-effort: any failure here
+        # (channel disabled, no bot_token, chat_id unresolvable) just means
+        # no typing indicator, never a fatal run error.
+        if trigger == TRIGGER_AUTO and (source_channel or "").strip().lower() == _TELEGRAM_CHANNEL:
+            typing_task = await _maybe_start_typing_indicator(
+                session, ticket_id, gateway=telegram_gateway
+            )
 
         # 5. AI-content filter is applied when rendering (labels own AI output,
         # see _build_user_message) — nothing is physically removed.
@@ -695,45 +761,67 @@ async def run_ticket_agent(
         if footer:
             body = f"{body}\n\n{footer}"
 
-        to_address = None
-        if based_on_article_id is not None:
-            src = next((a for a in articles if a.id == based_on_article_id), None)
-            if src is not None and src.from_address:
-                to_address = parseaddr(src.from_address)[1] or None
+        src = next((a for a in articles if a.id == based_on_article_id), None)
+        # Channel dispatch: the based_on article's channel decides where the
+        # reply goes. Telegram is checked FIRST and unconditionally — its
+        # a_from is a synthetic "<chat_id>@telegram.invalid" address that
+        # would otherwise parseaddr-match the email branch below and blow up
+        # an SMTP send to a fake address (the central guard this dispatch
+        # exists for).
+        if src is not None and src.channel.lower() == _TELEGRAM_CHANNEL:
+            from tiqora.channels.telegram.outbound import deliver_agent_telegram_reply
 
-        if to_address:
-            from tiqora.channels.email.outbound_reply import deliver_agent_email_reply
-
-            article_id = await deliver_agent_email_reply(
+            article_id = await deliver_agent_telegram_reply(
                 session,
                 sysconfig,
-                None,
                 ticket_id=ticket_id,
-                queue_id=ticket.queue_id,
                 user_id=actor_user_id,
                 article=ArticleIn(
                     sender_type="agent",
                     is_visible_for_customer=True,
                     subject=outcome.proposal.get("subject") or ticket.title,
                     body=body,
-                    to_address=to_address,
-                    channel="email",
+                    channel=_TELEGRAM_CHANNEL,
                 ),
             )
         else:
-            article_id = await add_article(
-                session,
-                ticket_id=ticket_id,
-                article=ArticleIn(
-                    sender_type="agent",
-                    is_visible_for_customer=True,
-                    subject=outcome.proposal.get("subject") or ticket.title,
-                    body=body,
-                    channel="note",
-                ),
-                user_id=actor_user_id,
-                sysconfig=sysconfig,
-            )
+            to_address = None
+            if src is not None and src.from_address:
+                to_address = parseaddr(src.from_address)[1] or None
+
+            if to_address:
+                from tiqora.channels.email.outbound_reply import deliver_agent_email_reply
+
+                article_id = await deliver_agent_email_reply(
+                    session,
+                    sysconfig,
+                    None,
+                    ticket_id=ticket_id,
+                    queue_id=ticket.queue_id,
+                    user_id=actor_user_id,
+                    article=ArticleIn(
+                        sender_type="agent",
+                        is_visible_for_customer=True,
+                        subject=outcome.proposal.get("subject") or ticket.title,
+                        body=body,
+                        to_address=to_address,
+                        channel="email",
+                    ),
+                )
+            else:
+                article_id = await add_article(
+                    session,
+                    ticket_id=ticket_id,
+                    article=ArticleIn(
+                        sender_type="agent",
+                        is_visible_for_customer=True,
+                        subject=outcome.proposal.get("subject") or ticket.title,
+                        body=body,
+                        channel="note",
+                    ),
+                    user_id=actor_user_id,
+                    sysconfig=sysconfig,
+                )
 
         session.add(
             TiqoraAiArticleOrigin(
@@ -766,6 +854,10 @@ async def run_ticket_agent(
             logger.exception("ai_runtime_error_bookkeeping_failed", ticket_id=ticket_id)
         raise
     finally:
+        if typing_task is not None:
+            typing_task.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await typing_task
         await _release_lock(session, ticket_id)
 
 

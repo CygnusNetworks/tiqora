@@ -19,7 +19,11 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from tiqora.ai.escalation import EscalationRuleError, validate_escalation_rules
-from tiqora.ai.gate import require_feature_allowed
+from tiqora.ai.gate import (
+    queue_serves_tiqora_only_channel,
+    require_auto_reply_not_paused,
+    require_feature_allowed,
+)
 from tiqora.ai.models import (
     AUTONOMY_MODES,
     FEATURE_AUTO_REPLY,
@@ -276,17 +280,31 @@ async def _enforce_gate_on_enable(
     enabled_auto_reply: bool | None,
     enabled_summary: bool | None,
     enabled_manual_assist: bool | None,
+    queue_id: int,
 ) -> None:
     """Only re-check the gate when ``enabled_auto_reply`` is *becoming* true.
 
     ``enabled_summary``/``enabled_manual_assist`` are accepted unconditionally
     (plan §3.0 v1.1 relaxation) — the parameters are still passed in so the
     calling code doesn't have to know which flag is gated.
+
+    The ``operation_mode=tiqora_primary`` requirement (but never the
+    ``ai.auto_reply.paused`` kill-switch) is additionally skipped when this
+    queue already serves a :data:`~tiqora.ai.gate.TIQORA_ONLY_CHANNELS`
+    channel (e.g. its name matches Telegram's configured ``queue_name``) —
+    such a queue has no Znuny counterpart to double-answer alongside. If the
+    queue/channel mapping is *renamed* after enabling, the runtime re-check
+    in :func:`tiqora.ai.runtime.run_ticket_agent` catches that on the next
+    run (it re-evaluates ``source_channel`` per event, not just at enable
+    time).
     """
     _ = enabled_summary, enabled_manual_assist
     prev_auto = bool(previous.enabled_auto_reply) if previous else False
     if enabled_auto_reply is True and not prev_auto:
-        await require_feature_allowed(session, FEATURE_AUTO_REPLY)
+        if await queue_serves_tiqora_only_channel(session, queue_id):
+            await require_auto_reply_not_paused(session)
+        else:
+            await require_feature_allowed(session, FEATURE_AUTO_REPLY)
 
 
 async def create_queue_policy(
@@ -350,6 +368,7 @@ async def create_queue_policy(
         enabled_auto_reply=enabled_auto_reply,
         enabled_summary=enabled_summary,
         enabled_manual_assist=enabled_manual_assist,
+        queue_id=queue_id,
     )
 
     row = TiqoraAiQueuePolicy(
@@ -441,6 +460,7 @@ async def update_queue_policy(
         enabled_auto_reply=fields.get("enabled_auto_reply"),
         enabled_summary=fields.get("enabled_summary"),
         enabled_manual_assist=fields.get("enabled_manual_assist"),
+        queue_id=row.queue_id,
     )
 
     for key, value in fields.items():
