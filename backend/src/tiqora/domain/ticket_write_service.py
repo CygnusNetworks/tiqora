@@ -1895,6 +1895,18 @@ class TicketWriteService:
                 user_id=user_id,
                 article=article,
             )
+        # Outgoing agent Telegram reply: Bot API send then store (see
+        # channels.telegram.outbound) -- send-then-store, same as email above.
+        if article.channel.lower() == "telegram" and article.sender_type == "agent":
+            from tiqora.channels.telegram.outbound import deliver_agent_telegram_reply
+
+            return await deliver_agent_telegram_reply(
+                self._session,
+                self._sysconfig,
+                ticket_id=ticket_id,
+                user_id=user_id,
+                article=article,
+            )
         return await add_article(
             self._session,
             ticket_id=ticket_id,
