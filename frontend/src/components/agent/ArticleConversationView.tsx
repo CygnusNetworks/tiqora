@@ -8,6 +8,7 @@ import { groupByDay } from "@/lib/article";
 import {
   avatarTone,
   channelIcon,
+  channelNameOf,
   emailFromAddress,
   initialsFor,
   isInternalNote,
@@ -173,7 +174,7 @@ function Bubble({
           <div className={cn("space-y-1 rounded-2xl px-3 py-2", tone)}>
             <div className="flex flex-wrap items-center gap-1.5 text-[11px] text-muted">
               <span className={cn("font-semibold", nameTone)}>{senderName}</span>
-              <span aria-hidden>{channelIcon(article.communication_channel_id)}</span>
+              <span aria-hidden>{channelIcon(channelNameOf(article))}</span>
               <span className="font-mono tabular-nums">{formatDateTime(article.create_time, locale)}</span>
               <span
                 className={cn(

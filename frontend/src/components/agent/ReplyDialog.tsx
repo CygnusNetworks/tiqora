@@ -57,6 +57,7 @@ export function ReplyDialog({
   open,
   onClose,
   initialDraft,
+  channelName,
 }: {
   ticketId: number;
   articleId: number;
@@ -68,7 +69,13 @@ export function ReplyDialog({
    * through the actual send below — closing without sending leaves it
    * untouched. */
   initialDraft?: { id: number; subject: string | null; body: string } | null;
+  /** Channel name of the article being replied to (`channelNameOf(article)`
+   * from `@/lib/articleChannel`) — routes the outgoing article. Only
+   * "Telegram" changes behavior today: no addresses, delivered via the
+   * Telegram gateway instead of email. */
+  channelName?: string;
 }) {
+  const isTelegram = channelName === "Telegram";
   const { t } = useTranslation();
   const queryClient = useQueryClient();
   const { confirm, dialog: confirmDialog } = useConfirm();
@@ -297,16 +304,18 @@ export function ReplyDialog({
         subject,
         body,
         content_type: "text/plain; charset=utf-8",
-        channel: "email",
+        channel: isTelegram ? "telegram" : "email",
         is_visible_for_customer: true,
-        to_address: joinRecipients(to),
-        cc: joinRecipients(cc),
-        bcc: joinRecipients(bcc),
-        reply_to: replyTo.trim() || null,
+        // Telegram has no addresses to send — the gateway routes by the
+        // ticket's linked telegram_contact, not by header.
+        to_address: isTelegram ? null : joinRecipients(to),
+        cc: isTelegram ? null : joinRecipients(cc),
+        bcc: isTelegram ? null : joinRecipients(bcc),
+        reply_to: isTelegram ? null : replyTo.trim() || null,
         // Threading headers from the reply-draft endpoint so the outbound
         // Message-ID chain matches Znuny follow-up detection.
-        in_reply_to: draftQ.data?.in_reply_to ?? null,
-        references: draftQ.data?.references ?? null,
+        in_reply_to: isTelegram ? null : (draftQ.data?.in_reply_to ?? null),
+        references: isTelegram ? null : (draftQ.data?.references ?? null),
         ai_draft_id: aiDraftId,
       });
       // The reply is out; mentions and the booking follow and may fail on
@@ -382,7 +391,7 @@ export function ReplyDialog({
 
   const canSend =
     body.trim().length > 0 &&
-    to.length > 0 &&
+    (isTelegram || to.length > 0) &&
     !sendMutation.isPending &&
     ticketLock.lockedBy === null;
 
@@ -422,101 +431,112 @@ export function ReplyDialog({
             onTakeOver={ticketLock.takeOver}
             busy={ticketLock.takingOver}
           />
-          <RecipientsField
-            label={t("ticket.replyTo")}
-            fieldKey="to"
-            recipients={to}
-            onChange={setTo}
-            onMove={moveRecipient}
-            required
-            placeholder={t("ticket.recipientAddHint")}
-            testid="reply-to"
-          />
-          {showCc && (
-            <RecipientsField
-              label={t("ticket.replyCc")}
-              fieldKey="cc"
-              recipients={cc}
-              onChange={setCc}
-              onMove={moveRecipient}
-              placeholder={t("ticket.recipientAddHint")}
-              testid="reply-cc"
-            />
-          )}
-          {showBcc && (
-            <RecipientsField
-              label={t("ticket.replyBcc")}
-              fieldKey="bcc"
-              recipients={bcc}
-              onChange={setBcc}
-              onMove={moveRecipient}
-              placeholder={t("ticket.recipientAddHint")}
-              testid="reply-bcc"
-            />
-          )}
-          {showReplyTo && (
-            <label className="block text-xs text-muted">
-              {t("ticket.replyReplyTo")}
-              <input
-                className={inputCls}
-                value={replyTo}
-                data-testid="reply-replyto"
+          {isTelegram ? (
+            <p
+              className="rounded border border-hairline bg-surface-subtle/60 px-2 py-1 text-xs text-muted"
+              data-testid="reply-telegram-hint"
+            >
+              {t("ticket.replyViaTelegram")}
+            </p>
+          ) : (
+            <>
+              <RecipientsField
+                label={t("ticket.replyTo")}
+                fieldKey="to"
+                recipients={to}
+                onChange={setTo}
+                onMove={moveRecipient}
+                required
                 placeholder={t("ticket.recipientAddHint")}
-                onChange={(e) => setReplyTo(e.target.value)}
+                testid="reply-to"
               />
-            </label>
-          )}
-          {/* Always-visible true toggles: expand/collapse; badge when collapsed + count. */}
-          <div className="flex flex-wrap items-center gap-1.5 text-xs">
-            <button
-              type="button"
-              className={cn(toggleCls, ccOn && toggleActiveCls)}
-              data-testid="reply-toggle-cc"
-              data-active={ccOn ? "true" : "false"}
-              aria-expanded={showCc}
-              onClick={() => setShowCc((v) => !v)}
-            >
-              {t("ticket.replyCc")}
-              {!showCc && cc.length > 0 && (
-                <span className={countBadgeCls} data-testid="reply-toggle-cc-count">
-                  {cc.length}
-                </span>
+              {showCc && (
+                <RecipientsField
+                  label={t("ticket.replyCc")}
+                  fieldKey="cc"
+                  recipients={cc}
+                  onChange={setCc}
+                  onMove={moveRecipient}
+                  placeholder={t("ticket.recipientAddHint")}
+                  testid="reply-cc"
+                />
               )}
-            </button>
-            <button
-              type="button"
-              className={cn(toggleCls, bccOn && toggleActiveCls)}
-              data-testid="reply-toggle-bcc"
-              data-active={bccOn ? "true" : "false"}
-              aria-expanded={showBcc}
-              onClick={() => setShowBcc((v) => !v)}
-            >
-              {t("ticket.replyBcc")}
-              {!showBcc && bcc.length > 0 && (
-                <span className={countBadgeCls} data-testid="reply-toggle-bcc-count">
-                  {bcc.length}
-                </span>
+              {showBcc && (
+                <RecipientsField
+                  label={t("ticket.replyBcc")}
+                  fieldKey="bcc"
+                  recipients={bcc}
+                  onChange={setBcc}
+                  onMove={moveRecipient}
+                  placeholder={t("ticket.recipientAddHint")}
+                  testid="reply-bcc"
+                />
               )}
-            </button>
-            <button
-              type="button"
-              className={cn(toggleCls, replyToOn && toggleActiveCls)}
-              data-testid="reply-toggle-replyto"
-              data-active={replyToOn ? "true" : "false"}
-              aria-expanded={showReplyTo}
-              onClick={() => setShowReplyTo((v) => !v)}
-            >
-              {t("ticket.replyReplyTo")}
-              {!showReplyTo && replyToCount > 0 && (
-                <span
-                  className={countBadgeCls}
-                  data-testid="reply-toggle-replyto-count"
+              {showReplyTo && (
+                <label className="block text-xs text-muted">
+                  {t("ticket.replyReplyTo")}
+                  <input
+                    className={inputCls}
+                    value={replyTo}
+                    data-testid="reply-replyto"
+                    placeholder={t("ticket.recipientAddHint")}
+                    onChange={(e) => setReplyTo(e.target.value)}
+                  />
+                </label>
+              )}
+              {/* Always-visible true toggles: expand/collapse; badge when collapsed + count. */}
+              <div className="flex flex-wrap items-center gap-1.5 text-xs">
+                <button
+                  type="button"
+                  className={cn(toggleCls, ccOn && toggleActiveCls)}
+                  data-testid="reply-toggle-cc"
+                  data-active={ccOn ? "true" : "false"}
+                  aria-expanded={showCc}
+                  onClick={() => setShowCc((v) => !v)}
                 >
-                  {replyToCount}
-                </span>
-              )}
-            </button>
-          </div>
+                  {t("ticket.replyCc")}
+                  {!showCc && cc.length > 0 && (
+                    <span className={countBadgeCls} data-testid="reply-toggle-cc-count">
+                      {cc.length}
+                    </span>
+                  )}
+                </button>
+                <button
+                  type="button"
+                  className={cn(toggleCls, bccOn && toggleActiveCls)}
+                  data-testid="reply-toggle-bcc"
+                  data-active={bccOn ? "true" : "false"}
+                  aria-expanded={showBcc}
+                  onClick={() => setShowBcc((v) => !v)}
+                >
+                  {t("ticket.replyBcc")}
+                  {!showBcc && bcc.length > 0 && (
+                    <span className={countBadgeCls} data-testid="reply-toggle-bcc-count">
+                      {bcc.length}
+                    </span>
+                  )}
+                </button>
+                <button
+                  type="button"
+                  className={cn(toggleCls, replyToOn && toggleActiveCls)}
+                  data-testid="reply-toggle-replyto"
+                  data-active={replyToOn ? "true" : "false"}
+                  aria-expanded={showReplyTo}
+                  onClick={() => setShowReplyTo((v) => !v)}
+                >
+                  {t("ticket.replyReplyTo")}
+                  {!showReplyTo && replyToCount > 0 && (
+                    <span
+                      className={countBadgeCls}
+                      data-testid="reply-toggle-replyto-count"
+                    >
+                      {replyToCount}
+                    </span>
+                  )}
+                </button>
+              </div>
+            </>
+          )}
           <label className="block text-xs text-muted">
             {t("ticket.replySubject")}
             <input

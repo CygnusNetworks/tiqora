@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { api, type ArticleListItem } from "@/lib/api";
 import { articleSortKey } from "@/lib/article";
-import { CHANNEL_EMAIL, CHANNEL_INTERNAL } from "@/lib/articleChannel";
+import { channelNameOf } from "@/lib/articleChannel";
 
 export type ArticleFilter = "all" | "email" | "note";
 
@@ -83,8 +83,8 @@ export function useArticleListState({
   const filtered = useMemo(
     () =>
       articles.filter((a) => {
-        if (filter === "email") return a.communication_channel_id === CHANNEL_EMAIL;
-        if (filter === "note") return a.communication_channel_id === CHANNEL_INTERNAL;
+        if (filter === "email") return channelNameOf(a) === "Email";
+        if (filter === "note") return channelNameOf(a) === "Internal";
         return true;
       }),
     [articles, filter],

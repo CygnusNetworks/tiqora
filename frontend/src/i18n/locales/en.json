@@ -421,6 +421,7 @@
     "historySortAsc": "Oldest first",
     "historySortDesc": "Newest first",
     "replyDialogTitle": "Reply",
+    "replyViaTelegram": "Reply will be sent via Telegram",
     "replyTo": "To",
     "replyCc": "Cc",
     "replyBcc": "Bcc",
