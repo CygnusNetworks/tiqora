@@ -151,7 +151,8 @@
     "passkeyAddError": "Не удалось добавить ключ доступа.",
     "passkeyDeleteError": "Не удалось удалить ключ доступа.",
     "passkeyDeleteLastError": "Нельзя удалить последний фактор 2FA, пока 2FA обязательна.",
-    "passkeyUnsupported": "Этот браузер не поддерживает ключи доступа (WebAuthn)."
+    "passkeyUnsupported": "Этот браузер не поддерживает ключи доступа (WebAuthn).",
+    "passkeyReauthRequired": "For your security, please sign in again before changing your passkeys."
   },
   "dashboard": {
     "greeting": {
@@ -545,7 +546,8 @@
     "extrasRetry": "Повторить",
     "customerUnresolved": "Нет записи клиента с этим адресом — сведения о клиенте недоступны.",
     "lockedByBanner": "Заблокировано: {{name}}",
-    "takeOver": "Принять"
+    "takeOver": "Принять",
+    "replyViaTelegram": "Reply will be sent via Telegram"
   },
   "search": {
     "title": "Поиск",
@@ -1235,6 +1237,9 @@
       "systemAddresses": {
         "email": "Адрес, используемый как From для очередей и автоответов.",
         "name": "Отображаемое имя рядом с e-mail (напр. «Support <support@example.com>»)."
+      },
+      "telegram": {
+        "mode": "\"Polling\" has Tiqora fetch updates from Telegram itself (no public URL needed). \"Webhook\" has Telegram push updates to the URL below — requires this server to be reachable over HTTPS."
       }
     },
     "nav": {
@@ -1289,7 +1294,8 @@
       "slas": "SLA",
       "systemAddresses": "Системные адреса",
       "notificationEvents": "События уведомлений",
-      "ticketAttributeRelations": "Связи атрибутов"
+      "ticketAttributeRelations": "Связи атрибутов",
+      "telegram": "Telegram"
     },
     "table": {
       "id": "ID",
@@ -2319,7 +2325,8 @@
       "slas": "Управление соглашениями об уровне сервиса и сроками.",
       "systemAddresses": "Адреса From для очередей и автоответов.",
       "notificationEvents": "Настройка уведомлений агентов по событиям.",
-      "ticketAttributeRelations": "Совместимые с Znuny матрицы зависимостей (сервис/очередь и т. п.) в CSV."
+      "ticketAttributeRelations": "Совместимые с Znuny матрицы зависимостей (сервис/очередь и т. п.) в CSV.",
+      "telegram": "Connect a Telegram bot as a ticket channel."
     },
     "mailAccounts": {
       "title_plural": "Почтовые аккаунты",
@@ -2411,6 +2418,37 @@
       "new": "Новая связь",
       "help": "CSV с заголовком Attribute1;Attribute2 и парами значений (Znuny AdminTicketAttributeRelations). Ограничивает выбор в формах (напр. Сервис → Очередь).",
       "confirmDelete": "Удалить эту связь?"
+    },
+    "telegram": {
+      "title": "Telegram",
+      "description": "Connect a Telegram bot as an inbound/outbound ticket channel.",
+      "enabled": "Channel active",
+      "mode": "Mode",
+      "modePolling": "Polling",
+      "modeWebhook": "Webhook",
+      "queue": "Queue",
+      "botToken": "Bot token",
+      "defaultCustomerUser": "Default customer user",
+      "webhookUrl": "Webhook URL",
+      "webhookSecretToken": "Webhook secret token",
+      "webhookRegister": "Register webhook",
+      "webhookRegistering": "Registering…",
+      "webhookUnregister": "Remove webhook",
+      "webhookUnregistering": "Removing…",
+      "webhookRegisterSuccess": "Webhook registered",
+      "webhookRegisterFailure": "Webhook registration failed",
+      "webhookUnregisterSuccess": "Webhook removed",
+      "webhookUnregisterFailure": "Removing the webhook failed",
+      "consentTitle": "GDPR consent",
+      "consentRequired": "Require consent before processing messages",
+      "consentRequiredHelp": "While required, incoming messages from a new Telegram contact are not processed until they confirm consent.",
+      "consentText": "Consent request text",
+      "consentConfirmedText": "Consent confirmation text",
+      "save": "Save",
+      "saving": "Saving…",
+      "saved": "Settings saved.",
+      "saveError": "Saving failed.",
+      "loadError": "Failed to load settings."
     }
   },
   "kb": {

@@ -85,6 +85,7 @@ import { DynamicFieldsPage } from "@/routes/admin/DynamicFieldsPage";
 import { WebhooksPage } from "@/routes/admin/WebhooksPage";
 import { MailOutboundPage } from "@/routes/admin/MailOutboundPage";
 import { MailAccountsPage } from "@/routes/admin/MailAccountsPage";
+import { TelegramChannelPage } from "@/routes/admin/TelegramChannelPage";
 import { OAuth2TokensPage } from "@/routes/admin/OAuth2TokensPage";
 import { MailLogPage } from "@/routes/admin/MailLogPage";
 import { SubjectConfigPage } from "@/routes/admin/SubjectConfigPage";
@@ -744,6 +745,12 @@ const adminMailAccountsRoute = createRoute({
   component: MailAccountsPage,
 });
 
+const adminTelegramRoute = createRoute({
+  getParentRoute: () => adminLayoutRoute,
+  path: "/telegram",
+  component: TelegramChannelPage,
+});
+
 const adminOAuth2TokensRoute = createRoute({
   getParentRoute: () => adminLayoutRoute,
   path: "/oauth2-tokens",
@@ -972,6 +979,7 @@ const routeTree = rootRoute.addChildren([
     adminApiKeysRoute,
     adminMailOutboundRoute,
     adminMailAccountsRoute,
+    adminTelegramRoute,
     adminOAuth2TokensRoute,
     adminMailLogRoute,
     adminSubjectConfigRoute,

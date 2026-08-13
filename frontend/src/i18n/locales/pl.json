@@ -151,7 +151,8 @@
     "passkeyAddError": "Nie można dodać klucza.",
     "passkeyDeleteError": "Nie można usunąć klucza dostępu.",
     "passkeyDeleteLastError": "Nie można usunąć ostatniego współczynnika 2FA, gdy wymuszane jest 2FA.",
-    "passkeyUnsupported": "Ta przeglądarka nie obsługuje kluczy dostępu (WebAuthn)."
+    "passkeyUnsupported": "Ta przeglądarka nie obsługuje kluczy dostępu (WebAuthn).",
+    "passkeyReauthRequired": "For your security, please sign in again before changing your passkeys."
   },
   "dashboard": {
     "greeting": {
@@ -545,7 +546,8 @@
     "extrasRetry": "Spróbuj ponownie",
     "customerUnresolved": "Żaden rekord klienta nie pasuje do tego adresu — dane klienta są niedostępne.",
     "lockedByBanner": "Zablokowane przez {{name}}",
-    "takeOver": "Przejmij"
+    "takeOver": "Przejmij",
+    "replyViaTelegram": "Reply will be sent via Telegram"
   },
   "search": {
     "title": "Szukaj",
@@ -1235,6 +1237,9 @@
       "systemAddresses": {
         "email": "Adres używany jako From dla kolejek i auto-odpowiedzi.",
         "name": "Nazwa wyświetlana obok e-maila (np. „Support <support@example.com>”)."
+      },
+      "telegram": {
+        "mode": "\"Polling\" has Tiqora fetch updates from Telegram itself (no public URL needed). \"Webhook\" has Telegram push updates to the URL below — requires this server to be reachable over HTTPS."
       }
     },
     "nav": {
@@ -1289,7 +1294,8 @@
       "slas": "SLA",
       "systemAddresses": "Adresy systemowe",
       "notificationEvents": "Zdarzenia powiadomień",
-      "ticketAttributeRelations": "Relacje atrybutów"
+      "ticketAttributeRelations": "Relacje atrybutów",
+      "telegram": "Telegram"
     },
     "table": {
       "id": "ID",
@@ -2319,7 +2325,8 @@
       "slas": "Zarządzaj umowami SLA i terminami.",
       "systemAddresses": "Adresy e-mail używane jako From dla kolejek i auto-odpowiedzi.",
       "notificationEvents": "Konfiguruj powiadomienia agentów oparte na zdarzeniach.",
-      "ticketAttributeRelations": "Macierze zależności zgodne z Znuny (usługa/kolejka itd.) w CSV."
+      "ticketAttributeRelations": "Macierze zależności zgodne z Znuny (usługa/kolejka itd.) w CSV.",
+      "telegram": "Connect a Telegram bot as a ticket channel."
     },
     "mailAccounts": {
       "title_plural": "Konta pocztowe",
@@ -2411,6 +2418,37 @@
       "new": "Nowa relacja",
       "help": "CSV z nagłówkiem Attribute1;Attribute2 i parami wartości (Znuny AdminTicketAttributeRelations). Ogranicza listy w formularzach (np. Usługa → Kolejka).",
       "confirmDelete": "Usunąć tę relację?"
+    },
+    "telegram": {
+      "title": "Telegram",
+      "description": "Connect a Telegram bot as an inbound/outbound ticket channel.",
+      "enabled": "Channel active",
+      "mode": "Mode",
+      "modePolling": "Polling",
+      "modeWebhook": "Webhook",
+      "queue": "Queue",
+      "botToken": "Bot token",
+      "defaultCustomerUser": "Default customer user",
+      "webhookUrl": "Webhook URL",
+      "webhookSecretToken": "Webhook secret token",
+      "webhookRegister": "Register webhook",
+      "webhookRegistering": "Registering…",
+      "webhookUnregister": "Remove webhook",
+      "webhookUnregistering": "Removing…",
+      "webhookRegisterSuccess": "Webhook registered",
+      "webhookRegisterFailure": "Webhook registration failed",
+      "webhookUnregisterSuccess": "Webhook removed",
+      "webhookUnregisterFailure": "Removing the webhook failed",
+      "consentTitle": "GDPR consent",
+      "consentRequired": "Require consent before processing messages",
+      "consentRequiredHelp": "While required, incoming messages from a new Telegram contact are not processed until they confirm consent.",
+      "consentText": "Consent request text",
+      "consentConfirmedText": "Consent confirmation text",
+      "save": "Save",
+      "saving": "Saving…",
+      "saved": "Settings saved.",
+      "saveError": "Saving failed.",
+      "loadError": "Failed to load settings."
     }
   },
   "kb": {

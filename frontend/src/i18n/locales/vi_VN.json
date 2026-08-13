@@ -151,7 +151,8 @@
     "passkeyAddError": "Không thể thêm mật mã.",
     "passkeyDeleteError": "Không thể xóa mật mã.",
     "passkeyDeleteLastError": "Không thể xóa yếu tố 2FA cuối cùng trong khi 2FA được thực thi.",
-    "passkeyUnsupported": "Trình duyệt này không hỗ trợ mật mã (WebAuthn)."
+    "passkeyUnsupported": "Trình duyệt này không hỗ trợ mật mã (WebAuthn).",
+    "passkeyReauthRequired": "For your security, please sign in again before changing your passkeys."
   },
   "dashboard": {
     "greeting": {
@@ -545,7 +546,8 @@
     "extrasRetry": "Thử lại",
     "customerUnresolved": "Không có hồ sơ khách hàng khớp địa chỉ này, nên không có chi tiết khách hàng.",
     "lockedByBanner": "Bị khóa bởi {{name}}",
-    "takeOver": "Tiếp quản"
+    "takeOver": "Tiếp quản",
+    "replyViaTelegram": "Reply will be sent via Telegram"
   },
   "search": {
     "title": "Tìm kiếm",
@@ -1235,6 +1237,9 @@
       "systemAddresses": {
         "email": "Địa chỉ dùng làm From cho hàng đợi và trả lời tự động.",
         "name": "Tên hiển thị cạnh email (vd. “Support <support@example.com>”)."
+      },
+      "telegram": {
+        "mode": "\"Polling\" has Tiqora fetch updates from Telegram itself (no public URL needed). \"Webhook\" has Telegram push updates to the URL below — requires this server to be reachable over HTTPS."
       }
     },
     "nav": {
@@ -1289,7 +1294,8 @@
       "slas": "SLA",
       "systemAddresses": "Địa chỉ hệ thống",
       "notificationEvents": "Sự kiện thông báo",
-      "ticketAttributeRelations": "Quan hệ thuộc tính"
+      "ticketAttributeRelations": "Quan hệ thuộc tính",
+      "telegram": "Telegram"
     },
     "table": {
       "id": "ID",
@@ -2319,7 +2325,8 @@
       "slas": "Quản lý thỏa thuận mức dịch vụ và thời hạn.",
       "systemAddresses": "Địa chỉ email dùng làm From cho hàng đợi và trả lời tự động.",
       "notificationEvents": "Cấu hình thông báo nhân viên theo sự kiện.",
-      "ticketAttributeRelations": "Ma trận phụ thuộc tương thích Znuny (dịch vụ/hàng đợi…) dạng CSV."
+      "ticketAttributeRelations": "Ma trận phụ thuộc tương thích Znuny (dịch vụ/hàng đợi…) dạng CSV.",
+      "telegram": "Connect a Telegram bot as a ticket channel."
     },
     "mailAccounts": {
       "title_plural": "Tài khoản thư",
@@ -2411,6 +2418,37 @@
       "new": "Quan hệ mới",
       "help": "CSV có tiêu đề Attribute1;Attribute2 và các cặp giá trị (Znuny AdminTicketAttributeRelations). Hạn chế bộ chọn form (vd. Dịch vụ → Hàng đợi).",
       "confirmDelete": "Xóa quan hệ này?"
+    },
+    "telegram": {
+      "title": "Telegram",
+      "description": "Connect a Telegram bot as an inbound/outbound ticket channel.",
+      "enabled": "Channel active",
+      "mode": "Mode",
+      "modePolling": "Polling",
+      "modeWebhook": "Webhook",
+      "queue": "Queue",
+      "botToken": "Bot token",
+      "defaultCustomerUser": "Default customer user",
+      "webhookUrl": "Webhook URL",
+      "webhookSecretToken": "Webhook secret token",
+      "webhookRegister": "Register webhook",
+      "webhookRegistering": "Registering…",
+      "webhookUnregister": "Remove webhook",
+      "webhookUnregistering": "Removing…",
+      "webhookRegisterSuccess": "Webhook registered",
+      "webhookRegisterFailure": "Webhook registration failed",
+      "webhookUnregisterSuccess": "Webhook removed",
+      "webhookUnregisterFailure": "Removing the webhook failed",
+      "consentTitle": "GDPR consent",
+      "consentRequired": "Require consent before processing messages",
+      "consentRequiredHelp": "While required, incoming messages from a new Telegram contact are not processed until they confirm consent.",
+      "consentText": "Consent request text",
+      "consentConfirmedText": "Consent confirmation text",
+      "save": "Save",
+      "saving": "Saving…",
+      "saved": "Settings saved.",
+      "saveError": "Saving failed.",
+      "loadError": "Failed to load settings."
     }
   },
   "kb": {

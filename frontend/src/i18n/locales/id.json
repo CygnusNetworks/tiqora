@@ -151,7 +151,8 @@
     "passkeyAddError": "Tidak dapat menambahkan kunci sandi.",
     "passkeyDeleteError": "Tidak dapat menghapus kunci sandi.",
     "passkeyDeleteLastError": "Tidak dapat menghapus faktor 2FA terakhir saat 2FA diterapkan.",
-    "passkeyUnsupported": "Browser ini tidak mendukung kunci sandi (WebAuthn)."
+    "passkeyUnsupported": "Browser ini tidak mendukung kunci sandi (WebAuthn).",
+    "passkeyReauthRequired": "For your security, please sign in again before changing your passkeys."
   },
   "dashboard": {
     "greeting": {
@@ -545,7 +546,8 @@
     "extrasRetry": "Coba lagi",
     "customerUnresolved": "Tidak ada data pelanggan yang cocok dengan alamat ini, sehingga detail tidak tersedia.",
     "lockedByBanner": "Dikunci oleh {{name}}",
-    "takeOver": "Ambil alih"
+    "takeOver": "Ambil alih",
+    "replyViaTelegram": "Reply will be sent via Telegram"
   },
   "search": {
     "title": "Cari",
@@ -1235,6 +1237,9 @@
       "systemAddresses": {
         "email": "Alamat yang dipakai sebagai From untuk antrean dan balasan otomatis.",
         "name": "Nama tampilan di samping email (mis. “Support <support@example.com>”)."
+      },
+      "telegram": {
+        "mode": "\"Polling\" has Tiqora fetch updates from Telegram itself (no public URL needed). \"Webhook\" has Telegram push updates to the URL below — requires this server to be reachable over HTTPS."
       }
     },
     "nav": {
@@ -1289,7 +1294,8 @@
       "slas": "SLA",
       "systemAddresses": "Alamat sistem",
       "notificationEvents": "Peristiwa notifikasi",
-      "ticketAttributeRelations": "Relasi atribut"
+      "ticketAttributeRelations": "Relasi atribut",
+      "telegram": "Telegram"
     },
     "table": {
       "id": "ID",
@@ -2319,7 +2325,8 @@
       "slas": "Kelola perjanjian tingkat layanan dan timer.",
       "systemAddresses": "Alamat email sebagai From untuk antrean dan balasan otomatis.",
       "notificationEvents": "Konfigurasikan notifikasi agen berbasis peristiwa.",
-      "ticketAttributeRelations": "Matriks dependensi kompatibel Znuny (layanan/antrean dll.) berformat CSV."
+      "ticketAttributeRelations": "Matriks dependensi kompatibel Znuny (layanan/antrean dll.) berformat CSV.",
+      "telegram": "Connect a Telegram bot as a ticket channel."
     },
     "mailAccounts": {
       "title_plural": "Akun email",
@@ -2411,6 +2418,37 @@
       "new": "Relasi baru",
       "help": "CSV dengan header Attribute1;Attribute2 dan pasangan nilai (Znuny AdminTicketAttributeRelations). Membatasi pemilih formulir (mis. Layanan → Antrean).",
       "confirmDelete": "Hapus relasi ini?"
+    },
+    "telegram": {
+      "title": "Telegram",
+      "description": "Connect a Telegram bot as an inbound/outbound ticket channel.",
+      "enabled": "Channel active",
+      "mode": "Mode",
+      "modePolling": "Polling",
+      "modeWebhook": "Webhook",
+      "queue": "Queue",
+      "botToken": "Bot token",
+      "defaultCustomerUser": "Default customer user",
+      "webhookUrl": "Webhook URL",
+      "webhookSecretToken": "Webhook secret token",
+      "webhookRegister": "Register webhook",
+      "webhookRegistering": "Registering…",
+      "webhookUnregister": "Remove webhook",
+      "webhookUnregistering": "Removing…",
+      "webhookRegisterSuccess": "Webhook registered",
+      "webhookRegisterFailure": "Webhook registration failed",
+      "webhookUnregisterSuccess": "Webhook removed",
+      "webhookUnregisterFailure": "Removing the webhook failed",
+      "consentTitle": "GDPR consent",
+      "consentRequired": "Require consent before processing messages",
+      "consentRequiredHelp": "While required, incoming messages from a new Telegram contact are not processed until they confirm consent.",
+      "consentText": "Consent request text",
+      "consentConfirmedText": "Consent confirmation text",
+      "save": "Save",
+      "saving": "Saving…",
+      "saved": "Settings saved.",
+      "saveError": "Saving failed.",
+      "loadError": "Failed to load settings."
     }
   },
   "kb": {

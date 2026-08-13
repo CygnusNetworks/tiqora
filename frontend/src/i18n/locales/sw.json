@@ -151,7 +151,8 @@
     "passkeyAddError": "Haikuweza kuongeza nenosiri.",
     "passkeyDeleteError": "Haikuweza kuondoa nenosiri.",
     "passkeyDeleteLastError": "Haiwezi kuondoa kipengele cha mwisho cha 2FA huku 2FA inatekelezwa.",
-    "passkeyUnsupported": "Kivinjari hiki hakitumii vitufe vya siri (WebAuthn)."
+    "passkeyUnsupported": "Kivinjari hiki hakitumii vitufe vya siri (WebAuthn).",
+    "passkeyReauthRequired": "For your security, please sign in again before changing your passkeys."
   },
   "dashboard": {
     "greeting": {
@@ -545,7 +546,8 @@
     "extrasRetry": "Jaribu tena",
     "customerUnresolved": "Hakuna rekodi ya mteja inayolingana na anwani hii, kwa hivyo maelezo hayapatikani.",
     "lockedByBanner": "Imefungwa na {{name}}",
-    "takeOver": "Chukua"
+    "takeOver": "Chukua",
+    "replyViaTelegram": "Reply will be sent via Telegram"
   },
   "search": {
     "title": "Tafuta",
@@ -1235,6 +1237,9 @@
       "systemAddresses": {
         "email": "Anwani inayotumika kama From kwa foleni na majibu otomatiki.",
         "name": "Jina linaloonekana kando ya barua pepe (k.m. “Support <support@example.com>”)."
+      },
+      "telegram": {
+        "mode": "\"Polling\" has Tiqora fetch updates from Telegram itself (no public URL needed). \"Webhook\" has Telegram push updates to the URL below — requires this server to be reachable over HTTPS."
       }
     },
     "nav": {
@@ -1289,7 +1294,8 @@
       "slas": "SLA",
       "systemAddresses": "Anwani za mfumo",
       "notificationEvents": "Matukio ya arifa",
-      "ticketAttributeRelations": "Mahusiano ya sifa"
+      "ticketAttributeRelations": "Mahusiano ya sifa",
+      "telegram": "Telegram"
     },
     "table": {
       "id": "ID",
@@ -2319,7 +2325,8 @@
       "slas": "Dhibiti makubaliano ya kiwango cha huduma na muda.",
       "systemAddresses": "Anwani za barua pepe zinazotumika kama From kwa foleni na majibu otomatiki.",
       "notificationEvents": "Sanidi arifa za wakala zinazoendeshwa na matukio.",
-      "ticketAttributeRelations": "Matriki za utegemezi zinazolingana na Znuny (huduma/foleni n.k.) kwa CSV."
+      "ticketAttributeRelations": "Matriki za utegemezi zinazolingana na Znuny (huduma/foleni n.k.) kwa CSV.",
+      "telegram": "Connect a Telegram bot as a ticket channel."
     },
     "mailAccounts": {
       "title_plural": "Akaunti za barua",
@@ -2411,6 +2418,37 @@
       "new": "Uhusiano mpya",
       "help": "CSV yenye kichwa Attribute1;Attribute2 na jozi za thamani (Znuny AdminTicketAttributeRelations). Huzuia vichaguzi vya fomu (k.m. Huduma → Foleni).",
       "confirmDelete": "Futa uhusiano huu?"
+    },
+    "telegram": {
+      "title": "Telegram",
+      "description": "Connect a Telegram bot as an inbound/outbound ticket channel.",
+      "enabled": "Channel active",
+      "mode": "Mode",
+      "modePolling": "Polling",
+      "modeWebhook": "Webhook",
+      "queue": "Queue",
+      "botToken": "Bot token",
+      "defaultCustomerUser": "Default customer user",
+      "webhookUrl": "Webhook URL",
+      "webhookSecretToken": "Webhook secret token",
+      "webhookRegister": "Register webhook",
+      "webhookRegistering": "Registering…",
+      "webhookUnregister": "Remove webhook",
+      "webhookUnregistering": "Removing…",
+      "webhookRegisterSuccess": "Webhook registered",
+      "webhookRegisterFailure": "Webhook registration failed",
+      "webhookUnregisterSuccess": "Webhook removed",
+      "webhookUnregisterFailure": "Removing the webhook failed",
+      "consentTitle": "GDPR consent",
+      "consentRequired": "Require consent before processing messages",
+      "consentRequiredHelp": "While required, incoming messages from a new Telegram contact are not processed until they confirm consent.",
+      "consentText": "Consent request text",
+      "consentConfirmedText": "Consent confirmation text",
+      "save": "Save",
+      "saving": "Saving…",
+      "saved": "Settings saved.",
+      "saveError": "Saving failed.",
+      "loadError": "Failed to load settings."
     }
   },
   "kb": {

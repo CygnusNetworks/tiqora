@@ -308,6 +308,14 @@ export const ADMIN_PAGES: AdminPageEntry[] = [
     keywords: ["imap", "pop3", "mailbox", "postfach", "mail account", "eingehend", "inbound"],
   },
   {
+    slug: "telegram",
+    route: "/admin/telegram",
+    group: "communication",
+    nameKey: "admin.nav.telegram",
+    descriptionKey: "admin.pageDescriptions.telegram",
+    keywords: ["telegram", "bot", "messenger", "kanal", "channel", "chat"],
+  },
+  {
     slug: "oauth2-tokens",
     route: "/admin/oauth2-tokens",
     group: "communication",
