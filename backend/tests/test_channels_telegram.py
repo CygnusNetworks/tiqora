@@ -18,11 +18,13 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 from tiqora.api.v1 import channels_telegram
 from tiqora.api.v1.admin.deps import get_admin_user
 from tiqora.channels.telegram.gateway import TelegramApiError, TelegramGateway
+from tiqora.channels.telegram.outbound import TelegramDeliveryError, deliver_agent_telegram_reply
 from tiqora.channels.telegram.service import process_update
 from tiqora.db.tiqora.base import TiqoraBase
 from tiqora.db.tiqora.models import TiqoraTelegramContact
 from tiqora.domain.auth import AuthenticatedUser
 from tiqora.domain.settings_store import KEY_TELEGRAM_UPDATE_OFFSET, get_setting, set_setting
+from tiqora.domain.ticket_write_service import ArticleIn, TicketWriteService
 from tiqora.worker.telegram_poller import run_telegram_poller_tick
 from tiqora.znuny.password import hash_password
 from tiqora.znuny.sysconfig import SysConfig
@@ -916,5 +918,288 @@ async def test_webhook_register_403_for_non_admin(mariadb_znuny_url: str) -> Non
                 # db_leak_baseline.txt), this module deletes what it commits.
                 await session.execute(text("DELETE FROM users WHERE id = :id"), {"id": plain_id})
                 await session.commit()
+    finally:
+        await engine.dispose()
+
+
+# ---------------------------------------------------------------------------
+# Outbound agent replies (Task 4: send-then-store + dispatch seam)
+# ---------------------------------------------------------------------------
+
+
+class _FakeTelegramGateway:
+    """Records sends; can be made to fail like a real Bot API error."""
+
+    def __init__(self, *, fail: bool = False) -> None:
+        self.sent: list[tuple[int, str]] = []
+        self._fail = fail
+
+    async def send_message(self, chat_id: int | str, text_body: str) -> dict:
+        if self._fail:
+            raise TelegramApiError("boom")
+        self.sent.append((int(chat_id), text_body))
+        return {"message_id": 999}
+
+
+@pytest.mark.db
+async def test_agent_reply_via_write_service_sends_and_stores(
+    mariadb_znuny_url: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """channel=telegram agent article, dispatched through TicketWriteService.add_article
+    (the seam), resolves chat_id via the mapped tiqora_telegram_contact row."""
+    _ensure_tiqora_tables(mariadb_znuny_url)
+    engine = create_async_engine(_mysql_async(mariadb_znuny_url))
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    try:
+        async with factory() as session:
+            before = await _snapshot_max_ids(session)
+            try:
+                await set_setting(
+                    session, "channel.telegram.default_customer_user", "portal-default"
+                )
+                await set_setting(session, "channel.telegram.enabled", "1")
+                sysconfig = SysConfig(session)
+
+                inbound = await process_update(
+                    session, factory, sysconfig, None, _text_message(555, "Hi there"), user_id=1
+                )
+                await session.commit()
+
+                # Simulate an admin-linked contact so resolution uses the
+                # contact-mapping path rather than the a_from fallback.
+                await session.execute(
+                    text(
+                        "UPDATE tiqora_telegram_contact SET customer_user_login = 'portal-default'"
+                        " WHERE chat_id = 555"
+                    )
+                )
+                await session.commit()
+
+                fake_gateway = _FakeTelegramGateway()
+
+                async def _fake_build_gateway(_session: AsyncSession) -> _FakeTelegramGateway:
+                    return fake_gateway
+
+                monkeypatch.setattr(
+                    "tiqora.channels.telegram.outbound._build_gateway", _fake_build_gateway
+                )
+
+                async with session.begin():
+                    svc = TicketWriteService(session, factory, sysconfig)
+                    article_id = await svc.add_article(
+                        1,
+                        inbound["ticket_id"],
+                        ArticleIn(
+                            sender_type="agent",
+                            is_visible_for_customer=False,  # forced True for telegram agent
+                            subject="Re: Hi there",
+                            body="Thanks, we will help.",
+                            channel="telegram",
+                        ),
+                    )
+
+                assert fake_gateway.sent == [(555, "Thanks, we will help.")]
+
+                row = (
+                    await session.execute(
+                        text(
+                            "SELECT a_body, a_to FROM article_data_mime WHERE article_id = :aid"
+                        ),
+                        {"aid": article_id},
+                    )
+                ).first()
+                assert row is not None
+                assert row[0] == "Thanks, we will help."
+                assert row[1] == "555@telegram.invalid"
+
+                ch_row = (
+                    await session.execute(
+                        text(
+                            "SELECT cc.name, ast.name FROM article a"
+                            " JOIN communication_channel cc ON cc.id = a.communication_channel_id"
+                            " JOIN article_sender_type ast ON ast.id = a.article_sender_type_id"
+                            " WHERE a.id = :aid"
+                        ),
+                        {"aid": article_id},
+                    )
+                ).first()
+                assert ch_row is not None
+                assert ch_row[0] == "Telegram"
+                assert ch_row[1] == "agent"
+
+                visible_row = (
+                    await session.execute(
+                        text("SELECT is_visible_for_customer FROM article WHERE id = :aid"),
+                        {"aid": article_id},
+                    )
+                ).first()
+                assert visible_row is not None
+                assert bool(visible_row[0]) is True
+            finally:
+                await _cleanup_new_rows(session, before)
+    finally:
+        await engine.dispose()
+
+
+@pytest.mark.db
+async def test_agent_reply_resolves_chat_id_via_a_from_fallback(mariadb_znuny_url: str) -> None:
+    """Ticket without a contact->customer_user mapping: chat_id comes from the
+    most recent inbound article's a_from local-part instead."""
+    _ensure_tiqora_tables(mariadb_znuny_url)
+    engine = create_async_engine(_mysql_async(mariadb_znuny_url))
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    try:
+        async with factory() as session:
+            before = await _snapshot_max_ids(session)
+            try:
+                await set_setting(
+                    session, "channel.telegram.default_customer_user", "portal-default"
+                )
+                await set_setting(session, "channel.telegram.enabled", "1")
+                sysconfig = SysConfig(session)
+
+                inbound = await process_update(
+                    session, factory, sysconfig, None, _text_message(777, "Fallback please"), user_id=1
+                )
+                await session.commit()
+
+                # No contact.customer_user_login mapping was ever set -- the
+                # contact-mapping path in _resolve_chat_id must miss.
+                fake_gateway = _FakeTelegramGateway()
+                async with session.begin():
+                    article_id = await deliver_agent_telegram_reply(
+                        session,
+                        sysconfig,
+                        ticket_id=inbound["ticket_id"],
+                        user_id=1,
+                        article=ArticleIn(
+                            sender_type="agent",
+                            is_visible_for_customer=False,
+                            subject="Re: Fallback please",
+                            body="Got it via fallback.",
+                            channel="telegram",
+                        ),
+                        gateway=fake_gateway,
+                    )
+
+                assert fake_gateway.sent == [(777, "Got it via fallback.")]
+                to_row = (
+                    await session.execute(
+                        text("SELECT a_to FROM article_data_mime WHERE article_id = :aid"),
+                        {"aid": article_id},
+                    )
+                ).first()
+                assert to_row is not None
+                assert to_row[0] == "777@telegram.invalid"
+            finally:
+                await _cleanup_new_rows(session, before)
+    finally:
+        await engine.dispose()
+
+
+@pytest.mark.db
+async def test_agent_reply_send_failure_stores_no_article(mariadb_znuny_url: str) -> None:
+    """send-then-store: a failed Bot API call must leave no article row."""
+    _ensure_tiqora_tables(mariadb_znuny_url)
+    engine = create_async_engine(_mysql_async(mariadb_znuny_url))
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    try:
+        async with factory() as session:
+            before = await _snapshot_max_ids(session)
+            try:
+                await set_setting(
+                    session, "channel.telegram.default_customer_user", "portal-default"
+                )
+                await set_setting(session, "channel.telegram.enabled", "1")
+                sysconfig = SysConfig(session)
+
+                inbound = await process_update(
+                    session, factory, sysconfig, None, _text_message(888, "Will fail"), user_id=1
+                )
+                await session.commit()
+
+                count_before = (
+                    await session.execute(
+                        text("SELECT COUNT(*) FROM article WHERE ticket_id = :tid"),
+                        {"tid": inbound["ticket_id"]},
+                    )
+                ).scalar()
+                # The read above autobegins a transaction (SQLAlchemy 2
+                # autobegin) -- close it out before session.begin() below,
+                # which errors on "A transaction is already begun".
+                await session.commit()
+
+                failing_gateway = _FakeTelegramGateway(fail=True)
+                with pytest.raises(TelegramDeliveryError):
+                    async with session.begin():
+                        await deliver_agent_telegram_reply(
+                            session,
+                            sysconfig,
+                            ticket_id=inbound["ticket_id"],
+                            user_id=1,
+                            article=ArticleIn(
+                                sender_type="agent",
+                                is_visible_for_customer=False,
+                                subject="Re: Will fail",
+                                body="This never arrives.",
+                                channel="telegram",
+                            ),
+                            gateway=failing_gateway,
+                        )
+
+                count_after = (
+                    await session.execute(
+                        text("SELECT COUNT(*) FROM article WHERE ticket_id = :tid"),
+                        {"tid": inbound["ticket_id"]},
+                    )
+                ).scalar()
+                assert count_after == count_before
+            finally:
+                await _cleanup_new_rows(session, before)
+    finally:
+        await engine.dispose()
+
+
+@pytest.mark.db
+async def test_agent_reply_disabled_channel_raises(mariadb_znuny_url: str) -> None:
+    """Channel not enabled (default) -> TelegramDeliveryError, no send attempted."""
+    _ensure_tiqora_tables(mariadb_znuny_url)
+    engine = create_async_engine(_mysql_async(mariadb_znuny_url))
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    try:
+        async with factory() as session:
+            before = await _snapshot_max_ids(session)
+            try:
+                await set_setting(
+                    session, "channel.telegram.default_customer_user", "portal-default"
+                )
+                # channel.telegram.enabled intentionally left unset (defaults False).
+                sysconfig = SysConfig(session)
+
+                inbound = await process_update(
+                    session, factory, sysconfig, None, _text_message(999, "Disabled test"), user_id=1
+                )
+                await session.commit()
+
+                fake_gateway = _FakeTelegramGateway()
+                with pytest.raises(TelegramDeliveryError):
+                    async with session.begin():
+                        await deliver_agent_telegram_reply(
+                            session,
+                            sysconfig,
+                            ticket_id=inbound["ticket_id"],
+                            user_id=1,
+                            article=ArticleIn(
+                                sender_type="agent",
+                                is_visible_for_customer=False,
+                                subject="Re: Disabled test",
+                                body="Should not send.",
+                                channel="telegram",
+                            ),
+                            gateway=fake_gateway,
+                        )
+                assert fake_gateway.sent == []
+            finally:
+                await _cleanup_new_rows(session, before)
     finally:
         await engine.dispose()
