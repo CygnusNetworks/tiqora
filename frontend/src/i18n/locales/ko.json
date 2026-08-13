@@ -151,7 +151,8 @@
     "passkeyAddError": "암호키를 추가할 수 없습니다.",
     "passkeyDeleteError": "암호키를 제거할 수 없습니다.",
     "passkeyDeleteLastError": "2FA가 시행되는 동안에는 마지막 2FA 요소를 제거할 수 없습니다.",
-    "passkeyUnsupported": "이 브라우저는 암호키(WebAuthn)를 지원하지 않습니다."
+    "passkeyUnsupported": "이 브라우저는 암호키(WebAuthn)를 지원하지 않습니다.",
+    "passkeyReauthRequired": "For your security, please sign in again before changing your passkeys."
   },
   "dashboard": {
     "greeting": {
@@ -545,7 +546,8 @@
     "extrasRetry": "다시 시도",
     "customerUnresolved": "이 주소와 일치하는 고객 레코드가 없어 고객 정보를 사용할 수 없습니다.",
     "lockedByBanner": "{{name}} 님이 잠금",
-    "takeOver": "인수"
+    "takeOver": "인수",
+    "replyViaTelegram": "Reply will be sent via Telegram"
   },
   "search": {
     "title": "검색",
@@ -1235,6 +1237,9 @@
       "systemAddresses": {
         "email": "대기열·자동 응답의 From으로 쓰는 주소.",
         "name": "이메일 옆에 표시되는 이름(예: “Support <support@example.com>”)."
+      },
+      "telegram": {
+        "mode": "\"Polling\" has Tiqora fetch updates from Telegram itself (no public URL needed). \"Webhook\" has Telegram push updates to the URL below — requires this server to be reachable over HTTPS."
       }
     },
     "nav": {
@@ -1289,7 +1294,8 @@
       "slas": "SLA",
       "systemAddresses": "시스템 주소",
       "notificationEvents": "알림 이벤트",
-      "ticketAttributeRelations": "속성 관계"
+      "ticketAttributeRelations": "속성 관계",
+      "telegram": "Telegram"
     },
     "table": {
       "id": "ID",
@@ -2319,7 +2325,8 @@
       "slas": "서비스 수준 계약과 기한을 관리합니다.",
       "systemAddresses": "대기열과 자동 응답의 From으로 쓰는 이메일 주소.",
       "notificationEvents": "이벤트 기반 상담원 알림을 구성합니다.",
-      "ticketAttributeRelations": "Znuny 호환 의존성 행렬(서비스→대기열 등)을 CSV로 관리합니다."
+      "ticketAttributeRelations": "Znuny 호환 의존성 행렬(서비스→대기열 등)을 CSV로 관리합니다.",
+      "telegram": "Connect a Telegram bot as a ticket channel."
     },
     "mailAccounts": {
       "title_plural": "메일 계정",
@@ -2411,6 +2418,37 @@
       "new": "새 관계",
       "help": "헤더 Attribute1;Attribute2와 값 쌍의 CSV(Znuny AdminTicketAttributeRelations). 폼 선택 제한에 사용(예: 서비스 → 대기열).",
       "confirmDelete": "이 관계를 삭제할까요?"
+    },
+    "telegram": {
+      "title": "Telegram",
+      "description": "Connect a Telegram bot as an inbound/outbound ticket channel.",
+      "enabled": "Channel active",
+      "mode": "Mode",
+      "modePolling": "Polling",
+      "modeWebhook": "Webhook",
+      "queue": "Queue",
+      "botToken": "Bot token",
+      "defaultCustomerUser": "Default customer user",
+      "webhookUrl": "Webhook URL",
+      "webhookSecretToken": "Webhook secret token",
+      "webhookRegister": "Register webhook",
+      "webhookRegistering": "Registering…",
+      "webhookUnregister": "Remove webhook",
+      "webhookUnregistering": "Removing…",
+      "webhookRegisterSuccess": "Webhook registered",
+      "webhookRegisterFailure": "Webhook registration failed",
+      "webhookUnregisterSuccess": "Webhook removed",
+      "webhookUnregisterFailure": "Removing the webhook failed",
+      "consentTitle": "GDPR consent",
+      "consentRequired": "Require consent before processing messages",
+      "consentRequiredHelp": "While required, incoming messages from a new Telegram contact are not processed until they confirm consent.",
+      "consentText": "Consent request text",
+      "consentConfirmedText": "Consent confirmation text",
+      "save": "Save",
+      "saving": "Saving…",
+      "saved": "Settings saved.",
+      "saveError": "Saving failed.",
+      "loadError": "Failed to load settings."
     }
   },
   "kb": {

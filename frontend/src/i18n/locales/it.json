@@ -151,7 +151,8 @@
     "passkeyAddError": "Impossibile aggiungere la passkey.",
     "passkeyDeleteError": "Impossibile rimuovere la passkey.",
     "passkeyDeleteLastError": "Impossibile rimuovere l'ultimo fattore 2FA mentre la 2FA è obbligatoria.",
-    "passkeyUnsupported": "Questo browser non supporta le passkey (WebAuthn)."
+    "passkeyUnsupported": "Questo browser non supporta le passkey (WebAuthn).",
+    "passkeyReauthRequired": "For your security, please sign in again before changing your passkeys."
   },
   "dashboard": {
     "greeting": {
@@ -545,7 +546,8 @@
     "extrasRetry": "Riprova",
     "customerUnresolved": "Nessun record cliente corrisponde a questo indirizzo; i dettagli non sono disponibili.",
     "lockedByBanner": "Bloccato da {{name}}",
-    "takeOver": "Prendi in carico"
+    "takeOver": "Prendi in carico",
+    "replyViaTelegram": "Reply will be sent via Telegram"
   },
   "search": {
     "title": "Cerca",
@@ -1235,6 +1237,9 @@
       "systemAddresses": {
         "email": "Indirizzo usato come From per code e auto-risposte.",
         "name": "Nome visualizzato accanto all’e-mail (es. “Support <support@example.com>”)."
+      },
+      "telegram": {
+        "mode": "\"Polling\" has Tiqora fetch updates from Telegram itself (no public URL needed). \"Webhook\" has Telegram push updates to the URL below — requires this server to be reachable over HTTPS."
       }
     },
     "nav": {
@@ -1289,7 +1294,8 @@
       "slas": "SLA",
       "systemAddresses": "Indirizzi di sistema",
       "notificationEvents": "Eventi di notifica",
-      "ticketAttributeRelations": "Relazioni tra attributi"
+      "ticketAttributeRelations": "Relazioni tra attributi",
+      "telegram": "Telegram"
     },
     "table": {
       "id": "ID",
@@ -2319,7 +2325,8 @@
       "slas": "Gestisci gli accordi di livello di servizio e i timer.",
       "systemAddresses": "Indirizzi e-mail usati come mittente per code e auto-risposte.",
       "notificationEvents": "Configura le notifiche agli agenti basate su eventi.",
-      "ticketAttributeRelations": "Matrici di dipendenza compatibili Znuny (servizio/coda, ecc.) in CSV."
+      "ticketAttributeRelations": "Matrici di dipendenza compatibili Znuny (servizio/coda, ecc.) in CSV.",
+      "telegram": "Connect a Telegram bot as a ticket channel."
     },
     "mailAccounts": {
       "title_plural": "Account di posta",
@@ -2411,6 +2418,37 @@
       "new": "Nuova relazione",
       "help": "CSV con intestazione Attribute1;Attribute2 e coppie di valori (Znuny AdminTicketAttributeRelations). Limita i selettori dei moduli (es. Servizio → Coda).",
       "confirmDelete": "Eliminare questa relazione?"
+    },
+    "telegram": {
+      "title": "Telegram",
+      "description": "Connect a Telegram bot as an inbound/outbound ticket channel.",
+      "enabled": "Channel active",
+      "mode": "Mode",
+      "modePolling": "Polling",
+      "modeWebhook": "Webhook",
+      "queue": "Queue",
+      "botToken": "Bot token",
+      "defaultCustomerUser": "Default customer user",
+      "webhookUrl": "Webhook URL",
+      "webhookSecretToken": "Webhook secret token",
+      "webhookRegister": "Register webhook",
+      "webhookRegistering": "Registering…",
+      "webhookUnregister": "Remove webhook",
+      "webhookUnregistering": "Removing…",
+      "webhookRegisterSuccess": "Webhook registered",
+      "webhookRegisterFailure": "Webhook registration failed",
+      "webhookUnregisterSuccess": "Webhook removed",
+      "webhookUnregisterFailure": "Removing the webhook failed",
+      "consentTitle": "GDPR consent",
+      "consentRequired": "Require consent before processing messages",
+      "consentRequiredHelp": "While required, incoming messages from a new Telegram contact are not processed until they confirm consent.",
+      "consentText": "Consent request text",
+      "consentConfirmedText": "Consent confirmation text",
+      "save": "Save",
+      "saving": "Saving…",
+      "saved": "Settings saved.",
+      "saveError": "Saving failed.",
+      "loadError": "Failed to load settings."
     }
   },
   "kb": {

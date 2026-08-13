@@ -151,7 +151,8 @@
     "passkeyAddError": "Kunde inte lägga till passkey.",
     "passkeyDeleteError": "Kunde inte ta bort passkey.",
     "passkeyDeleteLastError": "Det går inte att ta bort den sista 2FA-faktorn medan 2FA tillämpas.",
-    "passkeyUnsupported": "Den här webbläsaren stöder inte passkeys (WebAuthn)."
+    "passkeyUnsupported": "Den här webbläsaren stöder inte passkeys (WebAuthn).",
+    "passkeyReauthRequired": "For your security, please sign in again before changing your passkeys."
   },
   "dashboard": {
     "greeting": {
@@ -545,7 +546,8 @@
     "extrasRetry": "Försök igen",
     "customerUnresolved": "Ingen kundpost matchar adressen, så kunduppgifter saknas.",
     "lockedByBanner": "Låst av {{name}}",
-    "takeOver": "Ta över"
+    "takeOver": "Ta över",
+    "replyViaTelegram": "Reply will be sent via Telegram"
   },
   "search": {
     "title": "Sök",
@@ -1235,6 +1237,9 @@
       "systemAddresses": {
         "email": "Adress som används som From för köer och autosvar.",
         "name": "Visningsnamn bredvid e-postadressen (t.ex. ”Support <support@example.com>”)."
+      },
+      "telegram": {
+        "mode": "\"Polling\" has Tiqora fetch updates from Telegram itself (no public URL needed). \"Webhook\" has Telegram push updates to the URL below — requires this server to be reachable over HTTPS."
       }
     },
     "nav": {
@@ -1289,7 +1294,8 @@
       "slas": "SLA",
       "systemAddresses": "Systemadresser",
       "notificationEvents": "Aviserings­händelser",
-      "ticketAttributeRelations": "Attribut­relationer"
+      "ticketAttributeRelations": "Attribut­relationer",
+      "telegram": "Telegram"
     },
     "table": {
       "id": "ID",
@@ -2319,7 +2325,8 @@
       "slas": "Hantera servicenivåavtal och tider.",
       "systemAddresses": "E-postadresser som From för köer och autosvar.",
       "notificationEvents": "Konfigurera händelsestyrda aviseringar till handläggare.",
-      "ticketAttributeRelations": "Znuny-kompatibla beroendematriser (tjänst/kö m.m.) i CSV."
+      "ticketAttributeRelations": "Znuny-kompatibla beroendematriser (tjänst/kö m.m.) i CSV.",
+      "telegram": "Connect a Telegram bot as a ticket channel."
     },
     "mailAccounts": {
       "title_plural": "Mailkonton",
@@ -2411,6 +2418,37 @@
       "new": "Ny relation",
       "help": "CSV med rubrik Attribute1;Attribute2 och värdepar (Znuny AdminTicketAttributeRelations). Begränsar formulärval (t.ex. Tjänst → Kö).",
       "confirmDelete": "Ta bort den här relationen?"
+    },
+    "telegram": {
+      "title": "Telegram",
+      "description": "Connect a Telegram bot as an inbound/outbound ticket channel.",
+      "enabled": "Channel active",
+      "mode": "Mode",
+      "modePolling": "Polling",
+      "modeWebhook": "Webhook",
+      "queue": "Queue",
+      "botToken": "Bot token",
+      "defaultCustomerUser": "Default customer user",
+      "webhookUrl": "Webhook URL",
+      "webhookSecretToken": "Webhook secret token",
+      "webhookRegister": "Register webhook",
+      "webhookRegistering": "Registering…",
+      "webhookUnregister": "Remove webhook",
+      "webhookUnregistering": "Removing…",
+      "webhookRegisterSuccess": "Webhook registered",
+      "webhookRegisterFailure": "Webhook registration failed",
+      "webhookUnregisterSuccess": "Webhook removed",
+      "webhookUnregisterFailure": "Removing the webhook failed",
+      "consentTitle": "GDPR consent",
+      "consentRequired": "Require consent before processing messages",
+      "consentRequiredHelp": "While required, incoming messages from a new Telegram contact are not processed until they confirm consent.",
+      "consentText": "Consent request text",
+      "consentConfirmedText": "Consent confirmation text",
+      "save": "Save",
+      "saving": "Saving…",
+      "saved": "Settings saved.",
+      "saveError": "Saving failed.",
+      "loadError": "Failed to load settings."
     }
   },
   "kb": {

@@ -151,7 +151,8 @@
     "passkeyAddError": "无法添加通行密钥。",
     "passkeyDeleteError": "无法移除通行密钥。",
     "passkeyDeleteLastError": "在强制启用 2FA 时，无法移除最后一个 2FA 因素。",
-    "passkeyUnsupported": "此浏览器不支持通行密钥（WebAuthn）。"
+    "passkeyUnsupported": "此浏览器不支持通行密钥（WebAuthn）。",
+    "passkeyReauthRequired": "For your security, please sign in again before changing your passkeys."
   },
   "dashboard": {
     "greeting": {
@@ -545,7 +546,8 @@
     "extrasRetry": "重试",
     "customerUnresolved": "没有与此地址匹配的客户记录，因此无法显示客户详情。",
     "lockedByBanner": "由 {{name}} 锁定",
-    "takeOver": "接管"
+    "takeOver": "接管",
+    "replyViaTelegram": "Reply will be sent via Telegram"
   },
   "search": {
     "title": "搜索",
@@ -1235,6 +1237,9 @@
       "systemAddresses": {
         "email": "用作队列与自动回复发件人的地址。",
         "name": "显示在电子邮件旁的名称（例如 “Support <support@example.com>”）。"
+      },
+      "telegram": {
+        "mode": "\"Polling\" has Tiqora fetch updates from Telegram itself (no public URL needed). \"Webhook\" has Telegram push updates to the URL below — requires this server to be reachable over HTTPS."
       }
     },
     "nav": {
@@ -1289,7 +1294,8 @@
       "slas": "SLA",
       "systemAddresses": "系统地址",
       "notificationEvents": "通知事件",
-      "ticketAttributeRelations": "属性关系"
+      "ticketAttributeRelations": "属性关系",
+      "telegram": "Telegram"
     },
     "table": {
       "id": "ID",
@@ -2319,7 +2325,8 @@
       "slas": "管理服务级别协议与时限。",
       "systemAddresses": "用作队列与自动回复发件人的电子邮件地址。",
       "notificationEvents": "配置由事件触发的坐席通知。",
-      "ticketAttributeRelations": "Znuny 兼容的依赖矩阵（如服务→队列），CSV 格式。"
+      "ticketAttributeRelations": "Znuny 兼容的依赖矩阵（如服务→队列），CSV 格式。",
+      "telegram": "Connect a Telegram bot as a ticket channel."
     },
     "mailAccounts": {
       "title_plural": "邮件账户",
@@ -2411,6 +2418,37 @@
       "new": "新建关系",
       "help": "带表头 Attribute1;Attribute2 与值对的 CSV（Znuny AdminTicketAttributeRelations）。用于限制表单选项（如 服务 → 队列）。",
       "confirmDelete": "删除此关系？"
+    },
+    "telegram": {
+      "title": "Telegram",
+      "description": "Connect a Telegram bot as an inbound/outbound ticket channel.",
+      "enabled": "Channel active",
+      "mode": "Mode",
+      "modePolling": "Polling",
+      "modeWebhook": "Webhook",
+      "queue": "Queue",
+      "botToken": "Bot token",
+      "defaultCustomerUser": "Default customer user",
+      "webhookUrl": "Webhook URL",
+      "webhookSecretToken": "Webhook secret token",
+      "webhookRegister": "Register webhook",
+      "webhookRegistering": "Registering…",
+      "webhookUnregister": "Remove webhook",
+      "webhookUnregistering": "Removing…",
+      "webhookRegisterSuccess": "Webhook registered",
+      "webhookRegisterFailure": "Webhook registration failed",
+      "webhookUnregisterSuccess": "Webhook removed",
+      "webhookUnregisterFailure": "Removing the webhook failed",
+      "consentTitle": "GDPR consent",
+      "consentRequired": "Require consent before processing messages",
+      "consentRequiredHelp": "While required, incoming messages from a new Telegram contact are not processed until they confirm consent.",
+      "consentText": "Consent request text",
+      "consentConfirmedText": "Consent confirmation text",
+      "save": "Save",
+      "saving": "Saving…",
+      "saved": "Settings saved.",
+      "saveError": "Saving failed.",
+      "loadError": "Failed to load settings."
     }
   },
   "kb": {
