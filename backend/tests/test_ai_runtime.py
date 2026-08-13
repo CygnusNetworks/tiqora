@@ -55,8 +55,9 @@ from tiqora.channels.common import ensure_channel_row
 from tiqora.config import get_settings
 from tiqora.db.tiqora.base import TiqoraBase
 from tiqora.db.tiqora.models import TiqoraTelegramContact
-from tiqora.domain.ticket_write_service import add_article
+from tiqora.domain.ticket_write_service import ArticleIn, add_article
 from tiqora.znuny.password import hash_password
+from tiqora.znuny.sysconfig import SysConfig
 
 pytestmark = pytest.mark.db
 
@@ -2111,5 +2112,112 @@ async def test_identity_block_never_active_for_email_source(
             )
         assert llm.calls == 1
         assert result.status == "sent"
+    finally:
+        await engine.dispose()
+
+
+async def test_identity_exchange_context_excludes_ticket_content_and_customer_id(
+    mariadb_znuny_url: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Security fix (review finding, Critical): the identity mini-exchange's
+    LLM context must be structurally minimal — it must NOT include internal
+    notes, other prior articles, or the ticket's current CustomerID/
+    CustomerUser (render_ticket_header), since an unidentified Telegram user
+    is one prompt injection away from exfiltrating anything present there.
+    Only the latest customer message may be present."""
+    seed = _seed_ticket(mariadb_znuny_url, ns=27)
+    engine = create_async_engine(_mysql_async(mariadb_znuny_url))
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    settings = get_settings()
+    chat_id = 900027
+    secret_note_body = "SECRET-INTERNAL-NOTE-only-an-agent-should-ever-see-this"
+    newest_customer_body = "My phone number is +491112223, please check my account."
+    try:
+        async with factory() as session:
+            await _setup_identity_policy(session, seed=seed)
+            await _seed_telegram_article(
+                session, article_id=seed["customer_article_id"], chat_id=chat_id
+            )
+            sysconfig = SysConfig(session)
+            # Internal, agent-only note — must never reach an unidentified user.
+            await add_article(
+                session,
+                ticket_id=seed["ticket_id"],
+                article=ArticleIn(
+                    sender_type="agent",
+                    is_visible_for_customer=False,
+                    subject="Internal",
+                    body=secret_note_body,
+                    channel="note",
+                ),
+                user_id=seed["agent_id"],
+                sysconfig=sysconfig,
+            )
+            # Newest customer message — the only thing the identity exchange
+            # should see (to extract identity_claim values from it).
+            await add_article(
+                session,
+                ticket_id=seed["ticket_id"],
+                article=ArticleIn(
+                    sender_type="customer",
+                    is_visible_for_customer=True,
+                    subject="Re",
+                    body=newest_customer_body,
+                    from_address=f"Tester <{chat_id}@telegram.invalid>",
+                    channel="telegram",
+                ),
+                user_id=seed["agent_id"],
+                sysconfig=sysconfig,
+            )
+            await session.commit()
+
+        async def _fake_telegram_deliver(
+            session: AsyncSession,
+            sysconfig: Any,
+            *,
+            ticket_id: int,
+            user_id: int,
+            article: Any,
+            gateway: Any = None,
+        ) -> int:
+            return await add_article(
+                session, ticket_id=ticket_id, article=article, user_id=user_id, sysconfig=sysconfig
+            )
+
+        monkeypatch.setattr(
+            "tiqora.channels.telegram.outbound.deliver_agent_telegram_reply",
+            _fake_telegram_deliver,
+        )
+
+        llm = ScriptedLlm([_identity_response("clarify", "Please tell me your phone number.")])
+        async with factory() as session:
+            await run_ticket_agent(
+                session,
+                settings=settings,
+                llm=llm,
+                ticket_id=seed["ticket_id"],
+                trigger=TRIGGER_AUTO,
+                acting_user_id=None,
+                run_id="run-27",
+                source_channel="telegram",
+            )
+
+        assert llm.calls == 1
+        sent_user_message = llm.last_user_message
+        assert sent_user_message is not None
+
+        # (c) the latest customer message IS present.
+        assert newest_customer_body in sent_user_message
+
+        # (a) internal note bodies and other prior articles' content are NOT
+        # present.
+        assert secret_note_body not in sent_user_message
+        assert "I need help with X" not in sent_user_message  # the seeded first article
+
+        # (b) the ticket's customer_user login / CustomerID is NOT present.
+        assert "CUST9627" not in sent_user_message
+        assert "customer9627@example.com" not in sent_user_message
+        assert "CustomerID" not in sent_user_message
+        assert "CustomerUser" not in sent_user_message
     finally:
         await engine.dispose()
