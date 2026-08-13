@@ -24,7 +24,12 @@ from __future__ import annotations
 from sqlalchemy import ColumnElement, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from tiqora.db.legacy.article import Article, ArticleDataMime, ArticleSenderType
+from tiqora.db.legacy.article import (
+    Article,
+    ArticleDataMime,
+    ArticleSenderType,
+    CommunicationChannel,
+)
 from tiqora.db.legacy.customer import CustomerUserCustomer
 from tiqora.db.legacy.queue import Queue
 from tiqora.db.legacy.ticket import (
@@ -285,6 +290,8 @@ class PortalTicketService:
         sender_types = {
             r.id: r.name for r in (await self._session.execute(select(ArticleSenderType))).scalars()
         }
+        channel_rows = await self._session.execute(select(CommunicationChannel))
+        channel_names = {r.id: r.name for r in channel_rows.scalars()}
         articles = (
             (
                 await self._session.execute(
@@ -319,6 +326,7 @@ class PortalTicketService:
                     sender_type=sender_types.get(a.article_sender_type_id),
                     sender_type_id=a.article_sender_type_id,
                     communication_channel_id=a.communication_channel_id,
+                    communication_channel_name=channel_names.get(a.communication_channel_id),
                     is_visible_for_customer=bool(a.is_visible_for_customer),
                     create_time=a.create_time,
                     create_by=a.create_by,
