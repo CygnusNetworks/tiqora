@@ -97,6 +97,9 @@ const tickets = {
 
 const ticketDetail = {
   ...tickets.items[0],
+  // The agent may write — enables the reply/note composers in the zoom view.
+  can_write: true,
+  permissions: { ro: true, note: true, rw: true },
   type_id: 1,
   service_id: null,
   sla_id: null,
@@ -542,6 +545,47 @@ export async function mockApi(page: Page) {
       await json(route, 201, { article_id: 999 });
       return;
     }
+    if (path.match(/\/api\/v1\/tickets\/\d+\/articles\/\d+\/reply-draft$/) && method === "GET") {
+      await json(route, 200, {
+        subject: "Re: Printer smoke on level 3",
+        body: "> quoted original",
+        is_html: false,
+        to_address: "customer@example.com",
+        cc: "",
+        in_reply_to: null,
+        references: null,
+        signature: "",
+        signature_is_html: false,
+      });
+      return;
+    }
+    if (path.match(/\/api\/v1\/tickets\/\d+\/drafts$/) && method === "GET") {
+      await json(route, 200, []);
+      return;
+    }
+    if (path.match(/\/api\/v1\/tickets\/\d+\/templates$/) && method === "GET") {
+      await json(route, 200, []);
+      return;
+    }
+    // Composer auto-lock (Znuny RequiredLock). Ticket 101 plays "locked by
+    // another agent" until a takeover is posted; everything else acquires.
+    if (path.match(/\/api\/v1\/tickets\/\d+\/acquire-lock$/) && method === "POST") {
+      const req_ = route.request().postDataJSON() as { takeover?: boolean };
+      if (path.includes("/tickets/101/") && !req_.takeover) {
+        await json(route, 200, {
+          result: "locked_by_other",
+          locked_by_id: 7,
+          locked_by_name: "Bea Blocker",
+        });
+        return;
+      }
+      await json(route, 200, {
+        result: req_.takeover ? "taken_over" : "acquired",
+        locked_by_id: null,
+        locked_by_name: null,
+      });
+      return;
+    }
     if (path.match(/\/api\/v1\/tickets\/\d+\/articles$/)) {
       await json(route, 200, articles);
       return;
@@ -550,8 +594,11 @@ export async function mockApi(page: Page) {
       await json(route, 200, history);
       return;
     }
-    if (path.match(/\/api\/v1\/tickets\/\d+$/)) {
-      await json(route, 200, ticketDetail);
+    if (path.match(/\/api\/v1\/tickets\/(\d+)$/)) {
+      // Echo the requested id so per-ticket behaviour (e.g. the foreign-lock
+      // fixture on ticket 101) sees consistent ids across all endpoints.
+      const id = Number(path.match(/\/api\/v1\/tickets\/(\d+)$/)?.[1] ?? 100);
+      await json(route, 200, { ...ticketDetail, id });
       return;
     }
     if (path.endsWith("/api/v1/tickets") && method === "GET") {

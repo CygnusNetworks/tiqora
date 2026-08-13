@@ -543,7 +543,9 @@
     "extrasFailedTime": "Poslano — vrijeme nije evidentirano.",
     "extrasFailedBoth": "Poslano — ni spominjanje ni evidencija vremena nisu spremljeni.",
     "extrasRetry": "Pokušaj ponovno",
-    "customerUnresolved": "Nema korisničkog zapisa za ovu adresu, stoga podaci nisu dostupni."
+    "customerUnresolved": "Nema korisničkog zapisa za ovu adresu, stoga podaci nisu dostupni.",
+    "lockedByBanner": "Zaključao {{name}}",
+    "takeOver": "Preuzmi"
   },
   "search": {
     "title": "Traži",

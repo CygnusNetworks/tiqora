@@ -543,7 +543,9 @@
     "extrasFailedTime": "已傳送 — 時間未登記。",
     "extrasFailedBoth": "已傳送 — 提及與時間登記皆未儲存。",
     "extrasRetry": "重試",
-    "customerUnresolved": "沒有與此地址相符的客戶紀錄，因此無法顯示客戶詳情。"
+    "customerUnresolved": "沒有與此地址相符的客戶紀錄，因此無法顯示客戶詳情。",
+    "lockedByBanner": "由 {{name}} 鎖定",
+    "takeOver": "接管"
   },
   "search": {
     "title": "搜尋",

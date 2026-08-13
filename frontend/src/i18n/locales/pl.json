@@ -543,7 +543,9 @@
     "extrasFailedTime": "Wysłano — czas nie został zaksięgowany.",
     "extrasFailedBoth": "Wysłano — ani wzmianka, ani księgowanie czasu nie zostały zapisane.",
     "extrasRetry": "Spróbuj ponownie",
-    "customerUnresolved": "Żaden rekord klienta nie pasuje do tego adresu — dane klienta są niedostępne."
+    "customerUnresolved": "Żaden rekord klienta nie pasuje do tego adresu — dane klienta są niedostępne.",
+    "lockedByBanner": "Zablokowane przez {{name}}",
+    "takeOver": "Przejmij"
   },
   "search": {
     "title": "Szukaj",

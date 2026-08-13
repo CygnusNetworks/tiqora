@@ -543,7 +543,9 @@
     "extrasFailedTime": "Terkirim — waktu tidak dicatat.",
     "extrasFailedBoth": "Terkirim — sebutan maupun pencatatan waktu tidak disimpan.",
     "extrasRetry": "Coba lagi",
-    "customerUnresolved": "Tidak ada data pelanggan yang cocok dengan alamat ini, sehingga detail tidak tersedia."
+    "customerUnresolved": "Tidak ada data pelanggan yang cocok dengan alamat ini, sehingga detail tidak tersedia.",
+    "lockedByBanner": "Dikunci oleh {{name}}",
+    "takeOver": "Ambil alih"
   },
   "search": {
     "title": "Cari",

@@ -543,7 +543,9 @@
     "extrasFailedTime": "전송됨 — 시간이 기록되지 않았습니다.",
     "extrasFailedBoth": "전송됨 — 멘션과 시간 기록이 모두 저장되지 않았습니다.",
     "extrasRetry": "다시 시도",
-    "customerUnresolved": "이 주소와 일치하는 고객 레코드가 없어 고객 정보를 사용할 수 없습니다."
+    "customerUnresolved": "이 주소와 일치하는 고객 레코드가 없어 고객 정보를 사용할 수 없습니다.",
+    "lockedByBanner": "{{name}} 님이 잠금",
+    "takeOver": "인수"
   },
   "search": {
     "title": "검색",

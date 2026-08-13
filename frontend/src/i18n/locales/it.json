@@ -543,7 +543,9 @@
     "extrasFailedTime": "Inviato — il tempo non è stato registrato.",
     "extrasFailedBoth": "Inviato — né la menzione né la registrazione del tempo sono state salvate.",
     "extrasRetry": "Riprova",
-    "customerUnresolved": "Nessun record cliente corrisponde a questo indirizzo; i dettagli non sono disponibili."
+    "customerUnresolved": "Nessun record cliente corrisponde a questo indirizzo; i dettagli non sono disponibili.",
+    "lockedByBanner": "Bloccato da {{name}}",
+    "takeOver": "Prendi in carico"
   },
   "search": {
     "title": "Cerca",

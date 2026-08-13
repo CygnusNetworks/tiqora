@@ -5,6 +5,8 @@ import { api, type CustomerRef } from "@/lib/api";
 import { Button } from "@/components/ui/Button";
 import { Dialog } from "@/components/ui/Dialog";
 import { SelectField } from "@/components/ui/SelectField";
+import { useComposerLock } from "@/lib/composerLock";
+import { ComposerLockBanner } from "./ComposerLock";
 
 const inputCls =
   "w-full rounded border border-hairline bg-surface px-2 py-1.5 text-sm text-ink placeholder:text-muted focus:outline-none focus:ring-1 focus:ring-accent";
@@ -30,6 +32,7 @@ export function ForwardDialog({
 }) {
   const { t } = useTranslation();
   const invalidate = useInvalidateTicket(ticketId);
+  const ticketLock = useComposerLock(ticketId, "forward", open);
   const [to, setTo] = useState("");
   const [note, setNote] = useState("");
 
@@ -49,6 +52,11 @@ export function ForwardDialog({
   return (
     <Dialog open={open} onClose={onClose} title={t("ticket.forwardDialogTitle")}>
       <div className="space-y-2" data-testid="forward-dialog">
+        <ComposerLockBanner
+          lockedBy={ticketLock.lockedBy}
+          onTakeOver={ticketLock.takeOver}
+          busy={ticketLock.takingOver}
+        />
         <label className="block text-xs text-muted">
           {t("ticket.replyTo")}
           <input className={inputCls} value={to} onChange={(e) => setTo(e.target.value)} />
@@ -66,7 +74,7 @@ export function ForwardDialog({
         <DialogActions
           onCancel={onClose}
           onSave={() => m.mutate()}
-          disabled={!to.trim() || m.isPending}
+          disabled={!to.trim() || m.isPending || ticketLock.lockedBy !== null}
         />
       </div>
     </Dialog>
@@ -86,6 +94,7 @@ export function BounceDialog({
 }) {
   const { t } = useTranslation();
   const invalidate = useInvalidateTicket(ticketId);
+  const ticketLock = useComposerLock(ticketId, "bounce", open);
   const [to, setTo] = useState("");
 
   const m = useMutation({
@@ -99,6 +108,11 @@ export function BounceDialog({
   return (
     <Dialog open={open} onClose={onClose} title={t("ticket.bounceDialogTitle")}>
       <div className="space-y-2" data-testid="bounce-dialog">
+        <ComposerLockBanner
+          lockedBy={ticketLock.lockedBy}
+          onTakeOver={ticketLock.takeOver}
+          busy={ticketLock.takingOver}
+        />
         <label className="block text-xs text-muted">
           {t("ticket.replyTo")}
           <input className={inputCls} value={to} onChange={(e) => setTo(e.target.value)} />
@@ -107,7 +121,7 @@ export function BounceDialog({
         <DialogActions
           onCancel={onClose}
           onSave={() => m.mutate()}
-          disabled={!to.trim() || m.isPending}
+          disabled={!to.trim() || m.isPending || ticketLock.lockedBy !== null}
         />
       </div>
     </Dialog>

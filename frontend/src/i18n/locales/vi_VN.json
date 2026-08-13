@@ -543,7 +543,9 @@
     "extrasFailedTime": "Đã gửi — thời gian chưa được ghi.",
     "extrasFailedBoth": "Đã gửi — cả nhắc đến và ghi thời gian đều chưa lưu.",
     "extrasRetry": "Thử lại",
-    "customerUnresolved": "Không có hồ sơ khách hàng khớp địa chỉ này, nên không có chi tiết khách hàng."
+    "customerUnresolved": "Không có hồ sơ khách hàng khớp địa chỉ này, nên không có chi tiết khách hàng.",
+    "lockedByBanner": "Bị khóa bởi {{name}}",
+    "takeOver": "Tiếp quản"
   },
   "search": {
     "title": "Tìm kiếm",

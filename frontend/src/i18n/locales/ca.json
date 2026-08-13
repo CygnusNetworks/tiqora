@@ -543,7 +543,9 @@
     "extrasFailedTime": "Enviat — el temps no s'ha registrat.",
     "extrasFailedBoth": "Enviat — no s'han desat ni la menció ni el registre de temps.",
     "extrasRetry": "Torna-ho a provar",
-    "customerUnresolved": "Cap registre de client no coincideix amb aquesta adreça; els detalls no estan disponibles."
+    "customerUnresolved": "Cap registre de client no coincideix amb aquesta adreça; els detalls no estan disponibles.",
+    "lockedByBanner": "Bloquejat per {{name}}",
+    "takeOver": "Assumir"
   },
   "search": {
     "title": "Cerca",

@@ -543,7 +543,9 @@
     "extrasFailedTime": "Sendt — tiden ble ikke registrert.",
     "extrasFailedBoth": "Sendt — verken omtale eller tidsregistrering ble lagret.",
     "extrasRetry": "Prøv igjen",
-    "customerUnresolved": "Ingen kundepost matcher denne adressen, så kundedetaljer er utilgjengelige."
+    "customerUnresolved": "Ingen kundepost matcher denne adressen, så kundedetaljer er utilgjengelige.",
+    "lockedByBanner": "Låst av {{name}}",
+    "takeOver": "Overta"
   },
   "search": {
     "title": "Søk",

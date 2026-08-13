@@ -269,6 +269,73 @@
         "title": "AclUpdate",
         "type": "object"
       },
+      "AcquireLockRequest": {
+        "description": "Composer-open lock acquisition (Znuny RequiredLock semantics).",
+        "properties": {
+          "action": {
+            "enum": [
+              "compose",
+              "forward",
+              "bounce",
+              "close"
+            ],
+            "title": "Action",
+            "type": "string"
+          },
+          "takeover": {
+            "default": false,
+            "title": "Takeover",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "action"
+        ],
+        "title": "AcquireLockRequest",
+        "type": "object"
+      },
+      "AcquireLockResponse": {
+        "properties": {
+          "locked_by_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Locked By Id"
+          },
+          "locked_by_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Locked By Name"
+          },
+          "result": {
+            "enum": [
+              "not_required",
+              "acquired",
+              "already_mine",
+              "taken_over",
+              "locked_by_other"
+            ],
+            "title": "Result",
+            "type": "string"
+          }
+        },
+        "required": [
+          "result"
+        ],
+        "title": "AcquireLockResponse",
+        "type": "object"
+      },
       "ActivityDialogDetailOut": {
         "description": "Full field definitions for one activity dialog.",
         "properties": {
@@ -4783,6 +4850,16 @@
             },
             "title": "Enforce Group Ids",
             "type": "array"
+          },
+          "portal_enabled": {
+            "default": true,
+            "title": "Portal Enabled",
+            "type": "boolean"
+          },
+          "portal_locked_by_env": {
+            "default": false,
+            "title": "Portal Locked By Env",
+            "type": "boolean"
           }
         },
         "required": [
@@ -4810,6 +4887,17 @@
               }
             ],
             "title": "Enforce Group Ids"
+          },
+          "portal_enabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Portal Enabled"
           }
         },
         "required": [
@@ -4861,6 +4949,11 @@
           "password": {
             "default": true,
             "title": "Password",
+            "type": "boolean"
+          },
+          "portal_enabled": {
+            "default": true,
+            "title": "Portal Enabled",
             "type": "boolean"
           },
           "spnego": {
@@ -17495,6 +17588,24 @@
           "code"
         ],
         "title": "TOTPCodeIn",
+        "type": "object"
+      },
+      "TOTPEnrollIn": {
+        "description": "Body for ``POST /auth/totp/enroll``.\n\n``current_code`` is only required when a TOTP factor is already enabled \u2014\nre-enrolling then means replacing a live second factor, which must be\nproven, not merely requested from an authenticated session.",
+        "properties": {
+          "current_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Current Code"
+          }
+        },
+        "title": "TOTPEnrollIn",
         "type": "object"
       },
       "TOTPEnrollOut": {
@@ -43624,7 +43735,7 @@
     },
     "/api/v1/auth/passkey/{passkey_id}": {
       "delete": {
-        "description": "Delete a passkey. Blocked when it is the last remaining 2FA factor under enforce.",
+        "description": "Delete a passkey. Blocked when it is the last remaining 2FA factor under enforce.\n\nRemoving a factor needs the same recently-authenticated session as adding\none \u2014 otherwise a hijacked session could strip the account back down to a\nsingle factor it already controls.",
         "operationId": "passkey_delete_api_v1_auth_passkey__passkey_id__delete",
         "parameters": [
           {
@@ -43985,6 +44096,7 @@
     },
     "/api/v1/auth/totp/enroll": {
       "post": {
+        "description": "Start (or replace) a TOTP enrollment.\n\nReplacing an *active* factor needs ``current_code`` from the authenticator\nalready enrolled \u2014 an authenticated session alone is not enough, or a\nhijacked session could swap the second factor for one it controls\n(security review H-2). Wrong codes are throttled like any other 2FA guess.",
         "operationId": "totp_enroll_api_v1_auth_totp_enroll_post",
         "parameters": [
           {
@@ -44020,6 +44132,23 @@
             }
           }
         ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/TOTPEnrollIn"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Body"
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
             "content": {
@@ -52521,6 +52650,91 @@
           }
         },
         "summary": "Patch Ticket",
+        "tags": [
+          "tickets"
+        ]
+      }
+    },
+    "/api/v1/tickets/{ticket_id}/acquire-lock": {
+      "post": {
+        "description": "Znuny composer-open lock semantics (RequiredLock).\n\nCalled when a composer dialog opens (and again with ``takeover`` from the\n\"\u00dcbernehmen\" banner). Locking an unlocked ticket makes the caller its\nowner; a foreign lock is reported as ``locked_by_other`` without writing.",
+        "operationId": "acquire_ticket_lock_api_v1_tickets__ticket_id__acquire_lock_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "ticket_id",
+            "required": true,
+            "schema": {
+              "title": "Ticket Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AcquireLockRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AcquireLockResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Acquire Ticket Lock",
         "tags": [
           "tickets"
         ]
