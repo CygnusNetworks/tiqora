@@ -1,10 +1,15 @@
 import { describe, it, expect } from "vitest";
 import type { ArticleListItem } from "@/lib/api";
 import {
+  channelIcon,
+  channelNameOf,
+  dominantChannel,
   emailFromAddress,
   formatFromAddress,
   formatToAddresses,
   initialsFor,
+  isConversationalChannel,
+  isInternalNote,
   senderDisplayName,
 } from "./articleChannel";
 
@@ -62,6 +67,113 @@ describe("initialsFor", () => {
 
   it("falls back to a placeholder for missing input", () => {
     expect(initialsFor(article(null))).toBe("?");
+  });
+});
+
+function article(overrides: Partial<ArticleListItem>): ArticleListItem {
+  return {
+    id: 1,
+    communication_channel_id: 1,
+    communication_channel_name: null,
+    sender_type: "customer",
+    is_visible_for_customer: true,
+    ...overrides,
+  } as ArticleListItem;
+}
+
+describe("channelNameOf", () => {
+  it("uses communication_channel_name when the backend sent one", () => {
+    expect(
+      channelNameOf(article({ communication_channel_id: 999, communication_channel_name: "Telegram" })),
+    ).toBe("Telegram");
+  });
+
+  it("falls back to the legacy numeric-id mapping when name is null", () => {
+    expect(channelNameOf(article({ communication_channel_id: 1, communication_channel_name: null }))).toBe(
+      "Email",
+    );
+    expect(channelNameOf(article({ communication_channel_id: 2, communication_channel_name: null }))).toBe(
+      "Phone",
+    );
+    expect(channelNameOf(article({ communication_channel_id: 3, communication_channel_name: null }))).toBe(
+      "Internal",
+    );
+    expect(channelNameOf(article({ communication_channel_id: 4, communication_channel_name: null }))).toBe(
+      "Chat",
+    );
+  });
+
+  it("defaults to Email for an unrecognized id and no name (old app behavior)", () => {
+    expect(channelNameOf(article({ communication_channel_id: 42, communication_channel_name: null }))).toBe(
+      "Email",
+    );
+  });
+});
+
+describe("isConversationalChannel / channelIcon", () => {
+  it("treats Telegram as conversational, with the paper-plane icon", () => {
+    expect(isConversationalChannel("Telegram")).toBe(true);
+    expect(channelIcon("Telegram")).toBe("✈");
+  });
+
+  it("treats Email as non-conversational, with the envelope icon", () => {
+    expect(isConversationalChannel("Email")).toBe(false);
+    expect(channelIcon("Email")).toBe("✉");
+  });
+
+  it("keeps the legacy Chat channel conversational with the speech-bubble icon", () => {
+    expect(isConversationalChannel("Chat")).toBe(true);
+    expect(channelIcon("Chat")).toBe("💬");
+  });
+});
+
+describe("isInternalNote", () => {
+  it("is true for a non-customer-visible article on the Internal channel (by name)", () => {
+    expect(
+      isInternalNote(
+        article({ communication_channel_id: 999, communication_channel_name: "Internal", is_visible_for_customer: false }),
+      ),
+    ).toBe(true);
+  });
+
+  it("still matches legacy id-3 data with no name (unchanged old behavior)", () => {
+    expect(
+      isInternalNote(
+        article({ communication_channel_id: 3, communication_channel_name: null, is_visible_for_customer: false }),
+      ),
+    ).toBe(true);
+  });
+
+  it("is false when visible for the customer even on the Internal channel", () => {
+    expect(
+      isInternalNote(
+        article({ communication_channel_id: 3, communication_channel_name: null, is_visible_for_customer: true }),
+      ),
+    ).toBe(false);
+  });
+});
+
+describe("dominantChannel", () => {
+  it("returns the most common channel name among customer articles", () => {
+    const articles = [
+      article({ id: 1, sender_type: "customer", communication_channel_name: "Telegram" }),
+      article({ id: 2, sender_type: "customer", communication_channel_name: "Telegram" }),
+      article({ id: 3, sender_type: "agent", communication_channel_name: "Email" }),
+    ];
+    expect(dominantChannel(articles)).toBe("Telegram");
+  });
+
+  it("falls back to all articles when there are no customer articles", () => {
+    const articles = [
+      article({ id: 1, sender_type: "agent", communication_channel_name: "Internal" }),
+      article({ id: 2, sender_type: "agent", communication_channel_name: "Internal" }),
+      article({ id: 3, sender_type: "system", communication_channel_name: "Email" }),
+    ];
+    expect(dominantChannel(articles)).toBe("Internal");
+  });
+
+  it("returns null for an empty list", () => {
+    expect(dominantChannel([])).toBeNull();
   });
 });
 

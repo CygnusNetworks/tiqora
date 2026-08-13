@@ -21,7 +21,7 @@ import {
 } from "./ArticleActionDialogs";
 import { cn } from "@/lib/cn";
 import { articleSortKey, groupByDay } from "@/lib/article";
-import { formatFromAddress, formatToAddresses } from "@/lib/articleChannel";
+import { channelNameOf, formatFromAddress, formatToAddresses } from "@/lib/articleChannel";
 
 function senderTone(
   senderType: string | null | undefined,
@@ -254,6 +254,7 @@ function ArticleActions({
           replyAll={dialog === "replyAll"}
           open={dialog === "reply" || dialog === "replyAll"}
           onClose={() => setDialog(null)}
+          channelName={channelNameOf(article)}
         />
       )}
       <ForwardDialog

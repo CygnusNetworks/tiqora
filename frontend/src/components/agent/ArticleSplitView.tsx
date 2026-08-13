@@ -7,6 +7,7 @@ import { decodeEntities, stripHtml } from "@/lib/html";
 import {
   avatarTone,
   channelIcon,
+  channelNameOf,
   emailFromAddress,
   formatFromAddress,
   formatToAddresses,
@@ -158,7 +159,7 @@ function ArticleListRow({
           </span>
         </div>
         <p className="truncate text-[11px] text-muted">
-          <span aria-hidden>{channelIcon(article.communication_channel_id)}</span>{" "}
+          <span aria-hidden>{channelIcon(channelNameOf(article))}</span>{" "}
           <ArticlePreview ticketId={ticketId} article={article} />
         </p>
       </div>
@@ -216,7 +217,7 @@ function ArticleReader({
           <Badge tone={article.is_visible_for_customer ? "success" : "muted"}>
             {article.is_visible_for_customer ? t("ticket.visibleCustomer") : t("ticket.internal")}
           </Badge>
-          <Badge tone="default">{channelIcon(article.communication_channel_id)}</Badge>
+          <Badge tone="default">{channelIcon(channelNameOf(article))}</Badge>
         </div>
       </div>
       <ArticleQuickActions
