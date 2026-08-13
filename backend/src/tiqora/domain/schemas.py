@@ -263,6 +263,7 @@ class ArticleListItem(BaseModel):
     sender_type: str | None = None
     sender_type_id: int
     communication_channel_id: int
+    communication_channel_name: str | None = None
     is_visible_for_customer: bool
     create_time: UtcDateTime
     create_by: int

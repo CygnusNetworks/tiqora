@@ -213,6 +213,21 @@ async def test_inbound_text_creates_ticket(mariadb_znuny_url: str) -> None:
                 ).first()
                 assert sender_row is not None
                 assert sender_row[0] == "customer"
+
+                # ArticleListItem.communication_channel_name: same join
+                # TicketService.list_articles resolves via communication_channel.
+                channel_name_row = (
+                    await session.execute(
+                        text(
+                            "SELECT cc.name FROM article a"
+                            " JOIN communication_channel cc ON cc.id = a.communication_channel_id"
+                            " WHERE a.id = :aid"
+                        ),
+                        {"aid": result["article_id"]},
+                    )
+                ).first()
+                assert channel_name_row is not None
+                assert channel_name_row[0] == "Telegram"
             finally:
                 await _cleanup_new_rows(session, before)
     finally:
