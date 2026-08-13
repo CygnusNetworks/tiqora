@@ -46,6 +46,13 @@ export function Dialog({
   const { t } = useTranslation();
   const panelRef = useRef<HTMLDivElement | null>(null);
   const openerRef = useRef<HTMLElement | null>(null);
+  // Read via ref inside the effect: the effect must run exactly once per
+  // open/close. Depending on `onClose` re-runs it whenever a parent re-render
+  // passes a fresh closure (draft autosave, query update, …) — its cleanup
+  // then bounces focus to the opener and back to the FIRST field, stealing
+  // the caret mid-typing.
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
 
   useEffect(() => {
     if (!open) return;
@@ -72,7 +79,7 @@ export function Dialog({
 
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
-        onClose();
+        onCloseRef.current();
         return;
       }
       if (e.key !== "Tab") return;
@@ -100,7 +107,7 @@ export function Dialog({
       document.body.style.overflow = prevOverflow;
       openerRef.current?.focus?.();
     };
-  }, [open, onClose]);
+  }, [open]);
 
   if (!open) return null;
 
