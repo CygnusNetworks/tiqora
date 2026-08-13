@@ -1256,6 +1256,9 @@
         "change": "Wirkung der ACL, sobald die Bedingungen zutreffen — typischerweise werden dadurch Auswahlmöglichkeiten in Formularen eingeschränkt oder erzwungen (z. B. nur bestimmte Folgestatus erlaubt).",
         "stopAfterMatch": "Wenn aktiv, werden nach einem produktiven Treffer dieser ACL keine weiteren ACLs mehr ausgewertet (Znuny StopAfterMatch)."
       },
+      "telegram": {
+        "mode": "„Polling“ ruft Updates aktiv von Telegram ab (keine öffentliche URL nötig). „Webhook“ lässt Telegram Updates an die untenstehende URL senden — erfordert, dass dieser Server per HTTPS erreichbar ist."
+      },
       "mailOutbound": {
         "host": "Hostname des SMTP-Servers für ausgehende Mail. Muss von diesem Server aus über den unten angegebenen Port erreichbar sein (DNS + Firewall).",
         "port": "TCP-Port des SMTP-Servers — üblich sind 25 oder 587 für STARTTLS, 465 für implizites TLS (SSL).",
@@ -1331,6 +1334,7 @@
       "processes": "Prozesse",
       "mailOutbound": "E-Mail (Ausgang)",
       "mailAccounts": "E-Mail-Konten",
+      "telegram": "Telegram",
       "oauth2Tokens": "OAuth2-Token (E-Mail)",
       "mailLog": "Kommunikationsprotokoll",
       "subjectConfig": "Betreff-Hook",
@@ -1904,6 +1908,37 @@
       "trustedHelp": "X-OTRS-Header von diesem Konto vertrauen (Znuny-Semantik).",
       "comments": "Kommentar"
     },
+    "telegram": {
+      "title": "Telegram",
+      "description": "Telegram-Bot als eingehenden/ausgehenden Ticket-Kanal verbinden.",
+      "enabled": "Kanal aktiv",
+      "mode": "Modus",
+      "modePolling": "Polling",
+      "modeWebhook": "Webhook",
+      "queue": "Queue",
+      "botToken": "Bot-Token",
+      "defaultCustomerUser": "Standard-Kundenbenutzer",
+      "webhookUrl": "Webhook-URL",
+      "webhookSecretToken": "Webhook-Secret-Token",
+      "webhookRegister": "Webhook registrieren",
+      "webhookRegistering": "Registriere…",
+      "webhookUnregister": "Webhook entfernen",
+      "webhookUnregistering": "Entferne…",
+      "webhookRegisterSuccess": "Webhook registriert",
+      "webhookRegisterFailure": "Webhook-Registrierung fehlgeschlagen",
+      "webhookUnregisterSuccess": "Webhook entfernt",
+      "webhookUnregisterFailure": "Entfernen des Webhooks fehlgeschlagen",
+      "consentTitle": "DSGVO-Zustimmung",
+      "consentRequired": "Zustimmung vor Verarbeitung erforderlich",
+      "consentRequiredHelp": "Solange erforderlich, werden eingehende Nachrichten eines neuen Telegram-Kontakts erst verarbeitet, nachdem die Zustimmung bestätigt wurde.",
+      "consentText": "Zustimmungstext",
+      "consentConfirmedText": "Bestätigungstext",
+      "save": "Speichern",
+      "saving": "Wird gespeichert…",
+      "saved": "Einstellungen gespeichert.",
+      "saveError": "Speichern fehlgeschlagen.",
+      "loadError": "Einstellungen konnten nicht geladen werden."
+    },
     "oauth2": {
       "title_plural": "OAuth2-Token (E-Mail)",
       "new": "Neue Token-Konfiguration",
@@ -2418,6 +2453,7 @@
       "autoResponses": "Automatische Antworten (z. B. Bestätigung, Abwesenheit) verwalten.",
       "mailOutbound": "SMTP-Ausgangsserver und Absenderadresse konfigurieren.",
       "mailAccounts": "Eingehende IMAP/POP-Postfächer (Passwort oder OAuth2).",
+      "telegram": "Telegram-Bot als Ticket-Kanal verbinden.",
       "oauth2Tokens": "OAuth2-Token-Konfigurationen für Microsoft/Google-Mail (Znuny-kompatibel).",
       "subjectConfig": "Betreff-Format und Ticketnummer-Hook konfigurieren.",
       "postmasterFilters": "Regeln zur Verarbeitung eingehender E-Mails pflegen.",

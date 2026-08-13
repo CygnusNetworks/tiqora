@@ -151,7 +151,8 @@
     "passkeyAddError": "पासकी नहीं जोड़ा जा सका.",
     "passkeyDeleteError": "पासकी नहीं निकाली जा सकी.",
     "passkeyDeleteLastError": "2FA लागू होने पर अंतिम 2FA कारक को हटाया नहीं जा सकता।",
-    "passkeyUnsupported": "यह ब्राउज़र पासकीज़ (WebAuthn) का समर्थन नहीं करता है।"
+    "passkeyUnsupported": "यह ब्राउज़र पासकीज़ (WebAuthn) का समर्थन नहीं करता है।",
+    "passkeyReauthRequired": "For your security, please sign in again before changing your passkeys."
   },
   "dashboard": {
     "greeting": {
@@ -545,7 +546,8 @@
     "extrasRetry": "फिर कोशिश करें",
     "customerUnresolved": "इस पते से मेल खाता कोई ग्राहक रिकॉर्ड नहीं, इसलिए विवरण उपलब्ध नहीं।",
     "lockedByBanner": "{{name}} द्वारा लॉक किया गया",
-    "takeOver": "अधिग्रहण करें"
+    "takeOver": "अधिग्रहण करें",
+    "replyViaTelegram": "Reply will be sent via Telegram"
   },
   "search": {
     "title": "खोजें",
@@ -1235,6 +1237,9 @@
       "systemAddresses": {
         "email": "कतारों व स्वतः-उत्तरों के From हेतु प्रयुक्त पता।",
         "name": "ईमेल के साथ दिखाया गया नाम (जैसे “Support <support@example.com>”)।"
+      },
+      "telegram": {
+        "mode": "\"Polling\" has Tiqora fetch updates from Telegram itself (no public URL needed). \"Webhook\" has Telegram push updates to the URL below — requires this server to be reachable over HTTPS."
       }
     },
     "nav": {
@@ -1289,7 +1294,8 @@
       "slas": "SLA",
       "systemAddresses": "सिस्टम पते",
       "notificationEvents": "अधिसूचना इवेंट",
-      "ticketAttributeRelations": "विशेषता संबंध"
+      "ticketAttributeRelations": "विशेषता संबंध",
+      "telegram": "Telegram"
     },
     "table": {
       "id": "ID",
@@ -2319,7 +2325,8 @@
       "slas": "सेवा स्तर समझौते और समयसीमा प्रबंधित करें।",
       "systemAddresses": "कतारों व स्वतः-उत्तरों के From हेतु ईमेल पते।",
       "notificationEvents": "इवेंट-संचालित एजेंट अधिसूचनाएँ कॉन्फ़िगर करें।",
-      "ticketAttributeRelations": "Znuny-संगत निर्भरता मैट्रिक्स (सेवा/कतार आदि) CSV में।"
+      "ticketAttributeRelations": "Znuny-संगत निर्भरता मैट्रिक्स (सेवा/कतार आदि) CSV में।",
+      "telegram": "Connect a Telegram bot as a ticket channel."
     },
     "mailAccounts": {
       "title_plural": "मेल खाते",
@@ -2411,6 +2418,37 @@
       "new": "नया संबंध",
       "help": "शीर्षक Attribute1;Attribute2 और मान-युग्म वाला CSV (Znuny AdminTicketAttributeRelations)। फॉर्म चयन सीमित करता है (जैसे सेवा → कतार)।",
       "confirmDelete": "यह संबंध हटाएँ?"
+    },
+    "telegram": {
+      "title": "Telegram",
+      "description": "Connect a Telegram bot as an inbound/outbound ticket channel.",
+      "enabled": "Channel active",
+      "mode": "Mode",
+      "modePolling": "Polling",
+      "modeWebhook": "Webhook",
+      "queue": "Queue",
+      "botToken": "Bot token",
+      "defaultCustomerUser": "Default customer user",
+      "webhookUrl": "Webhook URL",
+      "webhookSecretToken": "Webhook secret token",
+      "webhookRegister": "Register webhook",
+      "webhookRegistering": "Registering…",
+      "webhookUnregister": "Remove webhook",
+      "webhookUnregistering": "Removing…",
+      "webhookRegisterSuccess": "Webhook registered",
+      "webhookRegisterFailure": "Webhook registration failed",
+      "webhookUnregisterSuccess": "Webhook removed",
+      "webhookUnregisterFailure": "Removing the webhook failed",
+      "consentTitle": "GDPR consent",
+      "consentRequired": "Require consent before processing messages",
+      "consentRequiredHelp": "While required, incoming messages from a new Telegram contact are not processed until they confirm consent.",
+      "consentText": "Consent request text",
+      "consentConfirmedText": "Consent confirmation text",
+      "save": "Save",
+      "saving": "Saving…",
+      "saved": "Settings saved.",
+      "saveError": "Saving failed.",
+      "loadError": "Failed to load settings."
     }
   },
   "kb": {

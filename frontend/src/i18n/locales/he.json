@@ -151,7 +151,8 @@
     "passkeyAddError": "לא ניתן להוסיף מפתח.",
     "passkeyDeleteError": "לא ניתן להסיר את מפתח הסיסמה.",
     "passkeyDeleteLastError": "לא ניתן להסיר את גורם 2FA האחרון בזמן שה-2FA נאכף.",
-    "passkeyUnsupported": "דפדפן זה אינו תומך במפתחות סיסמה (WebAuthn)."
+    "passkeyUnsupported": "דפדפן זה אינו תומך במפתחות סיסמה (WebAuthn).",
+    "passkeyReauthRequired": "For your security, please sign in again before changing your passkeys."
   },
   "dashboard": {
     "greeting": {
@@ -545,7 +546,8 @@
     "extrasRetry": "נסו שוב",
     "customerUnresolved": "אין רשומת לקוח התואמת לכתובת זו, ולכן הפרטים אינם זמינים.",
     "lockedByBanner": "נעול על ידי {{name}}",
-    "takeOver": "השתלטות"
+    "takeOver": "השתלטות",
+    "replyViaTelegram": "Reply will be sent via Telegram"
   },
   "search": {
     "title": "חפש",
@@ -1235,6 +1237,9 @@
       "systemAddresses": {
         "email": "כתובת המשמשת כ־From לתורים ומענים אוטומטיים.",
         "name": "שם תצוגה ליד הדוא״ל (למשל ”Support <support@example.com>“)."
+      },
+      "telegram": {
+        "mode": "\"Polling\" has Tiqora fetch updates from Telegram itself (no public URL needed). \"Webhook\" has Telegram push updates to the URL below — requires this server to be reachable over HTTPS."
       }
     },
     "nav": {
@@ -1289,7 +1294,8 @@
       "slas": "הסכמי שירות",
       "systemAddresses": "כתובות מערכת",
       "notificationEvents": "אירועי התראה",
-      "ticketAttributeRelations": "יחסי תכונות"
+      "ticketAttributeRelations": "יחסי תכונות",
+      "telegram": "Telegram"
     },
     "table": {
       "id": "ID",
@@ -2319,7 +2325,8 @@
       "slas": "ניהול הסכמי רמת שירות וזמנים.",
       "systemAddresses": "כתובות דוא״ל כ־From לתורים ומענים אוטומטיים.",
       "notificationEvents": "הגדרת התראות לנציגים לפי אירועים.",
-      "ticketAttributeRelations": "מטריצות תלות תואמות Znuny (שירות/תור וכד') ב־CSV."
+      "ticketAttributeRelations": "מטריצות תלות תואמות Znuny (שירות/תור וכד') ב־CSV.",
+      "telegram": "Connect a Telegram bot as a ticket channel."
     },
     "mailAccounts": {
       "title_plural": "חשבונות דואר",
@@ -2411,6 +2418,37 @@
       "new": "יחס חדש",
       "help": "CSV עם כותרת Attribute1;Attribute2 וזוגות ערכים (Znuny AdminTicketAttributeRelations). מגביל בוחרי טופס (למשל שירות → תור).",
       "confirmDelete": "למחוק יחס זה?"
+    },
+    "telegram": {
+      "title": "Telegram",
+      "description": "Connect a Telegram bot as an inbound/outbound ticket channel.",
+      "enabled": "Channel active",
+      "mode": "Mode",
+      "modePolling": "Polling",
+      "modeWebhook": "Webhook",
+      "queue": "Queue",
+      "botToken": "Bot token",
+      "defaultCustomerUser": "Default customer user",
+      "webhookUrl": "Webhook URL",
+      "webhookSecretToken": "Webhook secret token",
+      "webhookRegister": "Register webhook",
+      "webhookRegistering": "Registering…",
+      "webhookUnregister": "Remove webhook",
+      "webhookUnregistering": "Removing…",
+      "webhookRegisterSuccess": "Webhook registered",
+      "webhookRegisterFailure": "Webhook registration failed",
+      "webhookUnregisterSuccess": "Webhook removed",
+      "webhookUnregisterFailure": "Removing the webhook failed",
+      "consentTitle": "GDPR consent",
+      "consentRequired": "Require consent before processing messages",
+      "consentRequiredHelp": "While required, incoming messages from a new Telegram contact are not processed until they confirm consent.",
+      "consentText": "Consent request text",
+      "consentConfirmedText": "Consent confirmation text",
+      "save": "Save",
+      "saving": "Saving…",
+      "saved": "Settings saved.",
+      "saveError": "Saving failed.",
+      "loadError": "Failed to load settings."
     }
   },
   "kb": {

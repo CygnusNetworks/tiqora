@@ -151,7 +151,8 @@
     "passkeyAddError": "Nevarēja pievienot ieejas atslēgu.",
     "passkeyDeleteError": "Nevarēja noņemt ieejas atslēgu.",
     "passkeyDeleteLastError": "Nevar noņemt pēdējo 2FA faktoru, kamēr 2FA ir izpildīts.",
-    "passkeyUnsupported": "Šī pārlūkprogramma neatbalsta piekļuves atslēgas (WebAuthn)."
+    "passkeyUnsupported": "Šī pārlūkprogramma neatbalsta piekļuves atslēgas (WebAuthn).",
+    "passkeyReauthRequired": "For your security, please sign in again before changing your passkeys."
   },
   "dashboard": {
     "greeting": {
@@ -545,7 +546,8 @@
     "extrasRetry": "Mēģināt vēlreiz",
     "customerUnresolved": "Šai adresei nav klienta ieraksta, tāpēc dati nav pieejami.",
     "lockedByBanner": "Bloķējis {{name}}",
-    "takeOver": "Pārņemt"
+    "takeOver": "Pārņemt",
+    "replyViaTelegram": "Reply will be sent via Telegram"
   },
   "search": {
     "title": "Meklēt",
@@ -1235,6 +1237,9 @@
       "systemAddresses": {
         "email": "Adrese, ko izmanto kā From rindām un autoatbildēm.",
         "name": "Rādāmais vārds blakus e-pastam (piem. “Support <support@example.com>”)."
+      },
+      "telegram": {
+        "mode": "\"Polling\" has Tiqora fetch updates from Telegram itself (no public URL needed). \"Webhook\" has Telegram push updates to the URL below — requires this server to be reachable over HTTPS."
       }
     },
     "nav": {
@@ -1289,7 +1294,8 @@
       "slas": "SLA",
       "systemAddresses": "Sistēmas adreses",
       "notificationEvents": "Paziņojumu notikumi",
-      "ticketAttributeRelations": "Atribūtu saites"
+      "ticketAttributeRelations": "Atribūtu saites",
+      "telegram": "Telegram"
     },
     "table": {
       "id": "ID",
@@ -2319,7 +2325,8 @@
       "slas": "Pārvaldiet pakalpojumu līmeņa līgumus un termiņus.",
       "systemAddresses": "From e-pasta adreses rindām un autoatbildēm.",
       "notificationEvents": "Konfigurējiet notikumu balstītus aģentu paziņojumus.",
-      "ticketAttributeRelations": "Ar Znuny saderenīgas atkarību matrices (pakalpojums/rinda u.c.) CSV formātā."
+      "ticketAttributeRelations": "Ar Znuny saderenīgas atkarību matrices (pakalpojums/rinda u.c.) CSV formātā.",
+      "telegram": "Connect a Telegram bot as a ticket channel."
     },
     "mailAccounts": {
       "title_plural": "Pasta konti",
@@ -2411,6 +2418,37 @@
       "new": "Jauna saite",
       "help": "CSV ar galveni Attribute1;Attribute2 un vērtību pāriem (Znuny AdminTicketAttributeRelations). Ierobežo veidlapu izvēles (piem. Pakalpojums → Rinda).",
       "confirmDelete": "Dzēst šo saiti?"
+    },
+    "telegram": {
+      "title": "Telegram",
+      "description": "Connect a Telegram bot as an inbound/outbound ticket channel.",
+      "enabled": "Channel active",
+      "mode": "Mode",
+      "modePolling": "Polling",
+      "modeWebhook": "Webhook",
+      "queue": "Queue",
+      "botToken": "Bot token",
+      "defaultCustomerUser": "Default customer user",
+      "webhookUrl": "Webhook URL",
+      "webhookSecretToken": "Webhook secret token",
+      "webhookRegister": "Register webhook",
+      "webhookRegistering": "Registering…",
+      "webhookUnregister": "Remove webhook",
+      "webhookUnregistering": "Removing…",
+      "webhookRegisterSuccess": "Webhook registered",
+      "webhookRegisterFailure": "Webhook registration failed",
+      "webhookUnregisterSuccess": "Webhook removed",
+      "webhookUnregisterFailure": "Removing the webhook failed",
+      "consentTitle": "GDPR consent",
+      "consentRequired": "Require consent before processing messages",
+      "consentRequiredHelp": "While required, incoming messages from a new Telegram contact are not processed until they confirm consent.",
+      "consentText": "Consent request text",
+      "consentConfirmedText": "Consent confirmation text",
+      "save": "Save",
+      "saving": "Saving…",
+      "saved": "Settings saved.",
+      "saveError": "Saving failed.",
+      "loadError": "Failed to load settings."
     }
   },
   "kb": {

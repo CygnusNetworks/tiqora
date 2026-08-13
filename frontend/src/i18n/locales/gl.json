@@ -151,7 +151,8 @@
     "passkeyAddError": "Non se puido engadir a clave de acceso.",
     "passkeyDeleteError": "Non se puido eliminar a clave de acceso.",
     "passkeyDeleteLastError": "Non se pode eliminar o último factor 2FA mentres estea aplicado.",
-    "passkeyUnsupported": "Este navegador non admite claves de acceso (WebAuthn)."
+    "passkeyUnsupported": "Este navegador non admite claves de acceso (WebAuthn).",
+    "passkeyReauthRequired": "For your security, please sign in again before changing your passkeys."
   },
   "dashboard": {
     "greeting": {
@@ -545,7 +546,8 @@
     "extrasRetry": "Tentar de novo",
     "customerUnresolved": "Ningún rexistro de cliente coincide con este enderezo; os detalles non están dispoñibles.",
     "lockedByBanner": "Bloqueado por {{name}}",
-    "takeOver": "Asumir"
+    "takeOver": "Asumir",
+    "replyViaTelegram": "Reply will be sent via Telegram"
   },
   "search": {
     "title": "Busca",
@@ -1235,6 +1237,9 @@
       "systemAddresses": {
         "email": "Enderezo usado como From para colas e auto-respostas.",
         "name": "Nome amosado xunto ao correo (p. ex. “Support <support@example.com>”)."
+      },
+      "telegram": {
+        "mode": "\"Polling\" has Tiqora fetch updates from Telegram itself (no public URL needed). \"Webhook\" has Telegram push updates to the URL below — requires this server to be reachable over HTTPS."
       }
     },
     "nav": {
@@ -1289,7 +1294,8 @@
       "slas": "SLA",
       "systemAddresses": "Enderezos do sistema",
       "notificationEvents": "Eventos de notificación",
-      "ticketAttributeRelations": "Relacións de atributos"
+      "ticketAttributeRelations": "Relacións de atributos",
+      "telegram": "Telegram"
     },
     "table": {
       "id": "ID",
@@ -2319,7 +2325,8 @@
       "slas": "Xestionar os acordos de nivel de servizo e os prazos.",
       "systemAddresses": "Enderezos de correo usados como From para colas e auto-respostas.",
       "notificationEvents": "Configurar as notificacións a axentes baseadas en eventos.",
-      "ticketAttributeRelations": "Matrices de dependencia compatibles con Znuny (servizo/cola etc.) en CSV."
+      "ticketAttributeRelations": "Matrices de dependencia compatibles con Znuny (servizo/cola etc.) en CSV.",
+      "telegram": "Connect a Telegram bot as a ticket channel."
     },
     "mailAccounts": {
       "title_plural": "Contas de correo",
@@ -2411,6 +2418,37 @@
       "new": "Nova relación",
       "help": "CSV con cabeceira Attribute1;Attribute2 e pares de valores (Znuny AdminTicketAttributeRelations). Restrinxe selectores de formularios (p. ex. Servizo → Cola).",
       "confirmDelete": "Eliminar esta relación?"
+    },
+    "telegram": {
+      "title": "Telegram",
+      "description": "Connect a Telegram bot as an inbound/outbound ticket channel.",
+      "enabled": "Channel active",
+      "mode": "Mode",
+      "modePolling": "Polling",
+      "modeWebhook": "Webhook",
+      "queue": "Queue",
+      "botToken": "Bot token",
+      "defaultCustomerUser": "Default customer user",
+      "webhookUrl": "Webhook URL",
+      "webhookSecretToken": "Webhook secret token",
+      "webhookRegister": "Register webhook",
+      "webhookRegistering": "Registering…",
+      "webhookUnregister": "Remove webhook",
+      "webhookUnregistering": "Removing…",
+      "webhookRegisterSuccess": "Webhook registered",
+      "webhookRegisterFailure": "Webhook registration failed",
+      "webhookUnregisterSuccess": "Webhook removed",
+      "webhookUnregisterFailure": "Removing the webhook failed",
+      "consentTitle": "GDPR consent",
+      "consentRequired": "Require consent before processing messages",
+      "consentRequiredHelp": "While required, incoming messages from a new Telegram contact are not processed until they confirm consent.",
+      "consentText": "Consent request text",
+      "consentConfirmedText": "Consent confirmation text",
+      "save": "Save",
+      "saving": "Saving…",
+      "saved": "Settings saved.",
+      "saveError": "Saving failed.",
+      "loadError": "Failed to load settings."
     }
   },
   "kb": {

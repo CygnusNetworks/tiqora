@@ -151,7 +151,8 @@
     "passkeyAddError": "Nepavyko pridėti slaptažodžio.",
     "passkeyDeleteError": "Nepavyko pašalinti slaptažodžio.",
     "passkeyDeleteLastError": "Negalima pašalinti paskutinio 2FA faktoriaus, kol 2FA yra vykdomas.",
-    "passkeyUnsupported": "Ši naršyklė nepalaiko slaptažodžių (WebAuthn)."
+    "passkeyUnsupported": "Ši naršyklė nepalaiko slaptažodžių (WebAuthn).",
+    "passkeyReauthRequired": "For your security, please sign in again before changing your passkeys."
   },
   "dashboard": {
     "greeting": {
@@ -545,7 +546,8 @@
     "extrasRetry": "Bandyti dar kartą",
     "customerUnresolved": "Šiam adresui nėra kliento įrašo, todėl duomenys nepasiekiami.",
     "lockedByBanner": "Užrakino {{name}}",
-    "takeOver": "Perimti"
+    "takeOver": "Perimti",
+    "replyViaTelegram": "Reply will be sent via Telegram"
   },
   "search": {
     "title": "Ieškoti",
@@ -1235,6 +1237,9 @@
       "systemAddresses": {
         "email": "Adresas, naudojamas kaip From eilėms ir autoatsakymams.",
         "name": "Rodomas vardas šalia el. pašto (pvz. „Support <support@example.com>“)."
+      },
+      "telegram": {
+        "mode": "\"Polling\" has Tiqora fetch updates from Telegram itself (no public URL needed). \"Webhook\" has Telegram push updates to the URL below — requires this server to be reachable over HTTPS."
       }
     },
     "nav": {
@@ -1289,7 +1294,8 @@
       "slas": "SLA",
       "systemAddresses": "Sistemos adresai",
       "notificationEvents": "Pranešimų įvykiai",
-      "ticketAttributeRelations": "Atributų ryšiai"
+      "ticketAttributeRelations": "Atributų ryšiai",
+      "telegram": "Telegram"
     },
     "table": {
       "id": "ID",
@@ -2319,7 +2325,8 @@
       "slas": "Tvarkykite paslaugų lygio sutartis ir terminus.",
       "systemAddresses": "From el. pašto adresai eilėms ir autoatsakymams.",
       "notificationEvents": "Konfigūruokite įvykiais grįstus agentų pranešimus.",
-      "ticketAttributeRelations": "Su Znuny suderinamos priklausomybių matricos (paslauga/eilė ir pan.) CSV."
+      "ticketAttributeRelations": "Su Znuny suderinamos priklausomybių matricos (paslauga/eilė ir pan.) CSV.",
+      "telegram": "Connect a Telegram bot as a ticket channel."
     },
     "mailAccounts": {
       "title_plural": "Pašto paskyros",
@@ -2411,6 +2418,37 @@
       "new": "Naujas ryšys",
       "help": "CSV su antrašte Attribute1;Attribute2 ir reikšmių poromis (Znuny AdminTicketAttributeRelations). Ribojamos formų parinktys (pvz. Paslauga → Eilė).",
       "confirmDelete": "Ištrinti šį ryšį?"
+    },
+    "telegram": {
+      "title": "Telegram",
+      "description": "Connect a Telegram bot as an inbound/outbound ticket channel.",
+      "enabled": "Channel active",
+      "mode": "Mode",
+      "modePolling": "Polling",
+      "modeWebhook": "Webhook",
+      "queue": "Queue",
+      "botToken": "Bot token",
+      "defaultCustomerUser": "Default customer user",
+      "webhookUrl": "Webhook URL",
+      "webhookSecretToken": "Webhook secret token",
+      "webhookRegister": "Register webhook",
+      "webhookRegistering": "Registering…",
+      "webhookUnregister": "Remove webhook",
+      "webhookUnregistering": "Removing…",
+      "webhookRegisterSuccess": "Webhook registered",
+      "webhookRegisterFailure": "Webhook registration failed",
+      "webhookUnregisterSuccess": "Webhook removed",
+      "webhookUnregisterFailure": "Removing the webhook failed",
+      "consentTitle": "GDPR consent",
+      "consentRequired": "Require consent before processing messages",
+      "consentRequiredHelp": "While required, incoming messages from a new Telegram contact are not processed until they confirm consent.",
+      "consentText": "Consent request text",
+      "consentConfirmedText": "Consent confirmation text",
+      "save": "Save",
+      "saving": "Saving…",
+      "saved": "Settings saved.",
+      "saveError": "Saving failed.",
+      "loadError": "Failed to load settings."
     }
   },
   "kb": {

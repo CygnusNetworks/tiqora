@@ -1256,6 +1256,9 @@
         "change": "The ACL's effect once its conditions match — typically it restricts or forces the choices available in forms (e.g. only certain follow-up states allowed).",
         "stopAfterMatch": "When checked, no further ACLs are evaluated after this one matches productively (Znuny StopAfterMatch)."
       },
+      "telegram": {
+        "mode": "\"Polling\" has Tiqora fetch updates from Telegram itself (no public URL needed). \"Webhook\" has Telegram push updates to the URL below — requires this server to be reachable over HTTPS."
+      },
       "mailOutbound": {
         "host": "SMTP server hostname for outgoing mail. Must be reachable from this server (DNS + firewall) on the port below.",
         "port": "TCP port of the SMTP server — commonly 25 or 587 for STARTTLS, 465 for implicit TLS (SSL).",
@@ -1331,6 +1334,7 @@
       "processes": "Processes",
       "mailOutbound": "Email (outbound)",
       "mailAccounts": "Mail accounts",
+      "telegram": "Telegram",
       "oauth2Tokens": "OAuth2 tokens (mail)",
       "mailLog": "Communication log",
       "subjectConfig": "Subject hook",
@@ -1904,6 +1908,37 @@
       "trustedHelp": "Trust X-OTRS headers from this account (Znuny semantics).",
       "comments": "Comment"
     },
+    "telegram": {
+      "title": "Telegram",
+      "description": "Connect a Telegram bot as an inbound/outbound ticket channel.",
+      "enabled": "Channel active",
+      "mode": "Mode",
+      "modePolling": "Polling",
+      "modeWebhook": "Webhook",
+      "queue": "Queue",
+      "botToken": "Bot token",
+      "defaultCustomerUser": "Default customer user",
+      "webhookUrl": "Webhook URL",
+      "webhookSecretToken": "Webhook secret token",
+      "webhookRegister": "Register webhook",
+      "webhookRegistering": "Registering…",
+      "webhookUnregister": "Remove webhook",
+      "webhookUnregistering": "Removing…",
+      "webhookRegisterSuccess": "Webhook registered",
+      "webhookRegisterFailure": "Webhook registration failed",
+      "webhookUnregisterSuccess": "Webhook removed",
+      "webhookUnregisterFailure": "Removing the webhook failed",
+      "consentTitle": "GDPR consent",
+      "consentRequired": "Require consent before processing messages",
+      "consentRequiredHelp": "While required, incoming messages from a new Telegram contact are not processed until they confirm consent.",
+      "consentText": "Consent request text",
+      "consentConfirmedText": "Consent confirmation text",
+      "save": "Save",
+      "saving": "Saving…",
+      "saved": "Settings saved.",
+      "saveError": "Saving failed.",
+      "loadError": "Failed to load settings."
+    },
     "oauth2": {
       "title_plural": "OAuth2 tokens (mail)",
       "new": "New token config",
@@ -2418,6 +2453,7 @@
       "autoResponses": "Manage automatic responses (e.g. acknowledgement, out-of-office).",
       "mailOutbound": "Configure the outbound SMTP server and sender address.",
       "mailAccounts": "Incoming IMAP/POP mailboxes (password or OAuth2).",
+      "telegram": "Connect a Telegram bot as a ticket channel.",
       "oauth2Tokens": "OAuth2 token configs for Microsoft/Google mail (Znuny-compatible).",
       "subjectConfig": "Configure the subject format and ticket-number hook.",
       "postmasterFilters": "Maintain rules for processing incoming mail.",
