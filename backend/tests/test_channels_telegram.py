@@ -5,6 +5,7 @@ per-chat ticket continuity, contact upsert), plus the two Task 3 transports
 
 from __future__ import annotations
 
+import json
 import uuid
 from datetime import datetime
 from typing import Any
@@ -171,6 +172,7 @@ async def test_inbound_text_creates_ticket(mariadb_znuny_url: str) -> None:
                 await set_setting(
                     session, "channel.telegram.default_customer_user", "portal-default"
                 )
+                await set_setting(session, "channel.telegram.consent_required", "0")
 
                 sysconfig = SysConfig(session)
                 update = _text_message(111, "Need help with my order")
@@ -229,6 +231,7 @@ async def test_second_update_same_chat_appends_to_same_ticket(mariadb_znuny_url:
                 await set_setting(
                     session, "channel.telegram.default_customer_user", "portal-default"
                 )
+                await set_setting(session, "channel.telegram.consent_required", "0")
                 sysconfig = SysConfig(session)
 
                 first = await process_update(
@@ -274,6 +277,7 @@ async def test_two_unknown_chat_ids_create_two_tickets(mariadb_znuny_url: str) -
                 await set_setting(
                     session, "channel.telegram.default_customer_user", "portal-default"
                 )
+                await set_setting(session, "channel.telegram.consent_required", "0")
                 sysconfig = SysConfig(session)
 
                 first = await process_update(
@@ -317,6 +321,7 @@ async def test_is_bot_and_edited_message_are_skipped(mariadb_znuny_url: str) -> 
                 await set_setting(
                     session, "channel.telegram.default_customer_user", "portal-default"
                 )
+                await set_setting(session, "channel.telegram.consent_required", "0")
                 sysconfig = SysConfig(session)
 
                 bot_result = await process_update(
@@ -355,6 +360,7 @@ async def test_no_customer_mapping_skips(mariadb_znuny_url: str) -> None:
                 # Each test cleans up its own settings row, but pin this
                 # explicitly rather than relying on test execution order.
                 await set_setting(session, "channel.telegram.default_customer_user", "")
+                await set_setting(session, "channel.telegram.consent_required", "0")
                 sysconfig = SysConfig(session)
                 result = await process_update(
                     session, factory, sysconfig, None, _text_message(666, "hello"), user_id=1
@@ -399,6 +405,269 @@ async def test_contact_upsert_updates_display_name_keeps_login(mariadb_znuny_url
                 ).scalar_one()
                 assert row.display_name == "Ada Lovelace"
                 assert row.customer_user_login == "realcustomer"
+            finally:
+                await _cleanup_new_rows(session, before)
+    finally:
+        await engine.dispose()
+
+
+# ---------------------------------------------------------------------------
+# DSGVO consent flow (Task 13)
+# ---------------------------------------------------------------------------
+
+
+def _callback_update(
+    update_id: int, chat_id: int, user_id: int, *, data: str = "tiqora_consent_accept"
+) -> dict:
+    return {
+        "update_id": update_id,
+        "callback_query": {
+            "id": f"cbq{update_id}",
+            "from": {
+                "id": user_id,
+                "is_bot": False,
+                "first_name": "Ada",
+                "last_name": "Lovelace",
+                "username": "ada",
+            },
+            "message": {
+                "message_id": update_id,
+                "chat": {"id": chat_id, "type": "private"},
+            },
+            "data": data,
+        },
+    }
+
+
+def _recording_gateway() -> tuple[TelegramGateway, list[tuple[str, dict]]]:
+    """A Telegram gateway backed by ``httpx.MockTransport`` that always
+    succeeds and records every call as ``(method, json_payload)``."""
+    calls: list[tuple[str, dict]] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        method = str(request.url).rsplit("/", 1)[-1]
+        payload = json.loads(request.content or b"{}")
+        calls.append((method, payload))
+        if method == "answerCallbackQuery":
+            return httpx.Response(200, json={"ok": True, "result": True})
+        return httpx.Response(200, json={"ok": True, "result": {"message_id": 1}})
+
+    client = httpx.AsyncClient(transport=httpx.MockTransport(handler))
+    return TelegramGateway(bot_token="test-token", client=client), calls
+
+
+@pytest.mark.db
+async def test_consent_required_message_without_consent_skips_and_prompts(
+    mariadb_znuny_url: str,
+) -> None:
+    _ensure_tiqora_tables(mariadb_znuny_url)
+    engine = create_async_engine(_mysql_async(mariadb_znuny_url))
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    try:
+        async with factory() as session:
+            before = await _snapshot_max_ids(session)
+            try:
+                # consent_required left unset -- default is ON.
+                await set_setting(
+                    session, "channel.telegram.default_customer_user", "portal-default"
+                )
+                sysconfig = SysConfig(session)
+                gateway, calls = _recording_gateway()
+
+                result = await process_update(
+                    session, factory, sysconfig, gateway, _text_message(9501, "Hallo"), user_id=1
+                )
+                await session.commit()
+
+                assert result == {"skipped": "no_consent"}
+
+                sent = [c for c in calls if c[0] == "sendMessage"]
+                assert len(sent) == 1
+                keyboard = sent[0][1]["reply_markup"]["inline_keyboard"]
+                assert keyboard[0][0]["callback_data"] == "tiqora_consent_accept"
+
+                ticket_count = (
+                    await session.execute(
+                        text("SELECT COUNT(*) FROM ticket WHERE id > :b"), {"b": before["ticket"]}
+                    )
+                ).scalar()
+                assert ticket_count == 0
+
+                contact = (
+                    await session.execute(
+                        select(TiqoraTelegramContact).where(TiqoraTelegramContact.chat_id == 9501)
+                    )
+                ).scalar_one()
+                assert contact.consent_time is None
+                assert contact.consent_prompt_time is not None
+            finally:
+                await _cleanup_new_rows(session, before)
+    finally:
+        await engine.dispose()
+
+
+@pytest.mark.db
+async def test_consent_reprompt_suppressed_within_window(mariadb_znuny_url: str) -> None:
+    _ensure_tiqora_tables(mariadb_znuny_url)
+    engine = create_async_engine(_mysql_async(mariadb_znuny_url))
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    try:
+        async with factory() as session:
+            before = await _snapshot_max_ids(session)
+            try:
+                await set_setting(
+                    session, "channel.telegram.default_customer_user", "portal-default"
+                )
+                sysconfig = SysConfig(session)
+                gateway, calls = _recording_gateway()
+
+                first = await process_update(
+                    session,
+                    factory,
+                    sysconfig,
+                    gateway,
+                    _text_message(9502, "One"),
+                    user_id=1,
+                )
+                await session.commit()
+                assert first == {"skipped": "no_consent"}
+                assert len([c for c in calls if c[0] == "sendMessage"]) == 1
+
+                second = await process_update(
+                    session,
+                    factory,
+                    sysconfig,
+                    gateway,
+                    _text_message(9502, "Two"),
+                    user_id=1,
+                )
+                await session.commit()
+                assert second == {"skipped": "no_consent"}
+                # Still just the one prompt -- the second message arrived
+                # well within CONSENT_REPROMPT_SECONDS.
+                assert len([c for c in calls if c[0] == "sendMessage"]) == 1
+            finally:
+                await _cleanup_new_rows(session, before)
+    finally:
+        await engine.dispose()
+
+
+@pytest.mark.db
+async def test_consent_callback_accept_sets_consent_no_ticket(mariadb_znuny_url: str) -> None:
+    _ensure_tiqora_tables(mariadb_znuny_url)
+    engine = create_async_engine(_mysql_async(mariadb_znuny_url))
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    try:
+        async with factory() as session:
+            before = await _snapshot_max_ids(session)
+            try:
+                await set_setting(
+                    session, "channel.telegram.default_customer_user", "portal-default"
+                )
+                sysconfig = SysConfig(session)
+                gateway, calls = _recording_gateway()
+
+                result = await process_update(
+                    session,
+                    factory,
+                    sysconfig,
+                    gateway,
+                    _callback_update(504, 9504, 19504),
+                    user_id=1,
+                )
+                await session.commit()
+
+                assert result == {"consent": "accepted"}
+                assert len([c for c in calls if c[0] == "answerCallbackQuery"]) == 1
+                sent = [c for c in calls if c[0] == "sendMessage"]
+                assert len(sent) == 1
+                assert sent[0][1]["text"] == (
+                    "Vielen Dank! Ihre Zustimmung wurde gespeichert. "
+                    "Bitte senden Sie jetzt Ihr Anliegen."
+                )
+
+                ticket_count = (
+                    await session.execute(
+                        text("SELECT COUNT(*) FROM ticket WHERE id > :b"), {"b": before["ticket"]}
+                    )
+                ).scalar()
+                assert ticket_count == 0
+
+                contact = (
+                    await session.execute(
+                        select(TiqoraTelegramContact).where(TiqoraTelegramContact.chat_id == 9504)
+                    )
+                ).scalar_one()
+                assert contact.consent_time is not None
+            finally:
+                await _cleanup_new_rows(session, before)
+    finally:
+        await engine.dispose()
+
+
+@pytest.mark.db
+async def test_message_after_consent_creates_ticket(mariadb_znuny_url: str) -> None:
+    _ensure_tiqora_tables(mariadb_znuny_url)
+    engine = create_async_engine(_mysql_async(mariadb_znuny_url))
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    try:
+        async with factory() as session:
+            before = await _snapshot_max_ids(session)
+            try:
+                session.add(
+                    TiqoraTelegramContact(
+                        chat_id=9505,
+                        telegram_user_id=19505,
+                        username="ada",
+                        display_name="Ada Lovelace",
+                        consent_time=NOW,
+                    )
+                )
+                await session.commit()
+                await set_setting(
+                    session, "channel.telegram.default_customer_user", "portal-default"
+                )
+                sysconfig = SysConfig(session)
+
+                result = await process_update(
+                    session, factory, sysconfig, None, _text_message(9505, "Ready now"), user_id=1
+                )
+                await session.commit()
+
+                assert result["created_ticket"] is True
+                assert "ticket_id" in result
+            finally:
+                await _cleanup_new_rows(session, before)
+    finally:
+        await engine.dispose()
+
+
+@pytest.mark.db
+async def test_consent_disabled_creates_ticket_immediately(mariadb_znuny_url: str) -> None:
+    _ensure_tiqora_tables(mariadb_znuny_url)
+    engine = create_async_engine(_mysql_async(mariadb_znuny_url))
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    try:
+        async with factory() as session:
+            before = await _snapshot_max_ids(session)
+            try:
+                await set_setting(session, "channel.telegram.consent_required", "0")
+                await set_setting(
+                    session, "channel.telegram.default_customer_user", "portal-default"
+                )
+                sysconfig = SysConfig(session)
+
+                result = await process_update(
+                    session,
+                    factory,
+                    sysconfig,
+                    None,
+                    _text_message(9506, "Immediate"),
+                    user_id=1,
+                )
+                await session.commit()
+
+                assert result["created_ticket"] is True
             finally:
                 await _cleanup_new_rows(session, before)
     finally:
@@ -504,6 +773,7 @@ async def test_poller_tick_processes_updates_and_advances_offset(mariadb_znuny_u
                 await set_setting(
                     session, "channel.telegram.default_customer_user", "portal-default"
                 )
+                await set_setting(session, "channel.telegram.consent_required", "0")
 
                 updates = [
                     _telegram_update(101, 9101, "First"),
@@ -545,6 +815,7 @@ async def test_poller_tick_error_stops_offset_advance_and_next_tick_retries(
                 await set_setting(
                     session, "channel.telegram.default_customer_user", "portal-default"
                 )
+                await set_setting(session, "channel.telegram.consent_required", "0")
 
                 good = _telegram_update(201, 9201, "Good")
                 # A message with no "chat" key breaks _upsert_contact (KeyError),
@@ -599,6 +870,7 @@ async def test_poller_tick_dedup_skips_updates_below_offset(mariadb_znuny_url: s
                 await set_setting(
                     session, "channel.telegram.default_customer_user", "portal-default"
                 )
+                await set_setting(session, "channel.telegram.consent_required", "0")
                 await set_setting(session, KEY_TELEGRAM_UPDATE_OFFSET, "302")
 
                 stale = _telegram_update(301, 9301, "Stale, already processed")
@@ -614,6 +886,63 @@ async def test_poller_tick_dedup_skips_updates_below_offset(mariadb_znuny_url: s
                 }
                 offset = await get_setting(session, KEY_TELEGRAM_UPDATE_OFFSET)
                 assert offset == "303"
+            finally:
+                await _cleanup_new_rows(session, before)
+    finally:
+        await engine.dispose()
+
+
+def _updates_and_actions_gateway(updates: list[dict]) -> TelegramGateway:
+    """Like :func:`_updates_gateway`, but also answers ``sendMessage`` /
+    ``answerCallbackQuery`` calls -- needed for a callback_query update,
+    whose consent-accept handling calls both."""
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        url = str(request.url)
+        if "/getUpdates" in url:
+            return httpx.Response(200, json={"ok": True, "result": updates})
+        if "/answerCallbackQuery" in url:
+            return httpx.Response(200, json={"ok": True, "result": True})
+        return httpx.Response(200, json={"ok": True, "result": {"message_id": 1}})
+
+    client = httpx.AsyncClient(transport=httpx.MockTransport(handler))
+    return TelegramGateway(bot_token="test-token", client=client)
+
+
+@pytest.mark.db
+async def test_poller_tick_processes_callback_query_and_advances_offset(
+    mariadb_znuny_url: str,
+) -> None:
+    """A callback_query update (consent accept) must be dispatched through
+    the poller the same as a message update, advancing the offset."""
+    _ensure_tiqora_tables(mariadb_znuny_url)
+    engine = create_async_engine(_mysql_async(mariadb_znuny_url))
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    try:
+        async with factory() as session:
+            before = await _snapshot_max_ids(session)
+            try:
+                await set_setting(session, "daemon.telegram_poller.enabled", "1")
+                await set_setting(session, "channel.telegram.enabled", "1")
+                await set_setting(session, "channel.telegram.mode", "polling")
+                await set_setting(session, "channel.telegram.bot_token", "test-token")
+
+                update = _callback_update(601, 9601, 19601)
+                result = await run_telegram_poller_tick(
+                    session_factory=factory, gateway=_updates_and_actions_gateway([update])
+                )
+                assert result["updates"] == 1
+
+                await session.commit()
+                offset = await get_setting(session, KEY_TELEGRAM_UPDATE_OFFSET)
+                assert offset == "602"
+
+                contact = (
+                    await session.execute(
+                        select(TiqoraTelegramContact).where(TiqoraTelegramContact.chat_id == 9601)
+                    )
+                ).scalar_one()
+                assert contact.consent_time is not None
             finally:
                 await _cleanup_new_rows(session, before)
     finally:
@@ -645,6 +974,7 @@ async def _webhook_setup(session: AsyncSession, *, mode: str = "webhook") -> Non
     await set_setting(session, "channel.telegram.mode", mode)
     await set_setting(session, "channel.telegram.webhook_secret_token", "wh-secret")
     await set_setting(session, "channel.telegram.default_customer_user", "portal-default")
+    await set_setting(session, "channel.telegram.consent_required", "0")
 
 
 @pytest.mark.db
@@ -787,6 +1117,45 @@ async def test_webhook_duplicate_update_skipped(
         await engine.dispose()
 
 
+@pytest.mark.db
+async def test_webhook_processes_callback_query_and_advances_offset(
+    mariadb_znuny_url: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A callback_query delivery (consent accept) must be dispatched through
+    the webhook route the same as a message update, advancing the offset."""
+    _ensure_tiqora_tables(mariadb_znuny_url)
+    engine = create_async_engine(_mysql_async(mariadb_znuny_url))
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    monkeypatch.setattr(channels_telegram, "get_session_factory", lambda: factory)
+    try:
+        async with factory() as session:
+            before = await _snapshot_max_ids(session)
+            try:
+                await _webhook_setup(session)
+                update = _callback_update(406, 9406, 19406)
+                request = _fake_request(update, secret="wh-secret")
+
+                response = await channels_telegram.receive_webhook(
+                    request, session, x_secret="wh-secret"
+                )
+                assert response.ok is True
+                assert response.skipped is False
+
+                offset = await get_setting(session, KEY_TELEGRAM_UPDATE_OFFSET)
+                assert offset == "407"
+
+                contact = (
+                    await session.execute(
+                        select(TiqoraTelegramContact).where(TiqoraTelegramContact.chat_id == 9406)
+                    )
+                ).scalar_one()
+                assert contact.consent_time is not None
+            finally:
+                await _cleanup_new_rows(session, before)
+    finally:
+        await engine.dispose()
+
+
 # ---------------------------------------------------------------------------
 # webhook-register / webhook-unregister (Task 3, admin-only)
 # ---------------------------------------------------------------------------
@@ -867,7 +1236,12 @@ async def test_webhook_register_calls_set_webhook_with_url_and_secret(
                 assert response.ok is True
                 assert response.url == "https://example.com/hook"
                 assert _FakeRegisterGateway.calls == [
-                    ("set_webhook", "https://example.com/hook", "wh-secret", ["message"])
+                    (
+                        "set_webhook",
+                        "https://example.com/hook",
+                        "wh-secret",
+                        ["message", "callback_query"],
+                    )
                 ]
             finally:
                 await _cleanup_new_rows(session, before)
@@ -957,6 +1331,7 @@ async def test_agent_reply_via_write_service_sends_and_stores(
                 await set_setting(
                     session, "channel.telegram.default_customer_user", "portal-default"
                 )
+                await set_setting(session, "channel.telegram.consent_required", "0")
                 await set_setting(session, "channel.telegram.enabled", "1")
                 sysconfig = SysConfig(session)
 
@@ -1002,9 +1377,7 @@ async def test_agent_reply_via_write_service_sends_and_stores(
 
                 row = (
                     await session.execute(
-                        text(
-                            "SELECT a_body, a_to FROM article_data_mime WHERE article_id = :aid"
-                        ),
+                        text("SELECT a_body, a_to FROM article_data_mime WHERE article_id = :aid"),
                         {"aid": article_id},
                     )
                 ).first()
@@ -1055,11 +1428,17 @@ async def test_agent_reply_resolves_chat_id_via_a_from_fallback(mariadb_znuny_ur
                 await set_setting(
                     session, "channel.telegram.default_customer_user", "portal-default"
                 )
+                await set_setting(session, "channel.telegram.consent_required", "0")
                 await set_setting(session, "channel.telegram.enabled", "1")
                 sysconfig = SysConfig(session)
 
                 inbound = await process_update(
-                    session, factory, sysconfig, None, _text_message(777, "Fallback please"), user_id=1
+                    session,
+                    factory,
+                    sysconfig,
+                    None,
+                    _text_message(777, "Fallback please"),
+                    user_id=1,
                 )
                 await session.commit()
 
@@ -1110,6 +1489,7 @@ async def test_agent_reply_send_failure_stores_no_article(mariadb_znuny_url: str
                 await set_setting(
                     session, "channel.telegram.default_customer_user", "portal-default"
                 )
+                await set_setting(session, "channel.telegram.consent_required", "0")
                 await set_setting(session, "channel.telegram.enabled", "1")
                 sysconfig = SysConfig(session)
 
@@ -1173,11 +1553,17 @@ async def test_agent_reply_disabled_channel_raises(mariadb_znuny_url: str) -> No
                 await set_setting(
                     session, "channel.telegram.default_customer_user", "portal-default"
                 )
+                await set_setting(session, "channel.telegram.consent_required", "0")
                 # channel.telegram.enabled intentionally left unset (defaults False).
                 sysconfig = SysConfig(session)
 
                 inbound = await process_update(
-                    session, factory, sysconfig, None, _text_message(999, "Disabled test"), user_id=1
+                    session,
+                    factory,
+                    sysconfig,
+                    None,
+                    _text_message(999, "Disabled test"),
+                    user_id=1,
                 )
                 await session.commit()
 
