@@ -543,7 +543,9 @@
     "extrasFailedTime": "Enviado — o tempo não foi lançado.",
     "extrasFailedBoth": "Enviado — nem a menção nem o lançamento de tempo foram salvos.",
     "extrasRetry": "Tentar novamente",
-    "customerUnresolved": "Nenhum registro de cliente corresponde a este endereço; os detalhes não estão disponíveis."
+    "customerUnresolved": "Nenhum registro de cliente corresponde a este endereço; os detalhes não estão disponíveis.",
+    "lockedByBanner": "Bloqueado por {{name}}",
+    "takeOver": "Assumir"
   },
   "search": {
     "title": "Pesquisar",

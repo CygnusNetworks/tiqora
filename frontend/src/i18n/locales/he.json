@@ -543,7 +543,9 @@
     "extrasFailedTime": "נשלח — הזמן לא נרשם.",
     "extrasFailedBoth": "נשלח — לא האזכור ולא רישום הזמן נשמרו.",
     "extrasRetry": "נסו שוב",
-    "customerUnresolved": "אין רשומת לקוח התואמת לכתובת זו, ולכן הפרטים אינם זמינים."
+    "customerUnresolved": "אין רשומת לקוח התואמת לכתובת זו, ולכן הפרטים אינם זמינים.",
+    "lockedByBanner": "נעול על ידי {{name}}",
+    "takeOver": "השתלטות"
   },
   "search": {
     "title": "חפש",

@@ -543,7 +543,9 @@
     "extrasFailedTime": "Envoyé — le temps n’a pas été saisi.",
     "extrasFailedBoth": "Envoyé — ni la mention ni la saisie de temps n’ont été enregistrées.",
     "extrasRetry": "Réessayer",
-    "customerUnresolved": "Aucun enregistrement client ne correspond à cette adresse ; les détails client sont indisponibles."
+    "customerUnresolved": "Aucun enregistrement client ne correspond à cette adresse ; les détails client sont indisponibles.",
+    "lockedByBanner": "Verrouillé par {{name}}",
+    "takeOver": "Prendre en charge"
   },
   "search": {
     "title": "Recherche",

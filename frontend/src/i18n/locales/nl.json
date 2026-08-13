@@ -543,7 +543,9 @@
     "extrasFailedTime": "Verzonden — de tijd is niet geboekt.",
     "extrasFailedBoth": "Verzonden — noch de vermelding noch de tijdboeking is opgeslagen.",
     "extrasRetry": "Opnieuw proberen",
-    "customerUnresolved": "Geen klantrecord komt overeen met dit adres; klantgegevens zijn niet beschikbaar."
+    "customerUnresolved": "Geen klantrecord komt overeen met dit adres; klantgegevens zijn niet beschikbaar.",
+    "lockedByBanner": "Vergrendeld door {{name}}",
+    "takeOver": "Overnemen"
   },
   "search": {
     "title": "Zoeken",

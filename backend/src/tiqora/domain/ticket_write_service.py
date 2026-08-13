@@ -1107,8 +1107,14 @@ async def lock_ticket(
     user_id: int,
     sysconfig: SysConfig,
 ) -> None:
-    """Lock a ticket."""
-    await _ticket_must_exist(session, ticket_id)
+    """Lock a ticket (port of ``Ticket.pm::TicketLockSet``, Lock => 'lock').
+
+    Znuny: "check if update is needed" — a ticket that is already locked
+    (lock or tmp_lock) is a silent no-op: no UPDATE, no history row.
+    """
+    t = await _ticket_must_exist(session, ticket_id)
+    if int(t["ticket_lock_id"]) != 1:  # 1=unlock
+        return
     await session.execute(
         text(
             "UPDATE ticket SET ticket_lock_id = 2, change_time = current_timestamp,"
@@ -1129,8 +1135,10 @@ async def unlock_ticket(
     user_id: int,
     sysconfig: SysConfig,
 ) -> None:
-    """Unlock a ticket."""
-    await _ticket_must_exist(session, ticket_id)
+    """Unlock a ticket (``TicketLockSet`` Lock => 'unlock'; same-state no-op)."""
+    t = await _ticket_must_exist(session, ticket_id)
+    if int(t["ticket_lock_id"]) == 1:  # already unlocked — Znuny no-op
+        return
     await session.execute(
         text(
             "UPDATE ticket SET ticket_lock_id = 1, change_time = current_timestamp,"
@@ -1142,6 +1150,93 @@ async def unlock_ticket(
     await ticket_accelerator_update(session, ticket_id, sysconfig)
     await invalidate_ticket_cache(session, ticket_id)
     await _emit_event(session, "TicketLockUpdate", ticket_id, {"lock": "unlock"})
+
+
+@dataclass(frozen=True)
+class AcquireLockResult:
+    """Outcome of a composer-open lock acquisition (see :func:`acquire_lock`)."""
+
+    result: str  # not_required | acquired | already_mine | taken_over | locked_by_other
+    locked_by_id: int | None = None
+    locked_by_name: str | None = None
+
+
+async def _user_display_name(session: AsyncSession, user_id: int) -> str:
+    row = (
+        await session.execute(
+            text("SELECT first_name, last_name, login FROM users WHERE id = :uid LIMIT 1"),
+            {"uid": user_id},
+        )
+    ).first()
+    if row is None:
+        return f"#{user_id}"
+    first, last, login = row
+    full = " ".join(p for p in [first, last] if p)
+    return full or str(login)
+
+
+async def acquire_lock(
+    session: AsyncSession,
+    *,
+    ticket_id: int,
+    user_id: int,
+    sysconfig: SysConfig,
+    action: str,
+    takeover: bool = False,
+) -> AcquireLockResult:
+    """Composer-open lock acquisition (port of the Znuny frontend behaviour).
+
+    Znuny screens with ``RequiredLock`` (AgentTicketCompose/Forward/Bounce/
+    Close via AgentTicketActionCommon) lock an unlocked ticket on open and
+    make the opening agent its owner — ``TicketLockSet('lock')`` first, then
+    ``TicketOwnerSet(self)``, so the history order is Lock, OwnerUpdate.
+
+    Outcomes:
+
+    - ``not_required`` — the action's RequiredLock sysconfig is off; no write.
+    - ``acquired`` — was unlocked: now locked, caller is owner.
+    - ``already_mine`` — locked (lock/tmp_lock) and the caller is the owner.
+    - ``locked_by_other`` — locked by someone else and ``takeover`` is False;
+      ``locked_by_*`` name the holder. No write.
+    - ``taken_over`` — locked by someone else and ``takeover`` is True: owner
+      moves to the caller (Znuny AgentTicketOwner semantics), lock stays.
+    """
+    if not await sysconfig.required_lock(action):
+        return AcquireLockResult(result="not_required")
+
+    t = await _ticket_must_exist(session, ticket_id)
+    owner_id = int(t["user_id"])
+    locked = int(t["ticket_lock_id"]) != 1
+
+    if locked:
+        if owner_id == user_id:
+            return AcquireLockResult(result="already_mine")
+        if not takeover:
+            return AcquireLockResult(
+                result="locked_by_other",
+                locked_by_id=owner_id,
+                locked_by_name=await _user_display_name(session, owner_id),
+            )
+        await assign_owner(
+            session,
+            ticket_id=ticket_id,
+            new_owner_id=user_id,
+            user_id=user_id,
+            sysconfig=sysconfig,
+        )
+        return AcquireLockResult(result="taken_over")
+
+    # Unlocked: lock first, then owner — Znuny AgentTicketActionCommon order.
+    await lock_ticket(session, ticket_id=ticket_id, user_id=user_id, sysconfig=sysconfig)
+    if owner_id != user_id:
+        await assign_owner(
+            session,
+            ticket_id=ticket_id,
+            new_owner_id=user_id,
+            user_id=user_id,
+            sysconfig=sysconfig,
+        )
+    return AcquireLockResult(result="acquired")
 
 
 async def watch_ticket(
@@ -1836,6 +1931,21 @@ class TicketWriteService:
     ) -> None:
         t = await _ticket_must_exist(self._session, ticket_id)
         await self._assert_rw(user_id, int(t["queue_id"]))
+        # Frontend close parity (AgentTicketActionCommon): the close screen
+        # carries RequiredLock — opening it on an unlocked ticket locks it and
+        # makes the agent owner — and after the state change a closed ticket is
+        # unlocked again. Workers/process/AI call the module-level change_state
+        # and stay core-faithful (no lock/owner side effects).
+        new_state_type = await _state_type_name(self._session, new_state_id)
+        closing = new_state_type.lower().startswith("close")
+        if closing:
+            await acquire_lock(
+                self._session,
+                ticket_id=ticket_id,
+                user_id=user_id,
+                sysconfig=self._sysconfig,
+                action="close",
+            )
         await change_state(
             self._session,
             ticket_id=ticket_id,
@@ -1844,6 +1954,13 @@ class TicketWriteService:
             sysconfig=self._sysconfig,
             pending_time=pending_time,
         )
+        if closing:
+            await unlock_ticket(
+                self._session,
+                ticket_id=ticket_id,
+                user_id=user_id,
+                sysconfig=self._sysconfig,
+            )
 
     async def change_priority(self, user_id: int, ticket_id: int, new_priority_id: int) -> None:
         t = await _ticket_must_exist(self._session, ticket_id)
@@ -1950,7 +2067,36 @@ class TicketWriteService:
             user_id=user_id,
         )
 
-    async def lock_ticket(self, user_id: int, ticket_id: int) -> None:
+    async def acquire_lock(
+        self,
+        user_id: int,
+        ticket_id: int,
+        *,
+        action: str,
+        takeover: bool = False,
+    ) -> AcquireLockResult:
+        """Composer-open acquisition — see module :func:`acquire_lock`.
+
+        ``rw`` gates the acquisition itself (the composer screens are rw
+        screens); a takeover is an owner change and therefore additionally
+        requires the Znuny ``owner`` permission key, like ``assign_owner``.
+        """
+        t = await _ticket_must_exist(self._session, ticket_id)
+        await self._assert_rw(user_id, int(t["queue_id"]))
+        if takeover:
+            await self._assert(user_id, int(t["queue_id"]), "owner")
+        return await acquire_lock(
+            self._session,
+            ticket_id=ticket_id,
+            user_id=user_id,
+            sysconfig=self._sysconfig,
+            action=action,
+            takeover=takeover,
+        )
+
+    async def lock_ticket(
+        self, user_id: int, ticket_id: int, *, take_ownership: bool = False
+    ) -> None:
         t = await _ticket_must_exist(self._session, ticket_id)
         await self._assert_rw(user_id, int(t["queue_id"]))
         await lock_ticket(
@@ -1959,6 +2105,17 @@ class TicketWriteService:
             user_id=user_id,
             sysconfig=self._sysconfig,
         )
+        # Znuny AgentTicketLock "Sperren": locking through the menu also makes
+        # the agent the owner (TicketLockSet, then TicketOwnerSet). Unlock
+        # deliberately leaves the owner untouched.
+        if take_ownership and int(t["user_id"]) != user_id:
+            await assign_owner(
+                self._session,
+                ticket_id=ticket_id,
+                new_owner_id=user_id,
+                user_id=user_id,
+                sysconfig=self._sysconfig,
+            )
 
     async def unlock_ticket(self, user_id: int, ticket_id: int) -> None:
         t = await _ticket_must_exist(self._session, ticket_id)

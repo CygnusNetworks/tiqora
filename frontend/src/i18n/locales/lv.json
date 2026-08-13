@@ -543,7 +543,9 @@
     "extrasFailedTime": "Nosūtīts — laiks netika reģistrēts.",
     "extrasFailedBoth": "Nosūtīts — ne pieminējums, ne laika ieraksts netika saglabāts.",
     "extrasRetry": "Mēģināt vēlreiz",
-    "customerUnresolved": "Šai adresei nav klienta ieraksta, tāpēc dati nav pieejami."
+    "customerUnresolved": "Šai adresei nav klienta ieraksta, tāpēc dati nav pieejami.",
+    "lockedByBanner": "Bloķējis {{name}}",
+    "takeOver": "Pārņemt"
   },
   "search": {
     "title": "Meklēt",

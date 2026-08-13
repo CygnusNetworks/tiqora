@@ -45,6 +45,8 @@ export {
   type TemplateOut,
   type MutationRequest,
   type MergeRequest,
+  type AcquireLockRequest,
+  type AcquireLockResponse,
   type TicketCreateRequest,
   type TicketCreateResponse,
   type ForwardRequest,

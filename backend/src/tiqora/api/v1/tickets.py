@@ -6,7 +6,7 @@ import csv
 from collections.abc import AsyncGenerator
 from datetime import datetime
 from html import escape as html_escape
-from typing import Any
+from typing import Any, Literal
 
 from fastapi import APIRouter, HTTPException, Query, status
 from fastapi.responses import HTMLResponse, Response, StreamingResponse
@@ -140,6 +140,23 @@ class MutationRequest(BaseModel):
 
 class MergeRequest(BaseModel):
     main_ticket_id: int
+
+
+class AcquireLockRequest(BaseModel):
+    """Composer-open lock acquisition (Znuny RequiredLock semantics)."""
+
+    action: Literal["compose", "forward", "bounce", "close"]
+    # Take over a ticket locked by another agent (owner moves to the caller,
+    # lock stays). Requires the Znuny ``owner`` permission key.
+    takeover: bool = False
+
+
+class AcquireLockResponse(BaseModel):
+    result: Literal[
+        "not_required", "acquired", "already_mine", "taken_over", "locked_by_other"
+    ]
+    locked_by_id: int | None = None
+    locked_by_name: str | None = None
 
 
 class DraftIn(BaseModel):
@@ -1046,6 +1063,35 @@ async def create_article(
     return ArticleCreateResponse(article_id=aid)
 
 
+@router.post("/{ticket_id}/acquire-lock", response_model=AcquireLockResponse)
+async def acquire_ticket_lock(
+    ticket_id: int,
+    body: AcquireLockRequest,
+    user: CurrentUser,
+    session: DbSession,
+    settings: AppSettings,
+) -> AcquireLockResponse:
+    """Znuny composer-open lock semantics (RequiredLock).
+
+    Called when a composer dialog opens (and again with ``takeover`` from the
+    "Übernehmen" banner). Locking an unlocked ticket makes the caller its
+    owner; a foreign lock is reported as ``locked_by_other`` without writing.
+    """
+    svc = _write_service(session, settings)
+    try:
+        async with session.begin():
+            res = await svc.acquire_lock(
+                user.id, ticket_id, action=body.action, takeover=body.takeover
+            )
+    except (WriteAccessDenied, WriteNotFound) as exc:
+        raise _map_exc(exc) from exc
+    return AcquireLockResponse(
+        result=res.result,  # type: ignore[arg-type]
+        locked_by_id=res.locked_by_id,
+        locked_by_name=res.locked_by_name,
+    )
+
+
 @router.patch("/{ticket_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def patch_ticket(
     ticket_id: int,
@@ -1104,7 +1150,9 @@ async def patch_ticket(
                 await svc.assign_responsible(user.id, ticket_id, body.responsible_id)
             if body.lock is not None:
                 if body.lock == "lock":
-                    await svc.lock_ticket(user.id, ticket_id)
+                    # Znuny AgentTicketLock: locking via the menu also makes
+                    # the agent the owner; unlock leaves the owner untouched.
+                    await svc.lock_ticket(user.id, ticket_id, take_ownership=True)
                 elif body.lock == "unlock":
                     await svc.unlock_ticket(user.id, ticket_id)
             if body.archive is not None:

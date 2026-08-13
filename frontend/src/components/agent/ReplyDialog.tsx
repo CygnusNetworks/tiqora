@@ -18,6 +18,8 @@ import {
 import { postComposerExtras } from "@/lib/composerExtras";
 import type { PickedMention } from "@/lib/mentions";
 import { ArticleBodyRenderer } from "./ArticleBodyRenderer";
+import { useComposerLock } from "@/lib/composerLock";
+import { ComposerLockBanner } from "./ComposerLock";
 import { ComposerTimeChip } from "./ComposerTimeChip";
 import { MentionTextarea } from "./MentionTextarea";
 import {
@@ -130,6 +132,10 @@ export function ReplyDialog({
     if (destKey === "cc") setShowCc(true);
     if (destKey === "bcc") setShowBcc(true);
   };
+
+  // Znuny RequiredLock: opening the composer locks the ticket and makes the
+  // agent its owner; a foreign lock shows the takeover banner instead.
+  const ticketLock = useComposerLock(ticketId, "compose", open);
 
   const storedDraft = useReplyDraft(ticketId, articleId);
   const draftsLoaded = useReplyDraftsLoaded(ticketId);
@@ -374,7 +380,11 @@ export function ReplyDialog({
     [replyAll, t],
   );
 
-  const canSend = body.trim().length > 0 && to.length > 0 && !sendMutation.isPending;
+  const canSend =
+    body.trim().length > 0 &&
+    to.length > 0 &&
+    !sendMutation.isPending &&
+    ticketLock.lockedBy === null;
 
   // Wide on large viewports (~80+ mono chars in the body); full-width on mobile.
   // Dialog base is max-w-md; this className overrides via cn().
@@ -407,6 +417,11 @@ export function ReplyDialog({
         <p className="text-sm text-danger">{t("ticket.replyDraftError")}</p>
       ) : (
         <div className="space-y-2" data-testid="reply-dialog">
+          <ComposerLockBanner
+            lockedBy={ticketLock.lockedBy}
+            onTakeOver={ticketLock.takeOver}
+            busy={ticketLock.takingOver}
+          />
           <RecipientsField
             label={t("ticket.replyTo")}
             fieldKey="to"

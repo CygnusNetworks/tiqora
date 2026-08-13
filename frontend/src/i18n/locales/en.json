@@ -610,7 +610,9 @@
     "extrasFailedTime": "Sent — the time was not booked.",
     "extrasFailedBoth": "Sent — neither the mention nor the booking was saved.",
     "extrasRetry": "Try again",
-    "customerUnresolved": "No customer record matches this address, so customer details are unavailable."
+    "customerUnresolved": "No customer record matches this address, so customer details are unavailable.",
+    "lockedByBanner": "Locked by {{name}}",
+    "takeOver": "Take over"
   },
   "search": {
     "title": "Search",

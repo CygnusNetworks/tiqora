@@ -32,4 +32,20 @@ test.describe("ticket zoom", () => {
     await page.getByTestId("overflow-tab-history").click({ force: true });
     await expect(page.getByTestId("history-table")).toBeVisible();
   });
+
+  test("reply on a foreign-locked ticket shows the takeover banner (Znuny RequiredLock)", async ({
+    page,
+  }) => {
+    // Ticket 101 is mocked as locked by "Bea Blocker" until takeover.
+    await page.goto("/agent/tickets/101");
+    await expect(page.getByTestId("ticket-zoom")).toBeVisible();
+    await page.getByTestId("ticket-actions-reply").click();
+
+    const banner = page.getByTestId("composer-lock-banner");
+    await expect(banner).toContainText("Bea Blocker");
+    await expect(page.getByTestId("reply-send")).toBeDisabled();
+
+    await page.getByTestId("composer-lock-takeover").click();
+    await expect(banner).toBeHidden();
+  });
 });

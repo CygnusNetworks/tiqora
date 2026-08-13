@@ -50,6 +50,22 @@ ZNUNY_SETTING_DEFAULTS: Final[dict[str, Any]] = {
     # is NOT proof of validity.
     "SessionMaxTime": 57600,
     "SessionMaxIdleTime": 7200,
+    # Composer auto-lock (Ticket.xml AgentTicket*###RequiredLock defaults).
+    # Opening these screens on an unlocked ticket locks it and makes the agent
+    # owner (AgentTicketActionCommon); Note deliberately absent — its default
+    # is 0 and Tiqora never asks for it.
+    "Ticket::Frontend::AgentTicketCompose###RequiredLock": 1,
+    "Ticket::Frontend::AgentTicketForward###RequiredLock": 1,
+    "Ticket::Frontend::AgentTicketBounce###RequiredLock": 1,
+    "Ticket::Frontend::AgentTicketClose###RequiredLock": 1,
+}
+
+# Composer action name (API wire value) → RequiredLock sysconfig key.
+REQUIRED_LOCK_ACTIONS: Final[dict[str, str]] = {
+    "compose": "Ticket::Frontend::AgentTicketCompose###RequiredLock",
+    "forward": "Ticket::Frontend::AgentTicketForward###RequiredLock",
+    "bounce": "Ticket::Frontend::AgentTicketBounce###RequiredLock",
+    "close": "Ticket::Frontend::AgentTicketClose###RequiredLock",
 }
 
 # Settings Tiqora currently needs typed accessors for.
@@ -226,6 +242,18 @@ class SysConfig:
     async def session_max_idle_time(self) -> int:
         """``SessionMaxIdleTime`` — idle timeout in seconds."""
         return int(await self.get("SessionMaxIdleTime", 7200) or 7200)
+
+    async def required_lock(self, action: str) -> bool:
+        """``Ticket::Frontend::AgentTicket*###RequiredLock`` for a composer action.
+
+        *action* is the API wire value (``compose``/``forward``/``bounce``/
+        ``close``). Unknown actions never require a lock.
+        """
+        key = REQUIRED_LOCK_ACTIONS.get(action)
+        if key is None:
+            return False
+        value = await self.get(key, 1)
+        return bool(int(value or 0))
 
     async def tiqora_settings(self) -> dict[str, Any]:
         """All settings currently required by Tiqora core."""

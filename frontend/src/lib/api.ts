@@ -20,6 +20,7 @@ export const api = new ApiClient({
 
 export { ApiError } from "@tiqora/api-client";
 export type {
+  AcquireLockResponse,
   UserMe,
   AuthMethodsOut,
   TOTPCodeIn,

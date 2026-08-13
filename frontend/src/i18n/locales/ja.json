@@ -543,7 +543,9 @@
     "extrasFailedTime": "送信済み — 工数は計上されませんでした。",
     "extrasFailedBoth": "送信済み — メンションも工数も保存されませんでした。",
     "extrasRetry": "再試行",
-    "customerUnresolved": "このアドレスに一致する顧客レコードがないため、顧客詳細は表示できません。"
+    "customerUnresolved": "このアドレスに一致する顧客レコードがないため、顧客詳細は表示できません。",
+    "lockedByBanner": "{{name}} がロック中",
+    "takeOver": "引き継ぐ"
   },
   "search": {
     "title": "検索",

@@ -543,7 +543,9 @@
     "extrasFailedTime": "Poslano — čas ni bil vnesen.",
     "extrasFailedBoth": "Poslano — niti omemba niti vnos časa nista bila shranjena.",
     "extrasRetry": "Poskusi znova",
-    "customerUnresolved": "Za ta naslov ni zapisa stranke, zato podrobnosti niso na voljo."
+    "customerUnresolved": "Za ta naslov ni zapisa stranke, zato podrobnosti niso na voljo.",
+    "lockedByBanner": "Zaklenil {{name}}",
+    "takeOver": "Prevzemi"
   },
   "search": {
     "title": "Iskanje",

@@ -543,7 +543,9 @@
     "extrasFailedTime": "Imetumwa — muda haukurekodiwa.",
     "extrasFailedBoth": "Imetumwa — wala kutajwa wala kurekodi muda hakuhifadhiwa.",
     "extrasRetry": "Jaribu tena",
-    "customerUnresolved": "Hakuna rekodi ya mteja inayolingana na anwani hii, kwa hivyo maelezo hayapatikani."
+    "customerUnresolved": "Hakuna rekodi ya mteja inayolingana na anwani hii, kwa hivyo maelezo hayapatikani.",
+    "lockedByBanner": "Imefungwa na {{name}}",
+    "takeOver": "Chukua"
   },
   "search": {
     "title": "Tafuta",

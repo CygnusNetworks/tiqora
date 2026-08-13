@@ -543,7 +543,9 @@
     "extrasFailedTime": "Skickat — tiden bokades inte.",
     "extrasFailedBoth": "Skickat — varken omnämnande eller tidsbokning sparades.",
     "extrasRetry": "Försök igen",
-    "customerUnresolved": "Ingen kundpost matchar adressen, så kunduppgifter saknas."
+    "customerUnresolved": "Ingen kundpost matchar adressen, så kunduppgifter saknas.",
+    "lockedByBanner": "Låst av {{name}}",
+    "takeOver": "Ta över"
   },
   "search": {
     "title": "Sök",

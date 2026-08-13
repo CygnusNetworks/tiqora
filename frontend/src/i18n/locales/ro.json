@@ -543,7 +543,9 @@
     "extrasFailedTime": "Trimis — timpul nu a fost înregistrat.",
     "extrasFailedBoth": "Trimis — nici mențiunea, nici înregistrarea de timp nu au fost salvate.",
     "extrasRetry": "Încearcă din nou",
-    "customerUnresolved": "Nicio înregistrare de client nu corespunde acestei adrese; detaliile nu sunt disponibile."
+    "customerUnresolved": "Nicio înregistrare de client nu corespunde acestei adrese; detaliile nu sunt disponibile.",
+    "lockedByBanner": "Blocat de {{name}}",
+    "takeOver": "Preia"
   },
   "search": {
     "title": "Caută",

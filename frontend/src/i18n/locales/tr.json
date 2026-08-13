@@ -543,7 +543,9 @@
     "extrasFailedTime": "Gönderildi — zaman kaydedilmedi.",
     "extrasFailedBoth": "Gönderildi — ne bahsetme ne de zaman kaydı kaydedildi.",
     "extrasRetry": "Yeniden dene",
-    "customerUnresolved": "Bu adrese uyan müşteri kaydı yok; müşteri ayrıntıları kullanılamıyor."
+    "customerUnresolved": "Bu adrese uyan müşteri kaydı yok; müşteri ayrıntıları kullanılamıyor.",
+    "lockedByBanner": "{{name}} tarafından kilitlendi",
+    "takeOver": "Devral"
   },
   "search": {
     "title": "Ara",

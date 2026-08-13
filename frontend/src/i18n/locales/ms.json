@@ -543,7 +543,9 @@
     "extrasFailedTime": "Dihantar — masa tidak direkod.",
     "extrasFailedBoth": "Dihantar — sebutan mahupun rekod masa tidak disimpan.",
     "extrasRetry": "Cuba lagi",
-    "customerUnresolved": "Tiada rekod pelanggan sepadan dengan alamat ini, jadi butiran tidak tersedia."
+    "customerUnresolved": "Tiada rekod pelanggan sepadan dengan alamat ini, jadi butiran tidak tersedia.",
+    "lockedByBanner": "Dikunci oleh {{name}}",
+    "takeOver": "Ambil alih"
   },
   "search": {
     "title": "Cari",
