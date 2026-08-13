@@ -24,6 +24,7 @@ from tiqora.ai.gate import (
     require_auto_reply_not_paused,
     require_feature_allowed,
 )
+from tiqora.ai.identity import get_customer_user_columns, valid_column_name
 from tiqora.ai.models import (
     AUTONOMY_MODES,
     FEATURE_AUTO_REPLY,
@@ -261,6 +262,49 @@ def _validate_fields(
         )
 
 
+async def _validate_clarify_schema_json(session: AsyncSession, raw: str | None) -> None:
+    """``clarify_schema_json``, when set, must be ``{"fields": [{"column":
+    str, "label": str}, ...]}`` with at least one field; each ``column`` must
+    match ``^[a-z0-9_]+$`` AND exist as a real ``customer_user`` column
+    (same error class/422 shape as the other queue-policy validations)."""
+    if raw is None or raw == "":
+        return
+    import json
+
+    try:
+        parsed = json.loads(raw)
+    except (json.JSONDecodeError, TypeError) as exc:
+        raise QueuePolicyValidationError(f"clarify_schema_json is not valid JSON: {exc}") from exc
+    if not isinstance(parsed, dict):
+        raise QueuePolicyValidationError(
+            'clarify_schema_json must be a JSON object: {"fields": [...]}'
+        )
+    fields = parsed.get("fields")
+    if not isinstance(fields, list) or not fields:
+        raise QueuePolicyValidationError("clarify_schema_json.fields must be a non-empty array")
+    columns = await get_customer_user_columns(session)
+    for item in fields:
+        if (
+            not isinstance(item, dict)
+            or not isinstance(item.get("column"), str)
+            or not isinstance(item.get("label"), str)
+            or not item.get("column")
+            or not item.get("label")
+        ):
+            raise QueuePolicyValidationError(
+                'clarify_schema_json.fields entries must be {"column": str, "label": str}'
+            )
+        column = item["column"]
+        if not valid_column_name(column):
+            raise QueuePolicyValidationError(
+                f"clarify_schema_json column {column!r} must match ^[a-z0-9_]+$"
+            )
+        if column not in columns:
+            raise QueuePolicyValidationError(
+                f"clarify_schema_json column {column!r} does not exist on customer_user"
+            )
+
+
 async def _validate_vision_provider(session: AsyncSession, vision_provider_id: int | None) -> None:
     if vision_provider_id is None:
         return
@@ -361,6 +405,7 @@ async def create_queue_policy(
         summary_detail=summary_detail,
     )
     _validate_escalation_rules_json(escalation_rules)
+    await _validate_clarify_schema_json(session, clarify_schema_json)
     await _validate_vision_provider(session, vision_provider_id)
     await _enforce_gate_on_enable(
         session,
@@ -452,6 +497,8 @@ async def update_queue_policy(
     )
     if "escalation_rules" in fields:
         _validate_escalation_rules_json(fields.get("escalation_rules"))
+    if "clarify_schema_json" in fields:
+        await _validate_clarify_schema_json(session, fields.get("clarify_schema_json"))
     if "vision_provider_id" in fields:
         await _validate_vision_provider(session, fields.get("vision_provider_id"))
     await _enforce_gate_on_enable(
