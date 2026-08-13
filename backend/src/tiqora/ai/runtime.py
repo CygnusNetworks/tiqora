@@ -399,6 +399,24 @@ def _build_identity_system_prompt(fields: list[Any]) -> str:
     )
 
 
+def _build_identity_user_message(articles: list[ArticleSnapshot]) -> str:
+    """Minimal, structurally-safe context for the identity mini-exchange.
+
+    Deliberately NOT :func:`_build_user_message` / ``render_ticket_header`` —
+    those include the full article history (incl. internal, agent-only
+    notes) and the ticket's current CustomerID/CustomerUser. An unidentified
+    Telegram user must not be able to get any of that echoed back via
+    prompt injection; the only thing the model needs to do its job (ask for
+    the configured fields, or extract them from what the customer just
+    wrote) is the latest customer message — nothing else is included, so
+    there is nothing else for a compromised model to leak."""
+    latest_customer_body = next(
+        (a.body or "" for a in reversed(articles) if a.sender_type == "customer"),
+        "",
+    )
+    return f"--- latest customer message ---\n{latest_customer_body}"
+
+
 def _identity_tool_schema() -> list[dict[str, Any]]:
     return [
         {
@@ -594,9 +612,7 @@ async def _run_identity_exchange(
         llm, settings=settings, context=audit_context, session=session, pii_mapper=PiiMapper()
     )
     system_prompt = _build_identity_system_prompt(fields)
-    user_message = _build_user_message(
-        ticket, articles, pii=PiiMapper(), mask=False, kb_bundle=None
-    )
+    user_message = _build_identity_user_message(articles)
     messages: list[LlmMessage] = [
         LlmMessage(role="system", content=system_prompt),
         LlmMessage(role="user", content=user_message),
