@@ -614,3 +614,34 @@ class TiqoraStandardTemplateUser(TiqoraBase):
     user_id: Mapped[int] = mapped_column(Integer, primary_key=True, nullable=False)
 
     __table_args__ = (Index("ix_tiqora_standard_template_user_user", "user_id"),)
+
+
+class TiqoraTelegramContact(TiqoraBase):
+    """A Telegram chat, resolved (best-effort) to a customer identity.
+
+    ``chat_id``/``telegram_user_id`` never change for a given Telegram user,
+    but ``customer_user_login`` can — re-linking, portal account merges — so
+    the resolved identity is cached here rather than looked up fresh on
+    every inbound message.
+    """
+
+    __tablename__ = "tiqora_telegram_contact"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True, nullable=False)
+    chat_id: Mapped[int] = mapped_column(BigInteger, nullable=False, unique=True)
+    telegram_user_id: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    username: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    display_name: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    customer_user_login: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    create_time: Mapped[datetime] = mapped_column(
+        DateTime,
+        nullable=False,
+        server_default=func.now(),
+    )
+    change_time: Mapped[datetime] = mapped_column(
+        DateTime,
+        nullable=False,
+        server_default=func.now(),
+    )
+
+    __table_args__ = (Index("ix_tiqora_telegram_contact_customer_login", "customer_user_login"),)
