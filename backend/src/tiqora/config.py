@@ -379,6 +379,12 @@ class Settings(BaseSettings):
     postmaster_interval_seconds: int = Field(
         default=60, validation_alias="TIQORA_POSTMASTER_INTERVAL"
     )
+    # Telegram poller daemon (Phase T3). The `daemon.telegram_poller.enabled`
+    # tiqora_settings key (default OFF) is the actual takeover switch; this is
+    # only the getUpdates long-poll cadence once enabled.
+    telegram_poller_interval_seconds: int = Field(
+        default=5, validation_alias="TIQORA_TELEGRAM_POLLER_INTERVAL"
+    )
     # Outbound SMTP. Disabled by default so agent email replies store the
     # article without 502ing when no relay is configured (prod often has no
     # TIQORA_SMTP_HOST). Set TIQORA_SMTP_ENABLED=1 once a real relay is wired.

@@ -31,6 +31,8 @@ from tiqora.domain.settings_store import (
     KEY_OUTBOX_INTERVAL_SECONDS,
     KEY_POSTMASTER_ENABLED,
     KEY_POSTMASTER_INTERVAL_SECONDS,
+    KEY_TELEGRAM_POLLER_ENABLED,
+    KEY_TELEGRAM_POLLER_INTERVAL_SECONDS,
 )
 
 ScheduleKind = Literal["interval", "daily"]
@@ -140,6 +142,15 @@ DAEMON_SERVICES: tuple[DaemonService, ...] = (
         schedule_kind="interval",
         interval_key=KEY_AI_WORKER_INTERVAL_SECONDS,
         interval_settings_attr="ai_worker_interval_seconds",
+    ),
+    DaemonService(
+        slug="telegram_poller",
+        enabled_key=KEY_TELEGRAM_POLLER_ENABLED,
+        default_enabled=False,
+        toggleable=True,
+        schedule_kind="interval",
+        interval_key=KEY_TELEGRAM_POLLER_INTERVAL_SECONDS,
+        interval_settings_attr="telegram_poller_interval_seconds",
     ),
     DaemonService(
         slug="ai_audit_cleanup",
