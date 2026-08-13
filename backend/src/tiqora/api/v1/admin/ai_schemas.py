@@ -185,6 +185,7 @@ class AiQueuePolicyOut(BaseModel):
     service_user_id: int | None
     llm_provider_id: int | None
     model_override: str | None
+    llm_fallback_json: str | None = None
     vision_provider_id: int | None
     kb_tags: str | None
     kb_category_ids: str | None
@@ -228,6 +229,7 @@ class AiQueuePolicyCreate(BaseModel):
     service_user_id: int | None = None
     llm_provider_id: int | None = None
     model_override: str | None = None
+    llm_fallback_json: str | None = None
     vision_provider_id: int | None = None
     kb_tags: str | None = None
     kb_category_ids: str | None = None
@@ -267,6 +269,7 @@ class AiQueuePolicyUpdate(BaseModel):
     service_user_id: int | None = None
     llm_provider_id: int | None = None
     model_override: str | None = None
+    llm_fallback_json: str | None = None
     vision_provider_id: int | None = None
     kb_tags: str | None = None
     kb_category_ids: str | None = None

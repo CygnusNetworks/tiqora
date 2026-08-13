@@ -257,7 +257,9 @@ async def _process_customer_article_event(
         )
         return None
 
-    llm = await build_llm_client(session, settings, policy.llm_provider_id, policy.model_override)
+    llm = await build_llm_client(
+        session, settings, policy.llm_provider_id, policy.model_override, policy.llm_fallback_json
+    )
     bundle = await kb_bundle(session, settings, policy.service_user_id, policy)
 
     return await run_ticket_agent(
@@ -286,7 +288,9 @@ async def _maybe_auto_summarize(session: AsyncSession, settings: Settings, ticke
     policy = await get_queue_policy_by_queue(session, ticket.queue_id)
     if policy is None or policy.llm_provider_id is None:
         return False
-    llm = await build_llm_client(session, settings, policy.llm_provider_id, policy.model_override)
+    llm = await build_llm_client(
+        session, settings, policy.llm_provider_id, policy.model_override, policy.llm_fallback_json
+    )
     await summary_service.summarize_ticket(
         session,
         llm=llm,
