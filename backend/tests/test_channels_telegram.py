@@ -981,7 +981,7 @@ async def test_agent_reply_via_write_service_sends_and_stores(
                     return fake_gateway
 
                 monkeypatch.setattr(
-                    "tiqora.channels.telegram.outbound._build_gateway", _fake_build_gateway
+                    "tiqora.channels.telegram.outbound.build_gateway", _fake_build_gateway
                 )
 
                 async with session.begin():
