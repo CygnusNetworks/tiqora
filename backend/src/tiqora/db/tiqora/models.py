@@ -623,6 +623,11 @@ class TiqoraTelegramContact(TiqoraBase):
     but ``customer_user_login`` can — re-linking, portal account merges — so
     the resolved identity is cached here rather than looked up fresh on
     every inbound message.
+
+    ``consent_time``/``consent_prompt_time`` back the DSGVO consent flow
+    (Task 13): only chat_id + identity fields are ever stored before
+    ``consent_time`` is set — no ticket/article is created for a contact
+    until they accept the inline consent prompt.
     """
 
     __tablename__ = "tiqora_telegram_contact"
@@ -633,6 +638,8 @@ class TiqoraTelegramContact(TiqoraBase):
     username: Mapped[str | None] = mapped_column(String(64), nullable=True)
     display_name: Mapped[str | None] = mapped_column(String(200), nullable=True)
     customer_user_login: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    consent_time: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    consent_prompt_time: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     create_time: Mapped[datetime] = mapped_column(
         DateTime,
         nullable=False,

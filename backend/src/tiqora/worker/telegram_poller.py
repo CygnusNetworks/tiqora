@@ -74,7 +74,9 @@ async def run_telegram_poller_tick(
 
     gateway = gateway or TelegramGateway(bot_token=bot_token)
     try:
-        updates = await gateway.get_updates(offset=offset, timeout=20, allowed_updates=["message"])
+        updates = await gateway.get_updates(
+            offset=offset, timeout=20, allowed_updates=["message", "callback_query"]
+        )
     except TelegramApiError as exc:
         logger.warning("telegram_poller_get_updates_failed", error=str(exc))
         return {"updates": 0, "articles": 0, "tickets_created": 0, "skipped": 0}

@@ -39,6 +39,27 @@ CHANNEL_NAME = "telegram"
 COMM_CHANNEL_NAME = "Telegram"
 COMM_CHANNEL_MODULE = "Tiqora::CommunicationChannel::Telegram"
 
+# Consent-accept inline button's callback_data — matched verbatim against
+# ``callback_query.data``.
+CONSENT_ACCEPT_CALLBACK_DATA = "tiqora_consent_accept"
+
+# Minimum gap between two consent prompts to the same chat (spam guard for
+# customers who keep messaging before tapping the button).
+CONSENT_REPROMPT_SECONDS = 3600
+
+_DEFAULT_CONSENT_TEXT = (
+    "Bevor wir Ihr Anliegen bearbeiten können, benötigen wir Ihre Zustimmung zur "
+    "Verarbeitung Ihrer Daten (Chat-ID, Name, Nachrichteninhalt) zur Bearbeitung "
+    "Ihrer Anfrage. Bitte bestätigen Sie über den Button unten. Senden Sie Ihr "
+    "Anliegen danach bitte erneut.\n\n✅ Zustimmen"
+)
+_DEFAULT_CONSENT_CONFIRMED_TEXT = (
+    "Vielen Dank! Ihre Zustimmung wurde gespeichert. Bitte senden Sie jetzt Ihr Anliegen."
+)
+_CONSENT_KEYBOARD = {
+    "inline_keyboard": [[{"text": "✅ Zustimmen", "callback_data": CONSENT_ACCEPT_CALLBACK_DATA}]]
+}
+
 # Telegram media message keys that carry a downloadable attachment, in the
 # order they're checked (a message has at most one of these).
 _MEDIA_PLACEHOLDERS: dict[str, str] = {
@@ -111,7 +132,19 @@ async def _upsert_contact(session: AsyncSession, message: dict[str, Any]) -> Tiq
     """
     chat = message.get("chat") or {}
     frm = message.get("from") or {}
-    chat_id = int(chat["id"])
+    return await _upsert_contact_fields(session, chat_id=int(chat["id"]), frm=frm)
+
+
+async def _upsert_contact_fields(
+    session: AsyncSession, *, chat_id: int, frm: dict[str, Any]
+) -> TiqoraTelegramContact:
+    """Insert or refresh the contact row for *chat_id* from a Telegram
+    ``from`` object. Identity fields only — used by both ``message`` and
+    ``callback_query`` updates (see :func:`_upsert_contact`).
+
+    ``customer_user_login`` is a manual/admin-set mapping and is never
+    touched here.
+    """
     telegram_user_id = frm.get("id")
     username = frm.get("username")
     first_name = str(frm.get("first_name") or "").strip()
@@ -234,6 +267,74 @@ async def _resolve_ticket(
     return ticket_id, True
 
 
+async def _consent_required(session: AsyncSession) -> bool:
+    value = await channel_setting(session, CHANNEL_NAME, "consent_required")
+    return value != "0"
+
+
+async def _handle_consent_callback(
+    session: AsyncSession, gateway: TelegramGateway | None, callback_query: dict[str, Any]
+) -> dict[str, Any]:
+    """Handle a ``callback_query`` update. Only the consent-accept button is
+    understood — any other callback_query is skipped, same as before this
+    update type was handled at all."""
+    if callback_query.get("data") != CONSENT_ACCEPT_CALLBACK_DATA:
+        return {"skipped": "unsupported_callback"}
+
+    message = callback_query.get("message") or {}
+    chat = message.get("chat") or {}
+    if "id" not in chat:
+        return {"skipped": "unsupported_callback"}
+    chat_id = int(chat["id"])
+    frm = callback_query.get("from") or {}
+
+    contact = await _upsert_contact_fields(session, chat_id=chat_id, frm=frm)
+    contact.consent_time = datetime.now(UTC).replace(tzinfo=None)
+    await session.flush()
+
+    callback_query_id = str(callback_query.get("id") or "")
+    confirmed_text = await channel_setting(
+        session, CHANNEL_NAME, "consent_confirmed_text", _DEFAULT_CONSENT_CONFIRMED_TEXT
+    )
+    if gateway is not None:
+        await gateway.answer_callback_query(callback_query_id, confirmed_text)
+        try:
+            await gateway.send_message(chat_id, confirmed_text)
+        except TelegramApiError as exc:
+            logger.warning(
+                "telegram_consent_confirmed_send_failed", chat_id=chat_id, error=str(exc)
+            )
+
+    return {"consent": "accepted"}
+
+
+async def _maybe_prompt_consent(
+    session: AsyncSession, gateway: TelegramGateway | None, contact: TiqoraTelegramContact
+) -> None:
+    """Send the consent prompt to *contact*, unless one was already sent
+    within :data:`CONSENT_REPROMPT_SECONDS` (spam guard)."""
+    now = datetime.now(UTC).replace(tzinfo=None)
+    if contact.consent_prompt_time is not None:
+        elapsed = (now - contact.consent_prompt_time).total_seconds()
+        if elapsed < CONSENT_REPROMPT_SECONDS:
+            return
+
+    contact.consent_prompt_time = now
+    await session.flush()
+
+    if gateway is None:
+        return
+    consent_text = await channel_setting(
+        session, CHANNEL_NAME, "consent_text", _DEFAULT_CONSENT_TEXT
+    )
+    try:
+        await gateway.send_message(contact.chat_id, consent_text, reply_markup=_CONSENT_KEYBOARD)
+    except TelegramApiError as exc:
+        logger.warning(
+            "telegram_consent_prompt_send_failed", chat_id=contact.chat_id, error=str(exc)
+        )
+
+
 async def process_update(
     session: AsyncSession,
     session_factory: async_sessionmaker[AsyncSession],
@@ -245,11 +346,17 @@ async def process_update(
     """Process one Telegram update. Caller commits the session.
 
     Used by both the long-poll daemon and the webhook route (Task 3); this
-    function itself is transport-agnostic.
+    function itself is transport-agnostic. DSGVO consent (Task 13) is
+    enforced right after the bot-loop check, before any ticket/article/
+    identity logic runs — see ``callback_query``/consent handling below.
     """
+    callback_query = update.get("callback_query")
+    if isinstance(callback_query, dict):
+        return await _handle_consent_callback(session, gateway, callback_query)
+
     message = update.get("message")
     if not isinstance(message, dict):
-        # edited_message, callback_query, channel_post, ... — not handled yet.
+        # edited_message, channel_post, ... — not handled yet.
         return {"skipped": "unsupported"}
 
     frm = message.get("from") or {}
@@ -260,7 +367,15 @@ async def process_update(
 
     await ensure_channel_row(session, COMM_CHANNEL_NAME, COMM_CHANNEL_MODULE)
 
+    # Contact-Upsert here only ever touches identity fields (chat_id,
+    # telegram_user_id, username, display_name) plus, below,
+    # consent_prompt_time — never the message text or a ticket/article, so
+    # this same call is safe to make before consent is granted.
     contact = await _upsert_contact(session, message)
+
+    if await _consent_required(session) and contact.consent_time is None:
+        await _maybe_prompt_consent(session, gateway, contact)
+        return {"skipped": "no_consent"}
 
     default_customer = await channel_setting(session, CHANNEL_NAME, "default_customer_user")
     is_mapped_customer = bool(contact.customer_user_login)

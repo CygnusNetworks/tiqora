@@ -96,10 +96,20 @@ class TelegramGateway:
         result = await self._call("getUpdates", payload)
         return list(result or [])
 
-    async def send_message(self, chat_id: int | str, text: str) -> dict[str, Any]:
+    async def send_message(
+        self,
+        chat_id: int | str,
+        text: str,
+        *,
+        reply_markup: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
         """Send a plain-text message (no ``parse_mode`` — caller text is not
-        Markdown/HTML-escaped)."""
-        result = await self._call("sendMessage", {"chat_id": chat_id, "text": text})
+        Markdown/HTML-escaped). *reply_markup*, when given, is sent verbatim
+        as the Bot API ``reply_markup`` field (e.g. an inline keyboard)."""
+        payload: dict[str, Any] = {"chat_id": chat_id, "text": text}
+        if reply_markup is not None:
+            payload["reply_markup"] = reply_markup
+        result = await self._call("sendMessage", payload)
         return dict(result or {})
 
     async def send_chat_action(self, chat_id: int | str, action: str = "typing") -> None:
@@ -108,6 +118,18 @@ class TelegramGateway:
             await self._call("sendChatAction", {"chat_id": chat_id, "action": action})
         except TelegramApiError as exc:
             logger.warning("telegram_send_chat_action_failed", error=str(exc))
+
+    async def answer_callback_query(self, callback_query_id: str, text: str | None = None) -> None:
+        """Best-effort acknowledgement of an inline-keyboard tap — failures
+        are logged, not raised (the callback_query already happened; there's
+        nothing to roll back)."""
+        payload: dict[str, Any] = {"callback_query_id": callback_query_id}
+        if text is not None:
+            payload["text"] = text
+        try:
+            await self._call("answerCallbackQuery", payload)
+        except TelegramApiError as exc:
+            logger.warning("telegram_answer_callback_query_failed", error=str(exc))
 
     async def set_webhook(
         self,

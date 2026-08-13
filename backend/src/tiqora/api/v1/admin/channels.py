@@ -56,6 +56,9 @@ CHANNEL_CONFIG_KEYS: Final[dict[str, set[str]]] = {
         "mode",
         "webhook_url",
         "webhook_secret_token",
+        "consent_required",
+        "consent_text",
+        "consent_confirmed_text",
     },
 }
 
