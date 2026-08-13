@@ -305,6 +305,44 @@ async def _validate_clarify_schema_json(session: AsyncSession, raw: str | None) 
             )
 
 
+async def _validate_llm_fallback_json(session: AsyncSession, raw: str | None) -> None:
+    """``llm_fallback_json``, when set, must be a JSON array of
+    ``{"provider_id": int > 0, "model": str|null}`` entries whose
+    ``provider_id`` refers to an existing :class:`TiqoraLlmProvider` — same
+    error class/422 shape as the other queue-policy validations. Actual
+    fallback resolution/skip-on-missing happens at run time in
+    :func:`tiqora.ai.kb_wiring.build_llm_client`; this only rejects obviously
+    invalid input at write time."""
+    if raw is None or raw == "":
+        return
+    import json
+
+    try:
+        parsed = json.loads(raw)
+    except (json.JSONDecodeError, TypeError) as exc:
+        raise QueuePolicyValidationError(f"llm_fallback_json is not valid JSON: {exc}") from exc
+    if not isinstance(parsed, list):
+        raise QueuePolicyValidationError("llm_fallback_json must be a JSON array")
+    for item in parsed:
+        if not isinstance(item, dict) or "provider_id" not in item:
+            raise QueuePolicyValidationError(
+                'llm_fallback_json entries must be {"provider_id": int, "model": str|null}'
+            )
+        provider_id = item["provider_id"]
+        if not isinstance(provider_id, int) or isinstance(provider_id, bool) or provider_id <= 0:
+            raise QueuePolicyValidationError(
+                f"llm_fallback_json provider_id {provider_id!r} must be a positive integer"
+            )
+        model = item.get("model")
+        if model is not None and not isinstance(model, str):
+            raise QueuePolicyValidationError("llm_fallback_json model must be a string or null")
+        provider = await session.get(TiqoraLlmProvider, provider_id)
+        if provider is None:
+            raise QueuePolicyValidationError(
+                f"llm_fallback_json provider_id {provider_id} does not exist"
+            )
+
+
 async def _validate_vision_provider(session: AsyncSession, vision_provider_id: int | None) -> None:
     if vision_provider_id is None:
         return
@@ -364,6 +402,7 @@ async def create_queue_policy(
     service_user_id: int | None = None,
     llm_provider_id: int | None = None,
     model_override: str | None = None,
+    llm_fallback_json: str | None = None,
     vision_provider_id: int | None = None,
     kb_tags: str | None = None,
     kb_category_ids: str | None = None,
@@ -406,6 +445,7 @@ async def create_queue_policy(
     )
     _validate_escalation_rules_json(escalation_rules)
     await _validate_clarify_schema_json(session, clarify_schema_json)
+    await _validate_llm_fallback_json(session, llm_fallback_json)
     await _validate_vision_provider(session, vision_provider_id)
     await _enforce_gate_on_enable(
         session,
@@ -426,6 +466,7 @@ async def create_queue_policy(
         service_user_id=service_user_id,
         llm_provider_id=llm_provider_id,
         model_override=model_override,
+        llm_fallback_json=llm_fallback_json,
         vision_provider_id=vision_provider_id,
         kb_tags=kb_tags,
         kb_category_ids=kb_category_ids,
@@ -499,6 +540,8 @@ async def update_queue_policy(
         _validate_escalation_rules_json(fields.get("escalation_rules"))
     if "clarify_schema_json" in fields:
         await _validate_clarify_schema_json(session, fields.get("clarify_schema_json"))
+    if "llm_fallback_json" in fields:
+        await _validate_llm_fallback_json(session, fields.get("llm_fallback_json"))
     if "vision_provider_id" in fields:
         await _validate_vision_provider(session, fields.get("vision_provider_id"))
     await _enforce_gate_on_enable(

@@ -440,6 +440,11 @@ async def summarize_ticket(
     known_names = await collect_known_names(session, ticket, articles, extra_texts=ner_texts)
     pii = PiiMapper(never_mask=never_mask or None, known_names=known_names or None)
 
+    # Kept before the AuditingLlmClient wrap below so record_usage() can read
+    # active_provider_id/active_model off it after the run — set by
+    # FallbackLlmClient (tiqora.ai.llm_fallback) once a fallback entry
+    # actually served a response; absent on a plain OpenAiCompatLlmClient.
+    raw_llm = llm
     llm = AuditingLlmClient(
         llm,
         settings=settings or get_settings(),
@@ -499,8 +504,8 @@ async def summarize_ticket(
         queue_id=ticket.queue_id,
         ticket_id=ticket_id,
         feature=FEATURE_SUMMARY,
-        provider_id=policy.llm_provider_id,
-        model=policy.model_override,
+        provider_id=getattr(raw_llm, "active_provider_id", None) or policy.llm_provider_id,
+        model=getattr(raw_llm, "active_model", None) or policy.model_override,
         prompt_tokens=prompt_tokens,
         completion_tokens=completion_tokens,
         success=bool(response.content),
