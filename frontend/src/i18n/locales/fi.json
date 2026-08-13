@@ -543,7 +543,9 @@
     "extrasFailedTime": "Lähetetty — aikaa ei kirjattu.",
     "extrasFailedBoth": "Lähetetty — mainintaa eikä aikakirjausta tallennettu.",
     "extrasRetry": "Yritä uudelleen",
-    "customerUnresolved": "Tähän osoitteeseen ei löydy asiakastietuetta, joten tiedot eivät ole saatavilla."
+    "customerUnresolved": "Tähän osoitteeseen ei löydy asiakastietuetta, joten tiedot eivät ole saatavilla.",
+    "lockedByBanner": "Lukinnut {{name}}",
+    "takeOver": "Ota haltuun"
   },
   "search": {
     "title": "Etsi",

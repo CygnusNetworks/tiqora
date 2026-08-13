@@ -15,6 +15,7 @@ const {
   createTicketMention,
   createTicketTimeAccounting,
   listReferenceAgents,
+  acquireTicketLock,
   formDrafts,
 } = vi.hoisted(() => ({
   getReplyDraft: vi.fn(),
@@ -23,6 +24,7 @@ const {
   createTicketMention: vi.fn(),
   createTicketTimeAccounting: vi.fn(),
   listReferenceAgents: vi.fn(),
+  acquireTicketLock: vi.fn(),
   formDrafts: { list: vi.fn(), upsert: vi.fn(), remove: vi.fn() },
 }));
 
@@ -37,6 +39,7 @@ vi.mock("@/lib/api", async () => {
       createTicketMention,
       createTicketTimeAccounting,
       listReferenceAgents,
+      acquireTicketLock,
     },
   };
 });
@@ -55,6 +58,7 @@ beforeEach(() => {
   qc = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   });
+  acquireTicketLock.mockReset().mockResolvedValue({ result: "acquired" });
   formDrafts.list.mockReset().mockResolvedValue([]);
   formDrafts.upsert.mockReset().mockImplementation((ticketId, body) =>
     Promise.resolve({

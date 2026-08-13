@@ -543,7 +543,9 @@
     "extrasFailedTime": "Odoslané — čas nebol zaznamenaný.",
     "extrasFailedBoth": "Odoslané — neuložila sa ani zmienka, ani záznam času.",
     "extrasRetry": "Skúsiť znova",
-    "customerUnresolved": "K tejto adrese neexistuje zákaznícky záznam, detaily nie sú k dispozícii."
+    "customerUnresolved": "K tejto adrese neexistuje zákaznícky záznam, detaily nie sú k dispozícii.",
+    "lockedByBanner": "Uzamkol {{name}}",
+    "takeOver": "Prevziať"
   },
   "search": {
     "title": "Hľadať",

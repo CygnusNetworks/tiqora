@@ -543,7 +543,9 @@
     "extrasFailedTime": "أُرسل — لم يُسجَّل الوقت.",
     "extrasFailedBoth": "أُرسل — لم تُحفظ الإشارة ولا تسجيل الوقت.",
     "extrasRetry": "أعد المحاولة",
-    "customerUnresolved": "لا يوجد سجل عميل يطابق هذا العنوان، لذا تفاصيل العميل غير متاحة."
+    "customerUnresolved": "لا يوجد سجل عميل يطابق هذا العنوان، لذا تفاصيل العميل غير متاحة.",
+    "lockedByBanner": "مقفلة بواسطة {{name}}",
+    "takeOver": "استلام"
   },
   "search": {
     "title": "بحث",

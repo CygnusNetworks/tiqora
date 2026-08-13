@@ -543,7 +543,9 @@
     "extrasFailedTime": "Elküldve — az idő nem került rögzítésre.",
     "extrasFailedBoth": "Elküldve — sem az említés, sem az időrögzítés nem mentődött.",
     "extrasRetry": "Újra",
-    "customerUnresolved": "Ehhez a címhez nincs ügyfélrekord, ezért az ügyféladatok nem érhetők el."
+    "customerUnresolved": "Ehhez a címhez nincs ügyfélrekord, ezért az ügyféladatok nem érhetők el.",
+    "lockedByBanner": "Zárolta: {{name}}",
+    "takeOver": "Átvétel"
   },
   "search": {
     "title": "Keresés",

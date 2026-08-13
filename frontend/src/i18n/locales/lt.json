@@ -543,7 +543,9 @@
     "extrasFailedTime": "Išsiųsta — laikas neįrašytas.",
     "extrasFailedBoth": "Išsiųsta — nei paminėjimas, nei laiko įrašas neišsaugoti.",
     "extrasRetry": "Bandyti dar kartą",
-    "customerUnresolved": "Šiam adresui nėra kliento įrašo, todėl duomenys nepasiekiami."
+    "customerUnresolved": "Šiam adresui nėra kliento įrašo, todėl duomenys nepasiekiami.",
+    "lockedByBanner": "Užrakino {{name}}",
+    "takeOver": "Perimti"
   },
   "search": {
     "title": "Ieškoti",

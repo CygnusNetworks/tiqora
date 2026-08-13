@@ -60,6 +60,8 @@ export type ReplyDraftOut = Schemas["ReplyDraftOut"];
 export type TemplateOut = Schemas["TemplateOut"];
 export type MutationRequest = Schemas["MutationRequest"];
 export type MergeRequest = Schemas["MergeRequest"];
+export type AcquireLockRequest = Schemas["AcquireLockRequest"];
+export type AcquireLockResponse = Schemas["AcquireLockResponse"];
 export type TicketCreateRequest = Schemas["TicketCreateRequest"];
 export type TicketCreateResponse = Schemas["TicketCreateResponse"];
 export type ForwardRequest = Schemas["ForwardRequest"];
@@ -1314,6 +1316,14 @@ export class ApiClient {
       body,
       signal,
     });
+  }
+
+  acquireTicketLock(ticketId: number, body: AcquireLockRequest, signal?: AbortSignal) {
+    return this.request<AcquireLockResponse>(
+      "POST",
+      `/api/v1/tickets/${ticketId}/acquire-lock`,
+      { body, signal },
+    );
   }
 
   mergeTicket(ticketId: number, body: MergeRequest, signal?: AbortSignal) {

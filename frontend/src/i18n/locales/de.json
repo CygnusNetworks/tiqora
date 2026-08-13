@@ -610,7 +610,9 @@
     "extrasFailedTime": "Gesendet — die Zeit wurde nicht gebucht.",
     "extrasFailedBoth": "Gesendet — Erwähnung und Zeitbuchung wurden nicht gespeichert.",
     "extrasRetry": "Erneut versuchen",
-    "customerUnresolved": "Zu dieser Adresse gibt es keinen Kundenbenutzer. Kundeninformationen sind daher nicht verfügbar."
+    "customerUnresolved": "Zu dieser Adresse gibt es keinen Kundenbenutzer. Kundeninformationen sind daher nicht verfügbar.",
+    "lockedByBanner": "Gesperrt von {{name}}",
+    "takeOver": "Übernehmen"
   },
   "search": {
     "title": "Suche",

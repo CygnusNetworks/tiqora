@@ -5150,6 +5150,30 @@ export interface paths {
         patch: operations["patch_ticket_api_v1_tickets__ticket_id__patch"];
         trace?: never;
     };
+    "/api/v1/tickets/{ticket_id}/acquire-lock": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Acquire Ticket Lock
+         * @description Znuny composer-open lock semantics (RequiredLock).
+         *
+         *     Called when a composer dialog opens (and again with ``takeover`` from the
+         *     "Übernehmen" banner). Locking an unlocked ticket makes the caller its
+         *     owner; a foreign lock is reported as ``locked_by_other`` without writing.
+         */
+        post: operations["acquire_ticket_lock_api_v1_tickets__ticket_id__acquire_lock_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/tickets/{ticket_id}/ai": {
         parameters: {
             query?: never;
@@ -6095,6 +6119,34 @@ export interface components {
             stop_after_match?: number | null;
             /** Valid Id */
             valid_id?: number | null;
+        };
+        /**
+         * AcquireLockRequest
+         * @description Composer-open lock acquisition (Znuny RequiredLock semantics).
+         */
+        AcquireLockRequest: {
+            /**
+             * Action
+             * @enum {string}
+             */
+            action: "compose" | "forward" | "bounce" | "close";
+            /**
+             * Takeover
+             * @default false
+             */
+            takeover: boolean;
+        };
+        /** AcquireLockResponse */
+        AcquireLockResponse: {
+            /** Locked By Id */
+            locked_by_id?: number | null;
+            /** Locked By Name */
+            locked_by_name?: string | null;
+            /**
+             * Result
+             * @enum {string}
+             */
+            result: "not_required" | "acquired" | "already_mine" | "taken_over" | "locked_by_other";
         };
         /**
          * ActivityDialogDetailOut
@@ -26683,6 +26735,45 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    acquire_ticket_lock_api_v1_tickets__ticket_id__acquire_lock_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                ticket_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AcquireLockRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AcquireLockResponse"];
+                };
             };
             /** @description Validation Error */
             422: {

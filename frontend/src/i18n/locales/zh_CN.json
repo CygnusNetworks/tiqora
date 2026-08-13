@@ -543,7 +543,9 @@
     "extrasFailedTime": "已发送 — 时间未登记。",
     "extrasFailedBoth": "已发送 — 提及与时间登记均未保存。",
     "extrasRetry": "重试",
-    "customerUnresolved": "没有与此地址匹配的客户记录，因此无法显示客户详情。"
+    "customerUnresolved": "没有与此地址匹配的客户记录，因此无法显示客户详情。",
+    "lockedByBanner": "由 {{name}} 锁定",
+    "takeOver": "接管"
   },
   "search": {
     "title": "搜索",

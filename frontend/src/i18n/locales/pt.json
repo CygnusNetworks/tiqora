@@ -543,7 +543,9 @@
     "extrasFailedTime": "Enviado — o tempo não foi registado.",
     "extrasFailedBoth": "Enviado — nem a menção nem o registo de tempo foram guardados.",
     "extrasRetry": "Tentar novamente",
-    "customerUnresolved": "Nenhum registo de cliente corresponde a este endereço; os detalhes não estão disponíveis."
+    "customerUnresolved": "Nenhum registo de cliente corresponde a este endereço; os detalhes não estão disponíveis.",
+    "lockedByBanner": "Bloqueado por {{name}}",
+    "takeOver": "Assumir"
   },
   "search": {
     "title": "Pesquisar",

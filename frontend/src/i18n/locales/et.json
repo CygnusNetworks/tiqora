@@ -543,7 +543,9 @@
     "extrasFailedTime": "Saadetud — aega ei broneeritud.",
     "extrasFailedBoth": "Saadetud — ei mainimist ega ajakannet ei salvestatud.",
     "extrasRetry": "Proovi uuesti",
-    "customerUnresolved": "Selle aadressiga ei sobi ükski kliendikirje, andmed pole saadaval."
+    "customerUnresolved": "Selle aadressiga ei sobi ükski kliendikirje, andmed pole saadaval.",
+    "lockedByBanner": "Lukustanud {{name}}",
+    "takeOver": "Võta üle"
   },
   "search": {
     "title": "Otsi",

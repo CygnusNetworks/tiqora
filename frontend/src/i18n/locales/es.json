@@ -543,7 +543,9 @@
     "extrasFailedTime": "Enviado — el tiempo no se registró.",
     "extrasFailedBoth": "Enviado — no se guardaron la mención ni el registro de tiempo.",
     "extrasRetry": "Reintentar",
-    "customerUnresolved": "Ningún registro de cliente coincide con esta dirección; los datos del cliente no están disponibles."
+    "customerUnresolved": "Ningún registro de cliente coincide con esta dirección; los datos del cliente no están disponibles.",
+    "lockedByBanner": "Bloqueado por {{name}}",
+    "takeOver": "Asumir"
   },
   "search": {
     "title": "Buscar",
