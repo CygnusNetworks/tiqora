@@ -154,6 +154,36 @@ describe("DraftPlaceholder", () => {
     await waitFor(() => expect(getReplyDraft).toHaveBeenCalledWith(7, 2, false));
   });
 
+  it("DraftListRow opens the reply dialog in Telegram mode when given a Telegram channelName", async () => {
+    const draft = makeDraft();
+    getReplyDraft.mockResolvedValue({
+      to_address: null,
+      cc: "",
+      subject: "",
+      body: "quoted",
+      in_reply_to: null,
+      references: null,
+      signature: "",
+      signature_is_html: false,
+    });
+    wrap(<DraftListRow draft={draft} locale="en" channelName="Telegram" />);
+
+    fireEvent.click(screen.getByTestId("article-draft-row-2"));
+    await screen.findByTestId("reply-dialog");
+    expect(screen.getByTestId("reply-telegram-hint")).toBeInTheDocument();
+    expect(screen.queryByTestId("reply-to")).not.toBeInTheDocument();
+  });
+
+  it("DraftBubble's edit button opens the reply dialog with today's email behavior when channelName is Email", async () => {
+    const draft = makeDraft();
+    wrap(<DraftBubble draft={draft} locale="en" channelName="Email" />);
+
+    fireEvent.click(screen.getByTestId("conversation-draft-edit-2"));
+    await screen.findByTestId("reply-dialog");
+    expect(screen.queryByTestId("reply-telegram-hint")).toBeNull();
+    expect(screen.getByTestId("reply-to")).toBeInTheDocument();
+  });
+
   it("discarding a draft removes it from the store after confirmation", async () => {
     serveDraft();
     // Render the bubble the way the article views do — driven by the store,

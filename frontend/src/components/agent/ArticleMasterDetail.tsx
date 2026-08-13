@@ -111,6 +111,7 @@ export function ArticleMasterDetail({
         <ArticleConversationView
           ticketId={ticketId}
           articles={state.chronological}
+          allArticles={state.articles}
           canNote={canNote}
           canDelete={canDelete}
           locale={locale}

@@ -17,7 +17,7 @@ import { ReplyDialog } from "./ReplyDialog";
  */
 
 /** Shared open/continue/discard plumbing for both renderings. */
-function useDraftActions(draft: ReplyDraft) {
+function useDraftActions(draft: ReplyDraft, channelName?: string) {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const { confirm, dialog: confirmDialog } = useConfirm();
@@ -43,6 +43,7 @@ function useDraftActions(draft: ReplyDraft) {
         replyAll={draft.replyAll}
         open={open}
         onClose={() => setOpen(false)}
+        channelName={channelName}
       />
     </>
   );
@@ -55,9 +56,20 @@ function useDraftActions(draft: ReplyDraft) {
  * real articles regardless of sort direction — an unsent draft is always the
  * most current thing on the ticket.
  */
-export function DraftListRow({ draft, locale }: { draft: ReplyDraft; locale: string }) {
+export function DraftListRow({
+  draft,
+  locale,
+  channelName,
+}: {
+  draft: ReplyDraft;
+  locale: string;
+  /** Channel name of the article the draft replies to (see
+   * `channelNameOf`/`dominantChannel` in `@/lib/articleChannel`) — routes
+   * the reply dialog opened from this row. */
+  channelName?: string;
+}) {
   const { t } = useTranslation();
-  const actions = useDraftActions(draft);
+  const actions = useDraftActions(draft, channelName);
   const preview = draftPreview(draft.body, 80);
 
   return (
@@ -96,9 +108,20 @@ export function DraftListRow({ draft, locale }: { draft: ReplyDraft; locale: str
  * Conversation view: a bubble on the agent side, at the end of the thread —
  * where the reply will land once it is sent.
  */
-export function DraftBubble({ draft, locale }: { draft: ReplyDraft; locale: string }) {
+export function DraftBubble({
+  draft,
+  locale,
+  channelName,
+}: {
+  draft: ReplyDraft;
+  locale: string;
+  /** Channel name of the article the draft replies to (see
+   * `channelNameOf`/`dominantChannel` in `@/lib/articleChannel`) — routes
+   * the reply dialog opened from this bubble. */
+  channelName?: string;
+}) {
   const { t } = useTranslation();
-  const actions = useDraftActions(draft);
+  const actions = useDraftActions(draft, channelName);
   const preview = draftPreview(draft.body, 400);
 
   return (
