@@ -118,7 +118,9 @@ async def register_webhook(
 
     gateway = TelegramGateway(bot_token=bot_token)
     try:
-        await gateway.set_webhook(url, secret_token=secret, allowed_updates=["message"])
+        await gateway.set_webhook(
+            url, secret_token=secret, allowed_updates=["message", "callback_query"]
+        )
     except TelegramApiError as exc:
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)) from exc
     return TelegramWebhookRegisterResponse(ok=True, url=url)
