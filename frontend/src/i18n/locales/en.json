@@ -472,6 +472,8 @@
       "draftsLabel": "Drafts",
       "createDraftButton": "Create draft",
       "createDraftHint": "This can take up to a minute…",
+      "draftRunning": "The AI is working on a draft — this can take several minutes…",
+      "draftSkipped": "The AI did not produce a reply suggestion.",
       "draftsEmpty": "No AI drafts yet.",
       "draftKind": {
         "reply": "Reply",

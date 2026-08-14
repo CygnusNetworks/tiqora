@@ -472,6 +472,8 @@
       "draftsLabel": "Entwürfe",
       "createDraftButton": "Entwurf erstellen",
       "createDraftHint": "Dies kann bis zu einer Minute dauern…",
+      "draftRunning": "Die KI arbeitet an einem Entwurf – das kann einige Minuten dauern …",
+      "draftSkipped": "Die KI hat keinen Antwortvorschlag erstellt.",
       "draftsEmpty": "Noch keine KI-Entwürfe.",
       "draftKind": {
         "reply": "Antwort",

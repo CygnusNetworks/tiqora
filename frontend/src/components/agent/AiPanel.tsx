@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { api, ApiError } from "@/lib/api";
@@ -38,6 +38,42 @@ import { SummaryText } from "./SummaryText";
 const MAX_COVERAGE_DOTS = 12;
 
 const SUMMARY_DETAILS: SummaryDetail[] = ["standard", "detailed"];
+
+/** Manual Assist draft POST returns immediately (nginx-90s-timeout fix) and
+ * this panel polls `GET /tickets/{id}/ai` for the background run's outcome
+ * at this interval while `manual_run_status === "running"`. */
+const MANUAL_RUN_POLL_INTERVAL_MS = 2500;
+
+/** Error codes both `_map_run_error`'s ApiError detail prefix (synchronous
+ * failures, e.g. the lock check) and `manual_run_error_code` (background-run
+ * outcome polled via GET) can carry — see backend `_run_error_code`. */
+const MANUAL_RUN_MAPPED_ERROR_CODES = new Set([
+  "llm_empty_output",
+  "llm_timeout",
+  "llm_provider_error",
+  "ai_run_locked",
+]);
+
+type TFn = ReturnType<typeof useTranslation>["t"];
+
+/** Single source of truth for the error-code → i18n text mapping, used both
+ * for a synchronous request failure (ApiError detail prefix) and for a
+ * background run's `manual_run_error_code` polled via GET — see
+ * `mapRunError` and the `manual_run_status === "error"` branch below. */
+function runErrorCodeText(t: TFn, code: string | undefined): string {
+  switch (code) {
+    case "llm_empty_output":
+      return t("ticket.ai.errorLlmEmptyOutput");
+    case "llm_timeout":
+      return t("ticket.ai.errorLlmTimeout");
+    case "llm_provider_error":
+      return t("ticket.ai.errorLlmProviderError");
+    case "ai_run_locked":
+      return t("ticket.ai.errorLocked");
+    default:
+      return t("ticket.ai.errorGeneric");
+  }
+}
 
 /** Extracts the stable error code from an ApiError's FastAPI `detail`
  * string, when it follows the `"<code>: <message>"` convention used by
@@ -123,11 +159,41 @@ export function AiPanel({
   const [openTraceId, setOpenTraceId] = useState<number | null>(null);
   const [replyDraft, setReplyDraft] = useState<AiDraftOut | null>(null);
   const [summaryDetail, setSummaryDetail] = useState<SummaryDetail>("standard");
+  // Manual Assist background-run tracking (nginx-90s-timeout fix): the
+  // draft POST returns "started" immediately, so the actual outcome is
+  // polled via GET below. `myRunStartedAt` remembers the `manual_run_started_at`
+  // this panel instance's OWN run reported, once seen — the skipped/error
+  // result box only ever renders for a run that matches it, so reopening a
+  // ticket with an old failed run sitting in the DB never surprises the
+  // agent with a stale error (see the render guards below).
+  const [myRunStartedAt, setMyRunStartedAt] = useState<string | null>(null);
+  const [awaitingRunMarker, setAwaitingRunMarker] = useState(false);
 
   const stateQ = useQuery({
     queryKey: ["tickets", ticketId, "ai"],
     queryFn: ({ signal }) => ticketAiApi.getState(ticketId, signal),
+    refetchInterval: (query) =>
+      query.state.data?.manual_run_status === "running"
+        ? MANUAL_RUN_POLL_INTERVAL_MS
+        : false,
   });
+
+  // Once the poll first observes "running" after a POST this panel just
+  // triggered, capture its started_at as our own run's marker.
+  useEffect(() => {
+    if (
+      awaitingRunMarker &&
+      stateQ.data?.manual_run_status === "running" &&
+      stateQ.data.manual_run_started_at
+    ) {
+      setMyRunStartedAt(stateQ.data.manual_run_started_at);
+      setAwaitingRunMarker(false);
+    }
+  }, [
+    awaitingRunMarker,
+    stateQ.data?.manual_run_status,
+    stateQ.data?.manual_run_started_at,
+  ]);
 
   // Shares the query key with TicketHeaderActions/ArticleMasterDetail, so in
   // the zoom page this is a cache hit, not a second request. Used for the
@@ -145,6 +211,9 @@ export function AiPanel({
       void queryClient.invalidateQueries({
         queryKey: ["tickets", ticketId, "ai"],
       });
+    },
+    onError: () => {
+      setAwaitingRunMarker(false);
     },
   });
 
@@ -191,6 +260,24 @@ export function AiPanel({
   const state = stateQ.data;
   if (!state.manual_assist_available && !state.summary_available) return null;
 
+  // Only this panel instance's OWN triggered run ever renders a
+  // running/skipped/error result — see the `myRunStartedAt` doc comment
+  // above. A run in progress before this comparison even resolves (the
+  // brief window between the POST resolving and the first poll observing
+  // "running") is covered by `awaitingRunMarker` in the disabled/spinner
+  // checks below.
+  const isMyRun =
+    myRunStartedAt != null && state.manual_run_started_at === myRunStartedAt;
+  const manualRunActive = isMyRun && state.manual_run_status === "running";
+  const manualRunSkipped =
+    isMyRun &&
+    (state.manual_run_status === "skipped" ||
+      state.manual_run_status === "escalated" ||
+      state.manual_run_status === "superseded");
+  const manualRunErrored = isMyRun && state.manual_run_status === "error";
+  const manualRunBusy =
+    draftMutation.isPending || awaitingRunMarker || manualRunActive;
+
   const openDrafts = state.drafts.filter((d) => d.status === "open");
   // Admins additionally see non-open drafts (accepted/discarded/superseded)
   // so they can hard-delete them — the reason the delete option was
@@ -205,15 +292,9 @@ export function AiPanel({
       // matched before the generic status-code fallbacks below so a known
       // code always wins even if the status code is shared with other
       // (unrelated) 409s.
-      switch (errorDetailCode(error)) {
-        case "llm_empty_output":
-          return t("ticket.ai.errorLlmEmptyOutput");
-        case "llm_timeout":
-          return t("ticket.ai.errorLlmTimeout");
-        case "llm_provider_error":
-          return t("ticket.ai.errorLlmProviderError");
-        case "ai_run_locked":
-          return t("ticket.ai.errorLocked");
+      const code = errorDetailCode(error);
+      if (code && MANUAL_RUN_MAPPED_ERROR_CODES.has(code)) {
+        return runErrorCodeText(t, code);
       }
       if (error.status === 423) return t("ticket.ai.errorLocked");
       if (error.status === 403) return t("ticket.ai.errorForbidden");
@@ -432,10 +513,14 @@ export function AiPanel({
                 size="sm"
                 variant="primary"
                 data-testid="ai-panel-create-draft-button"
-                disabled={!canNote || draftMutation.isPending}
-                onClick={() => draftMutation.mutate()}
+                disabled={!canNote || manualRunBusy}
+                onClick={() => {
+                  setMyRunStartedAt(null);
+                  setAwaitingRunMarker(true);
+                  draftMutation.mutate();
+                }}
               >
-                {draftMutation.isPending ? (
+                {manualRunBusy ? (
                   <Spinner className="h-3.5 w-3.5" />
                 ) : (
                   t("ticket.ai.createDraftButton")
@@ -443,9 +528,11 @@ export function AiPanel({
               </Button>
             </span>
           </div>
-          {draftMutation.isPending && (
-            <p className="text-xs text-muted">
-              {t("ticket.ai.createDraftHint")}
+          {manualRunBusy && (
+            <p className="text-xs text-muted" data-testid="ai-panel-draft-running">
+              {manualRunActive
+                ? t("ticket.ai.draftRunning")
+                : t("ticket.ai.createDraftHint")}
             </p>
           )}
           {draftMutation.isError && (
@@ -454,6 +541,30 @@ export function AiPanel({
               data-testid="ai-panel-draft-error"
             >
               {mapRunError(draftMutation.error)}
+            </p>
+          )}
+          {manualRunSkipped && (
+            <div
+              className="rounded-md border border-hairline bg-surface-subtle p-2 text-xs text-muted"
+              data-testid="ai-panel-draft-skipped"
+            >
+              <p>{t("ticket.ai.draftSkipped")}</p>
+              {state.manual_run_notes && (
+                <p
+                  className="mt-1 text-[11px] text-muted/80"
+                  data-testid="ai-panel-draft-skipped-notes"
+                >
+                  {state.manual_run_notes}
+                </p>
+              )}
+            </div>
+          )}
+          {manualRunErrored && (
+            <p
+              className="text-xs text-danger"
+              data-testid="ai-panel-draft-run-error"
+            >
+              {runErrorCodeText(t, state.manual_run_error_code ?? undefined)}
             </p>
           )}
 
