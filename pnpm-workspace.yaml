@@ -33,7 +33,7 @@ allowBuilds:
 # for a normal update to pick them up. Prefer minimal patch bumps that clear
 # GHSA findings without jumping majors.
 overrides:
-  "nanoid@^3.0.0": "3.3.17"
+  "nanoid@^3.0.0": "3.3.18"
   "js-yaml@^4.0.0": "4.3.1"
   "brace-expansion@^1.0.0": "1.1.18"
   "brace-expansion@^2.0.0": "2.1.4"

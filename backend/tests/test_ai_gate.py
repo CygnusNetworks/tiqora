@@ -134,9 +134,7 @@ async def test_telegram_source_channel_bypasses_parallel_gate(mariadb_znuny_url:
         async with factory() as session:
             assert await is_tiqora_primary(session) is False
             # Case-insensitive: the outbox payload channel value.
-            await require_feature_allowed(
-                session, FEATURE_AUTO_REPLY, source_channel="Telegram"
-            )
+            await require_feature_allowed(session, FEATURE_AUTO_REPLY, source_channel="Telegram")
     finally:
         await engine.dispose()
 
