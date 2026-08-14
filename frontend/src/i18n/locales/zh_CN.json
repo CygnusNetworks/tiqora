@@ -443,7 +443,10 @@
         "accepted": "已接受",
         "discarded": "已丢弃",
         "superseded": "已被替代"
-      }
+      },
+      "originBadge": "AI",
+      "originBadgeTooltip": "Auto-sent by the AI agent — click to see the tool trace",
+      "originTraceEmpty": "No tool calls were recorded for this reply."
     },
     "toolbar": {
       "print": "打印",

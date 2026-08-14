@@ -19,6 +19,7 @@ import { cn } from "@/lib/cn";
 import { Avatar } from "@/components/ui/Avatar";
 import { ArticleBodyRenderer } from "./ArticleBodyRenderer";
 import { useTicketReplyDrafts } from "@/lib/replyDrafts";
+import { AiOriginBadge } from "./AiOriginBadge";
 import { ArticleQuickActions } from "./ArticleQuickActions";
 import { DraftBubble } from "./DraftPlaceholder";
 import { SummaryMarker } from "./SummaryMarker";
@@ -191,6 +192,9 @@ function Bubble({
             <div className="flex flex-wrap items-center gap-1.5 text-[11px] text-muted">
               <span className={cn("font-semibold", nameTone)}>{senderName}</span>
               <span aria-hidden>{channelIcon(channelNameOf(article))}</span>
+              {article.ai_origin && (
+                <AiOriginBadge ticketId={ticketId} articleId={article.id} compact />
+              )}
               <span className="font-mono tabular-nums">{formatDateTime(article.create_time, locale)}</span>
               <span
                 className={cn(
