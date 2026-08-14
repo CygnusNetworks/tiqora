@@ -1312,7 +1312,8 @@
       "systemAddresses": "Sistēmas adreses",
       "notificationEvents": "Paziņojumu notikumi",
       "ticketAttributeRelations": "Atribūtu saites",
-      "telegram": "Telegram"
+      "telegram": "Telegram",
+      "queueCustomerLinks": "External customer links"
     },
     "table": {
       "id": "ID",
@@ -2343,7 +2344,8 @@
       "systemAddresses": "From e-pasta adreses rindām un autoatbildēm.",
       "notificationEvents": "Konfigurējiet notikumu balstītus aģentu paziņojumus.",
       "ticketAttributeRelations": "Ar Znuny saderenīgas atkarību matrices (pakalpojums/rinda u.c.) CSV formātā.",
-      "telegram": "Connect a Telegram bot as a ticket channel."
+      "telegram": "Connect a Telegram bot as a ticket channel.",
+      "queueCustomerLinks": "Configure the external customer-tool button shown in the ticket header, per queue."
     },
     "mailAccounts": {
       "title_plural": "Pasta konti",
@@ -2466,6 +2468,23 @@
       "saved": "Settings saved.",
       "saveError": "Saving failed.",
       "loadError": "Failed to load settings."
+    },
+    "customerLinks": {
+      "title_plural": "External customer links",
+      "intro": "Configure a second, per-queue button in the ticket header that links to an external customer-management tool.",
+      "new": "New link",
+      "queue": "Queue",
+      "label": "Button label",
+      "defaultLabel": "Customer data",
+      "labelHelp": "Shown on the button. Leave empty to use the default label \"Customer data\".",
+      "urlTemplate": "URL template",
+      "adminUrlTemplate": "Admin URL template (optional)",
+      "adminUrlTemplateHelp": "Shown to admins instead of the URL template above, e.g. for a Kerberos-authenticated host. Non-admins never see this.",
+      "templateHelp": "Placeholders: {customer_user}, {customer_id}, {ticket_number}, {customer_email}, {customer_name} — values are URL-encoded.",
+      "visibility": "Visibility",
+      "visibilityAll": "Everyone",
+      "visibilityAdmins": "Admins only",
+      "empty": "No external customer links configured yet."
     }
   },
   "kb": {
@@ -2740,7 +2759,8 @@
     "openCount": "{{count}} atvērti",
     "closedCount": "{{count}} aizvērti",
     "allTickets": "Visi pieteikumi →",
-    "recentTickets": "Jaunākie pieteikumi"
+    "recentTickets": "Jaunākie pieteikumi",
+    "externalDefault": "Customer data"
   },
   "timeAccounting": {
     "title": "Laika uzskaite",

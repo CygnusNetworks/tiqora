@@ -305,6 +305,44 @@ queue/state/priority additionally invalidate every currently-affected
 ticket (no per-config-row cache-invalidation entity exists, so admin
 writes enumerate affected `ticket.id`s directly).
 
+#### External customer links (per queue)
+
+`tiqora_queue_customer_link` (`db/tiqora/models.py`, admin CRUD at
+`api/v1/admin/customer_links.py`, `/api/v1/admin/queue-customer-links`) lets
+an admin configure a second, per-queue button in the ticket-zoom header next
+to the existing internal "Kunde"/"Customer" link, pointing at an external
+customer-management tool (e.g. a NetAdmin diagnosis page). At most one row
+per `queue_id`; queues without a row show no external button.
+
+Each row has:
+
+- `url_template` (required) and `admin_url_template` (optional) — see
+  placeholders below.
+- `label` (optional) — button text; empty falls back to the localized
+  default "Customer data" / "Kundendaten".
+- `visibility` — `"all"` (everyone) or `"admins"` (hidden from non-admins
+  entirely, no fallback to the normal template).
+
+`GET /api/v1/tickets/{ticket_id}/customer-link` (`tiqora.domain.
+customer_link.resolve_customer_link`, agent-auth, same permission gate as
+other ticket-scoped routes) resolves the link **server-side** for the
+current agent and ticket:
+
+1. Look up the row for the ticket's queue; no row → `{"label": null, "url":
+   null}` (never 404 — the frontend just renders no button).
+2. `visibility == "admins"` and the agent is not admin (`PermissionEngine
+   .is_admin`) → same null response.
+3. Admin **and** `admin_url_template` is set → use it; otherwise use
+   `url_template`.
+4. Substitute placeholders, URL-encoding every value:
+   - `{customer_user}` — `ticket.customer_user_id` with any Znuny `#N`
+     disambiguator suffix stripped (`z50test#3` → `z50test`).
+   - `{customer_id}` — `ticket.customer_id`.
+   - `{ticket_number}` — `ticket.tn`.
+   - `{customer_email}` / `{customer_name}` — looked up from
+     `customer_user` by the stripped login (`email`, `first_name` +
+     `last_name`); empty string when there is no match.
+
 ### Stats / reporting
 
 `tiqora/stats/` — a modern equivalent of Znuny's `Kernel::System::Stats`
