@@ -49,6 +49,17 @@ CHANNEL_CONFIG_KEYS: Final[dict[str, set[str]]] = {
         "default_customer_user",
         "queue_name",
     },
+    "telegram": {
+        "bot_token",
+        "queue_name",
+        "default_customer_user",
+        "mode",
+        "webhook_url",
+        "webhook_secret_token",
+        "consent_required",
+        "consent_text",
+        "consent_confirmed_text",
+    },
 }
 
 _SECRET_KEY_MARKERS: Final[tuple[str, ...]] = ("secret", "token")

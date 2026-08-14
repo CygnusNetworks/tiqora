@@ -56,6 +56,7 @@ class ArticleSnapshot:
     from_address: str | None
     is_ai_origin: bool
     attachments: tuple[AttachmentSnapshot, ...] = ()
+    channel: str = "Internal"
 
 
 class TicketNotFoundError(Exception):
@@ -122,11 +123,13 @@ async def load_articles(session: AsyncSession, ticket_id: int) -> list[ArticleSn
                 text(
                     "SELECT a.id, st.name AS sender_type, a.is_visible_for_customer,"
                     " m.a_subject, m.a_body, m.a_from,"
-                    " (o.article_id IS NOT NULL) AS is_ai_origin"
+                    " (o.article_id IS NOT NULL) AS is_ai_origin,"
+                    " cc.name AS channel"
                     " FROM article a"
                     " JOIN article_sender_type st ON st.id = a.article_sender_type_id"
                     " LEFT JOIN article_data_mime m ON m.article_id = a.id"
                     " LEFT JOIN tiqora_ai_article_origin o ON o.article_id = a.id"
+                    " LEFT JOIN communication_channel cc ON cc.id = a.communication_channel_id"
                     " WHERE a.ticket_id = :tid ORDER BY a.id"
                 ),
                 {"tid": ticket_id},
@@ -148,6 +151,7 @@ async def load_articles(session: AsyncSession, ticket_id: int) -> list[ArticleSn
             from_address=r["a_from"],
             is_ai_origin=bool(r["is_ai_origin"]),
             attachments=tuple(attachments_by_article.get(int(r["id"]), [])),
+            channel=r["channel"] or "Internal",
         )
         for r in rows
     ]

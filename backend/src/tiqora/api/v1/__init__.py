@@ -9,6 +9,7 @@ from tiqora.api.v1 import (
     calendar,
     channels_phone,
     channels_sms,
+    channels_telegram,
     channels_whatsapp,
     customers,
     events,
@@ -41,6 +42,7 @@ api_v1_router.include_router(search.router)
 api_v1_router.include_router(kb.router)
 api_v1_router.include_router(channels_sms.router)
 api_v1_router.include_router(channels_whatsapp.router)
+api_v1_router.include_router(channels_telegram.router)
 api_v1_router.include_router(channels_phone.router)
 api_v1_router.include_router(stats.router)
 api_v1_router.include_router(admin_router)

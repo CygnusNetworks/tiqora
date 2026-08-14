@@ -565,6 +565,97 @@ describe("ReplyDialog reset after send / persistence without send", () => {
   });
 });
 
+describe("ReplyDialog Telegram routing", () => {
+  beforeEach(() => {
+    getReplyDraft.mockReset();
+    listTemplates.mockReset().mockResolvedValue([]);
+    createArticle.mockReset().mockResolvedValue({ id: 99 });
+  });
+
+  it("hides recipient fields and shows the Telegram hint when replying on a Telegram article", async () => {
+    getReplyDraft.mockResolvedValue({ ...baseDraft, to_address: null });
+
+    wrap(
+      <ReplyDialog
+        ticketId={1}
+        articleId={2}
+        replyAll={false}
+        open
+        onClose={vi.fn()}
+        channelName="Telegram"
+      />,
+    );
+
+    await waitFor(() => expect(screen.getByTestId("reply-dialog")).toBeTruthy());
+
+    expect(screen.getByTestId("reply-telegram-hint").textContent).toBe(
+      i18n.t("ticket.replyViaTelegram"),
+    );
+    expect(screen.queryByTestId("reply-to")).toBeNull();
+    expect(screen.queryByTestId("reply-toggle-cc")).toBeNull();
+    expect(screen.queryByTestId("reply-toggle-bcc")).toBeNull();
+    expect(screen.queryByTestId("reply-toggle-replyto")).toBeNull();
+  });
+
+  it("posts channel \"telegram\" with no address fields on send", async () => {
+    getReplyDraft.mockResolvedValue({ ...baseDraft, to_address: null });
+
+    wrap(
+      <ReplyDialog
+        ticketId={1}
+        articleId={2}
+        replyAll={false}
+        open
+        onClose={vi.fn()}
+        channelName="Telegram"
+      />,
+    );
+
+    await waitFor(() => expect(screen.getByTestId("reply-dialog")).toBeTruthy());
+    fireEvent.change(screen.getByTestId("reply-body"), { target: { value: "Antwort" } });
+    fireEvent.click(screen.getByTestId("reply-send"));
+
+    await waitFor(() => expect(createArticle).toHaveBeenCalled());
+    const payload = createArticle.mock.calls[0][1] as {
+      channel: string;
+      to_address: string | null;
+      cc: string | null;
+      bcc: string | null;
+      reply_to: string | null;
+    };
+    expect(payload.channel).toBe("telegram");
+    expect(payload.to_address).toBeNull();
+    expect(payload.cc).toBeNull();
+    expect(payload.bcc).toBeNull();
+    expect(payload.reply_to).toBeNull();
+  });
+
+  it("keeps exactly today's email behavior when replying on a non-Telegram article", async () => {
+    getReplyDraft.mockResolvedValue({ ...baseDraft, to_address: "to@x.com" });
+
+    wrap(
+      <ReplyDialog
+        ticketId={1}
+        articleId={2}
+        replyAll={false}
+        open
+        onClose={vi.fn()}
+        channelName="Email"
+      />,
+    );
+
+    await waitFor(() => expect(screen.getByTestId("reply-dialog")).toBeTruthy());
+    expect(screen.queryByTestId("reply-telegram-hint")).toBeNull();
+    expect(screen.getByTestId("reply-to")).toBeTruthy();
+
+    fireEvent.click(screen.getByTestId("reply-send"));
+
+    await waitFor(() => expect(createArticle).toHaveBeenCalled());
+    const payload = createArticle.mock.calls[0][1] as { channel: string };
+    expect(payload.channel).toBe("email");
+  });
+});
+
 describe("ReplyDialog composer extras (mentions + time)", () => {
   beforeEach(() => {
     getReplyDraft.mockReset().mockResolvedValue(baseDraft);

@@ -151,7 +151,8 @@
     "passkeyAddError": "Salasanaa ei voitu lisätä.",
     "passkeyDeleteError": "Salasanaa ei voitu poistaa.",
     "passkeyDeleteLastError": "Viimeistä 2FA-tekijää ei voi poistaa, kun 2FA on pakotettu.",
-    "passkeyUnsupported": "Tämä selain ei tue salasanoja (WebAuthn)."
+    "passkeyUnsupported": "Tämä selain ei tue salasanoja (WebAuthn).",
+    "passkeyReauthRequired": "For your security, please sign in again before changing your passkeys."
   },
   "dashboard": {
     "greeting": {
@@ -545,7 +546,8 @@
     "extrasRetry": "Yritä uudelleen",
     "customerUnresolved": "Tähän osoitteeseen ei löydy asiakastietuetta, joten tiedot eivät ole saatavilla.",
     "lockedByBanner": "Lukinnut {{name}}",
-    "takeOver": "Ota haltuun"
+    "takeOver": "Ota haltuun",
+    "replyViaTelegram": "Reply will be sent via Telegram"
   },
   "search": {
     "title": "Etsi",
@@ -964,7 +966,15 @@
           "detailed": "Yksityiskohtainen"
         },
         "kbCategories": "KB-luokat",
-        "kbCategoriesEmpty": "Luokkia ei ole saatavilla."
+        "kbCategoriesEmpty": "Luokkia ei ole saatavilla.",
+        "llmFallback": "Fallback providers",
+        "fallbackAdd": "Add fallback",
+        "fallbackEmpty": "No fallback providers — the primary provider above is used exclusively.",
+        "fallbackMoveUp": "Move up",
+        "fallbackMoveDown": "Move down",
+        "fallbackRemove": "Remove",
+        "clarifySchemaJson": "Clarify schema fields (JSON)",
+        "clarifySchemaJsonPlaceholder": "{\"fields\": [{\"column\": \"wpnum\", \"label\": \"WP-Nummer\"}]}"
       },
       "usage": {
         "title": "Käyttö",
@@ -1136,7 +1146,8 @@
         "replyLanguageDefault": "BCP-47-kielikoodia käytetään \"Auto\"-tilassa, kun tekstiä ei voida varmasti sovittaa tunnettuun kieliprofiiliin.",
         "allowedStateTypes": "Pilkuilla eroteltu luettelo sallituista Znuny-tilatyypeistä (esim. \"avoin\" tai \"avoin, odottava muistutus\"), AI voi asettaa lipun update_ticket_fields -kenttien kautta - pakotetaan sekä tilan nimelle että numeeriselle tilatunnukselle. Tyhjä = oletuksena vain \"avoin\" (uudelleenavautuminen sallittu, ei koskaan sulkemista); selkeä tyhjä luettelo \"[]\" poistaa tilan muutokset kokonaan käytöstä.",
         "piiNer": "Havaitsee henkilöiden nimet tekstistä spaCy NER:n (saksa + englanti) kautta ja maskaa ne [NAME_n], ennen kuin sisältö saavuttaa LLM-palveluntarjoajan – asiakkaan nimen ja lähettäjien lisäksi. Aktiivinen vain, kun henkilötietojen peittäminen on käytössä. Väärät positiiviset ovat vaarattomia (vain enemmän peittämistä).",
-        "summaryDetail": "Vakio: tiiviit kappaleet, 1–2 lausetta per liiteasiakirja. Yksityiskohtaiset: perusteellisemmat kappaleet ja 3–5 lausetta asiakirjaa kohden – hyödyllinen jonoissa, joissa on monia PDF-liitteitä."
+        "summaryDetail": "Vakio: tiiviit kappaleet, 1–2 lausetta per liiteasiakirja. Yksityiskohtaiset: perusteellisemmat kappaleet ja 3–5 lausetta asiakirjaa kohden – hyödyllinen jonoissa, joissa on monia PDF-liitteitä.",
+        "llmFallback": "Providers tried in order, after the primary provider above, when a request fails (rate limit, timeout, error). Each entry has its own optional model override. Priority 1 is always the primary provider/model; entries here are priority 2, 3, …."
       },
       "common": {
         "validId": "Kelvollinen/virheellinen on pehmeän poiston lippu: merkinnän merkitseminen virheelliseksi piilottaa sen uusien tietueiden poimijilta poistamatta olemassa olevia viitteitä (esim. liput, tehtävät). Kovaa poistamista ei ole."
@@ -1235,6 +1246,9 @@
       "systemAddresses": {
         "email": "Osoite, jota käytetään From-osoitteena jonoille ja automaattivastauksille.",
         "name": "Näyttönimi sähköpostin vieressä (esim. ”Support <support@example.com>”)."
+      },
+      "telegram": {
+        "mode": "\"Polling\" has Tiqora fetch updates from Telegram itself (no public URL needed). \"Webhook\" has Telegram push updates to the URL below — requires this server to be reachable over HTTPS."
       }
     },
     "nav": {
@@ -1289,7 +1303,8 @@
       "slas": "SLA:t",
       "systemAddresses": "Järjestelmäosoitteet",
       "notificationEvents": "Ilmoitustapahtumat",
-      "ticketAttributeRelations": "Attribuuttisuhteet"
+      "ticketAttributeRelations": "Attribuuttisuhteet",
+      "telegram": "Telegram"
     },
     "table": {
       "id": "ID",
@@ -2319,7 +2334,8 @@
       "slas": "Hallitse palvelutasosopimuksia ja määräaikoja.",
       "systemAddresses": "From-sähköpostiosoitteet jonoille ja automaattivastauksille.",
       "notificationEvents": "Määritä tapahtumapohjaiset agentti-ilmoitukset.",
-      "ticketAttributeRelations": "Znuny-yhteensopivat riippuvuusmatriisit (palvelu/jono jne.) CSV:nä."
+      "ticketAttributeRelations": "Znuny-yhteensopivat riippuvuusmatriisit (palvelu/jono jne.) CSV:nä.",
+      "telegram": "Connect a Telegram bot as a ticket channel."
     },
     "mailAccounts": {
       "title_plural": "Postitilit",
@@ -2411,6 +2427,37 @@
       "new": "Uusi suhde",
       "help": "CSV otsikolla Attribute1;Attribute2 ja arvopareilla (Znuny AdminTicketAttributeRelations). Rajoittaa lomakevalintoja (esim. Palvelu → Jono).",
       "confirmDelete": "Poistetaanko tämä suhde?"
+    },
+    "telegram": {
+      "title": "Telegram",
+      "description": "Connect a Telegram bot as an inbound/outbound ticket channel.",
+      "enabled": "Channel active",
+      "mode": "Mode",
+      "modePolling": "Polling",
+      "modeWebhook": "Webhook",
+      "queue": "Queue",
+      "botToken": "Bot token",
+      "defaultCustomerUser": "Default customer user",
+      "webhookUrl": "Webhook URL",
+      "webhookSecretToken": "Webhook secret token",
+      "webhookRegister": "Register webhook",
+      "webhookRegistering": "Registering…",
+      "webhookUnregister": "Remove webhook",
+      "webhookUnregistering": "Removing…",
+      "webhookRegisterSuccess": "Webhook registered",
+      "webhookRegisterFailure": "Webhook registration failed",
+      "webhookUnregisterSuccess": "Webhook removed",
+      "webhookUnregisterFailure": "Removing the webhook failed",
+      "consentTitle": "GDPR consent",
+      "consentRequired": "Require consent before processing messages",
+      "consentRequiredHelp": "While required, incoming messages from a new Telegram contact are not processed until they confirm consent.",
+      "consentText": "Consent request text",
+      "consentConfirmedText": "Consent confirmation text",
+      "save": "Save",
+      "saving": "Saving…",
+      "saved": "Settings saved.",
+      "saveError": "Saving failed.",
+      "loadError": "Failed to load settings."
     }
   },
   "kb": {

@@ -47,7 +47,7 @@ async def test_list_channels_defaults_disabled_and_no_config(mariadb_znuny_url: 
         async with factory() as session:
             listed = await admin_channels.list_channels(_root_user(), session)
             names = {c.channel for c in listed}
-            assert names == {"sms", "whatsapp", "phone"}
+            assert names == {"sms", "whatsapp", "phone", "telegram"}
             assert all(c.enabled is False for c in listed)
     finally:
         await engine.dispose()
@@ -95,6 +95,41 @@ async def test_update_channel_enable_and_set_config(mariadb_znuny_url: str) -> N
             fetched = await admin_channels.get_channel("sms", _root_user(), session)
             assert fetched.enabled is True
             assert fetched.config["inbound_shared_secret"] == "********"
+    finally:
+        await engine.dispose()
+
+
+async def test_update_channel_telegram_bot_token_masked(mariadb_znuny_url: str) -> None:
+    _ensure_tiqora_tables(mariadb_znuny_url)
+    engine = create_async_engine(_mysql_async(mariadb_znuny_url))
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    try:
+        async with factory() as session:
+            updated = await admin_channels.update_channel(
+                "telegram",
+                admin_channels.ChannelConfigUpdate(
+                    enabled=True,
+                    config={
+                        "bot_token": "123456:ABC-DEF",
+                        "queue_name": "Raw",
+                        "default_customer_user": "portal-default",
+                    },
+                ),
+                _root_user(),
+                session,
+                _settings(),
+            )
+            assert updated.enabled is True
+            assert updated.config["bot_token"] == "********"
+            assert updated.config["queue_name"] == "Raw"
+
+            from tiqora.channels.common import setting_key
+            from tiqora.domain.settings_store import get_setting
+
+            stored = await get_setting(session, setting_key("telegram", "bot_token"))
+            assert stored is not None
+            assert stored != "123456:ABC-DEF"
+            assert stored.startswith("gAAAA")
     finally:
         await engine.dispose()
 

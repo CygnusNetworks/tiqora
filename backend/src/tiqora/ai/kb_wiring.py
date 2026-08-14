@@ -9,6 +9,7 @@ bundle/search/get-article seams the same way.
 
 from __future__ import annotations
 
+import json
 from collections.abc import Awaitable, Callable
 from dataclasses import replace
 from typing import Any
@@ -20,7 +21,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from tiqora.ai.audit import AuditContext, AuditingLlmClient
 from tiqora.ai.listfields import parse_int_list, parse_str_list
 from tiqora.ai.llm import LlmClient, OpenAiCompatLlmClient
-from tiqora.ai.models import TiqoraAiQueuePolicy
+from tiqora.ai.llm_fallback import FallbackEntry, FallbackLlmClient
+from tiqora.ai.models import TiqoraAiQueuePolicy, TiqoraLlmProvider
 from tiqora.ai.providers import get_provider
 from tiqora.config import Settings
 from tiqora.crypto.secret import decrypt_secret
@@ -31,38 +33,106 @@ _KB_ARTICLE_BUNDLE_LIMIT = 20
 _KB_ARTICLE_BODY_CHARS = 2000
 
 
+def _client_factory(
+    provider: TiqoraLlmProvider, *, api_key: str | None, model: str, settings: Settings
+) -> Callable[[], LlmClient]:
+    def _factory() -> LlmClient:
+        return OpenAiCompatLlmClient(
+            base_url=provider.base_url,
+            api_key=api_key,
+            model=model,
+            timeout_seconds=settings.llm_timeout_seconds,
+        )
+
+    return _factory
+
+
+def _parse_fallback_entries(fallback_json: str | None) -> list[dict[str, Any]]:
+    """Best-effort parse of ``llm_fallback_json`` — malformed content is
+    logged and treated as "no fallback entries" rather than breaking the
+    run; :func:`tiqora.ai.policies._validate_llm_fallback_json` is what
+    actually rejects bad input at write time."""
+    if not fallback_json:
+        return []
+    try:
+        parsed = json.loads(fallback_json)
+    except (json.JSONDecodeError, TypeError):
+        logger.warning("ai_llm_fallback_json_invalid")
+        return []
+    if not isinstance(parsed, list):
+        logger.warning("ai_llm_fallback_json_invalid")
+        return []
+    return [item for item in parsed if isinstance(item, dict)]
+
+
+async def _resolve_entry(
+    session: AsyncSession, settings: Settings, *, provider_id: int, model: str | None
+) -> FallbackEntry | None:
+    provider = await get_provider(session, provider_id)
+    if provider is None:
+        return None
+    api_key = (
+        decrypt_secret(settings.secret_key, provider.api_key_enc) if provider.api_key_enc else None
+    )
+    effective_model = model or provider.default_model
+    return FallbackEntry(
+        provider_id=provider.id,
+        model=effective_model,
+        factory=_client_factory(
+            provider, api_key=api_key, model=effective_model, settings=settings
+        ),
+    )
+
+
 async def build_llm_client(
     session: AsyncSession,
     settings: Settings,
     provider_id: int | None,
     model_override: str | None,
+    fallback_json: str | None = None,
 ) -> LlmClient:
-    """Build the configured :class:`LlmClient` for a queue policy.
+    """Build the configured :class:`LlmClient` for a queue policy, including
+    the priority-ordered fallback list (``fallback_json`` — see
+    :mod:`tiqora.ai.llm_fallback`).
 
     Raises :class:`fastapi.HTTPException` (409) when the policy has no
-    provider configured or the provider row is gone — safe to call from an
-    HTTP route. The worker (no HTTP context) catches this and treats it as
-    a skip/error like any other :class:`Exception`.
+    provider configured or the primary provider row is gone — safe to call
+    from an HTTP route. The worker (no HTTP context) catches this and treats
+    it as a skip/error like any other :class:`Exception`. Fallback entries
+    whose provider no longer exists are skipped (logged), not fatal.
     """
     if provider_id is None:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="Queue AI policy has no llm_provider_id configured",
         )
-    provider = await get_provider(session, provider_id)
-    if provider is None:
+    primary = await _resolve_entry(session, settings, provider_id=provider_id, model=model_override)
+    if primary is None:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT, detail="Configured LLM provider no longer exists"
         )
-    api_key = (
-        decrypt_secret(settings.secret_key, provider.api_key_enc) if provider.api_key_enc else None
-    )
-    return OpenAiCompatLlmClient(
-        base_url=provider.base_url,
-        api_key=api_key,
-        model=model_override or provider.default_model,
-        timeout_seconds=settings.llm_timeout_seconds,
-    )
+
+    entries = [primary]
+    for item in _parse_fallback_entries(fallback_json):
+        raw_provider_id = item.get("provider_id")
+        if not isinstance(raw_provider_id, int):
+            logger.warning("ai_llm_fallback_entry_invalid", entry=item)
+            continue
+        model = item.get("model")
+        entry = await _resolve_entry(
+            session,
+            settings,
+            provider_id=raw_provider_id,
+            model=model if isinstance(model, str) else None,
+        )
+        if entry is None:
+            logger.warning("ai_llm_fallback_provider_missing", provider_id=raw_provider_id)
+            continue
+        entries.append(entry)
+
+    if len(entries) == 1:
+        return entries[0].factory()
+    return FallbackLlmClient(entries)
 
 
 async def build_vision_llm_factory(

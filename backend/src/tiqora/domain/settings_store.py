@@ -104,6 +104,18 @@ KEY_AI_AUTO_REPLY_PAUSED = "ai.auto_reply.paused"
 # tiqora.domain.portal_gate for the single resolution point. Default ON.
 KEY_PORTAL_ENABLED = "portal.enabled"
 
+# Telegram poller daemon (Phase T3) — takes over Telegram Bot API long-polling
+# (getUpdates) when ``channel.telegram.mode`` is ``"polling"`` (the default).
+# Default OFF, like every other daemon.* takeover switch.
+KEY_TELEGRAM_POLLER_ENABLED = "daemon.telegram_poller.enabled"
+KEY_TELEGRAM_POLLER_INTERVAL_SECONDS = "daemon.telegram_poller.interval_seconds"
+
+# Telegram inbound update_id cursor (Phase T3). Shared by both transports: the
+# poller advances it after each successfully processed getUpdates batch, the
+# webhook route advances it (dedup guard) after each delivered update. Not a
+# watermark in the outbox-cursor sense — Telegram's own update_id sequence.
+KEY_TELEGRAM_UPDATE_OFFSET = "channel.telegram.update_offset"
+
 
 async def get_setting_bool(session: AsyncSession, key: str, default: bool = False) -> bool:
     raw = await get_setting(session, key)

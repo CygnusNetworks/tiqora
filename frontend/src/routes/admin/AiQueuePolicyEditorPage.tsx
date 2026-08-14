@@ -55,6 +55,11 @@ const REPLY_LANGUAGES = [...LOCALE_CODES];
 
 type TabId = "basics" | "drafts" | "summaries" | "auto" | "safety";
 
+/** One fallback-provider entry in the priority list (below the primary
+ * `llm_provider_id`/`model_override`). `model` empty string means "use the
+ * provider's default model", mirroring `model_override`'s own convention. */
+type FallbackEntry = { provider_id: number; model: string };
+
 type FormState = {
   queue_id: number;
   enabled_auto_reply: boolean;
@@ -64,6 +69,7 @@ type FormState = {
   system_prompt: string;
   llm_provider_id: number;
   model_override: string;
+  llm_fallback: FallbackEntry[];
   vision_provider_id: number;
   service_user_id: number;
   kb_tags: string;
@@ -108,6 +114,7 @@ function emptyForm(queueId: number): FormState {
     system_prompt: "",
     llm_provider_id: NONE,
     model_override: "",
+    llm_fallback: [],
     vision_provider_id: NONE,
     service_user_id: NONE,
     kb_tags: "",
@@ -170,6 +177,40 @@ function linesToSendersRaw(text: string): string | null {
   return items.length > 0 ? items.join(",") : null;
 }
 
+/** Defensive parse of `llm_fallback_json` — malformed/unexpected stored JSON
+ * must never crash the editor; it just falls back to an empty list (the
+ * operator can re-add entries) with a console warning for diagnosis. */
+function parseFallbackJson(raw: string | null): FallbackEntry[] {
+  if (!raw || !raw.trim()) return [];
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    if (!Array.isArray(parsed)) throw new Error("not an array");
+    return parsed
+      .filter(
+        (e): e is { provider_id: unknown; model?: unknown } =>
+          typeof e === "object" && e !== null && "provider_id" in e,
+      )
+      .map((e) => ({
+        provider_id: Number(e.provider_id),
+        model: typeof e.model === "string" ? e.model : "",
+      }))
+      .filter((e) => Number.isFinite(e.provider_id));
+  } catch (err) {
+    console.warn("Invalid llm_fallback_json, resetting to empty list:", err);
+    return [];
+  }
+}
+
+function fallbackToJson(entries: FallbackEntry[]): string | null {
+  if (entries.length === 0) return null;
+  return JSON.stringify(
+    entries.map((e) => ({
+      provider_id: e.provider_id,
+      model: e.model.trim() || null,
+    })),
+  );
+}
+
 function toForm(row: AiQueuePolicyOut): FormState {
   return {
     queue_id: row.queue_id,
@@ -180,6 +221,7 @@ function toForm(row: AiQueuePolicyOut): FormState {
     system_prompt: row.system_prompt,
     llm_provider_id: row.llm_provider_id ?? NONE,
     model_override: row.model_override ?? "",
+    llm_fallback: parseFallbackJson(row.llm_fallback_json),
     vision_provider_id: row.vision_provider_id ?? NONE,
     service_user_id: row.service_user_id ?? NONE,
     kb_tags: row.kb_tags ?? "",
@@ -415,6 +457,42 @@ function AiQueuePolicyEditor({ policyId }: { policyId?: number }) {
   const setField = <K extends keyof FormState>(key: K, value: FormState[K]) =>
     setForm((f) => (f ? { ...f, [key]: value } : f));
 
+  const addFallback = () => {
+    setForm((f) =>
+      f
+        ? {
+            ...f,
+            llm_fallback: [...f.llm_fallback, { provider_id: NONE, model: "" }],
+          }
+        : f,
+    );
+  };
+  const removeFallback = (index: number) => {
+    setForm((f) =>
+      f
+        ? { ...f, llm_fallback: f.llm_fallback.filter((_, i) => i !== index) }
+        : f,
+    );
+  };
+  const moveFallback = (index: number, dir: -1 | 1) => {
+    setForm((f) => {
+      if (!f) return f;
+      const target = index + dir;
+      if (target < 0 || target >= f.llm_fallback.length) return f;
+      const next = [...f.llm_fallback];
+      [next[index], next[target]] = [next[target], next[index]];
+      return { ...f, llm_fallback: next };
+    });
+  };
+  const updateFallback = (index: number, patch: Partial<FallbackEntry>) => {
+    setForm((f) => {
+      if (!f) return f;
+      const next = [...f.llm_fallback];
+      next[index] = { ...next[index], ...patch };
+      return { ...f, llm_fallback: next };
+    });
+  };
+
   const toggleMcpClient = (id: number) => {
     setForm((f) => {
       if (!f) return f;
@@ -510,6 +588,7 @@ function AiQueuePolicyEditor({ policyId }: { policyId?: number }) {
     system_prompt: f.system_prompt,
     llm_provider_id: f.llm_provider_id !== NONE ? f.llm_provider_id : null,
     model_override: f.model_override.trim() || null,
+    llm_fallback_json: fallbackToJson(f.llm_fallback),
     vision_provider_id:
       f.vision_provider_id !== NONE ? f.vision_provider_id : null,
     service_user_id: f.service_user_id !== NONE ? f.service_user_id : null,
@@ -921,6 +1000,108 @@ function AiQueuePolicyEditor({ policyId }: { policyId?: number }) {
                 className={inputClass}
               />
             </label>
+            <div className="block text-sm sm:col-span-2" data-testid="admin-ai-queue-fallback-section">
+              <div className="mb-1 flex items-center justify-between gap-2">
+                <FieldLabel
+                  text={t("admin.ai.queues.llmFallback")}
+                  help={t("admin.help.aiQueue.llmFallback")}
+                  testId="admin-ai-queue-help-llm_fallback"
+                />
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  data-testid="admin-ai-queue-fallback-add"
+                  onClick={addFallback}
+                >
+                  {t("admin.ai.queues.fallbackAdd")}
+                </Button>
+              </div>
+              {form.llm_fallback.length === 0 ? (
+                <p className="text-xs text-muted">
+                  {t("admin.ai.queues.fallbackEmpty")}
+                </p>
+              ) : (
+                <div className="space-y-2">
+                  {form.llm_fallback.map((entry, index) => (
+                    <div
+                      key={index}
+                      className="flex items-center gap-2"
+                      data-testid={`admin-ai-queue-fallback-row-${index}`}
+                    >
+                      <span className="w-5 shrink-0 text-xs text-muted">
+                        {index + 2}
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <PickerField
+                          testId={`admin-ai-queue-fallback-provider-${index}`}
+                          value={entry.provider_id}
+                          items={[
+                            {
+                              value: NONE,
+                              label: t("admin.form.selectPlaceholder"),
+                            },
+                            ...(providersQ.data?.items ?? []).map((p) => ({
+                              value: p.id,
+                              label: p.name,
+                            })),
+                          ]}
+                          placeholder={t("admin.form.selectPlaceholder")}
+                          loading={providersQ.isLoading}
+                          onSelect={(v) =>
+                            updateFallback(index, { provider_id: v })
+                          }
+                        />
+                      </div>
+                      <input
+                        data-testid={`admin-ai-queue-fallback-model-${index}`}
+                        value={entry.model}
+                        onChange={(e) =>
+                          updateFallback(index, { model: e.target.value })
+                        }
+                        placeholder={t("admin.ai.queues.modelOverride")}
+                        className={cn(inputClass, "min-w-0 flex-1")}
+                      />
+                      <div className="flex shrink-0 items-center">
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          aria-label={t("admin.ai.queues.fallbackMoveUp")}
+                          data-testid={`admin-ai-queue-fallback-up-${index}`}
+                          disabled={index === 0}
+                          onClick={() => moveFallback(index, -1)}
+                        >
+                          ▲
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          aria-label={t("admin.ai.queues.fallbackMoveDown")}
+                          data-testid={`admin-ai-queue-fallback-down-${index}`}
+                          disabled={index === form.llm_fallback.length - 1}
+                          onClick={() => moveFallback(index, 1)}
+                        >
+                          ▼
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          aria-label={t("admin.ai.queues.fallbackRemove")}
+                          data-testid={`admin-ai-queue-fallback-remove-${index}`}
+                          onClick={() => removeFallback(index)}
+                        >
+                          ✕
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
             <label className="block text-sm sm:col-span-2">
               <FieldLabel
                 text={t("admin.ai.queues.visionProvider")}
@@ -1505,7 +1686,7 @@ function AiQueuePolicyEditor({ policyId }: { policyId?: number }) {
             {form.identity_mode === "clarify_schema" && (
               <label className="block text-sm sm:col-span-2">
                 <FieldLabel
-                  text={t("admin.ai.queues.section.identity")}
+                  text={t("admin.ai.queues.clarifySchemaJson")}
                   help={t("admin.help.aiQueue.clarifySchemaJson")}
                   testId="admin-ai-queue-help-clarify_schema_json"
                 />
@@ -1515,6 +1696,7 @@ function AiQueuePolicyEditor({ policyId }: { policyId?: number }) {
                   onChange={(e) =>
                     setField("clarify_schema_json", e.target.value)
                   }
+                  placeholder={t("admin.ai.queues.clarifySchemaJsonPlaceholder")}
                   rows={3}
                   spellCheck={false}
                   className={cn(inputClass, "font-mono text-xs")}

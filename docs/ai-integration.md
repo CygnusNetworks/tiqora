@@ -258,6 +258,19 @@ Two admin-managed building blocks sit under the per-queue policies:
 - **MCP clients** (`/admin/ai/mcp-clients`) — external MCP servers registered as
   tool sources the built-in agent may call, subject to the same ACLs.
 
+**LLM provider fallback** (`tiqora.ai.llm_fallback.FallbackLlmClient`): a
+queue policy's `llm_fallback_json` is an optional priority-ordered list of
+additional `{provider_id, model}` entries tried, in order, when the primary
+provider raises an `LlmError` (timeout, non-2xx, malformed response). Two
+pieces of state make repeated failures cheap: **stickiness** — the client
+remembers which entry last succeeded and starts there on the next call
+within the same run, instead of re-trying a provider that just failed — and
+a module-global **5-minute per-provider cooldown**, shared across
+runs/requests in the process, so a newly built client for a *different* run
+also skips a provider that failed recently (unless every entry is in
+cooldown, in which case the full list is tried anyway rather than failing
+outright).
+
 **PII masking** is a pipeline step, not an afterthought: when a queue policy has
 `pii_masking` on, article bodies (and extracted attachment text) are run through
 a masker (`tiqora.ai.pii`, regex + optional spaCy NER for names) that replaces
@@ -279,6 +292,16 @@ Auto-reply is unsafe in `parallel` operation: it posts into the Tiqora
 outbox, which Znuny does not see while running alongside it, so a customer
 could receive both Znuny's own autoresponder and Tiqora's AI reply.
 
+**Exception — Tiqora-only channels.** `require_feature_allowed` skips the
+`operation_mode` check (the kill-switch still applies) when the triggering
+article's channel is in `tiqora.ai.gate.TIQORA_ONLY_CHANNELS` (currently
+just `"telegram"`, matched case-insensitively) — i.e. a channel with no
+Znuny counterpart at all. There is nothing for a Tiqora auto-reply to
+double up with: Znuny never sees a Telegram message in the first place, so
+the double-answer risk the `parallel`/`tiqora_primary` distinction exists to
+prevent doesn't apply. See [parallel-operation.md](parallel-operation.md)
+§Feature-flag daemon takeover.
+
 Manual Assist (drafts) and Summaries are **not** gated (v1.1 relaxation —
 they were originally gated too, but neither writes anything Sync-relevant):
 Manual Assist creates a `tiqora_ai_draft` row, a distinct entity that is
@@ -289,6 +312,39 @@ auto-summary scan is likewise ungated, though it only ever considers tickets
 touched by the outbox batch — which stays empty in `parallel` operation
 until mail ingestion moves to Tiqora, so it has no practical effect before
 then.
+
+### Identity verification (`identity_mode = clarify_schema`)
+
+Email/portal senders already carry a somewhat trustworthy identity (a
+verified inbound address or a portal login); a Telegram chat does not until
+someone maps it. A queue policy's `identity_mode` covers that gap —
+enforcement is wired only for Telegram-sourced runs
+(`tiqora.ai.runtime.run_ticket_agent`); every other channel/mode combination
+falls straight through unchanged:
+
+- **`ticket_customer_id`** (default) or any non-Telegram source — no active
+  check, always considered identified.
+- **`clarify_schema`** — the queue's `clarify_schema_json` names which
+  `customer_user` columns the customer must confirm (e.g. email + postal
+  code), validated at policy-save time against the table's *real* columns
+  (introspected via `SELECT * ... LIMIT 0`, not a hardcoded list) so a typo'd
+  column can't be saved. Until the ticket's `tiqora_telegram_contact` has a
+  `customer_user_login` mapped, the run diverts into a dedicated
+  identity-check exchange instead of the normal agent prompt: the model asks
+  the customer to confirm the configured fields, and
+  `tiqora.ai.identity.verify_identity_claim` matches the claimed values
+  (case/whitespace-insensitive) deterministically against `customer_user`
+  rows (`valid_id = 1`) — a match is only accepted if it resolves to
+  *exactly one* row (ambiguous or zero matches both fail). A successful
+  match maps the contact (`customer_user_login`), re-points the ticket's
+  customer, resets the attempt counter, and the run then continues normally.
+- **Escalation**: each failed claim increments
+  `tiqora_ai_ticket_state.identity_attempts`; after **`MAX_IDENTITY_ATTEMPTS`
+  (3)** failed attempts, the run stops asking and instead creates a
+  human-reviewed clarify draft ("Identity could not be confirmed after
+  multiple attempts — please review manually") rather than looping
+  indefinitely. A misconfigured policy (`clarify_schema` mode with no usable
+  schema) fails safe the same way, immediately.
 
 ### Per-queue policy and autonomy
 

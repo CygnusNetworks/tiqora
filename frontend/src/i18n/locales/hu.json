@@ -151,7 +151,8 @@
     "passkeyAddError": "Nem sikerült hozzáadni a jelszót.",
     "passkeyDeleteError": "Nem sikerült eltávolítani a jelszót.",
     "passkeyDeleteLastError": "Az utolsó 2FA-tényező nem távolítható el, miközben a 2FA kényszerítve van.",
-    "passkeyUnsupported": "Ez a böngésző nem támogatja a jelszót (WebAuthn)."
+    "passkeyUnsupported": "Ez a böngésző nem támogatja a jelszót (WebAuthn).",
+    "passkeyReauthRequired": "For your security, please sign in again before changing your passkeys."
   },
   "dashboard": {
     "greeting": {
@@ -545,7 +546,8 @@
     "extrasRetry": "Újra",
     "customerUnresolved": "Ehhez a címhez nincs ügyfélrekord, ezért az ügyféladatok nem érhetők el.",
     "lockedByBanner": "Zárolta: {{name}}",
-    "takeOver": "Átvétel"
+    "takeOver": "Átvétel",
+    "replyViaTelegram": "Reply will be sent via Telegram"
   },
   "search": {
     "title": "Keresés",
@@ -964,7 +966,15 @@
           "detailed": "Részletes"
         },
         "kbCategories": "KB kategóriák",
-        "kbCategoriesEmpty": "Nincs elérhető kategória."
+        "kbCategoriesEmpty": "Nincs elérhető kategória.",
+        "llmFallback": "Fallback providers",
+        "fallbackAdd": "Add fallback",
+        "fallbackEmpty": "No fallback providers — the primary provider above is used exclusively.",
+        "fallbackMoveUp": "Move up",
+        "fallbackMoveDown": "Move down",
+        "fallbackRemove": "Remove",
+        "clarifySchemaJson": "Clarify schema fields (JSON)",
+        "clarifySchemaJsonPlaceholder": "{\"fields\": [{\"column\": \"wpnum\", \"label\": \"WP-Nummer\"}]}"
       },
       "usage": {
         "title": "Használat",
@@ -1136,7 +1146,8 @@
         "replyLanguageDefault": "BCP-47 nyelvi kód, amelyet \"Auto\" módban használnak, ha a szöveg nem illeszthető biztosan egy ismert nyelvi profilhoz.",
         "allowedStateTypes": "Vesszővel elválasztott lista az engedélyezett Znuny állapotípusokról (pl. „open” vagy „open,pending reminder”), amelyekre az AI a jegyet az update_ticket_fields eszközzel állíthatja — érvényesül az állapotnévre és a numerikus állapot-ID-ra is. Üres = alapértelmezetten csak „open” (újranyitás megengedett, lezárás soha); az explicit üres lista „[]” teljesen letiltja az állapotváltást.",
         "piiNer": "A spaCy NER (német + angol) segítségével felismeri a személyneveket a szövegben, és [NAME_n] formában maszkolja őket, mielőtt a tartalom eljutna az LLM-szolgáltatóhoz — az ügyfélnév és a feladók maszkolásán felül. Csak akkor aktív, ha a PII-maszkolás be van kapcsolva. A téves pozitívok ártalmatlanok (csak több maszkolás).",
-        "summaryDetail": "Szabvány: tömör bekezdések, csatolt dokumentumonként 1-2 mondat. Részletes: alaposabb bekezdések és 3–5 mondat dokumentumonként – hasznos a sok PDF-mellékletet tartalmazó soroknál."
+        "summaryDetail": "Szabvány: tömör bekezdések, csatolt dokumentumonként 1-2 mondat. Részletes: alaposabb bekezdések és 3–5 mondat dokumentumonként – hasznos a sok PDF-mellékletet tartalmazó soroknál.",
+        "llmFallback": "Providers tried in order, after the primary provider above, when a request fails (rate limit, timeout, error). Each entry has its own optional model override. Priority 1 is always the primary provider/model; entries here are priority 2, 3, …."
       },
       "common": {
         "validId": "Az érvényes/érvénytelen egy lágy törlés jelző: érvénytelenre állításkor az elem eltűnik az új rekordok kiválasztóiból, de a meglévő hivatkozások megmaradnak."
@@ -1235,6 +1246,9 @@
       "systemAddresses": {
         "email": "A sorok és automatikus válaszok From-címeként használt cím.",
         "name": "Megjelenített név az e-mail mellett (pl. „Support <support@example.com>”)."
+      },
+      "telegram": {
+        "mode": "\"Polling\" has Tiqora fetch updates from Telegram itself (no public URL needed). \"Webhook\" has Telegram push updates to the URL below — requires this server to be reachable over HTTPS."
       }
     },
     "nav": {
@@ -1289,7 +1303,8 @@
       "slas": "SLA-k",
       "systemAddresses": "Rendszercímek",
       "notificationEvents": "Értesítési események",
-      "ticketAttributeRelations": "Attribútumkapcsolatok"
+      "ticketAttributeRelations": "Attribútumkapcsolatok",
+      "telegram": "Telegram"
     },
     "table": {
       "id": "ID",
@@ -2319,7 +2334,8 @@
       "slas": "Szolgáltatási szintű megállapodások és határidők kezelése.",
       "systemAddresses": "A sorok és automatikus válaszok From-címei.",
       "notificationEvents": "Eseményvezérelt ügynök-értesítések beállítása.",
-      "ticketAttributeRelations": "Znuny-kompatibilis függőségi mátrixok (pl. szolgáltatás → sor) CSV-ben."
+      "ticketAttributeRelations": "Znuny-kompatibilis függőségi mátrixok (pl. szolgáltatás → sor) CSV-ben.",
+      "telegram": "Connect a Telegram bot as a ticket channel."
     },
     "mailAccounts": {
       "title_plural": "Levelezési fiókok",
@@ -2411,6 +2427,37 @@
       "new": "Új kapcsolat",
       "help": "CSV Attribute1;Attribute2 fejléccel és értékpárokkal (Znuny AdminTicketAttributeRelations). Űrlapválasztókat korlátoz (pl. Szolgáltatás → Sor).",
       "confirmDelete": "Törli ezt a kapcsolatot?"
+    },
+    "telegram": {
+      "title": "Telegram",
+      "description": "Connect a Telegram bot as an inbound/outbound ticket channel.",
+      "enabled": "Channel active",
+      "mode": "Mode",
+      "modePolling": "Polling",
+      "modeWebhook": "Webhook",
+      "queue": "Queue",
+      "botToken": "Bot token",
+      "defaultCustomerUser": "Default customer user",
+      "webhookUrl": "Webhook URL",
+      "webhookSecretToken": "Webhook secret token",
+      "webhookRegister": "Register webhook",
+      "webhookRegistering": "Registering…",
+      "webhookUnregister": "Remove webhook",
+      "webhookUnregistering": "Removing…",
+      "webhookRegisterSuccess": "Webhook registered",
+      "webhookRegisterFailure": "Webhook registration failed",
+      "webhookUnregisterSuccess": "Webhook removed",
+      "webhookUnregisterFailure": "Removing the webhook failed",
+      "consentTitle": "GDPR consent",
+      "consentRequired": "Require consent before processing messages",
+      "consentRequiredHelp": "While required, incoming messages from a new Telegram contact are not processed until they confirm consent.",
+      "consentText": "Consent request text",
+      "consentConfirmedText": "Consent confirmation text",
+      "save": "Save",
+      "saving": "Saving…",
+      "saved": "Settings saved.",
+      "saveError": "Saving failed.",
+      "loadError": "Failed to load settings."
     }
   },
   "kb": {

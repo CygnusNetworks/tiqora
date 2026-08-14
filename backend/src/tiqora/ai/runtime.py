@@ -10,6 +10,8 @@ until the outbox-driven worker lands in Phase D.
 
 from __future__ import annotations
 
+import asyncio
+import contextlib
 import json
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
@@ -42,6 +44,14 @@ from tiqora.ai.context import (
     ticket_snapshot,
 )
 from tiqora.ai.gate import AiGateError, require_feature_allowed
+from tiqora.ai.identity import (
+    MAX_IDENTITY_ATTEMPTS,
+    get_customer_id_for_login,
+    is_identified,
+    parse_clarify_schema,
+    record_identity_attempt,
+    verify_identity_claim,
+)
 from tiqora.ai.kb_wiring import build_vision_llm_factory
 from tiqora.ai.listfields import parse_int_list
 from tiqora.ai.llm import LlmClient, LlmMessage, LlmResponse
@@ -53,6 +63,7 @@ from tiqora.ai.models import (
     DRAFT_KIND_REPLY,
     FEATURE_AUTO_REPLY,
     FEATURE_MANUAL_ASSIST,
+    IDENTITY_CLARIFY_SCHEMA,
     REPLY_LANGUAGE_AUTO,
     REPLY_LANGUAGE_FIXED,
     SOURCE_AUTO,
@@ -64,6 +75,7 @@ from tiqora.ai.models import (
     TiqoraMcpClient,
     TiqoraMcpToolPolicy,
 )
+from tiqora.ai.output_guards import CustomerMessageGuardError, validate_customer_message
 from tiqora.ai.pii import PiiMapper
 from tiqora.ai.policies import get_queue_policy_by_queue, load_prompt_parts
 from tiqora.ai.prompt_safety import UNTRUSTED_CONTENT_SYSTEM_BLOCK
@@ -74,6 +86,7 @@ from tiqora.ai.reply_language import (
 )
 from tiqora.ai.tool_chain import analyze_tool_chain
 from tiqora.ai.tools import (
+    TOOL_PROPOSE_CUSTOMER_MESSAGE,
     McpToolSpec,
     ToolArgumentError,
     ToolExecutor,
@@ -83,14 +96,18 @@ from tiqora.ai.tools import (
 )
 from tiqora.config import Settings
 from tiqora.crypto.secret import decrypt_secret
+from tiqora.db.tiqora.models import TiqoraTelegramContact
 from tiqora.domain.settings_store import KEY_AI_DISCLOSURE_DEFAULT, get_setting
 from tiqora.domain.ticket_write_service import ArticleIn, add_article
+from tiqora.domain.ticket_write_service import set_customer as domain_set_customer
 from tiqora.znuny.sysconfig import SysConfig
 
 logger = structlog.get_logger(__name__)
 
 _LOCK_MAX_AGE = timedelta(minutes=15)
 DEFAULT_MAX_TOOL_ROUNDS = 8
+_TELEGRAM_CHANNEL = "telegram"
+_TYPING_INTERVAL_SECONDS = 4.0
 
 TRIGGER_MANUAL = "manual"
 TRIGGER_AUTO = "auto"
@@ -357,6 +374,369 @@ def _disclosure_footer(default_text: str, override_text: str | None) -> str:
     return (override_text or default_text or "").strip()
 
 
+def _build_identity_system_prompt(fields: list[Any]) -> str:
+    """System prompt for the identity-check mini-exchange (Task 6). Replaces
+    the normal system prompt entirely — the model must not see the queue's
+    configured prompt/tools while identity is unconfirmed."""
+    field_lines = "\n".join(f"- {f.label} (internal key: {f.column})" for f in fields)
+    return "\n\n".join(
+        [
+            UNTRUSTED_CONTENT_SYSTEM_BLOCK,
+            (
+                "This customer's identity is NOT yet confirmed. You may NOT answer any "
+                "support question, and you may NOT reveal any ticket, account, or "
+                "personal information. Your only job right now is identity "
+                "verification via propose_customer_message:\n"
+                "- If the customer's latest message does not (yet) contain all of the "
+                "fields below, propose kind='clarify' politely asking for them.\n"
+                "- If the customer's latest message already states them, extract the "
+                "values into 'identity_claim' (an object keyed by the internal key "
+                "below) AND still propose kind='clarify' with a short acknowledgement "
+                "body (e.g. 'Thank you, checking that now.') — never a factual answer.\n\n"
+                f"Required fields:\n{field_lines}"
+            ),
+        ]
+    )
+
+
+def _build_identity_user_message(articles: list[ArticleSnapshot]) -> str:
+    """Minimal, structurally-safe context for the identity mini-exchange.
+
+    Deliberately NOT :func:`_build_user_message` / ``render_ticket_header`` —
+    those include the full article history (incl. internal, agent-only
+    notes) and the ticket's current CustomerID/CustomerUser. An unidentified
+    Telegram user must not be able to get any of that echoed back via
+    prompt injection; the only thing the model needs to do its job (ask for
+    the configured fields, or extract them from what the customer just
+    wrote) is the latest customer message — nothing else is included, so
+    there is nothing else for a compromised model to leak."""
+    latest_customer_body = next(
+        (a.body or "" for a in reversed(articles) if a.sender_type == "customer"),
+        "",
+    )
+    return f"--- latest customer message ---\n{latest_customer_body}"
+
+
+def _identity_tool_schema() -> list[dict[str, Any]]:
+    return [
+        {
+            "type": "function",
+            "function": {
+                "name": TOOL_PROPOSE_CUSTOMER_MESSAGE,
+                "description": (
+                    "Deliver an identity-check message to the customer, and/or extract "
+                    "identity_claim values from their latest message. This is the ONLY "
+                    "tool available right now — no support answer, no other action."
+                ),
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "kind": {"type": "string", "enum": ["reply", "clarify"]},
+                        "subject": {"type": "string"},
+                        "body": {"type": "string"},
+                        "identity_claim": {
+                            "type": "object",
+                            "description": (
+                                "Field values the customer already provided, keyed by "
+                                "the internal key given in the system prompt. Omit "
+                                "entirely if none were provided yet."
+                            ),
+                            "additionalProperties": {"type": "string"},
+                        },
+                    },
+                    "required": ["kind", "body"],
+                },
+            },
+        }
+    ]
+
+
+async def _dispatch_identity_message(
+    session: AsyncSession,
+    sysconfig: SysConfig,
+    *,
+    ticket: TicketSnapshot,
+    actor_user_id: int,
+    trigger: str,
+    autonomy: str,
+    kind: str,
+    subject: str,
+    body: str,
+    based_on_article_id: int | None,
+    created_by_user_id: int | None,
+    prompt_tokens: int,
+    completion_tokens: int,
+) -> AgentRunResult:
+    """Draft or send the identity-flow's proposed message via Telegram (the
+    identity block only ever runs for a Telegram-sourced run — see the guard
+    in :func:`run_ticket_agent`)."""
+    destination = _map_customer_message(trigger=trigger, autonomy=autonomy, kind=kind)
+    source = SOURCE_MANUAL if trigger == TRIGGER_MANUAL else SOURCE_AUTO
+
+    if destination == "draft":
+        draft = await draft_service.create_draft(
+            session,
+            ticket_id=ticket.ticket_id,
+            queue_id=ticket.queue_id,
+            kind=kind,
+            body=body,
+            subject=subject or None,
+            based_on_article_id=based_on_article_id,
+            tool_trace_json=None,
+            created_by_user_id=created_by_user_id,
+            source=source,
+            actor_user_id=actor_user_id,
+        )
+        return AgentRunResult(
+            status=STATUS_DRAFTED,
+            draft_id=draft.id,
+            prompt_tokens=prompt_tokens,
+            completion_tokens=completion_tokens,
+        )
+
+    from tiqora.channels.telegram.outbound import deliver_agent_telegram_reply
+
+    article_id = await deliver_agent_telegram_reply(
+        session,
+        sysconfig,
+        ticket_id=ticket.ticket_id,
+        user_id=actor_user_id,
+        article=ArticleIn(
+            sender_type="agent",
+            is_visible_for_customer=True,
+            subject=subject or ticket.title,
+            body=body,
+            channel=_TELEGRAM_CHANNEL,
+        ),
+    )
+    session.add(
+        TiqoraAiArticleOrigin(
+            article_id=article_id,
+            source=SOURCE_AUTO,
+            queue_id=ticket.queue_id,
+            service_user_id=actor_user_id,
+        )
+    )
+    return AgentRunResult(
+        status=STATUS_SENT,
+        article_id=article_id,
+        prompt_tokens=prompt_tokens,
+        completion_tokens=completion_tokens,
+    )
+
+
+async def _typing_loop(gateway: Any, chat_id: int) -> None:
+    """Send a Telegram "typing" chat action roughly every
+    :data:`_TYPING_INTERVAL_SECONDS`, forever, until the task is cancelled by
+    the caller (:func:`run_ticket_agent`'s ``finally``). Any error from the
+    gateway call is only debug-logged — a failed typing indicator must never
+    fail (or even affect) the agent run."""
+    while True:
+        try:
+            await gateway.send_chat_action(chat_id, "typing")
+        except Exception as exc:  # noqa: BLE001 — best-effort, never fatal
+            logger.debug("ai_typing_indicator_send_failed", chat_id=chat_id, error=str(exc))
+        await asyncio.sleep(_TYPING_INTERVAL_SECONDS)
+
+
+async def _maybe_start_typing_indicator(
+    session: AsyncSession, ticket_id: int, *, gateway: Any = None
+) -> asyncio.Task[None] | None:
+    """Resolve the Telegram chat_id + gateway and start the background
+    typing-indicator task, or return ``None`` (no indicator) on any failure —
+    e.g. the channel is disabled, has no bot_token, or the chat_id can't be
+    resolved (see :func:`tiqora.channels.telegram.outbound.resolve_chat_id`).
+    Never raises: a missing typing indicator is cosmetic, not a run failure.
+    """
+    from tiqora.channels.telegram.outbound import (
+        TelegramDeliveryError,
+        build_gateway,
+        resolve_chat_id,
+    )
+
+    try:
+        chat_id = await resolve_chat_id(session, ticket_id)
+        gw = gateway if gateway is not None else await build_gateway(session)
+    except TelegramDeliveryError as exc:
+        logger.debug("ai_typing_indicator_unavailable", ticket_id=ticket_id, error=str(exc))
+        return None
+    return asyncio.ensure_future(_typing_loop(gw, chat_id))
+
+
+async def _run_identity_exchange(
+    session: AsyncSession,
+    *,
+    settings: Settings,
+    llm: LlmClient,
+    sysconfig: SysConfig,
+    policy: TiqoraAiQueuePolicy,
+    ticket: TicketSnapshot,
+    articles: list[ArticleSnapshot],
+    based_on_article_id: int | None,
+    trigger: str,
+    actor_user_id: int,
+    audit_context: AuditContext,
+    created_by_user_id: int | None,
+) -> AgentRunResult | None:
+    """Run one identity-check LLM exchange (Task 6). Returns an
+    :class:`AgentRunResult` when the run ends here (drafted/sent/skipped),
+    or ``None`` when identity was just confirmed and the caller should
+    continue into the normal run (re-loading the ticket snapshot first)."""
+    from tiqora.channels.telegram.outbound import resolve_chat_id
+
+    ticket_id = ticket.ticket_id
+    source = SOURCE_MANUAL if trigger == TRIGGER_MANUAL else SOURCE_AUTO
+    state = await get_or_create_state(session, ticket_id)
+
+    fields = parse_clarify_schema(policy)
+    if not fields:
+        # Misconfigured policy (clarify_schema mode but no usable schema) —
+        # fail safe to a human draft rather than looping on a check that can
+        # never succeed.
+        draft = await draft_service.create_draft(
+            session,
+            ticket_id=ticket_id,
+            queue_id=ticket.queue_id,
+            kind=DRAFT_KIND_CLARIFY,
+            body="Identity verification is misconfigured for this queue (clarify_schema_json).",
+            based_on_article_id=based_on_article_id,
+            created_by_user_id=created_by_user_id,
+            source=source,
+            actor_user_id=actor_user_id,
+        )
+        state.last_run_at = datetime.now(UTC).replace(tzinfo=None)
+        await session.commit()
+        return AgentRunResult(status=STATUS_DRAFTED, draft_id=draft.id)
+
+    identity_llm = AuditingLlmClient(
+        llm, settings=settings, context=audit_context, session=session, pii_mapper=PiiMapper()
+    )
+    system_prompt = _build_identity_system_prompt(fields)
+    user_message = _build_identity_user_message(articles)
+    messages: list[LlmMessage] = [
+        LlmMessage(role="system", content=system_prompt),
+        LlmMessage(role="user", content=user_message),
+    ]
+    response: LlmResponse = await identity_llm.chat(
+        messages=messages, tools=_identity_tool_schema()
+    )
+    prompt_tokens = response.usage.prompt_tokens
+    completion_tokens = response.usage.completion_tokens
+
+    tool_call = next(
+        (tc for tc in (response.tool_calls or []) if tc.name == TOOL_PROPOSE_CUSTOMER_MESSAGE),
+        None,
+    )
+    if tool_call is None:
+        state.last_run_at = datetime.now(UTC).replace(tzinfo=None)
+        await session.commit()
+        return AgentRunResult(
+            status=STATUS_SKIPPED,
+            notes="Identity check produced no proposal.",
+            prompt_tokens=prompt_tokens,
+            completion_tokens=completion_tokens,
+        )
+
+    args = tool_call.arguments or {}
+    kind = args.get("kind")
+    body = args.get("body")
+    subject_raw = args.get("subject")
+    subject = subject_raw if isinstance(subject_raw, str) else ""
+    if kind not in ("reply", "clarify") or not isinstance(body, str) or not body.strip():
+        state.last_run_at = datetime.now(UTC).replace(tzinfo=None)
+        await session.commit()
+        return AgentRunResult(
+            status=STATUS_SKIPPED,
+            notes="Identity check proposal was malformed.",
+            prompt_tokens=prompt_tokens,
+            completion_tokens=completion_tokens,
+        )
+    try:
+        validate_customer_message(kind=kind, subject=subject, body=body)
+    except CustomerMessageGuardError as exc:
+        state.last_run_at = datetime.now(UTC).replace(tzinfo=None)
+        await session.commit()
+        return AgentRunResult(
+            status=STATUS_SKIPPED,
+            notes=f"Identity check proposal rejected: {exc}",
+            prompt_tokens=prompt_tokens,
+            completion_tokens=completion_tokens,
+        )
+
+    identity_claim_raw = args.get("identity_claim")
+    claim_values: dict[str, str] = {}
+    if isinstance(identity_claim_raw, dict):
+        claim_values = {k: v for k, v in identity_claim_raw.items() if isinstance(v, str)}
+
+    if claim_values:
+        login = await verify_identity_claim(session, fields, claim_values)
+        if login is not None:
+            chat_id = await resolve_chat_id(session, ticket_id)
+            contact = (
+                await session.execute(
+                    select(TiqoraTelegramContact).where(TiqoraTelegramContact.chat_id == chat_id)
+                )
+            ).scalar_one_or_none()
+            if contact is not None:
+                contact.customer_user_login = login
+            customer_id = await get_customer_id_for_login(session, login)
+            await domain_set_customer(
+                session,
+                ticket_id=ticket_id,
+                customer_id=customer_id,
+                customer_user_id=login,
+                user_id=actor_user_id,
+            )
+            state.identity_attempts = 0
+            await session.commit()
+            return None  # identified — caller continues the normal run
+
+        attempts = await record_identity_attempt(session, state)
+        await session.commit()
+        if attempts >= MAX_IDENTITY_ATTEMPTS:
+            draft = await draft_service.create_draft(
+                session,
+                ticket_id=ticket_id,
+                queue_id=ticket.queue_id,
+                kind=DRAFT_KIND_CLARIFY,
+                body=(
+                    "Identity could not be confirmed after multiple attempts — "
+                    "please review manually."
+                ),
+                based_on_article_id=based_on_article_id,
+                created_by_user_id=created_by_user_id,
+                source=source,
+                actor_user_id=actor_user_id,
+            )
+            state.last_run_at = datetime.now(UTC).replace(tzinfo=None)
+            await session.commit()
+            return AgentRunResult(
+                status=STATUS_DRAFTED,
+                draft_id=draft.id,
+                prompt_tokens=prompt_tokens,
+                completion_tokens=completion_tokens,
+            )
+
+    result = await _dispatch_identity_message(
+        session,
+        sysconfig,
+        ticket=ticket,
+        actor_user_id=actor_user_id,
+        trigger=trigger,
+        autonomy=policy.autonomy,
+        kind=kind,
+        subject=subject,
+        body=body,
+        based_on_article_id=based_on_article_id,
+        created_by_user_id=created_by_user_id,
+        prompt_tokens=prompt_tokens,
+        completion_tokens=completion_tokens,
+    )
+    state.last_run_at = datetime.now(UTC).replace(tzinfo=None)
+    await session.commit()
+    return result
+
+
 async def run_ticket_agent(
     session: AsyncSession,
     *,
@@ -374,6 +754,8 @@ async def run_ticket_agent(
     kb_get_article_fn: Any = None,
     kb_bundle: str | None = None,
     vision_llm_factory: Any = None,
+    source_channel: str | None = None,
+    telegram_gateway: Any = None,
 ) -> AgentRunResult:
     """Run the agent once for one ticket (plan §3.4 steps 1-12).
 
@@ -383,7 +765,13 @@ async def run_ticket_agent(
     (a sync ``() -> LlmClient``) is an injectable seam for the attachment
     vision pre-pass — production omits it and the queue policy's
     ``vision_provider_id`` is resolved automatically; tests inject a fake to
-    assert on the vision prompt without a real endpoint.
+    assert on the vision prompt without a real endpoint. ``source_channel``
+    is the triggering article's channel (from the outbox event payload,
+    auto-worker only) — passed through to the gate re-check below so a
+    Telegram-sourced run is exempt from the ``operation_mode`` check (see
+    ``tiqora.ai.gate``). ``telegram_gateway`` is an injectable seam for the
+    typing-indicator task (tests); production omits it and a gateway is
+    built lazily from the channel config only when actually needed.
     """
     # 1. Readiness gate — auto-reply only (plan §3.0 v1.1 relaxation, Phase
     # E). Manual Assist always runs regardless of operation_mode: it only
@@ -391,13 +779,17 @@ async def run_ticket_agent(
     # customer-visible send.
     if trigger == TRIGGER_AUTO:
         try:
-            await require_feature_allowed(session, FEATURE_AUTO_REPLY)
+            await require_feature_allowed(
+                session, FEATURE_AUTO_REPLY, source_channel=source_channel
+            )
         except AiGateError as exc:
             raise AgentRunError(str(exc)) from exc
 
     # 2. Per-ticket lock
     lock_owner = f"{worker_instance}:{run_id}"
     await _acquire_lock(session, ticket_id, lock_owner)
+
+    typing_task: asyncio.Task[None] | None = None
 
     try:
         try:
@@ -439,8 +831,17 @@ async def run_ticket_agent(
         customer_articles = [a for a in articles if a.sender_type == "customer"]
         based_on_article_id = customer_articles[-1].id if customer_articles else None
 
-        # 5. AI-content filter is applied when rendering (labels own AI output,
-        # see _build_user_message) — nothing is physically removed.
+        # Typing indicator (auto-trigger, Telegram source only): resolved
+        # synchronously (chat_id + gateway) via the *same* session before the
+        # background task starts, because AsyncSession is not safe for
+        # concurrent use across tasks — the loop below never touches the
+        # session again, only the gateway. Best-effort: any failure here
+        # (channel disabled, no bot_token, chat_id unresolvable) just means
+        # no typing indicator, never a fatal run error.
+        if trigger == TRIGGER_AUTO and (source_channel or "").strip().lower() == _TELEGRAM_CHANNEL:
+            typing_task = await _maybe_start_typing_indicator(
+                session, ticket_id, gateway=telegram_gateway
+            )
 
         # 6/7. Prompts — document/image attachments are rendered into the
         # per-article text before masking (see build_attachment_context).
@@ -457,6 +858,43 @@ async def run_ticket_agent(
             provider_id=policy.llm_provider_id,
             model=policy.model_override,
         )
+
+        # Identity check (Task 6, plan: identity verification) — wired ONLY
+        # for Telegram-sourced runs (guard is the outermost condition; every
+        # other channel/identity_mode combination falls straight through
+        # unchanged). clarify_schema means the customer's Telegram chat has
+        # not yet been matched to a customer_user login: the model may not
+        # produce a real answer until that happens.
+        if (
+            (source_channel or "").strip().lower() == _TELEGRAM_CHANNEL
+            and policy.identity_mode == IDENTITY_CLARIFY_SCHEMA
+            and not await is_identified(
+                session, ticket_id, source_channel=source_channel, policy=policy
+            )
+        ):
+            identity_result = await _run_identity_exchange(
+                session,
+                settings=settings,
+                llm=llm,
+                sysconfig=sysconfig,
+                policy=policy,
+                ticket=ticket,
+                articles=articles,
+                based_on_article_id=based_on_article_id,
+                trigger=trigger,
+                actor_user_id=actor_user_id,
+                audit_context=audit_context,
+                created_by_user_id=(acting_user_id if trigger == TRIGGER_MANUAL else None),
+            )
+            if identity_result is not None:
+                return identity_result
+            # Identified during this run (identity_claim verified): the
+            # ticket's customer was just re-pointed — reload the snapshot
+            # before building the normal prompt/tools below.
+            ticket = await ticket_snapshot(session, ticket_id)
+
+        # 5. AI-content filter is applied when rendering (labels own AI output,
+        # see _build_user_message) — nothing is physically removed.
 
         effective_vision_factory = vision_llm_factory
         if effective_vision_factory is None and policy.vision_provider_id is not None:
@@ -478,6 +916,11 @@ async def run_ticket_agent(
         )
         known_names = await collect_known_names(session, ticket, articles, extra_texts=ner_texts)
         pii = PiiMapper(never_mask=never_mask or None, known_names=known_names or None)
+        # Kept before the AuditingLlmClient wrap below so record_usage() can
+        # read active_provider_id/active_model off it after the run — set by
+        # FallbackLlmClient (tiqora.ai.llm_fallback) once a fallback entry
+        # actually served a response; absent on a plain OpenAiCompatLlmClient.
+        raw_llm = llm
         llm = AuditingLlmClient(
             llm, settings=settings, context=audit_context, session=session, pii_mapper=pii
         )
@@ -598,8 +1041,8 @@ async def run_ticket_agent(
             queue_id=ticket.queue_id,
             ticket_id=ticket_id,
             feature=feature,
-            provider_id=policy.llm_provider_id,
-            model=policy.model_override,
+            provider_id=getattr(raw_llm, "active_provider_id", None) or policy.llm_provider_id,
+            model=getattr(raw_llm, "active_model", None) or policy.model_override,
             prompt_tokens=prompt_tokens,
             completion_tokens=completion_tokens,
             success=True,
@@ -695,45 +1138,67 @@ async def run_ticket_agent(
         if footer:
             body = f"{body}\n\n{footer}"
 
-        to_address = None
-        if based_on_article_id is not None:
-            src = next((a for a in articles if a.id == based_on_article_id), None)
-            if src is not None and src.from_address:
-                to_address = parseaddr(src.from_address)[1] or None
+        src = next((a for a in articles if a.id == based_on_article_id), None)
+        # Channel dispatch: the based_on article's channel decides where the
+        # reply goes. Telegram is checked FIRST and unconditionally — its
+        # a_from is a synthetic "<chat_id>@telegram.invalid" address that
+        # would otherwise parseaddr-match the email branch below and blow up
+        # an SMTP send to a fake address (the central guard this dispatch
+        # exists for).
+        if src is not None and src.channel.lower() == _TELEGRAM_CHANNEL:
+            from tiqora.channels.telegram.outbound import deliver_agent_telegram_reply
 
-        if to_address:
-            from tiqora.channels.email.outbound_reply import deliver_agent_email_reply
-
-            article_id = await deliver_agent_email_reply(
+            article_id = await deliver_agent_telegram_reply(
                 session,
                 sysconfig,
-                None,
                 ticket_id=ticket_id,
-                queue_id=ticket.queue_id,
                 user_id=actor_user_id,
                 article=ArticleIn(
                     sender_type="agent",
                     is_visible_for_customer=True,
                     subject=outcome.proposal.get("subject") or ticket.title,
                     body=body,
-                    to_address=to_address,
-                    channel="email",
+                    channel=_TELEGRAM_CHANNEL,
                 ),
             )
         else:
-            article_id = await add_article(
-                session,
-                ticket_id=ticket_id,
-                article=ArticleIn(
-                    sender_type="agent",
-                    is_visible_for_customer=True,
-                    subject=outcome.proposal.get("subject") or ticket.title,
-                    body=body,
-                    channel="note",
-                ),
-                user_id=actor_user_id,
-                sysconfig=sysconfig,
-            )
+            to_address = None
+            if src is not None and src.from_address:
+                to_address = parseaddr(src.from_address)[1] or None
+
+            if to_address:
+                from tiqora.channels.email.outbound_reply import deliver_agent_email_reply
+
+                article_id = await deliver_agent_email_reply(
+                    session,
+                    sysconfig,
+                    None,
+                    ticket_id=ticket_id,
+                    queue_id=ticket.queue_id,
+                    user_id=actor_user_id,
+                    article=ArticleIn(
+                        sender_type="agent",
+                        is_visible_for_customer=True,
+                        subject=outcome.proposal.get("subject") or ticket.title,
+                        body=body,
+                        to_address=to_address,
+                        channel="email",
+                    ),
+                )
+            else:
+                article_id = await add_article(
+                    session,
+                    ticket_id=ticket_id,
+                    article=ArticleIn(
+                        sender_type="agent",
+                        is_visible_for_customer=True,
+                        subject=outcome.proposal.get("subject") or ticket.title,
+                        body=body,
+                        channel="note",
+                    ),
+                    user_id=actor_user_id,
+                    sysconfig=sysconfig,
+                )
 
         session.add(
             TiqoraAiArticleOrigin(
@@ -766,6 +1231,10 @@ async def run_ticket_agent(
             logger.exception("ai_runtime_error_bookkeeping_failed", ticket_id=ticket_id)
         raise
     finally:
+        if typing_task is not None:
+            typing_task.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await typing_task
         await _release_lock(session, ticket_id)
 
 

@@ -151,7 +151,8 @@
     "passkeyAddError": "ไม่สามารถเพิ่มรหัสผ่าน",
     "passkeyDeleteError": "ไม่สามารถลบรหัสผ่านได้",
     "passkeyDeleteLastError": "ไม่สามารถลบปัจจัย 2FA สุดท้ายในขณะที่บังคับใช้ 2FA ได้",
-    "passkeyUnsupported": "เบราว์เซอร์นี้ไม่รองรับรหัสผ่าน (WebAuthn)"
+    "passkeyUnsupported": "เบราว์เซอร์นี้ไม่รองรับรหัสผ่าน (WebAuthn)",
+    "passkeyReauthRequired": "For your security, please sign in again before changing your passkeys."
   },
   "dashboard": {
     "greeting": {
@@ -545,7 +546,8 @@
     "extrasRetry": "ลองอีกครั้ง",
     "customerUnresolved": "ไม่มีระเบียนลูกค้าที่ตรงกับที่อยู่นี้ จึงไม่สามารถแสดงรายละเอียดลูกค้าได้",
     "lockedByBanner": "ล็อกโดย {{name}}",
-    "takeOver": "รับช่วงต่อ"
+    "takeOver": "รับช่วงต่อ",
+    "replyViaTelegram": "Reply will be sent via Telegram"
   },
   "search": {
     "title": "ค้นหา",
@@ -964,7 +966,15 @@
           "detailed": "รายละเอียด"
         },
         "kbCategories": "หมวดหมู่ KB",
-        "kbCategoriesEmpty": "ไม่มีหมวดหมู่ที่ใช้ได้"
+        "kbCategoriesEmpty": "ไม่มีหมวดหมู่ที่ใช้ได้",
+        "llmFallback": "Fallback providers",
+        "fallbackAdd": "Add fallback",
+        "fallbackEmpty": "No fallback providers — the primary provider above is used exclusively.",
+        "fallbackMoveUp": "Move up",
+        "fallbackMoveDown": "Move down",
+        "fallbackRemove": "Remove",
+        "clarifySchemaJson": "Clarify schema fields (JSON)",
+        "clarifySchemaJsonPlaceholder": "{\"fields\": [{\"column\": \"wpnum\", \"label\": \"WP-Nummer\"}]}"
       },
       "usage": {
         "title": "การใช้งาน",
@@ -1136,7 +1146,8 @@
         "replyLanguageDefault": "รหัสภาษา BCP-47 ที่ใช้ในโหมด \"อัตโนมัติ\" เมื่อไม่สามารถจับคู่ข้อความกับโปรไฟล์ภาษาที่รู้จักได้อย่างมั่นใจ",
         "allowedStateTypes": "รายการที่คั่นด้วยเครื่องหมายจุลภาคของประเภทสถานะ Znuny ที่อนุญาต (เช่น \"เปิด\" หรือ \"เปิด การเตือนที่รอดำเนินการ\") AI อาจตั้งค่าตั๋วผ่าน update_ticket_fields - บังคับใช้สำหรับทั้งชื่อรัฐและรหัสสถานะตัวเลข Empty = ค่าเริ่มต้น \"เปิด\" เท่านั้น (อนุญาตให้เปิดใหม่ได้ ไม่เคยปิด); รายการว่างที่ชัดเจน \"[]\" ปิดการใช้งานการเปลี่ยนแปลงสถานะทั้งหมด",
         "piiNer": "ตรวจจับชื่อบุคคลในข้อความผ่าน spaCy NER (เยอรมัน + อังกฤษ) และปกปิดเป็น [NAME_n] ก่อนที่เนื้อหาจะไปถึงผู้ให้บริการ LLM นอกเหนือจากชื่อลูกค้าและผู้ส่ง ใช้งานได้เฉพาะเมื่อเปิดการมาสก์ PII เท่านั้น ผลบวกลวงไม่เป็นอันตราย (เพียงปิดบังมากกว่า)",
-        "summaryDetail": "มาตรฐาน: ย่อหน้าขนาดกะทัดรัด 1-2 ประโยคต่อเอกสารแนบ รายละเอียด: ย่อหน้าที่ละเอียดยิ่งขึ้นและ 3–5 ประโยคต่อเอกสาร ซึ่งมีประโยชน์สำหรับคิวที่มีไฟล์แนบ PDF จำนวนมาก"
+        "summaryDetail": "มาตรฐาน: ย่อหน้าขนาดกะทัดรัด 1-2 ประโยคต่อเอกสารแนบ รายละเอียด: ย่อหน้าที่ละเอียดยิ่งขึ้นและ 3–5 ประโยคต่อเอกสาร ซึ่งมีประโยชน์สำหรับคิวที่มีไฟล์แนบ PDF จำนวนมาก",
+        "llmFallback": "Providers tried in order, after the primary provider above, when a request fails (rate limit, timeout, error). Each entry has its own optional model override. Priority 1 is always the primary provider/model; entries here are priority 2, 3, …."
       },
       "common": {
         "validId": "ถูกต้อง/ไม่ถูกต้องคือการตั้งค่าสถานะการลบแบบนุ่มนวล: การทำเครื่องหมายรายการไม่ถูกต้องจะซ่อนรายการนั้นจากตัวเลือกสำหรับบันทึกใหม่โดยไม่ต้องลบข้อมูลอ้างอิงที่มีอยู่ (เช่น ตั๋ว การมอบหมาย) ไม่มีทางลบยาก"
@@ -1235,6 +1246,9 @@
       "systemAddresses": {
         "email": "ที่อยู่ที่ใช้เป็น From สำหรับคิวและการตอบอัตโนมัติ",
         "name": "ชื่อที่แสดงข้างอีเมล (เช่น “Support <support@example.com>”)"
+      },
+      "telegram": {
+        "mode": "\"Polling\" has Tiqora fetch updates from Telegram itself (no public URL needed). \"Webhook\" has Telegram push updates to the URL below — requires this server to be reachable over HTTPS."
       }
     },
     "nav": {
@@ -1289,7 +1303,8 @@
       "slas": "SLA",
       "systemAddresses": "ที่อยู่ระบบ",
       "notificationEvents": "เหตุการณ์การแจ้งเตือน",
-      "ticketAttributeRelations": "ความสัมพันธ์แอตทริบิวต์"
+      "ticketAttributeRelations": "ความสัมพันธ์แอตทริบิวต์",
+      "telegram": "Telegram"
     },
     "table": {
       "id": "ID",
@@ -2319,7 +2334,8 @@
       "slas": "จัดการข้อตกลงระดับบริการและตัวจับเวลา",
       "systemAddresses": "ที่อยู่อีเมลที่ใช้เป็น From สำหรับคิวและการตอบอัตโนมัติ",
       "notificationEvents": "กำหนดค่าการแจ้งเตือนเจ้าหน้าที่ตามเหตุการณ์",
-      "ticketAttributeRelations": "เมทริกซ์ความขึ้นต่อกันที่เข้ากันกับ Znuny (บริการ→คิว ฯลฯ) แบบ CSV"
+      "ticketAttributeRelations": "เมทริกซ์ความขึ้นต่อกันที่เข้ากันกับ Znuny (บริการ→คิว ฯลฯ) แบบ CSV",
+      "telegram": "Connect a Telegram bot as a ticket channel."
     },
     "mailAccounts": {
       "title_plural": "บัญชีเมล",
@@ -2411,6 +2427,37 @@
       "new": "ความสัมพันธ์ใหม่",
       "help": "CSV ที่มีหัว Attribute1;Attribute2 และคู่ค่า (Znuny AdminTicketAttributeRelations) ใช้จำกัดตัวเลือกในฟอร์ม (เช่น บริการ → คิว)",
       "confirmDelete": "ลบความสัมพันธ์นี้?"
+    },
+    "telegram": {
+      "title": "Telegram",
+      "description": "Connect a Telegram bot as an inbound/outbound ticket channel.",
+      "enabled": "Channel active",
+      "mode": "Mode",
+      "modePolling": "Polling",
+      "modeWebhook": "Webhook",
+      "queue": "Queue",
+      "botToken": "Bot token",
+      "defaultCustomerUser": "Default customer user",
+      "webhookUrl": "Webhook URL",
+      "webhookSecretToken": "Webhook secret token",
+      "webhookRegister": "Register webhook",
+      "webhookRegistering": "Registering…",
+      "webhookUnregister": "Remove webhook",
+      "webhookUnregistering": "Removing…",
+      "webhookRegisterSuccess": "Webhook registered",
+      "webhookRegisterFailure": "Webhook registration failed",
+      "webhookUnregisterSuccess": "Webhook removed",
+      "webhookUnregisterFailure": "Removing the webhook failed",
+      "consentTitle": "GDPR consent",
+      "consentRequired": "Require consent before processing messages",
+      "consentRequiredHelp": "While required, incoming messages from a new Telegram contact are not processed until they confirm consent.",
+      "consentText": "Consent request text",
+      "consentConfirmedText": "Consent confirmation text",
+      "save": "Save",
+      "saving": "Saving…",
+      "saved": "Settings saved.",
+      "saveError": "Saving failed.",
+      "loadError": "Failed to load settings."
     }
   },
   "kb": {

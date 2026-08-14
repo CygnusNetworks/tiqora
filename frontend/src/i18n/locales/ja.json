@@ -151,7 +151,8 @@
     "passkeyAddError": "パスキーを追加できませんでした。",
     "passkeyDeleteError": "パスキーを削除できませんでした。",
     "passkeyDeleteLastError": "2FAが強制されている間は、最後の2FA要素を削除できません。",
-    "passkeyUnsupported": "このブラウザはパスキー（WebAuthn）に対応していません。"
+    "passkeyUnsupported": "このブラウザはパスキー（WebAuthn）に対応していません。",
+    "passkeyReauthRequired": "For your security, please sign in again before changing your passkeys."
   },
   "dashboard": {
     "greeting": {
@@ -545,7 +546,8 @@
     "extrasRetry": "再試行",
     "customerUnresolved": "このアドレスに一致する顧客レコードがないため、顧客詳細は表示できません。",
     "lockedByBanner": "{{name}} がロック中",
-    "takeOver": "引き継ぐ"
+    "takeOver": "引き継ぐ",
+    "replyViaTelegram": "Reply will be sent via Telegram"
   },
   "search": {
     "title": "検索",
@@ -964,7 +966,15 @@
           "detailed": "詳細"
         },
         "kbCategories": "KBカテゴリ",
-        "kbCategoriesEmpty": "利用可能なカテゴリはありません。"
+        "kbCategoriesEmpty": "利用可能なカテゴリはありません。",
+        "llmFallback": "Fallback providers",
+        "fallbackAdd": "Add fallback",
+        "fallbackEmpty": "No fallback providers — the primary provider above is used exclusively.",
+        "fallbackMoveUp": "Move up",
+        "fallbackMoveDown": "Move down",
+        "fallbackRemove": "Remove",
+        "clarifySchemaJson": "Clarify schema fields (JSON)",
+        "clarifySchemaJsonPlaceholder": "{\"fields\": [{\"column\": \"wpnum\", \"label\": \"WP-Nummer\"}]}"
       },
       "usage": {
         "title": "使用法",
@@ -1136,7 +1146,8 @@
         "replyLanguageDefault": "BCP-47言語コードは、テキストが既知の言語プロファイルと確実に一致しない場合に「自動」モードで使用されます。",
         "allowedStateTypes": "AIがupdate_ticket_fields経由でチケットを設定できる、許可されているZnuny状態タイプのカンマ区切りのリスト (例: 「open」または「open,pendingリマインダー」) — 状態名と数値の状態IDの両方に適用されます。空 = デフォルトは「開く」のみ (再オープンは許可され、閉じることはできません);明示的な空のリスト「[]」は状態の変更を完全に無効にします。",
         "piiNer": "spaCy NER (ドイツ語 + 英語) を介してテキスト内の個人名を検出し、コンテンツがLLMプロバイダーに到達する前に、顧客名と送信者に加えて [NAME_n] としてマスクします。 PIIマスキングがオンの場合にのみアクティブになります。誤検知は無害です (マスキングが強化されるだけです)。",
-        "summaryDetail": "標準: コンパクトな段落、添付文書あたり1 ～ 2文。詳細: より詳細な段落とドキュメントあたり3 ～ 5文 - 多数のPDF添付ファイルを含むキューに役立ちます。"
+        "summaryDetail": "標準: コンパクトな段落、添付文書あたり1 ～ 2文。詳細: より詳細な段落とドキュメントあたり3 ～ 5文 - 多数のPDF添付ファイルを含むキューに役立ちます。",
+        "llmFallback": "Providers tried in order, after the primary provider above, when a request fails (rate limit, timeout, error). Each entry has its own optional model override. Priority 1 is always the primary provider/model; entries here are priority 2, 3, …."
       },
       "common": {
         "validId": "有効/無効は論理的な削除フラグです。エントリを無効とマークすると、既存の参照 (チケット、割り当てなど) を削除せずに、新しいレコードのピッカーからそのエントリが非表示になります。強制削除はありません。"
@@ -1235,6 +1246,9 @@
       "systemAddresses": {
         "email": "キューと自動応答の From として使うアドレス。",
         "name": "メール横に表示する名前（例: 「Support <support@example.com>」）。"
+      },
+      "telegram": {
+        "mode": "\"Polling\" has Tiqora fetch updates from Telegram itself (no public URL needed). \"Webhook\" has Telegram push updates to the URL below — requires this server to be reachable over HTTPS."
       }
     },
     "nav": {
@@ -1289,7 +1303,8 @@
       "slas": "SLA",
       "systemAddresses": "システムアドレス",
       "notificationEvents": "通知イベント",
-      "ticketAttributeRelations": "属性リレーション"
+      "ticketAttributeRelations": "属性リレーション",
+      "telegram": "Telegram"
     },
     "table": {
       "id": "ID",
@@ -2327,7 +2342,8 @@
       "slas": "サービスレベル契約と期限を管理します。",
       "systemAddresses": "キューと自動応答の From に使うメールアドレス。",
       "notificationEvents": "イベント駆動の担当者通知を設定します。",
-      "ticketAttributeRelations": "Znuny 互換の依存マトリクス（サービス→キュー等）を CSV で管理します。"
+      "ticketAttributeRelations": "Znuny 互換の依存マトリクス（サービス→キュー等）を CSV で管理します。",
+      "telegram": "Connect a Telegram bot as a ticket channel."
     },
     "mailAccounts": {
       "title_plural": "メールアカウント",
@@ -2419,6 +2435,37 @@
       "new": "新規リレーション",
       "help": "ヘッダー Attribute1;Attribute2 と値ペアの CSV（Znuny AdminTicketAttributeRelations）。フォームの選択肢を制限します（例: サービス → キュー）。",
       "confirmDelete": "このリレーションを削除しますか？"
+    },
+    "telegram": {
+      "title": "Telegram",
+      "description": "Connect a Telegram bot as an inbound/outbound ticket channel.",
+      "enabled": "Channel active",
+      "mode": "Mode",
+      "modePolling": "Polling",
+      "modeWebhook": "Webhook",
+      "queue": "Queue",
+      "botToken": "Bot token",
+      "defaultCustomerUser": "Default customer user",
+      "webhookUrl": "Webhook URL",
+      "webhookSecretToken": "Webhook secret token",
+      "webhookRegister": "Register webhook",
+      "webhookRegistering": "Registering…",
+      "webhookUnregister": "Remove webhook",
+      "webhookUnregistering": "Removing…",
+      "webhookRegisterSuccess": "Webhook registered",
+      "webhookRegisterFailure": "Webhook registration failed",
+      "webhookUnregisterSuccess": "Webhook removed",
+      "webhookUnregisterFailure": "Removing the webhook failed",
+      "consentTitle": "GDPR consent",
+      "consentRequired": "Require consent before processing messages",
+      "consentRequiredHelp": "While required, incoming messages from a new Telegram contact are not processed until they confirm consent.",
+      "consentText": "Consent request text",
+      "consentConfirmedText": "Consent confirmation text",
+      "save": "Save",
+      "saving": "Saving…",
+      "saved": "Settings saved.",
+      "saveError": "Saving failed.",
+      "loadError": "Failed to load settings."
     }
   },
   "kb": {

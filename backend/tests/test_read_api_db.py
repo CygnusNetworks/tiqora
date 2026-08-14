@@ -373,6 +373,7 @@ async def test_queue_ticket_detail_attachment_permissions(
         assert len(articles) == 1
         assert articles[0].subject == "Re: Test"
         assert articles[0].sender_type == "customer"
+        assert articles[0].communication_channel_name == "Email"
 
         body = await ts.get_article_body(ids["reader"], ids["ticket"], ids["article"])
         assert "Hello body" in body.body

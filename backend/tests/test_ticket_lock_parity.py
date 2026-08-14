@@ -144,16 +144,12 @@ async def _make_ticket(
             session,
             factory,
             sysconfig,
-            params=TicketIn(
-                title=title, queue_id=1, state_id=1, priority_id=3, owner_id=1
-            ),
+            params=TicketIn(title=title, queue_id=1, state_id=1, priority_id=3, owner_id=1),
             user_id=1,
         )
 
 
-async def _ticket_row(
-    factory: async_sessionmaker[AsyncSession], ticket_id: int
-) -> tuple[int, int]:
+async def _ticket_row(factory: async_sessionmaker[AsyncSession], ticket_id: int) -> tuple[int, int]:
     async with factory() as session:
         row = (
             await session.execute(
@@ -165,9 +161,7 @@ async def _ticket_row(
         return int(row[0]), int(row[1])
 
 
-async def _history_types(
-    factory: async_sessionmaker[AsyncSession], ticket_id: int
-) -> list[str]:
+async def _history_types(factory: async_sessionmaker[AsyncSession], ticket_id: int) -> list[str]:
     async with factory() as session:
         rows = await session.execute(
             text(
@@ -262,9 +256,7 @@ async def test_acquire_lock_respects_sysconfig_off_mariadb(mariadb_znuny_url: st
     url = _mysql_async(mariadb_znuny_url)
     engine = create_async_engine(url)
     factory = async_sessionmaker(engine, expire_on_commit=False)
-    sysconfig = _make_sysconfig(
-        {"Ticket::Frontend::AgentTicketCompose###RequiredLock": "0"}
-    )
+    sysconfig = _make_sysconfig({"Ticket::Frontend::AgentTicketCompose###RequiredLock": "0"})
 
     async with factory() as session:
         await _seed(session)
@@ -299,17 +291,13 @@ async def test_lock_set_same_state_noop_mariadb(mariadb_znuny_url: str) -> None:
     # Unlocking an unlocked ticket: no history row.
     before = await _history_types(factory, ticket_id)
     async with factory() as session, session.begin():
-        await unlock_ticket(
-            session, ticket_id=ticket_id, user_id=_UID_ALICE, sysconfig=sysconfig
-        )
+        await unlock_ticket(session, ticket_id=ticket_id, user_id=_UID_ALICE, sysconfig=sysconfig)
     assert await _history_types(factory, ticket_id) == before
 
     # Locking twice: exactly one Lock row.
     for _ in range(2):
         async with factory() as session, session.begin():
-            await lock_ticket(
-                session, ticket_id=ticket_id, user_id=_UID_ALICE, sysconfig=sysconfig
-            )
+            await lock_ticket(session, ticket_id=ticket_id, user_id=_UID_ALICE, sysconfig=sysconfig)
     assert (await _history_types(factory, ticket_id)).count("Lock") == 1
 
     await engine.dispose()

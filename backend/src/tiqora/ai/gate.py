@@ -32,6 +32,7 @@ blocked) and pauses auto-reply only.
 
 from __future__ import annotations
 
+from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from tiqora.ai.models import FEATURE_AUTO_REPLY
@@ -46,6 +47,15 @@ from tiqora.domain.settings_store import (
 OPERATION_MODE_PARALLEL = "parallel"
 OPERATION_MODE_TIQORA_PRIMARY = "tiqora_primary"
 VALID_OPERATION_MODES = frozenset({OPERATION_MODE_PARALLEL, OPERATION_MODE_TIQORA_PRIMARY})
+
+# Channels with no Znuny counterpart at all — an auto-reply sent through the
+# Tiqora outbox for one of these channels can never be "missed" by Znuny's
+# own autoresponders, because Znuny never sees these messages in the first
+# place (unlike email, which Znuny still ingests while running in parallel).
+# Deliberately narrow (telegram only, for now); names match the channel
+# name used in the ArticleCreate outbox payload / channels/common.py
+# convention, always lowercase.
+TIQORA_ONLY_CHANNELS: frozenset[str] = frozenset({"telegram"})
 
 
 class AiGateError(RuntimeError):
@@ -116,27 +126,66 @@ async def require_auto_reply_not_paused(session: AsyncSession) -> None:
         )
 
 
-async def require_feature_allowed(session: AsyncSession, feature: str) -> None:
+async def queue_serves_tiqora_only_channel(session: AsyncSession, queue_id: int) -> bool:
+    """True when *queue_id*'s queue name matches the configured ``queue_name``
+    of any :data:`TIQORA_ONLY_CHANNELS` channel (e.g. Telegram) — such a queue
+    has no Znuny counterpart to double-answer alongside, so it is exempt from
+    :func:`require_tiqora_primary` (see :func:`require_feature_allowed`).
+    """
+    # Lazy import: tiqora.channels.common pulls in domain/ticket_write_service
+    # and permissions.engine, which would otherwise create an import cycle
+    # with tiqora.ai.gate at module load time.
+    from tiqora.channels.common import channel_setting
+
+    row = (
+        await session.execute(text("SELECT name FROM queue WHERE id = :qid"), {"qid": queue_id})
+    ).first()
+    if row is None or not row[0]:
+        return False
+    queue_name = str(row[0])
+    for channel in TIQORA_ONLY_CHANNELS:
+        configured_queue_name = await channel_setting(session, channel, "queue_name")
+        if configured_queue_name and configured_queue_name == queue_name:
+            return True
+    return False
+
+
+async def require_feature_allowed(
+    session: AsyncSession, feature: str, *, source_channel: str | None = None
+) -> None:
     """Feature-scoped Readiness-Gate (plan §3.0 v1.1 relaxation, Phase E).
 
     Only :data:`~tiqora.ai.models.FEATURE_AUTO_REPLY` requires
     ``operation_mode=tiqora_primary`` and a clear kill-switch — see the
     module docstring for why. ``manual_assist`` and ``summary`` always pass.
+
+    ``source_channel`` (the triggering article's channel, e.g. from the
+    ArticleCreate outbox payload) skips the ``operation_mode`` check when it
+    is one of :data:`TIQORA_ONLY_CHANNELS` (case-insensitive) — those
+    channels have no Znuny counterpart to double-answer, so auto-reply may
+    run in ``parallel`` operation for them too. The kill-switch
+    (``ai.auto_reply.paused``) is never skipped, regardless of channel.
     """
     if feature == FEATURE_AUTO_REPLY:
-        await require_tiqora_primary(session)
+        is_tiqora_only_channel = (
+            source_channel is not None and source_channel.strip().lower() in TIQORA_ONLY_CHANNELS
+        )
+        if not is_tiqora_only_channel:
+            await require_tiqora_primary(session)
         await require_auto_reply_not_paused(session)
 
 
 __all__ = [
     "OPERATION_MODE_PARALLEL",
     "OPERATION_MODE_TIQORA_PRIMARY",
+    "TIQORA_ONLY_CHANNELS",
     "VALID_OPERATION_MODES",
     "AiAutoReplyPausedError",
     "AiGateError",
     "get_operation_mode",
     "is_auto_reply_paused",
     "is_tiqora_primary",
+    "queue_serves_tiqora_only_channel",
     "require_auto_reply_not_paused",
     "require_feature_allowed",
     "require_tiqora_primary",

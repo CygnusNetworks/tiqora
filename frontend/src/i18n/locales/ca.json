@@ -151,7 +151,8 @@
     "passkeyAddError": "No s'ha pogut afegir la contrasenya.",
     "passkeyDeleteError": "No s'ha pogut eliminar la contrasenya.",
     "passkeyDeleteLastError": "No es pot eliminar l'últim factor 2FA mentre s'aplica.",
-    "passkeyUnsupported": "Aquest navegador no admet claus de pas (WebAuthn)."
+    "passkeyUnsupported": "Aquest navegador no admet claus de pas (WebAuthn).",
+    "passkeyReauthRequired": "For your security, please sign in again before changing your passkeys."
   },
   "dashboard": {
     "greeting": {
@@ -545,7 +546,8 @@
     "extrasRetry": "Torna-ho a provar",
     "customerUnresolved": "Cap registre de client no coincideix amb aquesta adreça; els detalls no estan disponibles.",
     "lockedByBanner": "Bloquejat per {{name}}",
-    "takeOver": "Assumir"
+    "takeOver": "Assumir",
+    "replyViaTelegram": "Reply will be sent via Telegram"
   },
   "search": {
     "title": "Cerca",
@@ -964,7 +966,15 @@
           "detailed": "Detallat"
         },
         "kbCategories": "Categories KB",
-        "kbCategoriesEmpty": "No hi ha categories disponibles."
+        "kbCategoriesEmpty": "No hi ha categories disponibles.",
+        "llmFallback": "Fallback providers",
+        "fallbackAdd": "Add fallback",
+        "fallbackEmpty": "No fallback providers — the primary provider above is used exclusively.",
+        "fallbackMoveUp": "Move up",
+        "fallbackMoveDown": "Move down",
+        "fallbackRemove": "Remove",
+        "clarifySchemaJson": "Clarify schema fields (JSON)",
+        "clarifySchemaJsonPlaceholder": "{\"fields\": [{\"column\": \"wpnum\", \"label\": \"WP-Nummer\"}]}"
       },
       "usage": {
         "title": "Ús",
@@ -1136,7 +1146,8 @@
         "replyLanguageDefault": "Codi d'idioma BCP-47 utilitzat en el mode \"Automàtic\" quan el text no es pot relacionar amb seguretat amb un perfil d'idioma conegut.",
         "allowedStateTypes": "Llista separada per comes de tipus d'estat Znuny permesos (per exemple, \"obert\" o \"obert, recordatori pendent\"), l'IA pot establir un bitllet mitjançant update_ticket_fields, que s'aplica tant per al nom de l'estat com per a l'identificador numèric de l'estat. Buit = només \"obert\" per defecte (reobertura permesa, mai tancar); una llista buida explícita \"[]\" desactiva completament els canvis d'estat.",
         "piiNer": "Detecta els noms de les persones al text mitjançant spaCy NER (alemany + anglès) i els emmascara com a [NAME_n] abans que el contingut arribi al proveïdor de LLM, a més del nom del client i dels remitents. Només està actiu quan l'emmascarament de PII està activat. Els falsos positius són inofensius (només més emmascarament).",
-        "summaryDetail": "Estàndard: paràgrafs compactes, 1–2 frases per document adjunt. Detallat: paràgrafs més detallats i de 3 a 5 frases per document, útil per a les cues amb molts fitxers adjunts PDF."
+        "summaryDetail": "Estàndard: paràgrafs compactes, 1–2 frases per document adjunt. Detallat: paràgrafs més detallats i de 3 a 5 frases per document, útil per a les cues amb molts fitxers adjunts PDF.",
+        "llmFallback": "Providers tried in order, after the primary provider above, when a request fails (rate limit, timeout, error). Each entry has its own optional model override. Priority 1 is always the primary provider/model; entries here are priority 2, 3, …."
       },
       "common": {
         "validId": "Vàlid/no vàlid és una marca d'eliminació suau: marcar una entrada com a vàlida l'amaga als seleccionadors de registres nous sense esborrar les referències existents (per exemple, bitllets, tasques). No hi ha una eliminació difícil."
@@ -1235,6 +1246,9 @@
       "systemAddresses": {
         "email": "Adreça usada com a From per a cues i respostes automàtiques.",
         "name": "Nom mostrat al costat del correu (p. ex. «Support <support@example.com>»)."
+      },
+      "telegram": {
+        "mode": "\"Polling\" has Tiqora fetch updates from Telegram itself (no public URL needed). \"Webhook\" has Telegram push updates to the URL below — requires this server to be reachable over HTTPS."
       }
     },
     "nav": {
@@ -1289,7 +1303,8 @@
       "slas": "SLA",
       "systemAddresses": "Adreces del sistema",
       "notificationEvents": "Esdeveniments de notificació",
-      "ticketAttributeRelations": "Relacions d'atributs"
+      "ticketAttributeRelations": "Relacions d'atributs",
+      "telegram": "Telegram"
     },
     "table": {
       "id": "ID",
@@ -2319,7 +2334,8 @@
       "slas": "Gestioneu els acords de nivell de servei i els terminis.",
       "systemAddresses": "Adreces de correu usades com a From per a cues i respostes automàtiques.",
       "notificationEvents": "Configureu les notificacions als agents basades en esdeveniments.",
-      "ticketAttributeRelations": "Matrius de dependència compatibles amb Znuny (servei/cua, etc.) en CSV."
+      "ticketAttributeRelations": "Matrius de dependència compatibles amb Znuny (servei/cua, etc.) en CSV.",
+      "telegram": "Connect a Telegram bot as a ticket channel."
     },
     "mailAccounts": {
       "title_plural": "Comptes de correu",
@@ -2411,6 +2427,37 @@
       "new": "Relació nova",
       "help": "CSV amb capçalera Attribute1;Attribute2 i parells de valors (Znuny AdminTicketAttributeRelations). Restringeix selectors de formularis (p. ex. Servei → Cua).",
       "confirmDelete": "Suprimir aquesta relació?"
+    },
+    "telegram": {
+      "title": "Telegram",
+      "description": "Connect a Telegram bot as an inbound/outbound ticket channel.",
+      "enabled": "Channel active",
+      "mode": "Mode",
+      "modePolling": "Polling",
+      "modeWebhook": "Webhook",
+      "queue": "Queue",
+      "botToken": "Bot token",
+      "defaultCustomerUser": "Default customer user",
+      "webhookUrl": "Webhook URL",
+      "webhookSecretToken": "Webhook secret token",
+      "webhookRegister": "Register webhook",
+      "webhookRegistering": "Registering…",
+      "webhookUnregister": "Remove webhook",
+      "webhookUnregistering": "Removing…",
+      "webhookRegisterSuccess": "Webhook registered",
+      "webhookRegisterFailure": "Webhook registration failed",
+      "webhookUnregisterSuccess": "Webhook removed",
+      "webhookUnregisterFailure": "Removing the webhook failed",
+      "consentTitle": "GDPR consent",
+      "consentRequired": "Require consent before processing messages",
+      "consentRequiredHelp": "While required, incoming messages from a new Telegram contact are not processed until they confirm consent.",
+      "consentText": "Consent request text",
+      "consentConfirmedText": "Consent confirmation text",
+      "save": "Save",
+      "saving": "Saving…",
+      "saved": "Settings saved.",
+      "saveError": "Saving failed.",
+      "loadError": "Failed to load settings."
     }
   },
   "kb": {

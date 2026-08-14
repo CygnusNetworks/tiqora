@@ -19,7 +19,12 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from tiqora.ai.escalation import EscalationRuleError, validate_escalation_rules
-from tiqora.ai.gate import require_feature_allowed
+from tiqora.ai.gate import (
+    queue_serves_tiqora_only_channel,
+    require_auto_reply_not_paused,
+    require_feature_allowed,
+)
+from tiqora.ai.identity import get_customer_user_columns, valid_column_name
 from tiqora.ai.models import (
     AUTONOMY_MODES,
     FEATURE_AUTO_REPLY,
@@ -257,6 +262,87 @@ def _validate_fields(
         )
 
 
+async def _validate_clarify_schema_json(session: AsyncSession, raw: str | None) -> None:
+    """``clarify_schema_json``, when set, must be ``{"fields": [{"column":
+    str, "label": str}, ...]}`` with at least one field; each ``column`` must
+    match ``^[a-z0-9_]+$`` AND exist as a real ``customer_user`` column
+    (same error class/422 shape as the other queue-policy validations)."""
+    if raw is None or raw == "":
+        return
+    import json
+
+    try:
+        parsed = json.loads(raw)
+    except (json.JSONDecodeError, TypeError) as exc:
+        raise QueuePolicyValidationError(f"clarify_schema_json is not valid JSON: {exc}") from exc
+    if not isinstance(parsed, dict):
+        raise QueuePolicyValidationError(
+            'clarify_schema_json must be a JSON object: {"fields": [...]}'
+        )
+    fields = parsed.get("fields")
+    if not isinstance(fields, list) or not fields:
+        raise QueuePolicyValidationError("clarify_schema_json.fields must be a non-empty array")
+    columns = await get_customer_user_columns(session)
+    for item in fields:
+        if (
+            not isinstance(item, dict)
+            or not isinstance(item.get("column"), str)
+            or not isinstance(item.get("label"), str)
+            or not item.get("column")
+            or not item.get("label")
+        ):
+            raise QueuePolicyValidationError(
+                'clarify_schema_json.fields entries must be {"column": str, "label": str}'
+            )
+        column = item["column"]
+        if not valid_column_name(column):
+            raise QueuePolicyValidationError(
+                f"clarify_schema_json column {column!r} must match ^[a-z0-9_]+$"
+            )
+        if column not in columns:
+            raise QueuePolicyValidationError(
+                f"clarify_schema_json column {column!r} does not exist on customer_user"
+            )
+
+
+async def _validate_llm_fallback_json(session: AsyncSession, raw: str | None) -> None:
+    """``llm_fallback_json``, when set, must be a JSON array of
+    ``{"provider_id": int > 0, "model": str|null}`` entries whose
+    ``provider_id`` refers to an existing :class:`TiqoraLlmProvider` — same
+    error class/422 shape as the other queue-policy validations. Actual
+    fallback resolution/skip-on-missing happens at run time in
+    :func:`tiqora.ai.kb_wiring.build_llm_client`; this only rejects obviously
+    invalid input at write time."""
+    if raw is None or raw == "":
+        return
+    import json
+
+    try:
+        parsed = json.loads(raw)
+    except (json.JSONDecodeError, TypeError) as exc:
+        raise QueuePolicyValidationError(f"llm_fallback_json is not valid JSON: {exc}") from exc
+    if not isinstance(parsed, list):
+        raise QueuePolicyValidationError("llm_fallback_json must be a JSON array")
+    for item in parsed:
+        if not isinstance(item, dict) or "provider_id" not in item:
+            raise QueuePolicyValidationError(
+                'llm_fallback_json entries must be {"provider_id": int, "model": str|null}'
+            )
+        provider_id = item["provider_id"]
+        if not isinstance(provider_id, int) or isinstance(provider_id, bool) or provider_id <= 0:
+            raise QueuePolicyValidationError(
+                f"llm_fallback_json provider_id {provider_id!r} must be a positive integer"
+            )
+        model = item.get("model")
+        if model is not None and not isinstance(model, str):
+            raise QueuePolicyValidationError("llm_fallback_json model must be a string or null")
+        provider = await session.get(TiqoraLlmProvider, provider_id)
+        if provider is None:
+            raise QueuePolicyValidationError(
+                f"llm_fallback_json provider_id {provider_id} does not exist"
+            )
+
+
 async def _validate_vision_provider(session: AsyncSession, vision_provider_id: int | None) -> None:
     if vision_provider_id is None:
         return
@@ -276,17 +362,31 @@ async def _enforce_gate_on_enable(
     enabled_auto_reply: bool | None,
     enabled_summary: bool | None,
     enabled_manual_assist: bool | None,
+    queue_id: int,
 ) -> None:
     """Only re-check the gate when ``enabled_auto_reply`` is *becoming* true.
 
     ``enabled_summary``/``enabled_manual_assist`` are accepted unconditionally
     (plan §3.0 v1.1 relaxation) — the parameters are still passed in so the
     calling code doesn't have to know which flag is gated.
+
+    The ``operation_mode=tiqora_primary`` requirement (but never the
+    ``ai.auto_reply.paused`` kill-switch) is additionally skipped when this
+    queue already serves a :data:`~tiqora.ai.gate.TIQORA_ONLY_CHANNELS`
+    channel (e.g. its name matches Telegram's configured ``queue_name``) —
+    such a queue has no Znuny counterpart to double-answer alongside. If the
+    queue/channel mapping is *renamed* after enabling, the runtime re-check
+    in :func:`tiqora.ai.runtime.run_ticket_agent` catches that on the next
+    run (it re-evaluates ``source_channel`` per event, not just at enable
+    time).
     """
     _ = enabled_summary, enabled_manual_assist
     prev_auto = bool(previous.enabled_auto_reply) if previous else False
     if enabled_auto_reply is True and not prev_auto:
-        await require_feature_allowed(session, FEATURE_AUTO_REPLY)
+        if await queue_serves_tiqora_only_channel(session, queue_id):
+            await require_auto_reply_not_paused(session)
+        else:
+            await require_feature_allowed(session, FEATURE_AUTO_REPLY)
 
 
 async def create_queue_policy(
@@ -302,6 +402,7 @@ async def create_queue_policy(
     service_user_id: int | None = None,
     llm_provider_id: int | None = None,
     model_override: str | None = None,
+    llm_fallback_json: str | None = None,
     vision_provider_id: int | None = None,
     kb_tags: str | None = None,
     kb_category_ids: str | None = None,
@@ -343,6 +444,8 @@ async def create_queue_policy(
         summary_detail=summary_detail,
     )
     _validate_escalation_rules_json(escalation_rules)
+    await _validate_clarify_schema_json(session, clarify_schema_json)
+    await _validate_llm_fallback_json(session, llm_fallback_json)
     await _validate_vision_provider(session, vision_provider_id)
     await _enforce_gate_on_enable(
         session,
@@ -350,6 +453,7 @@ async def create_queue_policy(
         enabled_auto_reply=enabled_auto_reply,
         enabled_summary=enabled_summary,
         enabled_manual_assist=enabled_manual_assist,
+        queue_id=queue_id,
     )
 
     row = TiqoraAiQueuePolicy(
@@ -362,6 +466,7 @@ async def create_queue_policy(
         service_user_id=service_user_id,
         llm_provider_id=llm_provider_id,
         model_override=model_override,
+        llm_fallback_json=llm_fallback_json,
         vision_provider_id=vision_provider_id,
         kb_tags=kb_tags,
         kb_category_ids=kb_category_ids,
@@ -433,6 +538,10 @@ async def update_queue_policy(
     )
     if "escalation_rules" in fields:
         _validate_escalation_rules_json(fields.get("escalation_rules"))
+    if "clarify_schema_json" in fields:
+        await _validate_clarify_schema_json(session, fields.get("clarify_schema_json"))
+    if "llm_fallback_json" in fields:
+        await _validate_llm_fallback_json(session, fields.get("llm_fallback_json"))
     if "vision_provider_id" in fields:
         await _validate_vision_provider(session, fields.get("vision_provider_id"))
     await _enforce_gate_on_enable(
@@ -441,6 +550,7 @@ async def update_queue_policy(
         enabled_auto_reply=fields.get("enabled_auto_reply"),
         enabled_summary=fields.get("enabled_summary"),
         enabled_manual_assist=fields.get("enabled_manual_assist"),
+        queue_id=row.queue_id,
     )
 
     for key, value in fields.items():

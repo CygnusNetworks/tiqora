@@ -151,7 +151,8 @@
     "passkeyAddError": "Přístupový klíč se nepodařilo přidat.",
     "passkeyDeleteError": "Přístupový klíč se nepodařilo odebrat.",
     "passkeyDeleteLastError": "Nelze odebrat poslední 2FA faktor, dokud je 2FA vynuceno.",
-    "passkeyUnsupported": "Tento prohlížeč nepodporuje přístupové klíče (WebAuthn)."
+    "passkeyUnsupported": "Tento prohlížeč nepodporuje přístupové klíče (WebAuthn).",
+    "passkeyReauthRequired": "For your security, please sign in again before changing your passkeys."
   },
   "dashboard": {
     "greeting": {
@@ -545,7 +546,8 @@
     "extrasRetry": "Zkusit znovu",
     "customerUnresolved": "K této adrese neexistuje zákaznický záznam, detaily nejsou k dispozici.",
     "lockedByBanner": "Uzamčeno uživatelem {{name}}",
-    "takeOver": "Převzít"
+    "takeOver": "Převzít",
+    "replyViaTelegram": "Reply will be sent via Telegram"
   },
   "search": {
     "title": "Hledat",
@@ -964,7 +966,15 @@
           "detailed": "Podrobné"
         },
         "kbCategories": "Kategorie KB",
-        "kbCategoriesEmpty": "Žádné kategorie nejsou k dispozici."
+        "kbCategoriesEmpty": "Žádné kategorie nejsou k dispozici.",
+        "llmFallback": "Fallback providers",
+        "fallbackAdd": "Add fallback",
+        "fallbackEmpty": "No fallback providers — the primary provider above is used exclusively.",
+        "fallbackMoveUp": "Move up",
+        "fallbackMoveDown": "Move down",
+        "fallbackRemove": "Remove",
+        "clarifySchemaJson": "Clarify schema fields (JSON)",
+        "clarifySchemaJsonPlaceholder": "{\"fields\": [{\"column\": \"wpnum\", \"label\": \"WP-Nummer\"}]}"
       },
       "usage": {
         "title": "Využití",
@@ -1136,7 +1146,8 @@
         "replyLanguageDefault": "Jazykový kód BCP-47 použitý v režimu „Auto“, když text nelze spolehlivě přiřadit k známému jazykovému profilu.",
         "allowedStateTypes": "Čárkou oddělený seznam povolených typů stavů Znuny (např. „open“ nebo „open,pending reminder“), na které smí AI nastavit tiket přes update_ticket_fields — vynuceno pro název stavu i numerické state id. Prázdné = výchozí pouze „open“ (znovuotevření povoleno, nikdy uzavření); explicitní prázdný seznam „[]“ úplně zakáže změny stavu.",
         "piiNer": "Detekuje jména osob v textu přes spaCy NER (němčina + angličtina) a maskuje je jako [NAME_n] dříve, než obsah dorazí k LLM poskytovateli — navíc k jménu zákazníka a odesílatelům. Aktivní jen při zapnutém maskování PII. Falešné pozitivy jsou neškodné (jen více maskování).",
-        "summaryDetail": "Standardní: kompaktní odstavce, 1–2 věty na přiložený dokument. Podrobné: důkladnější odstavce a 3–5 vět na dokument — vhodné pro fronty s mnoha PDF přílohami."
+        "summaryDetail": "Standardní: kompaktní odstavce, 1–2 věty na přiložený dokument. Podrobné: důkladnější odstavce a 3–5 vět na dokument — vhodné pro fronty s mnoha PDF přílohami.",
+        "llmFallback": "Providers tried in order, after the primary provider above, when a request fails (rate limit, timeout, error). Each entry has its own optional model override. Priority 1 is always the primary provider/model; entries here are priority 2, 3, …."
       },
       "common": {
         "validId": "Platný/neplatný je příznak soft-delete: označení záznamu jako neplatného jej skryje ve výběrech pro nové záznamy, aniž by smazalo existující reference (např. tikety, přiřazení). Hard delete neexistuje."
@@ -1235,6 +1246,9 @@
       "systemAddresses": {
         "email": "Adresa používaná jako From pro fronty a auto-odpovědi.",
         "name": "Zobrazované jméno vedle e-mailu (např. „Support <support@example.com>“)."
+      },
+      "telegram": {
+        "mode": "\"Polling\" has Tiqora fetch updates from Telegram itself (no public URL needed). \"Webhook\" has Telegram push updates to the URL below — requires this server to be reachable over HTTPS."
       }
     },
     "nav": {
@@ -1289,7 +1303,8 @@
       "slas": "SLA",
       "systemAddresses": "Systémové adresy",
       "notificationEvents": "Notifikační události",
-      "ticketAttributeRelations": "Vztahy atributů"
+      "ticketAttributeRelations": "Vztahy atributů",
+      "telegram": "Telegram"
     },
     "table": {
       "id": "ID",
@@ -2319,7 +2334,8 @@
       "slas": "Spravujte dohody o úrovni služeb a lhůty.",
       "systemAddresses": "E-mailové adresy používané jako From pro fronty a auto-odpovědi.",
       "notificationEvents": "Konfigurujte událostmi řízené notifikace agentů.",
-      "ticketAttributeRelations": "Matice závislostí kompatibilní se Znuny (služba/fronta aj.) ve formátu CSV."
+      "ticketAttributeRelations": "Matice závislostí kompatibilní se Znuny (služba/fronta aj.) ve formátu CSV.",
+      "telegram": "Connect a Telegram bot as a ticket channel."
     },
     "mailAccounts": {
       "title_plural": "Poštovní účty",
@@ -2411,6 +2427,37 @@
       "new": "Nový vztah",
       "help": "CSV s hlavičkou Attribute1;Attribute2 a páry hodnot (Znuny AdminTicketAttributeRelations). Omezuje výběry ve formulářích (např. Služba → Fronta).",
       "confirmDelete": "Smazat tento vztah?"
+    },
+    "telegram": {
+      "title": "Telegram",
+      "description": "Connect a Telegram bot as an inbound/outbound ticket channel.",
+      "enabled": "Channel active",
+      "mode": "Mode",
+      "modePolling": "Polling",
+      "modeWebhook": "Webhook",
+      "queue": "Queue",
+      "botToken": "Bot token",
+      "defaultCustomerUser": "Default customer user",
+      "webhookUrl": "Webhook URL",
+      "webhookSecretToken": "Webhook secret token",
+      "webhookRegister": "Register webhook",
+      "webhookRegistering": "Registering…",
+      "webhookUnregister": "Remove webhook",
+      "webhookUnregistering": "Removing…",
+      "webhookRegisterSuccess": "Webhook registered",
+      "webhookRegisterFailure": "Webhook registration failed",
+      "webhookUnregisterSuccess": "Webhook removed",
+      "webhookUnregisterFailure": "Removing the webhook failed",
+      "consentTitle": "GDPR consent",
+      "consentRequired": "Require consent before processing messages",
+      "consentRequiredHelp": "While required, incoming messages from a new Telegram contact are not processed until they confirm consent.",
+      "consentText": "Consent request text",
+      "consentConfirmedText": "Consent confirmation text",
+      "save": "Save",
+      "saving": "Saving…",
+      "saved": "Settings saved.",
+      "saveError": "Saving failed.",
+      "loadError": "Failed to load settings."
     }
   },
   "kb": {

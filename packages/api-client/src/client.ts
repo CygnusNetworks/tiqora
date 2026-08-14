@@ -39,6 +39,11 @@ export type TicketDetail = Schemas["TicketDetail"];
 export type TicketPermissions = Schemas["TicketPermissions"];
 export type ArticleListItem = Schemas["ArticleListItem"];
 export type ArticleBody = Schemas["ArticleBody"];
+export type ChannelConfigOut = Schemas["ChannelConfigOut"];
+export type ChannelConfigUpdate = Schemas["ChannelConfigUpdate"];
+export type TelegramWebhookRegisterRequest = Schemas["TelegramWebhookRegisterRequest"];
+export type TelegramWebhookRegisterResponse = Schemas["TelegramWebhookRegisterResponse"];
+export type TelegramWebhookResponse = Schemas["TelegramWebhookResponse"];
 export type AttachmentMetaOut = Schemas["AttachmentMetaOut"];
 export type HistoryEntry = Schemas["HistoryEntry"];
 export type CustomerUserOut = Schemas["CustomerUserOut"];
@@ -2263,6 +2268,38 @@ export class ApiClient {
   get adminMailAccounts() {
     return this.adminCrud<MailAccountOut, MailAccountCreate, MailAccountUpdate>(
       "/api/v1/admin/mail-accounts",
+    );
+  }
+
+  /** Additional channel plugin config (SMS, WhatsApp, Phone, Telegram). */
+  get adminChannels() {
+    const base = "/api/v1/admin/channels";
+    return {
+      list: (signal?: AbortSignal) =>
+        this.request<ChannelConfigOut[]>("GET", base, { signal }),
+      get: (name: string, signal?: AbortSignal) =>
+        this.request<ChannelConfigOut>("GET", `${base}/${name}`, { signal }),
+      update: (name: string, body: ChannelConfigUpdate, signal?: AbortSignal) =>
+        this.request<ChannelConfigOut>("PUT", `${base}/${name}`, { body, signal }),
+    };
+  }
+
+  telegramWebhookRegister(
+    body: TelegramWebhookRegisterRequest = {},
+    signal?: AbortSignal,
+  ) {
+    return this.request<TelegramWebhookRegisterResponse>(
+      "POST",
+      "/api/v1/channels/telegram/webhook-register",
+      { body, signal },
+    );
+  }
+
+  telegramWebhookUnregister(signal?: AbortSignal) {
+    return this.request<TelegramWebhookResponse>(
+      "POST",
+      "/api/v1/channels/telegram/webhook-unregister",
+      { signal },
     );
   }
 

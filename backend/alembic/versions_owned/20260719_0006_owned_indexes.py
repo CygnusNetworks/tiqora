@@ -4,7 +4,7 @@ Revision ID: 20260719_0006
 Revises: 20260720_0007
 Create Date: 2026-07-19
 
-Rebased onto ``20260807_0031`` (password-setup tokens) so the
+Rebased onto ``20260813_0033`` (Telegram DSGVO consent columns) so the
 combined chain (tiqora + owned) keeps a single head — see
 ``tests/test_migration_gate.py``.
 
@@ -34,7 +34,7 @@ from collections.abc import Sequence
 from alembic import op
 
 revision: str = "20260719_0006"
-down_revision: str | None = "20260807_0031"
+down_revision: str | None = "20260813_0033"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 

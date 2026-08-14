@@ -151,7 +151,8 @@
     "passkeyAddError": "Nu s-a putut adăuga cheia de acces.",
     "passkeyDeleteError": "Nu s-a putut elimina cheia de acces.",
     "passkeyDeleteLastError": "Nu se poate elimina ultimul factor 2FA în timp ce 2FA este aplicat.",
-    "passkeyUnsupported": "Acest browser nu acceptă cheile de acces (WebAuthn)."
+    "passkeyUnsupported": "Acest browser nu acceptă cheile de acces (WebAuthn).",
+    "passkeyReauthRequired": "For your security, please sign in again before changing your passkeys."
   },
   "dashboard": {
     "greeting": {
@@ -545,7 +546,8 @@
     "extrasRetry": "Încearcă din nou",
     "customerUnresolved": "Nicio înregistrare de client nu corespunde acestei adrese; detaliile nu sunt disponibile.",
     "lockedByBanner": "Blocat de {{name}}",
-    "takeOver": "Preia"
+    "takeOver": "Preia",
+    "replyViaTelegram": "Reply will be sent via Telegram"
   },
   "search": {
     "title": "Caută",
@@ -964,7 +966,15 @@
           "detailed": "Detaliat"
         },
         "kbCategories": "categorii KB",
-        "kbCategoriesEmpty": "Nu există categorii disponibile."
+        "kbCategoriesEmpty": "Nu există categorii disponibile.",
+        "llmFallback": "Fallback providers",
+        "fallbackAdd": "Add fallback",
+        "fallbackEmpty": "No fallback providers — the primary provider above is used exclusively.",
+        "fallbackMoveUp": "Move up",
+        "fallbackMoveDown": "Move down",
+        "fallbackRemove": "Remove",
+        "clarifySchemaJson": "Clarify schema fields (JSON)",
+        "clarifySchemaJsonPlaceholder": "{\"fields\": [{\"column\": \"wpnum\", \"label\": \"WP-Nummer\"}]}"
       },
       "usage": {
         "title": "Utilizare",
@@ -1136,7 +1146,8 @@
         "replyLanguageDefault": "Codul de limbă BCP-47 utilizat în modul „Automat” atunci când textul nu poate fi asociat cu încredere unui profil de limbă cunoscut.",
         "allowedStateTypes": "Listă separată prin virgulă de tipuri de stări Znuny permise (de exemplu, „deschis” sau „deschis, memento în așteptare”) la care AI poate seta un bilet prin update_ticket_fields – aplicat atât pentru numele statului, cât și pentru id-ul numeric al stării. Gol = numai „deschis” implicit (redeschidere permisă, niciodată închidere); o listă explicită goală „[]” dezactivează complet schimbările de stare.",
         "piiNer": "Detectează numele persoanelor în text prin spaCy NER (germană + engleză) și le maschează ca [NAME_n] înainte ca conținutul să ajungă la furnizorul LLM - pe lângă numele clientului și expeditorii. Activ numai când mascarea PII este activată. Falsele pozitive sunt inofensive (doar mai multă mascare).",
-        "summaryDetail": "Standard: paragrafe compacte, 1–2 propoziții pentru fiecare document atașat. Detaliat: paragrafe mai detaliate și 3–5 propoziții per document — util pentru cozile cu multe atașamente PDF."
+        "summaryDetail": "Standard: paragrafe compacte, 1–2 propoziții pentru fiecare document atașat. Detaliat: paragrafe mai detaliate și 3–5 propoziții per document — util pentru cozile cu multe atașamente PDF.",
+        "llmFallback": "Providers tried in order, after the primary provider above, when a request fails (rate limit, timeout, error). Each entry has its own optional model override. Priority 1 is always the primary provider/model; entries here are priority 2, 3, …."
       },
       "common": {
         "validId": "Valabil/invalid este un semnal de ștergere soft: marcarea unei intrări ca fiind nevalidă o ascunde de selecție pentru înregistrări noi, fără a șterge referințele existente (de exemplu, bilete, sarcini). Nu există ștergere tare."
@@ -1235,6 +1246,9 @@
       "systemAddresses": {
         "email": "Adresa folosită ca From pentru cozi și auto-răspunsuri.",
         "name": "Numele afișat lângă e-mail (ex. „Support <support@example.com>”)."
+      },
+      "telegram": {
+        "mode": "\"Polling\" has Tiqora fetch updates from Telegram itself (no public URL needed). \"Webhook\" has Telegram push updates to the URL below — requires this server to be reachable over HTTPS."
       }
     },
     "nav": {
@@ -1289,7 +1303,8 @@
       "slas": "SLA-uri",
       "systemAddresses": "Adrese de sistem",
       "notificationEvents": "Evenimente de notificare",
-      "ticketAttributeRelations": "Relații de atribute"
+      "ticketAttributeRelations": "Relații de atribute",
+      "telegram": "Telegram"
     },
     "table": {
       "id": "ID",
@@ -2319,7 +2334,8 @@
       "slas": "Gestionați acordurile de nivel de serviciu și termenele.",
       "systemAddresses": "Adrese e-mail folosite ca From pentru cozi și auto-răspunsuri.",
       "notificationEvents": "Configurați notificările agenților declanșate de evenimente.",
-      "ticketAttributeRelations": "Matrici de dependență compatibile Znuny (serviciu/coadă etc.) în CSV."
+      "ticketAttributeRelations": "Matrici de dependență compatibile Znuny (serviciu/coadă etc.) în CSV.",
+      "telegram": "Connect a Telegram bot as a ticket channel."
     },
     "mailAccounts": {
       "title_plural": "Conturi de mail",
@@ -2411,6 +2427,37 @@
       "new": "Relație nouă",
       "help": "CSV cu antet Attribute1;Attribute2 și perechi de valori (Znuny AdminTicketAttributeRelations). Restricționează selectoarele din formulare (ex. Serviciu → Coadă).",
       "confirmDelete": "Ștergeți această relație?"
+    },
+    "telegram": {
+      "title": "Telegram",
+      "description": "Connect a Telegram bot as an inbound/outbound ticket channel.",
+      "enabled": "Channel active",
+      "mode": "Mode",
+      "modePolling": "Polling",
+      "modeWebhook": "Webhook",
+      "queue": "Queue",
+      "botToken": "Bot token",
+      "defaultCustomerUser": "Default customer user",
+      "webhookUrl": "Webhook URL",
+      "webhookSecretToken": "Webhook secret token",
+      "webhookRegister": "Register webhook",
+      "webhookRegistering": "Registering…",
+      "webhookUnregister": "Remove webhook",
+      "webhookUnregistering": "Removing…",
+      "webhookRegisterSuccess": "Webhook registered",
+      "webhookRegisterFailure": "Webhook registration failed",
+      "webhookUnregisterSuccess": "Webhook removed",
+      "webhookUnregisterFailure": "Removing the webhook failed",
+      "consentTitle": "GDPR consent",
+      "consentRequired": "Require consent before processing messages",
+      "consentRequiredHelp": "While required, incoming messages from a new Telegram contact are not processed until they confirm consent.",
+      "consentText": "Consent request text",
+      "consentConfirmedText": "Consent confirmation text",
+      "save": "Save",
+      "saving": "Saving…",
+      "saved": "Settings saved.",
+      "saveError": "Saving failed.",
+      "loadError": "Failed to load settings."
     }
   },
   "kb": {

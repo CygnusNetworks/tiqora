@@ -1,8 +1,8 @@
-# Additional channels: SMS, WhatsApp Business, Phone/CTI
+# Additional channels: SMS, WhatsApp Business, Phone/CTI, Telegram
 
 Beyond email (`channels/email/`, see the postmaster pipeline docs) and the
-customer web portal, Tiqora ships three more `CommunicationChannel` plugins.
-All three are **disabled by default** — they are integrations an operator
+customer web portal, Tiqora ships four more `CommunicationChannel` plugins.
+All four are **disabled by default** — they are integrations an operator
 opts into, not something that activates on upgrade. Every plugin funnels
 ticket/article writes through `domain/ticket_write_service` — never writes
 tickets/articles directly — and shares building blocks from
@@ -97,9 +97,100 @@ the built-in `Phone` communication channel.
 - **Config keys** (`channel.phone.*`): `enabled`, `inbound_shared_secret`,
   `default_customer_user`, `queue_name`.
 
+## Telegram (`channels/telegram/`)
+
+Talks to the [Telegram Bot API](https://core.telegram.org/bots/api). Unlike
+SMS/WhatsApp/Phone, Telegram chat_ids are not looked up against
+`customer_user` the way phone numbers are — an unmapped Telegram user
+(the common case) is a genuinely anonymous chat until identified (see AI
+identity verification below), so this plugin does **not** reuse
+`resolve_ticket_for_inbound`/`resolve_customer_by_phone`. It keys ticket
+continuity off the chat itself (see "Identity / contact mapping").
+
+- **Transports** (`channel.telegram.mode`, default `"polling"`) — exactly
+  one must be active for a given bot; running both double-processes every
+  update:
+  - **Polling**: the `telegram_poller` daemon (`worker/telegram_poller.py`,
+    slug `telegram_poller`, gated by `daemon.telegram_poller.enabled` —
+    default **OFF**, no Znuny counterpart) long-polls `getUpdates`.
+    `getUpdates` is a **single-consumer** API — Telegram serves each update
+    to only one caller and advances past it once acknowledged, with no
+    redelivery. **Never run two worker replicas against the same bot
+    token**: they would race for updates and each one would silently miss
+    roughly half the traffic. The offset is persisted in
+    `tiqora_settings` (`channel.telegram.update_offset`) and advances in
+    the same transaction as the article/ticket write, so a per-update
+    failure aborts the tick rather than skipping the message.
+  - **Webhook**: `POST /api/v1/channels/telegram/webhook`, one Telegram
+    update per request, authenticated via the
+    `X-Telegram-Bot-Api-Secret-Token` header (constant-time compared
+    against `channel.telegram.webhook_secret_token`). Requires
+    `channel.telegram.mode = "webhook"` (409 otherwise, so the poller and
+    the webhook route can't both be live by accident).
+    `POST /api/v1/channels/telegram/webhook-register` (admin) calls
+    Telegram's `setWebhook` with `channel.telegram.webhook_url` and the
+    secret token; `.../webhook-unregister` calls `deleteWebhook`.
+- **Identity / contact mapping**: every inbound message upserts a
+  `tiqora_telegram_contact` row (`chat_id`, `telegram_user_id`, `username`,
+  `display_name`, and — once mapped — `customer_user_login`). Until a
+  contact is mapped, its ticket/article writes use the channel's
+  `default_customer_user` setting; ticket continuity for an unmapped chat
+  is instead tracked by matching the `<chat_id@telegram.invalid>` marker
+  embedded in the `From` address of the chat's own prior articles (so two
+  different anonymous Telegram users never get merged into one ticket).
+  Once a contact *is* mapped (manually by an admin, or via the AI identity
+  exchange — see [ai-integration.md](ai-integration.md)), normal
+  `customer_user_id`-based ticket lookup applies.
+- **GDPR consent**: `channel.telegram.consent_required` (default **ON**).
+  Before anything else runs, an unconsented chat gets an inline "✅
+  Zustimmen" button (`channel.telegram.consent_text`, re-prompted at most
+  once per hour per chat); tapping it sets
+  `tiqora_telegram_contact.consent_time` and sends
+  `channel.telegram.consent_confirmed_text`. **Nothing is stored** for a
+  chat before consent — no ticket, no article, not even the message body;
+  only the identity fields already needed to show the prompt
+  (`chat_id`/`telegram_user_id`/`username`/`display_name`) are upserted.
+  The customer has to resend their message after consenting.
+- **Outbound**: no separate `/send` endpoint — an agent's reply goes through
+  the same `add_article` dispatch seam as every other channel
+  (`channels/telegram/outbound.py::deliver_agent_telegram_reply`), send-then-store
+  like the email outbound path: `sendMessage` first, article row only on
+  success (a failed send never produces a false "sent" customer-visible
+  note). The chat_id is resolved from the contact's mapping, falling back to
+  parsing the most recent inbound Telegram article's `From` address.
+- **`from_address` format**: `"{display_name or @username or chat_id}
+  <{chat_id}@telegram.invalid>"` — the synthetic `@telegram.invalid` domain
+  and the embedded `chat_id` are what both the ticket-continuity lookup and
+  outbound chat_id resolution parse back out; never hand-construct or rely
+  on this being a deliverable address.
+- **Attachments**: photo/document/voice/video/sticker messages download via
+  the Bot API `getFile` + file endpoint and are stored as article
+  attachments; the caption (if any) becomes the article body, otherwise a
+  placeholder (`[Foto]`, `[Dokument: name]`, ...). A download failure keeps
+  the placeholder text and appends a note rather than losing the message.
+- **Config keys** (`channel.telegram.*`): `enabled`, `bot_token`, `mode`
+  (`polling`|`webhook`), `webhook_url`, `webhook_secret_token`,
+  `default_customer_user`, `queue_name`, `consent_required`, `consent_text`,
+  `consent_confirmed_text`.
+
+### Known limitations
+
+- **Znuny renders Telegram articles as quasi-internal.** Znuny's own UI has
+  no concept of the `Telegram` communication channel Tiqora registers (same
+  situation as SMS/WhatsApp — see "Uncertainties" below); if an operator
+  still looks at tickets through Znuny's agent interface during parallel
+  operation, Telegram articles show up looking internal-only even though
+  Tiqora marks them customer-visible. Cosmetic in Znuny's UI, not a data
+  problem — Tiqora's own UI renders them correctly.
+- **Disable the target queue's Znuny autoresponder.** Telegram tickets are
+  Tiqora-only (Znuny never receives them), so a Znuny autoresponder still
+  configured on the queue Telegram tickets land in would never fire (Znuny
+  never sees the ticket) — leave it disabled to avoid confusion, not because
+  it would double-send.
+
 ## Admin config
 
-`GET/PUT /api/v1/admin/channels` and `/api/v1/admin/channels/{sms,whatsapp,phone}`
+`GET/PUT /api/v1/admin/channels` and `/api/v1/admin/channels/{sms,whatsapp,phone,telegram}`
 (admin group required) read/write the `tiqora_settings` keys above.
 `PUT` accepts `{"enabled": bool, "config": {...}}`; unknown config keys are
 rejected (422) rather than silently written. `GET` responses mask any key

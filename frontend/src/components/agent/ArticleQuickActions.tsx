@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { ArticleListItem } from "@/lib/api";
-import { isInternalNote } from "@/lib/articleChannel";
+import { channelNameOf, isInternalNote } from "@/lib/articleChannel";
 import { Button } from "@/components/ui/Button";
 import { Menu, MenuItem } from "@/components/ui/Menu";
 import { useReplyDraft } from "@/lib/replyDrafts";
@@ -126,6 +126,7 @@ export function ArticleQuickActions({
           replyAll={dialog === "replyAll"}
           open={dialog === "reply" || dialog === "replyAll"}
           onClose={() => setDialog(null)}
+          channelName={channelNameOf(article)}
         />
       )}
       <ForwardDialog

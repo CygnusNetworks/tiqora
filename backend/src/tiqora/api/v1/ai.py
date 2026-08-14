@@ -247,7 +247,9 @@ async def request_manual_draft(
                     detail="Sender is on the ignored-senders list for this queue",
                 )
 
-    llm = await build_llm_client(session, settings, policy.llm_provider_id, policy.model_override)
+    llm = await build_llm_client(
+        session, settings, policy.llm_provider_id, policy.model_override, policy.llm_fallback_json
+    )
     bundle = await kb_bundle(session, settings, user.id, policy)
 
     try:
@@ -301,7 +303,9 @@ async def request_summarize(
             status_code=status.HTTP_409_CONFLICT, detail="Summary is disabled for this queue"
         )
 
-    llm = await build_llm_client(session, settings, policy.llm_provider_id, policy.model_override)
+    llm = await build_llm_client(
+        session, settings, policy.llm_provider_id, policy.model_override, policy.llm_fallback_json
+    )
 
     try:
         result: SummaryResult = await summarize_ticket(
