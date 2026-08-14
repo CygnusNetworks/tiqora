@@ -1609,9 +1609,7 @@ async def test_auto_send_stamps_audit_run_id_onto_origin_row(mariadb_znuny_url: 
         async with factory() as session:
             run_id = (
                 await session.execute(
-                    text(
-                        "SELECT run_id FROM tiqora_ai_article_origin WHERE article_id = :aid"
-                    ),
+                    text("SELECT run_id FROM tiqora_ai_article_origin WHERE article_id = :aid"),
                     {"aid": result.article_id},
                 )
             ).scalar_one()

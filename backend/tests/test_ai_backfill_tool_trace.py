@@ -184,9 +184,7 @@ async def test_backfill_reconstructs_multi_round_tool_calls(mariadb_znuny_url: s
                     feature=FEATURE_AUTO_REPLY,
                     ticket_id=seed["ticket_id"],
                     queue_id=seed["queue_id"],
-                    request_json=json.dumps(
-                        {"messages": [{"role": "system", "content": "sys"}]}
-                    ),
+                    request_json=json.dumps({"messages": [{"role": "system", "content": "sys"}]}),
                 )
             )
             # Round 2's audit row (closest to origin.created): input now
