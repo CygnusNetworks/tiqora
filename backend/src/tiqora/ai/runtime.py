@@ -640,7 +640,8 @@ async def _run_identity_exchange(
     args = tool_call.arguments or {}
     kind = args.get("kind")
     body = args.get("body")
-    subject = args.get("subject") if isinstance(args.get("subject"), str) else ""
+    subject_raw = args.get("subject")
+    subject = subject_raw if isinstance(subject_raw, str) else ""
     if kind not in ("reply", "clarify") or not isinstance(body, str) or not body.strip():
         state.last_run_at = datetime.now(UTC).replace(tzinfo=None)
         await session.commit()

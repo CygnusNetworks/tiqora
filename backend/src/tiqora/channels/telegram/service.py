@@ -293,8 +293,11 @@ async def _handle_consent_callback(
     await session.flush()
 
     callback_query_id = str(callback_query.get("id") or "")
-    confirmed_text = await channel_setting(
-        session, CHANNEL_NAME, "consent_confirmed_text", _DEFAULT_CONSENT_CONFIRMED_TEXT
+    confirmed_text = (
+        await channel_setting(
+            session, CHANNEL_NAME, "consent_confirmed_text", _DEFAULT_CONSENT_CONFIRMED_TEXT
+        )
+        or _DEFAULT_CONSENT_CONFIRMED_TEXT
     )
     if gateway is not None:
         await gateway.answer_callback_query(callback_query_id, confirmed_text)
@@ -324,8 +327,9 @@ async def _maybe_prompt_consent(
 
     if gateway is None:
         return
-    consent_text = await channel_setting(
-        session, CHANNEL_NAME, "consent_text", _DEFAULT_CONSENT_TEXT
+    consent_text = (
+        await channel_setting(session, CHANNEL_NAME, "consent_text", _DEFAULT_CONSENT_TEXT)
+        or _DEFAULT_CONSENT_TEXT
     )
     try:
         await gateway.send_message(contact.chat_id, consent_text, reply_markup=_CONSENT_KEYBOARD)
