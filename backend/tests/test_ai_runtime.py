@@ -2705,3 +2705,87 @@ async def test_identity_exchange_gets_same_completion_budget(
         assert llm.max_tokens_seen == [4096]
     finally:
         await engine.dispose()
+
+
+# ---------------------------------------------------------------------------
+# Plain-text nudge (reasoning models answering as content instead of a tool)
+# ---------------------------------------------------------------------------
+
+
+def _plain_text_response(text_body: str) -> LlmResponse:
+    return LlmResponse(
+        content=text_body,
+        tool_calls=[],
+        usage=LlmUsage(prompt_tokens=10, completion_tokens=5),
+    )
+
+
+async def test_plain_text_final_answer_is_nudged_into_a_proposal(
+    mariadb_znuny_url: str,
+) -> None:
+    """A finished customer reply emitted as plain content (no tool call) must
+    not end the run as "no proposal" — the loop nudges the model to re-issue
+    it via propose_customer_message."""
+    seed = _seed_ticket(mariadb_znuny_url, ns=61)
+    engine = create_async_engine(_mysql_async(mariadb_znuny_url))
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    settings = get_settings()
+    try:
+        async with factory() as session:
+            await _setup_policy(session, seed=seed, autonomy=AUTONOMY_FULL)
+
+        body = "Tausche bitte das Patchkabel zwischen Dose und Router aus."
+        llm = ScriptedLlm(
+            [
+                _plain_text_response(body),
+                _propose_response("reply", body),
+            ]
+        )
+        async with factory() as session:
+            result = await run_ticket_agent(
+                session,
+                settings=settings,
+                llm=llm,
+                ticket_id=seed["ticket_id"],
+                trigger=TRIGGER_MANUAL,
+                acting_user_id=seed["agent_id"],
+                run_id="run-nudge-1",
+            )
+        assert result.status == "drafted"
+        assert result.draft_id is not None
+        assert llm.calls == 2
+        # The corrective user message reached the second call.
+        assert any(
+            m.role == "user" and "propose_customer_message" in (m.content or "")
+            for m in llm.last_messages
+        )
+    finally:
+        await engine.dispose()
+
+
+async def test_plain_text_nudges_are_bounded_then_run_skips(
+    mariadb_znuny_url: str,
+) -> None:
+    seed = _seed_ticket(mariadb_znuny_url, ns=62)
+    engine = create_async_engine(_mysql_async(mariadb_znuny_url))
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    settings = get_settings()
+    try:
+        async with factory() as session:
+            await _setup_policy(session, seed=seed, autonomy=AUTONOMY_FULL)
+
+        llm = ScriptedLlm([_plain_text_response("Immer nur Text.") for _ in range(3)])
+        async with factory() as session:
+            result = await run_ticket_agent(
+                session,
+                settings=settings,
+                llm=llm,
+                ticket_id=seed["ticket_id"],
+                trigger=TRIGGER_MANUAL,
+                acting_user_id=seed["agent_id"],
+                run_id="run-nudge-2",
+            )
+        assert result.status == "skipped"
+        assert llm.calls == 3  # initial + 2 nudged retries, then give up
+    finally:
+        await engine.dispose()
