@@ -966,7 +966,15 @@
           "detailed": "विस्तृत"
         },
         "kbCategories": "केबी श्रेणियां",
-        "kbCategoriesEmpty": "कोई श्रेणियां उपलब्ध नहीं."
+        "kbCategoriesEmpty": "कोई श्रेणियां उपलब्ध नहीं.",
+        "llmFallback": "Fallback providers",
+        "fallbackAdd": "Add fallback",
+        "fallbackEmpty": "No fallback providers — the primary provider above is used exclusively.",
+        "fallbackMoveUp": "Move up",
+        "fallbackMoveDown": "Move down",
+        "fallbackRemove": "Remove",
+        "clarifySchemaJson": "Clarify schema fields (JSON)",
+        "clarifySchemaJsonPlaceholder": "{\"fields\": [{\"column\": \"wpnum\", \"label\": \"WP-Nummer\"}]}"
       },
       "usage": {
         "title": "उपयोग",
@@ -1138,7 +1146,8 @@
         "replyLanguageDefault": "BCP-47 भाषा कोड का उपयोग \"ऑटो\" मोड में किया जाता है जब पाठ को किसी ज्ञात भाषा प्रोफ़ाइल से आत्मविश्वास से मिलान नहीं किया जा सकता है।",
         "allowedStateTypes": "अनुमत Znuny राज्य प्रकारों की अल्पविराम से अलग की गई सूची (उदाहरण के लिए \"खुला\" या \"खुला, लंबित अनुस्मारक\") AI update_ticket_fields के माध्यम से टिकट सेट कर सकता है - जो राज्य के नाम और संख्यात्मक राज्य आईडी दोनों के लिए लागू होता है। खाली = डिफ़ॉल्ट केवल \"खुला\" (फिर से खोलने की अनुमति, कभी बंद नहीं); एक स्पष्ट खाली सूची \"[]\" राज्य परिवर्तनों को पूरी तरह से अक्षम कर देती है।",
         "piiNer": "स्पासी एनईआर (जर्मन + अंग्रेजी) के माध्यम से पाठ में व्यक्ति के नाम का पता लगाता है और ग्राहक के नाम और प्रेषकों के अलावा एलएलएम प्रदाता तक सामग्री पहुंचने से पहले उन्हें [NAME_n] के रूप में मास्क करता है। केवल तभी सक्रिय जब PII मास्किंग चालू हो। झूठी सकारात्मकताएँ हानिरहित होती हैं (केवल अधिक छिपाने वाली)।",
-        "summaryDetail": "मानक: संक्षिप्त अनुच्छेद, प्रति संलग्न दस्तावेज़ 1-2 वाक्य। विस्तृत: अधिक विस्तृत पैराग्राफ और प्रति दस्तावेज़ 3-5 वाक्य - कई पीडीएफ अनुलग्नकों वाली कतारों के लिए उपयोगी।"
+        "summaryDetail": "मानक: संक्षिप्त अनुच्छेद, प्रति संलग्न दस्तावेज़ 1-2 वाक्य। विस्तृत: अधिक विस्तृत पैराग्राफ और प्रति दस्तावेज़ 3-5 वाक्य - कई पीडीएफ अनुलग्नकों वाली कतारों के लिए उपयोगी।",
+        "llmFallback": "Providers tried in order, after the primary provider above, when a request fails (rate limit, timeout, error). Each entry has its own optional model override. Priority 1 is always the primary provider/model; entries here are priority 2, 3, …."
       },
       "common": {
         "validId": "वैध/अमान्य एक सॉफ्ट-डिलीट फ़्लैग है: किसी प्रविष्टि को अमान्य चिह्नित करना मौजूदा संदर्भों (जैसे टिकट, असाइनमेंट) को हटाए बिना नए रिकॉर्ड के लिए इसे चुनने वालों से छुपाता है। कोई हार्ड डिलीट नहीं है."

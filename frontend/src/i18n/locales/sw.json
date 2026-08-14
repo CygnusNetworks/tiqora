@@ -966,7 +966,15 @@
           "detailed": "Kina"
         },
         "kbCategories": "Kategoria za KB",
-        "kbCategoriesEmpty": "Hakuna kategoria zinazopatikana."
+        "kbCategoriesEmpty": "Hakuna kategoria zinazopatikana.",
+        "llmFallback": "Fallback providers",
+        "fallbackAdd": "Add fallback",
+        "fallbackEmpty": "No fallback providers — the primary provider above is used exclusively.",
+        "fallbackMoveUp": "Move up",
+        "fallbackMoveDown": "Move down",
+        "fallbackRemove": "Remove",
+        "clarifySchemaJson": "Clarify schema fields (JSON)",
+        "clarifySchemaJsonPlaceholder": "{\"fields\": [{\"column\": \"wpnum\", \"label\": \"WP-Nummer\"}]}"
       },
       "usage": {
         "title": "Matumizi",
@@ -1138,7 +1146,8 @@
         "replyLanguageDefault": "Msimbo wa lugha wa BCP-47 unatumika katika hali ya \"Otomatiki\" wakati maandishi hayawezi kulinganishwa kwa ujasiri na wasifu wa lugha unaojulikana.",
         "allowedStateTypes": "Orodha iliyotenganishwa kwa koma ya aina zinazoruhusiwa za jimbo la Znuny (k.m. \"wazi\" au \"kikumbusho kilichofunguliwa, kinachosubiri\") AI inaweza kuweka tikiti kupitia sehemu_ya_tiketi - kutekelezwa kwa jina la jimbo na kitambulisho cha hali ya nambari. Tupu = chaguo-msingi \"fungua\" pekee (kufungua upya kunaruhusiwa, kutofunga kamwe); orodha ya wazi tupu \"[]\" huzima mabadiliko ya hali kabisa.",
         "piiNer": "Hutambua majina ya watu katika maandishi kupitia spaCy NER (Kijerumani + Kiingereza) na kuyafunika kama [NAME_n] kabla ya maudhui kumfikia mtoa huduma wa LLM — pamoja na jina la mteja na watumaji. Inatumika tu wakati ufunikaji wa PII umewashwa. Chanya za uwongo hazina madhara (masking zaidi tu).",
-        "summaryDetail": "Kawaida: aya kompakt, sentensi 1-2 kwa kila hati iliyoambatishwa. Kina: aya za kina zaidi na sentensi 3-5 kwa kila hati - muhimu kwa foleni zilizo na viambatisho vingi vya PDF."
+        "summaryDetail": "Kawaida: aya kompakt, sentensi 1-2 kwa kila hati iliyoambatishwa. Kina: aya za kina zaidi na sentensi 3-5 kwa kila hati - muhimu kwa foleni zilizo na viambatisho vingi vya PDF.",
+        "llmFallback": "Providers tried in order, after the primary provider above, when a request fails (rate limit, timeout, error). Each entry has its own optional model override. Priority 1 is always the primary provider/model; entries here are priority 2, 3, …."
       },
       "common": {
         "validId": "Sahihi/batili ni alama ya ufutaji laini: kuashiria ingizo kuwa batili huificha kutoka kwa wateuzi wa rekodi mpya bila kufuta marejeleo yaliyopo (k.m. tikiti, kazi). Hakuna kufuta ngumu."

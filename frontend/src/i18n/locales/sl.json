@@ -966,7 +966,15 @@
           "detailed": "Podrobno"
         },
         "kbCategories": "kategorije KB",
-        "kbCategoriesEmpty": "Na voljo ni nobena kategorija."
+        "kbCategoriesEmpty": "Na voljo ni nobena kategorija.",
+        "llmFallback": "Fallback providers",
+        "fallbackAdd": "Add fallback",
+        "fallbackEmpty": "No fallback providers — the primary provider above is used exclusively.",
+        "fallbackMoveUp": "Move up",
+        "fallbackMoveDown": "Move down",
+        "fallbackRemove": "Remove",
+        "clarifySchemaJson": "Clarify schema fields (JSON)",
+        "clarifySchemaJsonPlaceholder": "{\"fields\": [{\"column\": \"wpnum\", \"label\": \"WP-Nummer\"}]}"
       },
       "usage": {
         "title": "Uporaba",
@@ -1138,7 +1146,8 @@
         "replyLanguageDefault": "Jezikovna koda BCP-47, ki se uporablja v načinu \"Samodejno\", ko besedila ni mogoče zanesljivo ujemati z znanim jezikovnim profilom.",
         "allowedStateTypes": "Z vejicami ločen seznam dovoljenih tipov stanj Znuny (npr. »odprto« ali »odprto, čakajoči opomnik«), na katere lahko AI nastavi vstopnico prek update_ticket_fields — velja tako za ime stanja kot za številčni ID stanja. Prazno = privzeto samo \"odprto\" (dovoljeno ponovno odpiranje, nikoli zapiranje); izrecno prazen seznam \"[]\" v celoti onemogoči spremembe stanja.",
         "piiNer": "Zazna imena oseb v besedilu prek spaCy NER (nemščina + angleščina) in jih maskira kot [NAME_n], preden vsebina doseže ponudnika LLM — poleg imena stranke in pošiljateljev. Aktiven samo, ko je vklopljeno maskiranje PII. Lažni pozitivni rezultati so neškodljivi (samo več maskiranja).",
-        "summaryDetail": "Standardno: strnjeni odstavki, 1–2 stavka na pripet dokument. Podrobno: bolj temeljiti odstavki in 3–5 stavkov na dokument — uporabno za čakalne vrste s številnimi prilogami PDF."
+        "summaryDetail": "Standardno: strnjeni odstavki, 1–2 stavka na pripet dokument. Podrobno: bolj temeljiti odstavki in 3–5 stavkov na dokument — uporabno za čakalne vrste s številnimi prilogami PDF.",
+        "llmFallback": "Providers tried in order, after the primary provider above, when a request fails (rate limit, timeout, error). Each entry has its own optional model override. Priority 1 is always the primary provider/model; entries here are priority 2, 3, …."
       },
       "common": {
         "validId": "Veljavno/neveljavno je zastavica za mehko brisanje: če označite vnos kot neveljaven, ga skrijete pred izbirniki novih zapisov, ne da bi izbrisali obstoječe reference (npr. vstopnice, naloge). Trdnega brisanja ni."

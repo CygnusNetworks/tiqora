@@ -966,7 +966,15 @@
           "detailed": "Детаљно"
         },
         "kbCategories": "КБ категорије",
-        "kbCategoriesEmpty": "Нема доступних категорија."
+        "kbCategoriesEmpty": "Нема доступних категорија.",
+        "llmFallback": "Fallback providers",
+        "fallbackAdd": "Add fallback",
+        "fallbackEmpty": "No fallback providers — the primary provider above is used exclusively.",
+        "fallbackMoveUp": "Move up",
+        "fallbackMoveDown": "Move down",
+        "fallbackRemove": "Remove",
+        "clarifySchemaJson": "Clarify schema fields (JSON)",
+        "clarifySchemaJsonPlaceholder": "{\"fields\": [{\"column\": \"wpnum\", \"label\": \"WP-Nummer\"}]}"
       },
       "usage": {
         "title": "Употреба",
@@ -1138,7 +1146,8 @@
         "replyLanguageDefault": "Код језика БЦП-47 који се користи у режиму „Аутоматски“ када се текст не може поуздано упарити са профилом познатог језика.",
         "allowedStateTypes": "Листа дозвољених Знуни типова стања раздвојених зарезима (нпр. „отворено“ или „отворено, подсетник на чекању“) АИ може да подеси тикет преко упдате_тицкет_фиелдс — примењено и за назив државе и за нумерички ИД стања. Празно = подразумевано само \"отворено\" (поновно отварање дозвољено, никада затварање); експлицитна празна листа \"[]\" у потпуности онемогућава промене стања.",
         "piiNer": "Открива имена особа у тексту преко спаЦи НЕР-а (немачки + енглески) и маскира их као [НАМЕ_н] пре него што садржај стигне до ЛЛМ провајдера — поред имена корисника и пошиљаоца. Активно само када је маскирање ПИИ укључено. Лажни позитивни резултати су безопасни (само више маскирања).",
-        "summaryDetail": "Стандард: компактни параграфи, 1–2 реченице по приложеном документу. Детаљније: детаљнији параграфи и 3–5 реченица по документу — корисно за редове са много ПДФ прилога."
+        "summaryDetail": "Стандард: компактни параграфи, 1–2 реченице по приложеном документу. Детаљније: детаљнији параграфи и 3–5 реченица по документу — корисно за редове са много ПДФ прилога.",
+        "llmFallback": "Providers tried in order, after the primary provider above, when a request fails (rate limit, timeout, error). Each entry has its own optional model override. Priority 1 is always the primary provider/model; entries here are priority 2, 3, …."
       },
       "common": {
         "validId": "Важеће/неважеће је ознака меког брисања: означавање уноса као неважеће га сакрива од бирача за нове записе без брисања постојећих референци (нпр. улазница, задатака). Нема тешког брисања."
