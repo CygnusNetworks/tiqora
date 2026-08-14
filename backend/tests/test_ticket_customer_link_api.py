@@ -205,6 +205,7 @@ def _set_link(
     admin_url_template: str | None,
     visibility: str,
     label: str | None = "Kundendaten",
+    login_suffix_separator: str | None = "#",
 ) -> None:
     engine = create_engine(sync_url)
     with engine.begin() as conn:
@@ -216,8 +217,8 @@ def _set_link(
                 """
                 INSERT INTO tiqora_queue_customer_link
                     (queue_id, url_template, admin_url_template, label, visibility,
-                     create_by, create_time, change_by, change_time)
-                VALUES (:qid, :url, :admin_url, :label, :vis, 1, :t, 1, :t)
+                     login_suffix_separator, create_by, create_time, change_by, change_time)
+                VALUES (:qid, :url, :admin_url, :label, :vis, :sep, 1, :t, 1, :t)
                 """
             ),
             {
@@ -226,6 +227,7 @@ def _set_link(
                 "admin_url": admin_url_template,
                 "label": label,
                 "vis": visibility,
+                "sep": login_suffix_separator,
                 "t": NOW,
             },
         )

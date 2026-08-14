@@ -10899,6 +10899,8 @@ export interface components {
             admin_url_template?: string | null;
             /** Label */
             label?: string | null;
+            /** Login Suffix Separator */
+            login_suffix_separator?: string | null;
             /** Queue Id */
             queue_id: number;
             /** Url Template */
@@ -10927,6 +10929,8 @@ export interface components {
             id: number;
             /** Label */
             label: string | null;
+            /** Login Suffix Separator */
+            login_suffix_separator: string | null;
             /** Queue Id */
             queue_id: number;
             /** Queue Name */
@@ -10942,6 +10946,8 @@ export interface components {
             admin_url_template?: string | null;
             /** Label */
             label?: string | null;
+            /** Login Suffix Separator */
+            login_suffix_separator?: string | null;
             /** Url Template */
             url_template?: string | null;
             /** Visibility */
