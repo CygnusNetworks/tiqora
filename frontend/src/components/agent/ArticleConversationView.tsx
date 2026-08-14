@@ -19,7 +19,8 @@ import { cn } from "@/lib/cn";
 import { Avatar } from "@/components/ui/Avatar";
 import { ArticleBodyRenderer } from "./ArticleBodyRenderer";
 import { useTicketReplyDrafts } from "@/lib/replyDrafts";
-import { AiOriginBadge } from "./AiOriginBadge";
+import { AiOriginToggle, AiOriginTrace } from "./AiOriginBadge";
+import { useAiOriginTrace } from "./useAiOriginTrace";
 import { ArticleQuickActions } from "./ArticleQuickActions";
 import { DraftBubble } from "./DraftPlaceholder";
 import { SummaryMarker } from "./SummaryMarker";
@@ -172,59 +173,70 @@ function Bubble({
       ? "border border-accent/35 bg-accent/15 rounded-br-md"
       : "border border-green/35 bg-green/10 rounded-bl-md";
   const nameTone = isSystem ? "text-muted" : side === "right" ? "text-accent" : "text-green";
+  const aiOrigin = useAiOriginTrace({ ticketId, articleId: article.id });
 
   return (
     <div
-      className={cn("group flex", side === "right" ? "justify-end" : "justify-start")}
+      className="group flex flex-col gap-1"
       data-testid={`conversation-bubble-${article.id}`}
       data-side={side}
     >
-      <div className={cn("flex max-w-[76%] items-start gap-2", side === "right" && "flex-row-reverse")}>
-        <Avatar
-          initials={initialsFor(article)}
-          email={emailFromAddress(article.from_address)}
-          tone={avatarTone(article.sender_type)}
-          size={24}
-          className="mt-0.5"
-        />
-        <div className="relative min-w-0">
-          <div className={cn("space-y-1 rounded-2xl px-3 py-2", tone)}>
-            <div className="flex flex-wrap items-center gap-1.5 text-[11px] text-muted">
-              <span className={cn("font-semibold", nameTone)}>{senderName}</span>
-              <span aria-hidden>{channelIcon(channelNameOf(article))}</span>
-              {article.ai_origin && (
-                <AiOriginBadge ticketId={ticketId} articleId={article.id} compact />
-              )}
-              <span className="font-mono tabular-nums">{formatDateTime(article.create_time, locale)}</span>
-              <span
-                className={cn(
-                  "h-1.5 w-1.5 shrink-0 rounded-full",
-                  article.is_visible_for_customer ? "bg-green" : "bg-escalation",
+      <div className={cn("flex", side === "right" ? "justify-end" : "justify-start")}>
+        <div className={cn("flex max-w-[76%] items-start gap-2", side === "right" && "flex-row-reverse")}>
+          <Avatar
+            initials={initialsFor(article)}
+            email={emailFromAddress(article.from_address)}
+            tone={avatarTone(article.sender_type)}
+            size={24}
+            className="mt-0.5"
+          />
+          <div className="relative min-w-0">
+            <div className={cn("space-y-1 rounded-2xl px-3 py-2", tone)}>
+              <div className="flex flex-wrap items-center gap-1.5 text-[11px] text-muted">
+                <span className={cn("font-semibold", nameTone)}>{senderName}</span>
+                <span aria-hidden>{channelIcon(channelNameOf(article))}</span>
+                {article.ai_origin && (
+                  <AiOriginToggle
+                    articleId={article.id}
+                    compact
+                    open={aiOrigin.open}
+                    onToggle={aiOrigin.toggle}
+                  />
                 )}
-                title={
-                  article.is_visible_for_customer
-                    ? t("ticket.articleVisibleTooltip")
-                    : t("ticket.articleInternalTooltip")
-                }
-              />
+                <span className="font-mono tabular-nums">{formatDateTime(article.create_time, locale)}</span>
+                <span
+                  className={cn(
+                    "h-1.5 w-1.5 shrink-0 rounded-full",
+                    article.is_visible_for_customer ? "bg-green" : "bg-escalation",
+                  )}
+                  title={
+                    article.is_visible_for_customer
+                      ? t("ticket.articleVisibleTooltip")
+                      : t("ticket.articleInternalTooltip")
+                  }
+                />
+              </div>
+              <BubbleBody ticketId={ticketId} article={article} />
             </div>
-            <BubbleBody ticketId={ticketId} article={article} />
-          </div>
-          {/* Hover/focus action island — same handlers as the split view's
-              reading pane, just icon-only to fit a bubble. */}
-          <div className="pointer-events-none absolute -top-3 right-1 opacity-0 transition-opacity duration-100 group-hover:opacity-100 group-focus-within:opacity-100">
-            <div className="pointer-events-auto rounded-md border border-hairline bg-surface p-0.5 shadow-sm">
-              <ArticleQuickActions
-                ticketId={ticketId}
-                article={article}
-                canNote={canNote}
-                canDelete={canDelete}
-                compact
-              />
+            {/* Hover/focus action island — same handlers as the split view's
+                reading pane, just icon-only to fit a bubble. */}
+            <div className="pointer-events-none absolute -top-3 right-1 opacity-0 transition-opacity duration-100 group-hover:opacity-100 group-focus-within:opacity-100">
+              <div className="pointer-events-auto rounded-md border border-hairline bg-surface p-0.5 shadow-sm">
+                <ArticleQuickActions
+                  ticketId={ticketId}
+                  article={article}
+                  canNote={canNote}
+                  canDelete={canDelete}
+                  compact
+                />
+              </div>
             </div>
           </div>
         </div>
       </div>
+      {article.ai_origin && (
+        <AiOriginTrace articleId={article.id} open={aiOrigin.open} query={aiOrigin.query} />
+      )}
     </div>
   );
 }
