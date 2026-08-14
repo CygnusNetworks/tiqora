@@ -37,6 +37,18 @@ export type AiDraftOut = {
   tool_trace: AiToolTraceOut[];
 };
 
+/** Manual Assist background-run status (nginx-90s-timeout fix — the draft
+ * POST returns immediately and the frontend polls this instead of the
+ * response). ``null`` when no manual run has ever been started for this
+ * ticket. */
+export type ManualRunStatus =
+  | "running"
+  | "drafted"
+  | "skipped"
+  | "escalated"
+  | "superseded"
+  | "error";
+
 export type AiStateOut = {
   manual_assist_available: boolean;
   summary_available: boolean;
@@ -46,6 +58,10 @@ export type AiStateOut = {
   summary_body: string | null;
   last_summary_upto_article_id: number | null;
   summary_created_at: string | null;
+  manual_run_status?: ManualRunStatus | null;
+  manual_run_notes?: string | null;
+  manual_run_error_code?: string | null;
+  manual_run_started_at?: string | null;
 };
 
 export type SummaryDetail = "standard" | "detailed";

@@ -449,7 +449,9 @@
       "originTraceEmpty": "No tool calls were recorded for this reply.",
       "errorLlmEmptyOutput": "The AI model used up its token budget while reasoning. Please try again.",
       "errorLlmTimeout": "Timed out waiting for the AI provider. Please try again.",
-      "errorLlmProviderError": "The AI provider reported an error. Please try again later."
+      "errorLlmProviderError": "The AI provider reported an error. Please try again later.",
+      "draftRunning": "The AI is working on a draft — this can take several minutes…",
+      "draftSkipped": "The AI did not produce a reply suggestion."
     },
     "toolbar": {
       "print": "Εκτύπωση",

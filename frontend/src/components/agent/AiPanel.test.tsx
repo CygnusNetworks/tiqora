@@ -342,6 +342,166 @@ describe("AiPanel", () => {
     );
   });
 
+  it("polls after 'started', shows the running hint, then reveals the new draft once drafted", async () => {
+    getState
+      .mockResolvedValueOnce({ ...baseState, manual_assist_available: true })
+      .mockResolvedValueOnce({
+        ...baseState,
+        manual_assist_available: true,
+        manual_run_status: "running",
+        manual_run_started_at: "2026-08-14T10:00:00",
+      })
+      .mockResolvedValue({
+        ...baseState,
+        manual_assist_available: true,
+        manual_run_status: "drafted",
+        manual_run_started_at: "2026-08-14T10:00:00",
+        drafts: [
+          {
+            ...baseDraft,
+            id: 50,
+            kind: "reply",
+            subject: "Re: Hello",
+            body: "Fresh async draft",
+            source: "manual",
+          },
+        ],
+      });
+    requestDraft.mockResolvedValue({
+      status: "started",
+      draft_id: null,
+      article_id: null,
+      notes: null,
+    });
+
+    wrap(<AiPanel ticketId={1} canNote />);
+
+    fireEvent.click(
+      await screen.findByTestId("ai-panel-create-draft-button"),
+    );
+    await waitFor(() => expect(requestDraft).toHaveBeenCalledWith(1));
+
+    await waitFor(() =>
+      expect(screen.getByTestId("ai-panel-draft-running").textContent).toBe(
+        "The AI is working on a draft — this can take several minutes…",
+      ),
+    );
+    expect(screen.getByTestId("ai-panel-create-draft-button")).toBeDisabled();
+
+    // The "drafted" outcome only arrives on the NEXT poll tick
+    // (MANUAL_RUN_POLL_INTERVAL_MS, real timers) — past the default waitFor
+    // window, so this one needs a longer timeout.
+    await waitFor(
+      () => expect(screen.getByTestId("ai-panel-draft-50")).toBeTruthy(),
+      { timeout: 4000 },
+    );
+    expect(screen.getByTestId("ai-panel-draft-body-50").textContent).toBe(
+      "Fresh async draft",
+    );
+    expect(
+      screen.queryByTestId("ai-panel-create-draft-button"),
+    ).not.toBeDisabled();
+  });
+
+  it("shows the skipped info box with notes for the run this panel started", async () => {
+    getState
+      .mockResolvedValueOnce({ ...baseState, manual_assist_available: true })
+      .mockResolvedValueOnce({
+        ...baseState,
+        manual_assist_available: true,
+        manual_run_status: "running",
+        manual_run_started_at: "2026-08-14T10:00:00",
+      })
+      .mockResolvedValue({
+        ...baseState,
+        manual_assist_available: true,
+        manual_run_status: "skipped",
+        manual_run_notes: "No terminal tool call produced.",
+        manual_run_started_at: "2026-08-14T10:00:00",
+      });
+    requestDraft.mockResolvedValue({
+      status: "started",
+      draft_id: null,
+      article_id: null,
+      notes: null,
+    });
+
+    wrap(<AiPanel ticketId={1} canNote />);
+
+    fireEvent.click(
+      await screen.findByTestId("ai-panel-create-draft-button"),
+    );
+
+    await waitFor(
+      () => expect(screen.getByTestId("ai-panel-draft-skipped")).toBeTruthy(),
+      { timeout: 4000 },
+    );
+    expect(screen.getByTestId("ai-panel-draft-skipped").textContent).toContain(
+      "The AI did not produce a reply suggestion.",
+    );
+    expect(
+      screen.getByTestId("ai-panel-draft-skipped-notes").textContent,
+    ).toBe("No terminal tool call produced.");
+  });
+
+  it("maps manual_run_error_code from a polled error status to the specific message", async () => {
+    getState
+      .mockResolvedValueOnce({ ...baseState, manual_assist_available: true })
+      .mockResolvedValueOnce({
+        ...baseState,
+        manual_assist_available: true,
+        manual_run_status: "running",
+        manual_run_started_at: "2026-08-14T10:00:00",
+      })
+      .mockResolvedValue({
+        ...baseState,
+        manual_assist_available: true,
+        manual_run_status: "error",
+        manual_run_error_code: "llm_timeout",
+        manual_run_notes: "provider timed out",
+        manual_run_started_at: "2026-08-14T10:00:00",
+      });
+    requestDraft.mockResolvedValue({
+      status: "started",
+      draft_id: null,
+      article_id: null,
+      notes: null,
+    });
+
+    wrap(<AiPanel ticketId={1} canNote />);
+
+    fireEvent.click(
+      await screen.findByTestId("ai-panel-create-draft-button"),
+    );
+
+    await waitFor(
+      () => expect(screen.getByTestId("ai-panel-draft-run-error")).toBeTruthy(),
+      { timeout: 4000 },
+    );
+    expect(screen.getByTestId("ai-panel-draft-run-error").textContent).toBe(
+      "Timed out waiting for the AI provider. Please try again.",
+    );
+  });
+
+  it("does not show a stale running/error result from a run this panel instance did not start", async () => {
+    getState.mockResolvedValue({
+      ...baseState,
+      manual_assist_available: true,
+      manual_run_status: "error",
+      manual_run_error_code: "llm_timeout",
+      manual_run_started_at: "2020-01-01T00:00:00",
+    });
+
+    wrap(<AiPanel ticketId={1} canNote />);
+
+    await screen.findByTestId("ai-panel-create-draft-button");
+    expect(screen.queryByTestId("ai-panel-draft-run-error")).toBeNull();
+    expect(screen.queryByTestId("ai-panel-draft-running")).toBeNull();
+    expect(
+      screen.getByTestId("ai-panel-create-draft-button"),
+    ).not.toBeDisabled();
+  });
+
   it("discards a draft after confirmation", async () => {
     getState.mockResolvedValue({
       ...baseState,
