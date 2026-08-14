@@ -789,6 +789,7 @@ class AiOriginOut(BaseModel):
 
     article_id: int
     run_id: int | None
+    audit_run_id: str | None
     source: str
     created_at: datetime | None
     tool_trace: list[AiToolTraceOut] | None
@@ -824,6 +825,7 @@ async def get_article_ai_origin(
     return AiOriginOut(
         article_id=origin.article_id,
         run_id=origin.draft_id,
+        audit_run_id=origin.run_id,
         source=origin.source,
         created_at=origin.created,
         tool_trace=parse_tool_trace(origin.tool_trace_json) if origin.tool_trace_json else None,

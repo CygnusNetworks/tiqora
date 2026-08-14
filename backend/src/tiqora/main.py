@@ -9,6 +9,7 @@ import sys
 import uvicorn
 
 from tiqora import __version__
+from tiqora.cli.ai_backfill import add_ai_subparser
 from tiqora.cli.api_key import add_api_key_subparser
 from tiqora.cli.bootstrap import add_bootstrap_subparser
 from tiqora.cli.crypto import add_crypto_subparser
@@ -45,6 +46,7 @@ def main(argv: list[str] | None = None) -> None:
     add_crypto_subparser(sub)
     add_api_key_subparser(sub)
     add_openapi_subparser(sub)
+    add_ai_subparser(sub)
 
     index_p = sub.add_parser("index", help="Search index maintenance")
     index_sub = index_p.add_subparsers(dest="index_command")
@@ -141,6 +143,13 @@ def main(argv: list[str] | None = None) -> None:
         sys.exit(exit_code)
     elif command == "openapi":
         sys.exit(args.func(args))
+    elif command == "ai":
+        func = getattr(args, "func", None)
+        if func is None:
+            sub.choices["ai"].print_help()
+            sys.exit(2)
+        exit_code = asyncio.run(func(args))
+        sys.exit(exit_code)
     else:
         parser.print_help()
         sys.exit(2)

@@ -383,7 +383,14 @@ row it already writes for that article. In the ticket zoom, an article with
 an AI origin shows a small "🤖 AI" badge (reader pane and conversation bubble
 alike); expanding it lazily fetches
 `GET /api/v1/tickets/{id}/articles/{article_id}/ai-origin` and renders the
-trace with the same `ToolTraceCard` component the draft panel uses.
+trace with the same `ToolTraceCard` component the draft panel uses, as a
+full-width block below the article/bubble (not squeezed into the badge row).
+The origin row's `run_id` column links it exactly to the `tiqora_ai_audit_log`
+run that produced it (exposed as `AiOriginOut.audit_run_id`); rows written
+before that column existed have no such link, so
+`tiqora ai backfill-tool-trace [--dry-run] [--ticket-id N]` reconstructs
+their `tool_trace_json`/`run_id` from the audit log's nearest matching run
+for that ticket.
 
 ### Summaries
 

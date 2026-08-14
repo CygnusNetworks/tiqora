@@ -6490,6 +6490,8 @@ export interface components {
         AiOriginOut: {
             /** Article Id */
             article_id: number;
+            /** Audit Run Id */
+            audit_run_id: string | null;
             /** Created At */
             created_at: string | null;
             /** Run Id */
