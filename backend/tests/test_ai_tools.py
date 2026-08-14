@@ -141,6 +141,87 @@ async def test_mcp_call_rejects_scoping_id_arguments() -> None:
     assert called[0]["_tiqora_ticket_id"] == 1
 
 
+def _executor_with_spy(spec: McpToolSpec, caller):  # noqa: ANN001
+    registry = ToolRegistry(autonomy=AUTONOMY_OFF, mcp_tools=[spec])
+    return ToolExecutor(
+        session=None,  # type: ignore[arg-type]
+        sysconfig=None,  # type: ignore[arg-type]
+        registry=registry,
+        ticket_id=1,
+        acting_user_id=1,
+        pii=PiiMapper(),
+        escalation_rules=None,
+        mcp_caller=caller,
+    )
+
+
+@pytest.mark.asyncio
+async def test_mcp_context_stripped_for_strict_schema_without_context_props() -> None:
+    """A tool whose schema is ``additionalProperties: false`` without the
+    ``_tiqora_*`` properties (fastmcp default for plain signatures) must not
+    receive the injected context — the server would reject the whole call."""
+    called: list[dict] = []
+
+    async def _spy_caller(url, token, tool, args):  # noqa: ANN001
+        called.append(args)
+        return {"ok": True}
+
+    spec = _mcp_spec(mutating=False)
+    spec = McpToolSpec(
+        client_name=spec.client_name,
+        client_url=spec.client_url,
+        auth_token=None,
+        tool_name=spec.tool_name,
+        mutating=False,
+        parameters_schema={"type": "object", "properties": {}, "additionalProperties": False},
+    )
+    executor = _executor_with_spy(spec, _spy_caller)
+    await executor.execute(spec.full_name, {})
+    assert called == [{}]
+
+
+@pytest.mark.asyncio
+async def test_mcp_context_kept_for_schema_declaring_context_props() -> None:
+    called: list[dict] = []
+
+    async def _spy_caller(url, token, tool, args):  # noqa: ANN001
+        called.append(args)
+        return {"ok": True}
+
+    spec = _mcp_spec(mutating=False)
+    spec = McpToolSpec(
+        client_name=spec.client_name,
+        client_url=spec.client_url,
+        auth_token=None,
+        tool_name=spec.tool_name,
+        mutating=False,
+        parameters_schema={
+            "type": "object",
+            "properties": {"_tiqora_ticket_id": {"type": "integer"}},
+            "additionalProperties": False,
+        },
+    )
+    executor = _executor_with_spy(spec, _spy_caller)
+    await executor.execute(spec.full_name, {})
+    assert called == [{"_tiqora_ticket_id": 1}]
+
+
+@pytest.mark.asyncio
+async def test_mcp_server_tool_error_becomes_tool_argument_error() -> None:
+    """A fastmcp ToolError (server-side validation reject) must surface as
+    ToolArgumentError so the agent loop feeds it back to the model instead of
+    aborting the whole run."""
+    from fastmcp.exceptions import ToolError as McpToolError
+
+    async def _rejecting_caller(url, token, tool, args):  # noqa: ANN001
+        raise McpToolError("3 validation errors for call[diagnose]")
+
+    spec = _mcp_spec(mutating=False)
+    executor = _executor_with_spy(spec, _rejecting_caller)
+    with pytest.raises(ToolArgumentError, match="rejected the call"):
+        await executor.execute(spec.full_name, {"query": "x"})
+
+
 # ---------------------------------------------------------------------------
 # resolve_allowed_state_types (plan block 5)
 # ---------------------------------------------------------------------------
