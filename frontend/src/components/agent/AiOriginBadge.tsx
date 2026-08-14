@@ -1,87 +1,84 @@
-import { useQuery } from "@tanstack/react-query";
-import { useState } from "react";
+import type { UseQueryResult } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
-import { api } from "@/lib/api";
+import type { AiOriginOut } from "@/lib/api";
 import { Badge } from "@/components/ui/Badge";
 import { ToolTraceCard } from "@/components/ai/ToolResultView";
 
-/**
- * Badge for an article that an AI agent auto-sent (never a draft — those get
- * their own tool trace inline in `AiPanel`). Lazily fetches
- * `GET .../ai-origin` on first expand and reuses `ToolTraceCard` (same
- * renderer as the draft panel) so both surfaces stay visually identical.
- */
-export function AiOriginBadge({
-  ticketId,
+/** Clickable 🤖 badge (or icon-only in `compact` mode) that toggles the
+ * shared open state returned by `useAiOriginTrace`. */
+export function AiOriginToggle({
   articleId,
   compact = false,
+  open,
+  onToggle,
 }: {
-  ticketId: number;
   articleId: number;
   /** Icon-only rendering for tight spaces (conversation bubbles). */
   compact?: boolean;
+  open: boolean;
+  onToggle: () => void;
 }) {
   const { t } = useTranslation();
-  const [open, setOpen] = useState(false);
-  const originQ = useQuery({
-    queryKey: ["tickets", ticketId, "articles", articleId, "ai-origin"],
-    queryFn: () => api.getArticleAiOrigin(ticketId, articleId),
-    enabled: open,
-  });
-
   return (
-    <span className="inline-flex flex-col items-start gap-1">
-      <button
-        type="button"
-        aria-expanded={open}
-        data-testid={`ai-origin-badge-${articleId}`}
-        onClick={() => setOpen((o) => !o)}
-        title={t("ticket.ai.originBadgeTooltip")}
-        className="inline-flex"
-      >
-        {compact ? (
-          <span aria-hidden className="text-[11px]">
-            🤖
-          </span>
-        ) : (
-          <Badge tone="accent">🤖 {t("ticket.ai.originBadge")}</Badge>
-        )}
-      </button>
-      {open && (
-        <span
-          className="block w-full min-w-[16rem] max-w-sm"
-          data-testid={`ai-origin-trace-${articleId}`}
-        >
-          {originQ.isLoading && (
-            <span className="text-[11px] text-muted">…</span>
-          )}
-          {originQ.data && (originQ.data.tool_trace?.length ?? 0) > 0 && (
-            <span className="block space-y-1.5">
-              <span className="block text-[11px] font-medium text-muted">
-                {t("ticket.ai.toolTrace", {
-                  count: originQ.data.tool_trace?.length ?? 0,
-                })}
-              </span>
-              <ul className="space-y-1.5">
-                {originQ.data.tool_trace?.map((step, i) => (
-                  <li key={i}>
-                    <ToolTraceCard
-                      name={step.name}
-                      content={step.content}
-                      testId={`ai-origin-trace-step-${articleId}-${i}`}
-                    />
-                  </li>
-                ))}
-              </ul>
-            </span>
-          )}
-          {originQ.data && !(originQ.data.tool_trace?.length ?? 0) && (
-            <span className="text-[11px] text-muted">
-              {t("ticket.ai.originTraceEmpty")}
-            </span>
-          )}
+    <button
+      type="button"
+      aria-expanded={open}
+      data-testid={`ai-origin-badge-${articleId}`}
+      onClick={onToggle}
+      title={t("ticket.ai.originBadgeTooltip")}
+      className="inline-flex"
+    >
+      {compact ? (
+        <span aria-hidden className="text-[11px]">
+          🤖
         </span>
+      ) : (
+        <Badge tone="accent">🤖 {t("ticket.ai.originBadge")}</Badge>
       )}
-    </span>
+    </button>
+  );
+}
+
+/** Full-width tool-trace block (same `ToolTraceCard` renderer as the draft
+ * panel), rendered outside the badge/meta row so its key/value grids get the
+ * article's full width instead of being squeezed into a narrow span. Renders
+ * nothing while collapsed. */
+export function AiOriginTrace({
+  articleId,
+  open,
+  query,
+}: {
+  articleId: number;
+  open: boolean;
+  query: UseQueryResult<AiOriginOut>;
+}) {
+  const { t } = useTranslation();
+  if (!open) return null;
+  const trace = query.data?.tool_trace;
+  return (
+    <div className="w-full space-y-1.5" data-testid={`ai-origin-trace-${articleId}`}>
+      {query.isLoading && <p className="text-xs text-muted">…</p>}
+      {query.data && (trace?.length ?? 0) > 0 && (
+        <div className="space-y-1.5">
+          <p className="text-xs font-medium text-muted">
+            {t("ticket.ai.toolTrace", { count: trace?.length ?? 0 })}
+          </p>
+          <ul className="space-y-1.5">
+            {trace?.map((step, i) => (
+              <li key={i}>
+                <ToolTraceCard
+                  name={step.name}
+                  content={step.content}
+                  testId={`ai-origin-trace-step-${articleId}-${i}`}
+                />
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+      {query.data && !(trace?.length ?? 0) && (
+        <p className="text-xs text-muted">{t("ticket.ai.originTraceEmpty")}</p>
+      )}
+    </div>
   );
 }
