@@ -2288,6 +2288,8 @@
       "adminUrlTemplate": "Admin-URL-Vorlage (optional)",
       "adminUrlTemplateHelp": "Wird Admins statt der obigen URL-Vorlage angezeigt, z. B. für einen Kerberos-authentifizierten Host. Nicht-Admins sehen dies nie.",
       "templateHelp": "Platzhalter: {customer_user}, {customer_id}, {ticket_number}, {customer_email}, {customer_name} — Werte werden URL-codiert.",
+      "loginSuffixSeparator": "Login-Suffix-Trennzeichen (optional)",
+      "loginSuffixSeparatorHelp": "Wenn gesetzt, wird {customer_user} am ersten Vorkommen dieses Zeichens abgeschnitten (z. B. „#“: z50test#3 → z50test). Leer = Login unverändert.",
       "visibility": "Sichtbarkeit",
       "visibilityAll": "Alle",
       "visibilityAdmins": "Nur Admins",

@@ -53,6 +53,7 @@ def _to_out(row: TiqoraQueueCustomerLink, queue_name: str | None) -> QueueCustom
         admin_url_template=row.admin_url_template,
         label=row.label,
         visibility=row.visibility,
+        login_suffix_separator=row.login_suffix_separator,
         create_time=row.create_time,
         change_time=row.change_time,
     )
@@ -110,6 +111,7 @@ async def create_queue_customer_link(
         admin_url_template=body.admin_url_template,
         label=body.label,
         visibility=body.visibility,
+        login_suffix_separator=body.login_suffix_separator,
         create_by=admin.id,
         change_by=admin.id,
     )

@@ -84,6 +84,7 @@ export function QueueCustomerLinksPage() {
     const adminUrlTemplate = String(values.admin_url_template ?? "").trim();
     const label = String(values.label ?? "").trim();
     const visibility = String(values.visibility ?? "all");
+    const loginSuffixSeparator = String(values.login_suffix_separator ?? "").trim();
     try {
       if (editing) {
         await updateM.mutateAsync({
@@ -93,6 +94,7 @@ export function QueueCustomerLinksPage() {
             admin_url_template: adminUrlTemplate || null,
             label: label || null,
             visibility,
+            login_suffix_separator: loginSuffixSeparator || null,
           },
         });
       } else {
@@ -102,6 +104,7 @@ export function QueueCustomerLinksPage() {
           admin_url_template: adminUrlTemplate || null,
           label: label || null,
           visibility,
+          login_suffix_separator: loginSuffixSeparator || null,
         });
       }
     } catch (err) {
@@ -169,6 +172,13 @@ export function QueueCustomerLinksPage() {
       helpText: t("admin.customerLinks.adminUrlTemplateHelp"),
     },
     {
+      name: "login_suffix_separator",
+      label: t("admin.customerLinks.loginSuffixSeparator"),
+      type: "text",
+      mono: true,
+      helpText: t("admin.customerLinks.loginSuffixSeparatorHelp"),
+    },
+    {
       name: "visibility",
       label: t("admin.customerLinks.visibility"),
       type: "select",
@@ -231,6 +241,7 @@ export function QueueCustomerLinksPage() {
                 url_template: editing.url_template,
                 admin_url_template: editing.admin_url_template ?? "",
                 visibility: editing.visibility,
+                login_suffix_separator: editing.login_suffix_separator ?? "",
               }
             : {
                 queue_id: availableQueues[0]?.id ?? "",
@@ -238,6 +249,7 @@ export function QueueCustomerLinksPage() {
                 url_template: "",
                 admin_url_template: "",
                 visibility: "all",
+                login_suffix_separator: "",
               }
         }
         onSubmit={handleSubmit}

@@ -2288,6 +2288,8 @@
       "adminUrlTemplate": "Admin URL template (optional)",
       "adminUrlTemplateHelp": "Shown to admins instead of the URL template above, e.g. for a Kerberos-authenticated host. Non-admins never see this.",
       "templateHelp": "Placeholders: {customer_user}, {customer_id}, {ticket_number}, {customer_email}, {customer_name} — values are URL-encoded.",
+      "loginSuffixSeparator": "Login suffix separator (optional)",
+      "loginSuffixSeparatorHelp": "When set, {customer_user} is cut at the first occurrence of this character (e.g. '#': z50test#3 \u2192 z50test). Empty = use the login verbatim.",
       "visibility": "Visibility",
       "visibilityAll": "Everyone",
       "visibilityAdmins": "Admins only",

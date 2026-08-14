@@ -2492,7 +2492,9 @@
       "visibility": "Visibility",
       "visibilityAll": "Everyone",
       "visibilityAdmins": "Admins only",
-      "empty": "No external customer links configured yet."
+      "empty": "No external customer links configured yet.",
+      "loginSuffixSeparator": "Login suffix separator (optional)",
+      "loginSuffixSeparatorHelp": "When set, {customer_user} is cut at the first occurrence of this character (e.g. '#': z50test#3 → z50test). Empty = use the login verbatim."
     }
   },
   "kb": {

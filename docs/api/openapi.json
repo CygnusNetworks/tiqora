@@ -14263,6 +14263,17 @@
             ],
             "title": "Label"
           },
+          "login_suffix_separator": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Login Suffix Separator"
+          },
           "queue_id": {
             "title": "Queue Id",
             "type": "integer"
@@ -14322,6 +14333,17 @@
             ],
             "title": "Label"
           },
+          "login_suffix_separator": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Login Suffix Separator"
+          },
           "queue_id": {
             "title": "Queue Id",
             "type": "integer"
@@ -14353,6 +14375,7 @@
           "admin_url_template",
           "label",
           "visibility",
+          "login_suffix_separator",
           "create_time",
           "change_time"
         ],
@@ -14382,6 +14405,17 @@
               }
             ],
             "title": "Label"
+          },
+          "login_suffix_separator": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Login Suffix Separator"
           },
           "url_template": {
             "anyOf": [

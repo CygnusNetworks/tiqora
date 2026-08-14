@@ -685,6 +685,9 @@ class TiqoraQueueCustomerLink(TiqoraBase):
     visibility: Mapped[str] = mapped_column(
         String(16), nullable=False, default="all", server_default="all"
     )
+    # {customer_user} strip rule: NULL/empty = login verbatim; e.g. "#" cuts
+    # the login at its first "#" (site-specific contract disambiguator).
+    login_suffix_separator: Mapped[str | None] = mapped_column(String(8), nullable=True)
     create_by: Mapped[int] = mapped_column(Integer, nullable=False)
     create_time: Mapped[datetime] = mapped_column(
         DateTime, nullable=False, server_default=func.now()

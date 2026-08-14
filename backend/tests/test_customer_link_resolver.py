@@ -84,7 +84,9 @@ async def test_resolve_customer_link_placeholders_and_encoding(
     ns = uuid.uuid4().int % 100_000
     queue_id = 87000 + (ns % 100)
     login = f"z{ns}test"
-    _seed_customer_user(sync_url, login=login, ns=ns)
+    # The customer_user row keeps the FULL Znuny login (incl. "#3") — only
+    # the {customer_user} placeholder is stripped via login_suffix_separator.
+    _seed_customer_user(sync_url, login=f"{login}#3", ns=ns)
 
     session, engine = await _make_session(sync_url)
     async with session as s:
@@ -98,6 +100,7 @@ async def test_resolve_customer_link_placeholders_and_encoding(
                 ),
                 admin_url_template=None,
                 label="Diagnose",
+                login_suffix_separator="#",
                 visibility="all",
                 create_by=1,
                 change_by=1,
@@ -130,7 +133,7 @@ async def test_resolve_customer_link_placeholders_and_encoding(
         )
         await s.commit()
 
-    _delete_customer_user(sync_url, login=login)
+    _delete_customer_user(sync_url, login=f"{login}#3")
     await engine.dispose()
 
 
@@ -247,3 +250,14 @@ async def test_resolve_customer_link_no_config_row_is_null(
         assert resolved.label is None
 
     await engine.dispose()
+
+
+def test_strip_login_suffix_is_config_driven() -> None:
+    """No separator configured = login verbatim (the '#' rule is a
+    site-specific convention, not a built-in)."""
+    from tiqora.domain.customer_link import _strip_login_suffix
+
+    assert _strip_login_suffix("z50test#3", None) == "z50test#3"
+    assert _strip_login_suffix("z50test#3", "") == "z50test#3"
+    assert _strip_login_suffix("z50test#3", "#") == "z50test"
+    assert _strip_login_suffix("a-b-c", "-") == "a"

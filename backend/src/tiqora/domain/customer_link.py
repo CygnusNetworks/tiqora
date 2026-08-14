@@ -34,17 +34,21 @@ class ResolvedCustomerLink(BaseModel):
     url: str | None
 
 
-def _strip_login_suffix(customer_user_id: str) -> str:
-    """``z50test#3`` -> ``z50test`` (Znuny appends a ``#N`` disambiguator)."""
-    return customer_user_id.split("#", 1)[0]
+def _strip_login_suffix(customer_user_id: str, separator: str | None) -> str:
+    """Apply the entry's configured strip rule: ``separator=None``/empty
+    leaves the login verbatim; e.g. ``"#"`` cuts ``z50test#3`` -> ``z50test``
+    (a site-specific contract disambiguator, not a generic Znuny rule)."""
+    if not separator:
+        return customer_user_id
+    return customer_user_id.split(separator, 1)[0]
 
 
-async def _customer_name_email(
-    session: AsyncSession, login: str
-) -> tuple[str, str]:
-    """``(full_name, email)`` for a stripped ``customer_user.login``; empty
-    strings when the login has no matching row (never a hard failure — the
-    button should still render with blank placeholders rather than 500)."""
+async def _customer_name_email(session: AsyncSession, login: str) -> tuple[str, str]:
+    """``(full_name, email)`` for a ``customer_user.login`` (the RAW ticket
+    login — the suffix strip only applies to the ``{customer_user}``
+    placeholder, the DB row keeps the full login); empty strings when the
+    login has no matching row (never a hard failure — the button should
+    still render with blank placeholders rather than 500)."""
     row = (
         await session.execute(
             select(CustomerUser.first_name, CustomerUser.last_name, CustomerUser.email).where(
@@ -93,10 +97,14 @@ async def resolve_customer_link(
     if is_admin and row.admin_url_template:
         template = row.admin_url_template
 
-    login = _strip_login_suffix(customer_user_id) if customer_user_id else ""
+    login = (
+        _strip_login_suffix(customer_user_id, row.login_suffix_separator)
+        if customer_user_id
+        else ""
+    )
     customer_name, customer_email = ("", "")
-    if login:
-        customer_name, customer_email = await _customer_name_email(session, login)
+    if customer_user_id:
+        customer_name, customer_email = await _customer_name_email(session, customer_user_id)
 
     url = _render_template(
         template,
