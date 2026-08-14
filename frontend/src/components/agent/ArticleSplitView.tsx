@@ -18,6 +18,7 @@ import {
 import { cn } from "@/lib/cn";
 import { Avatar } from "@/components/ui/Avatar";
 import { Badge } from "@/components/ui/Badge";
+import { AiOriginBadge } from "./AiOriginBadge";
 import { useTicketReplyDrafts } from "@/lib/replyDrafts";
 import { ArticleQuickActions } from "./ArticleQuickActions";
 import { DraftListRow } from "./DraftPlaceholder";
@@ -232,6 +233,9 @@ function ArticleReader({
             {article.is_visible_for_customer ? t("ticket.visibleCustomer") : t("ticket.internal")}
           </Badge>
           <Badge tone="default">{channelIcon(channelNameOf(article))}</Badge>
+          {article.ai_origin && (
+            <AiOriginBadge ticketId={ticketId} articleId={article.id} />
+          )}
         </div>
       </div>
       <ArticleQuickActions

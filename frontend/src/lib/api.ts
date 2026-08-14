@@ -39,6 +39,7 @@ export type {
   TicketDetail,
   ArticleListItem,
   ArticleBody,
+  AiOriginOut,
   AttachmentMetaOut,
   HistoryEntry,
   PresenceIn,
