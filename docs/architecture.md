@@ -104,11 +104,15 @@ falling back to "most recent non-closed ticket for this customer").
 | `channels/sms/` | in+out | Generic HTTP webhook gateway (`SmsGateway` protocol) |
 | `channels/whatsapp/` | in+out | Meta WhatsApp Cloud API (Graph API) |
 | `channels/phone/` | in only | Thin CTI logging API (no gateway) |
+| `channels/telegram/` | in+out | Telegram Bot API — long-poll (`worker/telegram_poller.py`) or webhook, mutually exclusive |
 
-SMS/WhatsApp/Phone are mounted under `/api/v1/channels/{sms,whatsapp,phone}`,
-disabled by default (`channel.<name>.enabled` in `tiqora_settings`), and
-configured via `/api/v1/admin/channels`. Full details, endpoints, and config
-keys: [channels.md](./channels.md).
+SMS/WhatsApp/Phone/Telegram are mounted under
+`/api/v1/channels/{sms,whatsapp,phone,telegram}`, disabled by default
+(`channel.<name>.enabled` in `tiqora_settings`), and configured via
+`/api/v1/admin/channels`. Unlike the others, Telegram has no `/send`
+endpoint — outbound goes through the same `add_article` dispatch seam agents
+already use (`channels/telegram/outbound.py`). Full details, endpoints, and
+config keys: [channels.md](./channels.md).
 
 ### Read path
 
