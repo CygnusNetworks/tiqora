@@ -72,6 +72,44 @@ def test_real_phone_numbers_still_masked() -> None:
     assert "[PHONE_2]" in masked
 
 
+def test_wp_nummer_is_not_masked_as_phone() -> None:
+    """A WP-Nummer must reach the model as digits, not as [PHONE_n] — otherwise
+    the agent reports it back as a "Telefonnummer" and cannot use it as the
+    search key for the Netadmin tools.
+
+    Both the canonical grouped form (3-2-2-2-1) and the 9-digit core customers
+    actually type have to survive.
+    """
+    mapper = PiiMapper()
+    for text in ("WPnum 599-99-99-99-9", "WPnum 5999999999", "WPnum 599999999"):
+        assert mapper.mask(text) == text, text
+
+
+def test_pkz_next_to_wp_nummer_survives_together() -> None:
+    """The loose PHONE char class contains spaces and slashes, so an unlabelled
+    "PKZ WP-Nummer" pair used to be swallowed into a single PHONE token."""
+    mapper = PiiMapper()
+    for text in ("132665, 544010110", "132665 544010110", "132665 / 544010110"):
+        masked = mapper.mask(text)
+        assert "PHONE" not in masked, text
+        assert "132665" in masked, text
+        assert "544010110" in masked, text
+
+
+def test_identifier_shaped_number_behind_phone_label_is_still_masked() -> None:
+    for text in ("Tel: 544010110", "Fax 544010110", "Durchwahl: 544010110"):
+        masked = PiiMapper().mask(text)
+        assert "544010110" not in masked, text
+        assert "[PHONE_1]" in masked, text
+
+
+def test_phone_numbers_near_identifier_shapes_still_masked() -> None:
+    """Leading zero / "+" / a non-identifier digit group keep a span a phone."""
+    for text in ("0201 123456", "030 12345678", "+49 544010110", "(030) 5440101"):
+        masked = PiiMapper().mask(text)
+        assert "[PHONE_1]" in masked, text
+
+
 def test_known_names_masked_case_insensitively() -> None:
     mapper = PiiMapper(known_names=["Anna Meyer"])
     masked = mapper.mask("Hi, this is anna meyer writing about my order.")
