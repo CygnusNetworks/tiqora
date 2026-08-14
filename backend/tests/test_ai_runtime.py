@@ -1534,6 +1534,52 @@ async def test_auto_send_dispatches_telegram_channel_never_email(
         await engine.dispose()
 
 
+async def test_auto_send_writes_tool_trace_onto_origin_row(mariadb_znuny_url: str) -> None:
+    """Auto-sent AI articles carry the same tool trace a draft would have
+    gotten (plan: expose it in the ticket zoom via the ai-origin endpoint) —
+    the shared insert at the end of the auto-send dispatch must stamp
+    ``tool_trace_json`` from the same ``messages`` list the draft path uses.
+
+    The seeded customer article has no ``a_from``, so dispatch falls through
+    to the "note" auto-send branch (real ``add_article``, no channel fake
+    needed) — that branch shares the same origin-row insert as Telegram/email."""
+    seed = _seed_ticket(mariadb_znuny_url, ns=40)
+    engine = create_async_engine(_mysql_async(mariadb_znuny_url))
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    settings = get_settings()
+    try:
+        async with factory() as session:
+            await _setup_policy(session, seed=seed, autonomy=AUTONOMY_FULL, enabled_auto_reply=True)
+
+        llm = ScriptedLlm([_propose_response("reply", "Tool-trace bound answer.")])
+        async with factory() as session:
+            result = await run_ticket_agent(
+                session,
+                settings=settings,
+                llm=llm,
+                ticket_id=seed["ticket_id"],
+                trigger=TRIGGER_AUTO,
+                acting_user_id=None,
+                run_id="run-40",
+            )
+        assert result.status == "sent"
+
+        async with factory() as session:
+            trace_json = (
+                await session.execute(
+                    text(
+                        "SELECT tool_trace_json FROM tiqora_ai_article_origin "
+                        "WHERE article_id = :aid"
+                    ),
+                    {"aid": result.article_id},
+                )
+            ).scalar_one()
+            assert trace_json is not None
+            assert "propose_customer_message" in trace_json
+    finally:
+        await engine.dispose()
+
+
 async def test_auto_send_email_dispatch_unchanged_regression(
     mariadb_znuny_url: str, monkeypatch: pytest.MonkeyPatch
 ) -> None:

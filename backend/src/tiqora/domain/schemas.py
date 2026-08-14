@@ -272,6 +272,7 @@ class ArticleListItem(BaseModel):
     to_address: str | None = None
     content_type: str | None = None
     incoming_time: int | None = None
+    ai_origin: bool = False
 
 
 class ArticleBody(BaseModel):

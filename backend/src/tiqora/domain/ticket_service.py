@@ -12,7 +12,7 @@ from sqlalchemy import Select, and_, func, or_, select
 from sqlalchemy.exc import DBAPIError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from tiqora.ai.models import TiqoraAiTicketState
+from tiqora.ai.models import TiqoraAiArticleOrigin, TiqoraAiTicketState
 from tiqora.db.legacy.article import (
     Article,
     ArticleDataMime,
@@ -895,6 +895,17 @@ class TicketService:
             .all()
         )
         mime_by_aid = {m.article_id: m for m in mime_rows}
+        origin_ids = set(
+            (
+                await self._session.execute(
+                    select(TiqoraAiArticleOrigin.article_id).where(
+                        TiqoraAiArticleOrigin.article_id.in_(article_ids)
+                    )
+                )
+            )
+            .scalars()
+            .all()
+        )
 
         out: list[ArticleListItem] = []
         for a in articles:
@@ -915,6 +926,7 @@ class TicketService:
                     to_address=m.a_to if m else None,
                     content_type=m.a_content_type if m else None,
                     incoming_time=m.incoming_time if m else None,
+                    ai_origin=a.id in origin_ids,
                 )
             )
         return out
@@ -978,6 +990,26 @@ class TicketService:
                 body=text_body,
             )
         return await self.get_article_body(user_id, ticket_id, article_id)
+
+    async def get_article_ai_origin(
+        self, user_id: int, ticket_id: int, article_id: int
+    ) -> TiqoraAiArticleOrigin | None:
+        """Return the AI-origin row for an article, or ``None`` if the article
+        was not auto-sent/accepted by the AI agent (caller maps that to 404).
+        """
+        await self._assert_ticket_ro(user_id, ticket_id)
+        art = (
+            await self._session.execute(
+                select(Article.id).where(Article.id == article_id, Article.ticket_id == ticket_id)
+            )
+        ).scalar_one_or_none()
+        if art is None:
+            raise TicketNotFound(article_id)
+        return (
+            await self._session.execute(
+                select(TiqoraAiArticleOrigin).where(TiqoraAiArticleOrigin.article_id == article_id)
+            )
+        ).scalar_one_or_none()
 
     async def list_attachments(
         self, user_id: int, ticket_id: int, article_id: int

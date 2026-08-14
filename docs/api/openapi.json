@@ -1062,6 +1062,65 @@
         "title": "AiDraftRequestOut",
         "type": "object"
       },
+      "AiOriginOut": {
+        "description": "AI-origin marker for an auto-sent article, with its tool trace \u2014 same\nwire shape as ``AiDraftOut.tool_trace`` (see ``tiqora.api.v1.ai``) so the\nfrontend can reuse the draft tool-trace renderer.",
+        "properties": {
+          "article_id": {
+            "title": "Article Id",
+            "type": "integer"
+          },
+          "created_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created At"
+          },
+          "run_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Run Id"
+          },
+          "source": {
+            "title": "Source",
+            "type": "string"
+          },
+          "tool_trace": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/AiToolTraceOut"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tool Trace"
+          }
+        },
+        "required": [
+          "article_id",
+          "run_id",
+          "source",
+          "created_at",
+          "tool_trace"
+        ],
+        "title": "AiOriginOut",
+        "type": "object"
+      },
       "AiPromptPartCreate": {
         "properties": {
           "content": {
@@ -1348,6 +1407,17 @@
               }
             ],
             "title": "Kb Tags"
+          },
+          "llm_fallback_json": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Llm Fallback Json"
           },
           "llm_provider_id": {
             "anyOf": [
@@ -1699,6 +1769,17 @@
               }
             ],
             "title": "Kb Tags"
+          },
+          "llm_fallback_json": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Llm Fallback Json"
           },
           "llm_provider_id": {
             "anyOf": [
@@ -2121,6 +2202,17 @@
               }
             ],
             "title": "Kb Tags"
+          },
+          "llm_fallback_json": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Llm Fallback Json"
           },
           "llm_provider_id": {
             "anyOf": [
@@ -3756,9 +3848,25 @@
       },
       "ArticleListItem": {
         "properties": {
+          "ai_origin": {
+            "default": false,
+            "title": "Ai Origin",
+            "type": "boolean"
+          },
           "communication_channel_id": {
             "title": "Communication Channel Id",
             "type": "integer"
+          },
+          "communication_channel_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Communication Channel Name"
           },
           "content_type": {
             "anyOf": [
@@ -17656,6 +17764,59 @@
           "article_count"
         ],
         "title": "TagOut",
+        "type": "object"
+      },
+      "TelegramWebhookRegisterRequest": {
+        "properties": {
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Url"
+          }
+        },
+        "title": "TelegramWebhookRegisterRequest",
+        "type": "object"
+      },
+      "TelegramWebhookRegisterResponse": {
+        "properties": {
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "url": {
+            "title": "Url",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ok",
+          "url"
+        ],
+        "title": "TelegramWebhookRegisterResponse",
+        "type": "object"
+      },
+      "TelegramWebhookResponse": {
+        "properties": {
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "skipped": {
+            "default": false,
+            "title": "Skipped",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "ok"
+        ],
+        "title": "TelegramWebhookResponse",
         "type": "object"
       },
       "TemplateAttachmentsReplace": {
@@ -45476,6 +45637,196 @@
         ]
       }
     },
+    "/api/v1/channels/telegram/webhook": {
+      "post": {
+        "description": "Telegram's webhook delivery: one update per request.",
+        "operationId": "receive_webhook_api_v1_channels_telegram_webhook_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-Telegram-Bot-Api-Secret-Token",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Telegram-Bot-Api-Secret-Token"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TelegramWebhookResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Receive Webhook",
+        "tags": [
+          "channels:telegram"
+        ]
+      }
+    },
+    "/api/v1/channels/telegram/webhook-register": {
+      "post": {
+        "operationId": "register_webhook_api_v1_channels_telegram_webhook_register_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TelegramWebhookRegisterRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TelegramWebhookRegisterResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Register Webhook",
+        "tags": [
+          "channels:telegram"
+        ]
+      }
+    },
+    "/api/v1/channels/telegram/webhook-unregister": {
+      "post": {
+        "operationId": "unregister_webhook_api_v1_channels_telegram_webhook_unregister_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TelegramWebhookResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Unregister Webhook",
+        "tags": [
+          "channels:telegram"
+        ]
+      }
+    },
     "/api/v1/channels/whatsapp/send": {
       "post": {
         "operationId": "send_text_api_v1_channels_whatsapp_send_post",
@@ -53290,6 +53641,89 @@
           }
         },
         "summary": "Delete Article Endpoint",
+        "tags": [
+          "tickets"
+        ]
+      }
+    },
+    "/api/v1/tickets/{ticket_id}/articles/{article_id}/ai-origin": {
+      "get": {
+        "operationId": "get_article_ai_origin_api_v1_tickets__ticket_id__articles__article_id__ai_origin_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "ticket_id",
+            "required": true,
+            "schema": {
+              "title": "Ticket Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "article_id",
+            "required": true,
+            "schema": {
+              "title": "Article Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AiOriginOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Article Ai Origin",
         "tags": [
           "tickets"
         ]
