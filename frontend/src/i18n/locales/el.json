@@ -446,7 +446,10 @@
       },
       "originBadge": "AI",
       "originBadgeTooltip": "Auto-sent by the AI agent — click to see the tool trace",
-      "originTraceEmpty": "No tool calls were recorded for this reply."
+      "originTraceEmpty": "No tool calls were recorded for this reply.",
+      "errorLlmEmptyOutput": "The AI model used up its token budget while reasoning. Please try again.",
+      "errorLlmTimeout": "Timed out waiting for the AI provider. Please try again.",
+      "errorLlmProviderError": "The AI provider reported an error. Please try again later."
     },
     "toolbar": {
       "print": "Εκτύπωση",

@@ -39,6 +39,24 @@ const MAX_COVERAGE_DOTS = 12;
 
 const SUMMARY_DETAILS: SummaryDetail[] = ["standard", "detailed"];
 
+/** Extracts the stable error code from an ApiError's FastAPI `detail`
+ * string, when it follows the `"<code>: <message>"` convention used by
+ * `_map_run_error` (backend: api/v1/ai.py) for a few distinguishable
+ * run/LLM failures. Returns `undefined` for plain-string details without
+ * that prefix (e.g. "Manual Assist is disabled for this queue") — those
+ * fall back to the generic per-status-code text. */
+function errorDetailCode(error: ApiError): string | undefined {
+  const payload = error.detail;
+  const raw =
+    payload && typeof payload === "object" && "detail" in payload
+      ? (payload as { detail: unknown }).detail
+      : payload;
+  if (typeof raw !== "string") return undefined;
+  const colonIdx = raw.indexOf(":");
+  if (colonIdx <= 0) return undefined;
+  return raw.slice(0, colonIdx).trim();
+}
+
 /** Coverage of the current summary over the ticket's articles: filled dots
  * are summarized, the outline dots arrived later. */
 function CoverageDots({ covered, total }: { covered: number; total: number }) {
@@ -182,6 +200,21 @@ export function AiPanel({
 
   const mapRunError = (error: unknown): string => {
     if (error instanceof ApiError) {
+      // Stable "<code>: <message>" detail prefix (backend: _map_run_error in
+      // api/v1/ai.py) for the cases with a specific, actionable message —
+      // matched before the generic status-code fallbacks below so a known
+      // code always wins even if the status code is shared with other
+      // (unrelated) 409s.
+      switch (errorDetailCode(error)) {
+        case "llm_empty_output":
+          return t("ticket.ai.errorLlmEmptyOutput");
+        case "llm_timeout":
+          return t("ticket.ai.errorLlmTimeout");
+        case "llm_provider_error":
+          return t("ticket.ai.errorLlmProviderError");
+        case "ai_run_locked":
+          return t("ticket.ai.errorLocked");
+      }
       if (error.status === 423) return t("ticket.ai.errorLocked");
       if (error.status === 403) return t("ticket.ai.errorForbidden");
       if (error.status === 429) return t("ticket.ai.errorRateLimited");
