@@ -443,7 +443,10 @@
         "accepted": "Prihvaćeno",
         "discarded": "Odbačeno",
         "superseded": "Zamijenjeno"
-      }
+      },
+      "originBadge": "AI",
+      "originBadgeTooltip": "Auto-sent by the AI agent — click to see the tool trace",
+      "originTraceEmpty": "No tool calls were recorded for this reply."
     },
     "toolbar": {
       "print": "Ispis",
