@@ -116,6 +116,16 @@ KEY_TELEGRAM_POLLER_INTERVAL_SECONDS = "daemon.telegram_poller.interval_seconds"
 # watermark in the outbox-cursor sense — Telegram's own update_id sequence.
 KEY_TELEGRAM_UPDATE_OFFSET = "channel.telegram.update_offset"
 
+# Completion-token budget for every tiqora.ai.runtime agent chat() call (tool
+# loop / final answer / identity exchange — see runtime.DEFAULT_MAX_COMPLETION_TOKENS
+# for the fallback default when this row is unset). Reasoning models (e.g.
+# Hetzner GLM) can burn the OpenAI wire default of max_tokens=1024 entirely on
+# hidden reasoning tokens before ever producing a tool call or visible text —
+# the prod incident this key fixes. Admin-editable; unrelated to
+# tiqora.ai.summary._completion_budget, which sizes the separate summary
+# completion and is not touched by this key.
+KEY_AI_LLM_MAX_COMPLETION_TOKENS = "ai.llm.max_completion_tokens"
+
 
 async def get_setting_bool(session: AsyncSession, key: str, default: bool = False) -> bool:
     raw = await get_setting(session, key)
