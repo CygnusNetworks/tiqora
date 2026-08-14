@@ -19,6 +19,7 @@ from tiqora.api.v1.admin import (
     auto_responses,
     channels,
     crypto_keys,
+    customer_links,
     customers,
     daemons,
     dynamic_fields,
@@ -86,6 +87,7 @@ admin_router.include_router(daemons.router)
 admin_router.include_router(system.router)
 admin_router.include_router(placeholder_variables.queue_variables_router)
 admin_router.include_router(placeholder_variables.customer_fields_router)
+admin_router.include_router(customer_links.router)
 admin_router.include_router(ai.router)
 admin_router.include_router(ai_audit.router)
 
