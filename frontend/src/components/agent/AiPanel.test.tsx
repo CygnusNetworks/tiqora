@@ -258,6 +258,90 @@ describe("AiPanel", () => {
     );
   });
 
+  it("maps a known llm_empty_output detail code to the specific message", async () => {
+    getState.mockResolvedValue({ ...baseState, manual_assist_available: true });
+    requestDraft.mockRejectedValue(
+      new ApiError(
+        502,
+        "llm_empty_output: LLM returned finish_reason='length' twice in a row.",
+        "/api/v1/tickets/1/ai/draft",
+      ),
+    );
+
+    wrap(<AiPanel ticketId={1} canNote />);
+
+    fireEvent.click(
+      await screen.findByTestId("ai-panel-create-draft-button"),
+    );
+    await waitFor(() =>
+      expect(screen.getByTestId("ai-panel-draft-error")).toBeTruthy(),
+    );
+    expect(screen.getByTestId("ai-panel-draft-error").textContent).toBe(
+      "The AI model used up its token budget while reasoning. Please try again.",
+    );
+  });
+
+  it("maps a known llm_timeout detail code to the specific message", async () => {
+    getState.mockResolvedValue({ ...baseState, manual_assist_available: true });
+    requestDraft.mockRejectedValue(
+      new ApiError(504, "llm_timeout: timed out", "/api/v1/tickets/1/ai/draft"),
+    );
+
+    wrap(<AiPanel ticketId={1} canNote />);
+
+    fireEvent.click(
+      await screen.findByTestId("ai-panel-create-draft-button"),
+    );
+    await waitFor(() =>
+      expect(screen.getByTestId("ai-panel-draft-error")).toBeTruthy(),
+    );
+    expect(screen.getByTestId("ai-panel-draft-error").textContent).toBe(
+      "Timed out waiting for the AI provider. Please try again.",
+    );
+  });
+
+  it("maps a known llm_provider_error detail code to the specific message", async () => {
+    getState.mockResolvedValue({ ...baseState, manual_assist_available: true });
+    requestDraft.mockRejectedValue(
+      new ApiError(
+        502,
+        "llm_provider_error: HTTP 503: Service Unavailable",
+        "/api/v1/tickets/1/ai/draft",
+      ),
+    );
+
+    wrap(<AiPanel ticketId={1} canNote />);
+
+    fireEvent.click(
+      await screen.findByTestId("ai-panel-create-draft-button"),
+    );
+    await waitFor(() =>
+      expect(screen.getByTestId("ai-panel-draft-error")).toBeTruthy(),
+    );
+    expect(screen.getByTestId("ai-panel-draft-error").textContent).toBe(
+      "The AI provider reported an error. Please try again later.",
+    );
+  });
+
+  it("falls back to the generic error message for an unknown detail code", async () => {
+    getState.mockResolvedValue({ ...baseState, manual_assist_available: true });
+    requestDraft.mockRejectedValue(
+      new ApiError(500, "some_unmapped_code: boom", "/api/v1/tickets/1/ai/draft"),
+    );
+
+    wrap(<AiPanel ticketId={1} canNote />);
+
+    fireEvent.click(
+      await screen.findByTestId("ai-panel-create-draft-button"),
+    );
+    await waitFor(() =>
+      expect(screen.getByTestId("ai-panel-draft-error")).toBeTruthy(),
+    );
+    expect(screen.getByTestId("ai-panel-draft-error").textContent).toBe(
+      "Something went wrong. Please try again.",
+    );
+  });
+
   it("discards a draft after confirmation", async () => {
     getState.mockResolvedValue({
       ...baseState,
