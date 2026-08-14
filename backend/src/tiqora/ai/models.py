@@ -450,6 +450,7 @@ class TiqoraAiArticleOrigin(TiqoraBase):
     queue_id: Mapped[int] = mapped_column(Integer, nullable=False)
     service_user_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
     tool_trace_json: Mapped[str | None] = mapped_column(Text, nullable=True)
+    run_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
     created: Mapped[datetime] = mapped_column(DateTime, nullable=False, server_default=func.now())
 
 

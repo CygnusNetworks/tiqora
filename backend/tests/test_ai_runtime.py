@@ -1580,6 +1580,46 @@ async def test_auto_send_writes_tool_trace_onto_origin_row(mariadb_znuny_url: st
         await engine.dispose()
 
 
+async def test_auto_send_stamps_audit_run_id_onto_origin_row(mariadb_znuny_url: str) -> None:
+    """The origin row's ``run_id`` column (20260814_0037) is the exact audit
+    ``run_id`` for the run that produced it — the backfill CLI
+    (tiqora.ai.backfill_tool_trace) only exists because pre-feature rows
+    lack this and must correlate heuristically instead."""
+    seed = _seed_ticket(mariadb_znuny_url, ns=41)
+    engine = create_async_engine(_mysql_async(mariadb_znuny_url))
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    settings = get_settings()
+    try:
+        async with factory() as session:
+            await _setup_policy(session, seed=seed, autonomy=AUTONOMY_FULL, enabled_auto_reply=True)
+
+        llm = ScriptedLlm([_propose_response("reply", "Run-id bound answer.")])
+        async with factory() as session:
+            result = await run_ticket_agent(
+                session,
+                settings=settings,
+                llm=llm,
+                ticket_id=seed["ticket_id"],
+                trigger=TRIGGER_AUTO,
+                acting_user_id=None,
+                run_id="run-41",
+            )
+        assert result.status == "sent"
+
+        async with factory() as session:
+            run_id = (
+                await session.execute(
+                    text(
+                        "SELECT run_id FROM tiqora_ai_article_origin WHERE article_id = :aid"
+                    ),
+                    {"aid": result.article_id},
+                )
+            ).scalar_one()
+            assert run_id == "run-41"
+    finally:
+        await engine.dispose()
+
+
 async def test_auto_send_email_dispatch_unchanged_regression(
     mariadb_znuny_url: str, monkeypatch: pytest.MonkeyPatch
 ) -> None:

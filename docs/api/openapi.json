@@ -1069,6 +1069,17 @@
             "title": "Article Id",
             "type": "integer"
           },
+          "audit_run_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Audit Run Id"
+          },
           "created_at": {
             "anyOf": [
               {
@@ -1114,6 +1125,7 @@
         "required": [
           "article_id",
           "run_id",
+          "audit_run_id",
           "source",
           "created_at",
           "tool_trace"

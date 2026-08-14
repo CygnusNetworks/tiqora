@@ -1259,6 +1259,7 @@ async def run_ticket_agent(
                 queue_id=ticket.queue_id,
                 service_user_id=actor_user_id,
                 tool_trace_json=json.dumps([m.to_wire() for m in messages if m.role == "tool"]),
+                run_id=run_id,
             )
         )
         state.last_run_at = datetime.now(UTC).replace(tzinfo=None)
