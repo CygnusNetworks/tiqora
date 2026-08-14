@@ -1130,9 +1130,13 @@ async def create_article(
 
         draft = await ai_drafts.get_draft(session, body.ai_draft_id)
         if draft is not None and draft.ticket_id == ticket_id:
-            await ai_drafts.mark_accepted(
+            accepted = await ai_drafts.mark_accepted(
                 session, body.ai_draft_id, article_id=aid, actor_user_id=user.id
             )
+            if accepted is not None:
+                await ai_drafts.record_accepted_origin(
+                    session, accepted, article_id=aid, actor_user_id=user.id
+                )
     return ArticleCreateResponse(article_id=aid)
 
 
