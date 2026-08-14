@@ -1312,7 +1312,8 @@
       "systemAddresses": "Systeemadressen",
       "notificationEvents": "Notificatiegebeurtenissen",
       "ticketAttributeRelations": "Attribuut­relaties",
-      "telegram": "Telegram"
+      "telegram": "Telegram",
+      "queueCustomerLinks": "External customer links"
     },
     "table": {
       "id": "ID",
@@ -2343,7 +2344,8 @@
       "systemAddresses": "E-mailadressen als From voor wachtrijen en auto-antwoorden.",
       "notificationEvents": "Configureer event-gestuurde agentnotificaties.",
       "ticketAttributeRelations": "Znuny-compatibele afhankelijkheidsmatrices (service/wachtrij e.d.) als CSV.",
-      "telegram": "Connect a Telegram bot as a ticket channel."
+      "telegram": "Connect a Telegram bot as a ticket channel.",
+      "queueCustomerLinks": "Configure the external customer-tool button shown in the ticket header, per queue."
     },
     "mailAccounts": {
       "title_plural": "Mailaccounts",
@@ -2466,6 +2468,23 @@
       "saved": "Settings saved.",
       "saveError": "Saving failed.",
       "loadError": "Failed to load settings."
+    },
+    "customerLinks": {
+      "title_plural": "External customer links",
+      "intro": "Configure a second, per-queue button in the ticket header that links to an external customer-management tool.",
+      "new": "New link",
+      "queue": "Queue",
+      "label": "Button label",
+      "defaultLabel": "Customer data",
+      "labelHelp": "Shown on the button. Leave empty to use the default label \"Customer data\".",
+      "urlTemplate": "URL template",
+      "adminUrlTemplate": "Admin URL template (optional)",
+      "adminUrlTemplateHelp": "Shown to admins instead of the URL template above, e.g. for a Kerberos-authenticated host. Non-admins never see this.",
+      "templateHelp": "Placeholders: {customer_user}, {customer_id}, {ticket_number}, {customer_email}, {customer_name} — values are URL-encoded.",
+      "visibility": "Visibility",
+      "visibilityAll": "Everyone",
+      "visibilityAdmins": "Admins only",
+      "empty": "No external customer links configured yet."
     }
   },
   "kb": {
@@ -2740,7 +2759,8 @@
     "openCount": "{{count}} open",
     "closedCount": "{{count}} gesloten",
     "allTickets": "Alle tickets →",
-    "recentTickets": "Recente tickets"
+    "recentTickets": "Recente tickets",
+    "externalDefault": "Customer data"
   },
   "timeAccounting": {
     "title": "Tijdregistratie",

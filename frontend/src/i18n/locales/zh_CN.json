@@ -1312,7 +1312,8 @@
       "systemAddresses": "系统地址",
       "notificationEvents": "通知事件",
       "ticketAttributeRelations": "属性关系",
-      "telegram": "Telegram"
+      "telegram": "Telegram",
+      "queueCustomerLinks": "External customer links"
     },
     "table": {
       "id": "ID",
@@ -2343,7 +2344,8 @@
       "systemAddresses": "用作队列与自动回复发件人的电子邮件地址。",
       "notificationEvents": "配置由事件触发的坐席通知。",
       "ticketAttributeRelations": "Znuny 兼容的依赖矩阵（如服务→队列），CSV 格式。",
-      "telegram": "Connect a Telegram bot as a ticket channel."
+      "telegram": "Connect a Telegram bot as a ticket channel.",
+      "queueCustomerLinks": "Configure the external customer-tool button shown in the ticket header, per queue."
     },
     "mailAccounts": {
       "title_plural": "邮件账户",
@@ -2466,6 +2468,23 @@
       "saved": "Settings saved.",
       "saveError": "Saving failed.",
       "loadError": "Failed to load settings."
+    },
+    "customerLinks": {
+      "title_plural": "External customer links",
+      "intro": "Configure a second, per-queue button in the ticket header that links to an external customer-management tool.",
+      "new": "New link",
+      "queue": "Queue",
+      "label": "Button label",
+      "defaultLabel": "Customer data",
+      "labelHelp": "Shown on the button. Leave empty to use the default label \"Customer data\".",
+      "urlTemplate": "URL template",
+      "adminUrlTemplate": "Admin URL template (optional)",
+      "adminUrlTemplateHelp": "Shown to admins instead of the URL template above, e.g. for a Kerberos-authenticated host. Non-admins never see this.",
+      "templateHelp": "Placeholders: {customer_user}, {customer_id}, {ticket_number}, {customer_email}, {customer_name} — values are URL-encoded.",
+      "visibility": "Visibility",
+      "visibilityAll": "Everyone",
+      "visibilityAdmins": "Admins only",
+      "empty": "No external customer links configured yet."
     }
   },
   "kb": {
@@ -2740,7 +2759,8 @@
     "openCount": "{{count}} 个未关闭",
     "closedCount": "{{count}} 个已关闭",
     "allTickets": "全部工单 →",
-    "recentTickets": "最近的工单"
+    "recentTickets": "最近的工单",
+    "externalDefault": "Customer data"
   },
   "timeAccounting": {
     "title": "工时统计",

@@ -163,6 +163,14 @@ export const ADMIN_PAGES: AdminPageEntry[] = [
     keywords: ["platzhalter", "variablen", "placeholder", "smart tags"],
   },
   {
+    slug: "queue-customer-links",
+    route: "/admin/queue-customer-links",
+    group: "tickets",
+    nameKey: "admin.nav.queueCustomerLinks",
+    descriptionKey: "admin.pageDescriptions.queueCustomerLinks",
+    keywords: ["kundenlink", "customer link", "netadmin", "extern", "diagnose"],
+  },
+  {
     slug: "states",
     route: "/admin/states",
     group: "tickets",

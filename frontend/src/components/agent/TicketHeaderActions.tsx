@@ -9,6 +9,7 @@ import { useAuth } from "@/auth/AuthContext";
 import { Avatar } from "@/components/ui/Avatar";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
+import { ExternalLinkIcon, UserIcon } from "@/components/ui/icons";
 import { Menu, MenuItem, MenuLabel, MenuSeparator } from "@/components/ui/Menu";
 import { SelectMenu, type SelectMenuItem } from "@/components/ui/SelectMenu";
 import { PriorityChip, StateChip } from "@/components/ui/StatusChip";
@@ -36,6 +37,9 @@ import { ticketPerms, usePatchTicket } from "@/lib/ticket";
  * All values stay clickable dropdowns/dialogs; ActionToolbar keeps owning
  * the dialog implementations — this component only re-wires their triggers.
  */
+const headerLinkButtonClass =
+  "inline-flex items-center gap-1 rounded-md border border-hairline bg-surface px-2 py-1 text-xs font-medium text-ink transition-colors duration-100 hover:bg-surface-subtle";
+
 export function TicketHeaderActions({
   ticket,
   canNote,
@@ -104,6 +108,14 @@ export function TicketHeaderActions({
   const articlesQ = useQuery({
     queryKey: ["tickets", ticketId, "articles"],
     queryFn: () => api.listArticles(ticketId),
+  });
+  // Resolved external customer-tool link (second header button, admin
+  // Section "Externe Kunden-Links"); server returns url: null when no
+  // per-queue config applies, so this never 404s.
+  const customerLinkQ = useQuery({
+    queryKey: ["tickets", ticketId, "customer-link"],
+    queryFn: ({ signal }) => api.getTicketCustomerLink(ticketId, signal),
+    enabled: ticketId > 0,
   });
 
   const aclAllowed = (field: string, id: number): boolean => {
@@ -539,12 +551,30 @@ export function TicketHeaderActions({
           <Link
             to="/agent/customers/$login"
             params={{ login: ticket.customer_user_id }}
-            className="text-xs font-medium text-accent hover:underline"
+            className={headerLinkButtonClass}
             data-testid="ticket-customer-centre-link"
             title={t("customerCentre.title")}
           >
+            <UserIcon className="text-[13px]" />
             {t("customerCentre.open")}
           </Link>
+        )}
+        {/* Second, per-queue-configurable button pointing at an external
+            customer-management tool (admin Section "Externe Kunden-Links").
+            Absent entirely when the queue has no config, or visibility
+            hides it from this (non-admin) agent — resolved server-side. */}
+        {customerLinkQ.data?.url && (
+          <a
+            href={customerLinkQ.data.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className={headerLinkButtonClass}
+            data-testid="ticket-customer-external-link"
+            title={customerLinkQ.data.label || t("customerCentre.externalDefault")}
+          >
+            <ExternalLinkIcon className="text-[13px]" />
+            {customerLinkQ.data.label || t("customerCentre.externalDefault")}
+          </a>
         )}
         {/* Counters and timestamp share the right edge: state first, then when. */}
         <span className="ml-auto inline-flex items-center gap-2">

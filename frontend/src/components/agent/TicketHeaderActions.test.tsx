@@ -18,6 +18,7 @@ const {
   listQueues,
   listReferenceAgents,
   ticketAclFieldOptions,
+  getTicketCustomerLink,
 } = vi.hoisted(() => ({
   patchTicket: vi.fn(),
   listReferencePriorities: vi.fn(),
@@ -30,6 +31,7 @@ const {
   listQueues: vi.fn(),
   listReferenceAgents: vi.fn(),
   ticketAclFieldOptions: vi.fn(),
+  getTicketCustomerLink: vi.fn(),
 }));
 
 vi.mock("@/lib/api", async () => {
@@ -48,6 +50,7 @@ vi.mock("@/lib/api", async () => {
       listQueues,
       listReferenceAgents,
       ticketAclFieldOptions,
+      getTicketCustomerLink,
       listTemplates: vi.fn().mockResolvedValue([]),
       // Queried by the header's @ / ⏱ counters.
       listTicketMentions: vi.fn().mockResolvedValue([]),
@@ -180,6 +183,7 @@ describe("TicketHeaderActions", () => {
       signature: "",
       signature_is_html: false,
     });
+    getTicketCustomerLink.mockReset().mockResolvedValue({ label: null, url: null });
   });
 
   it("renders the state/priority/queue/owner/customer pills with their values", async () => {
@@ -366,5 +370,47 @@ describe("TicketHeaderActions", () => {
     wrap(<TicketHeaderActions ticket={makeTicket()} canNote={false} onOpenNote={vi.fn()} />);
     expect(screen.getByTestId("ticket-actions-reply")).toBeDisabled();
     expect(screen.getByTestId("ticket-actions-note")).toBeDisabled();
+  });
+
+  it("shows the internal Kunde button once the customer login resolves to an email", async () => {
+    wrap(
+      <TicketHeaderActions
+        ticket={makeTicket({ customer_email: "bob@example.com" })}
+        canNote
+        onOpenNote={vi.fn()}
+      />,
+    );
+    const link = await screen.findByTestId("ticket-customer-centre-link");
+    expect(link).toHaveAttribute("href", "/agent/customers/$login");
+    expect(link).toHaveAttribute("data-params", JSON.stringify({ login: "bob" }));
+  });
+
+  it("shows no external customer-link button when the endpoint returns url: null", async () => {
+    wrap(<TicketHeaderActions ticket={makeTicket()} canNote onOpenNote={vi.fn()} />);
+    await waitFor(() => expect(getTicketCustomerLink).toHaveBeenCalledWith(7, expect.anything()));
+    expect(screen.queryByTestId("ticket-customer-external-link")).not.toBeInTheDocument();
+  });
+
+  it("shows the external customer-link button with its configured label, opening in a new tab", async () => {
+    getTicketCustomerLink.mockResolvedValue({
+      label: "Diagnose",
+      url: "https://netadmin.example/?u=bob",
+    });
+    wrap(<TicketHeaderActions ticket={makeTicket()} canNote onOpenNote={vi.fn()} />);
+    const link = await screen.findByTestId("ticket-customer-external-link");
+    expect(link).toHaveTextContent("Diagnose");
+    expect(link).toHaveAttribute("href", "https://netadmin.example/?u=bob");
+    expect(link).toHaveAttribute("target", "_blank");
+    expect(link).toHaveAttribute("rel", "noopener noreferrer");
+  });
+
+  it("falls back to the default 'Customer data' label when the config has no label", async () => {
+    getTicketCustomerLink.mockResolvedValue({
+      label: null,
+      url: "https://netadmin.example/?u=bob",
+    });
+    wrap(<TicketHeaderActions ticket={makeTicket()} canNote onOpenNote={vi.fn()} />);
+    const link = await screen.findByTestId("ticket-customer-external-link");
+    expect(link).toHaveTextContent(/Customer data|Kundendaten/);
   });
 });

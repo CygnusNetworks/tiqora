@@ -100,6 +100,7 @@ import { GenericAgentJobDetailPage } from "@/routes/admin/GenericAgentJobDetailP
 import { ProcessesPage } from "@/routes/admin/ProcessesPage";
 import { ProcessDetailPage } from "@/routes/admin/ProcessDetailPage";
 import { QueueVariablesPage } from "@/routes/admin/QueueVariablesPage";
+import { QueueCustomerLinksPage } from "@/routes/admin/QueueCustomerLinksPage";
 import { CustomerFieldsPage } from "@/routes/admin/CustomerFieldsPage";
 import { ApiKeysPage } from "@/routes/admin/ApiKeysPage";
 import { AuthConfigPage } from "@/routes/admin/AuthConfigPage";
@@ -823,6 +824,12 @@ const adminQueueVariablesRoute = createRoute({
   component: QueueVariablesPage,
 });
 
+const adminQueueCustomerLinksRoute = createRoute({
+  getParentRoute: () => adminLayoutRoute,
+  path: "/queue-customer-links",
+  component: QueueCustomerLinksPage,
+});
+
 const adminCustomerFieldsRoute = createRoute({
   getParentRoute: () => adminLayoutRoute,
   path: "/customer-fields",
@@ -993,6 +1000,7 @@ const routeTree = rootRoute.addChildren([
     adminProcessesRoute,
     adminProcessDetailRoute,
     adminQueueVariablesRoute,
+    adminQueueCustomerLinksRoute,
     adminCustomerFieldsRoute,
     adminGdprRoute,
     adminDaemonsRoute,

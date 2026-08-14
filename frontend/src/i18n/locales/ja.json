@@ -1312,7 +1312,8 @@
       "systemAddresses": "システムアドレス",
       "notificationEvents": "通知イベント",
       "ticketAttributeRelations": "属性リレーション",
-      "telegram": "Telegram"
+      "telegram": "Telegram",
+      "queueCustomerLinks": "External customer links"
     },
     "table": {
       "id": "ID",
@@ -2351,7 +2352,8 @@
       "systemAddresses": "キューと自動応答の From に使うメールアドレス。",
       "notificationEvents": "イベント駆動の担当者通知を設定します。",
       "ticketAttributeRelations": "Znuny 互換の依存マトリクス（サービス→キュー等）を CSV で管理します。",
-      "telegram": "Connect a Telegram bot as a ticket channel."
+      "telegram": "Connect a Telegram bot as a ticket channel.",
+      "queueCustomerLinks": "Configure the external customer-tool button shown in the ticket header, per queue."
     },
     "mailAccounts": {
       "title_plural": "メールアカウント",
@@ -2474,6 +2476,23 @@
       "saved": "Settings saved.",
       "saveError": "Saving failed.",
       "loadError": "Failed to load settings."
+    },
+    "customerLinks": {
+      "title_plural": "External customer links",
+      "intro": "Configure a second, per-queue button in the ticket header that links to an external customer-management tool.",
+      "new": "New link",
+      "queue": "Queue",
+      "label": "Button label",
+      "defaultLabel": "Customer data",
+      "labelHelp": "Shown on the button. Leave empty to use the default label \"Customer data\".",
+      "urlTemplate": "URL template",
+      "adminUrlTemplate": "Admin URL template (optional)",
+      "adminUrlTemplateHelp": "Shown to admins instead of the URL template above, e.g. for a Kerberos-authenticated host. Non-admins never see this.",
+      "templateHelp": "Placeholders: {customer_user}, {customer_id}, {ticket_number}, {customer_email}, {customer_name} — values are URL-encoded.",
+      "visibility": "Visibility",
+      "visibilityAll": "Everyone",
+      "visibilityAdmins": "Admins only",
+      "empty": "No external customer links configured yet."
     }
   },
   "kb": {
@@ -2748,7 +2767,8 @@
     "openCount": "未完了 {{count}}",
     "closedCount": "完了 {{count}}",
     "allTickets": "すべてのチケット →",
-    "recentTickets": "最近のチケット"
+    "recentTickets": "最近のチケット",
+    "externalDefault": "Customer data"
   },
   "timeAccounting": {
     "title": "工数管理",

@@ -1312,7 +1312,8 @@
       "systemAddresses": "시스템 주소",
       "notificationEvents": "알림 이벤트",
       "ticketAttributeRelations": "속성 관계",
-      "telegram": "Telegram"
+      "telegram": "Telegram",
+      "queueCustomerLinks": "External customer links"
     },
     "table": {
       "id": "ID",
@@ -2343,7 +2344,8 @@
       "systemAddresses": "대기열과 자동 응답의 From으로 쓰는 이메일 주소.",
       "notificationEvents": "이벤트 기반 상담원 알림을 구성합니다.",
       "ticketAttributeRelations": "Znuny 호환 의존성 행렬(서비스→대기열 등)을 CSV로 관리합니다.",
-      "telegram": "Connect a Telegram bot as a ticket channel."
+      "telegram": "Connect a Telegram bot as a ticket channel.",
+      "queueCustomerLinks": "Configure the external customer-tool button shown in the ticket header, per queue."
     },
     "mailAccounts": {
       "title_plural": "메일 계정",
@@ -2466,6 +2468,23 @@
       "saved": "Settings saved.",
       "saveError": "Saving failed.",
       "loadError": "Failed to load settings."
+    },
+    "customerLinks": {
+      "title_plural": "External customer links",
+      "intro": "Configure a second, per-queue button in the ticket header that links to an external customer-management tool.",
+      "new": "New link",
+      "queue": "Queue",
+      "label": "Button label",
+      "defaultLabel": "Customer data",
+      "labelHelp": "Shown on the button. Leave empty to use the default label \"Customer data\".",
+      "urlTemplate": "URL template",
+      "adminUrlTemplate": "Admin URL template (optional)",
+      "adminUrlTemplateHelp": "Shown to admins instead of the URL template above, e.g. for a Kerberos-authenticated host. Non-admins never see this.",
+      "templateHelp": "Placeholders: {customer_user}, {customer_id}, {ticket_number}, {customer_email}, {customer_name} — values are URL-encoded.",
+      "visibility": "Visibility",
+      "visibilityAll": "Everyone",
+      "visibilityAdmins": "Admins only",
+      "empty": "No external customer links configured yet."
     }
   },
   "kb": {
@@ -2740,7 +2759,8 @@
     "openCount": "미결 {{count}}",
     "closedCount": "종료 {{count}}",
     "allTickets": "모든 티켓 →",
-    "recentTickets": "최근 티켓"
+    "recentTickets": "최근 티켓",
+    "externalDefault": "Customer data"
   },
   "timeAccounting": {
     "title": "시간 기록",
