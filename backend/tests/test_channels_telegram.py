@@ -5,6 +5,7 @@ per-chat ticket continuity, contact upsert), plus the two Task 3 transports
 
 from __future__ import annotations
 
+import asyncio
 import json
 import uuid
 from datetime import datetime
@@ -958,6 +959,243 @@ async def test_poller_tick_processes_callback_query_and_advances_offset(
                     )
                 ).scalar_one()
                 assert contact.consent_time is not None
+            finally:
+                await _cleanup_new_rows(session, before)
+    finally:
+        await engine.dispose()
+
+
+# ---------------------------------------------------------------------------
+# /start = new dialog (Task: Telegram-Chat-UX)
+# ---------------------------------------------------------------------------
+
+
+def test_render_start_text_empty_first_name_no_double_space() -> None:
+    from tiqora.channels.telegram.service import _render_start_text
+
+    rendered = _render_start_text(
+        "Hallo {first_name}! 👋 Schildere mir bitte kurz dein Anliegen.", ""
+    )
+    assert "  " not in rendered
+    assert rendered == "Hallo ! 👋 Schildere mir bitte kurz dein Anliegen."
+
+    rendered_named = _render_start_text("Hallo {first_name}!", "Ada")
+    assert rendered_named == "Hallo Ada!"
+
+
+@pytest.mark.db
+async def test_start_without_consent_still_prompts_consent(mariadb_znuny_url: str) -> None:
+    """Consent gate has priority: /start from an unconsented chat is treated
+    like any other message -- consent prompt, no greeting, no reset."""
+    _ensure_tiqora_tables(mariadb_znuny_url)
+    engine = create_async_engine(_mysql_async(mariadb_znuny_url))
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    try:
+        async with factory() as session:
+            before = await _snapshot_max_ids(session)
+            try:
+                await set_setting(
+                    session, "channel.telegram.default_customer_user", "portal-default"
+                )
+                sysconfig = SysConfig(session)
+                gateway, calls = _recording_gateway()
+
+                result = await process_update(
+                    session, factory, sysconfig, gateway, _text_message(9601, "/start"), user_id=1
+                )
+                await session.commit()
+
+                assert result == {"skipped": "no_consent"}
+                sent = [c for c in calls if c[0] == "sendMessage"]
+                assert len(sent) == 1
+                assert sent[0][1]["reply_markup"]["inline_keyboard"][0][0]["callback_data"] == (
+                    "tiqora_consent_accept"
+                )
+
+                contact = (
+                    await session.execute(
+                        select(TiqoraTelegramContact).where(TiqoraTelegramContact.chat_id == 9601)
+                    )
+                ).scalar_one()
+                assert contact.new_dialog_since is None
+            finally:
+                await _cleanup_new_rows(session, before)
+    finally:
+        await engine.dispose()
+
+
+@pytest.mark.db
+async def test_start_with_consent_greets_and_resets_no_ticket(mariadb_znuny_url: str) -> None:
+    _ensure_tiqora_tables(mariadb_znuny_url)
+    engine = create_async_engine(_mysql_async(mariadb_znuny_url))
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    try:
+        async with factory() as session:
+            before = await _snapshot_max_ids(session)
+            try:
+                await set_setting(
+                    session, "channel.telegram.default_customer_user", "portal-default"
+                )
+                await set_setting(session, "channel.telegram.consent_required", "0")
+                sysconfig = SysConfig(session)
+                gateway, calls = _recording_gateway()
+
+                result = await process_update(
+                    session, factory, sysconfig, gateway, _text_message(9602, "/start"), user_id=1
+                )
+                await session.commit()
+
+                assert result == {"command": "start"}
+
+                sent = [c for c in calls if c[0] == "sendMessage"]
+                assert len(sent) == 1
+                assert "Ada" in sent[0][1]["text"]
+                assert "  " not in sent[0][1]["text"]
+
+                contact = (
+                    await session.execute(
+                        select(TiqoraTelegramContact).where(TiqoraTelegramContact.chat_id == 9602)
+                    )
+                ).scalar_one()
+                assert contact.new_dialog_since is not None
+
+                ticket_count = (
+                    await session.execute(
+                        text("SELECT COUNT(*) FROM ticket WHERE id > :b"), {"b": before["ticket"]}
+                    )
+                ).scalar()
+                assert ticket_count == 0
+            finally:
+                await _cleanup_new_rows(session, before)
+    finally:
+        await engine.dispose()
+
+
+@pytest.mark.db
+async def test_start_resets_ticket_continuity(mariadb_znuny_url: str) -> None:
+    """/start forces a new ticket on the next message even though the old
+    per-chat ticket is still open; a further message then continues the
+    *new* ticket (stage b picks it up again once it has its own article)."""
+    _ensure_tiqora_tables(mariadb_znuny_url)
+    engine = create_async_engine(_mysql_async(mariadb_znuny_url))
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    try:
+        async with factory() as session:
+            before = await _snapshot_max_ids(session)
+            try:
+                await set_setting(
+                    session, "channel.telegram.default_customer_user", "portal-default"
+                )
+                await set_setting(session, "channel.telegram.consent_required", "0")
+                sysconfig = SysConfig(session)
+                gateway, _calls = _recording_gateway()
+
+                first = await process_update(
+                    session,
+                    factory,
+                    sysconfig,
+                    gateway,
+                    _text_message(9603, "Old conversation"),
+                    user_id=1,
+                )
+                await session.commit()
+                assert first["created_ticket"] is True
+
+                start_result = await process_update(
+                    session, factory, sysconfig, gateway, _text_message(9603, "/start"), user_id=1
+                )
+                await session.commit()
+                assert start_result == {"command": "start"}
+
+                # DATETIME columns are second-resolution: without a real gap,
+                # the next article could land in the very same wall-clock
+                # second as new_dialog_since and the strict '>' comparison
+                # would (correctly, if narrowly) miss it -- a real customer
+                # always takes longer than that to type a reply.
+                await asyncio.sleep(1.1)
+
+                second = await process_update(
+                    session,
+                    factory,
+                    sysconfig,
+                    gateway,
+                    _text_message(9603, "Brand new topic"),
+                    user_id=1,
+                )
+                await session.commit()
+                assert second["created_ticket"] is True
+                assert second["ticket_id"] != first["ticket_id"]
+
+                third = await process_update(
+                    session,
+                    factory,
+                    sysconfig,
+                    gateway,
+                    _text_message(9603, "Follow-up on the new topic"),
+                    user_id=1,
+                )
+                await session.commit()
+                assert third["created_ticket"] is False
+                assert third["ticket_id"] == second["ticket_id"]
+            finally:
+                await _cleanup_new_rows(session, before)
+    finally:
+        await engine.dispose()
+
+
+@pytest.mark.db
+async def test_followup_tag_beats_start_reset(mariadb_znuny_url: str) -> None:
+    """An explicit follow-up tag in the message text outranks a prior
+    /start reset -- stage (a) always wins."""
+    _ensure_tiqora_tables(mariadb_znuny_url)
+    engine = create_async_engine(_mysql_async(mariadb_znuny_url))
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    try:
+        async with factory() as session:
+            before = await _snapshot_max_ids(session)
+            try:
+                await set_setting(
+                    session, "channel.telegram.default_customer_user", "portal-default"
+                )
+                await set_setting(session, "channel.telegram.consent_required", "0")
+                sysconfig = SysConfig(session)
+                gateway, _calls = _recording_gateway()
+
+                first = await process_update(
+                    session,
+                    factory,
+                    sysconfig,
+                    gateway,
+                    _text_message(9604, "Original issue"),
+                    user_id=1,
+                )
+                await session.commit()
+
+                tn_row = (
+                    await session.execute(
+                        text("SELECT tn FROM ticket WHERE id = :tid"), {"tid": first["ticket_id"]}
+                    )
+                ).first()
+                assert tn_row is not None
+                tn = tn_row[0]
+
+                start_result = await process_update(
+                    session, factory, sysconfig, gateway, _text_message(9604, "/start"), user_id=1
+                )
+                await session.commit()
+                assert start_result == {"command": "start"}
+
+                followup = await process_update(
+                    session,
+                    factory,
+                    sysconfig,
+                    gateway,
+                    _text_message(9604, f"Re: [Ticket#{tn}] more details"),
+                    user_id=1,
+                )
+                await session.commit()
+                assert followup["created_ticket"] is False
+                assert followup["ticket_id"] == first["ticket_id"]
             finally:
                 await _cleanup_new_rows(session, before)
     finally:

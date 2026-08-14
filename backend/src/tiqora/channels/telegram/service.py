@@ -19,6 +19,7 @@ to the customer_user-based lookup once a contact has a *real* mapped login.
 
 from __future__ import annotations
 
+import re
 from datetime import UTC, datetime
 from typing import Any
 
@@ -46,6 +47,26 @@ CONSENT_ACCEPT_CALLBACK_DATA = "tiqora_consent_accept"
 # Minimum gap between two consent prompts to the same chat (spam guard for
 # customers who keep messaging before tapping the button).
 CONSENT_REPROMPT_SECONDS = 3600
+
+# ``/start`` = explicit new-dialog reset (Telegram-Chat-UX). Compared against
+# the stripped message text verbatim — no other command is understood yet.
+START_COMMAND = "/start"
+
+DEFAULT_START_TEXT = (
+    "Hallo {first_name}! 👋 Schildere mir bitte kurz dein Anliegen – ich lege "
+    "dafür einen neuen Vorgang an."
+)
+
+# System-prompt addendum for AI replies triggered from this channel (Task:
+# Telegram-Chat-UX) — a Telegram chat reads as a conversation, not a letter,
+# so the model is told to duze and drop formal-mail conventions. Read by
+# ``tiqora.ai.runtime`` via the ``channel.telegram.tone_prompt`` setting.
+DEFAULT_TONE_PROMPT = (
+    "Dies ist ein Telegram-Chat: Duze die Nutzerin/den Nutzer konsequent und "
+    "sprich sie/ihn mit Vornamen an. Schreibe kurz, freundlich und "
+    "chat-gerecht – keine förmlichen Brief-Floskeln, keine Grußformeln wie "
+    "'Sehr geehrte…'."
+)
 
 _DEFAULT_CONSENT_TEXT = (
     "Bevor wir Ihr Anliegen bearbeiten können, benötigen wir Ihre Zustimmung zur "
@@ -174,6 +195,46 @@ async def _upsert_contact_fields(
     return row
 
 
+def _render_start_text(template: str, first_name: str) -> str:
+    """``{first_name}`` via ``str.format``; an empty/missing name must not
+    leave a doubled space behind (e.g. ``"Hallo  ! ..."``)."""
+    try:
+        rendered = template.format(first_name=first_name)
+    except (KeyError, IndexError):
+        # Admin-configured text with an unsupported placeholder — fall back
+        # to the template verbatim rather than failing the whole update.
+        rendered = template
+    return re.sub(r"[ \t]{2,}", " ", rendered).strip()
+
+
+async def _handle_start_command(
+    session: AsyncSession,
+    gateway: TelegramGateway | None,
+    contact: TiqoraTelegramContact,
+    frm: dict[str, Any],
+) -> dict[str, Any]:
+    """Handle ``/start``: reset per-chat ticket continuity and greet, without
+    creating any ticket/article (see module docstring's stage (a)-(d) order
+    and its interaction with ``new_dialog_since`` below)."""
+    contact.new_dialog_since = datetime.now(UTC).replace(tzinfo=None)
+    await session.flush()
+
+    if gateway is not None:
+        first_name = str(frm.get("first_name") or "").strip()
+        template = (
+            await channel_setting(session, CHANNEL_NAME, "start_text", DEFAULT_START_TEXT)
+        ) or DEFAULT_START_TEXT
+        greeting = _render_start_text(template, first_name)
+        try:
+            await gateway.send_message(contact.chat_id, greeting)
+        except TelegramApiError as exc:
+            logger.warning(
+                "telegram_start_greeting_send_failed", chat_id=contact.chat_id, error=str(exc)
+            )
+
+    return {"command": "start"}
+
+
 async def _resolve_ticket(
     session: AsyncSession,
     session_factory: async_sessionmaker[AsyncSession],
@@ -186,6 +247,7 @@ async def _resolve_ticket(
     is_mapped_customer: bool,
     title: str,
     user_id: int,
+    new_dialog_since: datetime | None = None,
 ) -> tuple[int, bool]:
     """Return ``(ticket_id, created)``.
 
@@ -193,6 +255,16 @@ async def _resolve_ticket(
     that already has an article from this chat (per-chat continuity — see
     module docstring), (c) only for a *really* mapped contact, most recent
     open ticket for that customer_user (generic fallback), (d) create new.
+
+    ``new_dialog_since`` (set by ``/start``, Task: Telegram-Chat-UX) makes
+    stage (b) ignore any per-chat ticket whose newest Telegram article
+    predates it, and skips stage (c) entirely — a customer who taps
+    ``/start`` always gets a fresh ticket, even with an older ticket of
+    theirs still open. Once that new ticket has its own article, it is
+    younger than ``new_dialog_since`` and stage (b) picks it up again on the
+    next message, same as before. Stage (a) (follow-up tag) always wins
+    regardless — an explicit reply-to-this-ticket signal outranks a stale
+    ``/start``.
     """
     from tiqora.domain.subject_hook import load_subject_config
 
@@ -210,24 +282,29 @@ async def _resolve_ticket(
         return ticket_id, False
 
     chat_pattern = f"%<{chat_id}@telegram.invalid>%"
-    row = (
-        await session.execute(
-            text(
-                "SELECT t.id FROM ticket t"
-                " JOIN ticket_state ts ON ts.id = t.ticket_state_id"
-                " JOIN ticket_state_type tst ON tst.id = ts.type_id"
-                " JOIN article a ON a.ticket_id = t.id"
-                " JOIN article_data_mime adm ON adm.article_id = a.id"
-                " WHERE adm.a_from LIKE :pat AND tst.name NOT IN ('closed', 'removed')"
-                " ORDER BY t.id DESC LIMIT 1"
-            ),
-            {"pat": chat_pattern},
-        )
-    ).first()
+    stage_b_sql = (
+        "SELECT t.id FROM ticket t"
+        " JOIN ticket_state ts ON ts.id = t.ticket_state_id"
+        " JOIN ticket_state_type tst ON tst.id = ts.type_id"
+        " JOIN article a ON a.ticket_id = t.id"
+        " JOIN article_data_mime adm ON adm.article_id = a.id"
+        " WHERE adm.a_from LIKE :pat AND tst.name NOT IN ('closed', 'removed')"
+    )
+    stage_b_params: dict[str, Any] = {"pat": chat_pattern}
+    if new_dialog_since is not None:
+        # DATETIME columns are second-resolution on MariaDB: a message sent
+        # in the very same wall-clock second as /start is an unavoidable
+        # edge case either way (a customer never types that fast in
+        # practice) -- keep the strict '>' so an *older* per-chat article
+        # from before the reset is never mistaken for a new one.
+        stage_b_sql += " AND a.create_time > :nds"
+        stage_b_params["nds"] = new_dialog_since
+    stage_b_sql += " ORDER BY t.id DESC LIMIT 1"
+    row = (await session.execute(text(stage_b_sql), stage_b_params)).first()
     if row is not None:
         return int(row[0]), False
 
-    if is_mapped_customer and customer_user_id:
+    if new_dialog_since is None and is_mapped_customer and customer_user_id:
         row = (
             await session.execute(
                 text(
@@ -381,6 +458,9 @@ async def process_update(
         await _maybe_prompt_consent(session, gateway, contact)
         return {"skipped": "no_consent"}
 
+    if (message.get("text") or "").strip() == START_COMMAND:
+        return await _handle_start_command(session, gateway, contact, frm)
+
     default_customer = await channel_setting(session, CHANNEL_NAME, "default_customer_user")
     is_mapped_customer = bool(contact.customer_user_login)
     customer_user_id = contact.customer_user_login or default_customer
@@ -408,6 +488,7 @@ async def process_update(
         is_mapped_customer=is_mapped_customer,
         title=title,
         user_id=user_id,
+        new_dialog_since=contact.new_dialog_since,
     )
 
     attachments: list[tuple[str, str, bytes]] = []

@@ -343,3 +343,147 @@ async def test_ticket_zoom(url_fixture: str, request: pytest.FixtureRequest) -> 
         assert "Bounce" in htypes
 
     await engine.dispose()
+
+
+def _seed_quote_skip(sync_url: str) -> dict[str, Any]:
+    """Self-contained fixture (own id range, no reuse of ``_seed``'s ticket
+    7700) -- ``_seed`` is not safely re-callable in the same session since
+    ``test_ticket_zoom`` above leaves forward/bounce/split rows on ticket
+    7700 that FK-block its own idempotent cleanup on a second call."""
+    engine = create_engine(sync_url)
+    pw = hash_password("secret")
+    with engine.begin() as conn:
+        TiqoraBase.metadata.create_all(conn)
+        conn.execute(text("DELETE FROM article_data_mime WHERE id IN (7811, 7812)"))
+        conn.execute(text("DELETE FROM article WHERE id IN (7811, 7812)"))
+        conn.execute(text("DELETE FROM ticket WHERE id = 7710"))
+        conn.execute(text("DELETE FROM queue WHERE id = 7310"))
+        conn.execute(
+            text("DELETE FROM group_user WHERE user_id = 7311 OR group_id = 7340"),
+        )
+        conn.execute(text("DELETE FROM permission_groups WHERE id = 7340"))
+        conn.execute(text("DELETE FROM users WHERE id = 7311"))
+        conn.execute(
+            text(
+                "INSERT INTO users (id, login, pw, first_name, last_name, valid_id,"
+                " create_time, create_by, change_time, change_by)"
+                " VALUES (7311, 'agent.quoteskip', :pw, 'Ag', 'Ent', 1, :t, 1, :t, 1)"
+            ),
+            {"pw": pw, "t": NOW},
+        )
+        conn.execute(
+            text(
+                "INSERT INTO permission_groups (id, name, valid_id,"
+                " create_time, create_by, change_time, change_by)"
+                " VALUES (7340, 'quoteskip-grp', 1, :t, 1, :t, 1)"
+            ),
+            {"t": NOW},
+        )
+        for key in ("ro", "rw"):
+            conn.execute(
+                text(
+                    "INSERT INTO group_user (user_id, group_id, permission_key,"
+                    " create_time, create_by, change_time, change_by)"
+                    " VALUES (7311, 7340, :k, :t, 1, :t, 1)"
+                ),
+                {"k": key, "t": NOW},
+            )
+        conn.execute(
+            text(
+                "INSERT INTO queue (id, name, group_id, system_address_id, salutation_id,"
+                " signature_id, follow_up_id, follow_up_lock, valid_id,"
+                " create_time, create_by, change_time, change_by)"
+                " VALUES (7310, 'QuoteSkipQueue', 7340, 1, 1, 1, 1, 0, 1, :t, 1, :t, 1)"
+            ),
+            {"t": NOW},
+        )
+        conn.execute(
+            text(
+                "INSERT INTO ticket (id, tn, title, queue_id, ticket_lock_id, type_id,"
+                " user_id, responsible_user_id, ticket_priority_id, ticket_state_id,"
+                " customer_id, customer_user_id, timeout, until_time, escalation_time,"
+                " escalation_update_time, escalation_response_time, escalation_solution_time,"
+                " archive_flag, create_time, create_by, change_time, change_by)"
+                " VALUES (7710, '20240601710001', 'Quote-skip ticket', 7310, 1, 1,"
+                " 7311, 1, 3, 4, 'CUST1', 'alice@example.com',"
+                " 0, 0, 0, 0, 0, 0, 0, :t, 1, :t, 1)"
+            ),
+            {"t": NOW},
+        )
+        # Email-channel article (channel id 1 == Email, as in test_ticket_zoom).
+        conn.execute(
+            text(
+                "INSERT INTO article (id, ticket_id, article_sender_type_id,"
+                " communication_channel_id, is_visible_for_customer, search_index_needs_rebuild,"
+                " create_time, create_by, change_time, change_by)"
+                " VALUES (7811, 7710, 3, 1, 1, 0, :t, 1, :t, 1)"
+            ),
+            {"t": NOW},
+        )
+        conn.execute(
+            text(
+                "INSERT INTO article_data_mime (id, article_id, a_from, a_subject,"
+                " a_content_type, a_body, a_message_id, incoming_time,"
+                " create_time, create_by, change_time, change_by)"
+                " VALUES (7811, 7811, 'alice@example.com', 'Broken thing',"
+                " 'text/plain; charset=utf-8', 'First line\nSecond line', '<msg-quoteskip@x>',"
+                " 1717243200, :t, 1, :t, 1)"
+            ),
+            {"t": NOW},
+        )
+    engine.dispose()
+    return {"agent": 7311, "ticket": 7710, "email_article": 7811, "telegram_article": 7812}
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("url_fixture", ["mariadb_znuny_url", "postgres_znuny_url"])
+async def test_reply_draft_telegram_article_skips_quote(
+    url_fixture: str, request: pytest.FixtureRequest
+) -> None:
+    """Task: Telegram-Chat-UX — a reply draft based on a Telegram-channel
+    article gets an empty answer area (no Znuny-style "On <date>, X wrote:"
+    quote); an email-channel article on the same ticket is unaffected."""
+    from tiqora.channels.common import ensure_channel_row
+
+    sync_url: str = request.getfixturevalue(url_fixture)
+    ids = _seed_quote_skip(sync_url)
+    engine = create_async_engine(_to_async_url(sync_url))
+    factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+
+    async with factory() as session:
+        tg_channel_id = await ensure_channel_row(
+            session, "Telegram", "Tiqora::CommunicationChannel::Telegram"
+        )
+        await session.execute(
+            text(
+                "INSERT INTO article (id, ticket_id, article_sender_type_id,"
+                " communication_channel_id, is_visible_for_customer,"
+                " search_index_needs_rebuild, create_time, create_by, change_time, change_by)"
+                " VALUES (:aid, :tid, 3, :ccid, 1, 0, :t, 1, :t, 1)"
+            ),
+            {"aid": ids["telegram_article"], "tid": ids["ticket"], "ccid": tg_channel_id, "t": NOW},
+        )
+        await session.execute(
+            text(
+                "INSERT INTO article_data_mime (id, article_id, a_from, a_subject,"
+                " a_content_type, a_body, a_message_id, incoming_time,"
+                " create_time, create_by, change_time, change_by)"
+                " VALUES (:aid, :aid, 'Ada <111@telegram.invalid>', 'Chat message',"
+                " 'text/plain; charset=utf-8', 'Hi there', '<msg-tg@x>', 1717243200,"
+                " :t, 1, :t, 1)"
+            ),
+            {"aid": ids["telegram_article"], "t": NOW},
+        )
+        await session.commit()
+
+        ts = TicketService(session)
+        draft = await ts.get_reply_draft(ids["agent"], ids["ticket"], ids["telegram_article"])
+        assert "wrote:" not in draft.body
+        assert "Hi there" not in draft.body
+        assert draft.body == ""
+
+        # Email-channel article on the same ticket keeps the quote.
+        draft_email = await ts.get_reply_draft(ids["agent"], ids["ticket"], ids["email_article"])
+        assert "wrote:" in draft_email.body
+        assert "> First line" in draft_email.body
+    await engine.dispose()

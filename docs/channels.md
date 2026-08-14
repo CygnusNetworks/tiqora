@@ -168,10 +168,29 @@ continuity off the chat itself (see "Identity / contact mapping").
   attachments; the caption (if any) becomes the article body, otherwise a
   placeholder (`[Foto]`, `[Dokument: name]`, ...). A download failure keeps
   the placeholder text and appends a note rather than losing the message.
+- **`/start` = new dialog**: sends `channel.telegram.start_text` (`{first_name}`
+  interpolated) and sets `tiqora_telegram_contact.new_dialog_since` — no
+  ticket/article is created. Afterwards, `_resolve_ticket`'s per-chat
+  continuity lookup (stage b) ignores any ticket without a Telegram article
+  newer than `new_dialog_since`, and skips the customer-fallback lookup
+  (stage c) entirely, so the next message always starts a fresh ticket even
+  if an older one for the same chat is still open; the follow-up-tag lookup
+  (stage a) still takes priority over a `/start` reset.
+- **No email-style quoting on Telegram replies**: the reply-draft composer
+  (`TicketService.get_reply_draft`) leaves the answer area empty instead of
+  prefixing the Znuny-style `On <date>, <from> wrote:` quote when the
+  based-on article's channel is Telegram — a chat reply isn't a quoted email.
+- **Du-Anrede / chat tone for AI replies**: `channel.telegram.tone_prompt`
+  (default: duze the customer by first name, no formal-letter phrasing) is
+  appended to the AI system prompt whenever the run is Telegram-sourced —
+  covers both the auto-trigger (`source_channel`) and Manual Assist (decided
+  by the based-on/latest customer article's channel instead, since manual
+  runs never set `source_channel`) — and to the identity-check exchange,
+  which is Telegram-only by construction.
 - **Config keys** (`channel.telegram.*`): `enabled`, `bot_token`, `mode`
   (`polling`|`webhook`), `webhook_url`, `webhook_secret_token`,
   `default_customer_user`, `queue_name`, `consent_required`, `consent_text`,
-  `consent_confirmed_text`.
+  `consent_confirmed_text`, `start_text`, `tone_prompt`.
 
 ### Known limitations
 
