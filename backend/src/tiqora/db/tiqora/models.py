@@ -640,6 +640,13 @@ class TiqoraTelegramContact(TiqoraBase):
     customer_user_login: Mapped[str | None] = mapped_column(String(200), nullable=True)
     consent_time: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     consent_prompt_time: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    # Set by ``/start`` (Task: Telegram-Chat-UX); marks the beginning of a
+    # fresh dialog so ``_resolve_ticket`` stops reusing older per-chat
+    # tickets that predate it. Explicitly set in code — deliberately no
+    # ``server_default`` (see 20260814_0035, and the 0032/0034 lesson this
+    # mirrors: ORM and migration must declare the identical default, and
+    # "none at all" is the simplest way to keep that true).
+    new_dialog_since: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     create_time: Mapped[datetime] = mapped_column(
         DateTime,
         nullable=False,

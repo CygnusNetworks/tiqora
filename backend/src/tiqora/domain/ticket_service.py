@@ -1168,13 +1168,29 @@ class TicketService:
                         extras.append(a)
             cc = ", ".join(extras) or None
 
-        raw_body = (mime.a_body if mime else None) or ""
-        ct = (mime.a_content_type if mime else "text/plain") or "text/plain"
-        is_html = ct.split(";", 1)[0].strip().lower() in {"text/html", "application/xhtml+xml"}
-        plain = html_to_plaintext(raw_body) if is_html else raw_body
-        quoted = quote_plaintext_body(plain, from_address=from_addr, sent_at=art.create_time)
-        # Empty answer area above the quote (two newlines), then the quote.
-        body = f"\n\n{quoted}\n"
+        # Telegram reads as a chat, not an email — no "On <date>, X wrote:"
+        # quote of the original message (Task: Telegram-Chat-UX). Subject
+        # handling above is unaffected; only the quoted body is skipped.
+        based_on_channel_name = (
+            await self._session.execute(
+                select(CommunicationChannel.name).where(
+                    CommunicationChannel.id == art.communication_channel_id
+                )
+            )
+        ).scalar_one_or_none()
+        if (based_on_channel_name or "").strip() == "Telegram":
+            body = ""
+        else:
+            raw_body = (mime.a_body if mime else None) or ""
+            ct = (mime.a_content_type if mime else "text/plain") or "text/plain"
+            is_html = ct.split(";", 1)[0].strip().lower() in {
+                "text/html",
+                "application/xhtml+xml",
+            }
+            plain = html_to_plaintext(raw_body) if is_html else raw_body
+            quoted = quote_plaintext_body(plain, from_address=from_addr, sent_at=art.create_time)
+            # Empty answer area above the quote (two newlines), then the quote.
+            body = f"\n\n{quoted}\n"
 
         signature = ""
         signature_is_html = False
