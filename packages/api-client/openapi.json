@@ -2610,6 +2610,51 @@
             "title": "Manual Assist Available",
             "type": "boolean"
           },
+          "manual_run_error_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Manual Run Error Code"
+          },
+          "manual_run_notes": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Manual Run Notes"
+          },
+          "manual_run_started_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Manual Run Started At"
+          },
+          "manual_run_status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Manual Run Status"
+          },
           "operation_mode_ready": {
             "title": "Operation Mode Ready",
             "type": "boolean"
@@ -53179,7 +53224,7 @@
     },
     "/api/v1/tickets/{ticket_id}/ai/draft": {
       "post": {
-        "description": "Manual Assist: run the agent synchronously and return the outcome.\n\nAlways draft-path (plan \u00a73.4) \u2014 never sends a customer-visible article,\nregardless of the queue's autonomy setting.",
+        "description": "Manual Assist: kick off the agent run in the background and return\nimmediately.\n\nHetzner-hosted reasoning models can take 4-7 minutes per run \u2014 long past\nnginx's ``proxy_read_timeout 90s`` in front of this API \u2014 so the run\nitself happens in an ``asyncio.create_task`` (see\n:func:`_run_manual_draft_background`) started *after* the pre-flight\nchecks and the lock below, both still synchronous so a second POST while\na run is in flight gets a deterministic 423 rather than racing the\nbackground task. Always draft-path (plan \u00a73.4) \u2014 never sends a\ncustomer-visible article, regardless of the queue's autonomy setting.",
         "operationId": "request_manual_draft_api_v1_tickets__ticket_id__ai_draft_post",
         "parameters": [
           {
@@ -53225,7 +53270,7 @@
           }
         ],
         "responses": {
-          "201": {
+          "200": {
             "content": {
               "application/json": {
                 "schema": {
