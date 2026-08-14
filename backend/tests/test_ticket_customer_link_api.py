@@ -284,7 +284,9 @@ async def test_customer_link_admin_sees_admin_template(mariadb_znuny_url: str) -
 
 
 @pytest.mark.asyncio
-async def test_customer_link_admins_only_visibility_hides_from_agent(mariadb_znuny_url: str) -> None:
+async def test_customer_link_admins_only_visibility_hides_from_agent(
+    mariadb_znuny_url: str,
+) -> None:
     _seed(mariadb_znuny_url)
     _set_link(
         mariadb_znuny_url,
