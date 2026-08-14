@@ -122,6 +122,20 @@ DEFAULT_MAX_TOOL_ROUNDS = 8
 # unset. Reasoning models need real headroom beyond the OpenAI wire default
 # of 1024 — see settings_store.KEY_AI_LLM_MAX_COMPLETION_TOKENS.
 DEFAULT_MAX_COMPLETION_TOKENS = 8192
+
+# Reasoning models occasionally emit the finished customer reply as plain
+# assistant text instead of calling the terminal propose_customer_message
+# tool. Plain text has no delivery path, so the tool loop corrects the model
+# at most this many times per run before giving up as "no proposal".
+_MAX_PLAIN_TEXT_NUDGES = 2
+_PLAIN_TEXT_NUDGE = (
+    "Your previous message was plain text, which is never shown to the "
+    "customer or the agent — it has no effect at all. You MUST finish with a "
+    "tool call: if that text was your reply for the customer, call "
+    "propose_customer_message with it (kind='reply'); if it was internal "
+    "analysis, call add_internal_note; if you cannot help, call "
+    "escalate_to_human. Do not answer in plain text again."
+)
 _TELEGRAM_CHANNEL = "telegram"
 _TYPING_INTERVAL_SECONDS = 4.0
 
@@ -1126,6 +1140,7 @@ async def run_ticket_agent(
         executed_tool_names: list[str] = []
 
         # 9. Tool loop
+        nudges_left = _MAX_PLAIN_TEXT_NUDGES
         for _round in range(max_tool_rounds):
             response: LlmResponse = await _chat_with_budget_retry(
                 llm, messages=messages, tools=schemas, max_tokens=completion_budget
@@ -1134,9 +1149,17 @@ async def run_ticket_agent(
             completion_tokens += response.usage.completion_tokens
 
             if not response.tool_calls:
-                # Model produced plain text with no terminal tool call: it
-                # never gets a customer-facing path (no send-tool exists), so
-                # the run ends without a proposal.
+                # Plain text never reaches anyone (no send-tool exists) — but
+                # reasoning models sometimes write the finished customer reply
+                # as content instead of calling propose_customer_message.
+                # Nudge them back onto a terminal tool call instead of ending
+                # the run as "no proposal".
+                if (response.content or "").strip() and nudges_left > 0:
+                    nudges_left -= 1
+                    logger.info("ai_plain_text_nudge", ticket_id=ticket_id, nudges_left=nudges_left)
+                    messages.append(LlmMessage(role="assistant", content=response.content))
+                    messages.append(LlmMessage(role="user", content=_PLAIN_TEXT_NUDGE))
+                    continue
                 break
 
             messages.append(
