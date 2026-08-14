@@ -151,7 +151,8 @@
     "passkeyAddError": "Δεν ήταν δυνατή η προσθήκη κλειδιού πρόσβασης.",
     "passkeyDeleteError": "Δεν ήταν δυνατή η αφαίρεση του κωδικού πρόσβασης.",
     "passkeyDeleteLastError": "Δεν είναι δυνατή η κατάργηση του τελευταίου παράγοντα 2FA ενώ επιβάλλεται το 2FA.",
-    "passkeyUnsupported": "Αυτό το πρόγραμμα περιήγησης δεν υποστηρίζει κωδικούς πρόσβασης (WebAuthn)."
+    "passkeyUnsupported": "Αυτό το πρόγραμμα περιήγησης δεν υποστηρίζει κωδικούς πρόσβασης (WebAuthn).",
+    "passkeyReauthRequired": "For your security, please sign in again before changing your passkeys."
   },
   "dashboard": {
     "greeting": {
@@ -545,7 +546,8 @@
     "extrasRetry": "Δοκιμάστε ξανά",
     "customerUnresolved": "Κανένα αρχείο πελάτη δεν αντιστοιχεί στη διεύθυνση· τα στοιχεία δεν είναι διαθέσιμα.",
     "lockedByBanner": "Κλειδωμένο από {{name}}",
-    "takeOver": "Ανάληψη"
+    "takeOver": "Ανάληψη",
+    "replyViaTelegram": "Reply will be sent via Telegram"
   },
   "search": {
     "title": "Αναζήτηση",
@@ -964,7 +966,15 @@
           "detailed": "Αναλυτικά"
         },
         "kbCategories": "Κατηγορίες KB",
-        "kbCategoriesEmpty": "Δεν υπάρχουν διαθέσιμες κατηγορίες."
+        "kbCategoriesEmpty": "Δεν υπάρχουν διαθέσιμες κατηγορίες.",
+        "llmFallback": "Fallback providers",
+        "fallbackAdd": "Add fallback",
+        "fallbackEmpty": "No fallback providers — the primary provider above is used exclusively.",
+        "fallbackMoveUp": "Move up",
+        "fallbackMoveDown": "Move down",
+        "fallbackRemove": "Remove",
+        "clarifySchemaJson": "Clarify schema fields (JSON)",
+        "clarifySchemaJsonPlaceholder": "{\"fields\": [{\"column\": \"wpnum\", \"label\": \"WP-Nummer\"}]}"
       },
       "usage": {
         "title": "Χρήση",
@@ -1136,7 +1146,8 @@
         "replyLanguageDefault": "Ο κωδικός γλώσσας BCP-47 χρησιμοποιείται στη λειτουργία \"Auto\" όταν το κείμενο δεν μπορεί να αντιστοιχιστεί με σιγουριά σε ένα προφίλ γνωστής γλώσσας.",
         "allowedStateTypes": "Λίστα επιτρεπόμενων τύπων κατάστασης Znuny διαχωρισμένη με κόμματα (π.χ. \"ανοιχτή\" ή \"ανοιχτή, σε εκκρεμότητα υπενθύμισης\") η τεχνητή νοημοσύνη μπορεί να ορίσει ένα εισιτήριο μέσω πεδίων update_ticket_ — επιβάλλεται τόσο για το όνομα της κατάστασης όσο και για το αριθμητικό αναγνωριστικό κατάστασης. Empty = προεπιλεγμένο \"ανοιχτό\" μόνο (το ξανά άνοιγμα επιτρέπεται, ποτέ δεν κλείνει). μια ρητή κενή λίστα \"[]\" απενεργοποιεί πλήρως τις αλλαγές κατάστασης.",
         "piiNer": "Εντοπίζει ονόματα ατόμων σε κείμενο μέσω του spaCy NER (Γερμανικά + Αγγλικά) και τα κρύβει ως [NAME_n] πριν το περιεχόμενο φτάσει στον πάροχο LLM — εκτός από το όνομα πελάτη και τους αποστολείς. Ενεργή μόνο όταν η κάλυψη PII είναι ενεργοποιημένη. Τα ψευδώς θετικά είναι αβλαβή (απλώς περισσότερο συγκάλυψη).",
-        "summaryDetail": "Πρότυπο: συμπαγείς παράγραφοι, 1–2 προτάσεις ανά συνημμένο έγγραφο. Αναλυτικά: πιο εμπεριστατωμένες παράγραφοι και 3–5 προτάσεις ανά έγγραφο — χρήσιμο για ουρές με πολλά συνημμένα PDF."
+        "summaryDetail": "Πρότυπο: συμπαγείς παράγραφοι, 1–2 προτάσεις ανά συνημμένο έγγραφο. Αναλυτικά: πιο εμπεριστατωμένες παράγραφοι και 3–5 προτάσεις ανά έγγραφο — χρήσιμο για ουρές με πολλά συνημμένα PDF.",
+        "llmFallback": "Providers tried in order, after the primary provider above, when a request fails (rate limit, timeout, error). Each entry has its own optional model override. Priority 1 is always the primary provider/model; entries here are priority 2, 3, …."
       },
       "common": {
         "validId": "Valid/invalid είναι μια σημαία απαλής διαγραφής: η επισήμανση μιας καταχώρισης ως μη έγκυρης την αποκρύπτει από τους επιλογείς για νέες εγγραφές χωρίς να διαγράφει υπάρχουσες αναφορές (π.χ. εισιτήρια, εργασίες). Δεν υπάρχει σκληρή διαγραφή."
@@ -1235,6 +1246,9 @@
       "systemAddresses": {
         "email": "Διεύθυνση που χρησιμοποιείται ως From για ουρές και αυτόματες απαντήσεις.",
         "name": "Εμφανιζόμενο όνομα δίπλα στο email (π.χ. «Support <support@example.com>»)."
+      },
+      "telegram": {
+        "mode": "\"Polling\" has Tiqora fetch updates from Telegram itself (no public URL needed). \"Webhook\" has Telegram push updates to the URL below — requires this server to be reachable over HTTPS."
       }
     },
     "nav": {
@@ -1289,7 +1303,8 @@
       "slas": "SLA",
       "systemAddresses": "Διευθύνσεις συστήματος",
       "notificationEvents": "Συμβάντα ειδοποιήσεων",
-      "ticketAttributeRelations": "Σχέσεις χαρακτηριστικών"
+      "ticketAttributeRelations": "Σχέσεις χαρακτηριστικών",
+      "telegram": "Telegram"
     },
     "table": {
       "id": "ID",
@@ -2319,7 +2334,8 @@
       "slas": "Διαχείριση συμφωνιών επιπέδου υπηρεσίας και προθεσμιών.",
       "systemAddresses": "Διευθύνσεις email ως From για ουρές και αυτόματες απαντήσεις.",
       "notificationEvents": "Ρύθμιση ειδοποιήσεων πρακτόρων βάσει συμβάντων.",
-      "ticketAttributeRelations": "Πίνακες εξαρτήσεων συμβατοί με Znuny (υπηρεσία/ουρά κ.ά.) σε CSV."
+      "ticketAttributeRelations": "Πίνακες εξαρτήσεων συμβατοί με Znuny (υπηρεσία/ουρά κ.ά.) σε CSV.",
+      "telegram": "Connect a Telegram bot as a ticket channel."
     },
     "mailAccounts": {
       "title_plural": "Λογαριασμοί αλληλογραφίας",
@@ -2411,6 +2427,37 @@
       "new": "Νέα σχέση",
       "help": "CSV με κεφαλίδα Attribute1;Attribute2 και ζεύγη τιμών (Znuny AdminTicketAttributeRelations). Περιορίζει επιλογές φορμών (π.χ. Υπηρεσία → Ουρά).",
       "confirmDelete": "Διαγραφή αυτής της σχέσης;"
+    },
+    "telegram": {
+      "title": "Telegram",
+      "description": "Connect a Telegram bot as an inbound/outbound ticket channel.",
+      "enabled": "Channel active",
+      "mode": "Mode",
+      "modePolling": "Polling",
+      "modeWebhook": "Webhook",
+      "queue": "Queue",
+      "botToken": "Bot token",
+      "defaultCustomerUser": "Default customer user",
+      "webhookUrl": "Webhook URL",
+      "webhookSecretToken": "Webhook secret token",
+      "webhookRegister": "Register webhook",
+      "webhookRegistering": "Registering…",
+      "webhookUnregister": "Remove webhook",
+      "webhookUnregistering": "Removing…",
+      "webhookRegisterSuccess": "Webhook registered",
+      "webhookRegisterFailure": "Webhook registration failed",
+      "webhookUnregisterSuccess": "Webhook removed",
+      "webhookUnregisterFailure": "Removing the webhook failed",
+      "consentTitle": "GDPR consent",
+      "consentRequired": "Require consent before processing messages",
+      "consentRequiredHelp": "While required, incoming messages from a new Telegram contact are not processed until they confirm consent.",
+      "consentText": "Consent request text",
+      "consentConfirmedText": "Consent confirmation text",
+      "save": "Save",
+      "saving": "Saving…",
+      "saved": "Settings saved.",
+      "saveError": "Saving failed.",
+      "loadError": "Failed to load settings."
     }
   },
   "kb": {

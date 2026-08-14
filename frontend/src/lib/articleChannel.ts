@@ -6,33 +6,55 @@ import { parseRecipient, parseRecipientList, formatRecipient } from "@/component
 /**
  * Standard Znuny `communication_channel` seed order (see
  * backend/src/tiqora/bootstrap/schema/initial_insert.*.sql): 1=Email,
- * 2=Phone, 3=Internal, 4=Chat. `ArticleListItem` only carries the numeric
- * id, so filtering/icons/auto-detection key off these stable ids rather
- * than a name.
+ * 2=Phone, 3=Internal, 4=Chat. Channels seeded later (Telegram, WhatsApp, …)
+ * are created lazily by their gateway on first use, so their ids are
+ * installation-dependent and cannot be hardcoded — those are only
+ * distinguishable by `communication_channel_name`.
  */
 export const CHANNEL_EMAIL = 1;
 export const CHANNEL_PHONE = 2;
 export const CHANNEL_INTERNAL = 3;
 export const CHANNEL_CHAT = 4;
 
-/**
- * Channels considered "conversational" for the auto view-switch heuristic
- * (dominant channel → default to the chat-bubble view). This Znuny install's
- * `communication_channel` table only ever seeds Email/Phone/Internal/Chat —
- * there is no whatsapp/sms row to match against — so `Chat` (id 4) is the
- * closest available proxy for the "whatsapp/sms/chat" rule of thumb.
- */
-const CONVERSATIONAL_CHANNELS = new Set<number>([CHANNEL_CHAT]);
+const LEGACY_ID_NAMES: Record<number, string> = {
+  [CHANNEL_EMAIL]: "Email",
+  [CHANNEL_PHONE]: "Phone",
+  [CHANNEL_INTERNAL]: "Internal",
+  [CHANNEL_CHAT]: "Chat",
+};
 
-export function isConversationalChannel(channelId: number): boolean {
-  return CONVERSATIONAL_CHANNELS.has(channelId);
+/**
+ * Channel name for an article: `communication_channel_name` when the
+ * backend sent one (Task 8+), else the legacy numeric-id lookup, else the
+ * "Email" default the app has always used for an unrecognized id — so
+ * existing data (only ids, no name) resolves identically to before this was
+ * name-based.
+ */
+export function channelNameOf(
+  a: Pick<ArticleListItem, "communication_channel_id" | "communication_channel_name">,
+): string {
+  return a.communication_channel_name || LEGACY_ID_NAMES[a.communication_channel_id] || "Email";
 }
 
-export function channelIcon(channelId: number): string {
-  if (channelId === CHANNEL_EMAIL) return "✉";
-  if (channelId === CHANNEL_PHONE) return "📞";
-  if (channelId === CHANNEL_INTERNAL) return "📝";
-  if (channelId === CHANNEL_CHAT) return "💬";
+/**
+ * Channels considered "conversational" for the auto view-switch heuristic
+ * (dominant channel → default to the chat-bubble view): the classic Chat
+ * channel plus the bot-style channels that behave like it (WhatsApp/SMS
+ * aren't seeded by this install yet, but the name is already reserved for
+ * when they are; Telegram is seeded lazily by its gateway, see above).
+ */
+export const CONVERSATIONAL_CHANNEL_NAMES = new Set<string>(["Chat", "WhatsApp", "SMS", "Telegram"]);
+
+export function isConversationalChannel(channelName: string): boolean {
+  return CONVERSATIONAL_CHANNEL_NAMES.has(channelName);
+}
+
+export function channelIcon(channelName: string): string {
+  if (channelName === "Email") return "✉";
+  if (channelName === "Phone") return "📞";
+  if (channelName === "Internal") return "📝";
+  if (channelName === "Telegram") return "✈";
+  if (channelName === "Chat" || channelName === "WhatsApp" || channelName === "SMS") return "💬";
   return "✉";
 }
 
@@ -120,30 +142,31 @@ export function formatToAddresses(raw: string | null | undefined): string {
 /** A note that isn't visible to the customer, on the internal channel — the
  * article rendered as a centered pill rather than a side bubble/list row. */
 export function isInternalNote(a: ArticleListItem): boolean {
-  return a.communication_channel_id === CHANNEL_INTERNAL && !a.is_visible_for_customer;
+  return channelNameOf(a) === "Internal" && !a.is_visible_for_customer;
 }
 
 /**
- * Most common channel among an article set — prefers customer-authored
+ * Most common channel NAME among an article set — prefers customer-authored
  * articles (their channel is what the customer actually used to reach out),
  * falling back to all articles when there are none. Returns null for an
  * empty list. Drives the split/conversation auto view-switch.
  */
-export function dominantChannel(articles: ArticleListItem[]): number | null {
+export function dominantChannel(articles: ArticleListItem[]): string | null {
   const customerArticles = articles.filter(
     (a) => (a.sender_type || "").toLowerCase() === "customer",
   );
   const pool = customerArticles.length > 0 ? customerArticles : articles;
   if (pool.length === 0) return null;
-  const counts = new Map<number, number>();
+  const counts = new Map<string, number>();
   for (const a of pool) {
-    counts.set(a.communication_channel_id, (counts.get(a.communication_channel_id) ?? 0) + 1);
+    const name = channelNameOf(a);
+    counts.set(name, (counts.get(name) ?? 0) + 1);
   }
-  let best: number | null = null;
+  let best: string | null = null;
   let bestCount = -1;
-  for (const [id, count] of counts) {
+  for (const [name, count] of counts) {
     if (count > bestCount) {
-      best = id;
+      best = name;
       bestCount = count;
     }
   }

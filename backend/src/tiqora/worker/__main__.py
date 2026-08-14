@@ -26,6 +26,7 @@ from tiqora.worker.outbox_drain import drain_outbox
 from tiqora.worker.poller import poll_once
 from tiqora.worker.postmaster import run_postmaster_tick
 from tiqora.worker.status import record_tick_status, seconds_until_daily
+from tiqora.worker.telegram_poller import run_telegram_poller_tick
 
 logger = structlog.get_logger(__name__)
 
@@ -150,6 +151,9 @@ async def _run_all_loops(stop: asyncio.Event) -> None:
     async def generic_agent_tick() -> dict[str, int]:
         return await run_generic_agent_tick(settings=settings)
 
+    async def telegram_poller_tick() -> dict[str, int]:
+        return await run_telegram_poller_tick(settings=settings)
+
     await asyncio.gather(
         _heartbeat_loop(stop),
         _interval_loop("poller", poller_tick, settings.poller_interval_seconds, None, stop),
@@ -186,6 +190,13 @@ async def _run_all_loops(stop: asyncio.Event) -> None:
             generic_agent_tick,
             settings.generic_agent_interval_seconds,
             "daemon.generic_agent.interval_seconds",
+            stop,
+        ),
+        _interval_loop(
+            "telegram_poller",
+            telegram_poller_tick,
+            settings.telegram_poller_interval_seconds,
+            "daemon.telegram_poller.interval_seconds",
             stop,
         ),
         _daily_loop("gdpr_retention", run_gdpr_retention_tick, "03:00", stop),

@@ -151,7 +151,8 @@
     "passkeyAddError": "Не вдалося додати ключ доступу.",
     "passkeyDeleteError": "Не вдалося видалити ключ доступу.",
     "passkeyDeleteLastError": "Неможливо видалити останній фактор 2FA, поки 2FA застосовується примусово.",
-    "passkeyUnsupported": "Цей браузер не підтримує ключі доступу (WebAuthn)."
+    "passkeyUnsupported": "Цей браузер не підтримує ключі доступу (WebAuthn).",
+    "passkeyReauthRequired": "For your security, please sign in again before changing your passkeys."
   },
   "dashboard": {
     "greeting": {
@@ -545,7 +546,8 @@
     "extrasRetry": "Повторити",
     "customerUnresolved": "Немає запису клієнта з цією адресою — відомості недоступні.",
     "lockedByBanner": "Заблоковано: {{name}}",
-    "takeOver": "Прийняти"
+    "takeOver": "Прийняти",
+    "replyViaTelegram": "Reply will be sent via Telegram"
   },
   "search": {
     "title": "Пошук",
@@ -964,7 +966,15 @@
           "detailed": "Детальний"
         },
         "kbCategories": "Категорії КБ",
-        "kbCategoriesEmpty": "Категорії відсутні."
+        "kbCategoriesEmpty": "Категорії відсутні.",
+        "llmFallback": "Fallback providers",
+        "fallbackAdd": "Add fallback",
+        "fallbackEmpty": "No fallback providers — the primary provider above is used exclusively.",
+        "fallbackMoveUp": "Move up",
+        "fallbackMoveDown": "Move down",
+        "fallbackRemove": "Remove",
+        "clarifySchemaJson": "Clarify schema fields (JSON)",
+        "clarifySchemaJsonPlaceholder": "{\"fields\": [{\"column\": \"wpnum\", \"label\": \"WP-Nummer\"}]}"
       },
       "usage": {
         "title": "Використання",
@@ -1136,7 +1146,8 @@
         "replyLanguageDefault": "Код мови BCP-47, який використовується в режимі «Авто», коли текст не можна впевнено зіставити з відомим мовним профілем.",
         "allowedStateTypes": "Відокремлений комами список дозволених типів стану Znuny (наприклад, «відкрито» або «відкрито, очікує нагадування»), до якого AI може встановити квиток через update_ticket_fields — застосовується як для назви стану, так і для числового ідентифікатора стану. Порожньо = за замовчуванням лише \"відкрито\" (повторне відкриття дозволено, ніколи не закривається); явний порожній список \"[]\" повністю вимикає зміни стану.",
         "piiNer": "Виявляє імена осіб у тексті за допомогою spaCy NER (німецька + англійська) і маскує їх як [NAME_n] до того, як вміст досягне постачальника LLM — на додаток до імені клієнта та відправників. Активний, лише коли ввімкнено маскування ідентифікаційної інформації. Помилкові спрацьовування нешкідливі (просто більше маскування).",
-        "summaryDetail": "Стандарт: компактні абзаци, 1–2 речення в кожному вкладеному документі. Деталізовано: докладніші абзаци та 3–5 речень на документ — корисно для черг із багатьма PDF-додатками."
+        "summaryDetail": "Стандарт: компактні абзаци, 1–2 речення в кожному вкладеному документі. Деталізовано: докладніші абзаци та 3–5 речень на документ — корисно для черг із багатьма PDF-додатками.",
+        "llmFallback": "Providers tried in order, after the primary provider above, when a request fails (rate limit, timeout, error). Each entry has its own optional model override. Priority 1 is always the primary provider/model; entries here are priority 2, 3, …."
       },
       "common": {
         "validId": "Дійсний/недійсний — це позначка м’якого видалення: позначення запису недійсним приховує його від засобів вибору нових записів без видалення існуючих посилань (наприклад, квитки, завдання). Жорсткого видалення немає."
@@ -1235,6 +1246,9 @@
       "systemAddresses": {
         "email": "Адреса, що використовується як From для черг і автовідповідей.",
         "name": "Відображуване ім’я поруч з e-mail (напр. «Support <support@example.com>»)."
+      },
+      "telegram": {
+        "mode": "\"Polling\" has Tiqora fetch updates from Telegram itself (no public URL needed). \"Webhook\" has Telegram push updates to the URL below — requires this server to be reachable over HTTPS."
       }
     },
     "nav": {
@@ -1289,7 +1303,8 @@
       "slas": "SLA",
       "systemAddresses": "Системні адреси",
       "notificationEvents": "Події сповіщень",
-      "ticketAttributeRelations": "Зв’язки атрибутів"
+      "ticketAttributeRelations": "Зв’язки атрибутів",
+      "telegram": "Telegram"
     },
     "table": {
       "id": "ID",
@@ -2319,7 +2334,8 @@
       "slas": "Керування угодами про рівень сервісу та термінами.",
       "systemAddresses": "Адреси From для черг і автовідповідей.",
       "notificationEvents": "Налаштування сповіщень агентів за подіями.",
-      "ticketAttributeRelations": "Сумісні з Znuny матриці залежностей (сервіс/черга тощо) у CSV."
+      "ticketAttributeRelations": "Сумісні з Znuny матриці залежностей (сервіс/черга тощо) у CSV.",
+      "telegram": "Connect a Telegram bot as a ticket channel."
     },
     "mailAccounts": {
       "title_plural": "Поштові облікові записи",
@@ -2411,6 +2427,37 @@
       "new": "Новий зв’язок",
       "help": "CSV із заголовком Attribute1;Attribute2 і парами значень (Znuny AdminTicketAttributeRelations). Обмежує вибір у формах (напр. Сервіс → Черга).",
       "confirmDelete": "Видалити цей зв’язок?"
+    },
+    "telegram": {
+      "title": "Telegram",
+      "description": "Connect a Telegram bot as an inbound/outbound ticket channel.",
+      "enabled": "Channel active",
+      "mode": "Mode",
+      "modePolling": "Polling",
+      "modeWebhook": "Webhook",
+      "queue": "Queue",
+      "botToken": "Bot token",
+      "defaultCustomerUser": "Default customer user",
+      "webhookUrl": "Webhook URL",
+      "webhookSecretToken": "Webhook secret token",
+      "webhookRegister": "Register webhook",
+      "webhookRegistering": "Registering…",
+      "webhookUnregister": "Remove webhook",
+      "webhookUnregistering": "Removing…",
+      "webhookRegisterSuccess": "Webhook registered",
+      "webhookRegisterFailure": "Webhook registration failed",
+      "webhookUnregisterSuccess": "Webhook removed",
+      "webhookUnregisterFailure": "Removing the webhook failed",
+      "consentTitle": "GDPR consent",
+      "consentRequired": "Require consent before processing messages",
+      "consentRequiredHelp": "While required, incoming messages from a new Telegram contact are not processed until they confirm consent.",
+      "consentText": "Consent request text",
+      "consentConfirmedText": "Consent confirmation text",
+      "save": "Save",
+      "saving": "Saving…",
+      "saved": "Settings saved.",
+      "saveError": "Saving failed.",
+      "loadError": "Failed to load settings."
     }
   },
   "kb": {

@@ -8,6 +8,8 @@ import { groupByDay } from "@/lib/article";
 import {
   avatarTone,
   channelIcon,
+  channelNameOf,
+  dominantChannel,
   emailFromAddress,
   initialsFor,
   isInternalNote,
@@ -43,6 +45,7 @@ function bubbleSide(senderType: string | null | undefined): "left" | "right" {
 export function ArticleConversationView({
   ticketId,
   articles,
+  allArticles,
   canNote,
   canDelete = false,
   locale,
@@ -51,6 +54,10 @@ export function ArticleConversationView({
   /** Already filtered, chronological (oldest→newest) — see
    * `useArticleListState().chronological`. */
   articles: ArticleListItem[];
+  /** Full, unfiltered article set — used to look up a draft's reply target
+   * even when the active filter hides it from `articles`. Defaults to
+   * `articles` when omitted (e.g. in tests). */
+  allArticles?: ArticleListItem[];
   canNote: boolean;
   /** Whether the agent may delete internal notes (``rw`` permission). */
   canDelete?: boolean;
@@ -60,6 +67,11 @@ export function ArticleConversationView({
   const bottomRef = useRef<HTMLDivElement>(null);
   const { boundaryId, createdAt } = useSummaryBoundary(ticketId, articles);
   const drafts = useTicketReplyDrafts(ticketId);
+  const lookupArticles = allArticles ?? articles;
+  const draftChannelName = (articleId: number): string | undefined => {
+    const target = lookupArticles.find((a) => a.id === articleId);
+    return target ? channelNameOf(target) : (dominantChannel(lookupArticles) ?? undefined);
+  };
 
   // Scroll to the newest message whenever this view mounts (tab switch) or
   // the ticket changes. jsdom (tests) doesn't implement scrollIntoView.
@@ -113,7 +125,12 @@ export function ArticleConversationView({
       )}
       {/* After the last real article — where the reply will appear once sent. */}
       {drafts.map((d) => (
-        <DraftBubble key={`draft-${d.articleId}`} draft={d} locale={locale} />
+        <DraftBubble
+          key={`draft-${d.articleId}`}
+          draft={d}
+          locale={locale}
+          channelName={draftChannelName(d.articleId)}
+        />
       ))}
       <div ref={bottomRef} />
     </div>
@@ -173,7 +190,7 @@ function Bubble({
           <div className={cn("space-y-1 rounded-2xl px-3 py-2", tone)}>
             <div className="flex flex-wrap items-center gap-1.5 text-[11px] text-muted">
               <span className={cn("font-semibold", nameTone)}>{senderName}</span>
-              <span aria-hidden>{channelIcon(article.communication_channel_id)}</span>
+              <span aria-hidden>{channelIcon(channelNameOf(article))}</span>
               <span className="font-mono tabular-nums">{formatDateTime(article.create_time, locale)}</span>
               <span
                 className={cn(

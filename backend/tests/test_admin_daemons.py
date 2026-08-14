@@ -83,7 +83,7 @@ async def test_get_daemons_defaults(mariadb_znuny_url: str) -> None:
     try:
         async with factory() as session:
             out = await admin_daemons.list_daemons(_root_user(), session)
-            assert len(out.services) == 10
+            assert len(out.services) == 11
             by_slug = {s.slug: s for s in out.services}
 
             poller = by_slug["poller"]

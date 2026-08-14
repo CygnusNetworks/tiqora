@@ -151,7 +151,8 @@
     "passkeyAddError": "لا يمكن إضافة مفتاح المرور.",
     "passkeyDeleteError": "تعذر إزالة مفتاح المرور.",
     "passkeyDeleteLastError": "لا يمكن إزالة عامل 2FA الأخير أثناء فرض 2FA.",
-    "passkeyUnsupported": "هذا المتصفح لا يدعم مفاتيح المرور (WebAuthn)."
+    "passkeyUnsupported": "هذا المتصفح لا يدعم مفاتيح المرور (WebAuthn).",
+    "passkeyReauthRequired": "For your security, please sign in again before changing your passkeys."
   },
   "dashboard": {
     "greeting": {
@@ -545,7 +546,8 @@
     "extrasRetry": "أعد المحاولة",
     "customerUnresolved": "لا يوجد سجل عميل يطابق هذا العنوان، لذا تفاصيل العميل غير متاحة.",
     "lockedByBanner": "مقفلة بواسطة {{name}}",
-    "takeOver": "استلام"
+    "takeOver": "استلام",
+    "replyViaTelegram": "Reply will be sent via Telegram"
   },
   "search": {
     "title": "بحث",
@@ -964,7 +966,15 @@
           "detailed": "مفصلة"
         },
         "kbCategories": "فئات كيلو بايت",
-        "kbCategoriesEmpty": "لا توجد فئات متاحة."
+        "kbCategoriesEmpty": "لا توجد فئات متاحة.",
+        "llmFallback": "Fallback providers",
+        "fallbackAdd": "Add fallback",
+        "fallbackEmpty": "No fallback providers — the primary provider above is used exclusively.",
+        "fallbackMoveUp": "Move up",
+        "fallbackMoveDown": "Move down",
+        "fallbackRemove": "Remove",
+        "clarifySchemaJson": "Clarify schema fields (JSON)",
+        "clarifySchemaJsonPlaceholder": "{\"fields\": [{\"column\": \"wpnum\", \"label\": \"WP-Nummer\"}]}"
       },
       "usage": {
         "title": "الاستخدام",
@@ -1136,7 +1146,8 @@
         "replyLanguageDefault": "يتم استخدام رمز اللغة BCP-47 في الوضع \"تلقائي\" عندما لا يمكن مطابقة النص بثقة مع ملف تعريف لغة معروف.",
         "allowedStateTypes": "قائمة مفصولة بفواصل لأنواع حالات Znuny المسموح بها (على سبيل المثال، \"مفتوح\" أو \"مفتوح، في انتظار التذكير\") قد يقوم الذكاء الاصطناعي بتعيين تذكرة عبر update_ticket_fields - يتم فرضها على كل من اسم الولاية ومعرف الحالة الرقمي. فارغ = افتراضي \"فتح\" فقط (يُسمح بإعادة الفتح، ولا يُغلق مطلقًا)؛ تعمل القائمة الفارغة الصريحة \"[]\" على تعطيل تغييرات الحالة بالكامل.",
         "piiNer": "يكتشف أسماء الأشخاص في النص عبر spaCy NER (الألمانية + الإنجليزية) ويخفيها كـ [NAME_n] قبل أن يصل المحتوى إلى موفر LLM - بالإضافة إلى اسم العميل والمرسلين. يتم تفعيله فقط عندما يكون إخفاء معلومات تحديد الهوية الشخصية (PII) قيد التشغيل. الإيجابيات الكاذبة غير ضارة (مجرد المزيد من الإخفاء).",
-        "summaryDetail": "المعيار: فقرات مدمجة، 1-2 جمل لكل مستند مرفق. تفصيلي: فقرات أكثر شمولاً و3-5 جمل لكل مستند - مفيدة لقوائم الانتظار التي تحتوي على العديد من مرفقات PDF."
+        "summaryDetail": "المعيار: فقرات مدمجة، 1-2 جمل لكل مستند مرفق. تفصيلي: فقرات أكثر شمولاً و3-5 جمل لكل مستند - مفيدة لقوائم الانتظار التي تحتوي على العديد من مرفقات PDF.",
+        "llmFallback": "Providers tried in order, after the primary provider above, when a request fails (rate limit, timeout, error). Each entry has its own optional model override. Priority 1 is always the primary provider/model; entries here are priority 2, 3, …."
       },
       "common": {
         "validId": "صالح/غير صالح هي علامة للحذف الناعم: وضع علامة على الإدخال غير صالح يؤدي إلى إخفائه عن منتقي السجلات الجديدة دون حذف المراجع الموجودة (مثل التذاكر والواجبات). لا يوجد حذف الثابت."
@@ -1235,6 +1246,9 @@
       "systemAddresses": {
         "email": "العنوان المستخدم كمرسل (From) للطوابير والردود التلقائية.",
         "name": "الاسم المعروض بجانب البريد (مثل «Support <support@example.com>»)."
+      },
+      "telegram": {
+        "mode": "\"Polling\" has Tiqora fetch updates from Telegram itself (no public URL needed). \"Webhook\" has Telegram push updates to the URL below — requires this server to be reachable over HTTPS."
       }
     },
     "nav": {
@@ -1289,7 +1303,8 @@
       "slas": "اتفاقيات الخدمة",
       "systemAddresses": "عناوين النظام",
       "notificationEvents": "أحداث الإشعار",
-      "ticketAttributeRelations": "علاقات السمات"
+      "ticketAttributeRelations": "علاقات السمات",
+      "telegram": "Telegram"
     },
     "table": {
       "id": "ID",
@@ -2319,7 +2334,8 @@
       "slas": "إدارة اتفاقيات مستوى الخدمة والمُهَل.",
       "systemAddresses": "عناوين بريد تُستخدم كمرسل للطوابير والردود التلقائية.",
       "notificationEvents": "تهيئة إشعارات الوكلاء المستندة إلى الأحداث.",
-      "ticketAttributeRelations": "مصفوفات تبعيات متوافقة مع Znuny (خدمة/طابور وغيرها) بصيغة CSV."
+      "ticketAttributeRelations": "مصفوفات تبعيات متوافقة مع Znuny (خدمة/طابور وغيرها) بصيغة CSV.",
+      "telegram": "Connect a Telegram bot as a ticket channel."
     },
     "mailAccounts": {
       "title_plural": "حسابات البريد",
@@ -2411,6 +2427,37 @@
       "new": "علاقة جديدة",
       "help": "CSV برأس Attribute1;Attribute2 وأزواج قيم (Znuny AdminTicketAttributeRelations). يقيّد قوائم النماذج (مثل الخدمة → الطابور).",
       "confirmDelete": "حذف هذه العلاقة؟"
+    },
+    "telegram": {
+      "title": "Telegram",
+      "description": "Connect a Telegram bot as an inbound/outbound ticket channel.",
+      "enabled": "Channel active",
+      "mode": "Mode",
+      "modePolling": "Polling",
+      "modeWebhook": "Webhook",
+      "queue": "Queue",
+      "botToken": "Bot token",
+      "defaultCustomerUser": "Default customer user",
+      "webhookUrl": "Webhook URL",
+      "webhookSecretToken": "Webhook secret token",
+      "webhookRegister": "Register webhook",
+      "webhookRegistering": "Registering…",
+      "webhookUnregister": "Remove webhook",
+      "webhookUnregistering": "Removing…",
+      "webhookRegisterSuccess": "Webhook registered",
+      "webhookRegisterFailure": "Webhook registration failed",
+      "webhookUnregisterSuccess": "Webhook removed",
+      "webhookUnregisterFailure": "Removing the webhook failed",
+      "consentTitle": "GDPR consent",
+      "consentRequired": "Require consent before processing messages",
+      "consentRequiredHelp": "While required, incoming messages from a new Telegram contact are not processed until they confirm consent.",
+      "consentText": "Consent request text",
+      "consentConfirmedText": "Consent confirmation text",
+      "save": "Save",
+      "saving": "Saving…",
+      "saved": "Settings saved.",
+      "saveError": "Saving failed.",
+      "loadError": "Failed to load settings."
     }
   },
   "kb": {

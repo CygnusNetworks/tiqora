@@ -318,6 +318,11 @@ class TiqoraAiQueuePolicy(TiqoraBase):
     )
     clarify_schema_json: Mapped[str | None] = mapped_column(Text, nullable=True)
 
+    # Priority-ordered LLM provider fallback list (plan block: LLM fallback) —
+    # JSON array of {"provider_id": int, "model": str|null}, tried in order
+    # when llm_provider_id errors or is unavailable. NULL/empty = no fallback.
+    llm_fallback_json: Mapped[str | None] = mapped_column(Text, nullable=True)
+
     # Sender blocklist (plan block 2) — JSON array of exact addresses or
     # "*@domain" globs (see tiqora.ai.senders.matches_ignored). NULL/empty =
     # no blocklist.
@@ -525,6 +530,11 @@ class TiqoraAiTicketState(TiqoraBase):
         Integer, nullable=False, default=0, server_default="0"
     )
     clarification_count: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=0, server_default="0"
+    )
+    # Failed AI identity-check attempts (plan: identity verification) — reset
+    # once identity is confirmed; used to cap retries before escalating.
+    identity_attempts: Mapped[int] = mapped_column(
         Integer, nullable=False, default=0, server_default="0"
     )
     last_run_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)

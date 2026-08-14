@@ -7,6 +7,7 @@ session-scoped testcontainer DB is shared safely with other test files.
 
 from __future__ import annotations
 
+import asyncio
 from collections.abc import Callable, Coroutine
 from datetime import datetime, timedelta
 from typing import Any
@@ -23,11 +24,13 @@ from tiqora.ai.gate import (
     OPERATION_MODE_TIQORA_PRIMARY,
     set_operation_mode,
 )
+from tiqora.ai.identity import MAX_IDENTITY_ATTEMPTS
 from tiqora.ai.llm import LlmMessage, LlmResponse, LlmUsage, ToolCall
 from tiqora.ai.models import (
     AUTONOMY_CLARIFY_ONLY,
     AUTONOMY_FULL,
     AUTONOMY_OFF,
+    IDENTITY_CLARIFY_SCHEMA,
     REPLY_LANGUAGE_AUTO,
     TiqoraAiPromptPart,
     TiqoraAiQueuePolicy,
@@ -48,9 +51,13 @@ from tiqora.ai.runtime import (
     _resolve_reply_language_line,
     run_ticket_agent,
 )
+from tiqora.channels.common import ensure_channel_row
 from tiqora.config import get_settings
 from tiqora.db.tiqora.base import TiqoraBase
+from tiqora.db.tiqora.models import TiqoraTelegramContact
+from tiqora.domain.ticket_write_service import ArticleIn, add_article
 from tiqora.znuny.password import hash_password
+from tiqora.znuny.sysconfig import SysConfig
 
 pytestmark = pytest.mark.db
 
@@ -1434,5 +1441,783 @@ async def test_run_ticket_agent_system_prompt_unchanged_without_prompt_parts(
             kind_hint=None,
         )
         assert system_message == expected
+    finally:
+        await engine.dispose()
+
+
+# ---------------------------------------------------------------------------
+# T5: channel dispatch (Telegram vs. email) + typing indicator
+# ---------------------------------------------------------------------------
+
+
+async def test_auto_send_dispatches_telegram_channel_never_email(
+    mariadb_znuny_url: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """based_on article with channel Telegram must go through
+    deliver_agent_telegram_reply, never deliver_agent_email_reply — the
+    latter would otherwise SMTP-send to the synthetic
+    "<chat_id>@telegram.invalid" address (the central guard this dispatch
+    exists for)."""
+    seed = _seed_ticket(mariadb_znuny_url, ns=19)
+    engine = create_async_engine(_mysql_async(mariadb_znuny_url))
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    settings = get_settings()
+    try:
+        async with factory() as session:
+            await _setup_policy(session, seed=seed, autonomy=AUTONOMY_FULL, enabled_auto_reply=True)
+            telegram_channel_id = await ensure_channel_row(
+                session, "Telegram", "Tiqora::CommunicationChannel::Telegram"
+            )
+            await session.execute(
+                text("UPDATE article SET communication_channel_id = :cid WHERE id = :aid"),
+                {"cid": telegram_channel_id, "aid": seed["customer_article_id"]},
+            )
+            await session.commit()
+
+        email_calls: list[Any] = []
+
+        async def _fake_email_deliver(*_args: Any, **_kwargs: Any) -> int:
+            email_calls.append(True)
+            raise AssertionError("deliver_agent_email_reply must not be called for Telegram")
+
+        telegram_calls: list[dict[str, Any]] = []
+
+        async def _fake_telegram_deliver(
+            session: AsyncSession,
+            sysconfig: Any,
+            *,
+            ticket_id: int,
+            user_id: int,
+            article: Any,
+            gateway: Any = None,
+        ) -> int:
+            telegram_calls.append({"ticket_id": ticket_id, "user_id": user_id})
+            return await add_article(
+                session, ticket_id=ticket_id, article=article, user_id=user_id, sysconfig=sysconfig
+            )
+
+        monkeypatch.setattr(
+            "tiqora.channels.email.outbound_reply.deliver_agent_email_reply", _fake_email_deliver
+        )
+        monkeypatch.setattr(
+            "tiqora.channels.telegram.outbound.deliver_agent_telegram_reply",
+            _fake_telegram_deliver,
+        )
+
+        llm = ScriptedLlm([_propose_response("reply", "Telegram-bound answer.")])
+        async with factory() as session:
+            result = await run_ticket_agent(
+                session,
+                settings=settings,
+                llm=llm,
+                ticket_id=seed["ticket_id"],
+                trigger=TRIGGER_AUTO,
+                acting_user_id=None,
+                run_id="run-19",
+            )
+        assert result.status == "sent"
+        assert len(telegram_calls) == 1
+        assert email_calls == []
+
+        async with factory() as session:
+            origin = (
+                await session.execute(
+                    text("SELECT source FROM tiqora_ai_article_origin WHERE article_id = :aid"),
+                    {"aid": result.article_id},
+                )
+            ).first()
+            assert origin is not None and origin[0] == "auto"
+            state = await session.get(TiqoraAiTicketState, seed["ticket_id"])
+            assert state is not None
+            assert state.auto_reply_count == 1
+    finally:
+        await engine.dispose()
+
+
+async def test_auto_send_email_dispatch_unchanged_regression(
+    mariadb_znuny_url: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Regression: a non-Telegram based_on article with a parseable
+    ``a_from`` still goes through deliver_agent_email_reply exactly as
+    before T5, and the Telegram path is never even attempted."""
+    seed = _seed_ticket(mariadb_znuny_url, ns=20)
+    engine = create_async_engine(_mysql_async(mariadb_znuny_url))
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    settings = get_settings()
+    try:
+        async with factory() as session:
+            await _setup_policy(session, seed=seed, autonomy=AUTONOMY_FULL, enabled_auto_reply=True)
+            await session.execute(
+                text("UPDATE article_data_mime SET a_from = :a_from WHERE article_id = :aid"),
+                {"a_from": "Cust <customer20@example.com>", "aid": seed["customer_article_id"]},
+            )
+            await session.commit()
+
+        telegram_calls: list[Any] = []
+
+        async def _fake_telegram_deliver(*_args: Any, **_kwargs: Any) -> int:
+            telegram_calls.append(True)
+            raise AssertionError("deliver_agent_telegram_reply must not be called for email")
+
+        email_calls: list[dict[str, Any]] = []
+
+        async def _fake_email_deliver(
+            session: AsyncSession,
+            sysconfig: Any,
+            _mail_sender: Any,
+            *,
+            ticket_id: int,
+            queue_id: int,
+            user_id: int,
+            article: Any,
+        ) -> int:
+            email_calls.append({"to_address": article.to_address})
+            return await add_article(
+                session, ticket_id=ticket_id, article=article, user_id=user_id, sysconfig=sysconfig
+            )
+
+        monkeypatch.setattr(
+            "tiqora.channels.email.outbound_reply.deliver_agent_email_reply", _fake_email_deliver
+        )
+        monkeypatch.setattr(
+            "tiqora.channels.telegram.outbound.deliver_agent_telegram_reply",
+            _fake_telegram_deliver,
+        )
+
+        llm = ScriptedLlm([_propose_response("reply", "Email-bound answer.")])
+        async with factory() as session:
+            result = await run_ticket_agent(
+                session,
+                settings=settings,
+                llm=llm,
+                ticket_id=seed["ticket_id"],
+                trigger=TRIGGER_AUTO,
+                acting_user_id=None,
+                run_id="run-20",
+            )
+        assert result.status == "sent"
+        assert telegram_calls == []
+        assert len(email_calls) == 1
+        assert email_calls[0]["to_address"] == "customer20@example.com"
+    finally:
+        await engine.dispose()
+
+
+async def test_typing_indicator_fires_during_telegram_auto_run_and_stops_after(
+    mariadb_znuny_url: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Typing indicator (auto trigger + Telegram source only): fires
+    repeatedly (send_chat_action) while the run is in flight, and must stop
+    firing once the run has ended (task cancelled in the ``finally``)."""
+    import tiqora.ai.runtime as runtime_module
+
+    monkeypatch.setattr(runtime_module, "_TYPING_INTERVAL_SECONDS", 0.05)
+
+    seed = _seed_ticket(mariadb_znuny_url, ns=21)
+    engine = create_async_engine(_mysql_async(mariadb_znuny_url))
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    settings = get_settings()
+    try:
+        async with factory() as session:
+            await _setup_policy(session, seed=seed, autonomy=AUTONOMY_FULL, enabled_auto_reply=True)
+            telegram_channel_id = await ensure_channel_row(
+                session, "Telegram", "Tiqora::CommunicationChannel::Telegram"
+            )
+            await session.execute(
+                text("UPDATE article SET communication_channel_id = :cid WHERE id = :aid"),
+                {"cid": telegram_channel_id, "aid": seed["customer_article_id"]},
+            )
+            await session.execute(
+                text("UPDATE article_data_mime SET a_from = :a_from WHERE article_id = :aid"),
+                {"a_from": "Tester <555@telegram.invalid>", "aid": seed["customer_article_id"]},
+            )
+            await session.commit()
+
+        class _FakeGateway:
+            def __init__(self) -> None:
+                self.typing_calls: list[tuple[int, str]] = []
+
+            async def send_chat_action(self, chat_id: int, action: str = "typing") -> None:
+                self.typing_calls.append((int(chat_id), action))
+
+        fake_gateway = _FakeGateway()
+
+        async def _slow_llm_call() -> None:
+            await asyncio.sleep(0.3)
+
+        llm = ScriptedLlm(
+            [_propose_response("reply", "Slow telegram answer.")], on_call=_slow_llm_call
+        )
+
+        async def _fake_telegram_deliver(
+            session: AsyncSession,
+            sysconfig: Any,
+            *,
+            ticket_id: int,
+            user_id: int,
+            article: Any,
+            gateway: Any = None,
+        ) -> int:
+            return await add_article(
+                session, ticket_id=ticket_id, article=article, user_id=user_id, sysconfig=sysconfig
+            )
+
+        monkeypatch.setattr(
+            "tiqora.channels.telegram.outbound.deliver_agent_telegram_reply",
+            _fake_telegram_deliver,
+        )
+
+        async with factory() as session:
+            result = await run_ticket_agent(
+                session,
+                settings=settings,
+                llm=llm,
+                ticket_id=seed["ticket_id"],
+                trigger=TRIGGER_AUTO,
+                acting_user_id=None,
+                run_id="run-21",
+                source_channel="telegram",
+                telegram_gateway=fake_gateway,
+            )
+        assert result.status == "sent"
+        assert len(fake_gateway.typing_calls) >= 2
+        assert all(action == "typing" for _cid, action in fake_gateway.typing_calls)
+
+        calls_after_run = len(fake_gateway.typing_calls)
+        await asyncio.sleep(0.2)  # several typing intervals
+        assert len(fake_gateway.typing_calls) == calls_after_run
+    finally:
+        await engine.dispose()
+
+
+# ---------------------------------------------------------------------------
+# T6: identity verification (identity_mode=clarify_schema, Telegram only)
+# ---------------------------------------------------------------------------
+
+_CLARIFY_SCHEMA_PHONE = '{"fields": [{"column": "phone", "label": "Phone number"}]}'
+
+
+async def _setup_identity_policy(
+    session: AsyncSession,
+    *,
+    seed: dict[str, Any],
+    autonomy: str = AUTONOMY_FULL,
+    identity_mode: str = IDENTITY_CLARIFY_SCHEMA,
+    clarify_schema_json: str | None = _CLARIFY_SCHEMA_PHONE,
+) -> None:
+    await set_operation_mode(session, OPERATION_MODE_TIQORA_PRIMARY)
+    from tiqora.ai import providers as ai_providers
+
+    provider = await ai_providers.create_provider(
+        session,
+        settings=get_settings(),
+        change_by=1,
+        name=f"fake-provider-{seed['queue_id']}",
+        kind="openai_compat",
+        base_url="https://llm.example/v1",
+        default_model="fake-model",
+        api_key=None,
+        extra_json=None,
+        supports_tools=True,
+        supports_streaming=False,
+        eu_hosted=True,
+    )
+    await ai_policies.create_queue_policy(
+        session,
+        change_by=1,
+        queue_id=seed["queue_id"],
+        enabled_manual_assist=True,
+        enabled_auto_reply=True,
+        system_prompt="You are a helpful support agent.",
+        autonomy=autonomy,
+        service_user_id=seed["agent_id"],
+        llm_provider_id=provider.id,
+        pii_masking=False,
+        identity_mode=identity_mode,
+        clarify_schema_json=clarify_schema_json,
+    )
+
+
+async def _seed_telegram_article(session: AsyncSession, *, article_id: int, chat_id: int) -> None:
+    telegram_channel_id = await ensure_channel_row(
+        session, "Telegram", "Tiqora::CommunicationChannel::Telegram"
+    )
+    await session.execute(
+        text("UPDATE article SET communication_channel_id = :cid WHERE id = :aid"),
+        {"cid": telegram_channel_id, "aid": article_id},
+    )
+    await session.execute(
+        text("UPDATE article_data_mime SET a_from = :a_from WHERE article_id = :aid"),
+        {"a_from": f"Tester <{chat_id}@telegram.invalid>", "aid": article_id},
+    )
+    await session.execute(
+        text("DELETE FROM tiqora_telegram_contact WHERE chat_id = :cid"), {"cid": chat_id}
+    )
+    session.add(TiqoraTelegramContact(chat_id=chat_id, telegram_user_id=chat_id, username="tester"))
+    await session.commit()
+
+
+def _identity_response(
+    kind: str, body: str, *, identity_claim: dict[str, str] | None = None
+) -> LlmResponse:
+    arguments: dict[str, Any] = {"kind": kind, "subject": "", "body": body}
+    if identity_claim is not None:
+        arguments["identity_claim"] = identity_claim
+    return LlmResponse(
+        content=None,
+        tool_calls=[ToolCall(id="call_1", name="propose_customer_message", arguments=arguments)],
+        usage=LlmUsage(prompt_tokens=6, completion_tokens=3),
+    )
+
+
+async def test_identity_unidentified_telegram_asks_and_never_answers_content(
+    mariadb_znuny_url: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Unidentified Telegram chat -> the run produces only the identity
+    clarify question (no factual content, no main tool loop call at all)."""
+    seed = _seed_ticket(mariadb_znuny_url, ns=22)
+    engine = create_async_engine(_mysql_async(mariadb_znuny_url))
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    settings = get_settings()
+    chat_id = 900022
+    try:
+        async with factory() as session:
+            await _setup_identity_policy(session, seed=seed)
+            await _seed_telegram_article(
+                session, article_id=seed["customer_article_id"], chat_id=chat_id
+            )
+
+        sent: list[dict[str, Any]] = []
+
+        async def _fake_telegram_deliver(
+            session: AsyncSession,
+            sysconfig: Any,
+            *,
+            ticket_id: int,
+            user_id: int,
+            article: Any,
+            gateway: Any = None,
+        ) -> int:
+            sent.append({"body": article.body})
+            return await add_article(
+                session, ticket_id=ticket_id, article=article, user_id=user_id, sysconfig=sysconfig
+            )
+
+        monkeypatch.setattr(
+            "tiqora.channels.telegram.outbound.deliver_agent_telegram_reply",
+            _fake_telegram_deliver,
+        )
+
+        llm = ScriptedLlm([_identity_response("clarify", "Please tell me your phone number.")])
+        async with factory() as session:
+            result = await run_ticket_agent(
+                session,
+                settings=settings,
+                llm=llm,
+                ticket_id=seed["ticket_id"],
+                trigger=TRIGGER_AUTO,
+                acting_user_id=None,
+                run_id="run-22",
+                source_channel="telegram",
+            )
+        assert llm.calls == 1  # only the identity mini-exchange, no main loop
+        assert result.status == "sent"
+        assert len(sent) == 1
+        assert sent[0]["body"] == "Please tell me your phone number."
+
+        async with factory() as session:
+            state = await session.get(TiqoraAiTicketState, seed["ticket_id"])
+            assert state is not None
+            assert state.identity_attempts == 0
+    finally:
+        await engine.dispose()
+
+
+async def test_identity_correct_claim_maps_contact_and_continues_normal_flow(
+    mariadb_znuny_url: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A customer answer containing the configured field values (extracted by
+    the model as identity_claim) maps the Telegram contact + ticket customer,
+    resets the attempt counter, and the SAME run continues into a normal
+    (non-identity) reply."""
+    seed = _seed_ticket(mariadb_znuny_url, ns=23)
+    engine = create_async_engine(_mysql_async(mariadb_znuny_url))
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    settings = get_settings()
+    chat_id = 900023
+    login = "custid23"
+    try:
+        async with factory() as session:
+            await _setup_identity_policy(session, seed=seed)
+            await _seed_telegram_article(
+                session, article_id=seed["customer_article_id"], chat_id=chat_id
+            )
+            await session.execute(
+                text("DELETE FROM customer_user WHERE login = :login"), {"login": login}
+            )
+            await session.execute(
+                text(
+                    "INSERT INTO customer_user (login, email, customer_id, first_name,"
+                    " last_name, phone, pw, valid_id, create_time, create_by, change_time,"
+                    " change_by) VALUES (:login, :email, :login, 'Jane', 'Doe', '+491112223',"
+                    " 'x', 1, current_timestamp, 1, current_timestamp, 1)"
+                ),
+                {"login": login, "email": f"{login}@example.com"},
+            )
+            await session.commit()
+
+        sent: list[dict[str, Any]] = []
+
+        async def _fake_telegram_deliver(
+            session: AsyncSession,
+            sysconfig: Any,
+            *,
+            ticket_id: int,
+            user_id: int,
+            article: Any,
+            gateway: Any = None,
+        ) -> int:
+            sent.append({"body": article.body})
+            return await add_article(
+                session, ticket_id=ticket_id, article=article, user_id=user_id, sysconfig=sysconfig
+            )
+
+        monkeypatch.setattr(
+            "tiqora.channels.telegram.outbound.deliver_agent_telegram_reply",
+            _fake_telegram_deliver,
+        )
+
+        llm = ScriptedLlm(
+            [
+                _identity_response(
+                    "clarify", "Thanks, checking now.", identity_claim={"phone": "+491112223"}
+                ),
+                _propose_response("reply", "Here is your factual answer."),
+            ]
+        )
+        async with factory() as session:
+            result = await run_ticket_agent(
+                session,
+                settings=settings,
+                llm=llm,
+                ticket_id=seed["ticket_id"],
+                trigger=TRIGGER_AUTO,
+                acting_user_id=None,
+                run_id="run-23",
+                source_channel="telegram",
+            )
+        assert llm.calls == 2
+        assert result.status == "sent"
+        # Only the SECOND (normal-flow) message was actually dispatched — the
+        # identity ack itself never becomes a customer-visible send.
+        assert len(sent) == 1
+        assert sent[0]["body"] == "Here is your factual answer."
+
+        async with factory() as session:
+            contact = (
+                await session.execute(
+                    text(
+                        "SELECT customer_user_login FROM tiqora_telegram_contact"
+                        " WHERE chat_id = :cid"
+                    ),
+                    {"cid": chat_id},
+                )
+            ).first()
+            assert contact is not None and contact[0] == login
+            ticket_row = (
+                await session.execute(
+                    text("SELECT customer_user_id FROM ticket WHERE id = :tid"),
+                    {"tid": seed["ticket_id"]},
+                )
+            ).first()
+            assert ticket_row is not None and ticket_row[0] == login
+            state = await session.get(TiqoraAiTicketState, seed["ticket_id"])
+            assert state is not None
+            assert state.identity_attempts == 0
+    finally:
+        await engine.dispose()
+
+
+async def test_identity_wrong_claim_three_times_escalates_to_draft(
+    mariadb_znuny_url: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Three wrong identity_claim attempts (across separate runs) escalate to
+    a human-reviewed draft instead of asking a fourth time."""
+    seed = _seed_ticket(mariadb_znuny_url, ns=24)
+    engine = create_async_engine(_mysql_async(mariadb_znuny_url))
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    settings = get_settings()
+    chat_id = 900024
+    try:
+        async with factory() as session:
+            await _setup_identity_policy(session, seed=seed)
+            await _seed_telegram_article(
+                session, article_id=seed["customer_article_id"], chat_id=chat_id
+            )
+
+        async def _fake_telegram_deliver(
+            session: AsyncSession,
+            sysconfig: Any,
+            *,
+            ticket_id: int,
+            user_id: int,
+            article: Any,
+            gateway: Any = None,
+        ) -> int:
+            return await add_article(
+                session, ticket_id=ticket_id, article=article, user_id=user_id, sysconfig=sysconfig
+            )
+
+        monkeypatch.setattr(
+            "tiqora.channels.telegram.outbound.deliver_agent_telegram_reply",
+            _fake_telegram_deliver,
+        )
+
+        results = []
+        for i in range(MAX_IDENTITY_ATTEMPTS):
+            llm = ScriptedLlm(
+                [
+                    _identity_response(
+                        "clarify", "That does not match.", identity_claim={"phone": "+49wrong"}
+                    )
+                ]
+            )
+            async with factory() as session:
+                result = await run_ticket_agent(
+                    session,
+                    settings=settings,
+                    llm=llm,
+                    ticket_id=seed["ticket_id"],
+                    trigger=TRIGGER_AUTO,
+                    acting_user_id=None,
+                    run_id=f"run-24-{i}",
+                    source_channel="telegram",
+                )
+            results.append(result)
+
+        assert [r.status for r in results[:-1]] == ["sent"] * (MAX_IDENTITY_ATTEMPTS - 1)
+        assert results[-1].status == "drafted"
+        assert results[-1].draft_id is not None
+
+        async with factory() as session:
+            state = await session.get(TiqoraAiTicketState, seed["ticket_id"])
+            assert state is not None
+            assert state.identity_attempts == MAX_IDENTITY_ATTEMPTS
+    finally:
+        await engine.dispose()
+
+
+async def test_identity_mode_off_unaffected_on_telegram(
+    mariadb_znuny_url: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Default identity_mode (ticket_customer_id) on a Telegram source never
+    triggers the identity block — one normal LLM call, straight to reply."""
+    seed = _seed_ticket(mariadb_znuny_url, ns=25)
+    engine = create_async_engine(_mysql_async(mariadb_znuny_url))
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    settings = get_settings()
+    chat_id = 900025
+    try:
+        async with factory() as session:
+            await _setup_identity_policy(
+                session, seed=seed, identity_mode="ticket_customer_id", clarify_schema_json=None
+            )
+            await _seed_telegram_article(
+                session, article_id=seed["customer_article_id"], chat_id=chat_id
+            )
+
+        async def _fake_telegram_deliver(
+            session: AsyncSession,
+            sysconfig: Any,
+            *,
+            ticket_id: int,
+            user_id: int,
+            article: Any,
+            gateway: Any = None,
+        ) -> int:
+            return await add_article(
+                session, ticket_id=ticket_id, article=article, user_id=user_id, sysconfig=sysconfig
+            )
+
+        monkeypatch.setattr(
+            "tiqora.channels.telegram.outbound.deliver_agent_telegram_reply",
+            _fake_telegram_deliver,
+        )
+
+        llm = ScriptedLlm([_propose_response("reply", "Normal telegram answer.")])
+        async with factory() as session:
+            result = await run_ticket_agent(
+                session,
+                settings=settings,
+                llm=llm,
+                ticket_id=seed["ticket_id"],
+                trigger=TRIGGER_AUTO,
+                acting_user_id=None,
+                run_id="run-25",
+                source_channel="telegram",
+            )
+        assert llm.calls == 1
+        assert result.status == "sent"
+    finally:
+        await engine.dispose()
+
+
+async def test_identity_block_never_active_for_email_source(
+    mariadb_znuny_url: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """clarify_schema configured, but the triggering article's source_channel
+    is email (not Telegram) -> the identity block never runs."""
+    seed = _seed_ticket(mariadb_znuny_url, ns=26)
+    engine = create_async_engine(_mysql_async(mariadb_znuny_url))
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    settings = get_settings()
+    try:
+        async with factory() as session:
+            await _setup_identity_policy(session, seed=seed)
+            await session.execute(
+                text("UPDATE article_data_mime SET a_from = :a_from WHERE article_id = :aid"),
+                {"a_from": "Cust <customer26@example.com>", "aid": seed["customer_article_id"]},
+            )
+            await session.commit()
+
+        async def _fake_email_deliver(
+            session: AsyncSession,
+            sysconfig: Any,
+            _mail_sender: Any,
+            *,
+            ticket_id: int,
+            queue_id: int,
+            user_id: int,
+            article: Any,
+        ) -> int:
+            return await add_article(
+                session, ticket_id=ticket_id, article=article, user_id=user_id, sysconfig=sysconfig
+            )
+
+        monkeypatch.setattr(
+            "tiqora.channels.email.outbound_reply.deliver_agent_email_reply", _fake_email_deliver
+        )
+
+        llm = ScriptedLlm([_propose_response("reply", "Normal email answer.")])
+        async with factory() as session:
+            result = await run_ticket_agent(
+                session,
+                settings=settings,
+                llm=llm,
+                ticket_id=seed["ticket_id"],
+                trigger=TRIGGER_AUTO,
+                acting_user_id=None,
+                run_id="run-26",
+                source_channel="email",
+            )
+        assert llm.calls == 1
+        assert result.status == "sent"
+    finally:
+        await engine.dispose()
+
+
+async def test_identity_exchange_context_excludes_ticket_content_and_customer_id(
+    mariadb_znuny_url: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Security fix (review finding, Critical): the identity mini-exchange's
+    LLM context must be structurally minimal — it must NOT include internal
+    notes, other prior articles, or the ticket's current CustomerID/
+    CustomerUser (render_ticket_header), since an unidentified Telegram user
+    is one prompt injection away from exfiltrating anything present there.
+    Only the latest customer message may be present."""
+    seed = _seed_ticket(mariadb_znuny_url, ns=27)
+    engine = create_async_engine(_mysql_async(mariadb_znuny_url))
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    settings = get_settings()
+    chat_id = 900027
+    secret_note_body = "SECRET-INTERNAL-NOTE-only-an-agent-should-ever-see-this"
+    newest_customer_body = "My phone number is +491112223, please check my account."
+    try:
+        async with factory() as session:
+            await _setup_identity_policy(session, seed=seed)
+            await _seed_telegram_article(
+                session, article_id=seed["customer_article_id"], chat_id=chat_id
+            )
+            sysconfig = SysConfig(session)
+            # Internal, agent-only note — must never reach an unidentified user.
+            await add_article(
+                session,
+                ticket_id=seed["ticket_id"],
+                article=ArticleIn(
+                    sender_type="agent",
+                    is_visible_for_customer=False,
+                    subject="Internal",
+                    body=secret_note_body,
+                    channel="note",
+                ),
+                user_id=seed["agent_id"],
+                sysconfig=sysconfig,
+            )
+            # Newest customer message — the only thing the identity exchange
+            # should see (to extract identity_claim values from it).
+            await add_article(
+                session,
+                ticket_id=seed["ticket_id"],
+                article=ArticleIn(
+                    sender_type="customer",
+                    is_visible_for_customer=True,
+                    subject="Re",
+                    body=newest_customer_body,
+                    from_address=f"Tester <{chat_id}@telegram.invalid>",
+                    channel="telegram",
+                ),
+                user_id=seed["agent_id"],
+                sysconfig=sysconfig,
+            )
+            await session.commit()
+
+        async def _fake_telegram_deliver(
+            session: AsyncSession,
+            sysconfig: Any,
+            *,
+            ticket_id: int,
+            user_id: int,
+            article: Any,
+            gateway: Any = None,
+        ) -> int:
+            return await add_article(
+                session, ticket_id=ticket_id, article=article, user_id=user_id, sysconfig=sysconfig
+            )
+
+        monkeypatch.setattr(
+            "tiqora.channels.telegram.outbound.deliver_agent_telegram_reply",
+            _fake_telegram_deliver,
+        )
+
+        llm = ScriptedLlm([_identity_response("clarify", "Please tell me your phone number.")])
+        async with factory() as session:
+            await run_ticket_agent(
+                session,
+                settings=settings,
+                llm=llm,
+                ticket_id=seed["ticket_id"],
+                trigger=TRIGGER_AUTO,
+                acting_user_id=None,
+                run_id="run-27",
+                source_channel="telegram",
+            )
+
+        assert llm.calls == 1
+        sent_user_message = llm.last_user_message
+        assert sent_user_message is not None
+
+        # (c) the latest customer message IS present.
+        assert newest_customer_body in sent_user_message
+
+        # (a) internal note bodies and other prior articles' content are NOT
+        # present.
+        assert secret_note_body not in sent_user_message
+        assert "I need help with X" not in sent_user_message  # the seeded first article
+
+        # (b) the ticket's customer_user login / CustomerID is NOT present.
+        assert "CUST9627" not in sent_user_message
+        assert "customer9627@example.com" not in sent_user_message
+        assert "CustomerID" not in sent_user_message
+        assert "CustomerUser" not in sent_user_message
     finally:
         await engine.dispose()
