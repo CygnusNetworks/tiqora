@@ -59,6 +59,8 @@ CHANNEL_CONFIG_KEYS: Final[dict[str, set[str]]] = {
         "consent_required",
         "consent_text",
         "consent_confirmed_text",
+        "start_text",
+        "tone_prompt",
     },
 }
 

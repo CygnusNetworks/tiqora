@@ -252,6 +252,35 @@ async def _load_mcp_tools(
     return specs
 
 
+async def _resolve_telegram_tone_prompt(
+    session: AsyncSession,
+    *,
+    source_channel: str | None,
+    based_on_channel: str | None,
+) -> str | None:
+    """The Telegram chat-tone system-prompt addendum (Task: Telegram-Chat-UX),
+    or ``None`` when this run isn't Telegram-sourced.
+
+    ``source_channel`` covers the auto-trigger (outbox event payload);
+    ``trigger=manual`` (AI draft in the agent UI) never sets it, so that path
+    is decided by the based-on/latest customer article's channel instead —
+    see the call site in :func:`run_ticket_agent`. One cheap setting lookup,
+    only when actually Telegram.
+    """
+    is_telegram = (
+        (source_channel or "").strip().lower() == _TELEGRAM_CHANNEL
+        or (based_on_channel or "").strip().lower() == _TELEGRAM_CHANNEL
+    )
+    if not is_telegram:
+        return None
+    from tiqora.channels.common import channel_setting
+    from tiqora.channels.telegram.service import DEFAULT_TONE_PROMPT
+
+    return (
+        await channel_setting(session, _TELEGRAM_CHANNEL, "tone_prompt", DEFAULT_TONE_PROMPT)
+    ) or DEFAULT_TONE_PROMPT
+
+
 def _build_system_prompt(
     policy: TiqoraAiQueuePolicy,
     *,
@@ -259,6 +288,7 @@ def _build_system_prompt(
     kind_hint: str | None,
     reply_language_binding: bool = False,
     prompt_parts: list[TiqoraAiPromptPart] | None = None,
+    tone_prompt: str | None = None,
 ) -> str:
     # Kernel safety block first — not admin-editable, always present.
     parts = [UNTRUSTED_CONTENT_SYSTEM_BLOCK, policy.system_prompt or ""]
@@ -290,6 +320,8 @@ def _build_system_prompt(
         parts.append(f"Hint: this run is expected to produce a '{kind_hint}' message.")
     if reply_language_binding:
         parts.append("The reply language stated in the ticket header is binding.")
+    if tone_prompt:
+        parts.append(tone_prompt)
     return "\n\n".join(p for p in parts if p)
 
 
@@ -374,29 +406,34 @@ def _disclosure_footer(default_text: str, override_text: str | None) -> str:
     return (override_text or default_text or "").strip()
 
 
-def _build_identity_system_prompt(fields: list[Any]) -> str:
+def _build_identity_system_prompt(fields: list[Any], *, tone_prompt: str | None = None) -> str:
     """System prompt for the identity-check mini-exchange (Task 6). Replaces
     the normal system prompt entirely — the model must not see the queue's
-    configured prompt/tools while identity is unconfirmed."""
+    configured prompt/tools while identity is unconfirmed.
+
+    ``tone_prompt`` (Task: Telegram-Chat-UX) is always passed by the caller —
+    this exchange only ever runs for a Telegram-sourced run (see the guard in
+    :func:`run_ticket_agent`)."""
     field_lines = "\n".join(f"- {f.label} (internal key: {f.column})" for f in fields)
-    return "\n\n".join(
-        [
-            UNTRUSTED_CONTENT_SYSTEM_BLOCK,
-            (
-                "This customer's identity is NOT yet confirmed. You may NOT answer any "
-                "support question, and you may NOT reveal any ticket, account, or "
-                "personal information. Your only job right now is identity "
-                "verification via propose_customer_message:\n"
-                "- If the customer's latest message does not (yet) contain all of the "
-                "fields below, propose kind='clarify' politely asking for them.\n"
-                "- If the customer's latest message already states them, extract the "
-                "values into 'identity_claim' (an object keyed by the internal key "
-                "below) AND still propose kind='clarify' with a short acknowledgement "
-                "body (e.g. 'Thank you, checking that now.') — never a factual answer.\n\n"
-                f"Required fields:\n{field_lines}"
-            ),
-        ]
-    )
+    parts = [
+        UNTRUSTED_CONTENT_SYSTEM_BLOCK,
+        (
+            "This customer's identity is NOT yet confirmed. You may NOT answer any "
+            "support question, and you may NOT reveal any ticket, account, or "
+            "personal information. Your only job right now is identity "
+            "verification via propose_customer_message:\n"
+            "- If the customer's latest message does not (yet) contain all of the "
+            "fields below, propose kind='clarify' politely asking for them.\n"
+            "- If the customer's latest message already states them, extract the "
+            "values into 'identity_claim' (an object keyed by the internal key "
+            "below) AND still propose kind='clarify' with a short acknowledgement "
+            "body (e.g. 'Thank you, checking that now.') — never a factual answer.\n\n"
+            f"Required fields:\n{field_lines}"
+        ),
+    ]
+    if tone_prompt:
+        parts.append(tone_prompt)
+    return "\n\n".join(parts)
 
 
 def _build_identity_user_message(articles: list[ArticleSnapshot]) -> str:
@@ -611,7 +648,12 @@ async def _run_identity_exchange(
     identity_llm = AuditingLlmClient(
         llm, settings=settings, context=audit_context, session=session, pii_mapper=PiiMapper()
     )
-    system_prompt = _build_identity_system_prompt(fields)
+    # This exchange is only ever entered for a Telegram-sourced run (guard in
+    # run_ticket_agent), so the tone addendum is unconditional here.
+    identity_tone_prompt = await _resolve_telegram_tone_prompt(
+        session, source_channel=_TELEGRAM_CHANNEL, based_on_channel=None
+    )
+    system_prompt = _build_identity_system_prompt(fields, tone_prompt=identity_tone_prompt)
     user_message = _build_identity_user_message(articles)
     messages: list[LlmMessage] = [
         LlmMessage(role="system", content=system_prompt),
@@ -925,12 +967,22 @@ async def run_ticket_agent(
             llm, settings=settings, context=audit_context, session=session, pii_mapper=pii
         )
         reply_language_line = _resolve_reply_language_line(policy, ticket, customer_articles)
+        # trigger=manual (AI draft in the agent UI) never sets source_channel,
+        # so a Telegram ticket is instead recognized off the based-on/latest
+        # customer article's channel (Task: Telegram-Chat-UX).
+        based_on_channel = next(
+            (a.channel for a in articles if a.id == based_on_article_id), None
+        )
+        tone_prompt = await _resolve_telegram_tone_prompt(
+            session, source_channel=source_channel, based_on_channel=based_on_channel
+        )
         system_prompt = _build_system_prompt(
             policy,
             trigger=trigger,
             kind_hint=kind_hint,
             reply_language_binding=reply_language_line is not None,
             prompt_parts=prompt_parts,
+            tone_prompt=tone_prompt,
         )
         user_message = _build_user_message(
             ticket,

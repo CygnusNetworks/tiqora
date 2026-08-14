@@ -1603,6 +1603,181 @@ async def test_auto_send_email_dispatch_unchanged_regression(
         await engine.dispose()
 
 
+# ---------------------------------------------------------------------------
+# Telegram chat-tone system-prompt addendum (Task: Telegram-Chat-UX)
+# ---------------------------------------------------------------------------
+
+
+async def test_system_prompt_auto_trigger_telegram_source_channel_gets_tone(
+    mariadb_znuny_url: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    seed = _seed_ticket(mariadb_znuny_url, ns=30)
+    engine = create_async_engine(_mysql_async(mariadb_znuny_url))
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    settings = get_settings()
+    try:
+        async with factory() as session:
+            await _setup_policy(session, seed=seed, autonomy=AUTONOMY_FULL, enabled_auto_reply=True)
+            await _seed_telegram_article(
+                session, article_id=seed["customer_article_id"], chat_id=930030
+            )
+
+        async def _fake_telegram_deliver(
+            session: AsyncSession,
+            sysconfig: Any,
+            *,
+            ticket_id: int,
+            user_id: int,
+            article: Any,
+            gateway: Any = None,
+        ) -> int:
+            return await add_article(
+                session, ticket_id=ticket_id, article=article, user_id=user_id, sysconfig=sysconfig
+            )
+
+        monkeypatch.setattr(
+            "tiqora.channels.telegram.outbound.deliver_agent_telegram_reply",
+            _fake_telegram_deliver,
+        )
+
+        llm = ScriptedLlm([_propose_response("reply", "Hey, klar kann ich helfen!")])
+        async with factory() as session:
+            result = await run_ticket_agent(
+                session,
+                settings=settings,
+                llm=llm,
+                ticket_id=seed["ticket_id"],
+                trigger=TRIGGER_AUTO,
+                acting_user_id=None,
+                run_id="run-30",
+                source_channel="telegram",
+            )
+        assert result.status == "sent"
+        system_prompt = llm.last_messages[0].content
+        assert system_prompt is not None and "Duze" in system_prompt
+    finally:
+        await engine.dispose()
+
+
+async def test_system_prompt_email_source_no_tone(mariadb_znuny_url: str) -> None:
+    """Regression: a plain email-channel run never gets the Telegram tone
+    addendum."""
+    seed = _seed_ticket(mariadb_znuny_url, ns=31)
+    engine = create_async_engine(_mysql_async(mariadb_znuny_url))
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    settings = get_settings()
+    try:
+        async with factory() as session:
+            await _setup_policy(session, seed=seed, autonomy=AUTONOMY_FULL, enabled_auto_reply=True)
+
+        llm = ScriptedLlm([_propose_response("reply", "Here is the answer to your question.")])
+        async with factory() as session:
+            result = await run_ticket_agent(
+                session,
+                settings=settings,
+                llm=llm,
+                ticket_id=seed["ticket_id"],
+                trigger=TRIGGER_AUTO,
+                acting_user_id=None,
+                run_id="run-31",
+                source_channel="email",
+            )
+        assert result.status == "sent"
+        system_prompt = llm.last_messages[0].content
+        assert system_prompt is not None and "Duze" not in system_prompt
+    finally:
+        await engine.dispose()
+
+
+async def test_system_prompt_manual_trigger_telegram_ticket_gets_tone(
+    mariadb_znuny_url: str,
+) -> None:
+    """trigger=manual never sets source_channel -- the tone addendum must
+    still show up, resolved off the based-on/latest customer article's
+    channel instead."""
+    seed = _seed_ticket(mariadb_znuny_url, ns=32)
+    engine = create_async_engine(_mysql_async(mariadb_znuny_url))
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    settings = get_settings()
+    try:
+        async with factory() as session:
+            await _setup_policy(session, seed=seed, autonomy=AUTONOMY_FULL)
+            await _seed_telegram_article(
+                session, article_id=seed["customer_article_id"], chat_id=930032
+            )
+
+        llm = ScriptedLlm([_propose_response("reply", "Klar, mach ich!")])
+        async with factory() as session:
+            result = await run_ticket_agent(
+                session,
+                settings=settings,
+                llm=llm,
+                ticket_id=seed["ticket_id"],
+                trigger=TRIGGER_MANUAL,
+                acting_user_id=seed["agent_id"],
+                run_id="run-32",
+            )
+        assert result.status == "drafted"
+        system_prompt = llm.last_messages[0].content
+        assert system_prompt is not None and "Duze" in system_prompt
+    finally:
+        await engine.dispose()
+
+
+async def test_identity_prompt_contains_tone(
+    mariadb_znuny_url: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The identity mini-exchange system prompt (Telegram-only by
+    construction) also carries the chat-tone addendum."""
+    seed = _seed_ticket(mariadb_znuny_url, ns=33)
+    engine = create_async_engine(_mysql_async(mariadb_znuny_url))
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    settings = get_settings()
+    chat_id = 930033
+    try:
+        async with factory() as session:
+            await _setup_identity_policy(session, seed=seed)
+            await _seed_telegram_article(
+                session, article_id=seed["customer_article_id"], chat_id=chat_id
+            )
+
+        async def _fake_telegram_deliver(
+            session: AsyncSession,
+            sysconfig: Any,
+            *,
+            ticket_id: int,
+            user_id: int,
+            article: Any,
+            gateway: Any = None,
+        ) -> int:
+            return await add_article(
+                session, ticket_id=ticket_id, article=article, user_id=user_id, sysconfig=sysconfig
+            )
+
+        monkeypatch.setattr(
+            "tiqora.channels.telegram.outbound.deliver_agent_telegram_reply",
+            _fake_telegram_deliver,
+        )
+
+        llm = ScriptedLlm([_identity_response("clarify", "Wie lautet deine Telefonnummer?")])
+        async with factory() as session:
+            result = await run_ticket_agent(
+                session,
+                settings=settings,
+                llm=llm,
+                ticket_id=seed["ticket_id"],
+                trigger=TRIGGER_AUTO,
+                acting_user_id=None,
+                run_id="run-33",
+                source_channel="telegram",
+            )
+        assert result.status == "sent"
+        system_prompt = llm.last_messages[0].content
+        assert system_prompt is not None and "Duze" in system_prompt
+    finally:
+        await engine.dispose()
+
+
 async def test_typing_indicator_fires_during_telegram_auto_run_and_stops_after(
     mariadb_znuny_url: str, monkeypatch: pytest.MonkeyPatch
 ) -> None:
