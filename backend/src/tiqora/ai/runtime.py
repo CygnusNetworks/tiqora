@@ -267,10 +267,9 @@ async def _resolve_telegram_tone_prompt(
     see the call site in :func:`run_ticket_agent`. One cheap setting lookup,
     only when actually Telegram.
     """
-    is_telegram = (
-        (source_channel or "").strip().lower() == _TELEGRAM_CHANNEL
-        or (based_on_channel or "").strip().lower() == _TELEGRAM_CHANNEL
-    )
+    is_telegram = (source_channel or "").strip().lower() == _TELEGRAM_CHANNEL or (
+        based_on_channel or ""
+    ).strip().lower() == _TELEGRAM_CHANNEL
     if not is_telegram:
         return None
     from tiqora.channels.common import channel_setting
@@ -970,9 +969,7 @@ async def run_ticket_agent(
         # trigger=manual (AI draft in the agent UI) never sets source_channel,
         # so a Telegram ticket is instead recognized off the based-on/latest
         # customer article's channel (Task: Telegram-Chat-UX).
-        based_on_channel = next(
-            (a.channel for a in articles if a.id == based_on_article_id), None
-        )
+        based_on_channel = next((a.channel for a in articles if a.id == based_on_article_id), None)
         tone_prompt = await _resolve_telegram_tone_prompt(
             session, source_channel=source_channel, based_on_channel=based_on_channel
         )
