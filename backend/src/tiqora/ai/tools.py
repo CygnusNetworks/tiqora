@@ -705,14 +705,34 @@ class ToolExecutor:
             raw_result=result,
         )
 
-    def _mcp_server_context(self) -> dict[str, Any]:
-        """Pinned ticket identity injected into every MCP call (plan B #3)."""
+    def _mcp_server_context(self, parameters_schema: dict[str, Any] | None) -> dict[str, Any]:
+        """Pinned ticket identity injected into every MCP call (plan B #3).
+
+        Only keys the tool's input schema actually accepts are injected: a
+        server whose schema declares ``additionalProperties: false`` without
+        the ``_tiqora_*`` properties (fastmcp emits exactly that for plain
+        Python signatures) would otherwise reject the call outright — the
+        pinning then cannot be enforced server-side anyway, so sending the
+        keys only breaks the tool for no security gain.
+        """
         ctx: dict[str, Any] = {MCP_CONTEXT_TICKET_ID: self._ticket_id}
         if self._ticket_customer_id:
             ctx[MCP_CONTEXT_CUSTOMER_ID] = self._ticket_customer_id
         if self._ticket_customer_user_id:
             ctx[MCP_CONTEXT_CUSTOMER_USER_ID] = self._ticket_customer_user_id
-        return ctx
+
+        schema = parameters_schema or {}
+        if schema.get("additionalProperties") is not False:
+            return ctx
+        declared = schema.get("properties") or {}
+        accepted = {k: v for k, v in ctx.items() if k in declared}
+        if len(accepted) != len(ctx):
+            logger.warning(
+                "ai_mcp_context_not_supported",
+                ticket_id=self._ticket_id,
+                dropped=sorted(set(ctx) - set(accepted)),
+            )
+        return accepted
 
     async def _call_mcp(self, spec: McpToolSpec, arguments: dict[str, Any]) -> ToolOutcome:
         # Ticket-pinning boundary (security review H2): MCP tools get an
@@ -735,10 +755,27 @@ class ToolExecutor:
             k: (self._pii.unmask(v) if isinstance(v, str) else v) for k, v in arguments.items()
         }
         # Server context wins on key collision (should not happen after strip).
-        call_args = {**unmasked_args, **self._mcp_server_context()}
-        raw_result = _mcp_result_payload(
-            await self._mcp_caller(spec.client_url, spec.auth_token, spec.tool_name, call_args)
-        )
+        call_args = {**unmasked_args, **self._mcp_server_context(spec.parameters_schema)}
+        try:
+            raw_result = _mcp_result_payload(
+                await self._mcp_caller(spec.client_url, spec.auth_token, spec.tool_name, call_args)
+            )
+        except Exception as exc:  # noqa: BLE001 — server-side rejection must not kill the run
+            # fastmcp raises ToolError for server-side validation/tool failures
+            # (e.g. unexpected_keyword_argument). Feed the message back to the
+            # model as a tool error so it can correct its arguments — a single
+            # rejected call must never abort the whole agent run.
+            from fastmcp.exceptions import ToolError as _McpToolError
+
+            if not isinstance(exc, _McpToolError):
+                raise
+            logger.warning(
+                "ai_mcp_tool_rejected",
+                ticket_id=self._ticket_id,
+                tool=spec.full_name,
+                error=str(exc)[:500],
+            )
+            raise ToolArgumentError(f"MCP tool rejected the call: {exc}") from exc
         hit = check_escalation(
             self._escalation_rules, tool_full_name=spec.full_name, raw_result=raw_result
         )
