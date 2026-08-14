@@ -43,6 +43,42 @@ _PHONE_RE = re.compile(r"(?<!\w)(\+?\d[\d\s()./-]{6,}\d)(?!\w)")
 # space after the separator) and ISO yyyy-mm-dd.
 _DATE_LIKE_RE = re.compile(r"\A\d{1,2}[./]\s?\d{1,2}[./]\s?\d{2,4}\Z|\A\d{4}-\d{2}-\d{2}\Z")
 
+# Business identifiers customers quote to get their ticket routed:
+#
+#   PKZ         6 digits ("132665"), from the tenancy agreement
+#   WP-Nummer   the Wohnplatz, canonically grouped 3-2-2-2-1
+#               ("565-01-00-06-0", 10 digits); customers routinely drop the
+#               dashes and the trailing group and quote the 9-digit core
+#               ("544010110")
+#
+# The agent must be able to *read* their digits — they are the search key for
+# the Netadmin tools — so a PHONE candidate that is nothing but such
+# identifiers is rejected below.
+#
+# Without this a WP-Nummer reaches the model as "[PHONE_1]" and comes back
+# described as a phone number; worse, because _PHONE_RE's char class contains
+# spaces and slashes, a PKZ written next to a WP-Nummer ("132665 544010110")
+# is swallowed into the *same* PHONE span and both numbers vanish at once.
+#
+# The shape is deliberately narrow so real phone numbers keep being masked:
+# exactly 6, 9 or 10 digits, no leading zero, and — checked by the caller — no
+# "+"/parens anywhere in the span and no phone label in front of it. Every
+# common way of writing a German phone number ("+49 30 123456", "030/1234567",
+# "0201 123456", "Tel: 544010110") fails at least one of those: national
+# numbers carry the leading zero, international ones the "+".
+_IDENTIFIER_DIGIT_COUNTS = frozenset({6, 9, 10})
+
+# Separators between two *distinct* numbers. Dashes are excluded on purpose:
+# inside an identifier they are intra-number grouping ("565-01-00-06-0").
+_NUMBER_SEPARATOR_RE = re.compile(r"[\s/.]+")
+
+# A phone label directly in front of a candidate forces masking even when the
+# digits happen to fit an identifier shape.
+_PHONE_LABEL_RE = re.compile(
+    r"(?:tel|telefon|phone|mobil|mobile|handy|fax|durchwahl|dw)\.?\s*:?\s*\Z",
+    re.IGNORECASE,
+)
+
 
 # Clock times ("07:53:55" inside "2026-07-24T07:53:55+00:00") satisfy the
 # loose IPv6 group shape — an IPV6 candidate that looks like a time of day
@@ -50,22 +86,51 @@ _DATE_LIKE_RE = re.compile(r"\A\d{1,2}[./]\s?\d{1,2}[./]\s?\d{2,4}\Z|\A\d{4}-\d{
 _TIME_LIKE_RE = re.compile(r"\A:?\d{1,2}(:\d{2}){1,2}\Z")
 
 
-def _validate_ipv6(value: str) -> bool:
-    return not _TIME_LIKE_RE.match(value.strip())
+def _validate_ipv6(match: re.Match[str]) -> bool:
+    return not _TIME_LIKE_RE.match(match.group(0).strip())
 
 
-def _validate_phone(value: str) -> bool:
+def _is_identifier(value: str) -> bool:
+    """True for a bare PKZ / WP-Nummer (see :data:`_IDENTIFIER_DIGIT_COUNTS`).
+
+    Dashes are stripped as intra-number grouping; anything else (spaces, "+",
+    parens, dots, slashes) makes the value not an identifier.
+    """
+    digits = value.replace("-", "")
+    return (
+        digits.isdigit() and len(digits) in _IDENTIFIER_DIGIT_COUNTS and not digits.startswith("0")
+    )
+
+
+def _validate_phone(match: re.Match[str]) -> bool:
     """A PHONE candidate is only masked when it has enough digits to plausibly
-    be a phone number AND is not shaped like a date."""
+    be a phone number, is not shaped like a date, and is not made up purely of
+    business identifiers (PKZ / WP-Nummer)."""
+    value = match.group(0)
     if sum(1 for c in value if c.isdigit()) < 7:
         return False
-    return not _DATE_LIKE_RE.match(value.strip())
+    stripped = value.strip()
+    if _DATE_LIKE_RE.match(stripped):
+        return False
+    # "+"/parens are phone syntax no identifier uses; an explicit label in
+    # front ("Tel: 544010110") likewise settles it — mask in both cases.
+    if "+" in stripped or "(" in stripped:
+        return True
+    if _PHONE_LABEL_RE.search(match.string[: match.start()]):
+        return True
+    # Either the whole span is one identifier ("544-010-110"), or it is
+    # several identifiers the loose char class glued together
+    # ("132665 544010110" — PKZ and WP-Nummer separated by a space).
+    if _is_identifier(stripped):
+        return False
+    parts = _NUMBER_SEPARATOR_RE.split(stripped)
+    return not (len(parts) > 1 and all(_is_identifier(p) for p in parts))
 
 
 # (kind, compiled pattern, optional validator) in application order. A
 # candidate match is only masked when the validator (if given) returns True
-# for the matched text; otherwise it is left untouched in the output.
-_PATTERNS: tuple[tuple[str, re.Pattern[str], Callable[[str], bool] | None], ...] = (
+# for the match; otherwise it is left untouched in the output.
+_PATTERNS: tuple[tuple[str, re.Pattern[str], Callable[[re.Match[str]], bool] | None], ...] = (
     ("EMAIL", _EMAIL_RE, None),
     ("MAC", _MAC_RE, None),
     ("IPV6", _IPV6_RE, _validate_ipv6),
@@ -135,12 +200,12 @@ class PiiMapper:
             def _replace(
                 match: re.Match[str],
                 _kind: str = kind,
-                _validate: Callable[[str], bool] | None = validate,
+                _validate: Callable[[re.Match[str]], bool] | None = validate,
             ) -> str:
                 value = match.group(0)
                 if value in self._never_mask:
                     return value
-                if _validate is not None and not _validate(value):
+                if _validate is not None and not _validate(match):
                     return value
                 return self._token_for(_kind, value)
 
