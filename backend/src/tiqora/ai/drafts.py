@@ -153,6 +153,31 @@ async def mark_accepted(
     return row
 
 
+async def record_accepted_origin(
+    session: AsyncSession, draft: TiqoraAiDraft, *, article_id: int, actor_user_id: int
+) -> None:
+    """Origin marker for an accepted draft's article.
+
+    Carries the draft's tool trace so the AI badge + trace render on the
+    article in the ticket zoom, exactly like auto-sent AI articles. The
+    article stays in future LLM context — origin rows only relabel it as
+    "(AI, previous own action)" and exclude it from summary-threshold counts.
+    """
+    from tiqora.ai.models import TiqoraAiArticleOrigin
+
+    session.add(
+        TiqoraAiArticleOrigin(
+            article_id=article_id,
+            source="accepted",
+            draft_id=draft.id,
+            queue_id=draft.queue_id,
+            service_user_id=actor_user_id,
+            tool_trace_json=draft.tool_trace_json,
+        )
+    )
+    await session.commit()
+
+
 __all__ = [
     "DraftNotFound",
     "DraftStateError",
@@ -162,4 +187,5 @@ __all__ = [
     "get_draft",
     "list_for_ticket",
     "mark_accepted",
+    "record_accepted_origin",
 ]
