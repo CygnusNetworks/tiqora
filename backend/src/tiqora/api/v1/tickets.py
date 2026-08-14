@@ -153,9 +153,7 @@ class AcquireLockRequest(BaseModel):
 
 
 class AcquireLockResponse(BaseModel):
-    result: Literal[
-        "not_required", "acquired", "already_mine", "taken_over", "locked_by_other"
-    ]
+    result: Literal["not_required", "acquired", "already_mine", "taken_over", "locked_by_other"]
     locked_by_id: int | None = None
     locked_by_name: str | None = None
 
