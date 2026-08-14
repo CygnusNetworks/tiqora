@@ -40,7 +40,7 @@ $CONSOLE Dev::Package::Build \
     $OTRS/var/packages/
 ```
 
-This produces `$OTRS/var/packages/TiqoraSync-1.1.0.opm` (version from the SOPM).
+This produces `$OTRS/var/packages/TiqoraSync-1.1.1.opm` (version from the SOPM).
 
 If your peer accepts `.sopm` files directly for installation, you can skip the
 build step. If in doubt, build the `.opm` first.
@@ -52,7 +52,7 @@ OTRS 6.0 build, ship a one-line SOPM fork with only `<Framework>6.0.x</Framework
 ## Install
 
 ```sh
-$CONSOLE Admin::Package::Install $OTRS/var/packages/TiqoraSync-1.1.0.opm
+$CONSOLE Admin::Package::Install $OTRS/var/packages/TiqoraSync-1.1.1.opm
 ```
 
 ## Verify
@@ -63,7 +63,7 @@ $CONSOLE Admin::Package::Install $OTRS/var/packages/TiqoraSync-1.1.0.opm
    $CONSOLE Admin::Package::List
    ```
 
-   `TiqoraSync 1.1.0` should be listed.
+   `TiqoraSync 1.1.1` should be listed.
 
 2. Confirm the daemon cron task is registered and enabled:
 

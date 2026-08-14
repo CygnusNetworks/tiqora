@@ -45,7 +45,8 @@ C<tiqorasync.watermark>, defaulting to C<0> if unset)
 
 =item * selects up to 500 new rows from C<tiqora_cache_invalidation>
 
-=item * clears the Znuny ticket cache for every distinct C<TicketID> found
+=item * clears the Znuny ticket B<and article> cache for every distinct
+C<TicketID> found
 
 =item * runs C<Cache-E<gt>CleanUp( Type =E<gt> $CacheType )> once per distinct
 non-null C<cache_type> found
@@ -96,8 +97,8 @@ sub new {
 
 Called by the daemon cron task (C<Daemon::SchedulerCronTaskManager::Task###TiqoraSync>).
 Reads new rows from C<tiqora_cache_invalidation>, invalidates the Znuny
-ticket cache for every affected ticket, cleans up any requested master-data
-CacheTypes, and advances the watermark.
+ticket and article caches for every affected ticket, cleans up any requested
+master-data CacheTypes, and advances the watermark.
 
     my $Success = $TiqoraSyncObject->Run();
 
@@ -308,6 +309,15 @@ list-/count-level cache entries that can not be enumerated exhaustively here
 are handled by a single, coarser C<CleanUp( Type =E<gt> 'Ticket' )> call in
 L</Run()> after all tickets in a batch have been processed.
 
+Articles live in a I<separate> CacheType (C<'Article'>, not C<'Ticket'>), so
+clearing the ticket keys alone leaves a ticket's article list stale: an
+article Tiqora wrote directly via SQL stays invisible in AgentTicketZoom
+until the entry expires — and C<Kernel::System::Ticket::Article> sets
+C<CacheTTL> to 20 days. We therefore also drop the article-list key, which
+is exactly what Znuny's own C<_ArticleCacheClear()> does on every
+C<MIMEBase::ArticleCreate>; that private method deletes this one key and
+nothing else, so per-key deletion here is complete (no C<CleanUp> needed).
+
     $Self->_TicketCacheInvalidate( TicketID => 123 );
 
 =cut
@@ -332,6 +342,13 @@ sub _TicketCacheInvalidate {
             );
         }
     }
+
+    # Article list (CacheType 'Article'), see the note above: without this an
+    # article Tiqora inserted by SQL never shows up in the Znuny UI.
+    $CacheObject->Delete(
+        Type => 'Article',
+        Key  => '_MetaArticleList::' . $Param{TicketID},
+    );
 
     return 1;
 }
