@@ -259,9 +259,15 @@ Each of the following moves to Tiqora independently:
 | GenericAgent | GenericAgent | GA executor |
 | Auto-responses | AutoResponse | auto-response job |
 | AI auto-reply / auto-summary | *(n/a — new capability)* | `ai-worker` |
+| Telegram polling | *(n/a — no Znuny counterpart)* | `telegram_poller` |
 
 Flags must be **mutually exclusive** with the Znuny side for each function to
-avoid double-send or double-escalation.
+avoid double-send or double-escalation. `telegram_poller` (slug
+`telegram_poller`, `daemon.telegram_poller.enabled`, default **OFF**) is the
+odd one out: it has no Znuny side to be mutually exclusive *with* — Telegram
+never went through Znuny in the first place — but it must still not run
+alongside the channel's own webhook transport (see
+[channels.md](channels.md) §Telegram, "Transports").
 
 **The AI subsystem is gated more strictly.** Autonomous AI (the `ai-worker`:
 auto-reply and the auto-summary scan) requires **both** `operation_mode =
@@ -272,6 +278,20 @@ still owns the mailbox. Manual, human-gated AI (drafts and on-demand summaries)
 is *not* gated by the operation mode — an agent can use it during parallel
 operation because nothing is sent without explicit human action. See
 [ai-integration.md](ai-integration.md) §5 (Readiness-Gate).
+
+**One deliberate, channel-aware exception**: auto-reply *is* allowed in
+`parallel` operation for tickets in a queue that serves a Tiqora-only
+channel (currently Telegram; `tiqora.ai.gate.TIQORA_ONLY_CHANNELS`). The
+`operation_mode` gate exists specifically to prevent a customer receiving
+both Znuny's own autoresponder *and* Tiqora's AI reply for the same message
+— a risk that only exists for channels Znuny actually ingests (email). A
+Telegram message never reaches Znuny at all, in parallel operation or
+otherwise, so there is no double-answer to prevent and gating it on
+`tiqora_primary` would just be operationally pointless (it would force an
+operator into "tiqora_primary" — with everything that implies for the
+still-parallel email side — just to get AI auto-reply on their Telegram
+channel). The global kill-switch (`ai.auto_reply.paused`) still applies
+unconditionally.
 
 **Preferred switch: Admin → Dienste** (`/admin/daemons`) toggles every
 `daemon.*.enabled` flag and admin-overridable interval listed below, and
