@@ -2,8 +2,15 @@
 "Tool-Trace: Chat-Darstellung ... + Backfill alter Artikel", part 3).
 
 Seed ids use the 96xx range via ``_seed_ticket`` (shared helper, see
-``test_ai_runtime.py``'s module docstring) with ``ns`` in 50-53 — the highest
+``test_ai_runtime.py``'s module docstring) with ``ns`` in 50-54 — the highest
 ``ns`` used elsewhere in the suite is 91, so this range is free.
+
+Unlike ``test_ai_runtime.py``/``test_ai_audit.py`` (grandfathered leakers,
+see ``tests/db_leak_baseline.txt``), this module is NOT on the baseline —
+every test deletes everything it commits (``_cleanup_ticket``, FK-safe
+children-before-parents order, same pattern as
+``test_channels_telegram.py``'s ``_cleanup_new_rows``) so it also passes
+under ``TIQORA_STRICT_DB_LEAKS=1`` (CI) run on its own.
 """
 
 from __future__ import annotations
@@ -13,7 +20,7 @@ from datetime import datetime, timedelta
 from typing import Any
 
 import pytest
-from sqlalchemy import text
+from sqlalchemy import create_engine, text
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 from tests.test_ai_runtime import (
@@ -28,15 +35,72 @@ from tiqora.ai.backfill_tool_trace import run_backfill
 from tiqora.ai.models import AUTONOMY_FULL, SOURCE_AUTO, TiqoraAiArticleOrigin, TiqoraAiAuditLog
 from tiqora.ai.runtime import TRIGGER_AUTO, run_ticket_agent
 from tiqora.config import get_settings
+from tiqora.domain.settings_store import KEY_OPERATION_MODE
 
 pytestmark = pytest.mark.db
+
+
+def _cleanup_ticket(
+    sync_url: str, *, ticket_id: int, queue_id: int, agent_id: int, group_id: int
+) -> None:
+    """Delete every row a test in this module can have committed for one
+    seeded ticket (``_seed_ticket`` + ``_setup_policy`` + ``run_ticket_agent``
+    + this module's own direct ``TiqoraAiArticleOrigin``/``TiqoraAiAuditLog``
+    inserts), children before parents so no FK trips. Safe to call even for
+    rows that were never created (each DELETE is then a no-op)."""
+    engine = create_engine(sync_url)
+    with engine.begin() as conn:
+        for stmt, params in (
+            (
+                "DELETE FROM article_data_mime WHERE article_id IN "
+                "(SELECT id FROM article WHERE ticket_id = :tid)",
+                {"tid": ticket_id},
+            ),
+            (
+                "DELETE FROM tiqora_ai_article_origin WHERE article_id IN "
+                "(SELECT id FROM article WHERE ticket_id = :tid)",
+                {"tid": ticket_id},
+            ),
+            ("DELETE FROM ticket_history WHERE ticket_id = :tid", {"tid": ticket_id}),
+            ("DELETE FROM article WHERE ticket_id = :tid", {"tid": ticket_id}),
+            ("DELETE FROM tiqora_ai_audit_log WHERE ticket_id = :tid", {"tid": ticket_id}),
+            ("DELETE FROM tiqora_ai_usage WHERE ticket_id = :tid", {"tid": ticket_id}),
+            ("DELETE FROM tiqora_cache_invalidation WHERE ticket_id = :tid", {"tid": ticket_id}),
+            ("DELETE FROM tiqora_event_outbox WHERE ticket_id = :tid", {"tid": ticket_id}),
+            ("DELETE FROM tiqora_ai_ticket_state WHERE ticket_id = :tid", {"tid": ticket_id}),
+            ("DELETE FROM tiqora_ai_draft WHERE ticket_id = :tid", {"tid": ticket_id}),
+            ("DELETE FROM ticket WHERE id = :tid", {"tid": ticket_id}),
+            ("DELETE FROM tiqora_ai_queue_policy WHERE queue_id = :qid", {"qid": queue_id}),
+            ("DELETE FROM tiqora_ai_acl WHERE subject_id = :uid", {"uid": agent_id}),
+            (
+                "DELETE FROM tiqora_llm_provider WHERE name = :n",
+                {"n": f"fake-provider-{queue_id}"},
+            ),
+            (
+                "DELETE FROM group_user WHERE user_id = :uid OR group_id = :gid",
+                {"uid": agent_id, "gid": group_id},
+            ),
+            ("DELETE FROM queue WHERE id = :qid", {"qid": queue_id}),
+            ("DELETE FROM permission_groups WHERE id = :gid", {"gid": group_id}),
+            ("DELETE FROM users WHERE id = :uid", {"uid": agent_id}),
+            # set_operation_mode upserts one global key -- absent from the
+            # pristine snapshot, so every test that calls _setup_policy must
+            # remove it again (harmless no-op for tests that never set it).
+            ("DELETE FROM tiqora_settings WHERE `key` = :k", {"k": KEY_OPERATION_MODE}),
+        ):
+            conn.execute(text(stmt), params)
+    engine.dispose()
+
+
+def _group_id(seed: dict[str, Any]) -> int:
+    """``_seed_ticket`` doesn't return ``group_id`` — it's ``9630 + ns``,
+    deterministic from ``agent_id`` (``9600 + ns``), see its docstring."""
+    return int(seed["agent_id"]) + 30
 
 
 async def _null_out_trace(sync_url: str, *, article_id: int) -> None:
     """Simulate a pre-feature origin row: strip the trace/run_id a real run
     just stamped so the backfill has something to reconstruct."""
-    from sqlalchemy import create_engine
-
     engine = create_engine(sync_url)
     with engine.begin() as conn:
         conn.execute(
@@ -86,71 +150,89 @@ async def test_backfill_dry_run_reports_without_writing(mariadb_znuny_url: str) 
     a prior round's tool result IS recoverable. This test's job is the
     dry-run contract: correlate + report, write nothing."""
     seed = await _run_auto_send(mariadb_znuny_url, ns=50, run_id="run-50")
-    await _null_out_trace(mariadb_znuny_url, article_id=seed["article_id"])
-
-    engine = create_async_engine(_mysql_async(mariadb_znuny_url))
-    factory = async_sessionmaker(engine, expire_on_commit=False)
     try:
-        async with factory() as session:
-            result = await run_backfill(session, dry_run=True, ticket_id=seed["ticket_id"])
-            await session.commit()  # no-op: dry-run mutates nothing
+        await _null_out_trace(mariadb_znuny_url, article_id=seed["article_id"])
 
-        assert len(result.written) == 1
-        item = result.written[0]
-        assert item.article_id == seed["article_id"]
-        assert item.run_id == "run-50"
-        assert item.tool_call_count == 0
+        engine = create_async_engine(_mysql_async(mariadb_znuny_url))
+        factory = async_sessionmaker(engine, expire_on_commit=False)
+        try:
+            async with factory() as session:
+                result = await run_backfill(session, dry_run=True, ticket_id=seed["ticket_id"])
+                await session.commit()  # no-op: dry-run mutates nothing
 
-        async with factory() as session:
-            row = (
-                await session.execute(
-                    text(
-                        "SELECT tool_trace_json, run_id FROM tiqora_ai_article_origin "
-                        "WHERE article_id = :aid"
-                    ),
-                    {"aid": seed["article_id"]},
-                )
-            ).first()
-            assert row is not None
-            assert row[0] is None
-            assert row[1] is None
+            assert len(result.written) == 1
+            item = result.written[0]
+            assert item.article_id == seed["article_id"]
+            assert item.run_id == "run-50"
+            assert item.tool_call_count == 0
+
+            async with factory() as session:
+                row = (
+                    await session.execute(
+                        text(
+                            "SELECT tool_trace_json, run_id FROM tiqora_ai_article_origin "
+                            "WHERE article_id = :aid"
+                        ),
+                        {"aid": seed["article_id"]},
+                    )
+                ).first()
+                assert row is not None
+                assert row[0] is None
+                assert row[1] is None
+        finally:
+            await engine.dispose()
     finally:
-        await engine.dispose()
+        _cleanup_ticket(
+            mariadb_znuny_url,
+            ticket_id=seed["ticket_id"],
+            queue_id=seed["queue_id"],
+            agent_id=seed["agent_id"],
+            group_id=_group_id(seed),
+        )
 
 
 async def test_backfill_writes_trace_and_run_id(mariadb_znuny_url: str) -> None:
     seed = await _run_auto_send(mariadb_znuny_url, ns=51, run_id="run-51")
-    await _null_out_trace(mariadb_znuny_url, article_id=seed["article_id"])
-
-    engine = create_async_engine(_mysql_async(mariadb_znuny_url))
-    factory = async_sessionmaker(engine, expire_on_commit=False)
     try:
-        async with factory() as session:
-            result = await run_backfill(session, dry_run=False, ticket_id=seed["ticket_id"])
-            await session.commit()
+        await _null_out_trace(mariadb_znuny_url, article_id=seed["article_id"])
 
-        assert len(result.written) == 1
-        assert result.written[0].run_id == "run-51"
+        engine = create_async_engine(_mysql_async(mariadb_znuny_url))
+        factory = async_sessionmaker(engine, expire_on_commit=False)
+        try:
+            async with factory() as session:
+                result = await run_backfill(session, dry_run=False, ticket_id=seed["ticket_id"])
+                await session.commit()
 
-        async with factory() as session:
-            row = (
-                await session.execute(
-                    text(
-                        "SELECT tool_trace_json, run_id FROM tiqora_ai_article_origin "
-                        "WHERE article_id = :aid"
-                    ),
-                    {"aid": seed["article_id"]},
-                )
-            ).first()
-            assert row is not None
-            assert row[1] == "run-51"
-            # Origin previously had tool_trace_json IS NULL; the backfill
-            # writes even an empty reconstruction (valid JSON "[]"), same as
-            # the runtime itself does for a trace-less run (plan: "Identity-
-            # Artikel hat ggf. leeren Trace -> ok").
-            assert json.loads(row[0]) == []
+            assert len(result.written) == 1
+            assert result.written[0].run_id == "run-51"
+
+            async with factory() as session:
+                row = (
+                    await session.execute(
+                        text(
+                            "SELECT tool_trace_json, run_id FROM tiqora_ai_article_origin "
+                            "WHERE article_id = :aid"
+                        ),
+                        {"aid": seed["article_id"]},
+                    )
+                ).first()
+                assert row is not None
+                assert row[1] == "run-51"
+                # Origin previously had tool_trace_json IS NULL; the backfill
+                # writes even an empty reconstruction (valid JSON "[]"), same
+                # as the runtime itself does for a trace-less run (plan:
+                # "Identity-Artikel hat ggf. leeren Trace -> ok").
+                assert json.loads(row[0]) == []
+        finally:
+            await engine.dispose()
     finally:
-        await engine.dispose()
+        _cleanup_ticket(
+            mariadb_znuny_url,
+            ticket_id=seed["ticket_id"],
+            queue_id=seed["queue_id"],
+            agent_id=seed["agent_id"],
+            group_id=_group_id(seed),
+        )
 
 
 async def test_backfill_reconstructs_multi_round_tool_calls(mariadb_znuny_url: str) -> None:
@@ -161,165 +243,195 @@ async def test_backfill_reconstructs_multi_round_tool_calls(mariadb_znuny_url: s
     tool available in the scripted-LLM test fixtures) to isolate the
     correlation + extraction logic from the runtime's tool-calling loop."""
     seed = _seed_ticket(mariadb_znuny_url, ns=54)
-    origin_created = datetime(2026, 8, 14, 11, 0, 0)
-    engine = create_async_engine(_mysql_async(mariadb_znuny_url))
-    factory = async_sessionmaker(engine, expire_on_commit=False)
     try:
-        async with factory() as session:
-            session.add(
-                TiqoraAiArticleOrigin(
-                    article_id=seed["customer_article_id"],
-                    source=SOURCE_AUTO,
-                    queue_id=seed["queue_id"],
-                    service_user_id=seed["agent_id"],
-                    tool_trace_json=None,
-                    created=origin_created,
+        origin_created = datetime(2026, 8, 14, 11, 0, 0)
+        engine = create_async_engine(_mysql_async(mariadb_znuny_url))
+        factory = async_sessionmaker(engine, expire_on_commit=False)
+        try:
+            async with factory() as session:
+                session.add(
+                    TiqoraAiArticleOrigin(
+                        article_id=seed["customer_article_id"],
+                        source=SOURCE_AUTO,
+                        queue_id=seed["queue_id"],
+                        service_user_id=seed["agent_id"],
+                        tool_trace_json=None,
+                        created=origin_created,
+                    )
                 )
-            )
-            # Round 1's audit row: input has no tool messages yet.
-            session.add(
-                TiqoraAiAuditLog(
-                    ts=origin_created - timedelta(seconds=3),
-                    run_id="run-54",
-                    feature=FEATURE_AUTO_REPLY,
-                    ticket_id=seed["ticket_id"],
-                    queue_id=seed["queue_id"],
-                    request_json=json.dumps({"messages": [{"role": "system", "content": "sys"}]}),
-                )
-            )
-            # Round 2's audit row (closest to origin.created): input now
-            # carries round 1's tool result — this is what gets extracted.
-            session.add(
-                TiqoraAiAuditLog(
-                    ts=origin_created - timedelta(seconds=1),
-                    run_id="run-54",
-                    feature=FEATURE_AUTO_REPLY,
-                    ticket_id=seed["ticket_id"],
-                    queue_id=seed["queue_id"],
-                    request_json=json.dumps(
-                        {
-                            "messages": [
-                                {"role": "system", "content": "sys"},
-                                {
-                                    "role": "tool",
-                                    "tool_call_id": "call_1",
-                                    "name": "kb_search",
-                                    "content": "3 Treffer",
-                                },
-                            ]
-                        }
-                    ),
-                )
-            )
-            await session.commit()
-
-        async with factory() as session:
-            result = await run_backfill(session, dry_run=False, ticket_id=seed["ticket_id"])
-            await session.commit()
-
-        assert len(result.written) == 1
-        item = result.written[0]
-        assert item.run_id == "run-54"
-        assert item.tool_call_count == 1
-
-        async with factory() as session:
-            row = (
-                await session.execute(
-                    text(
-                        "SELECT tool_trace_json FROM tiqora_ai_article_origin "
-                        "WHERE article_id = :aid"
-                    ),
-                    {"aid": seed["customer_article_id"]},
-                )
-            ).scalar_one()
-            trace = json.loads(row)
-            assert trace == [
-                {
-                    "role": "tool",
-                    "tool_call_id": "call_1",
-                    "name": "kb_search",
-                    "content": "3 Treffer",
-                }
-            ]
-    finally:
-        await engine.dispose()
-
-
-async def test_backfill_skips_when_no_audit_rows(mariadb_znuny_url: str) -> None:
-    seed = _seed_ticket(mariadb_znuny_url, ns=52)
-    engine = create_async_engine(_mysql_async(mariadb_znuny_url))
-    factory = async_sessionmaker(engine, expire_on_commit=False)
-    try:
-        async with factory() as session:
-            session.add(
-                TiqoraAiArticleOrigin(
-                    article_id=seed["customer_article_id"],
-                    source=SOURCE_AUTO,
-                    queue_id=seed["queue_id"],
-                    service_user_id=seed["agent_id"],
-                    tool_trace_json=None,
-                )
-            )
-            await session.commit()
-
-        async with factory() as session:
-            result = await run_backfill(session, dry_run=False, ticket_id=seed["ticket_id"])
-            await session.commit()
-
-        assert result.written == []
-        assert len(result.skipped) == 1
-        assert result.skipped[0].reason == "no_audit_rows"
-    finally:
-        await engine.dispose()
-
-
-async def test_backfill_skips_when_two_runs_equally_near(mariadb_znuny_url: str) -> None:
-    seed = _seed_ticket(mariadb_znuny_url, ns=53)
-    origin_created = datetime(2026, 8, 14, 10, 0, 0)
-    engine = create_async_engine(_mysql_async(mariadb_znuny_url))
-    factory = async_sessionmaker(engine, expire_on_commit=False)
-    try:
-        async with factory() as session:
-            session.add(
-                TiqoraAiArticleOrigin(
-                    article_id=seed["customer_article_id"],
-                    source=SOURCE_AUTO,
-                    queue_id=seed["queue_id"],
-                    service_user_id=seed["agent_id"],
-                    tool_trace_json=None,
-                    created=origin_created,
-                )
-            )
-            for run_id in ("run-53-a", "run-53-b"):
+                # Round 1's audit row: input has no tool messages yet.
                 session.add(
                     TiqoraAiAuditLog(
-                        ts=origin_created - timedelta(seconds=2),
-                        run_id=run_id,
+                        ts=origin_created - timedelta(seconds=3),
+                        run_id="run-54",
+                        feature=FEATURE_AUTO_REPLY,
+                        ticket_id=seed["ticket_id"],
+                        queue_id=seed["queue_id"],
+                        request_json=json.dumps(
+                            {"messages": [{"role": "system", "content": "sys"}]}
+                        ),
+                    )
+                )
+                # Round 2's audit row (closest to origin.created): input now
+                # carries round 1's tool result — this is what gets
+                # extracted.
+                session.add(
+                    TiqoraAiAuditLog(
+                        ts=origin_created - timedelta(seconds=1),
+                        run_id="run-54",
                         feature=FEATURE_AUTO_REPLY,
                         ticket_id=seed["ticket_id"],
                         queue_id=seed["queue_id"],
                         request_json=json.dumps(
                             {
                                 "messages": [
+                                    {"role": "system", "content": "sys"},
                                     {
                                         "role": "tool",
                                         "tool_call_id": "call_1",
-                                        "name": "propose_customer_message",
-                                        "content": f"from {run_id}",
-                                    }
+                                        "name": "kb_search",
+                                        "content": "3 Treffer",
+                                    },
                                 ]
                             }
                         ),
                     )
                 )
-            await session.commit()
+                await session.commit()
 
-        async with factory() as session:
-            result = await run_backfill(session, dry_run=False, ticket_id=seed["ticket_id"])
-            await session.commit()
+            async with factory() as session:
+                result = await run_backfill(session, dry_run=False, ticket_id=seed["ticket_id"])
+                await session.commit()
 
-        assert result.written == []
-        assert len(result.skipped) == 1
-        assert result.skipped[0].reason == "ambiguous"
+            assert len(result.written) == 1
+            item = result.written[0]
+            assert item.run_id == "run-54"
+            assert item.tool_call_count == 1
+
+            async with factory() as session:
+                row = (
+                    await session.execute(
+                        text(
+                            "SELECT tool_trace_json FROM tiqora_ai_article_origin "
+                            "WHERE article_id = :aid"
+                        ),
+                        {"aid": seed["customer_article_id"]},
+                    )
+                ).scalar_one()
+                trace = json.loads(row)
+                assert trace == [
+                    {
+                        "role": "tool",
+                        "tool_call_id": "call_1",
+                        "name": "kb_search",
+                        "content": "3 Treffer",
+                    }
+                ]
+        finally:
+            await engine.dispose()
     finally:
-        await engine.dispose()
+        _cleanup_ticket(
+            mariadb_znuny_url,
+            ticket_id=seed["ticket_id"],
+            queue_id=seed["queue_id"],
+            agent_id=seed["agent_id"],
+            group_id=_group_id(seed),
+        )
+
+
+async def test_backfill_skips_when_no_audit_rows(mariadb_znuny_url: str) -> None:
+    seed = _seed_ticket(mariadb_znuny_url, ns=52)
+    try:
+        engine = create_async_engine(_mysql_async(mariadb_znuny_url))
+        factory = async_sessionmaker(engine, expire_on_commit=False)
+        try:
+            async with factory() as session:
+                session.add(
+                    TiqoraAiArticleOrigin(
+                        article_id=seed["customer_article_id"],
+                        source=SOURCE_AUTO,
+                        queue_id=seed["queue_id"],
+                        service_user_id=seed["agent_id"],
+                        tool_trace_json=None,
+                    )
+                )
+                await session.commit()
+
+            async with factory() as session:
+                result = await run_backfill(session, dry_run=False, ticket_id=seed["ticket_id"])
+                await session.commit()
+
+            assert result.written == []
+            assert len(result.skipped) == 1
+            assert result.skipped[0].reason == "no_audit_rows"
+        finally:
+            await engine.dispose()
+    finally:
+        _cleanup_ticket(
+            mariadb_znuny_url,
+            ticket_id=seed["ticket_id"],
+            queue_id=seed["queue_id"],
+            agent_id=seed["agent_id"],
+            group_id=_group_id(seed),
+        )
+
+
+async def test_backfill_skips_when_two_runs_equally_near(mariadb_znuny_url: str) -> None:
+    seed = _seed_ticket(mariadb_znuny_url, ns=53)
+    try:
+        origin_created = datetime(2026, 8, 14, 10, 0, 0)
+        engine = create_async_engine(_mysql_async(mariadb_znuny_url))
+        factory = async_sessionmaker(engine, expire_on_commit=False)
+        try:
+            async with factory() as session:
+                session.add(
+                    TiqoraAiArticleOrigin(
+                        article_id=seed["customer_article_id"],
+                        source=SOURCE_AUTO,
+                        queue_id=seed["queue_id"],
+                        service_user_id=seed["agent_id"],
+                        tool_trace_json=None,
+                        created=origin_created,
+                    )
+                )
+                for run_id in ("run-53-a", "run-53-b"):
+                    session.add(
+                        TiqoraAiAuditLog(
+                            ts=origin_created - timedelta(seconds=2),
+                            run_id=run_id,
+                            feature=FEATURE_AUTO_REPLY,
+                            ticket_id=seed["ticket_id"],
+                            queue_id=seed["queue_id"],
+                            request_json=json.dumps(
+                                {
+                                    "messages": [
+                                        {
+                                            "role": "tool",
+                                            "tool_call_id": "call_1",
+                                            "name": "propose_customer_message",
+                                            "content": f"from {run_id}",
+                                        }
+                                    ]
+                                }
+                            ),
+                        )
+                    )
+                await session.commit()
+
+            async with factory() as session:
+                result = await run_backfill(session, dry_run=False, ticket_id=seed["ticket_id"])
+                await session.commit()
+
+            assert result.written == []
+            assert len(result.skipped) == 1
+            assert result.skipped[0].reason == "ambiguous"
+        finally:
+            await engine.dispose()
+    finally:
+        _cleanup_ticket(
+            mariadb_znuny_url,
+            ticket_id=seed["ticket_id"],
+            queue_id=seed["queue_id"],
+            agent_id=seed["agent_id"],
+            group_id=_group_id(seed),
+        )
