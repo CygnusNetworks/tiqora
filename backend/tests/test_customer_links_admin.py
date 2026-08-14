@@ -126,7 +126,9 @@ async def test_queue_customer_link_crud_roundtrip(
         assert bad_vis.value.status_code == 422
 
         listed = await admin_cl.list_queue_customer_links(admin, s)
-        assert any(item.id == created.id and item.queue_name == f"CustLinkQ-{ns}" for item in listed)
+        assert any(
+            item.id == created.id and item.queue_name == f"CustLinkQ-{ns}" for item in listed
+        )
 
         got = await admin_cl.get_queue_customer_link(created.id, admin, s)
         assert got.url_template == "https://netadmin.example/?u={customer_user}"
