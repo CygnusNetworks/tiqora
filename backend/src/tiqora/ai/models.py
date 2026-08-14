@@ -541,6 +541,16 @@ class TiqoraAiTicketState(TiqoraBase):
     )
     last_run_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     last_error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Manual Assist background-run bookkeeping (nginx-90s-timeout fix): the
+    # API route now returns immediately and runs the agent in a background
+    # task, so the frontend polls GET /tickets/{id}/ai for these instead of
+    # waiting on the POST response. Written ONLY by the manual-trigger API
+    # path (tiqora.api.v1.ai) — the auto-reply worker (ai/auto_worker.py)
+    # never touches them.
+    manual_run_status: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    manual_run_notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    manual_run_error_code: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    manual_run_started_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
 
 class TiqoraAiAuditLog(TiqoraBase):

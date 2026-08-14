@@ -10,18 +10,25 @@ posting a reply/note on that queue).
 
 from __future__ import annotations
 
+import asyncio
 import json
 import uuid
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Literal
 
 import structlog
 from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from tiqora.ai import drafts as ai_drafts
 from tiqora.ai.acl import check_feature_access
-from tiqora.ai.context import article_from_address, latest_customer_article_id, load_articles
+from tiqora.ai.context import (
+    article_from_address,
+    get_or_create_state,
+    latest_customer_article_id,
+    load_articles,
+)
 from tiqora.ai.gate import is_tiqora_primary
 from tiqora.ai.kb_wiring import build_llm_client, kb_bundle, kb_get_article_fn, kb_search_fn
 from tiqora.ai.listfields import parse_str_list
@@ -29,6 +36,7 @@ from tiqora.ai.llm import LlmEmptyOutputError, LlmError, LlmHttpError, LlmTimeou
 from tiqora.ai.models import TiqoraAiTicketState
 from tiqora.ai.policies import get_queue_policy_by_queue
 from tiqora.ai.runtime import (
+    _LOCK_MAX_AGE,
     TRIGGER_MANUAL,
     AclDeniedError,
     AclLimitExceededError,
@@ -49,12 +57,24 @@ from tiqora.ai.summary import (
     summarize_ticket,
 )
 from tiqora.api.deps import AppSettings, CurrentUser, DbSession
+from tiqora.config import Settings
+from tiqora.db.engine import get_session_factory
 from tiqora.domain.ticket_service import TicketAccessDenied, TicketNotFound, TicketService
 from tiqora.permissions.engine import PermissionEngine
 
 logger = structlog.get_logger(__name__)
 
 router = APIRouter(prefix="/tickets/{ticket_id}/ai", tags=["ai"])
+
+# Manual Assist background runs (nginx-90s-timeout fix, see
+# request_manual_draft): asyncio.create_task() does not keep a strong
+# reference to the task, so it can be garbage-collected mid-flight — every
+# task is added here and discarded via its done-callback to prevent that.
+_background_run_tasks: set[asyncio.Task[None]] = set()
+
+# Stale-guard threshold for a manual run stuck in "running" (matches the
+# per-ticket run-lock's own stale age — see ai.runtime._acquire_lock).
+_MANUAL_RUN_STALE_AGE = _LOCK_MAX_AGE
 
 
 class AiToolTraceOut(BaseModel):
@@ -85,6 +105,10 @@ class AiStateOut(BaseModel):
     summary_body: str | None
     last_summary_upto_article_id: int | None
     summary_created_at: datetime | None
+    manual_run_status: str | None = None
+    manual_run_notes: str | None = None
+    manual_run_error_code: str | None = None
+    manual_run_started_at: datetime | None = None
 
 
 class AiSummarizeIn(BaseModel):
@@ -142,6 +166,26 @@ def _draft_out(draft: object) -> AiDraftOut:
     return AiDraftOut.model_validate(fields)
 
 
+def _run_error_code(exc: AgentRunError | LlmError) -> str:
+    """Stable error-code classification for a run-abort/LLM-client error —
+    shared by :func:`_map_run_error` (synchronous-request detail prefix) and
+    the background-task status write in :func:`_finish_manual_run` (the
+    ``manual_run_error_code`` column the frontend polls). Every branch here
+    must match the corresponding branch there — see ``AiPanel.mapRunError``.
+    """
+    if isinstance(exc, LockHeldError):
+        return "ai_run_locked"
+    # LlmEmptyOutputError is a subclass of LlmError — checked first here so
+    # it takes the specific branch instead of the generic LlmError catch-all.
+    if isinstance(exc, LlmEmptyOutputError):
+        return "llm_empty_output"
+    if isinstance(exc, LlmTimeoutError):
+        return "llm_timeout"
+    if isinstance(exc, LlmError):
+        return "llm_provider_error"
+    return "internal_error"
+
+
 def _map_run_error(exc: AgentRunError | LlmError) -> HTTPException:
     """Map a run-abort/LLM-client error to an HTTPException with a stable
     ``detail`` code prefix (``"<code>: <human text>"``) the frontend matches
@@ -158,8 +202,6 @@ def _map_run_error(exc: AgentRunError | LlmError) -> HTTPException:
         return HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(exc))
     if isinstance(exc, PolicyDisabledError):
         return HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc))
-    # LlmEmptyOutputError is a subclass of LlmError — checked first here so
-    # it takes the specific branch instead of the generic LlmError catch-all.
     if isinstance(exc, LlmEmptyOutputError):
         return HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY, detail=f"llm_empty_output: {exc}"
@@ -227,6 +269,22 @@ async def get_ai_state(ticket_id: int, user: CurrentUser, session: DbSession) ->
         articles = await load_articles(session, ticket_id)
         can_summarize = any(a.id > upto for a in articles) if upto is not None else bool(articles)
 
+    manual_run_status = state.manual_run_status if state else None
+    manual_run_notes = state.manual_run_notes if state else None
+    manual_run_error_code = state.manual_run_error_code if state else None
+    manual_run_started_at = state.manual_run_started_at if state else None
+    # Stale-guard: a run stuck in "running" (background task crashed without
+    # writing an outcome, e.g. the process was killed) is reported as an
+    # error rather than polled forever — never written back to the DB, since
+    # the background task itself might still land its own outcome later.
+    if (
+        manual_run_status == "running"
+        and manual_run_started_at is not None
+        and datetime.now(UTC).replace(tzinfo=None) - manual_run_started_at > _MANUAL_RUN_STALE_AGE
+    ):
+        manual_run_status = "error"
+        manual_run_error_code = "internal_error"
+
     return AiStateOut(
         manual_assist_available=manual_available,
         summary_available=summary_available,
@@ -236,17 +294,153 @@ async def get_ai_state(ticket_id: int, user: CurrentUser, session: DbSession) ->
         summary_body=state.summary_body if state else None,
         last_summary_upto_article_id=state.last_summary_upto_article_id if state else None,
         summary_created_at=state.summary_created_at if state else None,
+        manual_run_status=manual_run_status,
+        manual_run_notes=manual_run_notes,
+        manual_run_error_code=manual_run_error_code,
+        manual_run_started_at=manual_run_started_at,
     )
 
 
-@router.post("/draft", response_model=AiDraftRequestOut, status_code=status.HTTP_201_CREATED)
+async def _write_manual_run_state(
+    session: AsyncSession,
+    ticket_id: int,
+    *,
+    run_status: str | None,
+    notes: str | None,
+    error_code: str | None,
+) -> None:
+    state = await session.get(TiqoraAiTicketState, ticket_id)
+    if state is None:
+        return
+    state.manual_run_status = run_status
+    state.manual_run_notes = notes
+    state.manual_run_error_code = error_code
+    await session.commit()
+
+
+async def _finish_manual_run(
+    ticket_id: int,
+    *,
+    run_session: AsyncSession,
+    run_status: str | None,
+    notes: str | None,
+    error_code: str | None,
+) -> None:
+    """Write the manual-run outcome. Prefers the run's own session (already
+    open, no extra connection) but falls back to a fresh one from
+    :func:`~tiqora.db.engine.get_session_factory` when that session is
+    unusable — e.g. it was left in a failed-transaction state by the
+    exception that ended the run, or its request-scoped lifetime already
+    ended somehow.
+    """
+    try:
+        await _write_manual_run_state(
+            run_session, ticket_id, run_status=run_status, notes=notes, error_code=error_code
+        )
+        return
+    except Exception:  # noqa: BLE001 — fall back to a fresh session below
+        logger.warning(
+            "ai_manual_run_status_write_failed_on_run_session",
+            ticket_id=ticket_id,
+            exc_info=True,
+        )
+    factory = get_session_factory()
+    async with factory() as fresh_session:
+        await _write_manual_run_state(
+            fresh_session, ticket_id, run_status=run_status, notes=notes, error_code=error_code
+        )
+
+
+async def _run_manual_draft_background(
+    *, ticket_id: int, queue_id: int, user_id: int, settings: Settings, run_id: str
+) -> None:
+    """Manual Assist's actual agent run (nginx-90s-timeout fix): started via
+    ``asyncio.create_task`` from :func:`request_manual_draft` right after
+    that route has already returned its ``"started"`` response, so it needs
+    its own DB session — the request-scoped one is closed by then.
+    """
+    factory = get_session_factory()
+    async with factory() as session:
+        try:
+            policy = await get_queue_policy_by_queue(session, queue_id)
+            if policy is None or not policy.enabled_manual_assist:
+                raise PolicyDisabledError(f"Manual Assist is disabled for queue {queue_id}")
+            llm = await build_llm_client(
+                session,
+                settings,
+                policy.llm_provider_id,
+                policy.model_override,
+                policy.llm_fallback_json,
+            )
+            bundle = await kb_bundle(session, settings, user_id, policy)
+            result: AgentRunResult = await run_ticket_agent(
+                session,
+                settings=settings,
+                llm=llm,
+                ticket_id=ticket_id,
+                trigger=TRIGGER_MANUAL,
+                acting_user_id=user_id,
+                run_id=run_id,
+                worker_instance="api",
+                kb_bundle=bundle,
+                kb_search_fn=kb_search_fn(session, settings, user_id),
+                kb_get_article_fn=kb_get_article_fn(session, settings, user_id),
+            )
+        except (AgentRunError, LlmError, HTTPException) as exc:
+            error_code = (
+                _run_error_code(exc)
+                if isinstance(exc, AgentRunError | LlmError)
+                else "internal_error"
+            )
+            logger.warning(
+                "ai_manual_draft_background_run_failed",
+                ticket_id=ticket_id,
+                error=str(exc),
+                error_code=error_code,
+            )
+            await _finish_manual_run(
+                ticket_id,
+                run_session=session,
+                run_status="error",
+                notes=str(exc),
+                error_code=error_code,
+            )
+            return
+        except Exception as exc:  # noqa: BLE001 — background task must never crash silently
+            logger.exception("ai_manual_draft_background_unexpected_error", ticket_id=ticket_id)
+            await _finish_manual_run(
+                ticket_id,
+                run_session=session,
+                run_status="error",
+                notes=str(exc),
+                error_code="internal_error",
+            )
+            return
+
+        await _finish_manual_run(
+            ticket_id,
+            run_session=session,
+            run_status=result.status,
+            notes=result.notes,
+            error_code=None,
+        )
+
+
+@router.post("/draft", response_model=AiDraftRequestOut, status_code=status.HTTP_200_OK)
 async def request_manual_draft(
     ticket_id: int, user: CurrentUser, session: DbSession, settings: AppSettings
 ) -> AiDraftRequestOut:
-    """Manual Assist: run the agent synchronously and return the outcome.
+    """Manual Assist: kick off the agent run in the background and return
+    immediately.
 
-    Always draft-path (plan §3.4) — never sends a customer-visible article,
-    regardless of the queue's autonomy setting.
+    Hetzner-hosted reasoning models can take 4-7 minutes per run — long past
+    nginx's ``proxy_read_timeout 90s`` in front of this API — so the run
+    itself happens in an ``asyncio.create_task`` (see
+    :func:`_run_manual_draft_background`) started *after* the pre-flight
+    checks and the lock below, both still synchronous so a second POST while
+    a run is in flight gets a deterministic 423 rather than racing the
+    background task. Always draft-path (plan §3.4) — never sends a
+    customer-visible article, regardless of the queue's autonomy setting.
     """
     try:
         ticket = await TicketService(session).get_ticket(user.id, ticket_id)
@@ -274,34 +468,46 @@ async def request_manual_draft(
                     detail="Sender is on the ignored-senders list for this queue",
                 )
 
-    llm = await build_llm_client(
-        session, settings, policy.llm_provider_id, policy.model_override, policy.llm_fallback_json
+    state = await get_or_create_state(session, ticket_id)
+    now = datetime.now(UTC).replace(tzinfo=None)
+    lock_fresh = (
+        state.run_lock_owner is not None
+        and state.run_lock_at is not None
+        and (now - state.run_lock_at) < _LOCK_MAX_AGE
     )
-    bundle = await kb_bundle(session, settings, user.id, policy)
-
-    try:
-        result: AgentRunResult = await run_ticket_agent(
-            session,
-            settings=settings,
-            llm=llm,
-            ticket_id=ticket_id,
-            trigger=TRIGGER_MANUAL,
-            acting_user_id=user.id,
-            run_id=uuid.uuid4().hex,
-            worker_instance="api",
-            kb_bundle=bundle,
-            kb_search_fn=kb_search_fn(session, settings, user.id),
-            kb_get_article_fn=kb_get_article_fn(session, settings, user.id),
+    manual_run_fresh = (
+        state.manual_run_status == "running"
+        and state.manual_run_started_at is not None
+        and (now - state.manual_run_started_at) < _MANUAL_RUN_STALE_AGE
+    )
+    if lock_fresh or manual_run_fresh:
+        raise HTTPException(
+            status_code=status.HTTP_423_LOCKED,
+            detail=(
+                f"ai_run_locked: A Manual Assist run is already in progress for ticket {ticket_id}"
+            ),
         )
-    except (AgentRunError, LlmError) as exc:
-        raise _map_run_error(exc) from exc
 
-    return AiDraftRequestOut(
-        status=result.status,
-        draft_id=result.draft_id,
-        article_id=result.article_id,
-        notes=result.notes,
+    state.manual_run_status = "running"
+    state.manual_run_started_at = now
+    state.manual_run_notes = None
+    state.manual_run_error_code = None
+    await session.commit()
+
+    run_id = uuid.uuid4().hex
+    task = asyncio.create_task(
+        _run_manual_draft_background(
+            ticket_id=ticket_id,
+            queue_id=ticket.queue_id,
+            user_id=user.id,
+            settings=settings,
+            run_id=run_id,
+        )
     )
+    _background_run_tasks.add(task)
+    task.add_done_callback(_background_run_tasks.discard)
+
+    return AiDraftRequestOut(status="started", draft_id=None, article_id=None, notes=None)
 
 
 @router.post("/summarize", response_model=AiSummarizeOut, status_code=status.HTTP_200_OK)

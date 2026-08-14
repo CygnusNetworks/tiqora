@@ -5256,10 +5256,17 @@ export interface paths {
         put?: never;
         /**
          * Request Manual Draft
-         * @description Manual Assist: run the agent synchronously and return the outcome.
+         * @description Manual Assist: kick off the agent run in the background and return
+         *     immediately.
          *
-         *     Always draft-path (plan §3.4) — never sends a customer-visible article,
-         *     regardless of the queue's autonomy setting.
+         *     Hetzner-hosted reasoning models can take 4-7 minutes per run — long past
+         *     nginx's ``proxy_read_timeout 90s`` in front of this API — so the run
+         *     itself happens in an ``asyncio.create_task`` (see
+         *     :func:`_run_manual_draft_background`) started *after* the pre-flight
+         *     checks and the lock below, both still synchronous so a second POST while
+         *     a run is in flight gets a deterministic 423 rather than racing the
+         *     background task. Always draft-path (plan §3.4) — never sends a
+         *     customer-visible article, regardless of the queue's autonomy setting.
          */
         post: operations["request_manual_draft_api_v1_tickets__ticket_id__ai_draft_post"];
         delete?: never;
@@ -6908,6 +6915,14 @@ export interface components {
             last_summary_upto_article_id: number | null;
             /** Manual Assist Available */
             manual_assist_available: boolean;
+            /** Manual Run Error Code */
+            manual_run_error_code?: string | null;
+            /** Manual Run Notes */
+            manual_run_notes?: string | null;
+            /** Manual Run Started At */
+            manual_run_started_at?: string | null;
+            /** Manual Run Status */
+            manual_run_status?: string | null;
             /** Operation Mode Ready */
             operation_mode_ready: boolean;
             /** Summary Available */
@@ -27064,7 +27079,7 @@ export interface operations {
         requestBody?: never;
         responses: {
             /** @description Successful Response */
-            201: {
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };
