@@ -268,7 +268,11 @@ export function AiPanel({
   // checks below.
   const isMyRun =
     myRunStartedAt != null && state.manual_run_started_at === myRunStartedAt;
-  const manualRunActive = isMyRun && state.manual_run_status === "running";
+  // A run in "running" state is CURRENT, not stale — show the spinner text
+  // and block the button for every session (also after a page reload),
+  // regardless of who started it. Only the terminal skipped/error results
+  // stay gated to the starting panel instance via `isMyRun`.
+  const manualRunActive = state.manual_run_status === "running";
   const manualRunSkipped =
     isMyRun &&
     (state.manual_run_status === "skipped" ||

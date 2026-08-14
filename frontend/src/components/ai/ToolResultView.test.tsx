@@ -26,6 +26,19 @@ describe("ToolResultBody", () => {
     expect(screen.getByText(/"provider"/)).toBeInTheDocument();
   });
 
+  it("parses JSON with unquoted PII mask tokens in value position", () => {
+    render(
+      <ToolResultBody
+        content={`${PREFIX}{"user": {"free_traffic": [PHONE_2], "pkz": 777777, "comment": "call [PHONE_1]:22"}}`}
+      />,
+    );
+    // Structured rendering, not the plain-text fallback:
+    expect(screen.getByText(/"free_traffic"/)).toBeInTheDocument();
+    expect(screen.getByText(/\[PHONE_2\]/)).toBeInTheDocument();
+    // Token inside a string value stays part of that string untouched.
+    expect(screen.getByText(/call \[PHONE_1\]:22/)).toBeInTheDocument();
+  });
+
   it("strips the prefix from non-JSON text results", () => {
     render(<ToolResultBody content={`${PREFIX}no connection found`} />);
     expect(
