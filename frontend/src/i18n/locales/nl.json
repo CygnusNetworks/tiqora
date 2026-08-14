@@ -966,7 +966,15 @@
           "detailed": "Gedetailleerd"
         },
         "kbCategories": "KB-categorieën",
-        "kbCategoriesEmpty": "Geen categorieën beschikbaar."
+        "kbCategoriesEmpty": "Geen categorieën beschikbaar.",
+        "llmFallback": "Fallback providers",
+        "fallbackAdd": "Add fallback",
+        "fallbackEmpty": "No fallback providers — the primary provider above is used exclusively.",
+        "fallbackMoveUp": "Move up",
+        "fallbackMoveDown": "Move down",
+        "fallbackRemove": "Remove",
+        "clarifySchemaJson": "Clarify schema fields (JSON)",
+        "clarifySchemaJsonPlaceholder": "{\"fields\": [{\"column\": \"wpnum\", \"label\": \"WP-Nummer\"}]}"
       },
       "usage": {
         "title": "Gebruik",
@@ -1138,7 +1146,8 @@
         "replyLanguageDefault": "BCP-47 taalcode gebruikt in de \"Auto\"-modus wanneer de tekst niet met zekerheid kan worden gekoppeld aan een bekend taalprofiel.",
         "allowedStateTypes": "Door komma's gescheiden lijst met toegestane Znuny statustypen (bijvoorbeeld \"open\" of \"open, in afwachting van herinnering\") waarop AI een ticket kan instellen via update_ticket_fields - afgedwongen voor zowel de staatsnaam als de numerieke status-ID. Leeg = standaard alleen \"open\" (heropenen toegestaan, nooit sluiten); een expliciete lege lijst \"[]\" schakelt statuswijzigingen volledig uit.",
         "piiNer": "Detecteert persoonsnamen in tekst via spaCy NER (Duits + Engels) en maskeert deze als [NAME_n] voordat de inhoud de LLM provider bereikt — naast de klantnaam en afzenders. Alleen actief als PII-maskering is ingeschakeld. Valse positieven zijn onschadelijk (alleen meer maskering).",
-        "summaryDetail": "Standaard: compacte alinea's, 1 à 2 zinnen per bijgevoegd document. Gedetailleerd: uitgebreidere alinea's en 3-5 zinnen per document — handig voor wachtrijen met veel PDF bijlagen."
+        "summaryDetail": "Standaard: compacte alinea's, 1 à 2 zinnen per bijgevoegd document. Gedetailleerd: uitgebreidere alinea's en 3-5 zinnen per document — handig voor wachtrijen met veel PDF bijlagen.",
+        "llmFallback": "Providers tried in order, after the primary provider above, when a request fails (rate limit, timeout, error). Each entry has its own optional model override. Priority 1 is always the primary provider/model; entries here are priority 2, 3, …."
       },
       "common": {
         "validId": "Geldig/ongeldig is een vlag voor zacht verwijderen: als u een invoer als ongeldig markeert, wordt deze verborgen voor kiezers voor nieuwe records zonder bestaande referenties (bijvoorbeeld tickets, opdrachten) te verwijderen. Er is geen harde verwijdering."

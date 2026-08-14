@@ -966,7 +966,15 @@
           "detailed": "به تفصیل"
         },
         "kbCategories": "دسته بندی کیلوبایت",
-        "kbCategoriesEmpty": "هیچ دسته ای در دسترس نیست."
+        "kbCategoriesEmpty": "هیچ دسته ای در دسترس نیست.",
+        "llmFallback": "Fallback providers",
+        "fallbackAdd": "Add fallback",
+        "fallbackEmpty": "No fallback providers — the primary provider above is used exclusively.",
+        "fallbackMoveUp": "Move up",
+        "fallbackMoveDown": "Move down",
+        "fallbackRemove": "Remove",
+        "clarifySchemaJson": "Clarify schema fields (JSON)",
+        "clarifySchemaJsonPlaceholder": "{\"fields\": [{\"column\": \"wpnum\", \"label\": \"WP-Nummer\"}]}"
       },
       "usage": {
         "title": "استفاده",
@@ -1138,7 +1146,8 @@
         "replyLanguageDefault": "کد زبان BCP-47 در حالت «خودکار» استفاده می‌شود که متن را نمی‌توان به‌طور مطمئن با نمایه زبان شناخته‌شده مطابقت داد.",
         "allowedStateTypes": "فهرستی از انواع حالت مجاز Znuny جدا شده با کاما (به عنوان مثال \"باز\" یا \"باز، در انتظار یادآوری\") ممکن است هوش مصنوعی بلیطی را از طریق update_ticket_fields تنظیم کند - هم برای نام ایالت و هم برای شناسه حالت عددی اعمال می شود. Empty = پیش فرض \"باز\" ​​فقط (باز کردن مجدد مجاز است، هرگز بسته نمی شود). یک لیست خالی صریح \"[]\" تغییرات حالت را به طور کامل غیرفعال می کند.",
         "piiNer": "نام افراد را در متن از طریق spaCy NER (آلمانی + انگلیسی) تشخیص می‌دهد و قبل از اینکه محتوا به ارائه‌دهنده LLM برسد - علاوه بر نام مشتری و فرستنده، آنها را به عنوان [NAME_n] پنهان می‌کند. فقط زمانی فعال است که پوشش PII روشن باشد. مثبت کاذب بی ضرر هستند (فقط پوشاندن بیشتر).",
-        "summaryDetail": "استاندارد: پاراگراف های فشرده، 1 تا 2 جمله در هر سند پیوست. جزئیات: پاراگراف های دقیق تر و 3 تا 5 جمله در هر سند - برای صف هایی با پیوست های PDF بسیار مفید است."
+        "summaryDetail": "استاندارد: پاراگراف های فشرده، 1 تا 2 جمله در هر سند پیوست. جزئیات: پاراگراف های دقیق تر و 3 تا 5 جمله در هر سند - برای صف هایی با پیوست های PDF بسیار مفید است.",
+        "llmFallback": "Providers tried in order, after the primary provider above, when a request fails (rate limit, timeout, error). Each entry has its own optional model override. Priority 1 is always the primary provider/model; entries here are priority 2, 3, …."
       },
       "common": {
         "validId": "معتبر/نامعتبر یک پرچم حذف نرم است: با علامت گذاری یک ورودی به عنوان نامعتبر، بدون حذف مراجع موجود (به عنوان مثال بلیط، تکالیف) آن را از انتخاب کنندگان برای رکوردهای جدید پنهان می کند. حذف سخت وجود ندارد."

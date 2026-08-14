@@ -966,7 +966,15 @@
           "detailed": "Detaljerad"
         },
         "kbCategories": "KB-kategorier",
-        "kbCategoriesEmpty": "Inga kategorier tillgängliga."
+        "kbCategoriesEmpty": "Inga kategorier tillgängliga.",
+        "llmFallback": "Fallback providers",
+        "fallbackAdd": "Add fallback",
+        "fallbackEmpty": "No fallback providers — the primary provider above is used exclusively.",
+        "fallbackMoveUp": "Move up",
+        "fallbackMoveDown": "Move down",
+        "fallbackRemove": "Remove",
+        "clarifySchemaJson": "Clarify schema fields (JSON)",
+        "clarifySchemaJsonPlaceholder": "{\"fields\": [{\"column\": \"wpnum\", \"label\": \"WP-Nummer\"}]}"
       },
       "usage": {
         "title": "Användning",
@@ -1138,7 +1146,8 @@
         "replyLanguageDefault": "BCP-47-språkkod som används i läget \"Auto\" när texten inte säkert kan matchas mot en känd språkprofil.",
         "allowedStateTypes": "Kommaseparerad lista över tillåtna Znuny-statustyper (t.ex. \"open\" eller \"open,pending reminder\") som AI:n får sätta via update_ticket_fields — gäller både statusnamn och numeriskt status-id. Tomt = standard bara \"open\" (återöppning tillåten, aldrig stängning); en explicit tom lista \"[]\" inaktiverar statusändringar helt.",
         "piiNer": "Identifierar personnamn i text via spaCy NER (tyska + engelska) och maskar dem som [NAME_n] innan innehållet når LLM-leverantören — utöver kundnamn och avsändare. Aktiv bara när PII-maskning är på. Falska positiva är ofarliga (bara mer maskning).",
-        "summaryDetail": "Standard: kompakta stycken, 1–2 meningar per bifogat dokument. Detaljerad: mer grundliga stycken och 3–5 meningar per dokument — användbart för köer med många PDF-bilagor."
+        "summaryDetail": "Standard: kompakta stycken, 1–2 meningar per bifogat dokument. Detaljerad: mer grundliga stycken och 3–5 meningar per dokument — användbart för köer med många PDF-bilagor.",
+        "llmFallback": "Providers tried in order, after the primary provider above, when a request fails (rate limit, timeout, error). Each entry has its own optional model override. Priority 1 is always the primary provider/model; entries here are priority 2, 3, …."
       },
       "common": {
         "validId": "Giltig/ogiltig är en mjuk raderingsflagga: att markera en post som ogiltig döljer den från väljare för nya poster utan att ta bort befintliga referenser (t.ex. ärenden, tilldelningar). Det finns ingen hård radering."

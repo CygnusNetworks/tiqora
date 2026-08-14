@@ -966,7 +966,15 @@
           "detailed": "상세한"
         },
         "kbCategories": "KB 카테고리",
-        "kbCategoriesEmpty": "사용 가능한 카테고리가 없습니다."
+        "kbCategoriesEmpty": "사용 가능한 카테고리가 없습니다.",
+        "llmFallback": "Fallback providers",
+        "fallbackAdd": "Add fallback",
+        "fallbackEmpty": "No fallback providers — the primary provider above is used exclusively.",
+        "fallbackMoveUp": "Move up",
+        "fallbackMoveDown": "Move down",
+        "fallbackRemove": "Remove",
+        "clarifySchemaJson": "Clarify schema fields (JSON)",
+        "clarifySchemaJsonPlaceholder": "{\"fields\": [{\"column\": \"wpnum\", \"label\": \"WP-Nummer\"}]}"
       },
       "usage": {
         "title": "사용법",
@@ -1138,7 +1146,8 @@
         "replyLanguageDefault": "텍스트가 알려진 언어 프로필과 확실하게 일치할 수 없는 경우 \"자동\" 모드에서 사용되는 BCP-47 언어 코드입니다.",
         "allowedStateTypes": "AI가 update_ticket_fields를 통해 티켓을 설정할 수 있는 허용된 Znuny 상태 유형(예: \"열림\" 또는 \"열림, 보류 중인 알림\")의 쉼표로 구분된 목록 — 주 이름과 숫자로 된 주 ID 모두에 대해 시행됩니다. 비어 있음 = 기본적으로 \"열기\"만 가능(다시 열기는 허용, 절대 닫지 않음); 명시적인 빈 목록 \"[]\"은 상태 변경을 완전히 비활성화합니다.",
         "piiNer": "spaCy NER(독일어 + 영어)를 통해 텍스트에서 사람 이름을 감지하고 콘텐츠가 고객 이름 및 발신자 외에도 LLM 제공업체에 도달하기 전에 [NAME_n]으로 마스크합니다. PII 마스킹이 켜져 있을 때만 활성화됩니다. 거짓 긍정은 무해합니다(단지 더 많은 마스킹을 제공할 뿐입니다).",
-        "summaryDetail": "표준: 간결한 단락, 첨부 문서당 1~2문장. 상세함: 더 자세한 단락과 문서당 3~5개의 문장 — PDF 첨부 파일이 많은 대기열에 유용합니다."
+        "summaryDetail": "표준: 간결한 단락, 첨부 문서당 1~2문장. 상세함: 더 자세한 단락과 문서당 3~5개의 문장 — PDF 첨부 파일이 많은 대기열에 유용합니다.",
+        "llmFallback": "Providers tried in order, after the primary provider above, when a request fails (rate limit, timeout, error). Each entry has its own optional model override. Priority 1 is always the primary provider/model; entries here are priority 2, 3, …."
       },
       "common": {
         "validId": "유효/무효는 일시 삭제 플래그입니다. 유효하지 않은 항목을 표시하면 기존 참조(예: 티켓, 할당)를 삭제하지 않고 새 레코드 선택기에서 해당 항목이 숨겨집니다. 하드 삭제가 없습니다."

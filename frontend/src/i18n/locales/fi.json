@@ -966,7 +966,15 @@
           "detailed": "Yksityiskohtainen"
         },
         "kbCategories": "KB-luokat",
-        "kbCategoriesEmpty": "Luokkia ei ole saatavilla."
+        "kbCategoriesEmpty": "Luokkia ei ole saatavilla.",
+        "llmFallback": "Fallback providers",
+        "fallbackAdd": "Add fallback",
+        "fallbackEmpty": "No fallback providers — the primary provider above is used exclusively.",
+        "fallbackMoveUp": "Move up",
+        "fallbackMoveDown": "Move down",
+        "fallbackRemove": "Remove",
+        "clarifySchemaJson": "Clarify schema fields (JSON)",
+        "clarifySchemaJsonPlaceholder": "{\"fields\": [{\"column\": \"wpnum\", \"label\": \"WP-Nummer\"}]}"
       },
       "usage": {
         "title": "Käyttö",
@@ -1138,7 +1146,8 @@
         "replyLanguageDefault": "BCP-47-kielikoodia käytetään \"Auto\"-tilassa, kun tekstiä ei voida varmasti sovittaa tunnettuun kieliprofiiliin.",
         "allowedStateTypes": "Pilkuilla eroteltu luettelo sallituista Znuny-tilatyypeistä (esim. \"avoin\" tai \"avoin, odottava muistutus\"), AI voi asettaa lipun update_ticket_fields -kenttien kautta - pakotetaan sekä tilan nimelle että numeeriselle tilatunnukselle. Tyhjä = oletuksena vain \"avoin\" (uudelleenavautuminen sallittu, ei koskaan sulkemista); selkeä tyhjä luettelo \"[]\" poistaa tilan muutokset kokonaan käytöstä.",
         "piiNer": "Havaitsee henkilöiden nimet tekstistä spaCy NER:n (saksa + englanti) kautta ja maskaa ne [NAME_n], ennen kuin sisältö saavuttaa LLM-palveluntarjoajan – asiakkaan nimen ja lähettäjien lisäksi. Aktiivinen vain, kun henkilötietojen peittäminen on käytössä. Väärät positiiviset ovat vaarattomia (vain enemmän peittämistä).",
-        "summaryDetail": "Vakio: tiiviit kappaleet, 1–2 lausetta per liiteasiakirja. Yksityiskohtaiset: perusteellisemmat kappaleet ja 3–5 lausetta asiakirjaa kohden – hyödyllinen jonoissa, joissa on monia PDF-liitteitä."
+        "summaryDetail": "Vakio: tiiviit kappaleet, 1–2 lausetta per liiteasiakirja. Yksityiskohtaiset: perusteellisemmat kappaleet ja 3–5 lausetta asiakirjaa kohden – hyödyllinen jonoissa, joissa on monia PDF-liitteitä.",
+        "llmFallback": "Providers tried in order, after the primary provider above, when a request fails (rate limit, timeout, error). Each entry has its own optional model override. Priority 1 is always the primary provider/model; entries here are priority 2, 3, …."
       },
       "common": {
         "validId": "Kelvollinen/virheellinen on pehmeän poiston lippu: merkinnän merkitseminen virheelliseksi piilottaa sen uusien tietueiden poimijilta poistamatta olemassa olevia viitteitä (esim. liput, tehtävät). Kovaa poistamista ei ole."

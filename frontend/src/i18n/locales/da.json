@@ -966,7 +966,15 @@
           "detailed": "Detaljeret"
         },
         "kbCategories": "KB kategorier",
-        "kbCategoriesEmpty": "Ingen tilgængelige kategorier."
+        "kbCategoriesEmpty": "Ingen tilgængelige kategorier.",
+        "llmFallback": "Fallback providers",
+        "fallbackAdd": "Add fallback",
+        "fallbackEmpty": "No fallback providers — the primary provider above is used exclusively.",
+        "fallbackMoveUp": "Move up",
+        "fallbackMoveDown": "Move down",
+        "fallbackRemove": "Remove",
+        "clarifySchemaJson": "Clarify schema fields (JSON)",
+        "clarifySchemaJsonPlaceholder": "{\"fields\": [{\"column\": \"wpnum\", \"label\": \"WP-Nummer\"}]}"
       },
       "usage": {
         "title": "Brug",
@@ -1138,7 +1146,8 @@
         "replyLanguageDefault": "BCP-47 sprogkode bruges i \"Auto\"-tilstand, når teksten ikke kan matches sikkert til en kendt sprogprofil.",
         "allowedStateTypes": "Kommasepareret liste over tilladte Znuny-tilstandstyper (f.eks. \"åben\" eller \"åben, afventer påmindelse\"), som AI kan indstille en billet til via update_ticket_fields - håndhævet for både tilstandsnavnet og det numeriske tilstands-id. Tom = standard kun \"åben\" (genåbning tilladt, lukker aldrig); en eksplicit tom liste \"[]\" deaktiverer tilstandsændringer helt.",
         "piiNer": "Registrerer personnavne i tekst via spaCy NER (tysk + engelsk) og maskerer dem som [NAME_n], før indhold når LLM-udbyderen – ud over kundenavn og afsendere. Kun aktiv, når PII-maskering er aktiveret. Falske positiver er harmløse (bare mere maskering).",
-        "summaryDetail": "Standard: kompakte afsnit, 1-2 sætninger pr. vedhæftet dokument. Detaljeret: mere grundige afsnit og 3-5 sætninger pr. dokument — nyttigt til køer med mange PDF-vedhæftninger."
+        "summaryDetail": "Standard: kompakte afsnit, 1-2 sætninger pr. vedhæftet dokument. Detaljeret: mere grundige afsnit og 3-5 sætninger pr. dokument — nyttigt til køer med mange PDF-vedhæftninger.",
+        "llmFallback": "Providers tried in order, after the primary provider above, when a request fails (rate limit, timeout, error). Each entry has its own optional model override. Priority 1 is always the primary provider/model; entries here are priority 2, 3, …."
       },
       "common": {
         "validId": "Gyldig/ugyldig er et soft-delete-flag: markering af en post ugyldig skjuler den for vælgere til nye poster uden at slette eksisterende referencer (f.eks. billetter, opgaver). Der er ingen hård sletning."

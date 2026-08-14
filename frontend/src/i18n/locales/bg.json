@@ -966,7 +966,15 @@
           "detailed": "Подробно"
         },
         "kbCategories": "KB категории",
-        "kbCategoriesEmpty": "Няма налични категории."
+        "kbCategoriesEmpty": "Няма налични категории.",
+        "llmFallback": "Fallback providers",
+        "fallbackAdd": "Add fallback",
+        "fallbackEmpty": "No fallback providers — the primary provider above is used exclusively.",
+        "fallbackMoveUp": "Move up",
+        "fallbackMoveDown": "Move down",
+        "fallbackRemove": "Remove",
+        "clarifySchemaJson": "Clarify schema fields (JSON)",
+        "clarifySchemaJsonPlaceholder": "{\"fields\": [{\"column\": \"wpnum\", \"label\": \"WP-Nummer\"}]}"
       },
       "usage": {
         "title": "Използване",
@@ -1138,7 +1146,8 @@
         "replyLanguageDefault": "BCP-47 езиков код, използван в режим \"Автоматичен\", когато текстът не може да бъде надеждно съпоставен с известен езиков профил.",
         "allowedStateTypes": "Разделен със запетаи списък с позволени типове състояния на Znuny (напр. „отворено“ или „отворено, чакащо напомняне“), към които AI може да зададе билет чрез update_ticket_fields — прилага се както за името на състоянието, така и за цифровия идентификатор на състоянието. Празно = само \"отворено\" по подразбиране (разрешено е повторно отваряне, никога не се затваря); изричен празен списък \"[]\" забранява изцяло промените в състоянието.",
         "piiNer": "Открива имена на хора в текст чрез spaCy NER (немски + английски) и ги маскира като [NAME_n], преди съдържанието да достигне до доставчика на LLM — в допълнение към името на клиента и подателите. Активен само когато маскирането на PII е включено. Фалшивите положителни резултати са безвредни (просто повече маскиране).",
-        "summaryDetail": "Стандартно: компактни абзаци, 1–2 изречения на прикачен документ. Подробно: по-задълбочени параграфи и 3–5 изречения на документ — полезно за опашки с много PDF прикачени файлове."
+        "summaryDetail": "Стандартно: компактни абзаци, 1–2 изречения на прикачен документ. Подробно: по-задълбочени параграфи и 3–5 изречения на документ — полезно за опашки с много PDF прикачени файлове.",
+        "llmFallback": "Providers tried in order, after the primary provider above, when a request fails (rate limit, timeout, error). Each entry has its own optional model override. Priority 1 is always the primary provider/model; entries here are priority 2, 3, …."
       },
       "common": {
         "validId": "Valid/Invalid е флаг за плавно изтриване: маркирането на запис като невалиден го скрива от инструментите за избор на нови записи, без да изтрива съществуващи препратки (напр. билети, задачи). Няма твърдо изтриване."

@@ -966,7 +966,15 @@
           "detailed": "Detallat"
         },
         "kbCategories": "Categories KB",
-        "kbCategoriesEmpty": "No hi ha categories disponibles."
+        "kbCategoriesEmpty": "No hi ha categories disponibles.",
+        "llmFallback": "Fallback providers",
+        "fallbackAdd": "Add fallback",
+        "fallbackEmpty": "No fallback providers — the primary provider above is used exclusively.",
+        "fallbackMoveUp": "Move up",
+        "fallbackMoveDown": "Move down",
+        "fallbackRemove": "Remove",
+        "clarifySchemaJson": "Clarify schema fields (JSON)",
+        "clarifySchemaJsonPlaceholder": "{\"fields\": [{\"column\": \"wpnum\", \"label\": \"WP-Nummer\"}]}"
       },
       "usage": {
         "title": "Ús",
@@ -1138,7 +1146,8 @@
         "replyLanguageDefault": "Codi d'idioma BCP-47 utilitzat en el mode \"Automàtic\" quan el text no es pot relacionar amb seguretat amb un perfil d'idioma conegut.",
         "allowedStateTypes": "Llista separada per comes de tipus d'estat Znuny permesos (per exemple, \"obert\" o \"obert, recordatori pendent\"), l'IA pot establir un bitllet mitjançant update_ticket_fields, que s'aplica tant per al nom de l'estat com per a l'identificador numèric de l'estat. Buit = només \"obert\" per defecte (reobertura permesa, mai tancar); una llista buida explícita \"[]\" desactiva completament els canvis d'estat.",
         "piiNer": "Detecta els noms de les persones al text mitjançant spaCy NER (alemany + anglès) i els emmascara com a [NAME_n] abans que el contingut arribi al proveïdor de LLM, a més del nom del client i dels remitents. Només està actiu quan l'emmascarament de PII està activat. Els falsos positius són inofensius (només més emmascarament).",
-        "summaryDetail": "Estàndard: paràgrafs compactes, 1–2 frases per document adjunt. Detallat: paràgrafs més detallats i de 3 a 5 frases per document, útil per a les cues amb molts fitxers adjunts PDF."
+        "summaryDetail": "Estàndard: paràgrafs compactes, 1–2 frases per document adjunt. Detallat: paràgrafs més detallats i de 3 a 5 frases per document, útil per a les cues amb molts fitxers adjunts PDF.",
+        "llmFallback": "Providers tried in order, after the primary provider above, when a request fails (rate limit, timeout, error). Each entry has its own optional model override. Priority 1 is always the primary provider/model; entries here are priority 2, 3, …."
       },
       "common": {
         "validId": "Vàlid/no vàlid és una marca d'eliminació suau: marcar una entrada com a vàlida l'amaga als seleccionadors de registres nous sense esborrar les referències existents (per exemple, bitllets, tasques). No hi ha una eliminació difícil."

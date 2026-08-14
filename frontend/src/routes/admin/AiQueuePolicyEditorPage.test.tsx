@@ -365,4 +365,214 @@ describe("AiQueuePolicyEditorPage", () => {
       );
     });
   });
+
+  it("adds a fallback provider entry and saves it as llm_fallback_json", async () => {
+    listProviders.mockResolvedValue({
+      items: [
+        { id: 7, name: "Nebius" },
+        { id: 8, name: "OpenAI" },
+      ],
+      total: 2,
+      page: 1,
+      page_size: 2,
+    });
+    updateQueuePolicy.mockResolvedValue(samplePolicy);
+    renderEdit();
+    await waitFor(() => expect(screen.getByTestId("admin-ai-queue-form-system_prompt")).toBeInTheDocument());
+
+    expect(screen.getByTestId("admin-ai-queue-fallback-section")).toHaveTextContent(
+      "No fallback providers",
+    );
+    fireEvent.click(screen.getByTestId("admin-ai-queue-fallback-add"));
+
+    fireEvent.click(screen.getByTestId("admin-ai-queue-fallback-provider-0"));
+    fireEvent.click(
+      await screen.findByTestId("admin-ai-queue-fallback-provider-0-panel-option-8"),
+    );
+    fireEvent.change(screen.getByTestId("admin-ai-queue-fallback-model-0"), {
+      target: { value: "gpt-4o-mini" },
+    });
+
+    fireEvent.click(screen.getByTestId("admin-ai-queue-editor-save"));
+
+    await waitFor(() => {
+      expect(updateQueuePolicy).toHaveBeenCalledWith(
+        1,
+        expect.objectContaining({
+          llm_fallback_json: JSON.stringify([
+            { provider_id: 8, model: "gpt-4o-mini" },
+          ]),
+        }),
+      );
+    });
+  });
+
+  it("reorders fallback entries with the move-down button", async () => {
+    listProviders.mockResolvedValue({
+      items: [
+        { id: 7, name: "Nebius" },
+        { id: 8, name: "OpenAI" },
+      ],
+      total: 2,
+      page: 1,
+      page_size: 2,
+    });
+    listQueuePolicies.mockResolvedValue({
+      items: [
+        {
+          ...samplePolicy,
+          llm_fallback_json: JSON.stringify([
+            { provider_id: 7, model: null },
+            { provider_id: 8, model: "gpt-4o-mini" },
+          ]),
+        },
+      ],
+      total: 1,
+      page: 1,
+      page_size: 1,
+    });
+    updateQueuePolicy.mockResolvedValue(samplePolicy);
+    renderEdit();
+    await waitFor(() =>
+      expect(screen.getByTestId("admin-ai-queue-fallback-row-0")).toBeInTheDocument(),
+    );
+    expect(screen.getByTestId("admin-ai-queue-fallback-provider-0")).toHaveTextContent(
+      "Nebius",
+    );
+    expect(screen.getByTestId("admin-ai-queue-fallback-provider-1")).toHaveTextContent(
+      "OpenAI",
+    );
+
+    fireEvent.click(screen.getByTestId("admin-ai-queue-fallback-down-0"));
+
+    expect(screen.getByTestId("admin-ai-queue-fallback-provider-0")).toHaveTextContent(
+      "OpenAI",
+    );
+    expect(screen.getByTestId("admin-ai-queue-fallback-provider-1")).toHaveTextContent(
+      "Nebius",
+    );
+
+    fireEvent.click(screen.getByTestId("admin-ai-queue-editor-save"));
+
+    await waitFor(() => {
+      expect(updateQueuePolicy).toHaveBeenCalledWith(
+        1,
+        expect.objectContaining({
+          llm_fallback_json: JSON.stringify([
+            { provider_id: 8, model: "gpt-4o-mini" },
+            { provider_id: 7, model: null },
+          ]),
+        }),
+      );
+    });
+  });
+
+  it("removes the last fallback entry, saving llm_fallback_json as null", async () => {
+    listProviders.mockResolvedValue({
+      items: [{ id: 7, name: "Nebius" }],
+      total: 1,
+      page: 1,
+      page_size: 1,
+    });
+    listQueuePolicies.mockResolvedValue({
+      items: [
+        {
+          ...samplePolicy,
+          llm_fallback_json: JSON.stringify([{ provider_id: 7, model: null }]),
+        },
+      ],
+      total: 1,
+      page: 1,
+      page_size: 1,
+    });
+    updateQueuePolicy.mockResolvedValue(samplePolicy);
+    renderEdit();
+    await waitFor(() =>
+      expect(screen.getByTestId("admin-ai-queue-fallback-row-0")).toBeInTheDocument(),
+    );
+
+    fireEvent.click(screen.getByTestId("admin-ai-queue-fallback-remove-0"));
+    expect(screen.getByTestId("admin-ai-queue-fallback-section")).toHaveTextContent(
+      "No fallback providers",
+    );
+
+    fireEvent.click(screen.getByTestId("admin-ai-queue-editor-save"));
+
+    await waitFor(() => {
+      expect(updateQueuePolicy).toHaveBeenCalledWith(
+        1,
+        expect.objectContaining({ llm_fallback_json: null }),
+      );
+    });
+  });
+
+  it("resets to an empty fallback list and warns instead of crashing on malformed stored llm_fallback_json", async () => {
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    listQueuePolicies.mockResolvedValue({
+      items: [{ ...samplePolicy, llm_fallback_json: "{not valid json" }],
+      total: 1,
+      page: 1,
+      page_size: 1,
+    });
+    renderEdit();
+
+    await waitFor(() =>
+      expect(screen.getByTestId("admin-ai-queue-fallback-section")).toBeInTheDocument(),
+    );
+    expect(screen.getByTestId("admin-ai-queue-fallback-section")).toHaveTextContent(
+      "No fallback providers",
+    );
+    expect(warnSpy).toHaveBeenCalled();
+    warnSpy.mockRestore();
+  });
+
+  it("shows clarify_schema_json only when identity_mode is clarify_schema", async () => {
+    renderEdit();
+    await waitFor(() => expect(screen.getByTestId("admin-ai-queue-form-system_prompt")).toBeInTheDocument());
+    fireEvent.click(screen.getByText("Safety"));
+
+    expect(
+      screen.queryByTestId("admin-ai-queue-form-clarify_schema_json"),
+    ).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId("admin-ai-queue-form-identity_mode"));
+    fireEvent.click(
+      await screen.findByTestId(
+        "admin-ai-queue-form-identity_mode-panel-option-clarify_schema",
+      ),
+    );
+
+    expect(
+      screen.getByTestId("admin-ai-queue-form-clarify_schema_json"),
+    ).toBeInTheDocument();
+  });
+
+  it("shows a 422 validation error message for an invalid clarify_schema_json", async () => {
+    updateQueuePolicy.mockRejectedValue(
+      new ApiError(422, "clarify_schema_json: invalid schema", "/admin/ai/queue-policies/1"),
+    );
+    listQueuePolicies.mockResolvedValue({
+      items: [{ ...samplePolicy, identity_mode: "clarify_schema" }],
+      total: 1,
+      page: 1,
+      page_size: 1,
+    });
+    renderEdit();
+    await waitFor(() => expect(screen.getByTestId("admin-ai-queue-form-system_prompt")).toBeInTheDocument());
+    fireEvent.click(screen.getByText("Safety"));
+    await waitFor(() =>
+      expect(screen.getByTestId("admin-ai-queue-form-clarify_schema_json")).toBeInTheDocument(),
+    );
+
+    fireEvent.change(screen.getByTestId("admin-ai-queue-form-clarify_schema_json"), {
+      target: { value: '{"fields": [{"column": "wpnum"}]}' },
+    });
+    fireEvent.click(screen.getByTestId("admin-ai-queue-editor-save"));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("admin-ai-queue-editor-error").textContent).toMatch(
+        /clarify_schema_json/,
+      );
+    });
+  });
 });

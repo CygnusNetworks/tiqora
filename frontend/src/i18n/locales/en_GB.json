@@ -966,7 +966,15 @@
           "detailed": "Detailed"
         },
         "kbCategories": "KB categories",
-        "kbCategoriesEmpty": "No categories available."
+        "kbCategoriesEmpty": "No categories available.",
+        "llmFallback": "Fallback providers",
+        "fallbackAdd": "Add fallback",
+        "fallbackEmpty": "No fallback providers — the primary provider above is used exclusively.",
+        "fallbackMoveUp": "Move up",
+        "fallbackMoveDown": "Move down",
+        "fallbackRemove": "Remove",
+        "clarifySchemaJson": "Clarify schema fields (JSON)",
+        "clarifySchemaJsonPlaceholder": "{\"fields\": [{\"column\": \"wpnum\", \"label\": \"WP-Nummer\"}]}"
       },
       "usage": {
         "title": "Usage",
@@ -1138,7 +1146,8 @@
         "replyLanguageDefault": "BCP-47 language code used in \"Auto\" mode when the text cannot be confidently matched to a known language profile.",
         "allowedStateTypes": "Comma-separated list of allowed Znuny state types (e.g. \"open\" or \"open,pending reminder\") the AI may set a ticket to via update_ticket_fields — enforced for both the state name and the numeric state id. Empty = default \"open\" only (reopening allowed, never closing); an explicit empty list \"[]\" disables state changes entirely.",
         "piiNer": "Detects person names in text via spaCy NER (German + English) and masks them as [NAME_n] before content reaches the LLM provider — in addition to customer name and senders. Only active when PII masking is on. False positives are harmless (just more masking).",
-        "summaryDetail": "Standard: compact paragraphs, 1–2 sentences per attached document. Detailed: more thorough paragraphs and 3–5 sentences per document — useful for queues with many PDF attachments."
+        "summaryDetail": "Standard: compact paragraphs, 1–2 sentences per attached document. Detailed: more thorough paragraphs and 3–5 sentences per document — useful for queues with many PDF attachments.",
+        "llmFallback": "Providers tried in order, after the primary provider above, when a request fails (rate limit, timeout, error). Each entry has its own optional model override. Priority 1 is always the primary provider/model; entries here are priority 2, 3, …."
       },
       "common": {
         "validId": "Valid/invalid is a soft-delete flag: marking an entry invalid hides it from pickers for new records without deleting existing references (e.g. tickets, assignments). There is no hard delete."

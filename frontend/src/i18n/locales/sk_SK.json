@@ -966,7 +966,15 @@
           "detailed": "Podrobné"
         },
         "kbCategories": "kategórie KB",
-        "kbCategoriesEmpty": "Nie sú dostupné žiadne kategórie."
+        "kbCategoriesEmpty": "Nie sú dostupné žiadne kategórie.",
+        "llmFallback": "Fallback providers",
+        "fallbackAdd": "Add fallback",
+        "fallbackEmpty": "No fallback providers — the primary provider above is used exclusively.",
+        "fallbackMoveUp": "Move up",
+        "fallbackMoveDown": "Move down",
+        "fallbackRemove": "Remove",
+        "clarifySchemaJson": "Clarify schema fields (JSON)",
+        "clarifySchemaJsonPlaceholder": "{\"fields\": [{\"column\": \"wpnum\", \"label\": \"WP-Nummer\"}]}"
       },
       "usage": {
         "title": "Použitie",
@@ -1138,7 +1146,8 @@
         "replyLanguageDefault": "Kód jazyka BCP-47 sa používa v režime „Auto“, keď sa text nedá spoľahlivo priradiť k známemu jazykovému profilu.",
         "allowedStateTypes": "Čiarkami oddelený zoznam povolených typov stavov Znuny (napr. „otvorený“ alebo „otvorený, čaká na pripomenutie“), na ktorý môže AI nastaviť lístok cez pole update_ticket_fields – vynútené pre názov štátu aj číselné ID stavu. Prázdne = predvolené iba \"otvorené\" (opätovné otvorenie povolené, nikdy sa nezatvorí); explicitný prázdny zoznam \"[]\" úplne zakáže zmeny stavu.",
         "piiNer": "Zisťuje mená osôb v texte prostredníctvom spaCy NER (nemčina + angličtina) a maskuje ich ako [NAME_n] predtým, ako sa obsah dostane k poskytovateľovi LLM – okrem mena zákazníka a odosielateľov. Aktívne len vtedy, keď je zapnuté maskovanie PII. Falošné pozitíva sú neškodné (len viac maskovania).",
-        "summaryDetail": "Štandard: kompaktné odseky, 1–2 vety na priložený dokument. Podrobné: dôkladnejšie odseky a 3–5 viet na dokument – ​​užitočné pre fronty s mnohými prílohami PDF."
+        "summaryDetail": "Štandard: kompaktné odseky, 1–2 vety na priložený dokument. Podrobné: dôkladnejšie odseky a 3–5 viet na dokument – ​​užitočné pre fronty s mnohými prílohami PDF.",
+        "llmFallback": "Providers tried in order, after the primary provider above, when a request fails (rate limit, timeout, error). Each entry has its own optional model override. Priority 1 is always the primary provider/model; entries here are priority 2, 3, …."
       },
       "common": {
         "validId": "Platný/neplatný je príznak mäkkého vymazania: označenie položky za neplatnú ju skryje pred výberom nových záznamov bez vymazania existujúcich referencií (napr. lístkov, priradení). Neexistuje žiadne tvrdé odstránenie."

@@ -966,7 +966,15 @@
           "detailed": "Terperinci"
         },
         "kbCategories": "kategori KB",
-        "kbCategoriesEmpty": "Tiada kategori tersedia."
+        "kbCategoriesEmpty": "Tiada kategori tersedia.",
+        "llmFallback": "Fallback providers",
+        "fallbackAdd": "Add fallback",
+        "fallbackEmpty": "No fallback providers — the primary provider above is used exclusively.",
+        "fallbackMoveUp": "Move up",
+        "fallbackMoveDown": "Move down",
+        "fallbackRemove": "Remove",
+        "clarifySchemaJson": "Clarify schema fields (JSON)",
+        "clarifySchemaJsonPlaceholder": "{\"fields\": [{\"column\": \"wpnum\", \"label\": \"WP-Nummer\"}]}"
       },
       "usage": {
         "title": "Penggunaan",
@@ -1138,7 +1146,8 @@
         "replyLanguageDefault": "Kod bahasa BCP-47 digunakan dalam mod \"Auto\" apabila teks tidak boleh dipadankan dengan penuh yakin dengan profil bahasa yang diketahui.",
         "allowedStateTypes": "Senarai yang dipisahkan koma bagi jenis keadaan Znuny yang dibenarkan (cth. \"terbuka\" atau \"terbuka, peringatan belum selesai\") AI boleh menetapkan tiket melalui update_ticket_fields — dikuatkuasakan untuk kedua-dua nama negeri dan id keadaan angka. Kosong = lalai \"terbuka\" sahaja (pembukaan semula dibenarkan, tidak pernah ditutup); senarai kosong eksplisit \"[]\" melumpuhkan perubahan keadaan sepenuhnya.",
         "piiNer": "Mengesan nama orang dalam teks melalui spaCy NER (Jerman + Inggeris) dan menyembunyikannya sebagai [NAME_n] sebelum kandungan sampai ke penyedia LLM — selain nama pelanggan dan pengirim. Hanya aktif apabila topeng PII dihidupkan. Positif palsu tidak berbahaya (hanya lebih menutupi).",
-        "summaryDetail": "Standard: perenggan padat, 1–2 ayat setiap dokumen yang dilampirkan. Terperinci: perenggan yang lebih teliti dan 3–5 ayat setiap dokumen — berguna untuk baris gilir dengan banyak lampiran PDF."
+        "summaryDetail": "Standard: perenggan padat, 1–2 ayat setiap dokumen yang dilampirkan. Terperinci: perenggan yang lebih teliti dan 3–5 ayat setiap dokumen — berguna untuk baris gilir dengan banyak lampiran PDF.",
+        "llmFallback": "Providers tried in order, after the primary provider above, when a request fails (rate limit, timeout, error). Each entry has its own optional model override. Priority 1 is always the primary provider/model; entries here are priority 2, 3, …."
       },
       "common": {
         "validId": "Sah/tidak sah ialah bendera padam lembut: menandakan masukan tidak sah menyembunyikannya daripada pemilih untuk rekod baharu tanpa memadamkan rujukan sedia ada (cth. tiket, tugasan). Tiada pemadaman keras."

@@ -966,7 +966,15 @@
           "detailed": "Üksikasjalik"
         },
         "kbCategories": "KB kategooriad",
-        "kbCategoriesEmpty": "Kategooriaid pole saadaval."
+        "kbCategoriesEmpty": "Kategooriaid pole saadaval.",
+        "llmFallback": "Fallback providers",
+        "fallbackAdd": "Add fallback",
+        "fallbackEmpty": "No fallback providers — the primary provider above is used exclusively.",
+        "fallbackMoveUp": "Move up",
+        "fallbackMoveDown": "Move down",
+        "fallbackRemove": "Remove",
+        "clarifySchemaJson": "Clarify schema fields (JSON)",
+        "clarifySchemaJsonPlaceholder": "{\"fields\": [{\"column\": \"wpnum\", \"label\": \"WP-Nummer\"}]}"
       },
       "usage": {
         "title": "Kasutamine",
@@ -1138,7 +1146,8 @@
         "replyLanguageDefault": "BCP-47 keelekood, mida kasutatakse režiimis \"Auto\", kui teksti ei saa kindlalt teadaoleva keeleprofiiliga sobitada.",
         "allowedStateTypes": "Lubatud Znuny olekutüüpide (nt \"avatud\" või \"avatud, ootel meeldetuletus\") komadega eraldatud loend võib AI määrata pileti väljade update_ticket_fields kaudu – jõustatakse nii oleku nime kui ka numbrilise oleku ID jaoks. Tühi = vaikimisi \"avatud\" (taasavamine lubatud, mitte kunagi sulgemine); selgesõnaline tühi loend \"[]\" keelab olekumuudatused täielikult.",
         "piiNer": "Tuvastab inimeste nimed tekstis spaCy NER (saksa + inglise keel) kaudu ja maskeerib need nimega [NAME_n], enne kui sisu jõuab LLM-i pakkujani – lisaks kliendi nimele ja saatjatele. Aktiivne ainult siis, kui PII maskeerimine on sisse lülitatud. Valepositiivsed tulemused on kahjutud (lihtsalt rohkem maskeerivad).",
-        "summaryDetail": "Standard: kompaktsed lõigud, 1–2 lauset lisatud dokumendi kohta. Üksikasjalikud: põhjalikumad lõigud ja 3–5 lauset dokumendi kohta – kasulik paljude PDF-manustega järjekordade puhul."
+        "summaryDetail": "Standard: kompaktsed lõigud, 1–2 lauset lisatud dokumendi kohta. Üksikasjalikud: põhjalikumad lõigud ja 3–5 lauset dokumendi kohta – kasulik paljude PDF-manustega järjekordade puhul.",
+        "llmFallback": "Providers tried in order, after the primary provider above, when a request fails (rate limit, timeout, error). Each entry has its own optional model override. Priority 1 is always the primary provider/model; entries here are priority 2, 3, …."
       },
       "common": {
         "validId": "Kehtiv/kehtetu on pehme kustutamise lipp: kirje kehtetuks märkimine peidab selle uute kirjete valijate eest ilma olemasolevaid viiteid (nt piletid, ülesanded) kustutamata. Rasket kustutamist pole."

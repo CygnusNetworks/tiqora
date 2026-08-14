@@ -966,7 +966,15 @@
           "detailed": "Detalhado"
         },
         "kbCategories": "Categorias da KB",
-        "kbCategoriesEmpty": "Nenhuma categoria disponível."
+        "kbCategoriesEmpty": "Nenhuma categoria disponível.",
+        "llmFallback": "Fallback providers",
+        "fallbackAdd": "Add fallback",
+        "fallbackEmpty": "No fallback providers — the primary provider above is used exclusively.",
+        "fallbackMoveUp": "Move up",
+        "fallbackMoveDown": "Move down",
+        "fallbackRemove": "Remove",
+        "clarifySchemaJson": "Clarify schema fields (JSON)",
+        "clarifySchemaJsonPlaceholder": "{\"fields\": [{\"column\": \"wpnum\", \"label\": \"WP-Nummer\"}]}"
       },
       "usage": {
         "title": "Uso",
@@ -1138,7 +1146,8 @@
         "replyLanguageDefault": "Código de idioma BCP-47 usado no modo \"Automático\" quando o texto não puder ser correspondente com confiança a um perfil de idioma conhecido.",
         "allowedStateTypes": "Lista separada por vírgula de tipos de estado Znuny permitidos (p. ex. \"open\" ou \"open,pending reminder\") que a AI pode definir em um ticket via update_ticket_fields — aplicado tanto ao nome do estado quanto ao id numérico. Vazio = padrão somente \"open\" (reabertura permitida, nunca fechamento); uma lista vazia explícita \"[]\" desativa alterações de estado por completo.",
         "piiNer": "Detecta nomes de pessoas no texto via spaCy NER (alemão + inglês) e os mascara como [NAME_n] antes do conteúdo chegar ao provedor LLM — além do nome do cliente e dos remetentes. Só ativo quando o mascaramento de PII está ligado. Falsos positivos são inofensivos (apenas mais mascaramento).",
-        "summaryDetail": "Padrão: parágrafos compactos, 1–2 frases por documento anexado. Detalhado: parágrafos mais completos e 3–5 frases por documento — útil para filas com muitos anexos PDF."
+        "summaryDetail": "Padrão: parágrafos compactos, 1–2 frases por documento anexado. Detalhado: parágrafos mais completos e 3–5 frases por documento — útil para filas com muitos anexos PDF.",
+        "llmFallback": "Providers tried in order, after the primary provider above, when a request fails (rate limit, timeout, error). Each entry has its own optional model override. Priority 1 is always the primary provider/model; entries here are priority 2, 3, …."
       },
       "common": {
         "validId": "Válido/inválido é um sinalizador de exclusão lógica: marcar uma entrada como inválida a oculta dos seletores de novos registros sem apagar referências existentes (p. ex. tickets, atribuições). Não há exclusão física."

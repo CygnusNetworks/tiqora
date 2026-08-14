@@ -966,7 +966,15 @@
           "detailed": "Detaliat"
         },
         "kbCategories": "categorii KB",
-        "kbCategoriesEmpty": "Nu există categorii disponibile."
+        "kbCategoriesEmpty": "Nu există categorii disponibile.",
+        "llmFallback": "Fallback providers",
+        "fallbackAdd": "Add fallback",
+        "fallbackEmpty": "No fallback providers — the primary provider above is used exclusively.",
+        "fallbackMoveUp": "Move up",
+        "fallbackMoveDown": "Move down",
+        "fallbackRemove": "Remove",
+        "clarifySchemaJson": "Clarify schema fields (JSON)",
+        "clarifySchemaJsonPlaceholder": "{\"fields\": [{\"column\": \"wpnum\", \"label\": \"WP-Nummer\"}]}"
       },
       "usage": {
         "title": "Utilizare",
@@ -1138,7 +1146,8 @@
         "replyLanguageDefault": "Codul de limbă BCP-47 utilizat în modul „Automat” atunci când textul nu poate fi asociat cu încredere unui profil de limbă cunoscut.",
         "allowedStateTypes": "Listă separată prin virgulă de tipuri de stări Znuny permise (de exemplu, „deschis” sau „deschis, memento în așteptare”) la care AI poate seta un bilet prin update_ticket_fields – aplicat atât pentru numele statului, cât și pentru id-ul numeric al stării. Gol = numai „deschis” implicit (redeschidere permisă, niciodată închidere); o listă explicită goală „[]” dezactivează complet schimbările de stare.",
         "piiNer": "Detectează numele persoanelor în text prin spaCy NER (germană + engleză) și le maschează ca [NAME_n] înainte ca conținutul să ajungă la furnizorul LLM - pe lângă numele clientului și expeditorii. Activ numai când mascarea PII este activată. Falsele pozitive sunt inofensive (doar mai multă mascare).",
-        "summaryDetail": "Standard: paragrafe compacte, 1–2 propoziții pentru fiecare document atașat. Detaliat: paragrafe mai detaliate și 3–5 propoziții per document — util pentru cozile cu multe atașamente PDF."
+        "summaryDetail": "Standard: paragrafe compacte, 1–2 propoziții pentru fiecare document atașat. Detaliat: paragrafe mai detaliate și 3–5 propoziții per document — util pentru cozile cu multe atașamente PDF.",
+        "llmFallback": "Providers tried in order, after the primary provider above, when a request fails (rate limit, timeout, error). Each entry has its own optional model override. Priority 1 is always the primary provider/model; entries here are priority 2, 3, …."
       },
       "common": {
         "validId": "Valabil/invalid este un semnal de ștergere soft: marcarea unei intrări ca fiind nevalidă o ascunde de selecție pentru înregistrări noi, fără a șterge referințele existente (de exemplu, bilete, sarcini). Nu există ștergere tare."
