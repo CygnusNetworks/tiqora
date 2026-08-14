@@ -341,6 +341,7 @@ class ScriptedLlm:
         self.calls = 0
         self.last_messages: list[LlmMessage] = []
         self.max_tokens_seen: list[int] = []
+        self.tools_seen: list[list[dict[str, Any]] | None] = []
 
     async def chat(
         self,
@@ -354,6 +355,7 @@ class ScriptedLlm:
         self.calls += 1
         self.last_messages = messages
         self.max_tokens_seen.append(max_tokens)
+        self.tools_seen.append(tools)
         if self._on_call is not None:
             await self._on_call()
         return self._responses.pop(0)
@@ -2774,7 +2776,7 @@ async def test_plain_text_nudges_are_bounded_then_run_skips(
         async with factory() as session:
             await _setup_policy(session, seed=seed, autonomy=AUTONOMY_FULL)
 
-        llm = ScriptedLlm([_plain_text_response("Immer nur Text.") for _ in range(3)])
+        llm = ScriptedLlm([_plain_text_response("Immer nur Text.") for _ in range(4)])
         async with factory() as session:
             result = await run_ticket_agent(
                 session,
@@ -2786,6 +2788,102 @@ async def test_plain_text_nudges_are_bounded_then_run_skips(
                 run_id="run-nudge-2",
             )
         assert result.status == "skipped"
-        assert llm.calls == 3  # initial + 2 nudged retries, then give up
+        # initial + 2 nudged retries + 1 terminal-force attempt, then give up
+        assert llm.calls == 4
+    finally:
+        await engine.dispose()
+
+
+# ---------------------------------------------------------------------------
+# Terminal-force: research burned every round without a terminal tool call
+# ---------------------------------------------------------------------------
+
+
+def _note_tool_response(body: str) -> LlmResponse:
+    return LlmResponse(
+        content=None,
+        tool_calls=[ToolCall(id="call_note", name="add_internal_note", arguments={"body": body})],
+        usage=LlmUsage(prompt_tokens=10, completion_tokens=5),
+    )
+
+
+async def test_exhausted_tool_rounds_force_a_terminal_call(
+    mariadb_znuny_url: str,
+) -> None:
+    """All tool rounds spent on research -> one extra call restricted to the
+    terminal tools must still produce the proposal."""
+    seed = _seed_ticket(mariadb_znuny_url, ns=63)
+    engine = create_async_engine(_mysql_async(mariadb_znuny_url))
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    settings = get_settings()
+    try:
+        async with factory() as session:
+            await _setup_policy(session, seed=seed, autonomy=AUTONOMY_FULL)
+
+        llm = ScriptedLlm(
+            [
+                _note_tool_response("recherche 1"),
+                _propose_response("reply", "Die finale Antwort."),
+            ]
+        )
+        async with factory() as session:
+            result = await run_ticket_agent(
+                session,
+                settings=settings,
+                llm=llm,
+                ticket_id=seed["ticket_id"],
+                trigger=TRIGGER_MANUAL,
+                acting_user_id=seed["agent_id"],
+                run_id="run-force-1",
+                max_tool_rounds=1,
+            )
+        assert result.status == "drafted"
+        assert llm.calls == 2
+        # The forced call only offered the two terminal tools.
+        forced_tools = llm.tools_seen[-1] or []
+        names = {t["function"]["name"] for t in forced_tools}
+        assert names == {"propose_customer_message", "escalate_to_human"}
+        # And the closing instruction reached the model.
+        assert any(
+            m.role == "user" and "final step" in (m.content or "") for m in llm.last_messages
+        )
+    finally:
+        await engine.dispose()
+
+
+async def test_terminal_force_without_tool_call_still_skips(
+    mariadb_znuny_url: str,
+) -> None:
+    seed = _seed_ticket(mariadb_znuny_url, ns=64)
+    engine = create_async_engine(_mysql_async(mariadb_znuny_url))
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    settings = get_settings()
+    try:
+        async with factory() as session:
+            await _setup_policy(session, seed=seed, autonomy=AUTONOMY_FULL)
+
+        llm = ScriptedLlm(
+            [
+                _note_tool_response("recherche 1"),
+                LlmResponse(
+                    content="",
+                    tool_calls=[],
+                    usage=LlmUsage(prompt_tokens=5, completion_tokens=1),
+                ),
+            ]
+        )
+        async with factory() as session:
+            result = await run_ticket_agent(
+                session,
+                settings=settings,
+                llm=llm,
+                ticket_id=seed["ticket_id"],
+                trigger=TRIGGER_MANUAL,
+                acting_user_id=seed["agent_id"],
+                run_id="run-force-2",
+                max_tool_rounds=1,
+            )
+        assert result.status == "skipped"
+        assert llm.calls == 2
     finally:
         await engine.dispose()

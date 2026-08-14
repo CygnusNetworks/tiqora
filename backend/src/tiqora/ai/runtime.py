@@ -93,6 +93,7 @@ from tiqora.ai.reply_language import (
 )
 from tiqora.ai.tool_chain import analyze_tool_chain
 from tiqora.ai.tools import (
+    TOOL_ESCALATE_TO_HUMAN,
     TOOL_PROPOSE_CUSTOMER_MESSAGE,
     McpToolSpec,
     ToolArgumentError,
@@ -135,6 +136,13 @@ _PLAIN_TEXT_NUDGE = (
     "propose_customer_message with it (kind='reply'); if it was internal "
     "analysis, call add_internal_note; if you cannot help, call "
     "escalate_to_human. Do not answer in plain text again."
+)
+_TERMINAL_FORCE_PROMPT = (
+    "Your research budget is exhausted — this is the final step. You MUST now "
+    "call exactly one tool: propose_customer_message with your best answer or "
+    "clarifying question based on everything gathered so far, or "
+    "escalate_to_human if you genuinely cannot help. Do not answer in plain "
+    "text."
 )
 _TELEGRAM_CHANNEL = "telegram"
 _TYPING_INTERVAL_SECONDS = 4.0
@@ -1193,6 +1201,59 @@ async def run_ticket_agent(
                     break
             if terminal_hit:
                 break
+
+        # 9b. Terminal-force: the loop ended without any terminal tool call —
+        # models sometimes burn every round on research (kb_search/MCP) and
+        # never deliver. Give exactly one closing call restricted to the two
+        # terminal tools so the run produces a proposal/escalation instead of
+        # silently ending as "no proposal". No tool_choice forcing — not every
+        # OpenAI-compatible provider accepts "required", the schema restriction
+        # plus instruction is provider-agnostic.
+        if outcome is None:
+            terminal_schemas = [
+                s
+                for s in schemas
+                if s.get("function", {}).get("name")
+                in (TOOL_PROPOSE_CUSTOMER_MESSAGE, TOOL_ESCALATE_TO_HUMAN)
+            ]
+            messages.append(LlmMessage(role="user", content=_TERMINAL_FORCE_PROMPT))
+            logger.info("ai_terminal_force", ticket_id=ticket_id, trigger=trigger)
+            response = await _chat_with_budget_retry(
+                llm, messages=messages, tools=terminal_schemas, max_tokens=completion_budget
+            )
+            prompt_tokens += response.usage.prompt_tokens
+            completion_tokens += response.usage.completion_tokens
+            if response.tool_calls:
+                messages.append(
+                    LlmMessage(
+                        role="assistant", content=response.content, tool_calls=response.tool_calls
+                    )
+                )
+                for tc in response.tool_calls:
+                    try:
+                        result = await executor.execute(tc.name, tc.arguments)
+                    except (UnknownToolError, ToolArgumentError) as exc:
+                        messages.append(
+                            LlmMessage(
+                                role="tool",
+                                tool_call_id=tc.id,
+                                name=tc.name,
+                                content=f"Error: {exc}",
+                            )
+                        )
+                        continue
+                    executed_tool_names.append(tc.name)
+                    messages.append(
+                        LlmMessage(
+                            role="tool",
+                            tool_call_id=tc.id,
+                            name=tc.name,
+                            content=result.content_for_model,
+                        )
+                    )
+                    if result.terminal:
+                        outcome = result
+                        break
 
         chain_alerts = analyze_tool_chain(executed_tool_names)
         for alert in chain_alerts:
