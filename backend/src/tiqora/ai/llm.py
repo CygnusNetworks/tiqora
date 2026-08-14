@@ -43,6 +43,18 @@ class LlmSchemaError(LlmError):
     """The provider's response did not have the expected shape."""
 
 
+class LlmEmptyOutputError(LlmError):
+    """The provider returned ``finish_reason == "length"`` with no content
+    and no tool_calls — even after one retry with a doubled completion-token
+    budget (see ``tiqora.ai.runtime._chat_with_budget_retry``).
+
+    This means a reasoning model consumed its entire completion-token budget
+    on hidden reasoning before producing any visible output — the prod
+    incident this class exists to surface instead of silently ending the run
+    with no proposal.
+    """
+
+
 @dataclass(frozen=True, slots=True)
 class ToolCall:
     id: str
@@ -239,6 +251,7 @@ class OpenAiCompatLlmClient:
 
 __all__ = [
     "LlmClient",
+    "LlmEmptyOutputError",
     "LlmError",
     "LlmHttpError",
     "LlmMessage",

@@ -25,6 +25,7 @@ from tiqora.ai.context import article_from_address, latest_customer_article_id, 
 from tiqora.ai.gate import is_tiqora_primary
 from tiqora.ai.kb_wiring import build_llm_client, kb_bundle, kb_get_article_fn, kb_search_fn
 from tiqora.ai.listfields import parse_str_list
+from tiqora.ai.llm import LlmEmptyOutputError, LlmError, LlmHttpError, LlmTimeoutError
 from tiqora.ai.models import TiqoraAiTicketState
 from tiqora.ai.policies import get_queue_policy_by_queue
 from tiqora.ai.runtime import (
@@ -141,15 +142,41 @@ def _draft_out(draft: object) -> AiDraftOut:
     return AiDraftOut.model_validate(fields)
 
 
-def _map_run_error(exc: AgentRunError) -> HTTPException:
+def _map_run_error(exc: AgentRunError | LlmError) -> HTTPException:
+    """Map a run-abort/LLM-client error to an HTTPException with a stable
+    ``detail`` code prefix (``"<code>: <human text>"``) the frontend matches
+    on for a specific i18n message — see ``AiPanel.mapRunError``. There is no
+    existing structured-detail convention elsewhere in this API (plain
+    strings only), so a string prefix is used rather than introducing a new
+    JSON-detail shape just for this route.
+    """
     if isinstance(exc, LockHeldError):
-        return HTTPException(status_code=status.HTTP_423_LOCKED, detail=str(exc))
+        return HTTPException(status_code=status.HTTP_423_LOCKED, detail=f"ai_run_locked: {exc}")
     if isinstance(exc, AclLimitExceededError):
         return HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail=str(exc))
     if isinstance(exc, AclDeniedError):
         return HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(exc))
     if isinstance(exc, PolicyDisabledError):
         return HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc))
+    # LlmEmptyOutputError is a subclass of LlmError — checked first here so
+    # it takes the specific branch instead of the generic LlmError catch-all.
+    if isinstance(exc, LlmEmptyOutputError):
+        return HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY, detail=f"llm_empty_output: {exc}"
+        )
+    if isinstance(exc, LlmTimeoutError):
+        return HTTPException(
+            status_code=status.HTTP_504_GATEWAY_TIMEOUT, detail=f"llm_timeout: {exc}"
+        )
+    if isinstance(exc, LlmHttpError):
+        return HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"llm_provider_error: HTTP {exc.status_code}: {exc}",
+        )
+    if isinstance(exc, LlmError):
+        return HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY, detail=f"llm_provider_error: {exc}"
+        )
     return HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc))
 
 
@@ -266,7 +293,7 @@ async def request_manual_draft(
             kb_search_fn=kb_search_fn(session, settings, user.id),
             kb_get_article_fn=kb_get_article_fn(session, settings, user.id),
         )
-    except AgentRunError as exc:
+    except (AgentRunError, LlmError) as exc:
         raise _map_run_error(exc) from exc
 
     return AiDraftRequestOut(

@@ -13,7 +13,7 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import json
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import UTC, datetime, timedelta
 from email.utils import parseaddr
 from typing import Any
@@ -54,7 +54,14 @@ from tiqora.ai.identity import (
 )
 from tiqora.ai.kb_wiring import build_vision_llm_factory
 from tiqora.ai.listfields import parse_int_list
-from tiqora.ai.llm import LlmClient, LlmMessage, LlmResponse
+from tiqora.ai.llm import (
+    LlmClient,
+    LlmEmptyOutputError,
+    LlmError,
+    LlmMessage,
+    LlmResponse,
+    LlmUsage,
+)
 from tiqora.ai.models import (
     AUTONOMY_CLARIFY_ONLY,
     AUTONOMY_FULL,
@@ -97,7 +104,12 @@ from tiqora.ai.tools import (
 from tiqora.config import Settings
 from tiqora.crypto.secret import decrypt_secret
 from tiqora.db.tiqora.models import TiqoraTelegramContact
-from tiqora.domain.settings_store import KEY_AI_DISCLOSURE_DEFAULT, get_setting
+from tiqora.domain.settings_store import (
+    KEY_AI_DISCLOSURE_DEFAULT,
+    KEY_AI_LLM_MAX_COMPLETION_TOKENS,
+    get_setting,
+    get_setting_int,
+)
 from tiqora.domain.ticket_write_service import ArticleIn, add_article
 from tiqora.domain.ticket_write_service import set_customer as domain_set_customer
 from tiqora.znuny.sysconfig import SysConfig
@@ -106,6 +118,10 @@ logger = structlog.get_logger(__name__)
 
 _LOCK_MAX_AGE = timedelta(minutes=15)
 DEFAULT_MAX_TOOL_ROUNDS = 8
+# Fallback for KEY_AI_LLM_MAX_COMPLETION_TOKENS when the setting row is
+# unset. Reasoning models need real headroom beyond the OpenAI wire default
+# of 1024 — see settings_store.KEY_AI_LLM_MAX_COMPLETION_TOKENS.
+DEFAULT_MAX_COMPLETION_TOKENS = 8192
 _TELEGRAM_CHANNEL = "telegram"
 _TYPING_INTERVAL_SECONDS = 4.0
 
@@ -168,6 +184,76 @@ def _map_customer_message(*, trigger: str, autonomy: str, kind: str) -> str:
     if autonomy == AUTONOMY_FULL:
         return "send"
     return "draft"
+
+
+async def _resolve_completion_budget(session: AsyncSession) -> int:
+    """Read ``KEY_AI_LLM_MAX_COMPLETION_TOKENS`` once per run (plan: LLM
+    budget). Every agent ``chat()`` call in this run — tool loop/final
+    answer and the identity exchange — uses this same budget."""
+    return await get_setting_int(
+        session, KEY_AI_LLM_MAX_COMPLETION_TOKENS, DEFAULT_MAX_COMPLETION_TOKENS
+    )
+
+
+def _is_empty_length_output(response: LlmResponse) -> bool:
+    return (
+        response.finish_reason == "length"
+        and not response.tool_calls
+        and not (response.content or "").strip()
+    )
+
+
+async def _chat_with_budget_retry(
+    llm: LlmClient,
+    *,
+    messages: list[LlmMessage],
+    tools: list[dict[str, Any]] | None = None,
+    tool_choice: str | dict[str, Any] | None = None,
+    max_tokens: int,
+    temperature: float = 0.2,
+) -> LlmResponse:
+    """One agent ``chat()`` call, hardened against a reasoning model that
+    burns its whole completion-token budget on hidden reasoning and returns
+    ``finish_reason == "length"`` with empty content and no tool_calls (the
+    prod incident this guards against).
+
+    Exactly one immediate retry with a doubled budget; if that also comes
+    back empty, raise :class:`LlmEmptyOutputError` instead of silently
+    treating it as "the model had nothing to say" (the previous behaviour,
+    which ended the run with a bare "no proposal" skip and no diagnostic).
+    """
+    response = await llm.chat(
+        messages=messages,
+        tools=tools,
+        tool_choice=tool_choice,
+        max_tokens=max_tokens,
+        temperature=temperature,
+    )
+    if not _is_empty_length_output(response):
+        return response
+
+    logger.warning(
+        "ai_llm_empty_output_retry", max_tokens=max_tokens, retry_max_tokens=max_tokens * 2
+    )
+    retry_response = await llm.chat(
+        messages=messages,
+        tools=tools,
+        tool_choice=tool_choice,
+        max_tokens=max_tokens * 2,
+        temperature=temperature,
+    )
+    combined_usage = LlmUsage(
+        prompt_tokens=response.usage.prompt_tokens + retry_response.usage.prompt_tokens,
+        completion_tokens=(
+            response.usage.completion_tokens + retry_response.usage.completion_tokens
+        ),
+    )
+    if _is_empty_length_output(retry_response):
+        raise LlmEmptyOutputError(
+            "LLM returned finish_reason='length' with empty content and no tool_calls "
+            f"twice in a row (budgets {max_tokens}, then {max_tokens * 2})."
+        )
+    return replace(retry_response, usage=combined_usage)
 
 
 async def _acquire_lock(session: AsyncSession, ticket_id: int, owner: str) -> TiqoraAiTicketState:
@@ -613,6 +699,7 @@ async def _run_identity_exchange(
     actor_user_id: int,
     audit_context: AuditContext,
     created_by_user_id: int | None,
+    completion_budget: int,
 ) -> AgentRunResult | None:
     """Run one identity-check LLM exchange (Task 6). Returns an
     :class:`AgentRunResult` when the run ends here (drafted/sent/skipped),
@@ -658,8 +745,11 @@ async def _run_identity_exchange(
         LlmMessage(role="system", content=system_prompt),
         LlmMessage(role="user", content=user_message),
     ]
-    response: LlmResponse = await identity_llm.chat(
-        messages=messages, tools=_identity_tool_schema()
+    response: LlmResponse = await _chat_with_budget_retry(
+        identity_llm,
+        messages=messages,
+        tools=_identity_tool_schema(),
+        max_tokens=completion_budget,
     )
     prompt_tokens = response.usage.prompt_tokens
     completion_tokens = response.usage.completion_tokens
@@ -867,6 +957,11 @@ async def run_ticket_agent(
 
         sysconfig = SysConfig(session)
 
+        # Completion-token budget (plan: LLM budget) — resolved once per run,
+        # used by every agent chat() call below (identity exchange, tool
+        # loop/final answer).
+        completion_budget = await _resolve_completion_budget(session)
+
         # 4. Load ticket + articles; based_on_article_id = latest customer article
         articles = await load_articles(session, ticket_id)
         customer_articles = [a for a in articles if a.sender_type == "customer"]
@@ -926,6 +1021,7 @@ async def run_ticket_agent(
                 actor_user_id=actor_user_id,
                 audit_context=audit_context,
                 created_by_user_id=(acting_user_id if trigger == TRIGGER_MANUAL else None),
+                completion_budget=completion_budget,
             )
             if identity_result is not None:
                 return identity_result
@@ -1031,7 +1127,9 @@ async def run_ticket_agent(
 
         # 9. Tool loop
         for _round in range(max_tool_rounds):
-            response: LlmResponse = await llm.chat(messages=messages, tools=schemas)
+            response: LlmResponse = await _chat_with_budget_retry(
+                llm, messages=messages, tools=schemas, max_tokens=completion_budget
+            )
             prompt_tokens += response.usage.prompt_tokens
             completion_tokens += response.usage.completion_tokens
 
@@ -1272,7 +1370,12 @@ async def run_ticket_agent(
             prompt_tokens=prompt_tokens,
             completion_tokens=completion_tokens,
         )
-    except AgentRunError as exc:
+    except (AgentRunError, LlmError) as exc:
+        # LlmError (incl. LlmEmptyOutputError/LlmTimeoutError/LlmHttpError)
+        # isn't an AgentRunError — it propagates from llm.chat() itself, not
+        # from a run-abort check — but it deserves the same last_error
+        # bookkeeping before the caller (tiqora.api.v1.ai) maps it to a
+        # structured HTTP error.
         try:
             error_state = await session.get(TiqoraAiTicketState, ticket_id)
             if error_state is not None:

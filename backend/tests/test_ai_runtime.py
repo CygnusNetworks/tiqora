@@ -25,7 +25,7 @@ from tiqora.ai.gate import (
     set_operation_mode,
 )
 from tiqora.ai.identity import MAX_IDENTITY_ATTEMPTS
-from tiqora.ai.llm import LlmMessage, LlmResponse, LlmUsage, ToolCall
+from tiqora.ai.llm import LlmEmptyOutputError, LlmMessage, LlmResponse, LlmUsage, ToolCall
 from tiqora.ai.models import (
     AUTONOMY_CLARIFY_ONLY,
     AUTONOMY_FULL,
@@ -38,6 +38,7 @@ from tiqora.ai.models import (
 )
 from tiqora.ai.pii import PiiMapper
 from tiqora.ai.runtime import (
+    DEFAULT_MAX_COMPLETION_TOKENS,
     TRIGGER_AUTO,
     TRIGGER_MANUAL,
     AclDeniedError,
@@ -55,6 +56,7 @@ from tiqora.channels.common import ensure_channel_row
 from tiqora.config import get_settings
 from tiqora.db.tiqora.base import TiqoraBase
 from tiqora.db.tiqora.models import TiqoraTelegramContact
+from tiqora.domain.settings_store import KEY_AI_LLM_MAX_COMPLETION_TOKENS, set_setting
 from tiqora.domain.ticket_write_service import ArticleIn, add_article
 from tiqora.znuny.password import hash_password
 from tiqora.znuny.sysconfig import SysConfig
@@ -338,6 +340,7 @@ class ScriptedLlm:
         self._on_call = on_call
         self.calls = 0
         self.last_messages: list[LlmMessage] = []
+        self.max_tokens_seen: list[int] = []
 
     async def chat(
         self,
@@ -350,6 +353,7 @@ class ScriptedLlm:
     ) -> LlmResponse:
         self.calls += 1
         self.last_messages = messages
+        self.max_tokens_seen.append(max_tokens)
         if self._on_call is not None:
             await self._on_call()
         return self._responses.pop(0)
@@ -2478,5 +2482,226 @@ async def test_identity_exchange_context_excludes_ticket_content_and_customer_id
         assert "customer9627@example.com" not in sent_user_message
         assert "CustomerID" not in sent_user_message
         assert "CustomerUser" not in sent_user_message
+    finally:
+        await engine.dispose()
+
+
+# ---------------------------------------------------------------------------
+# Task: LLM completion-token budget (settings_store.KEY_AI_LLM_MAX_COMPLETION_TOKENS)
+# ---------------------------------------------------------------------------
+
+
+async def test_completion_budget_default_is_passed_to_chat(mariadb_znuny_url: str) -> None:
+    """No setting row -> every chat() call gets DEFAULT_MAX_COMPLETION_TOKENS."""
+    seed = _seed_ticket(mariadb_znuny_url, ns=50)
+    engine = create_async_engine(_mysql_async(mariadb_znuny_url))
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    settings = get_settings()
+    try:
+        async with factory() as session:
+            await _setup_policy(session, seed=seed, autonomy=AUTONOMY_FULL)
+            # Explicit delete (not just "never set"): the settings table is a
+            # single shared global-key/value store across the whole
+            # session-scoped test DB, so another test in this file/run may
+            # have already written this key.
+            await session.execute(
+                text("DELETE FROM tiqora_settings WHERE `key` = :k"),
+                {"k": KEY_AI_LLM_MAX_COMPLETION_TOKENS},
+            )
+            await session.commit()
+
+        llm = ScriptedLlm([_propose_response("reply", "Here is the answer.")])
+        async with factory() as session:
+            result = await run_ticket_agent(
+                session,
+                settings=settings,
+                llm=llm,
+                ticket_id=seed["ticket_id"],
+                trigger=TRIGGER_MANUAL,
+                acting_user_id=seed["agent_id"],
+                run_id="run-50",
+            )
+        assert result.status == "drafted"
+        assert llm.max_tokens_seen == [DEFAULT_MAX_COMPLETION_TOKENS]
+    finally:
+        await engine.dispose()
+
+
+async def test_completion_budget_setting_override_is_passed_to_chat(mariadb_znuny_url: str) -> None:
+    seed = _seed_ticket(mariadb_znuny_url, ns=51)
+    engine = create_async_engine(_mysql_async(mariadb_znuny_url))
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    settings = get_settings()
+    try:
+        async with factory() as session:
+            await _setup_policy(session, seed=seed, autonomy=AUTONOMY_FULL)
+            await set_setting(session, KEY_AI_LLM_MAX_COMPLETION_TOKENS, "2048")
+            await session.commit()
+
+        llm = ScriptedLlm([_propose_response("reply", "Here is the answer.")])
+        async with factory() as session:
+            result = await run_ticket_agent(
+                session,
+                settings=settings,
+                llm=llm,
+                ticket_id=seed["ticket_id"],
+                trigger=TRIGGER_MANUAL,
+                acting_user_id=seed["agent_id"],
+                run_id="run-51",
+            )
+        assert result.status == "drafted"
+        assert llm.max_tokens_seen == [2048]
+    finally:
+        await engine.dispose()
+
+
+async def test_empty_length_output_retries_once_with_doubled_budget(
+    mariadb_znuny_url: str,
+) -> None:
+    """finish_reason='length' + empty content + no tool_calls -> exactly one
+    retry with 2x the budget; a good response on the retry lets the run
+    continue normally."""
+    seed = _seed_ticket(mariadb_znuny_url, ns=52)
+    engine = create_async_engine(_mysql_async(mariadb_znuny_url))
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    settings = get_settings()
+    empty_response = LlmResponse(
+        content="",
+        tool_calls=[],
+        usage=LlmUsage(prompt_tokens=20, completion_tokens=8192),
+        finish_reason="length",
+    )
+    try:
+        async with factory() as session:
+            await _setup_policy(session, seed=seed, autonomy=AUTONOMY_FULL)
+            await set_setting(
+                session, KEY_AI_LLM_MAX_COMPLETION_TOKENS, str(DEFAULT_MAX_COMPLETION_TOKENS)
+            )
+            await session.commit()
+
+        llm = ScriptedLlm([empty_response, _propose_response("reply", "Recovered answer.")])
+        async with factory() as session:
+            result = await run_ticket_agent(
+                session,
+                settings=settings,
+                llm=llm,
+                ticket_id=seed["ticket_id"],
+                trigger=TRIGGER_MANUAL,
+                acting_user_id=seed["agent_id"],
+                run_id="run-52",
+            )
+        assert result.status == "drafted"
+        assert llm.calls == 2
+        assert llm.max_tokens_seen == [
+            DEFAULT_MAX_COMPLETION_TOKENS,
+            DEFAULT_MAX_COMPLETION_TOKENS * 2,
+        ]
+        # Both attempts' usage is accounted for, not just the successful retry.
+        assert result.prompt_tokens == 20 + 10
+        assert result.completion_tokens == 8192 + 5
+    finally:
+        await engine.dispose()
+
+
+async def test_empty_length_output_twice_raises_llm_empty_output_error(
+    mariadb_znuny_url: str,
+) -> None:
+    seed = _seed_ticket(mariadb_znuny_url, ns=53)
+    engine = create_async_engine(_mysql_async(mariadb_znuny_url))
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    settings = get_settings()
+    empty_response = LlmResponse(
+        content=None,
+        tool_calls=[],
+        usage=LlmUsage(prompt_tokens=20, completion_tokens=8192),
+        finish_reason="length",
+    )
+    try:
+        async with factory() as session:
+            await _setup_policy(session, seed=seed, autonomy=AUTONOMY_FULL)
+            await set_setting(
+                session, KEY_AI_LLM_MAX_COMPLETION_TOKENS, str(DEFAULT_MAX_COMPLETION_TOKENS)
+            )
+            await session.commit()
+
+        llm = ScriptedLlm([empty_response, empty_response])
+        async with factory() as session:
+            with pytest.raises(LlmEmptyOutputError):
+                await run_ticket_agent(
+                    session,
+                    settings=settings,
+                    llm=llm,
+                    ticket_id=seed["ticket_id"],
+                    trigger=TRIGGER_MANUAL,
+                    acting_user_id=seed["agent_id"],
+                    run_id="run-53",
+                )
+        assert llm.calls == 2
+        assert llm.max_tokens_seen == [
+            DEFAULT_MAX_COMPLETION_TOKENS,
+            DEFAULT_MAX_COMPLETION_TOKENS * 2,
+        ]
+
+        # The lock is released (finally-block) and last_error recorded even
+        # though LlmEmptyOutputError isn't an AgentRunError.
+        async with factory() as session:
+            state = await session.get(TiqoraAiTicketState, seed["ticket_id"])
+            assert state is not None
+            assert state.run_lock_owner is None
+            assert state.last_error is not None and "length" in state.last_error
+    finally:
+        await engine.dispose()
+
+
+async def test_identity_exchange_gets_same_completion_budget(
+    mariadb_znuny_url: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    seed = _seed_ticket(mariadb_znuny_url, ns=54)
+    engine = create_async_engine(_mysql_async(mariadb_znuny_url))
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    settings = get_settings()
+    chat_id = 900054
+    try:
+        async with factory() as session:
+            await _setup_identity_policy(session, seed=seed)
+            await _seed_telegram_article(
+                session, article_id=seed["customer_article_id"], chat_id=chat_id
+            )
+            await set_setting(session, KEY_AI_LLM_MAX_COMPLETION_TOKENS, "4096")
+            await session.commit()
+
+        async def _fake_telegram_deliver(
+            session: AsyncSession,
+            sysconfig: Any,
+            *,
+            ticket_id: int,
+            user_id: int,
+            article: Any,
+            gateway: Any = None,
+        ) -> int:
+            return await add_article(
+                session, ticket_id=ticket_id, article=article, user_id=user_id, sysconfig=sysconfig
+            )
+
+        monkeypatch.setattr(
+            "tiqora.channels.telegram.outbound.deliver_agent_telegram_reply",
+            _fake_telegram_deliver,
+        )
+
+        llm = ScriptedLlm([_identity_response("clarify", "Please tell me your phone number.")])
+        async with factory() as session:
+            await run_ticket_agent(
+                session,
+                settings=settings,
+                llm=llm,
+                ticket_id=seed["ticket_id"],
+                trigger=TRIGGER_AUTO,
+                acting_user_id=None,
+                run_id="run-54",
+                source_channel="telegram",
+            )
+
+        assert llm.calls == 1
+        assert llm.max_tokens_seen == [4096]
     finally:
         await engine.dispose()
