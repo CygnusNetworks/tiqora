@@ -19,6 +19,7 @@ from tiqora.api.v1.ai import AiToolTraceOut, parse_tool_trace
 from tiqora.channels.email.outbound_reply import OutboundMailError
 from tiqora.channels.telegram.outbound import TelegramDeliveryError
 from tiqora.db.engine import get_session_factory
+from tiqora.domain.customer_link import ResolvedCustomerLink, resolve_customer_link
 from tiqora.domain.schemas import (
     ArticleBody,
     ArticleListItem,
@@ -780,6 +781,32 @@ async def get_similar_tickets(
         )
     finally:
         await svc.close()
+
+
+@router.get("/{ticket_id}/customer-link", response_model=ResolvedCustomerLink)
+async def get_ticket_customer_link(
+    ticket_id: int,
+    user: CurrentUser,
+    session: DbSession,
+) -> ResolvedCustomerLink:
+    """Resolved per-queue external customer-tool link (ticket-zoom header,
+    second button next to the internal "Kunde" link). ``url`` is ``null``
+    when no link is configured for the ticket's queue, or the config's
+    ``visibility`` hides it from this (non-admin) agent — never a 404, so
+    the frontend can simply render nothing on a null ``url``."""
+    try:
+        ticket = await TicketService(session).get_ticket(user.id, ticket_id)
+    except (TicketNotFound, TicketAccessDenied) as exc:
+        raise _map_exc(exc) from exc
+    is_admin = await PermissionEngine(session).is_admin(user.id)
+    return await resolve_customer_link(
+        session,
+        queue_id=ticket.queue_id,
+        ticket_number=ticket.tn,
+        customer_id=ticket.customer_id,
+        customer_user_id=ticket.customer_user_id,
+        is_admin=is_admin,
+    )
 
 
 class AiOriginOut(BaseModel):

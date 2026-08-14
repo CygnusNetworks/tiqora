@@ -2217,6 +2217,49 @@ export interface paths {
         patch: operations["update_priority_api_v1_admin_priorities__priority_id__patch"];
         trace?: never;
     };
+    "/api/v1/admin/queue-customer-links": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Queue Customer Links
+         * @description Full list (one row per queue at most — no pagination needed).
+         */
+        get: operations["list_queue_customer_links_api_v1_admin_queue_customer_links_get"];
+        put?: never;
+        /** Create Queue Customer Link */
+        post: operations["create_queue_customer_link_api_v1_admin_queue_customer_links_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/queue-customer-links/{link_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Queue Customer Link */
+        get: operations["get_queue_customer_link_api_v1_admin_queue_customer_links__link_id__get"];
+        put?: never;
+        post?: never;
+        /**
+         * Delete Queue Customer Link
+         * @description Hard-delete (no soft-valid flag on this table, mirrors queue variables).
+         */
+        delete: operations["delete_queue_customer_link_api_v1_admin_queue_customer_links__link_id__delete"];
+        options?: never;
+        head?: never;
+        /** Update Queue Customer Link */
+        patch: operations["update_queue_customer_link_api_v1_admin_queue_customer_links__link_id__patch"];
+        trace?: never;
+    };
     "/api/v1/admin/queue-variables": {
         parameters: {
             query?: never;
@@ -5568,6 +5611,30 @@ export interface paths {
          * @description Split an article into a new linked ticket. Requires ``rw`` + ``create``.
          */
         post: operations["split_article_endpoint_api_v1_tickets__ticket_id__articles__article_id__split_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tickets/{ticket_id}/customer-link": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Ticket Customer Link
+         * @description Resolved per-queue external customer-tool link (ticket-zoom header,
+         *     second button next to the internal "Kunde" link). ``url`` is ``null``
+         *     when no link is configured for the ticket's queue, or the config's
+         *     ``visibility`` hides it from this (non-admin) agent — never a 404, so
+         *     the frontend can simply render nothing on a null ``url``.
+         */
+        get: operations["get_ticket_customer_link_api_v1_tickets__ticket_id__customer_link_get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -10826,6 +10893,60 @@ export interface components {
              */
             valid_id: number;
         };
+        /** QueueCustomerLinkCreate */
+        QueueCustomerLinkCreate: {
+            /** Admin Url Template */
+            admin_url_template?: string | null;
+            /** Label */
+            label?: string | null;
+            /** Queue Id */
+            queue_id: number;
+            /** Url Template */
+            url_template: string;
+            /**
+             * Visibility
+             * @default all
+             */
+            visibility: string;
+        };
+        /** QueueCustomerLinkOut */
+        QueueCustomerLinkOut: {
+            /** Admin Url Template */
+            admin_url_template: string | null;
+            /**
+             * Change Time
+             * Format: date-time
+             */
+            change_time: string;
+            /**
+             * Create Time
+             * Format: date-time
+             */
+            create_time: string;
+            /** Id */
+            id: number;
+            /** Label */
+            label: string | null;
+            /** Queue Id */
+            queue_id: number;
+            /** Queue Name */
+            queue_name?: string | null;
+            /** Url Template */
+            url_template: string;
+            /** Visibility */
+            visibility: string;
+        };
+        /** QueueCustomerLinkUpdate */
+        QueueCustomerLinkUpdate: {
+            /** Admin Url Template */
+            admin_url_template?: string | null;
+            /** Label */
+            label?: string | null;
+            /** Url Template */
+            url_template?: string | null;
+            /** Visibility */
+            visibility?: string | null;
+        };
         /** QueueNode */
         QueueNode: {
             /** Children */
@@ -11042,6 +11163,13 @@ export interface components {
             subject: string;
             /** To Address */
             to_address?: string | null;
+        };
+        /** ResolvedCustomerLink */
+        ResolvedCustomerLink: {
+            /** Label */
+            label: string | null;
+            /** Url */
+            url: string | null;
         };
         /** RoleAssignment */
         RoleAssignment: {
@@ -19202,6 +19330,183 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PriorityOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_queue_customer_links_api_v1_admin_queue_customer_links_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QueueCustomerLinkOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_queue_customer_link_api_v1_admin_queue_customer_links_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["QueueCustomerLinkCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QueueCustomerLinkOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_queue_customer_link_api_v1_admin_queue_customer_links__link_id__get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                link_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QueueCustomerLinkOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_queue_customer_link_api_v1_admin_queue_customer_links__link_id__delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                link_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_queue_customer_link_api_v1_admin_queue_customer_links__link_id__patch: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                link_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["QueueCustomerLinkUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QueueCustomerLinkOut"];
                 };
             };
             /** @description Validation Error */
@@ -27684,6 +27989,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["TicketCreateResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_ticket_customer_link_api_v1_tickets__ticket_id__customer_link_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                ticket_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResolvedCustomerLink"];
                 };
             };
             /** @description Validation Error */

@@ -659,3 +659,37 @@ class TiqoraTelegramContact(TiqoraBase):
     )
 
     __table_args__ = (Index("ix_tiqora_telegram_contact_customer_login", "customer_user_login"),)
+
+
+class TiqoraQueueCustomerLink(TiqoraBase):
+    """Per-queue external customer-management-tool link (ticket zoom).
+
+    One row per queue configures the second header button next to the
+    existing internal "Kunde" link. ``admin_url_template`` is optional —
+    when set, agents with admin rights see it instead of ``url_template``;
+    everyone else always sees ``url_template``. ``visibility="admins"``
+    hides the button entirely for non-admins (no fallback to the normal
+    template). Resolution (placeholder substitution) happens server-side in
+    ``tiqora.domain.customer_link``. No FK on ``queue_id`` — same convention
+    as ``tiqora_ai_queue_policy`` (Znuny's ``queue`` table lives outside
+    ``tiqora_metadata``, validated at the application layer instead).
+    """
+
+    __tablename__ = "tiqora_queue_customer_link"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True, nullable=False)
+    queue_id: Mapped[int] = mapped_column(Integer, nullable=False, unique=True)
+    url_template: Mapped[str] = mapped_column(String(1024), nullable=False)
+    admin_url_template: Mapped[str | None] = mapped_column(String(1024), nullable=True)
+    label: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    visibility: Mapped[str] = mapped_column(
+        String(16), nullable=False, default="all", server_default="all"
+    )
+    create_by: Mapped[int] = mapped_column(Integer, nullable=False)
+    create_time: Mapped[datetime] = mapped_column(
+        DateTime, nullable=False, server_default=func.now()
+    )
+    change_by: Mapped[int] = mapped_column(Integer, nullable=False)
+    change_time: Mapped[datetime] = mapped_column(
+        DateTime, nullable=False, server_default=func.now()
+    )

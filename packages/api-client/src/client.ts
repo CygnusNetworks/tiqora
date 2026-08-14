@@ -295,6 +295,10 @@ export type QueueVariableOut = Schemas["QueueVariableOut"];
 export type QueueVariableCreate = Schemas["QueueVariableCreate"];
 export type QueueVariableUpdate = Schemas["QueueVariableUpdate"];
 export type PhysicalQueueVariableOut = Schemas["PhysicalQueueVariableOut"];
+export type QueueCustomerLinkOut = Schemas["QueueCustomerLinkOut"];
+export type QueueCustomerLinkCreate = Schemas["QueueCustomerLinkCreate"];
+export type QueueCustomerLinkUpdate = Schemas["QueueCustomerLinkUpdate"];
+export type ResolvedCustomerLink = Schemas["ResolvedCustomerLink"];
 export type PlaceholderFieldOut = Schemas["PlaceholderFieldOut"];
 export type PlaceholderFieldCreate = Schemas["PlaceholderFieldCreate"];
 export type PlaceholderFieldUpdate = Schemas["PlaceholderFieldUpdate"];
@@ -2350,6 +2354,35 @@ export class ApiClient {
     return this.request<PhysicalQueueVariableOut[]>(
       "GET",
       `/api/v1/admin/queues/${queueId}/physical-variables`,
+      { signal },
+    );
+  }
+
+  /**
+   * Per-queue external customer-management-tool link (ticket-zoom header's
+   * second button). At most one row per queue, so — unlike
+   * {@link adminQueueVariables} — `list` returns a plain array, not a
+   * paginated {@link AdminPage}.
+   */
+  get adminQueueCustomerLinks() {
+    const base = "/api/v1/admin/queue-customer-links";
+    return {
+      list: (signal?: AbortSignal) =>
+        this.request<QueueCustomerLinkOut[]>("GET", base, { signal }),
+      create: (body: QueueCustomerLinkCreate, signal?: AbortSignal) =>
+        this.request<QueueCustomerLinkOut>("POST", base, { body, signal }),
+      update: (id: number, body: QueueCustomerLinkUpdate, signal?: AbortSignal) =>
+        this.request<QueueCustomerLinkOut>("PATCH", `${base}/${id}`, { body, signal }),
+      remove: (id: number, signal?: AbortSignal) =>
+        this.request<void>("DELETE", `${base}/${id}`, { signal }),
+    };
+  }
+
+  /** Resolved external customer-tool link for the ticket's queue (ticket-zoom header). */
+  getTicketCustomerLink(ticketId: number, signal?: AbortSignal) {
+    return this.request<ResolvedCustomerLink>(
+      "GET",
+      `/api/v1/tickets/${ticketId}/customer-link`,
       { signal },
     );
   }
