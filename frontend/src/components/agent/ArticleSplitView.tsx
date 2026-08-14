@@ -7,6 +7,8 @@ import { decodeEntities, stripHtml } from "@/lib/html";
 import {
   avatarTone,
   channelIcon,
+  channelNameOf,
+  dominantChannel,
   emailFromAddress,
   formatFromAddress,
   formatToAddresses,
@@ -45,9 +47,17 @@ export function ArticleSplitView({
   state: ArticleListState;
 }) {
   const { t } = useTranslation();
-  const { sorted, selectedId, setSelectedId, selected, onListKeyDown, descending } = state;
+  const { articles, sorted, selectedId, setSelectedId, selected, onListKeyDown, descending } = state;
   const { boundaryId, createdAt } = useSummaryBoundary(ticketId, sorted);
   const drafts = useTicketReplyDrafts(ticketId);
+  // A draft's reply target may have been filtered out of `sorted` (e.g. the
+  // "Notes" filter while replying to an email) — look it up in the full,
+  // unfiltered article set, falling back to the ticket's dominant channel so
+  // the composer still opens in a sensible mode.
+  const draftChannelName = (articleId: number): string | undefined => {
+    const target = articles.find((a) => a.id === articleId);
+    return target ? channelNameOf(target) : (dominantChannel(articles) ?? undefined);
+  };
 
   if (sorted.length === 0) {
     return <p className="text-sm text-muted">{t("ticket.noArticles")}</p>;
@@ -67,7 +77,12 @@ export function ArticleSplitView({
             the most current thing on the ticket, and burying one below the
             fold would defeat the point of showing it at all. */}
         {drafts.map((d) => (
-          <DraftListRow key={`draft-${d.articleId}`} draft={d} locale={locale} />
+          <DraftListRow
+            key={`draft-${d.articleId}`}
+            draft={d}
+            locale={locale}
+            channelName={draftChannelName(d.articleId)}
+          />
         ))}
         {sorted.map((a) => (
           <Fragment key={a.id}>
@@ -158,7 +173,7 @@ function ArticleListRow({
           </span>
         </div>
         <p className="truncate text-[11px] text-muted">
-          <span aria-hidden>{channelIcon(article.communication_channel_id)}</span>{" "}
+          <span aria-hidden>{channelIcon(channelNameOf(article))}</span>{" "}
           <ArticlePreview ticketId={ticketId} article={article} />
         </p>
       </div>
@@ -216,7 +231,7 @@ function ArticleReader({
           <Badge tone={article.is_visible_for_customer ? "success" : "muted"}>
             {article.is_visible_for_customer ? t("ticket.visibleCustomer") : t("ticket.internal")}
           </Badge>
-          <Badge tone="default">{channelIcon(article.communication_channel_id)}</Badge>
+          <Badge tone="default">{channelIcon(channelNameOf(article))}</Badge>
         </div>
       </div>
       <ArticleQuickActions

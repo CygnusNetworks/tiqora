@@ -16,6 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from tiqora.api.attachment_response import safe_attachment_response
 from tiqora.api.deps import AppSettings, CurrentUser, DbSession
 from tiqora.channels.email.outbound_reply import OutboundMailError
+from tiqora.channels.telegram.outbound import TelegramDeliveryError
 from tiqora.db.engine import get_session_factory
 from tiqora.domain.schemas import (
     ArticleBody,
@@ -152,9 +153,7 @@ class AcquireLockRequest(BaseModel):
 
 
 class AcquireLockResponse(BaseModel):
-    result: Literal[
-        "not_required", "acquired", "already_mine", "taken_over", "locked_by_other"
-    ]
+    result: Literal["not_required", "acquired", "already_mine", "taken_over", "locked_by_other"]
     locked_by_id: int | None = None
     locked_by_name: str | None = None
 
@@ -196,6 +195,8 @@ def _map_exc(exc: Exception) -> HTTPException:
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail=f"Outbound email delivery failed: {exc}",
         )
+    if isinstance(exc, TelegramDeliveryError):
+        return HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc))
     return HTTPException(status_code=500, detail="Internal error")
 
 
@@ -1046,7 +1047,13 @@ async def create_article(
                     channel=body.channel,
                 ),
             )
-    except (WriteAccessDenied, WriteNotFound, InvalidInput, OutboundMailError) as exc:
+    except (
+        WriteAccessDenied,
+        WriteNotFound,
+        InvalidInput,
+        OutboundMailError,
+        TelegramDeliveryError,
+    ) as exc:
         raise _map_exc(exc) from exc
 
     if body.ai_draft_id is not None:

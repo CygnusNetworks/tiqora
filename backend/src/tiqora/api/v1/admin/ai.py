@@ -10,6 +10,16 @@ the request itself was malformed (422 is reserved for validation errors: bad
 autonomy value, missing service_user_id/llm_provider_id on auto-reply enable,
 etc.). ``enabled_summary``/``enabled_manual_assist`` are no longer gated —
 see ``tiqora.ai.gate`` and ``tiqora.ai.policies`` module docstrings.
+
+A queue whose name matches a :data:`~tiqora.ai.gate.TIQORA_ONLY_CHANNELS`
+channel's configured ``queue_name`` (currently Telegram) may enable
+``enabled_auto_reply`` even in ``parallel`` operation — see
+``tiqora.ai.gate.queue_serves_tiqora_only_channel`` and
+``tiqora.ai.policies._enforce_gate_on_enable``. If the queue or the channel's
+``queue_name`` setting is renamed afterwards, this enable-time check is not
+re-run — the AI runtime's per-event gate re-check
+(:func:`tiqora.ai.runtime.run_ticket_agent`) is what actually catches that on
+the next auto-reply run.
 """
 
 from __future__ import annotations

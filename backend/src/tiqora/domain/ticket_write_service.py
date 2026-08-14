@@ -472,6 +472,7 @@ async def add_article(
         "internal": "Internal",
         "sms": "SMS",
         "whatsapp": "WhatsApp",
+        "telegram": "Telegram",
     }
     ch_name = channel_name_map.get(article.channel.lower(), "Internal")
     comm_channel_id = await _channel_id(session, ch_name)
@@ -1891,6 +1892,18 @@ class TicketWriteService:
                 self._resolve_mail_sender(),
                 ticket_id=ticket_id,
                 queue_id=int(t["queue_id"]),
+                user_id=user_id,
+                article=article,
+            )
+        # Outgoing agent Telegram reply: Bot API send then store (see
+        # channels.telegram.outbound) -- send-then-store, same as email above.
+        if article.channel.lower() == "telegram" and article.sender_type == "agent":
+            from tiqora.channels.telegram.outbound import deliver_agent_telegram_reply
+
+            return await deliver_agent_telegram_reply(
+                self._session,
+                self._sysconfig,
+                ticket_id=ticket_id,
                 user_id=user_id,
                 article=article,
             )

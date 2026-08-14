@@ -151,7 +151,8 @@
     "passkeyAddError": "Kunne ikke tilføje adgangsnøgle.",
     "passkeyDeleteError": "Kunne ikke fjerne adgangsnøglen.",
     "passkeyDeleteLastError": "Kan ikke fjerne den sidste 2FA-faktor, mens 2FA håndhæves.",
-    "passkeyUnsupported": "Denne browser understøtter ikke adgangsnøgler (WebAuthn)."
+    "passkeyUnsupported": "Denne browser understøtter ikke adgangsnøgler (WebAuthn).",
+    "passkeyReauthRequired": "For your security, please sign in again before changing your passkeys."
   },
   "dashboard": {
     "greeting": {
@@ -545,7 +546,8 @@
     "extrasRetry": "Prøv igen",
     "customerUnresolved": "Ingen kundepost matcher denne adresse, så kundedata er utilgængelige.",
     "lockedByBanner": "Låst af {{name}}",
-    "takeOver": "Overtag"
+    "takeOver": "Overtag",
+    "replyViaTelegram": "Reply will be sent via Telegram"
   },
   "search": {
     "title": "Søg",
@@ -964,7 +966,15 @@
           "detailed": "Detaljeret"
         },
         "kbCategories": "KB kategorier",
-        "kbCategoriesEmpty": "Ingen tilgængelige kategorier."
+        "kbCategoriesEmpty": "Ingen tilgængelige kategorier.",
+        "llmFallback": "Fallback providers",
+        "fallbackAdd": "Add fallback",
+        "fallbackEmpty": "No fallback providers — the primary provider above is used exclusively.",
+        "fallbackMoveUp": "Move up",
+        "fallbackMoveDown": "Move down",
+        "fallbackRemove": "Remove",
+        "clarifySchemaJson": "Clarify schema fields (JSON)",
+        "clarifySchemaJsonPlaceholder": "{\"fields\": [{\"column\": \"wpnum\", \"label\": \"WP-Nummer\"}]}"
       },
       "usage": {
         "title": "Brug",
@@ -1136,7 +1146,8 @@
         "replyLanguageDefault": "BCP-47 sprogkode bruges i \"Auto\"-tilstand, når teksten ikke kan matches sikkert til en kendt sprogprofil.",
         "allowedStateTypes": "Kommasepareret liste over tilladte Znuny-tilstandstyper (f.eks. \"åben\" eller \"åben, afventer påmindelse\"), som AI kan indstille en billet til via update_ticket_fields - håndhævet for både tilstandsnavnet og det numeriske tilstands-id. Tom = standard kun \"åben\" (genåbning tilladt, lukker aldrig); en eksplicit tom liste \"[]\" deaktiverer tilstandsændringer helt.",
         "piiNer": "Registrerer personnavne i tekst via spaCy NER (tysk + engelsk) og maskerer dem som [NAME_n], før indhold når LLM-udbyderen – ud over kundenavn og afsendere. Kun aktiv, når PII-maskering er aktiveret. Falske positiver er harmløse (bare mere maskering).",
-        "summaryDetail": "Standard: kompakte afsnit, 1-2 sætninger pr. vedhæftet dokument. Detaljeret: mere grundige afsnit og 3-5 sætninger pr. dokument — nyttigt til køer med mange PDF-vedhæftninger."
+        "summaryDetail": "Standard: kompakte afsnit, 1-2 sætninger pr. vedhæftet dokument. Detaljeret: mere grundige afsnit og 3-5 sætninger pr. dokument — nyttigt til køer med mange PDF-vedhæftninger.",
+        "llmFallback": "Providers tried in order, after the primary provider above, when a request fails (rate limit, timeout, error). Each entry has its own optional model override. Priority 1 is always the primary provider/model; entries here are priority 2, 3, …."
       },
       "common": {
         "validId": "Gyldig/ugyldig er et soft-delete-flag: markering af en post ugyldig skjuler den for vælgere til nye poster uden at slette eksisterende referencer (f.eks. billetter, opgaver). Der er ingen hård sletning."
@@ -1235,6 +1246,9 @@
       "systemAddresses": {
         "email": "Adresse brugt som From til køer og autosvar.",
         "name": "Visningsnavn ved siden af e-mailen (f.eks. “Support <support@example.com>”)."
+      },
+      "telegram": {
+        "mode": "\"Polling\" has Tiqora fetch updates from Telegram itself (no public URL needed). \"Webhook\" has Telegram push updates to the URL below — requires this server to be reachable over HTTPS."
       }
     },
     "nav": {
@@ -1289,7 +1303,8 @@
       "slas": "SLA",
       "systemAddresses": "Systemadresser",
       "notificationEvents": "Notifikations­hændelser",
-      "ticketAttributeRelations": "Attribut­relationer"
+      "ticketAttributeRelations": "Attribut­relationer",
+      "telegram": "Telegram"
     },
     "table": {
       "id": "ID",
@@ -2319,7 +2334,8 @@
       "slas": "Administrer service level agreements og frister.",
       "systemAddresses": "E-mailadresser som From til køer og autosvar.",
       "notificationEvents": "Konfigurer hændelsesdrevne agentnotifikationer.",
-      "ticketAttributeRelations": "Znuny-kompatible afhængighedsmatriciser (service/kø m.m.) som CSV."
+      "ticketAttributeRelations": "Znuny-kompatible afhængighedsmatriciser (service/kø m.m.) som CSV.",
+      "telegram": "Connect a Telegram bot as a ticket channel."
     },
     "mailAccounts": {
       "title_plural": "Mail konti",
@@ -2411,6 +2427,37 @@
       "new": "Ny relation",
       "help": "CSV med overskrift Attribute1;Attribute2 og værdipar (Znuny AdminTicketAttributeRelations). Begrænser formularvalg (f.eks. Service → Kø).",
       "confirmDelete": "Slet denne relation?"
+    },
+    "telegram": {
+      "title": "Telegram",
+      "description": "Connect a Telegram bot as an inbound/outbound ticket channel.",
+      "enabled": "Channel active",
+      "mode": "Mode",
+      "modePolling": "Polling",
+      "modeWebhook": "Webhook",
+      "queue": "Queue",
+      "botToken": "Bot token",
+      "defaultCustomerUser": "Default customer user",
+      "webhookUrl": "Webhook URL",
+      "webhookSecretToken": "Webhook secret token",
+      "webhookRegister": "Register webhook",
+      "webhookRegistering": "Registering…",
+      "webhookUnregister": "Remove webhook",
+      "webhookUnregistering": "Removing…",
+      "webhookRegisterSuccess": "Webhook registered",
+      "webhookRegisterFailure": "Webhook registration failed",
+      "webhookUnregisterSuccess": "Webhook removed",
+      "webhookUnregisterFailure": "Removing the webhook failed",
+      "consentTitle": "GDPR consent",
+      "consentRequired": "Require consent before processing messages",
+      "consentRequiredHelp": "While required, incoming messages from a new Telegram contact are not processed until they confirm consent.",
+      "consentText": "Consent request text",
+      "consentConfirmedText": "Consent confirmation text",
+      "save": "Save",
+      "saving": "Saving…",
+      "saved": "Settings saved.",
+      "saveError": "Saving failed.",
+      "loadError": "Failed to load settings."
     }
   },
   "kb": {

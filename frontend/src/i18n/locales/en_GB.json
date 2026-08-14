@@ -151,7 +151,8 @@
     "passkeyAddError": "Could not add passkey.",
     "passkeyDeleteError": "Could not remove passkey.",
     "passkeyDeleteLastError": "Cannot remove the last 2FA factor while 2FA is enforced.",
-    "passkeyUnsupported": "This browser does not support passkeys (WebAuthn)."
+    "passkeyUnsupported": "This browser does not support passkeys (WebAuthn).",
+    "passkeyReauthRequired": "For your security, please sign in again before changing your passkeys."
   },
   "dashboard": {
     "greeting": {
@@ -545,7 +546,8 @@
     "extrasRetry": "Try again",
     "customerUnresolved": "No customer record matches this address, so customer details are unavailable.",
     "lockedByBanner": "Locked by {{name}}",
-    "takeOver": "Take over"
+    "takeOver": "Take over",
+    "replyViaTelegram": "Reply will be sent via Telegram"
   },
   "search": {
     "title": "Search",
@@ -964,7 +966,15 @@
           "detailed": "Detailed"
         },
         "kbCategories": "KB categories",
-        "kbCategoriesEmpty": "No categories available."
+        "kbCategoriesEmpty": "No categories available.",
+        "llmFallback": "Fallback providers",
+        "fallbackAdd": "Add fallback",
+        "fallbackEmpty": "No fallback providers — the primary provider above is used exclusively.",
+        "fallbackMoveUp": "Move up",
+        "fallbackMoveDown": "Move down",
+        "fallbackRemove": "Remove",
+        "clarifySchemaJson": "Clarify schema fields (JSON)",
+        "clarifySchemaJsonPlaceholder": "{\"fields\": [{\"column\": \"wpnum\", \"label\": \"WP-Nummer\"}]}"
       },
       "usage": {
         "title": "Usage",
@@ -1136,7 +1146,8 @@
         "replyLanguageDefault": "BCP-47 language code used in \"Auto\" mode when the text cannot be confidently matched to a known language profile.",
         "allowedStateTypes": "Comma-separated list of allowed Znuny state types (e.g. \"open\" or \"open,pending reminder\") the AI may set a ticket to via update_ticket_fields — enforced for both the state name and the numeric state id. Empty = default \"open\" only (reopening allowed, never closing); an explicit empty list \"[]\" disables state changes entirely.",
         "piiNer": "Detects person names in text via spaCy NER (German + English) and masks them as [NAME_n] before content reaches the LLM provider — in addition to customer name and senders. Only active when PII masking is on. False positives are harmless (just more masking).",
-        "summaryDetail": "Standard: compact paragraphs, 1–2 sentences per attached document. Detailed: more thorough paragraphs and 3–5 sentences per document — useful for queues with many PDF attachments."
+        "summaryDetail": "Standard: compact paragraphs, 1–2 sentences per attached document. Detailed: more thorough paragraphs and 3–5 sentences per document — useful for queues with many PDF attachments.",
+        "llmFallback": "Providers tried in order, after the primary provider above, when a request fails (rate limit, timeout, error). Each entry has its own optional model override. Priority 1 is always the primary provider/model; entries here are priority 2, 3, …."
       },
       "common": {
         "validId": "Valid/invalid is a soft-delete flag: marking an entry invalid hides it from pickers for new records without deleting existing references (e.g. tickets, assignments). There is no hard delete."
@@ -1235,6 +1246,9 @@
       "systemAddresses": {
         "email": "Address used as the From email for queues and auto-responses.",
         "name": "Display name shown next to the email (e.g. “Support <support@example.com>”)."
+      },
+      "telegram": {
+        "mode": "\"Polling\" has Tiqora fetch updates from Telegram itself (no public URL needed). \"Webhook\" has Telegram push updates to the URL below — requires this server to be reachable over HTTPS."
       }
     },
     "nav": {
@@ -1289,7 +1303,8 @@
       "slas": "SLAs",
       "systemAddresses": "System addresses",
       "notificationEvents": "Notification events",
-      "ticketAttributeRelations": "Attribute relations"
+      "ticketAttributeRelations": "Attribute relations",
+      "telegram": "Telegram"
     },
     "table": {
       "id": "ID",
@@ -2327,7 +2342,8 @@
       "slas": "Manage service level agreements and timers.",
       "systemAddresses": "Email addresses used as From for queues and auto-responses.",
       "notificationEvents": "Configure event-driven agent notifications.",
-      "ticketAttributeRelations": "Znuny-compatible service/queue (and similar) dependency matrices (CSV)."
+      "ticketAttributeRelations": "Znuny-compatible service/queue (and similar) dependency matrices (CSV).",
+      "telegram": "Connect a Telegram bot as a ticket channel."
     },
     "mailAccounts": {
       "title_plural": "Mail accounts",
@@ -2419,6 +2435,37 @@
       "new": "New relation",
       "help": "CSV with header Attribute1;Attribute2 and value pairs (Znuny AdminTicketAttributeRelations). Used to restrict form pickers (e.g. Service → Queue).",
       "confirmDelete": "Delete this relation?"
+    },
+    "telegram": {
+      "title": "Telegram",
+      "description": "Connect a Telegram bot as an inbound/outbound ticket channel.",
+      "enabled": "Channel active",
+      "mode": "Mode",
+      "modePolling": "Polling",
+      "modeWebhook": "Webhook",
+      "queue": "Queue",
+      "botToken": "Bot token",
+      "defaultCustomerUser": "Default customer user",
+      "webhookUrl": "Webhook URL",
+      "webhookSecretToken": "Webhook secret token",
+      "webhookRegister": "Register webhook",
+      "webhookRegistering": "Registering…",
+      "webhookUnregister": "Remove webhook",
+      "webhookUnregistering": "Removing…",
+      "webhookRegisterSuccess": "Webhook registered",
+      "webhookRegisterFailure": "Webhook registration failed",
+      "webhookUnregisterSuccess": "Webhook removed",
+      "webhookUnregisterFailure": "Removing the webhook failed",
+      "consentTitle": "GDPR consent",
+      "consentRequired": "Require consent before processing messages",
+      "consentRequiredHelp": "While required, incoming messages from a new Telegram contact are not processed until they confirm consent.",
+      "consentText": "Consent request text",
+      "consentConfirmedText": "Consent confirmation text",
+      "save": "Save",
+      "saving": "Saving…",
+      "saved": "Settings saved.",
+      "saveError": "Saving failed.",
+      "loadError": "Failed to load settings."
     }
   },
   "kb": {
