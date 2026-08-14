@@ -18,7 +18,8 @@ import {
 import { cn } from "@/lib/cn";
 import { Avatar } from "@/components/ui/Avatar";
 import { Badge } from "@/components/ui/Badge";
-import { AiOriginBadge } from "./AiOriginBadge";
+import { AiOriginToggle, AiOriginTrace } from "./AiOriginBadge";
+import { useAiOriginTrace } from "./useAiOriginTrace";
 import { useTicketReplyDrafts } from "@/lib/replyDrafts";
 import { ArticleQuickActions } from "./ArticleQuickActions";
 import { DraftListRow } from "./DraftPlaceholder";
@@ -211,6 +212,7 @@ function ArticleReader({
   locale: string;
 }) {
   const { t } = useTranslation();
+  const aiOrigin = useAiOriginTrace({ ticketId, articleId: article.id });
   return (
     <div className="space-y-3 rounded-lg border border-hairline bg-surface p-3">
       <div className="space-y-1.5 border-b border-hairline pb-2">
@@ -234,10 +236,17 @@ function ArticleReader({
           </Badge>
           <Badge tone="default">{channelIcon(channelNameOf(article))}</Badge>
           {article.ai_origin && (
-            <AiOriginBadge ticketId={ticketId} articleId={article.id} />
+            <AiOriginToggle
+              articleId={article.id}
+              open={aiOrigin.open}
+              onToggle={aiOrigin.toggle}
+            />
           )}
         </div>
       </div>
+      {article.ai_origin && (
+        <AiOriginTrace articleId={article.id} open={aiOrigin.open} query={aiOrigin.query} />
+      )}
       <ArticleQuickActions
         ticketId={ticketId}
         article={article}
