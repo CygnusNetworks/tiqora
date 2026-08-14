@@ -15,6 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from tiqora.api.attachment_response import safe_attachment_response
 from tiqora.api.deps import AppSettings, CurrentUser, DbSession
+from tiqora.api.v1.ai import AiToolTraceOut, parse_tool_trace
 from tiqora.channels.email.outbound_reply import OutboundMailError
 from tiqora.channels.telegram.outbound import TelegramDeliveryError
 from tiqora.db.engine import get_session_factory
@@ -781,6 +782,18 @@ async def get_similar_tickets(
         await svc.close()
 
 
+class AiOriginOut(BaseModel):
+    """AI-origin marker for an auto-sent article, with its tool trace — same
+    wire shape as ``AiDraftOut.tool_trace`` (see ``tiqora.api.v1.ai``) so the
+    frontend can reuse the draft tool-trace renderer."""
+
+    article_id: int
+    run_id: int | None
+    source: str
+    created_at: datetime | None
+    tool_trace: list[AiToolTraceOut] | None
+
+
 @router.get("/{ticket_id}/articles", response_model=list[ArticleListItem])
 async def list_articles(
     ticket_id: int,
@@ -791,6 +804,30 @@ async def list_articles(
         return await TicketService(session).list_articles(user.id, ticket_id)
     except (TicketNotFound, TicketAccessDenied) as exc:
         raise _map_exc(exc) from exc
+
+
+@router.get("/{ticket_id}/articles/{article_id}/ai-origin", response_model=AiOriginOut)
+async def get_article_ai_origin(
+    ticket_id: int,
+    article_id: int,
+    user: CurrentUser,
+    session: DbSession,
+) -> AiOriginOut:
+    try:
+        origin = await TicketService(session).get_article_ai_origin(user.id, ticket_id, article_id)
+    except (TicketNotFound, TicketAccessDenied) as exc:
+        raise _map_exc(exc) from exc
+    if origin is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="No AI origin for this article"
+        )
+    return AiOriginOut(
+        article_id=origin.article_id,
+        run_id=origin.draft_id,
+        source=origin.source,
+        created_at=origin.created,
+        tool_trace=parse_tool_trace(origin.tool_trace_json) if origin.tool_trace_json else None,
+    )
 
 
 @router.get("/{ticket_id}/articles/{article_id}/body", response_model=ArticleBody)

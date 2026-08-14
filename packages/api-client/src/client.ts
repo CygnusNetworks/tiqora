@@ -62,6 +62,7 @@ export type OnlineAgentOut = Schemas["OnlineAgentOut"];
 export type ArticleCreateRequest = Schemas["ArticleCreateRequest"];
 export type ArticleCreateResponse = Schemas["ArticleCreateResponse"];
 export type ReplyDraftOut = Schemas["ReplyDraftOut"];
+export type AiOriginOut = Schemas["AiOriginOut"];
 export type TemplateOut = Schemas["TemplateOut"];
 export type MutationRequest = Schemas["MutationRequest"];
 export type MergeRequest = Schemas["MergeRequest"];
@@ -1304,6 +1305,14 @@ export class ApiClient {
     return this.request<ReplyDraftOut>(
       "GET",
       `/api/v1/tickets/${ticketId}/articles/${articleId}/reply-draft?reply_all=${replyAll}`,
+      { signal },
+    );
+  }
+
+  getArticleAiOrigin(ticketId: number, articleId: number, signal?: AbortSignal) {
+    return this.request<AiOriginOut>(
+      "GET",
+      `/api/v1/tickets/${ticketId}/articles/${articleId}/ai-origin`,
       { signal },
     );
   }

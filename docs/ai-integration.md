@@ -373,6 +373,18 @@ A proposed customer message that isn't auto-sent becomes a
 discards it (`tiqora.ai.drafts`). At most one `open` draft exists per
 `(ticket_id, based_on_article_id, kind)`; a new draft supersedes the old one.
 
+### Origin trace on auto-sent articles
+
+Auto-sent AI replies (Telegram/email/note, mapped by autonomy — never the
+model) never become a draft, so the tool trace that backs the message would
+otherwise be invisible on the ticket. The auto-send path stamps the same
+`tool_trace_json` a draft would have gotten onto the `tiqora_ai_article_origin`
+row it already writes for that article. In the ticket zoom, an article with
+an AI origin shows a small "🤖 AI" badge (reader pane and conversation bubble
+alike); expanding it lazily fetches
+`GET /api/v1/tickets/{id}/articles/{article_id}/ai-origin` and renders the
+trace with the same `ToolTraceCard` component the draft panel uses.
+
 ### Summaries
 
 A per-ticket running summary lives **only** in

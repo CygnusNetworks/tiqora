@@ -9,6 +9,7 @@ import pytest
 from sqlalchemy import create_engine, text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
+from tiqora.ai.models import TiqoraAiArticleOrigin
 from tiqora.db.tiqora.base import TiqoraBase
 from tiqora.domain.queue_service import QueueService
 from tiqora.domain.ticket_service import (
@@ -49,6 +50,7 @@ def _seed_tickets(sync_url: str) -> dict[str, Any]:
         # Children before parents so FKs do not block.
         conn.execute(text("DELETE FROM article_data_mime_attachment WHERE id = 700"))
         conn.execute(text("DELETE FROM article_data_mime WHERE id = 600"))
+        conn.execute(text("DELETE FROM tiqora_ai_article_origin WHERE article_id = 600"))
         conn.execute(text("DELETE FROM article WHERE id = 600"))
         conn.execute(text("DELETE FROM ticket_history WHERE id = 800"))
         conn.execute(text("DELETE FROM dynamic_field_value WHERE id IN (9001)"))
@@ -374,6 +376,32 @@ async def test_queue_ticket_detail_attachment_permissions(
         assert articles[0].subject == "Re: Test"
         assert articles[0].sender_type == "customer"
         assert articles[0].communication_channel_name == "Email"
+        assert articles[0].ai_origin is False
+
+        # No AI-origin row yet -> None (route maps this to 404).
+        assert await ts.get_article_ai_origin(ids["reader"], ids["ticket"], ids["article"]) is None
+        with pytest.raises(TicketAccessDenied):
+            await ts.get_article_ai_origin(ids["no_access"], ids["ticket"], ids["article"])
+
+        session.add(
+            TiqoraAiArticleOrigin(
+                article_id=ids["article"],
+                source="auto",
+                queue_id=ids["queue"],
+                service_user_id=ids["reader"],
+                tool_trace_json='[{"role": "tool", "name": "kb_search", "content": "3 Treffer"}]',
+            )
+        )
+        await session.commit()
+
+        articles = await ts.list_articles(ids["reader"], ids["ticket"])
+        assert articles[0].ai_origin is True
+
+        origin = await ts.get_article_ai_origin(ids["reader"], ids["ticket"], ids["article"])
+        assert origin is not None
+        assert origin.source == "auto"
+        assert origin.tool_trace_json is not None
+        assert "kb_search" in origin.tool_trace_json
 
         body = await ts.get_article_body(ids["reader"], ids["ticket"], ids["article"])
         assert "Hello body" in body.body
