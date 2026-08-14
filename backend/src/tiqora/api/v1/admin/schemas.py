@@ -1260,6 +1260,40 @@ class PlaceholderFieldUpdate(BaseModel):
 
 
 # ---------------------------------------------------------------------------
+# Queue customer links — tiqora_queue_customer_link
+# ---------------------------------------------------------------------------
+
+
+class QueueCustomerLinkOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    queue_id: int
+    queue_name: str | None = None
+    url_template: str
+    admin_url_template: str | None
+    label: str | None
+    visibility: str
+    create_time: datetime
+    change_time: datetime
+
+
+class QueueCustomerLinkCreate(BaseModel):
+    queue_id: int
+    url_template: str
+    admin_url_template: str | None = None
+    label: str | None = None
+    visibility: str = "all"
+
+
+class QueueCustomerLinkUpdate(BaseModel):
+    url_template: str | None = None
+    admin_url_template: str | None = None
+    label: str | None = None
+    visibility: str | None = None
+
+
+# ---------------------------------------------------------------------------
 # Auth config — per-agent SSO eligibility + 2FA enforcement
 # ---------------------------------------------------------------------------
 
