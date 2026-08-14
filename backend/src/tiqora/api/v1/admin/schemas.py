@@ -1274,6 +1274,7 @@ class QueueCustomerLinkOut(BaseModel):
     admin_url_template: str | None
     label: str | None
     visibility: str
+    login_suffix_separator: str | None
     create_time: datetime
     change_time: datetime
 
@@ -1284,6 +1285,7 @@ class QueueCustomerLinkCreate(BaseModel):
     admin_url_template: str | None = None
     label: str | None = None
     visibility: str = "all"
+    login_suffix_separator: str | None = None
 
 
 class QueueCustomerLinkUpdate(BaseModel):
@@ -1291,6 +1293,7 @@ class QueueCustomerLinkUpdate(BaseModel):
     admin_url_template: str | None = None
     label: str | None = None
     visibility: str | None = None
+    login_suffix_separator: str | None = None
 
 
 # ---------------------------------------------------------------------------
