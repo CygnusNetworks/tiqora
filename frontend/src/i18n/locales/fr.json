@@ -966,7 +966,15 @@
           "detailed": "Détaillé"
         },
         "kbCategories": "Catégories de la base de connaissances",
-        "kbCategoriesEmpty": "Aucune catégorie disponible."
+        "kbCategoriesEmpty": "Aucune catégorie disponible.",
+        "llmFallback": "Fallback providers",
+        "fallbackAdd": "Add fallback",
+        "fallbackEmpty": "No fallback providers — the primary provider above is used exclusively.",
+        "fallbackMoveUp": "Move up",
+        "fallbackMoveDown": "Move down",
+        "fallbackRemove": "Remove",
+        "clarifySchemaJson": "Clarify schema fields (JSON)",
+        "clarifySchemaJsonPlaceholder": "{\"fields\": [{\"column\": \"wpnum\", \"label\": \"WP-Nummer\"}]}"
       },
       "usage": {
         "title": "Utilisation",
@@ -1138,7 +1146,8 @@
         "replyLanguageDefault": "Code de langue BCP-47 utilisé en mode « Auto » lorsque le texte ne peut pas être associé en toute confiance à un profil de langue connu.",
         "allowedStateTypes": "Liste séparée par des virgules des types d'état Znuny autorisés (par exemple \"ouvert\" ou \"ouvert, en attente de rappel\") pour lesquels l'IA peut définir un ticket via update_ticket_fields - appliquée à la fois pour le nom de l'état et l'ID numérique d'état. Vide = \"ouvert\" par défaut uniquement (réouverture autorisée, jamais fermeture) ; une liste vide explicite \"[]\" désactive entièrement les changements d'état.",
         "piiNer": "Détecte les noms de personnes dans le texte via spaCy NER (allemand + anglais) et les masque comme [NAME_n] avant que le contenu n'atteigne le fournisseur LLM — en plus du nom du client et des expéditeurs. Actif uniquement lorsque le masquage PII est activé. Les faux positifs sont inoffensifs (juste plus de masquage).",
-        "summaryDetail": "Standard : paragraphes compacts, 1 à 2 phrases par document joint. Détaillé : paragraphes plus détaillés et 3 à 5 phrases par document – utile pour les files d'attente contenant de nombreuses pièces jointes PDF."
+        "summaryDetail": "Standard : paragraphes compacts, 1 à 2 phrases par document joint. Détaillé : paragraphes plus détaillés et 3 à 5 phrases par document – utile pour les files d'attente contenant de nombreuses pièces jointes PDF.",
+        "llmFallback": "Providers tried in order, after the primary provider above, when a request fails (rate limit, timeout, error). Each entry has its own optional model override. Priority 1 is always the primary provider/model; entries here are priority 2, 3, …."
       },
       "common": {
         "validId": "Valide/invalide est un indicateur de suppression logique : marquer une entrée comme invalide la masque des sélecteurs de nouveaux enregistrements sans supprimer les références existantes (p. ex. tickets, affectations). Il n'y a pas de suppression définitive."

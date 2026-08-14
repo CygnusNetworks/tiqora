@@ -966,7 +966,15 @@
           "detailed": "Детално"
         },
         "kbCategories": "KB категории",
-        "kbCategoriesEmpty": "Нема достапни категории."
+        "kbCategoriesEmpty": "Нема достапни категории.",
+        "llmFallback": "Fallback providers",
+        "fallbackAdd": "Add fallback",
+        "fallbackEmpty": "No fallback providers — the primary provider above is used exclusively.",
+        "fallbackMoveUp": "Move up",
+        "fallbackMoveDown": "Move down",
+        "fallbackRemove": "Remove",
+        "clarifySchemaJson": "Clarify schema fields (JSON)",
+        "clarifySchemaJsonPlaceholder": "{\"fields\": [{\"column\": \"wpnum\", \"label\": \"WP-Nummer\"}]}"
       },
       "usage": {
         "title": "Употреба",
@@ -1138,7 +1146,8 @@
         "replyLanguageDefault": "Јазичниот код на BCP-47 се користи во режимот „Автоматски“ кога текстот не може самоуверено да се совпадне со познат јазичен профил.",
         "allowedStateTypes": "Список разделен со запирки на дозволени типови на состојби Znuny (на пр. „отворен“ или „отворен, потсетник во очекување“) вештачката интелигенција може да постави тикет до преку update_ticket_fields — применета и за името на државата и за нумеричкиот ид на состојба. Празен = само стандардно „отворено“ (повторното отворање е дозволено, никогаш не се затвора); експлицитна празна листа „[]“ целосно ги оневозможува промените на состојбата.",
         "piiNer": "Ги открива имињата на лицата во текстот преку spaCy NER (германски + англиски) и ги маскира како [NAME_n] пред содржината да стигне до давателот на LLM - покрај името на клиентот и испраќачите. Активно само кога е вклучено маскирањето PII. Лажните позитиви се безопасни (само повеќе маскирање).",
-        "summaryDetail": "Стандард: компактни параграфи, 1–2 реченици по приложен документ. Детално: потемелни параграфи и 3–5 реченици по документ - корисни за редици со многу прилози за PDF."
+        "summaryDetail": "Стандард: компактни параграфи, 1–2 реченици по приложен документ. Детално: потемелни параграфи и 3–5 реченици по документ - корисни за редици со многу прилози за PDF.",
+        "llmFallback": "Providers tried in order, after the primary provider above, when a request fails (rate limit, timeout, error). Each entry has its own optional model override. Priority 1 is always the primary provider/model; entries here are priority 2, 3, …."
       },
       "common": {
         "validId": "Valid/invalid е знаменце со меко бришење: означувањето на записот како неважечки го сокрива од избирачите за нови записи без да се бришат постоечките референци (на пр. билети, задачи). Нема тешко бришење."

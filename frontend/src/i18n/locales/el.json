@@ -966,7 +966,15 @@
           "detailed": "Αναλυτικά"
         },
         "kbCategories": "Κατηγορίες KB",
-        "kbCategoriesEmpty": "Δεν υπάρχουν διαθέσιμες κατηγορίες."
+        "kbCategoriesEmpty": "Δεν υπάρχουν διαθέσιμες κατηγορίες.",
+        "llmFallback": "Fallback providers",
+        "fallbackAdd": "Add fallback",
+        "fallbackEmpty": "No fallback providers — the primary provider above is used exclusively.",
+        "fallbackMoveUp": "Move up",
+        "fallbackMoveDown": "Move down",
+        "fallbackRemove": "Remove",
+        "clarifySchemaJson": "Clarify schema fields (JSON)",
+        "clarifySchemaJsonPlaceholder": "{\"fields\": [{\"column\": \"wpnum\", \"label\": \"WP-Nummer\"}]}"
       },
       "usage": {
         "title": "Χρήση",
@@ -1138,7 +1146,8 @@
         "replyLanguageDefault": "Ο κωδικός γλώσσας BCP-47 χρησιμοποιείται στη λειτουργία \"Auto\" όταν το κείμενο δεν μπορεί να αντιστοιχιστεί με σιγουριά σε ένα προφίλ γνωστής γλώσσας.",
         "allowedStateTypes": "Λίστα επιτρεπόμενων τύπων κατάστασης Znuny διαχωρισμένη με κόμματα (π.χ. \"ανοιχτή\" ή \"ανοιχτή, σε εκκρεμότητα υπενθύμισης\") η τεχνητή νοημοσύνη μπορεί να ορίσει ένα εισιτήριο μέσω πεδίων update_ticket_ — επιβάλλεται τόσο για το όνομα της κατάστασης όσο και για το αριθμητικό αναγνωριστικό κατάστασης. Empty = προεπιλεγμένο \"ανοιχτό\" μόνο (το ξανά άνοιγμα επιτρέπεται, ποτέ δεν κλείνει). μια ρητή κενή λίστα \"[]\" απενεργοποιεί πλήρως τις αλλαγές κατάστασης.",
         "piiNer": "Εντοπίζει ονόματα ατόμων σε κείμενο μέσω του spaCy NER (Γερμανικά + Αγγλικά) και τα κρύβει ως [NAME_n] πριν το περιεχόμενο φτάσει στον πάροχο LLM — εκτός από το όνομα πελάτη και τους αποστολείς. Ενεργή μόνο όταν η κάλυψη PII είναι ενεργοποιημένη. Τα ψευδώς θετικά είναι αβλαβή (απλώς περισσότερο συγκάλυψη).",
-        "summaryDetail": "Πρότυπο: συμπαγείς παράγραφοι, 1–2 προτάσεις ανά συνημμένο έγγραφο. Αναλυτικά: πιο εμπεριστατωμένες παράγραφοι και 3–5 προτάσεις ανά έγγραφο — χρήσιμο για ουρές με πολλά συνημμένα PDF."
+        "summaryDetail": "Πρότυπο: συμπαγείς παράγραφοι, 1–2 προτάσεις ανά συνημμένο έγγραφο. Αναλυτικά: πιο εμπεριστατωμένες παράγραφοι και 3–5 προτάσεις ανά έγγραφο — χρήσιμο για ουρές με πολλά συνημμένα PDF.",
+        "llmFallback": "Providers tried in order, after the primary provider above, when a request fails (rate limit, timeout, error). Each entry has its own optional model override. Priority 1 is always the primary provider/model; entries here are priority 2, 3, …."
       },
       "common": {
         "validId": "Valid/invalid είναι μια σημαία απαλής διαγραφής: η επισήμανση μιας καταχώρισης ως μη έγκυρης την αποκρύπτει από τους επιλογείς για νέες εγγραφές χωρίς να διαγράφει υπάρχουσες αναφορές (π.χ. εισιτήρια, εργασίες). Δεν υπάρχει σκληρή διαγραφή."

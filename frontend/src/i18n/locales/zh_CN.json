@@ -966,7 +966,15 @@
           "detailed": "详细"
         },
         "kbCategories": "知识库类别",
-        "kbCategoriesEmpty": "暂无可用类别。"
+        "kbCategoriesEmpty": "暂无可用类别。",
+        "llmFallback": "Fallback providers",
+        "fallbackAdd": "Add fallback",
+        "fallbackEmpty": "No fallback providers — the primary provider above is used exclusively.",
+        "fallbackMoveUp": "Move up",
+        "fallbackMoveDown": "Move down",
+        "fallbackRemove": "Remove",
+        "clarifySchemaJson": "Clarify schema fields (JSON)",
+        "clarifySchemaJsonPlaceholder": "{\"fields\": [{\"column\": \"wpnum\", \"label\": \"WP-Nummer\"}]}"
       },
       "usage": {
         "title": "用途",
@@ -1138,7 +1146,8 @@
         "replyLanguageDefault": "当文本无法与已知语言配置文件可靠匹配时，在“自动”模式下使用 BCP-47 语言代码。",
         "allowedStateTypes": "以逗号分隔的允许的 Znuny 状态类型列表（例如“打开”或“打开、待处理提醒”），AI 可以通过 update_ticket_fields 设置工单 — 对状态名称和数字状态 id 强制执行。空 = 默认仅“打开”（允许重新打开，从不关闭）；显式的空列表“[]”完全禁用状态更改。",
         "piiNer": "通过 spaCy NER（德语 + 英语）检测文本中的人名，并在内容到达 LLM 提供商之前将其掩码为 [NAME_n] - 除了客户名称和发件人之外。仅当 PII 屏蔽开启时才有效。误报是无害的（只是更多的掩蔽）。",
-        "summaryDetail": "标准：段落紧凑，每个附件有 1-2 句话。详细：每个文档有更详尽的段落和 3-5 个句子 - 对于具有许多 PDF 附件的队列很有用。"
+        "summaryDetail": "标准：段落紧凑，每个附件有 1-2 句话。详细：每个文档有更详尽的段落和 3-5 个句子 - 对于具有许多 PDF 附件的队列很有用。",
+        "llmFallback": "Providers tried in order, after the primary provider above, when a request fails (rate limit, timeout, error). Each entry has its own optional model override. Priority 1 is always the primary provider/model; entries here are priority 2, 3, …."
       },
       "common": {
         "validId": "有效/无效是一个软删除标志：将条目标记为无效会在新记录的选择器中隐藏它，而不删除现有引用（例如工单、作业）。没有硬删除。"

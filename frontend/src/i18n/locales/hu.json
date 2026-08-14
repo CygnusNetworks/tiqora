@@ -966,7 +966,15 @@
           "detailed": "Részletes"
         },
         "kbCategories": "KB kategóriák",
-        "kbCategoriesEmpty": "Nincs elérhető kategória."
+        "kbCategoriesEmpty": "Nincs elérhető kategória.",
+        "llmFallback": "Fallback providers",
+        "fallbackAdd": "Add fallback",
+        "fallbackEmpty": "No fallback providers — the primary provider above is used exclusively.",
+        "fallbackMoveUp": "Move up",
+        "fallbackMoveDown": "Move down",
+        "fallbackRemove": "Remove",
+        "clarifySchemaJson": "Clarify schema fields (JSON)",
+        "clarifySchemaJsonPlaceholder": "{\"fields\": [{\"column\": \"wpnum\", \"label\": \"WP-Nummer\"}]}"
       },
       "usage": {
         "title": "Használat",
@@ -1138,7 +1146,8 @@
         "replyLanguageDefault": "BCP-47 nyelvi kód, amelyet \"Auto\" módban használnak, ha a szöveg nem illeszthető biztosan egy ismert nyelvi profilhoz.",
         "allowedStateTypes": "Vesszővel elválasztott lista az engedélyezett Znuny állapotípusokról (pl. „open” vagy „open,pending reminder”), amelyekre az AI a jegyet az update_ticket_fields eszközzel állíthatja — érvényesül az állapotnévre és a numerikus állapot-ID-ra is. Üres = alapértelmezetten csak „open” (újranyitás megengedett, lezárás soha); az explicit üres lista „[]” teljesen letiltja az állapotváltást.",
         "piiNer": "A spaCy NER (német + angol) segítségével felismeri a személyneveket a szövegben, és [NAME_n] formában maszkolja őket, mielőtt a tartalom eljutna az LLM-szolgáltatóhoz — az ügyfélnév és a feladók maszkolásán felül. Csak akkor aktív, ha a PII-maszkolás be van kapcsolva. A téves pozitívok ártalmatlanok (csak több maszkolás).",
-        "summaryDetail": "Szabvány: tömör bekezdések, csatolt dokumentumonként 1-2 mondat. Részletes: alaposabb bekezdések és 3–5 mondat dokumentumonként – hasznos a sok PDF-mellékletet tartalmazó soroknál."
+        "summaryDetail": "Szabvány: tömör bekezdések, csatolt dokumentumonként 1-2 mondat. Részletes: alaposabb bekezdések és 3–5 mondat dokumentumonként – hasznos a sok PDF-mellékletet tartalmazó soroknál.",
+        "llmFallback": "Providers tried in order, after the primary provider above, when a request fails (rate limit, timeout, error). Each entry has its own optional model override. Priority 1 is always the primary provider/model; entries here are priority 2, 3, …."
       },
       "common": {
         "validId": "Az érvényes/érvénytelen egy lágy törlés jelző: érvénytelenre állításkor az elem eltűnik az új rekordok kiválasztóiból, de a meglévő hivatkozások megmaradnak."

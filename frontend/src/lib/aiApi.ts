@@ -130,6 +130,9 @@ export type AiQueuePolicyOut = {
   service_user_id: number | null;
   llm_provider_id: number | null;
   model_override: string | null;
+  /** JSON array of fallback providers tried in order after `llm_provider_id`
+   * fails: `[{"provider_id": number, "model": string | null}, ...]`. */
+  llm_fallback_json: string | null;
   vision_provider_id: number | null;
   kb_tags: string | null;
   kb_category_ids: string | null;
@@ -174,6 +177,7 @@ export type AiQueuePolicyCreate = {
   service_user_id?: number | null;
   llm_provider_id?: number | null;
   model_override?: string | null;
+  llm_fallback_json?: string | null;
   vision_provider_id?: number | null;
   kb_tags?: string | null;
   kb_category_ids?: string | null;

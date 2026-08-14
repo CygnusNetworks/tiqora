@@ -966,7 +966,15 @@
           "detailed": "مفصلة"
         },
         "kbCategories": "فئات كيلو بايت",
-        "kbCategoriesEmpty": "لا توجد فئات متاحة."
+        "kbCategoriesEmpty": "لا توجد فئات متاحة.",
+        "llmFallback": "Fallback providers",
+        "fallbackAdd": "Add fallback",
+        "fallbackEmpty": "No fallback providers — the primary provider above is used exclusively.",
+        "fallbackMoveUp": "Move up",
+        "fallbackMoveDown": "Move down",
+        "fallbackRemove": "Remove",
+        "clarifySchemaJson": "Clarify schema fields (JSON)",
+        "clarifySchemaJsonPlaceholder": "{\"fields\": [{\"column\": \"wpnum\", \"label\": \"WP-Nummer\"}]}"
       },
       "usage": {
         "title": "الاستخدام",
@@ -1138,7 +1146,8 @@
         "replyLanguageDefault": "يتم استخدام رمز اللغة BCP-47 في الوضع \"تلقائي\" عندما لا يمكن مطابقة النص بثقة مع ملف تعريف لغة معروف.",
         "allowedStateTypes": "قائمة مفصولة بفواصل لأنواع حالات Znuny المسموح بها (على سبيل المثال، \"مفتوح\" أو \"مفتوح، في انتظار التذكير\") قد يقوم الذكاء الاصطناعي بتعيين تذكرة عبر update_ticket_fields - يتم فرضها على كل من اسم الولاية ومعرف الحالة الرقمي. فارغ = افتراضي \"فتح\" فقط (يُسمح بإعادة الفتح، ولا يُغلق مطلقًا)؛ تعمل القائمة الفارغة الصريحة \"[]\" على تعطيل تغييرات الحالة بالكامل.",
         "piiNer": "يكتشف أسماء الأشخاص في النص عبر spaCy NER (الألمانية + الإنجليزية) ويخفيها كـ [NAME_n] قبل أن يصل المحتوى إلى موفر LLM - بالإضافة إلى اسم العميل والمرسلين. يتم تفعيله فقط عندما يكون إخفاء معلومات تحديد الهوية الشخصية (PII) قيد التشغيل. الإيجابيات الكاذبة غير ضارة (مجرد المزيد من الإخفاء).",
-        "summaryDetail": "المعيار: فقرات مدمجة، 1-2 جمل لكل مستند مرفق. تفصيلي: فقرات أكثر شمولاً و3-5 جمل لكل مستند - مفيدة لقوائم الانتظار التي تحتوي على العديد من مرفقات PDF."
+        "summaryDetail": "المعيار: فقرات مدمجة، 1-2 جمل لكل مستند مرفق. تفصيلي: فقرات أكثر شمولاً و3-5 جمل لكل مستند - مفيدة لقوائم الانتظار التي تحتوي على العديد من مرفقات PDF.",
+        "llmFallback": "Providers tried in order, after the primary provider above, when a request fails (rate limit, timeout, error). Each entry has its own optional model override. Priority 1 is always the primary provider/model; entries here are priority 2, 3, …."
       },
       "common": {
         "validId": "صالح/غير صالح هي علامة للحذف الناعم: وضع علامة على الإدخال غير صالح يؤدي إلى إخفائه عن منتقي السجلات الجديدة دون حذف المراجع الموجودة (مثل التذاكر والواجبات). لا يوجد حذف الثابت."

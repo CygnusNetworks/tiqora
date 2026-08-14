@@ -966,7 +966,15 @@
           "detailed": "Išsamus"
         },
         "kbCategories": "KB kategorijos",
-        "kbCategoriesEmpty": "Nėra kategorijų."
+        "kbCategoriesEmpty": "Nėra kategorijų.",
+        "llmFallback": "Fallback providers",
+        "fallbackAdd": "Add fallback",
+        "fallbackEmpty": "No fallback providers — the primary provider above is used exclusively.",
+        "fallbackMoveUp": "Move up",
+        "fallbackMoveDown": "Move down",
+        "fallbackRemove": "Remove",
+        "clarifySchemaJson": "Clarify schema fields (JSON)",
+        "clarifySchemaJsonPlaceholder": "{\"fields\": [{\"column\": \"wpnum\", \"label\": \"WP-Nummer\"}]}"
       },
       "usage": {
         "title": "Naudojimas",
@@ -1138,7 +1146,8 @@
         "replyLanguageDefault": "BCP-47 kalbos kodas, naudojamas „Auto“ režimu, kai teksto negalima patikimai suderinti su žinomos kalbos profiliu.",
         "allowedStateTypes": "Kableliais atskirtas leidžiamų „Znuny“ būsenų tipų sąrašas (pvz., „atidaryti“ arba „atidaryti, laukia priminimas“), AI gali nustatyti bilietą per update_ticket_fields – taikomas ir būsenos pavadinimui, ir skaitiniam būsenos ID. Empty = numatytasis tik \"atidaryti\" (leidžiamas pakartotinis atidarymas, niekada neuždaromas); aiškus tuščias sąrašas „[]“ visiškai išjungia būsenos pakeitimus.",
         "piiNer": "Aptinka asmenų vardus tekste per spaCy NER (vokiečių ir anglų k.) ir užmaskuoja juos kaip [NAME_n], kol turinys pasiekia LLM teikėją, be kliento vardo ir siuntėjų. Aktyvus tik tada, kai įjungtas AII maskavimas. Klaidingi teigiami rezultatai yra nekenksmingi (tik labiau maskuoja).",
-        "summaryDetail": "Standartas: kompaktiškos pastraipos, 1–2 sakiniai kiekviename pridedamame dokumente. Išsamiau: išsamesnės pastraipos ir 3–5 sakiniai viename dokumente – naudinga eilėse su daugybe PDF priedų."
+        "summaryDetail": "Standartas: kompaktiškos pastraipos, 1–2 sakiniai kiekviename pridedamame dokumente. Išsamiau: išsamesnės pastraipos ir 3–5 sakiniai viename dokumente – naudinga eilėse su daugybe PDF priedų.",
+        "llmFallback": "Providers tried in order, after the primary provider above, when a request fails (rate limit, timeout, error). Each entry has its own optional model override. Priority 1 is always the primary provider/model; entries here are priority 2, 3, …."
       },
       "common": {
         "validId": "Valid / Invalid yra švelnaus ištrynimo vėliavėlė: pažymėjus įrašą kaip negaliojantį, jis paslepiamas nuo naujų įrašų rinkėjų, neištrinant esamų nuorodų (pvz., bilietų, užduočių). Sunkaus ištrynimo nėra."

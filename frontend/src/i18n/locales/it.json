@@ -966,7 +966,15 @@
           "detailed": "Dettagliato"
         },
         "kbCategories": "KB categorie",
-        "kbCategoriesEmpty": "Nessuna categoria disponibile"
+        "kbCategoriesEmpty": "Nessuna categoria disponibile",
+        "llmFallback": "Fallback providers",
+        "fallbackAdd": "Add fallback",
+        "fallbackEmpty": "No fallback providers — the primary provider above is used exclusively.",
+        "fallbackMoveUp": "Move up",
+        "fallbackMoveDown": "Move down",
+        "fallbackRemove": "Remove",
+        "clarifySchemaJson": "Clarify schema fields (JSON)",
+        "clarifySchemaJsonPlaceholder": "{\"fields\": [{\"column\": \"wpnum\", \"label\": \"WP-Nummer\"}]}"
       },
       "usage": {
         "title": "Utilizzo",
@@ -1138,7 +1146,8 @@
         "replyLanguageDefault": "Codice lingua BCP-47 utilizzato in modalità \"Auto\" quando non è possibile abbinare con sicurezza il testo a un profilo linguistico noto.",
         "allowedStateTypes": "Elenco separato da virgole dei tipi di stato Znuny consentiti (ad esempio \"aperto\" o \"aperto, promemoria in sospeso\") su cui AI può impostare un ticket tramite update_ticket_fields - applicato sia per il nome dello stato che per l'ID numerico dello stato. Vuoto = predefinito solo \"aperto\" (riapertura consentita, mai chiusura); un elenco vuoto esplicito \"[]\" disabilita completamente i cambiamenti di stato.",
         "piiNer": "Rileva i nomi di persona nel testo tramite spaCy NER (tedesco + inglese) e li maschera come [NAME_n] prima che il contenuto raggiunga il provider LLM — oltre a nome cliente e mittenti. Attivo solo quando il mascheramento PII è abilitato.",
-        "summaryDetail": "Standard: paragrafi compatti, 1–2 frasi per documento allegato. Dettagliato: paragrafi più approfonditi e 3-5 frasi per documento: utile per code con molti allegati PDF."
+        "summaryDetail": "Standard: paragrafi compatti, 1–2 frasi per documento allegato. Dettagliato: paragrafi più approfonditi e 3-5 frasi per documento: utile per code con molti allegati PDF.",
+        "llmFallback": "Providers tried in order, after the primary provider above, when a request fails (rate limit, timeout, error). Each entry has its own optional model override. Priority 1 is always the primary provider/model; entries here are priority 2, 3, …."
       },
       "common": {
         "validId": "Valido/non valido è un flag di eliminazione temporanea: contrassegnare una voce come non valida la nasconde ai selezionatori per nuovi record senza eliminare i riferimenti esistenti (ad esempio ticket, assegnazioni). Non è prevista alcuna eliminazione definitiva."

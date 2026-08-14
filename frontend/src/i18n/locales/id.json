@@ -966,7 +966,15 @@
           "detailed": "Terperinci"
         },
         "kbCategories": "kategori KB",
-        "kbCategoriesEmpty": "Tidak ada kategori yang tersedia."
+        "kbCategoriesEmpty": "Tidak ada kategori yang tersedia.",
+        "llmFallback": "Fallback providers",
+        "fallbackAdd": "Add fallback",
+        "fallbackEmpty": "No fallback providers — the primary provider above is used exclusively.",
+        "fallbackMoveUp": "Move up",
+        "fallbackMoveDown": "Move down",
+        "fallbackRemove": "Remove",
+        "clarifySchemaJson": "Clarify schema fields (JSON)",
+        "clarifySchemaJsonPlaceholder": "{\"fields\": [{\"column\": \"wpnum\", \"label\": \"WP-Nummer\"}]}"
       },
       "usage": {
         "title": "Penggunaan",
@@ -1138,7 +1146,8 @@
         "replyLanguageDefault": "Kode bahasa BCP-47 digunakan dalam mode \"Otomatis\" ketika teks tidak dapat dicocokkan dengan profil bahasa yang dikenal.",
         "allowedStateTypes": "Daftar jenis negara bagian Znuny yang diizinkan yang dipisahkan koma (misalnya, \"terbuka\" atau \"terbuka, pengingat tertunda\") yang dapat ditetapkan tiketnya oleh AI melalui update_ticket_fields — diberlakukan untuk nama negara bagian dan id negara bagian numerik. Kosong = default \"buka\" saja (dibolehkan dibuka kembali, tidak pernah ditutup); daftar kosong eksplisit \"[]\" menonaktifkan perubahan status sepenuhnya.",
         "piiNer": "Mendeteksi nama orang dalam teks melalui spaCy NER (Jerman + Inggris) dan menyamarkannya sebagai [NAME_n] sebelum konten mencapai penyedia LLM — selain nama pelanggan dan pengirim. Hanya aktif jika penyembunyian PII aktif. Positif palsu tidak berbahaya (hanya lebih menutupi).",
-        "summaryDetail": "Standar: paragraf ringkas, 1–2 kalimat per dokumen terlampir. Terperinci: paragraf lebih menyeluruh dan 3–5 kalimat per dokumen — berguna untuk antrean dengan banyak lampiran PDF."
+        "summaryDetail": "Standar: paragraf ringkas, 1–2 kalimat per dokumen terlampir. Terperinci: paragraf lebih menyeluruh dan 3–5 kalimat per dokumen — berguna untuk antrean dengan banyak lampiran PDF.",
+        "llmFallback": "Providers tried in order, after the primary provider above, when a request fails (rate limit, timeout, error). Each entry has its own optional model override. Priority 1 is always the primary provider/model; entries here are priority 2, 3, …."
       },
       "common": {
         "validId": "Valid/tidak valid adalah tanda penghapusan sementara: menandai entri sebagai tidak valid akan menyembunyikan entri tersebut dari pemetik rekaman baru tanpa menghapus referensi yang sudah ada (misalnya tiket, tugas). Tidak ada penghapusan yang sulit."

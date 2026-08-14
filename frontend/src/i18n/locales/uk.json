@@ -966,7 +966,15 @@
           "detailed": "Детальний"
         },
         "kbCategories": "Категорії КБ",
-        "kbCategoriesEmpty": "Категорії відсутні."
+        "kbCategoriesEmpty": "Категорії відсутні.",
+        "llmFallback": "Fallback providers",
+        "fallbackAdd": "Add fallback",
+        "fallbackEmpty": "No fallback providers — the primary provider above is used exclusively.",
+        "fallbackMoveUp": "Move up",
+        "fallbackMoveDown": "Move down",
+        "fallbackRemove": "Remove",
+        "clarifySchemaJson": "Clarify schema fields (JSON)",
+        "clarifySchemaJsonPlaceholder": "{\"fields\": [{\"column\": \"wpnum\", \"label\": \"WP-Nummer\"}]}"
       },
       "usage": {
         "title": "Використання",
@@ -1138,7 +1146,8 @@
         "replyLanguageDefault": "Код мови BCP-47, який використовується в режимі «Авто», коли текст не можна впевнено зіставити з відомим мовним профілем.",
         "allowedStateTypes": "Відокремлений комами список дозволених типів стану Znuny (наприклад, «відкрито» або «відкрито, очікує нагадування»), до якого AI може встановити квиток через update_ticket_fields — застосовується як для назви стану, так і для числового ідентифікатора стану. Порожньо = за замовчуванням лише \"відкрито\" (повторне відкриття дозволено, ніколи не закривається); явний порожній список \"[]\" повністю вимикає зміни стану.",
         "piiNer": "Виявляє імена осіб у тексті за допомогою spaCy NER (німецька + англійська) і маскує їх як [NAME_n] до того, як вміст досягне постачальника LLM — на додаток до імені клієнта та відправників. Активний, лише коли ввімкнено маскування ідентифікаційної інформації. Помилкові спрацьовування нешкідливі (просто більше маскування).",
-        "summaryDetail": "Стандарт: компактні абзаци, 1–2 речення в кожному вкладеному документі. Деталізовано: докладніші абзаци та 3–5 речень на документ — корисно для черг із багатьма PDF-додатками."
+        "summaryDetail": "Стандарт: компактні абзаци, 1–2 речення в кожному вкладеному документі. Деталізовано: докладніші абзаци та 3–5 речень на документ — корисно для черг із багатьма PDF-додатками.",
+        "llmFallback": "Providers tried in order, after the primary provider above, when a request fails (rate limit, timeout, error). Each entry has its own optional model override. Priority 1 is always the primary provider/model; entries here are priority 2, 3, …."
       },
       "common": {
         "validId": "Дійсний/недійсний — це позначка м’якого видалення: позначення запису недійсним приховує його від засобів вибору нових записів без видалення існуючих посилань (наприклад, квитки, завдання). Жорсткого видалення немає."
