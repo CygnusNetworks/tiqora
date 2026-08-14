@@ -19,11 +19,21 @@ function stripUntrustedPrefix(content: string): string {
   return content.slice(UNTRUSTED_TOOL_RESULT_PREFIX.length).replace(/^\s+/, "");
 }
 
+/** PII masking replaces matches in the *serialized* JSON string; when the
+ * original value was a bare number (e.g. `"free_traffic": 1073741824`), the
+ * replacement token comes out unquoted (`"free_traffic": [PHONE_2]`) and
+ * breaks JSON.parse. Quote such bare tokens in value position — tokens
+ * inside string values are untouched (they are preceded by a quote, not by
+ * `:`/`,`/`[`). */
+function quoteBareMaskTokens(content: string): string {
+  return content.replace(/([:[,]\s*)(\[[A-Z][A-Z0-9_]*_\d+\])(?=\s*[,}\]])/g, '$1"$2"');
+}
+
 /** Best-effort JSON parse of a tool result — objects/arrays render
  * structured, everything else falls back to (unescaped) text. */
 function parseToolContent(content: string): unknown | null {
   try {
-    const v = JSON.parse(content) as unknown;
+    const v = JSON.parse(quoteBareMaskTokens(content)) as unknown;
     return typeof v === "object" && v !== null ? v : null;
   } catch {
     return null;
