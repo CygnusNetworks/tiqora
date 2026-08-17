@@ -11,6 +11,7 @@ import { Spinner } from "@/components/ui/Spinner";
 import { postComposerExtras } from "@/lib/composerExtras";
 import type { PickedMention } from "@/lib/mentions";
 import { ArticleBodyRenderer } from "./ArticleBodyRenderer";
+import { AttachmentLightbox } from "./AttachmentLightbox";
 import { ComposerTimeChip } from "./ComposerTimeChip";
 import { MentionTextarea } from "./MentionTextarea";
 import { ReplyDialog } from "./ReplyDialog";
@@ -523,6 +524,20 @@ export function ArticleBodyLoader({
   );
 }
 
+/** Above this size an inline preview costs more than it is worth: the browser
+ * would pull the full original just to paint a 4rem square. Such images stay
+ * plain file rows until the API grows a thumbnail variant. */
+const PREVIEW_MAX_BYTES = 10 * 1024 * 1024;
+/** Thumbnails shown before the strip collapses into a "+N" tile. */
+const STRIP_LIMIT = 6;
+
+function isPreviewable(a: { content_type?: string | null; content_size?: string | null }): boolean {
+  const mime = (a.content_type ?? "").split(";")[0].trim().toLowerCase();
+  if (!mime.startsWith("image/")) return false;
+  const size = Number(a.content_size);
+  return !Number.isFinite(size) || size <= PREVIEW_MAX_BYTES;
+}
+
 export function AttachmentList({
   ticketId,
   articleId,
@@ -531,6 +546,10 @@ export function AttachmentList({
   articleId: number;
 }) {
   const { t } = useTranslation();
+  const [lightboxAt, setLightboxAt] = useState<number | null>(null);
+  // Images whose bytes never arrived fall back to a normal file row rather
+  // than leaving a broken-image glyph in the strip.
+  const [broken, setBroken] = useState<number[]>([]);
   const attQ = useQuery({
     queryKey: ["tickets", ticketId, "articles", articleId, "attachments"],
     queryFn: () => api.listAttachments(ticketId, articleId),
@@ -544,9 +563,12 @@ export function AttachmentList({
   if (items.length === 0) return null;
 
   // Embedded cid: parts (signature logos etc.) are noise next to real
-  // attachments — tuck them behind a small disclosure instead.
+  // attachments — tuck them behind a small disclosure instead. They keep the
+  // plain-row treatment too: a signature logo is not evidence worth previewing.
   const real = items.filter((a) => !a.inline);
   const inline = items.filter((a) => a.inline);
+  const images = real.filter((a) => isPreviewable(a) && !broken.includes(a.id));
+  const files = real.filter((a) => !images.includes(a));
 
   const renderItem = (a: (typeof items)[number]) => {
     const type = fileTypeInfo(a.content_type, a.filename);
@@ -578,12 +600,54 @@ export function AttachmentList({
 
   if (real.length === 0 && inline.length === 0) return null;
 
+  const shown = images.slice(0, STRIP_LIMIT);
+  const overflow = images.length - shown.length;
+
   return (
     <div data-testid="attachment-list">
       {real.length > 0 && (
         <>
           <h4 className="mb-1 text-xs font-semibold text-muted">{t("ticket.attachments")}</h4>
-          <ul className="space-y-1">{real.map(renderItem)}</ul>
+          {images.length > 0 && (
+            <div className="mb-2 flex flex-wrap gap-2" data-testid="attachment-strip">
+              {shown.map((a, i) => (
+                <button
+                  key={a.id}
+                  type="button"
+                  onClick={() => setLightboxAt(i)}
+                  title={a.filename ?? undefined}
+                  aria-label={t("ticket.previewImage", {
+                    name: a.filename || `attachment-${a.id}`,
+                  })}
+                  data-testid={`attachment-thumb-${a.id}`}
+                  className="h-[4.5rem] w-[4.5rem] overflow-hidden rounded-md border border-hairline transition-transform duration-100 hover:-translate-y-0.5 hover:shadow-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+                >
+                  <img
+                    src={api.attachmentDownloadUrl(ticketId, articleId, a.id, false)}
+                    alt=""
+                    loading="lazy"
+                    decoding="async"
+                    onError={() =>
+                      setBroken((prev) => (prev.includes(a.id) ? prev : [...prev, a.id]))
+                    }
+                    className="h-full w-full object-cover"
+                  />
+                </button>
+              ))}
+              {overflow > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setLightboxAt(STRIP_LIMIT)}
+                  aria-label={t("ticket.moreImages", { count: overflow })}
+                  data-testid="attachment-strip-more"
+                  className="h-[4.5rem] w-[4.5rem] rounded-md border border-dashed border-hairline text-xs tabular-nums text-muted hover:text-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+                >
+                  +{overflow}
+                </button>
+              )}
+            </div>
+          )}
+          {files.length > 0 && <ul className="space-y-1">{files.map(renderItem)}</ul>}
         </>
       )}
       {inline.length > 0 && (
@@ -593,6 +657,16 @@ export function AttachmentList({
           </summary>
           <ul className="mt-1 space-y-1">{inline.map(renderItem)}</ul>
         </details>
+      )}
+      {lightboxAt !== null && images.length > 0 && (
+        <AttachmentLightbox
+          ticketId={ticketId}
+          articleId={articleId}
+          images={images}
+          index={Math.min(lightboxAt, images.length - 1)}
+          onIndexChange={setLightboxAt}
+          onClose={() => setLightboxAt(null)}
+        />
       )}
     </div>
   );
