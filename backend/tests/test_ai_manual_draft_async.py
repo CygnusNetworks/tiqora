@@ -195,9 +195,7 @@ async def _setup(
     async_engine = create_async_engine(_to_async_url(mariadb_znuny_url))
     factory = async_sessionmaker(async_engine, expire_on_commit=False)
     async with factory() as session:
-        await _setup_policy(
-            session, seed=seed, autonomy=AUTONOMY_FULL, enabled_manual_assist=True
-        )
+        await _setup_policy(session, seed=seed, autonomy=AUTONOMY_FULL, enabled_manual_assist=True)
     await async_engine.dispose()
     login = f"agent.airuntime.96{ns}"
     client, client_engine = await _client_for(
