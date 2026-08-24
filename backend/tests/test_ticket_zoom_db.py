@@ -55,10 +55,11 @@ def _seed(sync_url: str) -> dict[str, Any]:
         conn.execute(text("DELETE FROM ticket_history WHERE id = 7900"))
         conn.execute(text("DELETE FROM dynamic_field_value WHERE id IN (9101, 9102)"))
         conn.execute(text("DELETE FROM dynamic_field WHERE id IN (9101, 9102)"))
-        conn.execute(text("DELETE FROM article_data_mime WHERE id = 7800"))
-        conn.execute(text("DELETE FROM article WHERE id = 7800"))
+        conn.execute(text("DELETE FROM article_data_mime WHERE id IN (7800, 7801)"))
+        conn.execute(text("DELETE FROM article WHERE id IN (7800, 7801)"))
         conn.execute(text("DELETE FROM ticket WHERE id = 7700"))
         conn.execute(text("DELETE FROM queue WHERE id = 7300"))
+        conn.execute(text("DELETE FROM system_address WHERE id = 7350"))
         conn.execute(
             text("DELETE FROM group_user WHERE user_id IN (7301, 7302) OR group_id = 7330"),
         )
@@ -135,6 +136,38 @@ def _seed(sync_url: str) -> dict[str, Any]:
             ),
             {"t": NOW},
         )
+        # Agent-sent article (sender type 1 = agent): the ticket was created by
+        # us, so a reply must go to its To (the customer), not back to our own
+        # From. Its Cc carries the queue address to prove self-filtering.
+        conn.execute(
+            text(
+                "INSERT INTO system_address (id, value0, value1, queue_id, valid_id,"
+                " create_time, create_by, change_time, change_by)"
+                " VALUES (7350, 'zoomqueue@example.com', 'ZoomQueue', 7300, 1, :t, 1, :t, 1)"
+            ),
+            {"t": NOW},
+        )
+        conn.execute(
+            text(
+                "INSERT INTO article (id, ticket_id, article_sender_type_id,"
+                " communication_channel_id, is_visible_for_customer, search_index_needs_rebuild,"
+                " create_time, create_by, change_time, change_by)"
+                " VALUES (7801, 7700, 1, 1, 1, 0, :t, 1, :t, 1)"
+            ),
+            {"t": NOW},
+        )
+        conn.execute(
+            text(
+                "INSERT INTO article_data_mime (id, article_id, a_from, a_to, a_cc, a_subject,"
+                " a_content_type, a_body, a_message_id, incoming_time,"
+                " create_time, create_by, change_time, change_by)"
+                " VALUES (7801, 7801, 'ZoomQueue <zoomqueue@example.com>',"
+                " 'Dave <dave@example.com>', 'erin@example.com, zoomqueue@example.com',"
+                " 'Broken thing', 'text/plain; charset=utf-8', 'Our first mail',"
+                " '<msg-2@x>', 1717243300, :t, 1, :t, 1)"
+            ),
+            {"t": NOW},
+        )
         # Two dynamic fields: one with value, one empty (must be hidden)
         for fid, name in ((9101, "ZoomFilled"), (9102, "ZoomEmpty")):
             conn.execute(
@@ -208,7 +241,14 @@ def _seed(sync_url: str) -> dict[str, Any]:
             {"t": NOW},
         )
     engine.dispose()
-    return {"agent": 7301, "no_access": 7302, "queue": 7300, "ticket": 7700, "article": 7800}
+    return {
+        "agent": 7301,
+        "no_access": 7302,
+        "queue": 7300,
+        "ticket": 7700,
+        "article": 7800,
+        "agent_article": 7801,
+    }
 
 
 @pytest.mark.asyncio
@@ -268,6 +308,22 @@ async def test_ticket_zoom(url_fixture: str, request: pytest.FixtureRequest) -> 
         assert "bob@example.com" in draft_all.cc
         assert "carol@example.com" in draft_all.cc
         assert "alice@example.com" not in (draft_all.cc or "")
+
+        # Replying to our own outgoing article addresses the customer it went
+        # to — not ourselves (Znuny AgentTicketCompose sender-type behaviour).
+        own = await ts.get_reply_draft(ids["agent"], ids["ticket"], ids["agent_article"])
+        assert own.to_address == "Dave <dave@example.com>"
+        assert "zoomqueue@example.com" not in (own.to_address or "")
+
+        # Reply-all on it: the remaining Cc only, minus our own system address
+        # and minus the To we already reply to.
+        own_all = await ts.get_reply_draft(
+            ids["agent"], ids["ticket"], ids["agent_article"], reply_all=True
+        )
+        assert own_all.cc is not None
+        assert "erin@example.com" in own_all.cc
+        assert "dave@example.com" not in own_all.cc
+        assert "zoomqueue@example.com" not in own_all.cc
 
         # Templates: only the Answer template for this queue.
         tpls = await ts.list_templates(ids["agent"], ids["ticket"])
