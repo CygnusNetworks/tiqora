@@ -162,9 +162,7 @@ async def test_queue_customer_link_crud_roundtrip(
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("url_fixture", ["mariadb_znuny_url", "postgres_znuny_url"])
-async def test_update_missing_link_is_404(
-    url_fixture: str, request: pytest.FixtureRequest
-) -> None:
+async def test_update_missing_link_is_404(url_fixture: str, request: pytest.FixtureRequest) -> None:
     sync_url: str = request.getfixturevalue(url_fixture)
     session, engine = await _make_session(sync_url)
     admin = _admin()
