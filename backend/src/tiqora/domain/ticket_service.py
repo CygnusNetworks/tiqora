@@ -13,6 +13,7 @@ from sqlalchemy.exc import DBAPIError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from tiqora.ai.models import TiqoraAiArticleOrigin, TiqoraAiTicketState
+from tiqora.channels.email.parser import get_email_address, split_address_line
 from tiqora.db.legacy.article import (
     Article,
     ArticleDataMime,
@@ -23,7 +24,14 @@ from tiqora.db.legacy.article import (
 )
 from tiqora.db.legacy.customer import CustomerUser
 from tiqora.db.legacy.dynamic_field import DynamicField, DynamicFieldValue
-from tiqora.db.legacy.queue import Queue, QueueStandardTemplate, Service, Sla, StandardTemplate
+from tiqora.db.legacy.queue import (
+    Queue,
+    QueueStandardTemplate,
+    Service,
+    Sla,
+    StandardTemplate,
+    SystemAddress,
+)
 from tiqora.db.legacy.ticket import (
     Ticket,
     TicketHistory,
@@ -77,6 +85,15 @@ VIEW_STATE_TYPES: dict[str, frozenset[str]] = {
     "new": frozenset({"new"}),
     "pending": frozenset({"pending reminder", "pending auto"}),
 }
+
+
+def _addresses_of(value: str | None) -> set[str]:
+    """Lowercased bare email addresses in an address header field."""
+    return {
+        addr
+        for addr in (get_email_address(e).lower() for e in split_address_line(value or ""))
+        if addr
+    }
 
 
 def _is_body_part_attachment(a: AttachmentMeta) -> bool:
@@ -1132,6 +1149,15 @@ class TicketService:
             for h in rows
         ]
 
+    async def _system_addresses(self) -> set[str]:
+        """Lowercased addresses of all configured system (queue) addresses.
+
+        Znuny strips these from reply recipients so an answer never loops back
+        into the helpdesk itself.
+        """
+        rows = (await self._session.execute(select(SystemAddress.value0))).scalars().all()
+        return {str(v).strip().lower() for v in rows if v and str(v).strip()}
+
     async def get_reply_draft(
         self, user_id: int, ticket_id: int, article_id: int, *, reply_all: bool = False
     ) -> ReplyDraftOut:
@@ -1183,21 +1209,41 @@ class TicketService:
                 add_re=False,
                 add_fwd=False,
             )
+        # Znuny (AgentTicketCompose) picks the reply target by sender type: an
+        # incoming customer article is answered to its From, an outgoing
+        # agent/system article to whoever it was addressed to. Without that
+        # distinction, replying inside a ticket the agent created himself would
+        # address the agent instead of the customer.
+        sender_type = (
+            await self._session.execute(
+                select(ArticleSenderType.name).where(
+                    ArticleSenderType.id == art.article_sender_type_id
+                )
+            )
+        ).scalar_one_or_none()
+        outgoing = (sender_type or "").strip().lower() in {"agent", "system"}
         from_addr = (mime.a_from if mime else None) or None
-        to_addr = from_addr
+        art_to = (mime.a_to if mime else None) or None
+        art_cc = (mime.a_cc if mime else None) or None
+        to_addr = (art_to if outgoing else from_addr) or None
         cc: str | None = None
         if reply_all:
-            # Reply-all: keep original recipients (To + Cc) as Cc, minus the
-            # sender we're already replying to. Simplified vs Znuny (no full
-            # address parsing / self-address stripping beyond exact match).
+            # Reply-all: everyone else on the original as Cc — minus whoever is
+            # already in To, minus the article's own sender on an outgoing
+            # article, and minus our own system addresses so a reply never
+            # loops back into the queue it came from.
+            skip = _addresses_of(to_addr)
+            if outgoing:
+                skip |= _addresses_of(from_addr)
+            skip |= await self._system_addresses()
             extras: list[str] = []
-            for field in ((mime.a_to if mime else None), (mime.a_cc if mime else None)):
-                if not field:
-                    continue
-                for addr in field.split(","):
-                    a = addr.strip()
-                    if a and a != from_addr and a not in extras:
-                        extras.append(a)
+            for field in (art_cc,) if outgoing else (art_to, art_cc):
+                for entry in split_address_line(field or ""):
+                    addr = get_email_address(entry).lower()
+                    if not addr or addr in skip:
+                        continue
+                    skip.add(addr)
+                    extras.append(entry)
             cc = ", ".join(extras) or None
 
         # Telegram reads as a chat, not an email — no "On <date>, X wrote:"
