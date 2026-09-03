@@ -60,7 +60,12 @@ dependencies = [
 
 [project.optional-dependencies]
 kerberos = [
-    "gssapi>=1.9.0",
+    # Upper-bounded to the version the Jenkins build's prebuilt wheel is
+    # pinned to (GSSAPI_AMD64_WHEEL_URL in Jenkinsfile) -- compiling gssapi's
+    # C extension from source needs a wheel-build step Jenkins no longer has,
+    # so the version here and the wheel must move together by hand. See the
+    # version-match guard in Dockerfile.
+    "gssapi>=1.9.0,<1.12",
 ]
 crypto = [
     "python-gnupg>=0.5.2",
