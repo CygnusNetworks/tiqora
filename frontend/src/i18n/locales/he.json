@@ -849,7 +849,11 @@
         "priceOutput": "פלט מחיר לכל 1 מיליון אסימונים",
         "priceCurrency": "מטבע",
         "priceHelp": "עלות לכל מיליון אסימונים (קלט/פלט) במטבע הנתון - משמש לחישוב עלות בביקורת LLM.",
-        "priceCurrencyNone": "- אף אחד -"
+        "priceCurrencyNone": "- אף אחד -",
+        "budgetCostDay": "Cost budget / day",
+        "budgetCostWeek": "Cost budget / week",
+        "budgetCostMonth": "Cost budget / month",
+        "budgetCostHelp": "Optional spend cap in the provider's currency. Once reached, calls to this provider are blocked until the window resets."
       },
       "mcp": {
         "title": "לקוחות MCP",

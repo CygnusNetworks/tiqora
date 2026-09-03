@@ -849,7 +849,11 @@
         "priceOutput": "Output harga per 1 juta token",
         "priceCurrency": "Mata uang",
         "priceHelp": "Biaya per 1 juta token (input/output) dalam mata uang tertentu — digunakan untuk penghitungan biaya dalam audit LLM.",
-        "priceCurrencyNone": "— tidak ada —"
+        "priceCurrencyNone": "— tidak ada —",
+        "budgetCostDay": "Cost budget / day",
+        "budgetCostWeek": "Cost budget / week",
+        "budgetCostMonth": "Cost budget / month",
+        "budgetCostHelp": "Optional spend cap in the provider's currency. Once reached, calls to this provider are blocked until the window resets."
       },
       "mcp": {
         "title": "klien MCP",

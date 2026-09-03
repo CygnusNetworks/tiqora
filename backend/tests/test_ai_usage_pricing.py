@@ -197,3 +197,208 @@ async def test_record_usage_respects_explicit_cost_hint_override(mariadb_znuny_u
     finally:
         await engine.dispose()
         get_settings.cache_clear()
+
+
+async def test_provider_budget_exceeded_returns_none_under_limit(mariadb_znuny_url: str) -> None:
+    _ensure_tables(mariadb_znuny_url)
+    get_settings.cache_clear()
+    settings = get_settings()
+    engine = create_async_engine(_mysql_async(mariadb_znuny_url))
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    try:
+        async with factory() as session:
+            provider = await ai_providers.create_provider(
+                session,
+                settings=settings,
+                change_by=1,
+                name="under-budget-89520",
+                kind="openai_compat",
+                base_url="https://api.example/v1",
+                default_model="model-a",
+                api_key=None,
+                extra_json=None,
+                supports_tools=True,
+                supports_streaming=True,
+                eu_hosted=False,
+                budget_cost_day=10.0,
+                budget_cost_week=50.0,
+                budget_cost_month=100.0,
+            )
+            await ai_usage.record_usage(
+                session,
+                queue_id=89520,
+                feature="manual_assist",
+                provider_id=provider.id,
+                cost_hint=1.0,
+            )
+            assert await ai_usage.provider_budget_exceeded(session, provider.id) is None
+    finally:
+        await engine.dispose()
+        get_settings.cache_clear()
+
+
+async def test_provider_budget_exceeded_returns_day_when_day_limit_hit(
+    mariadb_znuny_url: str,
+) -> None:
+    _ensure_tables(mariadb_znuny_url)
+    get_settings.cache_clear()
+    settings = get_settings()
+    engine = create_async_engine(_mysql_async(mariadb_znuny_url))
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    try:
+        async with factory() as session:
+            provider = await ai_providers.create_provider(
+                session,
+                settings=settings,
+                change_by=1,
+                name="day-budget-89521",
+                kind="openai_compat",
+                base_url="https://api.example/v1",
+                default_model="model-a",
+                api_key=None,
+                extra_json=None,
+                supports_tools=True,
+                supports_streaming=True,
+                eu_hosted=False,
+                budget_cost_day=5.0,
+                budget_cost_week=100.0,
+                budget_cost_month=100.0,
+            )
+            await ai_usage.record_usage(
+                session,
+                queue_id=89521,
+                feature="manual_assist",
+                provider_id=provider.id,
+                cost_hint=6.0,
+            )
+            assert await ai_usage.provider_budget_exceeded(session, provider.id) == "day"
+    finally:
+        await engine.dispose()
+        get_settings.cache_clear()
+
+
+async def test_provider_budget_exceeded_checks_week_when_only_week_configured(
+    mariadb_znuny_url: str,
+) -> None:
+    _ensure_tables(mariadb_znuny_url)
+    get_settings.cache_clear()
+    settings = get_settings()
+    engine = create_async_engine(_mysql_async(mariadb_znuny_url))
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    try:
+        async with factory() as session:
+            provider = await ai_providers.create_provider(
+                session,
+                settings=settings,
+                change_by=1,
+                name="week-budget-89522",
+                kind="openai_compat",
+                base_url="https://api.example/v1",
+                default_model="model-a",
+                api_key=None,
+                extra_json=None,
+                supports_tools=True,
+                supports_streaming=True,
+                eu_hosted=False,
+                budget_cost_week=3.0,
+            )
+            await ai_usage.record_usage(
+                session,
+                queue_id=89522,
+                feature="manual_assist",
+                provider_id=provider.id,
+                cost_hint=4.0,
+            )
+            assert await ai_usage.provider_budget_exceeded(session, provider.id) == "week"
+    finally:
+        await engine.dispose()
+        get_settings.cache_clear()
+
+
+async def test_provider_budget_exceeded_none_when_no_budget_configured(
+    mariadb_znuny_url: str,
+) -> None:
+    _ensure_tables(mariadb_znuny_url)
+    get_settings.cache_clear()
+    settings = get_settings()
+    engine = create_async_engine(_mysql_async(mariadb_znuny_url))
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    try:
+        async with factory() as session:
+            provider = await ai_providers.create_provider(
+                session,
+                settings=settings,
+                change_by=1,
+                name="no-budget-89523",
+                kind="openai_compat",
+                base_url="https://api.example/v1",
+                default_model="model-a",
+                api_key=None,
+                extra_json=None,
+                supports_tools=True,
+                supports_streaming=True,
+                eu_hosted=False,
+            )
+            await ai_usage.record_usage(
+                session,
+                queue_id=89523,
+                feature="manual_assist",
+                provider_id=provider.id,
+                cost_hint=1_000_000.0,
+            )
+            assert await ai_usage.provider_budget_exceeded(session, provider.id) is None
+    finally:
+        await engine.dispose()
+        get_settings.cache_clear()
+
+
+async def test_provider_budget_exceeded_ignores_other_providers_spend(
+    mariadb_znuny_url: str,
+) -> None:
+    _ensure_tables(mariadb_znuny_url)
+    get_settings.cache_clear()
+    settings = get_settings()
+    engine = create_async_engine(_mysql_async(mariadb_znuny_url))
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    try:
+        async with factory() as session:
+            budgeted = await ai_providers.create_provider(
+                session,
+                settings=settings,
+                change_by=1,
+                name="budgeted-89524",
+                kind="openai_compat",
+                base_url="https://api.example/v1",
+                default_model="model-a",
+                api_key=None,
+                extra_json=None,
+                supports_tools=True,
+                supports_streaming=True,
+                eu_hosted=False,
+                budget_cost_day=1.0,
+            )
+            other = await ai_providers.create_provider(
+                session,
+                settings=settings,
+                change_by=1,
+                name="other-89525",
+                kind="openai_compat",
+                base_url="https://api.example/v1",
+                default_model="model-b",
+                api_key=None,
+                extra_json=None,
+                supports_tools=True,
+                supports_streaming=True,
+                eu_hosted=False,
+            )
+            await ai_usage.record_usage(
+                session,
+                queue_id=89524,
+                feature="manual_assist",
+                provider_id=other.id,
+                cost_hint=1_000.0,
+            )
+            assert await ai_usage.provider_budget_exceeded(session, budgeted.id) is None
+    finally:
+        await engine.dispose()
+        get_settings.cache_clear()

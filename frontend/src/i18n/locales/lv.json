@@ -849,7 +849,11 @@
         "priceOutput": "Izlaides cena par 1 miljonu marķieru",
         "priceCurrency": "Valūta",
         "priceHelp": "Maksa par 1 miljonu marķieru (ievade/izvade) dotajā valūtā — izmantota izmaksu aprēķināšanai LLM auditā.",
-        "priceCurrencyNone": "— nav —"
+        "priceCurrencyNone": "— nav —",
+        "budgetCostDay": "Cost budget / day",
+        "budgetCostWeek": "Cost budget / week",
+        "budgetCostMonth": "Cost budget / month",
+        "budgetCostHelp": "Optional spend cap in the provider's currency. Once reached, calls to this provider are blocked until the window resets."
       },
       "mcp": {
         "title": "MCP klienti",

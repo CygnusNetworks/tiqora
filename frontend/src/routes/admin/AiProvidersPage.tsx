@@ -41,6 +41,9 @@ function toFormValues(row: LlmProviderOut | null): FieldValues {
         price_input_per_1m: row.price_input_per_1m ?? "",
         price_output_per_1m: row.price_output_per_1m ?? "",
         price_currency: row.price_currency ?? "",
+        budget_cost_day: row.budget_cost_day ?? "",
+        budget_cost_week: row.budget_cost_week ?? "",
+        budget_cost_month: row.budget_cost_month ?? "",
       }
     : {
         name: "",
@@ -55,6 +58,9 @@ function toFormValues(row: LlmProviderOut | null): FieldValues {
         price_input_per_1m: "",
         price_output_per_1m: "",
         price_currency: "",
+        budget_cost_day: "",
+        budget_cost_week: "",
+        budget_cost_month: "",
       };
 }
 
@@ -171,6 +177,9 @@ export function AiProvidersPage() {
         String(values.price_currency ?? "")
           .trim()
           .toUpperCase() || null,
+      budget_cost_day: priceOrNull(values.budget_cost_day),
+      budget_cost_week: priceOrNull(values.budget_cost_week),
+      budget_cost_month: priceOrNull(values.budget_cost_month),
     };
     const apiKey =
       typeof values.api_key === "string" ? values.api_key.trim() : "";
@@ -400,6 +409,22 @@ export function AiProvidersPage() {
         { value: "EUR", label: "EUR" },
         { value: "USD", label: "USD" },
       ],
+    },
+    {
+      name: "budget_cost_day",
+      label: t("admin.ai.providers.budgetCostDay"),
+      type: "number",
+      helpText: t("admin.ai.providers.budgetCostHelp"),
+    },
+    {
+      name: "budget_cost_week",
+      label: t("admin.ai.providers.budgetCostWeek"),
+      type: "number",
+    },
+    {
+      name: "budget_cost_month",
+      label: t("admin.ai.providers.budgetCostMonth"),
+      type: "number",
     },
     {
       name: "supports_tools",

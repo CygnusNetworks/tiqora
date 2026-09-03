@@ -849,7 +849,11 @@
         "priceOutput": "Pato la bei kwa tokeni 1M",
         "priceCurrency": "Sarafu",
         "priceHelp": "Gharama kwa kila tokeni 1M (ingizo/pato) katika sarafu husika - hutumika kukokotoa gharama katika ukaguzi wa LLM.",
-        "priceCurrencyNone": "- hapana -"
+        "priceCurrencyNone": "- hapana -",
+        "budgetCostDay": "Cost budget / day",
+        "budgetCostWeek": "Cost budget / week",
+        "budgetCostMonth": "Cost budget / month",
+        "budgetCostHelp": "Optional spend cap in the provider's currency. Once reached, calls to this provider are blocked until the window resets."
       },
       "mcp": {
         "title": "Wateja wa MCP",

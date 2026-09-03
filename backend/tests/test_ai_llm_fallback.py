@@ -184,7 +184,13 @@ async def test_all_entries_in_cooldown_still_attempted_in_order() -> None:
 
 def _provider(id_: int, *, model: str = "gpt-x") -> SimpleNamespace:
     return SimpleNamespace(
-        id=id_, base_url="https://example.invalid", api_key_enc=None, default_model=model
+        id=id_,
+        base_url="https://example.invalid",
+        api_key_enc=None,
+        default_model=model,
+        budget_cost_day=None,
+        budget_cost_week=None,
+        budget_cost_month=None,
     )
 
 

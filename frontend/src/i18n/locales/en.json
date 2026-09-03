@@ -916,7 +916,11 @@
         "priceOutput": "Price output per 1M tokens",
         "priceCurrency": "Currency",
         "priceHelp": "Cost per 1M tokens (input/output) in the given currency — used for cost calculation in the LLM audit.",
-        "priceCurrencyNone": "— none —"
+        "priceCurrencyNone": "— none —",
+        "budgetCostDay": "Cost budget / day",
+        "budgetCostWeek": "Cost budget / week",
+        "budgetCostMonth": "Cost budget / month",
+        "budgetCostHelp": "Optional spend cap in the provider's currency. Once reached, calls to this provider are blocked until the window resets."
       },
       "mcp": {
         "title": "MCP clients",

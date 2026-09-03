@@ -24,6 +24,7 @@ from tiqora.ai.llm import LlmClient, OpenAiCompatLlmClient
 from tiqora.ai.llm_fallback import FallbackEntry, FallbackLlmClient
 from tiqora.ai.models import TiqoraAiQueuePolicy, TiqoraLlmProvider
 from tiqora.ai.providers import get_provider
+from tiqora.ai.usage import provider_budget_exceeded
 from tiqora.config import Settings
 from tiqora.crypto.secret import decrypt_secret
 
@@ -96,15 +97,24 @@ async def build_llm_client(
     :mod:`tiqora.ai.llm_fallback`).
 
     Raises :class:`fastapi.HTTPException` (409) when the policy has no
-    provider configured or the primary provider row is gone — safe to call
-    from an HTTP route. The worker (no HTTP context) catches this and treats
-    it as a skip/error like any other :class:`Exception`. Fallback entries
-    whose provider no longer exists are skipped (logged), not fatal.
+    provider configured, the primary provider row is gone, or the primary
+    provider's cost budget (day/week/month) is exceeded — safe to call from
+    an HTTP route. The worker (no HTTP context) catches this and treats it
+    as a skip/error like any other :class:`Exception`. Fallback entries
+    whose provider no longer exists are skipped (logged), not fatal — a
+    budget-exceeded *primary*, like a missing primary, is not retried
+    against the fallback chain.
     """
     if provider_id is None:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="Queue AI policy has no llm_provider_id configured",
+        )
+    exceeded_window = await provider_budget_exceeded(session, provider_id)
+    if exceeded_window is not None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"LLM provider budget exceeded ({exceeded_window})",
         )
     primary = await _resolve_entry(session, settings, provider_id=provider_id, model=model_override)
     if primary is None:
@@ -146,9 +156,10 @@ async def build_vision_llm_factory(
     for the attachment vision pre-pass (:mod:`tiqora.ai.attachment_context`).
 
     Returns ``None`` (never raises) when no provider is configured, the
-    provider row is gone, or it does not have ``supports_vision`` set — the
-    caller treats this as "images are ignored for this run", matching the
-    documented "NULL = Bilder werden ignoriert" policy semantics.
+    provider row is gone, it does not have ``supports_vision`` set, or its
+    cost budget (day/week/month) is exceeded — the caller treats this as
+    "images are ignored for this run", matching the documented "NULL =
+    Bilder werden ignoriert" policy semantics.
 
     When ``audit`` is given, every call made through the returned client is
     written to ``tiqora_ai_audit_log`` with ``feature="vision"`` (see
@@ -159,6 +170,8 @@ async def build_vision_llm_factory(
         return None
     provider = await get_provider(session, vision_provider_id)
     if provider is None or not provider.supports_vision:
+        return None
+    if await provider_budget_exceeded(session, vision_provider_id) is not None:
         return None
     api_key = (
         decrypt_secret(settings.secret_key, provider.api_key_enc) if provider.api_key_enc else None

@@ -849,7 +849,11 @@
         "priceOutput": "Излез на цена по 1 милион токени",
         "priceCurrency": "Валута",
         "priceHelp": "Цена по 1 милион токени (влез/излез) во дадената валута - се користи за пресметка на трошоците во ревизијата на LLM.",
-        "priceCurrencyNone": "- ниеден -"
+        "priceCurrencyNone": "- ниеден -",
+        "budgetCostDay": "Cost budget / day",
+        "budgetCostWeek": "Cost budget / week",
+        "budgetCostMonth": "Cost budget / month",
+        "budgetCostHelp": "Optional spend cap in the provider's currency. Once reached, calls to this provider are blocked until the window resets."
       },
       "mcp": {
         "title": "MCP клиенти",
