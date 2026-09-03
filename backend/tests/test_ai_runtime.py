@@ -361,6 +361,12 @@ def test_system_prompt_always_warns_against_copying_disclosure_footer() -> None:
     assert "appended automatically by the system" in prompt
 
 
+def test_system_prompt_always_warns_against_generic_signoff() -> None:
+    policy = _policy()
+    prompt = _build_system_prompt(policy, trigger=TRIGGER_MANUAL, kind_hint=None)
+    assert "the system appends the agent's real queue signature" in prompt
+
+
 def test_system_prompt_always_warns_against_repeating_prior_explanations() -> None:
     policy = _policy()
     prompt = _build_system_prompt(policy, trigger=TRIGGER_MANUAL, kind_hint=None)

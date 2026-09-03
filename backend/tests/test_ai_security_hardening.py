@@ -19,6 +19,7 @@ from tiqora.ai.output_guards import (
     MAX_CUSTOMER_BODY_CHARS,
     MAX_CUSTOMER_BODY_LINKS,
     CustomerMessageGuardError,
+    strip_hallucinated_signoff,
     validate_customer_message,
 )
 from tiqora.ai.pii import PiiMapper
@@ -260,6 +261,60 @@ async def test_propose_customer_message_runs_output_guard() -> None:
             TOOL_PROPOSE_CUSTOMER_MESSAGE,
             {"kind": "reply", "body": "y" * (MAX_CUSTOMER_BODY_CHARS + 1)},
         )
+
+
+def test_strip_hallucinated_signoff_removes_english_closing_and_placeholder() -> None:
+    body = (
+        "Please try this: connect your router directly to the wall socket.\n\n"
+        "Best regards,\n[Your Name]\nSTW Bonn – StudNet Support"
+    )
+    assert strip_hallucinated_signoff(body) == (
+        "Please try this: connect your router directly to the wall socket."
+    )
+
+
+def test_strip_hallucinated_signoff_removes_german_closing() -> None:
+    body = "Bitte starte den Router neu.\n\nMit freundlichen Grüßen\n[Ihr Name]"
+    assert strip_hallucinated_signoff(body) == "Bitte starte den Router neu."
+
+
+def test_strip_hallucinated_signoff_leaves_normal_body_untouched() -> None:
+    body = "Hello,\n\nHere is the fix for your connection issue."
+    assert strip_hallucinated_signoff(body) == body
+
+
+def test_strip_hallucinated_signoff_all_signoff_yields_empty() -> None:
+    assert strip_hallucinated_signoff("Best regards,\n[Your Name]") == ""
+
+
+@pytest.mark.asyncio
+async def test_propose_customer_message_strips_hallucinated_signoff() -> None:
+    registry = ToolRegistry(autonomy=AUTONOMY_OFF)
+    executor = ToolExecutor(
+        session=None,  # type: ignore[arg-type]
+        sysconfig=None,  # type: ignore[arg-type]
+        registry=registry,
+        ticket_id=1,
+        acting_user_id=1,
+        pii=PiiMapper(),
+        escalation_rules=None,
+    )
+    outcome = await executor.execute(
+        TOOL_PROPOSE_CUSTOMER_MESSAGE,
+        {
+            "kind": "reply",
+            "body": (
+                "Hi Christina,\n\nI've checked your connection and there's no port "
+                "lock in place.\n\nBest regards,\n[Your Name]\nSTW Bonn – StudNet "
+                "Support"
+            ),
+        },
+    )
+    assert outcome.proposal is not None
+    assert outcome.proposal["body"] == (
+        "Hi Christina,\n\nI've checked your connection and there's no port "
+        "lock in place."
+    )
 
 
 # ---------------------------------------------------------------------------

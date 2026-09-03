@@ -30,6 +30,40 @@ class CustomerMessageGuardError(ValueError):
     """Raised when a proposed customer message fails an output guard."""
 
 
+# Closing salutations models habitually invent on their own (a generic
+# business-email reflex), usually followed by a placeholder name/role line
+# ("[Your Name]", "STW Bonn – StudNet Support", ...). The real signature is
+# appended separately by the system when a message is actually sent (see
+# tiqora.ai.runtime._build_system_prompt's matching instruction), so any of
+# this is always safe to drop — never legitimate reply content.
+_SIGNOFF_PHRASES = {
+    "best regards",
+    "kind regards",
+    "regards",
+    "warm regards",
+    "mit freundlichen grüßen",
+    "freundliche grüße",
+    "viele grüße",
+    "liebe grüße",
+    "beste grüße",
+    "mfg",
+}
+
+
+def strip_hallucinated_signoff(body: str) -> str:
+    """Drop a trailing closing-salutation line and everything after it
+    (typically a placeholder name/org line) that the model invented on its
+    own. Only the last few lines are inspected so real content earlier in
+    the body is never touched."""
+    lines = body.rstrip().split("\n")
+    window_start = max(0, len(lines) - 6)
+    for i in range(window_start, len(lines)):
+        normalized = lines[i].strip().rstrip(",:.").lower()
+        if normalized in _SIGNOFF_PHRASES:
+            return "\n".join(lines[:i]).rstrip()
+    return body
+
+
 def validate_customer_message(*, kind: str, subject: str, body: str) -> None:
     """Raise :class:`CustomerMessageGuardError` if the proposal is not safe
     enough to hand to the draft/send path."""
@@ -62,5 +96,6 @@ __all__ = [
     "MAX_CUSTOMER_BODY_LINKS",
     "MAX_CUSTOMER_SUBJECT_CHARS",
     "CustomerMessageGuardError",
+    "strip_hallucinated_signoff",
     "validate_customer_message",
 ]
