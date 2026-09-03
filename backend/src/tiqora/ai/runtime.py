@@ -399,6 +399,19 @@ def _build_system_prompt(
 ) -> str:
     # Kernel safety block first — not admin-editable, always present.
     parts = [UNTRUSTED_CONTENT_SYSTEM_BLOCK, policy.system_prompt or ""]
+    parts.append(
+        "Earlier articles in this ticket may end with a short disclosure or "
+        "signature block (e.g. noting the reply was AI-assisted). That block is "
+        "appended automatically by the system when a message is sent — it is not "
+        "part of the reply content. Never copy it into the message you propose; "
+        "the system adds it again if needed."
+    )
+    parts.append(
+        "Before answering, check whether earlier articles in this ticket already "
+        "explained something the customer is asking about again. If so, do not "
+        "restate that explanation in full — keep it brief or reference the earlier "
+        "answer instead of repeating it verbatim."
+    )
     ordered_parts = sorted(prompt_parts or [], key=lambda p: p.position)
     parts.extend(p.content for p in ordered_parts if p.enabled)
     if trigger == TRIGGER_MANUAL:
@@ -465,6 +478,22 @@ def _resolve_reply_language_line(
     return None
 
 
+def _strip_known_footer(body: str, footer: str | None) -> str:
+    """Remove a trailing disclosure/signature footer that the system itself
+    appended when a previous article was sent (see ``_disclosure_footer``),
+    before that article is shown to the model as thread context. Otherwise
+    the model sees "body\\n\\nfooter" in a prior own message and — with
+    nothing marking the footer as system-added — reproduces it again in the
+    next draft, doubling it once a human accepts and re-sends (prod bug)."""
+    footer = (footer or "").strip()
+    if not footer:
+        return body
+    stripped = body.rstrip()
+    if stripped.endswith(footer):
+        return stripped[: -len(footer)].rstrip()
+    return body
+
+
 def _build_user_message(
     ticket: TicketSnapshot,
     articles: list[ArticleSnapshot],
@@ -474,6 +503,7 @@ def _build_user_message(
     kb_bundle: str | None,
     attachment_blocks: dict[int, str] | None = None,
     reply_language_line: str | None = None,
+    disclosure_footer: str | None = None,
 ) -> str:
     lines = [render_ticket_header(ticket)]
     if reply_language_line:
@@ -483,7 +513,7 @@ def _build_user_message(
         label = "agent" if a.sender_type == "agent" else a.sender_type
         if a.is_ai_origin:
             label += " (AI, previous own action)"
-        body = a.body or ""
+        body = _strip_known_footer(a.body or "", disclosure_footer)
         subject_line = f"Subject: {a.subject}" if a.subject else None
         if mask:
             body = pii.mask(body)
@@ -1099,6 +1129,13 @@ async def run_ticket_agent(
             prompt_parts=prompt_parts,
             tone_prompt=tone_prompt,
         )
+        # Known disclosure footer text, so a previously sent article that has
+        # it appended doesn't get echoed back into a new draft (see
+        # _strip_known_footer). Looked up regardless of ai_disclosure_enabled
+        # today — the footer may have been appended by an earlier run under a
+        # since-changed policy and can still be sitting in article history.
+        disclosure_default = await get_setting(session, KEY_AI_DISCLOSURE_DEFAULT) or ""
+        disclosure_footer = _disclosure_footer(disclosure_default, policy.ai_disclosure_text)
         user_message = _build_user_message(
             ticket,
             articles,
@@ -1107,6 +1144,7 @@ async def run_ticket_agent(
             kb_bundle=kb_bundle,
             attachment_blocks=attachment_context.blocks,
             reply_language_line=reply_language_line,
+            disclosure_footer=disclosure_footer,
         )
 
         # 8. Tools
@@ -1361,10 +1399,7 @@ async def run_ticket_agent(
             )
 
         # destination == "send": auto path only (manual always drafts above)
-        footer = ""
-        if policy.ai_disclosure_enabled:
-            default_text = await get_setting(session, KEY_AI_DISCLOSURE_DEFAULT) or ""
-            footer = _disclosure_footer(default_text, policy.ai_disclosure_text)
+        footer = disclosure_footer if policy.ai_disclosure_enabled else ""
         body = outcome.proposal["body"]
         if footer:
             body = f"{body}\n\n{footer}"
