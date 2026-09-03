@@ -82,7 +82,11 @@ from tiqora.ai.models import (
     TiqoraMcpClient,
     TiqoraMcpToolPolicy,
 )
-from tiqora.ai.output_guards import CustomerMessageGuardError, validate_customer_message
+from tiqora.ai.output_guards import (
+    CustomerMessageGuardError,
+    strip_hallucinated_signoff,
+    validate_customer_message,
+)
 from tiqora.ai.pii import PiiMapper
 from tiqora.ai.policies import get_queue_policy_by_queue, load_prompt_parts
 from tiqora.ai.prompt_safety import UNTRUSTED_CONTENT_SYSTEM_BLOCK
@@ -405,6 +409,12 @@ def _build_system_prompt(
         "appended automatically by the system when a message is sent — it is not "
         "part of the reply content. Never copy it into the message you propose; "
         "the system adds it again if needed."
+    )
+    parts.append(
+        "Never end a proposed customer message with your own closing salutation "
+        "or signature (e.g. 'Best regards', 'Mit freundlichen Grüßen') or a "
+        "placeholder name/role like '[Your Name]' — the system appends the "
+        "agent's real queue signature automatically when the message is sent."
     )
     parts.append(
         "Before answering, check whether earlier articles in this ticket already "
@@ -823,6 +833,8 @@ async def _run_identity_exchange(
     args = tool_call.arguments or {}
     kind = args.get("kind")
     body = args.get("body")
+    if isinstance(body, str):
+        body = strip_hallucinated_signoff(body)
     subject_raw = args.get("subject")
     subject = subject_raw if isinstance(subject_raw, str) else ""
     if kind not in ("reply", "clarify") or not isinstance(body, str) or not body.strip():
