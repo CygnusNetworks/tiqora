@@ -31,6 +31,13 @@ updates:
       frontend:
         patterns: ["*"]
     open-pull-requests-limit: 5
+    ignore:
+      # TS7 brach openapi-typescript@7.13.0 in packages/api-client
+      # (`ts.factory` ist unter TS7 undefined) -- der Bump lag als Major
+      # unauffaellig in der frontend-Gruppe neben 22 harmlosen Updates.
+      # Minor/Patch innerhalb 5.x bleiben erlaubt.
+      - dependency-name: "typescript"
+        update-types: ["version-update:semver-major"]
 
   - package-ecosystem: uv
     directory: /
@@ -43,6 +50,14 @@ updates:
       backend:
         patterns: ["*"]
     open-pull-requests-limit: 5
+    ignore:
+      # Jenkins baut gegen einen von Hand vorgebauten Wheel
+      # (GSSAPI_AMD64_WHEEL_URL im Jenkinsfile), fuer den es aktuell keinen
+      # Wheel-Build-Schritt mehr gibt -- ein Versions-Bump hier bricht den
+      # Docker-Build (siehe Guard in Dockerfile), bis jemand von Hand einen
+      # neuen Wheel baut, hochlaedt und Jenkinsfile + pyproject.toml zusammen
+      # anpasst.
+      - dependency-name: "gssapi"
 
   - package-ecosystem: github-actions
     directory: /
