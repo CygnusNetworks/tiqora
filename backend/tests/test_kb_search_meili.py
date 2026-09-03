@@ -15,7 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 
 from tiqora.config import Settings
 from tiqora.db.tiqora.base import TiqoraBase
-from tiqora.kb.schemas import ArticleIn, CategoryIn
+from tiqora.kb.schemas import ArticleIn, ArticleUpdateIn, CategoryIn
 from tiqora.kb.service import KbService
 from tiqora.znuny.password import hash_password
 
@@ -30,6 +30,13 @@ def _to_async_url(sync_url: str) -> str:
     if sync_url.startswith("mysql+pymysql://"):
         return sync_url.replace("mysql+pymysql://", "mysql+aiomysql://", 1)
     return sync_url
+
+
+def _create_tables(sync_url: str) -> None:
+    engine = create_engine(sync_url)
+    with engine.begin() as conn:
+        TiqoraBase.metadata.create_all(conn)
+    engine.dispose()
 
 
 @pytest.fixture(scope="module")
@@ -196,6 +203,90 @@ async def test_publish_indexes_chunks_with_scoping(
             customer_article_ids = {h.article_id for h in customer_hits.hits}
             assert restricted_article.id not in customer_article_ids
             assert public_article.id in customer_article_ids
+        finally:
+            await svc.close()
+
+    await engine.dispose()
+
+
+@pytest.mark.asyncio
+async def test_unpublish_and_delete_deindex(
+    postgres_znuny_url: str,
+    meili_url: str,
+) -> None:
+    """A PATCH that moves an article off "published", and delete_article's
+
+    archive, must both remove the article's chunks from Meilisearch -- the
+    search index has no "state" filter, so a stale published-once article
+    would otherwise stay forever discoverable via kb_search/AI drafts even
+    though the UI shows it as draft/archived (regression: found via a
+    ticket-draft that cited a since-unpublished duplicate article).
+    """
+    _create_tables(postgres_znuny_url)
+    async_url = _to_async_url(postgres_znuny_url)
+    engine = create_async_engine(async_url)
+    factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+
+    settings = Settings(
+        database_url=async_url,
+        meili_url=meili_url,
+        meili_master_key="test-master-key",
+        meili_kb_index="kb_test_deindex",
+    )
+
+    async with factory() as session:
+        svc = KbService(session, settings)
+        try:
+            async with session.begin():
+                cat = await svc.create_category(
+                    1,
+                    CategoryIn(
+                        name="Deindex FAQ",
+                        slug="deindex-faq-kb1",
+                        permission_group_ids=[],
+                        customer_visible=True,
+                    ),
+                )
+            async with session.begin():
+                article_a = await svc.create_article(
+                    1,
+                    ArticleIn(
+                        category_id=cat.id,
+                        title="QuokkaUnpublishArticle",
+                        slug="quokka-unpublish-article-1",
+                        content_md="## Steps\n\nQuokkaUnpublishArticle findable while published.",
+                    ),
+                )
+                article_b = await svc.create_article(
+                    1,
+                    ArticleIn(
+                        category_id=cat.id,
+                        title="QuokkaDeleteArticle",
+                        slug="quokka-delete-article-1",
+                        content_md="## Steps\n\nQuokkaDeleteArticle findable while published too.",
+                    ),
+                )
+            async with session.begin():
+                await svc.publish(1, article_a.id)
+            async with session.begin():
+                await svc.publish(1, article_b.id)
+
+            before = await svc.search_customer("Quokka", limit=10)
+            before_ids = {h.article_id for h in before.hits}
+            assert article_a.id in before_ids
+            assert article_b.id in before_ids
+
+            # Unpublish article_a via PATCH (state="draft"), archive article_b
+            # via delete_article -- both are "leaves published" transitions.
+            async with session.begin():
+                await svc.update_article(1, article_a.id, ArticleUpdateIn(state="draft"))
+            async with session.begin():
+                await svc.delete_article(1, article_b.id)
+
+            after = await svc.search_customer("Quokka", limit=10)
+            after_ids = {h.article_id for h in after.hits}
+            assert article_a.id not in after_ids
+            assert article_b.id not in after_ids
         finally:
             await svc.close()
 
