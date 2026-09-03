@@ -37,7 +37,11 @@ from tiqora.ai.capabilities import AgentCapabilities, capabilities_for_autonomy
 from tiqora.ai.escalation import check_escalation
 from tiqora.ai.listfields import parse_str_list
 from tiqora.ai.models import DEFAULT_ALLOWED_STATE_TYPES
-from tiqora.ai.output_guards import CustomerMessageGuardError, validate_customer_message
+from tiqora.ai.output_guards import (
+    CustomerMessageGuardError,
+    strip_hallucinated_signoff,
+    validate_customer_message,
+)
 from tiqora.ai.pii import PiiMapper
 from tiqora.ai.prompt_safety import with_untrusted_tool_prefix
 from tiqora.domain.ticket_write_service import ArticleIn, add_article, change_priority
@@ -496,6 +500,11 @@ class ToolExecutor:
         kind = arguments.get("kind")
         body = arguments.get("body")
         if kind not in ("reply", "clarify") or not isinstance(body, str) or not body.strip():
+            raise ToolArgumentError(
+                "propose_customer_message requires kind in {reply, clarify} and a non-empty body"
+            )
+        body = strip_hallucinated_signoff(body)
+        if not body.strip():
             raise ToolArgumentError(
                 "propose_customer_message requires kind in {reply, clarify} and a non-empty body"
             )
