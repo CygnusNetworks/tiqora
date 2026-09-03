@@ -849,7 +849,11 @@
         "priceOutput": "Preu de sortida per 1M de fitxes",
         "priceCurrency": "Moneda",
         "priceHelp": "Cost per 1 milió de fitxes (entrada/sortida) en la moneda donada; s'utilitza per al càlcul de costos a l'auditoria de LLM.",
-        "priceCurrencyNone": "- cap -"
+        "priceCurrencyNone": "- cap -",
+        "budgetCostDay": "Cost budget / day",
+        "budgetCostWeek": "Cost budget / week",
+        "budgetCostMonth": "Cost budget / month",
+        "budgetCostHelp": "Optional spend cap in the provider's currency. Once reached, calls to this provider are blocked until the window resets."
       },
       "mcp": {
         "title": "Clients MCP",

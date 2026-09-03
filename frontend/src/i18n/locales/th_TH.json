@@ -849,7 +849,11 @@
         "priceOutput": "ราคาที่ส่งออกต่อโทเค็น 1M",
         "priceCurrency": "สกุลเงิน",
         "priceHelp": "ราคาต่อโทเค็น 1M (อินพุต/เอาท์พุต) ในสกุลเงินที่กำหนด — ใช้สำหรับการคำนวณต้นทุนในการตรวจสอบ LLM",
-        "priceCurrencyNone": "— ไม่มี —"
+        "priceCurrencyNone": "— ไม่มี —",
+        "budgetCostDay": "Cost budget / day",
+        "budgetCostWeek": "Cost budget / week",
+        "budgetCostMonth": "Cost budget / month",
+        "budgetCostHelp": "Optional spend cap in the provider's currency. Once reached, calls to this provider are blocked until the window resets."
       },
       "mcp": {
         "title": "ลูกค้าเอ็มซีพี",

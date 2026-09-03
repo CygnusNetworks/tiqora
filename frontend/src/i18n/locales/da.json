@@ -849,7 +849,11 @@
         "priceOutput": "Prisoutput pr. 1M tokens",
         "priceCurrency": "Valuta",
         "priceHelp": "Pris pr. 1M tokens (input/output) i den givne valuta — bruges til omkostningsberegning i LLM-revisionen.",
-        "priceCurrencyNone": "— ingen —"
+        "priceCurrencyNone": "— ingen —",
+        "budgetCostDay": "Cost budget / day",
+        "budgetCostWeek": "Cost budget / week",
+        "budgetCostMonth": "Cost budget / month",
+        "budgetCostHelp": "Optional spend cap in the provider's currency. Once reached, calls to this provider are blocked until the window resets."
       },
       "mcp": {
         "title": "MCP klienter",

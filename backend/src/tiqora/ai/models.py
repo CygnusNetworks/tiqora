@@ -172,6 +172,12 @@ class TiqoraLlmProvider(TiqoraBase):
     price_input_per_1m: Mapped[float | None] = mapped_column(Float, nullable=True)
     price_output_per_1m: Mapped[float | None] = mapped_column(Float, nullable=True)
     price_currency: Mapped[str | None] = mapped_column(String(3), nullable=True)
+    # Cost budgets (in price_currency), all optional — see
+    # ``tiqora.ai.usage.provider_budget_exceeded`` for enforcement. ``None``
+    # means "no limit configured", same semantics as unset pricing.
+    budget_cost_day: Mapped[float | None] = mapped_column(Float, nullable=True)
+    budget_cost_week: Mapped[float | None] = mapped_column(Float, nullable=True)
+    budget_cost_month: Mapped[float | None] = mapped_column(Float, nullable=True)
     valid_id: Mapped[int] = mapped_column(
         SmallInteger, nullable=False, default=1, server_default="1"
     )

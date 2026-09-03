@@ -5,7 +5,7 @@ limits is wired into the agent runtime in later phases."""
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -47,6 +47,49 @@ async def _compute_cost_hint(
     if price_output is not None:
         cost += completion_tokens * price_output / 1_000_000
     return cost
+
+
+async def provider_budget_exceeded(
+    session: AsyncSession, provider_id: int, *, now: datetime | None = None
+) -> str | None:
+    """Return ``"day"``/``"week"``/``"month"`` naming the first exceeded
+    cost-budget window for this provider's spend (summed ``cost_hint``), or
+    ``None`` if every configured window is within budget (or none are
+    configured — ``None`` limits mean "no cap", same as unset pricing).
+
+    Windows are calendar-aligned, matching
+    ``auto_worker._tokens_used_today``'s naive-UTC-midnight convention: day
+    = midnight today, week = midnight of the most recent Monday, month =
+    the 1st of the current month. All spend counts toward the budget (no
+    ``success`` filter) — a failed call can still have consumed billable
+    tokens, same reasoning as the existing token-budget check.
+    """
+    provider = await session.get(TiqoraLlmProvider, provider_id)
+    if provider is None:
+        return None
+    now = now or datetime.now(UTC).replace(tzinfo=None)
+    day_start = datetime(now.year, now.month, now.day)
+    week_start = day_start - timedelta(days=day_start.weekday())
+    month_start = datetime(now.year, now.month, 1)
+    windows = (
+        ("day", provider.budget_cost_day, day_start),
+        ("week", provider.budget_cost_week, week_start),
+        ("month", provider.budget_cost_month, month_start),
+    )
+    for window_name, limit, window_start in windows:
+        if limit is None:
+            continue
+        spent = (
+            await session.execute(
+                select(func.coalesce(func.sum(TiqoraAiUsage.cost_hint), 0.0)).where(
+                    TiqoraAiUsage.provider_id == provider_id,
+                    TiqoraAiUsage.ts >= window_start,
+                )
+            )
+        ).scalar_one()
+        if spent >= limit:
+            return window_name
+    return None
 
 
 async def record_usage(
@@ -153,4 +196,4 @@ async def list_usage(
     )
 
 
-__all__ = ["UsagePage", "list_usage", "record_usage"]
+__all__ = ["UsagePage", "list_usage", "provider_budget_exceeded", "record_usage"]

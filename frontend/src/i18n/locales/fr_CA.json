@@ -849,7 +849,11 @@
         "priceOutput": "Prix ​​de sortie par 1 million de jetons",
         "priceCurrency": "Devise",
         "priceHelp": "Coût par million de jetons (entrée/sortie) dans la devise donnée — utilisé pour le calcul du coût dans l'audit LLM.",
-        "priceCurrencyNone": "— aucun —"
+        "priceCurrencyNone": "— aucun —",
+        "budgetCostDay": "Cost budget / day",
+        "budgetCostWeek": "Cost budget / week",
+        "budgetCostMonth": "Cost budget / month",
+        "budgetCostHelp": "Optional spend cap in the provider's currency. Once reached, calls to this provider are blocked until the window resets."
       },
       "mcp": {
         "title": "Clients MCP",

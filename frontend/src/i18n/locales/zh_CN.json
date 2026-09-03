@@ -849,7 +849,11 @@
         "priceOutput": "每 100 万代币的价格输出",
         "priceCurrency": "货币",
         "priceHelp": "给定货币的每 1M 代币成本（输入/输出）——用于 LLM 审计中的成本计算。",
-        "priceCurrencyNone": "— 无 —"
+        "priceCurrencyNone": "— 无 —",
+        "budgetCostDay": "Cost budget / day",
+        "budgetCostWeek": "Cost budget / week",
+        "budgetCostMonth": "Cost budget / month",
+        "budgetCostHelp": "Optional spend cap in the provider's currency. Once reached, calls to this provider are blocked until the window resets."
       },
       "mcp": {
         "title": "MCP 客户",

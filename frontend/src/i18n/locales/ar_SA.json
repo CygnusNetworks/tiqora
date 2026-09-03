@@ -849,7 +849,11 @@
         "priceOutput": "إخراج السعر لكل 1 مليون رمز",
         "priceCurrency": "العملة",
         "priceHelp": "التكلفة لكل مليون رمز (الإدخال/الإخراج) بالعملة المحددة - تُستخدم لحساب التكلفة في تدقيق LLM.",
-        "priceCurrencyNone": "— لا شيء —"
+        "priceCurrencyNone": "— لا شيء —",
+        "budgetCostDay": "Cost budget / day",
+        "budgetCostWeek": "Cost budget / week",
+        "budgetCostMonth": "Cost budget / month",
+        "budgetCostHelp": "Optional spend cap in the provider's currency. Once reached, calls to this provider are blocked until the window resets."
       },
       "mcp": {
         "title": "عملاء MCP",

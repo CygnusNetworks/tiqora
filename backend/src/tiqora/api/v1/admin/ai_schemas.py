@@ -64,6 +64,9 @@ class LlmProviderOut(BaseModel):
     price_input_per_1m: float | None
     price_output_per_1m: float | None
     price_currency: str | None
+    budget_cost_day: float | None
+    budget_cost_week: float | None
+    budget_cost_month: float | None
     valid_id: int
     create_time: datetime
     change_time: datetime
@@ -83,6 +86,9 @@ class LlmProviderCreate(BaseModel):
     price_input_per_1m: float | None = None
     price_output_per_1m: float | None = None
     price_currency: str | None = None
+    budget_cost_day: float | None = None
+    budget_cost_week: float | None = None
+    budget_cost_month: float | None = None
 
 
 class LlmProviderUpdate(BaseModel):
@@ -100,6 +106,9 @@ class LlmProviderUpdate(BaseModel):
     price_input_per_1m: float | None = None
     price_output_per_1m: float | None = None
     price_currency: str | None = None
+    budget_cost_day: float | None = None
+    budget_cost_week: float | None = None
+    budget_cost_month: float | None = None
     valid_id: int | None = None
 
 

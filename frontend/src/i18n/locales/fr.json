@@ -849,7 +849,11 @@
         "priceOutput": "Prix sortie pour 1 M de tokens",
         "priceCurrency": "Devise",
         "priceHelp": "Coût pour 1 M de tokens (entrée/sortie) dans la devise indiquée — utilisé pour le calcul des coûts dans l'audit LLM.",
-        "priceCurrencyNone": "— aucune —"
+        "priceCurrencyNone": "— aucune —",
+        "budgetCostDay": "Cost budget / day",
+        "budgetCostWeek": "Cost budget / week",
+        "budgetCostMonth": "Cost budget / month",
+        "budgetCostHelp": "Optional spend cap in the provider's currency. Once reached, calls to this provider are blocked until the window resets."
       },
       "mcp": {
         "title": "Clients MCP",

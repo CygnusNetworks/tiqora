@@ -21,6 +21,7 @@ from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from tests.test_ai_runtime import ScriptedLlm, _propose_response
 from tiqora.ai import policies as ai_policies
 from tiqora.ai import providers as ai_providers
+from tiqora.ai import usage as usage_service
 from tiqora.ai.auto_worker import run_auto_tick
 from tiqora.ai.gate import (
     OPERATION_MODE_PARALLEL,
@@ -29,7 +30,7 @@ from tiqora.ai.gate import (
     set_operation_mode,
 )
 from tiqora.ai.llm import LlmClient
-from tiqora.ai.models import AUTONOMY_FULL, AUTONOMY_OFF, TiqoraAiTicketState
+from tiqora.ai.models import AUTONOMY_FULL, AUTONOMY_OFF, TiqoraAiTicketState, TiqoraLlmProvider
 from tiqora.config import get_settings
 from tiqora.db.tiqora.base import TiqoraBase
 from tiqora.domain.settings_store import (
@@ -221,7 +222,10 @@ async def _setup_policy(
     max_clarifications: int = 2,
     max_replies_per_hour: int | None = None,
     budget_tokens_day: int | None = None,
-) -> None:
+    budget_cost_day: float | None = None,
+    budget_cost_week: float | None = None,
+    budget_cost_month: float | None = None,
+) -> TiqoraLlmProvider:
     await set_operation_mode(session, OPERATION_MODE_TIQORA_PRIMARY)
     # tiqora_settings is a single shared table across tests in this module;
     # reset the global cap so an earlier test's setting never leaks here.
@@ -239,6 +243,9 @@ async def _setup_policy(
         supports_tools=True,
         supports_streaming=False,
         eu_hosted=True,
+        budget_cost_day=budget_cost_day,
+        budget_cost_week=budget_cost_week,
+        budget_cost_month=budget_cost_month,
     )
     await ai_policies.create_queue_policy(
         session,
@@ -254,6 +261,7 @@ async def _setup_policy(
         max_replies_per_hour=max_replies_per_hour,
         budget_tokens_day=budget_tokens_day,
     )
+    return provider
 
 
 def _patch_llm(monkeypatch: pytest.MonkeyPatch, llm: LlmClient) -> None:
@@ -772,4 +780,89 @@ async def test_kill_switch_blocks_telegram_channel_event_too(
     finally:
         async with factory() as session:
             await set_auto_reply_paused(session, False)
+        await engine.dispose()
+
+
+async def test_provider_budget_cost_day_exceeded_blocks_run(
+    mariadb_znuny_url: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    seed = _seed_ticket(mariadb_znuny_url, ns=16)
+    article_id = _add_article(
+        mariadb_znuny_url, ticket_id=seed["ticket_id"], sender_type="customer", body="Help!"
+    )
+    _insert_outbox_event(
+        mariadb_znuny_url,
+        ticket_id=seed["ticket_id"],
+        event_type="ArticleCreate",
+        article_id=article_id,
+    )
+    engine = create_async_engine(_mysql_async(mariadb_znuny_url))
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    try:
+        async with factory() as session:
+            provider = await _setup_policy(session, seed=seed, budget_cost_day=5.0)
+            await usage_service.record_usage(
+                session,
+                queue_id=seed["queue_id"],
+                feature="auto_reply",
+                provider_id=provider.id,
+                cost_hint=6.0,
+                success=True,
+            )
+
+        _patch_llm(monkeypatch, ScriptedLlm([_propose_response("reply", "Should not run.")]))
+        totals = await run_auto_tick(settings=get_settings(), session_factory=factory)
+        assert totals["auto_replies"] == 0
+    finally:
+        await engine.dispose()
+
+
+async def test_provider_budget_on_other_provider_does_not_block_run(
+    mariadb_znuny_url: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A budget configured on a DIFFERENT provider must never leak into this
+    queue's cap check — cost budgets are scoped per provider_id."""
+    seed = _seed_ticket(mariadb_znuny_url, ns=17)
+    article_id = _add_article(
+        mariadb_znuny_url, ticket_id=seed["ticket_id"], sender_type="customer", body="Help!"
+    )
+    _insert_outbox_event(
+        mariadb_znuny_url,
+        ticket_id=seed["ticket_id"],
+        event_type="ArticleCreate",
+        article_id=article_id,
+    )
+    engine = create_async_engine(_mysql_async(mariadb_znuny_url))
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    try:
+        async with factory() as session:
+            await _setup_policy(session, seed=seed)
+            other = await ai_providers.create_provider(
+                session,
+                settings=get_settings(),
+                change_by=1,
+                name=f"other-provider-{seed['queue_id']}",
+                kind="openai_compat",
+                base_url="https://llm.example/v1",
+                default_model="fake-model",
+                api_key=None,
+                extra_json=None,
+                supports_tools=True,
+                supports_streaming=False,
+                eu_hosted=True,
+                budget_cost_day=1.0,
+            )
+            await usage_service.record_usage(
+                session,
+                queue_id=seed["queue_id"],
+                feature="auto_reply",
+                provider_id=other.id,
+                cost_hint=1_000.0,
+                success=True,
+            )
+
+        _patch_llm(monkeypatch, ScriptedLlm([_propose_response("reply", "Should run.")]))
+        totals = await run_auto_tick(settings=get_settings(), session_factory=factory)
+        assert totals["auto_replies"] == 1
+    finally:
         await engine.dispose()

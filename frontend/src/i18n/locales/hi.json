@@ -849,7 +849,11 @@
         "priceOutput": "प्रति 1M टोकन मूल्य आउटपुट",
         "priceCurrency": "मुद्रा",
         "priceHelp": "दी गई मुद्रा में प्रति 1M टोकन (इनपुट/आउटपुट) की लागत - एलएलएम ऑडिट में लागत गणना के लिए उपयोग की जाती है।",
-        "priceCurrencyNone": "- कोई नहीं -"
+        "priceCurrencyNone": "- कोई नहीं -",
+        "budgetCostDay": "Cost budget / day",
+        "budgetCostWeek": "Cost budget / week",
+        "budgetCostMonth": "Cost budget / month",
+        "budgetCostHelp": "Optional spend cap in the provider's currency. Once reached, calls to this provider are blocked until the window resets."
       },
       "mcp": {
         "title": "एमसीपी ग्राहक",

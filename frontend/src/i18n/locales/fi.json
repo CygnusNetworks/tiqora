@@ -849,7 +849,11 @@
         "priceOutput": "Tuotantohinta 1 miljoonalta tokenilta",
         "priceCurrency": "Valuutta",
         "priceHelp": "Kustannukset 1 miljoonasta tokeneista (syöttö/tulostus) annetussa valuutassa — käytetään kustannuslaskelmaan LLM-tarkastuksessa.",
-        "priceCurrencyNone": "- ei yhtään -"
+        "priceCurrencyNone": "- ei yhtään -",
+        "budgetCostDay": "Cost budget / day",
+        "budgetCostWeek": "Cost budget / week",
+        "budgetCostMonth": "Cost budget / month",
+        "budgetCostHelp": "Optional spend cap in the provider's currency. Once reached, calls to this provider are blocked until the window resets."
       },
       "mcp": {
         "title": "MCP-asiakkaat",

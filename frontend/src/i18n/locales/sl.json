@@ -849,7 +849,11 @@
         "priceOutput": "Izhodna cena za 1 milijon žetonov",
         "priceCurrency": "Valuta",
         "priceHelp": "Cena na 1 milijon žetonov (vhod/izhod) v dani valuti — uporabljena za izračun stroškov pri reviziji LLM.",
-        "priceCurrencyNone": "— nič —"
+        "priceCurrencyNone": "— nič —",
+        "budgetCostDay": "Cost budget / day",
+        "budgetCostWeek": "Cost budget / week",
+        "budgetCostMonth": "Cost budget / month",
+        "budgetCostHelp": "Optional spend cap in the provider's currency. Once reached, calls to this provider are blocked until the window resets."
       },
       "mcp": {
         "title": "odjemalci MCP",

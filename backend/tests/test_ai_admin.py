@@ -345,6 +345,81 @@ async def test_provider_price_fields_roundtrip_and_validation(mariadb_znuny_url:
             assert exc_info.value.status_code == 422
     finally:
         await engine.dispose()
+
+
+async def test_provider_budget_fields_roundtrip_and_validation(mariadb_znuny_url: str) -> None:
+    _ensure_tiqora_tables(mariadb_znuny_url)
+    get_settings.cache_clear()
+    engine = create_async_engine(_mysql_async(mariadb_znuny_url))
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    try:
+        async with factory() as session:
+            created = await admin_ai.create_llm_provider(
+                LlmProviderCreate(
+                    name="budgeted-89601",
+                    kind="openai_compat",
+                    base_url="https://api.example/v1",
+                    default_model="model-a",
+                    budget_cost_day=5.0,
+                    budget_cost_week=25.0,
+                    budget_cost_month=90.0,
+                ),
+                _root_user(),
+                session,
+            )
+            assert created.budget_cost_day == 5.0
+            assert created.budget_cost_week == 25.0
+            assert created.budget_cost_month == 90.0
+
+            updated = await admin_ai.update_llm_provider(
+                created.id,
+                LlmProviderUpdate(budget_cost_day=10.0),
+                _root_user(),
+                session,
+            )
+            assert updated.budget_cost_day == 10.0
+            assert updated.budget_cost_week == 25.0  # untouched
+            assert updated.budget_cost_month == 90.0  # untouched
+
+            # A provider without any budget configured still round-trips as None.
+            bare = await admin_ai.create_llm_provider(
+                LlmProviderCreate(
+                    name="unbudgeted-89602",
+                    kind="openai_compat",
+                    base_url="https://api.example/v1",
+                    default_model="model-b",
+                ),
+                _root_user(),
+                session,
+            )
+            assert bare.budget_cost_day is None
+            assert bare.budget_cost_week is None
+            assert bare.budget_cost_month is None
+
+            with pytest.raises(HTTPException) as exc_info:
+                await admin_ai.create_llm_provider(
+                    LlmProviderCreate(
+                        name="negative-budget-89603",
+                        kind="openai_compat",
+                        base_url="https://api.example/v1",
+                        default_model="model-c",
+                        budget_cost_day=-1.0,
+                    ),
+                    _root_user(),
+                    session,
+                )
+            assert exc_info.value.status_code == 422
+
+            with pytest.raises(HTTPException) as exc_info:
+                await admin_ai.update_llm_provider(
+                    created.id,
+                    LlmProviderUpdate(budget_cost_week=-5.0),
+                    _root_user(),
+                    session,
+                )
+            assert exc_info.value.status_code == 422
+    finally:
+        await engine.dispose()
         get_settings.cache_clear()
 
 
