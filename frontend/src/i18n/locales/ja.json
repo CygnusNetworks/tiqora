@@ -849,7 +849,11 @@
         "priceOutput": "100万トークンあたりの価格出力",
         "priceCurrency": "通貨",
         "priceHelp": "特定の通貨での100万トークンあたりのコスト (入力/出力) — LLM監査のコスト計算に使用されます。",
-        "priceCurrencyNone": "— なし —"
+        "priceCurrencyNone": "— なし —",
+        "budgetCostDay": "Cost budget / day",
+        "budgetCostWeek": "Cost budget / week",
+        "budgetCostMonth": "Cost budget / month",
+        "budgetCostHelp": "Optional spend cap in the provider's currency. Once reached, calls to this provider are blocked until the window resets."
       },
       "mcp": {
         "title": "MCPクライアント",

@@ -9303,6 +9303,12 @@ export interface components {
             api_key?: string | null;
             /** Base Url */
             base_url: string;
+            /** Budget Cost Day */
+            budget_cost_day?: number | null;
+            /** Budget Cost Month */
+            budget_cost_month?: number | null;
+            /** Budget Cost Week */
+            budget_cost_week?: number | null;
             /** Default Model */
             default_model: string;
             /**
@@ -9346,6 +9352,12 @@ export interface components {
         LlmProviderOut: {
             /** Base Url */
             base_url: string;
+            /** Budget Cost Day */
+            budget_cost_day: number | null;
+            /** Budget Cost Month */
+            budget_cost_month: number | null;
+            /** Budget Cost Week */
+            budget_cost_week: number | null;
             /**
              * Change Time
              * Format: date-time
@@ -9405,6 +9417,12 @@ export interface components {
             api_key?: string | null;
             /** Base Url */
             base_url?: string | null;
+            /** Budget Cost Day */
+            budget_cost_day?: number | null;
+            /** Budget Cost Month */
+            budget_cost_month?: number | null;
+            /** Budget Cost Week */
+            budget_cost_week?: number | null;
             /** Default Model */
             default_model?: string | null;
             /** Eu Hosted */

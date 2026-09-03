@@ -849,7 +849,11 @@
         "priceOutput": "Ценова продукция за 1M токени",
         "priceCurrency": "Валута",
         "priceHelp": "Цена за 1 милион токени (вход/изход) в дадената валута — използва се за изчисляване на разходите в одита на LLM.",
-        "priceCurrencyNone": "— няма —"
+        "priceCurrencyNone": "— няма —",
+        "budgetCostDay": "Cost budget / day",
+        "budgetCostWeek": "Cost budget / week",
+        "budgetCostMonth": "Cost budget / month",
+        "budgetCostHelp": "Optional spend cap in the provider's currency. Once reached, calls to this provider are blocked until the window resets."
       },
       "mcp": {
         "title": "MCP клиенти",

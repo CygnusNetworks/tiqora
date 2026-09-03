@@ -849,7 +849,11 @@
         "priceOutput": "Kimeneti ár 1 millió tokenenként",
         "priceCurrency": "Pénznem",
         "priceHelp": "Költség 1M tokenenként (input/output) az adott pénznemben – az LLM audit költségszámításánál használatos.",
-        "priceCurrencyNone": "– egyik sem –"
+        "priceCurrencyNone": "– egyik sem –",
+        "budgetCostDay": "Cost budget / day",
+        "budgetCostWeek": "Cost budget / week",
+        "budgetCostMonth": "Cost budget / month",
+        "budgetCostHelp": "Optional spend cap in the provider's currency. Once reached, calls to this provider are blocked until the window resets."
       },
       "mcp": {
         "title": "MCP kliensek",

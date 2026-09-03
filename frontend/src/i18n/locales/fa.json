@@ -849,7 +849,11 @@
         "priceOutput": "قیمت خروجی به ازای هر 1 میلیون توکن",
         "priceCurrency": "ارز",
         "priceHelp": "هزینه به ازای هر 1 میلیون توکن (ورودی/خروجی) در ارز داده شده - برای محاسبه هزینه در ممیزی LLM استفاده می شود.",
-        "priceCurrencyNone": "- هیچ -"
+        "priceCurrencyNone": "- هیچ -",
+        "budgetCostDay": "Cost budget / day",
+        "budgetCostWeek": "Cost budget / week",
+        "budgetCostMonth": "Cost budget / month",
+        "budgetCostHelp": "Optional spend cap in the provider's currency. Once reached, calls to this provider are blocked until the window resets."
       },
       "mcp": {
         "title": "مشتریان MCP",

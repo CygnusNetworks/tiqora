@@ -849,7 +849,11 @@
         "priceOutput": "Salida de precios por 1 millón de tokens",
         "priceCurrency": "Moneda",
         "priceHelp": "Costo por 1 millón de tokens (entrada/salida) en la moneda determinada: se utiliza para el cálculo del costo en la auditoría LLM.",
-        "priceCurrencyNone": "- ninguno -"
+        "priceCurrencyNone": "- ninguno -",
+        "budgetCostDay": "Cost budget / day",
+        "budgetCostWeek": "Cost budget / week",
+        "budgetCostMonth": "Cost budget / month",
+        "budgetCostHelp": "Optional spend cap in the provider's currency. Once reached, calls to this provider are blocked until the window resets."
       },
       "mcp": {
         "title": "Clientes MCP",

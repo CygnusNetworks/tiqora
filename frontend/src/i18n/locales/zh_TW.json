@@ -849,7 +849,11 @@
         "priceOutput": "每 100 萬代幣的價格輸出",
         "priceCurrency": "貨幣",
         "priceHelp": "給定貨幣的每 1M 代幣成本（輸入/輸出）—用於 LLM 審計中的成本計算。",
-        "priceCurrencyNone": "— 無 —"
+        "priceCurrencyNone": "— 無 —",
+        "budgetCostDay": "Cost budget / day",
+        "budgetCostWeek": "Cost budget / week",
+        "budgetCostMonth": "Cost budget / month",
+        "budgetCostHelp": "Optional spend cap in the provider's currency. Once reached, calls to this provider are blocked until the window resets."
       },
       "mcp": {
         "title": "MCP 客戶",

@@ -849,7 +849,11 @@
         "priceOutput": "Ieșire de preț pentru 1 milion de jetoane",
         "priceCurrency": "Moneda",
         "priceHelp": "Costul pe 1 milion de jetoane (intrare/ieșire) în moneda dată - utilizat pentru calcularea costurilor în auditul LLM.",
-        "priceCurrencyNone": "— niciunul —"
+        "priceCurrencyNone": "— niciunul —",
+        "budgetCostDay": "Cost budget / day",
+        "budgetCostWeek": "Cost budget / week",
+        "budgetCostMonth": "Cost budget / month",
+        "budgetCostHelp": "Optional spend cap in the provider's currency. Once reached, calls to this provider are blocked until the window resets."
       },
       "mcp": {
         "title": "Clienți MCP",

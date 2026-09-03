@@ -48,6 +48,9 @@ export type LlmProviderOut = {
   price_input_per_1m: number | null;
   price_output_per_1m: number | null;
   price_currency: string | null;
+  budget_cost_day: number | null;
+  budget_cost_week: number | null;
+  budget_cost_month: number | null;
   valid_id: number;
   create_time: string;
   change_time: string;
@@ -67,6 +70,9 @@ export type LlmProviderCreate = {
   price_input_per_1m?: number | null;
   price_output_per_1m?: number | null;
   price_currency?: string | null;
+  budget_cost_day?: number | null;
+  budget_cost_week?: number | null;
+  budget_cost_month?: number | null;
 };
 
 export type LlmProviderUpdate = Partial<LlmProviderCreate> & { valid_id?: number };

@@ -9600,6 +9600,39 @@
             "title": "Base Url",
             "type": "string"
           },
+          "budget_cost_day": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Budget Cost Day"
+          },
+          "budget_cost_month": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Budget Cost Month"
+          },
+          "budget_cost_week": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Budget Cost Week"
+          },
           "default_model": {
             "title": "Default Model",
             "type": "string"
@@ -9695,6 +9728,39 @@
           "base_url": {
             "title": "Base Url",
             "type": "string"
+          },
+          "budget_cost_day": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Budget Cost Day"
+          },
+          "budget_cost_month": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Budget Cost Month"
+          },
+          "budget_cost_week": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Budget Cost Week"
           },
           "change_time": {
             "format": "date-time",
@@ -9810,6 +9876,9 @@
           "price_input_per_1m",
           "price_output_per_1m",
           "price_currency",
+          "budget_cost_day",
+          "budget_cost_week",
+          "budget_cost_month",
           "valid_id",
           "create_time",
           "change_time"
@@ -9882,6 +9951,39 @@
               }
             ],
             "title": "Base Url"
+          },
+          "budget_cost_day": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Budget Cost Day"
+          },
+          "budget_cost_month": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Budget Cost Month"
+          },
+          "budget_cost_week": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Budget Cost Week"
           },
           "default_model": {
             "anyOf": [

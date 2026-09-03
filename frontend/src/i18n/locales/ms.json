@@ -849,7 +849,11 @@
         "priceOutput": "Keluaran harga bagi setiap token 1M",
         "priceCurrency": "mata wang",
         "priceHelp": "Kos setiap token 1M (input/output) dalam mata wang yang diberikan — digunakan untuk pengiraan kos dalam audit LLM.",
-        "priceCurrencyNone": "— tiada —"
+        "priceCurrencyNone": "— tiada —",
+        "budgetCostDay": "Cost budget / day",
+        "budgetCostWeek": "Cost budget / week",
+        "budgetCostMonth": "Cost budget / month",
+        "budgetCostHelp": "Optional spend cap in the provider's currency. Once reached, calls to this provider are blocked until the window resets."
       },
       "mcp": {
         "title": "pelanggan MCP",

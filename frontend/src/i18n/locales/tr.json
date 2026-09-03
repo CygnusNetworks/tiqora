@@ -849,7 +849,11 @@
         "priceOutput": "1 milyon token başına fiyat çıkışı",
         "priceCurrency": "Para birimi",
         "priceHelp": "Verilen para biriminde 1 milyon token (giriş/çıkış) başına maliyet - LLM denetiminde maliyet hesaplaması için kullanılır.",
-        "priceCurrencyNone": "- hiçbiri -"
+        "priceCurrencyNone": "- hiçbiri -",
+        "budgetCostDay": "Cost budget / day",
+        "budgetCostWeek": "Cost budget / week",
+        "budgetCostMonth": "Cost budget / month",
+        "budgetCostHelp": "Optional spend cap in the provider's currency. Once reached, calls to this provider are blocked until the window resets."
       },
       "mcp": {
         "title": "MCP istemcileri",

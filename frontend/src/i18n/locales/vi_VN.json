@@ -849,7 +849,11 @@
         "priceOutput": "Giá đầu ra trên mỗi 1M token",
         "priceCurrency": "Tiền tệ",
         "priceHelp": "Chi phí trên mỗi 1 triệu token (đầu vào/đầu ra) bằng loại tiền tệ nhất định — được sử dụng để tính toán chi phí trong kiểm tra LLM.",
-        "priceCurrencyNone": "— không có —"
+        "priceCurrencyNone": "— không có —",
+        "budgetCostDay": "Cost budget / day",
+        "budgetCostWeek": "Cost budget / week",
+        "budgetCostMonth": "Cost budget / month",
+        "budgetCostHelp": "Optional spend cap in the provider's currency. Once reached, calls to this provider are blocked until the window resets."
       },
       "mcp": {
         "title": "Khách hàng MCP",

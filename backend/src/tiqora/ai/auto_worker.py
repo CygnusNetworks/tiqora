@@ -47,6 +47,7 @@ from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from tiqora.ai import summary as summary_service
+from tiqora.ai import usage as usage_service
 from tiqora.ai.context import (
     TicketNotFoundError,
     article_from_address,
@@ -192,6 +193,10 @@ async def _cap_reason(
         tokens_today = await _tokens_used_today(session, queue_id)
         if tokens_today >= policy.budget_tokens_day:
             return "budget_tokens_day"
+    if policy.llm_provider_id is not None:
+        window = await usage_service.provider_budget_exceeded(session, policy.llm_provider_id)
+        if window is not None:
+            return f"provider_budget_{window}"
     return None
 
 

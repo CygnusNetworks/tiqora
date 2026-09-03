@@ -849,7 +849,11 @@
         "priceOutput": "Hind väljund 1M märgi kohta",
         "priceCurrency": "Valuuta",
         "priceHelp": "Maksumus 1M märgi kohta (sisend/väljund) antud valuutas — kasutatakse kuluarvestuses LLM-i auditis.",
-        "priceCurrencyNone": "— mitte ühtegi —"
+        "priceCurrencyNone": "— mitte ühtegi —",
+        "budgetCostDay": "Cost budget / day",
+        "budgetCostWeek": "Cost budget / week",
+        "budgetCostMonth": "Cost budget / month",
+        "budgetCostHelp": "Optional spend cap in the provider's currency. Once reached, calls to this provider are blocked until the window resets."
       },
       "mcp": {
         "title": "MCP kliendid",

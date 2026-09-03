@@ -849,7 +849,11 @@
         "priceOutput": "Kaina už 1 mln. žetonų",
         "priceCurrency": "Valiuta",
         "priceHelp": "Kaina už 1 mln. žetonų (įvestis/išvestis) nurodyta valiuta – naudojama sąnaudoms apskaičiuoti atliekant LLM auditą.",
-        "priceCurrencyNone": "-nėra -"
+        "priceCurrencyNone": "-nėra -",
+        "budgetCostDay": "Cost budget / day",
+        "budgetCostWeek": "Cost budget / week",
+        "budgetCostMonth": "Cost budget / month",
+        "budgetCostHelp": "Optional spend cap in the provider's currency. Once reached, calls to this provider are blocked until the window resets."
       },
       "mcp": {
         "title": "MCP klientai",

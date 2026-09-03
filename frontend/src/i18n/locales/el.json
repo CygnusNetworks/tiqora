@@ -849,7 +849,11 @@
         "priceOutput": "Τιμή παραγωγής ανά 1 εκατομμύριο μάρκες",
         "priceCurrency": "Νόμισμα",
         "priceHelp": "Κόστος ανά 1 εκατομμύριο διακριτικά (εισόδου/εξόδου) στο συγκεκριμένο νόμισμα — χρησιμοποιείται για τον υπολογισμό του κόστους στον έλεγχο LLM.",
-        "priceCurrencyNone": "— κανένα —"
+        "priceCurrencyNone": "— κανένα —",
+        "budgetCostDay": "Cost budget / day",
+        "budgetCostWeek": "Cost budget / week",
+        "budgetCostMonth": "Cost budget / month",
+        "budgetCostHelp": "Optional spend cap in the provider's currency. Once reached, calls to this provider are blocked until the window resets."
       },
       "mcp": {
         "title": "πελάτες MCP",

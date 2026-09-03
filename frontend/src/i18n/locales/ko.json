@@ -849,7 +849,11 @@
         "priceOutput": "100만 토큰당 가격 출력",
         "priceCurrency": "통화",
         "priceHelp": "해당 통화의 100만 개 토큰(입력/출력)당 비용 — LLM 감사에서 비용 계산에 사용됩니다.",
-        "priceCurrencyNone": "— 없음 —"
+        "priceCurrencyNone": "— 없음 —",
+        "budgetCostDay": "Cost budget / day",
+        "budgetCostWeek": "Cost budget / week",
+        "budgetCostMonth": "Cost budget / month",
+        "budgetCostHelp": "Optional spend cap in the provider's currency. Once reached, calls to this provider are blocked until the window resets."
       },
       "mcp": {
         "title": "MCP 클라이언트",

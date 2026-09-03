@@ -48,6 +48,21 @@ def _validate_pricing(
         )
 
 
+def _validate_budget(
+    *,
+    budget_cost_day: float | None,
+    budget_cost_week: float | None,
+    budget_cost_month: float | None,
+) -> None:
+    for label, value in (
+        ("budget_cost_day", budget_cost_day),
+        ("budget_cost_week", budget_cost_week),
+        ("budget_cost_month", budget_cost_month),
+    ):
+        if value is not None and value < 0:
+            raise ProviderValidationError(f"{label} must be >= 0")
+
+
 # Minimal tool schema used to probe tool-calling support on /chat/completions.
 _TEST_TOOL_SCHEMA = [
     {
@@ -104,11 +119,19 @@ async def create_provider(
     price_input_per_1m: float | None = None,
     price_output_per_1m: float | None = None,
     price_currency: str | None = None,
+    budget_cost_day: float | None = None,
+    budget_cost_week: float | None = None,
+    budget_cost_month: float | None = None,
 ) -> TiqoraLlmProvider:
     _validate_pricing(
         price_input_per_1m=price_input_per_1m,
         price_output_per_1m=price_output_per_1m,
         price_currency=price_currency,
+    )
+    _validate_budget(
+        budget_cost_day=budget_cost_day,
+        budget_cost_week=budget_cost_week,
+        budget_cost_month=budget_cost_month,
     )
     # Keys/URLs arrive via copy-paste; stray whitespace or a trailing newline
     # silently breaks the Bearer header at the provider (opaque 401s).
@@ -127,6 +150,9 @@ async def create_provider(
         price_input_per_1m=price_input_per_1m,
         price_output_per_1m=price_output_per_1m,
         price_currency=price_currency,
+        budget_cost_day=budget_cost_day,
+        budget_cost_week=budget_cost_week,
+        budget_cost_month=budget_cost_month,
         create_by=change_by,
         change_by=change_by,
     )
@@ -155,12 +181,20 @@ async def update_provider(
     price_input_per_1m: float | None = None,
     price_output_per_1m: float | None = None,
     price_currency: str | None = None,
+    budget_cost_day: float | None = None,
+    budget_cost_week: float | None = None,
+    budget_cost_month: float | None = None,
     valid_id: int | None = None,
 ) -> TiqoraLlmProvider:
     _validate_pricing(
         price_input_per_1m=price_input_per_1m,
         price_output_per_1m=price_output_per_1m,
         price_currency=price_currency,
+    )
+    _validate_budget(
+        budget_cost_day=budget_cost_day,
+        budget_cost_week=budget_cost_week,
+        budget_cost_month=budget_cost_month,
     )
     if name is not None:
         row.name = name
@@ -188,6 +222,12 @@ async def update_provider(
         row.price_output_per_1m = price_output_per_1m
     if price_currency is not None:
         row.price_currency = price_currency
+    if budget_cost_day is not None:
+        row.budget_cost_day = budget_cost_day
+    if budget_cost_week is not None:
+        row.budget_cost_week = budget_cost_week
+    if budget_cost_month is not None:
+        row.budget_cost_month = budget_cost_month
     if valid_id is not None:
         row.valid_id = valid_id
     row.change_by = change_by
@@ -237,6 +277,9 @@ async def duplicate_provider(
         price_input_per_1m=row.price_input_per_1m,
         price_output_per_1m=row.price_output_per_1m,
         price_currency=row.price_currency,
+        budget_cost_day=row.budget_cost_day,
+        budget_cost_week=row.budget_cost_week,
+        budget_cost_month=row.budget_cost_month,
         valid_id=row.valid_id,
         create_by=change_by,
         change_by=change_by,
@@ -263,6 +306,9 @@ def provider_to_public_dict(row: TiqoraLlmProvider) -> dict[str, object]:
         "price_input_per_1m": row.price_input_per_1m,
         "price_output_per_1m": row.price_output_per_1m,
         "price_currency": row.price_currency,
+        "budget_cost_day": row.budget_cost_day,
+        "budget_cost_week": row.budget_cost_week,
+        "budget_cost_month": row.budget_cost_month,
         "valid_id": int(row.valid_id),
         "create_time": row.create_time,
         "change_time": row.change_time,

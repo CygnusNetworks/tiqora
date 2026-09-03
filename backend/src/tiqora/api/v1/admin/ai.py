@@ -205,6 +205,9 @@ async def create_llm_provider(
             price_input_per_1m=body.price_input_per_1m,
             price_output_per_1m=body.price_output_per_1m,
             price_currency=body.price_currency,
+            budget_cost_day=body.budget_cost_day,
+            budget_cost_week=body.budget_cost_week,
+            budget_cost_month=body.budget_cost_month,
         )
     except ai_providers.ProviderValidationError as exc:
         raise HTTPException(

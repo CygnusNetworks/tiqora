@@ -849,7 +849,11 @@
         "priceOutput": "Cijena izlaza za 1M tokena",
         "priceCurrency": "valuta",
         "priceHelp": "Trošak po 1M tokena (ulaz/izlaz) u danoj valuti — koristi se za izračun troškova u LLM reviziji.",
-        "priceCurrencyNone": "— nijedan —"
+        "priceCurrencyNone": "— nijedan —",
+        "budgetCostDay": "Cost budget / day",
+        "budgetCostWeek": "Cost budget / week",
+        "budgetCostMonth": "Cost budget / month",
+        "budgetCostHelp": "Optional spend cap in the provider's currency. Once reached, calls to this provider are blocked until the window resets."
       },
       "mcp": {
         "title": "MCP klijenti",

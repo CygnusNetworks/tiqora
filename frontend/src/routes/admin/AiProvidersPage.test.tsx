@@ -128,6 +128,53 @@ describe("AiProvidersPage", () => {
     });
   });
 
+  it("submits provider cost-budget fields via the drawer", async () => {
+    createProvider.mockResolvedValue({
+      ...sampleProvider,
+      id: 3,
+      name: "Budgeted",
+    });
+    renderPage();
+    await waitFor(() =>
+      expect(screen.getByTestId("admin-ai-providers-new")).toBeInTheDocument(),
+    );
+
+    fireEvent.click(screen.getByTestId("admin-ai-providers-new"));
+    fireEvent.change(screen.getByTestId("admin-ai-provider-form-name"), {
+      target: { value: "Budgeted" },
+    });
+    fireEvent.change(screen.getByTestId("admin-ai-provider-form-base_url"), {
+      target: { value: "https://api.example.com/v1" },
+    });
+    fireEvent.change(
+      screen.getByTestId("admin-ai-provider-form-default_model"),
+      { target: { value: "model-a" } },
+    );
+    fireEvent.change(
+      screen.getByTestId("admin-ai-provider-form-budget_cost_day"),
+      { target: { value: "5" } },
+    );
+    fireEvent.change(
+      screen.getByTestId("admin-ai-provider-form-budget_cost_week"),
+      { target: { value: "25" } },
+    );
+    fireEvent.change(
+      screen.getByTestId("admin-ai-provider-form-budget_cost_month"),
+      { target: { value: "90" } },
+    );
+    fireEvent.click(screen.getByTestId("admin-ai-provider-form-submit"));
+
+    await waitFor(() => {
+      expect(createProvider).toHaveBeenCalledWith(
+        expect.objectContaining({
+          budget_cost_day: 5,
+          budget_cost_week: 25,
+          budget_cost_month: 90,
+        }),
+      );
+    });
+  });
+
   it("deletes a provider via the ⋯-menu only after confirming", async () => {
     deleteProvider.mockResolvedValue(undefined);
     renderPage();

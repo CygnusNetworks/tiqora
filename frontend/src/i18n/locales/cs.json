@@ -849,7 +849,11 @@
         "priceOutput": "Cena výstupu za 1M tokenů",
         "priceCurrency": "Měna",
         "priceHelp": "Náklady za 1M tokenů (vstup/výstup) v dané měně — pro výpočet nákladů v LLM auditu.",
-        "priceCurrencyNone": "— žádná —"
+        "priceCurrencyNone": "— žádná —",
+        "budgetCostDay": "Cost budget / day",
+        "budgetCostWeek": "Cost budget / week",
+        "budgetCostMonth": "Cost budget / month",
+        "budgetCostHelp": "Optional spend cap in the provider's currency. Once reached, calls to this provider are blocked until the window resets."
       },
       "mcp": {
         "title": "MCP klienti",

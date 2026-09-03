@@ -849,7 +849,11 @@
         "priceOutput": "Вывод цены за 1 миллион токенов",
         "priceCurrency": "Валюта",
         "priceHelp": "Стоимость за 1 млн токенов (вход/выход) в заданной валюте — используется для расчета стоимости при LLM-аудите.",
-        "priceCurrencyNone": "- никто -"
+        "priceCurrencyNone": "- никто -",
+        "budgetCostDay": "Cost budget / day",
+        "budgetCostWeek": "Cost budget / week",
+        "budgetCostMonth": "Cost budget / month",
+        "budgetCostHelp": "Optional spend cap in the provider's currency. Once reached, calls to this provider are blocked until the window resets."
       },
       "mcp": {
         "title": "клиенты MCP",

@@ -849,7 +849,11 @@
         "priceOutput": "Вихід ціни за 1 млн токенів",
         "priceCurrency": "Валюта",
         "priceHelp": "Вартість 1 млн токенів (введення/виведення) у вказаній валюті — використовується для розрахунку вартості під час аудиту LLM.",
-        "priceCurrencyNone": "— немає —"
+        "priceCurrencyNone": "— немає —",
+        "budgetCostDay": "Cost budget / day",
+        "budgetCostWeek": "Cost budget / week",
+        "budgetCostMonth": "Cost budget / month",
+        "budgetCostHelp": "Optional spend cap in the provider's currency. Once reached, calls to this provider are blocked until the window resets."
       },
       "mcp": {
         "title": "Клієнти MCP",

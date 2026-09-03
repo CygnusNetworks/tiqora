@@ -916,7 +916,11 @@
         "priceOutput": "Preis Output je 1M Token",
         "priceCurrency": "Währung",
         "priceHelp": "Kosten je 1 Mio. Token (Input/Output) in der angegebenen Währung — Basis für die Kostenberechnung im LLM-Audit.",
-        "priceCurrencyNone": "— keine —"
+        "priceCurrencyNone": "— keine —",
+        "budgetCostDay": "Kostenlimit / Tag",
+        "budgetCostWeek": "Kostenlimit / Woche",
+        "budgetCostMonth": "Kostenlimit / Monat",
+        "budgetCostHelp": "Optionales Ausgabenlimit in der Währung des Providers. Bei Erreichen werden Aufrufe an diesen Provider blockiert, bis das Zeitfenster zurückgesetzt wird."
       },
       "mcp": {
         "title": "MCP-Clients",
