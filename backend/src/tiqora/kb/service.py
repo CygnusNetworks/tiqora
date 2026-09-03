@@ -515,6 +515,7 @@ class KbService:
         self, user_id: int, article_id: int, data: ArticleUpdateIn
     ) -> TiqoraKbArticle:
         row = await self.get_article(article_id)
+        was_published = row.state == STATE_PUBLISHED
         content_changed = (data.title is not None and data.title != row.title) or (
             data.content_md is not None and data.content_md != row.content_md
         )
@@ -539,15 +540,28 @@ class KbService:
         row.change_by = user_id
         row.change_time = datetime.now(UTC).replace(tzinfo=None)
         await self._session.flush()
+
+        # A PATCH can move an article off "published" (e.g. state="draft")
+        # without going through publish()/the dedicated unpublish path. The
+        # search index has no notion of state (see ensure_index()'s
+        # filterable_attributes) and is never re-derived from the DB, so a
+        # chunk stays discoverable via kb_search forever unless we explicitly
+        # remove it here.
+        if was_published and row.state != STATE_PUBLISHED:
+            await self._deindex_article(article_id)
+
         return row
 
     async def delete_article(self, user_id: int, article_id: int) -> None:
         """Soft-delete: archive (history/chunks are kept for audit/citations)."""
         row = await self.get_article(article_id)
+        was_published = row.state == STATE_PUBLISHED
         row.state = "archived"
         row.change_by = user_id
         row.change_time = datetime.now(UTC).replace(tzinfo=None)
         await self._session.flush()
+        if was_published:
+            await self._deindex_article(article_id)
 
     async def list_versions(self, article_id: int) -> list[TiqoraKbArticleVersion]:
         rows = await self._session.execute(
@@ -635,6 +649,20 @@ class KbService:
             task = await index.add_documents(docs)
             await client.wait_for_task(task.task_uid, timeout_in_ms=120_000)
         return row
+
+    async def _deindex_article(self, article_id: int) -> None:
+        """Remove every Meilisearch chunk document belonging to ``article_id``.
+
+        Does not touch ``tiqora_kb_chunk`` — those rows stay for
+        version-history/citation purposes (see ``delete_article``); only the
+        live search index, which unpublished/archived content must not
+        surface through, is affected.
+        """
+        await self.ensure_index()
+        client = await self._get_client()
+        index = client.index(self._settings.meili_kb_index)
+        task = await index.delete_documents_by_filter(f"article_id = {article_id}")
+        await client.wait_for_task(task.task_uid, timeout_in_ms=60_000)
 
     # ------------------------------------------------------------------
     # Search
