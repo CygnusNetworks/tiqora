@@ -195,6 +195,76 @@ def test_user_message_omits_reply_language_line_by_default() -> None:
 
 
 # ---------------------------------------------------------------------------
+# _build_user_message: known disclosure footer is stripped from prior
+# articles before being shown to the model as context (prod bug — the model
+# saw its own previously-sent footer in the thread history and reproduced it
+# again in the next draft, doubling it once a human accepted and sent).
+# ---------------------------------------------------------------------------
+
+
+def test_user_message_strips_known_disclosure_footer_from_prior_article() -> None:
+    ticket = _snapshot()
+    article = ArticleSnapshot(
+        id=1,
+        sender_type="agent",
+        is_visible_for_customer=True,
+        subject=None,
+        body="Here is the answer to your question.\n\nThis reply was AI-assisted.",
+        from_address="agent@example.com",
+        is_ai_origin=True,
+    )
+    msg = _build_user_message(
+        ticket,
+        [article],
+        pii=PiiMapper(),
+        mask=False,
+        kb_bundle=None,
+        disclosure_footer="This reply was AI-assisted.",
+    )
+    assert "Here is the answer to your question." in msg
+    assert "This reply was AI-assisted." not in msg
+
+
+def test_user_message_leaves_article_body_untouched_when_footer_not_present() -> None:
+    ticket = _snapshot()
+    article = ArticleSnapshot(
+        id=1,
+        sender_type="agent",
+        is_visible_for_customer=True,
+        subject=None,
+        body="Here is the answer to your question.",
+        from_address="agent@example.com",
+        is_ai_origin=True,
+    )
+    msg = _build_user_message(
+        ticket,
+        [article],
+        pii=PiiMapper(),
+        mask=False,
+        kb_bundle=None,
+        disclosure_footer="This reply was AI-assisted.",
+    )
+    assert "Here is the answer to your question." in msg
+
+
+def test_user_message_ignores_empty_disclosure_footer() -> None:
+    ticket = _snapshot()
+    article = ArticleSnapshot(
+        id=1,
+        sender_type="agent",
+        is_visible_for_customer=True,
+        subject=None,
+        body="Here is the answer to your question.",
+        from_address="agent@example.com",
+        is_ai_origin=True,
+    )
+    msg = _build_user_message(
+        ticket, [article], pii=PiiMapper(), mask=False, kb_bundle=None, disclosure_footer=""
+    )
+    assert "Here is the answer to your question." in msg
+
+
+# ---------------------------------------------------------------------------
 # _resolve_reply_language_line: auto mode without a configured default (prod
 # bug — replying in the queue's implicit language although the customer
 # wrote in a different one, plan block 3 / detect_reply_language_detailed).
@@ -283,6 +353,18 @@ def test_system_prompt_without_parts_is_unchanged_regression() -> None:
     assert prompt_no_parts == prompt_empty_list
     assert prompt_no_parts.startswith(UNTRUSTED_CONTENT_SYSTEM_BLOCK)
     assert "Base prompt." in prompt_no_parts
+
+
+def test_system_prompt_always_warns_against_copying_disclosure_footer() -> None:
+    policy = _policy()
+    prompt = _build_system_prompt(policy, trigger=TRIGGER_MANUAL, kind_hint=None)
+    assert "appended automatically by the system" in prompt
+
+
+def test_system_prompt_always_warns_against_repeating_prior_explanations() -> None:
+    policy = _policy()
+    prompt = _build_system_prompt(policy, trigger=TRIGGER_MANUAL, kind_hint=None)
+    assert "do not restate that explanation in full" in prompt
 
 
 def test_system_prompt_appends_enabled_parts_in_position_order() -> None:
