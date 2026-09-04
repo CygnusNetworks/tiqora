@@ -411,10 +411,12 @@ def _build_system_prompt(
         "the system adds it again if needed."
     )
     parts.append(
-        "Never end a proposed customer message with your own closing salutation "
-        "or signature (e.g. 'Best regards', 'Mit freundlichen Grüßen') or a "
-        "placeholder name/role like '[Your Name]' — the system appends the "
-        "agent's real queue signature automatically when the message is sent."
+        "You may end a proposed customer message with a short closing "
+        "salutation such as 'Best regards', 'With best regards', or "
+        "'Mit freundlichen Grüßen'. Do not add anything after that line — "
+        "no name, role, phone, queue title, '--' delimiter, or AI-disclosure "
+        "footer. The system appends the real queue signature when the "
+        "message is sent."
     )
     parts.append(
         "Before answering, check whether earlier articles in this ticket already "
