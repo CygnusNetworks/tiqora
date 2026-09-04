@@ -263,19 +263,35 @@ async def test_propose_customer_message_runs_output_guard() -> None:
         )
 
 
-def test_strip_hallucinated_signoff_removes_english_closing_and_placeholder() -> None:
+def test_strip_hallucinated_signoff_keeps_english_closing_drops_placeholder() -> None:
     body = (
         "Please try this: connect your router directly to the wall socket.\n\n"
         "Best regards,\n[Your Name]\nSTW Bonn – StudNet Support"
     )
     assert strip_hallucinated_signoff(body) == (
-        "Please try this: connect your router directly to the wall socket."
+        "Please try this: connect your router directly to the wall socket.\n\n"
+        "Best regards,"
     )
 
 
-def test_strip_hallucinated_signoff_removes_german_closing() -> None:
+def test_strip_hallucinated_signoff_keeps_with_best_regards_drops_queue_footer() -> None:
+    body = (
+        "Please use a router from the tested list.\n\n"
+        "With best regards\n\n"
+        "--\n"
+        "Alex Example - NetAdmin StudNet Bonn - netadmin@stw-bonn.de\n"
+        "StudNet Hotline 0228-28627252"
+    )
+    assert strip_hallucinated_signoff(body) == (
+        "Please use a router from the tested list.\n\nWith best regards"
+    )
+
+
+def test_strip_hallucinated_signoff_keeps_german_closing_drops_placeholder() -> None:
     body = "Bitte starte den Router neu.\n\nMit freundlichen Grüßen\n[Ihr Name]"
-    assert strip_hallucinated_signoff(body) == "Bitte starte den Router neu."
+    assert strip_hallucinated_signoff(body) == (
+        "Bitte starte den Router neu.\n\nMit freundlichen Grüßen"
+    )
 
 
 def test_strip_hallucinated_signoff_leaves_normal_body_untouched() -> None:
@@ -283,8 +299,8 @@ def test_strip_hallucinated_signoff_leaves_normal_body_untouched() -> None:
     assert strip_hallucinated_signoff(body) == body
 
 
-def test_strip_hallucinated_signoff_all_signoff_yields_empty() -> None:
-    assert strip_hallucinated_signoff("Best regards,\n[Your Name]") == ""
+def test_strip_hallucinated_signoff_bare_signoff_keeps_the_line() -> None:
+    assert strip_hallucinated_signoff("Best regards,\n[Your Name]") == "Best regards,"
 
 
 @pytest.mark.asyncio
@@ -313,7 +329,7 @@ async def test_propose_customer_message_strips_hallucinated_signoff() -> None:
     assert outcome.proposal is not None
     assert outcome.proposal["body"] == (
         "Hi Christina,\n\nI've checked your connection and there's no port "
-        "lock in place."
+        "lock in place.\n\nBest regards,"
     )
 
 

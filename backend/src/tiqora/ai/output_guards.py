@@ -30,17 +30,16 @@ class CustomerMessageGuardError(ValueError):
     """Raised when a proposed customer message fails an output guard."""
 
 
-# Closing salutations models habitually invent on their own (a generic
-# business-email reflex), usually followed by a placeholder name/role line
-# ("[Your Name]", "STW Bonn – StudNet Support", ...). The real signature is
-# appended separately by the system when a message is actually sent (see
-# tiqora.ai.runtime._build_system_prompt's matching instruction), so any of
-# this is always safe to drop — never legitimate reply content.
+# Closing salutations the model may use; anything *after* that line is the
+# queue signature / AI-disclosure footer, which the mailer appends itself.
 _SIGNOFF_PHRASES = {
     "best regards",
+    "with best regards",
     "kind regards",
+    "with kind regards",
     "regards",
     "warm regards",
+    "with warm regards",
     "mit freundlichen grüßen",
     "freundliche grüße",
     "viele grüße",
@@ -50,18 +49,34 @@ _SIGNOFF_PHRASES = {
 }
 
 
+def _is_signoff_line(line: str) -> bool:
+    normalized = line.strip().rstrip(",:.").lower()
+    if not normalized:
+        return False
+    if normalized in _SIGNOFF_PHRASES:
+        return True
+    if normalized.startswith("with ") and normalized[5:] in _SIGNOFF_PHRASES:
+        return True
+    return False
+
+
 def strip_hallucinated_signoff(body: str) -> str:
-    """Drop a trailing closing-salutation line and everything after it
-    (typically a placeholder name/org line) that the model invented on its
-    own. Only the last few lines are inspected so real content earlier in
-    the body is never touched."""
+    """Keep a trailing closing salutation; drop the signature/footer after it.
+
+    "Best regards" / "With best regards" / "Mit freundlichen Grüßen" stay.
+    Name, role, phone, ``--`` delimiter and AI-disclosure copied after that
+    line are dropped — the mailer appends the real queue signature on send.
+    Only the last few lines are inspected so quoted earlier mail is untouched.
+    """
     lines = body.rstrip().split("\n")
-    window_start = max(0, len(lines) - 6)
+    window_start = max(0, len(lines) - 12)
+    signoff_at = None
     for i in range(window_start, len(lines)):
-        normalized = lines[i].strip().rstrip(",:.").lower()
-        if normalized in _SIGNOFF_PHRASES:
-            return "\n".join(lines[:i]).rstrip()
-    return body
+        if _is_signoff_line(lines[i]):
+            signoff_at = i
+    if signoff_at is None:
+        return body
+    return "\n".join(lines[: signoff_at + 1]).rstrip()
 
 
 def validate_customer_message(*, kind: str, subject: str, body: str) -> None:
