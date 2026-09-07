@@ -17,7 +17,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 
 from tiqora.domain.settings_store import KEY_ESCALATION_ENABLED, set_setting
 from tiqora.worker import escalation as escalation_module
-from tiqora.worker.escalation import run_escalation_tick, sweep_ticket
+from tiqora.worker.escalation import _sweepable_ticket_ids, run_escalation_tick, sweep_ticket
 from tiqora.znuny.sysconfig import SysConfig
 
 
@@ -248,6 +248,65 @@ async def test_run_escalation_tick_disabled_by_default(mariadb_znuny_url: str) -
             await _seed_tiqora_tables(session)
         result = await run_escalation_tick(session_factory=factory)
         assert result == {"enabled": 0}
+    finally:
+        await engine.dispose()
+
+
+@pytest.mark.db
+async def test_run_escalation_tick_skips_closed_tickets(mariadb_znuny_url: str) -> None:
+    """Closed tickets must not enter the daemon batch (Znuny type name is 'closed')."""
+    engine = create_async_engine(_mysql_async(mariadb_znuny_url))
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    try:
+        async with factory() as session:
+            await _seed_tiqora_tables(session)
+            closed_row = (
+                await session.execute(
+                    text(
+                        "SELECT ts.id FROM ticket_state ts"
+                        " JOIN ticket_state_type tst ON tst.id = ts.type_id"
+                        " WHERE tst.name = 'closed' LIMIT 1"
+                    )
+                )
+            ).first()
+            assert closed_row is not None
+            await session.execute(
+                text(
+                    "UPDATE queue SET first_response_time = 60, solution_time = 0,"
+                    " update_time = 60 WHERE id = 1"
+                )
+            )
+            ticket_id = await _insert_ticket(
+                session, "ESC_SKIP_CLOSED", state_id=int(closed_row[0])
+            )
+            await session.execute(
+                text(
+                    "UPDATE ticket SET escalation_update_time = :epoch WHERE id = :tid"
+                ),
+                {"epoch": int(time.time()) + 3600, "tid": ticket_id},
+            )
+            await session.commit()
+            await set_setting(session, KEY_ESCALATION_ENABLED, "1")
+
+        result = await run_escalation_tick(session_factory=factory)
+        assert result["stop"] == 0
+        async with factory() as session:
+            swept_ids = await _sweepable_ticket_ids(session, 4000)
+            assert ticket_id not in swept_ids
+            assert await _history_count(session, ticket_id, "EscalationUpdateTimeStop") == 0
+            leftover = (
+                await session.execute(
+                    text("SELECT escalation_update_time FROM ticket WHERE id = :tid"),
+                    {"tid": ticket_id},
+                )
+            ).scalar_one()
+            assert int(leftover or 0) > 0
+            await session.execute(text("DELETE FROM ticket WHERE id = :tid"), {"tid": ticket_id})
+            await session.execute(
+                text("DELETE FROM tiqora_settings WHERE `key` = :k"),
+                {"k": KEY_ESCALATION_ENABLED},
+            )
+            await session.commit()
     finally:
         await engine.dispose()
 
