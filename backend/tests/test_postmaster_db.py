@@ -8,14 +8,22 @@ merge-chain walk / References lookup used by follow-up detection.
 
 from __future__ import annotations
 
+from types import SimpleNamespace
+
 import pytest
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from tiqora.channels.email import loop_protection
 from tiqora.channels.email.filters import apply_filters
+from tiqora.channels.email.pipeline import _new_ticket_queue_id
 from tiqora.znuny.followup import find_ticket_by_references, ticket_check_number
 from tiqora.znuny.history import add_merged
+
+
+class _PostmasterSysConfig:
+    async def postmaster_default_queue(self) -> str:
+        return "Raw"
 
 
 def _mysql_async(url: str) -> str:
@@ -144,6 +152,69 @@ async def test_filter_stop_after_match_halts_later_filters(mariadb_znuny_url: st
             await apply_filters(session, get_param)
             # 'a-first' sorts before 'b-second' and has StopAfterMatch.
             assert get_param["X-OTRS-Queue"] == "First"
+    finally:
+        await engine.dispose()
+
+
+# ---------------------------------------------------------------------------
+# new-ticket queue (mail-account QueueID vs DestQueue)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.db
+async def test_new_ticket_queue_prefers_mail_account_over_system_address(
+    mariadb_znuny_url: str,
+) -> None:
+    """Znuny fetch passes account QueueID into PostMaster::Run; DestQueue must not win."""
+    engine = create_async_engine(_mysql_async(mariadb_znuny_url))
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    addr = "tiqora-destqueue-test@example.test"
+    try:
+        async with factory() as session:
+            junk_id = (
+                await session.execute(text("SELECT id FROM queue WHERE name = 'Junk' LIMIT 1"))
+            ).scalar_one()
+            await session.execute(
+                text(
+                    "INSERT INTO system_address (value0, value1, queue_id, comments, valid_id,"
+                    " create_time, create_by, change_time, change_by)"
+                    " VALUES (:a, '', :qid, '', 1, current_timestamp, 1, current_timestamp, 1)"
+                ),
+                {"a": addr, "qid": int(junk_id)},
+            )
+            await session.commit()
+            account = SimpleNamespace(queue_id=1)
+            qid = await _new_ticket_queue_id(
+                session, {"To": f"Netadmin <{addr}>"}, _PostmasterSysConfig(), account
+            )
+            assert qid == 1
+            await session.execute(
+                text("DELETE FROM system_address WHERE value0 = :a"), {"a": addr}
+            )
+            await session.commit()
+    finally:
+        await engine.dispose()
+
+
+@pytest.mark.db
+async def test_new_ticket_queue_trusted_x_otrs_overrides_account(
+    mariadb_znuny_url: str,
+) -> None:
+    engine = create_async_engine(_mysql_async(mariadb_znuny_url))
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    try:
+        async with factory() as session:
+            junk_id = (
+                await session.execute(text("SELECT id FROM queue WHERE name = 'Junk' LIMIT 1"))
+            ).scalar_one()
+            account = SimpleNamespace(queue_id=1)
+            qid = await _new_ticket_queue_id(
+                session,
+                {"To": "nobody@example.test", "X-OTRS-Queue": "Junk"},
+                _PostmasterSysConfig(),
+                account,
+            )
+            assert qid == int(junk_id)
     finally:
         await engine.dispose()
 

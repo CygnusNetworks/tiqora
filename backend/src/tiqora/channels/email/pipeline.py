@@ -104,6 +104,30 @@ async def _trusted_queue_id(session: AsyncSession, get_param: dict[str, str]) ->
     return await _lookup_id(session, "queue", "name", queue_name)
 
 
+async def _new_ticket_queue_id(
+    session: AsyncSession,
+    get_param: dict[str, str],
+    sysconfig: SysConfig,
+    account: MailAccount,
+) -> int:
+    """Queue for a new ticket — Znuny ``PostMaster::Run(QueueID => $Account{QueueID})``.
+
+    Order matches ``Kernel::System::PostMaster`` + POP3/IMAP fetch:
+
+    1. Mail-account ``QueueID`` if set (fetch always passes it; 0 means unset).
+    2. Else DestQueue: ``system_address`` match on To/Cc/…, else
+       ``PostmasterDefaultQueue``.
+    3. Trusted ``X-OTRS-Queue`` (filter Set, or a header on a trusted account)
+       overrides both.
+    """
+    trusted = await _trusted_queue_id(session, get_param)
+    if trusted is not None:
+        return trusted
+    if account.queue_id:
+        return int(account.queue_id)
+    return await _dest_queue_id(session, get_param, sysconfig)
+
+
 def _build_get_param(parsed: ParsedEmail, *, trusted: bool) -> dict[str, str]:
     get_param: dict[str, str] = {
         "From": parsed.from_header,
@@ -318,9 +342,7 @@ async def _process_message_inner(
                 channel="email",
                 attachments=[(a.filename, a.content_type, a.content) for a in parsed.attachments],
             )
-            new_queue_id = await _trusted_queue_id(session, get_param) or await _dest_queue_id(
-                session, get_param, sysconfig
-            )
+            new_queue_id = await _new_ticket_queue_id(session, get_param, sysconfig, account)
             customer_no, customer_user = await _resolve_customer(session, get_param)
             x_fields = await _apply_x_otrs_ticket_fields(session, get_param, sysconfig)
             params = TicketIn(
@@ -421,9 +443,7 @@ async def _process_message_inner(
         )
 
     # New ticket.
-    queue_id = await _trusted_queue_id(session, get_param) or await _dest_queue_id(
-        session, get_param, sysconfig
-    )
+    queue_id = await _new_ticket_queue_id(session, get_param, sysconfig, account)
     customer_no, customer_user = await _resolve_customer(session, get_param)
     x_fields = await _apply_x_otrs_ticket_fields(session, get_param, sysconfig)
     article = ArticleIn(
