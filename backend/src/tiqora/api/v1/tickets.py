@@ -230,6 +230,10 @@ async def list_tickets(
     escalated: bool | None = Query(
         None, description="True = any escalation_* epoch already in the past."
     ),
+    ai_escalated: bool | None = Query(
+        None,
+        description="True = AI handed the ticket to a human and a human has not yet taken over.",
+    ),
     offset: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=200),
     sort: str = Query("age"),
@@ -253,6 +257,7 @@ async def list_tickets(
         locked=locked,
         watcher_user_id=watcher_user_id,
         escalated=True if escalated else None,
+        ai_escalated=True if ai_escalated else None,
         offset=offset,
         limit=limit,
         sort=sort,
@@ -286,11 +291,12 @@ class DashboardSummary(BaseModel):
     my_new: int
     unowned_new: int
     escalated: int
+    ai_escalated: int
 
 
 @router.get("/dashboard-summary", response_model=DashboardSummary)
 async def dashboard_summary(user: CurrentUser, session: DbSession) -> DashboardSummary:
-    """Counts for the dashboard KPI tiles: owned open/new, unclaimed new, escalated.
+    """Counts for the dashboard KPI tiles: owned open/new, unclaimed new, SLA-escalated, AI handoff.
 
     Registered before ``/{ticket_id}`` so "dashboard-summary" is not parsed as
     a ticket id.
@@ -383,6 +389,7 @@ async def _export_tickets_csv_stream(
     locked: bool | None = None,
     watcher_user_id: int | None = None,
     escalated: bool | None = None,
+    ai_escalated: bool | None = None,
     sort: str,
     order: str,
     include_archived: bool = False,
@@ -404,6 +411,7 @@ async def _export_tickets_csv_stream(
         locked=locked,
         watcher_user_id=watcher_user_id,
         escalated=escalated,
+        ai_escalated=ai_escalated,
         sort=sort,
         order=order,
         include_archived=include_archived,
@@ -425,6 +433,7 @@ async def export_tickets_csv(
     locked: bool | None = None,
     watcher_user_id: int | None = None,
     escalated: bool | None = None,
+    ai_escalated: bool | None = None,
     sort: str = Query("age"),
     order: str = Query("desc"),
     include_archived: bool = Query(
@@ -456,6 +465,7 @@ async def export_tickets_csv(
             locked=locked,
             watcher_user_id=watcher_user_id,
             escalated=True if escalated else None,
+            ai_escalated=True if ai_escalated else None,
             sort=sort,
             order=order,
             include_archived=include_archived,

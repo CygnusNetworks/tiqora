@@ -809,6 +809,10 @@ async def test_escalate_to_human_stops_run_and_writes_internal_note(mariadb_znun
                 )
             ).scalar()
             assert note == 1
+
+            state = await session.get(TiqoraAiTicketState, seed["ticket_id"])
+            assert state is not None
+            assert state.ai_escalated_at is not None
     finally:
         await engine.dispose()
 
