@@ -13,7 +13,7 @@ import structlog
 from prometheus_client import Counter
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from tiqora.channels.email.fetch import fetch_account, list_valid_mail_accounts
+from tiqora.channels.email.fetch import delete_messages, fetch_account, list_valid_mail_accounts
 from tiqora.channels.email.pipeline import process_message_and_respond
 from tiqora.channels.email.smtp import MailSender, SmtpMailSender
 from tiqora.config import Settings, get_settings
@@ -68,10 +68,13 @@ async def process_account(
         # OAuth accounts need a DB session to load/refresh access tokens from
         # the shared legacy ``oauth2_token`` table (Znuny-compatible).
         async with session_factory() as session:
+            # Always leave fetched mail on the server until process succeeds.
+            # Fetch-then-DELE (Znuny POP3) loses the message when dispatch
+            # later raises — production hit that with a utf8mb3 1366.
             fetch_result = await fetch_account(
                 account,
                 max_size_kb=max_size_kb,
-                leave_on_server=leave_on_server,
+                leave_on_server=True,
                 session=session,
             )
     except Exception:
@@ -86,6 +89,7 @@ async def process_account(
     stats["fetched"] = len(fetch_result.messages)
     POSTMASTER_FETCHED.inc(len(fetch_result.messages))
 
+    processed_uids: list[str] = []
     for message in fetch_result.messages:
         try:
             async with session_factory() as session, session.begin():
@@ -124,10 +128,26 @@ async def process_account(
                 ticket_id=result.ticket_id,
                 uid=message.uid,
             )
+            processed_uids.append(message.uid)
         except Exception:
             logger.exception("postmaster_message_failed", account_id=account_id, uid=message.uid)
             stats["errors"] += 1
             POSTMASTER_ERRORS.labels(stage="dispatch").inc()
+
+    if not leave_on_server and processed_uids:
+        try:
+            async with session_factory() as session:
+                del_errors = await delete_messages(account, processed_uids, session=session)
+            for err in del_errors:
+                logger.error(
+                    "postmaster_delete_error",
+                    account_id=account_id,
+                    error=err,
+                )
+                POSTMASTER_ERRORS.labels(stage="delete").inc()
+        except Exception:
+            logger.exception("postmaster_delete_failed", account_id=account_id)
+            POSTMASTER_ERRORS.labels(stage="delete").inc()
 
     return stats
 
