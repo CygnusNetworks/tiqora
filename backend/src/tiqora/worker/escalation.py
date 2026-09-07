@@ -6,7 +6,7 @@ see ``tiqora.domain.settings_store``). Ports two Znuny pieces:
 - ``Kernel::System::Console::Command::Maint::Ticket::EscalationIndexRebuild``
   (behind ``Daemon::SchedulerCronTaskManager::Task###EscalationCheck``): batched
   recompute of the four ``ticket.escalation_*`` columns for every ticket whose
-  state type is not ``merge``/``close``/``remove`` — the actual column math is
+  state type is not ``merged``/``closed``/``removed`` — the actual column math is
   ``tiqora.znuny.escalation.escalation_index_build`` (ported separately).
 - ``TriggerEscalationStartEvents`` semantics: Znuny fires
   ``Escalation{ResponseTime,UpdateTime,SolutionTime}{Start,Stop}`` ticket
@@ -101,7 +101,13 @@ async def _emit_event(session: AsyncSession, ticket_id: int, event_type: str) ->
 
 
 async def _sweepable_ticket_ids(session: AsyncSession, batch_size: int) -> list[int]:
-    """Open (non merge/close/remove) tickets, oldest-recomputed first.
+    """Open tickets (not merged/closed/removed), oldest-recomputed first.
+
+    Znuny state-type names are ``closed`` / ``merged`` / ``removed``. Matching
+    the ``^(merge|close|remove)`` prefix used by ``escalation_index_build``
+    keeps a closed ticket out of the daemon sweep — otherwise leftover
+    escalation columns on historic closed tickets fire Stop events and bump
+    ``change_time``.
 
     Ordering by ``change_time`` (ascending) approximates Znuny's own
     RebuildEscalationIndexOnline default (unordered full-table scan) while
@@ -114,7 +120,9 @@ async def _sweepable_ticket_ids(session: AsyncSession, batch_size: int) -> list[
                 "SELECT t.id FROM ticket t"
                 " JOIN ticket_state ts ON ts.id = t.ticket_state_id"
                 " JOIN ticket_state_type tst ON tst.id = ts.type_id"
-                " WHERE tst.name NOT IN ('merge', 'close', 'remove')"
+                " WHERE LOWER(tst.name) NOT LIKE 'merge%'"
+                " AND LOWER(tst.name) NOT LIKE 'close%'"
+                " AND LOWER(tst.name) NOT LIKE 'remove%'"
                 " ORDER BY t.change_time ASC, t.id ASC LIMIT :n"
             ),
             {"n": batch_size},
