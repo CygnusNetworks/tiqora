@@ -7,11 +7,16 @@ Behavioural port of ``Kernel/System/MailAccount/{IMAP,IMAPS,POP3,POP3S}.pm``:
   SASL XOAUTH2 using the shared legacy ``oauth2_token`` table (Znuny 6.3+).
 - Messages larger than ``PostMasterMaxEmailSize`` (KB) are logged and skipped
   (not handed to the pipeline), matching Znuny's oversized-message handling.
-- Znuny **deletes** processed messages from the mailbox after fetch. Tiqora
-  replicates this by default; set the ``daemon.postmaster.leave_on_server``
-  tiqora_settings flag to "1" to keep messages on the server (testing only —
-  running this against a mailbox Znuny's own daemon also polls will duplicate
-  processing).
+- Znuny **deletes** processed messages from the mailbox after fetch (POP3
+  RETR+DELE+QUIT, then process). That loses mail when processing later fails.
+  Tiqora fetches with the messages left on the server, processes each one,
+  and deletes only UIDs that processed successfully. Set
+  ``daemon.postmaster.leave_on_server`` to "1" to skip the post-process
+  delete entirely (testing only — running this against a mailbox Znuny's
+  own daemon also polls will duplicate processing).
+- Oversized messages are dropped from the mailbox during fetch so they cannot
+  clog the next tick. POP3 message ids used for the later delete are UIDL
+  unique-ids (sequence numbers shift after DELE).
 
 The blocking ``imaplib``/``poplib`` stdlib clients are wrapped with
 ``asyncio.to_thread`` rather than pulling in an async IMAP dependency — Phase 4a
@@ -177,6 +182,54 @@ def _office365_host(host: str) -> bool:
     return "office365" in h or "outlook.office" in h or h.endswith("office.com")
 
 
+def _pop3_connect(account: MailAccount, auth: _AuthMaterial) -> poplib.POP3:
+    if account.account_type.upper() == ACCOUNT_TYPE_POP3S:
+        conn: poplib.POP3 = poplib.POP3_SSL(account.host, POP3S_PORT, timeout=60)
+    else:
+        conn = poplib.POP3(account.host, POP3_PORT, timeout=60)
+    if auth.kind == AUTH_OAUTH2:
+        assert auth.access_token is not None
+        _pop3_xoauth2(
+            conn,
+            account.login,
+            auth.access_token,
+            split_method=_office365_host(account.host),
+        )
+    else:
+        conn.user(account.login)
+        conn.pass_(auth.password or "")
+    return conn
+
+
+def _pop3_uidl_map(conn: poplib.POP3) -> dict[int, str]:
+    """Map 1-based sequence numbers to UIDL unique-ids (stable across DELE)."""
+    try:
+        _resp, lines, _octets = conn.uidl()
+    except (poplib.error_proto, AttributeError, TypeError, ValueError):
+        return {}
+    mapping: dict[int, str] = {}
+    for line in lines or []:
+        raw = line.decode("ascii", "replace") if isinstance(line, bytes) else str(line)
+        parts = raw.split(None, 1)
+        if len(parts) != 2:
+            continue
+        try:
+            mapping[int(parts[0])] = parts[1]
+        except ValueError:
+            continue
+    return mapping
+
+
+async def _auth_material(account: MailAccount, session: AsyncSession | None) -> _AuthMaterial | str:
+    """Resolve credentials or return an error string."""
+    auth_type = _account_auth_type(account)
+    if auth_type == AUTH_OAUTH2:
+        if session is None:
+            return "oauth2_token auth requires a database session"
+        return await _resolve_auth(session, account)
+    return _AuthMaterial(kind=AUTH_PASSWORD, password=account.pw or "")
+
+
 def _fetch_imap_sync(
     account: MailAccount,
     *,
@@ -222,8 +275,8 @@ def _fetch_imap_sync(
                         size=size,
                         max_size=max_size_bytes,
                     )
-                    if not leave_on_server:
-                        conn.uid("store", uid_str, "+FLAGS", r"(\Deleted)")
+                    # Always drop oversized mail so it cannot clog the next tick.
+                    conn.uid("store", uid_str, "+FLAGS", r"(\Deleted)")
                     continue
 
                 fetch_status, fetch_data = conn.uid("fetch", uid_str, "(RFC822)")
@@ -244,7 +297,7 @@ def _fetch_imap_sync(
             except OSError as exc:  # noqa: PERF203 — per-message isolation
                 errors.append(f"uid {uid_str}: {exc}")
 
-        if not leave_on_server:
+        if not leave_on_server or oversized:
             conn.expunge()
     except (OSError, imaplib.IMAP4.error) as exc:
         errors.append(str(exc))
@@ -268,24 +321,12 @@ def _fetch_pop3_sync(
     oversized = 0
     conn: poplib.POP3 | None = None
     try:
-        if account.account_type.upper() == ACCOUNT_TYPE_POP3S:
-            conn = poplib.POP3_SSL(account.host, POP3S_PORT, timeout=60)
-        else:
-            conn = poplib.POP3(account.host, POP3_PORT, timeout=60)
-        if auth.kind == AUTH_OAUTH2:
-            assert auth.access_token is not None
-            _pop3_xoauth2(
-                conn,
-                account.login,
-                auth.access_token,
-                split_method=_office365_host(account.host),
-            )
-        else:
-            conn.user(account.login)
-            conn.pass_(auth.password or "")
+        conn = _pop3_connect(account, auth)
 
         count, _size = conn.stat()
+        uidl_map = _pop3_uidl_map(conn)
         for msg_num in range(1, count + 1):
+            uid_str = uidl_map.get(msg_num, str(msg_num))
             try:
                 _resp, msg_size_lines, _octets = conn.top(msg_num, 0)
                 approx_size = sum(len(line) for line in msg_size_lines)
@@ -294,17 +335,17 @@ def _fetch_pop3_sync(
                     logger.warning(
                         "postmaster_message_oversized",
                         account_id=account.id,
-                        uid=str(msg_num),
+                        uid=uid_str,
                         size=approx_size,
                         max_size=max_size_bytes,
                     )
-                    if not leave_on_server:
-                        conn.dele(msg_num)
+                    # Always drop oversized mail so it cannot clog the next tick.
+                    conn.dele(msg_num)
                     continue
 
                 _resp, lines, _octets = conn.retr(msg_num)
                 raw = b"\r\n".join(lines)
-                messages.append(FetchedMessage(raw=raw, uid=str(msg_num)))
+                messages.append(FetchedMessage(raw=raw, uid=uid_str))
                 if not leave_on_server:
                     conn.dele(msg_num)
             except poplib.error_proto as exc:  # noqa: PERF203
@@ -320,6 +361,71 @@ def _fetch_pop3_sync(
                 conn.quit()
 
     return FetchResult(account_id=account.id, messages=messages, oversized=oversized, errors=errors)
+
+
+def _delete_imap_sync(account: MailAccount, uids: list[str], auth: _AuthMaterial) -> list[str]:
+    if not uids:
+        return []
+    errors: list[str] = []
+    conn: imaplib.IMAP4 | None = None
+    try:
+        conn = _imap_connect(account, auth)
+        folder = account.imap_folder or "INBOX"
+        status, _ = conn.select(folder)
+        if status != "OK":
+            return [f"cannot select folder {folder!r}"]
+        for uid_str in uids:
+            try:
+                store_status, _data = conn.uid("store", uid_str, "+FLAGS", r"(\Deleted)")
+                if store_status != "OK":
+                    errors.append(f"store failed for uid {uid_str}")
+            except OSError as exc:  # noqa: PERF203
+                errors.append(f"uid {uid_str}: {exc}")
+        conn.expunge()
+    except (OSError, imaplib.IMAP4.error) as exc:
+        errors.append(str(exc))
+    finally:
+        if conn is not None:
+            with contextlib.suppress(OSError, imaplib.IMAP4.error):
+                conn.logout()
+    return errors
+
+
+def _delete_pop3_sync(account: MailAccount, uids: list[str], auth: _AuthMaterial) -> list[str]:
+    if not uids:
+        return []
+    errors: list[str] = []
+    conn: poplib.POP3 | None = None
+    try:
+        conn = _pop3_connect(account, auth)
+        uidl_map = _pop3_uidl_map(conn)
+        reverse = {unique: num for num, unique in uidl_map.items()}
+        count, _size = conn.stat()
+        for uid_str in uids:
+            msg_num = reverse.get(uid_str)
+            if msg_num is None:
+                try:
+                    candidate = int(uid_str)
+                except ValueError:
+                    errors.append(f"uid {uid_str} not in UIDL")
+                    continue
+                if candidate < 1 or candidate > count:
+                    errors.append(f"uid {uid_str} not in UIDL")
+                    continue
+                msg_num = candidate
+            try:
+                conn.dele(msg_num)
+            except poplib.error_proto as exc:  # noqa: PERF203
+                errors.append(f"uid {uid_str}: {exc}")
+        conn.quit()
+        conn = None
+    except (OSError, poplib.error_proto) as exc:
+        errors.append(str(exc))
+    finally:
+        if conn is not None:
+            with contextlib.suppress(OSError, poplib.error_proto):
+                conn.quit()
+    return errors
 
 
 async def fetch_account(
@@ -338,21 +444,10 @@ async def fetch_account(
     max_size_bytes = max_size_kb * 1024
     account_type = account.account_type.upper()
 
-    auth_type = _account_auth_type(account)
-    if auth_type == AUTH_OAUTH2:
-        if session is None:
-            return FetchResult(
-                account_id=account.id,
-                messages=[],
-                oversized=0,
-                errors=["oauth2_token auth requires a database session"],
-            )
-        resolved = await _resolve_auth(session, account)
-        if isinstance(resolved, str):
-            return FetchResult(account_id=account.id, messages=[], oversized=0, errors=[resolved])
-        auth = resolved
-    else:
-        auth = _AuthMaterial(kind=AUTH_PASSWORD, password=account.pw or "")
+    resolved = await _auth_material(account, session)
+    if isinstance(resolved, str):
+        return FetchResult(account_id=account.id, messages=[], oversized=0, errors=[resolved])
+    auth = resolved
 
     if account_type in (ACCOUNT_TYPE_IMAP, ACCOUNT_TYPE_IMAPS):
         return await asyncio.to_thread(
@@ -376,3 +471,29 @@ async def fetch_account(
         oversized=0,
         errors=[f"unsupported account_type {account.account_type!r}"],
     )
+
+
+async def delete_messages(
+    account: MailAccount,
+    uids: list[str],
+    *,
+    session: AsyncSession | None = None,
+) -> list[str]:
+    """Delete previously fetched messages by UID / POP3 UIDL unique-id.
+
+    Called after a message has been processed successfully. Failures are
+    returned as strings (never raised) so a delete hiccup cannot undo the
+    ticket that was just committed.
+    """
+    if not uids:
+        return []
+    resolved = await _auth_material(account, session)
+    if isinstance(resolved, str):
+        return [resolved]
+    auth = resolved
+    account_type = account.account_type.upper()
+    if account_type in (ACCOUNT_TYPE_IMAP, ACCOUNT_TYPE_IMAPS):
+        return await asyncio.to_thread(_delete_imap_sync, account, uids, auth)
+    if account_type in (ACCOUNT_TYPE_POP3, ACCOUNT_TYPE_POP3S):
+        return await asyncio.to_thread(_delete_pop3_sync, account, uids, auth)
+    return [f"unsupported account_type {account.account_type!r}"]
