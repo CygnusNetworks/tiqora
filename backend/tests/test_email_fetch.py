@@ -18,7 +18,7 @@ import pytest
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
-from tiqora.channels.email.fetch import fetch_account, list_valid_mail_accounts
+from tiqora.channels.email.fetch import delete_messages, fetch_account, list_valid_mail_accounts
 from tiqora.db.legacy.mail_account import MailAccount
 
 NOW = datetime(2024, 6, 1, 12, 0, 0)
@@ -124,6 +124,7 @@ class _FakePop3:
     """Stand-in for poplib.POP3/POP3_SSL with a scripted mailbox (1-indexed)."""
 
     messages: dict[int, bytes] = field(default_factory=dict)
+    uidl_ids: dict[int, str] = field(default_factory=dict)
     user_calls: list[str] = field(default_factory=list)
     pass_calls: list[str] = field(default_factory=list)
     dele_calls: list[int] = field(default_factory=list)
@@ -151,6 +152,13 @@ class _FakePop3:
 
     def dele(self, msg_num: int) -> None:
         self.dele_calls.append(msg_num)
+
+    def uidl(self, msg_num: int | None = None) -> tuple[bytes, list[bytes], int] | bytes:
+        if msg_num is not None:
+            unique = self.uidl_ids.get(msg_num, str(msg_num))
+            return f"+OK {msg_num} {unique}".encode()
+        lines = [f"{n} {self.uidl_ids.get(n, str(n))}".encode() for n in sorted(self.messages)]
+        return (b"+OK", lines, 0)
 
     def quit(self) -> None:
         self.quit_called = True
@@ -301,6 +309,27 @@ async def test_fetch_account_imap_oversized_message_skipped(
     assert [m.uid for m in result.messages] == ["2"]
     # Oversized message still gets deleted from the server (not left to re-fetch forever).
     assert ("1", "+FLAGS", r"(\Deleted)") in fake.store_calls
+    assert fake.expunge_called is True
+
+
+async def test_fetch_account_imap_oversized_deleted_even_when_leaving(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    fake = _FakeImap(
+        uids=[b"1", b"2"],
+        sizes={b"1": 2_000_000, b"2": 10},
+        bodies={b"1": b"huge", b"2": b"small body"},
+    )
+    monkeypatch.setattr(imaplib, "IMAP4", _imap_factory(fake))
+    account = _account(account_type="IMAP")
+
+    result = await fetch_account(account, max_size_kb=1, leave_on_server=True)
+
+    assert result.oversized == 1
+    assert [m.uid for m in result.messages] == ["2"]
+    assert ("1", "+FLAGS", r"(\Deleted)") in fake.store_calls
+    assert ("2", "+FLAGS", r"(\Deleted)") not in fake.store_calls
+    assert fake.expunge_called is True
 
 
 async def test_fetch_account_imap_select_failure_returns_error(
@@ -401,6 +430,22 @@ async def test_fetch_account_pop3_leave_on_server_skips_delete(
     assert fake.dele_calls == []
 
 
+async def test_fetch_account_pop3_uses_uidl_unique_ids(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    fake = _FakePop3(
+        messages={1: b"From: a@example.com\r\n\r\nhi", 2: b"From: b@example.com\r\n\r\nyo"},
+        uidl_ids={1: "AAA", 2: "BBB"},
+    )
+    monkeypatch.setattr(poplib, "POP3", lambda *a, **kw: fake)
+    account = _account(account_type="POP3")
+
+    result = await fetch_account(account, max_size_kb=1024, leave_on_server=True)
+
+    assert [m.uid for m in result.messages] == ["AAA", "BBB"]
+    assert fake.dele_calls == []
+
+
 async def test_fetch_account_pop3_oversized_message_skipped(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -413,6 +458,20 @@ async def test_fetch_account_pop3_oversized_message_skipped(
     assert result.oversized == 1
     assert [m.uid for m in result.messages] == ["2"]
     assert 1 in fake.dele_calls  # oversized message still deleted from server
+
+
+async def test_fetch_account_pop3_oversized_deleted_even_when_leaving(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    fake = _FakePop3(messages={1: b"x" * 5000, 2: b"small"})
+    monkeypatch.setattr(poplib, "POP3", lambda *a, **kw: fake)
+    account = _account(account_type="POP3")
+
+    result = await fetch_account(account, max_size_kb=1, leave_on_server=True)
+
+    assert result.oversized == 1
+    assert [m.uid for m in result.messages] == ["2"]
+    assert fake.dele_calls == [1]
 
 
 async def test_fetch_account_pop3_per_message_error_is_isolated(
@@ -440,6 +499,44 @@ async def test_fetch_account_unsupported_type_returns_error() -> None:
 
     assert result.messages == []
     assert any("unsupported account_type" in e for e in result.errors)
+
+
+# ---------------------------------------------------------------------------
+# delete_messages (post-process mailbox cleanup)
+# ---------------------------------------------------------------------------
+
+
+async def test_delete_messages_imap(monkeypatch: pytest.MonkeyPatch) -> None:
+    fake = _FakeImap(uids=[b"1", b"2"], sizes={b"1": 5, b"2": 5}, bodies={b"1": b"a", b"2": b"b"})
+    monkeypatch.setattr(imaplib, "IMAP4", _imap_factory(fake))
+    account = _account(account_type="IMAP")
+
+    errors = await delete_messages(account, ["1"])
+
+    assert errors == []
+    assert fake.store_calls == [("1", "+FLAGS", r"(\Deleted)")]
+    assert fake.expunge_called is True
+    assert fake.logout_called is True
+
+
+async def test_delete_messages_pop3_maps_uidl(monkeypatch: pytest.MonkeyPatch) -> None:
+    fake = _FakePop3(
+        messages={1: b"one", 2: b"two"},
+        uidl_ids={1: "AAA", 2: "BBB"},
+    )
+    monkeypatch.setattr(poplib, "POP3", lambda *a, **kw: fake)
+    account = _account(account_type="POP3")
+
+    errors = await delete_messages(account, ["BBB"])
+
+    assert errors == []
+    assert fake.dele_calls == [2]
+    assert fake.quit_called is True
+
+
+async def test_delete_messages_empty_is_noop() -> None:
+    account = _account(account_type="POP3")
+    assert await delete_messages(account, []) == []
 
 
 # ---------------------------------------------------------------------------

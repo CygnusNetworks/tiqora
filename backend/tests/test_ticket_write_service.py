@@ -349,6 +349,61 @@ async def test_add_article_invariants_mariadb(mariadb_znuny_url: str) -> None:
 
 
 @pytest.mark.db
+async def test_add_article_replaces_non_bmp_for_utf8mb3(mariadb_znuny_url: str) -> None:
+    """Emoji in the body must not raise MariaDB 1366 on utf8mb3 columns."""
+    url = _mysql_async(mariadb_znuny_url)
+    engine = create_async_engine(url)
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    sysconfig = _make_sysconfig()
+
+    async with factory() as session:
+        await _seed_tiqora_tables(session)
+
+    ticket_id = await _make_ticket(factory, sysconfig, "Emoji 😅 Title")
+
+    async with factory() as session, session.begin():
+        article_id = await add_article(
+            session,
+            ticket_id=ticket_id,
+            article=ArticleIn(
+                sender_type="customer",
+                is_visible_for_customer=True,
+                subject="WG: Problem 😅",
+                body="Hallo 😅\r\n",
+                content_type="text/plain; charset=utf-8",
+                from_address="dana@example.com",
+                to_address="netadmin@stw-bonn.de",
+                message_id="<emoji-utf8mb3@example.com>",
+                channel="email",
+            ),
+            user_id=1,
+            sysconfig=sysconfig,
+        )
+
+    async with factory() as session:
+        mime = (
+            await session.execute(
+                text("SELECT a_subject, a_body FROM article_data_mime WHERE article_id = :aid"),
+                {"aid": article_id},
+            )
+        ).first()
+        title = (
+            await session.execute(
+                text("SELECT title FROM ticket WHERE id = :tid"),
+                {"tid": ticket_id},
+            )
+        ).first()
+
+    assert mime is not None
+    assert mime[0] == "WG: Problem \ufffd"
+    assert mime[1] == "Hallo \ufffd\r\n"
+    assert title is not None
+    assert title[0] == "Emoji \ufffd Title"
+
+    await engine.dispose()
+
+
+@pytest.mark.db
 async def test_add_agent_note_without_from_stamps_agent_name_mariadb(
     mariadb_znuny_url: str,
 ) -> None:

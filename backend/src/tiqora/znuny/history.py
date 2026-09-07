@@ -41,6 +41,8 @@ from typing import Final
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from tiqora.db.utf8mb3 import replace_non_bmp
+
 # History type names as stored in ticket_history_type.name (Znuny seed data).
 TYPE_NEW_TICKET: Final = "NewTicket"
 TYPE_STATE_UPDATE: Final = "StateUpdate"
@@ -140,7 +142,7 @@ async def history_add(
     state_id: int | None = None,
 ) -> None:
     """Write one ``ticket_history`` row (port of ``Ticket.pm::HistoryAdd``)."""
-    name = name[:200]
+    name = (replace_non_bmp(name) or "")[:200]
 
     if None in (queue_id, type_id, owner_id, priority_id, state_id):
         snap = await _ticket_snapshot(session, ticket_id)

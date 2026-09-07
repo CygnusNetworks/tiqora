@@ -34,6 +34,7 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from tiqora.ai.handoff import clear_ai_escalated
+from tiqora.db.utf8mb3 import replace_non_bmp
 from tiqora.permissions.engine import PermissionEngine
 from tiqora.znuny.cache_invalidation import invalidate_ticket_cache
 from tiqora.znuny.escalation import escalation_index_build
@@ -318,7 +319,7 @@ async def create_ticket(
     """
     tn = await ticket_create_number(session_factory, sysconfig)
 
-    title = (params.title or "")[:255]
+    title = (replace_non_bmp(params.title) or "")[:255]
     responsible_id = params.responsible_id if params.responsible_id is not None else 1
     type_id = params.type_id if params.type_id is not None else 1
 
@@ -351,8 +352,8 @@ async def create_ticket(
             "svc_id": params.service_id,
             "sla_id": params.sla_id,
             "archive": params.archive_flag,
-            "cid": params.customer_id,
-            "cuid": params.customer_user_id,
+            "cid": replace_non_bmp(params.customer_id),
+            "cuid": replace_non_bmp(params.customer_user_id),
             "uid": user_id,
         },
     )
@@ -429,6 +430,28 @@ async def create_ticket(
 # ---------------------------------------------------------------------------
 
 
+def _utf8mb3_article(article: ArticleIn) -> ArticleIn:
+    """Strip supplementary-plane chars so MIME INSERTs survive utf8mb3 columns."""
+    return replace(
+        article,
+        subject=replace_non_bmp(article.subject) or "",
+        body=replace_non_bmp(article.body) or "",
+        content_type=replace_non_bmp(article.content_type) or article.content_type,
+        from_address=replace_non_bmp(article.from_address),
+        to_address=replace_non_bmp(article.to_address),
+        cc=replace_non_bmp(article.cc),
+        bcc=replace_non_bmp(article.bcc),
+        reply_to=replace_non_bmp(article.reply_to),
+        message_id=replace_non_bmp(article.message_id),
+        in_reply_to=replace_non_bmp(article.in_reply_to),
+        references=replace_non_bmp(article.references),
+        attachments=[
+            (replace_non_bmp(filename) or "", content_type, content)
+            for filename, content_type, content in article.attachments
+        ],
+    )
+
+
 async def add_article(
     session: AsyncSession,
     *,
@@ -464,6 +487,8 @@ async def add_article(
         if agent_row is not None:
             full_name = " ".join(p for p in (agent_row[0], agent_row[1]) if p).strip()
             article = replace(article, from_address=full_name or agent_row[2])
+
+    article = _utf8mb3_article(article)
 
     # Resolve communication channel id by channel name
     channel_name_map: dict[str, str] = {
@@ -976,7 +1001,7 @@ async def change_title(
     """Change ticket title."""
     t = await _ticket_must_exist(session, ticket_id)
     old_title = str(t.get("title") or "")
-    title_truncated = new_title[:255]
+    title_truncated = (replace_non_bmp(new_title) or "")[:255]
 
     await session.execute(
         text(
@@ -986,7 +1011,11 @@ async def change_title(
         {"title": title_truncated, "uid": user_id, "tid": ticket_id},
     )
     await add_title_update(
-        session, ticket_id=ticket_id, old_title=old_title, new_title=new_title, user_id=user_id
+        session,
+        ticket_id=ticket_id,
+        old_title=old_title,
+        new_title=title_truncated,
+        user_id=user_id,
     )
     await invalidate_ticket_cache(session, ticket_id)
     await _emit_event(session, "TicketTitleUpdate", ticket_id, {"title": title_truncated})

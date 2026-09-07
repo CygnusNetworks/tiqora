@@ -17,6 +17,7 @@ import structlog
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from tiqora.db.tiqora.models import TiqoraMailLog
+from tiqora.db.utf8mb3 import replace_non_bmp
 
 logger = structlog.get_logger(__name__)
 
@@ -54,16 +55,16 @@ async def write_mail_log(
         row = TiqoraMailLog(
             direction=direction,
             status=status,
-            from_addr=_truncate(from_addr, 500),
-            to_addr=_truncate(to_addr, 1000),
-            cc_addr=_truncate(cc_addr, 1000) or None,
-            subject=_truncate(subject, 500),
-            message_id=_truncate(message_id, 255) or None,
+            from_addr=_truncate(replace_non_bmp(from_addr), 500),
+            to_addr=_truncate(replace_non_bmp(to_addr), 1000),
+            cc_addr=_truncate(replace_non_bmp(cc_addr), 1000) or None,
+            subject=_truncate(replace_non_bmp(subject), 500),
+            message_id=_truncate(replace_non_bmp(message_id), 255) or None,
             ticket_id=ticket_id,
             article_id=article_id,
-            queue=_truncate(queue, 200) or None,
+            queue=_truncate(replace_non_bmp(queue), 200) or None,
             smtp_code=smtp_code,
-            detail=detail,
+            detail=replace_non_bmp(detail),
             duration_ms=duration_ms,
         )
         # Prefer an independent commit so failure logs survive outer rollback.
