@@ -7331,6 +7331,10 @@
       "DashboardSummary": {
         "description": "KPI-tile counts for the agent dashboard.",
         "properties": {
+          "ai_escalated": {
+            "title": "Ai Escalated",
+            "type": "integer"
+          },
           "escalated": {
             "title": "Escalated",
             "type": "integer"
@@ -7352,7 +7356,8 @@
           "my_open",
           "my_new",
           "unowned_new",
-          "escalated"
+          "escalated",
+          "ai_escalated"
         ],
         "title": "DashboardSummary",
         "type": "object"
@@ -18601,6 +18606,11 @@
             ],
             "title": "Age Seconds"
           },
+          "ai_escalated": {
+            "default": false,
+            "title": "Ai Escalated",
+            "type": "boolean"
+          },
           "archive_flag": {
             "default": 0,
             "title": "Archive Flag",
@@ -19114,6 +19124,11 @@
               }
             ],
             "title": "Age Seconds"
+          },
+          "ai_escalated": {
+            "default": false,
+            "title": "Ai Escalated",
+            "type": "boolean"
           },
           "archive_flag": {
             "default": 0,
@@ -52790,6 +52805,24 @@
             }
           },
           {
+            "description": "True = AI handed the ticket to a human and a human has not yet taken over.",
+            "in": "query",
+            "name": "ai_escalated",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "True = AI handed the ticket to a human and a human has not yet taken over.",
+              "title": "Ai Escalated"
+            }
+          },
+          {
             "in": "query",
             "name": "offset",
             "required": false,
@@ -52981,7 +53014,7 @@
     },
     "/api/v1/tickets/dashboard-summary": {
       "get": {
-        "description": "Counts for the dashboard KPI tiles: owned open/new, unclaimed new, escalated.\n\nRegistered before ``/{ticket_id}`` so \"dashboard-summary\" is not parsed as\na ticket id.",
+        "description": "Counts for the dashboard KPI tiles: owned open/new, unclaimed new, SLA-escalated, AI handoff.\n\nRegistered before ``/{ticket_id}`` so \"dashboard-summary\" is not parsed as\na ticket id.",
         "operationId": "dashboard_summary_api_v1_tickets_dashboard_summary_get",
         "parameters": [
           {
@@ -53208,6 +53241,22 @@
                 }
               ],
               "title": "Escalated"
+            }
+          },
+          {
+            "in": "query",
+            "name": "ai_escalated",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Ai Escalated"
             }
           },
           {

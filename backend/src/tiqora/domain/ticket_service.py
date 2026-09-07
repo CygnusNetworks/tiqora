@@ -12,6 +12,7 @@ from sqlalchemy import Select, and_, func, or_, select
 from sqlalchemy.exc import DBAPIError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from tiqora.ai.handoff import ai_escalated_ticket_ids as _ai_escalated_ticket_ids
 from tiqora.ai.models import TiqoraAiArticleOrigin, TiqoraAiTicketState
 from tiqora.channels.email.parser import get_email_address, split_address_line
 from tiqora.db.legacy.article import (
@@ -189,6 +190,7 @@ class TicketService:
         attachment_count_by_ticket: dict[int, int] | None = None,
         ai_summary_ticket_ids: set[int] | None = None,
         customer_email_by_login: dict[str, str] | None = None,
+        ai_escalated_ticket_ids: set[int] | None = None,
     ) -> TicketListItem:
         owner = maps["user"].get(t.user_id)
         return TicketListItem(
@@ -218,6 +220,7 @@ class TicketService:
             first_from=(first_from_by_ticket or {}).get(t.id),
             attachment_count=(attachment_count_by_ticket or {}).get(t.id, 0),
             has_ai_summary=t.id in (ai_summary_ticket_ids or set()),
+            ai_escalated=t.id in (ai_escalated_ticket_ids or set()),
             create_time=t.create_time,
             change_time=t.change_time,
             age_seconds=age_seconds(t.create_time),
@@ -251,6 +254,7 @@ class TicketService:
         locked: bool | None = None,
         watcher_user_id: int | None = None,
         escalated: bool | None = None,
+        ai_escalated: bool | None = None,
         include_archived: bool = False,
     ) -> Select[tuple[Ticket]] | None:
         """Build the permission-filtered, unordered ``Ticket`` select.
@@ -338,6 +342,30 @@ class TicketService:
                     ),
                 )
             )
+        if ai_escalated:
+            try:
+                ai_ticket_ids = (
+                    (
+                        await self._session.execute(
+                            select(TiqoraAiTicketState.ticket_id).where(
+                                TiqoraAiTicketState.ai_escalated_at.is_not(None)
+                            )
+                        )
+                    )
+                    .scalars()
+                    .all()
+                )
+            except DBAPIError:
+                logger.debug(
+                    "tiqora_ai_ticket_state query failed (table missing?) — treating as no"
+                    " AI handoffs",
+                    exc_info=True,
+                )
+                await self._session.rollback()
+                ai_ticket_ids = []
+            if not ai_ticket_ids:
+                return None
+            stmt = stmt.where(Ticket.id.in_(set(ai_ticket_ids)))
         if state_type is not None:
             type_names = VIEW_STATE_TYPES.get(state_type, {state_type})
             state_ids = (
@@ -383,6 +411,7 @@ class TicketService:
         locked: bool | None = None,
         watcher_user_id: int | None = None,
         escalated: bool | None = None,
+        ai_escalated: bool | None = None,
         offset: int = 0,
         limit: int = 50,
         sort: str = "age",
@@ -401,6 +430,7 @@ class TicketService:
             locked=locked,
             watcher_user_id=watcher_user_id,
             escalated=escalated,
+            ai_escalated=ai_escalated,
             include_archived=include_archived,
         )
         if stmt is None:
@@ -417,6 +447,7 @@ class TicketService:
         first_from_by_ticket = await self._first_article_from_by_ticket(ticket_ids)
         attachment_count_by_ticket = await self._attachment_counts_by_ticket(ticket_ids)
         ai_summary_ticket_ids = await self._ai_summary_ticket_ids(ticket_ids)
+        ai_escalated_ids = await _ai_escalated_ticket_ids(self._session, ticket_ids)
         customer_email_by_login = await self._customer_emails_by_login(
             [t.customer_user_id for t in tickets if t.customer_user_id]
         )
@@ -428,6 +459,7 @@ class TicketService:
                 attachment_count_by_ticket,
                 ai_summary_ticket_ids,
                 customer_email_by_login,
+                ai_escalated_ids,
             )
             for t in tickets
         ]
@@ -552,6 +584,7 @@ class TicketService:
         locked: bool | None = None,
         watcher_user_id: int | None = None,
         escalated: bool | None = None,
+        ai_escalated: bool | None = None,
         sort: str = "age",
         order: str = "desc",
         batch_size: int = 500,
@@ -574,6 +607,7 @@ class TicketService:
             locked=locked,
             watcher_user_id=watcher_user_id,
             escalated=escalated,
+            ai_escalated=ai_escalated,
             include_archived=include_archived,
         )
         if stmt is None:
@@ -682,7 +716,7 @@ class TicketService:
 
         Reuses the same ``ro`` permission scoping and ``state_type`` view
         resolution as the ticket list (:meth:`_filtered_ticket_stmt`) so each
-        tile agrees with the filtered list it links to. Four cheap
+        tile agrees with the filtered list it links to. Five cheap
         ``COUNT(*)`` queries — no rows or lookup maps are materialised.
 
         - ``my_open`` / ``my_new``: viewable-open / new tickets owned by the
@@ -692,8 +726,11 @@ class TicketService:
         - ``escalated``: viewable-open tickets whose nearest escalation
           deadline has already passed (any ``escalation_*`` epoch in
           ``(0, now)``).
+        - ``ai_escalated``: viewable-open tickets the AI handed off to a
+          human (``tiqora_ai_ticket_state.ai_escalated_at`` set) that a human
+          has not yet taken back over.
         """
-        summary = {"my_open": 0, "my_new": 0, "unowned_new": 0, "escalated": 0}
+        summary = {"my_open": 0, "my_new": 0, "unowned_new": 0, "escalated": 0, "ai_escalated": 0}
 
         async def _count(stmt: Select[tuple[Ticket]] | None) -> int:
             if stmt is None:
@@ -737,6 +774,17 @@ class TicketService:
                 )
             )
             summary["escalated"] = await _count(esc_stmt)
+
+        summary["ai_escalated"] = await _count(
+            await self._filtered_ticket_stmt(
+                user_id,
+                queue_id=None,
+                state_id=None,
+                state_type="open",
+                owner_id=None,
+                ai_escalated=True,
+            )
+        )
         return summary
 
     async def get_ticket(self, user_id: int, ticket_id: int) -> TicketDetail:

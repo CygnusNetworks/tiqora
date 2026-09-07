@@ -5111,7 +5111,7 @@ export interface paths {
         };
         /**
          * Dashboard Summary
-         * @description Counts for the dashboard KPI tiles: owned open/new, unclaimed new, escalated.
+         * @description Counts for the dashboard KPI tiles: owned open/new, unclaimed new, SLA-escalated, AI handoff.
          *
          *     Registered before ``/{ticket_id}`` so "dashboard-summary" is not parsed as
          *     a ticket id.
@@ -8451,6 +8451,8 @@ export interface components {
          * @description KPI-tile counts for the agent dashboard.
          */
         DashboardSummary: {
+            /** Ai Escalated */
+            ai_escalated: number;
             /** Escalated */
             escalated: number;
             /** My New */
@@ -12197,6 +12199,11 @@ export interface components {
             /** Age Seconds */
             age_seconds?: number | null;
             /**
+             * Ai Escalated
+             * @default false
+             */
+            ai_escalated: boolean;
+            /**
              * Archive Flag
              * @default 0
              */
@@ -12408,6 +12415,11 @@ export interface components {
         TicketListItem: {
             /** Age Seconds */
             age_seconds?: number | null;
+            /**
+             * Ai Escalated
+             * @default false
+             */
+            ai_escalated: boolean;
             /**
              * Archive Flag
              * @default 0
@@ -26981,6 +26993,8 @@ export interface operations {
                 watcher_user_id?: number | null;
                 /** @description True = any escalation_* epoch already in the past. */
                 escalated?: boolean | null;
+                /** @description True = AI handed the ticket to a human and a human has not yet taken over. */
+                ai_escalated?: boolean | null;
                 offset?: number;
                 limit?: number;
                 sort?: string;
@@ -27101,6 +27115,7 @@ export interface operations {
                 locked?: boolean | null;
                 watcher_user_id?: number | null;
                 escalated?: boolean | null;
+                ai_escalated?: boolean | null;
                 sort?: string;
                 order?: string;
                 /** @description Also export archived tickets (admins only; ignored otherwise). */

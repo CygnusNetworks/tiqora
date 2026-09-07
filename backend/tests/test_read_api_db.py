@@ -447,7 +447,10 @@ def _seed_dashboard(sync_url: str) -> dict[str, Any]:
 
         # Idempotent cleanup of our block (shared session-scoped DB).
         conn.execute(
-            text("DELETE FROM ticket WHERE id IN (963001, 963002, 963003, 963004)"),
+            text("DELETE FROM tiqora_ai_ticket_state WHERE ticket_id = 963005"),
+        )
+        conn.execute(
+            text("DELETE FROM ticket WHERE id IN (963001, 963002, 963003, 963004, 963005)"),
         )
         conn.execute(text("DELETE FROM queue WHERE id = 96300"))
         conn.execute(
@@ -512,6 +515,7 @@ def _seed_dashboard(sync_url: str) -> dict[str, Any]:
             (963002, "20240601963002", 96300, 1, 0),  # my new (also in "open" view)
             (963003, "20240601963003", 1, 1, 0),  # unowned new (root-owned)
             (963004, "20240601963004", 1, 4, 1000),  # escalated open (other owner)
+            (963005, "20240601963005", 1, 4, 0),  # AI-escalated open (other owner)
         ]
         for tid, tn, owner, state_id, esc in rows:
             conn.execute(
@@ -535,6 +539,14 @@ def _seed_dashboard(sync_url: str) -> dict[str, Any]:
                 ),
                 {"id": tid, "tn": tn, "owner": owner, "state": state_id, "esc": esc, "t": NOW},
             )
+
+        conn.execute(
+            text(
+                "INSERT INTO tiqora_ai_ticket_state (ticket_id, ai_escalated_at)"
+                " VALUES (963005, :t)"
+            ),
+            {"t": NOW},
+        )
 
     engine.dispose()
     return ids
@@ -564,6 +576,8 @@ async def test_dashboard_summary_counts(
         assert summary["unowned_new"] == 1
         # escalated = viewable-open with a past escalation epoch, any owner: 553.
         assert summary["escalated"] == 1
+        # ai_escalated = viewable-open with the AI handoff flag set, any owner: 554.
+        assert summary["ai_escalated"] == 1
 
         # No-access agent sees nothing in any tile.
         assert await ts.count_dashboard_summary(ids["no_access"]) == {
@@ -571,6 +585,7 @@ async def test_dashboard_summary_counts(
             "my_new": 0,
             "unowned_new": 0,
             "escalated": 0,
+            "ai_escalated": 0,
         }
 
     await engine.dispose()

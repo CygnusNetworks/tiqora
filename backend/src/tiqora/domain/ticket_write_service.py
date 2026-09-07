@@ -33,6 +33,7 @@ from typing import Any
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from tiqora.ai.handoff import clear_ai_escalated
 from tiqora.permissions.engine import PermissionEngine
 from tiqora.znuny.cache_invalidation import invalidate_ticket_cache
 from tiqora.znuny.escalation import escalation_index_build
@@ -663,6 +664,11 @@ async def add_article(
     # Without this, field changes propagate but externally-added articles do not.
     await invalidate_ticket_cache(session, ticket_id)
 
+    # A human agent sending a customer-visible reply is the human taking the
+    # ticket back over — clear the AI handoff flag (see tiqora.ai.handoff).
+    if article.sender_type == "agent" and article.is_visible_for_customer:
+        await clear_ai_escalated(session, ticket_id)
+
     return article_id
 
 
@@ -772,6 +778,11 @@ async def change_state(
     await ticket_accelerator_update(session, ticket_id, sysconfig)
     await invalidate_ticket_cache(session, ticket_id)
     await _emit_event(session, "TicketStateUpdate", ticket_id, {"state_id": new_state_id})
+
+    # Ticket is done (closed), no longer relevant (merged) or gone (removed)
+    # — clear the AI handoff flag (see tiqora.ai.handoff).
+    if new_state_type.lower() in ("closed", "merged", "removed"):
+        await clear_ai_escalated(session, ticket_id)
 
 
 async def change_priority(

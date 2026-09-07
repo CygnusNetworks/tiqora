@@ -44,6 +44,7 @@ from tiqora.ai.context import (
     ticket_snapshot,
 )
 from tiqora.ai.gate import AiGateError, require_feature_allowed
+from tiqora.ai.handoff import mark_ai_escalated
 from tiqora.ai.identity import (
     MAX_IDENTITY_ATTEMPTS,
     get_customer_id_for_login,
@@ -1354,6 +1355,7 @@ async def run_ticket_agent(
             )
 
         if outcome.escalate_reason is not None:
+            await mark_ai_escalated(session, ticket_id)
             state.last_run_at = datetime.now(UTC).replace(tzinfo=None)
             await session.commit()
             return AgentRunResult(
