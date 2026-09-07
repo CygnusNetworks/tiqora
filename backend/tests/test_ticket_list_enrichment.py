@@ -228,6 +228,12 @@ def _seed(sync_url: str) -> dict[str, Any]:
             ),
             {"tid": TICKET_AI_SUMMARY, "summary": "Customer asked about invoice X."},
         )
+        conn.execute(
+            text(
+                "INSERT INTO tiqora_ai_ticket_state (ticket_id, ai_escalated_at) VALUES (:tid, :t)"
+            ),
+            {"tid": TICKET_ATTACHMENTS, "t": NOW},
+        )
 
     engine.dispose()
     return {
@@ -272,17 +278,49 @@ async def test_list_tickets_enrichment_fields(
         att_item = by_id[ids["ticket_attachments"]]
         assert att_item.attachment_count == 2
         assert att_item.has_ai_summary is False
+        assert att_item.ai_escalated is True
 
         summary_item = by_id[ids["ticket_ai_summary"]]
         assert summary_item.attachment_count == 0
         assert summary_item.has_ai_summary is True
+        assert summary_item.ai_escalated is False
 
         plain_item = by_id[ids["ticket_plain"]]
         assert plain_item.attachment_count == 0
         assert plain_item.has_ai_summary is False
+        assert plain_item.ai_escalated is False
         assert plain_item.customer_id == CUSTOMER_ID
         assert plain_item.customer_user_id == CUSTOMER_LOGIN
         assert plain_item.customer_email == CUSTOMER_EMAIL
+
+    await engine.dispose()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("url_fixture", ["mariadb_znuny_url", "postgres_znuny_url"])
+async def test_list_tickets_ai_escalated_filter(
+    url_fixture: str,
+    request: pytest.FixtureRequest,
+) -> None:
+    """``ai_escalated=True`` narrows the list to tickets the AI handed off to
+    a human (``tiqora_ai_ticket_state.ai_escalated_at`` set) — only
+    ``TICKET_ATTACHMENTS`` carries that flag in this fixture."""
+    sync_url: str = request.getfixturevalue(url_fixture)
+    ids = _seed(sync_url)
+    async_url = _to_async_url(sync_url)
+    engine = create_async_engine(async_url)
+    factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+
+    async with factory() as session:
+        ts = TicketService(session)
+
+        matched = await ts.list_tickets(
+            ids["reader"], queue_id=ids["queue"], ai_escalated=True, limit=50
+        )
+        assert {i.id for i in matched.items} == {ids["ticket_attachments"]}
+
+        unfiltered = await ts.list_tickets(ids["reader"], queue_id=ids["queue"], limit=50)
+        assert ids["ticket_ai_summary"] in {i.id for i in unfiltered.items}
 
     await engine.dispose()
 

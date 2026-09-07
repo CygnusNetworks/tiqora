@@ -34,6 +34,7 @@ export type DashboardSummary = {
   my_new: number;
   unowned_new: number;
   escalated: number;
+  ai_escalated: number;
 };
 export type TicketDetail = Schemas["TicketDetail"];
 export type TicketPermissions = Schemas["TicketPermissions"];
@@ -1183,6 +1184,8 @@ export class ApiClient {
       watcher_user_id?: number;
       /** True = any escalation_* epoch already in the past. */
       escalated?: boolean;
+      /** True = AI handed the ticket to a human and a human has not yet taken over. */
+      ai_escalated?: boolean;
       offset?: number;
       limit?: number;
       sort?: string;
@@ -1205,7 +1208,7 @@ export class ApiClient {
     });
   }
 
-  /** KPI-tile counts for the agent dashboard: owned open/new, unclaimed new, escalated. */
+  /** KPI-tile counts for the agent dashboard: owned open/new, unclaimed new, SLA-escalated, AI handoff. */
   dashboardSummary(signal?: AbortSignal) {
     return this.request<DashboardSummary>("GET", "/api/v1/tickets/dashboard-summary", {
       signal,
@@ -1472,6 +1475,7 @@ export class ApiClient {
       locked?: boolean;
       watcher_user_id?: number;
       escalated?: boolean;
+      ai_escalated?: boolean;
       sort?: string;
       order?: string;
       /** Admins only — also export archived tickets (ignored for non-admins). */

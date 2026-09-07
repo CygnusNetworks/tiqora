@@ -557,6 +557,12 @@ class TiqoraAiTicketState(TiqoraBase):
     manual_run_notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     manual_run_error_code: Mapped[str | None] = mapped_column(String(32), nullable=True)
     manual_run_started_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    # Set when the agent hands off to a human (escalate_to_human or an
+    # escalation-rule hit). Independent of Znuny SLA ``ticket.escalation_*``
+    # columns — those are rebuilt from queue minutes and would wipe a fake
+    # timestamp. Cleared when an agent sends a customer-visible article or
+    # the ticket moves to closed/merged/removed.
+    ai_escalated_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
 
 class TiqoraAiAuditLog(TiqoraBase):
