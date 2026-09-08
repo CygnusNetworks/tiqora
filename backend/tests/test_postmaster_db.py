@@ -229,9 +229,7 @@ async def test_new_ticket_queue_destaddr_survives_comma_display_name(
                 account,
             )
             assert qid == int(junk_id)
-            await session.execute(
-                text("DELETE FROM system_address WHERE value0 = :a"), {"a": addr}
-            )
+            await session.execute(text("DELETE FROM system_address WHERE value0 = :a"), {"a": addr})
             await session.commit()
     finally:
         await engine.dispose()
