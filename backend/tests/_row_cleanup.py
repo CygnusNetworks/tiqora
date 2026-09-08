@@ -11,7 +11,9 @@ from __future__ import annotations
 
 from collections.abc import Iterator, Sequence
 
-from sqlalchemy import create_engine, text
+from sqlalchemy import create_engine, delete, text
+
+from tiqora.db.tiqora.models import TiqoraSettings
 
 # Child rows first: ticket_history and the article payload tables reference
 # ticket/article, so the order here is the delete order.
@@ -57,8 +59,10 @@ def delete_rows_above(
             for table in DEFAULT_TABLES:
                 if table in snapshot:
                     conn.execute(text(f"DELETE FROM {table} WHERE id > :m"), {"m": snapshot[table]})
-            for key in setting_keys:
-                conn.execute(text("DELETE FROM tiqora_settings WHERE `key` = :k"), {"k": key})
+            if setting_keys:
+                # Via the model, not raw SQL: ``key`` is reserved in MySQL and
+                # would need backticks that PostgreSQL rejects.
+                conn.execute(delete(TiqoraSettings).where(TiqoraSettings.key.in_(setting_keys)))
     finally:
         engine.dispose()
 
