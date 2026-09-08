@@ -41,6 +41,11 @@ ZNUNY_SETTING_DEFAULTS: Final[dict[str, Any]] = {
     "PostmasterFollowUpStateClosed": "open",
     "PostmasterBounceEmailAsFollowUp": 1,
     "PostmasterUserID": 1,
+    # Notification sender (Framework.xml). The stock email carries an unresolved
+    # <OTRS_CONFIG_FQDN>; tiqora.worker.notification_templates then falls back to
+    # the queue's system address instead of inventing a mailbox on the web host.
+    "NotificationSenderName": "Znuny Notifications",
+    "NotificationSenderEmail": "znuny@<OTRS_CONFIG_FQDN>",
     # Envelope-only archive copy of all outgoing mail (Defaults.pm: empty).
     "SendmailBcc": "",
     # Session lifetime — Kernel/Config/Files/XML/Framework.xml defaults. Used by
