@@ -713,3 +713,60 @@ async def test_skip_recipients_and_root_agent_are_never_notified(mariadb_znuny_u
         assert _recipients_of(sender, "SKIP-SUBJECT") == ["skip-responsible@example.com"]
     finally:
         await engine.dispose()
+
+
+class _FailingMailSender:
+    """Sender whose every send fails, like an unreachable relay."""
+
+    def __init__(self) -> None:
+        self.attempts = 0
+        self.sendmail_bcc: str | None = None
+
+    async def send(self, message: object) -> None:
+        self.attempts += 1
+        raise OSError("Connect call failed ('127.0.0.1', 25)")
+
+
+@pytest.mark.db
+async def test_failed_sends_are_counted_not_swallowed(mariadb_znuny_url: str) -> None:
+    """A tick must not report errors: 0 while every send is failing.
+
+    Per-recipient failures were logged but never counted, so a misconfigured
+    relay produced healthy-looking ticks indefinitely.
+    """
+    engine = create_async_engine(_mysql_async(mariadb_znuny_url))
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    sender = _FailingMailSender()
+    owner_id = 910_401
+    try:
+        async with factory() as session:
+            await _seed_tiqora_tables(session)
+            await _skip_backlog(session)
+            queue_id = await _insert_queue(session, "notify-q-fail")
+            await _insert_agent(session, user_id=owner_id, login="fail.owner")
+            await _set_user_prefs(session, owner_id, "fail-owner@example.com")
+            ticket_id = await _insert_ticket(
+                session, "NOTIFY_FAIL", owner_id=owner_id, queue_id=queue_id
+            )
+            await _insert_notification_event(
+                session,
+                "fail-notify",
+                items={
+                    "Events": ["TicketCreate"],
+                    "QueueID": [str(queue_id)],
+                    "Recipients": ["AgentOwner"],
+                    "Transports": ["Email"],
+                },
+                subject="FAIL-SUBJECT",
+                body="b",
+            )
+            await _insert_outbox_event(session, "TicketCreate", ticket_id)
+            await session.commit()
+            await set_setting(session, KEY_NOTIFICATIONS_ENABLED, "1")
+
+        result = await run_notifications_tick(session_factory=factory, mail_sender=sender)
+        assert sender.attempts == 1
+        assert result["sent"] == 0
+        assert result["errors"] == 1
+    finally:
+        await engine.dispose()

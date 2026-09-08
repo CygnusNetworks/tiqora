@@ -17,13 +17,16 @@ from __future__ import annotations
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime
-from typing import Literal
+from typing import TYPE_CHECKING, Literal
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from tiqora.config import Settings, get_settings
 from tiqora.crypto.secret import decrypt_secret, encrypt_secret
 from tiqora.db.tiqora.models import TiqoraMailOutbound
+
+if TYPE_CHECKING:  # import cycle: smtp imports this module at runtime
+    from tiqora.channels.email.smtp import SmtpMailSender
 
 SINGLETON_ID = 1
 
@@ -240,6 +243,34 @@ async def upsert_mail_outbound(
     return row
 
 
+async def build_outbound_sender(
+    session: AsyncSession,
+    *,
+    sendmail_bcc: str | None = None,
+    settings: Settings | None = None,
+) -> SmtpMailSender:
+    """Sender for the configured outbound relay, for background workers.
+
+    Workers used to build ``SmtpMailSender(settings)`` straight from the
+    ``TIQORA_SMTP_*`` environment. Those are unset whenever the relay is
+    configured through the admin UI instead — which is the normal case — so
+    the sender silently fell back to ``localhost:25`` and every send failed
+    with ``SMTPConnectError`` while the tick still reported success. Resolve
+    the same configuration the agent-reply path uses.
+    """
+    from tiqora.channels.email.smtp import SmtpMailSender
+
+    resolved = await resolve_outbound_smtp(session, settings)
+    if not resolved.enabled:
+        return SmtpMailSender(settings or get_settings(), sendmail_bcc=sendmail_bcc)
+    oauth_gen = None
+    if resolved.auth_type == "oauth2_token" and resolved.oauth2_token_config_id is not None:
+        oauth_gen = make_oauth_token_generator(session, resolved.oauth2_token_config_id)
+    return SmtpMailSender.from_resolved(
+        resolved, sendmail_bcc=sendmail_bcc, oauth_token_generator=oauth_gen
+    )
+
+
 def make_oauth_token_generator(session: AsyncSession, config_id: int) -> OAuthTokenGenerator:
     """Build an aiosmtplib ``oauth_token_generator`` for *config_id*."""
 
@@ -260,6 +291,7 @@ __all__ = [
     "ResolvedOutboundSmtp",
     "get_mail_outbound_row",
     "make_oauth_token_generator",
+    "build_outbound_sender",
     "resolve_outbound_smtp",
     "row_to_public_dict",
     "upsert_mail_outbound",
