@@ -38,11 +38,16 @@ Documented simplifications (see docs/parallel-operation.md → Uncertainties):
 ``RecipientGroups``/``RecipientRoles`` resolve group *members* only (no
 role→group expansion); ``AgentWatcher`` is resolved from the modelled
 ``ticket_watcher`` table (valid agents with a ``UserEmail`` preference);
-``AgentMyQueues`` is not implemented (needs per-agent queue subscriptions
-via personal-queues preferences, not yet consumed here); only the ``Email``
-transport is supported; user notification preferences
+only the ``Email`` transport is supported; user notification preferences
 (``Notification-<id>-Email``) are not consulted — every matched recipient
 with the ``Email`` transport is notified.
+
+``AgentMyQueues``/``AgentMyServices``/``AgentMyQueuesMyServices`` are ported
+from ``Ticket.pm::GetSubscribedUserIDsByQueueID``/``...ByServiceID``
+(``personal_queues``/``personal_services``); queue subscribers additionally
+need ``ro`` on the queue's group. Znuny's ``SkipRecipients`` arrives as
+``skip_user_ids`` in the outbox payload (see the legacy ``Notification*``
+events in ``domain.ticket_write_service``), and agent 1 is never notified.
 
 Parallel-operation safety: this engine only drains ``tiqora_event_outbox``
 (Tiqora-originated events). Znuny's daemon never sees those rows, so enabling
@@ -71,6 +76,7 @@ from tiqora.domain.settings_store import (
     set_setting,
 )
 from tiqora.domain.ticket_write_service import ArticleIn, add_article
+from tiqora.permissions.engine import PermissionEngine
 from tiqora.znuny.history import history_add
 from tiqora.znuny.sysconfig import SysConfig
 
@@ -98,6 +104,8 @@ _TICKET_ATTRIBUTE_FILTER_KEYS: dict[str, str] = {
     "TypeID": "type_id",
 }
 _ARTICLE_ONLY_EVENTS = {"ArticleCreate", "ArticleSend"}
+# Znuny's NotificationEvent always adds agent 1 to SkipRecipients.
+_ROOT_AGENT_USER_ID = 1
 
 
 @dataclass
@@ -250,13 +258,57 @@ def _decode_pref(value: object) -> str:
     return decode_preference_value(value) or ""
 
 
+async def _queue_subscriber_ids(session: AsyncSession, queue_id: int) -> set[int]:
+    """Port of ``Ticket.pm::GetSubscribedUserIDsByQueueID``.
+
+    ``personal_queues`` rows, restricted to valid users that still hold ``ro``
+    on the queue's group -- resolved through :class:`PermissionEngine` so that
+    role-derived grants and ``rw``-implies-all behave as everywhere else.
+    """
+    rows = (
+        await session.execute(
+            text(
+                "SELECT pq.user_id FROM personal_queues pq"
+                " JOIN users u ON u.id = pq.user_id AND u.valid_id = 1"
+                " WHERE pq.queue_id = :qid"
+            ),
+            {"qid": queue_id},
+        )
+    ).fetchall()
+    engine = PermissionEngine(session)
+    return {int(r[0]) for r in rows if await engine.check(int(r[0]), queue_id, "ro")}
+
+
+async def _service_subscriber_ids(session: AsyncSession, service_id: int) -> set[int]:
+    """Port of ``Ticket.pm::GetSubscribedUserIDsByServiceID`` (valid users only)."""
+    rows = (
+        await session.execute(
+            text(
+                "SELECT ps.user_id FROM personal_services ps"
+                " JOIN users u ON u.id = ps.user_id AND u.valid_id = 1"
+                " WHERE ps.service_id = :sid"
+            ),
+            {"sid": service_id},
+        )
+    ).fetchall()
+    return {int(r[0]) for r in rows}
+
+
 async def _resolve_recipients(
-    session: AsyncSession, notification: _NotificationRow, ticket: dict[str, object]
+    session: AsyncSession,
+    notification: _NotificationRow,
+    ticket: dict[str, object],
+    skip_user_ids: frozenset[int] = frozenset(),
 ) -> list[_Recipient]:
     recipients: list[_Recipient] = []
     seen: set[tuple[str, str]] = set()
+    # Znuny hard-codes this: the built-in root agent (id 1) is never notified,
+    # on top of the per-event SkipRecipients of the acting agent.
+    skipped = skip_user_ids | {_ROOT_AGENT_USER_ID}
 
     async def _add_agent(user_id: int) -> None:
+        if user_id in skipped:
+            return
         # Only valid agents (mirrors Znuny: invalid users never receive mail).
         valid_row = (
             await session.execute(
@@ -297,6 +349,30 @@ async def _resolve_recipients(
         await _add_agent(_as_int(ticket["user_id"]))
     if "AgentResponsible" in recipient_kinds and ticket.get("responsible_user_id"):
         await _add_agent(_as_int(ticket["responsible_user_id"]))
+
+    # ``AgentMyQueues``/``AgentMyServices`` = the personal queue/service
+    # subscriptions (Ticket.pm::GetSubscribedUserIDsByQueueID / ...ByServiceID).
+    # Queue subscribers additionally need ``ro`` on the queue's group;
+    # service subscribers only need to be valid.
+    my_queue_ids: set[int] | None = None
+    my_service_ids: set[int] | None = None
+    if recipient_kinds & {"AgentMyQueues", "AgentMyQueuesMyServices"}:
+        my_queue_ids = await _queue_subscriber_ids(session, _as_int(ticket["queue_id"]))
+    if recipient_kinds & {"AgentMyServices", "AgentMyQueuesMyServices"}:
+        service_id = ticket.get("service_id")
+        my_service_ids = (
+            await _service_subscriber_ids(session, _as_int(service_id)) if service_id else set()
+        )
+    if "AgentMyQueues" in recipient_kinds and my_queue_ids:
+        for uid in sorted(my_queue_ids):
+            await _add_agent(uid)
+    if "AgentMyServices" in recipient_kinds and my_service_ids:
+        for uid in sorted(my_service_ids):
+            await _add_agent(uid)
+    if "AgentMyQueuesMyServices" in recipient_kinds:
+        # Znuny intersects: only agents subscribed to *both*.
+        for uid in sorted((my_queue_ids or set()) & (my_service_ids or set())):
+            await _add_agent(uid)
 
     if "AgentWatcher" in recipient_kinds:
         watcher_rows = (
@@ -506,6 +582,14 @@ async def process_event(
     if event_type in _ARTICLE_ONLY_EVENTS and payload.get("article_id"):
         article = await _article_row(session, _as_int(payload["article_id"]))
 
+    # ``skip_user_ids`` is Znuny's ``SkipRecipients`` (the acting agent is not
+    # notified about their own action); emitted by the legacy ``Notification*``
+    # events in ``domain.ticket_write_service``.
+    raw_skip = payload.get("skip_user_ids")
+    skip_user_ids = (
+        frozenset(_as_int(uid) for uid in raw_skip) if isinstance(raw_skip, list) else frozenset()
+    )
+
     sent = 0
     for notification in notifications:
         if not _passes_ticket_filter(notification, ticket):
@@ -516,7 +600,7 @@ async def process_event(
         if transports and "Email" not in transports:
             continue
 
-        recipients = await _resolve_recipients(session, notification, ticket)
+        recipients = await _resolve_recipients(session, notification, ticket, skip_user_ids)
         for recipient in recipients:
             try:
                 if await _send_to_recipient(

@@ -1993,6 +1993,14 @@
           "name": "GenericAgent",
           "description": "Spúšťa naplánované úlohy GenericAgent."
         },
+        "unlock_timeout": {
+          "name": "Časový limit odomknutia",
+          "description": "Odomkne vhodné tikety po uplynutí pracovného času ich frontu."
+        },
+        "pending_check": {
+          "name": "Kontrola čakajúcich",
+          "description": "Použije splatné čakajúce prechody a vydá udalosti pripomenutia."
+        },
         "gdpr_retention": {
           "name": "uchovávanie podľa GDPR",
           "description": "Aplikuje nakonfigurované pravidlá uchovávania raz denne."

@@ -1993,6 +1993,14 @@
           "name": "GenericAgent",
           "description": "מפעיל משימות מתוזמנות של GenericAgent."
         },
+        "unlock_timeout": {
+          "name": "פסק זמן לשחרור נעילה",
+          "description": "משחרר נעילת פניות מתאימות בתום פסק הזמן בשעות העבודה של התור שלהן."
+        },
+        "pending_check": {
+          "name": "בדיקת ממתינות",
+          "description": "מחיל מעברי המתנה שהגיע מועדם ומפיק אירועי תזכורת."
+        },
         "gdpr_retention": {
           "name": "שימור GDPR",
           "description": "מחיל כללי שמירה מוגדרים פעם ביום."
