@@ -366,6 +366,28 @@ above (`tiqora.ai.runtime._map_customer_message`). Manual Assist (an agent
 clicking "AI draft" in the ticket zoom) is always the draft path, regardless
 of queue autonomy.
 
+### Handing off to a human
+
+`escalate_to_human` ends the run, writes an internal note and stamps
+`tiqora_ai_ticket_state.ai_escalated_at`. That stamp is a real stop, not just
+a marker: the auto-reply worker refuses to start another run on a ticket that
+carries it (`_cap_reason` → `escalated_to_human`), so the AI cannot promise a
+customer that a colleague will take over and then answer the follow-up
+itself. Summaries are unaffected — they are never gated — and Manual Assist
+still works, because a human explicitly asking for a draft on an escalated
+ticket is the point.
+
+The stamp is cleared, and automation resumes, exactly when a human has taken
+the ticket over: an agent sends a customer-visible reply, or the ticket moves
+to `closed`/`merged`/`removed` (`domain.ticket_write_service`).
+
+Note what this does **not** cover: `escalate_to_human` is the model's own
+judgement. The deterministic counterpart is `escalation_rules` on the queue
+policy, which stops autonomous sending when an MCP tool result matches a
+configured value. A queue running `full` autonomy with `escalation_rules`
+unset has no rule-based brake at all — under `clarify_only` that is masked,
+because a factual reply is force-drafted anyway.
+
 ### Drafts
 
 A proposed customer message that isn't auto-sent becomes a
