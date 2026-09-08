@@ -32,6 +32,17 @@ _LEGACY_TICKET_URL = re.compile(
 )
 
 
+# A Znuny CGI path left in a rendered notification: the template's ticket URL
+# was a variant :data:`_LEGACY_TICKET_URL` does not know, so the link now carries
+# the Tiqora host with a Znuny path and 404s.
+_LEGACY_CGI_PATH = re.compile(r"(?:index|customer)\.pl\?Action=", re.IGNORECASE)
+
+
+def has_untranslated_legacy_link(rendered: str) -> bool:
+    """True when a rendered notification still contains a Znuny CGI link."""
+    return _LEGACY_CGI_PATH.search(rendered) is not None
+
+
 def normalize_notification_template(template: str) -> str:
     template = _ENCODED_TAG.sub(lambda m: f"<{m[1]}>", template)
     return _LEGACY_TICKET_URL.sub("<TIQORA_TICKET_URL>", template)
