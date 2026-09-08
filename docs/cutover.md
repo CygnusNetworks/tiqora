@@ -23,18 +23,51 @@ Before starting *any* stage below:
       production for a representative period (see
       `docs/parallel-operation.md` → "Taking over ..." sections):
       `daemon.postmaster.enabled`, `daemon.escalation.enabled`,
-      `daemon.notifications.enabled`, `daemon.generic_agent.enabled` — all
+      `daemon.notifications.enabled`, `daemon.generic_agent.enabled`,
+      `daemon.unlock_timeout.enabled`, `daemon.pending_check.enabled` — all
       `1` in `tiqora_settings`.
-- [ ] Golden-master and compat test suites are green on the current release
-      (`cd backend && uv run pytest -m db`).
+- [ ] Relevant DB integration and compatibility tests pass on the deployed
+      revision (`cd backend && uv run pytest -m db`). Run the separate
+      golden-master suite with its documented prerequisites when validating
+      peer parity; `-m db` alone is not a golden-master run.
 - [ ] A full, verified, restorable database backup/dump exists and its
       restore procedure has been tested recently. **Every rollback stage
       beyond "freeze Znuny web" assumes this dump is available and current.**
+- [ ] Restore the dump into an isolated database, verify critical row counts
+      and attachment data, and retain the dump, checksum, deployment config,
+      encryption keys and previous image reference securely. A successful
+      backup job alone does not demonstrate a working restore. Never start
+      mail fetchers or outbound workers against the restored production data.
 - [ ] Prometheus/Grafana dashboards for the golden signals below are set up
       and someone is watching them during the cutover window.
 - [ ] A maintenance window is scheduled and stakeholders notified.
 - [ ] Security-hardening backlog reviewed (see next section) — accepted or
       resolved before going production-primary.
+
+### Inventory every remaining responsibility
+
+Run the peer's `Maint::Daemon::Summary` and inspect OS cron, supervisor,
+container restart policies, event handlers and installed addons. A healthy
+Tiqora container and enabled flags do not prove that every legacy task has
+been replaced. Classify each remaining task as **taken over**, **no longer
+needed**, or **must remain as an independent service**.
+
+| Responsibility | Required evidence before stopping the peer |
+|---|---|
+| Unlock timeout | Tiqora respects configured unlock states, queue timeout and queue/SLA working calendar; a due locked ticket unlocks once. |
+| Pending checks | Due automatic states transition to their configured destination; due reminders use working hours and do not duplicate within their cadence. |
+| GenericAgent | Compare a read-only match result for each active job, including empty optional fields and archive/time filters. Disable both the cron-driven runner and the independent `SchedulerGenericAgentTaskManager`; disabling the GenericAgent event handler alone does not disable scheduled jobs. |
+| Notification rules | List each valid rule's `Events` and `Recipients` values and confirm every one is emitted and resolvable. Rules carried over from older releases are typically bound to the legacy `Notification*` events, not to `Ticket*`/`Article*` ones — a rule bound to an event nobody emits stays silent while the takeover reports healthy ticks. |
+| Outbound mail and spool | Drain the peer's `mail_queue` and filesystem spool while its sender still runs. Tiqora's SMTP sender does not drain the legacy queue. Verify direct replies, autoresponses, notifications and SMTP failure handling with controlled test recipients or a sink. |
+| Calendar, S/MIME, processes and addons | Check actual configured use, including scheduled ticket creation, certificate renewal and custom jobs. An empty current workload is not implementation parity; retain or replace required functions before stopping their executor. |
+| Shared data and external writers | Preserve the database, attachment storage, keys and any independent imports or integrations. Verify external writers against the owned schema before enabling migrations. |
+| Peer-only housekeeping | Cache, dashboard and search-index maintenance can retire with the peer if nothing else consumes their output. |
+
+Do not run `docker compose down` on a stack containing the shared database.
+Stop named application services only. Keep independent services in the
+deployment definition, and use an explicit opt-in profile or remove the
+retired application from automatic startup. Disable cron/supervisor and
+update automation that could revive it. Retain a documented rollback path.
 
 ---
 
@@ -106,11 +139,18 @@ duty before the Znuny daemon is stopped.
    SELECT `key`, value FROM tiqora_settings WHERE `key` LIKE 'daemon.%.enabled';
    ```
    Expect `daemon.postmaster.enabled`, `daemon.escalation.enabled`,
-   `daemon.notifications.enabled`, `daemon.generic_agent.enabled` all `1`.
-2. Confirm the Tiqora worker process is running and its daemon-specific
-   Prometheus counters are advancing (`tiqora_postmaster_fetched_total`,
+   `daemon.notifications.enabled`, `daemon.generic_agent.enabled`,
+   `daemon.unlock_timeout.enabled`, `daemon.pending_check.enabled` all `1`.
+   Disable each corresponding peer executor **before** enabling its Tiqora
+   flag; the flags do not control Znuny's scheduler.
+2. Confirm fresh successful `daemon.<slug>.status.last_ok` timestamps and
+   inspect `last_result` for per-item errors. A completed tick may still
+   report errors. When eligible work exists, verify corresponding counters
+   and resulting ticket changes (`tiqora_postmaster_fetched_total`,
    `tiqora_escalation_tickets_swept_total`,
    `tiqora_notifications_sent_total`, `tiqora_generic_agent_jobs_run_total`).
+   A zero counter is normal when no work is due; test each duty with controlled
+   fixtures before cutover rather than generating unsolicited production mail.
 3. Stop the Znuny daemon:
    ```sh
    su -c "bin/otrs.Daemon.pl stop" -s /bin/bash otrs
@@ -118,8 +158,9 @@ duty before the Znuny daemon is stopped.
    ```
 4. Confirm it stayed stopped (`bin/znuny.Console.pl Maint::Daemon::Summary`
    for per-task status, or `ps`/`systemctl status` for the process itself)
-   for at least one full poll interval of the slowest takeover
-   (`escalation`, default 300s — see `TIQORA_ESCALATION_INTERVAL`).
+   for at least one full poll interval of the slowest enabled takeover and
+   through the configured daemon restart mechanism. Check scheduled jobs
+   again at their next due time, not just immediately after stopping.
 
 **Verify**: no new rows appear in Znuny's own daemon PID/lock files; Tiqora's
 per-daemon counters keep advancing with the Znuny daemon down.
@@ -127,16 +168,22 @@ per-daemon counters keep advancing with the Znuny daemon down.
 **Rollback**: `su -c "bin/otrs.Daemon.pl start" -s /bin/bash otrs` restarts the Znuny
 daemon. Because every takeover flag is a mutually-exclusive switch (Tiqora
 checks the flag before acting, Znuny's own daemon tasks are independent of
-those flags), having *both* running briefly during rollback is not
-catastrophic but should be avoided — flip the `daemon.*.enabled` flags back
-to `0` in `tiqora_settings` first, then restart the Znuny daemon, then
-Tiqora resumes deferring to Znuny.
+those flags), disable the duties being returned to Znuny first, let their
+in-flight Tiqora ticks finish, and only then restore the matching peer tasks
+and restart its daemon. Do not disable Tiqora-only services such as the outbox
+or Telegram indiscriminately. Concurrent mail fetch or notification execution
+can duplicate or lose work.
 
 ---
 
 ## Stage 3 — Repoint nginx GenericInterface locations to Tiqora compat
 
-**Goal**: external integrators (and the TiqoraSync addon, if still installed)
+This stage applies only if legacy clients or links must continue working.
+Inventory actual consumers and test the operations they use. If no such
+compatibility is required, record the stage as not applicable in the site's
+execution record and leave routing changes out of the cutover.
+
+**Goal**: external integrators
 hit Tiqora's `/znuny-compat` layer instead of Znuny's
 `nph-genericinterface.pl`.
 
@@ -197,7 +244,7 @@ full business day for a cautious rollout) before proceeding to Stage 5.
 |---|---|---|
 | `tiqora_http_requests_total{status=~"5.."}` | API/compat error rate | any sustained increase |
 | `tiqora_http_request_duration_seconds` | Latency | p99 regression vs. baseline |
-| `tiqora_poller_history_lag` / `tiqora_poller_article_lag` | Znuny-write poller keeping up (should now trend to ~0 permanently, since Znuny is no longer writing) | non-zero and growing |
+| `tiqora_poller_history_lag` / `tiqora_poller_article_lag` | Legacy-table poller keeping up, including any remaining external writers | non-zero and growing |
 | `tiqora_webhook_deliveries_total{status="failure"}` | Outbox → webhook fan-out health | any sustained increase |
 | `tiqora_escalation_errors_total` | Escalation sweep errors | any increase |
 | `tiqora_notifications_errors_total` | Notification engine errors | any increase |
@@ -207,11 +254,31 @@ full business day for a cautious rollout) before proceeding to Stage 5.
 
 ### Manual checklist
 
-- [ ] Spot-check tickets created/updated during the window in both the
-      Tiqora UI and (read-only) the Znuny UI — they must match.
-- [ ] Confirm outbound mail (`SMTP`) is flowing via
-      `tiqora_postmaster_*` metrics/logs, not Znuny's mail queue.
+- [ ] Spot-check tickets, history and attachments created/updated during the
+      window in Tiqora against the stored data. Do not restart the retired
+      peer or create new peer sessions just to run this check.
+- [ ] Confirm outbound mail using SMTP delivery logs and Tiqora's outbound
+      mail records; postmaster fetch counters alone do not prove delivery.
+- [ ] Verify fresh successful pending-check and unlock-timeout status, due
+      actions, and the next scheduled GenericAgent job.
+- [ ] Confirm at least one notification per configured event family actually
+      reached its recipients, using a controlled recipient rather than
+      production correspondents.
 - [ ] Confirm no operator has re-enabled the Znuny daemon out-of-band.
+- [ ] Confirm the shared database and independent services remain healthy.
+
+### Set the operation mode deliberately
+
+Once Tiqora owns the required duties, set `system.operation_mode` to
+`tiqora_primary` through the admin settings. This is separate from schema
+ownership. Inspect AI worker, per-queue auto-reply/summary rules and the
+global `ai.auto_reply.paused` switch first: changing the mode can open the
+gate for autonomous AI that was already configured but inactive in parallel
+mode. Record the intended behavior before switching; enabling new automated
+customer replies is not a prerequisite for retiring Znuny.
+
+For rollback, restore the previous operation mode before handing mail duties
+back to the peer. Preserve intentionally paused AI settings.
 
 If anything looks wrong, stop here — do **not** proceed to Stage 5. Roll
 back Stages 1–3 (in reverse order) and investigate.
@@ -224,9 +291,10 @@ back Stages 1–3 (in reverse order) and investigate.
 indexes, orphan reporting) now that Znuny is confirmed shut down and will
 stay shut down.
 
-This is the **first stage with a real point of no return**: once owned
-migrations are applied, rolling back requires a database restore, not just a
-config revert (see Rollback below).
+This is the **first stage that changes the legacy schema**. A configuration
+revert alone is insufficient once migrations run. The current index-only
+migration has a downgrade; future migrations may require a database restore
+(see Rollback below).
 
 1. Confirm Znuny is fully stopped: web frontend frozen (Stage 1), daemon
    stopped (Stage 2), and — for this gate specifically — **no admin is
@@ -249,6 +317,11 @@ config revert (see Rollback below).
      `--history-watermark-minutes` (default 15).
    - `sessions` table: must be empty (Znuny does not timestamp session rows,
      so "any row present" is treated as "someone is still logged in").
+
+   The history check sees Tiqora writes too; it cannot identify which
+   application wrote a row. A busy Tiqora install can fail this conservative
+   check after Znuny is stopped. Investigate the writer and arrange a quiet
+   window rather than treating recent history as proof of a live peer.
 
    It prints a report and refuses (exit code 1) if either check fails. Do
    **not** reflexively re-run with `--force` — investigate first (a lingering
@@ -308,9 +381,12 @@ No schema changes occurred. This is a config-only rollback.
 the current head).**
 
 The composite indexes added by `20260719_0006` **can** be dropped cleanly
-with `alembic downgrade 20260719_0005` (they are pure additive DDL with a
-matching `downgrade()`) — this returns the schema to the pre-ownership
-state. However:
+using that migration's matching `downgrade()`. Determine the immediate
+`down_revision` from the **deployed** revision file and downgrade to that
+revision with both ownership gates still active. Do not use an old hard-coded
+target: the owned migration is rebased as the normal chain advances, and an
+older target could also undo application migrations and remove data. Disable
+the gates only after the schema downgrade succeeds. However:
 
 - Any **future** owned migration that is not purely additive (e.g. a
   destructive orphan cleanup, should one ever be added in a later version)
@@ -334,12 +410,10 @@ state.
 Once schema ownership is enabled and the monitoring window (Stage 4-equivalent,
 post-Stage-5) has passed cleanly:
 
-- [ ] **Uninstall the TiqoraSync Znuny addon** (`packages/znuny-addon`) from
-      the now-retired Znuny instance, if it was ever installed for
-      cache-invalidation purposes — it has no further role once Znuny is
-      shut down. (`bin/znuny.Console.pl Admin::Package::Uninstall
-      TiqoraSync`, if the Znuny instance is still reachable for
-      housekeeping.)
+- [ ] Retire the TiqoraSync executor with Znuny. It has no role after the
+      peer stops. Do not restart a retired application against the owned
+      database solely to uninstall an addon; an archived rollback image may
+      keep the installed package.
 - [ ] **Archive the Znuny crontab** (`var/cron/*`) — copy it out for
       historical reference, then disable it (`crontab -r` for the znuny
       user, or remove the cron.d drop-in). Confirm no Znuny cron job is
@@ -351,7 +425,8 @@ post-Stage-5) has passed cleanly:
       rollback will ever be needed.
 - [ ] Update internal documentation/runbooks that reference the old Znuny
       URLs or admin procedures to point at Tiqora.
-- [ ] Remove the maintenance-mode banner / 503 override from Stage 1.
+- [ ] Remove temporary Tiqora maintenance notices. Keep the retired peer
+      inaccessible; removing an old 503 override must not reopen its UI.
 
 ---
 
