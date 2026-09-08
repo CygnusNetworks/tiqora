@@ -7,6 +7,7 @@ Database templates remain untouched, including when shared with Znuny.
 from __future__ import annotations
 
 import re
+from email.utils import formataddr
 from urllib.parse import SplitResult, urlsplit
 
 from tiqora.channels.email.placeholder import PlaceholderContext
@@ -15,6 +16,8 @@ from tiqora.znuny.sysconfig import SysConfig
 
 _ENCODED_TAG = re.compile(r"&lt;((?:OTRS|TIQORA)_[A-Za-z0-9_:]+(?:\[\d+\])?)&gt;", re.IGNORECASE)
 _PREFIX = r"<(?:OTRS|TIQORA)_CONFIG_"
+_UNRESOLVED_TAG = re.compile(r"<(?:OTRS|TIQORA)_", re.IGNORECASE)
+_TIQORA_SENDER_NAME = "Tiqora Notifications"
 _LEGACY_SEPARATOR = r"(?:\\?;|&amp;|&)"
 _LEGACY_TICKET_URL = re.compile(
     _PREFIX
@@ -77,7 +80,7 @@ async def configure_notification_context(
     context.ticket["url"] = f"{base}/{route}/tickets/{ticket_id}"
     sender_name = await sysconfig.get_str("NotificationSenderName")
     if not sender_name or sender_name.strip() in {"OTRS Notifications", "Znuny Notifications"}:
-        sender_name = "Tiqora Notifications"
+        sender_name = _TIQORA_SENDER_NAME
     context.config_overrides.update(
         {
             "notificationsendername": sender_name,
@@ -85,3 +88,22 @@ async def configure_notification_context(
             "httptype": url.scheme,
         }
     )
+
+
+async def resolve_notification_sender(
+    sysconfig: SysConfig, context: PlaceholderContext
+) -> str | None:
+    """``From:`` for a notification mail, or ``None`` when nothing is deliverable.
+
+    ``NotificationSenderEmail`` when it holds a usable address, else the ticket
+    queue's system address -- the mailbox this install already sends from.
+    Znuny ships the setting as ``znuny@<OTRS_CONFIG_FQDN>``; resolving that
+    against the Tiqora host would invent a mailbox nobody reads, and a sender on
+    a host that does not accept mail is what relays reject.
+    """
+    name = context.config_overrides.get("notificationsendername") or _TIQORA_SENDER_NAME
+    configured = (await sysconfig.get_str("NotificationSenderEmail")).strip()
+    email = configured if configured and not _UNRESOLVED_TAG.search(configured) else ""
+    if not email:
+        email = (context.queue.get("email") or "").strip()
+    return formataddr((name, email)) if email else None

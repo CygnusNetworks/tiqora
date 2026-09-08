@@ -12,6 +12,7 @@ from tiqora.worker.notification_templates import (
     configure_notification_context,
     has_untranslated_legacy_link,
     normalize_notification_template,
+    resolve_notification_sender,
 )
 from tiqora.znuny.sysconfig import SysConfig
 
@@ -168,3 +169,37 @@ def test_untranslated_legacy_link_is_detectable(rendered: str, expected: bool) -
     """A customized template whose ticket URL we could not translate would point at
     the Tiqora host with a Znuny path — detectable so the worker can warn."""
     assert has_untranslated_legacy_link(rendered) is expected
+
+
+@pytest.mark.asyncio
+async def test_notification_sender_prefers_configured_address() -> None:
+    context = PlaceholderContext(
+        queue={"email": "queue@example.test", "real_name": "Queue"},
+        config_overrides={"notificationsendername": "Support Team"},
+    )
+    sysconfig = _sysconfig({"NotificationSenderEmail": "notifications@example.test"})
+    assert (
+        await resolve_notification_sender(sysconfig, context)
+        == "Support Team <notifications@example.test>"
+    )
+
+
+@pytest.mark.asyncio
+async def test_notification_sender_falls_back_to_queue_system_address() -> None:
+    """Znuny ships the setting as ``znuny@<OTRS_CONFIG_FQDN>``; expanding that against
+    the Tiqora host would invent a mailbox nobody reads."""
+    context = PlaceholderContext(
+        queue={"email": "queue@example.test"},
+        config_overrides={"notificationsendername": "Tiqora Notifications"},
+    )
+    sysconfig = _sysconfig({"NotificationSenderEmail": "znuny@<OTRS_CONFIG_FQDN>"})
+    assert (
+        await resolve_notification_sender(sysconfig, context)
+        == "Tiqora Notifications <queue@example.test>"
+    )
+
+
+@pytest.mark.asyncio
+async def test_notification_sender_is_none_without_any_usable_address() -> None:
+    sysconfig = _sysconfig({"NotificationSenderEmail": ""})
+    assert await resolve_notification_sender(sysconfig, PlaceholderContext()) is None
