@@ -1993,6 +1993,14 @@
           "name": "Đại lý chung",
           "description": "Chạy các công việc GenericAgent theo lịch trình."
         },
+        "unlock_timeout": {
+          "name": "Thời gian chờ mở khóa",
+          "description": "Mở khóa các phiếu đủ điều kiện sau thời gian chờ làm việc của hàng đợi."
+        },
+        "pending_check": {
+          "name": "Kiểm tra chờ xử lý",
+          "description": "Áp dụng các chuyển trạng thái chờ đã đến hạn và phát sự kiện nhắc nhở."
+        },
         "gdpr_retention": {
           "name": "Duy trì GDPR",
           "description": "Áp dụng các quy tắc lưu giữ đã định cấu hình mỗi ngày một lần."

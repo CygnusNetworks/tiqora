@@ -1993,6 +1993,14 @@
           "name": "GenericAgent",
           "description": "Ütemezett GenericAgent-feladatokat futtat."
         },
+        "unlock_timeout": {
+          "name": "Feloldási időkorlát",
+          "description": "Feloldja a megfelelő jegyeket a várólistájuk munkaidő-időkorlátja után."
+        },
+        "pending_check": {
+          "name": "Függőben lévők ellenőrzése",
+          "description": "Alkalmazza az esedékes függő átmeneteket, és emlékeztető eseményeket bocsát ki."
+        },
         "gdpr_retention": {
           "name": "GDPR megőrzés",
           "description": "A konfigurált megőrzési szabályokat naponta egyszer alkalmazza."

@@ -16,7 +16,10 @@ const REFETCH_INTERVAL_MS = 10_000;
 //: postmaster/escalation/notifications/generic_agent are Znuny daemon
 // takeovers and must stay mutually exclusive with the corresponding Znuny
 // scheduler task — see docs/parallel-operation.md.
-const TAKEOVER_SLUGS = new Set(["postmaster", "escalation", "notifications", "generic_agent"]);
+const TAKEOVER_SLUGS = new Set([
+  "postmaster", "escalation", "notifications", "generic_agent",
+  "unlock_timeout", "pending_check",
+]);
 
 const DOT_CLASS: Record<StatusColor, string> = {
   green: "bg-green",

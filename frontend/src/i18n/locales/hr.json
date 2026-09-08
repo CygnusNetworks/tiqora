@@ -1993,6 +1993,14 @@
           "name": "Generički agent",
           "description": "Pokreće zakazane GenericAgent poslove."
         },
+        "unlock_timeout": {
+          "name": "Istek otključavanja",
+          "description": "Otključava prikladne prijave nakon isteka radnog vremena njihova reda."
+        },
+        "pending_check": {
+          "name": "Provjera na čekanju",
+          "description": "Primjenjuje dospjele prijelaze na čekanju i šalje događaje podsjetnika."
+        },
         "gdpr_retention": {
           "name": "GDPR zadržavanje",
           "description": "Primjenjuje konfigurirana pravila zadržavanja jednom dnevno."

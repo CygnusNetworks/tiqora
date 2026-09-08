@@ -1993,6 +1993,14 @@
           "name": "GenericAgent",
           "description": "Rulează joburi programate GenericAgent."
         },
+        "unlock_timeout": {
+          "name": "Expirare deblocare",
+          "description": "Deblochează tichetele eligibile după expirarea timpului de lucru al cozii lor."
+        },
+        "pending_check": {
+          "name": "Verificare în așteptare",
+          "description": "Aplică tranzițiile în așteptare scadente și emite evenimente de memento."
+        },
         "gdpr_retention": {
           "name": "Păstrarea GDPR",
           "description": "Se aplică regulile de păstrare configurate o dată pe zi."

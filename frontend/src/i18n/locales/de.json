@@ -2144,6 +2144,14 @@
           "name": "GenericAgent",
           "description": "Geplante GenericAgent-Jobs ausführen."
         },
+        "unlock_timeout": {
+          "name": "Zeitüberschreitung beim Entsperren",
+          "description": "Entsperrt geeignete Tickets nach der Arbeitszeit-Frist ihrer Queue."
+        },
+        "pending_check": {
+          "name": "Wartend-Prüfung",
+          "description": "Wendet fällige Wartend-Übergänge an und erzeugt Wartend-Erinnerungsereignisse."
+        },
         "gdpr_retention": {
           "name": "DSGVO-Aufbewahrung",
           "description": "Konfigurierte Aufbewahrungsregeln täglich anwenden."
