@@ -269,8 +269,7 @@ def test_strip_hallucinated_signoff_keeps_english_closing_drops_placeholder() ->
         "Best regards,\n[Your Name]\nSTW Bonn – StudNet Support"
     )
     assert strip_hallucinated_signoff(body) == (
-        "Please try this: connect your router directly to the wall socket.\n\n"
-        "Best regards,"
+        "Please try this: connect your router directly to the wall socket.\n\nBest regards,"
     )
 
 

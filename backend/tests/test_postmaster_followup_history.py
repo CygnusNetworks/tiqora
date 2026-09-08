@@ -9,6 +9,8 @@ apart in the ticket history — and what decides whether the legacy
 
 from __future__ import annotations
 
+from collections.abc import Iterator
+
 import pytest
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
@@ -16,6 +18,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 from tiqora.channels.email.pipeline import process_message
 from tiqora.db.legacy.mail_account import MailAccount
 
+from ._row_cleanup import cleanup_module
 from .test_mail_log import (
     NOW,
     _ensure_tables,
@@ -23,6 +26,12 @@ from .test_mail_log import (
     _raw_email,
     _to_async_url,
 )
+
+
+@pytest.fixture(autouse=True, scope="module")
+def _cleanup(mariadb_znuny_url: str) -> Iterator[None]:
+    """Delete the ticket, articles and log rows the pipeline commits."""
+    yield from cleanup_module(mariadb_znuny_url)
 
 
 def _account() -> MailAccount:
