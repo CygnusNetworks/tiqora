@@ -1993,6 +1993,14 @@
           "name": "GenericAgent",
           "description": "Palaiž plānotos GenericAgent darbus."
         },
+        "unlock_timeout": {
+          "name": "Atbloķēšanas noildze",
+          "description": "Atbloķē atbilstošos pieteikumus pēc to rindas darba laika noildzes."
+        },
+        "pending_check": {
+          "name": "Gaidošo pārbaude",
+          "description": "Piemēro iestājušās gaidošās pārejas un rada atgādinājuma notikumus."
+        },
         "gdpr_retention": {
           "name": "GDPR saglabāšana",
           "description": "Konfigurētus saglabāšanas noteikumus piemēro reizi dienā."

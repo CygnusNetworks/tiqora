@@ -1993,6 +1993,14 @@
           "name": "Agent générique",
           "description": "Exécute les tâches GenericAgent planifiées."
         },
+        "unlock_timeout": {
+          "name": "Délai de déverrouillage",
+          "description": "Déverrouille les tickets éligibles après le délai en heures ouvrées de leur file."
+        },
+        "pending_check": {
+          "name": "Vérification des tickets en attente",
+          "description": "Applique les transitions en attente échues et émet des événements de rappel."
+        },
         "gdpr_retention": {
           "name": "Rétention du RGPD",
           "description": "Applique les règles de conservation configurées une fois par jour."

@@ -1993,6 +1993,14 @@
           "name": "GenericAgent",
           "description": "Kjører planlagte GenericAgent-jobber."
         },
+        "unlock_timeout": {
+          "name": "Tidsavbrudd for opplåsing",
+          "description": "Låser opp kvalifiserte saker etter køens tidsavbrudd i arbeidstid."
+        },
+        "pending_check": {
+          "name": "Sjekk av ventende",
+          "description": "Bruker forfalte ventende overganger og sender påminnelseshendelser."
+        },
         "gdpr_retention": {
           "name": "GDPR-oppbevaring",
           "description": "Bruker konfigurerte oppbevaringsregler én gang om dagen."

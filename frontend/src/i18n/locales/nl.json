@@ -1993,6 +1993,14 @@
           "name": "GeneriekAgent",
           "description": "Voert geplande Generic agent-taken uit."
         },
+        "unlock_timeout": {
+          "name": "Time-out voor ontgrendelen",
+          "description": "Ontgrendelt in aanmerking komende tickets na de werktijd-time-out van hun wachtrij."
+        },
+        "pending_check": {
+          "name": "Wachtend-controle",
+          "description": "Past vervallen wachtende overgangen toe en verzendt herinneringsgebeurtenissen."
+        },
         "gdpr_retention": {
           "name": "GDPR retentie",
           "description": "Past geconfigureerde bewaarregels eenmaal per dag toe."

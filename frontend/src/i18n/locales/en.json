@@ -2144,6 +2144,14 @@
           "name": "GenericAgent",
           "description": "Runs scheduled GenericAgent jobs."
         },
+        "unlock_timeout": {
+          "name": "Unlock timeout",
+          "description": "Unlocks eligible tickets after their queue working-time timeout."
+        },
+        "pending_check": {
+          "name": "Pending check",
+          "description": "Applies due pending transitions and emits pending reminder events."
+        },
         "gdpr_retention": {
           "name": "GDPR retention",
           "description": "Applies configured retention rules once a day."

@@ -1993,6 +1993,14 @@
           "name": "Bendrasis agentas",
           "description": "Vykdo suplanuotas GenericAgent užduotis."
         },
+        "unlock_timeout": {
+          "name": "Atrakinimo skirtasis laikas",
+          "description": "Atrakina tinkamas užklausas pasibaigus jų eilės darbo laiko limitui."
+        },
+        "pending_check": {
+          "name": "Laukiančiųjų tikrinimas",
+          "description": "Pritaiko suėjusius laukiančius perėjimus ir siunčia priminimo įvykius."
+        },
         "gdpr_retention": {
           "name": "GDPR išlaikymas",
           "description": "Taiko sukonfigūruotas saugojimo taisykles kartą per dieną."

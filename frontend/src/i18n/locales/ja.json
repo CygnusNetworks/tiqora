@@ -2001,6 +2001,14 @@
           "name": "ジェネリックエージェント",
           "description": "スケジュールされたGenericAgentジョブを実行します。"
         },
+        "unlock_timeout": {
+          "name": "ロック解除タイムアウト",
+          "description": "対象チケットをキューの稼働時間タイムアウト後にロック解除します。"
+        },
+        "pending_check": {
+          "name": "保留チェック",
+          "description": "期限が来た保留状態の遷移を適用し、保留リマインダーイベントを発行します。"
+        },
         "gdpr_retention": {
           "name": "GDPRの保持",
           "description": "構成された保持ルールを1日に1回適用します。"
