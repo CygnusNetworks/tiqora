@@ -196,6 +196,10 @@ class TiqoraPasswordSetupToken(TiqoraBase):
     Only the SHA-256 of the token is stored, so a database leak does not
     hand over working links. ``used`` is a timestamp rather than a flag to
     keep a minimal audit trail; rows are not deleted on redemption.
+
+    ``used`` means *redeemed by the agent* and nothing else — a link the admin
+    replaced is invalidated by setting ``expires`` to now, so the admin user
+    list can report "invitation accepted" straight from this column.
     """
 
     __tablename__ = "tiqora_password_setup_token"
