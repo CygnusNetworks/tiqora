@@ -770,3 +770,656 @@ async def test_failed_sends_are_counted_not_swallowed(mariadb_znuny_url: str) ->
         assert result["errors"] == 1
     finally:
         await engine.dispose()
+
+
+@pytest.mark.db
+async def test_stock_notification_renders_recipient_article_and_tiqora_link(
+    mariadb_znuny_url: str,
+) -> None:
+    from tiqora.config import Settings
+
+    engine = create_async_engine(_mysql_async(mariadb_znuny_url))
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    sender = CapturingMailSender()
+    try:
+        async with factory() as session:
+            await _seed_tiqora_tables(session)
+            await _skip_backlog(session)
+            qid = await _insert_queue(session, "Notification rendering support")
+            uid = 910_901
+            await _insert_agent(session, user_id=uid, login="notify.render")
+            await session.execute(
+                text("UPDATE users SET first_name = 'Ada', last_name = 'Lovelace' WHERE id = :uid"),
+                {"uid": uid},
+            )
+            await _set_user_prefs(session, uid, "ada@example.com", "de")
+            tid = await _insert_ticket(session, "2026090810000045", owner_id=uid, queue_id=qid)
+            aid = await _insert_article(session, tid, sender_type="customer", is_visible=1)
+            await session.execute(
+                text(
+                    "INSERT INTO article_data_mime (article_id, a_from, a_subject, a_body,"
+                    " a_content_type, incoming_time, create_time, create_by, change_time,"
+                    " change_by)"
+                    " VALUES (:aid, 'Elisa <elisa@example.com>', 'Internet kaputt',"
+                    " 'Erste Zeile\nZweite Zeile\nDritte Zeile', 'text/plain', 0,"
+                    " current_timestamp, 1, current_timestamp, 1)"
+                ),
+                {"aid": aid},
+            )
+            await _insert_notification_event(
+                session,
+                "stock-render-regression",
+                items={
+                    "Events": ["NotificationNewTicket"],
+                    "QueueID": [str(qid)],
+                    "Recipients": ["AgentOwner"],
+                    "Transports": ["Email"],
+                },
+                language="de",
+                subject="Neu: <OTRS_CUSTOMER_SUBJECT[7]>",
+                body=(
+                    "Hallo <OTRS_NOTIFICATION_RECIPIENT_UserFirstname> "
+                    "<OTRS_NOTIFICATION_RECIPIENT_UserLastname>,\n"
+                    "[<OTRS_CONFIG_Ticket::Hook><OTRS_CONFIG_Ticket::HookDivider>"
+                    "<OTRS_TICKET_TicketNumber>] Queue <OTRS_TICKET_Queue>\n"
+                    "<OTRS_CUSTOMER_REALNAME> schrieb:\n<OTRS_CUSTOMER_BODY[2]>\n"
+                    "<OTRS_CONFIG_HttpType>://<OTRS_CONFIG_FQDN>/"
+                    "<OTRS_CONFIG_ScriptAlias>index.pl?Action=AgentTicketZoom;"
+                    "TicketID=<OTRS_TICKET_TicketID>\n"
+                    "-- <OTRS_CONFIG_NotificationSenderName>"
+                ),
+            )
+            await _insert_outbox_event(
+                session, "NotificationNewTicket", tid, payload=f'{{"article_id": {aid}}}'
+            )
+            await session.commit()
+            await set_setting(session, KEY_NOTIFICATIONS_ENABLED, "1")
+        result = await run_notifications_tick(
+            session_factory=factory,
+            mail_sender=sender,
+            settings=Settings(public_base_url="https://support.example.org/helpdesk/"),
+        )
+        assert result["sent"] == 1
+        message = sender.sent[0]
+        assert str(message["Subject"]) == "Neu: Interne"
+        body = message.get_content()
+        assert "Hallo Ada Lovelace," in body
+        assert "Ticket#2026090810000045" in body
+        assert "Queue Notification rendering support" in body
+        assert "Elisa schrieb:\nErste Zeile\nZweite Zeile" in body
+        assert "Dritte Zeile" not in body
+        assert f"https://support.example.org/helpdesk/agent/tickets/{tid}" in body
+        assert "-- Tiqora Notifications" in body
+        assert "<OTRS_" not in body
+        assert "index.pl" not in body
+    finally:
+        await engine.dispose()
+
+
+@pytest.mark.db
+async def test_notification_recipient_placeholders_are_rendered_per_actual_agent(
+    mariadb_znuny_url: str,
+) -> None:
+    """The recipient map is the addressed agent, not the ticket owner for every mail."""
+    engine = create_async_engine(_mysql_async(mariadb_znuny_url))
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    sender = CapturingMailSender()
+    owner_id = 910_902
+    explicit_recipient_id = 910_903
+    try:
+        async with factory() as session:
+            await _seed_tiqora_tables(session)
+            await _skip_backlog(session)
+            queue_id = await _insert_queue(session, "notify-q-recipient-context")
+            for user_id, login, first, last, email in (
+                (owner_id, "notify.recipient.owner", "Owner", "One", "owner-one@example.com"),
+                (
+                    explicit_recipient_id,
+                    "notify.recipient.other",
+                    "Recipient",
+                    "Two",
+                    "recipient-two@example.com",
+                ),
+            ):
+                await _insert_agent(session, user_id=user_id, login=login)
+                await session.execute(
+                    text("UPDATE users SET first_name = :first, last_name = :last WHERE id = :uid"),
+                    {"uid": user_id, "first": first, "last": last},
+                )
+                await _set_user_prefs(session, user_id, email)
+            ticket_id = await _insert_ticket(
+                session, "NOTIFY_RECIPIENT_CONTEXT", owner_id=owner_id, queue_id=queue_id
+            )
+            await _insert_notification_event(
+                session,
+                "recipient-context-regression",
+                items={
+                    "Events": ["TicketCreate"],
+                    "QueueID": [str(queue_id)],
+                    "Recipients": ["AgentOwner"],
+                    "RecipientAgents": [str(explicit_recipient_id)],
+                    "Transports": ["Email"],
+                },
+                subject="RECIPIENT-CONTEXT",
+                body=(
+                    "Hello <OTRS_NOTIFICATION_RECIPIENT_UserFullname> "
+                    "(<OTRS_NOTIFICATION_RECIPIENT_UserEmail>)"
+                ),
+            )
+            await _insert_outbox_event(session, "TicketCreate", ticket_id)
+            await session.commit()
+            await set_setting(session, KEY_NOTIFICATIONS_ENABLED, "1")
+
+        result = await run_notifications_tick(session_factory=factory, mail_sender=sender)
+        assert result["sent"] == 2
+        rendered = {
+            str(message["To"]): message.get_content()
+            for message in sender.sent
+            if str(message["Subject"]) == "RECIPIENT-CONTEXT"
+        }
+        assert rendered == {
+            "owner-one@example.com": "Hello Owner One (owner-one@example.com)\n",
+            "recipient-two@example.com": "Hello Recipient Two (recipient-two@example.com)\n",
+        }
+    finally:
+        await engine.dispose()
+
+
+@pytest.mark.db
+async def test_notification_uses_event_article_and_never_falls_back_to_later_article(
+    mariadb_znuny_url: str,
+) -> None:
+    """Legacy Notification* events must quote their payload article only.
+
+    This protects against the historical behavior where a missing article was
+    replaced by the ticket's most recent customer message, potentially leaking
+    an internal or unrelated later update.
+    """
+    engine = create_async_engine(_mysql_async(mariadb_znuny_url))
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    sender = CapturingMailSender()
+    owner_id = 910_904
+    try:
+        async with factory() as session:
+            await _seed_tiqora_tables(session)
+            await _skip_backlog(session)
+            queue_id = await _insert_queue(session, "notify-q-event-article")
+            await _insert_agent(session, user_id=owner_id, login="notify.event.article")
+            await _set_user_prefs(session, owner_id, "event-article@example.com")
+            ticket_id = await _insert_ticket(
+                session, "NOTIFY_EVENT_ARTICLE", owner_id=owner_id, queue_id=queue_id
+            )
+            event_article_id = await _insert_article(
+                session, ticket_id, sender_type="customer", is_visible=1
+            )
+            later_article_id = await _insert_article(
+                session, ticket_id, sender_type="agent", is_visible=0
+            )
+            for article_id, sender_name, subject, body in (
+                (event_article_id, "Event Sender", "Event subject", "event body"),
+                (later_article_id, "Later Sender", "Later subject", "later body"),
+            ):
+                sender_address = sender_name.lower().replace(" ", ".") + "@example.com"
+                await session.execute(
+                    text(
+                        "INSERT INTO article_data_mime "
+                        "(article_id, a_from, a_subject, a_body, a_content_type, incoming_time,"
+                        " create_time, create_by, change_time, change_by)"
+                        " VALUES (:aid, :from_addr, :subject, :body, 'text/plain', 0,"
+                        " current_timestamp, 1, current_timestamp, 1)"
+                    ),
+                    {
+                        "aid": article_id,
+                        "from_addr": f"{sender_name} <{sender_address}>",
+                        "subject": subject,
+                        "body": body,
+                    },
+                )
+            await _insert_notification_event(
+                session,
+                "event-article-regression",
+                items={
+                    "Events": ["NotificationNewTicket"],
+                    "QueueID": [str(queue_id)],
+                    "Recipients": ["AgentOwner"],
+                    "Transports": ["Email"],
+                },
+                subject="EVENT-ARTICLE-CONTEXT",
+                body=(
+                    "from=<OTRS_CUSTOMER_REALNAME>; subject=<OTRS_CUSTOMER_SUBJECT>; "
+                    "body=<OTRS_CUSTOMER_BODY>"
+                ),
+            )
+            await _insert_outbox_event(
+                session,
+                "NotificationNewTicket",
+                ticket_id,
+                payload=f'{{"article_id": {event_article_id}}}',
+            )
+            # The row has been deleted before the worker sees it.  The later
+            # article remains in the ticket and must not become a fallback.
+            await _insert_outbox_event(
+                session,
+                "NotificationNewTicket",
+                ticket_id,
+                payload='{"article_id": 999999999}',
+            )
+            await session.commit()
+            await set_setting(session, KEY_NOTIFICATIONS_ENABLED, "1")
+
+        result = await run_notifications_tick(session_factory=factory, mail_sender=sender)
+        assert result["sent"] == 2
+        bodies = [
+            message.get_content()
+            for message in sender.sent
+            if str(message["Subject"]) == "EVENT-ARTICLE-CONTEXT"
+        ]
+        assert bodies == [
+            "from=Event Sender; subject=Event subject; body=event body\n",
+            "from=; subject=; body=\n",
+        ]
+        assert all("Later Sender" not in body and "later body" not in body for body in bodies)
+    finally:
+        await engine.dispose()
+
+
+@pytest.mark.db
+async def test_customer_notification_does_not_expose_internal_event_article(
+    mariadb_znuny_url: str,
+) -> None:
+    """Customer recipients must never receive body data from an internal article."""
+    from tiqora.config import Settings
+
+    engine = create_async_engine(_mysql_async(mariadb_znuny_url))
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    sender = CapturingMailSender()
+    try:
+        async with factory() as session:
+            await _seed_tiqora_tables(session)
+            await _skip_backlog(session)
+            queue_id = await _insert_queue(session, "notify-q-customer-article-privacy")
+            await _insert_customer_user(session, "privacy.customer", "privacy@example.com")
+            await session.execute(
+                text(
+                    "UPDATE customer_user SET first_name = 'Priya', last_name = 'Customer'"
+                    " WHERE login = 'privacy.customer'"
+                )
+            )
+            owner_id = 910_905
+            await _insert_agent(session, user_id=owner_id, login="notify.customer.privacy")
+            ticket_id = await _insert_ticket(
+                session,
+                "NOTIFY_CUSTOMER_ARTICLE_PRIVACY",
+                owner_id=owner_id,
+                customer_user_id="privacy.customer",
+                queue_id=queue_id,
+            )
+            internal_article_id = await _insert_article(
+                session, ticket_id, sender_type="agent", is_visible=0
+            )
+            await session.execute(
+                text(
+                    "INSERT INTO article_data_mime "
+                    "(article_id, a_from, a_subject, a_body, a_content_type, incoming_time,"
+                    " create_time, create_by, change_time, change_by)"
+                    " VALUES (:aid, 'Agent <agent@example.com>', 'Internal', 'do not disclose',"
+                    " 'text/plain', 0, current_timestamp, 1, current_timestamp, 1)"
+                ),
+                {"aid": internal_article_id},
+            )
+            await _insert_notification_event(
+                session,
+                "customer-article-privacy-regression",
+                items={
+                    "Events": ["NotificationNewTicket"],
+                    "QueueID": [str(queue_id)],
+                    "Recipients": ["Customer"],
+                    "Transports": ["Email"],
+                },
+                subject="CUSTOMER-ARTICLE-PRIVACY",
+                body=(
+                    "Hello <OTRS_NOTIFICATION_RECIPIENT_UserFullname>; "
+                    "quoted=<OTRS_CUSTOMER_BODY>; sender=<OTRS_CUSTOMER_REALNAME>; "
+                    "subject=<OTRS_CUSTOMER_SUBJECT>; url=<TIQORA_TICKET_URL>"
+                ),
+            )
+            await _insert_outbox_event(
+                session,
+                "NotificationNewTicket",
+                ticket_id,
+                payload=f'{{"article_id": {internal_article_id}}}',
+            )
+            await session.commit()
+            await set_setting(session, KEY_NOTIFICATIONS_ENABLED, "1")
+
+        result = await run_notifications_tick(
+            session_factory=factory,
+            mail_sender=sender,
+            settings=Settings(public_base_url="https://support.example.org/helpdesk/"),
+        )
+        assert result["sent"] == 1
+        message = next(
+            message
+            for message in sender.sent
+            if str(message["Subject"]) == "CUSTOMER-ARTICLE-PRIVACY"
+        )
+        assert str(message["To"]) == "privacy@example.com"
+        assert message.get_content() == (
+            "Hello Priya Customer; quoted=; sender=; subject=; "
+            f"url=https://support.example.org/helpdesk/portal/tickets/{ticket_id}\n"
+        )
+        assert "do not disclose" not in message.get_content()
+        assert "Agent" not in message.get_content()
+        assert "Internal" not in message.get_content()
+    finally:
+        await engine.dispose()
+
+
+@pytest.mark.db
+async def test_untranslated_legacy_link_is_warned_about(mariadb_znuny_url: str) -> None:
+    """A customized ticket URL we cannot translate now points at the Tiqora host
+    with a Znuny path. The mail still goes out, but the tick says so."""
+    import structlog.testing
+
+    from tiqora.config import Settings
+
+    engine = create_async_engine(_mysql_async(mariadb_znuny_url))
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    sender = CapturingMailSender()
+    owner_id = 910_906
+    try:
+        async with factory() as session:
+            await _seed_tiqora_tables(session)
+            await _skip_backlog(session)
+            queue_id = await _insert_queue(session, "notify-q-legacy-link")
+            await _insert_agent(session, user_id=owner_id, login="notify.legacy.link")
+            await _set_user_prefs(session, owner_id, "legacy-link@example.com")
+            ticket_id = await _insert_ticket(
+                session, "NOTIFY_LEGACY_LINK", owner_id=owner_id, queue_id=queue_id
+            )
+            await _insert_notification_event(
+                session,
+                "legacy-link-warning",
+                items={
+                    "Events": ["TicketCreate"],
+                    "QueueID": [str(queue_id)],
+                    "Recipients": ["AgentOwner"],
+                    "Transports": ["Email"],
+                },
+                subject="LEGACY-LINK",
+                # Not the stock ticket-zoom URL, so the translation cannot match it.
+                body=(
+                    "<OTRS_CONFIG_HttpType>://<OTRS_CONFIG_FQDN>/<OTRS_CONFIG_ScriptAlias>"
+                    "index.pl?Action=AgentTicketHistory;TicketID=<OTRS_TICKET_TicketID>"
+                ),
+            )
+            await _insert_outbox_event(session, "TicketCreate", ticket_id)
+            await session.commit()
+            await set_setting(session, KEY_NOTIFICATIONS_ENABLED, "1")
+
+        with structlog.testing.capture_logs() as logs:
+            result = await run_notifications_tick(
+                session_factory=factory,
+                mail_sender=sender,
+                settings=Settings(public_base_url="https://support.example.org"),
+            )
+
+        assert result["sent"] == 1
+        warned = [
+            entry for entry in logs if entry["event"] == "notification_legacy_link_untranslated"
+        ]
+        assert len(warned) == 1
+        assert warned[0]["ticket_id"] == ticket_id
+    finally:
+        await engine.dispose()
+
+
+@pytest.mark.db
+async def test_placeholder_context_is_built_once_per_recipient_kind(
+    mariadb_znuny_url: str,
+) -> None:
+    """Only the recipient map differs per recipient — loading the ticket/queue/customer
+    context per recipient turns one event into dozens of redundant query rounds."""
+    from unittest.mock import AsyncMock, patch
+
+    import tiqora.worker.notifications as notifications_module
+
+    engine = create_async_engine(_mysql_async(mariadb_znuny_url))
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    sender = CapturingMailSender()
+    owner_id = 910_907
+    second_agent_id = 910_908
+    try:
+        async with factory() as session:
+            await _seed_tiqora_tables(session)
+            await _skip_backlog(session)
+            queue_id = await _insert_queue(session, "notify-q-context-reuse")
+            await _insert_customer_user(session, "reuse.customer", "reuse-customer@example.com")
+            for user_id, login, email in (
+                (owner_id, "notify.reuse.owner", "reuse-owner@example.com"),
+                (second_agent_id, "notify.reuse.second", "reuse-second@example.com"),
+            ):
+                await _insert_agent(session, user_id=user_id, login=login)
+                await _set_user_prefs(session, user_id, email)
+            ticket_id = await _insert_ticket(
+                session,
+                "NOTIFY_CONTEXT_REUSE",
+                owner_id=owner_id,
+                customer_user_id="reuse.customer",
+                queue_id=queue_id,
+            )
+            await _insert_notification_event(
+                session,
+                "context-reuse",
+                items={
+                    "Events": ["TicketCreate"],
+                    "QueueID": [str(queue_id)],
+                    "Recipients": ["AgentOwner", "Customer"],
+                    "RecipientAgents": [str(second_agent_id)],
+                    "Transports": ["Email"],
+                },
+                subject="CONTEXT-REUSE",
+                body="Hallo <OTRS_NOTIFICATION_RECIPIENT_UserFullname>",
+            )
+            await _insert_outbox_event(session, "TicketCreate", ticket_id)
+            await session.commit()
+            await set_setting(session, KEY_NOTIFICATIONS_ENABLED, "1")
+
+        real_loader = notifications_module.load_placeholder_context
+        spy = AsyncMock(side_effect=real_loader)
+        with patch.object(notifications_module, "load_placeholder_context", spy):
+            result = await run_notifications_tick(session_factory=factory, mail_sender=sender)
+
+        assert result["sent"] == 3
+        # Two agents + one customer, but only an agent view and a customer view.
+        assert spy.await_count == 2
+    finally:
+        await engine.dispose()
+
+
+@pytest.mark.db
+async def test_html_notification_escapes_values_and_rewrites_encoded_link(
+    mariadb_znuny_url: str,
+) -> None:
+    """HTML templates store their tags HTML-encoded; values substituted into them
+    must be escaped and keep their line breaks."""
+    from tiqora.config import Settings
+
+    engine = create_async_engine(_mysql_async(mariadb_znuny_url))
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    sender = CapturingMailSender()
+    owner_id = 910_909
+    try:
+        async with factory() as session:
+            await _seed_tiqora_tables(session)
+            await _skip_backlog(session)
+            queue_id = await _insert_queue(session, "notify-q-html")
+            await _insert_agent(session, user_id=owner_id, login="notify.html")
+            await session.execute(
+                text(
+                    "UPDATE users SET first_name = 'Ada & <b>Ada</b>', last_name = 'Lovelace'"
+                    " WHERE id = :uid"
+                ),
+                {"uid": owner_id},
+            )
+            await _set_user_prefs(session, owner_id, "html-agent@example.com")
+            ticket_id = await _insert_ticket(
+                session, "NOTIFY_HTML", owner_id=owner_id, queue_id=queue_id
+            )
+            article_id = await _insert_article(
+                session, ticket_id, sender_type="customer", is_visible=1
+            )
+            await session.execute(
+                text(
+                    "INSERT INTO article_data_mime (article_id, a_from, a_subject, a_body,"
+                    " a_content_type, incoming_time, create_time, create_by, change_time,"
+                    " change_by)"
+                    " VALUES (:aid, 'Elisa <elisa@example.com>', 'HTML', 'Zeile A\nZeile B',"
+                    " 'text/plain', 0, current_timestamp, 1, current_timestamp, 1)"
+                ),
+                {"aid": article_id},
+            )
+            await _insert_notification_event(
+                session,
+                "html-escaping",
+                items={
+                    "Events": ["NotificationNewTicket"],
+                    "QueueID": [str(queue_id)],
+                    "Recipients": ["AgentOwner"],
+                    "Transports": ["Email"],
+                },
+                content_type="text/html",
+                subject="HTML-ESCAPING",
+                body=(
+                    "<p>Hallo <OTRS_NOTIFICATION_RECIPIENT_UserFirstname></p>"
+                    "<p><OTRS_CUSTOMER_BODY></p>"
+                    '<a href="&lt;OTRS_CONFIG_HttpType&gt;://&lt;OTRS_CONFIG_FQDN&gt;/'
+                    "&lt;OTRS_CONFIG_ScriptAlias&gt;index.pl?Action=AgentTicketZoom&amp;"
+                    'TicketID=&lt;OTRS_TICKET_TicketID&gt;">Ticket</a>'
+                ),
+            )
+            await _insert_outbox_event(
+                session,
+                "NotificationNewTicket",
+                ticket_id,
+                payload=f'{{"article_id": {article_id}}}',
+            )
+            await session.commit()
+            await set_setting(session, KEY_NOTIFICATIONS_ENABLED, "1")
+
+        result = await run_notifications_tick(
+            session_factory=factory,
+            mail_sender=sender,
+            settings=Settings(public_base_url="https://support.example.org/helpdesk"),
+        )
+        assert result["sent"] == 1
+        body = sender.sent[0].get_content()
+        assert "<p>Hallo Ada &amp; &lt;b&gt;Ada&lt;/b&gt;</p>" in body
+        assert "<p>Zeile A<br />\nZeile B</p>" in body
+        assert f'href="https://support.example.org/helpdesk/agent/tickets/{ticket_id}"' in body
+        assert "index.pl" not in body
+    finally:
+        await engine.dispose()
+
+
+@pytest.mark.db
+async def test_customer_without_customer_user_row_is_greeted_by_address(
+    mariadb_znuny_url: str,
+) -> None:
+    """A customer known only from an article has no name columns — the greeting
+    must not degrade to "Hallo ,"."""
+    engine = create_async_engine(_mysql_async(mariadb_znuny_url))
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    sender = CapturingMailSender()
+    owner_id = 910_910
+    try:
+        async with factory() as session:
+            await _seed_tiqora_tables(session)
+            await _skip_backlog(session)
+            queue_id = await _insert_queue(session, "notify-q-nameless-customer")
+            await _insert_agent(session, user_id=owner_id, login="notify.nameless")
+            ticket_id = await _insert_ticket(
+                session, "NOTIFY_NAMELESS", owner_id=owner_id, queue_id=queue_id
+            )
+            article_id = await _insert_article(
+                session, ticket_id, sender_type="customer", is_visible=1
+            )
+            await session.execute(
+                text(
+                    "INSERT INTO article_data_mime (article_id, a_from, a_subject, a_body,"
+                    " a_content_type, incoming_time, create_time, create_by, change_time,"
+                    " change_by)"
+                    " VALUES (:aid, 'walkin@example.com', 'Hilfe', 'Text', 'text/plain', 0,"
+                    " current_timestamp, 1, current_timestamp, 1)"
+                ),
+                {"aid": article_id},
+            )
+            await _insert_notification_event(
+                session,
+                "nameless-customer",
+                items={
+                    "Events": ["TicketCreate"],
+                    "QueueID": [str(queue_id)],
+                    "Recipients": ["Customer"],
+                    "Transports": ["Email"],
+                },
+                subject="NAMELESS-CUSTOMER",
+                body="Hallo <OTRS_NOTIFICATION_RECIPIENT_UserFullname>,",
+            )
+            await _insert_outbox_event(session, "TicketCreate", ticket_id)
+            await session.commit()
+            await set_setting(session, KEY_NOTIFICATIONS_ENABLED, "1")
+
+        result = await run_notifications_tick(session_factory=factory, mail_sender=sender)
+        assert result["sent"] == 1
+        assert sender.sent[0].get_content() == "Hallo walkin@example.com,\n"
+    finally:
+        await engine.dispose()
+
+
+@pytest.mark.db
+async def test_missing_public_base_url_fails_loudly_instead_of_sending_dead_links(
+    mariadb_znuny_url: str,
+) -> None:
+    from tiqora.config import Settings
+
+    engine = create_async_engine(_mysql_async(mariadb_znuny_url))
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    sender = CapturingMailSender()
+    owner_id = 910_911
+    try:
+        async with factory() as session:
+            await _seed_tiqora_tables(session)
+            await _skip_backlog(session)
+            queue_id = await _insert_queue(session, "notify-q-no-base-url")
+            await _insert_agent(session, user_id=owner_id, login="notify.no.base.url")
+            await _set_user_prefs(session, owner_id, "no-base-url@example.com")
+            ticket_id = await _insert_ticket(
+                session, "NOTIFY_NO_BASE_URL", owner_id=owner_id, queue_id=queue_id
+            )
+            await _insert_notification_event(
+                session,
+                "no-base-url",
+                items={
+                    "Events": ["TicketCreate"],
+                    "QueueID": [str(queue_id)],
+                    "Recipients": ["AgentOwner"],
+                    "Transports": ["Email"],
+                },
+                subject="NO-BASE-URL",
+                body="<TIQORA_TICKET_URL>",
+            )
+            await _insert_outbox_event(session, "TicketCreate", ticket_id)
+            await session.commit()
+            await set_setting(session, KEY_NOTIFICATIONS_ENABLED, "1")
+
+        result = await run_notifications_tick(
+            session_factory=factory,
+            mail_sender=sender,
+            settings=Settings(public_base_url="", cors_origins="*"),
+        )
+        assert result["sent"] == 0
+        assert result["errors"] == 1
+        assert sender.sent == []
+    finally:
+        await engine.dispose()

@@ -505,6 +505,32 @@ is sent twice.
    recipient, with a `SendAgentNotification`/`SendCustomerNotification`
    history row.
 
+### Notification templates and public links
+
+Set `TIQORA_PUBLIC_BASE_URL` to the public Tiqora browser URL on **both the
+API and notification worker**, including any deployment path prefix. For
+example, `https://support.example.org` yields an agent ticket link such as
+`https://support.example.org/agent/tickets/123`. If unset, the first
+`TIQORA_CORS_ORIGINS` entry that is an absolute `http(s)` URL is used, as for
+password-setup links. If neither yields one, the send fails loudly and is
+counted in the tick's `errors` -- a notification with a dead link is worse than
+a visibly failed one. Do not leave the Compose example hostname in production.
+
+New notification templates can use `<TIQORA_TICKET_URL>`; customer recipients
+receive a `/portal/tickets/{id}` link. Inherited OTRS/Znuny ticket URL
+expressions are translated during rendering, including HTML-encoded tags,
+without updating the stored templates or the shared Znuny configuration.
+`CONFIG_FQDN` and `CONFIG_HttpType` use the public Tiqora URL in notifications.
+The stock `NotificationSenderName` values “OTRS Notifications” and “Znuny
+Notifications” render as “Tiqora Notifications”; custom names are retained.
+
+Notification templates receive the actual recipient's name, ticket/queue
+context, and the article identified by the triggering event. For example,
+`<OTRS_CUSTOMER_BODY[30]>` quotes at most 30 lines of that article. If the
+event has no available article, article placeholders are empty; no newer
+message is substituted. Internal articles are not quoted to customers.
+Already sent messages are not resent by these rendering changes.
+
 ### Check which events your rules are actually bound to
 
 Znuny fires two families of events, and installations upgraded from older
