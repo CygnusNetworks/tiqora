@@ -1423,3 +1423,84 @@ async def test_missing_public_base_url_fails_loudly_instead_of_sending_dead_link
         assert sender.sent == []
     finally:
         await engine.dispose()
+
+
+@pytest.mark.db
+async def test_notification_sender_is_the_queue_address_not_localhost(
+    mariadb_znuny_url: str,
+) -> None:
+    """A hardcoded ``notifications@localhost`` sender is what relays reject; the
+    queue's own system address is a mailbox this install already sends from."""
+    engine = create_async_engine(_mysql_async(mariadb_znuny_url))
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    sender = CapturingMailSender()
+    owner_id = 910_912
+    try:
+        async with factory() as session:
+            await _seed_tiqora_tables(session)
+            await _skip_backlog(session)
+            queue_id = await _insert_queue(session, "notify-q-sender-address")
+            await session.execute(
+                text(
+                    "INSERT INTO system_address (value0, value1, comments, valid_id, queue_id,"
+                    " create_by, create_time, change_by, change_time)"
+                    " VALUES ('support@example.org', 'Support', '', 1, :qid, 1,"
+                    " current_timestamp, 1, current_timestamp)"
+                ),
+                {"qid": queue_id},
+            )
+            address_id = (
+                await session.execute(
+                    text("SELECT id FROM system_address WHERE value0 = 'support@example.org'")
+                )
+            ).scalar_one()
+            await session.execute(
+                text("UPDATE queue SET system_address_id = :sid WHERE id = :qid"),
+                {"sid": address_id, "qid": queue_id},
+            )
+            await _insert_customer_user(session, "sender.customer", "sender-cust@example.com")
+            await _insert_agent(session, user_id=owner_id, login="notify.sender.address")
+            await _set_user_prefs(session, owner_id, "sender-agent@example.com")
+            ticket_id = await _insert_ticket(
+                session,
+                "NOTIFY_SENDER_ADDRESS",
+                owner_id=owner_id,
+                customer_user_id="sender.customer",
+                queue_id=queue_id,
+            )
+            await _insert_notification_event(
+                session,
+                "sender-address",
+                items={
+                    "Events": ["TicketCreate"],
+                    "QueueID": [str(queue_id)],
+                    "Recipients": ["AgentOwner", "Customer"],
+                    "Transports": ["Email"],
+                },
+                subject="SENDER-ADDRESS",
+                body="body",
+            )
+            await _insert_outbox_event(session, "TicketCreate", ticket_id)
+            await session.commit()
+            await set_setting(session, KEY_NOTIFICATIONS_ENABLED, "1")
+
+        result = await run_notifications_tick(session_factory=factory, mail_sender=sender)
+        assert result["sent"] == 2
+        assert {str(message["From"]) for message in sender.sent} == {
+            "Tiqora Notifications <support@example.org>"
+        }
+
+        async with factory() as session:
+            article_from = (
+                await session.execute(
+                    text(
+                        "SELECT m.a_from FROM article a"
+                        " JOIN article_data_mime m ON m.article_id = a.id"
+                        " WHERE a.ticket_id = :tid ORDER BY a.id DESC LIMIT 1"
+                    ),
+                    {"tid": ticket_id},
+                )
+            ).scalar_one()
+        assert article_from == "Tiqora Notifications <support@example.org>"
+    finally:
+        await engine.dispose()

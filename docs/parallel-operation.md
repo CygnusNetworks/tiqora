@@ -524,6 +524,14 @@ without updating the stored templates or the shared Znuny configuration.
 The stock `NotificationSenderName` values “OTRS Notifications” and “Znuny
 Notifications” render as “Tiqora Notifications”; custom names are retained.
 
+Notifications are sent from `NotificationSenderEmail`, falling back to the
+system address of the ticket's queue -- the mailbox this install already sends
+from. Znuny ships that setting as `znuny@<OTRS_CONFIG_FQDN>`; an unresolved
+placeholder counts as unset rather than being expanded against the Tiqora host.
+If neither yields an address, the mail goes out from `notifications@localhost`
+and the tick logs `notification_sender_address_unresolved` -- most relays reject
+that sender, so treat the warning as a configuration bug.
+
 Notification templates receive the actual recipient's name, ticket/queue
 context, and the article identified by the triggering event. For example,
 `<OTRS_CUSTOMER_BODY[30]>` quotes at most 30 lines of that article. If the
