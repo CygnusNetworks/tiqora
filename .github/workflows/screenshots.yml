@@ -1,11 +1,20 @@
 name: Screenshots (release tags)
 
-# Regenerate the README / docs screenshots from the mock-driven UI and commit
-# them back to main. No backend needed — the generator drives the built SPA
-# with Playwright and intercepts /api/** via page.route (see
+# Regenerate the README / docs screenshots from the mock-driven UI and open a
+# pull request with them. No backend needed — the generator drives the built
+# SPA with Playwright and intercepts /api/** via page.route (see
 # frontend/e2e/screenshots.spec.ts + fixtures/rich-mock.ts).
 #
 # Runs on version tags (v*) and manual dispatch only — not on every push.
+#
+# This used to push straight to main, which the `main-protection` ruleset has
+# rejected since it started requiring pull requests ("GH013 ... Changes must
+# be made through a pull request"). The failure was invisible: a red workflow
+# on a release tag blocks nothing, so the screenshots silently went stale for
+# four releases. Granting github-actions[bot] a bypass is not an option — the
+# Actions bot is built in rather than an installed app, and the ruleset API
+# rejects it with "Actor GitHub Actions integration must be part of the
+# ruleset source or owner organization". So: open a PR instead.
 
 on:
   push:
@@ -14,6 +23,7 @@ on:
 
 permissions:
   contents: write
+  pull-requests: write
 
 concurrency:
   group: screenshots
@@ -58,8 +68,11 @@ jobs:
         env:
           SCREENSHOTS: "1"
         run: pnpm --filter tiqora-frontend exec playwright test screenshots --project=chromium
-      - name: Commit regenerated screenshots to main
+      - name: Open a pull request with the regenerated screenshots
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
+          set -euo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add docs/images/*.png
@@ -67,5 +80,30 @@ jobs:
             echo "No screenshot changes to commit."
             exit 0
           fi
-          git commit -m "docs(screenshots): regenerate for ${GITHUB_REF_NAME} [skip ci]"
-          git push origin HEAD:main
+
+          # Branch name carries the ref so two releases in quick succession
+          # cannot collide on one branch.
+          slug="$(echo "${GITHUB_REF_NAME}" | tr -c 'A-Za-z0-9._-' '-')"
+          branch="docs/screenshots-${slug}"
+
+          # No [skip ci] here: branch protection expects the usual checks to
+          # run on the PR, and a skipped run leaves it unmergeable.
+          git commit -m "docs(screenshots): regenerate for ${GITHUB_REF_NAME}"
+
+          # Plain --force, not --force-with-lease: a fresh CI checkout has no
+          # remote-tracking ref for this branch, and the lease check then
+          # fails with "stale info". The branch is bot-owned and per-tag, so
+          # there is nothing to protect against here.
+          git push --force origin "HEAD:refs/heads/${branch}"
+
+          if gh pr view "$branch" --json number >/dev/null 2>&1; then
+            echo "PR for $branch already open — the push updated it."
+            exit 0
+          fi
+          body="Automatisch erzeugt vom Screenshots-Workflow fuer ${GITHUB_REF_NAME}."
+          body="${body} Enthaelt ausschliesslich neu gerenderte PNGs unter docs/images/."
+          gh pr create \
+            --base main \
+            --head "$branch" \
+            --title "docs(screenshots): regenerate for ${GITHUB_REF_NAME}" \
+            --body "$body"
