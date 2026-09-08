@@ -63,6 +63,15 @@ needed**, or **must remain as an independent service**.
 | Shared data and external writers | Preserve the database, attachment storage, keys and any independent imports or integrations. Verify external writers against the owned schema before enabling migrations. |
 | Peer-only housekeeping | Cache, dashboard and search-index maintenance can retire with the peer if nothing else consumes their output. |
 
+> **Check the database session's time zone before writing `NOW()`-based SQL.**
+> The application's own connections may run in UTC while an interactive client
+> inherits the server's local zone, so the same table holds rows written in one
+> zone and read back through the other. A window like
+> `create_time > DATE_SUB(NOW(), INTERVAL 20 MINUTE)` then covers a stretch of
+> time hours away from the rows it was meant to match. Compare `NOW()` with
+> `UTC_TIMESTAMP()` first, and prefer addressing rows by primary key over a
+> time window whenever the statement deletes or updates.
+
 > **A configuration tool reporting success is not proof of a change.** Some
 > settings are flagged *required*, and the CLI that invalidates settings
 > accepts the request, prints its usual success line, and writes nothing —
