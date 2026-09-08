@@ -866,3 +866,74 @@ async def test_provider_budget_on_other_provider_does_not_block_run(
         assert totals["auto_replies"] == 1
     finally:
         await engine.dispose()
+
+
+async def test_escalated_ticket_is_not_answered_again(
+    mariadb_znuny_url: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """After escalate_to_human, the next customer message must not be answered.
+
+    Regression: `ai_escalated_at` was set by the escalation tool but nothing
+    consumed it, so the AI told the customer a human would take over and then
+    answered the follow-up itself — under `full` autonomy directly, without a
+    human ever seeing it.
+    """
+    seed = _seed_ticket(mariadb_znuny_url, ns=42)
+    article_id = _add_article(
+        mariadb_znuny_url, ticket_id=seed["ticket_id"], sender_type="customer", body="Und jetzt?"
+    )
+    _insert_outbox_event(
+        mariadb_znuny_url,
+        ticket_id=seed["ticket_id"],
+        event_type="ArticleCreate",
+        article_id=article_id,
+    )
+    engine = create_async_engine(_mysql_async(mariadb_znuny_url))
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    try:
+        async with factory() as session:
+            await _setup_policy(session, seed=seed, autonomy="full")
+            session.add(
+                TiqoraAiTicketState(
+                    ticket_id=seed["ticket_id"],
+                    ai_escalated_at=datetime(2026, 9, 8, 12, 0, 0),
+                )
+            )
+            await session.commit()
+
+        _patch_llm(monkeypatch, ScriptedLlm([_propose_response("reply", "Should not run.")]))
+        totals = await run_auto_tick(settings=get_settings(), session_factory=factory)
+        assert totals["auto_replies"] == 0
+        # The watermark still advances — a blocked run is not a stuck queue.
+        assert totals["events"] >= 1
+    finally:
+        await engine.dispose()
+
+
+async def test_ticket_without_handoff_flag_still_answered(
+    mariadb_znuny_url: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The guard must key on the flag, not simply disable the worker."""
+    seed = _seed_ticket(mariadb_znuny_url, ns=43)
+    article_id = _add_article(
+        mariadb_znuny_url, ticket_id=seed["ticket_id"], sender_type="customer", body="Hallo?"
+    )
+    _insert_outbox_event(
+        mariadb_znuny_url,
+        ticket_id=seed["ticket_id"],
+        event_type="ArticleCreate",
+        article_id=article_id,
+    )
+    engine = create_async_engine(_mysql_async(mariadb_znuny_url))
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    try:
+        async with factory() as session:
+            await _setup_policy(session, seed=seed, autonomy="full")
+            session.add(TiqoraAiTicketState(ticket_id=seed["ticket_id"], ai_escalated_at=None))
+            await session.commit()
+
+        _patch_llm(monkeypatch, ScriptedLlm([_propose_response("reply", "Gerne!")]))
+        totals = await run_auto_tick(settings=get_settings(), session_factory=factory)
+        assert totals["auto_replies"] == 1
+    finally:
+        await engine.dispose()
