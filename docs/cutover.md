@@ -56,12 +56,21 @@ needed**, or **must remain as an independent service**.
 |---|---|
 | Unlock timeout | Tiqora respects configured unlock states, queue timeout and queue/SLA working calendar; a due locked ticket unlocks once. |
 | Pending checks | Due automatic states transition to their configured destination; due reminders use working hours and do not duplicate within their cadence. |
-| GenericAgent | Compare a read-only match result for each active job, including empty optional fields and archive/time filters. Disable both the cron-driven runner and the independent `SchedulerGenericAgentTaskManager`; disabling the GenericAgent event handler alone does not disable scheduled jobs. |
+| GenericAgent | Compare a read-only match result for each active job, including empty optional fields and archive/time filters. Scheduled jobs run from a dedicated daemon module, not from the GenericAgent event handler, so disabling that handler does not stop them. The module is usually a *required* setting and therefore cannot be invalidated (see the warning below) — plan the GenericAgent handover for the moment the peer daemon stops, and keep both sides' job definitions identical until then, since a job table shared by both is executed by whichever side is running. |
 | Notification rules | List each valid rule's `Events` and `Recipients` values and confirm every one is emitted and resolvable. Rules carried over from older releases are typically bound to the legacy `Notification*` events, not to `Ticket*`/`Article*` ones — a rule bound to an event nobody emits stays silent while the takeover reports healthy ticks. |
 | Outbound mail and spool | Drain the peer's `mail_queue` and filesystem spool while its sender still runs. Tiqora's SMTP sender does not drain the legacy queue. Verify direct replies, autoresponses, notifications and SMTP failure handling with controlled test recipients or a sink. |
 | Calendar, S/MIME, processes and addons | Check actual configured use, including scheduled ticket creation, certificate renewal and custom jobs. An empty current workload is not implementation parity; retain or replace required functions before stopping their executor. |
 | Shared data and external writers | Preserve the database, attachment storage, keys and any independent imports or integrations. Verify external writers against the owned schema before enabling migrations. |
 | Peer-only housekeeping | Cache, dashboard and search-index maintenance can retire with the peer if nothing else consumes their output. |
+
+> **A configuration tool reporting success is not proof of a change.** Some
+> settings are flagged *required*, and the CLI that invalidates settings
+> accepts the request, prints its usual success line, and writes nothing —
+> the deployed configuration keeps the old value. After disabling anything,
+> re-read the *deployed* configuration (not the tool's output, and not the
+> settings table's defaults) and confirm the entry is actually gone. Duties
+> that cannot be disabled individually have to be sequenced with stopping the
+> peer's scheduler as a whole.
 
 Do not run `docker compose down` on a stack containing the shared database.
 Stop named application services only. Keep independent services in the
