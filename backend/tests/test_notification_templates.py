@@ -10,6 +10,7 @@ from tiqora.channels.email.placeholder import PlaceholderContext, expand_placeho
 from tiqora.config import Settings
 from tiqora.worker.notification_templates import (
     configure_notification_context,
+    has_untranslated_legacy_link,
     normalize_notification_template,
 )
 from tiqora.znuny.sysconfig import SysConfig
@@ -31,10 +32,12 @@ async def _expand_notification_template(
     settings: Settings | None = None,
     sender_name: str | None = None,
     escape_html: bool = False,
+    customer_body: str | None = None,
 ) -> str:
     context = PlaceholderContext(
         ticket={"ticketid": "45", "ticketnumber": "2026090810000045"},
         notification_recipient={"userfullname": "Ada Lovelace"},
+        customer_body=customer_body,
     )
     sysconfig = _sysconfig(
         {"NotificationSenderName": sender_name} if sender_name is not None else {}
@@ -139,3 +142,29 @@ async def test_notification_values_are_html_escaped_without_recursive_expansion(
         context=context,
     )
     assert result == "<p>&lt;b&gt;&lt;OTRS_TICKET_TicketID&gt;&lt;/b&gt;</p>"
+
+
+@pytest.mark.asyncio
+async def test_html_mode_keeps_line_breaks_of_quoted_article() -> None:
+    """A quoted article is plain text; in an HTML notification its newlines must
+    survive as ``<br />`` instead of collapsing into one paragraph."""
+    result = await _expand_notification_template(
+        "<p><OTRS_CUSTOMER_BODY></p>",
+        escape_html=True,
+        customer_body="Erste Zeile\nZweite Zeile",
+    )
+    assert result == "<p>Erste Zeile<br />\nZweite Zeile</p>"
+
+
+@pytest.mark.parametrize(
+    ("rendered", "expected"),
+    [
+        ("Open https://help.example.test/agent/tickets/45", False),
+        ("Open https://help.example.test/otrs/index.pl?Action=AgentTicketZoom;TicketID=45", True),
+        ("Open https://help.example.test/otrs/customer.pl?Action=CustomerTicketZoom;TID=45", True),
+    ],
+)
+def test_untranslated_legacy_link_is_detectable(rendered: str, expected: bool) -> None:
+    """A customized template whose ticket URL we could not translate would point at
+    the Tiqora host with a Znuny path — detectable so the worker can warn."""
+    assert has_untranslated_legacy_link(rendered) is expected
