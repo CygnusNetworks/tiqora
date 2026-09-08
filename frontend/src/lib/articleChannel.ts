@@ -1,7 +1,7 @@
 /** Channel/role presentation helpers shared by the split (master-detail) and
  * conversation (chat-bubble) article views, plus the auto view-mode switch. */
 import type { ArticleListItem } from "@/lib/api";
-import { parseRecipient, parseRecipientList, formatRecipient } from "@/components/agent/RecipientsField";
+import { parseRecipient, parseRecipientList } from "@/components/agent/RecipientsField";
 
 /**
  * Standard Znuny `communication_channel` seed order (see
@@ -127,16 +127,26 @@ export function emailFromAddress(raw: string | null | undefined): string | undef
 /** Render a raw `from_address` header ("Name <mail@host>", quoted or not) as
  * clean "Name <mail@host>" — same shape, quotes stripped. Falls back to the
  * trimmed raw string when it doesn't parse as an address at all. */
+/** Render a parsed recipient for *reading*, not for a mail header.
+ *
+ * Deliberately not `formatRecipient`: that one re-quotes a display name
+ * containing an RFC 5322 special so the outgoing header survives the trip
+ * (see RecipientsField). Here the string is only ever shown to an agent in
+ * the article header, where `"Nachname, Vorname" <a@b.de>` is just noise. */
+function formatForDisplay(r: { name: string; email: string }): string {
+  return r.name ? `${r.name} <${r.email}>` : r.email;
+}
+
 export function formatFromAddress(raw: string | null | undefined): string {
   const parsed = parseRecipient((raw ?? "").trim());
-  return parsed ? formatRecipient(parsed) : (raw ?? "").trim();
+  return parsed ? formatForDisplay(parsed) : (raw ?? "").trim();
 }
 
 /** Same as `formatFromAddress`, but for a comma-joined `to_address` header
  * with (potentially) multiple recipients. */
 export function formatToAddresses(raw: string | null | undefined): string {
   const recipients = parseRecipientList(raw);
-  return recipients.length ? recipients.map(formatRecipient).join(", ") : (raw ?? "").trim();
+  return recipients.length ? recipients.map(formatForDisplay).join(", ") : (raw ?? "").trim();
 }
 
 /** A note that isn't visible to the customer, on the internal channel — the
