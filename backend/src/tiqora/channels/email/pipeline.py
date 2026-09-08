@@ -19,7 +19,12 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from tiqora.channels.email.filters import apply_filters
-from tiqora.channels.email.parser import ParsedEmail, get_email_address, parse_email
+from tiqora.channels.email.parser import (
+    ParsedEmail,
+    get_email_address,
+    parse_email,
+    split_address_line,
+)
 from tiqora.db.legacy.mail_account import MailAccount
 from tiqora.domain.mail_log import write_mail_log
 from tiqora.domain.ticket_write_service import ArticleIn, TicketIn, add_article, create_ticket
@@ -75,8 +80,11 @@ async def _dest_queue_id(
         for k in ("Resent-To", "Envelope-To", "To", "Cc", "Delivered-To", "X-Original-To")
         if get_param.get(k)
     )
-    for addr_part in recipient.split(","):
-        addr = get_email_address(addr_part.strip())
+    # A plain recipient.split(",") corrupts any display-name containing a
+    # comma (e.g. "Nachname, Vorname" <a@b>) — use the quote-aware splitter
+    # instead, same fix as the reply-all Cc-recipient bug.
+    for addr_part in split_address_line(recipient):
+        addr = get_email_address(addr_part)
         if not addr:
             continue
         row = (

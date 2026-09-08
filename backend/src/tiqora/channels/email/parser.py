@@ -14,7 +14,7 @@ from dataclasses import dataclass, field
 from email import message_from_bytes, policy
 from email.header import decode_header
 from email.message import EmailMessage
-from email.utils import getaddresses, parseaddr
+from email.utils import formataddr, getaddresses, parseaddr
 
 # Simple HTML→text fallback, mirroring the intent of Znuny's
 # ``PostmasterAutoHTML2Text`` (real HTML-to-text conversion is out of scope for
@@ -79,10 +79,17 @@ def get_email_address(value: str) -> str:
 
 
 def split_address_line(value: str) -> list[str]:
-    """Split a comma-separated address header into individual address strings."""
+    """Split a comma-separated address header into individual address strings.
+
+    Reformats each parsed (name, addr) pair with ``formataddr`` rather than a
+    raw f-string — a bare ``f"{name} <{addr}>"`` doesn't re-quote a display
+    name that itself contains a comma (e.g. the common "Nachname, Vorname"
+    format), which then confuses a later ``parseaddr`` call on that string
+    into treating the comma as an address separator and dropping the address.
+    """
     if not value:
         return []
-    return [f"{name} <{addr}>" if name else addr for name, addr in getaddresses([value])]
+    return [formataddr((name, addr)) if name else addr for name, addr in getaddresses([value])]
 
 
 def _html_to_text(html: str) -> str:
