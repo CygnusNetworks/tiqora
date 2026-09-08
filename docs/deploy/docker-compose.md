@@ -133,18 +133,19 @@ environment:
 volumes:
   - ./secrets/tiqora.keytab:/etc/tiqora/tiqora.keytab:ro
   # Optional: pure acceptors usually need no krb5.conf (ticket decrypted with
-  # the keytab; no KDC round-trip). `default_realm = CYGNUSNETWORKS.DE` can help.
+  # the keytab; no KDC round-trip). a `default_realm` can help.
   # - ./secrets/krb5.conf:/etc/krb5.conf:ro
 ```
 
-Production SPN for Cygnus: `HTTP/tiqora.cygnusnetworks.de@CYGNUSNETWORKS.DE`.
+The SPN follows `HTTP/<api-hostname>@<REALM>`, e.g.
+`HTTP/tiqora.example.com@EXAMPLE.COM`.
 
 **Operational notes:**
 
 - The reverse proxy must **forward** the `Authorization: Negotiate` header
   unmodified (do not strip it).
 - The browser must reach the host that matches the keytab SPN
-  (`tiqora.cygnusnetworks.de` in production).
+  (the name the keytab was issued for).
 - SPNEGO only elevates agents flagged `sso_eligible`; the principal's primary
   part must still match an existing, valid `users.login`.
 
