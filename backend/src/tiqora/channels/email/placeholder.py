@@ -12,6 +12,7 @@ text is returned so template listing and reply send never break.
 
 from __future__ import annotations
 
+import html
 import re
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
@@ -30,9 +31,9 @@ logger = structlog.get_logger(__name__)
 # tiqora_placeholder_field tags resolve for CUSTOMER_DATA_*. Default OFF.
 KEY_CUSTOMER_ALLOWLIST = "placeholder.customer_allowlist.enabled"
 
-# Znuny matches <OTRS_Name> and <OTRS_Name[n]>; field names are alphanumeric + _.
+# Config keys may contain :: (for example Ticket::Hook).
 # <TIQORA_...> is a full alias of <OTRS_...> (configurable vars + stock tags).
-_TAG_RE = re.compile(r"<(?:OTRS|TIQORA)_([A-Za-z0-9_]+?)(?:\[(\d+)\])?>", re.IGNORECASE)
+_TAG_RE = re.compile(r"<(?:OTRS|TIQORA)_([A-Za-z0-9_:]+?)(?:\[(\d+)\])?>", re.IGNORECASE)
 
 # Standard CustomerUser Map (Config Defaults.pm) → DB column.
 _CUSTOMER_USER_COL_TO_TAG: dict[str, str] = {
@@ -94,6 +95,11 @@ class PlaceholderContext:
     # When set (allow-list gate ON), only these tag names resolve for
     # CUSTOMER_DATA_*. None means gate off (all columns resolve as before).
     customer_allowlist: set[str] | None = None
+    notification_recipient: dict[str, str] = field(default_factory=dict)
+    config_overrides: dict[str, str] = field(default_factory=dict)
+    customer_body: str | None = None
+    customer_realname: str | None = None
+    escape_html: bool = False
     queue_name: str = ""
     customer_subject: str = ""
     customer_email_lines: list[str] = field(default_factory=list)
@@ -336,6 +342,15 @@ async def _fetch_customer_allowlist(session: AsyncSession) -> set[str] | None:
         return None
 
 
+async def load_agent_maps(session: AsyncSession, user_id: int | None) -> dict[str, str]:
+    """Placeholder maps (``UserFirstname``/``UserFullname``/…) for one agent.
+
+    Empty when *user_id* is ``None`` or the user is gone — callers render an
+    empty name rather than failing.
+    """
+    return _agent_maps_from_row(await _fetch_user_row(session, user_id))
+
+
 async def load_placeholder_context(
     session: AsyncSession,
     *,
@@ -483,6 +498,9 @@ async def _resolve_tag(
     # Preserve original case for CONFIG_ keys (sysconfig names use :: from _).
     tag_u = tag.upper()
 
+    if tag_u.startswith("NOTIFICATION_RECIPIENT_"):
+        return _lookup(ctx.notification_recipient, tag[len("NOTIFICATION_RECIPIENT_") :]) or ""
+
     # Longer / more specific prefixes first (TICKET_OWNER before TICKET_, etc.).
     if tag_u.startswith("TICKET_OWNER_"):
         field = tag[len("TICKET_OWNER_") :]
@@ -521,8 +539,12 @@ async def _resolve_tag(
             count = int(bracket) if bracket and bracket.isdigit() else len(lines)
             return "\n".join(lines[:count])
         if rest_u in {"BODY", "NOTE", "REALNAME"}:
-            # Article body snippets need article context; leave empty rather than raw.
+            if rest_u in {"BODY", "NOTE"} and ctx.customer_body is not None:
+                lines = ctx.customer_body.splitlines()
+                return "\n".join(lines[: int(bracket)] if bracket else lines)
             if rest_u == "REALNAME":
+                if ctx.customer_realname is not None:
+                    return ctx.customer_realname
                 full = ctx.customer.get("userfullname") or ""
                 if not full:
                     full = (
@@ -580,6 +602,9 @@ async def _resolve_tag(
 
     if tag_u.startswith("CONFIG_"):
         setting_name = tag[len("CONFIG_") :].replace("_", "::")
+        override = _lookup(ctx.config_overrides, setting_name)
+        if override is not None:
+            return override
         value = await sysconfig.get(setting_name)
         return "" if value is None else str(value)
 
@@ -689,6 +714,8 @@ async def _expand_placeholders_inner(
         tag = match.group(1)
         bracket = match.group(2)
         replacement = await _resolve_tag(tag, bracket, ctx=ctx, sysconfig=sysconfig)
+        if ctx.escape_html:
+            replacement = html.escape(replacement, quote=True)
         start, end = match.span()
         result = result[: start + offset] + replacement + result[end + offset :]
         offset += len(replacement) - (end - start)
@@ -698,5 +725,6 @@ async def _expand_placeholders_inner(
 __all__ = [
     "PlaceholderContext",
     "expand_placeholders",
+    "load_agent_maps",
     "load_placeholder_context",
 ]

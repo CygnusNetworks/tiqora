@@ -18,9 +18,13 @@ OFF — see ``tiqora.domain.settings_store``). Ports the parts of
   event payload).
 - ``_RecipientsGet`` (subset above) + per-recipient rendering via
   ``TemplateGenerator::NotificationEvent`` — ported using the same
-  ``<OTRS_...>`` tag subset as postmaster auto-responses
+  ``<OTRS_...>`` tags as postmaster auto-responses
   (``tiqora.channels.email.placeholder.expand_placeholders``, reused rather
-  than duplicated).
+  than duplicated), enriched with the notification recipient and the article
+  named by the triggering event. Tiqora ticket links and notification branding
+  are resolved at render time (``worker.notification_templates``), so inherited
+  OTRS/Znuny templates keep working without rewriting the stored rows -- which
+  Znuny still reads during parallel operation.
 - ``::Transport::Email``: agents get a plain notification email (Znuny writes
   no ticket_history for agent notifications; Tiqora deliberately writes one
   anyway — ``SendAgentNotification`` — for auditability, a documented
@@ -57,15 +61,20 @@ Parallel-operation safety: this engine only drains ``tiqora_event_outbox``
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
+from email.utils import parseaddr
 
 import structlog
 from prometheus_client import Counter
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from tiqora.channels.email.parser import get_email_address
-from tiqora.channels.email.placeholder import expand_placeholders
+from tiqora.channels.email.parser import get_email_address, html_to_text
+from tiqora.channels.email.placeholder import (
+    expand_placeholders,
+    load_agent_maps,
+    load_placeholder_context,
+)
 from tiqora.channels.email.smtp import MailSender, SmtpMailSender, build_message
 from tiqora.config import Settings, get_settings
 from tiqora.db.engine import get_session_factory
@@ -78,6 +87,10 @@ from tiqora.domain.settings_store import (
 )
 from tiqora.domain.ticket_write_service import ArticleIn, add_article
 from tiqora.permissions.engine import PermissionEngine
+from tiqora.worker.notification_templates import (
+    configure_notification_context,
+    normalize_notification_template,
+)
 from tiqora.znuny.history import history_add
 from tiqora.znuny.sysconfig import SysConfig
 
@@ -447,6 +460,10 @@ async def _render_message(
     notification: _NotificationRow,
     ticket: dict[str, object],
     language: str,
+    *,
+    recipient: _Recipient,
+    article_id: int | None,
+    settings: Settings,
 ) -> tuple[str, str, str] | None:
     row = (
         await session.execute(
@@ -471,27 +488,60 @@ async def _render_message(
         return None
     subject_tpl, body_tpl, content_type = str(row[0]), str(row[1]), str(row[2])
 
-    ticket_vars = {
-        "TicketNumber": str(ticket.get("tn", "")),
-        "Title": str(ticket.get("title") or ""),
-    }
+    context = await load_placeholder_context(session, ticket_id=_as_int(ticket["id"]))
+    if recipient.kind == "Agent":
+        context.notification_recipient = await load_agent_maps(session, recipient.user_id)
+    else:
+        context.notification_recipient = dict(context.customer)
+    context.notification_recipient["useremail"] = recipient.email
+    # An absent/deleted article must not silently quote a later ticket message.
+    context.customer_realname = ""
+    context.customer_body = ""
+    if article_id is not None:
+        article_row = (
+            (
+                await session.execute(
+                    text(
+                        "SELECT m.a_from, m.a_subject, m.a_body, m.a_content_type,"
+                        " a.is_visible_for_customer FROM article a"
+                        " JOIN article_data_mime m ON m.article_id = a.id"
+                        " WHERE a.id = :aid AND a.ticket_id = :tid"
+                    ),
+                    {"aid": article_id, "tid": ticket["id"]},
+                )
+            )
+            .mappings()
+            .first()
+        )
+        if article_row is not None and (
+            recipient.kind == "Agent" or article_row["is_visible_for_customer"]
+        ):
+            context.customer_subject = str(article_row["a_subject"] or "")
+            sender_name, sender_email = parseaddr(str(article_row["a_from"] or ""))
+            context.customer_realname = sender_name or sender_email
+            body_text = str(article_row["a_body"] or "")
+            if str(article_row["a_content_type"] or "").lower().startswith("text/html"):
+                body_text = html_to_text(body_text)
+            context.customer_body = body_text
+            context.customer_email_lines = body_text.splitlines()
+    await configure_notification_context(
+        context,
+        sysconfig,
+        settings,
+        ticket_id=_as_int(ticket["id"]),
+        recipient_kind=recipient.kind,
+    )
     subject = await expand_placeholders(
         session,
         sysconfig,
-        subject_tpl,
-        ticket=ticket_vars,
-        queue_name="",
-        customer_subject="",
-        customer_email_lines=[],
+        normalize_notification_template(subject_tpl),
+        context=context,
     )
     body = await expand_placeholders(
         session,
         sysconfig,
-        body_tpl,
-        ticket=ticket_vars,
-        queue_name="",
-        customer_subject="",
-        customer_email_lines=[],
+        normalize_notification_template(body_tpl),
+        context=replace(context, escape_html=content_type.lower().startswith("text/html")),
     )
     return subject, body, content_type
 
@@ -505,8 +555,19 @@ async def _send_to_recipient(
     notification: _NotificationRow,
     recipient: _Recipient,
     user_id: int,
+    article_id: int | None,
+    settings: Settings,
 ) -> bool:
-    rendered = await _render_message(session, sysconfig, notification, ticket, recipient.language)
+    rendered = await _render_message(
+        session,
+        sysconfig,
+        notification,
+        ticket,
+        recipient.language,
+        recipient=recipient,
+        article_id=article_id,
+        settings=settings,
+    )
     if rendered is None:
         logger.info("notification_no_message_for_language", notification_id=notification.id)
         return False
@@ -569,6 +630,7 @@ async def process_event(
     ticket_id: int,
     payload: dict[str, object],
     user_id: int,
+    settings: Settings | None = None,
 ) -> tuple[int, int]:
     """Evaluate all matching notification_event rows for one outbox event.
 
@@ -619,6 +681,10 @@ async def process_event(
                     notification=notification,
                     recipient=recipient,
                     user_id=user_id,
+                    article_id=_as_int(payload["article_id"])
+                    if payload.get("article_id")
+                    else None,
+                    settings=settings or get_settings(),
                 ):
                     sent += 1
             except Exception:  # noqa: BLE001 — one bad recipient must not stop the others
@@ -678,6 +744,7 @@ async def run_notifications_tick(
                     ticket_id=ticket_id,
                     payload=payload,
                     user_id=user_id,
+                    settings=cfg,
                 )
             totals["events"] += 1
             totals["sent"] += sent
