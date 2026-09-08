@@ -395,18 +395,19 @@ streaming connections.
 
 ## Running migrations on first start
 
-`tiqora migrate upgrade` must be run once before `tiqora-api`/`tiqora-worker`
-serve traffic against a new database. It is **not** run automatically by
-the `api`/`worker`/`mcp` container commands (deliberately — you don't want a
-container restart silently applying migrations against a shared,
-possibly-live Znuny database).
+The API container entrypoint runs `python -m tiqora.main migrate upgrade`
+before serving traffic, unless `TIQORA_RUN_MIGRATIONS=0` is set. Worker and
+MCP roles do not run migrations. Both ownership gates still control whether
+the owned migration chain is available.
+
+To migrate explicitly before starting the other roles:
 
 ```sh
-docker compose run --rm tiqora-api tiqora migrate upgrade
+docker compose run --rm --entrypoint python tiqora-api -m tiqora.main migrate upgrade
 ```
 
-Run this after every image upgrade that includes new `tiqora_*` migrations,
-before restarting the long-running services. See
+When automatic API migrations are disabled, run this after every image
+upgrade that includes new migrations before restarting the services. See
 [`../guide/znuny-to-tiqora.md`](../guide/znuny-to-tiqora.md) for the
 distinction between the always-available `versions_tiqora/` chain and the
 gated `versions_owned/` chain (only unlocked post-cutover).
