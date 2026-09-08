@@ -94,7 +94,8 @@ without `gssapi`, `/api/v1/auth/spnego` returns `501`.
 | `TIQORA_SPNEGO_ENABLED` | `true` | Off by default |
 | `KRB5_KTNAME` | `/etc/tiqora/tiqora.keytab` | Service keytab, read-only to the API process user |
 
-Production SPN (Cygnus): `HTTP/tiqora.cygnusnetworks.de@CYGNUSNETWORKS.DE`.
+The SPN follows `HTTP/<api-hostname>@<REALM>` — e.g.
+`HTTP/tiqora.example.com@EXAMPLE.COM`.
 
 Docker Compose keytab mount (see `docker-compose.example.yml` and
 `docs/deploy/docker-compose.md`):
@@ -114,23 +115,22 @@ Manual verification against a real MIT Kerberos KDC:
 1. On the KDC, create a service principal for the Tiqora API host and export
    a keytab:
    ```
-   kadmin.local -q "addprinc -randkey HTTP/tiqora.cygnusnetworks.de@CYGNUSNETWORKS.DE"
-   kadmin.local -q "ktadd -k /etc/tiqora/tiqora.keytab HTTP/tiqora.cygnusnetworks.de@CYGNUSNETWORKS.DE"
+   kadmin.local -q "addprinc -randkey HTTP/tiqora.example.com@EXAMPLE.COM"
+   kadmin.local -q "ktadd -k /etc/tiqora/tiqora.keytab HTTP/tiqora.example.com@EXAMPLE.COM"
    ```
-   (Substitute your own host/realm for non-Cygnus deployments.)
+   (Substitute your own API hostname and Kerberos realm throughout.)
 2. Deploy the keytab to the Tiqora API host (or mount it into the container
    read-only), owned/readable only by the process user, and set
    `KRB5_KTNAME=/etc/tiqora/tiqora.keytab` + `TIQORA_SPNEGO_ENABLED=true`.
 3. Reverse proxy must forward the `Authorization: Negotiate` header
    unmodified to `/api/v1/auth/spnego` (do not strip it).
 4. The browser must reach the host that matches the keytab SPN
-   (`tiqora.cygnusnetworks.de` in production). Configure the browser to allow
-   SPNEGO for that site:
-   - Firefox: `network.negotiate-auth.trusted-uris` = `tiqora.cygnusnetworks.de`
-   - Chrome/Edge (Linux): `--auth-server-allowlist=tiqora.cygnusnetworks.de` or
+   Configure the browser to allow SPNEGO for that site:
+   - Firefox: `network.negotiate-auth.trusted-uris` = `tiqora.example.com`
+   - Chrome/Edge (Linux): `--auth-server-allowlist=tiqora.example.com` or
      the `AuthServerAllowlist` policy.
 5. On a domain-joined / `kinit`'d client, `curl --negotiate -u : -c -
-   https://tiqora.cygnusnetworks.de/api/v1/auth/spnego` should return a session
+   https://tiqora.example.com/api/v1/auth/spnego` should return a session
    cookie for a user whose Kerberos principal's primary part matches an
    existing `users.login` with `sso_eligible` set.
 6. Common failure modes: clock skew > 5 min (Kerberos requires tight time
