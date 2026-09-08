@@ -1467,7 +1467,19 @@
       "deleteBlockedHint": "به‌جای آن حساب را «نامعتبر» کنید تا تیکت‌ها، مقالات و تاریخچه قابل انتساب بمانند.",
       "resendSetupLink": "ارسال دوبارهٔ پیوند راه‌اندازی",
       "setupLinkSent": "پیوند راه‌اندازی ارسال شد.",
-      "setupLinkFailed": "ارسال پیوند راه‌اندازی ممکن نشد."
+      "setupLinkFailed": "ارسال پیوند راه‌اندازی ممکن نشد.",
+      "access": {
+        "header": "Access",
+        "active": "Active",
+        "accepted": "Password set",
+        "invited": "Invited",
+        "expired": "Invitation expired",
+        "none": "No invitation",
+        "lastSeen": "last seen {{when}}",
+        "linkExpires": "link expires {{when}}",
+        "linkExpiredOn": "link expired on {{date}}",
+        "neverSignedIn": "never signed in"
+      }
     },
     "groups": {
       "title_plural": "گروه ها",

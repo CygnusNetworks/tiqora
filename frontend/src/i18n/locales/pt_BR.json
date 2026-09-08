@@ -1467,7 +1467,19 @@
       "deleteBlockedHint": "Defina a conta como “Inválida” para que tickets, artigos e histórico permaneçam atribuíveis.",
       "resendSetupLink": "Reenviar link de configuração",
       "setupLinkSent": "Link de configuração enviado.",
-      "setupLinkFailed": "Não foi possível enviar o link de configuração."
+      "setupLinkFailed": "Não foi possível enviar o link de configuração.",
+      "access": {
+        "header": "Access",
+        "active": "Active",
+        "accepted": "Password set",
+        "invited": "Invited",
+        "expired": "Invitation expired",
+        "none": "No invitation",
+        "lastSeen": "last seen {{when}}",
+        "linkExpires": "link expires {{when}}",
+        "linkExpiredOn": "link expired on {{date}}",
+        "neverSignedIn": "never signed in"
+      }
     },
     "groups": {
       "title_plural": "Grupos",

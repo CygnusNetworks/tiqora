@@ -11,6 +11,7 @@ from datetime import datetime
 from typing import Any
 
 import redis.asyncio as redis
+import structlog
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -18,6 +19,8 @@ from tiqora.config import Settings
 from tiqora.db.legacy.user import UserPreferences, Users
 from tiqora.db.tiqora.models import TiqoraApiKey
 from tiqora.znuny.password import hash_password, is_weak_scheme, needs_rehash, verify_password
+
+logger = structlog.get_logger(__name__)
 
 SESSION_KEY_PREFIX = "tiqora:session:"
 SESSION_AVATAR_KEY_PREFIX = "tiqora:session:avatar:"
@@ -430,18 +433,18 @@ class AuthService:
         """Znuny UI / notification language from ``UserLanguage`` preference."""
         return await self._load_preference(user_id, "UserLanguage")
 
-    async def set_user_language(self, user_id: int, language: str) -> None:
-        """Upsert Znuny-compatible ``UserLanguage`` preference as UTF-8 text.
+    async def _upsert_preference(self, user_id: int, key: str, value: str) -> None:
+        """Upsert one ``user_preferences`` row as UTF-8 text.
 
         Bind a Python ``str`` (not ``bytes``) so PostgreSQL TEXT and MySQL
-        LONGBLOB both store readable language codes rather than PG hex escapes.
+        LONGBLOB both store readable values rather than PG hex escapes.
         """
         from sqlalchemy import text
 
         result = await self._session.execute(
             select(UserPreferences.user_id).where(
                 UserPreferences.user_id == user_id,
-                UserPreferences.preferences_key == "UserLanguage",
+                UserPreferences.preferences_key == key,
             )
         )
         if result.scalar_one_or_none() is None:
@@ -449,19 +452,42 @@ class AuthService:
                 text(
                     "INSERT INTO user_preferences"
                     " (user_id, preferences_key, preferences_value)"
-                    " VALUES (:uid, 'UserLanguage', :v)"
+                    " VALUES (:uid, :k, :v)"
                 ),
-                {"uid": user_id, "v": language},
+                {"uid": user_id, "k": key, "v": value},
             )
         else:
             await self._session.execute(
                 text(
                     "UPDATE user_preferences SET preferences_value = :v"
-                    " WHERE user_id = :uid AND preferences_key = 'UserLanguage'"
+                    " WHERE user_id = :uid AND preferences_key = :k"
                 ),
-                {"uid": user_id, "v": language},
+                {"uid": user_id, "k": key, "v": value},
             )
+
+    async def set_user_language(self, user_id: int, language: str) -> None:
+        """Upsert the Znuny-compatible ``UserLanguage`` preference."""
+        await self._upsert_preference(user_id, "UserLanguage", language)
         await self._session.commit()
+
+    async def _stamp_last_login(self, user_id: int) -> None:
+        """Record "the agent just signed in" as ``UserLastLogin``.
+
+        Stored as epoch seconds, which is what Znuny itself writes to this key,
+        so the value stays readable if Znuny is ever put back in front of the
+        same database.
+
+        A failure here must never cost the agent their session — the stamp is
+        reporting data, not part of authentication — so it is swallowed the same
+        way the opportunistic password rehash in :meth:`authenticate_password`
+        is.
+        """
+        try:
+            await self._upsert_preference(user_id, "UserLastLogin", str(int(time.time())))
+            await self._session.commit()
+        except Exception:  # noqa: BLE001 — login must not fail on a reporting write
+            await self._session.rollback()
+            logger.warning("auth.last_login_stamp_failed", user_id=user_id)
 
     async def _user_from_row(
         self,
@@ -518,6 +544,7 @@ class AuthService:
         # Prefer an explicit avatar_url (OIDC picture); fall back to whatever
         # was already attached to the AuthenticatedUser (usually None).
         resolved = avatar_url if avatar_url is not None else user.avatar_url
+        await self._stamp_last_login(user.id)
         return await self._sessions.create(user.id, user.login, avatar_url=resolved)
 
     async def resolve_session(self, token: str) -> AuthenticatedUser | None:
@@ -588,6 +615,9 @@ class AuthService:
         new_token = await self._sessions.promote_pending(token, avatar_url=avatar_url)
         if new_token is None:
             return None
+        # Stamped on promotion, not when the pending session was created: with
+        # 2FA on, a correct password alone is not a login yet.
+        await self._stamp_last_login(user.id)
         return new_token, await self._user_from_row(
             user, auth_method="session", avatar_url=avatar_url
         )
@@ -618,6 +648,7 @@ class AuthService:
         new_token = await self._sessions.promote_enroll(token, avatar_url=avatar_url)
         if new_token is None:
             return None
+        await self._stamp_last_login(user.id)
         return new_token, await self._user_from_row(
             user, auth_method="session", avatar_url=avatar_url
         )

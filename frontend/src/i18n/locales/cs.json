@@ -1467,7 +1467,19 @@
       "deleteBlockedHint": "Nastavte účet na «Neplatný», aby tickety, články a historie zůstaly přiřaditelné.",
       "resendSetupLink": "Znovu odeslat odkaz pro nastavení",
       "setupLinkSent": "Odkaz pro nastavení odeslán.",
-      "setupLinkFailed": "Odkaz pro nastavení se nepodařilo odeslat."
+      "setupLinkFailed": "Odkaz pro nastavení se nepodařilo odeslat.",
+      "access": {
+        "header": "Access",
+        "active": "Active",
+        "accepted": "Password set",
+        "invited": "Invited",
+        "expired": "Invitation expired",
+        "none": "No invitation",
+        "lastSeen": "last seen {{when}}",
+        "linkExpires": "link expires {{when}}",
+        "linkExpiredOn": "link expired on {{date}}",
+        "neverSignedIn": "never signed in"
+      }
     },
     "groups": {
       "title_plural": "Skupiny",

@@ -1467,7 +1467,19 @@
       "deleteBlockedHint": "Állítsa a fiókot „Érvénytelen” értékre, hogy a jegyek, cikkek és az előzmények hozzárendelhetők maradjanak.",
       "resendSetupLink": "Beállító hivatkozás újraküldése",
       "setupLinkSent": "Beállító hivatkozás elküldve.",
-      "setupLinkFailed": "A beállító hivatkozást nem sikerült elküldeni."
+      "setupLinkFailed": "A beállító hivatkozást nem sikerült elküldeni.",
+      "access": {
+        "header": "Access",
+        "active": "Active",
+        "accepted": "Password set",
+        "invited": "Invited",
+        "expired": "Invitation expired",
+        "none": "No invitation",
+        "lastSeen": "last seen {{when}}",
+        "linkExpires": "link expires {{when}}",
+        "linkExpiredOn": "link expired on {{date}}",
+        "neverSignedIn": "never signed in"
+      }
     },
     "groups": {
       "title_plural": "Csoportok",

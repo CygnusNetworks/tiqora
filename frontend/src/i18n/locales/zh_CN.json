@@ -1467,7 +1467,19 @@
       "deleteBlockedHint": "请改为将账户设为「无效」，以便工单、文章与历史仍可归属。",
       "resendSetupLink": "重新发送设置链接",
       "setupLinkSent": "设置链接已发送。",
-      "setupLinkFailed": "无法发送设置链接。"
+      "setupLinkFailed": "无法发送设置链接。",
+      "access": {
+        "header": "Access",
+        "active": "Active",
+        "accepted": "Password set",
+        "invited": "Invited",
+        "expired": "Invitation expired",
+        "none": "No invitation",
+        "lastSeen": "last seen {{when}}",
+        "linkExpires": "link expires {{when}}",
+        "linkExpiredOn": "link expired on {{date}}",
+        "neverSignedIn": "never signed in"
+      }
     },
     "groups": {
       "title_plural": "组",

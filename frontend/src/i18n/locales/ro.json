@@ -1467,7 +1467,19 @@
       "deleteBlockedHint": "Setați contul pe «Invalid» ca tichetele, articolele și istoricul să rămână atribuibile.",
       "resendSetupLink": "Retrimite linkul de configurare",
       "setupLinkSent": "Linkul de configurare a fost trimis.",
-      "setupLinkFailed": "Linkul de configurare nu a putut fi trimis."
+      "setupLinkFailed": "Linkul de configurare nu a putut fi trimis.",
+      "access": {
+        "header": "Access",
+        "active": "Active",
+        "accepted": "Password set",
+        "invited": "Invited",
+        "expired": "Invitation expired",
+        "none": "No invitation",
+        "lastSeen": "last seen {{when}}",
+        "linkExpires": "link expires {{when}}",
+        "linkExpiredOn": "link expired on {{date}}",
+        "neverSignedIn": "never signed in"
+      }
     },
     "groups": {
       "title_plural": "Grupuri",
