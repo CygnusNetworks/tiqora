@@ -19,6 +19,7 @@ from tiqora.channels.email.smtp import MailSender, SmtpMailSender
 from tiqora.config import Settings, get_settings
 from tiqora.db.engine import get_session_factory
 from tiqora.db.legacy.mail_account import MailAccount
+from tiqora.domain.mail_outbound import build_outbound_sender
 from tiqora.domain.settings_store import (
     KEY_POSTMASTER_ENABLED,
     KEY_POSTMASTER_LEAVE_ON_SERVER,
@@ -166,13 +167,19 @@ async def run_postmaster_tick(
     """One scheduler tick: check the feature flag, then process every account."""
     cfg = settings or get_settings()
     factory = session_factory or get_session_factory()
-    sender = mail_sender or SmtpMailSender(cfg)
 
     async with factory() as session:
         enabled = await get_setting_bool(session, KEY_POSTMASTER_ENABLED, False)
         leave_on_server = await get_setting_bool(session, KEY_POSTMASTER_LEAVE_ON_SERVER, False)
-        if isinstance(sender, SmtpMailSender):
-            sender.sendmail_bcc = (await SysConfig(session).sendmail_bcc()) or None
+        sendmail_bcc = (await SysConfig(session).sendmail_bcc()) or None
+        # Auto-responses and bounces go out through the configured relay, not
+        # the TIQORA_SMTP_* environment (unset when the relay is configured in
+        # the admin UI, which would silently fall back to localhost:25).
+        sender = mail_sender or await build_outbound_sender(
+            session, sendmail_bcc=sendmail_bcc, settings=cfg
+        )
+        if mail_sender is not None and isinstance(mail_sender, SmtpMailSender):
+            mail_sender.sendmail_bcc = sendmail_bcc
 
     if not enabled:
         logger.debug("postmaster_disabled")
