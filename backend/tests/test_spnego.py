@@ -224,9 +224,7 @@ def _seed_spnego_user(sync_url: str, login: str = "alice") -> int:
             text("SELECT id FROM users WHERE login = :login"), {"login": login}
         ).scalar_one_or_none()
         if stale is not None:
-            conn.execute(
-                text("DELETE FROM user_preferences WHERE user_id = :uid"), {"uid": stale}
-            )
+            conn.execute(text("DELETE FROM user_preferences WHERE user_id = :uid"), {"uid": stale})
             conn.execute(text("DELETE FROM users WHERE id = :uid"), {"uid": stale})
         conn.execute(
             text(
