@@ -12,6 +12,7 @@ import {
   isInternalNote,
   senderDisplayName,
 } from "./articleChannel";
+import { formatRecipient, parseRecipient } from "@/components/agent/RecipientsField";
 
 describe("emailFromAddress", () => {
   it("extracts the address from a \"Name <mail@host>\" from_address", () => {
@@ -190,5 +191,15 @@ describe("formatFromAddress / formatToAddresses", () => {
     expect(
       formatToAddresses('"Luhmer, Bastian" <l@x.de>, \'Netadmin StudNet Bonn\' <n@y.de>'),
     ).toBe("Luhmer, Bastian <l@x.de>, Netadmin StudNet Bonn <n@y.de>");
+  });
+
+  it("stays unquoted where formatRecipient would quote for the wire", () => {
+    // These two paths look interchangeable but are not: formatRecipient
+    // re-quotes an RFC 5322 special so the outgoing header survives Apple
+    // Mail, while this one only ever feeds the article header an agent
+    // reads. Sharing one formatter silently put quotes back into the UI.
+    const raw = '"Doe, Jane" <jane@x.com>';
+    expect(formatRecipient(parseRecipient(raw)!)).toBe(raw);
+    expect(formatFromAddress(raw)).toBe("Doe, Jane <jane@x.com>");
   });
 });
