@@ -164,3 +164,15 @@ async def test_expansion_error_returns_original_text() -> None:
             customer_email_lines=[],
         )
     assert result == original
+
+
+@pytest.mark.asyncio
+async def test_config_keys_with_colons_and_legacy_underscores() -> None:
+    result = await expand_placeholders(
+        None,
+        _sysconfig({"Ticket::Hook": "Cygnus#", "Ticket::HookDivider": "'-'"}),
+        "<OTRS_CONFIG_Ticket::Hook><TIQORA_CONFIG_Ticket::HookDivider>"
+        "<OTRS_TICKET_TicketNumber> / <OTRS_CONFIG_Ticket_Hook>",
+        ticket={"TicketNumber": "2026090810000045"},
+    )
+    assert result == "Cygnus#-2026090810000045 / Cygnus#"

@@ -92,7 +92,7 @@ def split_address_line(value: str) -> list[str]:
     return [formataddr((name, addr)) if name else addr for name, addr in getaddresses([value])]
 
 
-def _html_to_text(html: str) -> str:
+def html_to_text(html: str) -> str:
     text = _TAG_RE.sub(" ", html)
     text = (
         text.replace("&nbsp;", " ").replace("&amp;", "&").replace("&lt;", "<").replace("&gt;", ">")
@@ -180,7 +180,7 @@ def parse_email(raw: bytes) -> ParsedEmail:
         body_content_type = "text/plain; charset=utf-8"
     elif html_body is not None:
         # PostmasterAutoHTML2Text-equivalent fallback (Phase 4a: tag-strip only).
-        body = _html_to_text(html_body)
+        body = html_to_text(html_body)
         body_content_type = "text/plain; charset=utf-8"
     else:
         body = ""

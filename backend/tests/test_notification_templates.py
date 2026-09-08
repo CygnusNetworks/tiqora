@@ -1,0 +1,141 @@
+"""Unit tests for Tiqora's notification-template compatibility layer."""
+
+from __future__ import annotations
+
+from typing import Any
+
+import pytest
+
+from tiqora.channels.email.placeholder import PlaceholderContext, expand_placeholders
+from tiqora.config import Settings
+from tiqora.worker.notification_templates import (
+    configure_notification_context,
+    normalize_notification_template,
+)
+from tiqora.znuny.sysconfig import SysConfig
+
+
+def _sysconfig(values: dict[str, Any] | None = None) -> SysConfig:
+    values = values or {}
+
+    async def fetch(name: str) -> Any | None:
+        return values.get(name)
+
+    return SysConfig(fetch=fetch)
+
+
+async def _expand_notification_template(
+    template: str,
+    *,
+    recipient_kind: str = "Agent",
+    settings: Settings | None = None,
+    sender_name: str | None = None,
+    escape_html: bool = False,
+) -> str:
+    context = PlaceholderContext(
+        ticket={"ticketid": "45", "ticketnumber": "2026090810000045"},
+        notification_recipient={"userfullname": "Ada Lovelace"},
+    )
+    sysconfig = _sysconfig(
+        {"NotificationSenderName": sender_name} if sender_name is not None else {}
+    )
+    await configure_notification_context(
+        context,
+        sysconfig,
+        settings or Settings(public_base_url="https://help.example.test/support/"),
+        ticket_id=45,
+        recipient_kind=recipient_kind,
+    )
+    return await expand_placeholders(
+        None,
+        sysconfig,
+        normalize_notification_template(template),
+        context=PlaceholderContext(**{**context.__dict__, "escape_html": escape_html}),
+    )
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "template",
+    [
+        "<OTRS_CONFIG_HttpType>://<OTRS_CONFIG_FQDN>/<OTRS_CONFIG_ScriptAlias>"
+        "index.pl?Action=AgentTicketZoom;TicketID=<OTRS_TICKET_TicketID>",
+        "&lt;OTRS_CONFIG_HttpType&gt;://&lt;OTRS_CONFIG_FQDN&gt;/"
+        "&lt;OTRS_CONFIG_ScriptAlias&gt;index.pl?Action=AgentTicketZoom&amp;"
+        "TicketID=&lt;OTRS_TICKET_TicketID&gt;",
+        "<TIQORA_CONFIG_HttpType>://<TIQORA_CONFIG_FQDN>/<TIQORA_CONFIG_ScriptAlias>"
+        "customer.pl?Action=CustomerTicketZoom&TicketID=<TIQORA_TICKET_TicketID>",
+        r"<OTRS_CONFIG_HttpType>://<OTRS_CONFIG_FQDN>/<OTRS_CONFIG_ScriptAlias>"
+        r"index.pl?Action=AgentTicketZoom\;TicketID=<OTRS_TICKET_TicketID>"
+        r"\;ArticleID=<OTRS_TICKET_LAST_ARTICLE_ID>",
+    ],
+)
+async def test_inherited_otrs_ticket_links_normalize_before_expansion(template: str) -> None:
+    assert (
+        await _expand_notification_template(template)
+        == "https://help.example.test/support/agent/tickets/45"
+    )
+
+
+@pytest.mark.asyncio
+async def test_tiqora_ticket_url_uses_portal_route_for_customer() -> None:
+    assert (
+        await _expand_notification_template("Open <TIQORA_TICKET_URL>", recipient_kind="Customer")
+        == "Open https://help.example.test/support/portal/tickets/45"
+    )
+
+
+@pytest.mark.asyncio
+async def test_ticket_url_uses_first_http_cors_origin_when_public_base_url_is_unset() -> None:
+    # A non-absolute entry (e.g. "*") must be skipped, not turned into a dead link.
+    settings = Settings(
+        public_base_url="",
+        cors_origins="*,https://fallback.example.test/tiqora/,http://localhost:5173",
+    )
+    assert (
+        await _expand_notification_template("<OTRS_TICKET_URL>", settings=settings)
+        == "https://fallback.example.test/tiqora/agent/tickets/45"
+    )
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("legacy_name", ["OTRS Notifications", "Znuny Notifications", None])
+async def test_default_branding_is_tiqora_but_custom_sender_name_is_preserved(
+    legacy_name: str | None,
+) -> None:
+    assert (
+        await _expand_notification_template(
+            "-- <OTRS_CONFIG_NotificationSenderName>", sender_name=legacy_name
+        )
+        == "-- Tiqora Notifications"
+    )
+    assert (
+        await _expand_notification_template(
+            "-- <OTRS_CONFIG_NotificationSenderName>", sender_name="Support Team"
+        )
+        == "-- Support Team"
+    )
+
+
+@pytest.mark.asyncio
+async def test_notification_values_are_html_escaped_without_recursive_expansion() -> None:
+    context = PlaceholderContext(
+        ticket={"ticketid": "45"},
+        notification_recipient={"userfullname": "<b><OTRS_TICKET_TicketID></b>"},
+        escape_html=True,
+    )
+    sysconfig = _sysconfig()
+    await configure_notification_context(
+        context,
+        sysconfig,
+        Settings(public_base_url="https://help.example.test"),
+        ticket_id=45,
+        recipient_kind="Agent",
+    )
+    result = await expand_placeholders(
+        None,
+        sysconfig,
+        "<p><OTRS_NOTIFICATION_RECIPIENT_UserFullname></p>",
+        context=context,
+    )
+    assert result == "<p>&lt;b&gt;&lt;OTRS_TICKET_TicketID&gt;&lt;/b&gt;</p>"
