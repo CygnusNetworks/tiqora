@@ -196,6 +196,10 @@ class TiqoraPasswordSetupToken(TiqoraBase):
     Only the SHA-256 of the token is stored, so a database leak does not
     hand over working links. ``used`` is a timestamp rather than a flag to
     keep a minimal audit trail; rows are not deleted on redemption.
+
+    ``used`` means *redeemed by the agent* and nothing else — a link the admin
+    replaced is invalidated by setting ``expires`` to now, so the admin user
+    list can report "invitation accepted" straight from this column.
     """
 
     __tablename__ = "tiqora_password_setup_token"
@@ -248,7 +252,14 @@ class TiqoraUserAuthConfig(TiqoraBase):
 
     __tablename__ = "tiqora_user_auth_config"
 
-    user_id: Mapped[int] = mapped_column(Integer, primary_key=True, nullable=False)
+    # autoincrement=False: this mirrors ``users.id`` and must never invent one.
+    # SQLAlchemy defaults a single-column integer PK to ``autoincrement="auto"``,
+    # which emits AUTO_INCREMENT on MariaDB and SERIAL on PostgreSQL — migration
+    # 20260721_0014 creates a plain integer, so only metadata-built databases
+    # ever diverged.
+    user_id: Mapped[int] = mapped_column(
+        Integer, primary_key=True, autoincrement=False, nullable=False
+    )
     sso_eligible: Mapped[bool] = mapped_column(
         Boolean, nullable=False, default=False, server_default=false()
     )

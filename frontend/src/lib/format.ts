@@ -14,6 +14,27 @@ export function formatAgeSeconds(
   return rtf.format(-Math.floor(abs / (86400 * 30)), "month");
 }
 
+/** Relative time from now in either direction: "3 days ago" / "in 6 days".
+ *
+ * `formatAgeSeconds` only looks backwards, but an outstanding invitation is
+ * described by how long its link still has. */
+export function formatRelative(
+  value: string | Date | null | undefined,
+  locale: string,
+): string {
+  if (!value) return "—";
+  const d = typeof value === "string" ? new Date(value) : value;
+  if (Number.isNaN(d.getTime())) return "—";
+  const delta = Math.round((d.getTime() - Date.now()) / 1000);
+  const abs = Math.abs(delta);
+  const rtf = new Intl.RelativeTimeFormat(locale, { numeric: "auto" });
+  if (abs < 60) return rtf.format(delta, "second");
+  if (abs < 3600) return rtf.format(Math.round(delta / 60), "minute");
+  if (abs < 86400) return rtf.format(Math.round(delta / 3600), "hour");
+  if (abs < 86400 * 30) return rtf.format(Math.round(delta / 86400), "day");
+  return rtf.format(Math.round(delta / (86400 * 30)), "month");
+}
+
 export function formatDateTime(
   value: string | Date | null | undefined,
   locale: string,

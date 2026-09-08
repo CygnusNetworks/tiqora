@@ -12787,6 +12787,14 @@ export interface components {
             first_name: string;
             /** Id */
             id: number;
+            /** Invite Accepted At */
+            invite_accepted_at?: string | null;
+            /** Invite Expires */
+            invite_expires?: string | null;
+            /** Invited At */
+            invited_at?: string | null;
+            /** Last Login */
+            last_login?: string | null;
             /** Last Name */
             last_name: string;
             /** Login */

@@ -1467,7 +1467,19 @@
       "deleteBlockedHint": "הגדירו את החשבון כ”לא תקף” כדי שפניות, מאמרים והיסטוריה יישארו ניתנים לייחוס.",
       "resendSetupLink": "שליחה חוזרת של קישור הגדרה",
       "setupLinkSent": "קישור ההגדרה נשלח.",
-      "setupLinkFailed": "לא ניתן לשלוח את קישור ההגדרה."
+      "setupLinkFailed": "לא ניתן לשלוח את קישור ההגדרה.",
+      "access": {
+        "header": "Access",
+        "active": "Active",
+        "accepted": "Password set",
+        "invited": "Invited",
+        "expired": "Invitation expired",
+        "none": "No invitation",
+        "lastSeen": "last seen {{when}}",
+        "linkExpires": "link expires {{when}}",
+        "linkExpiredOn": "link expired on {{date}}",
+        "neverSignedIn": "never signed in"
+      }
     },
     "groups": {
       "title_plural": "קבוצות",

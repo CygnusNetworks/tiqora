@@ -1467,7 +1467,19 @@
       "deleteBlockedHint": "Hãy đặt tài khoản thành “Không hợp lệ” để ticket, bài viết và lịch sử vẫn gán được.",
       "resendSetupLink": "Gửi lại liên kết thiết lập",
       "setupLinkSent": "Đã gửi liên kết thiết lập.",
-      "setupLinkFailed": "Không gửi được liên kết thiết lập."
+      "setupLinkFailed": "Không gửi được liên kết thiết lập.",
+      "access": {
+        "header": "Access",
+        "active": "Active",
+        "accepted": "Password set",
+        "invited": "Invited",
+        "expired": "Invitation expired",
+        "none": "No invitation",
+        "lastSeen": "last seen {{when}}",
+        "linkExpires": "link expires {{when}}",
+        "linkExpiredOn": "link expired on {{date}}",
+        "neverSignedIn": "never signed in"
+      }
     },
     "groups": {
       "title_plural": "Nhóm",

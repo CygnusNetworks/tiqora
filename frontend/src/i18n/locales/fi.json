@@ -1467,7 +1467,19 @@
       "deleteBlockedHint": "Aseta tili tilaan ”Virheellinen”, jotta tiketit, artikkelit ja historia pysyvät kohdistettavina.",
       "resendSetupLink": "Lähetä asennuslinkki uudelleen",
       "setupLinkSent": "Asennuslinkki lähetetty.",
-      "setupLinkFailed": "Asennuslinkkiä ei voitu lähettää."
+      "setupLinkFailed": "Asennuslinkkiä ei voitu lähettää.",
+      "access": {
+        "header": "Access",
+        "active": "Active",
+        "accepted": "Password set",
+        "invited": "Invited",
+        "expired": "Invitation expired",
+        "none": "No invitation",
+        "lastSeen": "last seen {{when}}",
+        "linkExpires": "link expires {{when}}",
+        "linkExpiredOn": "link expired on {{date}}",
+        "neverSignedIn": "never signed in"
+      }
     },
     "groups": {
       "title_plural": "ryhmät",

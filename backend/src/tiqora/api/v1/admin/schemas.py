@@ -14,6 +14,7 @@ from typing import Annotated, Any, Literal
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from tiqora.domain.password_policy import MAX_PASSWORD_LENGTH, MIN_PASSWORD_LENGTH
+from tiqora.domain.schemas import UtcDateTime
 
 Password = Annotated[str, Field(min_length=MIN_PASSWORD_LENGTH, max_length=MAX_PASSWORD_LENGTH)]
 """Admin-set passwords. Declared as a field constraint rather than checked in
@@ -34,12 +35,28 @@ class UserOut(BaseModel):
     first_name: str
     last_name: str
     valid_id: int
-    create_time: datetime | None
-    change_time: datetime | None
+    create_time: UtcDateTime | None
+    change_time: UtcDateTime | None
     email: str | None = None
     """From ``user_preferences`` (key ``UserEmail``) — not a ``users`` column."""
     mobile: str | None = None
     """From ``user_preferences`` (key ``UserMobile``) — not a ``users`` column."""
+
+    invited_at: UtcDateTime | None = None
+    """When the agent's most recent setup link was mailed, from
+    ``tiqora_password_setup_token``. The row is committed only after the SMTP
+    send succeeds, so its presence means the invitation reached the mail server
+    — delivery and bounces are not tracked. ``None`` for an account created with
+    a password instead of an invitation."""
+    invite_expires: UtcDateTime | None = None
+    """When that link stops working."""
+    invite_accepted_at: UtcDateTime | None = None
+    """When the agent redeemed the link and chose a password. ``None`` while the
+    invitation is still outstanding."""
+    last_login: UtcDateTime | None = None
+    """From ``user_preferences`` (key ``UserLastLogin``, epoch seconds, the same
+    key and format Znuny uses). ``None`` means the account has never been signed
+    in to since the field was introduced."""
 
 
 class UserCreate(BaseModel):
@@ -108,8 +125,8 @@ class GroupOut(BaseModel):
     name: str
     comments: str | None
     valid_id: int
-    create_time: datetime | None
-    change_time: datetime | None
+    create_time: UtcDateTime | None
+    change_time: UtcDateTime | None
 
 
 class GroupCreate(BaseModel):
@@ -136,8 +153,8 @@ class RoleOut(BaseModel):
     name: str
     comments: str | None
     valid_id: int
-    create_time: datetime | None
-    change_time: datetime | None
+    create_time: UtcDateTime | None
+    change_time: UtcDateTime | None
 
 
 class RoleCreate(BaseModel):
@@ -223,8 +240,8 @@ class QueueOut(BaseModel):
     follow_up_lock: int
     comments: str | None
     valid_id: int
-    create_time: datetime | None
-    change_time: datetime | None
+    create_time: UtcDateTime | None
+    change_time: UtcDateTime | None
 
 
 class QueueCreate(BaseModel):
@@ -282,8 +299,8 @@ class StateOut(BaseModel):
     comments: str | None
     type_id: int
     valid_id: int
-    create_time: datetime | None
-    change_time: datetime | None
+    create_time: UtcDateTime | None
+    change_time: UtcDateTime | None
 
 
 class StateTypeOut(BaseModel):
@@ -312,8 +329,8 @@ class SystemAddressOut(BaseModel):
     queue_id: int | None = None
     comments: str | None = None
     valid_id: int
-    create_time: datetime | None = None
-    change_time: datetime | None = None
+    create_time: UtcDateTime | None = None
+    change_time: UtcDateTime | None = None
 
 
 class SystemAddressCreate(BaseModel):
@@ -370,8 +387,8 @@ class PriorityOut(BaseModel):
     id: int
     name: str
     valid_id: int
-    create_time: datetime | None
-    change_time: datetime | None
+    create_time: UtcDateTime | None
+    change_time: UtcDateTime | None
 
 
 class PriorityCreate(BaseModel):
@@ -408,8 +425,8 @@ class CustomerUserAdminOut(BaseModel):
     country: str | None
     comments: str | None
     valid_id: int
-    create_time: datetime | None
-    change_time: datetime | None
+    create_time: UtcDateTime | None
+    change_time: UtcDateTime | None
 
 
 class CustomerUserAdminCreate(BaseModel):
@@ -474,8 +491,8 @@ class CustomerCompanyOut(BaseModel):
     url: str | None
     comments: str | None
     valid_id: int
-    create_time: datetime | None
-    change_time: datetime | None
+    create_time: UtcDateTime | None
+    change_time: UtcDateTime | None
 
 
 class CustomerCompanyCreate(BaseModel):
@@ -519,8 +536,8 @@ class SalutationOut(BaseModel):
     content_type: str | None
     comments: str | None
     valid_id: int
-    create_time: datetime | None
-    change_time: datetime | None
+    create_time: UtcDateTime | None
+    change_time: UtcDateTime | None
 
 
 class SalutationWrite(BaseModel):
@@ -561,8 +578,8 @@ class StandardTemplateOut(BaseModel):
     template_type: str
     comments: str | None
     valid_id: int
-    create_time: datetime | None
-    change_time: datetime | None
+    create_time: UtcDateTime | None
+    change_time: UtcDateTime | None
     #: How many queues this template is assigned to (list responses only).
     assigned_queue_count: int = 0
 
@@ -618,8 +635,8 @@ class StandardAttachmentOut(BaseModel):
     filename: str
     comments: str | None
     valid_id: int
-    create_time: datetime | None
-    change_time: datetime | None
+    create_time: UtcDateTime | None
+    change_time: UtcDateTime | None
     #: How many templates link this attachment (list responses only).
     assigned_template_count: int = 0
 
@@ -719,8 +736,8 @@ class AutoResponseOut(BaseModel):
     content_type: str | None
     comments: str | None
     valid_id: int
-    create_time: datetime | None
-    change_time: datetime | None
+    create_time: UtcDateTime | None
+    change_time: UtcDateTime | None
     #: How many queues this auto-response is assigned to (list responses only).
     assigned_queue_count: int = 0
 
@@ -776,8 +793,8 @@ class DynamicFieldOut(BaseModel):
     object_type: str
     config: dict[str, Any]
     valid_id: int
-    create_time: datetime | None
-    change_time: datetime | None
+    create_time: UtcDateTime | None
+    change_time: UtcDateTime | None
 
 
 class DynamicFieldCreate(BaseModel):
@@ -872,8 +889,8 @@ class AclOut(BaseModel):
     stop_after_match: int | None
     config_match: str | None
     config_change: str | None
-    create_time: datetime | None
-    change_time: datetime | None
+    create_time: UtcDateTime | None
+    change_time: UtcDateTime | None
 
 
 class AclCreate(BaseModel):
@@ -938,8 +955,8 @@ class TicketTypeOut(BaseModel):
     id: int
     name: str
     valid_id: int
-    create_time: datetime | None = None
-    change_time: datetime | None = None
+    create_time: UtcDateTime | None = None
+    change_time: UtcDateTime | None = None
 
 
 class TicketTypeCreate(BaseModel):
@@ -959,8 +976,8 @@ class ServiceOut(BaseModel):
     name: str
     comments: str | None = None
     valid_id: int
-    create_time: datetime | None = None
-    change_time: datetime | None = None
+    create_time: UtcDateTime | None = None
+    change_time: UtcDateTime | None = None
     sla_ids: list[int] = Field(default_factory=list)
 
 
@@ -992,8 +1009,8 @@ class SlaOut(BaseModel):
     solution_notify: int | None = None
     comments: str | None = None
     valid_id: int
-    create_time: datetime | None = None
-    change_time: datetime | None = None
+    create_time: UtcDateTime | None = None
+    change_time: UtcDateTime | None = None
     service_ids: list[int] = Field(default_factory=list)
 
 
@@ -1042,8 +1059,8 @@ class NotificationEventOut(BaseModel):
     name: str
     comments: str | None = None
     valid_id: int
-    create_time: datetime | None = None
-    change_time: datetime | None = None
+    create_time: UtcDateTime | None = None
+    change_time: UtcDateTime | None = None
     # event_key → list of values (Znuny multi-row items)
     items: dict[str, list[str]] = Field(default_factory=dict)
     messages: list[NotificationMessageIn] = Field(default_factory=list)
@@ -1078,8 +1095,8 @@ class WebhookOut(BaseModel):
     url: str
     events: list[str]
     valid: bool
-    created: datetime
-    changed: datetime
+    created: UtcDateTime
+    changed: UtcDateTime
 
 
 class WebhookCreate(BaseModel):
@@ -1112,9 +1129,9 @@ class ApiKeyOut(BaseModel):
     name: str
     user_id: int
     valid: bool
-    created: datetime
-    expires_at: datetime | None
-    last_used_at: datetime | None
+    created: UtcDateTime
+    expires_at: UtcDateTime | None
+    last_used_at: UtcDateTime | None
     created_by: int | None
     # Comma-separated: legacy read/write/mcp/* and/or area:ro|area:rw.
     # Null/empty = unrestricted. See tiqora.domain.api_key_scopes.
@@ -1203,8 +1220,8 @@ class QueueVariableOut(BaseModel):
     queue_id: int | None
     name: str
     value: str | None
-    created: datetime
-    changed: datetime
+    created: UtcDateTime
+    changed: UtcDateTime
 
 
 class QueueVariableCreate(BaseModel):
@@ -1239,8 +1256,8 @@ class PlaceholderFieldOut(BaseModel):
     tag_name: str
     label: str | None
     enabled: bool
-    created: datetime
-    changed: datetime
+    created: UtcDateTime
+    changed: UtcDateTime
 
 
 class PlaceholderFieldCreate(BaseModel):
@@ -1275,8 +1292,8 @@ class QueueCustomerLinkOut(BaseModel):
     label: str | None
     visibility: str
     login_suffix_separator: str | None
-    create_time: datetime
-    change_time: datetime
+    create_time: UtcDateTime
+    change_time: UtcDateTime
 
 
 class QueueCustomerLinkCreate(BaseModel):
@@ -1412,10 +1429,10 @@ class GdprErasureJobOut(BaseModel):
     seed: int | None
     actor: str
     force_parallel: bool
-    created: datetime
-    applied_at: datetime
-    rolled_back_at: datetime | None
-    backup_expires_at: datetime
+    created: UtcDateTime
+    applied_at: UtcDateTime
+    rolled_back_at: UtcDateTime | None
+    backup_expires_at: UtcDateTime
 
 
 class GdprErasureJobDetailOut(GdprErasureJobOut):
@@ -1494,8 +1511,8 @@ class DaemonServiceOut(BaseModel):
     interval_seconds: int | None = None
     interval_overridden: bool = False
     daily_at: str | None = None
-    last_run_at: datetime | None = None
-    last_ok_at: datetime | None = None
+    last_run_at: UtcDateTime | None = None
+    last_ok_at: UtcDateTime | None = None
     last_error: str | None = None
     last_result: dict[str, Any] | None = None
 
@@ -1528,8 +1545,8 @@ class AppInfoOut(BaseModel):
     environment: str
     python_version: str
     hostname: str
-    server_time: datetime
-    started_at: datetime
+    server_time: UtcDateTime
+    started_at: UtcDateTime
     uptime_seconds: float
 
 
@@ -1598,7 +1615,7 @@ class ContainerOut(BaseModel):
     image: str
     state: str  # running / exited / created / ...
     health: str | None = None  # healthy / unhealthy / starting / None
-    started_at: datetime | None = None
+    started_at: UtcDateTime | None = None
     restart_count: int | None = None
 
 

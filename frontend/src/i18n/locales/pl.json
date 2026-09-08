@@ -1467,7 +1467,19 @@
       "deleteBlockedHint": "Ustaw konto na «Nieprawidłowe», aby zgłoszenia, artykuły i historia pozostały przypisywalne.",
       "resendSetupLink": "Wyślij ponownie link konfiguracji",
       "setupLinkSent": "Wysłano link konfiguracji.",
-      "setupLinkFailed": "Nie udało się wysłać linku konfiguracji."
+      "setupLinkFailed": "Nie udało się wysłać linku konfiguracji.",
+      "access": {
+        "header": "Access",
+        "active": "Active",
+        "accepted": "Password set",
+        "invited": "Invited",
+        "expired": "Invitation expired",
+        "none": "No invitation",
+        "lastSeen": "last seen {{when}}",
+        "linkExpires": "link expires {{when}}",
+        "linkExpiredOn": "link expired on {{date}}",
+        "neverSignedIn": "never signed in"
+      }
     },
     "groups": {
       "title_plural": "Grupy",

@@ -1467,7 +1467,19 @@
       "deleteBlockedHint": "대신 계정을 “무효”로 두어 티켓·기사·이력이 귀속될 수 있게 하세요.",
       "resendSetupLink": "설정 링크 다시 보내기",
       "setupLinkSent": "설정 링크를 보냈습니다.",
-      "setupLinkFailed": "설정 링크를 보내지 못했습니다."
+      "setupLinkFailed": "설정 링크를 보내지 못했습니다.",
+      "access": {
+        "header": "Access",
+        "active": "Active",
+        "accepted": "Password set",
+        "invited": "Invited",
+        "expired": "Invitation expired",
+        "none": "No invitation",
+        "lastSeen": "last seen {{when}}",
+        "linkExpires": "link expires {{when}}",
+        "linkExpiredOn": "link expired on {{date}}",
+        "neverSignedIn": "never signed in"
+      }
     },
     "groups": {
       "title_plural": "그룹",

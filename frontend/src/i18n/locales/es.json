@@ -1467,7 +1467,19 @@
       "deleteBlockedHint": "Marque la cuenta como «No válida» para que tickets, artículos e historial sigan siendo atribuibles.",
       "resendSetupLink": "Reenviar enlace de configuración",
       "setupLinkSent": "Enlace de configuración enviado.",
-      "setupLinkFailed": "No se pudo enviar el enlace de configuración."
+      "setupLinkFailed": "No se pudo enviar el enlace de configuración.",
+      "access": {
+        "header": "Access",
+        "active": "Active",
+        "accepted": "Password set",
+        "invited": "Invited",
+        "expired": "Invitation expired",
+        "none": "No invitation",
+        "lastSeen": "last seen {{when}}",
+        "linkExpires": "link expires {{when}}",
+        "linkExpiredOn": "link expired on {{date}}",
+        "neverSignedIn": "never signed in"
+      }
     },
     "groups": {
       "title_plural": "Grupos",

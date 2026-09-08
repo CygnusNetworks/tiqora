@@ -215,10 +215,17 @@ def _seed_spnego_user(sync_url: str, login: str = "alice") -> int:
     engine = create_engine(sync_url)
     with engine.begin() as conn:
         TiqoraBase.metadata.create_all(conn)
-        conn.execute(
-            text("DELETE FROM users WHERE login = :login"),
-            {"login": login},
-        )
+        # Children first: a successful SPNEGO login stamps `UserLastLogin` into
+        # user_preferences, whose FK to users.id would otherwise block dropping
+        # the previous run's agent. (Production does the same ordering in
+        # `tiqora.domain.user_delete.delete_user_rows`.) Resolved in two plain
+        # statements rather than a subquery, which MariaDB did not survive here.
+        stale = conn.execute(
+            text("SELECT id FROM users WHERE login = :login"), {"login": login}
+        ).scalar_one_or_none()
+        if stale is not None:
+            conn.execute(text("DELETE FROM user_preferences WHERE user_id = :uid"), {"uid": stale})
+            conn.execute(text("DELETE FROM users WHERE id = :uid"), {"uid": stale})
         conn.execute(
             text(
                 "INSERT INTO users (id, login, pw, first_name, last_name, valid_id,"
