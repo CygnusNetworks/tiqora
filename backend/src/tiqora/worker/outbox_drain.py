@@ -17,6 +17,7 @@ from tiqora.config import Settings, get_settings
 from tiqora.db.engine import get_session_factory
 from tiqora.domain.search import SearchIndexService
 from tiqora.domain.settings_store import KEY_OUTBOX_ENABLED, get_setting_bool
+from tiqora.domain.ticket_write_service import LEGACY_NOTIFICATION_EVENTS
 from tiqora.events.pubsub import (
     get_pubsub_redis,
     publish_ticket_event,
@@ -65,7 +66,11 @@ async def drain_outbox(
 
     row_ids = [int(r[0]) for r in rows]
     ticket_ids = sorted({int(r[2]) for r in rows})
-    webhook_rows = [(str(r[1]), int(r[2]), r[3]) for r in rows]
+    # The legacy ``Notification*`` events exist only to drive the notification
+    # engine; they duplicate a ``Ticket*``/``Article*`` event that is already in
+    # this same batch, so they must not fan out again to webhooks or SSE.
+    external_rows = [r for r in rows if str(r[1]) not in LEGACY_NOTIFICATION_EVENTS]
+    webhook_rows = [(str(r[1]), int(r[2]), r[3]) for r in external_rows]
 
     # Re-index in Meilisearch
     async with factory() as session:
@@ -86,7 +91,7 @@ async def drain_outbox(
     # (ticket_id, event_type) pair already grouped by the outbox rows.
     try:
         pubsub_client = get_pubsub_redis(cfg)
-        distinct_events = sorted({(int(r[2]), str(r[1])) for r in rows})
+        distinct_events = sorted({(int(r[2]), str(r[1])) for r in external_rows})
         queue_by_ticket = await resolve_ticket_queue_ids(factory, ticket_ids)
         for ticket_id, event_type in distinct_events:
             await publish_ticket_event(

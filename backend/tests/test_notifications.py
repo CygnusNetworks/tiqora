@@ -234,10 +234,17 @@ async def test_owner_and_customer_notified_with_placeholders_and_history(
             await _skip_backlog(session)
             queue_id = await _insert_queue(session, "notify-q-1")
             await _insert_customer_user(session, "cust1", "cust1@example.com")
+            # Owner must not be agent 1 — Znuny never notifies the root agent.
+            owner_id = 910_101
+            await _insert_agent(session, user_id=owner_id, login="notify.owner1")
             ticket_id = await _insert_ticket(
-                session, "NOTIFY_1", owner_id=1, customer_user_id="cust1", queue_id=queue_id
+                session,
+                "NOTIFY_1",
+                owner_id=owner_id,
+                customer_user_id="cust1",
+                queue_id=queue_id,
             )
-            await _set_user_prefs(session, 1, "owner@example.com")
+            await _set_user_prefs(session, owner_id, "owner@example.com")
             await _insert_notification_event(
                 session,
                 "new-ticket-notify",
@@ -282,10 +289,12 @@ async def test_article_filter_respected(mariadb_znuny_url: str) -> None:
             await _seed_tiqora_tables(session)
             await _skip_backlog(session)
             queue_id = await _insert_queue(session, "notify-q-2")
+            owner_id = 910_102
+            await _insert_agent(session, user_id=owner_id, login="notify.owner2")
             ticket_id = await _insert_ticket(
-                session, "NOTIFY_ARTFILT", owner_id=1, queue_id=queue_id
+                session, "NOTIFY_ARTFILT", owner_id=owner_id, queue_id=queue_id
             )
-            await _set_user_prefs(session, 1, "owner@example.com")
+            await _set_user_prefs(session, owner_id, "owner@example.com")
             await _insert_notification_event(
                 session,
                 "visible-article-notify",
@@ -342,8 +351,12 @@ async def test_watermark_prevents_resend_on_rerun(mariadb_znuny_url: str) -> Non
             await _seed_tiqora_tables(session)
             await _skip_backlog(session)
             queue_id = await _insert_queue(session, "notify-q-3")
-            ticket_id = await _insert_ticket(session, "NOTIFY_WM", owner_id=1, queue_id=queue_id)
-            await _set_user_prefs(session, 1, "owner@example.com")
+            owner_id = 910_103
+            await _insert_agent(session, user_id=owner_id, login="notify.owner3")
+            ticket_id = await _insert_ticket(
+                session, "NOTIFY_WM", owner_id=owner_id, queue_id=queue_id
+            )
+            await _set_user_prefs(session, owner_id, "owner@example.com")
             await _insert_notification_event(
                 session,
                 "wm-notify",
@@ -512,5 +525,191 @@ async def test_agent_watcher_recipient_resolves_watchers(
 
         async with factory() as session:
             assert await _history_count(session, ticket_id, "SendAgentNotification") == 1
+    finally:
+        await engine.dispose()
+
+
+def _recipients_of(sender: CapturingMailSender, subject: str) -> list[str]:
+    """Recipients of the mails one rule produced, identified by its subject.
+
+    The Znuny seed ships its own notification rules for the same events, so
+    tests must not assume their rule is the only one that matched.
+    """
+    return sorted(str(m["To"]) for m in sender.sent if str(m["Subject"]) == subject)
+
+
+async def _grant_group_permission(
+    session: AsyncSession, user_id: int, group_id: int, permission_key: str = "ro"
+) -> None:
+    await session.execute(
+        text(
+            "INSERT INTO group_user (user_id, group_id, permission_key, create_time,"
+            " create_by, change_time, change_by)"
+            " VALUES (:uid, :gid, :key, current_timestamp, 1, current_timestamp, 1)"
+        ),
+        {"uid": user_id, "gid": group_id, "key": permission_key},
+    )
+
+
+async def _subscribe_queue(session: AsyncSession, user_id: int, queue_id: int) -> None:
+    await session.execute(
+        text("INSERT INTO personal_queues (user_id, queue_id) VALUES (:uid, :qid)"),
+        {"uid": user_id, "qid": queue_id},
+    )
+
+
+async def _subscribe_service(session: AsyncSession, user_id: int, service_id: int) -> None:
+    await session.execute(
+        text("INSERT INTO personal_services (user_id, service_id) VALUES (:uid, :sid)"),
+        {"uid": user_id, "sid": service_id},
+    )
+
+
+async def _insert_service(session: AsyncSession, name: str) -> int:
+    await session.execute(
+        text(
+            "INSERT INTO service (name, valid_id, create_time, create_by,"
+            " change_time, change_by)"
+            " VALUES (:name, 1, current_timestamp, 1, current_timestamp, 1)"
+        ),
+        {"name": name},
+    )
+    row = (
+        await session.execute(text("SELECT id FROM service WHERE name = :name"), {"name": name})
+    ).first()
+    assert row is not None
+    return int(row[0])
+
+
+@pytest.mark.db
+async def test_my_queues_and_my_services_recipients(mariadb_znuny_url: str) -> None:
+    """AgentMyQueues/AgentMyServices resolve personal_queues/personal_services.
+
+    Ports ``Ticket.pm::GetSubscribedUserIDsByQueueID`` (queue subscribers also
+    need ``ro`` on the queue's group) and ``...ByServiceID`` (valid users only).
+    """
+    engine = create_async_engine(_mysql_async(mariadb_znuny_url))
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    sender = CapturingMailSender()
+
+    q_sub = 910_201  # subscribed to the queue, has ro
+    q_sub_no_perm = 910_202  # subscribed to the queue, but no ro on its group
+    s_sub = 910_203  # subscribed to the service only
+    try:
+        async with factory() as session:
+            await _seed_tiqora_tables(session)
+            await _skip_backlog(session)
+            queue_id = await _insert_queue(session, "notify-q-myq")
+            service_id = await _insert_service(session, "notify-svc-myq")
+            group_row = (
+                await session.execute(
+                    text("SELECT group_id FROM queue WHERE id = :qid"), {"qid": queue_id}
+                )
+            ).first()
+            assert group_row is not None
+            group_id = int(group_row[0])
+
+            for uid, login, mail in (
+                (q_sub, "myq.sub", "myq-sub@example.com"),
+                (q_sub_no_perm, "myq.noperm", "myq-noperm@example.com"),
+                (s_sub, "mysvc.sub", "mysvc-sub@example.com"),
+            ):
+                await _insert_agent(session, user_id=uid, login=login)
+                await _set_user_prefs(session, uid, mail)
+
+            await _grant_group_permission(session, q_sub, group_id)
+            await _grant_group_permission(session, s_sub, group_id)
+            await _subscribe_queue(session, q_sub, queue_id)
+            await _subscribe_queue(session, q_sub_no_perm, queue_id)
+            await _subscribe_service(session, s_sub, service_id)
+
+            owner_id = 910_204  # neither a queue nor a service subscriber
+            await _insert_agent(session, user_id=owner_id, login="myq.owner")
+            ticket_id = await _insert_ticket(
+                session, "NOTIFY_MYQ", owner_id=owner_id, queue_id=queue_id
+            )
+            await session.execute(
+                text("UPDATE ticket SET service_id = :sid WHERE id = :tid"),
+                {"sid": service_id, "tid": ticket_id},
+            )
+            await _insert_notification_event(
+                session,
+                "myqueues-notify",
+                items={
+                    "Events": ["NotificationMove"],
+                    "QueueID": [str(queue_id)],
+                    "Recipients": ["AgentMyQueues", "AgentMyServices"],
+                    "Transports": ["Email"],
+                },
+                subject="MYQ-SUBJECT",
+                body="b",
+            )
+            await _insert_outbox_event(session, "NotificationMove", ticket_id)
+            await session.commit()
+            await set_setting(session, KEY_NOTIFICATIONS_ENABLED, "1")
+
+        await run_notifications_tick(session_factory=factory, mail_sender=sender)
+        # The Znuny seed ships its own NotificationMove rule, so scope the
+        # assertion to this rule's subject.
+        assert _recipients_of(sender, "MYQ-SUBJECT") == [
+            "myq-sub@example.com",
+            "mysvc-sub@example.com",
+        ]
+    finally:
+        await engine.dispose()
+
+
+@pytest.mark.db
+async def test_skip_recipients_and_root_agent_are_never_notified(mariadb_znuny_url: str) -> None:
+    """``skip_user_ids`` (Znuny SkipRecipients) and agent 1 are filtered out."""
+    engine = create_async_engine(_mysql_async(mariadb_znuny_url))
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    sender = CapturingMailSender()
+
+    owner_id = 910_301
+    responsible_id = 910_302
+    try:
+        async with factory() as session:
+            await _seed_tiqora_tables(session)
+            await _skip_backlog(session)
+            queue_id = await _insert_queue(session, "notify-q-skip")
+            await _insert_agent(session, user_id=owner_id, login="skip.owner")
+            await _insert_agent(session, user_id=responsible_id, login="skip.responsible")
+            await _set_user_prefs(session, owner_id, "skip-owner@example.com")
+            await _set_user_prefs(session, responsible_id, "skip-responsible@example.com")
+            await _set_user_prefs(session, 1, "root@example.com")
+
+            ticket_id = await _insert_ticket(
+                session, "NOTIFY_SKIP", owner_id=owner_id, queue_id=queue_id
+            )
+            await session.execute(
+                text("UPDATE ticket SET responsible_user_id = :rid WHERE id = :tid"),
+                {"rid": responsible_id, "tid": ticket_id},
+            )
+            await _insert_notification_event(
+                session,
+                "skip-notify",
+                items={
+                    "Events": ["NotificationOwnerUpdate"],
+                    "QueueID": [str(queue_id)],
+                    "Recipients": ["AgentOwner", "AgentResponsible"],
+                    "RecipientAgents": ["1"],
+                    "Transports": ["Email"],
+                },
+                subject="SKIP-SUBJECT",
+                body="b",
+            )
+            await _insert_outbox_event(
+                session,
+                "NotificationOwnerUpdate",
+                ticket_id,
+                payload=f'{{"skip_user_ids": [{owner_id}]}}',
+            )
+            await session.commit()
+            await set_setting(session, KEY_NOTIFICATIONS_ENABLED, "1")
+
+        await run_notifications_tick(session_factory=factory, mail_sender=sender)
+        # Owner is skipped (they made the change), agent 1 is never notified.
+        assert _recipients_of(sender, "SKIP-SUBJECT") == ["skip-responsible@example.com"]
     finally:
         await engine.dispose()

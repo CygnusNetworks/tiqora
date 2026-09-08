@@ -1993,6 +1993,14 @@
           "name": "GenericAgent",
           "description": "Menjalankan kerja GenericAgent yang dijadualkan."
         },
+        "unlock_timeout": {
+          "name": "Had masa buka kunci",
+          "description": "Membuka kunci tiket yang layak selepas had masa bekerja baris gilirannya."
+        },
+        "pending_check": {
+          "name": "Semakan tertunda",
+          "description": "Menggunakan peralihan tertunda yang matang dan mengeluarkan peristiwa peringatan."
+        },
         "gdpr_retention": {
           "name": "Pengekalan GDPR",
           "description": "Menggunakan peraturan pengekalan yang dikonfigurasikan sekali sehari."

@@ -1993,6 +1993,14 @@
           "name": "GenericAgent",
           "description": "Uruchamia zaplanowane zadania GenericAgent."
         },
+        "unlock_timeout": {
+          "name": "Limit czasu odblokowania",
+          "description": "Odblokowuje kwalifikujące się zgłoszenia po upływie czasu pracy ich kolejki."
+        },
+        "pending_check": {
+          "name": "Sprawdzanie oczekujących",
+          "description": "Stosuje wymagalne przejścia oczekujące i emituje zdarzenia przypomnienia."
+        },
         "gdpr_retention": {
           "name": "Przechowywanie RODO",
           "description": "Stosuje skonfigurowane reguły przechowywania raz dziennie."

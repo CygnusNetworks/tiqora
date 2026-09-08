@@ -188,9 +188,7 @@ async def test_new_ticket_queue_prefers_mail_account_over_system_address(
                 session, {"To": f"Netadmin <{addr}>"}, _PostmasterSysConfig(), account
             )
             assert qid == 1
-            await session.execute(
-                text("DELETE FROM system_address WHERE value0 = :a"), {"a": addr}
-            )
+            await session.execute(text("DELETE FROM system_address WHERE value0 = :a"), {"a": addr})
             await session.commit()
     finally:
         await engine.dispose()

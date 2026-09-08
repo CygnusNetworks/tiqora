@@ -1993,6 +1993,14 @@
           "name": "Generisk Agent",
           "description": "Kører planlagte GenericAgent-job."
         },
+        "unlock_timeout": {
+          "name": "Timeout for oplåsning",
+          "description": "Låser kvalificerede sager op efter køens arbejdstidstimeout."
+        },
+        "pending_check": {
+          "name": "Kontrol af afventende",
+          "description": "Anvender forfaldne afventende overgange og udsender påmindelseshændelser."
+        },
         "gdpr_retention": {
           "name": "GDPR-opbevaring",
           "description": "Anvender konfigurerede opbevaringsregler én gang om dagen."

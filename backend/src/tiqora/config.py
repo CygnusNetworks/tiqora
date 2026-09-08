@@ -408,6 +408,12 @@ class Settings(BaseSettings):
     generic_agent_interval_seconds: int = Field(
         default=60, validation_alias="TIQORA_GENERIC_AGENT_INTERVAL"
     )
+    unlock_timeout_interval_seconds: int = Field(
+        default=300, validation_alias="TIQORA_UNLOCK_TIMEOUT_INTERVAL"
+    )
+    pending_check_interval_seconds: int = Field(
+        default=600, validation_alias="TIQORA_PENDING_CHECK_INTERVAL"
+    )
     # Outbox drain cadence (Phase 2c subtask 6). ``daemon.outbox.enabled``
     # (default ON) is the takeover switch; this is only the poll interval.
     outbox_drain_interval_seconds: int = Field(

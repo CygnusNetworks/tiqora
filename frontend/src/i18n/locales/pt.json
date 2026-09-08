@@ -1993,6 +1993,14 @@
           "name": "Agente Genérico",
           "description": "Executa trabalhos agendados do GenericAgent."
         },
+        "unlock_timeout": {
+          "name": "Tempo limite de desbloqueio",
+          "description": "Desbloqueia os tickets elegíveis após o tempo útil da respetiva fila."
+        },
+        "pending_check": {
+          "name": "Verificação de pendentes",
+          "description": "Aplica as transições pendentes vencidas e emite eventos de lembrete."
+        },
         "gdpr_retention": {
           "name": "Retenção do GDPR",
           "description": "Aplica regras de retenção configuradas uma vez por dia."

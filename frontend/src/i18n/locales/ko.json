@@ -1993,6 +1993,14 @@
           "name": "일반 에이전트",
           "description": "예약된 GenericAgent 작업을 실행합니다."
         },
+        "unlock_timeout": {
+          "name": "잠금 해제 시간 초과",
+          "description": "대상 티켓을 해당 큐의 업무 시간 제한이 지난 후 잠금 해제합니다."
+        },
+        "pending_check": {
+          "name": "보류 확인",
+          "description": "기한이 된 보류 전환을 적용하고 보류 알림 이벤트를 발생시킵니다."
+        },
         "gdpr_retention": {
           "name": "GDPR 보존",
           "description": "구성된 보관 규칙을 하루에 한 번 적용합니다."
