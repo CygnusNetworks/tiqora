@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import UTC, datetime
 from typing import Literal, cast
 
 import structlog
@@ -43,7 +44,11 @@ from tiqora.api.v1.admin.schemas import (
 from tiqora.db.legacy.queue import Queue
 from tiqora.db.legacy.user import GroupRole, GroupUser, PermissionGroups, Roles, RoleUser, Users
 from tiqora.domain.auth import SessionStore, normalize_language_code
-from tiqora.domain.password_setup import unusable_password_hash
+from tiqora.domain.password_setup import (
+    InviteStatus,
+    bulk_latest_invite,
+    unusable_password_hash,
+)
 from tiqora.domain.schemas import UserLanguageUpdate
 from tiqora.domain.user_delete import blocking_references, delete_user_rows
 from tiqora.domain.user_preferences import bulk_get_preferences, get_preference, set_preference
@@ -62,10 +67,40 @@ router = APIRouter(prefix="/users", tags=["admin:users"])
 PermissionKey = Literal["ro", "move_into", "create", "note", "owner", "priority", "rw"]
 
 
-def _with_preferences(user: Users, email: str | None, mobile: str | None) -> UserOut:
+def _parse_last_login(raw: str | None) -> datetime | None:
+    """``UserLastLogin`` holds epoch seconds (Znuny's own format for this key).
+
+    Returned *naive* in UTC, matching every other DB-sourced datetime on this
+    model — the ``UtcDateTime`` serializer tags them all on the way out, and
+    mixing naive and aware values in one model breaks Python-side comparisons.
+
+    A value written by something else — or a half-migrated row — must not take
+    the user list down with a 500, so anything unparseable reads as "never".
+    """
+    if not raw:
+        return None
+    try:
+        return datetime.fromtimestamp(int(raw), UTC).replace(tzinfo=None)
+    except (ValueError, OverflowError, OSError):
+        return None
+
+
+def _with_preferences(
+    user: Users,
+    email: str | None,
+    mobile: str | None,
+    *,
+    invite: InviteStatus | None = None,
+    last_login: datetime | None = None,
+) -> UserOut:
     out = UserOut.model_validate(user)
     out.email = email
     out.mobile = mobile
+    if invite is not None:
+        out.invited_at = invite.invited_at
+        out.invite_expires = invite.expires
+        out.invite_accepted_at = invite.accepted_at
+    out.last_login = last_login
     return out
 
 
@@ -77,9 +112,17 @@ async def list_users(admin: AdminUser, session: DbSession, params: ListParamsDep
     ids = [u.id for u in page.items]
     emails = await bulk_get_preferences(session, ids, "UserEmail")
     mobiles = await bulk_get_preferences(session, ids, "UserMobile")
+    last_logins = await bulk_get_preferences(session, ids, "UserLastLogin")
+    invites = await bulk_latest_invite(session, ids)
     for u in page.items:
         u.email = emails.get(u.id)
         u.mobile = mobiles.get(u.id)
+        u.last_login = _parse_last_login(last_logins.get(u.id))
+        invite = invites.get(u.id)
+        if invite is not None:
+            u.invited_at = invite.invited_at
+            u.invite_expires = invite.expires
+            u.invite_accepted_at = invite.accepted_at
     return page
 
 
@@ -111,7 +154,9 @@ async def get_user(user_id: int, admin: AdminUser, session: DbSession) -> UserOu
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
     email = await get_preference(session, user_id, "UserEmail")
     mobile = await get_preference(session, user_id, "UserMobile")
-    return _with_preferences(user, email, mobile)
+    last_login = _parse_last_login(await get_preference(session, user_id, "UserLastLogin"))
+    invite = (await bulk_latest_invite(session, [user_id])).get(user_id)
+    return _with_preferences(user, email, mobile, invite=invite, last_login=last_login)
 
 
 @router.post("", response_model=UserOut, status_code=status.HTTP_201_CREATED)

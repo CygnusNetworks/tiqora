@@ -9,6 +9,7 @@ import type { DataTableColumn } from "@/components/admin/DataTable";
 import { EffectivePermissionsDialog } from "@/components/admin/EffectivePermissionsDialog";
 import { AgentSettingsDialog } from "@/components/admin/AgentSettingsDialog";
 import { UserDeleteDialog } from "@/components/admin/UserDeleteDialog";
+import { UserAccessCell } from "@/components/admin/UserAccessCell";
 import { MenuItem } from "@/components/ui/Menu";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { formatDateTime } from "@/lib/format";
@@ -112,6 +113,11 @@ export function UsersPage() {
     },
     { key: "email", header: t("admin.users.email"), render: (r) => r.email ?? "—" },
     { key: "title", header: t("admin.users.title"), render: (r) => r.title ?? "—" },
+    {
+      key: "access",
+      header: t("admin.users.access.header"),
+      render: (r) => <UserAccessCell user={r} />,
+    },
     {
       key: "changed",
       header: t("admin.table.changed"),

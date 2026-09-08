@@ -1467,7 +1467,19 @@
       "deleteBlockedHint": "Tetapkan akun ke “Tidak valid” agar tiket, artikel, dan riwayat tetap dapat diatribusikan.",
       "resendSetupLink": "Kirim ulang tautan penyiapan",
       "setupLinkSent": "Tautan penyiapan terkirim.",
-      "setupLinkFailed": "Tidak dapat mengirim tautan penyiapan."
+      "setupLinkFailed": "Tidak dapat mengirim tautan penyiapan.",
+      "access": {
+        "header": "Access",
+        "active": "Active",
+        "accepted": "Password set",
+        "invited": "Invited",
+        "expired": "Invitation expired",
+        "none": "No invitation",
+        "lastSeen": "last seen {{when}}",
+        "linkExpires": "link expires {{when}}",
+        "linkExpiredOn": "link expired on {{date}}",
+        "neverSignedIn": "never signed in"
+      }
     },
     "groups": {
       "title_plural": "Grup",

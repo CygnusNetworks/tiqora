@@ -1467,7 +1467,19 @@
       "deleteBlockedHint": "Задайте акаунта на «Невалиден», за да останат тикети, статии и история приписваеми.",
       "resendSetupLink": "Повторно изпращане на връзката за настройка",
       "setupLinkSent": "Връзката за настройка е изпратена.",
-      "setupLinkFailed": "Връзката за настройка не можа да бъде изпратена."
+      "setupLinkFailed": "Връзката за настройка не можа да бъде изпратена.",
+      "access": {
+        "header": "Access",
+        "active": "Active",
+        "accepted": "Password set",
+        "invited": "Invited",
+        "expired": "Invitation expired",
+        "none": "No invitation",
+        "lastSeen": "last seen {{when}}",
+        "linkExpires": "link expires {{when}}",
+        "linkExpiredOn": "link expired on {{date}}",
+        "neverSignedIn": "never signed in"
+      }
     },
     "groups": {
       "title_plural": "Групи",

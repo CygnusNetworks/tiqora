@@ -1467,7 +1467,19 @@
       "deleteBlockedHint": "Set the account to \"Invalid\" instead, so tickets, articles and history stay attributable.",
       "resendSetupLink": "Resend setup link",
       "setupLinkSent": "Setup link sent.",
-      "setupLinkFailed": "Could not send the setup link."
+      "setupLinkFailed": "Could not send the setup link.",
+      "access": {
+        "header": "Access",
+        "active": "Active",
+        "accepted": "Password set",
+        "invited": "Invited",
+        "expired": "Invitation expired",
+        "none": "No invitation",
+        "lastSeen": "last seen {{when}}",
+        "linkExpires": "link expires {{when}}",
+        "linkExpiredOn": "link expired on {{date}}",
+        "neverSignedIn": "never signed in"
+      }
     },
     "groups": {
       "title_plural": "Groups",
