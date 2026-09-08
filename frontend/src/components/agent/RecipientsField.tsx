@@ -29,9 +29,21 @@ export function parseRecipient(raw: string): Recipient | null {
   return { name: "", email: value };
 }
 
-/** Render a recipient back to "Name <email>" (or bare email when unnamed). */
+// RFC 5322 §3.2.3 "specials" — a display-name containing any of these must be
+// a quoted-string, or a later parse (ours, or the recipient's mail client)
+// reads a bare comma/semicolon/etc. as a structural separator and mangles or
+// drops the address. Mirrors Python's email.utils.formataddr, which the
+// backend uses for the same header fields.
+const RFC5322_SPECIALS = /[[\]\\()<>@,:;".]/;
+
+/** Render a recipient back to "Name <email>" (or bare email when unnamed),
+ * quoting/escaping the name per RFC 5322 when it contains a special char
+ * (e.g. the German "Nachname, Vorname" display-name convention). */
 export function formatRecipient(r: Recipient): string {
-  return r.name ? `${r.name} <${r.email}>` : r.email;
+  if (!r.name) return r.email;
+  const escaped = r.name.replace(/([\\"])/g, "\\$1");
+  const name = RFC5322_SPECIALS.test(r.name) ? `"${escaped}"` : escaped;
+  return `${name} <${r.email}>`;
 }
 
 /**

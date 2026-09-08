@@ -8,6 +8,7 @@ import {
   parseRecipient,
   parseRecipientList,
   joinRecipients,
+  formatRecipient,
   moveRecipientBetween,
   sameRecipient,
   type Recipient,
@@ -77,6 +78,35 @@ describe("parseRecipientList / joinRecipients", () => {
     ];
     expect(joinRecipients(list)).toBe("Jane <jane@x.com>, bob@x.com");
     expect(joinRecipients([])).toBeNull();
+  });
+
+  it("re-quotes a 'Nachname, Vorname' display name on the way back out", () => {
+    // Regression: joinRecipients used to drop the quotes a comma-containing
+    // name needs, so the outgoing header (and the next parseRecipientList
+    // pass) split on the comma instead of treating it as one recipient.
+    const list = parseRecipientList('"Doe, Jane" <jane@x.com>, "Roe;Bob" <bob@x.com>');
+    const out = joinRecipients(list);
+    expect(out).toBe('"Doe, Jane" <jane@x.com>, "Roe;Bob" <bob@x.com>');
+    expect(parseRecipientList(out!)).toEqual(list);
+  });
+});
+
+describe("formatRecipient", () => {
+  it("leaves a plain name unquoted", () => {
+    expect(formatRecipient({ name: "Jane", email: "jane@x.com" })).toBe("Jane <jane@x.com>");
+  });
+
+  it("quotes a name containing an RFC 5322 special character", () => {
+    expect(formatRecipient({ name: "Doe, Jane", email: "jane@x.com" })).toBe(
+      '"Doe, Jane" <jane@x.com>',
+    );
+    expect(formatRecipient({ name: "Roe;Bob", email: "bob@x.com" })).toBe('"Roe;Bob" <bob@x.com>');
+  });
+
+  it("escapes an embedded quote or backslash", () => {
+    expect(formatRecipient({ name: 'Ann "The Boss" Lee', email: "a@x.com" })).toBe(
+      '"Ann \\"The Boss\\" Lee" <a@x.com>',
+    );
   });
 });
 
