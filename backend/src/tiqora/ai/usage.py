@@ -79,14 +79,19 @@ async def provider_budget_exceeded(
     for window_name, limit, window_start in windows:
         if limit is None:
             continue
-        spent = (
-            await session.execute(
-                select(func.coalesce(func.sum(TiqoraAiUsage.cost_hint), 0.0)).where(
-                    TiqoraAiUsage.provider_id == provider_id,
-                    TiqoraAiUsage.ts >= window_start,
+        # COALESCE guarantees a number, but the column is nullable, so the
+        # scalar comes back typed as ``float | None``.
+        spent = float(
+            (
+                await session.execute(
+                    select(func.coalesce(func.sum(TiqoraAiUsage.cost_hint), 0.0)).where(
+                        TiqoraAiUsage.provider_id == provider_id,
+                        TiqoraAiUsage.ts >= window_start,
+                    )
                 )
-            )
-        ).scalar_one()
+            ).scalar_one()
+            or 0.0
+        )
         if spent >= limit:
             return window_name
     return None

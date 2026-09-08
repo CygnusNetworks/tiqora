@@ -7,8 +7,10 @@ local testcontainer only, real async session, no network. Seed ids use the
 
 from __future__ import annotations
 
+from collections.abc import Iterator
+
 import pytest
-from sqlalchemy import create_engine, text
+from sqlalchemy import Connection, create_engine, text
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 from tiqora.ai import handoff
@@ -26,10 +28,24 @@ def _ensure_tables(sync_url: str) -> None:
     engine = create_engine(sync_url)
     with engine.begin() as conn:
         TiqoraBase.metadata.create_all(conn)
-        conn.execute(
-            text("DELETE FROM tiqora_ai_ticket_state WHERE ticket_id BETWEEN 89600 AND 89699")
-        )
+        _delete_state_rows(conn)
     engine.dispose()
+
+
+def _delete_state_rows(conn: Connection) -> None:
+    conn.execute(text("DELETE FROM tiqora_ai_ticket_state WHERE ticket_id BETWEEN 89600 AND 89699"))
+
+
+@pytest.fixture(autouse=True, scope="module")
+def _cleanup(mariadb_znuny_url: str) -> Iterator[None]:
+    """Clearing only on the way *in* left the last test's rows behind."""
+    yield
+    engine = create_engine(mariadb_znuny_url)
+    try:
+        with engine.begin() as conn:
+            _delete_state_rows(conn)
+    finally:
+        engine.dispose()
 
 
 async def test_mark_ai_escalated_creates_row_and_is_idempotent(mariadb_znuny_url: str) -> None:
