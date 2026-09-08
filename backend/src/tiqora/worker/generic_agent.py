@@ -300,14 +300,14 @@ def build_ticket_query(criteria: dict[str, list[str]]) -> tuple[str, dict[str, o
         if placeholders:
             clauses.append(f"{column} IN ({', '.join(placeholders)})")
 
-    if criteria.get("Title"):
+    if criteria.get("Title") and criteria["Title"][0] != "":
         value = criteria["Title"][0]
         n += 1
         pname = f"p{n}"
         params[pname] = _like_pattern(value)
         clauses.append(f"title LIKE :{pname}")
 
-    if criteria.get("CustomerID"):
+    if criteria.get("CustomerID") and criteria["CustomerID"][0] != "":
         value = criteria["CustomerID"][0]
         n += 1
         pname = f"p{n}"
