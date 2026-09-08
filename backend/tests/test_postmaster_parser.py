@@ -135,11 +135,11 @@ def test_get_email_address_and_split_address_line() -> None:
 
 
 def test_split_address_line_requotes_comma_display_name() -> None:
-    """"Nachname, Vorname" (common German Outlook/Exchange format) must round-trip
+    """ "Nachname, Vorname" (common German Outlook/Exchange format) must round-trip
     through get_email_address without losing its address — a bare f-string
     reformat used to drop the comma-quoting and silently lose the address."""
     line = (
-        'Cygnus Networks GmbH - Support <support@example.com>, '
+        "Cygnus Networks GmbH - Support <support@example.com>, "
         '"Potulski, Allan Jens" <j.potulski@example.com>, '
         '"Nitsche, Christopher" <c.nitsche@example.com>'
     )

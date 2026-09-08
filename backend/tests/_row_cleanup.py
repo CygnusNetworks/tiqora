@@ -12,6 +12,7 @@ from __future__ import annotations
 from collections.abc import Iterator, Sequence
 
 from sqlalchemy import create_engine, delete, text
+from sqlalchemy.exc import DatabaseError
 
 from tiqora.db.tiqora.models import TiqoraSettings
 
@@ -35,16 +36,26 @@ DEFAULT_TABLES: tuple[str, ...] = (
 
 
 def snapshot_max_ids(sync_url: str, tables: Sequence[str] = DEFAULT_TABLES) -> dict[str, int]:
-    """Highest existing id per table, before the module writes anything."""
+    """Highest existing id per table, before the module writes anything.
+
+    Tables the module creates itself (the additive ``tiqora_*`` set) may not
+    exist yet at module-setup time — a module that runs first in a fresh
+    container is exactly that case. Those are skipped: anything the module
+    goes on to create it also owns entirely, so the restore has nothing older
+    to preserve.
+    """
     engine = create_engine(sync_url)
+    snapshot: dict[str, int] = {}
     try:
-        with engine.begin() as conn:
-            return {
-                table: int(
-                    conn.execute(text(f"SELECT COALESCE(MAX(id), 0) FROM {table}")).scalar_one()
-                )
-                for table in tables
-            }
+        for table in tables:
+            try:
+                with engine.begin() as conn:
+                    snapshot[table] = int(
+                        conn.execute(text(f"SELECT COALESCE(MAX(id), 0) FROM {table}")).scalar_one()
+                    )
+            except DatabaseError:
+                continue
+        return snapshot
     finally:
         engine.dispose()
 
@@ -57,8 +68,12 @@ def delete_rows_above(
     try:
         with engine.begin() as conn:
             for table in DEFAULT_TABLES:
-                if table in snapshot:
+                if table not in snapshot:
+                    continue
+                try:
                     conn.execute(text(f"DELETE FROM {table} WHERE id > :m"), {"m": snapshot[table]})
+                except DatabaseError:
+                    continue
             if setting_keys:
                 # Via the model, not raw SQL: ``key`` is reserved in MySQL and
                 # would need backticks that PostgreSQL rejects.

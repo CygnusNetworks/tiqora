@@ -69,6 +69,7 @@ from tiqora.channels.email.placeholder import expand_placeholders
 from tiqora.channels.email.smtp import MailSender, SmtpMailSender, build_message
 from tiqora.config import Settings, get_settings
 from tiqora.db.engine import get_session_factory
+from tiqora.domain.mail_outbound import build_outbound_sender
 from tiqora.domain.settings_store import (
     KEY_NOTIFICATIONS_ENABLED,
     get_setting_bool,
@@ -568,15 +569,21 @@ async def process_event(
     ticket_id: int,
     payload: dict[str, object],
     user_id: int,
-) -> int:
-    """Evaluate all matching notification_event rows for one outbox event. Returns sent count."""
+) -> tuple[int, int]:
+    """Evaluate all matching notification_event rows for one outbox event.
+
+    Returns ``(sent, failed)``. Failures are counted rather than only logged:
+    a per-recipient send error used to leave the tick reporting
+    ``sent: 0, errors: 0``, which looks healthy even when every single send is
+    failing — exactly how a misconfigured relay stayed invisible.
+    """
     notifications = await _notifications_for_event(session, event_type)
     if not notifications:
-        return 0
+        return 0, 0
 
     ticket = await _ticket_row(session, ticket_id)
     if ticket is None:
-        return 0
+        return 0, 0
 
     article = None
     if event_type in _ARTICLE_ONLY_EVENTS and payload.get("article_id"):
@@ -591,6 +598,7 @@ async def process_event(
     )
 
     sent = 0
+    failed = 0
     for notification in notifications:
         if not _passes_ticket_filter(notification, ticket):
             continue
@@ -620,9 +628,10 @@ async def process_event(
                     ticket_id=ticket_id,
                     recipient=recipient.email,
                 )
+                failed += 1
                 NOTIFICATIONS_ERRORS.inc()
 
-    return sent
+    return sent, failed
 
 
 async def run_notifications_tick(
@@ -634,7 +643,6 @@ async def run_notifications_tick(
     """One scheduler tick: check the feature flag, drain new outbox events, send notifications."""
     cfg = settings or get_settings()
     factory = session_factory or get_session_factory()
-    sender = mail_sender or SmtpMailSender(cfg)
 
     async with factory() as session:
         enabled = await get_setting_bool(session, KEY_NOTIFICATIONS_ENABLED, False)
@@ -644,8 +652,15 @@ async def run_notifications_tick(
         watermark = await get_setting_int(session, KEY_NOTIFICATIONS_WATERMARK, 0)
         sysconfig = SysConfig(session)
         user_id = await sysconfig.postmaster_user_id()
-        if isinstance(sender, SmtpMailSender):
-            sender.sendmail_bcc = (await sysconfig.sendmail_bcc()) or None
+        sendmail_bcc = (await sysconfig.sendmail_bcc()) or None
+        # Resolve the configured relay, not the TIQORA_SMTP_* environment:
+        # those are unset whenever the relay is configured through the admin
+        # UI, and the fallback to localhost:25 fails every send.
+        sender = mail_sender or await build_outbound_sender(
+            session, sendmail_bcc=sendmail_bcc, settings=cfg
+        )
+        if mail_sender is not None and isinstance(mail_sender, SmtpMailSender):
+            mail_sender.sendmail_bcc = sendmail_bcc
         batch = await _next_outbox_batch(session, watermark, _BATCH_SIZE)
 
     totals = {"events": 0, "sent": 0, "errors": 0}
@@ -655,7 +670,7 @@ async def run_notifications_tick(
         try:
             async with factory() as session, session.begin():
                 sysconfig = SysConfig(session)
-                sent = await process_event(
+                sent, failed = await process_event(
                     session,
                     sysconfig,
                     sender,
@@ -666,6 +681,7 @@ async def run_notifications_tick(
                 )
             totals["events"] += 1
             totals["sent"] += sent
+            totals["errors"] += failed
             NOTIFICATIONS_EVENTS_PROCESSED.inc()
         except Exception:  # noqa: BLE001 — one broken event must not stop the batch
             logger.exception("notifications_event_failed", event_id=event_id, ticket_id=ticket_id)
