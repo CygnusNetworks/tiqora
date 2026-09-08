@@ -1993,6 +1993,14 @@
           "name": "GenericAgent",
           "description": "Suorittaa ajoitetut GenericAgent-työt."
         },
+        "unlock_timeout": {
+          "name": "Lukituksen avaamisen aikakatkaisu",
+          "description": "Avaa kelvolliset tiketit jonon työaika-aikakatkaisun jälkeen."
+        },
+        "pending_check": {
+          "name": "Odottavien tarkistus",
+          "description": "Soveltaa erääntyneet odottavat siirtymät ja lähettää muistutustapahtumia."
+        },
         "gdpr_retention": {
           "name": "GDPR:n säilyttäminen",
           "description": "Käyttää määritettyjä säilytyssääntöjä kerran päivässä."

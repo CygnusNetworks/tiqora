@@ -1993,6 +1993,14 @@
           "name": "Wakala wa Ujumla",
           "description": "Huendesha kazi zilizoratibiwa za Wakala Mkuu."
         },
+        "unlock_timeout": {
+          "name": "Muda wa kufungua",
+          "description": "Hufungua tiketi zinazostahili baada ya muda wa kazi wa foleni yao kuisha."
+        },
+        "pending_check": {
+          "name": "Ukaguzi wa zinazosubiri",
+          "description": "Hutekeleza mabadiliko yanayosubiri yaliyofika muda na hutoa matukio ya ukumbusho."
+        },
         "gdpr_retention": {
           "name": "Uhifadhi wa GDPR",
           "description": "Hutumia sheria zilizowekwa za kuhifadhi mara moja kwa siku."

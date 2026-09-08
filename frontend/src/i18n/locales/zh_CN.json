@@ -1993,6 +1993,14 @@
           "name": "通用代理",
           "description": "运行计划的 GenericAgent 作业。"
         },
+        "unlock_timeout": {
+          "name": "解锁超时",
+          "description": "在队列的工作时间超时后解锁符合条件的工单。"
+        },
+        "pending_check": {
+          "name": "挂起检查",
+          "description": "应用到期的挂起状态转换并发出挂起提醒事件。"
+        },
         "gdpr_retention": {
           "name": "GDPR 保留",
           "description": "每天应用一次配置的保留规则。"

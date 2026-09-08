@@ -1993,6 +1993,14 @@
           "name": "GenericAgent",
           "description": "Izvaja načrtovana opravila GenericAgent."
         },
+        "unlock_timeout": {
+          "name": "Časovna omejitev odklepanja",
+          "description": "Odklene ustrezne zahtevke po poteku delovnega časa njihove vrste."
+        },
+        "pending_check": {
+          "name": "Preverjanje čakajočih",
+          "description": "Uporabi zapadle čakajoče prehode in oddaja dogodke opomnika."
+        },
         "gdpr_retention": {
           "name": "GDPR hramba",
           "description": "Uporabi konfigurirana pravila hrambe enkrat na dan."
