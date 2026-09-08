@@ -35,6 +35,7 @@ x-app-env: &app-env
   # Local HTTP — no TLS, so session cookies must not be Secure-only.
   TIQORA_SESSION_COOKIE_SECURE: "false"
   TIQORA_CORS_ORIGINS: http://localhost:8000
+  TIQORA_PUBLIC_BASE_URL: http://localhost:8000
 
 x-app-build: &app-build
   build:

@@ -110,6 +110,8 @@ services:
       TIQORA_SECRET_KEY: ${TIQORA_SECRET_KEY:?set TIQORA_SECRET_KEY in .env}
       TIQORA_ENV: production
       TIQORA_LOG_LEVEL: INFO
+      # Public Tiqora URL, identical for API and worker-generated links.
+      TIQORA_PUBLIC_BASE_URL: ${TIQORA_PUBLIC_BASE_URL:-https://helpdesk.example.com}
       # Secure session cookies (HTTPS). Override only if you know why.
       TIQORA_SESSION_COOKIE_SECURE: "true"
       TIQORA_CORS_ORIGINS: ${TIQORA_CORS_ORIGINS:-https://helpdesk.example.com}
@@ -177,6 +179,8 @@ services:
       TIQORA_SECRET_KEY: ${TIQORA_SECRET_KEY:?set TIQORA_SECRET_KEY in .env}
       TIQORA_ENV: production
       TIQORA_LOG_LEVEL: INFO
+      # Public Tiqora URL, identical for API and worker-generated links.
+      TIQORA_PUBLIC_BASE_URL: ${TIQORA_PUBLIC_BASE_URL:-https://helpdesk.example.com}
     depends_on:
       - tiqora-api
       - redis
