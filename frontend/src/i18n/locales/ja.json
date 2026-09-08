@@ -1467,7 +1467,19 @@
       "deleteBlockedHint": "代わりにアカウントを「無効」にし、チケット・記事・履歴の帰属を保てます。",
       "resendSetupLink": "セットアップリンクを再送信",
       "setupLinkSent": "セットアップリンクを送信しました。",
-      "setupLinkFailed": "セットアップリンクを送信できませんでした。"
+      "setupLinkFailed": "セットアップリンクを送信できませんでした。",
+      "access": {
+        "header": "Access",
+        "active": "Active",
+        "accepted": "Password set",
+        "invited": "Invited",
+        "expired": "Invitation expired",
+        "none": "No invitation",
+        "lastSeen": "last seen {{when}}",
+        "linkExpires": "link expires {{when}}",
+        "linkExpiredOn": "link expired on {{date}}",
+        "neverSignedIn": "never signed in"
+      }
     },
     "groups": {
       "title_plural": "グループ",

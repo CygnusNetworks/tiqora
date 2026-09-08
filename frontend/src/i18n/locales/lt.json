@@ -1467,7 +1467,19 @@
       "deleteBlockedHint": "Nustatykite paskyrą į «Netinkama», kad bilietai, straipsniai ir istorija liktų priskirtini.",
       "resendSetupLink": "Iš naujo siųsti sąrankos nuorodą",
       "setupLinkSent": "Sąrankos nuoroda išsiųsta.",
-      "setupLinkFailed": "Nepavyko išsiųsti sąrankos nuorodos."
+      "setupLinkFailed": "Nepavyko išsiųsti sąrankos nuorodos.",
+      "access": {
+        "header": "Access",
+        "active": "Active",
+        "accepted": "Password set",
+        "invited": "Invited",
+        "expired": "Invitation expired",
+        "none": "No invitation",
+        "lastSeen": "last seen {{when}}",
+        "linkExpires": "link expires {{when}}",
+        "linkExpiredOn": "link expired on {{date}}",
+        "neverSignedIn": "never signed in"
+      }
     },
     "groups": {
       "title_plural": "Grupės",

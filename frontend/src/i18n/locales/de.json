@@ -1504,6 +1504,18 @@
       "name": "Name",
       "email": "E-Mail",
       "mobile": "Mobiltelefon",
+      "access": {
+        "header": "Zugang",
+        "active": "Aktiv",
+        "accepted": "Passwort gesetzt",
+        "invited": "Eingeladen",
+        "expired": "Einladung abgelaufen",
+        "none": "Keine Einladung",
+        "lastSeen": "zuletzt {{when}}",
+        "linkExpires": "Link läuft {{when}} ab",
+        "linkExpiredOn": "Link verfiel am {{date}}",
+        "neverSignedIn": "noch nie angemeldet"
+      },
       "effectivePermissions": "Effektive Berechtigungen anzeigen",
       "effectivePermissionsTitle": "Effektive Berechtigungen für {{name}}",
       "effectivePermissionsDescription": "Zusammengeführte Rechte aus direkter Gruppenzuweisung und Rollen.",

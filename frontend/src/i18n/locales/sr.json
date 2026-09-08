@@ -1467,7 +1467,19 @@
       "deleteBlockedHint": "Поставите налог на «Неважећи» да тикети, чланци и историја остану приписиви.",
       "resendSetupLink": "Поново пошаљи везу за подешавање",
       "setupLinkSent": "Веза за подешавање је послата.",
-      "setupLinkFailed": "Везу за подешавање није могуће послати."
+      "setupLinkFailed": "Везу за подешавање није могуће послати.",
+      "access": {
+        "header": "Access",
+        "active": "Active",
+        "accepted": "Password set",
+        "invited": "Invited",
+        "expired": "Invitation expired",
+        "none": "No invitation",
+        "lastSeen": "last seen {{when}}",
+        "linkExpires": "link expires {{when}}",
+        "linkExpiredOn": "link expired on {{date}}",
+        "neverSignedIn": "never signed in"
+      }
     },
     "groups": {
       "title_plural": "Групе",

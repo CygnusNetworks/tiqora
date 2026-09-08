@@ -1467,7 +1467,19 @@
       "deleteBlockedHint": "Вместо этого отметьте учётную запись «Недействительна», чтобы заявки, статьи и история оставались привязанными.",
       "resendSetupLink": "Отправить ссылку настройки снова",
       "setupLinkSent": "Ссылка настройки отправлена.",
-      "setupLinkFailed": "Не удалось отправить ссылку настройки."
+      "setupLinkFailed": "Не удалось отправить ссылку настройки.",
+      "access": {
+        "header": "Access",
+        "active": "Active",
+        "accepted": "Password set",
+        "invited": "Invited",
+        "expired": "Invitation expired",
+        "none": "No invitation",
+        "lastSeen": "last seen {{when}}",
+        "linkExpires": "link expires {{when}}",
+        "linkExpiredOn": "link expired on {{date}}",
+        "neverSignedIn": "never signed in"
+      }
     },
     "groups": {
       "title_plural": "Группы",

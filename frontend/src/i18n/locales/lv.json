@@ -1467,7 +1467,19 @@
       "deleteBlockedHint": "Iestatiet kontu uz “Nederīgs”, lai pieteikumi, raksti un vēsture paliktu attiecināmi.",
       "resendSetupLink": "Nosūtīt iestatīšanas saiti vēlreiz",
       "setupLinkSent": "Iestatīšanas saite nosūtīta.",
-      "setupLinkFailed": "Neizdevās nosūtīt iestatīšanas saiti."
+      "setupLinkFailed": "Neizdevās nosūtīt iestatīšanas saiti.",
+      "access": {
+        "header": "Access",
+        "active": "Active",
+        "accepted": "Password set",
+        "invited": "Invited",
+        "expired": "Invitation expired",
+        "none": "No invitation",
+        "lastSeen": "last seen {{when}}",
+        "linkExpires": "link expires {{when}}",
+        "linkExpiredOn": "link expired on {{date}}",
+        "neverSignedIn": "never signed in"
+      }
     },
     "groups": {
       "title_plural": "Grupas",

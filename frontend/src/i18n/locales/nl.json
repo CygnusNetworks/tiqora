@@ -1467,7 +1467,19 @@
       "deleteBlockedHint": "Zet het account op «Ongeldig» zodat tickets, artikelen en geschiedenis toewijsbaar blijven.",
       "resendSetupLink": "Setup-link opnieuw sturen",
       "setupLinkSent": "Setup-link verzonden.",
-      "setupLinkFailed": "Setup-link kon niet worden verzonden."
+      "setupLinkFailed": "Setup-link kon niet worden verzonden.",
+      "access": {
+        "header": "Access",
+        "active": "Active",
+        "accepted": "Password set",
+        "invited": "Invited",
+        "expired": "Invitation expired",
+        "none": "No invitation",
+        "lastSeen": "last seen {{when}}",
+        "linkExpires": "link expires {{when}}",
+        "linkExpiredOn": "link expired on {{date}}",
+        "neverSignedIn": "never signed in"
+      }
     },
     "groups": {
       "title_plural": "Groepen",

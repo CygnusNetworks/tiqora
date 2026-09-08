@@ -1467,7 +1467,19 @@
       "deleteBlockedHint": "Weka akaunti kuwa “Batili” ili tiketi, makala na historia zibaki zinazoweza kuhusishwa.",
       "resendSetupLink": "Tuma tena kiungo cha usanidi",
       "setupLinkSent": "Kiungo cha usanidi kimetumwa.",
-      "setupLinkFailed": "Imeshindikana kutuma kiungo cha usanidi."
+      "setupLinkFailed": "Imeshindikana kutuma kiungo cha usanidi.",
+      "access": {
+        "header": "Access",
+        "active": "Active",
+        "accepted": "Password set",
+        "invited": "Invited",
+        "expired": "Invitation expired",
+        "none": "No invitation",
+        "lastSeen": "last seen {{when}}",
+        "linkExpires": "link expires {{when}}",
+        "linkExpiredOn": "link expired on {{date}}",
+        "neverSignedIn": "never signed in"
+      }
     },
     "groups": {
       "title_plural": "Vikundi",

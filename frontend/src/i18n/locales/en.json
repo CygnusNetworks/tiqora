@@ -1504,6 +1504,18 @@
       "name": "Name",
       "email": "Email",
       "mobile": "Mobile phone",
+      "access": {
+        "header": "Access",
+        "active": "Active",
+        "accepted": "Password set",
+        "invited": "Invited",
+        "expired": "Invitation expired",
+        "none": "No invitation",
+        "lastSeen": "last seen {{when}}",
+        "linkExpires": "link expires {{when}}",
+        "linkExpiredOn": "link expired on {{date}}",
+        "neverSignedIn": "never signed in"
+      },
       "effectivePermissions": "View effective permissions",
       "effectivePermissionsTitle": "Effective permissions for {{name}}",
       "effectivePermissionsDescription": "Merged rights from direct group assignment and roles.",
