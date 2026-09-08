@@ -715,7 +715,9 @@ async def _expand_placeholders_inner(
         bracket = match.group(2)
         replacement = await _resolve_tag(tag, bracket, ctx=ctx, sysconfig=sysconfig)
         if ctx.escape_html:
-            replacement = html.escape(replacement, quote=True)
+            # Values reach an HTML template as plain text (a quoted article, a
+            # name): escape them, and keep their line breaks visible.
+            replacement = html.escape(replacement, quote=True).replace("\n", "<br />\n")
         start, end = match.span()
         result = result[: start + offset] + replacement + result[end + offset :]
         offset += len(replacement) - (end - start)

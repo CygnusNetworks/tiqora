@@ -71,6 +71,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from tiqora.channels.email.parser import get_email_address, html_to_text
 from tiqora.channels.email.placeholder import (
+    PlaceholderContext,
     expand_placeholders,
     load_agent_maps,
     load_placeholder_context,
@@ -89,6 +90,7 @@ from tiqora.domain.ticket_write_service import ArticleIn, add_article
 from tiqora.permissions.engine import PermissionEngine
 from tiqora.worker.notification_templates import (
     configure_notification_context,
+    has_untranslated_legacy_link,
     normalize_notification_template,
 )
 from tiqora.znuny.history import history_add
@@ -454,16 +456,90 @@ async def _resolve_recipients(
     return recipients
 
 
+async def _build_notification_context(
+    session: AsyncSession,
+    sysconfig: SysConfig,
+    settings: Settings,
+    *,
+    ticket: dict[str, object],
+    article_id: int | None,
+    recipient_kind: str,
+) -> PlaceholderContext:
+    """Placeholder context for one event and one recipient *kind*.
+
+    Everything here depends on the ticket, the triggering article and whether the
+    reader is an agent or the customer -- never on the individual recipient, who
+    only contributes :attr:`PlaceholderContext.notification_recipient`. Building
+    it once per kind keeps a notification to 30-odd queue subscribers from
+    replaying the same ticket/queue/customer lookups for every single mail.
+    """
+    context = await load_placeholder_context(session, ticket_id=_as_int(ticket["id"]))
+    # An absent/deleted article must not silently quote a later ticket message.
+    context.customer_realname = ""
+    context.customer_body = ""
+    if article_id is not None:
+        article_row = (
+            (
+                await session.execute(
+                    text(
+                        "SELECT m.a_from, m.a_subject, m.a_body, m.a_content_type,"
+                        " a.is_visible_for_customer FROM article a"
+                        " JOIN article_data_mime m ON m.article_id = a.id"
+                        " WHERE a.id = :aid AND a.ticket_id = :tid"
+                    ),
+                    {"aid": article_id, "tid": ticket["id"]},
+                )
+            )
+            .mappings()
+            .first()
+        )
+        if article_row is not None and (
+            recipient_kind == "Agent" or article_row["is_visible_for_customer"]
+        ):
+            context.customer_subject = str(article_row["a_subject"] or "")
+            sender_name, sender_email = parseaddr(str(article_row["a_from"] or ""))
+            context.customer_realname = sender_name or sender_email
+            body_text = str(article_row["a_body"] or "")
+            if str(article_row["a_content_type"] or "").lower().startswith("text/html"):
+                body_text = html_to_text(body_text)
+            context.customer_body = body_text
+            context.customer_email_lines = body_text.splitlines()
+    await configure_notification_context(
+        context,
+        sysconfig,
+        settings,
+        ticket_id=_as_int(ticket["id"]),
+        recipient_kind=recipient_kind,
+    )
+    return context
+
+
+async def _recipient_maps(
+    session: AsyncSession, base: PlaceholderContext, recipient: _Recipient
+) -> dict[str, str]:
+    """``<OTRS_NOTIFICATION_RECIPIENT_...>`` maps for the addressed reader."""
+    maps = (
+        await load_agent_maps(session, recipient.user_id)
+        if recipient.kind == "Agent"
+        else dict(base.customer)
+    )
+    maps["useremail"] = recipient.email
+    # A customer known only from an article carries no name columns; greeting
+    # them by address beats rendering the "Hallo ," this engine used to send.
+    if not maps.get("userfullname"):
+        maps["userfullname"] = recipient.email
+    return maps
+
+
 async def _render_message(
     session: AsyncSession,
     sysconfig: SysConfig,
     notification: _NotificationRow,
-    ticket: dict[str, object],
     language: str,
     *,
     recipient: _Recipient,
-    article_id: int | None,
-    settings: Settings,
+    base_context: PlaceholderContext,
+    ticket_id: int,
 ) -> tuple[str, str, str] | None:
     row = (
         await session.execute(
@@ -488,48 +564,9 @@ async def _render_message(
         return None
     subject_tpl, body_tpl, content_type = str(row[0]), str(row[1]), str(row[2])
 
-    context = await load_placeholder_context(session, ticket_id=_as_int(ticket["id"]))
-    if recipient.kind == "Agent":
-        context.notification_recipient = await load_agent_maps(session, recipient.user_id)
-    else:
-        context.notification_recipient = dict(context.customer)
-    context.notification_recipient["useremail"] = recipient.email
-    # An absent/deleted article must not silently quote a later ticket message.
-    context.customer_realname = ""
-    context.customer_body = ""
-    if article_id is not None:
-        article_row = (
-            (
-                await session.execute(
-                    text(
-                        "SELECT m.a_from, m.a_subject, m.a_body, m.a_content_type,"
-                        " a.is_visible_for_customer FROM article a"
-                        " JOIN article_data_mime m ON m.article_id = a.id"
-                        " WHERE a.id = :aid AND a.ticket_id = :tid"
-                    ),
-                    {"aid": article_id, "tid": ticket["id"]},
-                )
-            )
-            .mappings()
-            .first()
-        )
-        if article_row is not None and (
-            recipient.kind == "Agent" or article_row["is_visible_for_customer"]
-        ):
-            context.customer_subject = str(article_row["a_subject"] or "")
-            sender_name, sender_email = parseaddr(str(article_row["a_from"] or ""))
-            context.customer_realname = sender_name or sender_email
-            body_text = str(article_row["a_body"] or "")
-            if str(article_row["a_content_type"] or "").lower().startswith("text/html"):
-                body_text = html_to_text(body_text)
-            context.customer_body = body_text
-            context.customer_email_lines = body_text.splitlines()
-    await configure_notification_context(
-        context,
-        sysconfig,
-        settings,
-        ticket_id=_as_int(ticket["id"]),
-        recipient_kind=recipient.kind,
+    context = replace(
+        base_context,
+        notification_recipient=await _recipient_maps(session, base_context, recipient),
     )
     subject = await expand_placeholders(
         session,
@@ -543,6 +580,15 @@ async def _render_message(
         normalize_notification_template(body_tpl),
         context=replace(context, escape_html=content_type.lower().startswith("text/html")),
     )
+    if has_untranslated_legacy_link(body) or has_untranslated_legacy_link(subject):
+        # The template's ticket URL is a variant we do not translate, so it now
+        # carries the Tiqora host with a Znuny path and 404s. Only the template
+        # can fix this, so name it.
+        logger.warning(
+            "notification_legacy_link_untranslated",
+            notification_id=notification.id,
+            ticket_id=ticket_id,
+        )
     return subject, body, content_type
 
 
@@ -555,18 +601,16 @@ async def _send_to_recipient(
     notification: _NotificationRow,
     recipient: _Recipient,
     user_id: int,
-    article_id: int | None,
-    settings: Settings,
+    base_context: PlaceholderContext,
 ) -> bool:
     rendered = await _render_message(
         session,
         sysconfig,
         notification,
-        ticket,
         recipient.language,
         recipient=recipient,
-        article_id=article_id,
-        settings=settings,
+        base_context=base_context,
+        ticket_id=_as_int(ticket["id"]),
     )
     if rendered is None:
         logger.info("notification_no_message_for_language", notification_id=notification.id)
@@ -659,6 +703,10 @@ async def process_event(
         frozenset(_as_int(uid) for uid in raw_skip) if isinstance(raw_skip, list) else frozenset()
     )
 
+    event_article_id = _as_int(payload["article_id"]) if payload.get("article_id") else None
+    # One context per recipient kind, reused across that kind's recipients.
+    contexts: dict[str, PlaceholderContext] = {}
+
     sent = 0
     failed = 0
     for notification in notifications:
@@ -673,6 +721,17 @@ async def process_event(
         recipients = await _resolve_recipients(session, notification, ticket, skip_user_ids)
         for recipient in recipients:
             try:
+                base_context = contexts.get(recipient.kind)
+                if base_context is None:
+                    base_context = await _build_notification_context(
+                        session,
+                        sysconfig,
+                        settings or get_settings(),
+                        ticket=ticket,
+                        article_id=event_article_id,
+                        recipient_kind=recipient.kind,
+                    )
+                    contexts[recipient.kind] = base_context
                 if await _send_to_recipient(
                     session,
                     sysconfig,
@@ -681,10 +740,7 @@ async def process_event(
                     notification=notification,
                     recipient=recipient,
                     user_id=user_id,
-                    article_id=_as_int(payload["article_id"])
-                    if payload.get("article_id")
-                    else None,
-                    settings=settings or get_settings(),
+                    base_context=base_context,
                 ):
                     sent += 1
             except Exception:  # noqa: BLE001 — one bad recipient must not stop the others
