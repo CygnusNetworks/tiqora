@@ -197,6 +197,49 @@ async def test_new_ticket_queue_prefers_mail_account_over_system_address(
 
 
 @pytest.mark.db
+async def test_new_ticket_queue_destaddr_survives_comma_display_name(
+    mariadb_znuny_url: str,
+) -> None:
+    """A "Nachname, Vorname" display-name ahead of the system address in To/Cc
+    must not corrupt the naive-split DestQueue::GetQueueID match (the same
+    bug class as the reply-all Cc-recipient loss)."""
+    engine = create_async_engine(_mysql_async(mariadb_znuny_url))
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    addr = "tiqora-destqueue-comma-test@example.test"
+    try:
+        async with factory() as session:
+            junk_id = (
+                await session.execute(text("SELECT id FROM queue WHERE name = 'Junk' LIMIT 1"))
+            ).scalar_one()
+            await session.execute(
+                text(
+                    "INSERT INTO system_address (value0, value1, queue_id, comments, valid_id,"
+                    " create_time, create_by, change_time, change_by)"
+                    " VALUES (:a, '', :qid, '', 1, current_timestamp, 1, current_timestamp, 1)"
+                ),
+                {"a": addr, "qid": int(junk_id)},
+            )
+            await session.commit()
+            account = SimpleNamespace(queue_id=0)
+            qid = await _new_ticket_queue_id(
+                session,
+                {
+                    "To": f'"Nachname, Vorname" <other@example.test>, {addr}',
+                    "Cc": "",
+                },
+                _PostmasterSysConfig(),
+                account,
+            )
+            assert qid == int(junk_id)
+            await session.execute(
+                text("DELETE FROM system_address WHERE value0 = :a"), {"a": addr}
+            )
+            await session.commit()
+    finally:
+        await engine.dispose()
+
+
+@pytest.mark.db
 async def test_new_ticket_queue_trusted_x_otrs_overrides_account(
     mariadb_znuny_url: str,
 ) -> None:
