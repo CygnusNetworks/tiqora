@@ -416,6 +416,10 @@ async def test_archive_job_replays_znuny_archive_semantics(mariadb_znuny_url: st
             await _insert_job_row(
                 session, "ga-archive-job", "SearchInArchive", "NotArchivedTickets"
             )
+            # Znuny's production Archive job also retains empty optional text
+            # rows.  They are absent search criteria, not ``LIKE ''``.
+            await _insert_job_row(session, "ga-archive-job", "Title", "")
+            await _insert_job_row(session, "ga-archive-job", "CustomerID", "")
             # Inactive TimePoint rows the real job also carries — must not filter:
             await _insert_job_row(session, "ga-archive-job", "ChangeTimeSearchType", "")
             await _insert_job_row(session, "ga-archive-job", "TicketChangeTimePoint", "1")
