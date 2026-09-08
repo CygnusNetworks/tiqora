@@ -5,7 +5,7 @@ direct-router-call pattern used by ``test_admin_states.py``."""
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Any
 
 import pytest
@@ -108,6 +108,7 @@ _TEST_LOGINS = [
     "lang.test",
     "revoke.me",
     "keep.session",
+    "invitestatus.test",
 ]
 
 
@@ -332,6 +333,123 @@ async def test_create_user_persists_email_and_mobile(mariadb_znuny_url: str) -> 
             )
             listed = next(u for u in page.items if u.id == created.id)
             assert listed.email == "contact@example.test"
+    finally:
+        await engine.dispose()
+
+
+async def test_user_list_reports_invite_status_and_last_login(
+    mariadb_znuny_url: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The onboarding lifecycle as the admin list renders it: invited → password
+    set → signed in."""
+    _ensure_tiqora_tables(mariadb_znuny_url)
+    engine = create_async_engine(_mysql_async(mariadb_znuny_url))
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+
+    bodies: list[str] = []
+
+    async def fake_send(session: Any, *, to_addr: str, subject: str, body: str) -> None:
+        bodies.append(body)
+
+    monkeypatch.setattr(welcome_invite, "send_transactional_email", fake_send)
+
+    async def listed(session: Any, user_id: int) -> Any:
+        page = await admin_users.list_users(
+            _root_user(), session, ListParams(page=1, page_size=50, valid="valid")
+        )
+        return next(u for u in page.items if u.id == user_id)
+
+    try:
+        async with factory() as session:
+            created = await admin_users.create_user(
+                UserCreate(
+                    login="invitestatus.test",
+                    first_name="Invite",
+                    last_name="Status",
+                    email="invitestatus@example.test",
+                ),
+                _root_user(),
+                session,
+                _settings(),
+            )
+
+            # Invited: the mail went out, nothing has been redeemed, and the
+            # account has never been signed in to.
+            row = await listed(session, created.id)
+            assert row.invited_at is not None
+            assert row.invite_expires is not None
+            assert row.invite_expires > row.invited_at
+            assert row.invite_accepted_at is None
+            assert row.last_login is None
+
+            token = bodies[0].split("/set-password?token=")[1].split()[0]
+            assert await redeem_token(session, token, "chosen-secret-1234") == created.id
+            await session.commit()
+
+            # Accepted: the agent chose a password, but has not signed in yet.
+            row = await listed(session, created.id)
+            assert row.invite_accepted_at is not None
+            assert row.last_login is None
+
+            # Active: UserLastLogin holds epoch seconds, as Znuny writes it.
+            stamped = datetime(2026, 9, 8, 15, 43, 57, tzinfo=UTC)
+            await session.execute(
+                text(
+                    "INSERT INTO user_preferences"
+                    " (user_id, preferences_key, preferences_value)"
+                    " VALUES (:uid, 'UserLastLogin', :v)"
+                ),
+                {"uid": created.id, "v": str(int(stamped.timestamp()))},
+            )
+            await session.commit()
+
+            row = await listed(session, created.id)
+            assert row.last_login == stamped.replace(tzinfo=None)
+            fetched = await admin_users.get_user(created.id, _root_user(), session)
+            assert fetched.last_login == stamped.replace(tzinfo=None)
+            # What the browser actually receives must carry the offset, or it
+            # renders the instant in the wrong timezone.
+            assert fetched.model_dump(mode="json")["last_login"] == "2026-09-08T15:43:57+00:00"
+    finally:
+        await engine.dispose()
+
+
+async def test_invite_status_reports_only_the_newest_link(
+    mariadb_znuny_url: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A resend must not make an outstanding invitation look accepted."""
+    _ensure_tiqora_tables(mariadb_znuny_url)
+    engine = create_async_engine(_mysql_async(mariadb_znuny_url))
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+
+    bodies: list[str] = []
+
+    async def fake_send(session: Any, *, to_addr: str, subject: str, body: str) -> None:
+        bodies.append(body)
+
+    monkeypatch.setattr(welcome_invite, "send_transactional_email", fake_send)
+
+    try:
+        async with factory() as session:
+            created = await admin_users.create_user(
+                UserCreate(
+                    login="invitestatus.test",
+                    first_name="Invite",
+                    last_name="Status",
+                    email="invitestatus@example.test",
+                ),
+                _root_user(),
+                session,
+                _settings(),
+            )
+            await admin_users.resend_setup_link(created.id, _root_user(), session, _settings())
+
+            fetched = await admin_users.get_user(created.id, _root_user(), session)
+            assert fetched.invite_accepted_at is None
+            # The reported link is the fresh one, not the superseded row (whose
+            # `expires` was moved to the past by the resend).
+            assert fetched.invite_expires is not None
+            assert fetched.invite_expires > datetime.now(UTC).replace(tzinfo=None)
     finally:
         await engine.dispose()
 

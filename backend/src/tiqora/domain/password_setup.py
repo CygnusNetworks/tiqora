@@ -15,9 +15,11 @@ from __future__ import annotations
 
 import hashlib
 import secrets
+from collections.abc import Sequence
+from dataclasses import dataclass
 from datetime import datetime, timedelta
 
-from sqlalchemy import select, update
+from sqlalchemy import bindparam, select, text, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from tiqora.config import Settings
@@ -117,6 +119,41 @@ async def redeem_token(session: AsyncSession, token: str, new_password: str) -> 
         .values(pw=hash_password(new_password), change_time=now, change_by=row.user_id)
     )
     return row.user_id
+
+
+@dataclass(frozen=True)
+class InviteStatus:
+    """The agent's most recent setup link, as the admin user list reports it."""
+
+    invited_at: datetime
+    expires: datetime
+    accepted_at: datetime | None
+
+
+async def bulk_latest_invite(
+    session: AsyncSession, user_ids: Sequence[int]
+) -> dict[int, InviteStatus]:
+    """Return ``{user_id: InviteStatus}`` for the newest link per agent.
+
+    Only the newest matters: older rows were superseded by a resend, and
+    reporting an older row's ``used`` would claim an accepted invitation for an
+    agent whose current link is still outstanding. ``id`` is autoincrement, so
+    the highest one per agent is the newest — one round trip for the whole page.
+    """
+    if not user_ids:
+        return {}
+    stmt = text(
+        "SELECT t.user_id, t.created, t.expires, t.used"
+        " FROM tiqora_password_setup_token t"
+        " JOIN (SELECT user_id, MAX(id) AS id FROM tiqora_password_setup_token"
+        "        WHERE user_id IN :uids GROUP BY user_id) newest"
+        "   ON newest.id = t.id"
+    ).bindparams(bindparam("uids", expanding=True))
+    rows = (await session.execute(stmt, {"uids": list(user_ids)})).all()
+    return {
+        int(user_id): InviteStatus(invited_at=created, expires=expires, accepted_at=used)
+        for user_id, created, expires, used in rows
+    }
 
 
 def setup_url(settings: Settings, token: str) -> str:

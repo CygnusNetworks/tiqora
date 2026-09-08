@@ -42,6 +42,22 @@ class UserOut(BaseModel):
     mobile: str | None = None
     """From ``user_preferences`` (key ``UserMobile``) — not a ``users`` column."""
 
+    invited_at: UtcDateTime | None = None
+    """When the agent's most recent setup link was mailed, from
+    ``tiqora_password_setup_token``. The row is committed only after the SMTP
+    send succeeds, so its presence means the invitation reached the mail server
+    — delivery and bounces are not tracked. ``None`` for an account created with
+    a password instead of an invitation."""
+    invite_expires: UtcDateTime | None = None
+    """When that link stops working."""
+    invite_accepted_at: UtcDateTime | None = None
+    """When the agent redeemed the link and chose a password. ``None`` while the
+    invitation is still outstanding."""
+    last_login: UtcDateTime | None = None
+    """From ``user_preferences`` (key ``UserLastLogin``, epoch seconds, the same
+    key and format Znuny uses). ``None`` means the account has never been signed
+    in to since the field was introduced."""
+
 
 class UserCreate(BaseModel):
     login: str
