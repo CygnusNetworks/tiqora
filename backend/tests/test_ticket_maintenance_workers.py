@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import itertools
 import time
+from collections.abc import Iterator
 from datetime import UTC, datetime
 
 import pytest
@@ -17,6 +18,22 @@ from tiqora.domain.settings_store import (
 )
 from tiqora.worker.pending_check import reminder_due, run_pending_check_tick
 from tiqora.worker.unlock_timeout import run_unlock_timeout_tick, working_timeout_due
+
+from ._row_cleanup import cleanup_module
+
+
+@pytest.fixture(autouse=True, scope="module")
+def _cleanup(mariadb_znuny_url: str) -> Iterator[None]:
+    """Delete the queues, tickets, SLA, sysconfig and settings rows below."""
+    yield from cleanup_module(
+        mariadb_znuny_url,
+        setting_keys=(
+            KEY_UNLOCK_TIMEOUT_ENABLED,
+            KEY_PENDING_CHECK_ENABLED,
+            KEY_PENDING_CHECK_REMINDER_INTERVAL_SECONDS,
+        ),
+    )
+
 
 WEEKDAYS_9_TO_17 = {
     "Mon": list(range(9, 17)),
