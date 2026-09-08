@@ -196,6 +196,86 @@ async def test_promote_pending_session_issues_full_session(
     await engine.dispose()
 
 
+@pytest.mark.asyncio
+@pytest.mark.parametrize("url_fixture", ["mariadb_znuny_url", "postgres_znuny_url"])
+async def test_every_full_session_path_stamps_last_login(
+    url_fixture: str, request: pytest.FixtureRequest
+) -> None:
+    """All three ways to issue a full session record ``UserLastLogin``.
+
+    The admin user list reports an agent as "active" from this preference, so a
+    login path that forgets to stamp makes a working account look untouched.
+    Password logins go through ``create_session``, but a 2FA-enforced tenant
+    only ever reaches ``promote_pending_session`` / ``promote_enroll_session``.
+    """
+    from tiqora.domain.auth_config import AuthConfigService
+
+    sync_url: str = request.getfixturevalue(url_fixture)
+    user_id, login = _seed_user(sync_url)
+    engine = create_async_engine(_to_async_url(sync_url))
+    factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+    settings = Settings(secret_key="unit-test-secret-key", totp_pending_ttl_seconds=300)
+    sessions = SessionStore(_FakeRedis(), settings)  # type: ignore[arg-type]
+
+    async def stamp(session: AsyncSession) -> str | None:
+        row = (
+            await session.execute(
+                text(
+                    "SELECT preferences_value FROM user_preferences"
+                    " WHERE user_id = :uid AND preferences_key = 'UserLastLogin'"
+                ),
+                {"uid": user_id},
+            )
+        ).scalar_one_or_none()
+        return None if row is None else (row.decode() if isinstance(row, bytes) else str(row))
+
+    async def clear(session: AsyncSession) -> None:
+        await session.execute(
+            text(
+                "DELETE FROM user_preferences"
+                " WHERE user_id = :uid AND preferences_key = 'UserLastLogin'"
+            ),
+            {"uid": user_id},
+        )
+        await session.commit()
+
+    async with factory() as session:
+        auth = AuthService(session, sessions, settings)
+        assert await stamp(session) is None
+
+        user = await auth.authenticate_password(login, "secret123")
+        assert user is not None
+
+        # (1) plain password login
+        await auth.create_session(user)
+        assert (await stamp(session)) is not None
+
+        # (2) password + TOTP: the pending session is not a login yet, only the
+        #     promotion is.
+        await clear(session)
+        pending = await auth.create_pending_session(user)
+        assert await stamp(session) is None
+        assert await auth.promote_pending_session(pending) is not None
+        assert (await stamp(session)) is not None
+
+        # (3) forced enrolment
+        await clear(session)
+        await AuthConfigService(session).set(user_id, enforce_2fa=True)
+        enroll = await auth.create_enroll_session(user)
+        assert await stamp(session) is None
+        assert await auth.promote_enroll_session(enroll) is not None
+        assert (await stamp(session)) is not None
+
+        # Leave no rows behind beyond what _seed_user already commits.
+        await clear(session)
+        await session.execute(
+            text("DELETE FROM tiqora_user_auth_config WHERE user_id = :uid"), {"uid": user_id}
+        )
+        await session.commit()
+
+    await engine.dispose()
+
+
 # ---------------------------------------------------------------------------
 # Must-enroll (ENROLL) session + enforce_2fa
 # ---------------------------------------------------------------------------
