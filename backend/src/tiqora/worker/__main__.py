@@ -23,10 +23,12 @@ from tiqora.worker.gdpr_retention import run_gdpr_retention_tick
 from tiqora.worker.generic_agent import run_generic_agent_tick
 from tiqora.worker.notifications import run_notifications_tick
 from tiqora.worker.outbox_drain import drain_outbox
+from tiqora.worker.pending_check import run_pending_check_tick
 from tiqora.worker.poller import poll_once
 from tiqora.worker.postmaster import run_postmaster_tick
 from tiqora.worker.status import record_tick_status, seconds_until_daily
 from tiqora.worker.telegram_poller import run_telegram_poller_tick
+from tiqora.worker.unlock_timeout import run_unlock_timeout_tick
 
 logger = structlog.get_logger(__name__)
 
@@ -151,6 +153,12 @@ async def _run_all_loops(stop: asyncio.Event) -> None:
     async def generic_agent_tick() -> dict[str, int]:
         return await run_generic_agent_tick(settings=settings)
 
+    async def unlock_timeout_tick() -> dict[str, int]:
+        return await run_unlock_timeout_tick(settings=settings)
+
+    async def pending_check_tick() -> dict[str, int]:
+        return await run_pending_check_tick(settings=settings)
+
     async def telegram_poller_tick() -> dict[str, int]:
         return await run_telegram_poller_tick(settings=settings)
 
@@ -190,6 +198,20 @@ async def _run_all_loops(stop: asyncio.Event) -> None:
             generic_agent_tick,
             settings.generic_agent_interval_seconds,
             "daemon.generic_agent.interval_seconds",
+            stop,
+        ),
+        _interval_loop(
+            "unlock_timeout",
+            unlock_timeout_tick,
+            settings.unlock_timeout_interval_seconds,
+            "daemon.unlock_timeout.interval_seconds",
+            stop,
+        ),
+        _interval_loop(
+            "pending_check",
+            pending_check_tick,
+            settings.pending_check_interval_seconds,
+            "daemon.pending_check.interval_seconds",
             stop,
         ),
         _interval_loop(

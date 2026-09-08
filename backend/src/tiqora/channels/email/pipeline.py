@@ -432,6 +432,12 @@ async def _process_message_inner(
             references=get_param.get("References") or None,
             channel="email",
             attachments=[(a.filename, a.content_type, a.content) for a in parsed.attachments],
+            # Znuny's PostMaster::FollowUp writes ``FollowUp``, not the
+            # channel-derived ``EmailCustomer`` a new ticket's first article
+            # gets (PostMaster/FollowUp.pm vs NewTicket.pm). The history type
+            # is what tells the two apart in the ticket history, and it is what
+            # decides whether the ``NotificationFollowUp`` event fires.
+            history_type_override="FollowUp",
         )
         article_id = await add_article(
             session, ticket_id=ticket_id, article=article, user_id=user_id, sysconfig=sysconfig

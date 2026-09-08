@@ -51,6 +51,14 @@ KEY_NOTIFICATIONS_INTERVAL_SECONDS = "daemon.notifications.interval_seconds"
 KEY_GENERIC_AGENT_ENABLED = "daemon.generic_agent.enabled"
 KEY_GENERIC_AGENT_INTERVAL_SECONDS = "daemon.generic_agent.interval_seconds"
 
+# Znuny ticket-maintenance task takeovers. Both remain OFF until the matching
+# Znuny scheduler tasks have been disabled by an operator.
+KEY_UNLOCK_TIMEOUT_ENABLED = "daemon.unlock_timeout.enabled"
+KEY_UNLOCK_TIMEOUT_INTERVAL_SECONDS = "daemon.unlock_timeout.interval_seconds"
+KEY_PENDING_CHECK_ENABLED = "daemon.pending_check.enabled"
+KEY_PENDING_CHECK_INTERVAL_SECONDS = "daemon.pending_check.interval_seconds"
+KEY_PENDING_CHECK_REMINDER_INTERVAL_SECONDS = "daemon.pending_check.reminder_interval_seconds"
+
 # GDPR retention worker (Phase 2c) — applies config-driven retention rules
 # (see tiqora.gdpr.retention.KEY_GDPR_RETENTION_RULES) on a schedule. Default
 # OFF; also gated behind the schema-ownership write gate at run time

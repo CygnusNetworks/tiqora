@@ -26,9 +26,10 @@ from __future__ import annotations
 
 import secrets
 import time
+from collections.abc import Sequence
 from dataclasses import dataclass, field, replace
 from datetime import datetime
-from typing import Any
+from typing import Any, Final
 
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
@@ -41,6 +42,7 @@ from tiqora.znuny.escalation import escalation_index_build
 from tiqora.znuny.history import (
     TYPE_ADD_NOTE,
     TYPE_EMAIL_AGENT,
+    TYPE_FOLLOW_UP,
     TYPE_MISC,
     TYPE_PHONE_CALL_AGENT,
     add_archive_flag_update,
@@ -172,6 +174,71 @@ async def _emit_event(
             "pr": False,
         },
     )
+
+
+# ---------------------------------------------------------------------------
+# Legacy ``Notification*`` events
+#
+# Znuny fires a second, separate family of events purely for the notification
+# engine (``Kernel::System::Ticket::Event::NotificationEvent``): ``Notification
+# NewTicket``/``AddNote``/``FollowUp`` from ``MIMEBase::ArticleCreate`` and
+# ``NotificationOwnerUpdate``/``ResponsibleUpdate``/``LockTimeout``/``Move``/
+# ``ServiceUpdate`` from ``Ticket.pm``. They are NOT aliases of the modern
+# ``Ticket*Update`` events -- they carry ``SkipRecipients`` and have extra
+# preconditions -- and installations upgraded from older OTRS releases still
+# have their notification rules bound to these names. Emitting them keeps
+# those rules working after the takeover.
+# ---------------------------------------------------------------------------
+
+# ArticleCreate history types that make the *first* article of a ticket a
+# ``NotificationNewTicket`` (MIMEBase.pm: EmailAgent|EmailCustomer|
+# PhoneCallCustomer|WebRequestCustomer|SystemRequest).
+_NEW_TICKET_HISTORY_TYPES: Final = frozenset(
+    {
+        "EmailAgent",
+        "EmailCustomer",
+        "PhoneCallCustomer",
+        "WebRequestCustomer",
+        "SystemRequest",
+    }
+)
+
+
+# Every event name emitted by :func:`_emit_legacy_notification`. Consumers
+# other than the notification engine must ignore them: each one accompanies a
+# modern ``Ticket*``/``Article*`` event for the very same change.
+LEGACY_NOTIFICATION_EVENTS: Final[frozenset[str]] = frozenset(
+    {
+        "NotificationNewTicket",
+        "NotificationAddNote",
+        "NotificationFollowUp",
+        "NotificationLockTimeout",
+        "NotificationOwnerUpdate",
+        "NotificationResponsibleUpdate",
+        "NotificationMove",
+        "NotificationServiceUpdate",
+        "NotificationPendingReminder",
+    }
+)
+
+
+async def _emit_legacy_notification(
+    session: AsyncSession,
+    event_type: str,
+    ticket_id: int,
+    payload: dict[str, Any] | None = None,
+    *,
+    skip_user_ids: Sequence[int] = (),
+) -> None:
+    """Emit one legacy ``Notification*`` event.
+
+    ``skip_user_ids`` mirrors Znuny's ``SkipRecipients``: the acting agent is
+    not notified about their own action.
+    """
+    data: dict[str, Any] = dict(payload or {})
+    if skip_user_ids:
+        data["skip_user_ids"] = [int(uid) for uid in skip_user_ids]
+    await _emit_event(session, event_type, ticket_id, data)
 
 
 # ---------------------------------------------------------------------------
@@ -679,6 +746,28 @@ async def add_article(
                 user_id=user_id,
             )
 
+    # Legacy per-article notification events (MIMEBase.pm). Exactly one of
+    # them fires, chosen by history type -- and NotificationNewTicket only for
+    # the ticket's first article.
+    legacy_event: str | None = None
+    if history_type in _NEW_TICKET_HISTORY_TYPES:
+        earlier = (
+            await session.execute(
+                text("SELECT 1 FROM article WHERE ticket_id = :tid AND id < :aid LIMIT 1"),
+                {"tid": ticket_id, "aid": article_id},
+            )
+        ).first()
+        if earlier is None:
+            legacy_event = "NotificationNewTicket"
+    elif history_type == TYPE_ADD_NOTE:
+        legacy_event = "NotificationAddNote"
+    elif history_type == TYPE_FOLLOW_UP:
+        legacy_event = "NotificationFollowUp"
+    if legacy_event is not None:
+        await _emit_legacy_notification(
+            session, legacy_event, ticket_id, {"article_id": article_id}
+        )
+
     # Outbox event
     await _emit_event(
         session, "ArticleCreate", ticket_id, {"article_id": article_id, "channel": article.channel}
@@ -734,6 +823,11 @@ async def move_queue(
     )
     await ticket_accelerator_update(session, ticket_id, sysconfig)
     await invalidate_ticket_cache(session, ticket_id)
+    # Znuny only notifies queue subscribers while the ticket is not closed.
+    if await _state_type_name(session, int(t["ticket_state_id"])) != "closed":
+        await _emit_legacy_notification(
+            session, "NotificationMove", ticket_id, {"queue": new_queue}
+        )
     await _emit_event(session, "TicketQueueUpdate", ticket_id, {"queue_id": new_queue_id})
 
 
@@ -940,6 +1034,7 @@ async def change_service(
         user_id=user_id,
     )
     await invalidate_ticket_cache(session, ticket_id)
+    await _emit_legacy_notification(session, "NotificationServiceUpdate", ticket_id)
     await _emit_event(session, "TicketServiceUpdate", ticket_id, {"service_id": new_service_id})
 
 
@@ -1107,6 +1202,13 @@ async def assign_owner(
         await add_lock(session, ticket_id=ticket_id, lock="lock", user_id=user_id)
     await ticket_accelerator_update(session, ticket_id, sysconfig)
     await invalidate_ticket_cache(session, ticket_id)
+    await _emit_legacy_notification(
+        session,
+        "NotificationOwnerUpdate",
+        ticket_id,
+        {"owner_id": new_owner_id},
+        skip_user_ids=(user_id,) if user_id == new_owner_id else (),
+    )
     await _emit_event(session, "TicketOwnerUpdate", ticket_id, {"owner_id": new_owner_id})
 
 
@@ -1136,6 +1238,13 @@ async def assign_responsible(
         user_id=user_id,
     )
     await invalidate_ticket_cache(session, ticket_id)
+    await _emit_legacy_notification(
+        session,
+        "NotificationResponsibleUpdate",
+        ticket_id,
+        {"responsible_id": new_responsible_id},
+        skip_user_ids=(user_id,) if user_id == new_responsible_id else (),
+    )
     await _emit_event(
         session, "TicketResponsibleUpdate", ticket_id, {"responsible_id": new_responsible_id}
     )
@@ -1190,6 +1299,13 @@ async def unlock_ticket(
     await add_lock(session, ticket_id=ticket_id, lock="unlock", user_id=user_id)
     await ticket_accelerator_update(session, ticket_id, sysconfig)
     await invalidate_ticket_cache(session, ticket_id)
+    owner_id = int(t["user_id"]) if t.get("user_id") is not None else None
+    await _emit_legacy_notification(
+        session,
+        "NotificationLockTimeout",
+        ticket_id,
+        skip_user_ids=(user_id,) if owner_id == user_id else (),
+    )
     await _emit_event(session, "TicketLockUpdate", ticket_id, {"lock": "unlock"})
 
 

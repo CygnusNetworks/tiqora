@@ -1993,6 +1993,14 @@
           "name": "GenericAgent",
           "description": "Spouští naplánované úlohy GenericAgent."
         },
+        "unlock_timeout": {
+          "name": "Časový limit odemknutí",
+          "description": "Odemkne způsobilé tikety po vypršení pracovního času jejich fronty."
+        },
+        "pending_check": {
+          "name": "Kontrola čekajících",
+          "description": "Použije splatné čekající přechody a vydá události připomenutí."
+        },
         "gdpr_retention": {
           "name": "GDPR retence",
           "description": "Jednou denně aplikuje nakonfigurovaná pravidla retence."

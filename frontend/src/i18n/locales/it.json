@@ -1993,6 +1993,14 @@
           "name": "GenericAgent",
           "description": "Esegue i lavori pianificati GenericAgent."
         },
+        "unlock_timeout": {
+          "name": "Timeout di sblocco",
+          "description": "Sblocca i ticket idonei dopo il timeout in orario lavorativo della loro coda."
+        },
+        "pending_check": {
+          "name": "Controllo in attesa",
+          "description": "Applica le transizioni in attesa scadute ed emette eventi di promemoria."
+        },
         "gdpr_retention": {
           "name": "Conservazione del GDPR",
           "description": "Applica le regole di conservazione configurate una volta al giorno."

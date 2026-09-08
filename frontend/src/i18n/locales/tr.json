@@ -1993,6 +1993,14 @@
           "name": "JenerikAgent",
           "description": "Zamanlanmış GenericAgent işlerini çalıştırır."
         },
+        "unlock_timeout": {
+          "name": "Kilit açma zaman aşımı",
+          "description": "Uygun biletleri kuyruklarının çalışma saati zaman aşımından sonra açar."
+        },
+        "pending_check": {
+          "name": "Bekleyen denetimi",
+          "description": "Vadesi gelen bekleyen geçişleri uygular ve hatırlatma olayları yayar."
+        },
         "gdpr_retention": {
           "name": "GDPR saklama",
           "description": "Yapılandırılmış saklama kurallarını günde bir kez uygular."

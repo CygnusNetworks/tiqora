@@ -1993,6 +1993,14 @@
           "name": "Üldine agent",
           "description": "Käitab ajastatud GenericAgenti töid."
         },
+        "unlock_timeout": {
+          "name": "Avamise ajalõpp",
+          "description": "Vabastab sobivad piletid pärast nende järjekorra tööaja ajalõppu."
+        },
+        "pending_check": {
+          "name": "Ootel kontroll",
+          "description": "Rakendab tähtaja ületanud ootel üleminekud ja saadab meeldetuletussündmusi."
+        },
         "gdpr_retention": {
           "name": "GDPR-i säilitamine",
           "description": "Rakendab konfigureeritud säilitusreegleid üks kord päevas."

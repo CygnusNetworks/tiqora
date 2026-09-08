@@ -101,6 +101,8 @@ RUN useradd --create-home --uid 10001 tiqora \
     && rm -rf /var/lib/apt/lists/*
 
 COPY --from=python-deps /app/backend/.venv /app/.venv
+# Console-script shebangs are generated in the build stage with this path.
+RUN mkdir -p /app/backend && ln -s /app/.venv /app/backend/.venv
 COPY backend/src /app/backend/src
 COPY backend/alembic /app/backend/alembic
 COPY backend/alembic.ini /app/backend/alembic.ini

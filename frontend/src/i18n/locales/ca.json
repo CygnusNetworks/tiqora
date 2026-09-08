@@ -1993,6 +1993,14 @@
           "name": "GenericAgent",
           "description": "Executa treballs programats de GenericAgent."
         },
+        "unlock_timeout": {
+          "name": "Temps d'espera de desbloqueig",
+          "description": "Desbloqueja els tiquets elegibles després del temps d'espera laboral de la seva cua."
+        },
+        "pending_check": {
+          "name": "Comprovació de pendents",
+          "description": "Aplica les transicions pendents vençudes i emet esdeveniments de recordatori."
+        },
         "gdpr_retention": {
           "name": "Retenció del GDPR",
           "description": "Aplica les regles de retenció configurades un cop al dia."

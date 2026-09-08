@@ -29,10 +29,14 @@ from tiqora.domain.settings_store import (
     KEY_NOTIFICATIONS_INTERVAL_SECONDS,
     KEY_OUTBOX_ENABLED,
     KEY_OUTBOX_INTERVAL_SECONDS,
+    KEY_PENDING_CHECK_ENABLED,
+    KEY_PENDING_CHECK_INTERVAL_SECONDS,
     KEY_POSTMASTER_ENABLED,
     KEY_POSTMASTER_INTERVAL_SECONDS,
     KEY_TELEGRAM_POLLER_ENABLED,
     KEY_TELEGRAM_POLLER_INTERVAL_SECONDS,
+    KEY_UNLOCK_TIMEOUT_ENABLED,
+    KEY_UNLOCK_TIMEOUT_INTERVAL_SECONDS,
 )
 
 ScheduleKind = Literal["interval", "daily"]
@@ -112,6 +116,24 @@ DAEMON_SERVICES: tuple[DaemonService, ...] = (
         schedule_kind="interval",
         interval_key=KEY_GENERIC_AGENT_INTERVAL_SECONDS,
         interval_settings_attr="generic_agent_interval_seconds",
+    ),
+    DaemonService(
+        slug="unlock_timeout",
+        enabled_key=KEY_UNLOCK_TIMEOUT_ENABLED,
+        default_enabled=False,
+        toggleable=True,
+        schedule_kind="interval",
+        interval_key=KEY_UNLOCK_TIMEOUT_INTERVAL_SECONDS,
+        interval_settings_attr="unlock_timeout_interval_seconds",
+    ),
+    DaemonService(
+        slug="pending_check",
+        enabled_key=KEY_PENDING_CHECK_ENABLED,
+        default_enabled=False,
+        toggleable=True,
+        schedule_kind="interval",
+        interval_key=KEY_PENDING_CHECK_INTERVAL_SECONDS,
+        interval_settings_attr="pending_check_interval_seconds",
     ),
     DaemonService(
         slug="gdpr_retention",

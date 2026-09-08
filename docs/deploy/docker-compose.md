@@ -133,18 +133,19 @@ environment:
 volumes:
   - ./secrets/tiqora.keytab:/etc/tiqora/tiqora.keytab:ro
   # Optional: pure acceptors usually need no krb5.conf (ticket decrypted with
-  # the keytab; no KDC round-trip). `default_realm = CYGNUSNETWORKS.DE` can help.
+  # the keytab; no KDC round-trip). a `default_realm` can help.
   # - ./secrets/krb5.conf:/etc/krb5.conf:ro
 ```
 
-Production SPN for Cygnus: `HTTP/tiqora.cygnusnetworks.de@CYGNUSNETWORKS.DE`.
+The SPN follows `HTTP/<api-hostname>@<REALM>`, e.g.
+`HTTP/tiqora.example.com@EXAMPLE.COM`.
 
 **Operational notes:**
 
 - The reverse proxy must **forward** the `Authorization: Negotiate` header
   unmodified (do not strip it).
 - The browser must reach the host that matches the keytab SPN
-  (`tiqora.cygnusnetworks.de` in production).
+  (the name the keytab was issued for).
 - SPNEGO only elevates agents flagged `sso_eligible`; the principal's primary
   part must still match an existing, valid `users.login`.
 
@@ -395,18 +396,19 @@ streaming connections.
 
 ## Running migrations on first start
 
-`tiqora migrate upgrade` must be run once before `tiqora-api`/`tiqora-worker`
-serve traffic against a new database. It is **not** run automatically by
-the `api`/`worker`/`mcp` container commands (deliberately — you don't want a
-container restart silently applying migrations against a shared,
-possibly-live Znuny database).
+The API container entrypoint runs `python -m tiqora.main migrate upgrade`
+before serving traffic, unless `TIQORA_RUN_MIGRATIONS=0` is set. Worker and
+MCP roles do not run migrations. Both ownership gates still control whether
+the owned migration chain is available.
+
+To migrate explicitly before starting the other roles:
 
 ```sh
-docker compose run --rm tiqora-api tiqora migrate upgrade
+docker compose run --rm --entrypoint python tiqora-api -m tiqora.main migrate upgrade
 ```
 
-Run this after every image upgrade that includes new `tiqora_*` migrations,
-before restarting the long-running services. See
+When automatic API migrations are disabled, run this after every image
+upgrade that includes new migrations before restarting the services. See
 [`../guide/znuny-to-tiqora.md`](../guide/znuny-to-tiqora.md) for the
 distinction between the always-available `versions_tiqora/` chain and the
 gated `versions_owned/` chain (only unlocked post-cutover).

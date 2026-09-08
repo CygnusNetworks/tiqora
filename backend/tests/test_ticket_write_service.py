@@ -939,3 +939,160 @@ def test_invalid_input_is_exception() -> None:
 def test_ticket_access_denied_is_exception() -> None:
     exc = TicketAccessDenied("user 1 lacks rw")
     assert "rw" in str(exc)
+
+
+# ---------------------------------------------------------------------------
+# Legacy ``Notification*`` events (Znuny Ticket.pm / MIMEBase.pm)
+# ---------------------------------------------------------------------------
+
+
+async def _outbox_payloads(
+    session: AsyncSession, ticket_id: int, event_type: str
+) -> list[dict[str, Any]]:
+    rows = (
+        await session.execute(
+            text(
+                "SELECT payload FROM tiqora_event_outbox"
+                " WHERE ticket_id = :tid AND event_type = :et ORDER BY id"
+            ),
+            {"tid": ticket_id, "et": event_type},
+        )
+    ).fetchall()
+    return [json.loads(r[0] or "{}") for r in rows]
+
+
+@pytest.mark.db
+async def test_legacy_notification_events_for_articles_mariadb(mariadb_znuny_url: str) -> None:
+    """MIMEBase.pm fires NotificationNewTicket/AddNote/FollowUp per article.
+
+    NotificationNewTicket only for the ticket's *first* article and only for
+    the EmailAgent|EmailCustomer|PhoneCallCustomer|WebRequestCustomer|
+    SystemRequest history types.
+    """
+    engine = create_async_engine(_mysql_async(mariadb_znuny_url))
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    sysconfig = _make_sysconfig()
+    try:
+        async with factory() as session:
+            await _seed_tiqora_tables(session)
+        ticket_id = await _make_ticket(factory, sysconfig, "Legacy Article Events")
+
+        # 1st article: an incoming customer email -> NotificationNewTicket
+        async with factory() as session, session.begin():
+            await add_article(
+                session,
+                ticket_id=ticket_id,
+                article=ArticleIn(
+                    subject="First",
+                    body="b",
+                    channel="email",
+                    sender_type="customer",
+                    is_visible_for_customer=True,
+                ),
+                user_id=1,
+                sysconfig=sysconfig,
+            )
+        # 2nd article, same history type -> no second NotificationNewTicket
+        async with factory() as session, session.begin():
+            await add_article(
+                session,
+                ticket_id=ticket_id,
+                article=ArticleIn(
+                    subject="Second",
+                    body="b",
+                    channel="email",
+                    sender_type="customer",
+                    is_visible_for_customer=True,
+                ),
+                user_id=1,
+                sysconfig=sysconfig,
+            )
+        # An internal note -> NotificationAddNote
+        async with factory() as session, session.begin():
+            await add_article(
+                session,
+                ticket_id=ticket_id,
+                article=ArticleIn(
+                    subject="Note",
+                    body="b",
+                    channel="note",
+                    sender_type="agent",
+                    is_visible_for_customer=False,
+                ),
+                user_id=1,
+                sysconfig=sysconfig,
+            )
+        # An explicit FollowUp -> NotificationFollowUp
+        async with factory() as session, session.begin():
+            await add_article(
+                session,
+                ticket_id=ticket_id,
+                article=ArticleIn(
+                    subject="FollowUp",
+                    body="b",
+                    channel="email",
+                    sender_type="customer",
+                    is_visible_for_customer=True,
+                    history_type_override="FollowUp",
+                ),
+                user_id=1,
+                sysconfig=sysconfig,
+            )
+
+        async with factory() as session:
+            assert len(await _outbox_payloads(session, ticket_id, "NotificationNewTicket")) == 1
+            assert len(await _outbox_payloads(session, ticket_id, "NotificationAddNote")) == 1
+            assert len(await _outbox_payloads(session, ticket_id, "NotificationFollowUp")) == 1
+    finally:
+        await engine.dispose()
+
+
+@pytest.mark.db
+async def test_legacy_notification_lock_timeout_skips_acting_owner_mariadb(
+    mariadb_znuny_url: str,
+) -> None:
+    """Unlocking emits NotificationLockTimeout; the owner unlocking their own
+    ticket is put on SkipRecipients (Ticket.pm::TicketLockSet)."""
+    engine = create_async_engine(_mysql_async(mariadb_znuny_url))
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    sysconfig = _make_sysconfig()
+    try:
+        async with factory() as session:
+            await _seed_tiqora_tables(session)
+
+        # Owner (user 1) unlocks their own ticket -> skip themselves.
+        own = await _make_ticket(factory, sysconfig, "Legacy Unlock Own")
+        async with factory() as session, session.begin():
+            await lock_ticket(session, ticket_id=own, user_id=1, sysconfig=sysconfig)
+        async with factory() as session, session.begin():
+            await unlock_ticket(session, ticket_id=own, user_id=1, sysconfig=sysconfig)
+
+        # Somebody else unlocks it -> the owner must still be notified.
+        other = await _make_ticket(factory, sysconfig, "Legacy Unlock Other")
+        async with factory() as session, session.begin():
+            await lock_ticket(session, ticket_id=other, user_id=1, sysconfig=sysconfig)
+        other_owner_id = 920_001
+        async with factory() as session, session.begin():
+            await session.execute(
+                text(
+                    "INSERT INTO users (id, login, pw, first_name, last_name, valid_id,"
+                    " create_time, create_by, change_time, change_by)"
+                    " VALUES (:uid, 'legacy.owner', 'x', 'Legacy', 'Owner', 1,"
+                    " current_timestamp, 1, current_timestamp, 1)"
+                ),
+                {"uid": other_owner_id},
+            )
+            await session.execute(
+                text("UPDATE ticket SET user_id = :uid WHERE id = :tid"),
+                {"uid": other_owner_id, "tid": other},
+            )
+        async with factory() as session, session.begin():
+            await unlock_ticket(session, ticket_id=other, user_id=1, sysconfig=sysconfig)
+
+        async with factory() as session:
+            own_events = await _outbox_payloads(session, own, "NotificationLockTimeout")
+            other_events = await _outbox_payloads(session, other, "NotificationLockTimeout")
+        assert [e.get("skip_user_ids") for e in own_events] == [[1]]
+        assert [e.get("skip_user_ids") for e in other_events] == [None]
+    finally:
+        await engine.dispose()

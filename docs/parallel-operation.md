@@ -257,6 +257,8 @@ Each of the following moves to Tiqora independently:
 | Escalation sweep | RebuildEscalationIndexOnline | escalation job |
 | Notifications | NotificationEvent | notification engine |
 | GenericAgent | GenericAgent | GA executor |
+| Automatic unlock | TicketUnlockTimeout | unlock-timeout worker |
+| Pending states and reminders | TicketPendingCheck | pending-check worker |
 | Auto-responses | AutoResponse | auto-response job |
 | AI auto-reply / auto-summary | *(n/a — new capability)* | `ai-worker` |
 | Telegram polling | *(n/a — no Znuny counterpart)* | `telegram_poller` |
@@ -474,7 +476,8 @@ behavioural port of `Kernel::System::Ticket::Event::NotificationEvent` (+ its
 `notification_event_item` / `notification_event_message`, matches them
 against `tiqora_event_outbox` rows via a monotonic per-event watermark
 (loop-safe — each outbox row is consumed exactly once, ever), resolves
-recipients (`AgentOwner`/`AgentResponsible`/`RecipientAgents`/
+recipients (`AgentOwner`/`AgentResponsible`/`AgentWatcher`/`AgentMyQueues`/
+`AgentMyServices`/`AgentMyQueuesMyServices`/`RecipientAgents`/
 `RecipientGroups`/`Customer`), evaluates ticket-attribute and `ArticleFilter`
 matching, renders the subject/body with the shared `<OTRS_...>` placeholder
 module (`tiqora.channels.email.placeholder`, reused from the
@@ -501,6 +504,42 @@ is sent twice.
 4. Verify: a matching event produces exactly one email/article per
    recipient, with a `SendAgentNotification`/`SendCustomerNotification`
    history row.
+
+### Check which events your rules are actually bound to
+
+Znuny fires two families of events, and installations upgraded from older
+OTRS releases usually have their default rules bound to the *legacy* one:
+
+- modern `Ticket*`/`Article*` events (`TicketCreate`, `ArticleCreate`,
+  `TicketOwnerUpdate`, …), and
+- legacy `Notification*` events that exist only for the notification engine
+  and carry Znuny's `SkipRecipients`: `NotificationNewTicket`,
+  `NotificationAddNote`, `NotificationFollowUp`, `NotificationLockTimeout`,
+  `NotificationOwnerUpdate`, `NotificationResponsibleUpdate`,
+  `NotificationMove`, `NotificationServiceUpdate` and
+  `NotificationPendingReminder`.
+
+Tiqora emits both, from the same places Znuny does, so existing rules keep
+working unchanged. Before enabling the takeover, list what your rules use and
+confirm each event name and recipient type is covered:
+
+```sql
+SELECT ne.name, nei.event_key, nei.event_value
+  FROM notification_event ne
+  JOIN notification_event_item nei ON nei.notification_id = ne.id
+ WHERE ne.valid_id = 1 AND nei.event_key IN ('Events', 'Recipients')
+ ORDER BY ne.id;
+```
+
+A rule bound to an event nobody emits is silently dead: the takeover looks
+healthy (successful ticks, no errors) while the notification never arrives.
+The legacy events carry no extra fan-out — the outbox drain skips them for
+webhooks and SSE, since each accompanies a modern event for the same change.
+
+Note that agent id 1 never receives notifications, and the agent who caused a
+change is skipped for their own `NotificationOwnerUpdate`,
+`NotificationResponsibleUpdate` and `NotificationLockTimeout` — both are
+Znuny behaviours, ported deliberately.
 
 ### Rollback
 
@@ -532,8 +571,10 @@ action (double note, double state-flap history, etc.).
 
 ### Enabling the takeover
 
-1. Disable Znuny's `GenericAgent` daemon task (SysConfig UI → *Daemon →
-   SchedulerCronTaskManager* → `GenericAgent`).
+1. Disable Znuny's `GenericAgent` cron task **and** its independent
+   `SchedulerGenericAgentTaskManager`. Check `Maint::Daemon::Summary` for
+   both recurrent cron tasks and recurrent GenericAgent jobs. Disabling the
+   GenericAgent event handler does not stop these scheduled executions.
 2. Admin → Dienste → toggle *generic_agent* (or set
    `daemon.generic_agent.enabled = 1` in `tiqora_settings` directly).
 3. The worker polls this flag every tick (default 60s,
@@ -549,7 +590,8 @@ action (double note, double state-flap history, etc.).
 ### Rollback
 
 1. Set `daemon.generic_agent.enabled` back to `0`.
-2. Re-enable Znuny's `GenericAgent` daemon task.
+2. Wait for an in-flight Tiqora job to finish, then restore the Znuny
+   GenericAgent executors that were previously active.
 
 ### Safety flags
 
@@ -578,21 +620,23 @@ likely impact:
   `Notification-<id>-<Transport>` preference before sending (agents can
   individually opt out); Tiqora sends to every matched recipient
   unconditionally.
-- **Notification recipients**: `AgentMyQueues`/`AgentMyServices`/
-  `AgentWatcher`/`AgentWritePermissions`/`AgentCreateBy` are **not
-  implemented** (they require queue-subscription/ticket-watcher/permission
-  joins not yet modelled in the notification engine). `RecipientGroups`
-  resolves direct `group_user` members only — no role→group expansion via
-  `PermissionGroupRoleGet`.
+- **Notification recipients**: `AgentWritePermissions`/`AgentCreateBy` are
+  **not implemented**. `AgentMyQueues`/`AgentMyServices`/
+  `AgentMyQueuesMyServices` are ported from `personal_queues` /
+  `personal_services` (`Ticket.pm::GetSubscribedUserIDsByQueueID` /
+  `...ByServiceID`), including the `ro`-permission check on the queue's group.
+  `RecipientGroups` resolves direct `group_user` members only — no role→group
+  expansion via `PermissionGroupRoleGet`.
 - **Notification history divergence**: Znuny writes no `ticket_history` row
   for agent email notifications (only customer notifications, via the
   article backend); Tiqora deliberately writes a `SendAgentNotification` row
   for both, for auditability. This is an intentional divergence, not a bug —
   golden-master history-row comparisons for agent notifications will differ.
-- **GenericAgent time criteria**: only the `Older/NewerMinutes` variant of
-  each supported `Ticket*Time*` key is implemented; Znuny's `TimeSlot`
-  (absolute date range) and `TimePoint` (relative unit) UI variants, and
-  dynamic-field search criteria, are **not implemented**.
+- **GenericAgent time criteria**: `Older/NewerMinutes` and supported
+  `TimePoint` relative-unit criteria are implemented. `TimeSlot` absolute
+  date ranges, future `Next`/`After` variants and dynamic-field search
+  criteria remain unsupported. Review each production job's actual search
+  fields before takeover.
 - **GenericAgent recipient/notification interplay**: jobs with
   `SendNoNotification` are not distinguished — Tiqora's actions always run
   through the normal `ticket_write_service` path, so any *separately

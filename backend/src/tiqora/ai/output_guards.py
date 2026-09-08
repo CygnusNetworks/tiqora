@@ -55,9 +55,7 @@ def _is_signoff_line(line: str) -> bool:
         return False
     if normalized in _SIGNOFF_PHRASES:
         return True
-    if normalized.startswith("with ") and normalized[5:] in _SIGNOFF_PHRASES:
-        return True
-    return False
+    return normalized.startswith("with ") and normalized[5:] in _SIGNOFF_PHRASES
 
 
 def strip_hallucinated_signoff(body: str) -> str:

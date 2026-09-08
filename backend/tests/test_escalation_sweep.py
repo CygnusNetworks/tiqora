@@ -280,9 +280,7 @@ async def test_run_escalation_tick_skips_closed_tickets(mariadb_znuny_url: str) 
                 session, "ESC_SKIP_CLOSED", state_id=int(closed_row[0])
             )
             await session.execute(
-                text(
-                    "UPDATE ticket SET escalation_update_time = :epoch WHERE id = :tid"
-                ),
+                text("UPDATE ticket SET escalation_update_time = :epoch WHERE id = :tid"),
                 {"epoch": int(time.time()) + 3600, "tid": ticket_id},
             )
             await session.commit()
