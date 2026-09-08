@@ -1467,7 +1467,19 @@
       "deleteBlockedHint": "Поставете ја сметката на «Неважечка» за тикетите, статиите и историјата да останат приписливи.",
       "resendSetupLink": "Повторно испрати врска за поставување",
       "setupLinkSent": "Врската за поставување е испратена.",
-      "setupLinkFailed": "Врската за поставување не можеше да се испрати."
+      "setupLinkFailed": "Врската за поставување не можеше да се испрати.",
+      "access": {
+        "header": "Access",
+        "active": "Active",
+        "accepted": "Password set",
+        "invited": "Invited",
+        "expired": "Invitation expired",
+        "none": "No invitation",
+        "lastSeen": "last seen {{when}}",
+        "linkExpires": "link expires {{when}}",
+        "linkExpiredOn": "link expired on {{date}}",
+        "neverSignedIn": "never signed in"
+      }
     },
     "groups": {
       "title_plural": "Групи",

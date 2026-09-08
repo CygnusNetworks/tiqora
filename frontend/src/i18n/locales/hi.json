@@ -1467,7 +1467,19 @@
       "deleteBlockedHint": "खाते को «अमान्य» करें ताकि टिकट, लेख और इतिहास आरोपणीय रहें।",
       "resendSetupLink": "सेटअप लिंक पुनः भेजें",
       "setupLinkSent": "सेटअप लिंक भेजा गया।",
-      "setupLinkFailed": "सेटअप लिंक नहीं भेजा जा सका।"
+      "setupLinkFailed": "सेटअप लिंक नहीं भेजा जा सका।",
+      "access": {
+        "header": "Access",
+        "active": "Active",
+        "accepted": "Password set",
+        "invited": "Invited",
+        "expired": "Invitation expired",
+        "none": "No invitation",
+        "lastSeen": "last seen {{when}}",
+        "linkExpires": "link expires {{when}}",
+        "linkExpiredOn": "link expired on {{date}}",
+        "neverSignedIn": "never signed in"
+      }
     },
     "groups": {
       "title_plural": "समूह",

@@ -1467,7 +1467,19 @@
       "deleteBlockedHint": "اضبط الحساب على «غير صالح» بدلًا من ذلك لتبقى التذاكر والمقالات والسجل قابلة للإسناد.",
       "resendSetupLink": "إعادة إرسال رابط الإعداد",
       "setupLinkSent": "تم إرسال رابط الإعداد.",
-      "setupLinkFailed": "تعذّر إرسال رابط الإعداد."
+      "setupLinkFailed": "تعذّر إرسال رابط الإعداد.",
+      "access": {
+        "header": "Access",
+        "active": "Active",
+        "accepted": "Password set",
+        "invited": "Invited",
+        "expired": "Invitation expired",
+        "none": "No invitation",
+        "lastSeen": "last seen {{when}}",
+        "linkExpires": "link expires {{when}}",
+        "linkExpiredOn": "link expired on {{date}}",
+        "neverSignedIn": "never signed in"
+      }
     },
     "groups": {
       "title_plural": "المجموعات",

@@ -1467,7 +1467,19 @@
       "deleteBlockedHint": "Позначте обліковий запис як «Недійсний», щоб заявки, статті й історія лишалися прив’язаними.",
       "resendSetupLink": "Надіслати посилання налаштування знову",
       "setupLinkSent": "Посилання налаштування надіслано.",
-      "setupLinkFailed": "Не вдалося надіслати посилання налаштування."
+      "setupLinkFailed": "Не вдалося надіслати посилання налаштування.",
+      "access": {
+        "header": "Access",
+        "active": "Active",
+        "accepted": "Password set",
+        "invited": "Invited",
+        "expired": "Invitation expired",
+        "none": "No invitation",
+        "lastSeen": "last seen {{when}}",
+        "linkExpires": "link expires {{when}}",
+        "linkExpiredOn": "link expired on {{date}}",
+        "neverSignedIn": "never signed in"
+      }
     },
     "groups": {
       "title_plural": "Групи",
