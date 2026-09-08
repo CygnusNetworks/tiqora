@@ -1467,7 +1467,19 @@
       "deleteBlockedHint": "Imposta invece l’account su “Non valido” così ticket, articoli e cronologia restano attribuibili.",
       "resendSetupLink": "Reinvia link di configurazione",
       "setupLinkSent": "Link di configurazione inviato.",
-      "setupLinkFailed": "Impossibile inviare il link di configurazione."
+      "setupLinkFailed": "Impossibile inviare il link di configurazione.",
+      "access": {
+        "header": "Access",
+        "active": "Active",
+        "accepted": "Password set",
+        "invited": "Invited",
+        "expired": "Invitation expired",
+        "none": "No invitation",
+        "lastSeen": "last seen {{when}}",
+        "linkExpires": "link expires {{when}}",
+        "linkExpiredOn": "link expired on {{date}}",
+        "neverSignedIn": "never signed in"
+      }
     },
     "groups": {
       "title_plural": "Gruppi",

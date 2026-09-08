@@ -1467,7 +1467,19 @@
       "deleteBlockedHint": "Postavite račun na «Nevažeći» da tiketi, članci i povijest ostanu pripisivi.",
       "resendSetupLink": "Ponovno pošalji poveznicu za postavljanje",
       "setupLinkSent": "Poveznica za postavljanje je poslana.",
-      "setupLinkFailed": "Poveznicu za postavljanje nije moguće poslati."
+      "setupLinkFailed": "Poveznicu za postavljanje nije moguće poslati.",
+      "access": {
+        "header": "Access",
+        "active": "Active",
+        "accepted": "Password set",
+        "invited": "Invited",
+        "expired": "Invitation expired",
+        "none": "No invitation",
+        "lastSeen": "last seen {{when}}",
+        "linkExpires": "link expires {{when}}",
+        "linkExpiredOn": "link expired on {{date}}",
+        "neverSignedIn": "never signed in"
+      }
     },
     "groups": {
       "title_plural": "grupe",

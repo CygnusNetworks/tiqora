@@ -1467,7 +1467,19 @@
       "deleteBlockedHint": "Nastavite račun na »Neveljavno«, da zahtevki, članki in zgodovina ostanejo pripisljivi.",
       "resendSetupLink": "Ponovno pošlji povezavo za nastavitev",
       "setupLinkSent": "Povezava za nastavitev poslana.",
-      "setupLinkFailed": "Povezave za nastavitev ni bilo mogoče poslati."
+      "setupLinkFailed": "Povezave za nastavitev ni bilo mogoče poslati.",
+      "access": {
+        "header": "Access",
+        "active": "Active",
+        "accepted": "Password set",
+        "invited": "Invited",
+        "expired": "Invitation expired",
+        "none": "No invitation",
+        "lastSeen": "last seen {{when}}",
+        "linkExpires": "link expires {{when}}",
+        "linkExpiredOn": "link expired on {{date}}",
+        "neverSignedIn": "never signed in"
+      }
     },
     "groups": {
       "title_plural": "Skupine",

@@ -1467,7 +1467,19 @@
       "deleteBlockedHint": "Hesabı “Geçersiz” yapın; böylece biletler, makaleler ve geçmiş atanabilir kalır.",
       "resendSetupLink": "Kurulum bağlantısını yeniden gönder",
       "setupLinkSent": "Kurulum bağlantısı gönderildi.",
-      "setupLinkFailed": "Kurulum bağlantısı gönderilemedi."
+      "setupLinkFailed": "Kurulum bağlantısı gönderilemedi.",
+      "access": {
+        "header": "Access",
+        "active": "Active",
+        "accepted": "Password set",
+        "invited": "Invited",
+        "expired": "Invitation expired",
+        "none": "No invitation",
+        "lastSeen": "last seen {{when}}",
+        "linkExpires": "link expires {{when}}",
+        "linkExpiredOn": "link expired on {{date}}",
+        "neverSignedIn": "never signed in"
+      }
     },
     "groups": {
       "title_plural": "Gruplar",

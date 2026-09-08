@@ -1467,7 +1467,19 @@
       "deleteBlockedHint": "Tetapkan akaun kepada “Tidak sah” supaya tiket, artikel dan sejarah kekal boleh dikaitkan.",
       "resendSetupLink": "Hantar semula pautan persediaan",
       "setupLinkSent": "Pautan persediaan dihantar.",
-      "setupLinkFailed": "Tidak dapat menghantar pautan persediaan."
+      "setupLinkFailed": "Tidak dapat menghantar pautan persediaan.",
+      "access": {
+        "header": "Access",
+        "active": "Active",
+        "accepted": "Password set",
+        "invited": "Invited",
+        "expired": "Invitation expired",
+        "none": "No invitation",
+        "lastSeen": "last seen {{when}}",
+        "linkExpires": "link expires {{when}}",
+        "linkExpiredOn": "link expired on {{date}}",
+        "neverSignedIn": "never signed in"
+      }
     },
     "groups": {
       "title_plural": "Kumpulan",

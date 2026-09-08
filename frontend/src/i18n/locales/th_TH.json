@@ -1467,7 +1467,19 @@
       "deleteBlockedHint": "ตั้งบัญชีเป็น “ไม่ถูกต้อง” แทน เพื่อให้ตั๋ว บทความ และประวัติยังระบุเจ้าของได้",
       "resendSetupLink": "ส่งลิงก์ตั้งค่าอีกครั้ง",
       "setupLinkSent": "ส่งลิงก์ตั้งค่าแล้ว",
-      "setupLinkFailed": "ส่งลิงก์ตั้งค่าไม่ได้"
+      "setupLinkFailed": "ส่งลิงก์ตั้งค่าไม่ได้",
+      "access": {
+        "header": "Access",
+        "active": "Active",
+        "accepted": "Password set",
+        "invited": "Invited",
+        "expired": "Invitation expired",
+        "none": "No invitation",
+        "lastSeen": "last seen {{when}}",
+        "linkExpires": "link expires {{when}}",
+        "linkExpiredOn": "link expired on {{date}}",
+        "neverSignedIn": "never signed in"
+      }
     },
     "groups": {
       "title_plural": "กลุ่ม",

@@ -1467,7 +1467,19 @@
       "deleteBlockedHint": "請改為將帳戶設為「無效」，以便工單、文章與歷史仍可歸屬。",
       "resendSetupLink": "重新傳送設定連結",
       "setupLinkSent": "設定連結已傳送。",
-      "setupLinkFailed": "無法傳送設定連結。"
+      "setupLinkFailed": "無法傳送設定連結。",
+      "access": {
+        "header": "Access",
+        "active": "Active",
+        "accepted": "Password set",
+        "invited": "Invited",
+        "expired": "Invitation expired",
+        "none": "No invitation",
+        "lastSeen": "last seen {{when}}",
+        "linkExpires": "link expires {{when}}",
+        "linkExpiredOn": "link expired on {{date}}",
+        "neverSignedIn": "never signed in"
+      }
     },
     "groups": {
       "title_plural": "團體",

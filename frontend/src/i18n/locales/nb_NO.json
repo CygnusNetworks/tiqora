@@ -1467,7 +1467,19 @@
       "deleteBlockedHint": "Sett kontoen til «Ugyldig» slik at saker, artikler og historikk forblir tilordnbare.",
       "resendSetupLink": "Send oppsettslenke på nytt",
       "setupLinkSent": "Oppsettslenke sendt.",
-      "setupLinkFailed": "Kunne ikke sende oppsettslenke."
+      "setupLinkFailed": "Kunne ikke sende oppsettslenke.",
+      "access": {
+        "header": "Access",
+        "active": "Active",
+        "accepted": "Password set",
+        "invited": "Invited",
+        "expired": "Invitation expired",
+        "none": "No invitation",
+        "lastSeen": "last seen {{when}}",
+        "linkExpires": "link expires {{when}}",
+        "linkExpiredOn": "link expired on {{date}}",
+        "neverSignedIn": "never signed in"
+      }
     },
     "groups": {
       "title_plural": "Grupper",
