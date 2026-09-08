@@ -92,6 +92,7 @@ from tiqora.worker.notification_templates import (
     configure_notification_context,
     has_untranslated_legacy_link,
     normalize_notification_template,
+    resolve_notification_sender,
 )
 from tiqora.znuny.history import history_add
 from tiqora.znuny.sysconfig import SysConfig
@@ -120,6 +121,9 @@ _TICKET_ATTRIBUTE_FILTER_KEYS: dict[str, str] = {
     "TypeID": "type_id",
 }
 _ARTICLE_ONLY_EVENTS = {"ArticleCreate", "ArticleSend"}
+# Last resort when neither ``NotificationSenderEmail`` nor the queue's system
+# address yields one -- undeliverable through most relays, hence the warning.
+_FALLBACK_SENDER = "Tiqora Notifications <notifications@localhost>"
 # Znuny's NotificationEvent always adds agent 1 to SkipRecipients.
 _ROOT_AGENT_USER_ID = 1
 
@@ -617,8 +621,17 @@ async def _send_to_recipient(
         return False
     subject, body, content_type = rendered
 
+    sender_address = await resolve_notification_sender(sysconfig, base_context)
+    if sender_address is None:
+        logger.warning(
+            "notification_sender_address_unresolved",
+            notification_id=notification.id,
+            ticket_id=_as_int(ticket["id"]),
+        )
+        sender_address = _FALLBACK_SENDER
+
     message = build_message(
-        from_addr="Tiqora Notifications <notifications@localhost>",
+        from_addr=sender_address,
         to_addrs=recipient.email,
         cc_addrs=None,
         subject=subject,
@@ -646,7 +659,7 @@ async def _send_to_recipient(
             subject=subject,
             body=body,
             content_type=content_type or "text/plain; charset=utf-8",
-            from_address="Tiqora Notifications <notifications@localhost>",
+            from_address=sender_address,
             to_address=recipient.email,
             message_id=None,
             in_reply_to=None,
