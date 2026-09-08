@@ -175,7 +175,18 @@ async def _tokens_used_today(session: AsyncSession, queue_id: int) -> int:
 async def _cap_reason(
     session: AsyncSession, *, ticket_id: int, queue_id: int, policy: TiqoraAiQueuePolicy, state: Any
 ) -> str | None:
-    """Return a short reason string if any Phase D cap blocks this run, else None."""
+    """Return a short reason string if anything blocks this run, else None."""
+    # A handoff has to actually hand off. `escalate_to_human` sets
+    # `ai_escalated_at` and writes an internal note, but until this check
+    # existed nothing consumed the flag: the next customer message started a
+    # fresh run, and under `full` autonomy that answer went straight back to
+    # the customer -- right after the AI had said a human would take over.
+    # The flag is cleared again when an agent replies to the customer or the
+    # ticket is closed/merged/removed (see domain.ticket_write_service), so a
+    # ticket resumes automation exactly when a human has picked it up.
+    # Manual Assist is unaffected: it never runs through this worker.
+    if getattr(state, "ai_escalated_at", None) is not None:
+        return "escalated_to_human"
     if state.auto_reply_count >= policy.max_auto_replies:
         return "max_auto_replies"
     if state.clarification_count >= policy.max_clarifications:
