@@ -497,6 +497,26 @@ async def test_resend_setup_link_supersedes_the_previous_one(
             # Re-issuing moves the window rather than widening it.
             assert await resolve_token(session, first) is None
             assert await resolve_token(session, second) == created.id
+
+            # Superseding must expire the old link, not mark it used: `used` is
+            # what the admin UI reads as "the agent accepted the invitation", so
+            # overloading it here would report an accepted invite for someone
+            # who only ever got a replacement mail.
+            rows = (
+                await session.execute(
+                    text(
+                        "SELECT used, expires FROM tiqora_password_setup_token"
+                        " WHERE user_id = :uid ORDER BY id"
+                    ),
+                    {"uid": created.id},
+                )
+            ).all()
+            assert len(rows) == 2
+            superseded, current = rows
+            assert superseded.used is None
+            assert superseded.expires <= datetime.utcnow()  # noqa: DTZ003 — naive UTC column
+            assert current.used is None
+            assert current.expires > datetime.utcnow()  # noqa: DTZ003 — naive UTC column
     finally:
         await engine.dispose()
 

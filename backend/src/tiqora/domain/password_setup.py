@@ -51,22 +51,29 @@ async def issue_token(session: AsyncSession, user_id: int) -> str:
     The plaintext is returned to the caller and never stored; this is the only
     moment it exists. Caller owns the transaction.
     """
+    now = _utcnow()
     # Re-issuing supersedes: a link the admin just replaced must stop working,
-    # otherwise "resend" would widen rather than move the window.
+    # otherwise "resend" would widen rather than move the window. Expire it
+    # rather than marking it used — both make the link fail the checks in
+    # `resolve_token`/`redeem_token`, but `used` is the only record of the agent
+    # having actually accepted the invitation, and the admin user list reports
+    # it as such. Stamping it here would show "invitation accepted" for someone
+    # who did nothing but receive a replacement mail.
     await session.execute(
         update(TiqoraPasswordSetupToken)
         .where(
             TiqoraPasswordSetupToken.user_id == user_id,
             TiqoraPasswordSetupToken.used.is_(None),
+            TiqoraPasswordSetupToken.expires > now,
         )
-        .values(used=_utcnow())
+        .values(expires=now)
     )
     token = secrets.token_urlsafe(32)
     session.add(
         TiqoraPasswordSetupToken(
             user_id=user_id,
             token_hash=_digest(token),
-            expires=_utcnow() + TOKEN_TTL,
+            expires=now + TOKEN_TTL,
         )
     )
     return token
