@@ -1471,16 +1471,16 @@
       "setupLinkSent": "Opsætningslink sendt.",
       "setupLinkFailed": "Kunne ikke sende opsætningslink.",
       "access": {
-        "header": "Access",
-        "active": "Active",
-        "accepted": "Password set",
-        "invited": "Invited",
-        "expired": "Invitation expired",
-        "none": "No invitation",
-        "lastSeen": "last seen {{when}}",
-        "linkExpires": "link expires {{when}}",
-        "linkExpiredOn": "link expired on {{date}}",
-        "neverSignedIn": "never signed in"
+        "header": "Adgang",
+        "active": "Aktiv",
+        "accepted": "Adgangskode angivet",
+        "invited": "Inviteret",
+        "expired": "Invitation udløbet",
+        "none": "Ingen invitation",
+        "lastSeen": "sidst set {{when}}",
+        "linkExpires": "linket udløber {{when}}",
+        "linkExpiredOn": "linket udløb den {{date}}",
+        "neverSignedIn": "har aldrig logget ind"
       }
     },
     "groups": {

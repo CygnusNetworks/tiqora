@@ -1471,16 +1471,16 @@
       "setupLinkSent": "설정 링크를 보냈습니다.",
       "setupLinkFailed": "설정 링크를 보내지 못했습니다.",
       "access": {
-        "header": "Access",
-        "active": "Active",
-        "accepted": "Password set",
-        "invited": "Invited",
-        "expired": "Invitation expired",
-        "none": "No invitation",
-        "lastSeen": "last seen {{when}}",
-        "linkExpires": "link expires {{when}}",
-        "linkExpiredOn": "link expired on {{date}}",
-        "neverSignedIn": "never signed in"
+        "header": "접근",
+        "active": "활성",
+        "accepted": "비밀번호 설정됨",
+        "invited": "초대됨",
+        "expired": "초대 만료됨",
+        "none": "초대 없음",
+        "lastSeen": "마지막 로그인 {{when}}",
+        "linkExpires": "링크 만료 {{when}}",
+        "linkExpiredOn": "링크가 {{date}}에 만료됨",
+        "neverSignedIn": "로그인한 적 없음"
       }
     },
     "groups": {

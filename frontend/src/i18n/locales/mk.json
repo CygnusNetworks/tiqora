@@ -1471,16 +1471,16 @@
       "setupLinkSent": "Врската за поставување е испратена.",
       "setupLinkFailed": "Врската за поставување не можеше да се испрати.",
       "access": {
-        "header": "Access",
-        "active": "Active",
-        "accepted": "Password set",
-        "invited": "Invited",
-        "expired": "Invitation expired",
-        "none": "No invitation",
-        "lastSeen": "last seen {{when}}",
-        "linkExpires": "link expires {{when}}",
-        "linkExpiredOn": "link expired on {{date}}",
-        "neverSignedIn": "never signed in"
+        "header": "Пристап",
+        "active": "Активен",
+        "accepted": "Лозинката е поставена",
+        "invited": "Поканет",
+        "expired": "Поканата истече",
+        "none": "Без покана",
+        "lastSeen": "последно виден {{when}}",
+        "linkExpires": "врската истекува {{when}}",
+        "linkExpiredOn": "врската истече на {{date}}",
+        "neverSignedIn": "никогаш не се најавил"
       }
     },
     "groups": {

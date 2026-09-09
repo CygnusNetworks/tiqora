@@ -1471,16 +1471,16 @@
       "setupLinkSent": "Installationslänk skickad.",
       "setupLinkFailed": "Kunde inte skicka installationslänk.",
       "access": {
-        "header": "Access",
-        "active": "Active",
-        "accepted": "Password set",
-        "invited": "Invited",
-        "expired": "Invitation expired",
-        "none": "No invitation",
-        "lastSeen": "last seen {{when}}",
-        "linkExpires": "link expires {{when}}",
-        "linkExpiredOn": "link expired on {{date}}",
-        "neverSignedIn": "never signed in"
+        "header": "Åtkomst",
+        "active": "Aktiv",
+        "accepted": "Lösenord angivet",
+        "invited": "Inbjuden",
+        "expired": "Inbjudan har gått ut",
+        "none": "Ingen inbjudan",
+        "lastSeen": "senast sedd {{when}}",
+        "linkExpires": "länken går ut {{when}}",
+        "linkExpiredOn": "länken gick ut {{date}}",
+        "neverSignedIn": "har aldrig loggat in"
       }
     },
     "groups": {

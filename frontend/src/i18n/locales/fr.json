@@ -1471,16 +1471,16 @@
       "setupLinkSent": "Lien de configuration envoyé.",
       "setupLinkFailed": "Impossible d’envoyer le lien de configuration.",
       "access": {
-        "header": "Access",
-        "active": "Active",
-        "accepted": "Password set",
-        "invited": "Invited",
-        "expired": "Invitation expired",
-        "none": "No invitation",
-        "lastSeen": "last seen {{when}}",
-        "linkExpires": "link expires {{when}}",
-        "linkExpiredOn": "link expired on {{date}}",
-        "neverSignedIn": "never signed in"
+        "header": "Accès",
+        "active": "Actif",
+        "accepted": "Mot de passe défini",
+        "invited": "Invité",
+        "expired": "Invitation expirée",
+        "none": "Aucune invitation",
+        "lastSeen": "vu {{when}}",
+        "linkExpires": "le lien expire {{when}}",
+        "linkExpiredOn": "lien expiré le {{date}}",
+        "neverSignedIn": "jamais connecté"
       }
     },
     "groups": {
