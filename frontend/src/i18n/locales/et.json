@@ -1469,16 +1469,16 @@
       "setupLinkSent": "Seadistuslink saadetud.",
       "setupLinkFailed": "Seadistuslinki ei saanud saata.",
       "access": {
-        "header": "Access",
-        "active": "Active",
-        "accepted": "Password set",
-        "invited": "Invited",
-        "expired": "Invitation expired",
-        "none": "No invitation",
-        "lastSeen": "last seen {{when}}",
-        "linkExpires": "link expires {{when}}",
-        "linkExpiredOn": "link expired on {{date}}",
-        "neverSignedIn": "never signed in"
+        "header": "Juurdepääs",
+        "active": "Aktiivne",
+        "accepted": "Parool määratud",
+        "invited": "Kutsutud",
+        "expired": "Kutse aegunud",
+        "none": "Kutse puudub",
+        "lastSeen": "viimati nähtud {{when}}",
+        "linkExpires": "link aegub {{when}}",
+        "linkExpiredOn": "link aegus {{date}}",
+        "neverSignedIn": "pole kunagi sisse loginud"
       }
     },
     "groups": {

@@ -1469,16 +1469,16 @@
       "setupLinkSent": "Ο σύνδεσμος ρύθμισης στάλθηκε.",
       "setupLinkFailed": "Αδυναμία αποστολής του συνδέσμου ρύθμισης.",
       "access": {
-        "header": "Access",
-        "active": "Active",
-        "accepted": "Password set",
-        "invited": "Invited",
-        "expired": "Invitation expired",
-        "none": "No invitation",
-        "lastSeen": "last seen {{when}}",
-        "linkExpires": "link expires {{when}}",
-        "linkExpiredOn": "link expired on {{date}}",
-        "neverSignedIn": "never signed in"
+        "header": "Πρόσβαση",
+        "active": "Ενεργός",
+        "accepted": "Ο κωδικός ορίστηκε",
+        "invited": "Προσκεκλημένος",
+        "expired": "Η πρόσκληση έληξε",
+        "none": "Χωρίς πρόσκληση",
+        "lastSeen": "τελευταία σύνδεση {{when}}",
+        "linkExpires": "ο σύνδεσμος λήγει {{when}}",
+        "linkExpiredOn": "ο σύνδεσμος έληξε στις {{date}}",
+        "neverSignedIn": "δεν έχει συνδεθεί ποτέ"
       }
     },
     "groups": {
