@@ -1469,16 +1469,16 @@
       "setupLinkSent": "Beállító hivatkozás elküldve.",
       "setupLinkFailed": "A beállító hivatkozást nem sikerült elküldeni.",
       "access": {
-        "header": "Access",
-        "active": "Active",
-        "accepted": "Password set",
-        "invited": "Invited",
-        "expired": "Invitation expired",
-        "none": "No invitation",
-        "lastSeen": "last seen {{when}}",
-        "linkExpires": "link expires {{when}}",
-        "linkExpiredOn": "link expired on {{date}}",
-        "neverSignedIn": "never signed in"
+        "header": "Hozzáférés",
+        "active": "Aktív",
+        "accepted": "Jelszó beállítva",
+        "invited": "Meghívva",
+        "expired": "A meghívó lejárt",
+        "none": "Nincs meghívó",
+        "lastSeen": "utoljára látva {{when}}",
+        "linkExpires": "a hivatkozás lejár {{when}}",
+        "linkExpiredOn": "a hivatkozás lejárt: {{date}}",
+        "neverSignedIn": "még sosem jelentkezett be"
       }
     },
     "groups": {

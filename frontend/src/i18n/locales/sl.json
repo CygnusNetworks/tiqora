@@ -1469,16 +1469,16 @@
       "setupLinkSent": "Povezava za nastavitev poslana.",
       "setupLinkFailed": "Povezave za nastavitev ni bilo mogoče poslati.",
       "access": {
-        "header": "Access",
-        "active": "Active",
-        "accepted": "Password set",
-        "invited": "Invited",
-        "expired": "Invitation expired",
-        "none": "No invitation",
-        "lastSeen": "last seen {{when}}",
-        "linkExpires": "link expires {{when}}",
-        "linkExpiredOn": "link expired on {{date}}",
-        "neverSignedIn": "never signed in"
+        "header": "Dostop",
+        "active": "Aktiven",
+        "accepted": "Geslo nastavljeno",
+        "invited": "Povabljen",
+        "expired": "Vabilo je poteklo",
+        "none": "Brez vabila",
+        "lastSeen": "nazadnje viden {{when}}",
+        "linkExpires": "povezava poteče {{when}}",
+        "linkExpiredOn": "povezava je potekla {{date}}",
+        "neverSignedIn": "še nikoli prijavljen"
       }
     },
     "groups": {

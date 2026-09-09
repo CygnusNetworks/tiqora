@@ -1469,16 +1469,16 @@
       "setupLinkSent": "设置链接已发送。",
       "setupLinkFailed": "无法发送设置链接。",
       "access": {
-        "header": "Access",
-        "active": "Active",
-        "accepted": "Password set",
-        "invited": "Invited",
-        "expired": "Invitation expired",
-        "none": "No invitation",
-        "lastSeen": "last seen {{when}}",
-        "linkExpires": "link expires {{when}}",
-        "linkExpiredOn": "link expired on {{date}}",
-        "neverSignedIn": "never signed in"
+        "header": "访问",
+        "active": "活跃",
+        "accepted": "已设置密码",
+        "invited": "已邀请",
+        "expired": "邀请已过期",
+        "none": "无邀请",
+        "lastSeen": "最后登录 {{when}}",
+        "linkExpires": "链接{{when}}过期",
+        "linkExpiredOn": "链接已于 {{date}} 过期",
+        "neverSignedIn": "从未登录"
       }
     },
     "groups": {

@@ -1469,16 +1469,16 @@
       "setupLinkSent": "Pautan persediaan dihantar.",
       "setupLinkFailed": "Tidak dapat menghantar pautan persediaan.",
       "access": {
-        "header": "Access",
-        "active": "Active",
-        "accepted": "Password set",
-        "invited": "Invited",
-        "expired": "Invitation expired",
-        "none": "No invitation",
-        "lastSeen": "last seen {{when}}",
-        "linkExpires": "link expires {{when}}",
-        "linkExpiredOn": "link expired on {{date}}",
-        "neverSignedIn": "never signed in"
+        "header": "Akses",
+        "active": "Aktif",
+        "accepted": "Kata laluan ditetapkan",
+        "invited": "Dijemput",
+        "expired": "Jemputan tamat tempoh",
+        "none": "Tiada jemputan",
+        "lastSeen": "terakhir dilihat {{when}}",
+        "linkExpires": "pautan tamat tempoh {{when}}",
+        "linkExpiredOn": "pautan tamat tempoh pada {{date}}",
+        "neverSignedIn": "tidak pernah log masuk"
       }
     },
     "groups": {

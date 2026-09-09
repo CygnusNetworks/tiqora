@@ -1469,16 +1469,16 @@
       "setupLinkSent": "Sąrankos nuoroda išsiųsta.",
       "setupLinkFailed": "Nepavyko išsiųsti sąrankos nuorodos.",
       "access": {
-        "header": "Access",
-        "active": "Active",
-        "accepted": "Password set",
-        "invited": "Invited",
-        "expired": "Invitation expired",
-        "none": "No invitation",
-        "lastSeen": "last seen {{when}}",
-        "linkExpires": "link expires {{when}}",
-        "linkExpiredOn": "link expired on {{date}}",
-        "neverSignedIn": "never signed in"
+        "header": "Prieiga",
+        "active": "Aktyvus",
+        "accepted": "Slaptažodis nustatytas",
+        "invited": "Pakviestas",
+        "expired": "Kvietimas nebegalioja",
+        "none": "Kvietimo nėra",
+        "lastSeen": "paskutinį kartą matytas {{when}}",
+        "linkExpires": "nuoroda nustos galioti {{when}}",
+        "linkExpiredOn": "nuoroda nustojo galioti {{date}}",
+        "neverSignedIn": "niekada neprisijungė"
       }
     },
     "groups": {
