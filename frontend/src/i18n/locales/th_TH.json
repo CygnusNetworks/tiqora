@@ -859,7 +859,8 @@
         "budgetCostMonth": "Cost budget / month",
         "budgetCostHelp": "Optional spend cap in the provider's currency. Once reached, calls to this provider are blocked until the window resets.",
         "maxToolRounds": "รอบการใช้เครื่องมือสูงสุด",
-        "maxToolRoundsHelp": "โมเดลนี้มีขั้นตอนการค้นคว้ากี่ขั้นก่อนที่จะต้องตอบ แต่ละขั้นจะส่งบทสนทนาทั้งหมดใหม่ ดังนั้นการเพิ่มจึงมีค่าใช้จ่ายมากกว่าตามสัดส่วน เว้นว่าง = ค่าเริ่มต้นในตัว"
+        "maxToolRoundsHelp": "โมเดลนี้มีขั้นตอนการค้นคว้ากี่ขั้นก่อนที่จะต้องตอบ แต่ละขั้นจะส่งบทสนทนาทั้งหมดใหม่ ดังนั้นการเพิ่มจึงมีค่าใช้จ่ายมากกว่าตามสัดส่วน เว้นว่าง = ค่าเริ่มต้นในตัว",
+        "invalidAmount": "กรุณาป้อนจำนวนเงินที่ถูกต้อง หรือเว้นว่างไว้"
       },
       "mcp": {
         "title": "ลูกค้าเอ็มซีพี",

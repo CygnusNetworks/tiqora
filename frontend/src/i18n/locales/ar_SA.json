@@ -859,7 +859,8 @@
         "budgetCostMonth": "Cost budget / month",
         "budgetCostHelp": "Optional spend cap in the provider's currency. Once reached, calls to this provider are blocked until the window resets.",
         "maxToolRounds": "الحد الأقصى لجولات الأدوات",
-        "maxToolRoundsHelp": "عدد خطوات البحث المتاحة لهذا النموذج قبل أن يجيب. كل خطوة تعيد إرسال المحادثة كاملة، لذا فإن الزيادة تكلّف أكثر من التناسب. فارغ = الإعداد الافتراضي."
+        "maxToolRoundsHelp": "عدد خطوات البحث المتاحة لهذا النموذج قبل أن يجيب. كل خطوة تعيد إرسال المحادثة كاملة، لذا فإن الزيادة تكلّف أكثر من التناسب. فارغ = الإعداد الافتراضي.",
+        "invalidAmount": "يرجى إدخال مبلغ صالح أو ترك الحقل فارغًا."
       },
       "mcp": {
         "title": "عملاء MCP",

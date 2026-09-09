@@ -859,7 +859,8 @@
         "budgetCostMonth": "Cost budget / month",
         "budgetCostHelp": "Optional spend cap in the provider's currency. Once reached, calls to this provider are blocked until the window resets.",
         "maxToolRounds": "Μέγ. γύροι εργαλείων",
-        "maxToolRoundsHelp": "Πόσα βήματα έρευνας έχει αυτό το μοντέλο πριν πρέπει να απαντήσει. Κάθε βήμα ξαναστέλνει ολόκληρη τη συνομιλία, οπότε η αύξηση κοστίζει περισσότερο από αναλογικά. Κενό = ενσωματωμένη προεπιλογή."
+        "maxToolRoundsHelp": "Πόσα βήματα έρευνας έχει αυτό το μοντέλο πριν πρέπει να απαντήσει. Κάθε βήμα ξαναστέλνει ολόκληρη τη συνομιλία, οπότε η αύξηση κοστίζει περισσότερο από αναλογικά. Κενό = ενσωματωμένη προεπιλογή.",
+        "invalidAmount": "Εισαγάγετε ένα έγκυρο ποσό ή αφήστε το πεδίο κενό."
       },
       "mcp": {
         "title": "πελάτες MCP",

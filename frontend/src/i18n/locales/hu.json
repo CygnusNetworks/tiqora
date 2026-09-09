@@ -859,7 +859,8 @@
         "budgetCostMonth": "Cost budget / month",
         "budgetCostHelp": "Optional spend cap in the provider's currency. Once reached, calls to this provider are blocked until the window resets.",
         "maxToolRounds": "Max. eszközkörök",
-        "maxToolRoundsHelp": "Hány kutatási lépést kap ez a modell, mielőtt válaszolnia kell. Minden lépés újraküldi a teljes beszélgetést, így a növelés az aránynál többe kerül. Üres = beépített alapérték."
+        "maxToolRoundsHelp": "Hány kutatási lépést kap ez a modell, mielőtt válaszolnia kell. Minden lépés újraküldi a teljes beszélgetést, így a növelés az aránynál többe kerül. Üres = beépített alapérték.",
+        "invalidAmount": "Adjon meg érvényes összeget, vagy hagyja üresen a mezőt."
       },
       "mcp": {
         "title": "MCP kliensek",

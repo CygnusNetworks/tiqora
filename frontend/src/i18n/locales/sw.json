@@ -859,7 +859,8 @@
         "budgetCostMonth": "Cost budget / month",
         "budgetCostHelp": "Optional spend cap in the provider's currency. Once reached, calls to this provider are blocked until the window resets.",
         "maxToolRounds": "Raundi za zana za juu",
-        "maxToolRoundsHelp": "Hatua ngapi za utafiti mfano huu unapata kabla ya kulazimika kujibu. Kila hatua hutuma mazungumzo yote upya, hivyo kuongeza kunagharimu zaidi ya uwiano. Wazi = chaguo-msingi lililojengwa ndani."
+        "maxToolRoundsHelp": "Hatua ngapi za utafiti mfano huu unapata kabla ya kulazimika kujibu. Kila hatua hutuma mazungumzo yote upya, hivyo kuongeza kunagharimu zaidi ya uwiano. Wazi = chaguo-msingi lililojengwa ndani.",
+        "invalidAmount": "Tafadhali weka kiasi sahihi, au acha sehemu wazi."
       },
       "mcp": {
         "title": "Wateja wa MCP",

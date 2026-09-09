@@ -859,7 +859,8 @@
         "budgetCostMonth": "Cost budget / month",
         "budgetCostHelp": "Optional spend cap in the provider's currency. Once reached, calls to this provider are blocked until the window resets.",
         "maxToolRounds": "Maks. verktøyrunder",
-        "maxToolRoundsHelp": "Hvor mange undersøkelsestrinn denne modellen får før den må svare. Hvert trinn sender hele samtalen på nytt, så å øke det koster mer enn proporsjonalt. Tomt = innebygd standard."
+        "maxToolRoundsHelp": "Hvor mange undersøkelsestrinn denne modellen får før den må svare. Hvert trinn sender hele samtalen på nytt, så å øke det koster mer enn proporsjonalt. Tomt = innebygd standard.",
+        "invalidAmount": "Angi et gyldig beløp, eller la feltet stå tomt."
       },
       "mcp": {
         "title": "MCP-klienter",

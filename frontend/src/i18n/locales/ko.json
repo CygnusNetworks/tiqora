@@ -859,7 +859,8 @@
         "budgetCostMonth": "Cost budget / month",
         "budgetCostHelp": "Optional spend cap in the provider's currency. Once reached, calls to this provider are blocked until the window resets.",
         "maxToolRounds": "최대 도구 라운드",
-        "maxToolRoundsHelp": "이 모델이 답변하기 전에 사용할 수 있는 조사 단계 수입니다. 각 단계는 전체 대화를 다시 보내므로 늘리면 비례 이상으로 비용이 듭니다. 비워 두면 기본값이 적용됩니다."
+        "maxToolRoundsHelp": "이 모델이 답변하기 전에 사용할 수 있는 조사 단계 수입니다. 각 단계는 전체 대화를 다시 보내므로 늘리면 비례 이상으로 비용이 듭니다. 비워 두면 기본값이 적용됩니다.",
+        "invalidAmount": "유효한 금액을 입력하거나 필드를 비워 두세요."
       },
       "mcp": {
         "title": "MCP 클라이언트",

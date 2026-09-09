@@ -859,7 +859,8 @@
         "budgetCostMonth": "Cost budget / month",
         "budgetCostHelp": "Optional spend cap in the provider's currency. Once reached, calls to this provider are blocked until the window resets.",
         "maxToolRounds": "Roldas de ferramentas máx.",
-        "maxToolRoundsHelp": "Cantos pasos de investigación ten este modelo antes de ter que responder. Cada paso reenvía toda a conversa, así que aumentalo custa máis que proporcionalmente. Baleiro = valor predeterminado."
+        "maxToolRoundsHelp": "Cantos pasos de investigación ten este modelo antes de ter que responder. Cada paso reenvía toda a conversa, así que aumentalo custa máis que proporcionalmente. Baleiro = valor predeterminado.",
+        "invalidAmount": "Introduce un importe válido ou deixa o campo baleiro."
       },
       "mcp": {
         "title": "Clientes MCP",

@@ -859,7 +859,8 @@
         "budgetCostMonth": "Cost budget / month",
         "budgetCostHelp": "Optional spend cap in the provider's currency. Once reached, calls to this provider are blocked until the window resets.",
         "maxToolRounds": "Maks. pusingan alat",
-        "maxToolRoundsHelp": "Berapa langkah penyelidikan model ini dapat sebelum ia mesti menjawab. Setiap langkah menghantar semula keseluruhan perbualan, jadi menaikkannya lebih mahal daripada berkadar. Kosong = lalai terbina."
+        "maxToolRoundsHelp": "Berapa langkah penyelidikan model ini dapat sebelum ia mesti menjawab. Setiap langkah menghantar semula keseluruhan perbualan, jadi menaikkannya lebih mahal daripada berkadar. Kosong = lalai terbina.",
+        "invalidAmount": "Sila masukkan jumlah yang sah, atau biarkan medan kosong."
       },
       "mcp": {
         "title": "pelanggan MCP",

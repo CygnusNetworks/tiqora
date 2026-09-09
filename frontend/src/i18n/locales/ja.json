@@ -859,7 +859,8 @@
         "budgetCostMonth": "Cost budget / month",
         "budgetCostHelp": "Optional spend cap in the provider's currency. Once reached, calls to this provider are blocked until the window resets.",
         "maxToolRounds": "最大ツールラウンド数",
-        "maxToolRoundsHelp": "このモデルが回答するまでに使える調査ステップ数です。各ステップは会話全体を再送するため、増やすと比例以上にコストがかかります。空欄 = 既定値。"
+        "maxToolRoundsHelp": "このモデルが回答するまでに使える調査ステップ数です。各ステップは会話全体を再送するため、増やすと比例以上にコストがかかります。空欄 = 既定値。",
+        "invalidAmount": "有効な金額を入力するか、空欄のままにしてください。"
       },
       "mcp": {
         "title": "MCPクライアント",

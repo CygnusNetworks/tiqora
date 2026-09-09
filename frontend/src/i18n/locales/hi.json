@@ -859,7 +859,8 @@
         "budgetCostMonth": "Cost budget / month",
         "budgetCostHelp": "Optional spend cap in the provider's currency. Once reached, calls to this provider are blocked until the window resets.",
         "maxToolRounds": "अधिकतम टूल राउंड",
-        "maxToolRoundsHelp": "उत्तर देने से पहले इस मॉडल को कितने शोध चरण मिलते हैं। हर चरण पूरी बातचीत दोबारा भेजता है, इसलिए इसे बढ़ाना आनुपातिक से अधिक महंगा है। खाली = अंतर्निहित डिफ़ॉल्ट।"
+        "maxToolRoundsHelp": "उत्तर देने से पहले इस मॉडल को कितने शोध चरण मिलते हैं। हर चरण पूरी बातचीत दोबारा भेजता है, इसलिए इसे बढ़ाना आनुपातिक से अधिक महंगा है। खाली = अंतर्निहित डिफ़ॉल्ट।",
+        "invalidAmount": "कृपया मान्य राशि दर्ज करें या फ़ील्ड खाली छोड़ें।"
       },
       "mcp": {
         "title": "एमसीपी ग्राहक",

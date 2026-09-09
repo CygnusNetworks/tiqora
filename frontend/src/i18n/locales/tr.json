@@ -859,7 +859,8 @@
         "budgetCostMonth": "Cost budget / month",
         "budgetCostHelp": "Optional spend cap in the provider's currency. Once reached, calls to this provider are blocked until the window resets.",
         "maxToolRounds": "Maks. araç turu",
-        "maxToolRoundsHelp": "Bu modelin yanıt vermek zorunda kalmadan önce kaç araştırma adımı aldığı. Her adım tüm konuşmayı yeniden gönderir, bu yüzden artırmak orantıdan fazlaya mal olur. Boş = yerleşik varsayılan."
+        "maxToolRoundsHelp": "Bu modelin yanıt vermek zorunda kalmadan önce kaç araştırma adımı aldığı. Her adım tüm konuşmayı yeniden gönderir, bu yüzden artırmak orantıdan fazlaya mal olur. Boş = yerleşik varsayılan.",
+        "invalidAmount": "Geçerli bir tutar girin veya alanı boş bırakın."
       },
       "mcp": {
         "title": "MCP istemcileri",
