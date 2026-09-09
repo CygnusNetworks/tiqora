@@ -458,7 +458,8 @@
       "errorLlmProviderError": "The AI provider reported an error. Please try again later.",
       "draftRunning": "The AI is working on a draft — this can take several minutes…",
       "draftSkipped": "The AI did not produce a reply suggestion.",
-      "originMarkerTooltip": "Tekoälyagentin automaattisesti lähettämä"
+      "originMarkerTooltip": "Tekoälyagentin automaattisesti lähettämä",
+      "toolArguments": "Kutsuttu parametreilla"
     },
     "toolbar": {
       "print": "Tulosta",
@@ -515,7 +516,9 @@
     "list": {
       "attachments_one": "1 liite",
       "attachments_other": "{{count}} liitteitä",
-      "hasSummary": "AI yhteenveto saatavilla"
+      "hasSummary": "AI yhteenveto saatavilla",
+      "aiRepliedAuto": "Tekoäly vastasi automaattisesti",
+      "aiRepliedAccepted": "Tekoälyluonnos, agentin hyväksymä"
     },
     "similar": {
       "title": "Samanlaiset liput",

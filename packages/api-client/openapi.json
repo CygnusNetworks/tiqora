@@ -2764,6 +2764,17 @@
       },
       "AiToolTraceOut": {
         "properties": {
+          "arguments": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Arguments"
+          },
           "content": {
             "title": "Content",
             "type": "string"
@@ -18650,6 +18661,17 @@
             "title": "Ai Escalated",
             "type": "boolean"
           },
+          "ai_reply_source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ai Reply Source"
+          },
           "archive_flag": {
             "default": 0,
             "title": "Archive Flag",
@@ -19168,6 +19190,17 @@
             "default": false,
             "title": "Ai Escalated",
             "type": "boolean"
+          },
+          "ai_reply_source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ai Reply Source"
           },
           "archive_flag": {
             "default": 0,

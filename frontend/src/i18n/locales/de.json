@@ -496,6 +496,7 @@
       "originBadge": "KI",
       "originBadgeTooltip": "Automatisch von der KI gesendet — klicken für den Tool-Trace",
       "originMarkerTooltip": "Automatisch von der KI gesendet",
+      "toolArguments": "Aufgerufen mit",
       "originTraceEmpty": "Für diese Antwort wurden keine Tool-Aufrufe erfasst.",
       "expand": "Aufklappen",
       "collapse": "Zuklappen",
@@ -583,7 +584,9 @@
     "list": {
       "attachments_one": "1 Anhang",
       "attachments_other": "{{count}} Anhänge",
-      "hasSummary": "KI-Zusammenfassung vorhanden"
+      "hasSummary": "KI-Zusammenfassung vorhanden",
+      "aiRepliedAuto": "Automatisch von der KI beantwortet",
+      "aiRepliedAccepted": "KI-Entwurf, von einem Agenten übernommen"
     },
     "similar": {
       "title": "Ähnliche Tickets",

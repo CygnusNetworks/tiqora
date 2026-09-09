@@ -89,6 +89,7 @@ export function AiOriginTrace({
                 <ToolTraceCard
                   name={step.name}
                   content={step.content}
+                  arguments={step.arguments}
                   testId={`ai-origin-trace-step-${articleId}-${i}`}
                 />
               </li>

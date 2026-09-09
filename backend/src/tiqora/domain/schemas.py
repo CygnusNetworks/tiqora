@@ -201,6 +201,10 @@ class TicketListItem(BaseModel):
     """True when the AI handed this ticket to a human (``escalate_to_human``
     or an escalation-rule hit) and a human has not yet taken over. Distinct
     from Znuny SLA ``escalation_*`` timestamps."""
+    ai_reply_source: str | None = None
+    """How the ticket's most recent AI-written article got sent: ``"auto"``
+    (the agent sent it itself) or ``"manual_accept"`` (a human accepted an AI
+    draft). ``None`` when the AI has written nothing on this ticket."""
     archive_flag: int = 0
     """1 when the ticket is archived — only ever non-zero in admin listings
     with ``include_archived`` (used to show an "Archiviert" badge)."""
