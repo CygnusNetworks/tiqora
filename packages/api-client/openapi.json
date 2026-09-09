@@ -9667,6 +9667,17 @@
             "title": "Kind",
             "type": "string"
           },
+          "max_tool_rounds": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Tool Rounds"
+          },
           "name": {
             "title": "Name",
             "type": "string"
@@ -9812,6 +9823,17 @@
             "title": "Kind",
             "type": "string"
           },
+          "max_tool_rounds": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Tool Rounds"
+          },
           "name": {
             "title": "Name",
             "type": "string"
@@ -9884,6 +9906,7 @@
           "budget_cost_day",
           "budget_cost_week",
           "budget_cost_month",
+          "max_tool_rounds",
           "valid_id",
           "create_time",
           "change_time"
@@ -10037,6 +10060,17 @@
               }
             ],
             "title": "Kind"
+          },
+          "max_tool_rounds": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Tool Rounds"
           },
           "name": {
             "anyOf": [

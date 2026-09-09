@@ -903,3 +903,66 @@ async def test_admin_delete_summary_clears_state_and_404s(mariadb_znuny_url: str
             assert exc_info.value.status_code == 404
     finally:
         await engine.dispose()
+
+
+async def test_provider_max_tool_rounds_override_and_reset(mariadb_znuny_url: str) -> None:
+    """The per-provider tool-round budget, and how it is cleared again.
+
+    ``None`` on the column means "use DEFAULT_MAX_TOOL_ROUNDS". Since the update
+    path reads ``None`` as "field not supplied", 0 is what expresses "back to
+    the default" — an emptied number input in the admin UI sends exactly that.
+    """
+    _ensure_tiqora_tables(mariadb_znuny_url)
+    get_settings.cache_clear()
+    settings = get_settings()
+    engine = create_async_engine(_mysql_async(mariadb_znuny_url))
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    try:
+        async with factory() as session:
+            provider = await ai_providers.create_provider(
+                session,
+                settings=settings,
+                change_by=1,
+                name="rounds-provider",
+                kind="openai_compat",
+                base_url="https://example.com/v1",
+                default_model="m",
+                api_key=None,
+                extra_json=None,
+                supports_tools=True,
+                supports_streaming=True,
+                eu_hosted=False,
+            )
+            # Not configured -> the caller's default applies.
+            assert provider.max_tool_rounds is None
+            assert (
+                await ai_providers.resolve_max_tool_rounds(session, provider.id, default=12) == 12
+            )
+
+            await ai_providers.update_provider(
+                session, provider, settings=settings, change_by=1, max_tool_rounds=20
+            )
+            assert (
+                await ai_providers.resolve_max_tool_rounds(session, provider.id, default=12) == 20
+            )
+
+            # 0 clears the override rather than starving the loop of every round.
+            await ai_providers.update_provider(
+                session, provider, settings=settings, change_by=1, max_tool_rounds=0
+            )
+            assert provider.max_tool_rounds is None
+            assert (
+                await ai_providers.resolve_max_tool_rounds(session, provider.id, default=12) == 12
+            )
+
+            # An unknown or unset provider falls back rather than raising: the
+            # budget must never be the reason a run cannot start.
+            assert await ai_providers.resolve_max_tool_rounds(session, 999_999, default=12) == 12
+            assert await ai_providers.resolve_max_tool_rounds(session, None, default=12) == 12
+
+            await session.execute(
+                text("DELETE FROM tiqora_llm_provider WHERE id = :pid"), {"pid": provider.id}
+            )
+            await session.commit()
+    finally:
+        await engine.dispose()

@@ -51,6 +51,8 @@ export type LlmProviderOut = {
   budget_cost_day: number | null;
   budget_cost_week: number | null;
   budget_cost_month: number | null;
+  /** null = the built-in default applies. */
+  max_tool_rounds: number | null;
   valid_id: number;
   create_time: string;
   change_time: string;
@@ -73,6 +75,8 @@ export type LlmProviderCreate = {
   budget_cost_day?: number | null;
   budget_cost_week?: number | null;
   budget_cost_month?: number | null;
+  /** Tool rounds for this model; 0 or omitted means the built-in default. */
+  max_tool_rounds?: number | null;
 };
 
 export type LlmProviderUpdate = Partial<LlmProviderCreate> & { valid_id?: number };

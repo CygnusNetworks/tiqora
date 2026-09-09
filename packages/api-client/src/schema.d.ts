@@ -9326,6 +9326,8 @@ export interface components {
              * @enum {string}
              */
             kind: "openai_compat" | "anthropic";
+            /** Max Tool Rounds */
+            max_tool_rounds?: number | null;
             /** Name */
             name: string;
             /** Price Currency */
@@ -9385,6 +9387,8 @@ export interface components {
              * @enum {string}
              */
             kind: "openai_compat" | "anthropic";
+            /** Max Tool Rounds */
+            max_tool_rounds: number | null;
             /** Name */
             name: string;
             /** Price Currency */
@@ -9433,6 +9437,8 @@ export interface components {
             extra_json?: string | null;
             /** Kind */
             kind?: ("openai_compat" | "anthropic") | null;
+            /** Max Tool Rounds */
+            max_tool_rounds?: number | null;
             /** Name */
             name?: string | null;
             /** Price Currency */
