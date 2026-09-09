@@ -1469,16 +1469,16 @@
       "setupLinkSent": "設定連結已傳送。",
       "setupLinkFailed": "無法傳送設定連結。",
       "access": {
-        "header": "Access",
-        "active": "Active",
-        "accepted": "Password set",
-        "invited": "Invited",
-        "expired": "Invitation expired",
-        "none": "No invitation",
-        "lastSeen": "last seen {{when}}",
-        "linkExpires": "link expires {{when}}",
-        "linkExpiredOn": "link expired on {{date}}",
-        "neverSignedIn": "never signed in"
+        "header": "存取",
+        "active": "使用中",
+        "accepted": "已設定密碼",
+        "invited": "已邀請",
+        "expired": "邀請已過期",
+        "none": "無邀請",
+        "lastSeen": "最後登入 {{when}}",
+        "linkExpires": "連結{{when}}過期",
+        "linkExpiredOn": "連結已於 {{date}} 過期",
+        "neverSignedIn": "從未登入"
       }
     },
     "groups": {

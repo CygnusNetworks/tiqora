@@ -1469,16 +1469,16 @@
       "setupLinkSent": "Đã gửi liên kết thiết lập.",
       "setupLinkFailed": "Không gửi được liên kết thiết lập.",
       "access": {
-        "header": "Access",
-        "active": "Active",
-        "accepted": "Password set",
-        "invited": "Invited",
-        "expired": "Invitation expired",
-        "none": "No invitation",
-        "lastSeen": "last seen {{when}}",
-        "linkExpires": "link expires {{when}}",
-        "linkExpiredOn": "link expired on {{date}}",
-        "neverSignedIn": "never signed in"
+        "header": "Truy cập",
+        "active": "Đang hoạt động",
+        "accepted": "Đã đặt mật khẩu",
+        "invited": "Đã mời",
+        "expired": "Lời mời đã hết hạn",
+        "none": "Không có lời mời",
+        "lastSeen": "lần cuối {{when}}",
+        "linkExpires": "liên kết hết hạn {{when}}",
+        "linkExpiredOn": "liên kết đã hết hạn vào {{date}}",
+        "neverSignedIn": "chưa từng đăng nhập"
       }
     },
     "groups": {

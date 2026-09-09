@@ -1469,16 +1469,16 @@
       "setupLinkSent": "Linkul de configurare a fost trimis.",
       "setupLinkFailed": "Linkul de configurare nu a putut fi trimis.",
       "access": {
-        "header": "Access",
-        "active": "Active",
-        "accepted": "Password set",
-        "invited": "Invited",
-        "expired": "Invitation expired",
-        "none": "No invitation",
-        "lastSeen": "last seen {{when}}",
-        "linkExpires": "link expires {{when}}",
-        "linkExpiredOn": "link expired on {{date}}",
-        "neverSignedIn": "never signed in"
+        "header": "Acces",
+        "active": "Activ",
+        "accepted": "Parolă setată",
+        "invited": "Invitat",
+        "expired": "Invitație expirată",
+        "none": "Fără invitație",
+        "lastSeen": "văzut ultima dată {{when}}",
+        "linkExpires": "linkul expiră {{when}}",
+        "linkExpiredOn": "linkul a expirat pe {{date}}",
+        "neverSignedIn": "nu s-a autentificat niciodată"
       }
     },
     "groups": {

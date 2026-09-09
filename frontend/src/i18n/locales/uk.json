@@ -1469,16 +1469,16 @@
       "setupLinkSent": "Посилання налаштування надіслано.",
       "setupLinkFailed": "Не вдалося надіслати посилання налаштування.",
       "access": {
-        "header": "Access",
-        "active": "Active",
-        "accepted": "Password set",
-        "invited": "Invited",
-        "expired": "Invitation expired",
-        "none": "No invitation",
-        "lastSeen": "last seen {{when}}",
-        "linkExpires": "link expires {{when}}",
-        "linkExpiredOn": "link expired on {{date}}",
-        "neverSignedIn": "never signed in"
+        "header": "Доступ",
+        "active": "Активний",
+        "accepted": "Пароль встановлено",
+        "invited": "Запрошено",
+        "expired": "Запрошення протерміноване",
+        "none": "Без запрошення",
+        "lastSeen": "останній вхід {{when}}",
+        "linkExpires": "посилання спливає {{when}}",
+        "linkExpiredOn": "посилання спливло {{date}}",
+        "neverSignedIn": "жодного разу не входив"
       }
     },
     "groups": {

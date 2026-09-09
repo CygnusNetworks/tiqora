@@ -1469,16 +1469,16 @@
       "setupLinkSent": "Iestatīšanas saite nosūtīta.",
       "setupLinkFailed": "Neizdevās nosūtīt iestatīšanas saiti.",
       "access": {
-        "header": "Access",
-        "active": "Active",
-        "accepted": "Password set",
-        "invited": "Invited",
-        "expired": "Invitation expired",
-        "none": "No invitation",
-        "lastSeen": "last seen {{when}}",
-        "linkExpires": "link expires {{when}}",
-        "linkExpiredOn": "link expired on {{date}}",
-        "neverSignedIn": "never signed in"
+        "header": "Piekļuve",
+        "active": "Aktīvs",
+        "accepted": "Parole iestatīta",
+        "invited": "Uzaicināts",
+        "expired": "Uzaicinājums beidzies",
+        "none": "Nav uzaicinājuma",
+        "lastSeen": "pēdējoreiz redzēts {{when}}",
+        "linkExpires": "saite beigsies {{when}}",
+        "linkExpiredOn": "saite beidzās {{date}}",
+        "neverSignedIn": "nekad nav pieteicies"
       }
     },
     "groups": {

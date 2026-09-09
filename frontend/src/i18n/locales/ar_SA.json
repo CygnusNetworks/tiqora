@@ -1469,16 +1469,16 @@
       "setupLinkSent": "تم إرسال رابط الإعداد.",
       "setupLinkFailed": "تعذّر إرسال رابط الإعداد.",
       "access": {
-        "header": "Access",
-        "active": "Active",
-        "accepted": "Password set",
-        "invited": "Invited",
-        "expired": "Invitation expired",
-        "none": "No invitation",
-        "lastSeen": "last seen {{when}}",
-        "linkExpires": "link expires {{when}}",
-        "linkExpiredOn": "link expired on {{date}}",
-        "neverSignedIn": "never signed in"
+        "header": "الوصول",
+        "active": "نشط",
+        "accepted": "تم تعيين كلمة المرور",
+        "invited": "تمت الدعوة",
+        "expired": "انتهت صلاحية الدعوة",
+        "none": "لا توجد دعوة",
+        "lastSeen": "آخر ظهور {{when}}",
+        "linkExpires": "تنتهي صلاحية الرابط {{when}}",
+        "linkExpiredOn": "انتهت صلاحية الرابط في {{date}}",
+        "neverSignedIn": "لم يسجّل الدخول قط"
       }
     },
     "groups": {
