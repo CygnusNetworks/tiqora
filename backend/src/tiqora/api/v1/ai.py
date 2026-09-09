@@ -80,6 +80,9 @@ _MANUAL_RUN_STALE_AGE = _LOCK_MAX_AGE
 class AiToolTraceOut(BaseModel):
     name: str
     content: str
+    arguments: str | None = None
+    """JSON the tool was called with. ``None`` for runs recorded before the
+    arguments were kept — those traces show only what a tool returned."""
 
 
 class AiDraftOut(BaseModel):
@@ -156,7 +159,14 @@ def parse_tool_trace(raw: str | None) -> list[AiToolTraceOut]:
         if not isinstance(content, str):
             continue
         name = item.get("name")
-        out.append(AiToolTraceOut(name=name if isinstance(name, str) else "tool", content=content))
+        arguments = item.get("arguments")
+        out.append(
+            AiToolTraceOut(
+                name=name if isinstance(name, str) else "tool",
+                content=content,
+                arguments=arguments if isinstance(arguments, str) else None,
+            )
+        )
     return out
 
 

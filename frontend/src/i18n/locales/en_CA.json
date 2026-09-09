@@ -458,7 +458,8 @@
       "errorLlmProviderError": "The AI provider reported an error. Please try again later.",
       "draftRunning": "The AI is working on a draft — this can take several minutes…",
       "draftSkipped": "The AI did not produce a reply suggestion.",
-      "originMarkerTooltip": "Auto-sent by the AI agent"
+      "originMarkerTooltip": "Auto-sent by the AI agent",
+      "toolArguments": "Called with"
     },
     "toolbar": {
       "print": "Print",
@@ -515,7 +516,9 @@
     "list": {
       "attachments_one": "1 attachment",
       "attachments_other": "{{count}} attachments",
-      "hasSummary": "AI summary available"
+      "hasSummary": "AI summary available",
+      "aiRepliedAuto": "Answered automatically by the AI",
+      "aiRepliedAccepted": "AI draft, accepted by an agent"
     },
     "similar": {
       "title": "Similar tickets",

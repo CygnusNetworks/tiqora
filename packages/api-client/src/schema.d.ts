@@ -7024,6 +7024,8 @@ export interface components {
         };
         /** AiToolTraceOut */
         AiToolTraceOut: {
+            /** Arguments */
+            arguments?: string | null;
             /** Content */
             content: string;
             /** Name */
@@ -12214,6 +12216,8 @@ export interface components {
              * @default false
              */
             ai_escalated: boolean;
+            /** Ai Reply Source */
+            ai_reply_source?: string | null;
             /**
              * Archive Flag
              * @default 0
@@ -12431,6 +12435,8 @@ export interface components {
              * @default false
              */
             ai_escalated: boolean;
+            /** Ai Reply Source */
+            ai_reply_source?: string | null;
             /**
              * Archive Flag
              * @default 0

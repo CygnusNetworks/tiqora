@@ -229,9 +229,11 @@ export function TicketTable({
           const extras = ticket as typeof ticket & {
             attachment_count?: number;
             has_ai_summary?: boolean;
+            ai_reply_source?: string | null;
           };
           const attachmentCount = extras.attachment_count ?? 0;
           const hasAiSummary = extras.has_ai_summary ?? false;
+          const aiReplySource = extras.ai_reply_source ?? null;
           const customerNumber = ticket.customer_id || null;
           const customerLogin = ticket.customer_user_id || null;
           // `customer_email` comes from the customer_user record; customer_user_id
@@ -385,6 +387,31 @@ export function TicketTable({
                       aria-label={t("ticket.list.hasSummary")}
                     >
                       ✦
+                    </span>
+                  )}
+                  {aiReplySource && (
+                    // Same glyph for both, because both mean "the AI wrote
+                    // this"; the tone separates a reply the agent sent by
+                    // itself from a draft a human reviewed and accepted.
+                    <span
+                      className={cn(
+                        "flex-none text-[11px]",
+                        aiReplySource === "auto" ? "text-accent" : "text-muted",
+                      )}
+                      title={
+                        aiReplySource === "auto"
+                          ? t("ticket.list.aiRepliedAuto")
+                          : t("ticket.list.aiRepliedAccepted")
+                      }
+                      aria-label={
+                        aiReplySource === "auto"
+                          ? t("ticket.list.aiRepliedAuto")
+                          : t("ticket.list.aiRepliedAccepted")
+                      }
+                      data-testid={`ticket-ai-reply-indicator-${ticket.id}`}
+                      data-source={aiReplySource}
+                    >
+                      🤖
                     </span>
                   )}
                 </span>

@@ -458,7 +458,8 @@
       "errorLlmProviderError": "The AI provider reported an error. Please try again later.",
       "draftRunning": "The AI is working on a draft — this can take several minutes…",
       "draftSkipped": "The AI did not produce a reply suggestion.",
-      "originMarkerTooltip": "Автоматски испратено од ВИ агентот"
+      "originMarkerTooltip": "Автоматски испратено од ВИ агентот",
+      "toolArguments": "Повикано со"
     },
     "toolbar": {
       "print": "Печати",
@@ -515,7 +516,9 @@
     "list": {
       "attachments_one": "1 прилог",
       "attachments_other": "{{count}} прилози",
-      "hasSummary": "Достапно резиме за вештачка интелигенција"
+      "hasSummary": "Достапно резиме за вештачка интелигенција",
+      "aiRepliedAuto": "Автоматски одговорено од ВИ",
+      "aiRepliedAccepted": "ВИ нацрт, прифатен од агент"
     },
     "similar": {
       "title": "Слични билети",

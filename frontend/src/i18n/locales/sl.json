@@ -458,7 +458,8 @@
       "errorLlmProviderError": "The AI provider reported an error. Please try again later.",
       "draftRunning": "The AI is working on a draft — this can take several minutes…",
       "draftSkipped": "The AI did not produce a reply suggestion.",
-      "originMarkerTooltip": "Samodejno poslal agent UI"
+      "originMarkerTooltip": "Samodejno poslal agent UI",
+      "toolArguments": "Klicano z"
     },
     "toolbar": {
       "print": "Tiskanje",
@@ -515,7 +516,9 @@
     "list": {
       "attachments_one": "1 priloga",
       "attachments_other": "{{count}} priloge",
-      "hasSummary": "Na voljo je povzetek AI"
+      "hasSummary": "Na voljo je povzetek AI",
+      "aiRepliedAuto": "Samodejno odgovorila UI",
+      "aiRepliedAccepted": "Osnutek UI, sprejel agent"
     },
     "similar": {
       "title": "Podobne vstopnice",

@@ -458,7 +458,8 @@
       "errorLlmProviderError": "The AI provider reported an error. Please try again later.",
       "draftRunning": "The AI is working on a draft — this can take several minutes…",
       "draftSkipped": "The AI did not produce a reply suggestion.",
-      "originMarkerTooltip": "ส่งอัตโนมัติโดยเอเจนต์ AI"
+      "originMarkerTooltip": "ส่งอัตโนมัติโดยเอเจนต์ AI",
+      "toolArguments": "เรียกด้วย"
     },
     "toolbar": {
       "print": "พิมพ์",
@@ -515,7 +516,9 @@
     "list": {
       "attachments_one": "เอกสารแนบ 1 รายการ",
       "attachments_other": "ไฟล์แนบ {{count}}",
-      "hasSummary": "มีข้อมูลสรุป AI"
+      "hasSummary": "มีข้อมูลสรุป AI",
+      "aiRepliedAuto": "ตอบอัตโนมัติโดย AI",
+      "aiRepliedAccepted": "ร่างจาก AI ที่เจ้าหน้าที่ยอมรับ"
     },
     "similar": {
       "title": "ตั๋วที่คล้ายกัน",

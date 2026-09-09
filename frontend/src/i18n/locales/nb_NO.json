@@ -458,7 +458,8 @@
       "errorLlmProviderError": "The AI provider reported an error. Please try again later.",
       "draftRunning": "The AI is working on a draft — this can take several minutes…",
       "draftSkipped": "The AI did not produce a reply suggestion.",
-      "originMarkerTooltip": "Sendt automatisk av KI-agenten"
+      "originMarkerTooltip": "Sendt automatisk av KI-agenten",
+      "toolArguments": "Kalt med"
     },
     "toolbar": {
       "print": "Skriv ut",
@@ -515,7 +516,9 @@
     "list": {
       "attachments_one": "1 vedlegg",
       "attachments_other": "{{count}} vedlegg",
-      "hasSummary": "AI-sammendrag tilgjengelig"
+      "hasSummary": "AI-sammendrag tilgjengelig",
+      "aiRepliedAuto": "Besvart automatisk av KI-en",
+      "aiRepliedAccepted": "KI-utkast, godtatt av en agent"
     },
     "similar": {
       "title": "Lignende billetter",
