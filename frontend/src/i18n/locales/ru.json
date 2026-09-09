@@ -1471,16 +1471,16 @@
       "setupLinkSent": "Ссылка настройки отправлена.",
       "setupLinkFailed": "Не удалось отправить ссылку настройки.",
       "access": {
-        "header": "Access",
-        "active": "Active",
-        "accepted": "Password set",
-        "invited": "Invited",
-        "expired": "Invitation expired",
-        "none": "No invitation",
-        "lastSeen": "last seen {{when}}",
-        "linkExpires": "link expires {{when}}",
-        "linkExpiredOn": "link expired on {{date}}",
-        "neverSignedIn": "never signed in"
+        "header": "Доступ",
+        "active": "Активен",
+        "accepted": "Пароль задан",
+        "invited": "Приглашён",
+        "expired": "Приглашение истекло",
+        "none": "Без приглашения",
+        "lastSeen": "последний вход {{when}}",
+        "linkExpires": "ссылка истекает {{when}}",
+        "linkExpiredOn": "ссылка истекла {{date}}",
+        "neverSignedIn": "ни разу не входил"
       }
     },
     "groups": {

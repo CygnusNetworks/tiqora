@@ -1471,16 +1471,16 @@
       "setupLinkSent": "Enllaç de configuració enviat.",
       "setupLinkFailed": "No s'ha pogut enviar l'enllaç de configuració.",
       "access": {
-        "header": "Access",
-        "active": "Active",
-        "accepted": "Password set",
-        "invited": "Invited",
-        "expired": "Invitation expired",
-        "none": "No invitation",
-        "lastSeen": "last seen {{when}}",
-        "linkExpires": "link expires {{when}}",
-        "linkExpiredOn": "link expired on {{date}}",
-        "neverSignedIn": "never signed in"
+        "header": "Accés",
+        "active": "Actiu",
+        "accepted": "Contrasenya establerta",
+        "invited": "Convidat",
+        "expired": "Invitació caducada",
+        "none": "Sense invitació",
+        "lastSeen": "vist {{when}}",
+        "linkExpires": "l'enllaç caduca {{when}}",
+        "linkExpiredOn": "l'enllaç va caducar el {{date}}",
+        "neverSignedIn": "mai no ha iniciat sessió"
       }
     },
     "groups": {

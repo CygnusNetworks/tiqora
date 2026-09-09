@@ -1471,16 +1471,16 @@
       "setupLinkSent": "Asennuslinkki lähetetty.",
       "setupLinkFailed": "Asennuslinkkiä ei voitu lähettää.",
       "access": {
-        "header": "Access",
-        "active": "Active",
-        "accepted": "Password set",
-        "invited": "Invited",
-        "expired": "Invitation expired",
-        "none": "No invitation",
-        "lastSeen": "last seen {{when}}",
-        "linkExpires": "link expires {{when}}",
-        "linkExpiredOn": "link expired on {{date}}",
-        "neverSignedIn": "never signed in"
+        "header": "Käyttöoikeus",
+        "active": "Aktiivinen",
+        "accepted": "Salasana asetettu",
+        "invited": "Kutsuttu",
+        "expired": "Kutsu vanhentunut",
+        "none": "Ei kutsua",
+        "lastSeen": "nähty viimeksi {{when}}",
+        "linkExpires": "linkki vanhenee {{when}}",
+        "linkExpiredOn": "linkki vanheni {{date}}",
+        "neverSignedIn": "ei ole koskaan kirjautunut"
       }
     },
     "groups": {
