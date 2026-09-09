@@ -859,7 +859,8 @@
         "budgetCostMonth": "Cost budget / month",
         "budgetCostHelp": "Optional spend cap in the provider's currency. Once reached, calls to this provider are blocked until the window resets.",
         "maxToolRounds": "Najv. krogov orodij",
-        "maxToolRoundsHelp": "Koliko korakov raziskovanja dobi ta model, preden mora odgovoriti. Vsak korak znova pošlje celoten pogovor, zato zvišanje stane več kot sorazmerno. Prazno = vgrajena privzeta vrednost."
+        "maxToolRoundsHelp": "Koliko korakov raziskovanja dobi ta model, preden mora odgovoriti. Vsak korak znova pošlje celoten pogovor, zato zvišanje stane več kot sorazmerno. Prazno = vgrajena privzeta vrednost.",
+        "invalidAmount": "Vnesite veljaven znesek ali pustite polje prazno."
       },
       "mcp": {
         "title": "odjemalci MCP",

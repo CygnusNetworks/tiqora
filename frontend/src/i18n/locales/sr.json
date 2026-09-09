@@ -859,7 +859,8 @@
         "budgetCostMonth": "Cost budget / month",
         "budgetCostHelp": "Optional spend cap in the provider's currency. Once reached, calls to this provider are blocked until the window resets.",
         "maxToolRounds": "Макс. кругова алата",
-        "maxToolRoundsHelp": "Колико корака истраживања добија овај модел пре него што мора да одговори. Сваки корак поново шаље цео разговор, па повећање кошта више него пропорционално. Празно = уграђена подразумевана вредност."
+        "maxToolRoundsHelp": "Колико корака истраживања добија овај модел пре него што мора да одговори. Сваки корак поново шаље цео разговор, па повећање кошта више него пропорционално. Празно = уграђена подразумевана вредност.",
+        "invalidAmount": "Унесите важећи износ или оставите поље празно."
       },
       "mcp": {
         "title": "МЦП клијенти",

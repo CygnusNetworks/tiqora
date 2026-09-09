@@ -859,7 +859,8 @@
         "budgetCostMonth": "Cost budget / month",
         "budgetCostHelp": "Optional spend cap in the provider's currency. Once reached, calls to this provider are blocked until the window resets.",
         "maxToolRounds": "Số vòng công cụ tối đa",
-        "maxToolRoundsHelp": "Mô hình này có bao nhiêu bước nghiên cứu trước khi phải trả lời. Mỗi bước gửi lại toàn bộ cuộc hội thoại, nên tăng lên tốn kém hơn mức tỷ lệ. Để trống = giá trị mặc định."
+        "maxToolRoundsHelp": "Mô hình này có bao nhiêu bước nghiên cứu trước khi phải trả lời. Mỗi bước gửi lại toàn bộ cuộc hội thoại, nên tăng lên tốn kém hơn mức tỷ lệ. Để trống = giá trị mặc định.",
+        "invalidAmount": "Vui lòng nhập số tiền hợp lệ hoặc để trống."
       },
       "mcp": {
         "title": "Khách hàng MCP",

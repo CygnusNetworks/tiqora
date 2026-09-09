@@ -859,7 +859,8 @@
         "budgetCostMonth": "Cost budget / month",
         "budgetCostHelp": "Optional spend cap in the provider's currency. Once reached, calls to this provider are blocked until the window resets.",
         "maxToolRounds": "מקס' סבבי כלים",
-        "maxToolRoundsHelp": "כמה שלבי מחקר המודל מקבל לפני שעליו להשיב. כל שלב שולח מחדש את כל השיחה, ולכן העלאה עולה יותר מיחסית. ריק = ברירת המחדל המובנית."
+        "maxToolRoundsHelp": "כמה שלבי מחקר המודל מקבל לפני שעליו להשיב. כל שלב שולח מחדש את כל השיחה, ולכן העלאה עולה יותר מיחסית. ריק = ברירת המחדל המובנית.",
+        "invalidAmount": "יש להזין סכום תקין או להשאיר את השדה ריק."
       },
       "mcp": {
         "title": "לקוחות MCP",

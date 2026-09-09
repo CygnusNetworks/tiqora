@@ -905,6 +905,74 @@ async def test_admin_delete_summary_clears_state_and_404s(mariadb_znuny_url: str
         await engine.dispose()
 
 
+async def test_provider_money_columns_can_be_cleared_again(mariadb_znuny_url: str) -> None:
+    """A configured price or budget must be removable, and 0 must survive.
+
+    ``None`` on these columns means "no price configured" / "no cap", while 0
+    means "cap of zero — block everything". Both are reachable states, so the
+    update path cannot read ``None`` as "field not supplied": that made a
+    configured budget permanent. An omitted field is filtered out by the
+    router's ``exclude_unset``, so it never reaches the function at all.
+    """
+    _ensure_tiqora_tables(mariadb_znuny_url)
+    get_settings.cache_clear()
+    settings = get_settings()
+    engine = create_async_engine(_mysql_async(mariadb_znuny_url))
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    try:
+        async with factory() as session:
+            provider = await ai_providers.create_provider(
+                session,
+                settings=settings,
+                change_by=1,
+                name="money-provider",
+                kind="openai_compat",
+                base_url="https://example.com/v1",
+                default_model="m",
+                api_key=None,
+                extra_json=None,
+                supports_tools=True,
+                supports_streaming=True,
+                eu_hosted=False,
+                price_input_per_1m=0.25,
+                price_currency="USD",
+                budget_cost_day=5.0,
+            )
+            assert provider.budget_cost_day == 5.0
+
+            # Touching an unrelated field leaves the money columns alone.
+            await ai_providers.update_provider(
+                session, provider, settings=settings, change_by=1, default_model="m2"
+            )
+            assert provider.budget_cost_day == 5.0
+            assert provider.price_input_per_1m == 0.25
+
+            # An explicit None clears — this is what was impossible before.
+            await ai_providers.update_provider(
+                session,
+                provider,
+                settings=settings,
+                change_by=1,
+                budget_cost_day=None,
+                price_input_per_1m=None,
+            )
+            assert provider.budget_cost_day is None
+            assert provider.price_input_per_1m is None
+
+            # Zero is a cap of zero, not "unset" — it must be stored as 0.
+            await ai_providers.update_provider(
+                session, provider, settings=settings, change_by=1, budget_cost_day=0.0
+            )
+            assert provider.budget_cost_day == 0.0
+
+            await session.execute(
+                text("DELETE FROM tiqora_llm_provider WHERE id = :pid"), {"pid": provider.id}
+            )
+            await session.commit()
+    finally:
+        await engine.dispose()
+
+
 async def test_provider_max_tool_rounds_override_and_reset(mariadb_znuny_url: str) -> None:
     """The per-provider tool-round budget, and how it is cleared again.
 

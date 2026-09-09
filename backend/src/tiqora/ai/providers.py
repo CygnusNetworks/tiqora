@@ -10,6 +10,7 @@ import json
 import time
 from dataclasses import dataclass
 from datetime import UTC, datetime
+from typing import Any
 
 import httpx
 from sqlalchemy import select
@@ -120,14 +121,22 @@ async def resolve_max_tool_rounds(
     return provider.max_tool_rounds
 
 
-def _normalize_tool_rounds(value: int | None) -> int | None:
-    """Map "no override" onto NULL.
+# "Caller did not mention this field", as distinct from "caller set it to
+# NULL". The nullable money/limit columns need both: `None` means *no cap* and
+# *no configured price*, which are real, reachable states — so an update that
+# reads a plain `None` as "not supplied" can never clear one again. The router
+# already passes `model_dump(exclude_unset=True)`, so an omitted field simply
+# never arrives and this default stands.
+_UNSET: Any = object()
 
-    The update path uses ``None`` to mean "field not supplied" (house pattern
-    throughout this module), which would otherwise make a column whose whole
-    point is "NULL = use the default" impossible to reset. Accepting 0 — what
-    an emptied number input sends — as "back to the default" keeps the reset
-    expressible without changing the sentinel everywhere else.
+
+def _normalize_tool_rounds(value: int | None) -> int | None:
+    """Map a non-positive override onto NULL.
+
+    Zero rounds would leave the terminal-force as the only call an agent ever
+    makes, which is never what someone typing 0 means — they mean "use the
+    default". Unlike the money columns, zero carries no legitimate meaning
+    here, so it is folded into NULL rather than rejected.
     """
     if value is None or value < 1:
         return None
@@ -213,15 +222,30 @@ async def update_provider(
     supports_streaming: bool | None = None,
     eu_hosted: bool | None = None,
     supports_vision: bool | None = None,
-    price_input_per_1m: float | None = None,
-    price_output_per_1m: float | None = None,
-    price_currency: str | None = None,
-    budget_cost_day: float | None = None,
-    budget_cost_week: float | None = None,
-    budget_cost_month: float | None = None,
-    max_tool_rounds: int | None = None,
+    price_input_per_1m: float | None = _UNSET,
+    price_output_per_1m: float | None = _UNSET,
+    price_currency: str | None = _UNSET,
+    budget_cost_day: float | None = _UNSET,
+    budget_cost_week: float | None = _UNSET,
+    budget_cost_month: float | None = _UNSET,
+    max_tool_rounds: int | None = _UNSET,
     valid_id: int | None = None,
 ) -> TiqoraLlmProvider:
+    # Resolve "not supplied" against the stored row first, so validation sees
+    # the state the update would actually produce and the assignments below
+    # need no further guarding — an explicit None is now a real value that
+    # clears the column.
+    def _kept(supplied: Any, current: Any) -> Any:
+        return current if supplied is _UNSET else supplied
+
+    price_input_per_1m = _kept(price_input_per_1m, row.price_input_per_1m)
+    price_output_per_1m = _kept(price_output_per_1m, row.price_output_per_1m)
+    price_currency = _kept(price_currency, row.price_currency)
+    budget_cost_day = _kept(budget_cost_day, row.budget_cost_day)
+    budget_cost_week = _kept(budget_cost_week, row.budget_cost_week)
+    budget_cost_month = _kept(budget_cost_month, row.budget_cost_month)
+    max_tool_rounds = _kept(max_tool_rounds, row.max_tool_rounds)
+
     _validate_pricing(
         price_input_per_1m=price_input_per_1m,
         price_output_per_1m=price_output_per_1m,
@@ -252,22 +276,15 @@ async def update_provider(
         row.eu_hosted = eu_hosted
     if supports_vision is not None:
         row.supports_vision = supports_vision
-    if price_input_per_1m is not None:
-        row.price_input_per_1m = price_input_per_1m
-    if price_output_per_1m is not None:
-        row.price_output_per_1m = price_output_per_1m
-    if price_currency is not None:
-        row.price_currency = price_currency
-    if budget_cost_day is not None:
-        row.budget_cost_day = budget_cost_day
-    if budget_cost_week is not None:
-        row.budget_cost_week = budget_cost_week
-    if budget_cost_month is not None:
-        row.budget_cost_month = budget_cost_month
-    # Normalized rather than guarded: 0 is a supplied value meaning "back to the
-    # code default", so it must reach the column as NULL.
-    if max_tool_rounds is not None:
-        row.max_tool_rounds = _normalize_tool_rounds(max_tool_rounds)
+    # Assigned unconditionally: these were resolved above, so the value here is
+    # already the intended end state — including None, which clears the column.
+    row.price_input_per_1m = price_input_per_1m
+    row.price_output_per_1m = price_output_per_1m
+    row.price_currency = price_currency
+    row.budget_cost_day = budget_cost_day
+    row.budget_cost_week = budget_cost_week
+    row.budget_cost_month = budget_cost_month
+    row.max_tool_rounds = _normalize_tool_rounds(max_tool_rounds)
     if valid_id is not None:
         row.valid_id = valid_id
     row.change_by = change_by

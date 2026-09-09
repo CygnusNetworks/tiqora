@@ -859,7 +859,8 @@
         "budgetCostMonth": "Cost budget / month",
         "budgetCostHelp": "Optional spend cap in the provider's currency. Once reached, calls to this provider are blocked until the window resets.",
         "maxToolRounds": "最大工具轮数",
-        "maxToolRoundsHelp": "该模型在必须作答前可用的研究步数。每一步都会重新发送整段对话，因此调高的成本高于线性增长。留空 = 使用内置默认值。"
+        "maxToolRoundsHelp": "该模型在必须作答前可用的研究步数。每一步都会重新发送整段对话，因此调高的成本高于线性增长。留空 = 使用内置默认值。",
+        "invalidAmount": "请输入有效金额，或将该字段留空。"
       },
       "mcp": {
         "title": "MCP 客户",

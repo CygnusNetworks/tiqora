@@ -859,7 +859,8 @@
         "budgetCostMonth": "Cost budget / month",
         "budgetCostHelp": "Optional spend cap in the provider's currency. Once reached, calls to this provider are blocked until the window resets.",
         "maxToolRounds": "Max. kôl nástrojov",
-        "maxToolRoundsHelp": "Koľko krokov prieskumu dostane tento model, kým musí odpovedať. Každý krok znova odosiela celú konverzáciu, zvyšovanie teda stojí viac než úmerne. Prázdne = vstavaná predvolená hodnota."
+        "maxToolRoundsHelp": "Koľko krokov prieskumu dostane tento model, kým musí odpovedať. Každý krok znova odosiela celú konverzáciu, zvyšovanie teda stojí viac než úmerne. Prázdne = vstavaná predvolená hodnota.",
+        "invalidAmount": "Zadajte platnú sumu alebo nechajte pole prázdne."
       },
       "mcp": {
         "title": "klientov MCP",

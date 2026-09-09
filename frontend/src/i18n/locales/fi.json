@@ -859,7 +859,8 @@
         "budgetCostMonth": "Cost budget / month",
         "budgetCostHelp": "Optional spend cap in the provider's currency. Once reached, calls to this provider are blocked until the window resets.",
         "maxToolRounds": "Työkalukierrosten enimmäismäärä",
-        "maxToolRoundsHelp": "Montako tutkimusvaihetta tämä malli saa ennen kuin sen on vastattava. Jokainen vaihe lähettää koko keskustelun uudelleen, joten nostaminen maksaa enemmän kuin suhteessa. Tyhjä = sisäänrakennettu oletus."
+        "maxToolRoundsHelp": "Montako tutkimusvaihetta tämä malli saa ennen kuin sen on vastattava. Jokainen vaihe lähettää koko keskustelun uudelleen, joten nostaminen maksaa enemmän kuin suhteessa. Tyhjä = sisäänrakennettu oletus.",
+        "invalidAmount": "Anna kelvollinen summa tai jätä kenttä tyhjäksi."
       },
       "mcp": {
         "title": "MCP-asiakkaat",

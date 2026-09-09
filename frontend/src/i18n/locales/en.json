@@ -924,6 +924,7 @@
         "budgetCostDay": "Cost budget / day",
         "budgetCostWeek": "Cost budget / week",
         "budgetCostMonth": "Cost budget / month",
+        "invalidAmount": "Please enter a valid amount, or leave the field empty.",
         "maxToolRounds": "Max. tool rounds",
         "maxToolRoundsHelp": "How many research steps this model gets before it has to answer. Every step re-sends the whole conversation, so raising it costs more than proportionally. Empty = built-in default.",
         "budgetCostHelp": "Optional spend cap in the provider's currency. Once reached, calls to this provider are blocked until the window resets."
