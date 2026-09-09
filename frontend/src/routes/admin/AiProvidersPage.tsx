@@ -86,6 +86,13 @@ export function AiProvidersPage() {
     queryFn: ({ signal }) => aiApi.listProviders(signal),
   });
 
+  // Only for the tool-rounds placeholder: showing the actual default beats a
+  // help text naming a number that would go stale across 48 locale files.
+  const settingsQ = useQuery({
+    queryKey: ["admin", "ai", "settings"],
+    queryFn: ({ signal }) => aiApi.getSettings(signal),
+  });
+
   const invalidate = () => qc.invalidateQueries({ queryKey: QUERY_KEY });
 
   const createM = useMutation({
@@ -435,6 +442,9 @@ export function AiProvidersPage() {
       name: "max_tool_rounds",
       label: t("admin.ai.providers.maxToolRounds"),
       type: "number",
+      placeholder: settingsQ.data
+        ? String(settingsQ.data.default_max_tool_rounds)
+        : undefined,
       helpText: t("admin.ai.providers.maxToolRoundsHelp"),
     },
     {

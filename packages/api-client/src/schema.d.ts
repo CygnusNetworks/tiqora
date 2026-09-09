@@ -6949,6 +6949,11 @@ export interface components {
              * @default false
              */
             auto_reply_paused: boolean;
+            /**
+             * Default Max Tool Rounds
+             * @default 0
+             */
+            default_max_tool_rounds: number;
             /** Disclosure Default Text */
             disclosure_default_text: string;
             /** Global Max Replies Per Hour */

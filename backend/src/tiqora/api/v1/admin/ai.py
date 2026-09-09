@@ -49,6 +49,7 @@ from tiqora.ai.gate import (
 )
 from tiqora.ai.models import TiqoraAiPromptPart, TiqoraMcpClient
 from tiqora.ai.policies import PromptPartValidationError, QueuePolicyValidationError
+from tiqora.ai.runtime import DEFAULT_MAX_TOOL_ROUNDS
 from tiqora.api.deps import DbSession
 from tiqora.api.v1.admin.ai_schemas import (
     AiAclCreate,
@@ -141,6 +142,7 @@ async def get_ai_settings(admin: AdminUser, session: DbSession) -> AiSettingsOut
         global_max_replies_per_hour=global_cap,
         audit_retention_days=audit_retention_days,
         auto_reply_paused=await is_auto_reply_paused(session),
+        default_max_tool_rounds=DEFAULT_MAX_TOOL_ROUNDS,
     )
 
 

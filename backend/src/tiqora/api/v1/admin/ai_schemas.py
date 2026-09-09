@@ -32,6 +32,11 @@ class AiSettingsOut(BaseModel):
     audit_retention_days: int
     # Global kill-switch for auto-reply (independent of operation_mode).
     auto_reply_paused: bool = False
+    default_max_tool_rounds: int = 0
+    """Read-only: the built-in tool-round budget a provider gets when it does
+    not set its own. Served so the provider form can show it as a placeholder
+    instead of the help text naming a number that would go stale in 48 locale
+    files the next time the default moves."""
 
 
 class AiSettingsUpdate(BaseModel):
