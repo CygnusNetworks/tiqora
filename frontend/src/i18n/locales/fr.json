@@ -853,7 +853,9 @@
         "budgetCostDay": "Cost budget / day",
         "budgetCostWeek": "Cost budget / week",
         "budgetCostMonth": "Cost budget / month",
-        "budgetCostHelp": "Optional spend cap in the provider's currency. Once reached, calls to this provider are blocked until the window resets."
+        "budgetCostHelp": "Optional spend cap in the provider's currency. Once reached, calls to this provider are blocked until the window resets.",
+        "maxToolRounds": "Tours d'outils max.",
+        "maxToolRoundsHelp": "Combien d'étapes de recherche ce modèle obtient avant de devoir répondre. Chaque étape renvoie toute la conversation, augmenter coûte donc plus que proportionnellement. Vide = valeur par défaut intégrée."
       },
       "mcp": {
         "title": "Clients MCP",
