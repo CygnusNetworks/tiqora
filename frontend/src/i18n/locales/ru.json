@@ -853,7 +853,9 @@
         "budgetCostDay": "Cost budget / day",
         "budgetCostWeek": "Cost budget / week",
         "budgetCostMonth": "Cost budget / month",
-        "budgetCostHelp": "Optional spend cap in the provider's currency. Once reached, calls to this provider are blocked until the window resets."
+        "budgetCostHelp": "Optional spend cap in the provider's currency. Once reached, calls to this provider are blocked until the window resets.",
+        "maxToolRounds": "Макс. раундов инструментов",
+        "maxToolRoundsHelp": "Сколько шагов исследования получает эта модель, прежде чем должна ответить. Каждый шаг заново отправляет весь диалог, поэтому увеличение стоит больше, чем пропорционально. Пусто = встроенное значение по умолчанию."
       },
       "mcp": {
         "title": "клиенты MCP",

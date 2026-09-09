@@ -44,6 +44,7 @@ function toFormValues(row: LlmProviderOut | null): FieldValues {
         budget_cost_day: row.budget_cost_day ?? "",
         budget_cost_week: row.budget_cost_week ?? "",
         budget_cost_month: row.budget_cost_month ?? "",
+        max_tool_rounds: row.max_tool_rounds ?? "",
       }
     : {
         name: "",
@@ -61,6 +62,7 @@ function toFormValues(row: LlmProviderOut | null): FieldValues {
         budget_cost_day: "",
         budget_cost_week: "",
         budget_cost_month: "",
+        max_tool_rounds: "",
       };
 }
 
@@ -180,6 +182,9 @@ export function AiProvidersPage() {
       budget_cost_day: priceOrNull(values.budget_cost_day),
       budget_cost_week: priceOrNull(values.budget_cost_week),
       budget_cost_month: priceOrNull(values.budget_cost_month),
+      // 0 rather than null on an empty field: the backend reads null as "field
+      // not supplied" and would keep the old override instead of clearing it.
+      max_tool_rounds: priceOrNull(values.max_tool_rounds) ?? 0,
     };
     const apiKey =
       typeof values.api_key === "string" ? values.api_key.trim() : "";
@@ -425,6 +430,12 @@ export function AiProvidersPage() {
       name: "budget_cost_month",
       label: t("admin.ai.providers.budgetCostMonth"),
       type: "number",
+    },
+    {
+      name: "max_tool_rounds",
+      label: t("admin.ai.providers.maxToolRounds"),
+      type: "number",
+      helpText: t("admin.ai.providers.maxToolRoundsHelp"),
     },
     {
       name: "supports_tools",

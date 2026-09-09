@@ -920,6 +920,8 @@
         "budgetCostDay": "Kostenlimit / Tag",
         "budgetCostWeek": "Kostenlimit / Woche",
         "budgetCostMonth": "Kostenlimit / Monat",
+        "maxToolRounds": "Max. Tool-Runden",
+        "maxToolRoundsHelp": "Wie viele Rechercheschritte dieses Modell bekommt, bevor es antworten muss. Jeder Schritt schickt das gesamte Gespräch erneut, Erhöhen kostet also überproportional. Leer = eingebauter Standard.",
         "budgetCostHelp": "Optionales Ausgabenlimit in der Währung des Providers. Bei Erreichen werden Aufrufe an diesen Provider blockiert, bis das Zeitfenster zurückgesetzt wird."
       },
       "mcp": {
