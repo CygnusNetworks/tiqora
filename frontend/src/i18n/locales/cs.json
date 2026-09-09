@@ -457,7 +457,9 @@
       "errorLlmTimeout": "Timed out waiting for the AI provider. Please try again.",
       "errorLlmProviderError": "The AI provider reported an error. Please try again later.",
       "draftRunning": "The AI is working on a draft — this can take several minutes…",
-      "draftSkipped": "The AI did not produce a reply suggestion."
+      "draftSkipped": "The AI did not produce a reply suggestion.",
+      "originMarkerTooltip": "Odesláno automaticky agentem AI",
+      "toolArguments": "Voláno s"
     },
     "toolbar": {
       "print": "Tisk",
@@ -514,7 +516,9 @@
     "list": {
       "attachments_one": "1 příloha",
       "attachments_other": "{{count}} příloh",
-      "hasSummary": "AI shrnutí k dispozici"
+      "hasSummary": "AI shrnutí k dispozici",
+      "aiRepliedAuto": "Zodpovězeno automaticky AI",
+      "aiRepliedAccepted": "Návrh AI, přijatý agentem"
     },
     "similar": {
       "title": "Podobné tikety",

@@ -457,7 +457,9 @@
       "errorLlmTimeout": "Timed out waiting for the AI provider. Please try again.",
       "errorLlmProviderError": "The AI provider reported an error. Please try again later.",
       "draftRunning": "The AI is working on a draft — this can take several minutes…",
-      "draftSkipped": "The AI did not produce a reply suggestion."
+      "draftSkipped": "The AI did not produce a reply suggestion.",
+      "originMarkerTooltip": "Skickat automatiskt av AI-agenten",
+      "toolArguments": "Anropad med"
     },
     "toolbar": {
       "print": "Skriv ut",
@@ -514,7 +516,9 @@
     "list": {
       "attachments_one": "1 bilaga",
       "attachments_other": "{{count}} bilagor",
-      "hasSummary": "AI sammanfattning tillgänglig"
+      "hasSummary": "AI sammanfattning tillgänglig",
+      "aiRepliedAuto": "Besvarad automatiskt av AI:n",
+      "aiRepliedAccepted": "AI-utkast, godkänt av en agent"
     },
     "similar": {
       "title": "Liknande ärenden",
