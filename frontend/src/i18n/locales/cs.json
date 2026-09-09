@@ -853,7 +853,9 @@
         "budgetCostDay": "Cost budget / day",
         "budgetCostWeek": "Cost budget / week",
         "budgetCostMonth": "Cost budget / month",
-        "budgetCostHelp": "Optional spend cap in the provider's currency. Once reached, calls to this provider are blocked until the window resets."
+        "budgetCostHelp": "Optional spend cap in the provider's currency. Once reached, calls to this provider are blocked until the window resets.",
+        "maxToolRounds": "Max. kol nástrojů",
+        "maxToolRoundsHelp": "Kolik kroků průzkumu tento model dostane, než musí odpovědět. Každý krok znovu odesílá celou konverzaci, zvyšování tedy stojí více než úměrně. Prázdné = vestavěná výchozí hodnota."
       },
       "mcp": {
         "title": "MCP klienti",

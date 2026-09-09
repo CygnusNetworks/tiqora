@@ -853,7 +853,9 @@
         "budgetCostDay": "Cost budget / day",
         "budgetCostWeek": "Cost budget / week",
         "budgetCostMonth": "Cost budget / month",
-        "budgetCostHelp": "Optional spend cap in the provider's currency. Once reached, calls to this provider are blocked until the window resets."
+        "budgetCostHelp": "Optional spend cap in the provider's currency. Once reached, calls to this provider are blocked until the window resets.",
+        "maxToolRounds": "最大工具輪數",
+        "maxToolRoundsHelp": "此模型在必須作答前可用的研究步數。每一步都會重新傳送整段對話，因此調高的成本高於線性成長。留空 = 使用內建預設值。"
       },
       "mcp": {
         "title": "MCP 客戶",

@@ -167,6 +167,16 @@ class TiqoraLlmProvider(TiqoraBase):
     supports_vision: Mapped[bool] = mapped_column(
         Boolean, nullable=False, default=False, server_default=false()
     )
+    # How many tool rounds the agent loop grants this model before the
+    # terminal-force closes the run (see tiqora.ai.runtime). A model that
+    # batches its tool calls needs fewer; a weaker one needs more. ``None``
+    # means "use DEFAULT_MAX_TOOL_ROUNDS", the same "not configured" semantics
+    # as the pricing and budget columns above.
+    #
+    # Every extra round re-sends the whole grown conversation, so raising this
+    # costs more than linearly — see the module docstring of
+    # ``tiqora.ai.runtime`` for the loop that spends it.
+    max_tool_rounds: Mapped[int | None] = mapped_column(Integer, nullable=True)
     # Token pricing (per 1M tokens), all optional — see
     # ``tiqora.ai.usage.record_usage`` for how these feed ``cost_hint``.
     price_input_per_1m: Mapped[float | None] = mapped_column(Float, nullable=True)

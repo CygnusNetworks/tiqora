@@ -853,7 +853,9 @@
         "budgetCostDay": "Cost budget / day",
         "budgetCostWeek": "Cost budget / week",
         "budgetCostMonth": "Cost budget / month",
-        "budgetCostHelp": "Optional spend cap in the provider's currency. Once reached, calls to this provider are blocked until the window resets."
+        "budgetCostHelp": "Optional spend cap in the provider's currency. Once reached, calls to this provider are blocked until the window resets.",
+        "maxToolRounds": "Maks. įrankių ratų",
+        "maxToolRoundsHelp": "Kiek tyrimo žingsnių šis modelis gauna prieš atsakydamas. Kiekvienas žingsnis iš naujo siunčia visą pokalbį, todėl didinimas kainuoja daugiau nei proporcingai. Tuščia = numatytoji reikšmė."
       },
       "mcp": {
         "title": "MCP klientai",

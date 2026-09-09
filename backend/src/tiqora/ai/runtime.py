@@ -91,6 +91,7 @@ from tiqora.ai.output_guards import (
 from tiqora.ai.pii import PiiMapper
 from tiqora.ai.policies import get_queue_policy_by_queue, load_prompt_parts
 from tiqora.ai.prompt_safety import UNTRUSTED_CONTENT_SYSTEM_BLOCK
+from tiqora.ai.providers import resolve_max_tool_rounds
 from tiqora.ai.reply_language import (
     LANGUAGE_PROFILES,
     detect_reply_language,
@@ -123,7 +124,21 @@ from tiqora.znuny.sysconfig import SysConfig
 logger = structlog.get_logger(__name__)
 
 _LOCK_MAX_AGE = timedelta(minutes=15)
-DEFAULT_MAX_TOOL_ROUNDS = 8
+DEFAULT_MAX_TOOL_ROUNDS = 12
+"""Tool rounds granted when the provider does not configure its own.
+
+Raised from 8 after the first real production run exhausted the budget: the
+agent spent all eight rounds on legitimate, non-repeating research (three MCP
+diagnostics, three KB searches, two article reads) and never got to propose a
+reply — the terminal-force had to close it out. Twelve leaves headroom for that
+shape of ticket without inviting an open-ended crawl.
+
+Rounds are not free and not linear: each one re-sends the whole grown
+conversation, so the run above billed 68k input tokens for a conversation whose
+final context was 13.9k. Prompt caching would blunt that, but Nebius does not
+offer it yet, so the budget is the only lever.
+
+Per-provider overrides live in ``tiqora_llm_provider.max_tool_rounds``."""
 # Fallback for KEY_AI_LLM_MAX_COMPLETION_TOKENS when the setting row is
 # unset. Reasoning models need real headroom beyond the OpenAI wire default
 # of 1024 — see settings_store.KEY_AI_LLM_MAX_COMPLETION_TOKENS.
@@ -946,7 +961,7 @@ async def run_ticket_agent(
     kind_hint: str | None = None,
     run_id: str,
     worker_instance: str = "manual",
-    max_tool_rounds: int = DEFAULT_MAX_TOOL_ROUNDS,
+    max_tool_rounds: int | None = None,
     mcp_caller: Any = None,
     kb_search_fn: Any = None,
     kb_get_article_fn: Any = None,
@@ -1201,8 +1216,15 @@ async def run_ticket_agent(
         executed_tool_names: list[str] = []
 
         # 9. Tool loop
+        rounds = (
+            max_tool_rounds
+            if max_tool_rounds is not None
+            else await resolve_max_tool_rounds(
+                session, policy.llm_provider_id, default=DEFAULT_MAX_TOOL_ROUNDS
+            )
+        )
         nudges_left = _MAX_PLAIN_TEXT_NUDGES
-        for _round in range(max_tool_rounds):
+        for _round in range(rounds):
             response: LlmResponse = await _chat_with_budget_retry(
                 llm, messages=messages, tools=schemas, max_tokens=completion_budget
             )
@@ -1270,7 +1292,10 @@ async def run_ticket_agent(
                 in (TOOL_PROPOSE_CUSTOMER_MESSAGE, TOOL_ESCALATE_TO_HUMAN)
             ]
             messages.append(LlmMessage(role="user", content=_TERMINAL_FORCE_PROMPT))
-            logger.info("ai_terminal_force", ticket_id=ticket_id, trigger=trigger)
+            # `rounds` here is the budget that was just exhausted — logging it
+            # makes "how often is the budget too small?" answerable from the
+            # logs instead of by guesswork the next time someone asks.
+            logger.info("ai_terminal_force", ticket_id=ticket_id, trigger=trigger, rounds=rounds)
             response = await _chat_with_budget_retry(
                 llm, messages=messages, tools=terminal_schemas, max_tokens=completion_budget
             )

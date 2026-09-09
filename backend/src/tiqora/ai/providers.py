@@ -101,6 +101,39 @@ async def get_provider(session: AsyncSession, provider_id: int) -> TiqoraLlmProv
     return await session.get(TiqoraLlmProvider, provider_id)
 
 
+async def resolve_max_tool_rounds(
+    session: AsyncSession, provider_id: int | None, *, default: int
+) -> int:
+    """Tool-round budget for *provider_id*, falling back to *default*.
+
+    Resolved from the queue policy's configured provider, not from whichever
+    provider a mid-run fallback ends up on: the budget shapes the whole run and
+    has to be known before the first call. A non-positive stored value is
+    treated as unset rather than as "no rounds at all", which would leave the
+    terminal-force as the only call the agent ever makes.
+    """
+    if provider_id is None:
+        return default
+    provider = await get_provider(session, provider_id)
+    if provider is None or provider.max_tool_rounds is None or provider.max_tool_rounds < 1:
+        return default
+    return provider.max_tool_rounds
+
+
+def _normalize_tool_rounds(value: int | None) -> int | None:
+    """Map "no override" onto NULL.
+
+    The update path uses ``None`` to mean "field not supplied" (house pattern
+    throughout this module), which would otherwise make a column whose whole
+    point is "NULL = use the default" impossible to reset. Accepting 0 — what
+    an emptied number input sends — as "back to the default" keeps the reset
+    expressible without changing the sentinel everywhere else.
+    """
+    if value is None or value < 1:
+        return None
+    return value
+
+
 async def create_provider(
     session: AsyncSession,
     *,
@@ -122,6 +155,7 @@ async def create_provider(
     budget_cost_day: float | None = None,
     budget_cost_week: float | None = None,
     budget_cost_month: float | None = None,
+    max_tool_rounds: int | None = None,
 ) -> TiqoraLlmProvider:
     _validate_pricing(
         price_input_per_1m=price_input_per_1m,
@@ -153,6 +187,7 @@ async def create_provider(
         budget_cost_day=budget_cost_day,
         budget_cost_week=budget_cost_week,
         budget_cost_month=budget_cost_month,
+        max_tool_rounds=_normalize_tool_rounds(max_tool_rounds),
         create_by=change_by,
         change_by=change_by,
     )
@@ -184,6 +219,7 @@ async def update_provider(
     budget_cost_day: float | None = None,
     budget_cost_week: float | None = None,
     budget_cost_month: float | None = None,
+    max_tool_rounds: int | None = None,
     valid_id: int | None = None,
 ) -> TiqoraLlmProvider:
     _validate_pricing(
@@ -228,6 +264,10 @@ async def update_provider(
         row.budget_cost_week = budget_cost_week
     if budget_cost_month is not None:
         row.budget_cost_month = budget_cost_month
+    # Normalized rather than guarded: 0 is a supplied value meaning "back to the
+    # code default", so it must reach the column as NULL.
+    if max_tool_rounds is not None:
+        row.max_tool_rounds = _normalize_tool_rounds(max_tool_rounds)
     if valid_id is not None:
         row.valid_id = valid_id
     row.change_by = change_by
@@ -309,6 +349,7 @@ def provider_to_public_dict(row: TiqoraLlmProvider) -> dict[str, object]:
         "budget_cost_day": row.budget_cost_day,
         "budget_cost_week": row.budget_cost_week,
         "budget_cost_month": row.budget_cost_month,
+        "max_tool_rounds": row.max_tool_rounds,
         "valid_id": int(row.valid_id),
         "create_time": row.create_time,
         "change_time": row.change_time,

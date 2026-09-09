@@ -853,7 +853,9 @@
         "budgetCostDay": "Cost budget / day",
         "budgetCostWeek": "Cost budget / week",
         "budgetCostMonth": "Cost budget / month",
-        "budgetCostHelp": "Optional spend cap in the provider's currency. Once reached, calls to this provider are blocked until the window resets."
+        "budgetCostHelp": "Optional spend cap in the provider's currency. Once reached, calls to this provider are blocked until the window resets.",
+        "maxToolRounds": "Maks. rīku kārtas",
+        "maxToolRoundsHelp": "Cik izpētes soļu šis modelis saņem, pirms tam jāatbild. Katrs solis atkārtoti nosūta visu sarunu, tāpēc palielināšana maksā vairāk nekā proporcionāli. Tukšs = iebūvētā noklusējuma vērtība."
       },
       "mcp": {
         "title": "MCP klienti",

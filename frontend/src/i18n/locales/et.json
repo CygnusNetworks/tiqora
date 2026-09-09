@@ -853,7 +853,9 @@
         "budgetCostDay": "Cost budget / day",
         "budgetCostWeek": "Cost budget / week",
         "budgetCostMonth": "Cost budget / month",
-        "budgetCostHelp": "Optional spend cap in the provider's currency. Once reached, calls to this provider are blocked until the window resets."
+        "budgetCostHelp": "Optional spend cap in the provider's currency. Once reached, calls to this provider are blocked until the window resets.",
+        "maxToolRounds": "Maks. tööriistaringe",
+        "maxToolRoundsHelp": "Mitu uurimissammu see mudel enne vastamist saab. Iga samm saadab kogu vestluse uuesti, seega tõstmine maksab rohkem kui võrdeliselt. Tühi = sisseehitatud vaikeväärtus."
       },
       "mcp": {
         "title": "MCP kliendid",
