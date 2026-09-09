@@ -759,6 +759,7 @@ export function AiPanel({
                             <ToolTraceCard
                               name={step.name}
                               content={step.content}
+                              arguments={step.arguments}
                               testId={`ai-panel-draft-trace-step-${draft.id}-${i}`}
                             />
                           </li>

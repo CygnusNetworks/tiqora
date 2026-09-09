@@ -457,7 +457,9 @@
       "errorLlmTimeout": "Timed out waiting for the AI provider. Please try again.",
       "errorLlmProviderError": "The AI provider reported an error. Please try again later.",
       "draftRunning": "The AI is working on a draft — this can take several minutes…",
-      "draftSkipped": "The AI did not produce a reply suggestion."
+      "draftSkipped": "The AI did not produce a reply suggestion.",
+      "originMarkerTooltip": "به‌طور خودکار توسط عامل هوش مصنوعی ارسال شد",
+      "toolArguments": "فراخوانی‌شده با"
     },
     "toolbar": {
       "print": "چاپ کنید",
@@ -514,7 +516,9 @@
     "list": {
       "attachments_one": "1 پیوست",
       "attachments_other": "{{count}} پیوست",
-      "hasSummary": "خلاصه هوش مصنوعی در دسترس است"
+      "hasSummary": "خلاصه هوش مصنوعی در دسترس است",
+      "aiRepliedAuto": "به‌طور خودکار توسط هوش مصنوعی پاسخ داده شد",
+      "aiRepliedAccepted": "پیش‌نویس هوش مصنوعی، تأییدشده توسط کارشناس"
     },
     "similar": {
       "title": "بلیط های مشابه",

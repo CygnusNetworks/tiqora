@@ -457,7 +457,9 @@
       "errorLlmTimeout": "Timed out waiting for the AI provider. Please try again.",
       "errorLlmProviderError": "The AI provider reported an error. Please try again later.",
       "draftRunning": "The AI is working on a draft — this can take several minutes…",
-      "draftSkipped": "The AI did not produce a reply suggestion."
+      "draftSkipped": "The AI did not produce a reply suggestion.",
+      "originMarkerTooltip": "Enviado automaticamente pelo agente de IA",
+      "toolArguments": "Chamado com"
     },
     "toolbar": {
       "print": "Imprimir",
@@ -514,7 +516,9 @@
     "list": {
       "attachments_one": "1 anexo",
       "attachments_other": "{{count}} anexos",
-      "hasSummary": "Resumo de IA disponível"
+      "hasSummary": "Resumo de IA disponível",
+      "aiRepliedAuto": "Respondido automaticamente pela IA",
+      "aiRepliedAccepted": "Rascunho de IA, aceite por um agente"
     },
     "similar": {
       "title": "Ingressos semelhantes",

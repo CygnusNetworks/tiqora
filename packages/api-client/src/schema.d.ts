@@ -6949,6 +6949,11 @@ export interface components {
              * @default false
              */
             auto_reply_paused: boolean;
+            /**
+             * Default Max Tool Rounds
+             * @default 0
+             */
+            default_max_tool_rounds: number;
             /** Disclosure Default Text */
             disclosure_default_text: string;
             /** Global Max Replies Per Hour */
@@ -7019,6 +7024,8 @@ export interface components {
         };
         /** AiToolTraceOut */
         AiToolTraceOut: {
+            /** Arguments */
+            arguments?: string | null;
             /** Content */
             content: string;
             /** Name */
@@ -12209,6 +12216,8 @@ export interface components {
              * @default false
              */
             ai_escalated: boolean;
+            /** Ai Reply Source */
+            ai_reply_source?: string | null;
             /**
              * Archive Flag
              * @default 0
@@ -12426,6 +12435,8 @@ export interface components {
              * @default false
              */
             ai_escalated: boolean;
+            /** Ai Reply Source */
+            ai_reply_source?: string | null;
             /**
              * Archive Flag
              * @default 0

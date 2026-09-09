@@ -2481,6 +2481,11 @@
             "title": "Auto Reply Paused",
             "type": "boolean"
           },
+          "default_max_tool_rounds": {
+            "default": 0,
+            "title": "Default Max Tool Rounds",
+            "type": "integer"
+          },
           "disclosure_default_text": {
             "title": "Disclosure Default Text",
             "type": "string"
@@ -2759,6 +2764,17 @@
       },
       "AiToolTraceOut": {
         "properties": {
+          "arguments": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Arguments"
+          },
           "content": {
             "title": "Content",
             "type": "string"
@@ -18645,6 +18661,17 @@
             "title": "Ai Escalated",
             "type": "boolean"
           },
+          "ai_reply_source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ai Reply Source"
+          },
           "archive_flag": {
             "default": 0,
             "title": "Archive Flag",
@@ -19163,6 +19190,17 @@
             "default": false,
             "title": "Ai Escalated",
             "type": "boolean"
+          },
+          "ai_reply_source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ai Reply Source"
           },
           "archive_flag": {
             "default": 0,

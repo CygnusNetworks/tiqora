@@ -495,6 +495,8 @@
       "toolTrace_other": "Tool results ({{count}})",
       "originBadge": "AI",
       "originBadgeTooltip": "Auto-sent by the AI agent — click to see the tool trace",
+      "originMarkerTooltip": "Auto-sent by the AI agent",
+      "toolArguments": "Called with",
       "originTraceEmpty": "No tool calls were recorded for this reply.",
       "expand": "Expand",
       "collapse": "Collapse",
@@ -582,7 +584,9 @@
     "list": {
       "attachments_one": "1 attachment",
       "attachments_other": "{{count}} attachments",
-      "hasSummary": "AI summary available"
+      "hasSummary": "AI summary available",
+      "aiRepliedAuto": "Answered automatically by the AI",
+      "aiRepliedAccepted": "AI draft, accepted by an agent"
     },
     "similar": {
       "title": "Similar tickets",

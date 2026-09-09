@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { cn } from "@/lib/cn";
 
 /**
@@ -165,12 +166,16 @@ export function ToolResultBody({ content: rawContent }: { content: string }) {
 export function ToolTraceCard({
   name,
   content,
+  arguments: args,
   testId,
 }: {
   name: string;
   content: string;
+  /** JSON the tool was called with; absent on traces recorded before it was kept. */
+  arguments?: string | null;
   testId: string;
 }) {
+  const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   return (
     <div className="overflow-hidden rounded-md border border-hairline">
@@ -188,10 +193,22 @@ export function ToolTraceCard({
         <span className="font-mono text-[11px] font-semibold text-ink">
           {name}
         </span>
+        {args && (
+          // In the header, not just the expanded body: "nine kb_search calls"
+          // is useless without seeing what was searched for, and that has to
+          // be readable while scanning the list.
+          <span
+            data-testid={`${testId}-args`}
+            title={args}
+            className="min-w-0 flex-1 truncate font-mono text-[11px] text-muted"
+          >
+            {args}
+          </span>
+        )}
         <span
           aria-hidden
           className={cn(
-            "ml-auto text-[10px] text-muted transition-transform",
+            "ml-auto shrink-0 text-[10px] text-muted transition-transform",
             open && "rotate-90",
           )}
         >
@@ -199,7 +216,15 @@ export function ToolTraceCard({
         </span>
       </button>
       {open && (
-        <div className="px-2.5 py-2" data-testid={`${testId}-body`}>
+        <div className="space-y-2 px-2.5 py-2" data-testid={`${testId}-body`}>
+          {args && (
+            <div>
+              <p className="mb-0.5 text-[10px] uppercase tracking-wide text-muted">
+                {t("ticket.ai.toolArguments")}
+              </p>
+              <ToolResultBody content={args} />
+            </div>
+          )}
           <ToolResultBody content={content} />
         </div>
       )}

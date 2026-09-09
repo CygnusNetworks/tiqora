@@ -18,7 +18,7 @@ import {
 import { cn } from "@/lib/cn";
 import { Avatar } from "@/components/ui/Avatar";
 import { Badge } from "@/components/ui/Badge";
-import { AiOriginToggle, AiOriginTrace } from "./AiOriginBadge";
+import { AiOriginMarker, AiOriginToggle, AiOriginTrace } from "./AiOriginBadge";
 import { useAiOriginTrace } from "./useAiOriginTrace";
 import { useTicketReplyDrafts } from "@/lib/replyDrafts";
 import { ArticleQuickActions } from "./ArticleQuickActions";
@@ -170,6 +170,7 @@ function ArticleListRow({
             }
           />
           <span className="min-w-0 flex-1 truncate text-xs font-semibold text-ink">{senderName}</span>
+          {article.ai_origin && <AiOriginMarker articleId={article.id} />}
           <span className="shrink-0 font-mono text-[10px] tabular-nums text-muted">
             {formatDateTime(article.create_time, locale)}
           </span>
