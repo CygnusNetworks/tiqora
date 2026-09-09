@@ -457,7 +457,9 @@
       "errorLlmTimeout": "Timed out waiting for the AI provider. Please try again.",
       "errorLlmProviderError": "The AI provider reported an error. Please try again later.",
       "draftRunning": "The AI is working on a draft — this can take several minutes…",
-      "draftSkipped": "The AI did not produce a reply suggestion."
+      "draftSkipped": "The AI did not produce a reply suggestion.",
+      "originMarkerTooltip": "Được gửi tự động bởi tác nhân AI",
+      "toolArguments": "Được gọi với"
     },
     "toolbar": {
       "print": "In",
@@ -514,7 +516,9 @@
     "list": {
       "attachments_one": "1 tệp đính kèm",
       "attachments_other": "{{count}} tệp đính kèm",
-      "hasSummary": "Bản tóm tắt AI có sẵn"
+      "hasSummary": "Bản tóm tắt AI có sẵn",
+      "aiRepliedAuto": "Được AI trả lời tự động",
+      "aiRepliedAccepted": "Bản nháp AI, đã được nhân viên chấp nhận"
     },
     "similar": {
       "title": "Vé tương tự",

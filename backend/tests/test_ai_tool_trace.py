@@ -11,7 +11,35 @@ from __future__ import annotations
 import json
 from datetime import datetime
 
+from tiqora.ai.llm import LlmMessage, ToolCall
+from tiqora.ai.runtime import _tool_trace_wire
 from tiqora.api.v1.ai import AiDraftOut, _draft_out, parse_tool_trace
+
+
+def test_tool_trace_wire_pairs_arguments_with_their_result() -> None:
+    """Arguments live on the assistant message, results on the tool message —
+    ``tool_call_id`` is what puts them back together."""
+    messages = [
+        LlmMessage(role="user", content="Kein Internet"),
+        LlmMessage(
+            role="assistant",
+            tool_calls=[ToolCall(id="c1", name="kb_search", arguments={"query": "IPTV"})],
+        ),
+        LlmMessage(role="tool", tool_call_id="c1", name="kb_search", content="3 Treffer"),
+    ]
+    (step,) = _tool_trace_wire(messages)
+    assert step["name"] == "kb_search"
+    assert step["content"] == "3 Treffer"
+    assert step["arguments"] == '{"query": "IPTV"}'
+
+
+def test_tool_trace_wire_keeps_a_result_whose_call_it_cannot_find() -> None:
+    # A result without a matching call must still appear: losing a step
+    # entirely would be worse than showing it without its arguments.
+    messages = [LlmMessage(role="tool", tool_call_id="gone", name="kb_search", content="x")]
+    (step,) = _tool_trace_wire(messages)
+    assert "arguments" not in step
+    assert step["content"] == "x"
 
 
 class _FakeDraft:
@@ -39,6 +67,37 @@ def test_parse_tool_trace_happy_path() -> None:
         ("kb_search", "3 Treffer"),
         ("get_ticket", "{...}"),
     ]
+
+
+def test_parse_tool_trace_carries_call_arguments() -> None:
+    """What a tool was *asked* is the point of reading a trace.
+
+    Nine kb_search entries say nothing without the queries, so the recorded
+    entry keeps the arguments alongside the result.
+    """
+    raw = json.dumps(
+        [
+            {
+                "role": "tool",
+                "tool_call_id": "a",
+                "name": "kb_search",
+                "content": "3 Treffer",
+                "arguments": '{"query": "IPTV StudNet"}',
+            }
+        ]
+    )
+    (step,) = parse_tool_trace(raw)
+    assert step.arguments == '{"query": "IPTV StudNet"}'
+
+
+def test_parse_tool_trace_reads_traces_recorded_before_arguments_existed() -> None:
+    # Rows written by an older release have no "arguments" key at all; they
+    # must keep rendering rather than disappear from the trace.
+    (step,) = parse_tool_trace(
+        json.dumps([{"role": "tool", "name": "kb_search", "content": "3 Treffer"}])
+    )
+    assert step.arguments is None
+    assert step.content == "3 Treffer"
 
 
 def test_parse_tool_trace_degrades_on_bad_payloads() -> None:

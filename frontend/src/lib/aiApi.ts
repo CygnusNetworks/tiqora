@@ -29,9 +29,13 @@ export type AiSettingsOut = {
   audit_retention_days: number;
   /** Global kill-switch for auto-reply (independent of operation_mode). */
   auto_reply_paused: boolean;
+  /** Read-only: tool-round budget a provider gets when it sets none itself. */
+  default_max_tool_rounds: number;
 };
 
-export type AiSettingsUpdate = Partial<AiSettingsOut>;
+export type AiSettingsUpdate = Partial<
+  Omit<AiSettingsOut, "default_max_tool_rounds">
+>;
 
 export type LlmProviderOut = {
   id: number;

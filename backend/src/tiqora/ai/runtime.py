@@ -164,6 +164,34 @@ _TERMINAL_FORCE_PROMPT = (
     "escalate_to_human if you genuinely cannot help. Do not answer in plain "
     "text."
 )
+
+
+def _tool_trace_wire(messages: list[LlmMessage]) -> list[dict[str, Any]]:
+    """The run's tool steps, each carrying the arguments it was called with.
+
+    Only ``role == "tool"`` messages were recorded before, which are the
+    *results* — so a trace showed that ``kb_search`` ran nine times but never
+    what it searched for, the one thing an agent reading the trace actually
+    wants. The arguments live on the preceding assistant message's
+    ``tool_calls``; ``tool_call_id`` pairs them back up.
+
+    Kept as a flat list of result entries with an extra key rather than a new
+    shape: rows written before this change simply have no ``arguments``, and
+    ``parse_tool_trace`` keeps reading them unchanged.
+    """
+    calls = {tc.id: tc for m in messages if m.tool_calls for tc in m.tool_calls}
+    trace: list[dict[str, Any]] = []
+    for message in messages:
+        if message.role != "tool":
+            continue
+        wire = message.to_wire()
+        call = calls.get(message.tool_call_id or "")
+        if call is not None and call.arguments:
+            wire["arguments"] = json.dumps(call.arguments, ensure_ascii=False, sort_keys=True)
+        trace.append(wire)
+    return trace
+
+
 _TELEGRAM_CHANNEL = "telegram"
 _TYPING_INTERVAL_SECONDS = 4.0
 
@@ -1424,7 +1452,7 @@ async def run_ticket_agent(
                 body=outcome.proposal["body"],
                 subject=outcome.proposal.get("subject") or None,
                 based_on_article_id=based_on_article_id,
-                tool_trace_json=json.dumps([m.to_wire() for m in messages if m.role == "tool"]),
+                tool_trace_json=json.dumps(_tool_trace_wire(messages)),
                 created_by_user_id=created_by_user_id,
                 source=source,
                 actor_user_id=actor_user_id,
@@ -1513,7 +1541,7 @@ async def run_ticket_agent(
                 source=SOURCE_AUTO,
                 queue_id=ticket.queue_id,
                 service_user_id=actor_user_id,
-                tool_trace_json=json.dumps([m.to_wire() for m in messages if m.role == "tool"]),
+                tool_trace_json=json.dumps(_tool_trace_wire(messages)),
                 run_id=run_id,
             )
         )

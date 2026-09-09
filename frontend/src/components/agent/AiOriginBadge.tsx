@@ -39,6 +39,26 @@ export function AiOriginToggle({
   );
 }
 
+/** Non-interactive "this reply came from the AI" marker for article *lists*.
+ *
+ * Deliberately not the toggle: a list row is itself clickable (it selects the
+ * article), so a button inside it would fire both actions, and the trace it
+ * would open is only rendered in the reader anyway. Lists are for scanning —
+ * the marker answers "who wrote this?" at a glance and nothing more. */
+export function AiOriginMarker({ articleId }: { articleId: number }) {
+  const { t } = useTranslation();
+  return (
+    <span
+      data-testid={`ai-origin-marker-${articleId}`}
+      title={t("ticket.ai.originMarkerTooltip")}
+      aria-label={t("ticket.ai.originMarkerTooltip")}
+      className="shrink-0 text-[11px] leading-none"
+    >
+      🤖
+    </span>
+  );
+}
+
 /** Full-width tool-trace block (same `ToolTraceCard` renderer as the draft
  * panel), rendered outside the badge/meta row so its key/value grids get the
  * article's full width instead of being squeezed into a narrow span. Renders
@@ -69,6 +89,7 @@ export function AiOriginTrace({
                 <ToolTraceCard
                   name={step.name}
                   content={step.content}
+                  arguments={step.arguments}
                   testId={`ai-origin-trace-step-${articleId}-${i}`}
                 />
               </li>

@@ -457,7 +457,9 @@
       "errorLlmTimeout": "Timed out waiting for the AI provider. Please try again.",
       "errorLlmProviderError": "The AI provider reported an error. Please try again later.",
       "draftRunning": "The AI is working on a draft — this can take several minutes…",
-      "draftSkipped": "The AI did not produce a reply suggestion."
+      "draftSkipped": "The AI did not produce a reply suggestion.",
+      "originMarkerTooltip": "Yapay zekâ aracısı tarafından otomatik gönderildi",
+      "toolArguments": "Çağrı parametreleri"
     },
     "toolbar": {
       "print": "Yazdır",
@@ -514,7 +516,9 @@
     "list": {
       "attachments_one": "1 ek",
       "attachments_other": "{{count}} ekler",
-      "hasSummary": "AI özeti mevcut"
+      "hasSummary": "AI özeti mevcut",
+      "aiRepliedAuto": "Yapay zekâ tarafından otomatik yanıtlandı",
+      "aiRepliedAccepted": "Yapay zekâ taslağı, bir temsilci onayladı"
     },
     "similar": {
       "title": "Benzer biletler",

@@ -457,7 +457,9 @@
       "errorLlmTimeout": "Timed out waiting for the AI provider. Please try again.",
       "errorLlmProviderError": "The AI provider reported an error. Please try again later.",
       "draftRunning": "The AI is working on a draft — this can take several minutes…",
-      "draftSkipped": "The AI did not produce a reply suggestion."
+      "draftSkipped": "The AI did not produce a reply suggestion.",
+      "originMarkerTooltip": "AI 에이전트가 자동 전송",
+      "toolArguments": "호출 인자"
     },
     "toolbar": {
       "print": "인쇄",
@@ -514,7 +516,9 @@
     "list": {
       "attachments_one": "첨부파일 1개",
       "attachments_other": "{{count}} 첨부파일",
-      "hasSummary": "AI 요약 사용 가능"
+      "hasSummary": "AI 요약 사용 가능",
+      "aiRepliedAuto": "AI가 자동으로 답변",
+      "aiRepliedAccepted": "AI 초안을 상담원이 승인"
     },
     "similar": {
       "title": "비슷한 티켓",

@@ -21,6 +21,8 @@ export type AiDraftSource = "auto" | "manual";
 export type AiToolTraceOut = {
   name: string;
   content: string;
+  /** JSON the tool was called with; null on traces recorded before it was kept. */
+  arguments?: string | null;
 };
 
 export type AiDraftOut = {

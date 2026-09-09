@@ -457,7 +457,9 @@
       "errorLlmTimeout": "Timed out waiting for the AI provider. Please try again.",
       "errorLlmProviderError": "The AI provider reported an error. Please try again later.",
       "draftRunning": "The AI is working on a draft — this can take several minutes…",
-      "draftSkipped": "The AI did not produce a reply suggestion."
+      "draftSkipped": "The AI did not produce a reply suggestion.",
+      "originMarkerTooltip": "Enviat automàticament per l'agent d'IA",
+      "toolArguments": "Cridat amb"
     },
     "toolbar": {
       "print": "Imprimeix",
@@ -514,7 +516,9 @@
     "list": {
       "attachments_one": "1 fitxer adjunt",
       "attachments_other": "{{count}} fitxers adjunts",
-      "hasSummary": "Resum de l'IA disponible"
+      "hasSummary": "Resum de l'IA disponible",
+      "aiRepliedAuto": "Respost automàticament per la IA",
+      "aiRepliedAccepted": "Esborrany d'IA, acceptat per un agent"
     },
     "similar": {
       "title": "Entrades similars",

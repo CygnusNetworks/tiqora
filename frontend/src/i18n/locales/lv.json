@@ -457,7 +457,9 @@
       "errorLlmTimeout": "Timed out waiting for the AI provider. Please try again.",
       "errorLlmProviderError": "The AI provider reported an error. Please try again later.",
       "draftRunning": "The AI is working on a draft — this can take several minutes…",
-      "draftSkipped": "The AI did not produce a reply suggestion."
+      "draftSkipped": "The AI did not produce a reply suggestion.",
+      "originMarkerTooltip": "Automātiski nosūtījis MI aģents",
+      "toolArguments": "Izsaukts ar"
     },
     "toolbar": {
       "print": "Drukāt",
@@ -514,7 +516,9 @@
     "list": {
       "attachments_one": "1 pielikums",
       "attachments_other": "{{count}} pielikumi",
-      "hasSummary": "Ir pieejams AI kopsavilkums"
+      "hasSummary": "Ir pieejams AI kopsavilkums",
+      "aiRepliedAuto": "Atbildējis MI automātiski",
+      "aiRepliedAccepted": "MI melnraksts, ko apstiprināja aģents"
     },
     "similar": {
       "title": "Līdzīgas biļetes",

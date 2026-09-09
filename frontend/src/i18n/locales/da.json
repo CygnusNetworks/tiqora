@@ -457,7 +457,9 @@
       "errorLlmTimeout": "Timed out waiting for the AI provider. Please try again.",
       "errorLlmProviderError": "The AI provider reported an error. Please try again later.",
       "draftRunning": "The AI is working on a draft — this can take several minutes…",
-      "draftSkipped": "The AI did not produce a reply suggestion."
+      "draftSkipped": "The AI did not produce a reply suggestion.",
+      "originMarkerTooltip": "Sendt automatisk af AI-agenten",
+      "toolArguments": "Kaldt med"
     },
     "toolbar": {
       "print": "Udskriv",
@@ -514,7 +516,9 @@
     "list": {
       "attachments_one": "1 vedhæftet fil",
       "attachments_other": "{{count}} vedhæftede filer",
-      "hasSummary": "AI resumé tilgængelig"
+      "hasSummary": "AI resumé tilgængelig",
+      "aiRepliedAuto": "Besvaret automatisk af AI'en",
+      "aiRepliedAccepted": "AI-udkast, accepteret af en agent"
     },
     "similar": {
       "title": "Lignende billetter",

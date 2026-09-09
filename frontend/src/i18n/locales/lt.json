@@ -457,7 +457,9 @@
       "errorLlmTimeout": "Timed out waiting for the AI provider. Please try again.",
       "errorLlmProviderError": "The AI provider reported an error. Please try again later.",
       "draftRunning": "The AI is working on a draft — this can take several minutes…",
-      "draftSkipped": "The AI did not produce a reply suggestion."
+      "draftSkipped": "The AI did not produce a reply suggestion.",
+      "originMarkerTooltip": "Automatiškai išsiuntė DI agentas",
+      "toolArguments": "Iškviesta su"
     },
     "toolbar": {
       "print": "Spausdinti",
@@ -514,7 +516,9 @@
     "list": {
       "attachments_one": "1 priedas",
       "attachments_other": "{{count}} priedai",
-      "hasSummary": "Galima AI santrauka"
+      "hasSummary": "Galima AI santrauka",
+      "aiRepliedAuto": "Atsakė DI automatiškai",
+      "aiRepliedAccepted": "DI juodraštis, priimtas agento"
     },
     "similar": {
       "title": "Panašūs bilietai",
