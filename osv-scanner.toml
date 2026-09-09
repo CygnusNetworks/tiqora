@@ -9,13 +9,33 @@
 # Neue Funde sind von dieser Datei nicht betroffen und brechen den Workflow
 # sofort.
 #
-# Stand 2026-08-10: keine zurueckgestellten Funde. Alle zuvor hier gelisteten
-# GHSAs (brace-expansion, js-yaml, postcss, cryptography, h2) wurden durch
-# Patch-Bumps und pnpm-overrides behoben.
+# Stand 2026-09-09: drei Funde zurueckgestellt, alle npm und alle ausschliesslich
+# in devDependencies -- sie werden nie in ein Image gebaut. Die Runtime-Funde
+# derselben Scan-Runde (httpx2/httpcore2 ueber meilisearch-python-sdk, CVSS bis
+# 8.1) wurden stattdessen sofort behoben, weil die tatsaechlich ausgeliefert
+# werden.
 #
-# [[IgnoredVulns]]
-# id = "GHSA-..."
-# ignoreUntil = 2026-MM-DD
-# reason = """
-# ...
-# """
+# Fuer alle drei existiert bereits eine feste Version. Zurueckgestellt ist hier
+# nicht das Warten auf einen Fix, sondern der Bump selbst: vitest 3 -> 4 ist ein
+# Major-Upgrade des Test-Runners und gehoert nicht in denselben Schritt wie ein
+# Release.
+
+[[IgnoredVulns]]
+id = "GHSA-2883-xcg3-v3hh"
+ignoreUntil = 2026-12-09
+reason = """
+js-yaml 4.3.1, erreichbar nur ueber eslint -> @eslint/eslintrc (devDependencies,
+per `pnpm why js-yaml` geprueft). Laeuft ausschliesslich beim Linten, nie zur
+Laufzeit und nie im Container. Fix waere 4.3.2, kommt mit dem naechsten
+eslint-Update.
+"""
+
+[[IgnoredVulns]]
+id = "GHSA-82fw-gwwq-j7x9"
+ignoreUntil = 2026-12-09
+reason = """
+vitest und @vitest/mocker 3.2.7, beide devDependencies. Der Fix liegt erst in
+4.1.11, also hinter einem Major-Sprung der Test-Infrastruktur -- mit 1022
+Frontend-Tests ein eigener Vorgang, kein Nebenschritt eines Release. Test-Runner
+laufen nur in CI und lokal.
+"""
