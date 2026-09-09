@@ -853,7 +853,9 @@
         "budgetCostDay": "Cost budget / day",
         "budgetCostWeek": "Cost budget / week",
         "budgetCostMonth": "Cost budget / month",
-        "budgetCostHelp": "Optional spend cap in the provider's currency. Once reached, calls to this provider are blocked until the window resets."
+        "budgetCostHelp": "Optional spend cap in the provider's currency. Once reached, calls to this provider are blocked until the window resets.",
+        "maxToolRounds": "Макс. раундів інструментів",
+        "maxToolRoundsHelp": "Скільки кроків дослідження отримує ця модель, перш ніж має відповісти. Кожен крок надсилає всю розмову заново, тож збільшення коштує більше, ніж пропорційно. Порожньо = вбудоване значення за замовчуванням."
       },
       "mcp": {
         "title": "Клієнти MCP",
