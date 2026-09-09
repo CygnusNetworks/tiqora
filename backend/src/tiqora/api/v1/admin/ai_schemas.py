@@ -67,6 +67,9 @@ class LlmProviderOut(BaseModel):
     budget_cost_day: float | None
     budget_cost_week: float | None
     budget_cost_month: float | None
+    max_tool_rounds: int | None
+    """Tool rounds the agent loop grants this model. ``None`` = the built-in
+    default (see ``tiqora.ai.runtime.DEFAULT_MAX_TOOL_ROUNDS``)."""
     valid_id: int
     create_time: datetime
     change_time: datetime
@@ -89,6 +92,8 @@ class LlmProviderCreate(BaseModel):
     budget_cost_day: float | None = None
     budget_cost_week: float | None = None
     budget_cost_month: float | None = None
+    max_tool_rounds: int | None = None
+    """Omit, or send 0, for the built-in default."""
 
 
 class LlmProviderUpdate(BaseModel):
@@ -109,6 +114,8 @@ class LlmProviderUpdate(BaseModel):
     budget_cost_day: float | None = None
     budget_cost_week: float | None = None
     budget_cost_month: float | None = None
+    max_tool_rounds: int | None = None
+    """Send 0 to go back to the built-in default; omit to leave it unchanged."""
     valid_id: int | None = None
 
 

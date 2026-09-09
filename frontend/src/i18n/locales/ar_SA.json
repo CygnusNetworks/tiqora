@@ -853,7 +853,9 @@
         "budgetCostDay": "Cost budget / day",
         "budgetCostWeek": "Cost budget / week",
         "budgetCostMonth": "Cost budget / month",
-        "budgetCostHelp": "Optional spend cap in the provider's currency. Once reached, calls to this provider are blocked until the window resets."
+        "budgetCostHelp": "Optional spend cap in the provider's currency. Once reached, calls to this provider are blocked until the window resets.",
+        "maxToolRounds": "الحد الأقصى لجولات الأدوات",
+        "maxToolRoundsHelp": "عدد خطوات البحث المتاحة لهذا النموذج قبل أن يجيب. كل خطوة تعيد إرسال المحادثة كاملة، لذا فإن الزيادة تكلّف أكثر من التناسب. فارغ = الإعداد الافتراضي."
       },
       "mcp": {
         "title": "عملاء MCP",
