@@ -1469,16 +1469,16 @@
       "setupLinkSent": "Odkaz na nastavenie odoslaný.",
       "setupLinkFailed": "Odkaz na nastavenie sa nepodarilo odoslať.",
       "access": {
-        "header": "Access",
-        "active": "Active",
-        "accepted": "Password set",
-        "invited": "Invited",
-        "expired": "Invitation expired",
-        "none": "No invitation",
-        "lastSeen": "last seen {{when}}",
-        "linkExpires": "link expires {{when}}",
-        "linkExpiredOn": "link expired on {{date}}",
-        "neverSignedIn": "never signed in"
+        "header": "Prístup",
+        "active": "Aktívny",
+        "accepted": "Heslo nastavené",
+        "invited": "Pozvaný",
+        "expired": "Pozvánka vypršala",
+        "none": "Bez pozvánky",
+        "lastSeen": "naposledy videný {{when}}",
+        "linkExpires": "odkaz vyprší {{when}}",
+        "linkExpiredOn": "odkaz vypršal {{date}}",
+        "neverSignedIn": "nikdy sa neprihlásil"
       }
     },
     "groups": {

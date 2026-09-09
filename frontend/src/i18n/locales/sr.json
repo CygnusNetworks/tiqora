@@ -1469,16 +1469,16 @@
       "setupLinkSent": "Веза за подешавање је послата.",
       "setupLinkFailed": "Везу за подешавање није могуће послати.",
       "access": {
-        "header": "Access",
-        "active": "Active",
-        "accepted": "Password set",
-        "invited": "Invited",
-        "expired": "Invitation expired",
-        "none": "No invitation",
-        "lastSeen": "last seen {{when}}",
-        "linkExpires": "link expires {{when}}",
-        "linkExpiredOn": "link expired on {{date}}",
-        "neverSignedIn": "never signed in"
+        "header": "Приступ",
+        "active": "Активан",
+        "accepted": "Лозинка постављена",
+        "invited": "Позван",
+        "expired": "Позивница је истекла",
+        "none": "Без позивнице",
+        "lastSeen": "последњи пут виђен {{when}}",
+        "linkExpires": "веза истиче {{when}}",
+        "linkExpiredOn": "веза је истекла {{date}}",
+        "neverSignedIn": "никада се није пријавио"
       }
     },
     "groups": {
