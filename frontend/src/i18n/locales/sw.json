@@ -1469,16 +1469,16 @@
       "setupLinkSent": "Kiungo cha usanidi kimetumwa.",
       "setupLinkFailed": "Imeshindikana kutuma kiungo cha usanidi.",
       "access": {
-        "header": "Access",
-        "active": "Active",
-        "accepted": "Password set",
-        "invited": "Invited",
-        "expired": "Invitation expired",
-        "none": "No invitation",
-        "lastSeen": "last seen {{when}}",
-        "linkExpires": "link expires {{when}}",
-        "linkExpiredOn": "link expired on {{date}}",
-        "neverSignedIn": "never signed in"
+        "header": "Ufikiaji",
+        "active": "Inatumika",
+        "accepted": "Nenosiri limewekwa",
+        "invited": "Amealikwa",
+        "expired": "Mwaliko umeisha muda",
+        "none": "Hakuna mwaliko",
+        "lastSeen": "alionekana mwisho {{when}}",
+        "linkExpires": "kiungo kitaisha muda {{when}}",
+        "linkExpiredOn": "kiungo kiliisha muda tarehe {{date}}",
+        "neverSignedIn": "hajawahi kuingia"
       }
     },
     "groups": {

@@ -1469,16 +1469,16 @@
       "setupLinkSent": "ส่งลิงก์ตั้งค่าแล้ว",
       "setupLinkFailed": "ส่งลิงก์ตั้งค่าไม่ได้",
       "access": {
-        "header": "Access",
-        "active": "Active",
-        "accepted": "Password set",
-        "invited": "Invited",
-        "expired": "Invitation expired",
-        "none": "No invitation",
-        "lastSeen": "last seen {{when}}",
-        "linkExpires": "link expires {{when}}",
-        "linkExpiredOn": "link expired on {{date}}",
-        "neverSignedIn": "never signed in"
+        "header": "การเข้าถึง",
+        "active": "ใช้งานอยู่",
+        "accepted": "ตั้งรหัสผ่านแล้ว",
+        "invited": "เชิญแล้ว",
+        "expired": "คำเชิญหมดอายุ",
+        "none": "ไม่มีคำเชิญ",
+        "lastSeen": "เข้าใช้ล่าสุด {{when}}",
+        "linkExpires": "ลิงก์หมดอายุ {{when}}",
+        "linkExpiredOn": "ลิงก์หมดอายุเมื่อ {{date}}",
+        "neverSignedIn": "ยังไม่เคยเข้าสู่ระบบ"
       }
     },
     "groups": {

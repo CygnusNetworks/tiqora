@@ -1469,16 +1469,16 @@
       "setupLinkSent": "پیوند راه‌اندازی ارسال شد.",
       "setupLinkFailed": "ارسال پیوند راه‌اندازی ممکن نشد.",
       "access": {
-        "header": "Access",
-        "active": "Active",
-        "accepted": "Password set",
-        "invited": "Invited",
-        "expired": "Invitation expired",
-        "none": "No invitation",
-        "lastSeen": "last seen {{when}}",
-        "linkExpires": "link expires {{when}}",
-        "linkExpiredOn": "link expired on {{date}}",
-        "neverSignedIn": "never signed in"
+        "header": "دسترسی",
+        "active": "فعال",
+        "accepted": "گذرواژه تنظیم شد",
+        "invited": "دعوت‌شده",
+        "expired": "دعوت منقضی شده",
+        "none": "بدون دعوت",
+        "lastSeen": "آخرین بازدید {{when}}",
+        "linkExpires": "پیوند {{when}} منقضی می‌شود",
+        "linkExpiredOn": "پیوند در {{date}} منقضی شد",
+        "neverSignedIn": "هرگز وارد نشده است"
       }
     },
     "groups": {
