@@ -458,7 +458,8 @@
       "errorLlmProviderError": "The AI provider reported an error. Please try again later.",
       "draftRunning": "The AI is working on a draft — this can take several minutes…",
       "draftSkipped": "The AI did not produce a reply suggestion.",
-      "originMarkerTooltip": "AI एजेंट द्वारा स्वतः भेजा गया"
+      "originMarkerTooltip": "AI एजेंट द्वारा स्वतः भेजा गया",
+      "toolArguments": "के साथ बुलाया गया"
     },
     "toolbar": {
       "print": "प्रिंट करें",
@@ -515,7 +516,9 @@
     "list": {
       "attachments_one": "1 अनुलग्नक",
       "attachments_other": "{{count}} संलग्नक",
-      "hasSummary": "एआई सारांश उपलब्ध है"
+      "hasSummary": "एआई सारांश उपलब्ध है",
+      "aiRepliedAuto": "AI द्वारा स्वतः उत्तर दिया गया",
+      "aiRepliedAccepted": "AI ड्राफ़्ट, एजेंट द्वारा स्वीकृत"
     },
     "similar": {
       "title": "समान टिकट",

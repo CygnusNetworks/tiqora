@@ -458,7 +458,8 @@
       "errorLlmProviderError": "The AI provider reported an error. Please try again later.",
       "draftRunning": "The AI is working on a draft — this can take several minutes…",
       "draftSkipped": "The AI did not produce a reply suggestion.",
-      "originMarkerTooltip": "Imetumwa kiotomatiki na wakala wa AI"
+      "originMarkerTooltip": "Imetumwa kiotomatiki na wakala wa AI",
+      "toolArguments": "Imeitwa na"
     },
     "toolbar": {
       "print": "Chapisha",
@@ -515,7 +516,9 @@
     "list": {
       "attachments_one": "1 kiambatisho",
       "attachments_other": "{{count}} viambatisho",
-      "hasSummary": "Muhtasari wa AI unapatikana"
+      "hasSummary": "Muhtasari wa AI unapatikana",
+      "aiRepliedAuto": "Imejibiwa kiotomatiki na AI",
+      "aiRepliedAccepted": "Rasimu ya AI, imekubaliwa na wakala"
     },
     "similar": {
       "title": "Tikiti zinazofanana",

@@ -458,7 +458,8 @@
       "errorLlmProviderError": "The AI provider reported an error. Please try again later.",
       "draftRunning": "The AI is working on a draft — this can take several minutes…",
       "draftSkipped": "The AI did not produce a reply suggestion.",
-      "originMarkerTooltip": "由 AI 代理自动发送"
+      "originMarkerTooltip": "由 AI 代理自动发送",
+      "toolArguments": "调用参数"
     },
     "toolbar": {
       "print": "打印",
@@ -515,7 +516,9 @@
     "list": {
       "attachments_one": "1 个附件",
       "attachments_other": "{{count}} 附件",
-      "hasSummary": "AI摘要可用"
+      "hasSummary": "AI摘要可用",
+      "aiRepliedAuto": "由 AI 自动回复",
+      "aiRepliedAccepted": "AI 草稿，由客服采纳"
     },
     "similar": {
       "title": "类似工单",

@@ -458,7 +458,8 @@
       "errorLlmProviderError": "The AI provider reported an error. Please try again later.",
       "draftRunning": "The AI is working on a draft — this can take several minutes…",
       "draftSkipped": "The AI did not produce a reply suggestion.",
-      "originMarkerTooltip": "Odoslané automaticky agentom AI"
+      "originMarkerTooltip": "Odoslané automaticky agentom AI",
+      "toolArguments": "Volané s"
     },
     "toolbar": {
       "print": "Tlačiť",
@@ -515,7 +516,9 @@
     "list": {
       "attachments_one": "1 príloha",
       "attachments_other": "{{count}} príloh",
-      "hasSummary": "K dispozícii súhrn AI"
+      "hasSummary": "K dispozícii súhrn AI",
+      "aiRepliedAuto": "Zodpovedané automaticky AI",
+      "aiRepliedAccepted": "Návrh AI, prijatý agentom"
     },
     "similar": {
       "title": "Podobné lístky",

@@ -458,7 +458,8 @@
       "errorLlmProviderError": "The AI provider reported an error. Please try again later.",
       "draftRunning": "The AI is working on a draft — this can take several minutes…",
       "draftSkipped": "The AI did not produce a reply suggestion.",
-      "originMarkerTooltip": "Envoyé automatiquement par l'agent IA"
+      "originMarkerTooltip": "Envoyé automatiquement par l'agent IA",
+      "toolArguments": "Appelé avec"
     },
     "toolbar": {
       "print": "Imprimer",
@@ -515,7 +516,9 @@
     "list": {
       "attachments_one": "1 pièce jointe",
       "attachments_other": "{{count}} pièces jointes",
-      "hasSummary": "Résumé de l'IA disponible"
+      "hasSummary": "Résumé de l'IA disponible",
+      "aiRepliedAuto": "Répondu automatiquement par l'IA",
+      "aiRepliedAccepted": "Brouillon IA, accepté par un agent"
     },
     "similar": {
       "title": "Tickets similaires",

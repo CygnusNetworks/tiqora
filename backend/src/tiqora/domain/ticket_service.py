@@ -191,6 +191,7 @@ class TicketService:
         ai_summary_ticket_ids: set[int] | None = None,
         customer_email_by_login: dict[str, str] | None = None,
         ai_escalated_ticket_ids: set[int] | None = None,
+        ai_reply_source_by_ticket: dict[int, str] | None = None,
     ) -> TicketListItem:
         owner = maps["user"].get(t.user_id)
         return TicketListItem(
@@ -221,6 +222,7 @@ class TicketService:
             attachment_count=(attachment_count_by_ticket or {}).get(t.id, 0),
             has_ai_summary=t.id in (ai_summary_ticket_ids or set()),
             ai_escalated=t.id in (ai_escalated_ticket_ids or set()),
+            ai_reply_source=(ai_reply_source_by_ticket or {}).get(t.id),
             create_time=t.create_time,
             change_time=t.change_time,
             age_seconds=age_seconds(t.create_time),
@@ -448,6 +450,7 @@ class TicketService:
         attachment_count_by_ticket = await self._attachment_counts_by_ticket(ticket_ids)
         ai_summary_ticket_ids = await self._ai_summary_ticket_ids(ticket_ids)
         ai_escalated_ids = await _ai_escalated_ticket_ids(self._session, ticket_ids)
+        ai_reply_source_by_ticket = await self._ai_reply_source_by_ticket(ticket_ids)
         customer_email_by_login = await self._customer_emails_by_login(
             [t.customer_user_id for t in tickets if t.customer_user_id]
         )
@@ -460,6 +463,7 @@ class TicketService:
                 ai_summary_ticket_ids,
                 customer_email_by_login,
                 ai_escalated_ids,
+                ai_reply_source_by_ticket,
             )
             for t in tickets
         ]
@@ -569,6 +573,38 @@ class TicketService:
             )
             await self._session.rollback()
             return set()
+
+    async def _ai_reply_source_by_ticket(self, ticket_ids: list[int]) -> dict[int, str]:
+        """Per ticket, how its most recent AI-written article got there.
+
+        ``"auto"`` means the agent sent it itself; ``"manual_accept"`` means a
+        human accepted an AI draft. A ticket can have both over its life, so
+        the newest article wins — the list answers "how was this last handled",
+        which is what an agent scanning a queue is asking.
+
+        Origins are keyed by article, hence the join. Same missing-table
+        tolerance as the other AI lookups: a Znuny-only deployment must still
+        get its ticket list.
+        """
+        if not ticket_ids:
+            return {}
+        try:
+            rows = await self._session.execute(
+                select(Article.ticket_id, TiqoraAiArticleOrigin.source, Article.id)
+                .join(TiqoraAiArticleOrigin, TiqoraAiArticleOrigin.article_id == Article.id)
+                .where(Article.ticket_id.in_(ticket_ids))
+                .order_by(Article.ticket_id, Article.id)
+            )
+        except DBAPIError:
+            logger.debug(
+                "tiqora_ai_article_origin query failed (table missing?)"
+                " — treating as no AI replies",
+                exc_info=True,
+            )
+            await self._session.rollback()
+            return {}
+        # Ordered by article id, so the last row per ticket is the newest.
+        return {int(ticket_id): str(source) for ticket_id, source, _ in rows.all()}
 
     async def iter_tickets_for_export(
         self,

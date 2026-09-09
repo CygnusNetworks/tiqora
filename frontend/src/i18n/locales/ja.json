@@ -458,7 +458,8 @@
       "errorLlmProviderError": "The AI provider reported an error. Please try again later.",
       "draftRunning": "The AI is working on a draft — this can take several minutes…",
       "draftSkipped": "The AI did not produce a reply suggestion.",
-      "originMarkerTooltip": "AI エージェントが自動送信"
+      "originMarkerTooltip": "AI エージェントが自動送信",
+      "toolArguments": "呼び出し引数"
     },
     "toolbar": {
       "print": "印刷する",
@@ -515,7 +516,9 @@
     "list": {
       "attachments_one": "アタッチメント1個",
       "attachments_other": "{{count}} 添付ファイル",
-      "hasSummary": "AIサマリーが利用可能"
+      "hasSummary": "AIサマリーが利用可能",
+      "aiRepliedAuto": "AI が自動で回答",
+      "aiRepliedAccepted": "AI の下書きを担当者が承認"
     },
     "similar": {
       "title": "同様のチケット",

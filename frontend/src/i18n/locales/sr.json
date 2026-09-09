@@ -458,7 +458,8 @@
       "errorLlmProviderError": "The AI provider reported an error. Please try again later.",
       "draftRunning": "The AI is working on a draft — this can take several minutes…",
       "draftSkipped": "The AI did not produce a reply suggestion.",
-      "originMarkerTooltip": "Аутоматски послао ВИ агент"
+      "originMarkerTooltip": "Аутоматски послао ВИ агент",
+      "toolArguments": "Позвано са"
     },
     "toolbar": {
       "print": "Принт",
@@ -515,7 +516,9 @@
     "list": {
       "attachments_one": "1 прилог",
       "attachments_other": "{{count}} прилози",
-      "hasSummary": "АИ резиме доступан"
+      "hasSummary": "АИ резиме доступан",
+      "aiRepliedAuto": "Аутоматски одговорила ВИ",
+      "aiRepliedAccepted": "ВИ нацрт, прихватио агент"
     },
     "similar": {
       "title": "Сличне карте",

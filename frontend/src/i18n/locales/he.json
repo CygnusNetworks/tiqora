@@ -458,7 +458,8 @@
       "errorLlmProviderError": "The AI provider reported an error. Please try again later.",
       "draftRunning": "The AI is working on a draft — this can take several minutes…",
       "draftSkipped": "The AI did not produce a reply suggestion.",
-      "originMarkerTooltip": "נשלח אוטומטית על ידי סוכן ה-AI"
+      "originMarkerTooltip": "נשלח אוטומטית על ידי סוכן ה-AI",
+      "toolArguments": "נקרא עם"
     },
     "toolbar": {
       "print": "הדפס",
@@ -515,7 +516,9 @@
     "list": {
       "attachments_one": "1 קובץ מצורף",
       "attachments_other": "{{count}} קבצים מצורפים",
-      "hasSummary": "תקציר AI זמין"
+      "hasSummary": "תקציר AI זמין",
+      "aiRepliedAuto": "נענה אוטומטית על ידי ה-AI",
+      "aiRepliedAccepted": "טיוטת AI, אושרה על ידי נציג"
     },
     "similar": {
       "title": "כרטיסים דומים",
