@@ -1469,16 +1469,16 @@
       "setupLinkSent": "सेटअप लिंक भेजा गया।",
       "setupLinkFailed": "सेटअप लिंक नहीं भेजा जा सका।",
       "access": {
-        "header": "Access",
-        "active": "Active",
-        "accepted": "Password set",
-        "invited": "Invited",
-        "expired": "Invitation expired",
-        "none": "No invitation",
-        "lastSeen": "last seen {{when}}",
-        "linkExpires": "link expires {{when}}",
-        "linkExpiredOn": "link expired on {{date}}",
-        "neverSignedIn": "never signed in"
+        "header": "पहुँच",
+        "active": "सक्रिय",
+        "accepted": "पासवर्ड सेट किया गया",
+        "invited": "आमंत्रित",
+        "expired": "आमंत्रण समाप्त",
+        "none": "कोई आमंत्रण नहीं",
+        "lastSeen": "अंतिम बार देखा गया {{when}}",
+        "linkExpires": "लिंक {{when}} समाप्त होगा",
+        "linkExpiredOn": "लिंक {{date}} को समाप्त हुआ",
+        "neverSignedIn": "कभी साइन इन नहीं किया"
       }
     },
     "groups": {

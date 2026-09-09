@@ -1469,16 +1469,16 @@
       "setupLinkSent": "Tautan penyiapan terkirim.",
       "setupLinkFailed": "Tidak dapat mengirim tautan penyiapan.",
       "access": {
-        "header": "Access",
-        "active": "Active",
-        "accepted": "Password set",
-        "invited": "Invited",
-        "expired": "Invitation expired",
-        "none": "No invitation",
-        "lastSeen": "last seen {{when}}",
-        "linkExpires": "link expires {{when}}",
-        "linkExpiredOn": "link expired on {{date}}",
-        "neverSignedIn": "never signed in"
+        "header": "Akses",
+        "active": "Aktif",
+        "accepted": "Kata sandi disetel",
+        "invited": "Diundang",
+        "expired": "Undangan kedaluwarsa",
+        "none": "Tanpa undangan",
+        "lastSeen": "terakhir dilihat {{when}}",
+        "linkExpires": "tautan kedaluwarsa {{when}}",
+        "linkExpiredOn": "tautan kedaluwarsa pada {{date}}",
+        "neverSignedIn": "belum pernah masuk"
       }
     },
     "groups": {

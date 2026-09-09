@@ -1469,16 +1469,16 @@
       "setupLinkSent": "קישור ההגדרה נשלח.",
       "setupLinkFailed": "לא ניתן לשלוח את קישור ההגדרה.",
       "access": {
-        "header": "Access",
-        "active": "Active",
-        "accepted": "Password set",
-        "invited": "Invited",
-        "expired": "Invitation expired",
-        "none": "No invitation",
-        "lastSeen": "last seen {{when}}",
-        "linkExpires": "link expires {{when}}",
-        "linkExpiredOn": "link expired on {{date}}",
-        "neverSignedIn": "never signed in"
+        "header": "גישה",
+        "active": "פעיל",
+        "accepted": "סיסמה הוגדרה",
+        "invited": "הוזמן",
+        "expired": "ההזמנה פגה",
+        "none": "ללא הזמנה",
+        "lastSeen": "נראה לאחרונה {{when}}",
+        "linkExpires": "הקישור יפוג {{when}}",
+        "linkExpiredOn": "הקישור פג בתאריך {{date}}",
+        "neverSignedIn": "מעולם לא התחבר"
       }
     },
     "groups": {

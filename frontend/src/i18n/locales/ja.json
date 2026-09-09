@@ -1469,16 +1469,16 @@
       "setupLinkSent": "セットアップリンクを送信しました。",
       "setupLinkFailed": "セットアップリンクを送信できませんでした。",
       "access": {
-        "header": "Access",
-        "active": "Active",
-        "accepted": "Password set",
-        "invited": "Invited",
-        "expired": "Invitation expired",
-        "none": "No invitation",
-        "lastSeen": "last seen {{when}}",
-        "linkExpires": "link expires {{when}}",
-        "linkExpiredOn": "link expired on {{date}}",
-        "neverSignedIn": "never signed in"
+        "header": "アクセス",
+        "active": "アクティブ",
+        "accepted": "パスワード設定済み",
+        "invited": "招待済み",
+        "expired": "招待の有効期限切れ",
+        "none": "招待なし",
+        "lastSeen": "最終ログイン {{when}}",
+        "linkExpires": "リンクは{{when}}に期限切れ",
+        "linkExpiredOn": "リンクは {{date}} に期限切れ",
+        "neverSignedIn": "未ログイン"
       }
     },
     "groups": {
