@@ -13,6 +13,7 @@ import type { PickedMention } from "@/lib/mentions";
 import { ArticleBodyRenderer } from "./ArticleBodyRenderer";
 import { AttachmentLightbox } from "./AttachmentLightbox";
 import { ComposerTimeChip } from "./ComposerTimeChip";
+import { AiOriginMarker } from "./AiOriginBadge";
 import { MentionTextarea } from "./MentionTextarea";
 import { ReplyDialog } from "./ReplyDialog";
 import {
@@ -143,6 +144,7 @@ export function ArticleTimeline({
                               ? t("ticket.visibleCustomer")
                               : t("ticket.internal")}
                           </Badge>
+                          {article.ai_origin && <AiOriginMarker articleId={article.id} />}
                           <span className="font-mono text-xs tabular-nums text-muted">
                             {formatDateTime(article.create_time, locale)}
                           </span>

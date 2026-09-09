@@ -495,6 +495,7 @@
       "toolTrace_other": "Tool-Ergebnisse ({{count}})",
       "originBadge": "KI",
       "originBadgeTooltip": "Automatisch von der KI gesendet — klicken für den Tool-Trace",
+      "originMarkerTooltip": "Automatisch von der KI gesendet",
       "originTraceEmpty": "Für diese Antwort wurden keine Tool-Aufrufe erfasst.",
       "expand": "Aufklappen",
       "collapse": "Zuklappen",
