@@ -1471,16 +1471,16 @@
       "setupLinkSent": "Setup-link verzonden.",
       "setupLinkFailed": "Setup-link kon niet worden verzonden.",
       "access": {
-        "header": "Access",
-        "active": "Active",
-        "accepted": "Password set",
-        "invited": "Invited",
-        "expired": "Invitation expired",
-        "none": "No invitation",
-        "lastSeen": "last seen {{when}}",
-        "linkExpires": "link expires {{when}}",
-        "linkExpiredOn": "link expired on {{date}}",
-        "neverSignedIn": "never signed in"
+        "header": "Toegang",
+        "active": "Actief",
+        "accepted": "Wachtwoord ingesteld",
+        "invited": "Uitgenodigd",
+        "expired": "Uitnodiging verlopen",
+        "none": "Geen uitnodiging",
+        "lastSeen": "laatst gezien {{when}}",
+        "linkExpires": "link verloopt {{when}}",
+        "linkExpiredOn": "link verlopen op {{date}}",
+        "neverSignedIn": "nooit aangemeld"
       }
     },
     "groups": {

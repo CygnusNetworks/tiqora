@@ -1471,16 +1471,16 @@
       "setupLinkSent": "Връзката за настройка е изпратена.",
       "setupLinkFailed": "Връзката за настройка не можа да бъде изпратена.",
       "access": {
-        "header": "Access",
-        "active": "Active",
-        "accepted": "Password set",
-        "invited": "Invited",
-        "expired": "Invitation expired",
-        "none": "No invitation",
-        "lastSeen": "last seen {{when}}",
-        "linkExpires": "link expires {{when}}",
-        "linkExpiredOn": "link expired on {{date}}",
-        "neverSignedIn": "never signed in"
+        "header": "Достъп",
+        "active": "Активен",
+        "accepted": "Паролата е зададена",
+        "invited": "Поканен",
+        "expired": "Поканата е изтекла",
+        "none": "Без покана",
+        "lastSeen": "последно видян {{when}}",
+        "linkExpires": "връзката изтича {{when}}",
+        "linkExpiredOn": "връзката изтече на {{date}}",
+        "neverSignedIn": "никога не е влизал"
       }
     },
     "groups": {

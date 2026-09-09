@@ -1471,16 +1471,16 @@
       "setupLinkSent": "Kurulum bağlantısı gönderildi.",
       "setupLinkFailed": "Kurulum bağlantısı gönderilemedi.",
       "access": {
-        "header": "Access",
-        "active": "Active",
-        "accepted": "Password set",
-        "invited": "Invited",
-        "expired": "Invitation expired",
-        "none": "No invitation",
-        "lastSeen": "last seen {{when}}",
-        "linkExpires": "link expires {{when}}",
-        "linkExpiredOn": "link expired on {{date}}",
-        "neverSignedIn": "never signed in"
+        "header": "Erişim",
+        "active": "Etkin",
+        "accepted": "Parola belirlendi",
+        "invited": "Davet edildi",
+        "expired": "Davet süresi doldu",
+        "none": "Davet yok",
+        "lastSeen": "son görülme {{when}}",
+        "linkExpires": "bağlantı {{when}} sona eriyor",
+        "linkExpiredOn": "bağlantı {{date}} tarihinde sona erdi",
+        "neverSignedIn": "hiç giriş yapmadı"
       }
     },
     "groups": {
