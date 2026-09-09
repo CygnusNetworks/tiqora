@@ -935,19 +935,25 @@ async def test_provider_max_tool_rounds_override_and_reset(mariadb_znuny_url: st
             )
             # Not configured -> the caller's default applies.
             assert provider.max_tool_rounds is None
-            assert await ai_providers.resolve_max_tool_rounds(session, provider.id, default=12) == 12
+            assert (
+                await ai_providers.resolve_max_tool_rounds(session, provider.id, default=12) == 12
+            )
 
             await ai_providers.update_provider(
                 session, provider, settings=settings, change_by=1, max_tool_rounds=20
             )
-            assert await ai_providers.resolve_max_tool_rounds(session, provider.id, default=12) == 20
+            assert (
+                await ai_providers.resolve_max_tool_rounds(session, provider.id, default=12) == 20
+            )
 
             # 0 clears the override rather than starving the loop of every round.
             await ai_providers.update_provider(
                 session, provider, settings=settings, change_by=1, max_tool_rounds=0
             )
             assert provider.max_tool_rounds is None
-            assert await ai_providers.resolve_max_tool_rounds(session, provider.id, default=12) == 12
+            assert (
+                await ai_providers.resolve_max_tool_rounds(session, provider.id, default=12) == 12
+            )
 
             # An unknown or unset provider falls back rather than raising: the
             # budget must never be the reason a run cannot start.
