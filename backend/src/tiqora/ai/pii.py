@@ -83,11 +83,29 @@ _PHONE_LABEL_RE = re.compile(
 # Clock times ("07:53:55" inside "2026-07-24T07:53:55+00:00") satisfy the
 # loose IPv6 group shape — an IPV6 candidate that looks like a time of day
 # is rejected so timestamps survive unmasked.
+#
+# The candidate does not have to cover the whole time: _IPV6_RE is anchored on
+# \b, and whether a word boundary exists right after the seconds depends on
+# what follows them. "…T14:36:36Z" ends in a word character, so the only
+# possible match is the bare ":36:" — testing *that* span for time-likeness
+# said "not a time" and the tool call came back as "2026-09-10T14[IPV6_1]36Z"
+# (ticket 43099), which destroys exactly what timestamps are read for:
+# correlating events across tools. The span is therefore first widened over
+# the digits it may have cut into, then checked.
 _TIME_LIKE_RE = re.compile(r"\A:?\d{1,2}(:\d{2}){1,2}\Z")
 
 
+def _widen_over_digits(text: str, start: int, end: int) -> str:
+    while start > 0 and text[start - 1].isdigit():
+        start -= 1
+    while end < len(text) and text[end].isdigit():
+        end += 1
+    return text[start:end]
+
+
 def _validate_ipv6(match: re.Match[str]) -> bool:
-    return not _TIME_LIKE_RE.match(match.group(0).strip())
+    start, end = match.span()
+    return not _TIME_LIKE_RE.match(_widen_over_digits(match.string, start, end).strip())
 
 
 def _is_identifier(value: str) -> bool:
