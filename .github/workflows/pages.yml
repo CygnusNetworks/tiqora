@@ -64,8 +64,9 @@ jobs:
           # Screenshots used by the landing gallery
           # Both light and dark variants (the landing gallery has a switch).
           for f in \
-            agent-dashboard agent-ai-assist agent-ai-mcp agent-ticket-zoom \
-            agent-queues agent-stats agent-search agent-kb \
+            agent-dashboard agent-ai-assist agent-ai-mcp agent-ai-origin \
+            agent-ticket-zoom agent-queues agent-stats agent-search agent-kb \
+            admin-ai-settings admin-ai-queue-policies admin-ai-audit \
             admin-queues admin-gdpr portal
           do
             cp "docs/images/$f.png" "_site/assets/screenshots/$f.png"

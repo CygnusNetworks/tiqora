@@ -42,9 +42,13 @@ fork of Znuny — no Znuny source code is included or redistributed.
   ticket summaries** (document- and attachment-aware), and an optional **autonomous
   auto-reply** worker. Attachments get text extraction plus a **vision pre-pass** for
   images; sensitive data is **PII-masked (spaCy NER)** before any LLM call; every
-  request lands in an **audit log** with per-subject ACLs and token/request limits.
-  Bring your own OpenAI-compatible or Anthropic providers. Gated by the operation mode
-  so nothing autonomous runs during parallel operation.
+  request lands in an **audit log** with per-subject ACLs, token/request limits and
+  per-provider **cost budgets** (day/week/month). Every AI-written article is marked
+  🤖 in the ticket and carries the **tool trace** behind it — each call with the
+  arguments it was made with. The agent can **hand off to a human**, which really
+  stops the auto-reply until someone takes over. Bring your own OpenAI-compatible or
+  Anthropic providers. Gated by the operation mode so nothing autonomous runs during
+  parallel operation.
 - **GDPR tooling** — anonymization, retention jobs, and audit trails in admin.
 - **Modern design** — dark/light themes, compact cobalt design system.
 - **49 UI languages** — full Znuny language catalogue (48 Znuny `.po` codes +
@@ -79,6 +83,22 @@ VITE_BASE=/tiqora/demo/ pnpm --filter tiqora-frontend build:demo
 
 ![AI assist + MCP](./docs/images/agent-ai-mcp.png)
 <sub>AI assist + MCP — the draft is grounded in live results pulled from an MCP monitoring server (host metrics, active alerts)</sub>
+
+![AI origin trace](./docs/images/agent-ai-origin.png)
+<sub>Auto-sent AI reply — the 🤖 marker flags it in the article list and the reader, and the trace
+below shows every tool the agent called <em>and what it called it with</em></sub>
+
+| AI administration | Per-queue policies |
+|---|---|
+| ![AI settings](./docs/images/admin-ai-settings.png) | ![Queue AI policies](./docs/images/admin-ai-queue-policies.png) |
+
+| LLM providers | Cost budget & tool rounds |
+|---|---|
+| ![LLM providers](./docs/images/admin-ai-providers.png) | ![Provider budget](./docs/images/admin-ai-provider-budget.png) |
+
+| MCP tool sources | LLM request audit |
+|---|---|
+| ![MCP clients](./docs/images/admin-ai-mcp.png) | ![AI audit](./docs/images/admin-ai-audit.png) |
 
 ### Agent workspace
 
@@ -136,7 +156,7 @@ VITE_BASE=/tiqora/demo/ pnpm --filter tiqora-frontend build:demo
 | Ticket write path + Znuny invariants | Golden-master multi-peer matrix (OTRS/Znuny 6.0–7.3) |
 | GenericInterface compatibility | Session*, TicketCreate/Update/Get/Search/HistoryGet, TimeAccountingGet, OutOfOffice; REST + SOAP |
 | MCP tools | `ticket_*`, customer lookup, KB — see [docs/ai-integration.md](./docs/ai-integration.md) |
-| AI assistance subsystem | Draft replies, summaries, auto-reply worker, attachment/vision, PII masking, per-subject ACL & audit — `/admin/ai/*`, [docs/ai-integration.md](./docs/ai-integration.md) |
+| AI assistance subsystem | Draft replies, summaries, auto-reply worker, human handoff, 🤖 origin traces, attachment/vision, PII masking, per-subject ACL, cost budgets & audit — `/admin/ai/*`, [docs/ai-integration.md](./docs/ai-integration.md) |
 | Daemon takeover (mail, escalation, notify, GA) | Per-function flags, off by default |
 | Calendar / appointments | Month/week/agenda UI; reuses Znuny `calendar*` tables |
 | Process management (BPM) | Reuses Znuny `pm_*` tables — [docs/process-management.md](./docs/process-management.md) |
@@ -351,6 +371,11 @@ tickets through it while the portal is off.
 | i18n | react-i18next | 49 locales (Znuny catalogue parity; [docs/i18n.md](./docs/i18n.md)) |
 | Observability | structlog JSON, Prometheus `/metrics` | Zabbix template placeholder under `deploy/zabbix/` |
 | MCP | FastMCP (separate process) | Same permission engine as UI/REST |
+
+**Browser floor:** the UI's theme tokens are CSS variables tinted with
+`color-mix()`, so it needs Chrome/Edge 111+, Safari 16.4+, or Firefox 113+
+(all shipped in 2023). Older browsers render an uncoloured, but still usable,
+approximation.
 
 ## Status
 
