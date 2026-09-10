@@ -54,9 +54,17 @@ jobs:
         run: pnpm --filter tiqora-frontend build
       - name: Install Playwright chromium
         run: pnpm --filter tiqora-frontend exec playwright install --with-deps chromium
-      - name: Generate screenshots
+      - name: Generate screenshots (light)
         env:
           SCREENSHOTS: "1"
+        run: pnpm --filter tiqora-frontend exec playwright test screenshots --project=chromium
+      # The landing gallery has a light/dark switch, so every shot needs its
+      # `-dark` twin. Generating only the light set here left the dark ones to
+      # be produced by hand, which is how they drifted a release behind.
+      - name: Generate screenshots (dark)
+        env:
+          SCREENSHOTS: "1"
+          THEME: dark
         run: pnpm --filter tiqora-frontend exec playwright test screenshots --project=chromium
       # Why a pull request and not a push to main: the main-protection ruleset
       # requires one ("GH013: Changes must be made through a pull request"), and
