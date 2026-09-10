@@ -116,6 +116,12 @@ class ArticleIn:
     references: str | None = None
     # "email" | "phone" | "note" | "internal" — affects history type
     channel: str = "note"
+    # Machine-generated inbound mail (newsletter, bulk, spam-flagged) — see
+    # tiqora.channels.email.machine_mail. Rides along on the ArticleCreate
+    # outbox payload so the AI auto-reply can skip it (tiqora.ai.auto_worker);
+    # nothing in the article schema itself records it, because Tiqora does not
+    # store raw MIME and the headers are gone after ingest.
+    auto_generated: bool = False
     # Binary attachments: list of (filename, content_type, content_bytes)
     attachments: list[tuple[str, str, bytes]] = field(default_factory=list)
     # Override the derived ticket_history type (e.g. postmaster auto-responses
@@ -770,7 +776,14 @@ async def add_article(
 
     # Outbox event
     await _emit_event(
-        session, "ArticleCreate", ticket_id, {"article_id": article_id, "channel": article.channel}
+        session,
+        "ArticleCreate",
+        ticket_id,
+        {
+            "article_id": article_id,
+            "channel": article.channel,
+            "auto_generated": article.auto_generated,
+        },
     )
 
     # Invalidate Znuny's on-disk ticket/article cache so the new article shows

@@ -100,6 +100,7 @@ from tiqora.ai.reply_language import (
 from tiqora.ai.tool_chain import analyze_tool_chain
 from tiqora.ai.tools import (
     TOOL_ESCALATE_TO_HUMAN,
+    TOOL_NO_REPLY_NEEDED,
     TOOL_PROPOSE_CUSTOMER_MESSAGE,
     McpToolSpec,
     ToolArgumentError,
@@ -155,15 +156,21 @@ _PLAIN_TEXT_NUDGE = (
     "tool call: if that text was your reply for the customer, call "
     "propose_customer_message with it (kind='reply'); if it was internal "
     "analysis, call add_internal_note; if you cannot help, call "
-    "escalate_to_human. Do not answer in plain text again."
+    "escalate_to_human; if this ticket needs no answer at all, call "
+    "no_reply_needed. Do not answer in plain text again."
 )
 _TERMINAL_FORCE_PROMPT = (
     "Your research budget is exhausted — this is the final step. You MUST now "
     "call exactly one tool: propose_customer_message with your best answer or "
-    "clarifying question based on everything gathered so far, or "
-    "escalate_to_human if you genuinely cannot help. Do not answer in plain "
-    "text."
+    "clarifying question based on everything gathered so far, "
+    "escalate_to_human if you genuinely cannot help, or no_reply_needed if "
+    "this ticket needs no answer at all. Do not answer in plain text."
 )
+"""Offering only propose/escalate here is what sent a reply to a sipgate
+newsletter (ticket 2026091010000013): the model had already written "keine
+Kommunikation notwendig" into five internal notes, but "done, nothing to
+answer" was not among the tools it was allowed to finish with, so it wrote a
+customer message instead. ``no_reply_needed`` is the third exit."""
 
 
 def _tool_trace_wire(messages: list[LlmMessage]) -> list[dict[str, Any]]:
@@ -201,6 +208,7 @@ TRIGGER_AUTO = "auto"
 STATUS_DRAFTED = "drafted"
 STATUS_SENT = "sent"
 STATUS_ESCALATED = "escalated"
+STATUS_NO_REPLY = "no_reply"
 STATUS_SUPERSEDED = "superseded"
 STATUS_SKIPPED = "skipped"
 STATUS_ERROR = "error"
@@ -467,6 +475,13 @@ def _build_system_prompt(
         "explained something the customer is asking about again. If so, do not "
         "restate that explanation in full — keep it brief or reference the earlier "
         "answer instead of repeating it verbatim."
+    )
+    parts.append(
+        "Not every ticket deserves an answer. Advertising, newsletters, "
+        "automated notifications and anything that is not a request should end "
+        "with no_reply_needed — never with a customer message telling the "
+        "sender that no action is required, and never with an escalation that "
+        "gives a human nothing to do."
     )
     ordered_parts = sorted(prompt_parts or [], key=lambda p: p.position)
     parts.extend(p.content for p in ordered_parts if p.enabled)
@@ -1317,7 +1332,11 @@ async def run_ticket_agent(
                 s
                 for s in schemas
                 if s.get("function", {}).get("name")
-                in (TOOL_PROPOSE_CUSTOMER_MESSAGE, TOOL_ESCALATE_TO_HUMAN)
+                in (
+                    TOOL_PROPOSE_CUSTOMER_MESSAGE,
+                    TOOL_ESCALATE_TO_HUMAN,
+                    TOOL_NO_REPLY_NEEDED,
+                )
             ]
             messages.append(LlmMessage(role="user", content=_TERMINAL_FORCE_PROMPT))
             # `rounds` here is the budget that was just exhausted — logging it
@@ -1403,6 +1422,22 @@ async def run_ticket_agent(
             return AgentRunResult(
                 status=STATUS_SKIPPED,
                 notes="No terminal tool call produced (no proposal, no escalation).",
+                prompt_tokens=prompt_tokens,
+                completion_tokens=completion_tokens,
+            )
+
+        if outcome.no_reply_reason is not None:
+            # Nothing was written to the customer and nothing was handed to a
+            # human — the model decided this ticket needs no answer. Advance
+            # the loop guard anyway: this customer article WAS handled, and
+            # leaving it unmarked would re-run the same decision on every tick
+            # that replays the ticket.
+            state.last_run_at = datetime.now(UTC).replace(tzinfo=None)
+            state.last_customer_article_id = based_on_article_id
+            await session.commit()
+            return AgentRunResult(
+                status=STATUS_NO_REPLY,
+                notes=outcome.no_reply_reason,
                 prompt_tokens=prompt_tokens,
                 completion_tokens=completion_tokens,
             )
@@ -1590,6 +1625,7 @@ __all__ = [
     "STATUS_DRAFTED",
     "STATUS_ERROR",
     "STATUS_ESCALATED",
+    "STATUS_NO_REPLY",
     "STATUS_SENT",
     "STATUS_SKIPPED",
     "STATUS_SUPERSEDED",

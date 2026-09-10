@@ -48,6 +48,10 @@ export type ManualRunStatus =
   | "drafted"
   | "skipped"
   | "escalated"
+  // The agent ended the run on purpose without customer text — advertising, a
+  // newsletter, nothing to act on (backend: STATUS_NO_REPLY / the
+  // no_reply_needed tool).
+  | "no_reply"
   | "superseded"
   | "error";
 
