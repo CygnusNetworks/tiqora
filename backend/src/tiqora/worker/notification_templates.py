@@ -10,9 +10,19 @@ import re
 from email.utils import formataddr
 from urllib.parse import SplitResult, urlsplit
 
+import structlog
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from tiqora.channels.email.placeholder import PlaceholderContext
 from tiqora.config import Settings
+from tiqora.domain.settings_store import (
+    KEY_NOTIFICATION_SENDER_EMAIL,
+    KEY_NOTIFICATION_SENDER_NAME,
+    get_setting,
+)
 from tiqora.znuny.sysconfig import SysConfig
+
+logger = structlog.get_logger(__name__)
 
 _ENCODED_TAG = re.compile(r"&lt;((?:OTRS|TIQORA)_[A-Za-z0-9_:]+(?:\[\d+\])?)&gt;", re.IGNORECASE)
 _PREFIX = r"<(?:OTRS|TIQORA)_CONFIG_"
@@ -91,19 +101,40 @@ async def configure_notification_context(
 
 
 async def resolve_notification_sender(
-    sysconfig: SysConfig, context: PlaceholderContext
+    session: AsyncSession, sysconfig: SysConfig, context: PlaceholderContext
 ) -> str | None:
     """``From:`` for a notification mail, or ``None`` when nothing is deliverable.
 
-    ``NotificationSenderEmail`` when it holds a usable address, else the ticket
-    queue's system address -- the mailbox this install already sends from.
-    Znuny ships the setting as ``znuny@<OTRS_CONFIG_FQDN>``; resolving that
-    against the Tiqora host would invent a mailbox nobody reads, and a sender on
-    a host that does not accept mail is what relays reject.
+    In order: the ``notification.sender_email`` override, then Znuny's
+    ``NotificationSenderEmail`` when it holds a usable address, then the ticket
+    queue's system address. Znuny ships the setting as
+    ``znuny@<OTRS_CONFIG_FQDN>``; resolving that against the Tiqora host would
+    invent a mailbox nobody reads, and a sender on a host that does not accept
+    mail is what relays reject.
+
+    The queue address is a last resort, not a good default: it is the address
+    ordinary ticket correspondence goes out as, so falling back to it makes
+    notifications indistinguishable from replies for every mail filter sorting
+    by sender. Hence the warning -- an install landing here wants an override.
     """
-    name = context.config_overrides.get("notificationsendername") or _TIQORA_SENDER_NAME
+    override_name = (await get_setting(session, KEY_NOTIFICATION_SENDER_NAME) or "").strip()
+    name = (
+        override_name
+        or context.config_overrides.get("notificationsendername")
+        or _TIQORA_SENDER_NAME
+    )
+    override_email = (await get_setting(session, KEY_NOTIFICATION_SENDER_EMAIL) or "").strip()
+    if override_email:
+        return formataddr((name, override_email))
+
     configured = (await sysconfig.get_str("NotificationSenderEmail")).strip()
     email = configured if configured and not _UNRESOLVED_TAG.search(configured) else ""
     if not email:
         email = (context.queue.get("email") or "").strip()
+        if email:
+            logger.warning(
+                "notification_sender_falls_back_to_queue_address",
+                queue_address=email,
+                setting=KEY_NOTIFICATION_SENDER_EMAIL,
+            )
     return formataddr((name, email)) if email else None

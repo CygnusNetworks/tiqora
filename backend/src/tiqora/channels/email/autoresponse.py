@@ -27,9 +27,10 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from tiqora.channels.email import loop_protection
+from tiqora.channels.email.outbound_reply import generate_message_id
 from tiqora.channels.email.parser import get_email_address, split_address_line
 from tiqora.channels.email.placeholder import expand_placeholders
-from tiqora.channels.email.smtp import MailSender, build_message
+from tiqora.channels.email.smtp import MailSender, build_message, message_id_domain
 from tiqora.domain.quoting import build_ticket_subject
 from tiqora.domain.subject_hook import load_subject_config
 from tiqora.domain.ticket_write_service import ArticleIn, add_article
@@ -192,6 +193,9 @@ async def send_auto_response(
     to_line = ", ".join(allowed)
     from_line = f"{sender_realname} <{sender_address}>" if sender_realname else str(sender_address)
 
+    # One id for the mail and the article it is stored as, so the customer's
+    # reply threads onto the row the portal shows.
+    message_id = generate_message_id(domain=message_id_domain(from_line))
     message = build_message(
         from_addr=from_line,
         to_addrs=to_line,
@@ -200,8 +204,15 @@ async def send_auto_response(
         body=body,
         content_type=content_type or "text/plain",
         in_reply_to=orig_message_id,
+        message_id=message_id,
+        extra_headers=await sysconfig.mail_banner_headers(),
     )
-    await mail_sender.send(message)
+    # Znuny's SendAutoResponse sends with Loop => 1: null envelope sender, so a
+    # bounce from the auto-response cannot open a ticket of its own.
+    await mail_sender.send(
+        message,
+        envelope_from=await sysconfig.notification_envelope_from(from_line),
+    )
 
     for addr in allowed:
         await loop_protection.record(session, to=addr)
@@ -215,7 +226,7 @@ async def send_auto_response(
         content_type=content_type or "text/plain; charset=utf-8",
         from_address=from_line,
         to_address=to_line,
-        message_id=None,
+        message_id=message_id,
         in_reply_to=orig_message_id,
         channel="email",
         history_type_override=history_type,
