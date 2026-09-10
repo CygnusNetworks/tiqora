@@ -59,7 +59,13 @@ from tiqora.ai.kb_wiring import build_llm_client, kb_bundle, kb_get_article_fn, 
 from tiqora.ai.listfields import parse_str_list
 from tiqora.ai.models import FEATURE_AUTO_REPLY, TiqoraAiQueuePolicy, TiqoraAiUsage
 from tiqora.ai.policies import get_queue_policy_by_queue
-from tiqora.ai.runtime import TRIGGER_AUTO, AgentRunError, AgentRunResult, run_ticket_agent
+from tiqora.ai.runtime import (
+    STATUS_NO_REPLY,
+    TRIGGER_AUTO,
+    AgentRunError,
+    AgentRunResult,
+    run_ticket_agent,
+)
 from tiqora.ai.senders import matches_ignored
 from tiqora.config import Settings, get_settings
 from tiqora.db.engine import get_session_factory
@@ -232,6 +238,19 @@ async def _process_customer_article_event(
         return None
 
     ticket_id = event.ticket_id
+
+    # Machine-generated mail (newsletter, mailing list, spam-flagged) is never
+    # worth an answer, and answering it is actively harmful: the sender is
+    # typically a noreply@ address, so the reply bounces or loops. The flag is
+    # computed at ingest (tiqora.channels.email.machine_mail) because the
+    # headers it needs are gone by the time this worker runs — Tiqora stores no
+    # raw MIME. Events written before this field existed have no key and fall
+    # through unchanged.
+    if event.payload.get("auto_generated"):
+        logger.info(
+            "ai_auto_worker_auto_generated_skip", ticket_id=ticket_id, article_id=int(article_id)
+        )
+        return None
     try:
         ticket = await ticket_snapshot(session, ticket_id)
     except TicketNotFoundError:
@@ -347,6 +366,7 @@ async def run_auto_tick(
         "errors": 0,
         "gate_open": int(gate_open),
         "tiqora_only_replies": 0,
+        "no_reply": 0,
     }
     last_id = watermark
     touched_ticket_ids: set[int] = set()
@@ -378,6 +398,11 @@ async def run_auto_tick(
                 )
             if result is not None and result.status == "sent":
                 totals["auto_replies"] += 1
+            elif result is not None and result.status == STATUS_NO_REPLY:
+                # Counted separately from the generic skips: "the agent looked
+                # and decided not to answer" is the outcome we want to be able
+                # to see rising, not a cap or gate refusing to run at all.
+                totals["no_reply"] += 1
         except AgentRunError:
             # Expected abort conditions (lock held, policy disabled between
             # read and write, ACL) — not a bug, just a skip. run_ticket_agent
