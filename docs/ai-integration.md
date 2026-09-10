@@ -252,11 +252,44 @@ Two admin-managed building blocks sit under the per-queue policies:
 - **LLM providers** (`tiqora_llm_provider`, `/admin/ai/providers`) — one row per
   usable model: kind (`openai_compat` or `anthropic`), base URL, model, an
   encrypted API key (`TIQORA_SECRET_KEY`), capability flags (tools/streaming/
-  vision/EU-hosted) and optional pricing. A queue policy references a provider by
+  vision/EU-hosted), optional pricing, an optional cost budget and an optional
+  tool-round override (both below). A queue policy references a provider by
   id; a separate `vision_provider_id` can point at a vision-capable model for the
   attachment pre-pass.
 - **MCP clients** (`/admin/ai/mcp-clients`) — external MCP servers registered as
-  tool sources the built-in agent may call, subject to the same ACLs.
+  tool sources the built-in agent may call, subject to the same ACLs. Each
+  discovered tool is listed per client with its own `enabled` and `mutating`
+  switches, so a read-only subset of a server can be exposed without
+  registering a second endpoint.
+
+**Cost budget per provider** (`budget_cost_day` / `_week` / `_month`): an
+optional spend cap in the provider's own currency, summed from the
+`tiqora_ai_usage.cost_hint` values already recorded per call over
+calendar-aligned windows (day = midnight, week = the most recent Monday,
+month = the 1st; naive UTC, matching the token-budget convention). `NULL` on
+a window means "no cap". All spend counts, including failed calls — a call
+that timed out after the provider generated tokens is still billable. When a
+window is over budget, the auto-reply worker skips the run
+(`provider_budget_<window>`, silent, retried on the next event) and the
+manual-assist and summary paths refuse with `409 LLM provider budget
+exceeded (<window>)`; the vision pre-pass simply goes unused, so images are
+ignored rather than the run failing. Note this is a *provider*-wide cap
+shared by every queue pointing at that provider, unlike the per-queue
+`budget_tokens_day`.
+
+**Tool-round budget** (`max_tool_rounds`): how many research steps the agent
+gets before it has to answer. The built-in default is
+`tiqora.ai.runtime.DEFAULT_MAX_TOOL_ROUNDS` (**12**), and a provider row may
+override it — the round count is a property of the model, the same kind of
+fact `supports_tools` and `supports_vision` record. `NULL` (and any stored
+value below 1) means the default; `0` is what the admin UI's emptied number
+input sends, and is treated as "back to the default" rather than "no rounds
+at all", which would leave the terminal-force as the only call the agent
+ever makes. Resolved **once**, from the queue policy's configured provider,
+before the loop starts — not from whichever provider a mid-run fallback ends
+up on, because the budget shapes the whole run and has to be known up front.
+Raising it costs more than proportionally: every round re-sends the whole
+conversation.
 
 **LLM provider fallback** (`tiqora.ai.llm_fallback.FallbackLlmClient`): a
 queue policy's `llm_fallback_json` is an optional priority-ordered list of
@@ -395,6 +428,25 @@ A proposed customer message that isn't auto-sent becomes a
 discards it (`tiqora.ai.drafts`). At most one `open` draft exists per
 `(ticket_id, based_on_article_id, kind)`; a new draft supersedes the old one.
 
+**Manual Assist runs in the background, not in the request.**
+`POST /api/v1/tickets/{id}/ai/draft` used to run the whole agent
+synchronously, which does not survive a reverse proxy: nginx in front of
+`tiqora-api` cuts a request at `proxy_read_timeout` (90 s here), while a
+self-hosted reasoning model can take 4–7 minutes. The browser saw a 504 and
+an HTML error page while the run kept going server-side, sometimes ending
+`STATUS_SKIPPED` with nothing shown anywhere. The route now does its
+synchronous pre-flight (permissions, policy, per-ticket run lock), flips
+`tiqora_ai_ticket_state.manual_run_status` to `running`, and returns
+immediately; the run itself happens in an `asyncio.create_task` with its own
+DB session (tasks are kept in a module-level set so they are not
+garbage-collected mid-flight). `GET /api/v1/tickets/{id}/ai` exposes
+`manual_run_status` / `manual_run_notes` / `manual_run_error_code` /
+`manual_run_started_at` for the panel to poll. A run stuck in `running` past
+the run-lock's stale age — the background task died without writing an
+outcome, e.g. the process was killed — is *reported* as `error` /
+`internal_error` rather than polled forever, but never written back to the
+DB, since the task may still land its own outcome later.
+
 ### Origin trace on auto-sent articles
 
 Auto-sent AI replies (Telegram/email/note, mapped by autonomy — never the
@@ -413,6 +465,32 @@ before that column existed have no such link, so
 `tiqora ai backfill-tool-trace [--dry-run] [--ticket-id N]` reconstructs
 their `tool_trace_json`/`run_id` from the audit log's nearest matching run
 for that ticket.
+
+**A trace step records the call, not just the result.** It was originally
+built from the conversation's `role == "tool"` messages only — which are the
+*results* — so a run would report that `kb_search` ran three times without
+ever saying what it searched for, the one thing worth reading a trace for.
+The arguments were on the preceding assistant message's `tool_calls` all
+along and were simply filtered out; `tool_call_id` pairs them back up. Each
+step is therefore `{name, arguments, content}`, and `arguments` renders in
+the card *header* as well as the expanded body, because "three kb_search
+calls" is useless while scanning. The shape stayed a flat list with one
+added key: a trace written before this has no `arguments`
+(`AiToolTraceOut.arguments` is `None`) and parses unchanged. This adds no
+PII exposure — the arguments are model output derived from already-masked
+input, while the results the trace has always stored are unmasked KB and MCP
+data.
+
+### Where the AI shows up in the agent UI
+
+Everything the agent does is visible without opening the admin audit:
+
+| Surface | What it shows |
+|---|---|
+| Reader pane / conversation bubble | Clickable "🤖 AI" badge on an article with an AI origin; toggles the full-width tool trace below it (`AiOriginToggle` / `AiOriginTrace`). |
+| Article list (split view **and** timeline) | Non-interactive 🤖 marker (`AiOriginMarker`) on the same articles — a list row is itself clickable and selects the article, so a button inside it would fire both actions, and the trace only renders in the reader anyway. Its tooltip is deliberately shorter for the same reason: promising "click to see the tool trace" on something that does not respond to a click would be a lie. |
+| Ticket list | `TicketListItem.ai_reply_source` — how the most recent AI-written article on that ticket got sent: `auto` (the agent sent it itself) or `manual_accept` (a human accepted a draft). One field rather than two booleans, since the question is "how was this last handled". Read through a bulk join per page, with the same missing-table tolerance as the other AI lookups, so a Znuny-only deployment still gets its list. |
+| Ticket list + dashboard | `ai_escalated` filter/count — the tickets where the agent handed off to a human and stopped (see "Handing off to a human"). |
 
 ### Summaries
 
@@ -481,11 +559,15 @@ customer-authored) via its own watermark cursor
 (`daemon.ai_worker.outbox_watermark`, separate from the main worker's
 outbox-drain cursor), with a per-ticket loop guard
 (`tiqora_ai_ticket_state.last_customer_article_id`) so the same article
-never triggers two runs. Before invoking the runtime it checks, in order:
-the queue's `max_auto_replies`/`max_clarifications` per-ticket caps, the
-queue's `max_replies_per_hour`, an optional install-wide hard cap
-(`ai.auto_reply.global_max_per_hour`), and the queue's daily token budget
-(`budget_tokens_day`). Any cap hit is a silent skip, retried on the next
+never triggers two runs. Before invoking the runtime, `_cap_reason` checks,
+in this order: the escalation stamp `ai_escalated_at`
+(`escalated_to_human` — first, so a handoff wins over every other
+consideration), the queue's `max_auto_replies`/`max_clarifications`
+per-ticket caps, the queue's `max_replies_per_hour`, an optional
+install-wide hard cap (`ai.auto_reply.global_max_per_hour`), the queue's
+daily token budget (`budget_tokens_day`), and finally the configured
+provider's cost budget (`provider_budget_day`/`_week`/`_month`, see "Cost
+budget per provider"). Any cap hit is a silent skip, retried on the next
 relevant event — there is no catch-up queueing. These are separate from the
 per-agent ACL limits the manual-assist/summary path uses
 (`tiqora_ai_acl`) — auto-path and manual-path never cross-charge each other.

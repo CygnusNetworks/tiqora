@@ -104,6 +104,34 @@ test("agent screenshots", async ({ page }) => {
   } catch (err) {
     console.warn("screenshot 'agent-ai-mcp' failed:", err);
   }
+  // AI origin trace on an auto-sent reply (ticket 110): the newest article is
+  // the one the agent sent itself, so it is selected already — expand its
+  // 🤖 badge and open each tool card so the shot shows the marker in the
+  // list, the badge in the reader, and the arguments each tool was called
+  // with.
+  try {
+    await page.goto("/agent/tickets/110", { waitUntil: "domcontentloaded" });
+    await page.waitForLoadState("networkidle").catch(() => undefined);
+    const badge = page.getByTestId("ai-origin-badge-601");
+    await badge.waitFor({ state: "visible", timeout: 5000 });
+    await badge.click();
+    for (const i of [0, 1, 2]) {
+      await page
+        .getByTestId(`ai-origin-trace-step-601-${i}`)
+        .click()
+        .catch(() => undefined);
+    }
+    // Expanding the trace scrolls the page; bring the article view back to
+    // the top so the shot starts at the list + reader, not mid-panel.
+    await page
+      .getByTestId("article-view-tabs")
+      .evaluate((el) => el.scrollIntoView({ block: "start" }))
+      .catch(() => undefined);
+    await page.waitForTimeout(400);
+    await page.screenshot({ path: `${OUT}/agent-ai-origin${SUFFIX}.png`, fullPage: false });
+  } catch (err) {
+    console.warn("screenshot 'agent-ai-origin' failed:", err);
+  }
   // User menu open (best-effort — never fail the run over it)
   try {
     await page.goto("/agent", { waitUntil: "domcontentloaded" });
@@ -131,8 +159,42 @@ test("admin screenshots", async ({ page }) => {
     ["/admin/role-groups", "admin-role-groups"],
     ["/admin/auth-config", "admin-2fa"],
     ["/admin/gdpr", "admin-gdpr"],
+    // AI subsystem administration.
+    ["/admin/ai", "admin-ai-settings"],
+    ["/admin/ai/providers", "admin-ai-providers"],
+    ["/admin/ai/queues", "admin-ai-queue-policies"],
+    ["/admin/ai/audit", "admin-ai-audit"],
   ] as const) {
     await shot(page, route, name);
+  }
+  // MCP clients with one server's tool list expanded — the per-tool
+  // enabled/mutating switches are the point of the page, and the collapsed
+  // list shows none of them.
+  try {
+    await page.goto("/admin/ai/mcp", { waitUntil: "domcontentloaded" });
+    await page.waitForLoadState("networkidle").catch(() => undefined);
+    await page.getByTestId("admin-ai-mcp-toggle-1").click();
+    await page.getByTestId("admin-ai-mcp-tools-1").waitFor({ state: "visible", timeout: 5000 });
+    await page.waitForTimeout(400);
+    await page.screenshot({ path: `${OUT}/admin-ai-mcp${SUFFIX}.png`, fullPage: false });
+  } catch (err) {
+    console.warn("screenshot 'admin-ai-mcp' failed:", err);
+  }
+  // Provider edit form: cost budgets (day/week/month) and the per-provider
+  // tool-round override only exist in the form, not in the list row.
+  try {
+    await page.goto("/admin/ai/providers", { waitUntil: "domcontentloaded" });
+    await page.waitForLoadState("networkidle").catch(() => undefined);
+    await page.getByTestId("admin-ai-provider-menu-trigger-2").click();
+    await page.getByTestId("admin-ai-provider-edit-2").click();
+    // Scroll the form to the tool-round field so its help text isn't clipped
+    // by the dialog's bottom edge.
+    await page.mouse.move(720, 500);
+    await page.mouse.wheel(0, 240);
+    await page.waitForTimeout(600);
+    await page.screenshot({ path: `${OUT}/admin-ai-provider-budget${SUFFIX}.png`, fullPage: false });
+  } catch (err) {
+    console.warn("screenshot 'admin-ai-provider-budget' failed:", err);
   }
 });
 
