@@ -75,6 +75,7 @@ TOOL_PROPOSE_CUSTOMER_MESSAGE = "propose_customer_message"
 TOOL_ADD_INTERNAL_NOTE = "add_internal_note"
 TOOL_UPDATE_TICKET_FIELDS = "update_ticket_fields"
 TOOL_ESCALATE_TO_HUMAN = "escalate_to_human"
+TOOL_NO_REPLY_NEEDED = "no_reply_needed"
 TOOL_KB_SEARCH = "kb_search"
 TOOL_KB_GET_ARTICLE = "kb_get_article"
 
@@ -107,6 +108,7 @@ LOCAL_TOOL_NAMES = frozenset(
         TOOL_ADD_INTERNAL_NOTE,
         TOOL_UPDATE_TICKET_FIELDS,
         TOOL_ESCALATE_TO_HUMAN,
+        TOOL_NO_REPLY_NEEDED,
         TOOL_KB_SEARCH,
         TOOL_KB_GET_ARTICLE,
     }
@@ -145,6 +147,7 @@ class ToolOutcome:
     terminal: bool = False
     proposal: dict[str, str] | None = None  # {"kind", "subject", "body"} — unmasked
     escalate_reason: str | None = None
+    no_reply_reason: str | None = None
     raw_result: Any = None
 
 
@@ -325,6 +328,35 @@ def _local_tool_schemas(
                 },
             }
         )
+    # Deliberately NOT capability-gated. This is the only way for the model to
+    # end a run without producing customer text, and a run that cannot express
+    # "nothing to answer here" is forced to invent an answer — which is exactly
+    # how ticket 2026091010000013 (a sipgate newsletter) got a reply: the model
+    # said "keine Kommunikation notwendig" in five internal notes, then the
+    # terminal-force offered only propose/escalate and it picked propose.
+    schemas.append(
+        {
+            "type": "function",
+            "function": {
+                "name": TOOL_NO_REPLY_NEEDED,
+                "description": (
+                    "End this run WITHOUT writing anything to the customer. Use it "
+                    "when the ticket needs no answer at all — advertising, a "
+                    "newsletter, an automated notification, a message that is not a "
+                    "request, or a thread a human has already resolved. Prefer this "
+                    "over escalate_to_human when nobody needs to act; prefer it over "
+                    "propose_customer_message whenever you would only be "
+                    "acknowledging that no action is required. The reason is recorded "
+                    "as an internal note for the agents."
+                ),
+                "parameters": {
+                    "type": "object",
+                    "properties": {"reason": {"type": "string"}},
+                    "required": ["reason"],
+                },
+            },
+        }
+    )
     if kb_enabled and capabilities.kb_read:
         schemas.append(
             {
@@ -423,6 +455,9 @@ class ToolRegistry:
             return self._capabilities.allows_update_ticket_fields()
         if name == TOOL_ESCALATE_TO_HUMAN:
             return self._capabilities.escalate
+        if name == TOOL_NO_REPLY_NEEDED:
+            # Always callable — see the schema comment in _local_tool_schemas.
+            return True
         if name in (TOOL_KB_SEARCH, TOOL_KB_GET_ARTICLE):
             return self._kb_enabled and self._capabilities.kb_read
         return name in self._callable_mcp_tools()
@@ -484,6 +519,8 @@ class ToolExecutor:
             return await self._update_ticket_fields(arguments)
         if name == TOOL_ESCALATE_TO_HUMAN:
             return await self._escalate_to_human(arguments)
+        if name == TOOL_NO_REPLY_NEEDED:
+            return await self._no_reply_needed(arguments)
         if name == TOOL_KB_SEARCH:
             return await self._kb_search(arguments)
         if name == TOOL_KB_GET_ARTICLE:
@@ -674,6 +711,39 @@ class ToolExecutor:
             content_for_model="Escalated to human.",
             terminal=True,
             escalate_reason=unmasked,
+        )
+
+    async def _no_reply_needed(self, arguments: dict[str, Any]) -> ToolOutcome:
+        """Terminal outcome that writes an internal note and nothing else.
+
+        Deliberately does not touch the ticket state: which target states the
+        agent may set is a queue-policy decision (``allowed_state_types``), and
+        a tool that quietly bypassed it would defeat the point of that setting.
+        A queue that wants junk closed lists a closed state type there; the
+        model then calls ``update_ticket_fields`` before this tool.
+        """
+        reason = arguments.get("reason")
+        if not isinstance(reason, str) or not reason.strip():
+            raise ToolArgumentError("no_reply_needed requires a non-empty reason")
+        unmasked = self._pii.unmask(reason)
+        await add_article(
+            self._session,
+            ticket_id=self._ticket_id,
+            article=ArticleIn(
+                sender_type="agent",
+                is_visible_for_customer=False,
+                subject="AI agent: no reply needed",
+                body=f"No reply sent: {unmasked}",
+                channel="note",
+            ),
+            user_id=self._acting_user_id,
+            sysconfig=self._sysconfig,
+        )
+        return ToolOutcome(
+            name=TOOL_NO_REPLY_NEEDED,
+            content_for_model="Run closed without a customer message.",
+            terminal=True,
+            no_reply_reason=unmasked,
         )
 
     async def _kb_search(self, arguments: dict[str, Any]) -> ToolOutcome:

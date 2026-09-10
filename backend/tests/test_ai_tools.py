@@ -11,6 +11,7 @@ from tiqora.ai.pii import PiiMapper
 from tiqora.ai.tools import (
     TOOL_ADD_INTERNAL_NOTE,
     TOOL_ESCALATE_TO_HUMAN,
+    TOOL_NO_REPLY_NEEDED,
     TOOL_PROPOSE_CUSTOMER_MESSAGE,
     McpToolSpec,
     ToolArgumentError,
@@ -40,6 +41,41 @@ def test_local_tools_always_present() -> None:
     assert TOOL_ADD_INTERNAL_NOTE in names
     assert TOOL_ESCALATE_TO_HUMAN in names
     assert "update_ticket_fields" not in names
+
+
+def test_no_reply_needed_available_in_every_autonomy_mode() -> None:
+    """The "this needs no answer" exit must never be capability-gated — a run
+    that cannot express it is forced to invent a customer message instead
+    (regression: ticket 2026091010000013, a sipgate newsletter got answered)."""
+    for autonomy in (AUTONOMY_OFF, AUTONOMY_CLARIFY_ONLY, AUTONOMY_FULL):
+        registry = ToolRegistry(autonomy=autonomy)
+        names = {s["function"]["name"] for s in registry.build_schemas()}
+        assert TOOL_NO_REPLY_NEEDED in names
+        assert registry.is_known(TOOL_NO_REPLY_NEEDED)
+
+
+def test_no_reply_needed_stays_available_when_kb_is_disabled() -> None:
+    registry = ToolRegistry(autonomy=AUTONOMY_OFF, kb_enabled=False)
+    names = {s["function"]["name"] for s in registry.build_schemas()}
+    assert TOOL_NO_REPLY_NEEDED in names
+
+
+async def test_no_reply_needed_rejects_empty_reason() -> None:
+    """Argument validation runs before the internal note is written, so this
+    path never touches the session."""
+    executor = ToolExecutor(
+        session=None,  # type: ignore[arg-type]
+        sysconfig=None,  # type: ignore[arg-type]
+        registry=ToolRegistry(autonomy=AUTONOMY_OFF),
+        ticket_id=1,
+        acting_user_id=1,
+        pii=PiiMapper(),
+        escalation_rules=None,
+    )
+    with pytest.raises(ToolArgumentError):
+        await executor.execute(TOOL_NO_REPLY_NEEDED, {"reason": "   "})
+    with pytest.raises(ToolArgumentError):
+        await executor.execute(TOOL_NO_REPLY_NEEDED, {})
 
 
 def test_readonly_mcp_tool_available_in_every_autonomy_mode() -> None:

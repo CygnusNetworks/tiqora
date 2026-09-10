@@ -187,6 +187,7 @@ def _insert_outbox_event(
     event_type: str,
     article_id: int | None,
     channel: str | None = None,
+    auto_generated: bool | None = None,
 ) -> int:
     engine = create_engine(sync_url)
     with engine.begin() as conn:
@@ -196,6 +197,8 @@ def _insert_outbox_event(
             body: dict[str, Any] = {"article_id": article_id}
             if channel is not None:
                 body["channel"] = channel
+            if auto_generated is not None:
+                body["auto_generated"] = auto_generated
             payload = json.dumps(body)
         else:
             payload = "{}"
@@ -338,6 +341,71 @@ async def test_customer_article_triggers_auto_reply(
             assert state is not None
             assert state.auto_reply_count == 1
             assert state.last_customer_article_id == article_id
+    finally:
+        await engine.dispose()
+
+
+async def test_auto_generated_customer_article_is_not_answered(
+    mariadb_znuny_url: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Regression for ticket 2026091010000013: a sipgate newsletter from
+    noreply@sipgate.de reached the runtime and was answered. The ingest-time
+    machine-mail flag must stop it before any LLM call happens."""
+    seed = _seed_ticket(mariadb_znuny_url, ns=20)
+    article_id = _add_article(
+        mariadb_znuny_url,
+        ticket_id=seed["ticket_id"],
+        sender_type="customer",
+        body="Produkt-Update August/September 2026",
+    )
+    _insert_outbox_event(
+        mariadb_znuny_url,
+        ticket_id=seed["ticket_id"],
+        event_type="ArticleCreate",
+        article_id=article_id,
+        channel="email",
+        auto_generated=True,
+    )
+    engine = create_async_engine(_mysql_async(mariadb_znuny_url))
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    try:
+        async with factory() as session:
+            await _setup_policy(session, seed=seed, autonomy=AUTONOMY_FULL)
+
+        llm = ScriptedLlm([_propose_response("reply", "Sollte nie gesendet werden.")])
+        _patch_llm(monkeypatch, llm)
+        totals = await run_auto_tick(settings=get_settings(), session_factory=factory)
+        assert totals["auto_replies"] == 0
+        # Not merely "no reply sent" — the model must never have been asked.
+        assert llm.calls == 0
+    finally:
+        await engine.dispose()
+
+
+async def test_event_without_auto_generated_key_is_still_answered(
+    mariadb_znuny_url: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Outbox rows written before the flag existed carry no key at all — they
+    must keep the old behaviour rather than silently stop being answered."""
+    seed = _seed_ticket(mariadb_znuny_url, ns=21)
+    article_id = _add_article(
+        mariadb_znuny_url, ticket_id=seed["ticket_id"], sender_type="customer", body="Hilfe!"
+    )
+    _insert_outbox_event(
+        mariadb_znuny_url,
+        ticket_id=seed["ticket_id"],
+        event_type="ArticleCreate",
+        article_id=article_id,
+    )
+    engine = create_async_engine(_mysql_async(mariadb_znuny_url))
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    try:
+        async with factory() as session:
+            await _setup_policy(session, seed=seed, autonomy=AUTONOMY_FULL)
+
+        _patch_llm(monkeypatch, ScriptedLlm([_propose_response("reply", "Antwort.")]))
+        totals = await run_auto_tick(settings=get_settings(), session_factory=factory)
+        assert totals["auto_replies"] == 1
     finally:
         await engine.dispose()
 

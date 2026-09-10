@@ -444,6 +444,48 @@ describe("AiPanel", () => {
     ).toBe("No terminal tool call produced.");
   });
 
+  it("shows the no-answer-needed run as a skipped box carrying the reason", async () => {
+    // Regression for ticket 2026091010000013: the agent recognised a
+    // newsletter but had no way to end the run without customer text, so it
+    // wrote one. "no_reply" is that exit — the panel must render it as a
+    // finished run rather than leaving the spinner up forever.
+    getState
+      .mockResolvedValueOnce({ ...baseState, manual_assist_available: true })
+      .mockResolvedValueOnce({
+        ...baseState,
+        manual_assist_available: true,
+        manual_run_status: "running",
+        manual_run_started_at: "2026-08-14T10:00:00",
+      })
+      .mockResolvedValue({
+        ...baseState,
+        manual_assist_available: true,
+        manual_run_status: "no_reply",
+        manual_run_notes: "Werbe-Newsletter, keine Anfrage.",
+        manual_run_started_at: "2026-08-14T10:00:00",
+      });
+    requestDraft.mockResolvedValue({
+      status: "started",
+      draft_id: null,
+      article_id: null,
+      notes: null,
+    });
+
+    wrap(<AiPanel ticketId={1} canNote />);
+
+    fireEvent.click(
+      await screen.findByTestId("ai-panel-create-draft-button"),
+    );
+
+    await waitFor(
+      () => expect(screen.getByTestId("ai-panel-draft-skipped")).toBeTruthy(),
+      { timeout: 4000 },
+    );
+    expect(
+      screen.getByTestId("ai-panel-draft-skipped-notes").textContent,
+    ).toBe("Werbe-Newsletter, keine Anfrage.");
+  });
+
   it("maps manual_run_error_code from a polled error status to the specific message", async () => {
     getState
       .mockResolvedValueOnce({ ...baseState, manual_assist_available: true })

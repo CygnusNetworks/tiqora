@@ -2939,11 +2939,128 @@ async def test_exhausted_tool_rounds_force_a_terminal_call(
         # The forced call only offered the two terminal tools.
         forced_tools = llm.tools_seen[-1] or []
         names = {t["function"]["name"] for t in forced_tools}
-        assert names == {"propose_customer_message", "escalate_to_human"}
+        assert names == {
+            "propose_customer_message",
+            "escalate_to_human",
+            "no_reply_needed",
+        }
         # And the closing instruction reached the model.
         assert any(
             m.role == "user" and "final step" in (m.content or "") for m in llm.last_messages
         )
+    finally:
+        await engine.dispose()
+
+
+def _no_reply_response(reason: str) -> LlmResponse:
+    return LlmResponse(
+        content=None,
+        tool_calls=[
+            ToolCall(id="call_noreply", name="no_reply_needed", arguments={"reason": reason})
+        ],
+        usage=LlmUsage(prompt_tokens=9, completion_tokens=4),
+    )
+
+
+async def test_no_reply_needed_ends_run_without_customer_article(
+    mariadb_znuny_url: str,
+) -> None:
+    """Regression for ticket 2026091010000013: the model recognised a sipgate
+    newsletter, but had no way to finish a run without customer text and so
+    wrote one. ``no_reply_needed`` is that way — it must leave an internal
+    note and no customer-visible article at all."""
+    seed = _seed_ticket(mariadb_znuny_url, ns=65)
+    engine = create_async_engine(_mysql_async(mariadb_znuny_url))
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    settings = get_settings()
+    try:
+        async with factory() as session:
+            await _setup_policy(session, seed=seed, autonomy=AUTONOMY_FULL)
+
+        llm = ScriptedLlm([_no_reply_response("Werbe-Newsletter, keine Anfrage.")])
+        async with factory() as session:
+            result = await run_ticket_agent(
+                session,
+                settings=settings,
+                llm=llm,
+                ticket_id=seed["ticket_id"],
+                trigger=TRIGGER_MANUAL,
+                acting_user_id=seed["agent_id"],
+                run_id="run-noreply-1",
+            )
+        assert result.status == "no_reply"
+        assert result.notes == "Werbe-Newsletter, keine Anfrage."
+
+        async with factory() as session:
+            customer_visible = (
+                await session.execute(
+                    text(
+                        "SELECT COUNT(*) FROM article"
+                        " WHERE ticket_id = :tid AND is_visible_for_customer = 1"
+                        " AND article_sender_type_id ="
+                        " (SELECT id FROM article_sender_type WHERE name = 'agent')"
+                    ),
+                    {"tid": seed["ticket_id"]},
+                )
+            ).scalar_one()
+            assert customer_visible == 0
+            note_subjects = [
+                row[0]
+                for row in (
+                    await session.execute(
+                        text(
+                            "SELECT ad.a_subject FROM article a"
+                            " JOIN article_data_mime ad ON ad.article_id = a.id"
+                            " WHERE a.ticket_id = :tid"
+                        ),
+                        {"tid": seed["ticket_id"]},
+                    )
+                ).fetchall()
+            ]
+            assert "AI agent: no reply needed" in note_subjects
+            drafts = (
+                await session.execute(
+                    text("SELECT COUNT(*) FROM tiqora_ai_draft WHERE ticket_id = :tid"),
+                    {"tid": seed["ticket_id"]},
+                )
+            ).scalar_one()
+            assert drafts == 0
+    finally:
+        await engine.dispose()
+
+
+async def test_terminal_force_can_close_a_run_with_no_reply_needed(
+    mariadb_znuny_url: str,
+) -> None:
+    """The forced final step must accept "nothing to answer" too — this is the
+    exact step that produced the unwanted sipgate reply."""
+    seed = _seed_ticket(mariadb_znuny_url, ns=66)
+    engine = create_async_engine(_mysql_async(mariadb_znuny_url))
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    settings = get_settings()
+    try:
+        async with factory() as session:
+            await _setup_policy(session, seed=seed, autonomy=AUTONOMY_FULL)
+
+        llm = ScriptedLlm(
+            [
+                _note_tool_response("Marketing-Mail, keine Aktion erforderlich."),
+                _no_reply_response("Werbung."),
+            ]
+        )
+        async with factory() as session:
+            result = await run_ticket_agent(
+                session,
+                settings=settings,
+                llm=llm,
+                ticket_id=seed["ticket_id"],
+                trigger=TRIGGER_MANUAL,
+                acting_user_id=seed["agent_id"],
+                run_id="run-noreply-2",
+                max_tool_rounds=1,
+            )
+        assert result.status == "no_reply"
+        assert llm.calls == 2
     finally:
         await engine.dispose()
 

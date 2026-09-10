@@ -277,7 +277,11 @@ export function AiPanel({
     isMyRun &&
     (state.manual_run_status === "skipped" ||
       state.manual_run_status === "escalated" ||
-      state.manual_run_status === "superseded");
+      state.manual_run_status === "superseded" ||
+      // The agent decided the ticket needs no answer at all (advertising,
+      // newsletter, nothing to act on). Same "no draft was produced" panel —
+      // the reason it gives lands in manual_run_notes right below.
+      state.manual_run_status === "no_reply");
   const manualRunErrored = isMyRun && state.manual_run_status === "error";
   const manualRunBusy =
     draftMutation.isPending || awaitingRunMarker || manualRunActive;
