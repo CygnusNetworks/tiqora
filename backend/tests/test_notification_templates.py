@@ -17,6 +17,23 @@ from tiqora.worker.notification_templates import (
 from tiqora.znuny.sysconfig import SysConfig
 
 
+class _FakeSettingsSession:
+    """Just enough ``AsyncSession`` for ``settings_store.get_setting``."""
+
+    def __init__(self, settings: dict[str, str] | None = None) -> None:
+        self._settings = settings or {}
+
+    async def execute(self, statement: Any) -> Any:
+        key = statement.whereclause.right.value
+        value = self._settings.get(key)
+
+        class _Result:
+            def scalar_one_or_none(self) -> str | None:
+                return value
+
+        return _Result()
+
+
 def _sysconfig(values: dict[str, Any] | None = None) -> SysConfig:
     values = values or {}
 
@@ -179,8 +196,29 @@ async def test_notification_sender_prefers_configured_address() -> None:
     )
     sysconfig = _sysconfig({"NotificationSenderEmail": "notifications@example.test"})
     assert (
-        await resolve_notification_sender(sysconfig, context)
+        await resolve_notification_sender(_FakeSettingsSession(), sysconfig, context)  # type: ignore[arg-type]
         == "Support Team <notifications@example.test>"
+    )
+
+
+@pytest.mark.asyncio
+async def test_notification_sender_override_wins_over_znuny_and_queue() -> None:
+    """The Tiqora override exists because the queue fallback makes notifications
+    look like ordinary correspondence to anything sorting mail by sender."""
+    context = PlaceholderContext(
+        queue={"email": "queue@example.test"},
+        config_overrides={"notificationsendername": "Support Team"},
+    )
+    sysconfig = _sysconfig({"NotificationSenderEmail": "notifications@example.test"})
+    session = _FakeSettingsSession(
+        {
+            "notification.sender_email": "noreply@tiqora.example.test",
+            "notification.sender_name": "Tiqora",
+        }
+    )
+    assert (
+        await resolve_notification_sender(session, sysconfig, context)  # type: ignore[arg-type]
+        == "Tiqora <noreply@tiqora.example.test>"
     )
 
 
@@ -194,7 +232,7 @@ async def test_notification_sender_falls_back_to_queue_system_address() -> None:
     )
     sysconfig = _sysconfig({"NotificationSenderEmail": "znuny@<OTRS_CONFIG_FQDN>"})
     assert (
-        await resolve_notification_sender(sysconfig, context)
+        await resolve_notification_sender(_FakeSettingsSession(), sysconfig, context)  # type: ignore[arg-type]
         == "Tiqora Notifications <queue@example.test>"
     )
 
@@ -202,4 +240,9 @@ async def test_notification_sender_falls_back_to_queue_system_address() -> None:
 @pytest.mark.asyncio
 async def test_notification_sender_is_none_without_any_usable_address() -> None:
     sysconfig = _sysconfig({"NotificationSenderEmail": ""})
-    assert await resolve_notification_sender(sysconfig, PlaceholderContext()) is None
+    assert (
+        await resolve_notification_sender(  # type: ignore[arg-type]
+            _FakeSettingsSession(), sysconfig, PlaceholderContext()
+        )
+        is None
+    )

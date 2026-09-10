@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import time
 from collections.abc import Awaitable, Callable
+from email.utils import getaddresses
 from typing import Any, Final
 
 import yaml
@@ -204,6 +205,47 @@ class SysConfig:
     async def sendmail_bcc(self) -> str:
         """``SendmailBcc`` — extra envelope recipient for every outgoing mail."""
         return await self.get_str("SendmailBcc", "")
+
+    async def mail_banner_headers(self) -> dict[str, str]:
+        """``Organization`` / ``X-Mailer`` for **every** outgoing mail.
+
+        ``Kernel::System::Email::Send`` writes these outside its ``Loop`` block
+        (``Email.pm:1090-1140``), so an agent reply carries them just like a
+        notification does. ``Secure::DisableBanner`` suppresses the mailer
+        banner — Znuny's own escape hatch against the header being scored as
+        spam. ``X-Powered-By`` is deliberately not reproduced: it carries no
+        diagnostic value beyond ``X-Mailer``.
+        """
+        from tiqora import __version__
+
+        headers: dict[str, str] = {}
+        organization = (await self.get_str("Organization", "")).strip()
+        if organization:
+            headers["Organization"] = organization
+        banner_off = str(await self.get("Secure::DisableBanner", "0")).strip().lower()
+        if banner_off not in ("1", "true", "yes", "on"):
+            headers["X-Mailer"] = f"Tiqora Mail Service ({__version__})"
+        return headers
+
+    async def notification_envelope_from(self, from_addr: str) -> str:
+        """Envelope sender (``MAIL FROM``) for notifications and auto-responses.
+
+        Znuny's ``Kernel::System::Email::Send`` with ``Loop => 1``: the address
+        from ``SendmailNotificationEnvelopeFrom``, else empty unless
+        ``SendmailNotificationEnvelopeFrom::FallbackToEmailFrom`` is on. Both
+        ship empty/off, so out of the box automated mail carries the null
+        envelope sender and its bounces die at the relay instead of landing back
+        in a ticket queue.
+        """
+        configured = (await self.get_str("SendmailNotificationEnvelopeFrom", "")).strip()
+        if configured:
+            return configured
+        fallback = await self.get("SendmailNotificationEnvelopeFrom::FallbackToEmailFrom", "0")
+        if str(fallback).strip().lower() in ("1", "true", "yes", "on"):
+            # Envelope addresses are bare — strip the display name off ``From``.
+            _name, addr = next(iter(getaddresses([from_addr])), ("", ""))
+            return addr
+        return ""
 
     # --- postmaster (Phase 4a) ---
 

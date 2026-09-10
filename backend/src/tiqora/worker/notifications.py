@@ -69,6 +69,7 @@ from prometheus_client import Counter
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from tiqora.channels.email.outbound_reply import generate_message_id
 from tiqora.channels.email.parser import get_email_address, html_to_text
 from tiqora.channels.email.placeholder import (
     PlaceholderContext,
@@ -76,16 +77,23 @@ from tiqora.channels.email.placeholder import (
     load_agent_maps,
     load_placeholder_context,
 )
-from tiqora.channels.email.smtp import MailSender, SmtpMailSender, build_message
+from tiqora.channels.email.smtp import (
+    MailSender,
+    SmtpMailSender,
+    build_message,
+    message_id_domain,
+)
 from tiqora.config import Settings, get_settings
 from tiqora.db.engine import get_session_factory
 from tiqora.domain.mail_outbound import build_outbound_sender
+from tiqora.domain.quoting import build_ticket_subject
 from tiqora.domain.settings_store import (
     KEY_NOTIFICATIONS_ENABLED,
     get_setting_bool,
     get_setting_int,
     set_setting,
 )
+from tiqora.domain.subject_hook import SubjectHookConfig, load_subject_config
 from tiqora.domain.ticket_write_service import ArticleIn, add_article
 from tiqora.permissions.engine import PermissionEngine
 from tiqora.worker.notification_templates import (
@@ -535,6 +543,28 @@ async def _recipient_maps(
     return maps
 
 
+def _hooked_subject(subject: str, *, hook_cfg: SubjectHookConfig | None, tn: str) -> str:
+    """Prepend the ticket-number hook, as Znuny's notification subjects carry it.
+
+    ``TemplateGenerator::NotificationEvent`` runs the rendered subject through
+    ``TicketSubjectBuild(Type => 'New')``, so an agent sees
+    ``[Cygnus#2026…] Ticket unlocked`` and mail filters keyed on the hook match
+    notifications too. Same helper (and same idempotence) as agent replies.
+
+    *hook_cfg* is resolved once per event, not per recipient: a notification to
+    30-odd queue subscribers must not replay the same settings lookup 30 times.
+    """
+    if hook_cfg is None or not hook_cfg.enabled or not tn:
+        return subject
+    return build_ticket_subject(
+        subject,
+        hook=hook_cfg.hook,
+        divider=hook_cfg.divider,
+        tn=tn,
+        subject_format=hook_cfg.subject_format,
+    )
+
+
 async def _render_message(
     session: AsyncSession,
     sysconfig: SysConfig,
@@ -544,6 +574,8 @@ async def _render_message(
     recipient: _Recipient,
     base_context: PlaceholderContext,
     ticket_id: int,
+    hook_cfg: SubjectHookConfig | None,
+    tn: str,
 ) -> tuple[str, str, str] | None:
     row = (
         await session.execute(
@@ -584,6 +616,7 @@ async def _render_message(
         normalize_notification_template(body_tpl),
         context=replace(context, escape_html=content_type.lower().startswith("text/html")),
     )
+    subject = _hooked_subject(subject, hook_cfg=hook_cfg, tn=tn)
     if has_untranslated_legacy_link(body) or has_untranslated_legacy_link(subject):
         # The template's ticket URL is a variant we do not translate, so it now
         # carries the Tiqora host with a Znuny path and 404s. Only the template
@@ -606,6 +639,7 @@ async def _send_to_recipient(
     recipient: _Recipient,
     user_id: int,
     base_context: PlaceholderContext,
+    hook_cfg: SubjectHookConfig | None,
 ) -> bool:
     rendered = await _render_message(
         session,
@@ -615,13 +649,15 @@ async def _send_to_recipient(
         recipient=recipient,
         base_context=base_context,
         ticket_id=_as_int(ticket["id"]),
+        hook_cfg=hook_cfg,
+        tn=str(ticket.get("tn") or ""),
     )
     if rendered is None:
         logger.info("notification_no_message_for_language", notification_id=notification.id)
         return False
     subject, body, content_type = rendered
 
-    sender_address = await resolve_notification_sender(sysconfig, base_context)
+    sender_address = await resolve_notification_sender(session, sysconfig, base_context)
     if sender_address is None:
         logger.warning(
             "notification_sender_address_unresolved",
@@ -630,6 +666,9 @@ async def _send_to_recipient(
         )
         sender_address = _FALLBACK_SENDER
 
+    # One id for both the mail and the article stored for a customer notification,
+    # so a reply threads onto the row the portal shows.
+    message_id = generate_message_id(domain=message_id_domain(sender_address))
     message = build_message(
         from_addr=sender_address,
         to_addrs=recipient.email,
@@ -638,8 +677,15 @@ async def _send_to_recipient(
         body=body,
         content_type=content_type,
         in_reply_to=None,
+        message_id=message_id,
+        extra_headers=await sysconfig.mail_banner_headers(),
     )
-    await mail_sender.send(message)
+    # Znuny sends notifications with Loop => 1: the null envelope sender keeps
+    # bounces out of the queue mailbox (SendmailNotificationEnvelopeFrom).
+    await mail_sender.send(
+        message,
+        envelope_from=await sysconfig.notification_envelope_from(sender_address),
+    )
 
     if recipient.kind == "Agent":
         await history_add(
@@ -661,7 +707,7 @@ async def _send_to_recipient(
             content_type=content_type or "text/plain; charset=utf-8",
             from_address=sender_address,
             to_address=recipient.email,
-            message_id=None,
+            message_id=message_id,
             in_reply_to=None,
             channel="email",
             history_type_override="SendCustomerNotification",
@@ -716,6 +762,9 @@ async def process_event(
         frozenset(_as_int(uid) for uid in raw_skip) if isinstance(raw_skip, list) else frozenset()
     )
 
+    # Resolved once per event: every recipient's subject gets the same hook.
+    hook_cfg = await load_subject_config(session, sysconfig)
+
     event_article_id = _as_int(payload["article_id"]) if payload.get("article_id") else None
     # One context per recipient kind, reused across that kind's recipients.
     contexts: dict[str, PlaceholderContext] = {}
@@ -754,6 +803,7 @@ async def process_event(
                     recipient=recipient,
                     user_id=user_id,
                     base_context=base_context,
+                    hook_cfg=hook_cfg,
                 ):
                     sent += 1
             except Exception:  # noqa: BLE001 — one bad recipient must not stop the others

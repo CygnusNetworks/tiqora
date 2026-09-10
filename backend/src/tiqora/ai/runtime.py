@@ -1519,6 +1519,11 @@ async def run_ticket_agent(
                         to_address=to_address,
                         channel="email",
                     ),
+                    # Nobody read this before it left. RFC 3834 is what stops
+                    # the recipient's vacation responder and ticket system from
+                    # answering it -- Znuny's PostMaster folds any "auto-*" into
+                    # its own loop flag, so one header covers both.
+                    auto_submitted="auto-replied",
                 )
             else:
                 article_id = await add_article(

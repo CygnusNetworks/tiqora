@@ -1752,8 +1752,11 @@ async def test_auto_send_email_dispatch_unchanged_regression(
             queue_id: int,
             user_id: int,
             article: Any,
+            auto_submitted: str | None = None,
         ) -> int:
-            email_calls.append({"to_address": article.to_address})
+            # An AI reply nobody reviewed is machine mail (RFC 3834), which is
+            # what keeps the recipient's responder and ticket system quiet.
+            email_calls.append({"to_address": article.to_address, "auto_submitted": auto_submitted})
             return await add_article(
                 session, ticket_id=ticket_id, article=article, user_id=user_id, sysconfig=sysconfig
             )
@@ -1781,6 +1784,7 @@ async def test_auto_send_email_dispatch_unchanged_regression(
         assert telegram_calls == []
         assert len(email_calls) == 1
         assert email_calls[0]["to_address"] == "customer20@example.com"
+        assert email_calls[0]["auto_submitted"] == "auto-replied"
     finally:
         await engine.dispose()
 
@@ -2446,6 +2450,7 @@ async def test_identity_block_never_active_for_email_source(
             queue_id: int,
             user_id: int,
             article: Any,
+            auto_submitted: str | None = None,
         ) -> int:
             return await add_article(
                 session, ticket_id=ticket_id, article=article, user_id=user_id, sysconfig=sysconfig

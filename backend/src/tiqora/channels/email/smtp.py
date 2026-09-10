@@ -8,9 +8,10 @@ protocol so tests can inject a capturing fake.
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from email import policy as email_policy
 from email.message import EmailMessage
-from email.utils import getaddresses
+from email.utils import formatdate, getaddresses, make_msgid
 from typing import TYPE_CHECKING, Literal, Protocol
 
 import aiosmtplib
@@ -43,7 +44,7 @@ _OUTBOUND_POLICY = email_policy.default.clone(max_line_length=998)
 
 
 class MailSender(Protocol):
-    async def send(self, message: EmailMessage) -> None: ...
+    async def send(self, message: EmailMessage, *, envelope_from: str | None = None) -> None: ...
 
 
 def envelope_recipients(message: EmailMessage, extra: str | None) -> list[str] | None:
@@ -131,7 +132,14 @@ class SmtpMailSender:
             sendmail_bcc=sendmail_bcc,
         )
 
-    async def send(self, message: EmailMessage) -> None:
+    async def send(self, message: EmailMessage, *, envelope_from: str | None = None) -> None:
+        """Send *message*; *envelope_from* overrides the ``MAIL FROM`` address.
+
+        ``None`` keeps aiosmtplib's default (the ``From`` header).  An empty
+        string is the null envelope sender Znuny uses for notifications and
+        auto-responses (``SendmailNotificationEnvelopeFrom``, empty by default),
+        so their bounces go nowhere instead of back into a ticket queue.
+        """
         use_tls = self._security == "ssl"
         start_tls = True if self._security == "starttls" else False if use_tls else None
         kwargs: dict[str, object] = {
@@ -143,6 +151,8 @@ class SmtpMailSender:
             "start_tls": start_tls,
             "recipients": envelope_recipients(message, self.sendmail_bcc),
         }
+        if envelope_from is not None:
+            kwargs["sender"] = envelope_from
         if self._oauth_token_generator is not None:
             kwargs["oauth_token_generator"] = self._oauth_token_generator
         else:
@@ -167,11 +177,13 @@ class CapturingMailSender:
 
     def __init__(self) -> None:
         self.sent: list[EmailMessage] = []
+        self.envelope_senders: list[str | None] = []
         self.last_smtp_code: int | None = 250
         self.last_smtp_detail: str | None = "250 OK (captured)"
 
-    async def send(self, message: EmailMessage) -> None:
+    async def send(self, message: EmailMessage, *, envelope_from: str | None = None) -> None:
         self.sent.append(message)
+        self.envelope_senders.append(envelope_from)
 
 
 class FailingMailSender:
@@ -183,9 +195,23 @@ class FailingMailSender:
         self.last_smtp_code: int | None = None
         self.last_smtp_detail: str | None = None
 
-    async def send(self, message: EmailMessage) -> None:
+    async def send(self, message: EmailMessage, *, envelope_from: str | None = None) -> None:
         self.attempts += 1
         raise OSError(self.message)
+
+
+def message_id_domain(from_addr: str) -> str | None:
+    """Domain for a generated ``Message-ID``: the sender's, else the local host.
+
+    Deriving it from ``From`` keeps ids stable and meaningful. Falling back to
+    the machine name puts a container id in every ``Message-ID`` — different
+    after each restart, and a hostname no resolver knows.
+    """
+    _name, addr = next(iter(getaddresses([from_addr])), ("", ""))
+    # rpartition returns the whole string as the tail when there is no "@",
+    # which would make a bare word look like a domain.
+    _local, at, domain = addr.rpartition("@")
+    return domain if at and domain else None
 
 
 def build_message(
@@ -202,12 +228,38 @@ def build_message(
     references: str | None = None,
     message_id: str | None = None,
     loop_hint: bool = True,
+    extra_headers: Mapping[str, str] | None = None,
+    auto_submitted: str | None = None,
 ) -> EmailMessage:
     """Build an :class:`EmailMessage` for SMTP delivery.
 
-    ``loop_hint=True`` sets ``X-OTRS-Loop: yes`` (auto-responses / notifications).
+    ``loop_hint=True`` marks automated mail (auto-responses / notifications):
+    on top of Znuny's own ``X-OTRS-Loop`` it sets the three headers
+    ``Kernel::System::Email`` writes for ``Loop => 1`` — ``X-Loop``,
+    ``Precedence: bulk`` and ``Auto-Submitted: auto-generated`` — which is what
+    stops other systems' vacation responders and ticket systems from answering.
     Agent replies pass ``loop_hint=False`` so recipients' ticket systems do not
     treat the message as automated mail.
+
+    *extra_headers* carries the per-install banner (``Organization``,
+    ``X-Mailer``) that Znuny writes on every mail — see
+    :meth:`SysConfig.mail_banner_headers`. A name already on the message is
+    never overwritten.
+
+    *auto_submitted* is for mail that is machine-generated but **not** ticket
+    correspondence -- an invitation, a password link, an AI-sent reply. It sets
+    the RFC 3834 header alone (``auto-generated`` for a message nothing
+    prompted, ``auto-replied`` for an automatic answer to one), which is what
+    keeps vacation responders and other ticket systems from answering, without
+    ``Precedence: bulk``: that marks bulk mail, and a password link the reader
+    has to act on is the last thing that should carry it. Ignored when
+    *loop_hint* already set the header.
+
+    ``Date`` and ``Message-ID`` are always set: RFC 5322 requires both, and
+    neither ``EmailMessage`` nor aiosmtplib adds them. Without a Date header
+    clients fall back to the delivery time and spam filters score the omission;
+    without a Message-ID a reply cannot be threaded onto this mail. Pass
+    *message_id* to reuse the id stored on an article.
     """
     msg = EmailMessage(policy=_OUTBOUND_POLICY)
     msg["From"] = from_addr
@@ -217,21 +269,33 @@ def build_message(
     if bcc_addrs:
         msg["Bcc"] = bcc_addrs
     msg["Subject"] = subject
+    msg["Date"] = formatdate(localtime=True)
     if reply_to:
         msg["Reply-To"] = reply_to
     if message_id:
         mid = message_id if message_id.startswith("<") else f"<{message_id}>"
-        msg["Message-ID"] = mid
+    else:
+        mid = make_msgid(idstring="tiqora", domain=message_id_domain(from_addr))
+    msg["Message-ID"] = mid
     if in_reply_to:
         msg["In-Reply-To"] = in_reply_to
     refs = references or in_reply_to
     if refs:
         msg["References"] = refs
+    for name, value in (extra_headers or {}).items():
+        if value and name not in msg:
+            msg[name] = value
     if loop_hint:
         # X-OTRS-Loop marks automated messages (Znuny's own loop hint;
         # SendAutoResponse also checks the *inbound* email for this header
         # before replying — see channels/email/autoresponse.py).
         msg["X-OTRS-Loop"] = "yes"
+        # The Loop => 1 header set from Kernel::System::Email::Send.
+        msg["X-Loop"] = "yes"
+        msg["Precedence"] = "bulk"
+        msg["Auto-Submitted"] = "auto-generated"
+    elif auto_submitted:
+        msg["Auto-Submitted"] = auto_submitted
     subtype = "html" if "html" in content_type.lower() else "plain"
     msg.set_content(body, subtype=subtype, charset="utf-8")
     return msg
