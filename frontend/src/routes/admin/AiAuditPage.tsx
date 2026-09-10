@@ -150,19 +150,25 @@ function PerDayChart({
   const max = Math.max(1, ...perDay.map((d) => d.count));
   return (
     <div
-      className="flex h-24 items-end gap-1 rounded-lg border border-hairline bg-surface p-3"
+      className="flex h-24 items-stretch gap-1 rounded-lg border border-hairline bg-surface p-3"
       data-testid="ai-audit-chart"
     >
       {perDay.map((d) => (
         <div
           key={d.date}
-          className="flex flex-1 flex-col items-center justify-end gap-1"
+          className="flex flex-1 flex-col items-center gap-1"
           title={`${d.date}: ${d.count}`}
         >
-          <div
-            className="w-full rounded-t bg-accent/60"
-            style={{ height: `${Math.max(4, (d.count / max) * 100)}%` }}
-          />
+          {/* The bar's percentage height needs a parent with a definite
+              height to resolve against: `items-stretch` gives the column the
+              row's height, and this `flex-1` track is what the bar measures
+              itself in — without it the bars collapse to nothing. */}
+          <div className="flex w-full flex-1 items-end">
+            <div
+              className="w-full rounded-t bg-accent/60"
+              style={{ height: `${Math.max(4, (d.count / max) * 100)}%` }}
+            />
+          </div>
           <span className="truncate text-[9px] text-muted">
             {new Date(d.date).toLocaleDateString(locale, {
               day: "2-digit",
