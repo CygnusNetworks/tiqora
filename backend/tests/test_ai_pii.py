@@ -178,3 +178,21 @@ def test_timestamps_are_not_masked_as_ipv6() -> None:
     assert "fe80::1" not in masked
     assert "2001:db8:0:1:1:1:1:1" not in masked
     assert "[IPV6_" in masked
+
+
+def test_zulu_timestamps_in_tool_results_are_not_masked_as_ipv6() -> None:
+    """A "Z"-terminated ISO timestamp is a word character right after the
+    seconds, so the only IPV6 candidate is the bare ":36:" in the middle of
+    the time — it used to reach the model as "2026-09-10T14[IPV6_1]36Z"
+    (ticket 43099), leaving the timestamp useless for correlation."""
+    mapper = PiiMapper()
+    for text in (
+        '{"timestamp_utc": "2026-09-10T14:36:36Z"}',
+        '{"timestamp_utc": "2026-09-10T14:36:36.123456Z"}',
+        "activated 2026-09-10T14:36:36Z, log at 2026-09-10T14:36:41Z",
+    ):
+        assert mapper.mask(text) == text
+    # A real IPv6 next to a Zulu timestamp is still masked.
+    masked = mapper.mask('{"at": "2026-09-10T14:36:36Z", "ip": "2a01:238:4d5c::1"}')
+    assert "2026-09-10T14:36:36Z" in masked
+    assert "2a01:238:4d5c::1" not in masked
