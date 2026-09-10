@@ -12,6 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from tiqora.channels.email.smtp import build_message
 from tiqora.domain.mail_outbound import resolve_outbound_smtp
+from tiqora.znuny.sysconfig import SysConfig
 
 
 class WelcomeMailError(RuntimeError):
@@ -58,6 +59,11 @@ async def send_transactional_email(
         body=body,
         content_type="text/plain; charset=utf-8",
         in_reply_to=None,
-        loop_hint=True,
+        # Not ticket correspondence and not bulk: an invitation is one mail to
+        # one person who has to act on it. RFC 3834 keeps vacation responders
+        # off it; Precedence: bulk would only cost it inbox placement.
+        loop_hint=False,
+        auto_submitted="auto-generated",
+        extra_headers=await SysConfig(session).mail_banner_headers(),
     )
     await aiosmtplib.send(message, **send_kwargs)  # type: ignore[arg-type]

@@ -524,13 +524,56 @@ without updating the stored templates or the shared Znuny configuration.
 The stock `NotificationSenderName` values “OTRS Notifications” and “Znuny
 Notifications” render as “Tiqora Notifications”; custom names are retained.
 
-Notifications are sent from `NotificationSenderEmail`, falling back to the
-system address of the ticket's queue -- the mailbox this install already sends
-from. Znuny ships that setting as `znuny@<OTRS_CONFIG_FQDN>`; an unresolved
-placeholder counts as unset rather than being expanded against the Tiqora host.
-If neither yields an address, the mail goes out from `notifications@localhost`
-and the tick logs `notification_sender_address_unresolved` -- most relays reject
-that sender, so treat the warning as a configuration bug.
+Notifications are sent from the `notification.sender_email` /
+`notification.sender_name` settings, falling back to Znuny's
+`NotificationSenderEmail` and then to the system address of the ticket's queue.
+Znuny ships that setting as `znuny@<OTRS_CONFIG_FQDN>`; an unresolved
+placeholder counts as unset rather than being expanded against the Tiqora host,
+and the real FQDN often lives only in Znuny's `Config.pm`, which never reaches
+the SysConfig tables Tiqora reads.
+
+**Set `notification.sender_email`.** The queue address is a last resort, not a
+good default: it is the address ordinary ticket correspondence goes out as, so
+using it for notifications too makes the two indistinguishable to every mail
+filter that sorts by sender. The tick logs
+`notification_sender_falls_back_to_queue_address` when it lands there. If no
+source yields an address at all, the mail goes out from
+`notifications@localhost` and the tick logs
+`notification_sender_address_unresolved` -- most relays reject that sender, so
+treat either warning as a configuration bug.
+
+```sql
+INSERT INTO tiqora_settings (`key`, value) VALUES
+  ('notification.sender_email', 'noreply@tiqora.example.com'),
+  ('notification.sender_name', 'Tiqora Notifications')
+ON DUPLICATE KEY UPDATE value = VALUES(value);
+```
+
+`Organization` and `X-Mailer: Tiqora Mail Service (<version>)` go on **every**
+outgoing mail, agent replies included -- `Email.pm:1090-1140` writes them
+outside its `Loop` block. `Secure::DisableBanner` suppresses the mailer banner,
+as in Znuny. `X-Powered-By` is deliberately not reproduced.
+
+Mail that is machine-generated but *not* ticket correspondence -- the agent
+invitation, the password-setup link, a reply the AI sent on its own -- carries
+the RFC 3834 `Auto-Submitted` header alone (`auto-generated`, or `auto-replied`
+for the AI). Not `Precedence: bulk`: that marks bulk mail, and a password link
+the reader has to act on is the last thing that should carry it. A reply an
+agent typed or approved carries neither.
+
+Inbound, `_build_get_param` folds `Mailing-List`, `Precedence`, `X-Loop`,
+`X-No-Loop` and `Auto-Submitted: auto-*` into `X-OTRS-Loop`, as
+`PostMaster.pm:602-614` does. This is what makes auto-response loop protection
+work at all on a normal (untrusted) mail account: `x-otrs*` headers from an
+untrusted mailbox are dropped before that point, so a vacation responder
+setting only the standard header would otherwise get an auto-response back.
+
+Notification mail matches what Znuny's `Kernel::System::Email::Send` writes for
+`Loop => 1`: the ticket-number hook in the subject (`TicketSubjectBuild`),
+`Date`, `Message-ID`, `Organization`, `X-Loop: yes`, `Precedence: bulk`,
+`Auto-Submitted: auto-generated`, and the null envelope sender from
+`SendmailNotificationEnvelopeFrom` (empty by default), so a bounced notification
+cannot open a ticket of its own. Auto-responses are sent the same way.
 
 Notification templates receive the actual recipient's name, ticket/queue
 context, and the article identified by the triggering event. For example,

@@ -26,6 +26,7 @@ from tiqora.domain.mail_outbound import (
     row_to_public_dict,
     upsert_mail_outbound,
 )
+from tiqora.znuny.sysconfig import SysConfig
 
 logger = structlog.get_logger(__name__)
 
@@ -157,6 +158,9 @@ async def test_mail_outbound(
                 content_type="text/plain; charset=utf-8",
                 in_reply_to=None,
                 loop_hint=True,
+                # The point of a test send is seeing what real mail looks like,
+                # banner included.
+                extra_headers=await SysConfig(session).mail_banner_headers(),
             )
             send_kwargs: dict[str, object] = {
                 "hostname": resolved.host,

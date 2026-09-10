@@ -37,6 +37,64 @@ logger = structlog.get_logger(__name__)
 # subset Tiqora acts on) plus the full X-OTRS-* namespace when trusted.
 _X_OTRS_PREFIX = "x-otrs-"
 
+# Canonical spellings of the headers the pipeline reads, keyed by lowercase.
+#
+# Znuny does not guess: ``PostmasterX-Header`` (Ticket.xml:11444) lists the exact
+# names and ``GetEmailParams`` pulls each one from the mail under that spelling.
+# Deriving a name instead -- ``"-".join(p.capitalize() ...)`` -- turns
+# ``x-otrs-queue`` into ``X-Otrs-Queue`` and ``x-otrs-isvisibleforcustomer`` into
+# ``X-Otrs-Isvisibleforcustomer``, so every ``get_param["X-OTRS-Queue"]`` lookup
+# silently misses a real header and only ever sees what a PostMaster filter
+# injected. Only the subset Tiqora actually consumes is listed; anything else
+# keeps the derived spelling.
+_CANONICAL_HEADER_NAMES: dict[str, str] = {
+    name.lower(): name
+    for name in (
+        "X-OTRS-AttachmentCount",
+        "X-OTRS-AttachmentExists",
+        "X-OTRS-CustomerNo",
+        "X-OTRS-CustomerUser",
+        "X-OTRS-Ignore",
+        "X-OTRS-IsVisibleForCustomer",
+        "X-OTRS-Lock",
+        "X-OTRS-Loop",
+        "X-OTRS-Owner",
+        "X-OTRS-OwnerID",
+        "X-OTRS-Priority",
+        "X-OTRS-Queue",
+        "X-OTRS-Responsible",
+        "X-OTRS-ResponsibleID",
+        "X-OTRS-SLA",
+        "X-OTRS-SenderType",
+        "X-OTRS-Service",
+        "X-OTRS-State",
+        "X-OTRS-State-PendingTime",
+        "X-OTRS-Title",
+        "X-OTRS-Type",
+        "X-OTRS-FollowUp-IsVisibleForCustomer",
+        "X-OTRS-FollowUp-Lock",
+        "X-OTRS-FollowUp-Owner",
+        "X-OTRS-FollowUp-OwnerID",
+        "X-OTRS-FollowUp-Priority",
+        "X-OTRS-FollowUp-Queue",
+        "X-OTRS-FollowUp-Responsible",
+        "X-OTRS-FollowUp-ResponsibleID",
+        "X-OTRS-FollowUp-SLA",
+        "X-OTRS-FollowUp-SenderType",
+        "X-OTRS-FollowUp-Service",
+        "X-OTRS-FollowUp-State",
+        "X-OTRS-FollowUp-State-Keep",
+        "X-OTRS-FollowUp-State-PendingTime",
+        "X-OTRS-FollowUp-Title",
+        "X-OTRS-FollowUp-Type",
+        "X-Spam",
+        "X-Spam-Flag",
+        "X-Spam-Level",
+        "X-Spam-Score",
+        "X-Spam-Status",
+    )
+}
+
 
 def _msgid(value: str | None) -> str | None:
     """Re-wrap a bare Message-ID (parser strips <>) for storage/headers, matching
@@ -150,11 +208,29 @@ def _build_get_param(parsed: ParsedEmail, *, trusted: bool) -> dict[str, str]:
     }
     for key, value in parsed.headers.items():
         # Restore Header-Case for common headers; keep raw lowercase key too.
-        pretty = "-".join(p.capitalize() for p in key.split("-"))
+        pretty = _CANONICAL_HEADER_NAMES.get(key) or "-".join(
+            p.capitalize() for p in key.split("-")
+        )
         if key.startswith(_X_OTRS_PREFIX) and not trusted:
             continue
         get_param.setdefault(pretty, value)
         get_param.setdefault(key, value)
+    if not get_param.get("X-OTRS-Loop"):
+        # PostMaster.pm:602-614 folds every marker of machine-generated mail
+        # into X-OTRS-Loop, which is the single flag the auto-response check
+        # then reads. Without this, an out-of-office reply carrying only the
+        # RFC 3834 header -- the standard one, which Znuny itself sends -- gets
+        # an auto-response back, and the two systems answer each other.
+        auto_submitted = get_param.get("Auto-Submitted", "")
+        if (
+            get_param.get("Mailing-List")
+            or get_param.get("Precedence")
+            or get_param.get("X-Loop")
+            or get_param.get("X-No-Loop")
+            or auto_submitted.strip().lower().startswith("auto-")
+        ):
+            get_param["X-OTRS-Loop"] = "yes"
+            get_param["x-otrs-loop"] = "yes"
     return get_param
 
 

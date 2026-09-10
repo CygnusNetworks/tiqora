@@ -7,7 +7,12 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from tiqora.channels.email.smtp import CapturingMailSender
-from tiqora.domain.settings_store import KEY_NOTIFICATIONS_ENABLED, set_setting
+from tiqora.domain.settings_store import (
+    KEY_NOTIFICATION_SENDER_EMAIL,
+    KEY_NOTIFICATION_SENDER_NAME,
+    KEY_NOTIFICATIONS_ENABLED,
+    set_setting,
+)
 from tiqora.worker.notifications import KEY_NOTIFICATIONS_WATERMARK, run_notifications_tick
 
 
@@ -268,8 +273,10 @@ async def test_owner_and_customer_notified_with_placeholders_and_history(
         recipients = sorted(str(m["To"]) for m in sender.sent)
         assert recipients == ["cust1@example.com", "owner@example.com"]
 
+        # Znuny's TemplateGenerator runs notification subjects through
+        # TicketSubjectBuild, so the ticket-number hook is part of the subject.
         subjects = {str(m["Subject"]) for m in sender.sent}
-        assert subjects == {"New ticket NOTIFY_1"}
+        assert subjects == {"[Ticket#NOTIFY_1] New ticket NOTIFY_1"}
 
         async with factory() as session:
             assert await _history_count(session, ticket_id, "SendAgentNotification") == 1
@@ -533,9 +540,10 @@ def _recipients_of(sender: CapturingMailSender, subject: str) -> list[str]:
     """Recipients of the mails one rule produced, identified by its subject.
 
     The Znuny seed ships its own notification rules for the same events, so
-    tests must not assume their rule is the only one that matched.
+    tests must not assume their rule is the only one that matched. Matching is
+    by substring because the engine prepends the ticket-number hook.
     """
-    return sorted(str(m["To"]) for m in sender.sent if str(m["Subject"]) == subject)
+    return sorted(str(m["To"]) for m in sender.sent if subject in str(m["Subject"]))
 
 
 async def _grant_group_permission(
@@ -722,7 +730,7 @@ class _FailingMailSender:
         self.attempts = 0
         self.sendmail_bcc: str | None = None
 
-    async def send(self, message: object) -> None:
+    async def send(self, message: object, *, envelope_from: str | None = None) -> None:
         self.attempts += 1
         raise OSError("Connect call failed ('127.0.0.1', 25)")
 
@@ -841,7 +849,7 @@ async def test_stock_notification_renders_recipient_article_and_tiqora_link(
         )
         assert result["sent"] == 1
         message = sender.sent[0]
-        assert str(message["Subject"]) == "Neu: Interne"
+        assert str(message["Subject"]) == "[Ticket#2026090810000045] Neu: Interne"
         body = message.get_content()
         assert "Hallo Ada Lovelace," in body
         assert "Ticket#2026090810000045" in body
@@ -915,7 +923,7 @@ async def test_notification_recipient_placeholders_are_rendered_per_actual_agent
         rendered = {
             str(message["To"]): message.get_content()
             for message in sender.sent
-            if str(message["Subject"]) == "RECIPIENT-CONTEXT"
+            if "RECIPIENT-CONTEXT" in str(message["Subject"])
         }
         assert rendered == {
             "owner-one@example.com": "Hello Owner One (owner-one@example.com)\n",
@@ -1012,7 +1020,7 @@ async def test_notification_uses_event_article_and_never_falls_back_to_later_art
         bodies = [
             message.get_content()
             for message in sender.sent
-            if str(message["Subject"]) == "EVENT-ARTICLE-CONTEXT"
+            if "EVENT-ARTICLE-CONTEXT" in str(message["Subject"])
         ]
         assert bodies == [
             "from=Event Sender; subject=Event subject; body=event body\n",
@@ -1101,7 +1109,7 @@ async def test_customer_notification_does_not_expose_internal_event_article(
         message = next(
             message
             for message in sender.sent
-            if str(message["Subject"]) == "CUSTOMER-ARTICLE-PRIVACY"
+            if "CUSTOMER-ARTICLE-PRIVACY" in str(message["Subject"])
         )
         assert str(message["To"]) == "privacy@example.com"
         assert message.get_content() == (
@@ -1502,5 +1510,66 @@ async def test_notification_sender_is_the_queue_address_not_localhost(
                 )
             ).scalar_one()
         assert article_from == "Tiqora Notifications <support@example.org>"
+    finally:
+        await engine.dispose()
+
+
+@pytest.mark.db
+async def test_sender_override_wins_and_mail_looks_like_znuny(
+    mariadb_znuny_url: str,
+) -> None:
+    """The queue system address is what ordinary ticket correspondence goes out
+    as, so using it for notifications too makes them indistinguishable to any
+    mail filter sorting by sender -- exactly how watcher copies stopped being
+    filed. ``notification.sender_email`` overrides it, and the mail carries the
+    headers Znuny writes for ``Loop => 1``, including the null envelope sender.
+    """
+    engine = create_async_engine(_mysql_async(mariadb_znuny_url))
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    sender = CapturingMailSender()
+    owner_id = 910_913
+    try:
+        async with factory() as session:
+            await _seed_tiqora_tables(session)
+            await _skip_backlog(session)
+            queue_id = await _insert_queue(session, "notify-q-sender-override")
+            await _insert_agent(session, user_id=owner_id, login="notify.sender.override")
+            await _set_user_prefs(session, owner_id, "override-agent@example.com")
+            ticket_id = await _insert_ticket(
+                session,
+                "NOTIFY_SENDER_OVERRIDE",
+                owner_id=owner_id,
+                queue_id=queue_id,
+            )
+            await _insert_notification_event(
+                session,
+                "sender-override",
+                items={
+                    "Events": ["TicketCreate"],
+                    "QueueID": [str(queue_id)],
+                    "Recipients": ["AgentOwner"],
+                    "Transports": ["Email"],
+                },
+                subject="SENDER-OVERRIDE",
+                body="body",
+            )
+            await _insert_outbox_event(session, "TicketCreate", ticket_id)
+            await session.commit()
+            await set_setting(session, KEY_NOTIFICATIONS_ENABLED, "1")
+            await set_setting(session, KEY_NOTIFICATION_SENDER_EMAIL, "noreply@tiqora.example.test")
+            await set_setting(session, KEY_NOTIFICATION_SENDER_NAME, "Tiqora")
+
+        result = await run_notifications_tick(session_factory=factory, mail_sender=sender)
+        assert result["sent"] == 1
+        message = sender.sent[0]
+        assert str(message["From"]) == "Tiqora <noreply@tiqora.example.test>"
+        assert str(message["Subject"]) == "[Ticket#NOTIFY_SENDER_OVERRIDE] SENDER-OVERRIDE"
+        assert str(message["Auto-Submitted"]) == "auto-generated"
+        assert str(message["Precedence"]) == "bulk"
+        assert str(message["X-Loop"]) == "yes"
+        assert message["Date"] is not None
+        assert str(message["Message-ID"]).startswith("<")
+        # Null envelope sender: a bounced notification must not open a ticket.
+        assert sender.envelope_senders == [""]
     finally:
         await engine.dispose()
