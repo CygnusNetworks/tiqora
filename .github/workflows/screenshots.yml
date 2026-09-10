@@ -14,6 +14,7 @@ on:
 
 permissions:
   contents: write
+  pull-requests: write
 
 concurrency:
   group: screenshots
@@ -34,10 +35,9 @@ jobs:
           egress-policy: audit
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
-          # A tag is not a branch — check out main and commit the results there.
+          # A tag is not a branch — check out main and base the results on it.
           # Version tags are normally cut from main HEAD, so this reflects the
-          # released UI. NOTE: if main is a protected branch, allow the Actions
-          # bot to push (or switch the final step to open a PR).
+          # released UI.
           ref: main
           fetch-depth: 0
       - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86  # v6.0.10
@@ -58,14 +58,57 @@ jobs:
         env:
           SCREENSHOTS: "1"
         run: pnpm --filter tiqora-frontend exec playwright test screenshots --project=chromium
-      - name: Commit regenerated screenshots to main
+      # Why a pull request and not a push to main: the main-protection ruleset
+      # requires one ("GH013: Changes must be made through a pull request"), and
+      # the Actions bot cannot be added as a bypass actor — GitHub rejects it
+      # with "Actor GitHub Actions integration must be part of the ruleset
+      # source or owner organization", because it is not an installed app. This
+      # step used to push straight to main and had been failing silently since
+      # the ruleset went in: a red workflow on a release tag blocks nothing, so
+      # nobody saw it.
+      - name: Open a pull request with the regenerated screenshots
+        env:
+          GH_TOKEN: ${{ github.token }}
+          # On a tag that is the version; a manual run is not a release, so name
+          # it after the run instead of calling the branch "screenshots-main".
+          LABEL: ${{ github.ref_type == 'tag' && github.ref_name || format('manual-{0}', github.run_number) }}
         run: |
+          set -euo pipefail
+          BRANCH="chore/screenshots-${LABEL}"
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add docs/images/*.png
           if git diff --cached --quiet; then
             echo "No screenshot changes to commit."
+            echo "Screenshots unchanged for ${LABEL}." >> "$GITHUB_STEP_SUMMARY"
             exit 0
           fi
-          git commit -m "docs(screenshots): regenerate for ${GITHUB_REF_NAME} [skip ci]"
-          git push origin HEAD:main
+          git commit -m "docs(screenshots): regenerate for ${LABEL} [skip ci]"
+          # Force: a re-run of the same tag should replace its branch, not fail.
+          git push --force origin "HEAD:refs/heads/${BRANCH}"
+
+          url=$(gh pr list --head "$BRANCH" --state open --json url --jq '.[0].url // empty')
+          if [ -z "$url" ]; then
+            url=$(gh pr create \
+              --base main \
+              --head "$BRANCH" \
+              --title "docs(screenshots): regenerate for ${LABEL}" \
+              --body "Automatisch erzeugt fuer \`${LABEL}\` (Workflow \`screenshots.yml\`). Nur \`docs/images/*.png\`.")
+          fi
+          echo "Pull request: $url"
+
+          # The ruleset needs no approvals and no status checks, so the merge
+          # normally goes through right here. If it does not, the branch and the
+          # PR still hold the work — an open PR is a far better signal than the
+          # silent push failure this replaces, so do not fail the job for it.
+          if gh pr merge "$url" --squash --delete-branch; then
+            echo "Merged $url into main." >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "::warning::Screenshots konnten nicht automatisch gemerged werden — PR offen: $url"
+            {
+              echo "**Screenshots warten auf einen Merge von Hand:** $url"
+              echo ""
+              echo "Der Auto-Merge wurde abgelehnt. Bis der PR gemerged ist, zeigen"
+              echo "README und Produktseite die Screenshots des vorherigen Releases."
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi
