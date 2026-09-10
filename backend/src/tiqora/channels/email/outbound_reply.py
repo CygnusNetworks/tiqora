@@ -23,6 +23,7 @@ import re
 import secrets
 import socket
 import time
+from collections.abc import Mapping
 from dataclasses import replace
 
 import structlog
@@ -30,7 +31,7 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from tiqora.channels.email.placeholder import expand_placeholders
-from tiqora.channels.email.smtp import MailSender, build_message
+from tiqora.channels.email.smtp import MailSender, build_message, message_id_domain
 from tiqora.domain.mail_log import write_mail_log
 from tiqora.domain.quoting import build_ticket_subject
 from tiqora.domain.subject_hook import load_subject_config
@@ -249,12 +250,6 @@ async def prepare_outgoing_agent_email(
         )
         body = append_signature(body, expanded, content_type=article.content_type)
 
-    message_id = article.message_id
-    if not message_id or not str(message_id).strip():
-        message_id = generate_message_id()
-    elif not str(message_id).startswith("<"):
-        message_id = f"<{str(message_id).strip('<>')}>"
-
     in_reply_to = article.in_reply_to
     references = article.references
     parent_references: str | None = None
@@ -266,6 +261,12 @@ async def prepare_outgoing_agent_email(
         references = build_references_chain(parent_references, in_reply_to)
 
     from_address = article.from_address or from_line
+
+    message_id = article.message_id
+    if not message_id or not str(message_id).strip():
+        message_id = generate_message_id(domain=message_id_domain(from_address))
+    elif not str(message_id).startswith("<"):
+        message_id = f"<{str(message_id).strip('<>')}>"
     # Agent → customer email replies must be customer-visible (AgentTicketZoom + portal).
     is_visible = True if article.channel.lower() == "email" else article.is_visible_for_customer
 
@@ -308,8 +309,19 @@ async def prepare_outgoing_agent_email(
     )
 
 
-async def send_prepared_agent_email(mail_sender: MailSender, article: ArticleIn) -> None:
-    """SMTP-send a prepared agent email article. Raises :class:`OutboundMailError` on failure."""
+async def send_prepared_agent_email(
+    mail_sender: MailSender,
+    article: ArticleIn,
+    *,
+    auto_submitted: str | None = None,
+    extra_headers: Mapping[str, str] | None = None,
+) -> None:
+    """SMTP-send a prepared agent email article. Raises :class:`OutboundMailError` on failure.
+
+    *auto_submitted* marks a reply nobody reviewed before it went out (the AI
+    answering on its own): ``auto-replied`` per RFC 3834. A reply an agent
+    typed or approved is not automated mail and must not carry it.
+    """
     if not article.to_address:
         raise InvalidInput("Agent email reply requires to_address")
     message = build_message(
@@ -324,7 +336,9 @@ async def send_prepared_agent_email(mail_sender: MailSender, article: ArticleIn)
         references=article.references or article.in_reply_to,
         reply_to=article.reply_to,
         message_id=article.message_id,
-        loop_hint=False,  # human agent reply, not an automated bounce/auto-response
+        loop_hint=False,  # not a ticket-system bounce/auto-response
+        auto_submitted=auto_submitted,
+        extra_headers=extra_headers,
     )
     try:
         await mail_sender.send(message)
@@ -349,6 +363,7 @@ async def deliver_agent_email_reply(
     user_id: int,
     article: ArticleIn,
     dispatch: bool | None = None,
+    auto_submitted: str | None = None,
 ) -> int:
     """Prepare → optional SMTP send → store. Returns the new article id.
 
@@ -402,7 +417,12 @@ async def deliver_agent_email_reply(
             sender = SmtpMailSender(get_settings(), sendmail_bcc=sendmail_bcc)
         t0 = time.perf_counter()
         try:
-            await send_prepared_agent_email(sender, prepared)
+            await send_prepared_agent_email(
+                sender,
+                prepared,
+                auto_submitted=auto_submitted,
+                extra_headers=await sysconfig.mail_banner_headers(),
+            )
         except OutboundMailError as exc:
             duration_ms = int((time.perf_counter() - t0) * 1000)
             # Log BEFORE re-raising so the failure is captured even when the

@@ -44,6 +44,16 @@ KEY_ESCALATION_INTERVAL_SECONDS = "daemon.escalation.interval_seconds"
 KEY_NOTIFICATIONS_ENABLED = "daemon.notifications.enabled"
 KEY_NOTIFICATIONS_INTERVAL_SECONDS = "daemon.notifications.interval_seconds"
 
+# Notification sender identity. Znuny takes this from ``NotificationSenderEmail``,
+# whose shipped default is ``otrs@<OTRS_CONFIG_FQDN>`` -- and the real FQDN
+# usually lives in Znuny's Config.pm, which never reaches the SysConfig tables
+# Tiqora reads. Without an override the engine falls back to the ticket queue's
+# system address, which makes notifications indistinguishable from ordinary
+# ticket correspondence for anything sorting mail by sender. Set these keys to
+# an address of your own. Empty / missing re-inherits the Znuny value.
+KEY_NOTIFICATION_SENDER_EMAIL = "notification.sender_email"
+KEY_NOTIFICATION_SENDER_NAME = "notification.sender_name"
+
 # GenericAgent executor (Phase 4b subtask 3) — takes over
 # Daemon::SchedulerCronTaskManager::Task###GenericAgent (bin/znuny.Console.pl
 # Maint::Ticket::GenericAgent). Default OFF: see docs/parallel-operation.md →

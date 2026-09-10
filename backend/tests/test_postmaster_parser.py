@@ -6,6 +6,7 @@ from email.message import EmailMessage
 from typing import cast
 
 from tiqora.channels.email.parser import get_email_address, parse_email, split_address_line
+from tiqora.channels.email.pipeline import _build_get_param
 
 
 def _to_bytes(msg: EmailMessage) -> bytes:
@@ -147,3 +148,91 @@ def test_split_address_line_requotes_comma_display_name() -> None:
     assert len(entries) == 3
     addrs = [get_email_address(e) for e in entries]
     assert addrs == ["support@example.com", "j.potulski@example.com", "c.nitsche@example.com"]
+
+
+def _message_with(**headers: str) -> EmailMessage:
+    msg = EmailMessage()
+    msg["From"] = "someone@example.test"
+    msg["To"] = "support@example.test"
+    msg["Subject"] = "Request"
+    for name, value in headers.items():
+        msg[name] = value
+    msg.set_content("body")
+    return msg
+
+
+def _get_param(**headers: str) -> dict[str, str]:
+    msg = EmailMessage()
+    msg["From"] = "someone@example.test"
+    msg["To"] = "support@example.test"
+    msg["Subject"] = "Out of office"
+    for name, value in headers.items():
+        msg[name.replace("_", "-")] = value
+    msg.set_content("I am away.")
+    return _build_get_param(parse_email(_to_bytes(msg)), trusted=False)
+
+
+def test_rfc3834_and_bulk_markers_become_the_loop_flag() -> None:
+    """PostMaster.pm:602-614 folds every marker of machine-generated mail into
+    X-OTRS-Loop, the single flag the auto-response check reads. Without it a
+    vacation responder that sets only the RFC 3834 header gets an auto-response
+    back and the two systems answer each other."""
+    for header, value in (
+        ("Auto-Submitted", "auto-replied"),
+        ("Auto-Submitted", "auto-generated; owner=someone"),
+        ("Precedence", "bulk"),
+        ("X-Loop", "yes"),
+        ("X-No-Loop", "yes"),
+        ("Mailing-List", "list support.example.test"),
+    ):
+        assert _get_param(**{header.replace("-", "_"): value})["X-OTRS-Loop"] == "yes", header
+
+
+def test_ordinary_mail_keeps_no_loop_flag() -> None:
+    assert "X-OTRS-Loop" not in _get_param()
+    # RFC 3834's value for "this is not automated" must not trip the check.
+    assert "X-OTRS-Loop" not in _get_param(Auto_Submitted="no")
+
+
+def test_untrusted_mail_cannot_set_the_loop_flag_itself() -> None:
+    """PostMaster.pm:581 drops every ``x-otrs*`` header from an untrusted
+    mailbox, so on the normal account the flag can only come from the standard
+    markers -- which is why deriving it there is what makes loop protection
+    work at all, not a nicety."""
+    param = _get_param(X_OTRS_Loop="no")
+    assert "X-OTRS-Loop" not in param
+
+    param = _get_param(X_OTRS_Loop="no", Precedence="bulk")
+    assert param["X-OTRS-Loop"] == "yes"
+
+
+def test_trusted_x_otrs_headers_reach_their_canonical_name() -> None:
+    """Znuny pulls these under the exact names from ``PostmasterX-Header``.
+    Deriving the spelling instead yields ``X-Otrs-Queue`` /
+    ``X-Otrs-Isvisibleforcustomer``, and every consumer lookup misses."""
+    param = _build_get_param(
+        parse_email(
+            _to_bytes(
+                _message_with(
+                    **{
+                        "X-OTRS-Queue": "support",
+                        "X-OTRS-IsVisibleForCustomer": "0",
+                        "X-OTRS-State-PendingTime": "2026-09-11 08:00:00",
+                        "X-OTRS-OwnerID": "42",
+                    }
+                )
+            )
+        ),
+        trusted=True,
+    )
+    assert param["X-OTRS-Queue"] == "support"
+    assert param["X-OTRS-IsVisibleForCustomer"] == "0"
+    assert param["X-OTRS-State-PendingTime"] == "2026-09-11 08:00:00"
+    assert param["X-OTRS-OwnerID"] == "42"
+
+
+def test_unknown_headers_keep_the_derived_spelling() -> None:
+    param = _build_get_param(
+        parse_email(_to_bytes(_message_with(**{"X-Custom-Thing": "v"}))), trusted=True
+    )
+    assert param["X-Custom-Thing"] == "v"
