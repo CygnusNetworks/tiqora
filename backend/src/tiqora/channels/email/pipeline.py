@@ -19,6 +19,7 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from tiqora.channels.email.filters import apply_filters
+from tiqora.channels.email.machine_mail import is_auto_generated
 from tiqora.channels.email.parser import (
     ParsedEmail,
     get_email_address,
@@ -357,6 +358,11 @@ async def _process_message_inner(
             orig_message_id=_msgid(parsed.message_id),
         )
 
+    # Read after apply_filters so an admin's postmaster filter setting
+    # X-OTRS-Loop counts too. Carried on every ArticleIn below; the AI
+    # auto-reply is the only consumer (tiqora.ai.auto_worker).
+    auto_generated = is_auto_generated(get_param)
+
     from tiqora.domain.subject_hook import load_subject_config
 
     subject_cfg = await load_subject_config(session, sysconfig)
@@ -425,6 +431,7 @@ async def _process_message_inner(
                 references=get_param.get("References") or None,
                 channel="email",
                 attachments=[(a.filename, a.content_type, a.content) for a in parsed.attachments],
+                auto_generated=auto_generated,
             )
             new_queue_id = await _new_ticket_queue_id(session, get_param, sysconfig, account)
             customer_no, customer_user = await _resolve_customer(session, get_param)
@@ -508,6 +515,7 @@ async def _process_message_inner(
             references=get_param.get("References") or None,
             channel="email",
             attachments=[(a.filename, a.content_type, a.content) for a in parsed.attachments],
+            auto_generated=auto_generated,
             # Znuny's PostMaster::FollowUp writes ``FollowUp``, not the
             # channel-derived ``EmailCustomer`` a new ticket's first article
             # gets (PostMaster/FollowUp.pm vs NewTicket.pm). The history type
@@ -550,6 +558,7 @@ async def _process_message_inner(
         references=get_param.get("References") or None,
         channel="email",
         attachments=[(a.filename, a.content_type, a.content) for a in parsed.attachments],
+        auto_generated=auto_generated,
     )
     params = TicketIn(
         title=get_param.get("X-OTRS-Title") or get_param.get("Subject", ""),
