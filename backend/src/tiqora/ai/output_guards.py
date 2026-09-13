@@ -58,13 +58,37 @@ def _is_signoff_line(line: str) -> bool:
     return normalized.startswith("with ") and normalized[5:] in _SIGNOFF_PHRASES
 
 
+def _first_of_signoff_run(lines: list[str], last: int) -> int:
+    """Index of the first line in the run of closings ending at *last*.
+
+    Blank lines between two closings still count as the same run, so
+    ``"Viele Grüße\\n\\nMit freundlichen Grüßen"`` collapses to one.
+    """
+    first = last
+    i = last - 1
+    while i >= 0:
+        if not lines[i].strip():
+            i -= 1
+            continue
+        if not _is_signoff_line(lines[i]):
+            break
+        first = i
+        i -= 1
+    return first
+
+
 def strip_hallucinated_signoff(body: str) -> str:
-    """Keep a trailing closing salutation; drop the signature/footer after it.
+    """Keep ONE trailing closing salutation; drop the signature/footer after it.
 
     "Best regards" / "With best regards" / "Mit freundlichen Grüßen" stay.
     Name, role, phone, ``--`` delimiter and AI-disclosure copied after that
     line are dropped — the mailer appends the real queue signature on send.
     Only the last few lines are inspected so quoted earlier mail is untouched.
+
+    Stacked closings collapse to the first one: a KB answer template that
+    prescribes a closing plus the model's own closing shipped
+    "Viele Grüße\\nMit freundlichen Grüßen" to a customer (prod ticket 43102),
+    because anchoring on the *last* closing kept every line before it.
     """
     lines = body.rstrip().split("\n")
     window_start = max(0, len(lines) - 12)
@@ -74,7 +98,7 @@ def strip_hallucinated_signoff(body: str) -> str:
             signoff_at = i
     if signoff_at is None:
         return body
-    return "\n".join(lines[: signoff_at + 1]).rstrip()
+    return "\n".join(lines[: _first_of_signoff_run(lines, signoff_at) + 1]).rstrip()
 
 
 def validate_customer_message(*, kind: str, subject: str, body: str) -> None:

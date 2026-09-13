@@ -19,7 +19,7 @@ from email.utils import parseaddr
 from typing import Any
 
 import structlog
-from sqlalchemy import select
+from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from tiqora.ai import drafts as draft_service
@@ -108,6 +108,7 @@ from tiqora.ai.tools import (
     ToolOutcome,
     ToolRegistry,
     UnknownToolError,
+    resolve_allowed_state_types,
 )
 from tiqora.config import Settings
 from tiqora.crypto.secret import decrypt_secret
@@ -119,6 +120,7 @@ from tiqora.domain.settings_store import (
     get_setting_int,
 )
 from tiqora.domain.ticket_write_service import ArticleIn, add_article
+from tiqora.domain.ticket_write_service import change_state as domain_change_state
 from tiqora.domain.ticket_write_service import set_customer as domain_set_customer
 from tiqora.znuny.sysconfig import SysConfig
 
@@ -452,6 +454,7 @@ def _build_system_prompt(
     reply_language_binding: bool = False,
     prompt_parts: list[TiqoraAiPromptPart] | None = None,
     tone_prompt: str | None = None,
+    auto_state_hint: bool = False,
 ) -> str:
     # Kernel safety block first — not admin-editable, always present.
     parts = [UNTRUSTED_CONTENT_SYSTEM_BLOCK, policy.system_prompt or ""]
@@ -506,6 +509,13 @@ def _build_system_prompt(
         parts.append(
             "Any customer message you propose (reply or clarify) will be sent to the "
             "customer directly — write as if you are the final responder."
+        )
+    if auto_state_hint:
+        parts.append(
+            "You do not have to close the ticket yourself: once your message is "
+            "sent, the system closes the ticket for a factual reply and leaves it "
+            "open for a clarifying question. Call update_ticket_fields only when "
+            "you want a different state than that."
         )
     if kind_hint:
         parts.append(f"Hint: this run is expected to produce a '{kind_hint}' message.")
@@ -612,6 +622,48 @@ def _build_user_message(
 
 def _disclosure_footer(default_text: str, override_text: str | None) -> str:
     return (override_text or default_text or "").strip()
+
+
+# Ticket-state *types* Tiqora moves a ticket to after answering on its own,
+# most-preferred first, per proposal kind. A factual reply finishes the
+# conversation, so it closes; a clarifying question is still waiting on the
+# customer, so it only opens. Intersected with the queue's
+# ``allowed_state_types`` whitelist — an admin who allows only "open" gets
+# "open" for both, one who allows neither gets no state change at all.
+_AUTO_STATE_TYPES_BY_KIND: dict[str, tuple[str, ...]] = {
+    DRAFT_KIND_REPLY: ("closed", "open"),
+    DRAFT_KIND_CLARIFY: ("open",),
+}
+
+# Canonical Znuny state name per type, preferred over any other state sharing
+# that type ("closed successful" over "closed unsuccessful").
+_CANONICAL_STATE_NAME: dict[str, str] = {"closed": "closed successful", "open": "open"}
+
+
+async def _resolve_auto_state_id(
+    session: AsyncSession, *, kind: str, allowed_state_types: list[str]
+) -> int | None:
+    """Concrete ``ticket_state.id`` to park the ticket in, or ``None`` when the
+    policy allows no suitable type (or this Znuny has no valid state of it)."""
+    allowed = {t.strip().lower() for t in allowed_state_types}
+    for type_name in _AUTO_STATE_TYPES_BY_KIND.get(kind, ()):
+        if type_name not in allowed:
+            continue
+        row = (
+            await session.execute(
+                text(
+                    "SELECT ts.id FROM ticket_state ts"
+                    " JOIN ticket_state_type tst ON tst.id = ts.type_id"
+                    " WHERE LOWER(tst.name) = :type AND ts.valid_id = 1"
+                    " ORDER BY CASE WHEN LOWER(ts.name) = :canonical THEN 0 ELSE 1 END, ts.id"
+                    " LIMIT 1"
+                ),
+                {"type": type_name, "canonical": _CANONICAL_STATE_NAME.get(type_name, type_name)},
+            )
+        ).first()
+        if row is not None:
+            return int(row[0])
+    return None
 
 
 def _build_identity_system_prompt(fields: list[Any], *, tone_prompt: str | None = None) -> str:
@@ -1201,6 +1253,12 @@ async def run_ticket_agent(
             reply_language_binding=reply_language_line is not None,
             prompt_parts=prompt_parts,
             tone_prompt=tone_prompt,
+            # Only the auto path sends, and only a send parks the ticket — a
+            # Manual Assist run must not be told the system closes anything.
+            auto_state_hint=(
+                trigger != TRIGGER_MANUAL
+                and bool(resolve_allowed_state_types(policy.allowed_state_types))
+            ),
         )
         # Known disclosure footer text, so a previously sent article that has
         # it appended doesn't get echoed back into a new draft (see
@@ -1585,6 +1643,26 @@ async def run_ticket_agent(
                 run_id=run_id,
             )
         )
+        # The answer left the building, so the ticket must not stay in "new" —
+        # a queue full of answered-but-new tickets is what a human sees
+        # otherwise (prod ticket 43102). The model may call update_ticket_fields
+        # itself; only when it did not do we park the ticket ourselves, and only
+        # in a state type the queue policy already allows.
+        if not executor.state_change_applied:
+            auto_state_id = await _resolve_auto_state_id(
+                session,
+                kind=outcome.proposal["kind"],
+                allowed_state_types=resolve_allowed_state_types(policy.allowed_state_types),
+            )
+            if auto_state_id is not None:
+                await domain_change_state(
+                    session,
+                    ticket_id=ticket_id,
+                    new_state_id=auto_state_id,
+                    user_id=actor_user_id,
+                    sysconfig=sysconfig,
+                )
+
         state.last_run_at = datetime.now(UTC).replace(tzinfo=None)
         state.last_customer_article_id = based_on_article_id
         if outcome.proposal["kind"] == DRAFT_KIND_REPLY:

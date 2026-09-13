@@ -293,6 +293,26 @@ def test_strip_hallucinated_signoff_keeps_german_closing_drops_placeholder() -> 
     )
 
 
+def test_strip_hallucinated_signoff_collapses_stacked_closings() -> None:
+    """Prod ticket 43102: the KB answer template prescribes a closing and the
+    model wrote its own on top, so the customer got two in a row."""
+    body = (
+        "Deine Endgeräte verbindest du dann mit dem WLAN deines Routers.\n\n"
+        "Viele Grüße\n"
+        "Mit freundlichen Grüßen"
+    )
+    assert strip_hallucinated_signoff(body) == (
+        "Deine Endgeräte verbindest du dann mit dem WLAN deines Routers.\n\nViele Grüße"
+    )
+
+
+def test_strip_hallucinated_signoff_collapses_blank_separated_closings() -> None:
+    body = "Bitte stecke das Kabel in den blauen WAN-Port.\n\nViele Grüße\n\nBeste Grüße\n[Name]"
+    assert strip_hallucinated_signoff(body) == (
+        "Bitte stecke das Kabel in den blauen WAN-Port.\n\nViele Grüße"
+    )
+
+
 def test_strip_hallucinated_signoff_leaves_normal_body_untouched() -> None:
     body = "Hello,\n\nHere is the fix for your connection issue."
     assert strip_hallucinated_signoff(body) == body
