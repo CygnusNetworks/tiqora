@@ -506,6 +506,10 @@ class ToolExecutor:
         self._mask_results = mask_results
         self._ticket_customer_id = ticket_customer_id
         self._ticket_customer_user_id = ticket_customer_user_id
+        # True once the model has set the ticket state itself in this run. The
+        # runtime reads it to decide whether to apply its own closing state
+        # after an auto-send — the model's explicit choice always wins.
+        self.state_change_applied = False
 
     async def execute(self, name: str, arguments: dict[str, Any]) -> ToolOutcome:
         if not self._registry.is_known(name):
@@ -649,6 +653,7 @@ class ToolExecutor:
                 sysconfig=self._sysconfig,
             )
             applied.append("state")
+            self.state_change_applied = True
         priority_id = arguments.get("priority_id")
         if priority_id is not None:
             if not caps.update_priority:
