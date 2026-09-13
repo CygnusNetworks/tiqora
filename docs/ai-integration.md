@@ -399,6 +399,22 @@ above (`tiqora.ai.runtime._map_customer_message`). Manual Assist (an agent
 clicking "AI draft" in the ticket zoom) is always the draft path, regardless
 of queue autonomy.
 
+#### Ticket state after an auto-reply
+
+A sent answer must not leave the ticket sitting in `new` — otherwise a queue
+fills up with tickets that look untouched but have already been answered. So
+after the runtime sends an auto-reply it parks the ticket itself, choosing the
+state from the proposal kind: a factual `reply` closes the ticket, a `clarify`
+only opens it (the conversation is still waiting on the customer).
+
+Two things bound that. The target state type must be listed in the queue's
+`allowed_state_types` — with `["open"]` a reply gets `open` instead of a close,
+with `[]` the ticket keeps whatever state it had. And if the model called
+`update_ticket_fields` with a state of its own during the run, its choice
+stands; the runtime never overrules it. The draft paths (Manual Assist, and any
+autonomy that force-drafts) touch no state at all — nothing was sent, so there
+is nothing to close.
+
 ### Handing off to a human
 
 `escalate_to_human` ends the run, writes an internal note and stamps

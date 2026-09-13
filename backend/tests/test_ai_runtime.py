@@ -65,6 +65,11 @@ pytestmark = pytest.mark.db
 
 NOW = datetime(2024, 6, 1, 12, 0, 0)
 
+# Znuny base fixture data (ticket_state seeded by initial_insert).
+STATE_NEW_ID = 1  # "new" (type "new")
+STATE_CLOSED_ID = 2  # "closed successful" (type "closed")
+STATE_OPEN_ID = 4  # "open" (type "open")
+
 
 # ---------------------------------------------------------------------------
 # Pure unit test: autonomy matrix (plan §3.4 table)
@@ -487,7 +492,7 @@ def _mysql_async(url: str) -> str:
     return url.replace("mysql+pymysql://", "mysql+aiomysql://")
 
 
-def _seed_ticket(sync_url: str, *, ns: int) -> dict[str, Any]:
+def _seed_ticket(sync_url: str, *, ns: int, ticket_state_id: int = STATE_OPEN_ID) -> dict[str, Any]:
     agent_id = 9600 + ns
     group_id = 9630 + ns
     queue_id = 9600 + ns
@@ -566,7 +571,7 @@ def _seed_ticket(sync_url: str, *, ns: int) -> dict[str, Any]:
                 " escalation_update_time, escalation_response_time, escalation_solution_time,"
                 " archive_flag, create_time, create_by, change_time, change_by)"
                 " VALUES (:id, :tn, :title, :qid, 1, 1,"
-                " :uid, 1, 3, 4, :cid, :cuid,"
+                " :uid, 1, 3, :sid, :cid, :cuid,"
                 " 0, 0, 0, 0, 0, 0, 0, :t, 1, :t, 1)"
             ),
             {
@@ -575,6 +580,7 @@ def _seed_ticket(sync_url: str, *, ns: int) -> dict[str, Any]:
                 "title": f"AI runtime ticket 96{ns}",
                 "qid": queue_id,
                 "uid": agent_id,
+                "sid": ticket_state_id,
                 "cid": f"CUST96{ns}",
                 "cuid": f"customer96{ns}@example.com",
                 "t": NOW,
@@ -655,6 +661,7 @@ async def _setup_policy(
     autonomy: str,
     enabled_manual_assist: bool = True,
     enabled_auto_reply: bool = False,
+    allowed_state_types: str | None = None,
 ) -> None:
     await set_operation_mode(session, OPERATION_MODE_TIQORA_PRIMARY)
     provider_id = None
@@ -687,6 +694,7 @@ async def _setup_policy(
         service_user_id=seed["agent_id"] if enabled_auto_reply else None,
         llm_provider_id=provider_id,
         pii_masking=False,
+        allowed_state_types=allowed_state_types,
     )
 
 
@@ -3099,5 +3107,236 @@ async def test_terminal_force_without_tool_call_still_skips(
             )
         assert result.status == "skipped"
         assert llm.calls == 2
+    finally:
+        await engine.dispose()
+
+
+# ---------------------------------------------------------------------------
+# Auto-state: an answered ticket must not stay in "new" (prod ticket 43102)
+# ---------------------------------------------------------------------------
+
+
+async def _ticket_state_id(factory: Any, ticket_id: int) -> int:
+    async with factory() as session:
+        row = (
+            await session.execute(
+                text("SELECT ticket_state_id FROM ticket WHERE id = :id"), {"id": ticket_id}
+            )
+        ).first()
+    assert row is not None
+    return int(row[0])
+
+
+def _set_state_response(state_name: str) -> LlmResponse:
+    return LlmResponse(
+        content=None,
+        tool_calls=[
+            ToolCall(id="call_s", name="update_ticket_fields", arguments={"state": state_name})
+        ],
+        usage=LlmUsage(prompt_tokens=6, completion_tokens=3),
+    )
+
+
+async def test_auto_send_reply_closes_the_ticket(mariadb_znuny_url: str) -> None:
+    seed = _seed_ticket(mariadb_znuny_url, ns=67, ticket_state_id=STATE_NEW_ID)
+    engine = create_async_engine(_mysql_async(mariadb_znuny_url))
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    settings = get_settings()
+    try:
+        async with factory() as session:
+            await _setup_policy(
+                session,
+                seed=seed,
+                autonomy=AUTONOMY_FULL,
+                enabled_auto_reply=True,
+                allowed_state_types='["open", "closed"]',
+            )
+
+        llm = ScriptedLlm([_propose_response("reply", "Du brauchst einen WLAN-Router.")])
+        async with factory() as session:
+            result = await run_ticket_agent(
+                session,
+                settings=settings,
+                llm=llm,
+                ticket_id=seed["ticket_id"],
+                trigger=TRIGGER_AUTO,
+                acting_user_id=None,
+                run_id="run-state-1",
+            )
+        assert result.status == "sent"
+        assert await _ticket_state_id(factory, seed["ticket_id"]) == STATE_CLOSED_ID
+    finally:
+        await engine.dispose()
+
+
+async def test_auto_send_clarify_opens_but_never_closes(mariadb_znuny_url: str) -> None:
+    seed = _seed_ticket(mariadb_znuny_url, ns=68, ticket_state_id=STATE_NEW_ID)
+    engine = create_async_engine(_mysql_async(mariadb_znuny_url))
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    settings = get_settings()
+    try:
+        async with factory() as session:
+            await _setup_policy(
+                session,
+                seed=seed,
+                autonomy=AUTONOMY_FULL,
+                enabled_auto_reply=True,
+                allowed_state_types='["open", "closed"]',
+            )
+
+        llm = ScriptedLlm([_propose_response("clarify", "In welchem Wohnheim wohnst du?")])
+        async with factory() as session:
+            result = await run_ticket_agent(
+                session,
+                settings=settings,
+                llm=llm,
+                ticket_id=seed["ticket_id"],
+                trigger=TRIGGER_AUTO,
+                acting_user_id=None,
+                run_id="run-state-2",
+            )
+        assert result.status == "sent"
+        # Still waiting on the customer — closing would bury the question.
+        assert await _ticket_state_id(factory, seed["ticket_id"]) == STATE_OPEN_ID
+    finally:
+        await engine.dispose()
+
+
+async def test_auto_send_reply_respects_allowed_state_types_whitelist(
+    mariadb_znuny_url: str,
+) -> None:
+    """A queue that only permits "open" gets "open" — never a close it never
+    allowed the model to make either."""
+    seed = _seed_ticket(mariadb_znuny_url, ns=69, ticket_state_id=STATE_NEW_ID)
+    engine = create_async_engine(_mysql_async(mariadb_znuny_url))
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    settings = get_settings()
+    try:
+        async with factory() as session:
+            await _setup_policy(
+                session,
+                seed=seed,
+                autonomy=AUTONOMY_FULL,
+                enabled_auto_reply=True,
+                allowed_state_types='["open"]',
+            )
+
+        llm = ScriptedLlm([_propose_response("reply", "Antwort ohne Abschluss.")])
+        async with factory() as session:
+            result = await run_ticket_agent(
+                session,
+                settings=settings,
+                llm=llm,
+                ticket_id=seed["ticket_id"],
+                trigger=TRIGGER_AUTO,
+                acting_user_id=None,
+                run_id="run-state-3",
+            )
+        assert result.status == "sent"
+        assert await _ticket_state_id(factory, seed["ticket_id"]) == STATE_OPEN_ID
+    finally:
+        await engine.dispose()
+
+
+async def test_auto_send_leaves_state_alone_when_policy_allows_none(
+    mariadb_znuny_url: str,
+) -> None:
+    seed = _seed_ticket(mariadb_znuny_url, ns=70, ticket_state_id=STATE_NEW_ID)
+    engine = create_async_engine(_mysql_async(mariadb_znuny_url))
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    settings = get_settings()
+    try:
+        async with factory() as session:
+            await _setup_policy(
+                session,
+                seed=seed,
+                autonomy=AUTONOMY_FULL,
+                enabled_auto_reply=True,
+                allowed_state_types="[]",
+            )
+
+        llm = ScriptedLlm([_propose_response("reply", "Antwort ohne Statuswechsel.")])
+        async with factory() as session:
+            result = await run_ticket_agent(
+                session,
+                settings=settings,
+                llm=llm,
+                ticket_id=seed["ticket_id"],
+                trigger=TRIGGER_AUTO,
+                acting_user_id=None,
+                run_id="run-state-4",
+            )
+        assert result.status == "sent"
+        assert await _ticket_state_id(factory, seed["ticket_id"]) == STATE_NEW_ID
+    finally:
+        await engine.dispose()
+
+
+async def test_model_chosen_state_wins_over_auto_state(mariadb_znuny_url: str) -> None:
+    """The model asked for "open" on a factual reply — the runtime must not
+    overrule it with its own close."""
+    seed = _seed_ticket(mariadb_znuny_url, ns=71, ticket_state_id=STATE_NEW_ID)
+    engine = create_async_engine(_mysql_async(mariadb_znuny_url))
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    settings = get_settings()
+    try:
+        async with factory() as session:
+            await _setup_policy(
+                session,
+                seed=seed,
+                autonomy=AUTONOMY_FULL,
+                enabled_auto_reply=True,
+                allowed_state_types='["open", "closed"]',
+            )
+
+        llm = ScriptedLlm(
+            [
+                _set_state_response("open"),
+                _propose_response("reply", "Ich habe das an die Technik weitergegeben."),
+            ]
+        )
+        async with factory() as session:
+            result = await run_ticket_agent(
+                session,
+                settings=settings,
+                llm=llm,
+                ticket_id=seed["ticket_id"],
+                trigger=TRIGGER_AUTO,
+                acting_user_id=None,
+                run_id="run-state-5",
+            )
+        assert result.status == "sent"
+        assert await _ticket_state_id(factory, seed["ticket_id"]) == STATE_OPEN_ID
+    finally:
+        await engine.dispose()
+
+
+async def test_manual_assist_draft_never_touches_ticket_state(mariadb_znuny_url: str) -> None:
+    seed = _seed_ticket(mariadb_znuny_url, ns=72, ticket_state_id=STATE_NEW_ID)
+    engine = create_async_engine(_mysql_async(mariadb_znuny_url))
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    settings = get_settings()
+    try:
+        async with factory() as session:
+            await _setup_policy(
+                session,
+                seed=seed,
+                autonomy=AUTONOMY_FULL,
+                allowed_state_types='["open", "closed"]',
+            )
+
+        llm = ScriptedLlm([_propose_response("reply", "Ein Entwurf für den Agenten.")])
+        async with factory() as session:
+            result = await run_ticket_agent(
+                session,
+                settings=settings,
+                llm=llm,
+                ticket_id=seed["ticket_id"],
+                trigger=TRIGGER_MANUAL,
+                acting_user_id=seed["agent_id"],
+                run_id="run-state-6",
+            )
+        assert result.status == "drafted"
+        assert await _ticket_state_id(factory, seed["ticket_id"]) == STATE_NEW_ID
     finally:
         await engine.dispose()
