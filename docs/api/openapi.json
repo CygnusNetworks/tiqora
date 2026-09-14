@@ -2481,6 +2481,11 @@
             "title": "Auto Reply Paused",
             "type": "boolean"
           },
+          "default_max_tool_rounds": {
+            "default": 0,
+            "title": "Default Max Tool Rounds",
+            "type": "integer"
+          },
           "disclosure_default_text": {
             "title": "Disclosure Default Text",
             "type": "string"
@@ -2584,6 +2589,18 @@
       },
       "AiStateOut": {
         "properties": {
+          "ai_escalated_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ai Escalated At"
+          },
           "can_summarize": {
             "title": "Can Summarize",
             "type": "boolean"
@@ -2759,6 +2776,17 @@
       },
       "AiToolTraceOut": {
         "properties": {
+          "arguments": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Arguments"
+          },
           "content": {
             "title": "Content",
             "type": "string"
@@ -9667,6 +9695,17 @@
             "title": "Kind",
             "type": "string"
           },
+          "max_tool_rounds": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Tool Rounds"
+          },
           "name": {
             "title": "Name",
             "type": "string"
@@ -9812,6 +9851,17 @@
             "title": "Kind",
             "type": "string"
           },
+          "max_tool_rounds": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Tool Rounds"
+          },
           "name": {
             "title": "Name",
             "type": "string"
@@ -9884,6 +9934,7 @@
           "budget_cost_day",
           "budget_cost_week",
           "budget_cost_month",
+          "max_tool_rounds",
           "valid_id",
           "create_time",
           "change_time"
@@ -10037,6 +10088,17 @@
               }
             ],
             "title": "Kind"
+          },
+          "max_tool_rounds": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Tool Rounds"
           },
           "name": {
             "anyOf": [
@@ -18611,6 +18673,17 @@
             "title": "Ai Escalated",
             "type": "boolean"
           },
+          "ai_reply_source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ai Reply Source"
+          },
           "archive_flag": {
             "default": 0,
             "title": "Archive Flag",
@@ -19129,6 +19202,17 @@
             "default": false,
             "title": "Ai Escalated",
             "type": "boolean"
+          },
+          "ai_reply_source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ai Reply Source"
           },
           "archive_flag": {
             "default": 0,
@@ -20101,6 +20185,54 @@
           "id": {
             "title": "Id",
             "type": "integer"
+          },
+          "invite_accepted_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Invite Accepted At"
+          },
+          "invite_expires": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Invite Expires"
+          },
+          "invited_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Invited At"
+          },
+          "last_login": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Login"
           },
           "last_name": {
             "title": "Last Name",
@@ -54120,6 +54252,74 @@
           }
         },
         "summary": "Discard Ai Draft",
+        "tags": [
+          "ai"
+        ]
+      }
+    },
+    "/api/v1/tickets/{ticket_id}/ai/resume": {
+      "post": {
+        "description": "Manually clear the AI->human handoff flag so auto-reply can resume.\n\nNormally only a human agent's customer-visible reply (or the ticket\nclosing) clears ``ai_escalated_at`` \u2014 see\n:func:`tiqora.domain.ticket_write_service.resume_ai_automation`. This is\nthe explicit override for when a human decides the ticket is safe to\nhand back without writing a customer-visible reply, e.g. after fixing\nthe underlying issue that caused a bad escalation.",
+        "operationId": "resume_ai_route_api_v1_tickets__ticket_id__ai_resume_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "ticket_id",
+            "required": true,
+            "schema": {
+              "title": "Ticket Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Resume Ai Route",
         "tags": [
           "ai"
         ]
