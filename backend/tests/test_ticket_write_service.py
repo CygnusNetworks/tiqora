@@ -19,9 +19,11 @@ import json
 from typing import Any
 
 import pytest
-from sqlalchemy import text
+from sqlalchemy import create_engine, text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
+from tiqora.ai import handoff
+from tiqora.ai.models import TiqoraAiTicketState
 from tiqora.domain.ticket_write_service import (
     ArticleIn,
     InvalidInput,
@@ -34,6 +36,7 @@ from tiqora.domain.ticket_write_service import (
     create_ticket,
     lock_ticket,
     merge_tickets,
+    resume_ai_automation,
     set_customer,
     unlock_ticket,
     unwatch_ticket,
@@ -450,6 +453,64 @@ async def test_add_agent_note_without_from_stamps_agent_name_mariadb(
         assert row is not None and expected is not None
         full_name = " ".join(p for p in (expected[0], expected[1]) if p).strip()
         assert row[0] == (full_name or expected[2])
+
+    await engine.dispose()
+
+
+@pytest.mark.db
+async def test_resume_ai_automation_writes_note_and_clears_flag_mariadb(
+    mariadb_znuny_url: str,
+) -> None:
+    """resume_ai_automation writes an internal note (audit trail) and clears
+    ``ai_escalated_at`` — the internal note itself must NOT be what clears
+    it (only add_article's customer-visible-reply branch does that), so
+    this also proves the explicit clear_ai_escalated call is load-bearing."""
+    url = _mysql_async(mariadb_znuny_url)
+    engine = create_async_engine(url)
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    sysconfig = _make_sysconfig()
+
+    sync_engine = create_engine(mariadb_znuny_url)
+    with sync_engine.begin() as conn:
+        TiqoraAiTicketState.__table__.create(conn, checkfirst=True)
+    sync_engine.dispose()
+
+    async with factory() as session:
+        await _seed_tiqora_tables(session)
+
+    ticket_id = await _make_ticket(factory, sysconfig, "Resume AI Test")
+
+    async with factory() as session, session.begin():
+        await handoff.mark_ai_escalated(session, ticket_id)
+
+    async with factory() as session, session.begin():
+        await resume_ai_automation(session, ticket_id=ticket_id, user_id=1, sysconfig=sysconfig)
+
+    async with factory() as session:
+        state = await session.get(TiqoraAiTicketState, ticket_id)
+        assert state is not None
+        assert state.ai_escalated_at is None
+
+        note_row = (
+            await session.execute(
+                text(
+                    "SELECT a.is_visible_for_customer, m.a_body FROM article a"
+                    " JOIN article_data_mime m ON m.article_id = a.id"
+                    " WHERE a.ticket_id = :tid ORDER BY a.id DESC LIMIT 1"
+                ),
+                {"tid": ticket_id},
+            )
+        ).first()
+        assert note_row is not None
+        assert note_row[0] == 0
+        assert "reaktiviert" in note_row[1]
+
+    async with factory() as session:
+        await session.execute(
+            text("DELETE FROM tiqora_ai_ticket_state WHERE ticket_id = :tid"),
+            {"tid": ticket_id},
+        )
+        await session.commit()
 
     await engine.dispose()
 

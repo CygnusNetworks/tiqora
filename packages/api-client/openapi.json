@@ -2589,6 +2589,18 @@
       },
       "AiStateOut": {
         "properties": {
+          "ai_escalated_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ai Escalated At"
+          },
           "can_summarize": {
             "title": "Can Summarize",
             "type": "boolean"
@@ -54240,6 +54252,74 @@
           }
         },
         "summary": "Discard Ai Draft",
+        "tags": [
+          "ai"
+        ]
+      }
+    },
+    "/api/v1/tickets/{ticket_id}/ai/resume": {
+      "post": {
+        "description": "Manually clear the AI->human handoff flag so auto-reply can resume.\n\nNormally only a human agent's customer-visible reply (or the ticket\nclosing) clears ``ai_escalated_at`` \u2014 see\n:func:`tiqora.domain.ticket_write_service.resume_ai_automation`. This is\nthe explicit override for when a human decides the ticket is safe to\nhand back without writing a customer-visible reply, e.g. after fixing\nthe underlying issue that caused a bad escalation.",
+        "operationId": "resume_ai_route_api_v1_tickets__ticket_id__ai_resume_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "ticket_id",
+            "required": true,
+            "schema": {
+              "title": "Ticket Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Resume Ai Route",
         "tags": [
           "ai"
         ]
