@@ -204,10 +204,39 @@ def test_user_message_omits_reply_language_line_by_default() -> None:
 # articles before being shown to the model as context (prod bug — the model
 # saw its own previously-sent footer in the thread history and reproduced it
 # again in the next draft, doubling it once a human accepted and sent).
+# The footer is placed at the top of the message (customer-visible AI notice
+# must be seen before reading, not buried below the reply), so stripping
+# checks the front first; the trailing check stays for articles sent before
+# that change.
 # ---------------------------------------------------------------------------
 
 
 def test_user_message_strips_known_disclosure_footer_from_prior_article() -> None:
+    ticket = _snapshot()
+    article = ArticleSnapshot(
+        id=1,
+        sender_type="agent",
+        is_visible_for_customer=True,
+        subject=None,
+        body="This reply was AI-assisted.\n\nHere is the answer to your question.",
+        from_address="agent@example.com",
+        is_ai_origin=True,
+    )
+    msg = _build_user_message(
+        ticket,
+        [article],
+        pii=PiiMapper(),
+        mask=False,
+        kb_bundle=None,
+        disclosure_footer="This reply was AI-assisted.",
+    )
+    assert "Here is the answer to your question." in msg
+    assert "This reply was AI-assisted." not in msg
+
+
+def test_user_message_strips_known_disclosure_footer_from_legacy_trailing_position() -> None:
+    """Articles sent before the footer moved to the top still had it at the
+    bottom — those must still be stripped from thread history."""
     ticket = _snapshot()
     article = ArticleSnapshot(
         id=1,
@@ -461,7 +490,9 @@ class ScriptedLlm:
         )
 
 
-def _propose_response(kind: str, body: str, subject: str = "Re: Help") -> LlmResponse:
+def _propose_response(
+    kind: str, body: str, subject: str = "Re: Help", *, model: str | None = None
+) -> LlmResponse:
     return LlmResponse(
         content=None,
         tool_calls=[
@@ -472,6 +503,7 @@ def _propose_response(kind: str, body: str, subject: str = "Re: Help") -> LlmRes
             )
         ],
         usage=LlmUsage(prompt_tokens=10, completion_tokens=5),
+        model=model,
     )
 
 
@@ -3338,5 +3370,46 @@ async def test_manual_assist_draft_never_touches_ticket_state(mariadb_znuny_url:
             )
         assert result.status == "drafted"
         assert await _ticket_state_id(factory, seed["ticket_id"]) == STATE_NEW_ID
+    finally:
+        await engine.dispose()
+
+
+async def test_usage_records_the_model_the_provider_actually_served(
+    mariadb_znuny_url: str,
+) -> None:
+    """``tiqora_ai_usage.model`` must name the model that answered, not the
+    policy's ``model_override`` — see the sibling test in
+    ``test_ai_summary.py``. With no override configured the column was NULL.
+    """
+    seed = _seed_ticket(mariadb_znuny_url, ns=42)
+    engine = create_async_engine(_mysql_async(mariadb_znuny_url))
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    settings = get_settings()
+    try:
+        async with factory() as session:
+            await _setup_policy(session, seed=seed, autonomy=AUTONOMY_FULL)
+
+        llm = ScriptedLlm([_propose_response("reply", "An answer.", model="served/model-v9")])
+        async with factory() as session:
+            result = await run_ticket_agent(
+                session,
+                settings=settings,
+                llm=llm,
+                ticket_id=seed["ticket_id"],
+                trigger=TRIGGER_MANUAL,
+                acting_user_id=seed["agent_id"],
+                run_id="run-served-model",
+            )
+        assert result.status == "drafted"
+
+        async with factory() as session:
+            row = (
+                await session.execute(
+                    text("SELECT model FROM tiqora_ai_usage WHERE ticket_id = :tid"),
+                    {"tid": seed["ticket_id"]},
+                )
+            ).first()
+        assert row is not None
+        assert row[0] == "served/model-v9"
     finally:
         await engine.dispose()
