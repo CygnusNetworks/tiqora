@@ -505,7 +505,10 @@ async def summarize_ticket(
         ticket_id=ticket_id,
         feature=FEATURE_SUMMARY,
         provider_id=getattr(raw_llm, "active_provider_id", None) or policy.llm_provider_id,
-        model=getattr(raw_llm, "active_model", None) or policy.model_override,
+        # The provider echoes back what it actually served, which is the only
+        # source that also covers "no override configured, provider default
+        # used" — the common case, which recorded NULL before.
+        model=response.model or getattr(raw_llm, "active_model", None) or policy.model_override,
         prompt_tokens=prompt_tokens,
         completion_tokens=completion_tokens,
         success=bool(response.content),
