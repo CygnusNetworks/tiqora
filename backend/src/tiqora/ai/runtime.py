@@ -560,16 +560,21 @@ def _resolve_reply_language_line(
 
 
 def _strip_known_footer(body: str, footer: str | None) -> str:
-    """Remove a trailing disclosure/signature footer that the system itself
-    appended when a previous article was sent (see ``_disclosure_footer``),
-    before that article is shown to the model as thread context. Otherwise
-    the model sees "body\\n\\nfooter" in a prior own message and — with
-    nothing marking the footer as system-added — reproduces it again in the
-    next draft, doubling it once a human accepts and re-sends (prod bug)."""
+    """Remove a disclosure/signature footer that the system itself
+    prepended or appended when a previous article was sent (see
+    ``_disclosure_footer``), before that article is shown to the model as
+    thread context. Otherwise the model sees "footer\\n\\nbody" (or
+    "body\\n\\nfooter") in a prior own message and — with nothing marking
+    the footer as system-added — reproduces it again in the next draft,
+    doubling it once a human accepts and re-sends (prod bug). Checks the
+    front first since the footer is now placed at the top of the message;
+    the trailing check stays for articles sent before that change."""
     footer = (footer or "").strip()
     if not footer:
         return body
-    stripped = body.rstrip()
+    stripped = body.strip()
+    if stripped.startswith(footer):
+        return stripped[len(footer) :].lstrip()
     if stripped.endswith(footer):
         return stripped[: -len(footer)].rstrip()
     return body
@@ -1313,6 +1318,11 @@ async def run_ticket_agent(
 
         prompt_tokens = attachment_context.vision_usage.prompt_tokens
         completion_tokens = attachment_context.vision_usage.completion_tokens
+        # What the provider echoed back as the model that served the run — the
+        # only source that also covers "no override configured, provider
+        # default used", which recorded NULL before. Accumulated like the token
+        # counters so the last answering model wins after a mid-run fallback.
+        served_model: str | None = None
         outcome: ToolOutcome | None = None
         executed_tool_names: list[str] = []
 
@@ -1331,6 +1341,7 @@ async def run_ticket_agent(
             )
             prompt_tokens += response.usage.prompt_tokens
             completion_tokens += response.usage.completion_tokens
+            served_model = response.model or served_model
 
             if not response.tool_calls:
                 # Plain text never reaches anyone (no send-tool exists) — but
@@ -1406,6 +1417,7 @@ async def run_ticket_agent(
             )
             prompt_tokens += response.usage.prompt_tokens
             completion_tokens += response.usage.completion_tokens
+            served_model = response.model or served_model
             if response.tool_calls:
                 messages.append(
                     LlmMessage(
@@ -1456,7 +1468,7 @@ async def run_ticket_agent(
             ticket_id=ticket_id,
             feature=feature,
             provider_id=getattr(raw_llm, "active_provider_id", None) or policy.llm_provider_id,
-            model=getattr(raw_llm, "active_model", None) or policy.model_override,
+            model=served_model or getattr(raw_llm, "active_model", None) or policy.model_override,
             prompt_tokens=prompt_tokens,
             completion_tokens=completion_tokens,
             success=True,
@@ -1564,7 +1576,7 @@ async def run_ticket_agent(
         footer = disclosure_footer if policy.ai_disclosure_enabled else ""
         body = outcome.proposal["body"]
         if footer:
-            body = f"{body}\n\n{footer}"
+            body = f"{footer}\n\n{body}"
 
         src = next((a for a in articles if a.id == based_on_article_id), None)
         # Channel dispatch: the based_on article's channel decides where the
