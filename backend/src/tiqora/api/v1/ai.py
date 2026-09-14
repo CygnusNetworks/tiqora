@@ -60,7 +60,9 @@ from tiqora.api.deps import AppSettings, CurrentUser, DbSession
 from tiqora.config import Settings
 from tiqora.db.engine import get_session_factory
 from tiqora.domain.ticket_service import TicketAccessDenied, TicketNotFound, TicketService
+from tiqora.domain.ticket_write_service import resume_ai_automation as _resume_ai_automation
 from tiqora.permissions.engine import PermissionEngine
+from tiqora.znuny.sysconfig import SysConfig
 
 logger = structlog.get_logger(__name__)
 
@@ -112,6 +114,7 @@ class AiStateOut(BaseModel):
     manual_run_notes: str | None = None
     manual_run_error_code: str | None = None
     manual_run_started_at: datetime | None = None
+    ai_escalated_at: datetime | None = None
 
 
 class AiSummarizeIn(BaseModel):
@@ -308,6 +311,7 @@ async def get_ai_state(ticket_id: int, user: CurrentUser, session: DbSession) ->
         manual_run_notes=manual_run_notes,
         manual_run_error_code=manual_run_error_code,
         manual_run_started_at=manual_run_started_at,
+        ai_escalated_at=state.ai_escalated_at if state else None,
     )
 
 
@@ -589,6 +593,35 @@ async def discard_ai_draft(
         await ai_drafts.discard_draft(session, draft, actor_user_id=user.id)
     except ai_drafts.DraftStateError as exc:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+
+
+@router.post("/resume", status_code=status.HTTP_204_NO_CONTENT)
+async def resume_ai_route(ticket_id: int, user: CurrentUser, session: DbSession) -> None:
+    """Manually clear the AI->human handoff flag so auto-reply can resume.
+
+    Normally only a human agent's customer-visible reply (or the ticket
+    closing) clears ``ai_escalated_at`` — see
+    :func:`tiqora.domain.ticket_write_service.resume_ai_automation`. This is
+    the explicit override for when a human decides the ticket is safe to
+    hand back without writing a customer-visible reply, e.g. after fixing
+    the underlying issue that caused a bad escalation.
+    """
+    try:
+        ticket = await TicketService(session).get_ticket(user.id, ticket_id)
+    except (TicketNotFound, TicketAccessDenied) as exc:
+        if isinstance(exc, TicketNotFound):
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not found") from exc
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden") from exc
+
+    await _assert_note_permission(session, user.id, ticket.queue_id)
+
+    await _resume_ai_automation(
+        session,
+        ticket_id=ticket_id,
+        user_id=user.id,
+        sysconfig=SysConfig(session),
+    )
+    await session.commit()
 
 
 __all__ = ["router"]
