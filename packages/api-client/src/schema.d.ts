@@ -5335,6 +5335,33 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/tickets/{ticket_id}/ai/resume": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Resume Ai Route
+         * @description Manually clear the AI->human handoff flag so auto-reply can resume.
+         *
+         *     Normally only a human agent's customer-visible reply (or the ticket
+         *     closing) clears ``ai_escalated_at`` — see
+         *     :func:`tiqora.domain.ticket_write_service.resume_ai_automation`. This is
+         *     the explicit override for when a human decides the ticket is safe to
+         *     hand back without writing a customer-visible reply, e.g. after fixing
+         *     the underlying issue that caused a bad escalation.
+         */
+        post: operations["resume_ai_route_api_v1_tickets__ticket_id__ai_resume_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/tickets/{ticket_id}/ai/summarize": {
         parameters: {
             query?: never;
@@ -6979,6 +7006,8 @@ export interface components {
         };
         /** AiStateOut */
         AiStateOut: {
+            /** Ai Escalated At */
+            ai_escalated_at?: string | null;
             /** Can Summarize */
             can_summarize: boolean;
             /** Drafts */
@@ -27476,6 +27505,39 @@ export interface operations {
             path: {
                 ticket_id: number;
                 draft_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    resume_ai_route_api_v1_tickets__ticket_id__ai_resume_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                ticket_id: number;
             };
             cookie?: {
                 tiqora_session?: string | null;

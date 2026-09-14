@@ -498,6 +498,8 @@
       "originMarkerTooltip": "Automatisch von der KI gesendet",
       "toolArguments": "Aufgerufen mit",
       "originTraceEmpty": "Für diese Antwort wurden keine Tool-Aufrufe erfasst.",
+      "escalatedBanner": "KI hat um {{dateTime}} an einen Menschen übergeben — die automatische Antwort bleibt aus, bis ein Agent eine kundensichtbare Antwort sendet oder sie hier reaktiviert.",
+      "resumeButton": "KI reaktivieren",
       "expand": "Aufklappen",
       "collapse": "Zuklappen",
       "useDraft": "Als Antwort übernehmen",
@@ -1797,15 +1799,7 @@
       "every": "alle",
       "olderThan": "älter als {{duration}}",
       "newerThan": "neuer als {{duration}}",
-      "weekdaysShort": [
-        "So",
-        "Mo",
-        "Di",
-        "Mi",
-        "Do",
-        "Fr",
-        "Sa"
-      ],
+      "weekdaysShort": ["So", "Mo", "Di", "Mi", "Do", "Fr", "Sa"],
       "keyLabel": {
         "StateIDs": "Status",
         "QueueIDs": "Queue",

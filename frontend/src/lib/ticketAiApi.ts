@@ -68,6 +68,7 @@ export type AiStateOut = {
   manual_run_notes?: string | null;
   manual_run_error_code?: string | null;
   manual_run_started_at?: string | null;
+  ai_escalated_at?: string | null;
 };
 
 export type SummaryDetail = "standard" | "detailed";
@@ -116,5 +117,10 @@ export const ticketAiApi = {
       `/api/v1/tickets/${ticketId}/ai/drafts/${draftId}/discard`,
       { signal },
     );
+  },
+  resume(ticketId: number, signal?: AbortSignal) {
+    return api.request<void>("POST", `/api/v1/tickets/${ticketId}/ai/resume`, {
+      signal,
+    });
   },
 };

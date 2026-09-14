@@ -11,6 +11,7 @@ const {
   requestDraft,
   summarize,
   discardDraft,
+  resume,
   adminDeleteDraft,
   adminDeleteSummary,
   listArticles,
@@ -22,6 +23,7 @@ const {
   requestDraft: vi.fn(),
   summarize: vi.fn(),
   discardDraft: vi.fn(),
+  resume: vi.fn(),
   adminDeleteDraft: vi.fn(),
   adminDeleteSummary: vi.fn(),
   listArticles: vi.fn(),
@@ -37,7 +39,7 @@ vi.mock("@/lib/ticketAiApi", async () => {
     );
   return {
     ...actual,
-    ticketAiApi: { getState, requestDraft, summarize, discardDraft },
+    ticketAiApi: { getState, requestDraft, summarize, discardDraft, resume },
   };
 });
 
@@ -117,6 +119,7 @@ describe("AiPanel", () => {
     requestDraft.mockReset();
     summarize.mockReset();
     discardDraft.mockReset();
+    resume.mockReset();
     listArticles.mockReset().mockResolvedValue([]);
     createArticle.mockReset().mockResolvedValue({ id: 1 });
     getReplyDraft.mockReset().mockResolvedValue({
@@ -137,6 +140,48 @@ describe("AiPanel", () => {
     const { container } = wrap(<AiPanel ticketId={1} canNote />);
     await waitFor(() => expect(getState).toHaveBeenCalled());
     expect(container.textContent).toBe("");
+  });
+
+  it("shows the escalated banner and resumes AI when clicked", async () => {
+    getState
+      .mockResolvedValueOnce({
+        ...baseState,
+        summary_available: true,
+        ai_escalated_at: "2026-09-14T07:34:59",
+      })
+      .mockResolvedValueOnce({
+        ...baseState,
+        summary_available: true,
+        ai_escalated_at: null,
+      });
+    resume.mockResolvedValue(undefined);
+
+    wrap(<AiPanel ticketId={1} canNote />);
+
+    const banner = await screen.findByTestId("ai-panel-escalated-banner");
+    expect(banner.textContent).toContain("AI handed off to a human");
+
+    fireEvent.click(screen.getByTestId("ai-panel-resume-button"));
+
+    await waitFor(() => expect(resume).toHaveBeenCalledWith(1));
+    await waitFor(() =>
+      expect(
+        screen.queryByTestId("ai-panel-escalated-banner"),
+      ).not.toBeInTheDocument(),
+    );
+  });
+
+  it("disables the resume button without note permission", async () => {
+    getState.mockResolvedValue({
+      ...baseState,
+      summary_available: true,
+      ai_escalated_at: "2026-09-14T07:34:59",
+    });
+
+    wrap(<AiPanel ticketId={1} canNote={false} />);
+
+    const button = await screen.findByTestId("ai-panel-resume-button");
+    expect(button).toBeDisabled();
   });
 
   it("renders the summary section, calls summarize, and shows the up_to_date message", async () => {
@@ -270,9 +315,7 @@ describe("AiPanel", () => {
 
     wrap(<AiPanel ticketId={1} canNote />);
 
-    fireEvent.click(
-      await screen.findByTestId("ai-panel-create-draft-button"),
-    );
+    fireEvent.click(await screen.findByTestId("ai-panel-create-draft-button"));
     await waitFor(() =>
       expect(screen.getByTestId("ai-panel-draft-error")).toBeTruthy(),
     );
@@ -289,9 +332,7 @@ describe("AiPanel", () => {
 
     wrap(<AiPanel ticketId={1} canNote />);
 
-    fireEvent.click(
-      await screen.findByTestId("ai-panel-create-draft-button"),
-    );
+    fireEvent.click(await screen.findByTestId("ai-panel-create-draft-button"));
     await waitFor(() =>
       expect(screen.getByTestId("ai-panel-draft-error")).toBeTruthy(),
     );
@@ -312,9 +353,7 @@ describe("AiPanel", () => {
 
     wrap(<AiPanel ticketId={1} canNote />);
 
-    fireEvent.click(
-      await screen.findByTestId("ai-panel-create-draft-button"),
-    );
+    fireEvent.click(await screen.findByTestId("ai-panel-create-draft-button"));
     await waitFor(() =>
       expect(screen.getByTestId("ai-panel-draft-error")).toBeTruthy(),
     );
@@ -326,14 +365,16 @@ describe("AiPanel", () => {
   it("falls back to the generic error message for an unknown detail code", async () => {
     getState.mockResolvedValue({ ...baseState, manual_assist_available: true });
     requestDraft.mockRejectedValue(
-      new ApiError(500, "some_unmapped_code: boom", "/api/v1/tickets/1/ai/draft"),
+      new ApiError(
+        500,
+        "some_unmapped_code: boom",
+        "/api/v1/tickets/1/ai/draft",
+      ),
     );
 
     wrap(<AiPanel ticketId={1} canNote />);
 
-    fireEvent.click(
-      await screen.findByTestId("ai-panel-create-draft-button"),
-    );
+    fireEvent.click(await screen.findByTestId("ai-panel-create-draft-button"));
     await waitFor(() =>
       expect(screen.getByTestId("ai-panel-draft-error")).toBeTruthy(),
     );
@@ -376,9 +417,7 @@ describe("AiPanel", () => {
 
     wrap(<AiPanel ticketId={1} canNote />);
 
-    fireEvent.click(
-      await screen.findByTestId("ai-panel-create-draft-button"),
-    );
+    fireEvent.click(await screen.findByTestId("ai-panel-create-draft-button"));
     await waitFor(() => expect(requestDraft).toHaveBeenCalledWith(1));
 
     await waitFor(() =>
@@ -428,9 +467,7 @@ describe("AiPanel", () => {
 
     wrap(<AiPanel ticketId={1} canNote />);
 
-    fireEvent.click(
-      await screen.findByTestId("ai-panel-create-draft-button"),
-    );
+    fireEvent.click(await screen.findByTestId("ai-panel-create-draft-button"));
 
     await waitFor(
       () => expect(screen.getByTestId("ai-panel-draft-skipped")).toBeTruthy(),
@@ -439,9 +476,9 @@ describe("AiPanel", () => {
     expect(screen.getByTestId("ai-panel-draft-skipped").textContent).toContain(
       "The AI did not produce a reply suggestion.",
     );
-    expect(
-      screen.getByTestId("ai-panel-draft-skipped-notes").textContent,
-    ).toBe("No terminal tool call produced.");
+    expect(screen.getByTestId("ai-panel-draft-skipped-notes").textContent).toBe(
+      "No terminal tool call produced.",
+    );
   });
 
   it("shows the no-answer-needed run as a skipped box carrying the reason", async () => {
@@ -473,17 +510,15 @@ describe("AiPanel", () => {
 
     wrap(<AiPanel ticketId={1} canNote />);
 
-    fireEvent.click(
-      await screen.findByTestId("ai-panel-create-draft-button"),
-    );
+    fireEvent.click(await screen.findByTestId("ai-panel-create-draft-button"));
 
     await waitFor(
       () => expect(screen.getByTestId("ai-panel-draft-skipped")).toBeTruthy(),
       { timeout: 4000 },
     );
-    expect(
-      screen.getByTestId("ai-panel-draft-skipped-notes").textContent,
-    ).toBe("Werbe-Newsletter, keine Anfrage.");
+    expect(screen.getByTestId("ai-panel-draft-skipped-notes").textContent).toBe(
+      "Werbe-Newsletter, keine Anfrage.",
+    );
   });
 
   it("maps manual_run_error_code from a polled error status to the specific message", async () => {
@@ -512,9 +547,7 @@ describe("AiPanel", () => {
 
     wrap(<AiPanel ticketId={1} canNote />);
 
-    fireEvent.click(
-      await screen.findByTestId("ai-panel-create-draft-button"),
-    );
+    fireEvent.click(await screen.findByTestId("ai-panel-create-draft-button"));
 
     await waitFor(
       () => expect(screen.getByTestId("ai-panel-draft-run-error")).toBeTruthy(),
@@ -916,17 +949,24 @@ describe("AiPanel", () => {
 
     wrap(<AiPanel ticketId={1} canNote />);
 
-    await waitFor(() => expect(screen.getByTestId("ai-panel-draft-use-9")).toBeTruthy());
+    await waitFor(() =>
+      expect(screen.getByTestId("ai-panel-draft-use-9")).toBeTruthy(),
+    );
     fireEvent.click(screen.getByTestId("ai-panel-draft-use-9"));
 
-    await waitFor(() => expect(screen.getByTestId("reply-dialog")).toBeTruthy());
+    await waitFor(() =>
+      expect(screen.getByTestId("reply-dialog")).toBeTruthy(),
+    );
     expect(screen.getByTestId("reply-telegram-hint")).toBeInTheDocument();
     expect(screen.queryByTestId("reply-to")).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByTestId("reply-send"));
 
     await waitFor(() => expect(createArticle).toHaveBeenCalled());
-    const payload = createArticle.mock.calls[0][1] as { channel: string; to_address: string | null };
+    const payload = createArticle.mock.calls[0][1] as {
+      channel: string;
+      to_address: string | null;
+    };
     expect(payload.channel).toBe("telegram");
     expect(payload.to_address).toBeNull();
   });

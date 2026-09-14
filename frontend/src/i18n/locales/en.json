@@ -498,6 +498,8 @@
       "originMarkerTooltip": "Auto-sent by the AI agent",
       "toolArguments": "Called with",
       "originTraceEmpty": "No tool calls were recorded for this reply.",
+      "escalatedBanner": "AI handed off to a human at {{dateTime}} — auto-reply stays off until an agent sends a customer-visible reply, or resumes it here.",
+      "resumeButton": "Resume AI",
       "expand": "Expand",
       "collapse": "Collapse",
       "useDraft": "Use as reply",
@@ -1797,15 +1799,7 @@
       "every": "every",
       "olderThan": "older than {{duration}}",
       "newerThan": "newer than {{duration}}",
-      "weekdaysShort": [
-        "Sun",
-        "Mon",
-        "Tue",
-        "Wed",
-        "Thu",
-        "Fri",
-        "Sat"
-      ],
+      "weekdaysShort": ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"],
       "keyLabel": {
         "StateIDs": "State",
         "QueueIDs": "Queue",
