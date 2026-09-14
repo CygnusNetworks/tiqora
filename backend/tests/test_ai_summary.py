@@ -79,8 +79,9 @@ def test_detailed_prompt_deepens_documents_not_short_mails() -> None:
 class ScriptedLlm:
     """Returns one scripted plain-text :class:`LlmResponse` per call, in order."""
 
-    def __init__(self, contents: list[str | None]) -> None:
+    def __init__(self, contents: list[str | None], *, model: str | None = None) -> None:
         self._contents = list(contents)
+        self._model = model
         self.calls = 0
         self.last_user_message: str | None = None
         self.last_system_message: str | None = None
@@ -102,7 +103,11 @@ class ScriptedLlm:
             (m.content for m in reversed(messages) if m.role == "system"), None
         )
         content = self._contents.pop(0)
-        return LlmResponse(content=content, usage=LlmUsage(prompt_tokens=12, completion_tokens=6))
+        return LlmResponse(
+            content=content,
+            usage=LlmUsage(prompt_tokens=12, completion_tokens=6),
+            model=self._model,
+        )
 
 
 def _mysql_async(url: str) -> str:
@@ -1001,3 +1006,50 @@ def test_completion_budget_grows_with_docs_and_detail() -> None:
     many = [("f.pdf", 3000)] * 50
     assert _completion_budget(many, detail="standard") == 4000
     assert _completion_budget(many, detail="detailed") == 8000
+
+
+async def test_usage_records_the_model_the_provider_actually_served(
+    mariadb_znuny_url: str,
+) -> None:
+    """``tiqora_ai_usage.model`` must name the model that answered, not the
+    policy's ``model_override``.
+
+    With no override configured (the common case — the provider's
+    ``default_model`` is used), recording the override wrote NULL and left
+    the usage table unable to say which model produced a run.
+    """
+    seed = _seed_ticket(mariadb_znuny_url, ns=18)
+    _add_article(
+        mariadb_znuny_url, ticket_id=seed["ticket_id"], sender_type="customer", body="Help!"
+    )
+    engine = create_async_engine(_mysql_async(mariadb_znuny_url))
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    try:
+        async with factory() as session:
+            await _setup_policy(session, seed=seed)
+
+        llm = ScriptedLlm(["Summary."], model="served/model-v9")
+        async with factory() as session:
+            result = await summarize_ticket(
+                session,
+                llm=llm,
+                ticket_id=seed["ticket_id"],
+                trigger=TRIGGER_MANUAL,
+                acting_user_id=seed["agent_id"],
+            )
+        assert result.status == STATUS_UPDATED
+
+        async with factory() as session:
+            row = (
+                await session.execute(
+                    text(
+                        "SELECT model FROM tiqora_ai_usage"
+                        " WHERE ticket_id = :tid AND feature = 'summary'"
+                    ),
+                    {"tid": seed["ticket_id"]},
+                )
+            ).first()
+        assert row is not None
+        assert row[0] == "served/model-v9"
+    finally:
+        await engine.dispose()
