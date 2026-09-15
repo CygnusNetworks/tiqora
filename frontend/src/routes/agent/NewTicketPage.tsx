@@ -710,7 +710,14 @@ export function NewTicketPage() {
 
             {/* No quote here, so the whole body is the agent's own text. */}
             <RefineControls
-              target={queue === "" ? null : { queue_id: queue }}
+              target={
+                queue === ""
+                  ? null
+                  : {
+                      queue_id: queue,
+                      customer_user_id: customer?.login ?? null,
+                    }
+              }
               body={body}
               onChange={setBody}
               testIdPrefix="new-ticket-refine"
