@@ -2507,6 +2507,17 @@
       "AiRefineIn": {
         "description": "Exactly one of ``ticket_id`` / ``queue_id`` addresses the queue policy.\n\nReplying inside a ticket names the ticket and the server reads its queue \u2014\nthe composer has no queue of its own, and a client-sent one could disagree\nwith the ticket's. The New-ticket form has no ticket yet and names the\nqueue the agent picked in the form.",
         "properties": {
+          "customer_user_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Customer User Id"
+          },
           "queue_id": {
             "anyOf": [
               {

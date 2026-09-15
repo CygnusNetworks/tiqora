@@ -327,5 +327,8 @@ describe("NewTicketPage refine", () => {
     );
     expect(refine.mock.calls[0][0].queue_id).toBe(queue.id);
     expect(refine.mock.calls[0][0].ticket_id).toBeUndefined();
+    // Without a ticket the backend has no source for name masking, so the
+    // composer names the customer it was opened for.
+    expect(refine.mock.calls[0][0].customer_user_id).toBe(customer.login);
   });
 });
