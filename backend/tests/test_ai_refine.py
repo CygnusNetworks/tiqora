@@ -8,6 +8,7 @@ so the session-scoped testcontainer DB is shared safely.
 from __future__ import annotations
 
 import json
+from collections.abc import Generator
 from datetime import datetime
 from typing import Any
 
@@ -17,7 +18,6 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 
 from tiqora.ai import policies as ai_policies
 from tiqora.ai import providers as ai_providers
-from tiqora.ai.gate import OPERATION_MODE_TIQORA_PRIMARY, set_operation_mode
 from tiqora.ai.llm import LlmMessage, LlmResponse, LlmUsage
 from tiqora.ai.pii import PiiMapper
 from tiqora.ai.refine import (
@@ -158,30 +158,63 @@ def _mysql_async(url: str) -> str:
     return url.replace("mysql+pymysql://", "mysql+aiomysql://")
 
 
+#: Every (url, ns) this module seeded, so the module fixture below can delete
+#: exactly those rows again. Without it the module would leak into the shared
+#: testcontainer DB and fail conftest's strict leak check (CI sets
+#: TIQORA_STRICT_DB_LEAKS=1); db_leak_baseline.txt is a ratchet, not a target.
+_SEEDED: list[tuple[str, int]] = []
+
+
+def _seed_statements(*, ns: int) -> tuple[tuple[str, dict[str, Any]], ...]:
+    """The DELETEs that remove everything :func:`_seed` and the tests create.
+
+    Used twice: before seeding (so a re-run is idempotent) and after the module
+    (so nothing is left behind).
+    """
+    agent_id = 9500 + ns
+    group_id = 9530 + ns
+    queue_id = 9500 + ns
+    return (
+        ("DELETE FROM queue WHERE id = :id", {"id": queue_id}),
+        (
+            "DELETE FROM group_user WHERE user_id = :uid OR group_id = :gid",
+            {"uid": agent_id, "gid": group_id},
+        ),
+        ("DELETE FROM permission_groups WHERE id = :id", {"id": group_id}),
+        ("DELETE FROM users WHERE id = :id", {"id": agent_id}),
+        ("DELETE FROM tiqora_ai_queue_policy WHERE queue_id = :id", {"id": queue_id}),
+        ("DELETE FROM tiqora_ai_acl WHERE subject_id = :id", {"id": agent_id}),
+        ("DELETE FROM tiqora_ai_usage WHERE queue_id = :id", {"id": queue_id}),
+        ("DELETE FROM tiqora_ai_audit_log WHERE queue_id = :id", {"id": queue_id}),
+        (
+            "DELETE FROM tiqora_llm_provider WHERE name = :n",
+            {"n": f"fake-refine-provider-{queue_id}"},
+        ),
+    )
+
+
+@pytest.fixture(scope="module", autouse=True)
+def _delete_seeded_rows() -> Generator[None, None, None]:
+    yield
+    for sync_url, ns in _SEEDED:
+        engine = create_engine(sync_url)
+        with engine.begin() as conn:
+            for stmt, params in _seed_statements(ns=ns):
+                conn.execute(text(stmt), params)
+        engine.dispose()
+    _SEEDED.clear()
+
+
 def _seed(sync_url: str, *, ns: int) -> dict[str, Any]:
     agent_id = 9500 + ns
     group_id = 9530 + ns
     queue_id = 9500 + ns
 
+    _SEEDED.append((sync_url, ns))
     engine = create_engine(sync_url)
     TiqoraBase.metadata.create_all(engine)
     with engine.begin() as conn:
-        for stmt, params in (
-            ("DELETE FROM queue WHERE id = :id", {"id": queue_id}),
-            (
-                "DELETE FROM group_user WHERE user_id = :uid OR group_id = :gid",
-                {"uid": agent_id, "gid": group_id},
-            ),
-            ("DELETE FROM permission_groups WHERE id = :id", {"id": group_id}),
-            ("DELETE FROM users WHERE id = :id", {"id": agent_id}),
-            ("DELETE FROM tiqora_ai_queue_policy WHERE queue_id = :id", {"id": queue_id}),
-            ("DELETE FROM tiqora_ai_acl WHERE subject_id = :id", {"id": agent_id}),
-            ("DELETE FROM tiqora_ai_usage WHERE queue_id = :id", {"id": queue_id}),
-            (
-                "DELETE FROM tiqora_llm_provider WHERE name = :n",
-                {"n": f"fake-refine-provider-{queue_id}"},
-            ),
-        ):
+        for stmt, params in _seed_statements(ns=ns):
             conn.execute(text(stmt), params)
 
         conn.execute(
@@ -229,7 +262,6 @@ async def _setup_policy(
     enabled_refine: bool = True,
     pii_masking: bool = False,
 ) -> None:
-    await set_operation_mode(session, OPERATION_MODE_TIQORA_PRIMARY)
     provider = await ai_providers.create_provider(
         session,
         settings=get_settings(),
