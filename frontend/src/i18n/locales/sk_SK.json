@@ -567,7 +567,24 @@
     "customerUnresolved": "K tejto adrese neexistuje zákaznícky záznam, detaily nie sú k dispozícii.",
     "lockedByBanner": "Uzamkol {{name}}",
     "takeOver": "Prevziať",
-    "replyViaTelegram": "Reply will be sent via Telegram"
+    "replyViaTelegram": "Reply will be sent via Telegram",
+    "refine": {
+      "button": "Refine text",
+      "running": "Refining …",
+      "undo": "Undo refine",
+      "toneLabel": "Tone",
+      "toneStandard": "Standard",
+      "toneFormal": "Formal",
+      "toneFriendly": "Friendly",
+      "toneConcise": "Shorter",
+      "nothingToRefine": "No text of your own to refine — quotes are left untouched.",
+      "hint": "Rewrites only what you typed; quoted text is left untouched.",
+      "errorEmpty": "The model returned no usable rewrite. Your text is unchanged.",
+      "errorLimit": "Your quota for AI rewriting is used up.",
+      "errorDenied": "You are not allowed to use AI rewriting.",
+      "errorDisabled": "AI rewriting is not enabled for this queue.",
+      "error": "Refining failed. Your text is unchanged."
+    }
   },
   "search": {
     "title": "Hľadať",
@@ -820,7 +837,8 @@
         "summary": "Zhrnutie",
         "auto_reply": "Automatická odpoveď",
         "manual_assist": "Manuálna asistencia",
-        "mcp": "MCP"
+        "mcp": "MCP",
+        "refine": "Refine text"
       },
       "providers": {
         "title": "poskytovateľov LLM",
@@ -1173,7 +1191,8 @@
         "allowedStateTypes": "Čiarkami oddelený zoznam povolených typov stavov Znuny (napr. „otvorený“ alebo „otvorený, čaká na pripomenutie“), na ktorý môže AI nastaviť lístok cez pole update_ticket_fields – vynútené pre názov štátu aj číselné ID stavu. Prázdne = predvolené iba \"otvorené\" (opätovné otvorenie povolené, nikdy sa nezatvorí); explicitný prázdny zoznam \"[]\" úplne zakáže zmeny stavu.",
         "piiNer": "Zisťuje mená osôb v texte prostredníctvom spaCy NER (nemčina + angličtina) a maskuje ich ako [NAME_n] predtým, ako sa obsah dostane k poskytovateľovi LLM – okrem mena zákazníka a odosielateľov. Aktívne len vtedy, keď je zapnuté maskovanie PII. Falošné pozitíva sú neškodné (len viac maskovania).",
         "summaryDetail": "Štandard: kompaktné odseky, 1–2 vety na priložený dokument. Podrobné: dôkladnejšie odseky a 3–5 viet na dokument – ​​užitočné pre fronty s mnohými prílohami PDF.",
-        "llmFallback": "Providers tried in order, after the primary provider above, when a request fails (rate limit, timeout, error). Each entry has its own optional model override. Priority 1 is always the primary provider/model; entries here are priority 2, 3, …."
+        "llmFallback": "Providers tried in order, after the primary provider above, when a request fails (rate limit, timeout, error). Each entry has its own optional model override. Priority 1 is always the primary provider/model; entries here are priority 2, 3, ….",
+        "enabledRefine": "Shows the “Refine text” button in the reply and New-ticket composers. The model rewrites only what the agent typed; quoted passages are left untouched. Nothing is stored and nothing is sent — the agent sees the result in the editor and can undo it. Not affected by the operation-mode gate."
       },
       "common": {
         "validId": "Platný/neplatný je príznak mäkkého vymazania: označenie položky za neplatnú ju skryje pred výberom nových záznamov bez vymazania existujúcich referencií (napr. lístkov, priradení). Neexistuje žiadne tvrdé odstránenie."

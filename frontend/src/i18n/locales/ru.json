@@ -567,7 +567,24 @@
     "customerUnresolved": "Нет записи клиента с этим адресом — сведения о клиенте недоступны.",
     "lockedByBanner": "Заблокировано: {{name}}",
     "takeOver": "Принять",
-    "replyViaTelegram": "Reply will be sent via Telegram"
+    "replyViaTelegram": "Reply will be sent via Telegram",
+    "refine": {
+      "button": "Refine text",
+      "running": "Refining …",
+      "undo": "Undo refine",
+      "toneLabel": "Tone",
+      "toneStandard": "Standard",
+      "toneFormal": "Formal",
+      "toneFriendly": "Friendly",
+      "toneConcise": "Shorter",
+      "nothingToRefine": "No text of your own to refine — quotes are left untouched.",
+      "hint": "Rewrites only what you typed; quoted text is left untouched.",
+      "errorEmpty": "The model returned no usable rewrite. Your text is unchanged.",
+      "errorLimit": "Your quota for AI rewriting is used up.",
+      "errorDenied": "You are not allowed to use AI rewriting.",
+      "errorDisabled": "AI rewriting is not enabled for this queue.",
+      "error": "Refining failed. Your text is unchanged."
+    }
   },
   "search": {
     "title": "Поиск",
@@ -820,7 +837,8 @@
         "summary": "Сводка",
         "auto_reply": "Автоответ",
         "manual_assist": "Ручная помощь",
-        "mcp": "MCP"
+        "mcp": "MCP",
+        "refine": "Refine text"
       },
       "providers": {
         "title": "Поставщики LLM",
@@ -1173,7 +1191,8 @@
         "allowedStateTypes": "Разделенный запятыми список разрешенных типов состояний Znuny (например, «открыто» или «открыто, ожидающее напоминание»), для которого ИИ может установить тикет через update_ticket_fields — принудительно применяется как для имени состояния, так и для числового идентификатора состояния. Пусто = по умолчанию только «открыто» (разрешено повторное открытие, никогда не закрывается); явный пустой список «[]» полностью отключает изменение состояния.",
         "piiNer": "Обнаруживает имена людей в тексте через spaCy NER (немецкий + английский) и маскирует их как [NAME_n] до того, как контент достигнет провайдера LLM — в дополнение к имени клиента и отправителям. Активно только тогда, когда включено маскирование личных данных. Ложные срабатывания безвредны (просто дополнительная маскировка).",
         "summaryDetail": "Стандарт: компактные абзацы, 1–2 предложения в каждом прикрепленном документе. Подробно: более подробные абзацы и 3–5 предложений на документ — полезно для очередей с большим количеством вложений PDF.",
-        "llmFallback": "Providers tried in order, after the primary provider above, when a request fails (rate limit, timeout, error). Each entry has its own optional model override. Priority 1 is always the primary provider/model; entries here are priority 2, 3, …."
+        "llmFallback": "Providers tried in order, after the primary provider above, when a request fails (rate limit, timeout, error). Each entry has its own optional model override. Priority 1 is always the primary provider/model; entries here are priority 2, 3, ….",
+        "enabledRefine": "Shows the “Refine text” button in the reply and New-ticket composers. The model rewrites only what the agent typed; quoted passages are left untouched. Nothing is stored and nothing is sent — the agent sees the result in the editor and can undo it. Not affected by the operation-mode gate."
       },
       "common": {
         "validId": "Действителен/недействителен — это флаг мягкого удаления: пометка записи как недействительной скрывает ее от сборщиков новых записей без удаления существующих ссылок (например, заявок, назначений). Жесткого удаления нет."

@@ -567,7 +567,24 @@
     "customerUnresolved": "هیچ پروندهٔ مشتری با این نشانی مطابقت ندارد؛ جزئیات در دسترس نیست.",
     "lockedByBanner": "قفل‌شده توسط {{name}}",
     "takeOver": "تحویل گرفتن",
-    "replyViaTelegram": "Reply will be sent via Telegram"
+    "replyViaTelegram": "Reply will be sent via Telegram",
+    "refine": {
+      "button": "Refine text",
+      "running": "Refining …",
+      "undo": "Undo refine",
+      "toneLabel": "Tone",
+      "toneStandard": "Standard",
+      "toneFormal": "Formal",
+      "toneFriendly": "Friendly",
+      "toneConcise": "Shorter",
+      "nothingToRefine": "No text of your own to refine — quotes are left untouched.",
+      "hint": "Rewrites only what you typed; quoted text is left untouched.",
+      "errorEmpty": "The model returned no usable rewrite. Your text is unchanged.",
+      "errorLimit": "Your quota for AI rewriting is used up.",
+      "errorDenied": "You are not allowed to use AI rewriting.",
+      "errorDisabled": "AI rewriting is not enabled for this queue.",
+      "error": "Refining failed. Your text is unchanged."
+    }
   },
   "search": {
     "title": "جستجو کنید",
@@ -820,7 +837,8 @@
         "summary": "خلاصه",
         "auto_reply": "پاسخ خودکار",
         "manual_assist": "کمک دستی",
-        "mcp": "MCP"
+        "mcp": "MCP",
+        "refine": "Refine text"
       },
       "providers": {
         "title": "ارائه دهندگان LLM",
@@ -1173,7 +1191,8 @@
         "allowedStateTypes": "فهرستی از انواع حالت مجاز Znuny جدا شده با کاما (به عنوان مثال \"باز\" یا \"باز، در انتظار یادآوری\") ممکن است هوش مصنوعی بلیطی را از طریق update_ticket_fields تنظیم کند - هم برای نام ایالت و هم برای شناسه حالت عددی اعمال می شود. Empty = پیش فرض \"باز\" ​​فقط (باز کردن مجدد مجاز است، هرگز بسته نمی شود). یک لیست خالی صریح \"[]\" تغییرات حالت را به طور کامل غیرفعال می کند.",
         "piiNer": "نام افراد را در متن از طریق spaCy NER (آلمانی + انگلیسی) تشخیص می‌دهد و قبل از اینکه محتوا به ارائه‌دهنده LLM برسد - علاوه بر نام مشتری و فرستنده، آنها را به عنوان [NAME_n] پنهان می‌کند. فقط زمانی فعال است که پوشش PII روشن باشد. مثبت کاذب بی ضرر هستند (فقط پوشاندن بیشتر).",
         "summaryDetail": "استاندارد: پاراگراف های فشرده، 1 تا 2 جمله در هر سند پیوست. جزئیات: پاراگراف های دقیق تر و 3 تا 5 جمله در هر سند - برای صف هایی با پیوست های PDF بسیار مفید است.",
-        "llmFallback": "Providers tried in order, after the primary provider above, when a request fails (rate limit, timeout, error). Each entry has its own optional model override. Priority 1 is always the primary provider/model; entries here are priority 2, 3, …."
+        "llmFallback": "Providers tried in order, after the primary provider above, when a request fails (rate limit, timeout, error). Each entry has its own optional model override. Priority 1 is always the primary provider/model; entries here are priority 2, 3, ….",
+        "enabledRefine": "Shows the “Refine text” button in the reply and New-ticket composers. The model rewrites only what the agent typed; quoted passages are left untouched. Nothing is stored and nothing is sent — the agent sees the result in the editor and can undo it. Not affected by the operation-mode gate."
       },
       "common": {
         "validId": "معتبر/نامعتبر یک پرچم حذف نرم است: با علامت گذاری یک ورودی به عنوان نامعتبر، بدون حذف مراجع موجود (به عنوان مثال بلیط، تکالیف) آن را از انتخاب کنندگان برای رکوردهای جدید پنهان می کند. حذف سخت وجود ندارد."
