@@ -453,6 +453,8 @@
       "originBadge": "AI",
       "originBadgeTooltip": "Auto-sent by the AI agent — click to see the tool trace",
       "originTraceEmpty": "No tool calls were recorded for this reply.",
+      "escalatedBanner": "AI handed off to a human at {{dateTime}} — auto-reply stays off until an agent sends a customer-visible reply, or resumes it here.",
+      "resumeButton": "Resume AI",
       "errorLlmEmptyOutput": "The AI model used up its token budget while reasoning. Please try again.",
       "errorLlmTimeout": "Timed out waiting for the AI provider. Please try again.",
       "errorLlmProviderError": "The AI provider reported an error. Please try again later.",
@@ -565,7 +567,24 @@
     "customerUnresolved": "Ehhez a címhez nincs ügyfélrekord, ezért az ügyféladatok nem érhetők el.",
     "lockedByBanner": "Zárolta: {{name}}",
     "takeOver": "Átvétel",
-    "replyViaTelegram": "Reply will be sent via Telegram"
+    "replyViaTelegram": "Reply will be sent via Telegram",
+    "refine": {
+      "button": "Refine text",
+      "running": "Refining …",
+      "undo": "Undo refine",
+      "toneLabel": "Tone",
+      "toneStandard": "Standard",
+      "toneFormal": "Formal",
+      "toneFriendly": "Friendly",
+      "toneConcise": "Shorter",
+      "nothingToRefine": "No text of your own to refine — quotes are left untouched.",
+      "hint": "Rewrites only what you typed; quoted text is left untouched.",
+      "errorEmpty": "The model returned no usable rewrite. Your text is unchanged.",
+      "errorLimit": "Your quota for AI rewriting is used up.",
+      "errorDenied": "You are not allowed to use AI rewriting.",
+      "errorDisabled": "AI rewriting is not enabled for this queue.",
+      "error": "Refining failed. Your text is unchanged."
+    }
   },
   "search": {
     "title": "Keresés",
@@ -818,7 +837,8 @@
         "summary": "Összegzés",
         "auto_reply": "Automatikus válasz",
         "manual_assist": "Kézi segítség",
-        "mcp": "MCP"
+        "mcp": "MCP",
+        "refine": "Refine text"
       },
       "providers": {
         "title": "LLM szolgáltatók",
@@ -1171,7 +1191,8 @@
         "allowedStateTypes": "Vesszővel elválasztott lista az engedélyezett Znuny állapotípusokról (pl. „open” vagy „open,pending reminder”), amelyekre az AI a jegyet az update_ticket_fields eszközzel állíthatja — érvényesül az állapotnévre és a numerikus állapot-ID-ra is. Üres = alapértelmezetten csak „open” (újranyitás megengedett, lezárás soha); az explicit üres lista „[]” teljesen letiltja az állapotváltást.",
         "piiNer": "A spaCy NER (német + angol) segítségével felismeri a személyneveket a szövegben, és [NAME_n] formában maszkolja őket, mielőtt a tartalom eljutna az LLM-szolgáltatóhoz — az ügyfélnév és a feladók maszkolásán felül. Csak akkor aktív, ha a PII-maszkolás be van kapcsolva. A téves pozitívok ártalmatlanok (csak több maszkolás).",
         "summaryDetail": "Szabvány: tömör bekezdések, csatolt dokumentumonként 1-2 mondat. Részletes: alaposabb bekezdések és 3–5 mondat dokumentumonként – hasznos a sok PDF-mellékletet tartalmazó soroknál.",
-        "llmFallback": "Providers tried in order, after the primary provider above, when a request fails (rate limit, timeout, error). Each entry has its own optional model override. Priority 1 is always the primary provider/model; entries here are priority 2, 3, …."
+        "llmFallback": "Providers tried in order, after the primary provider above, when a request fails (rate limit, timeout, error). Each entry has its own optional model override. Priority 1 is always the primary provider/model; entries here are priority 2, 3, ….",
+        "enabledRefine": "Shows the “Refine text” button in the reply and New-ticket composers. The model rewrites only what the agent typed; quoted passages are left untouched. Nothing is stored and nothing is sent — the agent sees the result in the editor and can undo it. Not affected by the operation-mode gate."
       },
       "common": {
         "validId": "Az érvényes/érvénytelen egy lágy törlés jelző: érvénytelenre állításkor az elem eltűnik az új rekordok kiválasztóiból, de a meglévő hivatkozások megmaradnak."

@@ -3413,6 +3413,54 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/ai/refine": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Request Refine
+         * @description Rewrite the agent's own text in the composer (plan "Text verfeinern").
+         *
+         *     Stateless: nothing is written to the ticket, and quoted text is returned
+         *     to nobody — only the ``own`` sections come back, keyed by the index they
+         *     replace, so the composer can re-assemble the body around the untouched
+         *     quotes itself.
+         */
+        post: operations["request_refine_api_v1_ai_refine_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/ai/refine/availability": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Refine Availability
+         * @description Whether to offer the "refine" button at all. Answers ``False`` rather
+         *     than raising for a queue the agent may not write to, or a ticket they
+         *     cannot see — the button is simply absent, which is all the composer needs
+         *     to know.
+         */
+        get: operations["refine_availability_api_v1_ai_refine_availability_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/auth/login": {
         parameters: {
             query?: never;
@@ -5335,6 +5383,33 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/tickets/{ticket_id}/ai/resume": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Resume Ai Route
+         * @description Manually clear the AI->human handoff flag so auto-reply can resume.
+         *
+         *     Normally only a human agent's customer-visible reply (or the ticket
+         *     closing) clears ``ai_escalated_at`` — see
+         *     :func:`tiqora.domain.ticket_write_service.resume_ai_automation`. This is
+         *     the explicit override for when a human decides the ticket is safe to
+         *     hand back without writing a customer-visible reply, e.g. after fixing
+         *     the underlying issue that caused a bad escalation.
+         */
+        post: operations["resume_ai_route_api_v1_tickets__ticket_id__ai_resume_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/tickets/{ticket_id}/ai/summarize": {
         parameters: {
             query?: never;
@@ -6665,6 +6740,11 @@ export interface components {
              */
             enabled_manual_assist: boolean;
             /**
+             * Enabled Refine
+             * @default false
+             */
+            enabled_refine: boolean;
+            /**
              * Enabled Summary
              * @default false
              */
@@ -6789,6 +6869,8 @@ export interface components {
             enabled_auto_reply: boolean;
             /** Enabled Manual Assist */
             enabled_manual_assist: boolean;
+            /** Enabled Refine */
+            enabled_refine: boolean;
             /** Enabled Summary */
             enabled_summary: boolean;
             /** Escalation Rules */
@@ -6881,6 +6963,8 @@ export interface components {
             enabled_auto_reply?: boolean | null;
             /** Enabled Manual Assist */
             enabled_manual_assist?: boolean | null;
+            /** Enabled Refine */
+            enabled_refine?: boolean | null;
             /** Enabled Summary */
             enabled_summary?: boolean | null;
             /** Escalation Rules */
@@ -6940,6 +7024,61 @@ export interface components {
             /** Vision Provider Id */
             vision_provider_id?: number | null;
         };
+        /** AiRefineAvailabilityOut */
+        AiRefineAvailabilityOut: {
+            /** Available */
+            available: boolean;
+        };
+        /**
+         * AiRefineIn
+         * @description Exactly one of ``ticket_id`` / ``queue_id`` addresses the queue policy.
+         *
+         *     Replying inside a ticket names the ticket and the server reads its queue —
+         *     the composer has no queue of its own, and a client-sent one could disagree
+         *     with the ticket's. The New-ticket form has no ticket yet and names the
+         *     queue the agent picked in the form.
+         */
+        AiRefineIn: {
+            /** Queue Id */
+            queue_id?: number | null;
+            /** Segments */
+            segments: components["schemas"]["AiRefineSegmentIn"][];
+            /** Ticket Id */
+            ticket_id?: number | null;
+            /**
+             * Tone
+             * @default standard
+             */
+            tone: string;
+        };
+        /** AiRefineOut */
+        AiRefineOut: {
+            /** Sections */
+            sections: components["schemas"]["AiRefineSectionOut"][];
+        };
+        /** AiRefineSectionOut */
+        AiRefineSectionOut: {
+            /** Id */
+            id: number;
+            /** Text */
+            text: string;
+        };
+        /**
+         * AiRefineSegmentIn
+         * @description One run of the composer body, as segmented by the frontend
+         *     (``frontend/src/lib/replyQuote.ts``). Quote segments are sent so the model
+         *     can see what an inline answer refers to; they are never rewritten and
+         *     never come back in the response.
+         */
+        AiRefineSegmentIn: {
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "own" | "quote";
+            /** Text */
+            text: string;
+        };
         /** AiSettingsOut */
         AiSettingsOut: {
             /** Audit Retention Days */
@@ -6979,6 +7118,8 @@ export interface components {
         };
         /** AiStateOut */
         AiStateOut: {
+            /** Ai Escalated At */
+            ai_escalated_at?: string | null;
             /** Can Summarize */
             can_summarize: boolean;
             /** Drafts */
@@ -23480,6 +23621,79 @@ export interface operations {
             };
         };
     };
+    request_refine_api_v1_ai_refine_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AiRefineIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AiRefineOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    refine_availability_api_v1_ai_refine_availability_get: {
+        parameters: {
+            query?: {
+                ticket_id?: number | null;
+                queue_id?: number | null;
+            };
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AiRefineAvailabilityOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     login_api_v1_auth_login_post: {
         parameters: {
             query?: never;
@@ -27476,6 +27690,39 @@ export interface operations {
             path: {
                 ticket_id: number;
                 draft_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    resume_ai_route_api_v1_tickets__ticket_id__ai_resume_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                ticket_id: number;
             };
             cookie?: {
                 tiqora_session?: string | null;
