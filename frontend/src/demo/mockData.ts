@@ -716,7 +716,7 @@ const aiMcpToolPolicies: Record<number, unknown[]> = {
 // One policy per AI-enabled queue; the list page joins queue_id → queue name.
 function queuePolicy(over: Record<string, unknown>) {
   return {
-    id: 1, queue_id: 2, enabled_auto_reply: false, enabled_summary: true, enabled_manual_assist: true,
+    id: 1, queue_id: 2, enabled_auto_reply: false, enabled_summary: true, enabled_manual_assist: true, enabled_refine: true,
     system_prompt: "You are a support assistant for an IT service desk. Answer factually, in the customer's language, and never invent account details.",
     autonomy: "off", service_user_id: 1, llm_provider_id: 1, model_override: null,
     llm_fallback_json: JSON.stringify([{ provider_id: 2, model: null }]),

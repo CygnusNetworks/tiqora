@@ -567,7 +567,24 @@
     "customerUnresolved": "Geen klantrecord komt overeen met dit adres; klantgegevens zijn niet beschikbaar.",
     "lockedByBanner": "Vergrendeld door {{name}}",
     "takeOver": "Overnemen",
-    "replyViaTelegram": "Reply will be sent via Telegram"
+    "replyViaTelegram": "Reply will be sent via Telegram",
+    "refine": {
+      "button": "Refine text",
+      "running": "Refining …",
+      "undo": "Undo refine",
+      "toneLabel": "Tone",
+      "toneStandard": "Standard",
+      "toneFormal": "Formal",
+      "toneFriendly": "Friendly",
+      "toneConcise": "Shorter",
+      "nothingToRefine": "No text of your own to refine — quotes are left untouched.",
+      "hint": "Rewrites only what you typed; quoted text is left untouched.",
+      "errorEmpty": "The model returned no usable rewrite. Your text is unchanged.",
+      "errorLimit": "Your quota for AI rewriting is used up.",
+      "errorDenied": "You are not allowed to use AI rewriting.",
+      "errorDisabled": "AI rewriting is not enabled for this queue.",
+      "error": "Refining failed. Your text is unchanged."
+    }
   },
   "search": {
     "title": "Zoeken",
@@ -820,7 +837,8 @@
         "summary": "Samenvatting",
         "auto_reply": "Auto-antwoord",
         "manual_assist": "Handmatige assistentie",
-        "mcp": "MCP"
+        "mcp": "MCP",
+        "refine": "Refine text"
       },
       "providers": {
         "title": "LLM-providers",
@@ -1173,7 +1191,8 @@
         "allowedStateTypes": "Door komma's gescheiden lijst met toegestane Znuny statustypen (bijvoorbeeld \"open\" of \"open, in afwachting van herinnering\") waarop AI een ticket kan instellen via update_ticket_fields - afgedwongen voor zowel de staatsnaam als de numerieke status-ID. Leeg = standaard alleen \"open\" (heropenen toegestaan, nooit sluiten); een expliciete lege lijst \"[]\" schakelt statuswijzigingen volledig uit.",
         "piiNer": "Detecteert persoonsnamen in tekst via spaCy NER (Duits + Engels) en maskeert deze als [NAME_n] voordat de inhoud de LLM provider bereikt — naast de klantnaam en afzenders. Alleen actief als PII-maskering is ingeschakeld. Valse positieven zijn onschadelijk (alleen meer maskering).",
         "summaryDetail": "Standaard: compacte alinea's, 1 à 2 zinnen per bijgevoegd document. Gedetailleerd: uitgebreidere alinea's en 3-5 zinnen per document — handig voor wachtrijen met veel PDF bijlagen.",
-        "llmFallback": "Providers tried in order, after the primary provider above, when a request fails (rate limit, timeout, error). Each entry has its own optional model override. Priority 1 is always the primary provider/model; entries here are priority 2, 3, …."
+        "llmFallback": "Providers tried in order, after the primary provider above, when a request fails (rate limit, timeout, error). Each entry has its own optional model override. Priority 1 is always the primary provider/model; entries here are priority 2, 3, ….",
+        "enabledRefine": "Shows the “Refine text” button in the reply and New-ticket composers. The model rewrites only what the agent typed; quoted passages are left untouched. Nothing is stored and nothing is sent — the agent sees the result in the editor and can undo it. Not affected by the operation-mode gate."
       },
       "common": {
         "validId": "Geldig/ongeldig is een vlag voor zacht verwijderen: als u een invoer als ongeldig markeert, wordt deze verborgen voor kiezers voor nieuwe records zonder bestaande referenties (bijvoorbeeld tickets, opdrachten) te verwijderen. Er is geen harde verwijdering."
