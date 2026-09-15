@@ -62,11 +62,15 @@ KIND_OWN = "own"
 #: document editor. Enforced by the API layer, repeated here as a hard stop.
 MAX_TOTAL_CHARS = 60_000
 
-_SYSTEM_PROMPT = (
+#: Role and the non-negotiable rules. Kept separate from the tone block and
+#: the output contract so the tone can sit BETWEEN them — a tone sentence
+#: appended after the JSON contract is the last thing the model reads and was
+#: measurably ignored (all four tones produced near-identical German).
+_RULES = (
     "You are a writing assistant for a customer-support agent. You are given "
     "one or more sections of a message the agent has just typed, and you "
     "rewrite each one so it reads well: correct spelling and grammar, clear "
-    "sentence structure, a consistent professional register.\n\n"
+    "sentence structure.\n\n"
     "Hard rules:\n"
     "- Do not add any information, fact, number, date, identifier, name, "
     "promise or offer that is not already in the agent's text.\n"
@@ -77,27 +81,69 @@ _SYSTEM_PROMPT = (
     "already there; the system appends the signature itself.\n"
     "- Do not answer the customer, do not continue the message, do not "
     "comment on your changes.\n"
+    "- Never add a commitment: no follow-up, next step, check-back, "
+    "timeline or availability that the agent did not already write.\n"
     "- Sections marked as a quote are context only. Never reproduce, "
-    "translate or rewrite them.\n\n"
-    "Answer with a JSON object and nothing else, in this exact shape:\n"
-    '{"sections": [{"id": <the section id>, "text": "<the rewritten text>"}]}\n'
-    "Include exactly one entry for every [SECTION <id>] block you were "
-    "given, with the same id, and no other entries."
+    "translate or rewrite them."
 )
 
+_OUTPUT_CONTRACT = (
+    "Answer with a JSON object and nothing else, in this exact shape:\n"
+    '{"sections": [{"id": <the section id as a NUMBER>, "text": "<the rewritten text>"}]}\n'
+    "Include exactly one entry for every [SECTION <id>] block you were "
+    "given, with the same id, and no other entries. The id is the bare "
+    'number, not the label — write 1, not "SECTION 1".'
+)
+
+#: Concrete, contrastive, sentence-level. Each names what to DO and what NOT
+#: to do, so the model has a direction to move away from instead of one ideal
+#: to converge on. Naming a mood ("warm and approachable") does not work: the
+#: hard rules above are specific and simply out-argue it.
 _TONE_INSTRUCTIONS = {
-    TONE_STANDARD: ("Keep the agent's tone as it is; only fix language and readability."),
+    TONE_STANDARD: (
+        "Keep the agent's register exactly as it is. Change only what is "
+        "wrong or hard to read. Do not make it more formal and do not make "
+        "it warmer."
+    ),
     TONE_FORMAL: (
-        "Use a formal, polite business register (in German: 'Sie', complete "
-        "sentences, no colloquialisms)."
+        "Raise it to a formal business register. Prefer a nominal style "
+        "('die Bearbeitung erfolgt' over 'wir bearbeiten das'), full "
+        "courtesy formulas ('Wir bitten um Ihr Verstaendnis', 'Vielen Dank "
+        "fuer Ihre Geduld'), and complete, self-contained sentences. Keep "
+        "distance: no contractions, no colloquialisms, no exclamation "
+        "marks, and do not address the reader's feelings."
     ),
     TONE_FRIENDLY: (
-        "Use a warm, approachable tone while staying professional; keep it "
-        "natural rather than effusive."
+        "Make it noticeably more personal. Use short sentences and active "
+        "verbs ('wir schauen uns das an' over 'eine Pruefung erfolgt'), "
+        "address the reader directly, and acknowledge the situation once "
+        "where the text already implies it ('das ist aergerlich', 'wir "
+        "verstehen den Aerger'). This is NOT the formal register: avoid "
+        "nominal constructions and stock courtesy formulas, and do not sound "
+        "like a form letter. Stay professional and do not gush.\n"
+        "Warmth never buys you content: do not promise a follow-up, a next "
+        "step, a check-back or a timeline unless the agent already wrote "
+        "one. Sentences like 'wir melden uns' or 'wir schauen weiter nach' "
+        "are forbidden if they are not in the input."
     ),
     TONE_CONCISE: (
-        "Make it noticeably shorter and more direct: drop filler and redundancy, keep every fact."
+        "Cut it down hard: the result must be at least a third shorter than "
+        "the input. At most one subordinate clause per sentence. Drop "
+        "filler, hedging and repetition, and merge sentences that say the "
+        "same thing. Every fact stays. This is NOT about politeness: do not "
+        "add courtesy formulas and do not soften anything."
     ),
+}
+
+#: A tone shift needs room to move. At the client default of 0.2 the model
+#: converges on one 'best' rewrite and the tone instruction barely registers
+#: (measured: all four tones came back near-identical). Standard stays low on
+#: purpose -- it is only meant to fix language, not to vary.
+_TONE_TEMPERATURES = {
+    TONE_STANDARD: 0.2,
+    TONE_FORMAL: 0.5,
+    TONE_FRIENDLY: 0.5,
+    TONE_CONCISE: 0.4,
 }
 
 
@@ -147,6 +193,16 @@ def _tone_instruction(tone: str) -> str:
     return _TONE_INSTRUCTIONS.get(tone, _TONE_INSTRUCTIONS[TONE_STANDARD])
 
 
+def _temperature_for(tone: str) -> float:
+    return _TONE_TEMPERATURES.get(tone, _TONE_TEMPERATURES[TONE_STANDARD])
+
+
+def _build_system_prompt(tone: str) -> str:
+    """Rules, then the tone block, then the output contract — in that order."""
+    tone_block = f"TONE — apply this to every section:\n{_tone_instruction(tone)}"
+    return f"{_RULES}\n\n{tone_block}\n\n{_OUTPUT_CONTRACT}"
+
+
 def _build_user_message(
     segments: list[Segment],
     section_ids: list[int],
@@ -187,19 +243,24 @@ def _coerce_section_id(raw: Any) -> int | None:
     """Section id as an int, or ``None`` if it is not one.
 
     Models routinely answer ``"id": "2"`` even when the prompt shows an
-    unquoted number (seen in prod from Qwen3-235B), so a stringified integer
-    is accepted — rejecting it would throw away an otherwise good rewrite.
-    ``bool`` is excluded because it is an ``int`` subclass.
+    unquoted number, and sometimes echo the label back as ``"SECTION 1"``
+    (both seen in prod from Qwen3-235B). A single number anywhere in the
+    string is therefore accepted — rejecting it would throw away an otherwise
+    good rewrite and force a needless retry.
+
+    Anything ambiguous stays rejected: no number, several numbers, or a
+    ``bool`` (which is an ``int`` subclass). Being liberal about the *spelling*
+    of an id must not become liberal about *which* section it names.
     """
     if isinstance(raw, bool):
         return None
     if isinstance(raw, int):
         return raw
     if isinstance(raw, str):
-        try:
-            return int(raw.strip())
-        except ValueError:
+        numbers = re.findall(r"\d+", raw)
+        if len(numbers) != 1:
             return None
+        return int(numbers[0])
     return None
 
 
@@ -309,7 +370,8 @@ async def refine_text(
         pii_mapper=pii,
     )
 
-    system_prompt = f"{_SYSTEM_PROMPT}\n\nTone: {_tone_instruction(tone)}"
+    system_prompt = _build_system_prompt(tone)
+    temperature = _temperature_for(tone)
     prompt_tokens = 0
     completion_tokens = 0
     model_served: str | None = None
@@ -326,6 +388,7 @@ async def refine_text(
             ],
             tools=None,
             max_tokens=_completion_budget(segments, ids),
+            temperature=temperature,
         )
         prompt_tokens += response.usage.prompt_tokens
         completion_tokens += response.usage.completion_tokens

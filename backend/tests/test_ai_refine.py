@@ -21,16 +21,19 @@ from tiqora.ai import providers as ai_providers
 from tiqora.ai.llm import LlmMessage, LlmResponse, LlmUsage
 from tiqora.ai.pii import PiiMapper
 from tiqora.ai.refine import (
-    _SYSTEM_PROMPT,
     TONE_CONCISE,
     TONE_FORMAL,
+    TONE_FRIENDLY,
     TONE_STANDARD,
     RefineAclDeniedError,
     RefineEmptyOutputError,
     RefinePolicyDisabledError,
     Segment,
+    _build_system_prompt,
     _build_user_message,
+    _coerce_section_id,
     _parse_sections,
+    _temperature_for,
     _tone_instruction,
     own_section_ids,
     refine_text,
@@ -47,19 +50,75 @@ NOW = datetime(2024, 6, 1, 12, 0, 0)
 
 
 def test_system_prompt_forbids_inventing_or_dropping_content() -> None:
-    assert "Do not add" in _SYSTEM_PROMPT
-    assert "Do not remove" in _SYSTEM_PROMPT
+    prompt = _build_system_prompt(TONE_STANDARD)
+    assert "Do not add" in prompt
+    assert "Do not remove" in prompt
     # Reply language is the agent's choice, not the model's.
-    assert "same language" in _SYSTEM_PROMPT
+    assert "same language" in prompt
     # Signature is appended by the send pipeline; the model must not add one.
-    assert "signature" in _SYSTEM_PROMPT
+    assert "signature" in prompt
     # Output contract that _parse_sections depends on.
-    assert "JSON" in _SYSTEM_PROMPT
+    assert "JSON" in prompt
 
 
-def test_tone_instruction_differs_per_tone() -> None:
-    assert _tone_instruction(TONE_STANDARD) != _tone_instruction(TONE_FORMAL)
-    assert _tone_instruction(TONE_FORMAL) != _tone_instruction(TONE_CONCISE)
+def test_tone_block_comes_before_the_output_contract() -> None:
+    # A tone sentence tacked on after the output contract is the last thing the
+    # model reads and was measurably ignored (all four tones produced near
+    # identical German). It has to sit in the instruction body.
+    prompt = _build_system_prompt(TONE_FRIENDLY)
+    assert prompt.index("TONE") < prompt.index('{"sections"')
+
+
+def test_each_tone_names_concrete_sentence_level_choices() -> None:
+    # "warm and approachable" is a mood, not an instruction. Every tone must
+    # name something a rewrite can actually be checked against.
+    formal = _tone_instruction(TONE_FORMAL)
+    friendly = _tone_instruction(TONE_FRIENDLY)
+    concise = _tone_instruction(TONE_CONCISE)
+    assert "nominal" in formal.lower()
+    assert "short sentences" in friendly.lower()
+    assert "a third" in concise.lower()
+    assert len({formal, friendly, concise, _tone_instruction(TONE_STANDARD)}) == 4
+
+
+def test_tone_instructions_contrast_each_other_explicitly() -> None:
+    # Each non-default tone says what it is NOT, so the model has a direction
+    # to move away from rather than one ideal to converge on.
+    for tone in (TONE_FORMAL, TONE_FRIENDLY, TONE_CONCISE):
+        assert "not" in _tone_instruction(tone).lower()
+
+
+def test_friendly_tone_forbids_inventing_a_commitment() -> None:
+    # Measured regression: at a raised temperature "friendly" appended "Wir
+    # schauen aber weiterhin nach." to a text that said the opposite. Warmth
+    # must not buy the model a promise.
+    friendly = _tone_instruction(TONE_FRIENDLY).lower()
+    assert "promise" in friendly
+    assert "follow-up" in friendly or "next step" in friendly
+
+
+def test_temperature_is_raised_for_a_tone_shift_but_not_for_standard() -> None:
+    # Standard only fixes language, so it should stay convergent.
+    assert _temperature_for(TONE_STANDARD) < _temperature_for(TONE_FRIENDLY)
+    assert _temperature_for(TONE_STANDARD) < _temperature_for(TONE_FORMAL)
+
+
+def test_coerce_section_id_reads_a_label_the_model_echoed_back() -> None:
+    # Observed in prod: the model answered {"id": "SECTION 1"} instead of 1.
+    assert _coerce_section_id("SECTION 1") == 1
+    assert _coerce_section_id("#3") == 3
+    assert _coerce_section_id(" 2 ") == 2
+
+
+def test_coerce_section_id_rejects_an_ambiguous_or_numberless_id() -> None:
+    assert _coerce_section_id("1 or 2") is None
+    assert _coerce_section_id("zwei") is None
+    assert _coerce_section_id(True) is None
+
+
+def test_parse_sections_accepts_a_labelled_id() -> None:
+    content = '{"sections": [{"id": "SECTION 1", "text": "Guten Tag."}]}'
+    assert _parse_sections(content, [1]) == {1: "Guten Tag."}
 
 
 def test_own_section_ids_skips_quotes_and_blank_own_segments() -> None:
