@@ -453,6 +453,8 @@
       "originBadge": "AI",
       "originBadgeTooltip": "Auto-sent by the AI agent — click to see the tool trace",
       "originTraceEmpty": "No tool calls were recorded for this reply.",
+      "escalatedBanner": "AI handed off to a human at {{dateTime}} — auto-reply stays off until an agent sends a customer-visible reply, or resumes it here.",
+      "resumeButton": "Resume AI",
       "errorLlmEmptyOutput": "The AI model used up its token budget while reasoning. Please try again.",
       "errorLlmTimeout": "Timed out waiting for the AI provider. Please try again.",
       "errorLlmProviderError": "The AI provider reported an error. Please try again later.",
@@ -565,7 +567,24 @@
     "customerUnresolved": "אין רשומת לקוח התואמת לכתובת זו, ולכן הפרטים אינם זמינים.",
     "lockedByBanner": "נעול על ידי {{name}}",
     "takeOver": "השתלטות",
-    "replyViaTelegram": "Reply will be sent via Telegram"
+    "replyViaTelegram": "Reply will be sent via Telegram",
+    "refine": {
+      "button": "Refine text",
+      "running": "Refining …",
+      "undo": "Undo refine",
+      "toneLabel": "Tone",
+      "toneStandard": "Standard",
+      "toneFormal": "Formal",
+      "toneFriendly": "Friendly",
+      "toneConcise": "Shorter",
+      "nothingToRefine": "No text of your own to refine — quotes are left untouched.",
+      "hint": "Rewrites only what you typed; quoted text is left untouched.",
+      "errorEmpty": "The model returned no usable rewrite. Your text is unchanged.",
+      "errorLimit": "Your quota for AI rewriting is used up.",
+      "errorDenied": "You are not allowed to use AI rewriting.",
+      "errorDisabled": "AI rewriting is not enabled for this queue.",
+      "error": "Refining failed. Your text is unchanged."
+    }
   },
   "search": {
     "title": "חפש",
@@ -818,7 +837,8 @@
         "summary": "סיכום",
         "auto_reply": "תשובה אוטומטית",
         "manual_assist": "סיוע ידני",
-        "mcp": "MCP"
+        "mcp": "MCP",
+        "refine": "Refine text"
       },
       "providers": {
         "title": "ספקי LLM",
@@ -1171,7 +1191,8 @@
         "allowedStateTypes": "רשימה מופרדת בפסיקים של סוגי מצב Znuny המותרים (למשל \"פתוח\" או \"פתוח, בהמתנה לתזכורת\") שה-AI עשוי להגדיר כרטיס באמצעות update_ticket_fields - נאכף הן עבור שם המדינה והן עבור מזהה המדינה המספרי. ריק = ברירת מחדל \"פתוח\" בלבד (פתיחה מחדש מותרת, לעולם לא נסגרת); רשימה ריקה מפורשת \"[]\" משביתה את שינויי המצב לחלוטין.",
         "piiNer": "מזהה שמות אנשים בטקסט באמצעות spaCy NER (גרמנית + אנגלית) ומסווה אותם כ-[NAME_n] לפני שהתוכן מגיע לספק ה-LLM - בנוסף לשם הלקוח והשולחים. פעיל רק כאשר מיסוך PII פועל. תוצאות כוזבות אינן מזיקות (רק יותר מיסוך).",
         "summaryDetail": "תקן: פסקאות קומפקטיות, 1-2 משפטים לכל מסמך מצורף. מפורט: פסקאות יסודיות יותר ו-3-5 משפטים לכל מסמך - שימושי לתורים עם קבצי PDF רבים.",
-        "llmFallback": "Providers tried in order, after the primary provider above, when a request fails (rate limit, timeout, error). Each entry has its own optional model override. Priority 1 is always the primary provider/model; entries here are priority 2, 3, …."
+        "llmFallback": "Providers tried in order, after the primary provider above, when a request fails (rate limit, timeout, error). Each entry has its own optional model override. Priority 1 is always the primary provider/model; entries here are priority 2, 3, ….",
+        "enabledRefine": "Shows the “Refine text” button in the reply and New-ticket composers. The model rewrites only what the agent typed; quoted passages are left untouched. Nothing is stored and nothing is sent — the agent sees the result in the editor and can undo it. Not affected by the operation-mode gate."
       },
       "common": {
         "validId": "תקף/לא תקף הוא דגל למחיקה רכה: סימון ערך לא חוקי מסתיר אותו מהבוררים לרשומות חדשות מבלי למחוק הפניות קיימות (למשל כרטיסים, הקצאות). אין מחיקה קשה."

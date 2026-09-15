@@ -453,6 +453,8 @@
       "originBadge": "AI",
       "originBadgeTooltip": "Auto-sent by the AI agent — click to see the tool trace",
       "originTraceEmpty": "No tool calls were recorded for this reply.",
+      "escalatedBanner": "AI handed off to a human at {{dateTime}} — auto-reply stays off until an agent sends a customer-visible reply, or resumes it here.",
+      "resumeButton": "Resume AI",
       "errorLlmEmptyOutput": "The AI model used up its token budget while reasoning. Please try again.",
       "errorLlmTimeout": "Timed out waiting for the AI provider. Please try again.",
       "errorLlmProviderError": "The AI provider reported an error. Please try again later.",
@@ -565,7 +567,24 @@
     "customerUnresolved": "沒有與此地址相符的客戶紀錄，因此無法顯示客戶詳情。",
     "lockedByBanner": "由 {{name}} 鎖定",
     "takeOver": "接管",
-    "replyViaTelegram": "Reply will be sent via Telegram"
+    "replyViaTelegram": "Reply will be sent via Telegram",
+    "refine": {
+      "button": "Refine text",
+      "running": "Refining …",
+      "undo": "Undo refine",
+      "toneLabel": "Tone",
+      "toneStandard": "Standard",
+      "toneFormal": "Formal",
+      "toneFriendly": "Friendly",
+      "toneConcise": "Shorter",
+      "nothingToRefine": "No text of your own to refine — quotes are left untouched.",
+      "hint": "Rewrites only what you typed; quoted text is left untouched.",
+      "errorEmpty": "The model returned no usable rewrite. Your text is unchanged.",
+      "errorLimit": "Your quota for AI rewriting is used up.",
+      "errorDenied": "You are not allowed to use AI rewriting.",
+      "errorDisabled": "AI rewriting is not enabled for this queue.",
+      "error": "Refining failed. Your text is unchanged."
+    }
   },
   "search": {
     "title": "搜尋",
@@ -818,7 +837,8 @@
         "summary": "總結",
         "auto_reply": "自動回覆",
         "manual_assist": "手動輔助",
-        "mcp": "MCP"
+        "mcp": "MCP",
+        "refine": "Refine text"
       },
       "providers": {
         "title": "法學碩士提供者",
@@ -1171,7 +1191,8 @@
         "allowedStateTypes": "以逗號分隔的允許的 Znuny 狀態類型清單（例如「開啟」或「開啟、待處理提醒」），AI 可以透過 update_ticket_fields 設定票證 — 對狀態名稱和數字狀態 id 強制執行。空 = 預設僅「開啟」（允許重新打開，從不關閉）；明確的空清單「[]」完全停用狀態變更。",
         "piiNer": "透過 spaCy NER（德語 + 英語）檢測文本中的人名，並在內容到達 LLM 提供者之前將其遮罩為 [NAME_n] - 除了客戶名稱和寄件者之外。僅當 PII 屏蔽開啟時才有效。誤報是無害的（只是更多的掩蔽）。",
         "summaryDetail": "標準：段落緊湊，每個附件有 1-2 句話。詳細：每個文件有更詳盡的段落和 3-5 個句子 - 對於具有許多 PDF 附件的隊列很有用。",
-        "llmFallback": "Providers tried in order, after the primary provider above, when a request fails (rate limit, timeout, error). Each entry has its own optional model override. Priority 1 is always the primary provider/model; entries here are priority 2, 3, …."
+        "llmFallback": "Providers tried in order, after the primary provider above, when a request fails (rate limit, timeout, error). Each entry has its own optional model override. Priority 1 is always the primary provider/model; entries here are priority 2, 3, ….",
+        "enabledRefine": "Shows the “Refine text” button in the reply and New-ticket composers. The model rewrites only what the agent typed; quoted passages are left untouched. Nothing is stored and nothing is sent — the agent sees the result in the editor and can undo it. Not affected by the operation-mode gate."
       },
       "common": {
         "validId": "有效/無效是一個軟刪除標誌：將條目標記為無效會在新記錄的選擇器中隱藏它，而不刪除現有引用（例如票證、作業）。沒有硬刪除。"

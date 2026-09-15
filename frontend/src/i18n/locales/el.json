@@ -453,6 +453,8 @@
       "originBadge": "AI",
       "originBadgeTooltip": "Auto-sent by the AI agent — click to see the tool trace",
       "originTraceEmpty": "No tool calls were recorded for this reply.",
+      "escalatedBanner": "AI handed off to a human at {{dateTime}} — auto-reply stays off until an agent sends a customer-visible reply, or resumes it here.",
+      "resumeButton": "Resume AI",
       "errorLlmEmptyOutput": "The AI model used up its token budget while reasoning. Please try again.",
       "errorLlmTimeout": "Timed out waiting for the AI provider. Please try again.",
       "errorLlmProviderError": "The AI provider reported an error. Please try again later.",
@@ -565,7 +567,24 @@
     "customerUnresolved": "Κανένα αρχείο πελάτη δεν αντιστοιχεί στη διεύθυνση· τα στοιχεία δεν είναι διαθέσιμα.",
     "lockedByBanner": "Κλειδωμένο από {{name}}",
     "takeOver": "Ανάληψη",
-    "replyViaTelegram": "Reply will be sent via Telegram"
+    "replyViaTelegram": "Reply will be sent via Telegram",
+    "refine": {
+      "button": "Refine text",
+      "running": "Refining …",
+      "undo": "Undo refine",
+      "toneLabel": "Tone",
+      "toneStandard": "Standard",
+      "toneFormal": "Formal",
+      "toneFriendly": "Friendly",
+      "toneConcise": "Shorter",
+      "nothingToRefine": "No text of your own to refine — quotes are left untouched.",
+      "hint": "Rewrites only what you typed; quoted text is left untouched.",
+      "errorEmpty": "The model returned no usable rewrite. Your text is unchanged.",
+      "errorLimit": "Your quota for AI rewriting is used up.",
+      "errorDenied": "You are not allowed to use AI rewriting.",
+      "errorDisabled": "AI rewriting is not enabled for this queue.",
+      "error": "Refining failed. Your text is unchanged."
+    }
   },
   "search": {
     "title": "Αναζήτηση",
@@ -818,7 +837,8 @@
         "summary": "Περίληψη",
         "auto_reply": "Αυτόματη απάντηση",
         "manual_assist": "Χειροκίνητη βοήθεια",
-        "mcp": "MCP"
+        "mcp": "MCP",
+        "refine": "Refine text"
       },
       "providers": {
         "title": "πάροχοι LLM",
@@ -1171,7 +1191,8 @@
         "allowedStateTypes": "Λίστα επιτρεπόμενων τύπων κατάστασης Znuny διαχωρισμένη με κόμματα (π.χ. \"ανοιχτή\" ή \"ανοιχτή, σε εκκρεμότητα υπενθύμισης\") η τεχνητή νοημοσύνη μπορεί να ορίσει ένα εισιτήριο μέσω πεδίων update_ticket_ — επιβάλλεται τόσο για το όνομα της κατάστασης όσο και για το αριθμητικό αναγνωριστικό κατάστασης. Empty = προεπιλεγμένο \"ανοιχτό\" μόνο (το ξανά άνοιγμα επιτρέπεται, ποτέ δεν κλείνει). μια ρητή κενή λίστα \"[]\" απενεργοποιεί πλήρως τις αλλαγές κατάστασης.",
         "piiNer": "Εντοπίζει ονόματα ατόμων σε κείμενο μέσω του spaCy NER (Γερμανικά + Αγγλικά) και τα κρύβει ως [NAME_n] πριν το περιεχόμενο φτάσει στον πάροχο LLM — εκτός από το όνομα πελάτη και τους αποστολείς. Ενεργή μόνο όταν η κάλυψη PII είναι ενεργοποιημένη. Τα ψευδώς θετικά είναι αβλαβή (απλώς περισσότερο συγκάλυψη).",
         "summaryDetail": "Πρότυπο: συμπαγείς παράγραφοι, 1–2 προτάσεις ανά συνημμένο έγγραφο. Αναλυτικά: πιο εμπεριστατωμένες παράγραφοι και 3–5 προτάσεις ανά έγγραφο — χρήσιμο για ουρές με πολλά συνημμένα PDF.",
-        "llmFallback": "Providers tried in order, after the primary provider above, when a request fails (rate limit, timeout, error). Each entry has its own optional model override. Priority 1 is always the primary provider/model; entries here are priority 2, 3, …."
+        "llmFallback": "Providers tried in order, after the primary provider above, when a request fails (rate limit, timeout, error). Each entry has its own optional model override. Priority 1 is always the primary provider/model; entries here are priority 2, 3, ….",
+        "enabledRefine": "Shows the “Refine text” button in the reply and New-ticket composers. The model rewrites only what the agent typed; quoted passages are left untouched. Nothing is stored and nothing is sent — the agent sees the result in the editor and can undo it. Not affected by the operation-mode gate."
       },
       "common": {
         "validId": "Valid/invalid είναι μια σημαία απαλής διαγραφής: η επισήμανση μιας καταχώρισης ως μη έγκυρης την αποκρύπτει από τους επιλογείς για νέες εγγραφές χωρίς να διαγράφει υπάρχουσες αναφορές (π.χ. εισιτήρια, εργασίες). Δεν υπάρχει σκληρή διαγραφή."

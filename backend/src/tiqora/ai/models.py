@@ -117,7 +117,10 @@ FEATURE_SUMMARY = "summary"
 FEATURE_AUTO_REPLY = "auto_reply"
 FEATURE_MANUAL_ASSIST = "manual_assist"
 FEATURE_MCP = "mcp"
-AI_FEATURES = frozenset({FEATURE_SUMMARY, FEATURE_AUTO_REPLY, FEATURE_MANUAL_ASSIST, FEATURE_MCP})
+FEATURE_REFINE = "refine"
+AI_FEATURES = frozenset(
+    {FEATURE_SUMMARY, FEATURE_AUTO_REPLY, FEATURE_MANUAL_ASSIST, FEATURE_MCP, FEATURE_REFINE}
+)
 
 # tiqora_ai_audit_log.feature — distinct from AI_FEATURES above: this is the
 # LLM *call site*, not the ACL/usage feature name (manual assist calls are
@@ -128,6 +131,7 @@ AUDIT_FEATURE_SUMMARY = "summary"
 AUDIT_FEATURE_AUTO_REPLY = "auto_reply"
 AUDIT_FEATURE_VISION = "vision"
 AUDIT_FEATURE_TEST = "test"
+AUDIT_FEATURE_REFINE = "refine"
 AUDIT_FEATURES = frozenset(
     {
         AUDIT_FEATURE_DRAFT,
@@ -135,6 +139,7 @@ AUDIT_FEATURES = frozenset(
         AUDIT_FEATURE_AUTO_REPLY,
         AUDIT_FEATURE_VISION,
         AUDIT_FEATURE_TEST,
+        AUDIT_FEATURE_REFINE,
     }
 )
 
@@ -272,6 +277,12 @@ class TiqoraAiQueuePolicy(TiqoraBase):
         Boolean, nullable=False, default=False, server_default=false()
     )
     enabled_manual_assist: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default=false()
+    )
+    # "Text verfeinern" in the agent composer (tiqora.ai.refine) — a plain
+    # rewrite of what the agent typed, so it is independent of the autonomy
+    # ladder above and needs no service user.
+    enabled_refine: Mapped[bool] = mapped_column(
         Boolean, nullable=False, default=False, server_default=false()
     )
 

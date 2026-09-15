@@ -22,6 +22,7 @@ import { useComposerLock } from "@/lib/composerLock";
 import { ComposerLockBanner } from "./ComposerLock";
 import { ComposerTimeChip } from "./ComposerTimeChip";
 import { MentionTextarea } from "./MentionTextarea";
+import { RefineControls } from "./RefineControls";
 import {
   RecipientsField,
   joinRecipients,
@@ -98,7 +99,9 @@ export function ReplyDialog({
   const [timeUnits, setTimeUnits] = useState("");
   /** Set when the article went out but a mention/time write did not — the
    * dialog then offers a retry for those alone, never a second send. */
-  const [extrasFailed, setExtrasFailed] = useState<Array<"mentions" | "time">>([]);
+  const [extrasFailed, setExtrasFailed] = useState<Array<"mentions" | "time">>(
+    [],
+  );
   // What the server-side reply draft seeded — the yardstick for "the agent
   // actually typed something". Stays null until the draft query resolves, so
   // nothing is persisted before there is anything to compare against.
@@ -150,7 +153,14 @@ export function ReplyDialog({
   const clearDraft = useClearReplyDraft();
 
   const draftQ = useQuery({
-    queryKey: ["tickets", ticketId, "articles", articleId, "reply-draft", replyAll],
+    queryKey: [
+      "tickets",
+      ticketId,
+      "articles",
+      articleId,
+      "reply-draft",
+      replyAll,
+    ],
     queryFn: () => api.getReplyDraft(ticketId, articleId, replyAll),
     enabled: open,
   });
@@ -183,7 +193,9 @@ export function ReplyDialog({
     const serverSubject = initialDraft?.subject ?? d.subject;
     // Answer on top (blank, or the AI draft's text), blank line, then the
     // quoted original.
-    const serverBody = initialDraft ? `${initialDraft.body}\n\n${d.body}` : `\n\n${d.body}`;
+    const serverBody = initialDraft
+      ? `${initialDraft.body}\n\n${d.body}`
+      : `\n\n${d.body}`;
     baselineRef.current = {
       subject: serverSubject,
       body: serverBody,
@@ -206,7 +218,15 @@ export function ReplyDialog({
     setShowReplyTo(nextReplyTo.trim().length > 0);
     setSubject(stored?.subject ?? serverSubject);
     setBody(stored?.body ?? serverBody);
-  }, [draftQ.data, draftsLoaded, initialDraft, queryClient, ticketId, articleId, replyAll]);
+  }, [
+    draftQ.data,
+    draftsLoaded,
+    initialDraft,
+    queryClient,
+    ticketId,
+    articleId,
+    replyAll,
+  ]);
 
   const aiDraftId = initialDraft?.id ?? null;
 
@@ -320,7 +340,12 @@ export function ReplyDialog({
       });
       // The reply is out; mentions and the booking follow and may fail on
       // their own without costing the message.
-      return postComposerExtras(ticketId, { body, mentions, timeUnits, queryClient });
+      return postComposerExtras(ticketId, {
+        body,
+        mentions,
+        timeUnits,
+        queryClient,
+      });
     },
     onSuccess: (extras) => {
       // Sent — the draft is no longer pending, drop it before anything can
@@ -334,7 +359,9 @@ export function ReplyDialog({
       if (initialDraft) {
         // Sending with ai_draft_id accepts the draft server-side — it drops
         // out of the AI panel's open-drafts list.
-        void queryClient.invalidateQueries({ queryKey: ["tickets", ticketId, "ai"] });
+        void queryClient.invalidateQueries({
+          queryKey: ["tickets", ticketId, "ai"],
+        });
       }
       if (extras.failed.length > 0) {
         // Keep the body — the retry re-reads the `@names` out of it.
@@ -496,7 +523,10 @@ export function ReplyDialog({
                 >
                   {t("ticket.replyCc")}
                   {!showCc && cc.length > 0 && (
-                    <span className={countBadgeCls} data-testid="reply-toggle-cc-count">
+                    <span
+                      className={countBadgeCls}
+                      data-testid="reply-toggle-cc-count"
+                    >
                       {cc.length}
                     </span>
                   )}
@@ -511,7 +541,10 @@ export function ReplyDialog({
                 >
                   {t("ticket.replyBcc")}
                   {!showBcc && bcc.length > 0 && (
-                    <span className={countBadgeCls} data-testid="reply-toggle-bcc-count">
+                    <span
+                      className={countBadgeCls}
+                      data-testid="reply-toggle-bcc-count"
+                    >
                       {bcc.length}
                     </span>
                   )}
@@ -551,7 +584,10 @@ export function ReplyDialog({
               <SelectField
                 items={[
                   { value: "", label: t("ticket.replyTemplateNone") },
-                  ...templates.map((tpl) => ({ value: String(tpl.id), label: tpl.name })),
+                  ...templates.map((tpl) => ({
+                    value: String(tpl.id),
+                    label: tpl.name,
+                  })),
                 ]}
                 value={templateId}
                 onChange={onPickTemplate}
@@ -575,6 +611,15 @@ export function ReplyDialog({
               readOnly={extrasFailed.length > 0}
             />
           </div>
+          {/* Rewrites only the agent's own text; the quoted original below it
+              is re-assembled from the untouched original (see replyQuote). */}
+          <RefineControls
+            target={{ ticket_id: ticketId }}
+            body={body}
+            onChange={setBody}
+            disabled={extrasFailed.length > 0}
+            testIdPrefix="reply-refine"
+          />
           {/* Read-only signature preview — backend appends on send; do not
               put this into the editable body (would double on send). */}
           {Boolean(draftQ.data?.signature?.trim()) && (
@@ -625,7 +670,11 @@ export function ReplyDialog({
             </p>
           )}
           <div className="flex items-center gap-1.5 pt-1">
-            <ComposerTimeChip value={timeUnits} onChange={setTimeUnits} testId="reply-time" />
+            <ComposerTimeChip
+              value={timeUnits}
+              onChange={setTimeUnits}
+              testId="reply-time"
+            />
             {storedDraft && (
               <Button
                 variant="ghost"
@@ -659,7 +708,9 @@ export function ReplyDialog({
                 disabled={!canSend}
                 onClick={() => sendMutation.mutate()}
               >
-                {sendMutation.isPending ? t("ticket.replySending") : t("ticket.composerSend")}
+                {sendMutation.isPending
+                  ? t("ticket.replySending")
+                  : t("ticket.composerSend")}
               </Button>
             )}
           </div>

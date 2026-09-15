@@ -453,6 +453,8 @@
       "originBadge": "AI",
       "originBadgeTooltip": "Auto-sent by the AI agent — click to see the tool trace",
       "originTraceEmpty": "No tool calls were recorded for this reply.",
+      "escalatedBanner": "AI handed off to a human at {{dateTime}} — auto-reply stays off until an agent sends a customer-visible reply, or resumes it here.",
+      "resumeButton": "Resume AI",
       "errorLlmEmptyOutput": "The AI model used up its token budget while reasoning. Please try again.",
       "errorLlmTimeout": "Timed out waiting for the AI provider. Please try again.",
       "errorLlmProviderError": "The AI provider reported an error. Please try again later.",
@@ -565,7 +567,24 @@
     "customerUnresolved": "Tiada rekod pelanggan sepadan dengan alamat ini, jadi butiran tidak tersedia.",
     "lockedByBanner": "Dikunci oleh {{name}}",
     "takeOver": "Ambil alih",
-    "replyViaTelegram": "Reply will be sent via Telegram"
+    "replyViaTelegram": "Reply will be sent via Telegram",
+    "refine": {
+      "button": "Refine text",
+      "running": "Refining …",
+      "undo": "Undo refine",
+      "toneLabel": "Tone",
+      "toneStandard": "Standard",
+      "toneFormal": "Formal",
+      "toneFriendly": "Friendly",
+      "toneConcise": "Shorter",
+      "nothingToRefine": "No text of your own to refine — quotes are left untouched.",
+      "hint": "Rewrites only what you typed; quoted text is left untouched.",
+      "errorEmpty": "The model returned no usable rewrite. Your text is unchanged.",
+      "errorLimit": "Your quota for AI rewriting is used up.",
+      "errorDenied": "You are not allowed to use AI rewriting.",
+      "errorDisabled": "AI rewriting is not enabled for this queue.",
+      "error": "Refining failed. Your text is unchanged."
+    }
   },
   "search": {
     "title": "Cari",
@@ -818,7 +837,8 @@
         "summary": "Ringkasan",
         "auto_reply": "Balas automatik",
         "manual_assist": "Bantuan manual",
-        "mcp": "MCP"
+        "mcp": "MCP",
+        "refine": "Refine text"
       },
       "providers": {
         "title": "Pembekal LLM",
@@ -1171,7 +1191,8 @@
         "allowedStateTypes": "Senarai yang dipisahkan koma bagi jenis keadaan Znuny yang dibenarkan (cth. \"terbuka\" atau \"terbuka, peringatan belum selesai\") AI boleh menetapkan tiket melalui update_ticket_fields — dikuatkuasakan untuk kedua-dua nama negeri dan id keadaan angka. Kosong = lalai \"terbuka\" sahaja (pembukaan semula dibenarkan, tidak pernah ditutup); senarai kosong eksplisit \"[]\" melumpuhkan perubahan keadaan sepenuhnya.",
         "piiNer": "Mengesan nama orang dalam teks melalui spaCy NER (Jerman + Inggeris) dan menyembunyikannya sebagai [NAME_n] sebelum kandungan sampai ke penyedia LLM — selain nama pelanggan dan pengirim. Hanya aktif apabila topeng PII dihidupkan. Positif palsu tidak berbahaya (hanya lebih menutupi).",
         "summaryDetail": "Standard: perenggan padat, 1–2 ayat setiap dokumen yang dilampirkan. Terperinci: perenggan yang lebih teliti dan 3–5 ayat setiap dokumen — berguna untuk baris gilir dengan banyak lampiran PDF.",
-        "llmFallback": "Providers tried in order, after the primary provider above, when a request fails (rate limit, timeout, error). Each entry has its own optional model override. Priority 1 is always the primary provider/model; entries here are priority 2, 3, …."
+        "llmFallback": "Providers tried in order, after the primary provider above, when a request fails (rate limit, timeout, error). Each entry has its own optional model override. Priority 1 is always the primary provider/model; entries here are priority 2, 3, ….",
+        "enabledRefine": "Shows the “Refine text” button in the reply and New-ticket composers. The model rewrites only what the agent typed; quoted passages are left untouched. Nothing is stored and nothing is sent — the agent sees the result in the editor and can undo it. Not affected by the operation-mode gate."
       },
       "common": {
         "validId": "Sah/tidak sah ialah bendera padam lembut: menandakan masukan tidak sah menyembunyikannya daripada pemilih untuk rekod baharu tanpa memadamkan rujukan sedia ada (cth. tiket, tugasan). Tiada pemadaman keras."

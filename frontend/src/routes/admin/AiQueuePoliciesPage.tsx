@@ -4,7 +4,12 @@ import { useNavigate } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
 import { toBcp47 } from "@/i18n";
 import { api } from "@/lib/api";
-import { aiApi, type AclFeature, type AiQueuePolicyOut, type AiUsageOut } from "@/lib/aiApi";
+import {
+  aiApi,
+  type AclFeature,
+  type AiQueuePolicyOut,
+  type AiUsageOut,
+} from "@/lib/aiApi";
 import { DataTable, type DataTableColumn } from "@/components/admin/DataTable";
 import { PickerField } from "@/components/admin/PickerField";
 import { Tabs } from "@/components/ui/Tabs";
@@ -23,7 +28,12 @@ const PROVIDERS_KEY = ["admin", "ai", "providers"] as const;
 const USAGE_KEY = ["admin", "ai", "usage"] as const;
 
 const NONE = 0;
-const FEATURES: AclFeature[] = ["summary", "auto_reply", "manual_assist"];
+const FEATURES: AclFeature[] = [
+  "summary",
+  "auto_reply",
+  "manual_assist",
+  "refine",
+];
 
 type ListTab = "policies" | "usage";
 
@@ -36,7 +46,9 @@ export function AiQueuePoliciesPage() {
 
   const [listTab, setListTab] = useState<ListTab>("policies");
   const [usageQueueFilter, setUsageQueueFilter] = useState<number>(NONE);
-  const [usageFeatureFilter, setUsageFeatureFilter] = useState<AclFeature | "">("");
+  const [usageFeatureFilter, setUsageFeatureFilter] = useState<AclFeature | "">(
+    "",
+  );
   const [usagePage, setUsagePage] = useState(1);
 
   const policiesQ = useQuery({
@@ -89,7 +101,10 @@ export function AiQueuePoliciesPage() {
   };
 
   const goToEditor = (row: AiQueuePolicyOut) =>
-    void navigate({ to: "/admin/ai/queues/$policyId", params: { policyId: String(row.id) } });
+    void navigate({
+      to: "/admin/ai/queues/$policyId",
+      params: { policyId: String(row.id) },
+    });
 
   const handleDelete = async (row: AiQueuePolicyOut) => {
     const ok = await confirm({
@@ -103,7 +118,11 @@ export function AiQueuePoliciesPage() {
   // Two-line row matching the provider list: status dot + queue + autonomy on
   // top, provider (mono) below, feature chips right, actions in the ⋯-menu.
   const renderPolicyRow = (r: AiQueuePolicyOut) => {
-    const hasFeature = r.enabled_manual_assist || r.enabled_summary || r.enabled_auto_reply;
+    const hasFeature =
+      r.enabled_manual_assist ||
+      r.enabled_summary ||
+      r.enabled_auto_reply ||
+      r.enabled_refine;
     return (
       <div key={r.id} className="border-t border-hairline first:border-t-0">
         <div
@@ -125,13 +144,18 @@ export function AiQueuePoliciesPage() {
                 "h-1.5 w-1.5 shrink-0 rounded-full",
                 r.valid_id === 1 ? "bg-green" : "bg-muted",
               )}
-              title={r.valid_id === 1 ? t("admin.table.valid") : t("admin.table.invalid")}
+              title={
+                r.valid_id === 1
+                  ? t("admin.table.valid")
+                  : t("admin.table.invalid")
+              }
             />
             <span className="truncate text-sm font-medium text-ink">
               {queueNameById.get(r.queue_id) ?? `#${r.queue_id}`}
             </span>
             <span className="shrink-0 text-xs text-muted">
-              {t("admin.ai.queues.autonomy.label")}: {t(`admin.ai.queues.autonomy.${r.autonomy}`)}
+              {t("admin.ai.queues.autonomy.label")}:{" "}
+              {t(`admin.ai.queues.autonomy.${r.autonomy}`)}
             </span>
           </div>
           <div className="col-start-1 row-start-2 flex min-w-0 items-baseline gap-3 pl-4">
@@ -143,9 +167,18 @@ export function AiQueuePoliciesPage() {
             {r.enabled_manual_assist && (
               <Badge tone="accent">{t("admin.ai.feature.manual_assist")}</Badge>
             )}
-            {r.enabled_summary && <Badge tone="accent">{t("admin.ai.feature.summary")}</Badge>}
-            {r.enabled_auto_reply && <Badge tone="warn">{t("admin.ai.feature.auto_reply")}</Badge>}
-            {!hasFeature && <Badge tone="muted">{t("admin.ai.queues.noFeatures")}</Badge>}
+            {r.enabled_summary && (
+              <Badge tone="accent">{t("admin.ai.feature.summary")}</Badge>
+            )}
+            {r.enabled_refine && (
+              <Badge tone="accent">{t("admin.ai.feature.refine")}</Badge>
+            )}
+            {r.enabled_auto_reply && (
+              <Badge tone="warn">{t("admin.ai.feature.auto_reply")}</Badge>
+            )}
+            {!hasFeature && (
+              <Badge tone="muted">{t("admin.ai.queues.noFeatures")}</Badge>
+            )}
           </div>
           <div
             className="col-start-2 row-span-2 md:col-start-3"
@@ -167,7 +200,10 @@ export function AiQueuePoliciesPage() {
                 </button>
               )}
             >
-              <MenuItem testId={`admin-ai-queue-edit-${r.id}`} onSelect={() => goToEditor(r)}>
+              <MenuItem
+                testId={`admin-ai-queue-edit-${r.id}`}
+                onSelect={() => goToEditor(r)}
+              >
                 {t("admin.table.edit")}
               </MenuItem>
               <MenuSeparator />
@@ -195,20 +231,39 @@ export function AiQueuePoliciesPage() {
   const usageFeatureItems = useMemo(
     () => [
       { value: "" as const, label: t("admin.ai.usage.allFeatures") },
-      ...[...FEATURES, "mcp" as AclFeature].map((f) => ({ value: f, label: t(`admin.ai.feature.${f}`) })),
+      ...[...FEATURES, "mcp" as AclFeature].map((f) => ({
+        value: f,
+        label: t(`admin.ai.feature.${f}`),
+      })),
     ],
     [t],
   );
 
   const usageColumns: DataTableColumn<AiUsageOut>[] = [
-    { key: "ts", header: t("admin.ai.usage.ts"), render: (u) => formatDateTime(u.ts, locale) },
+    {
+      key: "ts",
+      header: t("admin.ai.usage.ts"),
+      render: (u) => formatDateTime(u.ts, locale),
+    },
     {
       key: "queue",
       header: t("admin.ai.usage.queue"),
-      render: (u) => (u.queue_id != null ? queueNameById.get(u.queue_id) ?? u.queue_id : "—"),
+      render: (u) =>
+        u.queue_id != null
+          ? (queueNameById.get(u.queue_id) ?? u.queue_id)
+          : "—",
     },
-    { key: "feature", header: t("admin.ai.usage.feature"), render: (u) => t(`admin.ai.feature.${u.feature}`) },
-    { key: "model", header: t("admin.ai.usage.model"), mono: true, render: (u) => u.model ?? "—" },
+    {
+      key: "feature",
+      header: t("admin.ai.usage.feature"),
+      render: (u) => t(`admin.ai.feature.${u.feature}`),
+    },
+    {
+      key: "model",
+      header: t("admin.ai.usage.model"),
+      mono: true,
+      render: (u) => u.model ?? "—",
+    },
     {
       key: "tokens",
       header: t("admin.ai.usage.tokens"),
@@ -230,8 +285,12 @@ export function AiQueuePoliciesPage() {
     <div className="space-y-4 p-4" data-testid="admin-ai-queues-page">
       <div className="flex items-center justify-between gap-3">
         <div>
-          <h1 className="font-display text-xl font-semibold text-ink">{t("admin.ai.queues.title")}</h1>
-          <p className="mt-1 text-xs text-muted">{t("admin.ai.queues.description")}</p>
+          <h1 className="font-display text-xl font-semibold text-ink">
+            {t("admin.ai.queues.title")}
+          </h1>
+          <p className="mt-1 text-xs text-muted">
+            {t("admin.ai.queues.description")}
+          </p>
         </div>
         {listTab === "policies" && (
           <Button
@@ -301,7 +360,10 @@ export function AiQueuePoliciesPage() {
               />
             </div>
             {usageQ.data && (
-              <span className="text-xs text-muted" data-testid="admin-ai-usage-totals">
+              <span
+                className="text-xs text-muted"
+                data-testid="admin-ai-usage-totals"
+              >
                 {t("admin.ai.usage.totals", {
                   prompt: usageQ.data.total_prompt_tokens,
                   completion: usageQ.data.total_completion_tokens,
