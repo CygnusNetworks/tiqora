@@ -453,6 +453,8 @@
       "originBadge": "AI",
       "originBadgeTooltip": "Auto-sent by the AI agent — click to see the tool trace",
       "originTraceEmpty": "No tool calls were recorded for this reply.",
+      "escalatedBanner": "AI handed off to a human at {{dateTime}} — auto-reply stays off until an agent sends a customer-visible reply, or resumes it here.",
+      "resumeButton": "Resume AI",
       "errorLlmEmptyOutput": "The AI model used up its token budget while reasoning. Please try again.",
       "errorLlmTimeout": "Timed out waiting for the AI provider. Please try again.",
       "errorLlmProviderError": "The AI provider reported an error. Please try again later.",
@@ -565,7 +567,24 @@
     "customerUnresolved": "Nessun record cliente corrisponde a questo indirizzo; i dettagli non sono disponibili.",
     "lockedByBanner": "Bloccato da {{name}}",
     "takeOver": "Prendi in carico",
-    "replyViaTelegram": "Reply will be sent via Telegram"
+    "replyViaTelegram": "Reply will be sent via Telegram",
+    "refine": {
+      "button": "Refine text",
+      "running": "Refining …",
+      "undo": "Undo refine",
+      "toneLabel": "Tone",
+      "toneStandard": "Standard",
+      "toneFormal": "Formal",
+      "toneFriendly": "Friendly",
+      "toneConcise": "Shorter",
+      "nothingToRefine": "No text of your own to refine — quotes are left untouched.",
+      "hint": "Rewrites only what you typed; quoted text is left untouched.",
+      "errorEmpty": "The model returned no usable rewrite. Your text is unchanged.",
+      "errorLimit": "Your quota for AI rewriting is used up.",
+      "errorDenied": "You are not allowed to use AI rewriting.",
+      "errorDisabled": "AI rewriting is not enabled for this queue.",
+      "error": "Refining failed. Your text is unchanged."
+    }
   },
   "search": {
     "title": "Cerca",
@@ -818,7 +837,8 @@
         "summary": "Sommario",
         "auto_reply": "Risposta automatica",
         "manual_assist": "Assistenza manuale",
-        "mcp": "MCP"
+        "mcp": "MCP",
+        "refine": "Refine text"
       },
       "providers": {
         "title": "Provider LLM",
@@ -1171,7 +1191,8 @@
         "allowedStateTypes": "Elenco separato da virgole dei tipi di stato Znuny consentiti (ad esempio \"aperto\" o \"aperto, promemoria in sospeso\") su cui AI può impostare un ticket tramite update_ticket_fields - applicato sia per il nome dello stato che per l'ID numerico dello stato. Vuoto = predefinito solo \"aperto\" (riapertura consentita, mai chiusura); un elenco vuoto esplicito \"[]\" disabilita completamente i cambiamenti di stato.",
         "piiNer": "Rileva i nomi di persona nel testo tramite spaCy NER (tedesco + inglese) e li maschera come [NAME_n] prima che il contenuto raggiunga il provider LLM — oltre a nome cliente e mittenti. Attivo solo quando il mascheramento PII è abilitato.",
         "summaryDetail": "Standard: paragrafi compatti, 1–2 frasi per documento allegato. Dettagliato: paragrafi più approfonditi e 3-5 frasi per documento: utile per code con molti allegati PDF.",
-        "llmFallback": "Providers tried in order, after the primary provider above, when a request fails (rate limit, timeout, error). Each entry has its own optional model override. Priority 1 is always the primary provider/model; entries here are priority 2, 3, …."
+        "llmFallback": "Providers tried in order, after the primary provider above, when a request fails (rate limit, timeout, error). Each entry has its own optional model override. Priority 1 is always the primary provider/model; entries here are priority 2, 3, ….",
+        "enabledRefine": "Shows the “Refine text” button in the reply and New-ticket composers. The model rewrites only what the agent typed; quoted passages are left untouched. Nothing is stored and nothing is sent — the agent sees the result in the editor and can undo it. Not affected by the operation-mode gate."
       },
       "common": {
         "validId": "Valido/non valido è un flag di eliminazione temporanea: contrassegnare una voce come non valida la nasconde ai selezionatori per nuovi record senza eliminare i riferimenti esistenti (ad esempio ticket, assegnazioni). Non è prevista alcuna eliminazione definitiva."

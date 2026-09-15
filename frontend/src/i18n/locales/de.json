@@ -498,6 +498,8 @@
       "originMarkerTooltip": "Automatisch von der KI gesendet",
       "toolArguments": "Aufgerufen mit",
       "originTraceEmpty": "Für diese Antwort wurden keine Tool-Aufrufe erfasst.",
+      "escalatedBanner": "KI hat um {{dateTime}} an einen Menschen übergeben — die automatische Antwort bleibt aus, bis ein Agent eine kundensichtbare Antwort sendet oder sie hier reaktiviert.",
+      "resumeButton": "KI reaktivieren",
       "expand": "Aufklappen",
       "collapse": "Zuklappen",
       "useDraft": "Als Antwort übernehmen",
@@ -632,7 +634,24 @@
     "extrasRetry": "Erneut versuchen",
     "customerUnresolved": "Zu dieser Adresse gibt es keinen Kundenbenutzer. Kundeninformationen sind daher nicht verfügbar.",
     "lockedByBanner": "Gesperrt von {{name}}",
-    "takeOver": "Übernehmen"
+    "takeOver": "Übernehmen",
+    "refine": {
+      "button": "Text verfeinern",
+      "running": "Verfeinere …",
+      "undo": "Verfeinern rückgängig",
+      "toneLabel": "Tonfall",
+      "toneStandard": "Standard",
+      "toneFormal": "Förmlich",
+      "toneFriendly": "Freundlich",
+      "toneConcise": "Knapper",
+      "nothingToRefine": "Kein eigener Text zum Verfeinern — Zitate bleiben unverändert.",
+      "hint": "Überarbeitet nur den selbst geschriebenen Text; Zitate bleiben unverändert.",
+      "errorEmpty": "Das Modell hat keine brauchbare Überarbeitung geliefert. Dein Text ist unverändert.",
+      "errorLimit": "Dein Kontingent für die KI-Überarbeitung ist aufgebraucht.",
+      "errorDenied": "Du darfst die KI-Überarbeitung nicht verwenden.",
+      "errorDisabled": "Die KI-Überarbeitung ist für diese Queue nicht aktiviert.",
+      "error": "Die Überarbeitung ist fehlgeschlagen. Dein Text ist unverändert."
+    }
   },
   "search": {
     "title": "Suche",
@@ -885,7 +904,8 @@
         "summary": "Zusammenfassung",
         "auto_reply": "Auto-Antwort",
         "manual_assist": "Manuelle Unterstützung",
-        "mcp": "MCP"
+        "mcp": "MCP",
+        "refine": "Text verfeinern"
       },
       "providers": {
         "title": "LLM-Provider",
@@ -1238,7 +1258,8 @@
         "replyLanguageDefault": "BCP-47-Sprachcode, auf den bei Modus „Automatisch“ zurückgefallen wird, wenn der Text keiner der bekannten Sprachprofile eindeutig zugeordnet werden kann.",
         "allowedStateTypes": "Kommagetrennte Liste erlaubter Znuny-Status-Typen (z. B. \"open\" oder \"open,closed\"). Sie steuert beides: worauf die KI ein Ticket per update_ticket_fields setzen darf (geprüft für Status-Name und Status-ID gleichermaßen) und welchen Status Tiqora selbst setzt, nachdem es automatisch geantwortet hat — eine inhaltliche Antwort schließt das Ticket, wenn \"closed\" erlaubt ist (sonst \"open\"), eine Rückfrage öffnet es nur. Leer = Standard nur \"open\" (Wiedereröffnen erlaubt, nie schließen); eine leere Liste \"[]\" deaktiviert Statusänderungen komplett, ein automatisch beantwortetes Ticket behält dann seinen bisherigen Status.",
         "piiNer": "Erkennt Personennamen im Text per spaCy-NER (Deutsch + Englisch) und maskiert sie als [NAME_n], bevor der Inhalt den LLM-Provider erreicht — zusätzlich zu Kundenname und Absendern. Nur aktiv, wenn PII-Maskierung eingeschaltet ist. False Positives sind unkritisch (nur mehr Maskierung).",
-        "summaryDetail": "Standard: kompakte Absätze, 1–2 Sätze je beigefügtem Dokument. Ausführlich: gründlichere Absätze und 3–5 Sätze je Dokument — sinnvoll bei Queues mit vielen PDF-Anhängen."
+        "summaryDetail": "Standard: kompakte Absätze, 1–2 Sätze je beigefügtem Dokument. Ausführlich: gründlichere Absätze und 3–5 Sätze je Dokument — sinnvoll bei Queues mit vielen PDF-Anhängen.",
+        "enabledRefine": "Blendet im Antwort- und Neues-Ticket-Dialog den Button „Text verfeinern“ ein. Das Modell überarbeitet nur den selbst geschriebenen Text; zitierte Passagen bleiben unverändert. Es wird nichts gespeichert und nichts versendet — der Agent sieht das Ergebnis im Editor und kann es rückgängig machen. Nicht vom Betriebsmodus-Gate betroffen."
       },
       "common": {
         "validId": "Gültig/Ungültig ist ein weicher Löschstatus: „Ungültig“ blendet den Eintrag aus Auswahllisten für neue Datensätze aus, ohne bestehende Verknüpfungen (z. B. Tickets, Zuordnungen) zu löschen. Ein echtes Löschen ist nicht vorgesehen."
@@ -1797,15 +1818,7 @@
       "every": "alle",
       "olderThan": "älter als {{duration}}",
       "newerThan": "neuer als {{duration}}",
-      "weekdaysShort": [
-        "So",
-        "Mo",
-        "Di",
-        "Mi",
-        "Do",
-        "Fr",
-        "Sa"
-      ],
+      "weekdaysShort": ["So", "Mo", "Di", "Mi", "Do", "Fr", "Sa"],
       "keyLabel": {
         "StateIDs": "Status",
         "QueueIDs": "Queue",

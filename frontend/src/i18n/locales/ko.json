@@ -453,6 +453,8 @@
       "originBadge": "AI",
       "originBadgeTooltip": "Auto-sent by the AI agent — click to see the tool trace",
       "originTraceEmpty": "No tool calls were recorded for this reply.",
+      "escalatedBanner": "AI handed off to a human at {{dateTime}} — auto-reply stays off until an agent sends a customer-visible reply, or resumes it here.",
+      "resumeButton": "Resume AI",
       "errorLlmEmptyOutput": "The AI model used up its token budget while reasoning. Please try again.",
       "errorLlmTimeout": "Timed out waiting for the AI provider. Please try again.",
       "errorLlmProviderError": "The AI provider reported an error. Please try again later.",
@@ -565,7 +567,24 @@
     "customerUnresolved": "이 주소와 일치하는 고객 레코드가 없어 고객 정보를 사용할 수 없습니다.",
     "lockedByBanner": "{{name}} 님이 잠금",
     "takeOver": "인수",
-    "replyViaTelegram": "Reply will be sent via Telegram"
+    "replyViaTelegram": "Reply will be sent via Telegram",
+    "refine": {
+      "button": "Refine text",
+      "running": "Refining …",
+      "undo": "Undo refine",
+      "toneLabel": "Tone",
+      "toneStandard": "Standard",
+      "toneFormal": "Formal",
+      "toneFriendly": "Friendly",
+      "toneConcise": "Shorter",
+      "nothingToRefine": "No text of your own to refine — quotes are left untouched.",
+      "hint": "Rewrites only what you typed; quoted text is left untouched.",
+      "errorEmpty": "The model returned no usable rewrite. Your text is unchanged.",
+      "errorLimit": "Your quota for AI rewriting is used up.",
+      "errorDenied": "You are not allowed to use AI rewriting.",
+      "errorDisabled": "AI rewriting is not enabled for this queue.",
+      "error": "Refining failed. Your text is unchanged."
+    }
   },
   "search": {
     "title": "검색",
@@ -818,7 +837,8 @@
         "summary": "요약",
         "auto_reply": "자동 답장",
         "manual_assist": "수동 지원",
-        "mcp": "MCP"
+        "mcp": "MCP",
+        "refine": "Refine text"
       },
       "providers": {
         "title": "LLM 제공업체",
@@ -1171,7 +1191,8 @@
         "allowedStateTypes": "AI가 update_ticket_fields를 통해 티켓을 설정할 수 있는 허용된 Znuny 상태 유형(예: \"열림\" 또는 \"열림, 보류 중인 알림\")의 쉼표로 구분된 목록 — 주 이름과 숫자로 된 주 ID 모두에 대해 시행됩니다. 비어 있음 = 기본적으로 \"열기\"만 가능(다시 열기는 허용, 절대 닫지 않음); 명시적인 빈 목록 \"[]\"은 상태 변경을 완전히 비활성화합니다.",
         "piiNer": "spaCy NER(독일어 + 영어)를 통해 텍스트에서 사람 이름을 감지하고 콘텐츠가 고객 이름 및 발신자 외에도 LLM 제공업체에 도달하기 전에 [NAME_n]으로 마스크합니다. PII 마스킹이 켜져 있을 때만 활성화됩니다. 거짓 긍정은 무해합니다(단지 더 많은 마스킹을 제공할 뿐입니다).",
         "summaryDetail": "표준: 간결한 단락, 첨부 문서당 1~2문장. 상세함: 더 자세한 단락과 문서당 3~5개의 문장 — PDF 첨부 파일이 많은 대기열에 유용합니다.",
-        "llmFallback": "Providers tried in order, after the primary provider above, when a request fails (rate limit, timeout, error). Each entry has its own optional model override. Priority 1 is always the primary provider/model; entries here are priority 2, 3, …."
+        "llmFallback": "Providers tried in order, after the primary provider above, when a request fails (rate limit, timeout, error). Each entry has its own optional model override. Priority 1 is always the primary provider/model; entries here are priority 2, 3, ….",
+        "enabledRefine": "Shows the “Refine text” button in the reply and New-ticket composers. The model rewrites only what the agent typed; quoted passages are left untouched. Nothing is stored and nothing is sent — the agent sees the result in the editor and can undo it. Not affected by the operation-mode gate."
       },
       "common": {
         "validId": "유효/무효는 일시 삭제 플래그입니다. 유효하지 않은 항목을 표시하면 기존 참조(예: 티켓, 할당)를 삭제하지 않고 새 레코드 선택기에서 해당 항목이 숨겨집니다. 하드 삭제가 없습니다."

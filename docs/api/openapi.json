@@ -1356,6 +1356,11 @@
             "title": "Enabled Manual Assist",
             "type": "boolean"
           },
+          "enabled_refine": {
+            "default": false,
+            "title": "Enabled Refine",
+            "type": "boolean"
+          },
           "enabled_summary": {
             "default": false,
             "title": "Enabled Summary",
@@ -1717,6 +1722,10 @@
             "title": "Enabled Manual Assist",
             "type": "boolean"
           },
+          "enabled_refine": {
+            "title": "Enabled Refine",
+            "type": "boolean"
+          },
           "enabled_summary": {
             "title": "Enabled Summary",
             "type": "boolean"
@@ -1988,6 +1997,7 @@
           "enabled_auto_reply",
           "enabled_summary",
           "enabled_manual_assist",
+          "enabled_refine",
           "system_prompt",
           "autonomy",
           "service_user_id",
@@ -2132,6 +2142,17 @@
               }
             ],
             "title": "Enabled Manual Assist"
+          },
+          "enabled_refine": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Enabled Refine"
           },
           "enabled_summary": {
             "anyOf": [
@@ -2470,6 +2491,121 @@
         "title": "AiQueuePolicyUpdate",
         "type": "object"
       },
+      "AiRefineAvailabilityOut": {
+        "properties": {
+          "available": {
+            "title": "Available",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "available"
+        ],
+        "title": "AiRefineAvailabilityOut",
+        "type": "object"
+      },
+      "AiRefineIn": {
+        "description": "Exactly one of ``ticket_id`` / ``queue_id`` addresses the queue policy.\n\nReplying inside a ticket names the ticket and the server reads its queue \u2014\nthe composer has no queue of its own, and a client-sent one could disagree\nwith the ticket's. The New-ticket form has no ticket yet and names the\nqueue the agent picked in the form.",
+        "properties": {
+          "queue_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Queue Id"
+          },
+          "segments": {
+            "items": {
+              "$ref": "#/components/schemas/AiRefineSegmentIn"
+            },
+            "minItems": 1,
+            "title": "Segments",
+            "type": "array"
+          },
+          "ticket_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ticket Id"
+          },
+          "tone": {
+            "default": "standard",
+            "title": "Tone",
+            "type": "string"
+          }
+        },
+        "required": [
+          "segments"
+        ],
+        "title": "AiRefineIn",
+        "type": "object"
+      },
+      "AiRefineOut": {
+        "properties": {
+          "sections": {
+            "items": {
+              "$ref": "#/components/schemas/AiRefineSectionOut"
+            },
+            "title": "Sections",
+            "type": "array"
+          }
+        },
+        "required": [
+          "sections"
+        ],
+        "title": "AiRefineOut",
+        "type": "object"
+      },
+      "AiRefineSectionOut": {
+        "properties": {
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "text": {
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "text"
+        ],
+        "title": "AiRefineSectionOut",
+        "type": "object"
+      },
+      "AiRefineSegmentIn": {
+        "description": "One run of the composer body, as segmented by the frontend\n(``frontend/src/lib/replyQuote.ts``). Quote segments are sent so the model\ncan see what an inline answer refers to; they are never rewritten and\nnever come back in the response.",
+        "properties": {
+          "kind": {
+            "enum": [
+              "own",
+              "quote"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "text": {
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "text"
+        ],
+        "title": "AiRefineSegmentIn",
+        "type": "object"
+      },
       "AiSettingsOut": {
         "properties": {
           "audit_retention_days": {
@@ -2480,6 +2616,11 @@
             "default": false,
             "title": "Auto Reply Paused",
             "type": "boolean"
+          },
+          "default_max_tool_rounds": {
+            "default": 0,
+            "title": "Default Max Tool Rounds",
+            "type": "integer"
           },
           "disclosure_default_text": {
             "title": "Disclosure Default Text",
@@ -2584,6 +2725,18 @@
       },
       "AiStateOut": {
         "properties": {
+          "ai_escalated_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ai Escalated At"
+          },
           "can_summarize": {
             "title": "Can Summarize",
             "type": "boolean"
@@ -2759,6 +2912,17 @@
       },
       "AiToolTraceOut": {
         "properties": {
+          "arguments": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Arguments"
+          },
           "content": {
             "title": "Content",
             "type": "string"
@@ -9667,6 +9831,17 @@
             "title": "Kind",
             "type": "string"
           },
+          "max_tool_rounds": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Tool Rounds"
+          },
           "name": {
             "title": "Name",
             "type": "string"
@@ -9812,6 +9987,17 @@
             "title": "Kind",
             "type": "string"
           },
+          "max_tool_rounds": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Tool Rounds"
+          },
           "name": {
             "title": "Name",
             "type": "string"
@@ -9884,6 +10070,7 @@
           "budget_cost_day",
           "budget_cost_week",
           "budget_cost_month",
+          "max_tool_rounds",
           "valid_id",
           "create_time",
           "change_time"
@@ -10037,6 +10224,17 @@
               }
             ],
             "title": "Kind"
+          },
+          "max_tool_rounds": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Tool Rounds"
           },
           "name": {
             "anyOf": [
@@ -18611,6 +18809,17 @@
             "title": "Ai Escalated",
             "type": "boolean"
           },
+          "ai_reply_source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ai Reply Source"
+          },
           "archive_flag": {
             "default": 0,
             "title": "Archive Flag",
@@ -19129,6 +19338,17 @@
             "default": false,
             "title": "Ai Escalated",
             "type": "boolean"
+          },
+          "ai_reply_source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ai Reply Source"
           },
           "archive_flag": {
             "default": 0,
@@ -20101,6 +20321,54 @@
           "id": {
             "title": "Id",
             "type": "integer"
+          },
+          "invite_accepted_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Invite Accepted At"
+          },
+          "invite_expires": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Invite Expires"
+          },
+          "invited_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Invited At"
+          },
+          "last_login": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Login"
           },
           "last_name": {
             "title": "Last Name",
@@ -44088,6 +44356,180 @@
         ]
       }
     },
+    "/api/v1/ai/refine": {
+      "post": {
+        "description": "Rewrite the agent's own text in the composer (plan \"Text verfeinern\").\n\nStateless: nothing is written to the ticket, and quoted text is returned\nto nobody \u2014 only the ``own`` sections come back, keyed by the index they\nreplace, so the composer can re-assemble the body around the untouched\nquotes itself.",
+        "operationId": "request_refine_api_v1_ai_refine_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AiRefineIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AiRefineOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Request Refine",
+        "tags": [
+          "ai"
+        ]
+      }
+    },
+    "/api/v1/ai/refine/availability": {
+      "get": {
+        "description": "Whether to offer the \"refine\" button at all. Answers ``False`` rather\nthan raising for a queue the agent may not write to, or a ticket they\ncannot see \u2014 the button is simply absent, which is all the composer needs\nto know.",
+        "operationId": "refine_availability_api_v1_ai_refine_availability_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "ticket_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Ticket Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "queue_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Queue Id"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AiRefineAvailabilityOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Refine Availability",
+        "tags": [
+          "ai"
+        ]
+      }
+    },
     "/api/v1/auth/login": {
       "post": {
         "operationId": "login_api_v1_auth_login_post",
@@ -54120,6 +54562,74 @@
           }
         },
         "summary": "Discard Ai Draft",
+        "tags": [
+          "ai"
+        ]
+      }
+    },
+    "/api/v1/tickets/{ticket_id}/ai/resume": {
+      "post": {
+        "description": "Manually clear the AI->human handoff flag so auto-reply can resume.\n\nNormally only a human agent's customer-visible reply (or the ticket\nclosing) clears ``ai_escalated_at`` \u2014 see\n:func:`tiqora.domain.ticket_write_service.resume_ai_automation`. This is\nthe explicit override for when a human decides the ticket is safe to\nhand back without writing a customer-visible reply, e.g. after fixing\nthe underlying issue that caused a bad escalation.",
+        "operationId": "resume_ai_route_api_v1_tickets__ticket_id__ai_resume_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "ticket_id",
+            "required": true,
+            "schema": {
+              "title": "Ticket Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Resume Ai Route",
         "tags": [
           "ai"
         ]

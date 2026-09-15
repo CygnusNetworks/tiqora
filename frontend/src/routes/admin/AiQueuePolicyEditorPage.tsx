@@ -65,6 +65,7 @@ type FormState = {
   enabled_auto_reply: boolean;
   enabled_summary: boolean;
   enabled_manual_assist: boolean;
+  enabled_refine: boolean;
   autonomy: Autonomy;
   system_prompt: string;
   llm_provider_id: number;
@@ -110,6 +111,7 @@ function emptyForm(queueId: number): FormState {
     enabled_auto_reply: false,
     enabled_summary: false,
     enabled_manual_assist: false,
+    enabled_refine: false,
     autonomy: "off",
     system_prompt: "",
     llm_provider_id: NONE,
@@ -217,6 +219,7 @@ function toForm(row: AiQueuePolicyOut): FormState {
     enabled_auto_reply: row.enabled_auto_reply,
     enabled_summary: row.enabled_summary,
     enabled_manual_assist: row.enabled_manual_assist,
+    enabled_refine: row.enabled_refine,
     autonomy: row.autonomy,
     system_prompt: row.system_prompt,
     llm_provider_id: row.llm_provider_id ?? NONE,
@@ -584,6 +587,7 @@ function AiQueuePolicyEditor({ policyId }: { policyId?: number }) {
     enabled_auto_reply: f.enabled_auto_reply,
     enabled_summary: f.enabled_summary,
     enabled_manual_assist: f.enabled_manual_assist,
+    enabled_refine: f.enabled_refine,
     autonomy: f.autonomy,
     system_prompt: f.system_prompt,
     llm_provider_id: f.llm_provider_id !== NONE ? f.llm_provider_id : null,
@@ -1000,7 +1004,10 @@ function AiQueuePolicyEditor({ policyId }: { policyId?: number }) {
                 className={inputClass}
               />
             </label>
-            <div className="block text-sm sm:col-span-2" data-testid="admin-ai-queue-fallback-section">
+            <div
+              className="block text-sm sm:col-span-2"
+              data-testid="admin-ai-queue-fallback-section"
+            >
               <div className="mb-1 flex items-center justify-between gap-2">
                 <FieldLabel
                   text={t("admin.ai.queues.llmFallback")}
@@ -1147,6 +1154,25 @@ function AiQueuePolicyEditor({ policyId }: { policyId?: number }) {
                 testId="admin-ai-queue-help-enabled_manual_assist"
               >
                 {t("admin.help.aiQueue.enabledManualAssist")}
+              </HelpPopover>
+            </label>
+
+            {/* Independent of manual assist: refine rewrites what the agent
+                already typed, it never drafts a reply. */}
+            <label className="flex items-center gap-2 text-sm text-ink">
+              <input
+                type="checkbox"
+                data-testid="admin-ai-queue-form-enabled_refine"
+                checked={form.enabled_refine}
+                onChange={(e) => setField("enabled_refine", e.target.checked)}
+                className="rounded border-hairline"
+              />
+              {t("admin.ai.feature.refine")}
+              <HelpPopover
+                title={t("admin.ai.feature.refine")}
+                testId="admin-ai-queue-help-enabled_refine"
+              >
+                {t("admin.help.aiQueue.enabledRefine")}
               </HelpPopover>
             </label>
 
@@ -1696,7 +1722,9 @@ function AiQueuePolicyEditor({ policyId }: { policyId?: number }) {
                   onChange={(e) =>
                     setField("clarify_schema_json", e.target.value)
                   }
-                  placeholder={t("admin.ai.queues.clarifySchemaJsonPlaceholder")}
+                  placeholder={t(
+                    "admin.ai.queues.clarifySchemaJsonPlaceholder",
+                  )}
                   rows={3}
                   spellCheck={false}
                   className={cn(inputClass, "font-mono text-xs")}

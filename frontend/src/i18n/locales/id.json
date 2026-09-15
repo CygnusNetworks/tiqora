@@ -453,6 +453,8 @@
       "originBadge": "AI",
       "originBadgeTooltip": "Auto-sent by the AI agent — click to see the tool trace",
       "originTraceEmpty": "No tool calls were recorded for this reply.",
+      "escalatedBanner": "AI handed off to a human at {{dateTime}} — auto-reply stays off until an agent sends a customer-visible reply, or resumes it here.",
+      "resumeButton": "Resume AI",
       "errorLlmEmptyOutput": "The AI model used up its token budget while reasoning. Please try again.",
       "errorLlmTimeout": "Timed out waiting for the AI provider. Please try again.",
       "errorLlmProviderError": "The AI provider reported an error. Please try again later.",
@@ -565,7 +567,24 @@
     "customerUnresolved": "Tidak ada data pelanggan yang cocok dengan alamat ini, sehingga detail tidak tersedia.",
     "lockedByBanner": "Dikunci oleh {{name}}",
     "takeOver": "Ambil alih",
-    "replyViaTelegram": "Reply will be sent via Telegram"
+    "replyViaTelegram": "Reply will be sent via Telegram",
+    "refine": {
+      "button": "Refine text",
+      "running": "Refining …",
+      "undo": "Undo refine",
+      "toneLabel": "Tone",
+      "toneStandard": "Standard",
+      "toneFormal": "Formal",
+      "toneFriendly": "Friendly",
+      "toneConcise": "Shorter",
+      "nothingToRefine": "No text of your own to refine — quotes are left untouched.",
+      "hint": "Rewrites only what you typed; quoted text is left untouched.",
+      "errorEmpty": "The model returned no usable rewrite. Your text is unchanged.",
+      "errorLimit": "Your quota for AI rewriting is used up.",
+      "errorDenied": "You are not allowed to use AI rewriting.",
+      "errorDisabled": "AI rewriting is not enabled for this queue.",
+      "error": "Refining failed. Your text is unchanged."
+    }
   },
   "search": {
     "title": "Cari",
@@ -818,7 +837,8 @@
         "summary": "Ringkasan",
         "auto_reply": "Balasan otomatis",
         "manual_assist": "Bantuan manual",
-        "mcp": "MCP"
+        "mcp": "MCP",
+        "refine": "Refine text"
       },
       "providers": {
         "title": "penyedia LLM",
@@ -1171,7 +1191,8 @@
         "allowedStateTypes": "Daftar jenis negara bagian Znuny yang diizinkan yang dipisahkan koma (misalnya, \"terbuka\" atau \"terbuka, pengingat tertunda\") yang dapat ditetapkan tiketnya oleh AI melalui update_ticket_fields — diberlakukan untuk nama negara bagian dan id negara bagian numerik. Kosong = default \"buka\" saja (dibolehkan dibuka kembali, tidak pernah ditutup); daftar kosong eksplisit \"[]\" menonaktifkan perubahan status sepenuhnya.",
         "piiNer": "Mendeteksi nama orang dalam teks melalui spaCy NER (Jerman + Inggris) dan menyamarkannya sebagai [NAME_n] sebelum konten mencapai penyedia LLM — selain nama pelanggan dan pengirim. Hanya aktif jika penyembunyian PII aktif. Positif palsu tidak berbahaya (hanya lebih menutupi).",
         "summaryDetail": "Standar: paragraf ringkas, 1–2 kalimat per dokumen terlampir. Terperinci: paragraf lebih menyeluruh dan 3–5 kalimat per dokumen — berguna untuk antrean dengan banyak lampiran PDF.",
-        "llmFallback": "Providers tried in order, after the primary provider above, when a request fails (rate limit, timeout, error). Each entry has its own optional model override. Priority 1 is always the primary provider/model; entries here are priority 2, 3, …."
+        "llmFallback": "Providers tried in order, after the primary provider above, when a request fails (rate limit, timeout, error). Each entry has its own optional model override. Priority 1 is always the primary provider/model; entries here are priority 2, 3, ….",
+        "enabledRefine": "Shows the “Refine text” button in the reply and New-ticket composers. The model rewrites only what the agent typed; quoted passages are left untouched. Nothing is stored and nothing is sent — the agent sees the result in the editor and can undo it. Not affected by the operation-mode gate."
       },
       "common": {
         "validId": "Valid/tidak valid adalah tanda penghapusan sementara: menandai entri sebagai tidak valid akan menyembunyikan entri tersebut dari pemetik rekaman baru tanpa menghapus referensi yang sudah ada (misalnya tiket, tugas). Tidak ada penghapusan yang sulit."
