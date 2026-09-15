@@ -567,7 +567,24 @@
     "customerUnresolved": "Ingen kundpost matchar adressen, så kunduppgifter saknas.",
     "lockedByBanner": "Låst av {{name}}",
     "takeOver": "Ta över",
-    "replyViaTelegram": "Reply will be sent via Telegram"
+    "replyViaTelegram": "Reply will be sent via Telegram",
+    "refine": {
+      "button": "Refine text",
+      "running": "Refining …",
+      "undo": "Undo refine",
+      "toneLabel": "Tone",
+      "toneStandard": "Standard",
+      "toneFormal": "Formal",
+      "toneFriendly": "Friendly",
+      "toneConcise": "Shorter",
+      "nothingToRefine": "No text of your own to refine — quotes are left untouched.",
+      "hint": "Rewrites only what you typed; quoted text is left untouched.",
+      "errorEmpty": "The model returned no usable rewrite. Your text is unchanged.",
+      "errorLimit": "Your quota for AI rewriting is used up.",
+      "errorDenied": "You are not allowed to use AI rewriting.",
+      "errorDisabled": "AI rewriting is not enabled for this queue.",
+      "error": "Refining failed. Your text is unchanged."
+    }
   },
   "search": {
     "title": "Sök",
@@ -820,7 +837,8 @@
         "summary": "Sammanfattning",
         "auto_reply": "Autosvar",
         "manual_assist": "Manuell assistans",
-        "mcp": "MCP"
+        "mcp": "MCP",
+        "refine": "Refine text"
       },
       "providers": {
         "title": "LLM-leverantörer",
@@ -1173,7 +1191,8 @@
         "allowedStateTypes": "Kommaseparerad lista över tillåtna Znuny-statustyper (t.ex. \"open\" eller \"open,pending reminder\") som AI:n får sätta via update_ticket_fields — gäller både statusnamn och numeriskt status-id. Tomt = standard bara \"open\" (återöppning tillåten, aldrig stängning); en explicit tom lista \"[]\" inaktiverar statusändringar helt.",
         "piiNer": "Identifierar personnamn i text via spaCy NER (tyska + engelska) och maskar dem som [NAME_n] innan innehållet når LLM-leverantören — utöver kundnamn och avsändare. Aktiv bara när PII-maskning är på. Falska positiva är ofarliga (bara mer maskning).",
         "summaryDetail": "Standard: kompakta stycken, 1–2 meningar per bifogat dokument. Detaljerad: mer grundliga stycken och 3–5 meningar per dokument — användbart för köer med många PDF-bilagor.",
-        "llmFallback": "Providers tried in order, after the primary provider above, when a request fails (rate limit, timeout, error). Each entry has its own optional model override. Priority 1 is always the primary provider/model; entries here are priority 2, 3, …."
+        "llmFallback": "Providers tried in order, after the primary provider above, when a request fails (rate limit, timeout, error). Each entry has its own optional model override. Priority 1 is always the primary provider/model; entries here are priority 2, 3, ….",
+        "enabledRefine": "Shows the “Refine text” button in the reply and New-ticket composers. The model rewrites only what the agent typed; quoted passages are left untouched. Nothing is stored and nothing is sent — the agent sees the result in the editor and can undo it. Not affected by the operation-mode gate."
       },
       "common": {
         "validId": "Giltig/ogiltig är en mjuk raderingsflagga: att markera en post som ogiltig döljer den från väljare för nya poster utan att ta bort befintliga referenser (t.ex. ärenden, tilldelningar). Det finns ingen hård radering."

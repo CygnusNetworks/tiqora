@@ -18,7 +18,7 @@ from typing import Literal
 
 import structlog
 from fastapi import APIRouter, HTTPException, status
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, field_validator, model_validator
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from tiqora.ai import drafts as ai_drafts
@@ -33,8 +33,22 @@ from tiqora.ai.gate import is_tiqora_primary
 from tiqora.ai.kb_wiring import build_llm_client, kb_bundle, kb_get_article_fn, kb_search_fn
 from tiqora.ai.listfields import parse_str_list
 from tiqora.ai.llm import LlmEmptyOutputError, LlmError, LlmHttpError, LlmTimeoutError
-from tiqora.ai.models import TiqoraAiTicketState
+from tiqora.ai.models import FEATURE_REFINE, TiqoraAiTicketState
 from tiqora.ai.policies import get_queue_policy_by_queue
+from tiqora.ai.refine import (
+    MAX_TOTAL_CHARS as REFINE_MAX_TOTAL_CHARS,
+)
+from tiqora.ai.refine import (
+    REFINE_TONES,
+    TONE_STANDARD,
+    RefineAclDeniedError,
+    RefineAclLimitExceededError,
+    RefineEmptyOutputError,
+    RefineError,
+    RefinePolicyDisabledError,
+    refine_text,
+)
+from tiqora.ai.refine import Segment as RefineSegment
 from tiqora.ai.runtime import (
     _LOCK_MAX_AGE,
     TRIGGER_MANUAL,
@@ -67,6 +81,9 @@ from tiqora.znuny.sysconfig import SysConfig
 logger = structlog.get_logger(__name__)
 
 router = APIRouter(prefix="/tickets/{ticket_id}/ai", tags=["ai"])
+# Composer refine is queue-scoped, not ticket-scoped: the New-ticket form
+# has no ticket id yet, and the reply dialog can supply one for audit.
+refine_router = APIRouter(prefix="/ai", tags=["ai"])
 
 # Manual Assist background runs (nginx-90s-timeout fix, see
 # request_manual_draft): asyncio.create_task() does not keep a strong
@@ -115,6 +132,65 @@ class AiStateOut(BaseModel):
     manual_run_error_code: str | None = None
     manual_run_started_at: datetime | None = None
     ai_escalated_at: datetime | None = None
+
+
+class AiRefineSegmentIn(BaseModel):
+    """One run of the composer body, as segmented by the frontend
+    (``frontend/src/lib/replyQuote.ts``). Quote segments are sent so the model
+    can see what an inline answer refers to; they are never rewritten and
+    never come back in the response."""
+
+    kind: Literal["own", "quote"]
+    text: str
+
+
+class AiRefineIn(BaseModel):
+    """Exactly one of ``ticket_id`` / ``queue_id`` addresses the queue policy.
+
+    Replying inside a ticket names the ticket and the server reads its queue —
+    the composer has no queue of its own, and a client-sent one could disagree
+    with the ticket's. The New-ticket form has no ticket yet and names the
+    queue the agent picked in the form.
+    """
+
+    ticket_id: int | None = None
+    queue_id: int | None = None
+    tone: str = TONE_STANDARD
+    segments: list[AiRefineSegmentIn] = Field(min_length=1)
+
+    @model_validator(mode="after")
+    def _exactly_one_target(self) -> AiRefineIn:
+        if (self.ticket_id is None) == (self.queue_id is None):
+            raise ValueError("Pass exactly one of ticket_id or queue_id")
+        return self
+
+    @field_validator("tone")
+    @classmethod
+    def _known_tone(cls, value: str) -> str:
+        if value not in REFINE_TONES:
+            raise ValueError(f"Unknown tone {value!r}")
+        return value
+
+    @model_validator(mode="after")
+    def _within_size_cap(self) -> AiRefineIn:
+        total = sum(len(s.text) for s in self.segments)
+        if total > REFINE_MAX_TOTAL_CHARS:
+            raise ValueError(f"Text too long to refine ({total} characters)")
+        return self
+
+
+class AiRefineSectionOut(BaseModel):
+    #: Index of the segment this text replaces, as sent in the request.
+    id: int
+    text: str
+
+
+class AiRefineOut(BaseModel):
+    sections: list[AiRefineSectionOut]
+
+
+class AiRefineAvailabilityOut(BaseModel):
+    available: bool
 
 
 class AiSummarizeIn(BaseModel):
@@ -242,6 +318,22 @@ def _map_summary_error(exc: SummaryError) -> HTTPException:
         return HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(exc))
     if isinstance(exc, SummaryPolicyDisabledError):
         return HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc))
+    return HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc))
+
+
+def _map_refine_error(exc: RefineError) -> HTTPException:
+    """Structured ``"<code>: <message>"`` detail — the composer matches on the
+    prefix to show a specific hint instead of the generic failure text."""
+    if isinstance(exc, RefineAclLimitExceededError):
+        return HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail=str(exc))
+    if isinstance(exc, RefineAclDeniedError):
+        return HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(exc))
+    if isinstance(exc, RefinePolicyDisabledError):
+        return HTTPException(status_code=status.HTTP_409_CONFLICT, detail=f"refine_disabled: {exc}")
+    if isinstance(exc, RefineEmptyOutputError):
+        return HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY, detail=f"refine_empty_output: {exc}"
+        )
     return HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc))
 
 
@@ -624,4 +716,115 @@ async def resume_ai_route(ticket_id: int, user: CurrentUser, session: DbSession)
     await session.commit()
 
 
-__all__ = ["router"]
+async def _resolve_refine_queue(
+    session: DbSession, user_id: int, *, ticket_id: int | None, queue_id: int | None
+) -> int:
+    """Queue whose AI policy governs this composer, after the write permission
+    the composer would eventually need: ``note`` for a reply on an existing
+    ticket, ``create`` for the New-ticket form.
+
+    With a ticket, its own queue is authoritative — the caller never supplies
+    one (see :class:`AiRefineIn`), so the policy can't be shopped for.
+    """
+    if ticket_id is not None:
+        ticket = await TicketService(session).get_ticket(user_id, ticket_id)
+        queue_id = ticket.queue_id
+        key = "note"
+    elif queue_id is not None:
+        key = "create"
+    else:  # pragma: no cover — AiRefineIn and the query-param check enforce this
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Pass exactly one of ticket_id or queue_id",
+        )
+    if not await PermissionEngine(session).check(user_id, queue_id, key):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden")
+    return queue_id
+
+
+@refine_router.get("/refine/availability", response_model=AiRefineAvailabilityOut)
+async def refine_availability(
+    user: CurrentUser,
+    session: DbSession,
+    ticket_id: int | None = None,
+    queue_id: int | None = None,
+) -> AiRefineAvailabilityOut:
+    """Whether to offer the "refine" button at all. Answers ``False`` rather
+    than raising for a queue the agent may not write to, or a ticket they
+    cannot see — the button is simply absent, which is all the composer needs
+    to know."""
+    if (ticket_id is None) == (queue_id is None):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Pass exactly one of ticket_id or queue_id",
+        )
+    try:
+        resolved = await _resolve_refine_queue(
+            session, user.id, ticket_id=ticket_id, queue_id=queue_id
+        )
+    except (TicketNotFound, TicketAccessDenied, HTTPException):
+        return AiRefineAvailabilityOut(available=False)
+
+    policy = await get_queue_policy_by_queue(session, resolved)
+    if policy is None or not policy.enabled_refine:
+        return AiRefineAvailabilityOut(available=False)
+    return AiRefineAvailabilityOut(
+        available=await check_feature_access(session, user.id, FEATURE_REFINE)
+    )
+
+
+@refine_router.post("/refine", response_model=AiRefineOut, status_code=status.HTTP_200_OK)
+async def request_refine(
+    body: AiRefineIn,
+    user: CurrentUser,
+    session: DbSession,
+    settings: AppSettings,
+) -> AiRefineOut:
+    """Rewrite the agent's own text in the composer (plan "Text verfeinern").
+
+    Stateless: nothing is written to the ticket, and quoted text is returned
+    to nobody — only the ``own`` sections come back, keyed by the index they
+    replace, so the composer can re-assemble the body around the untouched
+    quotes itself.
+    """
+    try:
+        queue_id = await _resolve_refine_queue(
+            session, user.id, ticket_id=body.ticket_id, queue_id=body.queue_id
+        )
+    except (TicketNotFound, TicketAccessDenied) as exc:
+        if isinstance(exc, TicketNotFound):
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not found") from exc
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden") from exc
+
+    policy = await get_queue_policy_by_queue(session, queue_id)
+    if policy is None or not policy.enabled_refine:
+        raise _map_refine_error(
+            RefinePolicyDisabledError(f"Refine is disabled for queue {queue_id}")
+        )
+
+    llm = await build_llm_client(
+        session, settings, policy.llm_provider_id, policy.model_override, policy.llm_fallback_json
+    )
+
+    try:
+        result = await refine_text(
+            session,
+            llm=llm,
+            queue_id=queue_id,
+            segments=[RefineSegment(kind=s.kind, text=s.text) for s in body.segments],
+            tone=body.tone,
+            acting_user_id=user.id,
+            ticket_id=body.ticket_id,
+            settings=settings,
+        )
+    except RefineError as exc:
+        raise _map_refine_error(exc) from exc
+    except (LlmTimeoutError, LlmHttpError, LlmEmptyOutputError, LlmError) as exc:
+        raise _map_run_error(exc) from exc
+
+    return AiRefineOut(
+        sections=[AiRefineSectionOut(id=sid, text=text) for sid, text in result.sections.items()]
+    )
+
+
+__all__ = ["refine_router", "router"]

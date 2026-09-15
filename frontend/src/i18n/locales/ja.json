@@ -567,7 +567,24 @@
     "customerUnresolved": "このアドレスに一致する顧客レコードがないため、顧客詳細は表示できません。",
     "lockedByBanner": "{{name}} がロック中",
     "takeOver": "引き継ぐ",
-    "replyViaTelegram": "Reply will be sent via Telegram"
+    "replyViaTelegram": "Reply will be sent via Telegram",
+    "refine": {
+      "button": "Refine text",
+      "running": "Refining …",
+      "undo": "Undo refine",
+      "toneLabel": "Tone",
+      "toneStandard": "Standard",
+      "toneFormal": "Formal",
+      "toneFriendly": "Friendly",
+      "toneConcise": "Shorter",
+      "nothingToRefine": "No text of your own to refine — quotes are left untouched.",
+      "hint": "Rewrites only what you typed; quoted text is left untouched.",
+      "errorEmpty": "The model returned no usable rewrite. Your text is unchanged.",
+      "errorLimit": "Your quota for AI rewriting is used up.",
+      "errorDenied": "You are not allowed to use AI rewriting.",
+      "errorDisabled": "AI rewriting is not enabled for this queue.",
+      "error": "Refining failed. Your text is unchanged."
+    }
   },
   "search": {
     "title": "検索",
@@ -820,7 +837,8 @@
         "summary": "要約",
         "auto_reply": "自動返信",
         "manual_assist": "マニュアルアシスト",
-        "mcp": "MCP"
+        "mcp": "MCP",
+        "refine": "Refine text"
       },
       "providers": {
         "title": "LLMプロバイダー",
@@ -1173,7 +1191,8 @@
         "allowedStateTypes": "AIがupdate_ticket_fields経由でチケットを設定できる、許可されているZnuny状態タイプのカンマ区切りのリスト (例: 「open」または「open,pendingリマインダー」) — 状態名と数値の状態IDの両方に適用されます。空 = デフォルトは「開く」のみ (再オープンは許可され、閉じることはできません);明示的な空のリスト「[]」は状態の変更を完全に無効にします。",
         "piiNer": "spaCy NER (ドイツ語 + 英語) を介してテキスト内の個人名を検出し、コンテンツがLLMプロバイダーに到達する前に、顧客名と送信者に加えて [NAME_n] としてマスクします。 PIIマスキングがオンの場合にのみアクティブになります。誤検知は無害です (マスキングが強化されるだけです)。",
         "summaryDetail": "標準: コンパクトな段落、添付文書あたり1 ～ 2文。詳細: より詳細な段落とドキュメントあたり3 ～ 5文 - 多数のPDF添付ファイルを含むキューに役立ちます。",
-        "llmFallback": "Providers tried in order, after the primary provider above, when a request fails (rate limit, timeout, error). Each entry has its own optional model override. Priority 1 is always the primary provider/model; entries here are priority 2, 3, …."
+        "llmFallback": "Providers tried in order, after the primary provider above, when a request fails (rate limit, timeout, error). Each entry has its own optional model override. Priority 1 is always the primary provider/model; entries here are priority 2, 3, ….",
+        "enabledRefine": "Shows the “Refine text” button in the reply and New-ticket composers. The model rewrites only what the agent typed; quoted passages are left untouched. Nothing is stored and nothing is sent — the agent sees the result in the editor and can undo it. Not affected by the operation-mode gate."
       },
       "common": {
         "validId": "有効/無効は論理的な削除フラグです。エントリを無効とマークすると、既存の参照 (チケット、割り当てなど) を削除せずに、新しいレコードのピッカーからそのエントリが非表示になります。強制削除はありません。"

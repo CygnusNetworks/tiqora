@@ -567,7 +567,24 @@
     "customerUnresolved": "Nicio înregistrare de client nu corespunde acestei adrese; detaliile nu sunt disponibile.",
     "lockedByBanner": "Blocat de {{name}}",
     "takeOver": "Preia",
-    "replyViaTelegram": "Reply will be sent via Telegram"
+    "replyViaTelegram": "Reply will be sent via Telegram",
+    "refine": {
+      "button": "Refine text",
+      "running": "Refining …",
+      "undo": "Undo refine",
+      "toneLabel": "Tone",
+      "toneStandard": "Standard",
+      "toneFormal": "Formal",
+      "toneFriendly": "Friendly",
+      "toneConcise": "Shorter",
+      "nothingToRefine": "No text of your own to refine — quotes are left untouched.",
+      "hint": "Rewrites only what you typed; quoted text is left untouched.",
+      "errorEmpty": "The model returned no usable rewrite. Your text is unchanged.",
+      "errorLimit": "Your quota for AI rewriting is used up.",
+      "errorDenied": "You are not allowed to use AI rewriting.",
+      "errorDisabled": "AI rewriting is not enabled for this queue.",
+      "error": "Refining failed. Your text is unchanged."
+    }
   },
   "search": {
     "title": "Caută",
@@ -820,7 +837,8 @@
         "summary": "Rezumat",
         "auto_reply": "Răspuns automat",
         "manual_assist": "Asistență manuală",
-        "mcp": "MCP"
+        "mcp": "MCP",
+        "refine": "Refine text"
       },
       "providers": {
         "title": "Furnizori LLM",
@@ -1173,7 +1191,8 @@
         "allowedStateTypes": "Listă separată prin virgulă de tipuri de stări Znuny permise (de exemplu, „deschis” sau „deschis, memento în așteptare”) la care AI poate seta un bilet prin update_ticket_fields – aplicat atât pentru numele statului, cât și pentru id-ul numeric al stării. Gol = numai „deschis” implicit (redeschidere permisă, niciodată închidere); o listă explicită goală „[]” dezactivează complet schimbările de stare.",
         "piiNer": "Detectează numele persoanelor în text prin spaCy NER (germană + engleză) și le maschează ca [NAME_n] înainte ca conținutul să ajungă la furnizorul LLM - pe lângă numele clientului și expeditorii. Activ numai când mascarea PII este activată. Falsele pozitive sunt inofensive (doar mai multă mascare).",
         "summaryDetail": "Standard: paragrafe compacte, 1–2 propoziții pentru fiecare document atașat. Detaliat: paragrafe mai detaliate și 3–5 propoziții per document — util pentru cozile cu multe atașamente PDF.",
-        "llmFallback": "Providers tried in order, after the primary provider above, when a request fails (rate limit, timeout, error). Each entry has its own optional model override. Priority 1 is always the primary provider/model; entries here are priority 2, 3, …."
+        "llmFallback": "Providers tried in order, after the primary provider above, when a request fails (rate limit, timeout, error). Each entry has its own optional model override. Priority 1 is always the primary provider/model; entries here are priority 2, 3, ….",
+        "enabledRefine": "Shows the “Refine text” button in the reply and New-ticket composers. The model rewrites only what the agent typed; quoted passages are left untouched. Nothing is stored and nothing is sent — the agent sees the result in the editor and can undo it. Not affected by the operation-mode gate."
       },
       "common": {
         "validId": "Valabil/invalid este un semnal de ștergere soft: marcarea unei intrări ca fiind nevalidă o ascunde de selecție pentru înregistrări noi, fără a șterge referințele existente (de exemplu, bilete, sarcini). Nu există ștergere tare."

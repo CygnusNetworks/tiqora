@@ -567,7 +567,24 @@
     "customerUnresolved": "Ningún registro de cliente coincide con esta dirección; los datos del cliente no están disponibles.",
     "lockedByBanner": "Bloqueado por {{name}}",
     "takeOver": "Asumir",
-    "replyViaTelegram": "Reply will be sent via Telegram"
+    "replyViaTelegram": "Reply will be sent via Telegram",
+    "refine": {
+      "button": "Refine text",
+      "running": "Refining …",
+      "undo": "Undo refine",
+      "toneLabel": "Tone",
+      "toneStandard": "Standard",
+      "toneFormal": "Formal",
+      "toneFriendly": "Friendly",
+      "toneConcise": "Shorter",
+      "nothingToRefine": "No text of your own to refine — quotes are left untouched.",
+      "hint": "Rewrites only what you typed; quoted text is left untouched.",
+      "errorEmpty": "The model returned no usable rewrite. Your text is unchanged.",
+      "errorLimit": "Your quota for AI rewriting is used up.",
+      "errorDenied": "You are not allowed to use AI rewriting.",
+      "errorDisabled": "AI rewriting is not enabled for this queue.",
+      "error": "Refining failed. Your text is unchanged."
+    }
   },
   "search": {
     "title": "Buscar",
@@ -820,7 +837,8 @@
         "summary": "Resumen",
         "auto_reply": "Respuesta automática",
         "manual_assist": "asistencia manual",
-        "mcp": "MCP"
+        "mcp": "MCP",
+        "refine": "Refine text"
       },
       "providers": {
         "title": "Proveedores de LLM",
@@ -1173,7 +1191,8 @@
         "allowedStateTypes": "Lista separada por comas de tipos de estado de Znuny permitidos (por ejemplo, \"abierto\" o \"abierto, recordatorio pendiente\") a los que la IA puede configurar un ticket a través de update_ticket_fields, aplicado tanto para el nombre del estado como para la identificación numérica del estado. Vacío = predeterminado sólo \"abierto\" (se permite reabrir, nunca cerrar); una lista vacía explícita \"[]\" deshabilita los cambios de estado por completo.",
         "piiNer": "Detecta nombres de personas en texto a través de spaCy NER (alemán + inglés) y los enmascara como [NOMBRE_n] antes de que el contenido llegue al proveedor de LLM, además del nombre del cliente y los remitentes. Solo está activo cuando el enmascaramiento de PII está activado. Los falsos positivos son inofensivos (solo más enmascaramiento).",
         "summaryDetail": "Estándar: párrafos compactos, 1 o 2 oraciones por documento adjunto. Detallado: párrafos más completos y de 3 a 5 oraciones por documento, útil para colas con muchos archivos adjuntos en PDF.",
-        "llmFallback": "Providers tried in order, after the primary provider above, when a request fails (rate limit, timeout, error). Each entry has its own optional model override. Priority 1 is always the primary provider/model; entries here are priority 2, 3, …."
+        "llmFallback": "Providers tried in order, after the primary provider above, when a request fails (rate limit, timeout, error). Each entry has its own optional model override. Priority 1 is always the primary provider/model; entries here are priority 2, 3, ….",
+        "enabledRefine": "Shows the “Refine text” button in the reply and New-ticket composers. The model rewrites only what the agent typed; quoted passages are left untouched. Nothing is stored and nothing is sent — the agent sees the result in the editor and can undo it. Not affected by the operation-mode gate."
       },
       "common": {
         "validId": "Válido/no válido es un indicador de eliminación temporal: marcar una entrada como no válida la oculta a los recolectores de nuevos registros sin eliminar las referencias existentes (por ejemplo, tickets, asignaciones). No hay eliminación definitiva."
