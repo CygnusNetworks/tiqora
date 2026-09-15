@@ -17,6 +17,8 @@ const {
   listReferenceAgents,
   acquireTicketLock,
   formDrafts,
+  refine,
+  refineAvailability,
 } = vi.hoisted(() => ({
   getReplyDraft: vi.fn(),
   listTemplates: vi.fn(),
@@ -26,7 +28,15 @@ const {
   listReferenceAgents: vi.fn(),
   acquireTicketLock: vi.fn(),
   formDrafts: { list: vi.fn(), upsert: vi.fn(), remove: vi.fn() },
+  refine: vi.fn(),
+  refineAvailability: vi.fn(),
 }));
+
+vi.mock("@/lib/refineApi", async () => {
+  const actual =
+    await vi.importActual<typeof import("@/lib/refineApi")>("@/lib/refineApi");
+  return { ...actual, refineApi: { refine, refineAvailability } };
+});
 
 vi.mock("@/lib/api", async () => {
   const actual = await vi.importActual<typeof import("@/lib/api")>("@/lib/api");
@@ -48,7 +58,9 @@ vi.mock("@/lib/api", async () => {
 // autosave is observable without a backend.
 vi.mock("@/lib/formDraftApi", async () => {
   const actual =
-    await vi.importActual<typeof import("@/lib/formDraftApi")>("@/lib/formDraftApi");
+    await vi.importActual<typeof import("@/lib/formDraftApi")>(
+      "@/lib/formDraftApi",
+    );
   return { ...actual, formDraftApi: formDrafts };
 });
 
@@ -118,7 +130,9 @@ describe("ReplyDialog recipient toggles", () => {
       />,
     );
 
-    await waitFor(() => expect(screen.getByTestId("reply-dialog")).toBeTruthy());
+    await waitFor(() =>
+      expect(screen.getByTestId("reply-dialog")).toBeTruthy(),
+    );
 
     // Draft with Cc addresses → field expanded by default; toggle still present.
     expect(screen.getByTestId("reply-cc")).toBeTruthy();
@@ -130,9 +144,9 @@ describe("ReplyDialog recipient toggles", () => {
     fireEvent.click(screen.getByTestId("reply-toggle-cc"));
     expect(screen.queryByTestId("reply-cc")).toBeNull();
     expect(screen.getByTestId("reply-toggle-cc-count").textContent).toBe("2");
-    expect(screen.getByTestId("reply-toggle-cc").getAttribute("aria-expanded")).toBe(
-      "false",
-    );
+    expect(
+      screen.getByTestId("reply-toggle-cc").getAttribute("aria-expanded"),
+    ).toBe("false");
 
     // Expand again: full field, no badge, chips still there.
     fireEvent.click(screen.getByTestId("reply-toggle-cc"));
@@ -194,7 +208,9 @@ describe("ReplyDialog recipient toggles", () => {
       />,
     );
 
-    await waitFor(() => expect(screen.getByTestId("reply-dialog")).toBeTruthy());
+    await waitFor(() =>
+      expect(screen.getByTestId("reply-dialog")).toBeTruthy(),
+    );
 
     // Collapse non-empty Cc (addresses must still be sent).
     fireEvent.click(screen.getByTestId("reply-toggle-cc"));
@@ -239,7 +255,9 @@ describe("ReplyDialog recipient toggles", () => {
       />,
     );
 
-    await waitFor(() => expect(screen.getByTestId("reply-dialog")).toBeTruthy());
+    await waitFor(() =>
+      expect(screen.getByTestId("reply-dialog")).toBeTruthy(),
+    );
 
     expect(screen.queryByTestId("reply-cc")).toBeNull();
     expect(screen.queryByTestId("reply-bcc")).toBeNull();
@@ -262,7 +280,9 @@ describe("ReplyDialog recipient toggles", () => {
       />,
     );
 
-    await waitFor(() => expect(screen.getByTestId("reply-dialog")).toBeTruthy());
+    await waitFor(() =>
+      expect(screen.getByTestId("reply-dialog")).toBeTruthy(),
+    );
 
     const ccToggle = screen.getByTestId("reply-toggle-cc");
     // Collapsed and empty → inactive (muted outline, not accent fill).
@@ -332,7 +352,9 @@ describe("ReplyDialog recipient toggles", () => {
       />,
     );
 
-    await waitFor(() => expect(screen.getByTestId("reply-signature-preview")).toBeTruthy());
+    await waitFor(() =>
+      expect(screen.getByTestId("reply-signature-preview")).toBeTruthy(),
+    );
     expect(screen.getByTestId("reply-signature-plain").textContent).toContain(
       "Alice Example",
     );
@@ -375,12 +397,16 @@ describe("ReplyDialog recipient toggles", () => {
       />,
     );
 
-    await waitFor(() => expect(screen.getByTestId("reply-dialog")).toBeTruthy());
+    await waitFor(() =>
+      expect(screen.getByTestId("reply-dialog")).toBeTruthy(),
+    );
     const body = screen.getByTestId("reply-body") as HTMLTextAreaElement;
     fireEvent.change(body, { target: { value: "Thanks\n\n> quoted" } });
     fireEvent.click(screen.getByTestId("reply-send"));
 
-    await waitFor(() => expect(screen.getByTestId("reply-send-error")).toBeTruthy());
+    await waitFor(() =>
+      expect(screen.getByTestId("reply-send-error")).toBeTruthy(),
+    );
     expect(screen.getByTestId("reply-send-error").textContent).toContain(
       "Outbound email delivery failed: SMTP refused",
     );
@@ -399,11 +425,17 @@ describe("ReplyDialog recipient toggles", () => {
         replyAll={false}
         open
         onClose={vi.fn()}
-        initialDraft={{ id: 42, subject: "Re: AI subject", body: "AI drafted answer" }}
+        initialDraft={{
+          id: 42,
+          subject: "Re: AI subject",
+          body: "AI drafted answer",
+        }}
       />,
     );
 
-    await waitFor(() => expect(screen.getByTestId("reply-dialog")).toBeTruthy());
+    await waitFor(() =>
+      expect(screen.getByTestId("reply-dialog")).toBeTruthy(),
+    );
     const body = screen.getByTestId("reply-body") as HTMLTextAreaElement;
     expect(body.value).toContain("AI drafted answer");
     expect(body.value).toContain("> quoted");
@@ -411,20 +443,34 @@ describe("ReplyDialog recipient toggles", () => {
     fireEvent.click(screen.getByTestId("reply-send"));
 
     await waitFor(() => expect(createArticle).toHaveBeenCalled());
-    const payload = createArticle.mock.calls[0][1] as { ai_draft_id: number | null };
+    const payload = createArticle.mock.calls[0][1] as {
+      ai_draft_id: number | null;
+    };
     expect(payload.ai_draft_id).toBe(42);
   });
 
   it("sends ai_draft_id null when no AI draft is used", async () => {
     getReplyDraft.mockResolvedValue({ ...baseDraft, to_address: "to@x.com" });
 
-    wrap(<ReplyDialog ticketId={1} articleId={2} replyAll={false} open onClose={vi.fn()} />);
+    wrap(
+      <ReplyDialog
+        ticketId={1}
+        articleId={2}
+        replyAll={false}
+        open
+        onClose={vi.fn()}
+      />,
+    );
 
-    await waitFor(() => expect(screen.getByTestId("reply-dialog")).toBeTruthy());
+    await waitFor(() =>
+      expect(screen.getByTestId("reply-dialog")).toBeTruthy(),
+    );
     fireEvent.click(screen.getByTestId("reply-send"));
 
     await waitFor(() => expect(createArticle).toHaveBeenCalled());
-    const payload = createArticle.mock.calls[0][1] as { ai_draft_id: number | null };
+    const payload = createArticle.mock.calls[0][1] as {
+      ai_draft_id: number | null;
+    };
     expect(payload.ai_draft_id).toBeNull();
   });
 });
@@ -477,10 +523,16 @@ describe("ReplyDialog reset after send / persistence without send", () => {
 
     wrap(<ControlledReplyDialog ticketId={7} articleId={11} />);
 
-    await waitFor(() => expect(screen.getByTestId("reply-dialog")).toBeTruthy());
+    await waitFor(() =>
+      expect(screen.getByTestId("reply-dialog")).toBeTruthy(),
+    );
 
-    const subjectInput = screen.getByDisplayValue("Re: Hello") as HTMLInputElement;
-    fireEvent.change(subjectInput, { target: { value: "Re: Changed subject" } });
+    const subjectInput = screen.getByDisplayValue(
+      "Re: Hello",
+    ) as HTMLInputElement;
+    fireEvent.change(subjectInput, {
+      target: { value: "Re: Changed subject" },
+    });
 
     const body = screen.getByTestId("reply-body") as HTMLTextAreaElement;
     fireEvent.change(body, { target: { value: "My typed reply\n\n> quoted" } });
@@ -489,17 +541,25 @@ describe("ReplyDialog reset after send / persistence without send", () => {
 
     await waitFor(() => expect(createArticle).toHaveBeenCalled());
     // Dialog closed after send.
-    await waitFor(() => expect(screen.queryByTestId("reply-dialog")).toBeNull());
+    await waitFor(() =>
+      expect(screen.queryByTestId("reply-dialog")).toBeNull(),
+    );
 
     // Reopen the same (still-mounted) component.
     fireEvent.click(screen.getByTestId("reopen"));
-    await waitFor(() => expect(screen.getByTestId("reply-dialog")).toBeTruthy());
+    await waitFor(() =>
+      expect(screen.getByTestId("reply-dialog")).toBeTruthy(),
+    );
 
-    const reopenedBody = screen.getByTestId("reply-body") as HTMLTextAreaElement;
+    const reopenedBody = screen.getByTestId(
+      "reply-body",
+    ) as HTMLTextAreaElement;
     expect(reopenedBody.value).not.toContain("My typed reply");
     expect(reopenedBody.value).toBe("\n\n> quoted");
 
-    const reopenedSubject = screen.getByDisplayValue("Re: Hello") as HTMLInputElement;
+    const reopenedSubject = screen.getByDisplayValue(
+      "Re: Hello",
+    ) as HTMLInputElement;
     expect(reopenedSubject.value).not.toBe("Re: Changed subject");
   });
 
@@ -511,17 +571,18 @@ describe("ReplyDialog reset after send / persistence without send", () => {
 
     wrap(<ControlledReplyDialog ticketId={7} articleId={11} />);
 
-    await waitFor(() => expect(screen.getByTestId("reply-dialog")).toBeTruthy());
+    await waitFor(() =>
+      expect(screen.getByTestId("reply-dialog")).toBeTruthy(),
+    );
 
     const body = screen.getByTestId("reply-body") as HTMLTextAreaElement;
     fireEvent.change(body, { target: { value: "My typed reply\n\n> quoted" } });
 
     // Let the debounced draft-store write happen before sending, so we can
     // be sure clearing (not "never having saved") is what emptied it.
-    await waitFor(
-      () => expect(getDraft(qc, 7, 11)).not.toBeNull(),
-      { timeout: 1000 },
-    );
+    await waitFor(() => expect(getDraft(qc, 7, 11)).not.toBeNull(), {
+      timeout: 1000,
+    });
 
     fireEvent.click(screen.getByTestId("reply-send"));
 
@@ -536,19 +597,31 @@ describe("ReplyDialog reset after send / persistence without send", () => {
     });
     const onCloseSpy = vi.fn();
 
-    wrap(<ControlledReplyDialog ticketId={8} articleId={12} onCloseSpy={onCloseSpy} />);
+    wrap(
+      <ControlledReplyDialog
+        ticketId={8}
+        articleId={12}
+        onCloseSpy={onCloseSpy}
+      />,
+    );
 
-    await waitFor(() => expect(screen.getByTestId("reply-dialog")).toBeTruthy());
+    await waitFor(() =>
+      expect(screen.getByTestId("reply-dialog")).toBeTruthy(),
+    );
 
     const body = screen.getByTestId("reply-body") as HTMLTextAreaElement;
-    fireEvent.change(body, { target: { value: "Draft in progress\n\n> quoted" } });
+    fireEvent.change(body, {
+      target: { value: "Draft in progress\n\n> quoted" },
+    });
 
     // Close via Cancel, without sending.
     fireEvent.click(screen.getByText(i18n.t("ticket.composerCancel")));
     expect(onCloseSpy).toHaveBeenCalled();
     expect(createArticle).not.toHaveBeenCalled();
 
-    await waitFor(() => expect(screen.queryByTestId("reply-dialog")).toBeNull());
+    await waitFor(() =>
+      expect(screen.queryByTestId("reply-dialog")).toBeNull(),
+    );
 
     // The debounced store write should have persisted the typed text.
     await waitFor(
@@ -558,9 +631,13 @@ describe("ReplyDialog reset after send / persistence without send", () => {
 
     // Reopen — the typed text must still be there.
     fireEvent.click(screen.getByTestId("reopen"));
-    await waitFor(() => expect(screen.getByTestId("reply-dialog")).toBeTruthy());
+    await waitFor(() =>
+      expect(screen.getByTestId("reply-dialog")).toBeTruthy(),
+    );
 
-    const reopenedBody = screen.getByTestId("reply-body") as HTMLTextAreaElement;
+    const reopenedBody = screen.getByTestId(
+      "reply-body",
+    ) as HTMLTextAreaElement;
     expect(reopenedBody.value).toContain("Draft in progress");
   });
 });
@@ -586,7 +663,9 @@ describe("ReplyDialog Telegram routing", () => {
       />,
     );
 
-    await waitFor(() => expect(screen.getByTestId("reply-dialog")).toBeTruthy());
+    await waitFor(() =>
+      expect(screen.getByTestId("reply-dialog")).toBeTruthy(),
+    );
 
     expect(screen.getByTestId("reply-telegram-hint").textContent).toBe(
       i18n.t("ticket.replyViaTelegram"),
@@ -597,7 +676,7 @@ describe("ReplyDialog Telegram routing", () => {
     expect(screen.queryByTestId("reply-toggle-replyto")).toBeNull();
   });
 
-  it("posts channel \"telegram\" with no address fields on send", async () => {
+  it('posts channel "telegram" with no address fields on send', async () => {
     getReplyDraft.mockResolvedValue({ ...baseDraft, to_address: null });
 
     wrap(
@@ -611,8 +690,12 @@ describe("ReplyDialog Telegram routing", () => {
       />,
     );
 
-    await waitFor(() => expect(screen.getByTestId("reply-dialog")).toBeTruthy());
-    fireEvent.change(screen.getByTestId("reply-body"), { target: { value: "Antwort" } });
+    await waitFor(() =>
+      expect(screen.getByTestId("reply-dialog")).toBeTruthy(),
+    );
+    fireEvent.change(screen.getByTestId("reply-body"), {
+      target: { value: "Antwort" },
+    });
     fireEvent.click(screen.getByTestId("reply-send"));
 
     await waitFor(() => expect(createArticle).toHaveBeenCalled());
@@ -644,7 +727,9 @@ describe("ReplyDialog Telegram routing", () => {
       />,
     );
 
-    await waitFor(() => expect(screen.getByTestId("reply-dialog")).toBeTruthy());
+    await waitFor(() =>
+      expect(screen.getByTestId("reply-dialog")).toBeTruthy(),
+    );
     expect(screen.queryByTestId("reply-telegram-hint")).toBeNull();
     expect(screen.getByTestId("reply-to")).toBeTruthy();
 
@@ -669,14 +754,26 @@ describe("ReplyDialog composer extras (mentions + time)", () => {
   });
 
   async function openDialog(onClose = vi.fn()) {
-    wrap(<ReplyDialog ticketId={1} articleId={2} replyAll={false} open onClose={onClose} />);
-    await waitFor(() => expect(screen.getByTestId("reply-dialog")).toBeTruthy());
+    wrap(
+      <ReplyDialog
+        ticketId={1}
+        articleId={2}
+        replyAll={false}
+        open
+        onClose={onClose}
+      />,
+    );
+    await waitFor(() =>
+      expect(screen.getByTestId("reply-dialog")).toBeTruthy(),
+    );
     return onClose;
   }
 
   it("books nothing extra for a plain reply", async () => {
     const onClose = await openDialog();
-    fireEvent.change(screen.getByTestId("reply-body"), { target: { value: "Antwort" } });
+    fireEvent.change(screen.getByTestId("reply-body"), {
+      target: { value: "Antwort" },
+    });
     fireEvent.click(screen.getByTestId("reply-send"));
     await waitFor(() => expect(onClose).toHaveBeenCalled());
     expect(createTicketTimeAccounting).not.toHaveBeenCalled();
@@ -685,11 +782,17 @@ describe("ReplyDialog composer extras (mentions + time)", () => {
 
   it("books the minutes typed into the footer chip", async () => {
     const onClose = await openDialog();
-    fireEvent.change(screen.getByTestId("reply-body"), { target: { value: "Antwort" } });
-    fireEvent.change(screen.getByTestId("reply-time"), { target: { value: "15" } });
+    fireEvent.change(screen.getByTestId("reply-body"), {
+      target: { value: "Antwort" },
+    });
+    fireEvent.change(screen.getByTestId("reply-time"), {
+      target: { value: "15" },
+    });
     fireEvent.click(screen.getByTestId("reply-send"));
     await waitFor(() =>
-      expect(createTicketTimeAccounting).toHaveBeenCalledWith(1, { time_unit: 15 }),
+      expect(createTicketTimeAccounting).toHaveBeenCalledWith(1, {
+        time_unit: 15,
+      }),
     );
     expect(onClose).toHaveBeenCalled();
   });
@@ -703,14 +806,20 @@ describe("ReplyDialog composer extras (mentions + time)", () => {
     fireEvent.mouseDown(await screen.findByTestId("mention-option-2"));
     await waitFor(() => expect(body.value).toContain("@Ada Lovelace"));
     fireEvent.click(screen.getByTestId("reply-send"));
-    await waitFor(() => expect(createTicketMention).toHaveBeenCalledWith(1, { user_id: 2 }));
+    await waitFor(() =>
+      expect(createTicketMention).toHaveBeenCalledWith(1, { user_id: 2 }),
+    );
   });
 
   it("keeps the dialog open with a retry when only the booking fails", async () => {
     createTicketTimeAccounting.mockRejectedValueOnce(new Error("boom"));
     const onClose = await openDialog();
-    fireEvent.change(screen.getByTestId("reply-body"), { target: { value: "Antwort" } });
-    fireEvent.change(screen.getByTestId("reply-time"), { target: { value: "15" } });
+    fireEvent.change(screen.getByTestId("reply-body"), {
+      target: { value: "Antwort" },
+    });
+    fireEvent.change(screen.getByTestId("reply-time"), {
+      target: { value: "15" },
+    });
     fireEvent.click(screen.getByTestId("reply-send"));
 
     // The reply itself went out exactly once and the dialog stays put.
@@ -724,5 +833,58 @@ describe("ReplyDialog composer extras (mentions + time)", () => {
     // Retrying books the time; it never re-sends the article.
     expect(createTicketTimeAccounting).toHaveBeenCalledTimes(2);
     expect(createArticle).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("ReplyDialog refine", () => {
+  beforeEach(() => {
+    getReplyDraft.mockReset();
+    listTemplates.mockReset().mockResolvedValue([]);
+    createArticle.mockReset().mockResolvedValue({ id: 99 });
+    refine.mockReset();
+    refineAvailability.mockReset().mockResolvedValue({ available: true });
+  });
+
+  it("rewrites the answer above the quote and leaves the quoted original alone", async () => {
+    getReplyDraft.mockResolvedValue({
+      ...baseDraft,
+      body: "On 2026-09-12 08:30, kunde@example.org wrote:\n> internet geht nicht",
+    });
+    refine.mockResolvedValue({
+      sections: [
+        { id: 0, text: "Guten Tag, der Anschluss wurde neu geschaltet." },
+      ],
+    });
+
+    wrap(
+      <ReplyDialog
+        ticketId={1}
+        articleId={2}
+        replyAll={false}
+        open
+        onClose={vi.fn()}
+      />,
+    );
+    await waitFor(() =>
+      expect(screen.getByTestId("reply-dialog")).toBeTruthy(),
+    );
+
+    const body = () => screen.getByTestId("reply-body") as HTMLTextAreaElement;
+    fireEvent.change(body(), {
+      target: { value: `anschluss neu geschaltet\n\n${baseDraft.body}` },
+    });
+
+    await waitFor(() =>
+      expect(screen.getByTestId("reply-refine-button")).toBeEnabled(),
+    );
+    fireEvent.click(screen.getByTestId("reply-refine-button"));
+
+    await waitFor(() =>
+      expect(body().value).toBe(
+        `Guten Tag, der Anschluss wurde neu geschaltet.\n\n${baseDraft.body}`,
+      ),
+    );
+    // Addressed by ticket — the server derives the queue from it.
+    expect(refine.mock.calls[0][0].ticket_id).toBe(1);
   });
 });

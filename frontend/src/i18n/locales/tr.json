@@ -567,7 +567,24 @@
     "customerUnresolved": "Bu adrese uyan müşteri kaydı yok; müşteri ayrıntıları kullanılamıyor.",
     "lockedByBanner": "{{name}} tarafından kilitlendi",
     "takeOver": "Devral",
-    "replyViaTelegram": "Reply will be sent via Telegram"
+    "replyViaTelegram": "Reply will be sent via Telegram",
+    "refine": {
+      "button": "Refine text",
+      "running": "Refining …",
+      "undo": "Undo refine",
+      "toneLabel": "Tone",
+      "toneStandard": "Standard",
+      "toneFormal": "Formal",
+      "toneFriendly": "Friendly",
+      "toneConcise": "Shorter",
+      "nothingToRefine": "No text of your own to refine — quotes are left untouched.",
+      "hint": "Rewrites only what you typed; quoted text is left untouched.",
+      "errorEmpty": "The model returned no usable rewrite. Your text is unchanged.",
+      "errorLimit": "Your quota for AI rewriting is used up.",
+      "errorDenied": "You are not allowed to use AI rewriting.",
+      "errorDisabled": "AI rewriting is not enabled for this queue.",
+      "error": "Refining failed. Your text is unchanged."
+    }
   },
   "search": {
     "title": "Ara",
@@ -820,7 +837,8 @@
         "summary": "Özet",
         "auto_reply": "Otomatik yanıt",
         "manual_assist": "Manuel yardım",
-        "mcp": "MCP"
+        "mcp": "MCP",
+        "refine": "Refine text"
       },
       "providers": {
         "title": "Yüksek Lisans sağlayıcıları",
@@ -1173,7 +1191,8 @@
         "allowedStateTypes": "İzin verilen Znuny durum türlerinin virgülle ayrılmış listesi (örneğin, \"açık\" veya \"açık, beklemede hatırlatma\") AI, hem durum adı hem de sayısal durum kimliği için uygulanan update_ticket_fields aracılığıyla bir bilet ayarlayabilir. Boş = yalnızca varsayılan \"açık\" (yeniden açılmaya izin verilir, asla kapanmaz); açık bir boş liste \"[]\" durum değişikliklerini tamamen devre dışı bırakır.",
         "piiNer": "spaCy NER (Almanca + İngilizce) aracılığıyla metindeki kişi adlarını algılar ve içerik LLM sağlayıcısına ulaşmadan önce müşteri adı ve gönderenlerin yanı sıra bunları [NAME_n] olarak maskeler. Yalnızca PII maskeleme açıkken etkindir. Yanlış pozitifler zararsızdır (sadece daha fazla maskeleme).",
         "summaryDetail": "Standart: kısa paragraflar, ekli belge başına 1-2 cümle. Ayrıntılı: daha ayrıntılı paragraflar ve belge başına 3-5 cümle — çok sayıda PDF eki içeren kuyruklar için kullanışlıdır.",
-        "llmFallback": "Providers tried in order, after the primary provider above, when a request fails (rate limit, timeout, error). Each entry has its own optional model override. Priority 1 is always the primary provider/model; entries here are priority 2, 3, …."
+        "llmFallback": "Providers tried in order, after the primary provider above, when a request fails (rate limit, timeout, error). Each entry has its own optional model override. Priority 1 is always the primary provider/model; entries here are priority 2, 3, ….",
+        "enabledRefine": "Shows the “Refine text” button in the reply and New-ticket composers. The model rewrites only what the agent typed; quoted passages are left untouched. Nothing is stored and nothing is sent — the agent sees the result in the editor and can undo it. Not affected by the operation-mode gate."
       },
       "common": {
         "validId": "Geçerli/geçersiz, geçici silme işaretidir: bir girişi geçersiz olarak işaretlemek, mevcut referansları (örneğin biletler, atamalar) silmeden, onu yeni kayıtlar için seçicilerden gizler. Sert silme yoktur."

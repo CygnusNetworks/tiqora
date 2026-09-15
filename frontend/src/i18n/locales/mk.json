@@ -567,7 +567,24 @@
     "customerUnresolved": "Нема запис за клиент за оваа адреса, податоците не се достапни.",
     "lockedByBanner": "Заклучено од {{name}}",
     "takeOver": "Преземи",
-    "replyViaTelegram": "Reply will be sent via Telegram"
+    "replyViaTelegram": "Reply will be sent via Telegram",
+    "refine": {
+      "button": "Refine text",
+      "running": "Refining …",
+      "undo": "Undo refine",
+      "toneLabel": "Tone",
+      "toneStandard": "Standard",
+      "toneFormal": "Formal",
+      "toneFriendly": "Friendly",
+      "toneConcise": "Shorter",
+      "nothingToRefine": "No text of your own to refine — quotes are left untouched.",
+      "hint": "Rewrites only what you typed; quoted text is left untouched.",
+      "errorEmpty": "The model returned no usable rewrite. Your text is unchanged.",
+      "errorLimit": "Your quota for AI rewriting is used up.",
+      "errorDenied": "You are not allowed to use AI rewriting.",
+      "errorDisabled": "AI rewriting is not enabled for this queue.",
+      "error": "Refining failed. Your text is unchanged."
+    }
   },
   "search": {
     "title": "Пребарување",
@@ -820,7 +837,8 @@
         "summary": "Резиме",
         "auto_reply": "Автоматски одговор",
         "manual_assist": "Рачна помош",
-        "mcp": "MCP"
+        "mcp": "MCP",
+        "refine": "Refine text"
       },
       "providers": {
         "title": "LLM провајдери",
@@ -1173,7 +1191,8 @@
         "allowedStateTypes": "Список разделен со запирки на дозволени типови на состојби Znuny (на пр. „отворен“ или „отворен, потсетник во очекување“) вештачката интелигенција може да постави тикет до преку update_ticket_fields — применета и за името на државата и за нумеричкиот ид на состојба. Празен = само стандардно „отворено“ (повторното отворање е дозволено, никогаш не се затвора); експлицитна празна листа „[]“ целосно ги оневозможува промените на состојбата.",
         "piiNer": "Ги открива имињата на лицата во текстот преку spaCy NER (германски + англиски) и ги маскира како [NAME_n] пред содржината да стигне до давателот на LLM - покрај името на клиентот и испраќачите. Активно само кога е вклучено маскирањето PII. Лажните позитиви се безопасни (само повеќе маскирање).",
         "summaryDetail": "Стандард: компактни параграфи, 1–2 реченици по приложен документ. Детално: потемелни параграфи и 3–5 реченици по документ - корисни за редици со многу прилози за PDF.",
-        "llmFallback": "Providers tried in order, after the primary provider above, when a request fails (rate limit, timeout, error). Each entry has its own optional model override. Priority 1 is always the primary provider/model; entries here are priority 2, 3, …."
+        "llmFallback": "Providers tried in order, after the primary provider above, when a request fails (rate limit, timeout, error). Each entry has its own optional model override. Priority 1 is always the primary provider/model; entries here are priority 2, 3, ….",
+        "enabledRefine": "Shows the “Refine text” button in the reply and New-ticket composers. The model rewrites only what the agent typed; quoted passages are left untouched. Nothing is stored and nothing is sent — the agent sees the result in the editor and can undo it. Not affected by the operation-mode gate."
       },
       "common": {
         "validId": "Valid/invalid е знаменце со меко бришење: означувањето на записот како неважечки го сокрива од избирачите за нови записи без да се бришат постоечките референци (на пр. билети, задачи). Нема тешко бришење."

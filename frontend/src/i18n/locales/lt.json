@@ -567,7 +567,24 @@
     "customerUnresolved": "Šiam adresui nėra kliento įrašo, todėl duomenys nepasiekiami.",
     "lockedByBanner": "Užrakino {{name}}",
     "takeOver": "Perimti",
-    "replyViaTelegram": "Reply will be sent via Telegram"
+    "replyViaTelegram": "Reply will be sent via Telegram",
+    "refine": {
+      "button": "Refine text",
+      "running": "Refining …",
+      "undo": "Undo refine",
+      "toneLabel": "Tone",
+      "toneStandard": "Standard",
+      "toneFormal": "Formal",
+      "toneFriendly": "Friendly",
+      "toneConcise": "Shorter",
+      "nothingToRefine": "No text of your own to refine — quotes are left untouched.",
+      "hint": "Rewrites only what you typed; quoted text is left untouched.",
+      "errorEmpty": "The model returned no usable rewrite. Your text is unchanged.",
+      "errorLimit": "Your quota for AI rewriting is used up.",
+      "errorDenied": "You are not allowed to use AI rewriting.",
+      "errorDisabled": "AI rewriting is not enabled for this queue.",
+      "error": "Refining failed. Your text is unchanged."
+    }
   },
   "search": {
     "title": "Ieškoti",
@@ -820,7 +837,8 @@
         "summary": "Santrauka",
         "auto_reply": "Automatinis atsakymas",
         "manual_assist": "Rankinė pagalba",
-        "mcp": "MCP"
+        "mcp": "MCP",
+        "refine": "Refine text"
       },
       "providers": {
         "title": "LLM teikėjai",
@@ -1173,7 +1191,8 @@
         "allowedStateTypes": "Kableliais atskirtas leidžiamų „Znuny“ būsenų tipų sąrašas (pvz., „atidaryti“ arba „atidaryti, laukia priminimas“), AI gali nustatyti bilietą per update_ticket_fields – taikomas ir būsenos pavadinimui, ir skaitiniam būsenos ID. Empty = numatytasis tik \"atidaryti\" (leidžiamas pakartotinis atidarymas, niekada neuždaromas); aiškus tuščias sąrašas „[]“ visiškai išjungia būsenos pakeitimus.",
         "piiNer": "Aptinka asmenų vardus tekste per spaCy NER (vokiečių ir anglų k.) ir užmaskuoja juos kaip [NAME_n], kol turinys pasiekia LLM teikėją, be kliento vardo ir siuntėjų. Aktyvus tik tada, kai įjungtas AII maskavimas. Klaidingi teigiami rezultatai yra nekenksmingi (tik labiau maskuoja).",
         "summaryDetail": "Standartas: kompaktiškos pastraipos, 1–2 sakiniai kiekviename pridedamame dokumente. Išsamiau: išsamesnės pastraipos ir 3–5 sakiniai viename dokumente – naudinga eilėse su daugybe PDF priedų.",
-        "llmFallback": "Providers tried in order, after the primary provider above, when a request fails (rate limit, timeout, error). Each entry has its own optional model override. Priority 1 is always the primary provider/model; entries here are priority 2, 3, …."
+        "llmFallback": "Providers tried in order, after the primary provider above, when a request fails (rate limit, timeout, error). Each entry has its own optional model override. Priority 1 is always the primary provider/model; entries here are priority 2, 3, ….",
+        "enabledRefine": "Shows the “Refine text” button in the reply and New-ticket composers. The model rewrites only what the agent typed; quoted passages are left untouched. Nothing is stored and nothing is sent — the agent sees the result in the editor and can undo it. Not affected by the operation-mode gate."
       },
       "common": {
         "validId": "Valid / Invalid yra švelnaus ištrynimo vėliavėlė: pažymėjus įrašą kaip negaliojantį, jis paslepiamas nuo naujų įrašų rinkėjų, neištrinant esamų nuorodų (pvz., bilietų, užduočių). Sunkaus ištrynimo nėra."

@@ -15,6 +15,8 @@ const {
   getComposeContext,
   createTicket,
   createArticle,
+  refine,
+  refineAvailability,
 } = vi.hoisted(() => ({
   navigate: vi.fn(),
   listQueues: vi.fn(),
@@ -24,7 +26,15 @@ const {
   getComposeContext: vi.fn(),
   createTicket: vi.fn(),
   createArticle: vi.fn(),
+  refine: vi.fn(),
+  refineAvailability: vi.fn(),
 }));
+
+vi.mock("@/lib/refineApi", async () => {
+  const actual =
+    await vi.importActual<typeof import("@/lib/refineApi")>("@/lib/refineApi");
+  return { ...actual, refineApi: { refine, refineAvailability } };
+});
 
 vi.mock("@tanstack/react-router", () => ({
   useNavigate: () => navigate,
@@ -39,7 +49,10 @@ vi.mock("@tanstack/react-router", () => ({
     to: string;
     params?: Record<string, string>;
   } & Record<string, unknown>) => (
-    <a href={`${to}${params ? `/${Object.values(params).join("/")}` : ""}`} {...rest}>
+    <a
+      href={`${to}${params ? `/${Object.values(params).join("/")}` : ""}`}
+      {...rest}
+    >
       {children}
     </a>
   ),
@@ -103,8 +116,14 @@ const customer = {
 
 async function renderReady() {
   const utils = wrap(<NewTicketPage />);
-  await waitFor(() => expect(screen.getByTestId("new-ticket-type-email")).toBeInTheDocument());
-  await waitFor(() => expect(screen.getByTestId("new-ticket-customer-search")).toBeInTheDocument());
+  await waitFor(() =>
+    expect(screen.getByTestId("new-ticket-type-email")).toBeInTheDocument(),
+  );
+  await waitFor(() =>
+    expect(
+      screen.getByTestId("new-ticket-customer-search"),
+    ).toBeInTheDocument(),
+  );
   return utils;
 }
 
@@ -117,7 +136,9 @@ async function pickCustomer() {
       expect.objectContaining({ q: "jane" }),
     ),
   );
-  const result = await screen.findByTestId("new-ticket-customer-result-jane.doe");
+  const result = await screen.findByTestId(
+    "new-ticket-customer-result-jane.doe",
+  );
   fireEvent.click(result);
 }
 
@@ -135,18 +156,25 @@ describe("NewTicketPage", () => {
 
   it("defaults to email mode and seeds the To chip + customer card on selection", async () => {
     await renderReady();
-    expect(screen.getByTestId("new-ticket-type-email")).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByTestId("new-ticket-type-email")).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
 
     await pickCustomer();
 
-    expect(screen.getByTestId("new-ticket-customer-card")).toHaveTextContent("Jane Doe");
+    expect(screen.getByTestId("new-ticket-customer-card")).toHaveTextContent(
+      "Jane Doe",
+    );
     expect(screen.getByTestId("new-ticket-to")).toHaveTextContent("Jane Doe");
   });
 
   it("keeps submit disabled until To/subject/body are filled, then enables it and creates the ticket + article", async () => {
     await renderReady();
     await pickCustomer();
-    await waitFor(() => expect(screen.getByTestId("new-ticket-submit")).toBeDisabled());
+    await waitFor(() =>
+      expect(screen.getByTestId("new-ticket-submit")).toBeDisabled(),
+    );
 
     fireEvent.change(screen.getByTestId("new-ticket-subject"), {
       target: { value: "Question about invoice" },
@@ -156,7 +184,9 @@ describe("NewTicketPage", () => {
     fireEvent.change(screen.getByTestId("new-ticket-body"), {
       target: { value: "Please advise." },
     });
-    await waitFor(() => expect(screen.getByTestId("new-ticket-submit")).not.toBeDisabled());
+    await waitFor(() =>
+      expect(screen.getByTestId("new-ticket-submit")).not.toBeDisabled(),
+    );
 
     fireEvent.click(screen.getByTestId("new-ticket-submit"));
 
@@ -193,7 +223,10 @@ describe("NewTicketPage", () => {
 
     expect(screen.queryByTestId("new-ticket-to")).not.toBeInTheDocument();
     expect(screen.queryByTestId("new-ticket-from")).not.toBeInTheDocument();
-    expect(screen.getByTestId("new-ticket-direction-in")).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByTestId("new-ticket-direction-in")).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
 
     fireEvent.click(screen.getByTestId("new-ticket-direction-out"));
     fireEvent.change(screen.getByTestId("new-ticket-subject"), {
@@ -202,7 +235,9 @@ describe("NewTicketPage", () => {
     fireEvent.change(screen.getByTestId("new-ticket-body"), {
       target: { value: "Customer called back." },
     });
-    await waitFor(() => expect(screen.getByTestId("new-ticket-submit")).not.toBeDisabled());
+    await waitFor(() =>
+      expect(screen.getByTestId("new-ticket-submit")).not.toBeDisabled(),
+    );
     fireEvent.click(screen.getByTestId("new-ticket-submit"));
 
     await waitFor(() => expect(createArticle).toHaveBeenCalledTimes(1));
@@ -228,22 +263,69 @@ describe("NewTicketPage", () => {
 
   it("shows sendError and does not navigate when the article creation returns 502", async () => {
     createArticle.mockRejectedValue(
-      new ApiError(502, "Outbound email delivery failed: SMTP refused", "/api/v1/tickets/42/articles"),
+      new ApiError(
+        502,
+        "Outbound email delivery failed: SMTP refused",
+        "/api/v1/tickets/42/articles",
+      ),
     );
     await renderReady();
     await pickCustomer();
     fireEvent.change(screen.getByTestId("new-ticket-subject"), {
       target: { value: "Question" },
     });
-    fireEvent.change(screen.getByTestId("new-ticket-body"), { target: { value: "Body text" } });
-    await waitFor(() => expect(screen.getByTestId("new-ticket-submit")).not.toBeDisabled());
+    fireEvent.change(screen.getByTestId("new-ticket-body"), {
+      target: { value: "Body text" },
+    });
+    await waitFor(() =>
+      expect(screen.getByTestId("new-ticket-submit")).not.toBeDisabled(),
+    );
     fireEvent.click(screen.getByTestId("new-ticket-submit"));
 
-    await waitFor(() => expect(screen.getByTestId("new-ticket-error")).toBeInTheDocument());
+    await waitFor(() =>
+      expect(screen.getByTestId("new-ticket-error")).toBeInTheDocument(),
+    );
     expect(screen.getByTestId("new-ticket-error")).toHaveTextContent(
       /could not be sent/,
     );
     expect(screen.getByText("Go to ticket")).toBeInTheDocument();
     expect(navigate).not.toHaveBeenCalled();
+  });
+});
+
+describe("NewTicketPage refine", () => {
+  beforeEach(() => {
+    navigate.mockReset();
+    listQueues.mockReset().mockResolvedValue([queue]);
+    listReferencePriorities.mockReset().mockResolvedValue(priorities);
+    listReferenceStates.mockReset().mockResolvedValue(states);
+    searchReferenceCustomers.mockReset().mockResolvedValue([customer]);
+    getComposeContext.mockReset().mockResolvedValue(composeContext);
+    refine.mockReset();
+    refineAvailability.mockReset().mockResolvedValue({ available: true });
+  });
+
+  it("rewrites the body and addresses the request by the picked queue", async () => {
+    refine.mockResolvedValue({
+      sections: [{ id: 0, text: "Der Kunde meldet eine Stoerung." }],
+    });
+    await renderReady();
+    // The form stays locked (disabled fieldset) until a customer is picked.
+    await pickCustomer();
+
+    const body = () =>
+      screen.getByTestId("new-ticket-body") as HTMLTextAreaElement;
+    fireEvent.change(body(), { target: { value: "kunde meldet stoerung" } });
+
+    await waitFor(() =>
+      expect(screen.getByTestId("new-ticket-refine-button")).toBeEnabled(),
+    );
+    fireEvent.click(screen.getByTestId("new-ticket-refine-button"));
+
+    await waitFor(() =>
+      expect(body().value).toBe("Der Kunde meldet eine Stoerung."),
+    );
+    expect(refine.mock.calls[0][0].queue_id).toBe(queue.id);
+    expect(refine.mock.calls[0][0].ticket_id).toBeUndefined();
   });
 });

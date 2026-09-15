@@ -567,7 +567,24 @@
     "customerUnresolved": "没有与此地址匹配的客户记录，因此无法显示客户详情。",
     "lockedByBanner": "由 {{name}} 锁定",
     "takeOver": "接管",
-    "replyViaTelegram": "Reply will be sent via Telegram"
+    "replyViaTelegram": "Reply will be sent via Telegram",
+    "refine": {
+      "button": "Refine text",
+      "running": "Refining …",
+      "undo": "Undo refine",
+      "toneLabel": "Tone",
+      "toneStandard": "Standard",
+      "toneFormal": "Formal",
+      "toneFriendly": "Friendly",
+      "toneConcise": "Shorter",
+      "nothingToRefine": "No text of your own to refine — quotes are left untouched.",
+      "hint": "Rewrites only what you typed; quoted text is left untouched.",
+      "errorEmpty": "The model returned no usable rewrite. Your text is unchanged.",
+      "errorLimit": "Your quota for AI rewriting is used up.",
+      "errorDenied": "You are not allowed to use AI rewriting.",
+      "errorDisabled": "AI rewriting is not enabled for this queue.",
+      "error": "Refining failed. Your text is unchanged."
+    }
   },
   "search": {
     "title": "搜索",
@@ -820,7 +837,8 @@
         "summary": "摘要",
         "auto_reply": "自动回复",
         "manual_assist": "手动辅助",
-        "mcp": "MCP"
+        "mcp": "MCP",
+        "refine": "Refine text"
       },
       "providers": {
         "title": "法学硕士提供者",
@@ -1173,7 +1191,8 @@
         "allowedStateTypes": "以逗号分隔的允许的 Znuny 状态类型列表（例如“打开”或“打开、待处理提醒”），AI 可以通过 update_ticket_fields 设置工单 — 对状态名称和数字状态 id 强制执行。空 = 默认仅“打开”（允许重新打开，从不关闭）；显式的空列表“[]”完全禁用状态更改。",
         "piiNer": "通过 spaCy NER（德语 + 英语）检测文本中的人名，并在内容到达 LLM 提供商之前将其掩码为 [NAME_n] - 除了客户名称和发件人之外。仅当 PII 屏蔽开启时才有效。误报是无害的（只是更多的掩蔽）。",
         "summaryDetail": "标准：段落紧凑，每个附件有 1-2 句话。详细：每个文档有更详尽的段落和 3-5 个句子 - 对于具有许多 PDF 附件的队列很有用。",
-        "llmFallback": "Providers tried in order, after the primary provider above, when a request fails (rate limit, timeout, error). Each entry has its own optional model override. Priority 1 is always the primary provider/model; entries here are priority 2, 3, …."
+        "llmFallback": "Providers tried in order, after the primary provider above, when a request fails (rate limit, timeout, error). Each entry has its own optional model override. Priority 1 is always the primary provider/model; entries here are priority 2, 3, ….",
+        "enabledRefine": "Shows the “Refine text” button in the reply and New-ticket composers. The model rewrites only what the agent typed; quoted passages are left untouched. Nothing is stored and nothing is sent — the agent sees the result in the editor and can undo it. Not affected by the operation-mode gate."
       },
       "common": {
         "validId": "有效/无效是一个软删除标志：将条目标记为无效会在新记录的选择器中隐藏它，而不删除现有引用（例如工单、作业）。没有硬删除。"

@@ -634,7 +634,24 @@
     "extrasRetry": "Try again",
     "customerUnresolved": "No customer record matches this address, so customer details are unavailable.",
     "lockedByBanner": "Locked by {{name}}",
-    "takeOver": "Take over"
+    "takeOver": "Take over",
+    "refine": {
+      "button": "Refine text",
+      "running": "Refining …",
+      "undo": "Undo refine",
+      "toneLabel": "Tone",
+      "toneStandard": "Standard",
+      "toneFormal": "Formal",
+      "toneFriendly": "Friendly",
+      "toneConcise": "Shorter",
+      "nothingToRefine": "No text of your own to refine — quotes are left untouched.",
+      "hint": "Rewrites only what you typed; quoted text is left untouched.",
+      "errorEmpty": "The model returned no usable rewrite. Your text is unchanged.",
+      "errorLimit": "Your quota for AI rewriting is used up.",
+      "errorDenied": "You are not allowed to use AI rewriting.",
+      "errorDisabled": "AI rewriting is not enabled for this queue.",
+      "error": "Refining failed. Your text is unchanged."
+    }
   },
   "search": {
     "title": "Search",
@@ -887,7 +904,8 @@
         "summary": "Summary",
         "auto_reply": "Auto reply",
         "manual_assist": "Manual assist",
-        "mcp": "MCP"
+        "mcp": "MCP",
+        "refine": "Refine text"
       },
       "providers": {
         "title": "LLM providers",
@@ -1240,7 +1258,8 @@
         "replyLanguageDefault": "BCP-47 language code used in \"Auto\" mode when the text cannot be confidently matched to a known language profile.",
         "allowedStateTypes": "Comma-separated list of allowed Znuny state types (e.g. \"open\" or \"open,closed\"). It governs both what the AI may set via update_ticket_fields — enforced for the state name and the numeric state id alike — and the state Tiqora parks a ticket in after it sent an auto-reply itself: a factual reply closes the ticket when \"closed\" is allowed (falling back to \"open\"), a clarifying question only opens it. Empty = default \"open\" only (reopening allowed, never closing); an explicit empty list \"[]\" disables state changes entirely, so an auto-replied ticket keeps whatever state it had.",
         "piiNer": "Detects person names in text via spaCy NER (German + English) and masks them as [NAME_n] before content reaches the LLM provider — in addition to customer name and senders. Only active when PII masking is on. False positives are harmless (just more masking).",
-        "summaryDetail": "Standard: compact paragraphs, 1–2 sentences per attached document. Detailed: more thorough paragraphs and 3–5 sentences per document — useful for queues with many PDF attachments."
+        "summaryDetail": "Standard: compact paragraphs, 1–2 sentences per attached document. Detailed: more thorough paragraphs and 3–5 sentences per document — useful for queues with many PDF attachments.",
+        "enabledRefine": "Shows the “Refine text” button in the reply and New-ticket composers. The model rewrites only what the agent typed; quoted passages are left untouched. Nothing is stored and nothing is sent — the agent sees the result in the editor and can undo it. Not affected by the operation-mode gate."
       },
       "common": {
         "validId": "Valid/invalid is a soft-delete flag: marking an entry invalid hides it from pickers for new records without deleting existing references (e.g. tickets, assignments). There is no hard delete."
@@ -2319,7 +2338,7 @@
       "adminUrlTemplateHelp": "Shown to admins instead of the URL template above, e.g. for a Kerberos-authenticated host. Non-admins never see this.",
       "templateHelp": "Placeholders: {customer_user}, {customer_id}, {ticket_number}, {customer_email}, {customer_name} — values are URL-encoded.",
       "loginSuffixSeparator": "Login suffix separator (optional)",
-      "loginSuffixSeparatorHelp": "When set, {customer_user} is cut at the first occurrence of this character (e.g. '#': z50test#3 \u2192 z50test). Empty = use the login verbatim.",
+      "loginSuffixSeparatorHelp": "When set, {customer_user} is cut at the first occurrence of this character (e.g. '#': z50test#3 → z50test). Empty = use the login verbatim.",
       "visibility": "Visibility",
       "visibilityAll": "Everyone",
       "visibilityAdmins": "Admins only",

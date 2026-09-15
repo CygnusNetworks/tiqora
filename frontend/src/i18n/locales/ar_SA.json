@@ -567,7 +567,24 @@
     "customerUnresolved": "لا يوجد سجل عميل يطابق هذا العنوان، لذا تفاصيل العميل غير متاحة.",
     "lockedByBanner": "مقفلة بواسطة {{name}}",
     "takeOver": "استلام",
-    "replyViaTelegram": "Reply will be sent via Telegram"
+    "replyViaTelegram": "Reply will be sent via Telegram",
+    "refine": {
+      "button": "Refine text",
+      "running": "Refining …",
+      "undo": "Undo refine",
+      "toneLabel": "Tone",
+      "toneStandard": "Standard",
+      "toneFormal": "Formal",
+      "toneFriendly": "Friendly",
+      "toneConcise": "Shorter",
+      "nothingToRefine": "No text of your own to refine — quotes are left untouched.",
+      "hint": "Rewrites only what you typed; quoted text is left untouched.",
+      "errorEmpty": "The model returned no usable rewrite. Your text is unchanged.",
+      "errorLimit": "Your quota for AI rewriting is used up.",
+      "errorDenied": "You are not allowed to use AI rewriting.",
+      "errorDisabled": "AI rewriting is not enabled for this queue.",
+      "error": "Refining failed. Your text is unchanged."
+    }
   },
   "search": {
     "title": "بحث",
@@ -820,7 +837,8 @@
         "summary": "ملخص",
         "auto_reply": "الرد التلقائي",
         "manual_assist": "المساعدة اليدوية",
-        "mcp": "MCP"
+        "mcp": "MCP",
+        "refine": "Refine text"
       },
       "providers": {
         "title": "مقدمي LLM",
@@ -1173,7 +1191,8 @@
         "allowedStateTypes": "قائمة مفصولة بفواصل لأنواع حالات Znuny المسموح بها (على سبيل المثال، \"مفتوح\" أو \"مفتوح، في انتظار التذكير\") قد يقوم الذكاء الاصطناعي بتعيين تذكرة عبر update_ticket_fields - يتم فرضها على كل من اسم الولاية ومعرف الحالة الرقمي. فارغ = افتراضي \"فتح\" فقط (يُسمح بإعادة الفتح، ولا يُغلق مطلقًا)؛ تعمل القائمة الفارغة الصريحة \"[]\" على تعطيل تغييرات الحالة بالكامل.",
         "piiNer": "يكتشف أسماء الأشخاص في النص عبر spaCy NER (الألمانية + الإنجليزية) ويخفيها كـ [NAME_n] قبل أن يصل المحتوى إلى موفر LLM - بالإضافة إلى اسم العميل والمرسلين. يتم تفعيله فقط عندما يكون إخفاء معلومات تحديد الهوية الشخصية (PII) قيد التشغيل. الإيجابيات الكاذبة غير ضارة (مجرد المزيد من الإخفاء).",
         "summaryDetail": "المعيار: فقرات مدمجة، 1-2 جمل لكل مستند مرفق. تفصيلي: فقرات أكثر شمولاً و3-5 جمل لكل مستند - مفيدة لقوائم الانتظار التي تحتوي على العديد من مرفقات PDF.",
-        "llmFallback": "Providers tried in order, after the primary provider above, when a request fails (rate limit, timeout, error). Each entry has its own optional model override. Priority 1 is always the primary provider/model; entries here are priority 2, 3, …."
+        "llmFallback": "Providers tried in order, after the primary provider above, when a request fails (rate limit, timeout, error). Each entry has its own optional model override. Priority 1 is always the primary provider/model; entries here are priority 2, 3, ….",
+        "enabledRefine": "Shows the “Refine text” button in the reply and New-ticket composers. The model rewrites only what the agent typed; quoted passages are left untouched. Nothing is stored and nothing is sent — the agent sees the result in the editor and can undo it. Not affected by the operation-mode gate."
       },
       "common": {
         "validId": "صالح/غير صالح هي علامة للحذف الناعم: وضع علامة على الإدخال غير صالح يؤدي إلى إخفائه عن منتقي السجلات الجديدة دون حذف المراجع الموجودة (مثل التذاكر والواجبات). لا يوجد حذف الثابت."
