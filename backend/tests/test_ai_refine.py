@@ -244,7 +244,10 @@ def _seed_statements(*, ns: int) -> tuple[tuple[str, dict[str, Any]], ...]:
     agent_id = 9500 + ns
     group_id = 9530 + ns
     queue_id = 9500 + ns
+    ticket_id = 9560 + ns
     return (
+        ("DELETE FROM ticket WHERE id = :id", {"id": ticket_id}),
+        ("DELETE FROM customer_user WHERE login = :l", {"l": f"refine.kunde.95{ns}"}),
         ("DELETE FROM queue WHERE id = :id", {"id": queue_id}),
         (
             "DELETE FROM group_user WHERE user_id = :uid OR group_id = :gid",
@@ -275,10 +278,12 @@ def _delete_seeded_rows() -> Generator[None, None, None]:
     _SEEDED.clear()
 
 
-def _seed(sync_url: str, *, ns: int) -> dict[str, Any]:
+def _seed(sync_url: str, *, ns: int, with_ticket: bool = False) -> dict[str, Any]:
     agent_id = 9500 + ns
     group_id = 9530 + ns
     queue_id = 9500 + ns
+    ticket_id = 9560 + ns
+    customer_login = f"refine.kunde.95{ns}"
 
     _SEEDED.append((sync_url, ns))
     engine = create_engine(sync_url)
@@ -321,8 +326,45 @@ def _seed(sync_url: str, *, ns: int) -> dict[str, Any]:
             ),
             {"id": queue_id, "name": f"AiRefineQueue95{ns}", "gid": group_id, "t": NOW},
         )
+        if with_ticket:
+            # A customer_user with a real surname — the only source
+            # collect_known_names has for name masking.
+            conn.execute(
+                text(
+                    "INSERT INTO customer_user (login, email, customer_id, first_name,"
+                    " last_name, pw, valid_id, create_time, create_by, change_time, change_by)"
+                    " VALUES (:l, :e, :l, 'Katrin', 'Falkenberg', 'x', 1, :t, 1, :t, 1)"
+                ),
+                {"l": customer_login, "e": f"{customer_login}@example.org", "t": NOW},
+            )
+            conn.execute(
+                text(
+                    "INSERT INTO ticket (id, tn, title, queue_id, ticket_lock_id, type_id,"
+                    " user_id, responsible_user_id, ticket_priority_id, ticket_state_id,"
+                    " customer_id, customer_user_id, timeout, until_time, escalation_time,"
+                    " escalation_update_time, escalation_response_time,"
+                    " escalation_solution_time, archive_flag, create_time, create_by,"
+                    " change_time, change_by)"
+                    " VALUES (:id, :tn, 'Refine ticket', :qid, 1, 1, :uid, 1, 3, 4,"
+                    " :cid, :cuid, 0, 0, 0, 0, 0, 0, 0, :t, 1, :t, 1)"
+                ),
+                {
+                    "id": ticket_id,
+                    "tn": f"2024060195{ns:03d}",
+                    "qid": queue_id,
+                    "uid": agent_id,
+                    "cid": customer_login,
+                    "cuid": customer_login,
+                    "t": NOW,
+                },
+            )
     engine.dispose()
-    return {"agent_id": agent_id, "queue_id": queue_id}
+    return {
+        "agent_id": agent_id,
+        "queue_id": queue_id,
+        "ticket_id": ticket_id,
+        "customer_login": customer_login,
+    }
 
 
 async def _setup_policy(
@@ -538,6 +580,70 @@ async def test_refine_is_refused_when_the_agent_acl_denies_the_feature(
                     tone=TONE_STANDARD,
                     acting_user_id=seed["agent_id"],
                 )
+    finally:
+        await engine.dispose()
+
+
+async def test_refine_masks_the_customer_name_from_the_ticket(
+    mariadb_znuny_url: str,
+) -> None:
+    seed = _seed(mariadb_znuny_url, ns=7, with_ticket=True)
+    engine = create_async_engine(_mysql_async(mariadb_znuny_url))
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    try:
+        async with factory() as session:
+            await _setup_policy(session, seed=seed, pii_masking=True)
+
+        # The agent typed the customer's name into their own draft.
+        segments = [Segment(kind="own", text="Frau Falkenberg hat sich gemeldet\n")]
+        llm = ScriptedLlm(
+            [json.dumps({"sections": [{"id": 0, "text": "Rueckmeldung liegt vor."}]})]
+        )
+        async with factory() as session:
+            await refine_text(
+                session,
+                llm=llm,
+                queue_id=seed["queue_id"],
+                segments=segments,
+                tone=TONE_STANDARD,
+                acting_user_id=seed["agent_id"],
+                ticket_id=seed["ticket_id"],
+            )
+
+        # Regex PII was already covered; this is the name path, which only
+        # works when known_names reaches the PiiMapper.
+        assert "Falkenberg" not in llm.user_messages[0]
+    finally:
+        await engine.dispose()
+
+
+async def test_refine_masks_the_customer_named_by_the_new_ticket_form(
+    mariadb_znuny_url: str,
+) -> None:
+    seed = _seed(mariadb_znuny_url, ns=8, with_ticket=True)
+    engine = create_async_engine(_mysql_async(mariadb_znuny_url))
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    try:
+        async with factory() as session:
+            await _setup_policy(session, seed=seed, pii_masking=True)
+
+        # No ticket here — the composer names the customer it was opened for.
+        segments = [Segment(kind="own", text="Frau Falkenberg hat sich gemeldet\n")]
+        llm = ScriptedLlm(
+            [json.dumps({"sections": [{"id": 0, "text": "Rueckmeldung liegt vor."}]})]
+        )
+        async with factory() as session:
+            await refine_text(
+                session,
+                llm=llm,
+                queue_id=seed["queue_id"],
+                segments=segments,
+                tone=TONE_STANDARD,
+                acting_user_id=seed["agent_id"],
+                customer_user_id=seed["customer_login"],
+            )
+
+        assert "Falkenberg" not in llm.user_messages[0]
     finally:
         await engine.dispose()
 
