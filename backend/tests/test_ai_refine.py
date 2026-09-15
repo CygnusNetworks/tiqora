@@ -112,6 +112,17 @@ def test_parse_sections_rejects_an_unknown_section_id() -> None:
     assert _parse_sections(content, [1]) is None
 
 
+def test_parse_sections_accepts_a_stringified_id() -> None:
+    # Observed in prod from Qwen3-235B: the model answers correctly but types
+    # the id as a JSON string. Rejecting that throws away a good rewrite.
+    content = '{"sections": [{"id": "2", "text": "Guten Tag."}]}'
+    assert _parse_sections(content, [2]) == {2: "Guten Tag."}
+
+
+def test_parse_sections_rejects_an_id_that_is_not_a_number() -> None:
+    assert _parse_sections('{"sections": [{"id": "zwei", "text": "x"}]}', [2]) is None
+
+
 def test_parse_sections_rejects_non_json() -> None:
     assert _parse_sections("Sure! Here is your improved text.", [0]) is None
 
