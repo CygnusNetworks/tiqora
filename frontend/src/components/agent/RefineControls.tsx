@@ -137,13 +137,18 @@ export function RefineControls({
 }
 
 /** Maps the structured `"<code>: <message>"` detail the API returns onto a
- * specific hint; anything unrecognised falls back to the generic failure. */
+ * specific hint; anything unrecognised falls back to the generic failure.
+ *
+ * Reads `message`, not `detail`: `detail` is the parsed response body, so for
+ * a FastAPI error it is the OBJECT `{detail: "..."}` and every prefix test
+ * below would silently miss. `ApiError` unwraps that into `message` — the same
+ * property `ReplyDialog` matches on. */
 function refineErrorMessage(
   error: unknown,
   t: (key: string) => string,
 ): string {
   if (!(error instanceof ApiError)) return t("ticket.refine.error");
-  const detail = typeof error.detail === "string" ? error.detail : "";
+  const detail = error.message;
   if (error.status === 429) return t("ticket.refine.errorLimit");
   if (error.status === 403) return t("ticket.refine.errorDenied");
   if (detail.startsWith("refine_disabled"))
