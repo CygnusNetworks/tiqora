@@ -155,6 +155,10 @@ class AiRefineIn(BaseModel):
 
     ticket_id: int | None = None
     queue_id: int | None = None
+    #: New-ticket form only: the customer the composer was opened for, so its
+    #: name can be PII-masked. With a ticket the names come from the ticket
+    #: itself — see ``tiqora.ai.refine._name_masking_inputs``.
+    customer_user_id: str | None = None
     tone: str = TONE_STANDARD
     segments: list[AiRefineSegmentIn] = Field(min_length=1)
 
@@ -162,6 +166,8 @@ class AiRefineIn(BaseModel):
     def _exactly_one_target(self) -> AiRefineIn:
         if (self.ticket_id is None) == (self.queue_id is None):
             raise ValueError("Pass exactly one of ticket_id or queue_id")
+        if self.customer_user_id is not None and self.ticket_id is not None:
+            raise ValueError("customer_user_id is only for the queue_id form")
         return self
 
     @field_validator("tone")
@@ -815,6 +821,7 @@ async def request_refine(
             tone=body.tone,
             acting_user_id=user.id,
             ticket_id=body.ticket_id,
+            customer_user_id=body.customer_user_id,
             settings=settings,
         )
     except RefineError as exc:

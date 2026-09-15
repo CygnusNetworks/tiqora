@@ -24,8 +24,12 @@ export const REFINE_TONES: RefineTone[] = [
 ];
 
 /** Exactly one of `ticket_id` / `queue_id` — the server rejects both or
- * neither. */
-export type RefineTarget = { ticket_id: number } | { queue_id: number };
+ * neither. `customer_user_id` only rides along with `queue_id`: without a
+ * ticket the backend has no source for PII name masking, so the composer has
+ * to name the customer it was opened for. */
+export type RefineTarget =
+  | { ticket_id: number }
+  | { queue_id: number; customer_user_id?: string | null };
 
 export type RefineRequest = RefineTarget & {
   tone: RefineTone;
