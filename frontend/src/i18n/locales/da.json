@@ -453,6 +453,8 @@
       "originBadge": "AI",
       "originBadgeTooltip": "Auto-sent by the AI agent — click to see the tool trace",
       "originTraceEmpty": "No tool calls were recorded for this reply.",
+      "escalatedBanner": "AI handed off to a human at {{dateTime}} — auto-reply stays off until an agent sends a customer-visible reply, or resumes it here.",
+      "resumeButton": "Resume AI",
       "errorLlmEmptyOutput": "The AI model used up its token budget while reasoning. Please try again.",
       "errorLlmTimeout": "Timed out waiting for the AI provider. Please try again.",
       "errorLlmProviderError": "The AI provider reported an error. Please try again later.",
@@ -565,7 +567,24 @@
     "customerUnresolved": "Ingen kundepost matcher denne adresse, så kundedata er utilgængelige.",
     "lockedByBanner": "Låst af {{name}}",
     "takeOver": "Overtag",
-    "replyViaTelegram": "Reply will be sent via Telegram"
+    "replyViaTelegram": "Reply will be sent via Telegram",
+    "refine": {
+      "button": "Refine text",
+      "running": "Refining …",
+      "undo": "Undo refine",
+      "toneLabel": "Tone",
+      "toneStandard": "Standard",
+      "toneFormal": "Formal",
+      "toneFriendly": "Friendly",
+      "toneConcise": "Shorter",
+      "nothingToRefine": "No text of your own to refine — quotes are left untouched.",
+      "hint": "Rewrites only what you typed; quoted text is left untouched.",
+      "errorEmpty": "The model returned no usable rewrite. Your text is unchanged.",
+      "errorLimit": "Your quota for AI rewriting is used up.",
+      "errorDenied": "You are not allowed to use AI rewriting.",
+      "errorDisabled": "AI rewriting is not enabled for this queue.",
+      "error": "Refining failed. Your text is unchanged."
+    }
   },
   "search": {
     "title": "Søg",
@@ -818,7 +837,8 @@
         "summary": "Resumé",
         "auto_reply": "Automatisk svar",
         "manual_assist": "Manuel hjælp",
-        "mcp": "MCP"
+        "mcp": "MCP",
+        "refine": "Refine text"
       },
       "providers": {
         "title": "LLM udbydere",
@@ -1171,7 +1191,8 @@
         "allowedStateTypes": "Kommasepareret liste over tilladte Znuny-tilstandstyper (f.eks. \"åben\" eller \"åben, afventer påmindelse\"), som AI kan indstille en billet til via update_ticket_fields - håndhævet for både tilstandsnavnet og det numeriske tilstands-id. Tom = standard kun \"åben\" (genåbning tilladt, lukker aldrig); en eksplicit tom liste \"[]\" deaktiverer tilstandsændringer helt.",
         "piiNer": "Registrerer personnavne i tekst via spaCy NER (tysk + engelsk) og maskerer dem som [NAME_n], før indhold når LLM-udbyderen – ud over kundenavn og afsendere. Kun aktiv, når PII-maskering er aktiveret. Falske positiver er harmløse (bare mere maskering).",
         "summaryDetail": "Standard: kompakte afsnit, 1-2 sætninger pr. vedhæftet dokument. Detaljeret: mere grundige afsnit og 3-5 sætninger pr. dokument — nyttigt til køer med mange PDF-vedhæftninger.",
-        "llmFallback": "Providers tried in order, after the primary provider above, when a request fails (rate limit, timeout, error). Each entry has its own optional model override. Priority 1 is always the primary provider/model; entries here are priority 2, 3, …."
+        "llmFallback": "Providers tried in order, after the primary provider above, when a request fails (rate limit, timeout, error). Each entry has its own optional model override. Priority 1 is always the primary provider/model; entries here are priority 2, 3, ….",
+        "enabledRefine": "Shows the “Refine text” button in the reply and New-ticket composers. The model rewrites only what the agent typed; quoted passages are left untouched. Nothing is stored and nothing is sent — the agent sees the result in the editor and can undo it. Not affected by the operation-mode gate."
       },
       "common": {
         "validId": "Gyldig/ugyldig er et soft-delete-flag: markering af en post ugyldig skjuler den for vælgere til nye poster uden at slette eksisterende referencer (f.eks. billetter, opgaver). Der er ingen hård sletning."

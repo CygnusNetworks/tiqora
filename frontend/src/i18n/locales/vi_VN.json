@@ -453,6 +453,8 @@
       "originBadge": "AI",
       "originBadgeTooltip": "Auto-sent by the AI agent — click to see the tool trace",
       "originTraceEmpty": "No tool calls were recorded for this reply.",
+      "escalatedBanner": "AI handed off to a human at {{dateTime}} — auto-reply stays off until an agent sends a customer-visible reply, or resumes it here.",
+      "resumeButton": "Resume AI",
       "errorLlmEmptyOutput": "The AI model used up its token budget while reasoning. Please try again.",
       "errorLlmTimeout": "Timed out waiting for the AI provider. Please try again.",
       "errorLlmProviderError": "The AI provider reported an error. Please try again later.",
@@ -565,7 +567,24 @@
     "customerUnresolved": "Không có hồ sơ khách hàng khớp địa chỉ này, nên không có chi tiết khách hàng.",
     "lockedByBanner": "Bị khóa bởi {{name}}",
     "takeOver": "Tiếp quản",
-    "replyViaTelegram": "Reply will be sent via Telegram"
+    "replyViaTelegram": "Reply will be sent via Telegram",
+    "refine": {
+      "button": "Refine text",
+      "running": "Refining …",
+      "undo": "Undo refine",
+      "toneLabel": "Tone",
+      "toneStandard": "Standard",
+      "toneFormal": "Formal",
+      "toneFriendly": "Friendly",
+      "toneConcise": "Shorter",
+      "nothingToRefine": "No text of your own to refine — quotes are left untouched.",
+      "hint": "Rewrites only what you typed; quoted text is left untouched.",
+      "errorEmpty": "The model returned no usable rewrite. Your text is unchanged.",
+      "errorLimit": "Your quota for AI rewriting is used up.",
+      "errorDenied": "You are not allowed to use AI rewriting.",
+      "errorDisabled": "AI rewriting is not enabled for this queue.",
+      "error": "Refining failed. Your text is unchanged."
+    }
   },
   "search": {
     "title": "Tìm kiếm",
@@ -818,7 +837,8 @@
         "summary": "Tóm tắt",
         "auto_reply": "Trả lời tự động",
         "manual_assist": "Hỗ trợ thủ công",
-        "mcp": "MCP"
+        "mcp": "MCP",
+        "refine": "Refine text"
       },
       "providers": {
         "title": "nhà cung cấp LLM",
@@ -1171,7 +1191,8 @@
         "allowedStateTypes": "Danh sách các loại trạng thái Znuny được phép được phân tách bằng dấu phẩy (ví dụ: \"mở\" hoặc \"mở, đang chờ nhắc nhở\") AI có thể đặt vé thông qua update_ticket_fields - được thực thi cho cả tên trạng thái và id trạng thái số. Trống = chỉ \"mở\" mặc định (cho phép mở lại, không bao giờ đóng); một danh sách trống rõ ràng \"[]\" vô hiệu hóa hoàn toàn các thay đổi trạng thái.",
         "piiNer": "Phát hiện tên người trong văn bản thông qua spaCy NER (tiếng Đức + tiếng Anh) và che dấu họ dưới dạng [NAME_n] trước khi nội dung đến nhà cung cấp LLM — ngoài tên khách hàng và người gửi. Chỉ hoạt động khi mặt nạ PII được bật. Kết quả dương tính giả là vô hại (chỉ cần che đậy nhiều hơn).",
         "summaryDetail": "Tiêu chuẩn: đoạn văn ngắn gọn, 1–2 câu cho mỗi tài liệu đính kèm. Chi tiết: các đoạn văn kỹ lưỡng hơn và 3–5 câu cho mỗi tài liệu — hữu ích cho các hàng đợi có nhiều tệp đính kèm PDF.",
-        "llmFallback": "Providers tried in order, after the primary provider above, when a request fails (rate limit, timeout, error). Each entry has its own optional model override. Priority 1 is always the primary provider/model; entries here are priority 2, 3, …."
+        "llmFallback": "Providers tried in order, after the primary provider above, when a request fails (rate limit, timeout, error). Each entry has its own optional model override. Priority 1 is always the primary provider/model; entries here are priority 2, 3, ….",
+        "enabledRefine": "Shows the “Refine text” button in the reply and New-ticket composers. The model rewrites only what the agent typed; quoted passages are left untouched. Nothing is stored and nothing is sent — the agent sees the result in the editor and can undo it. Not affected by the operation-mode gate."
       },
       "common": {
         "validId": "Hợp lệ/không hợp lệ là cờ xóa mềm: đánh dấu mục nhập không hợp lệ sẽ ẩn mục nhập đó khỏi bộ chọn đối với các bản ghi mới mà không xóa các tham chiếu hiện có (ví dụ: vé, bài tập). Không có xóa cứng."

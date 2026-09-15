@@ -453,6 +453,8 @@
       "originBadge": "AI",
       "originBadgeTooltip": "Auto-sent by the AI agent — click to see the tool trace",
       "originTraceEmpty": "No tool calls were recorded for this reply.",
+      "escalatedBanner": "AI handed off to a human at {{dateTime}} — auto-reply stays off until an agent sends a customer-visible reply, or resumes it here.",
+      "resumeButton": "Resume AI",
       "errorLlmEmptyOutput": "The AI model used up its token budget while reasoning. Please try again.",
       "errorLlmTimeout": "Timed out waiting for the AI provider. Please try again.",
       "errorLlmProviderError": "The AI provider reported an error. Please try again later.",
@@ -565,7 +567,24 @@
     "customerUnresolved": "Нема записа клијента за ову адресу, подаци нису доступни.",
     "lockedByBanner": "Закључао {{name}}",
     "takeOver": "Преузми",
-    "replyViaTelegram": "Reply will be sent via Telegram"
+    "replyViaTelegram": "Reply will be sent via Telegram",
+    "refine": {
+      "button": "Refine text",
+      "running": "Refining …",
+      "undo": "Undo refine",
+      "toneLabel": "Tone",
+      "toneStandard": "Standard",
+      "toneFormal": "Formal",
+      "toneFriendly": "Friendly",
+      "toneConcise": "Shorter",
+      "nothingToRefine": "No text of your own to refine — quotes are left untouched.",
+      "hint": "Rewrites only what you typed; quoted text is left untouched.",
+      "errorEmpty": "The model returned no usable rewrite. Your text is unchanged.",
+      "errorLimit": "Your quota for AI rewriting is used up.",
+      "errorDenied": "You are not allowed to use AI rewriting.",
+      "errorDisabled": "AI rewriting is not enabled for this queue.",
+      "error": "Refining failed. Your text is unchanged."
+    }
   },
   "search": {
     "title": "Тражи",
@@ -818,7 +837,8 @@
         "summary": "Резиме",
         "auto_reply": "Аутоматски одговор",
         "manual_assist": "Ручна помоћ",
-        "mcp": "MCP"
+        "mcp": "MCP",
+        "refine": "Refine text"
       },
       "providers": {
         "title": "ЛЛМ провајдери",
@@ -1171,7 +1191,8 @@
         "allowedStateTypes": "Листа дозвољених Знуни типова стања раздвојених зарезима (нпр. „отворено“ или „отворено, подсетник на чекању“) АИ може да подеси тикет преко упдате_тицкет_фиелдс — примењено и за назив државе и за нумерички ИД стања. Празно = подразумевано само \"отворено\" (поновно отварање дозвољено, никада затварање); експлицитна празна листа \"[]\" у потпуности онемогућава промене стања.",
         "piiNer": "Открива имена особа у тексту преко спаЦи НЕР-а (немачки + енглески) и маскира их као [НАМЕ_н] пре него што садржај стигне до ЛЛМ провајдера — поред имена корисника и пошиљаоца. Активно само када је маскирање ПИИ укључено. Лажни позитивни резултати су безопасни (само више маскирања).",
         "summaryDetail": "Стандард: компактни параграфи, 1–2 реченице по приложеном документу. Детаљније: детаљнији параграфи и 3–5 реченица по документу — корисно за редове са много ПДФ прилога.",
-        "llmFallback": "Providers tried in order, after the primary provider above, when a request fails (rate limit, timeout, error). Each entry has its own optional model override. Priority 1 is always the primary provider/model; entries here are priority 2, 3, …."
+        "llmFallback": "Providers tried in order, after the primary provider above, when a request fails (rate limit, timeout, error). Each entry has its own optional model override. Priority 1 is always the primary provider/model; entries here are priority 2, 3, ….",
+        "enabledRefine": "Shows the “Refine text” button in the reply and New-ticket composers. The model rewrites only what the agent typed; quoted passages are left untouched. Nothing is stored and nothing is sent — the agent sees the result in the editor and can undo it. Not affected by the operation-mode gate."
       },
       "common": {
         "validId": "Важеће/неважеће је ознака меког брисања: означавање уноса као неважеће га сакрива од бирача за нове записе без брисања постојећих референци (нпр. улазница, задатака). Нема тешког брисања."

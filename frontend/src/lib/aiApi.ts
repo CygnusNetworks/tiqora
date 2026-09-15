@@ -20,7 +20,8 @@ export type Autonomy = "off" | "clarify_only" | "full";
 export type IdentityMode = "ticket_customer_id" | "clarify_schema" | "off";
 export type ReplyLanguageMode = "off" | "fixed" | "auto";
 export type AclSubjectType = "group" | "role" | "user";
-export type AclFeature = "summary" | "auto_reply" | "manual_assist" | "mcp";
+export type AclFeature =
+  "summary" | "auto_reply" | "manual_assist" | "mcp" | "refine";
 
 export type AiSettingsOut = {
   operation_mode: OperationMode;
@@ -83,7 +84,9 @@ export type LlmProviderCreate = {
   max_tool_rounds?: number | null;
 };
 
-export type LlmProviderUpdate = Partial<LlmProviderCreate> & { valid_id?: number };
+export type LlmProviderUpdate = Partial<LlmProviderCreate> & {
+  valid_id?: number;
+};
 
 export type LlmProviderTestOut = {
   ok: boolean;
@@ -139,6 +142,7 @@ export type AiQueuePolicyOut = {
   enabled_auto_reply: boolean;
   enabled_summary: boolean;
   enabled_manual_assist: boolean;
+  enabled_refine: boolean;
   system_prompt: string;
   autonomy: Autonomy;
   service_user_id: number | null;
@@ -186,6 +190,7 @@ export type AiQueuePolicyCreate = {
   enabled_auto_reply?: boolean;
   enabled_summary?: boolean;
   enabled_manual_assist?: boolean;
+  enabled_refine?: boolean;
   system_prompt?: string;
   autonomy?: Autonomy;
   service_user_id?: number | null;
@@ -222,7 +227,9 @@ export type AiQueuePolicyCreate = {
   capabilities_json?: string | null;
 };
 
-export type AiQueuePolicyUpdate = Partial<AiQueuePolicyCreate> & { valid_id?: number };
+export type AiQueuePolicyUpdate = Partial<AiQueuePolicyCreate> & {
+  valid_id?: number;
+};
 
 export type AiUsageOut = {
   id: number;
@@ -283,7 +290,8 @@ export type AiAclUpdate = Partial<AiAclCreate>;
 
 // ── LLM-Request-Audit ──────────────────────────────────────────────────
 
-export type AuditFeature = "draft" | "summary" | "auto_reply" | "vision" | "test";
+export type AuditFeature =
+  "draft" | "summary" | "auto_reply" | "vision" | "test";
 export type AuditRequestStatus = "ok" | "error";
 
 export type AiAuditLogListItemOut = {
@@ -395,54 +403,110 @@ export type EscalationTestOut = {
 
 /** Wraps a plain array endpoint into the `AdminPage` shape the shared admin table components expect. */
 function asPage<T>(items: T[]): AdminPage<T> {
-  return { items, total: items.length, page: 1, page_size: Math.max(items.length, 1) };
+  return {
+    items,
+    total: items.length,
+    page: 1,
+    page_size: Math.max(items.length, 1),
+  };
 }
 
 export const aiApi = {
   getSettings(signal?: AbortSignal) {
-    return api.request<AiSettingsOut>("GET", "/api/v1/admin/ai/settings", { signal });
+    return api.request<AiSettingsOut>("GET", "/api/v1/admin/ai/settings", {
+      signal,
+    });
   },
   putSettings(body: AiSettingsUpdate, signal?: AbortSignal) {
-    return api.request<AiSettingsOut>("PUT", "/api/v1/admin/ai/settings", { body, signal });
+    return api.request<AiSettingsOut>("PUT", "/api/v1/admin/ai/settings", {
+      body,
+      signal,
+    });
   },
 
   listProviders: async (signal?: AbortSignal) =>
-    asPage(await api.request<LlmProviderOut[]>("GET", "/api/v1/admin/ai/providers", { signal })),
+    asPage(
+      await api.request<LlmProviderOut[]>("GET", "/api/v1/admin/ai/providers", {
+        signal,
+      }),
+    ),
   createProvider(body: LlmProviderCreate, signal?: AbortSignal) {
-    return api.request<LlmProviderOut>("POST", "/api/v1/admin/ai/providers", { body, signal });
+    return api.request<LlmProviderOut>("POST", "/api/v1/admin/ai/providers", {
+      body,
+      signal,
+    });
   },
-  updateProvider(id: number | string, body: LlmProviderUpdate, signal?: AbortSignal) {
-    return api.request<LlmProviderOut>("PUT", `/api/v1/admin/ai/providers/${id}`, { body, signal });
+  updateProvider(
+    id: number | string,
+    body: LlmProviderUpdate,
+    signal?: AbortSignal,
+  ) {
+    return api.request<LlmProviderOut>(
+      "PUT",
+      `/api/v1/admin/ai/providers/${id}`,
+      { body, signal },
+    );
   },
   deleteProvider(id: number | string, signal?: AbortSignal) {
-    return api.request<void>("DELETE", `/api/v1/admin/ai/providers/${id}`, { signal });
+    return api.request<void>("DELETE", `/api/v1/admin/ai/providers/${id}`, {
+      signal,
+    });
   },
   testProvider(id: number | string, signal?: AbortSignal) {
-    return api.request<LlmProviderTestOut>("POST", `/api/v1/admin/ai/providers/${id}/test`, {
-      signal,
-    });
+    return api.request<LlmProviderTestOut>(
+      "POST",
+      `/api/v1/admin/ai/providers/${id}/test`,
+      {
+        signal,
+      },
+    );
   },
   duplicateProvider(id: number | string, signal?: AbortSignal) {
-    return api.request<LlmProviderOut>("POST", `/api/v1/admin/ai/providers/${id}/duplicate`, {
-      signal,
-    });
+    return api.request<LlmProviderOut>(
+      "POST",
+      `/api/v1/admin/ai/providers/${id}/duplicate`,
+      {
+        signal,
+      },
+    );
   },
 
   listMcpClients: async (signal?: AbortSignal) =>
-    asPage(await api.request<McpClientOut[]>("GET", "/api/v1/admin/ai/mcp-clients", { signal })),
+    asPage(
+      await api.request<McpClientOut[]>("GET", "/api/v1/admin/ai/mcp-clients", {
+        signal,
+      }),
+    ),
   createMcpClient(body: McpClientCreate, signal?: AbortSignal) {
-    return api.request<McpClientOut>("POST", "/api/v1/admin/ai/mcp-clients", { body, signal });
-  },
-  updateMcpClient(id: number | string, body: McpClientUpdate, signal?: AbortSignal) {
-    return api.request<McpClientOut>("PUT", `/api/v1/admin/ai/mcp-clients/${id}`, { body, signal });
-  },
-  deleteMcpClient(id: number | string, signal?: AbortSignal) {
-    return api.request<void>("DELETE", `/api/v1/admin/ai/mcp-clients/${id}`, { signal });
-  },
-  discoverMcpTools(id: number | string, signal?: AbortSignal) {
-    return api.request<McpDiscoverOut>("POST", `/api/v1/admin/ai/mcp-clients/${id}/discover`, {
+    return api.request<McpClientOut>("POST", "/api/v1/admin/ai/mcp-clients", {
+      body,
       signal,
     });
+  },
+  updateMcpClient(
+    id: number | string,
+    body: McpClientUpdate,
+    signal?: AbortSignal,
+  ) {
+    return api.request<McpClientOut>(
+      "PUT",
+      `/api/v1/admin/ai/mcp-clients/${id}`,
+      { body, signal },
+    );
+  },
+  deleteMcpClient(id: number | string, signal?: AbortSignal) {
+    return api.request<void>("DELETE", `/api/v1/admin/ai/mcp-clients/${id}`, {
+      signal,
+    });
+  },
+  discoverMcpTools(id: number | string, signal?: AbortSignal) {
+    return api.request<McpDiscoverOut>(
+      "POST",
+      `/api/v1/admin/ai/mcp-clients/${id}/discover`,
+      {
+        signal,
+      },
+    );
   },
   listMcpToolPolicies(clientId: number | string, signal?: AbortSignal) {
     return api.request<McpToolPolicyOut[]>(
@@ -466,22 +530,42 @@ export const aiApi = {
 
   listQueuePolicies: async (signal?: AbortSignal) =>
     asPage(
-      await api.request<AiQueuePolicyOut[]>("GET", "/api/v1/admin/ai/queue-policies", { signal }),
+      await api.request<AiQueuePolicyOut[]>(
+        "GET",
+        "/api/v1/admin/ai/queue-policies",
+        { signal },
+      ),
     ),
   createQueuePolicy(body: AiQueuePolicyCreate, signal?: AbortSignal) {
-    return api.request<AiQueuePolicyOut>("POST", "/api/v1/admin/ai/queue-policies", {
-      body,
-      signal,
-    });
+    return api.request<AiQueuePolicyOut>(
+      "POST",
+      "/api/v1/admin/ai/queue-policies",
+      {
+        body,
+        signal,
+      },
+    );
   },
-  updateQueuePolicy(id: number | string, body: AiQueuePolicyUpdate, signal?: AbortSignal) {
-    return api.request<AiQueuePolicyOut>("PUT", `/api/v1/admin/ai/queue-policies/${id}`, {
-      body,
-      signal,
-    });
+  updateQueuePolicy(
+    id: number | string,
+    body: AiQueuePolicyUpdate,
+    signal?: AbortSignal,
+  ) {
+    return api.request<AiQueuePolicyOut>(
+      "PUT",
+      `/api/v1/admin/ai/queue-policies/${id}`,
+      {
+        body,
+        signal,
+      },
+    );
   },
   deleteQueuePolicy(id: number | string, signal?: AbortSignal) {
-    return api.request<void>("DELETE", `/api/v1/admin/ai/queue-policies/${id}`, { signal });
+    return api.request<void>(
+      "DELETE",
+      `/api/v1/admin/ai/queue-policies/${id}`,
+      { signal },
+    );
   },
 
   listPromptParts(policyId: number | string, signal?: AbortSignal) {
@@ -491,7 +575,11 @@ export const aiApi = {
       { signal },
     );
   },
-  createPromptPart(policyId: number | string, body: AiPromptPartCreate, signal?: AbortSignal) {
+  createPromptPart(
+    policyId: number | string,
+    body: AiPromptPartCreate,
+    signal?: AbortSignal,
+  ) {
     return api.request<AiPromptPartOut>(
       "POST",
       `/api/v1/admin/ai/queues/${policyId}/prompt-parts`,
@@ -510,7 +598,11 @@ export const aiApi = {
       { body, signal },
     );
   },
-  deletePromptPart(policyId: number | string, partId: number, signal?: AbortSignal) {
+  deletePromptPart(
+    policyId: number | string,
+    partId: number,
+    signal?: AbortSignal,
+  ) {
     return api.request<void>(
       "DELETE",
       `/api/v1/admin/ai/queues/${policyId}/prompt-parts/${partId}`,
@@ -520,20 +612,34 @@ export const aiApi = {
   /** Admin-only hard delete of an AI draft (any status) — distinct from the
    * agent-side discard, which only flips an open draft to `discarded`. */
   adminDeleteDraft(draftId: number, signal?: AbortSignal) {
-    return api.request<void>("DELETE", `/api/v1/admin/ai/drafts/${draftId}`, { signal });
+    return api.request<void>("DELETE", `/api/v1/admin/ai/drafts/${draftId}`, {
+      signal,
+    });
   },
   /** Admin-only: drop a ticket's stored AI summary (state-only, next run
    * starts from scratch). */
   adminDeleteSummary(ticketId: number, signal?: AbortSignal) {
-    return api.request<void>("DELETE", `/api/v1/admin/ai/summaries/${ticketId}`, { signal });
+    return api.request<void>(
+      "DELETE",
+      `/api/v1/admin/ai/summaries/${ticketId}`,
+      { signal },
+    );
   },
   testEscalationRules(body: EscalationTestIn, signal?: AbortSignal) {
-    return api.request<EscalationTestOut>("POST", "/api/v1/admin/ai/escalation-test", {
-      body,
-      signal,
-    });
+    return api.request<EscalationTestOut>(
+      "POST",
+      "/api/v1/admin/ai/escalation-test",
+      {
+        body,
+        signal,
+      },
+    );
   },
-  reorderPromptParts(policyId: number | string, orderedIds: number[], signal?: AbortSignal) {
+  reorderPromptParts(
+    policyId: number | string,
+    orderedIds: number[],
+    signal?: AbortSignal,
+  ) {
     return api.request<AiPromptPartOut[]>(
       "PUT",
       `/api/v1/admin/ai/queues/${policyId}/prompt-parts/reorder`,
@@ -559,13 +665,21 @@ export const aiApi = {
     return api.request<AiAclOut[]>("GET", "/api/v1/admin/ai/acl", { signal });
   },
   createAcl(body: AiAclCreate, signal?: AbortSignal) {
-    return api.request<AiAclOut>("POST", "/api/v1/admin/ai/acl", { body, signal });
+    return api.request<AiAclOut>("POST", "/api/v1/admin/ai/acl", {
+      body,
+      signal,
+    });
   },
   updateAcl(id: number | string, body: AiAclUpdate, signal?: AbortSignal) {
-    return api.request<AiAclOut>("PUT", `/api/v1/admin/ai/acl/${id}`, { body, signal });
+    return api.request<AiAclOut>("PUT", `/api/v1/admin/ai/acl/${id}`, {
+      body,
+      signal,
+    });
   },
   deleteAcl(id: number | string, signal?: AbortSignal) {
-    return api.request<void>("DELETE", `/api/v1/admin/ai/acl/${id}`, { signal });
+    return api.request<void>("DELETE", `/api/v1/admin/ai/acl/${id}`, {
+      signal,
+    });
   },
 
   listAuditLog(params: AiAuditLogListParams = {}, signal?: AbortSignal) {
@@ -584,23 +698,35 @@ export const aiApi = {
     });
   },
   getAuditLogStats(params: AiAuditLogFilterParams = {}, signal?: AbortSignal) {
-    return api.request<AiAuditLogStatsOut>("GET", "/api/v1/admin/ai/audit/stats", {
-      query: {
-        from: params.from,
-        to: params.to,
-        provider_id: params.provider_id,
-        feature: params.feature,
-        ticket: params.ticket,
+    return api.request<AiAuditLogStatsOut>(
+      "GET",
+      "/api/v1/admin/ai/audit/stats",
+      {
+        query: {
+          from: params.from,
+          to: params.to,
+          provider_id: params.provider_id,
+          feature: params.feature,
+          ticket: params.ticket,
+        },
+        signal,
       },
-      signal,
-    });
+    );
   },
   getAuditLogEntry(id: number | string, signal?: AbortSignal) {
-    return api.request<AiAuditLogDetailOut>("GET", `/api/v1/admin/ai/audit/${id}`, { signal });
+    return api.request<AiAuditLogDetailOut>(
+      "GET",
+      `/api/v1/admin/ai/audit/${id}`,
+      { signal },
+    );
   },
   revealAuditPii(id: number | string, signal?: AbortSignal) {
-    return api.request<PiiRevealOut>("POST", `/api/v1/admin/ai/audit/${id}/reveal-pii`, {
-      signal,
-    });
+    return api.request<PiiRevealOut>(
+      "POST",
+      `/api/v1/admin/ai/audit/${id}/reveal-pii`,
+      {
+        signal,
+      },
+    );
   },
 };

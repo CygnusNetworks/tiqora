@@ -799,6 +799,41 @@ async def add_article(
     return article_id
 
 
+async def resume_ai_automation(
+    session: AsyncSession,
+    *,
+    ticket_id: int,
+    user_id: int,
+    sysconfig: SysConfig,
+) -> None:
+    """Manually clear the AI->human handoff flag (``ai_escalated_at``).
+
+    Normally that flag only clears when a human sends a customer-visible
+    reply (see the check at the bottom of :func:`add_article`) or the ticket
+    closes — deliberately, so the AI never silently resumes on its own (see
+    tiqora.ai.auto_worker._cap_reason). This is the explicit override for
+    when a human decides the ticket is safe to hand back without writing a
+    customer-visible reply (e.g. after fixing the underlying KB/prompt
+    issue that caused a bad escalation). Writes an *internal* note for the
+    audit trail — internal notes don't trigger the automatic clear above,
+    so the explicit call below is still required.
+    """
+    await add_article(
+        session,
+        ticket_id=ticket_id,
+        article=ArticleIn(
+            sender_type="agent",
+            is_visible_for_customer=False,
+            subject="AI-Automatisierung reaktiviert",
+            body="Die KI-Automatisierung wurde manuell reaktiviert.",
+            channel="note",
+        ),
+        user_id=user_id,
+        sysconfig=sysconfig,
+    )
+    await clear_ai_escalated(session, ticket_id)
+
+
 # ---------------------------------------------------------------------------
 # Sub-task 3: field mutations
 # ---------------------------------------------------------------------------
@@ -2592,6 +2627,7 @@ __all__ = [
     "lock_ticket",
     "merge_tickets",
     "move_queue",
+    "resume_ai_automation",
     "set_customer",
     "unlock_ticket",
     "unwatch_ticket",

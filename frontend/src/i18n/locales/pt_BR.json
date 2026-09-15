@@ -453,6 +453,8 @@
       "originBadge": "AI",
       "originBadgeTooltip": "Auto-sent by the AI agent — click to see the tool trace",
       "originTraceEmpty": "No tool calls were recorded for this reply.",
+      "escalatedBanner": "AI handed off to a human at {{dateTime}} — auto-reply stays off until an agent sends a customer-visible reply, or resumes it here.",
+      "resumeButton": "Resume AI",
       "errorLlmEmptyOutput": "The AI model used up its token budget while reasoning. Please try again.",
       "errorLlmTimeout": "Timed out waiting for the AI provider. Please try again.",
       "errorLlmProviderError": "The AI provider reported an error. Please try again later.",
@@ -565,7 +567,24 @@
     "customerUnresolved": "Nenhum registro de cliente corresponde a este endereço; os detalhes não estão disponíveis.",
     "lockedByBanner": "Bloqueado por {{name}}",
     "takeOver": "Assumir",
-    "replyViaTelegram": "Reply will be sent via Telegram"
+    "replyViaTelegram": "Reply will be sent via Telegram",
+    "refine": {
+      "button": "Refine text",
+      "running": "Refining …",
+      "undo": "Undo refine",
+      "toneLabel": "Tone",
+      "toneStandard": "Standard",
+      "toneFormal": "Formal",
+      "toneFriendly": "Friendly",
+      "toneConcise": "Shorter",
+      "nothingToRefine": "No text of your own to refine — quotes are left untouched.",
+      "hint": "Rewrites only what you typed; quoted text is left untouched.",
+      "errorEmpty": "The model returned no usable rewrite. Your text is unchanged.",
+      "errorLimit": "Your quota for AI rewriting is used up.",
+      "errorDenied": "You are not allowed to use AI rewriting.",
+      "errorDisabled": "AI rewriting is not enabled for this queue.",
+      "error": "Refining failed. Your text is unchanged."
+    }
   },
   "search": {
     "title": "Pesquisar",
@@ -818,7 +837,8 @@
         "summary": "Resumo",
         "auto_reply": "Resposta automática",
         "manual_assist": "Assistência manual",
-        "mcp": "MCP"
+        "mcp": "MCP",
+        "refine": "Refine text"
       },
       "providers": {
         "title": "Provedores LLM",
@@ -1171,7 +1191,8 @@
         "allowedStateTypes": "Lista separada por vírgula de tipos de estado Znuny permitidos (p. ex. \"open\" ou \"open,pending reminder\") que a AI pode definir em um ticket via update_ticket_fields — aplicado tanto ao nome do estado quanto ao id numérico. Vazio = padrão somente \"open\" (reabertura permitida, nunca fechamento); uma lista vazia explícita \"[]\" desativa alterações de estado por completo.",
         "piiNer": "Detecta nomes de pessoas no texto via spaCy NER (alemão + inglês) e os mascara como [NAME_n] antes do conteúdo chegar ao provedor LLM — além do nome do cliente e dos remetentes. Só ativo quando o mascaramento de PII está ligado. Falsos positivos são inofensivos (apenas mais mascaramento).",
         "summaryDetail": "Padrão: parágrafos compactos, 1–2 frases por documento anexado. Detalhado: parágrafos mais completos e 3–5 frases por documento — útil para filas com muitos anexos PDF.",
-        "llmFallback": "Providers tried in order, after the primary provider above, when a request fails (rate limit, timeout, error). Each entry has its own optional model override. Priority 1 is always the primary provider/model; entries here are priority 2, 3, …."
+        "llmFallback": "Providers tried in order, after the primary provider above, when a request fails (rate limit, timeout, error). Each entry has its own optional model override. Priority 1 is always the primary provider/model; entries here are priority 2, 3, ….",
+        "enabledRefine": "Shows the “Refine text” button in the reply and New-ticket composers. The model rewrites only what the agent typed; quoted passages are left untouched. Nothing is stored and nothing is sent — the agent sees the result in the editor and can undo it. Not affected by the operation-mode gate."
       },
       "common": {
         "validId": "Válido/inválido é um sinalizador de exclusão lógica: marcar uma entrada como inválida a oculta dos seletores de novos registros sem apagar referências existentes (p. ex. tickets, atribuições). Não há exclusão física."

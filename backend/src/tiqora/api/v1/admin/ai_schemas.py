@@ -201,6 +201,7 @@ class AiQueuePolicyOut(BaseModel):
     enabled_auto_reply: bool
     enabled_summary: bool
     enabled_manual_assist: bool
+    enabled_refine: bool
     system_prompt: str
     autonomy: Autonomy
     service_user_id: int | None
@@ -245,6 +246,7 @@ class AiQueuePolicyCreate(BaseModel):
     enabled_auto_reply: bool = False
     enabled_summary: bool = False
     enabled_manual_assist: bool = False
+    enabled_refine: bool = False
     system_prompt: str = ""
     autonomy: Autonomy = "off"
     service_user_id: int | None = None
@@ -285,6 +287,7 @@ class AiQueuePolicyUpdate(BaseModel):
     enabled_auto_reply: bool | None = None
     enabled_summary: bool | None = None
     enabled_manual_assist: bool | None = None
+    enabled_refine: bool | None = None
     system_prompt: str | None = None
     autonomy: Autonomy | None = None
     service_user_id: int | None = None

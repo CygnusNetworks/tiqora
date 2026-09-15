@@ -12,7 +12,11 @@ import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import { Menu, MenuItem, MenuSeparator } from "@/components/ui/Menu";
 import { Spinner } from "@/components/ui/Spinner";
-import { CrudDrawer, type FieldDef, type FieldValues } from "@/components/admin/CrudDrawer";
+import {
+  CrudDrawer,
+  type FieldDef,
+  type FieldValues,
+} from "@/components/admin/CrudDrawer";
 import { SelectField } from "@/components/ui/SelectField";
 import { PlusIcon } from "@/components/ui/icons";
 import { cn } from "@/lib/cn";
@@ -20,7 +24,13 @@ import { cn } from "@/lib/cn";
 const ACL_KEY = ["admin", "ai", "acl"] as const;
 
 const ACL_SUBJECT_TYPES: AclSubjectType[] = ["group", "role", "user"];
-const ACL_FEATURES: AclFeature[] = ["summary", "auto_reply", "manual_assist", "mcp"];
+const ACL_FEATURES: AclFeature[] = [
+  "summary",
+  "auto_reply",
+  "manual_assist",
+  "refine",
+  "mcp",
+];
 
 function toAclFormValues(row: AiAclOut | null): FieldValues {
   return row
@@ -74,9 +84,15 @@ export function AiAclPage() {
 
   const subjectItems = (subjectType: string) => {
     if (subjectType === "group")
-      return (groupsQ.data?.items ?? []).map((g) => ({ value: g.id, label: g.name }));
+      return (groupsQ.data?.items ?? []).map((g) => ({
+        value: g.id,
+        label: g.name,
+      }));
     if (subjectType === "role")
-      return (rolesQ.data?.items ?? []).map((r) => ({ value: r.id, label: r.name }));
+      return (rolesQ.data?.items ?? []).map((r) => ({
+        value: r.id,
+        label: r.name,
+      }));
     return (agentsQ.data ?? []).map((a) => ({
       value: a.id,
       label: a.full_name,
@@ -98,8 +114,12 @@ export function AiAclPage() {
         subject_id: Number(values.subject_id),
         feature: values.feature as AclFeature,
         allowed: Boolean(values.allowed),
-        limit_requests_day: values.limit_requests_day ? Number(values.limit_requests_day) : null,
-        limit_tokens_day: values.limit_tokens_day ? Number(values.limit_tokens_day) : null,
+        limit_requests_day: values.limit_requests_day
+          ? Number(values.limit_requests_day)
+          : null,
+        limit_tokens_day: values.limit_tokens_day
+          ? Number(values.limit_tokens_day)
+          : null,
         limit_requests_month: values.limit_requests_month
           ? Number(values.limit_requests_month)
           : null,
@@ -117,8 +137,12 @@ export function AiAclPage() {
         subject_id: Number(values.subject_id),
         feature: values.feature as AclFeature,
         allowed: Boolean(values.allowed),
-        limit_requests_day: values.limit_requests_day ? Number(values.limit_requests_day) : null,
-        limit_tokens_day: values.limit_tokens_day ? Number(values.limit_tokens_day) : null,
+        limit_requests_day: values.limit_requests_day
+          ? Number(values.limit_requests_day)
+          : null,
+        limit_tokens_day: values.limit_tokens_day
+          ? Number(values.limit_tokens_day)
+          : null,
         limit_requests_month: values.limit_requests_month
           ? Number(values.limit_requests_month)
           : null,
@@ -163,7 +187,9 @@ export function AiAclPage() {
         await createAclM.mutateAsync(values);
       }
     } catch (err) {
-      setAclFormError(err instanceof ApiError ? err.message : t("admin.form.genericError"));
+      setAclFormError(
+        err instanceof ApiError ? err.message : t("admin.form.genericError"),
+      );
       throw err;
     }
   };
@@ -172,7 +198,9 @@ export function AiAclPage() {
     [
       r.limit_requests_day != null ? `${r.limit_requests_day}/d req` : null,
       r.limit_tokens_day != null ? `${r.limit_tokens_day}/d tok` : null,
-      r.limit_requests_month != null ? `${r.limit_requests_month}/mo req` : null,
+      r.limit_requests_month != null
+        ? `${r.limit_requests_month}/mo req`
+        : null,
     ]
       .filter(Boolean)
       .join(" · ") || t("admin.ai.acl.noLimits");
@@ -200,20 +228,30 @@ export function AiAclPage() {
               "h-1.5 w-1.5 shrink-0 rounded-full",
               r.allowed ? "bg-green" : "bg-danger",
             )}
-            title={r.allowed ? t("admin.ai.acl.allowedYes") : t("admin.ai.acl.allowedNo")}
+            title={
+              r.allowed
+                ? t("admin.ai.acl.allowedYes")
+                : t("admin.ai.acl.allowedNo")
+            }
           />
           <span className="truncate text-sm font-medium text-ink">
             {t(`admin.ai.acl.subjectType.${r.subject_type}`)}:{" "}
             {subjectLabel(r.subject_type, r.subject_id)}
           </span>
-          <span className="shrink-0 text-xs text-muted">{t(`admin.ai.feature.${r.feature}`)}</span>
+          <span className="shrink-0 text-xs text-muted">
+            {t(`admin.ai.feature.${r.feature}`)}
+          </span>
         </div>
         <div className="col-start-1 row-start-2 flex min-w-0 items-baseline gap-3 pl-4">
-          <span className="truncate font-mono text-xs text-muted">{limitSummary(r)}</span>
+          <span className="truncate font-mono text-xs text-muted">
+            {limitSummary(r)}
+          </span>
         </div>
         <div className="row-span-2 hidden items-center justify-end md:flex">
           <Badge tone={r.allowed ? "success" : "danger"}>
-            {r.allowed ? t("admin.ai.acl.allowedYes") : t("admin.ai.acl.allowedNo")}
+            {r.allowed
+              ? t("admin.ai.acl.allowedYes")
+              : t("admin.ai.acl.allowedNo")}
           </Badge>
         </div>
         <div
@@ -236,7 +274,10 @@ export function AiAclPage() {
               </button>
             )}
           >
-            <MenuItem testId={`admin-ai-acl-edit-${r.id}`} onSelect={() => openAclEdit(r)}>
+            <MenuItem
+              testId={`admin-ai-acl-edit-${r.id}`}
+              onSelect={() => openAclEdit(r)}
+            >
               {t("admin.table.edit")}
             </MenuItem>
             <MenuSeparator />
@@ -259,7 +300,10 @@ export function AiAclPage() {
       label: t("admin.ai.acl.subjectType.label"),
       type: "select",
       required: true,
-      options: ACL_SUBJECT_TYPES.map((v) => ({ value: v, label: t(`admin.ai.acl.subjectType.${v}`) })),
+      options: ACL_SUBJECT_TYPES.map((v) => ({
+        value: v,
+        label: t(`admin.ai.acl.subjectType.${v}`),
+      })),
     },
     {
       name: "subject_id",
@@ -282,20 +326,42 @@ export function AiAclPage() {
       label: t("admin.ai.acl.feature"),
       type: "select",
       required: true,
-      options: ACL_FEATURES.map((v) => ({ value: v, label: t(`admin.ai.feature.${v}`) })),
+      options: ACL_FEATURES.map((v) => ({
+        value: v,
+        label: t(`admin.ai.feature.${v}`),
+      })),
     },
     { name: "allowed", label: t("admin.ai.acl.allowed"), type: "checkbox" },
-    { name: "limit_requests_day", label: t("admin.ai.acl.limitRequestsDay"), type: "number" },
-    { name: "limit_tokens_day", label: t("admin.ai.acl.limitTokensDay"), type: "number" },
-    { name: "limit_requests_month", label: t("admin.ai.acl.limitRequestsMonth"), type: "number" },
+    {
+      name: "limit_requests_day",
+      label: t("admin.ai.acl.limitRequestsDay"),
+      type: "number",
+    },
+    {
+      name: "limit_tokens_day",
+      label: t("admin.ai.acl.limitTokensDay"),
+      type: "number",
+    },
+    {
+      name: "limit_requests_month",
+      label: t("admin.ai.acl.limitRequestsMonth"),
+      type: "number",
+    },
   ];
 
   return (
-    <div className="mx-auto max-w-3xl space-y-4 p-4" data-testid="admin-ai-acl-page">
+    <div
+      className="mx-auto max-w-3xl space-y-4 p-4"
+      data-testid="admin-ai-acl-page"
+    >
       <div className="flex items-center justify-between gap-3">
         <div>
-          <h1 className="font-display text-xl font-semibold text-ink">{t("admin.ai.acl.title")}</h1>
-          <p className="mt-1 text-sm text-muted">{t("admin.ai.acl.description")}</p>
+          <h1 className="font-display text-xl font-semibold text-ink">
+            {t("admin.ai.acl.title")}
+          </h1>
+          <p className="mt-1 text-sm text-muted">
+            {t("admin.ai.acl.description")}
+          </p>
         </div>
         <Button
           variant="primary"
@@ -327,7 +393,11 @@ export function AiAclPage() {
       <CrudDrawer
         open={aclDrawerOpen}
         onClose={() => setAclDrawerOpen(false)}
-        title={editingAcl ? t("admin.form.editTitle", { title: t("admin.ai.acl.title") }) : t("admin.ai.acl.new")}
+        title={
+          editingAcl
+            ? t("admin.form.editTitle", { title: t("admin.ai.acl.title") })
+            : t("admin.ai.acl.new")
+        }
         fields={aclFields}
         mode={editingAcl ? "edit" : "create"}
         initialValues={toAclFormValues(editingAcl)}

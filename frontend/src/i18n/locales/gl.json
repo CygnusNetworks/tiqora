@@ -453,6 +453,8 @@
       "originBadge": "AI",
       "originBadgeTooltip": "Auto-sent by the AI agent — click to see the tool trace",
       "originTraceEmpty": "No tool calls were recorded for this reply.",
+      "escalatedBanner": "AI handed off to a human at {{dateTime}} — auto-reply stays off until an agent sends a customer-visible reply, or resumes it here.",
+      "resumeButton": "Resume AI",
       "errorLlmEmptyOutput": "The AI model used up its token budget while reasoning. Please try again.",
       "errorLlmTimeout": "Timed out waiting for the AI provider. Please try again.",
       "errorLlmProviderError": "The AI provider reported an error. Please try again later.",
@@ -565,7 +567,24 @@
     "customerUnresolved": "Ningún rexistro de cliente coincide con este enderezo; os detalles non están dispoñibles.",
     "lockedByBanner": "Bloqueado por {{name}}",
     "takeOver": "Asumir",
-    "replyViaTelegram": "Reply will be sent via Telegram"
+    "replyViaTelegram": "Reply will be sent via Telegram",
+    "refine": {
+      "button": "Refine text",
+      "running": "Refining …",
+      "undo": "Undo refine",
+      "toneLabel": "Tone",
+      "toneStandard": "Standard",
+      "toneFormal": "Formal",
+      "toneFriendly": "Friendly",
+      "toneConcise": "Shorter",
+      "nothingToRefine": "No text of your own to refine — quotes are left untouched.",
+      "hint": "Rewrites only what you typed; quoted text is left untouched.",
+      "errorEmpty": "The model returned no usable rewrite. Your text is unchanged.",
+      "errorLimit": "Your quota for AI rewriting is used up.",
+      "errorDenied": "You are not allowed to use AI rewriting.",
+      "errorDisabled": "AI rewriting is not enabled for this queue.",
+      "error": "Refining failed. Your text is unchanged."
+    }
   },
   "search": {
     "title": "Busca",
@@ -818,7 +837,8 @@
         "summary": "Resumo",
         "auto_reply": "Resposta automática",
         "manual_assist": "Asistencia manual",
-        "mcp": "MCP"
+        "mcp": "MCP",
+        "refine": "Refine text"
       },
       "providers": {
         "title": "Provedores de LLM",
@@ -1171,7 +1191,8 @@
         "allowedStateTypes": "Lista separada por comas de tipos de estado de Znuny permitidos (por exemplo, \"aberto\" ou \"aberto, recordatorio pendente\") a IA pode establecer un ticket a través de update_ticket_fields, aplicado tanto para o nome do estado como para o ID numérico do estado. Baleiro = predeterminado só \"aberto\" (reapertura permitida, nunca pechada); unha lista baleira explícita \"[]\" desactiva os cambios de estado por completo.",
         "piiNer": "Detecta os nomes de persoas no texto a través de spaCy NER (alemán + inglés) e enmáscaras como [NAME_n] antes de que o contido chegue ao provedor de LLM, ademais do nome do cliente e dos remitentes. Só activo cando o enmascaramento de PII está activado. Os falsos positivos son inofensivos (só máis enmascaramento).",
         "summaryDetail": "Estándar: parágrafos compactos, 1–2 frases por documento adxunto. Detallado: parágrafos máis completos e de 3 a 5 frases por documento, útil para colas con moitos anexos PDF.",
-        "llmFallback": "Providers tried in order, after the primary provider above, when a request fails (rate limit, timeout, error). Each entry has its own optional model override. Priority 1 is always the primary provider/model; entries here are priority 2, 3, …."
+        "llmFallback": "Providers tried in order, after the primary provider above, when a request fails (rate limit, timeout, error). Each entry has its own optional model override. Priority 1 is always the primary provider/model; entries here are priority 2, 3, ….",
+        "enabledRefine": "Shows the “Refine text” button in the reply and New-ticket composers. The model rewrites only what the agent typed; quoted passages are left untouched. Nothing is stored and nothing is sent — the agent sees the result in the editor and can undo it. Not affected by the operation-mode gate."
       },
       "common": {
         "validId": "Válido/non válido é unha marca de eliminación suave: marcar unha entrada como non válida ocúltaa aos seleccionados para novos rexistros sen eliminar as referencias existentes (por exemplo, tickets, tarefas). Non hai eliminación dura."

@@ -255,6 +255,15 @@ export function AiPanel({
     },
   });
 
+  const resumeMutation = useMutation({
+    mutationFn: () => ticketAiApi.resume(ticketId),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({
+        queryKey: ["tickets", ticketId, "ai"],
+      });
+    },
+  });
+
   if (stateQ.isLoading || stateQ.isError || !stateQ.data) return null;
 
   const state = stateQ.data;
@@ -327,7 +336,9 @@ export function AiPanel({
       ?.id ??
     null;
   const replyArticle =
-    replyArticleId != null ? articles.find((a) => a.id === replyArticleId) : undefined;
+    replyArticleId != null
+      ? articles.find((a) => a.id === replyArticleId)
+      : undefined;
 
   return (
     <div
@@ -337,6 +348,34 @@ export function AiPanel({
       <h2 className="font-display text-sm font-semibold text-ink">
         {t("ticket.ai.title")}
       </h2>
+
+      {state.ai_escalated_at && (
+        <div
+          className="flex items-center justify-between gap-2 rounded-md border border-amber/30 bg-amber/15 p-2.5 text-xs text-ink"
+          data-testid="ai-panel-escalated-banner"
+        >
+          <span>
+            {t("ticket.ai.escalatedBanner", {
+              dateTime: formatDateTime(state.ai_escalated_at, locale),
+            })}
+          </span>
+          <span title={!canNote ? t("ticket.toolbar.noPermission") : undefined}>
+            <Button
+              size="sm"
+              variant="secondary"
+              data-testid="ai-panel-resume-button"
+              disabled={!canNote || resumeMutation.isPending}
+              onClick={() => resumeMutation.mutate()}
+            >
+              {resumeMutation.isPending ? (
+                <Spinner className="h-3.5 w-3.5" />
+              ) : (
+                t("ticket.ai.resumeButton")
+              )}
+            </Button>
+          </span>
+        </div>
+      )}
 
       {state.summary_available && (
         <div className="space-y-2" data-testid="ai-panel-summary">
@@ -537,7 +576,10 @@ export function AiPanel({
             </span>
           </div>
           {manualRunBusy && (
-            <p className="text-xs text-muted" data-testid="ai-panel-draft-running">
+            <p
+              className="text-xs text-muted"
+              data-testid="ai-panel-draft-running"
+            >
               {manualRunActive
                 ? t("ticket.ai.draftRunning")
                 : t("ticket.ai.createDraftHint")}

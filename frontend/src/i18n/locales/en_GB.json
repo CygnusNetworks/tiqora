@@ -453,6 +453,8 @@
       "originBadge": "AI",
       "originBadgeTooltip": "Auto-sent by the AI agent — click to see the tool trace",
       "originTraceEmpty": "No tool calls were recorded for this reply.",
+      "escalatedBanner": "AI handed off to a human at {{dateTime}} — auto-reply stays off until an agent sends a customer-visible reply, or resumes it here.",
+      "resumeButton": "Resume AI",
       "errorLlmEmptyOutput": "The AI model used up its token budget while reasoning. Please try again.",
       "errorLlmTimeout": "Timed out waiting for the AI provider. Please try again.",
       "errorLlmProviderError": "The AI provider reported an error. Please try again later.",
@@ -565,7 +567,24 @@
     "customerUnresolved": "No customer record matches this address, so customer details are unavailable.",
     "lockedByBanner": "Locked by {{name}}",
     "takeOver": "Take over",
-    "replyViaTelegram": "Reply will be sent via Telegram"
+    "replyViaTelegram": "Reply will be sent via Telegram",
+    "refine": {
+      "button": "Refine text",
+      "running": "Refining …",
+      "undo": "Undo refine",
+      "toneLabel": "Tone",
+      "toneStandard": "Standard",
+      "toneFormal": "Formal",
+      "toneFriendly": "Friendly",
+      "toneConcise": "Shorter",
+      "nothingToRefine": "No text of your own to refine — quotes are left untouched.",
+      "hint": "Rewrites only what you typed; quoted text is left untouched.",
+      "errorEmpty": "The model returned no usable rewrite. Your text is unchanged.",
+      "errorLimit": "Your quota for AI rewriting is used up.",
+      "errorDenied": "You are not allowed to use AI rewriting.",
+      "errorDisabled": "AI rewriting is not enabled for this queue.",
+      "error": "Refining failed. Your text is unchanged."
+    }
   },
   "search": {
     "title": "Search",
@@ -818,7 +837,8 @@
         "summary": "Summary",
         "auto_reply": "Auto reply",
         "manual_assist": "Manual assist",
-        "mcp": "MCP"
+        "mcp": "MCP",
+        "refine": "Refine text"
       },
       "providers": {
         "title": "LLM providers",
@@ -1171,7 +1191,8 @@
         "allowedStateTypes": "Comma-separated list of allowed Znuny state types (e.g. \"open\" or \"open,pending reminder\") the AI may set a ticket to via update_ticket_fields — enforced for both the state name and the numeric state id. Empty = default \"open\" only (reopening allowed, never closing); an explicit empty list \"[]\" disables state changes entirely.",
         "piiNer": "Detects person names in text via spaCy NER (German + English) and masks them as [NAME_n] before content reaches the LLM provider — in addition to customer name and senders. Only active when PII masking is on. False positives are harmless (just more masking).",
         "summaryDetail": "Standard: compact paragraphs, 1–2 sentences per attached document. Detailed: more thorough paragraphs and 3–5 sentences per document — useful for queues with many PDF attachments.",
-        "llmFallback": "Providers tried in order, after the primary provider above, when a request fails (rate limit, timeout, error). Each entry has its own optional model override. Priority 1 is always the primary provider/model; entries here are priority 2, 3, …."
+        "llmFallback": "Providers tried in order, after the primary provider above, when a request fails (rate limit, timeout, error). Each entry has its own optional model override. Priority 1 is always the primary provider/model; entries here are priority 2, 3, ….",
+        "enabledRefine": "Shows the “Refine text” button in the reply and New-ticket composers. The model rewrites only what the agent typed; quoted passages are left untouched. Nothing is stored and nothing is sent — the agent sees the result in the editor and can undo it. Not affected by the operation-mode gate."
       },
       "common": {
         "validId": "Valid/invalid is a soft-delete flag: marking an entry invalid hides it from pickers for new records without deleting existing references (e.g. tickets, assignments). There is no hard delete."
@@ -1730,15 +1751,7 @@
       "every": "every",
       "olderThan": "older than {{duration}}",
       "newerThan": "newer than {{duration}}",
-      "weekdaysShort": [
-        "Sun",
-        "Mon",
-        "Tue",
-        "Wed",
-        "Thu",
-        "Fri",
-        "Sat"
-      ],
+      "weekdaysShort": ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"],
       "keyLabel": {
         "StateIDs": "State",
         "QueueIDs": "Queue",

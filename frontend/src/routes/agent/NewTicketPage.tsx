@@ -21,6 +21,7 @@ import {
 } from "@/components/agent/RecipientsField";
 import { ComposerBody } from "@/components/agent/ComposerBody";
 import { ArticleBodyRenderer } from "@/components/agent/ArticleBodyRenderer";
+import { RefineControls } from "@/components/agent/RefineControls";
 
 const FIELD_CLASS =
   "w-full rounded-md border border-hairline bg-surface-subtle px-3 py-2 text-[13.5px] text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent focus:border-accent";
@@ -30,7 +31,8 @@ const SELECT_TRIGGER_CLASS =
 
 const toggleCls =
   "inline-flex items-center gap-1 rounded border border-hairline px-2 py-0.5 text-muted transition-colors duration-100 hover:text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent";
-const toggleActiveCls = "border-accent/50 bg-accent-dim text-accent hover:text-accent";
+const toggleActiveCls =
+  "border-accent/50 bg-accent-dim text-accent hover:text-accent";
 const countBadgeCls =
   "rounded-full bg-accent-dim px-1.5 py-0.5 font-mono text-[10px] tabular-nums text-accent";
 
@@ -53,7 +55,8 @@ function defaultId(
   for (const want of prefer) {
     const hit = options.find(
       (o) =>
-        o.name.toLowerCase().includes(want) || o.type_name?.toLowerCase().includes(want),
+        o.name.toLowerCase().includes(want) ||
+        o.type_name?.toLowerCase().includes(want),
     );
     if (hit) return hit.id;
   }
@@ -79,9 +82,14 @@ export function NewTicketPage() {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { queue_id: queueId } = useSearch({ from: "/agent/tickets/new" }) as NewTicketSearch;
+  const { queue_id: queueId } = useSearch({
+    from: "/agent/tickets/new",
+  }) as NewTicketSearch;
 
-  const queuesQ = useQuery({ queryKey: ["queues"], queryFn: () => api.listQueues() });
+  const queuesQ = useQuery({
+    queryKey: ["queues"],
+    queryFn: () => api.listQueues(),
+  });
   const prioritiesQ = useQuery({
     queryKey: ["reference", "priorities"],
     queryFn: () => api.listReferencePriorities(),
@@ -101,7 +109,10 @@ export function NewTicketPage() {
   const states = useMemo(
     () =>
       (statesQ.data ?? []).filter(
-        (s) => s.type_name === "new" || s.type_name === "open" || s.type_name === "pending auto",
+        (s) =>
+          s.type_name === "new" ||
+          s.type_name === "open" ||
+          s.type_name === "pending auto",
       ),
     [statesQ.data],
   );
@@ -180,7 +191,9 @@ export function NewTicketPage() {
     setCustomerQuery("");
     if (ticketType === "email") {
       const seed: Recipient = { name: c.full_name, email: c.email };
-      setTo((prev) => (prev.some((r) => sameRecipient(r, seed)) ? prev : [...prev, seed]));
+      setTo((prev) =>
+        prev.some((r) => sameRecipient(r, seed)) ? prev : [...prev, seed],
+      );
     }
   };
 
@@ -202,7 +215,11 @@ export function NewTicketPage() {
     const fromKey = from as RecipientField;
     const destKey = dest as RecipientField;
     if (!(fromKey in values) || !(destKey in values)) return;
-    const { source, target } = moveRecipientBetween(values[fromKey], values[destKey], r);
+    const { source, target } = moveRecipientBetween(
+      values[fromKey],
+      values[destKey],
+      r,
+    );
     setters[fromKey](source);
     setters[destKey](target);
     if (destKey === "cc") setShowCc(true);
@@ -254,7 +271,9 @@ export function NewTicketPage() {
             is_visible_for_customer: true,
             subject: subject.trim(),
             body,
-            content_type: richText ? "text/html; charset=utf-8" : "text/plain; charset=utf-8",
+            content_type: richText
+              ? "text/html; charset=utf-8"
+              : "text/plain; charset=utf-8",
             to_address: joinRecipients(to),
             cc: joinRecipients(cc),
             bcc: joinRecipients(bcc),
@@ -267,13 +286,19 @@ export function NewTicketPage() {
             subject: subject.trim(),
             body,
             content_type: "text/plain; charset=utf-8",
-            from_address: direction === "inbound" ? (customer?.email ?? null) : null,
-            to_address: direction === "outbound" ? (customer?.email ?? null) : null,
+            from_address:
+              direction === "inbound" ? (customer?.email ?? null) : null,
+            to_address:
+              direction === "outbound" ? (customer?.email ?? null) : null,
           });
         }
       } catch (articleErr) {
         if (!(articleErr instanceof ApiError)) throw articleErr;
-        setError(ticketType === "email" ? t("newTicket.sendError") : t("newTicket.submitError"));
+        setError(
+          ticketType === "email"
+            ? t("newTicket.sendError")
+            : t("newTicket.submitError"),
+        );
         return;
       }
       await navigate({
@@ -291,14 +316,20 @@ export function NewTicketPage() {
     }
   };
 
-  const loading = queuesQ.isLoading || prioritiesQ.isLoading || statesQ.isLoading;
+  const loading =
+    queuesQ.isLoading || prioritiesQ.isLoading || statesQ.isLoading;
 
   const ccOn = showCc || cc.length > 0;
   const bccOn = showBcc || bcc.length > 0;
 
   return (
-    <div className="mx-auto w-full max-w-3xl px-4 py-6" data-testid="agent-new-ticket-page">
-      <h1 className="font-display text-xl font-semibold text-ink">{t("newTicket.title")}</h1>
+    <div
+      className="mx-auto w-full max-w-3xl px-4 py-6"
+      data-testid="agent-new-ticket-page"
+    >
+      <h1 className="font-display text-xl font-semibold text-ink">
+        {t("newTicket.title")}
+      </h1>
       <p className="mt-1 text-[13px] text-muted">{t("newTicket.intro")}</p>
 
       <div className="mt-5 inline-flex overflow-hidden rounded-md border border-hairline text-sm">
@@ -309,7 +340,9 @@ export function NewTicketPage() {
           onClick={() => setTicketType("email")}
           className={cn(
             "px-3 py-1.5",
-            ticketType === "email" ? "bg-accent text-accent-ink" : "bg-surface text-muted hover:text-ink",
+            ticketType === "email"
+              ? "bg-accent text-accent-ink"
+              : "bg-surface text-muted hover:text-ink",
           )}
         >
           {t("newTicket.typeEmail")}
@@ -321,7 +354,9 @@ export function NewTicketPage() {
           onClick={() => setTicketType("phone")}
           className={cn(
             "border-l border-hairline px-3 py-1.5",
-            ticketType === "phone" ? "bg-accent text-accent-ink" : "bg-surface text-muted hover:text-ink",
+            ticketType === "phone"
+              ? "bg-accent text-accent-ink"
+              : "bg-surface text-muted hover:text-ink",
           )}
         >
           {t("newTicket.typePhone")}
@@ -341,12 +376,16 @@ export function NewTicketPage() {
                 data-testid="new-ticket-customer-card"
               >
                 <div className="min-w-0 flex-1">
-                  <p className="truncate font-medium text-ink">{customer.full_name}</p>
+                  <p className="truncate font-medium text-ink">
+                    {customer.full_name}
+                  </p>
                   <p className="truncate text-xs text-muted">
                     {customer.email} · {customer.login}
                   </p>
                 </div>
-                {customer.customer_id && <Badge tone="muted">{customer.customer_id}</Badge>}
+                {customer.customer_id && (
+                  <Badge tone="muted">{customer.customer_id}</Badge>
+                )}
                 <Button
                   type="button"
                   variant="ghost"
@@ -367,7 +406,9 @@ export function NewTicketPage() {
                   placeholder={t("newTicket.customerSearch")}
                   className={FIELD_CLASS}
                 />
-                <p className="mt-1 text-[11px] text-muted">{t("newTicket.customerSearchHint")}</p>
+                <p className="mt-1 text-[11px] text-muted">
+                  {t("newTicket.customerSearchHint")}
+                </p>
                 {debouncedCustomerQuery.trim().length >= 2 && (
                   <div className="mt-2 max-h-56 overflow-auto rounded border border-hairline">
                     {customersQ.isLoading ? (
@@ -444,10 +485,14 @@ export function NewTicketPage() {
                       className={SELECT_TRIGGER_CLASS}
                     >
                       <span className="min-w-0 flex-1 truncate">
-                        {queueItems.find((i) => i.value === queue)?.label ?? t("newTicket.noQueues")}
+                        {queueItems.find((i) => i.value === queue)?.label ??
+                          t("newTicket.noQueues")}
                       </span>
                       <ChevronDownIcon
-                        className={cn("shrink-0 text-muted transition-transform duration-150", open && "rotate-180")}
+                        className={cn(
+                          "shrink-0 text-muted transition-transform duration-150",
+                          open && "rotate-180",
+                        )}
                       />
                     </button>
                   )}
@@ -463,7 +508,9 @@ export function NewTicketPage() {
                     className="rounded-md border border-hairline bg-surface-subtle px-3 py-2 text-[13.5px] text-muted"
                     data-testid="new-ticket-from"
                   >
-                    {composeContextQ.isLoading ? "…" : composeContextQ.data?.from_address ?? "—"}
+                    {composeContextQ.isLoading
+                      ? "…"
+                      : (composeContextQ.data?.from_address ?? "—")}
                   </p>
                 </div>
               ) : (
@@ -477,7 +524,10 @@ export function NewTicketPage() {
                       data-testid="new-ticket-direction-in"
                       aria-pressed={direction === "inbound"}
                       onClick={() => setDirection("inbound")}
-                      className={cn(toggleCls, direction === "inbound" && toggleActiveCls)}
+                      className={cn(
+                        toggleCls,
+                        direction === "inbound" && toggleActiveCls,
+                      )}
                     >
                       {t("newTicket.directionIn")}
                     </button>
@@ -486,7 +536,10 @@ export function NewTicketPage() {
                       data-testid="new-ticket-direction-out"
                       aria-pressed={direction === "outbound"}
                       onClick={() => setDirection("outbound")}
-                      className={cn(toggleCls, direction === "outbound" && toggleActiveCls)}
+                      className={cn(
+                        toggleCls,
+                        direction === "outbound" && toggleActiveCls,
+                      )}
                     >
                       {t("newTicket.directionOut")}
                     </button>
@@ -593,11 +646,14 @@ export function NewTicketPage() {
                       className={SELECT_TRIGGER_CLASS}
                     >
                       <span className="min-w-0 flex-1 truncate">
-                        {priorityItems.find((i) => i.value === priority)?.label ??
-                          t("admin.form.selectPlaceholder")}
+                        {priorityItems.find((i) => i.value === priority)
+                          ?.label ?? t("admin.form.selectPlaceholder")}
                       </span>
                       <ChevronDownIcon
-                        className={cn("shrink-0 text-muted transition-transform duration-150", open && "rotate-180")}
+                        className={cn(
+                          "shrink-0 text-muted transition-transform duration-150",
+                          open && "rotate-180",
+                        )}
                       />
                     </button>
                   )}
@@ -627,7 +683,10 @@ export function NewTicketPage() {
                           t("admin.form.selectPlaceholder")}
                       </span>
                       <ChevronDownIcon
-                        className={cn("shrink-0 text-muted transition-transform duration-150", open && "rotate-180")}
+                        className={cn(
+                          "shrink-0 text-muted transition-transform duration-150",
+                          open && "rotate-180",
+                        )}
                       />
                     </button>
                   )}
@@ -637,7 +696,9 @@ export function NewTicketPage() {
 
             <label className="block">
               <span className="mb-1 block text-[12px] font-medium text-muted">
-                {ticketType === "email" ? t("newTicket.message") : t("newTicket.note")}
+                {ticketType === "email"
+                  ? t("newTicket.message")
+                  : t("newTicket.note")}
               </span>
               <ComposerBody
                 richText={ticketType === "email" && richText}
@@ -647,31 +708,44 @@ export function NewTicketPage() {
               />
             </label>
 
-            {ticketType === "email" && Boolean(composeContextQ.data?.signature?.trim()) && (
-              <div
-                className="rounded border border-hairline bg-surface-subtle/60 p-2"
-                data-testid="new-ticket-signature-preview"
-              >
-                <p className="mb-1 text-[11px] font-medium uppercase tracking-wide text-muted">
-                  {t("ticket.signaturePreview")}
-                </p>
-                {composeContextQ.data?.signature_is_html ? (
-                  <ArticleBodyRenderer
-                    body={composeContextQ.data.signature}
-                    isHtml
-                    className="text-xs"
-                  />
-                ) : (
-                  <pre className="max-h-40 overflow-auto whitespace-pre-wrap break-words font-mono text-xs text-ink">
-                    {composeContextQ.data?.signature}
-                  </pre>
-                )}
-              </div>
-            )}
+            {/* No quote here, so the whole body is the agent's own text. */}
+            <RefineControls
+              target={queue === "" ? null : { queue_id: queue }}
+              body={body}
+              onChange={setBody}
+              testIdPrefix="new-ticket-refine"
+            />
+
+            {ticketType === "email" &&
+              Boolean(composeContextQ.data?.signature?.trim()) && (
+                <div
+                  className="rounded border border-hairline bg-surface-subtle/60 p-2"
+                  data-testid="new-ticket-signature-preview"
+                >
+                  <p className="mb-1 text-[11px] font-medium uppercase tracking-wide text-muted">
+                    {t("ticket.signaturePreview")}
+                  </p>
+                  {composeContextQ.data?.signature_is_html ? (
+                    <ArticleBodyRenderer
+                      body={composeContextQ.data.signature}
+                      isHtml
+                      className="text-xs"
+                    />
+                  ) : (
+                    <pre className="max-h-40 overflow-auto whitespace-pre-wrap break-words font-mono text-xs text-ink">
+                      {composeContextQ.data?.signature}
+                    </pre>
+                  )}
+                </div>
+              )}
           </fieldset>
 
           {error && (
-            <p className="text-[13px] text-danger" data-testid="new-ticket-error" role="alert">
+            <p
+              className="text-[13px] text-danger"
+              data-testid="new-ticket-error"
+              role="alert"
+            >
               {error}
               {createdTicketId && (
                 <>
