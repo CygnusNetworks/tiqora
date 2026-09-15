@@ -7039,6 +7039,8 @@ export interface components {
          *     queue the agent picked in the form.
          */
         AiRefineIn: {
+            /** Customer User Id */
+            customer_user_id?: string | null;
             /** Queue Id */
             queue_id?: number | null;
             /** Segments */
