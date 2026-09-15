@@ -73,6 +73,19 @@ def test_request_rejects_naming_both_a_ticket_and_a_queue() -> None:
         AiRefineIn(ticket_id=42, queue_id=1, segments=_segments(("own", "hallo")))
 
 
+def test_request_accepts_a_customer_for_the_new_ticket_form() -> None:
+    # Seeds PII name masking when there is no ticket to read names from.
+    body = AiRefineIn(queue_id=1, customer_user_id="jane.doe", segments=_segments(("own", "x")))
+    assert body.customer_user_id == "jane.doe"
+
+
+def test_request_rejects_a_customer_alongside_a_ticket() -> None:
+    # With a ticket the names come from the ticket itself; a client-supplied
+    # customer could disagree with it.
+    with pytest.raises(ValidationError):
+        AiRefineIn(ticket_id=42, customer_user_id="jane.doe", segments=_segments(("own", "x")))
+
+
 def test_request_rejects_an_unknown_tone() -> None:
     with pytest.raises(ValidationError):
         AiRefineIn(queue_id=1, tone="shakespearean", segments=_segments(("own", "x")))

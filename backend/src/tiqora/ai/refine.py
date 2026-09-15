@@ -42,8 +42,16 @@ from tiqora.ai.acl import AclLimitExceededError as AiAclLimitExceededError
 from tiqora.ai.acl import check_feature_access, check_feature_limits
 from tiqora.ai.audit import FEATURE_REFINE as AUDIT_FEATURE_REFINE
 from tiqora.ai.audit import AuditContext, AuditingLlmClient
+from tiqora.ai.context import (
+    TicketNotFoundError,
+    collect_known_names,
+    customer_user_name,
+    load_articles,
+    ticket_snapshot,
+)
 from tiqora.ai.llm import LlmClient, LlmMessage
 from tiqora.ai.models import FEATURE_REFINE
+from tiqora.ai.ner import extract_person_names
 from tiqora.ai.pii import PiiMapper
 from tiqora.ai.policies import get_queue_policy_by_queue
 from tiqora.config import Settings, get_settings
@@ -311,6 +319,57 @@ def _completion_budget(segments: list[Segment], section_ids: list[int]) -> int:
     return max(512, min(4096, (chars // 2) + 256))
 
 
+async def _name_masking_inputs(
+    session: AsyncSession,
+    *,
+    ticket_id: int | None,
+    customer_user_id: str | None,
+    segments: list[Segment],
+    ner_enabled: bool,
+) -> tuple[list[str], set[str]]:
+    """``(known_names, never_mask)`` for the :class:`PiiMapper`.
+
+    :class:`~tiqora.ai.pii.PiiMapper` masks a person's name **only** when the
+    caller hands it that name — there is no heuristic. Without this the regex
+    identifiers (mail, phone, IP, MAC) would be masked but every name in the
+    composer would reach the provider in the clear.
+
+    Two sources, mirroring how the composer is addressed: an existing ticket
+    yields its customer and everyone on the article From-headers (exactly what
+    :mod:`tiqora.ai.summary` uses), while the New-ticket form has no ticket and
+    instead names the customer it was opened for. NER, when the queue enables
+    it, runs over the composer text itself — that is the text being sent, so it
+    is the text whose names matter.
+
+    Purely additive: anything that cannot be resolved simply yields fewer
+    candidates, never an error.
+    """
+    ner_texts = [s.text for s in segments if s.text.strip()] if ner_enabled else None
+
+    if ticket_id is not None:
+        try:
+            ticket = await ticket_snapshot(session, ticket_id)
+        except TicketNotFoundError:
+            return [], set()
+        articles = await load_articles(session, ticket_id)
+        ticket_names = await collect_known_names(session, ticket, articles, extra_texts=ner_texts)
+        ticket_never = {v for v in (ticket.customer_id, ticket.customer_user_id) if v}
+        return ticket_names, ticket_never
+
+    names: list[str] = []
+    if ner_texts:
+        for text_block in ner_texts:
+            names.extend(extract_person_names(text_block))
+    never: set[str] = set()
+    if customer_user_id:
+        never.add(customer_user_id)
+        first, last = await customer_user_name(session, customer_user_id)
+        names.extend(n for n in (first, last) if n)
+        if first and last:
+            names.append(f"{first} {last}")
+    return names, never
+
+
 async def refine_text(
     session: AsyncSession,
     *,
@@ -320,6 +379,7 @@ async def refine_text(
     tone: str,
     acting_user_id: int,
     ticket_id: int | None = None,
+    customer_user_id: str | None = None,
     settings: Settings | None = None,
     run_id: str | None = None,
 ) -> RefineResult:
@@ -349,7 +409,18 @@ async def refine_text(
         raise RefineError("Nothing to refine — no own text in this composer")
 
     mask = bool(policy.pii_masking)
-    pii = PiiMapper()
+    known_names, never_mask = (
+        await _name_masking_inputs(
+            session,
+            ticket_id=ticket_id,
+            customer_user_id=customer_user_id,
+            segments=segments,
+            ner_enabled=bool(policy.pii_ner_enabled),
+        )
+        if mask
+        else ([], set())
+    )
+    pii = PiiMapper(known_names=known_names or None, never_mask=never_mask or None)
 
     audit_context = AuditContext(
         feature=AUDIT_FEATURE_REFINE,
