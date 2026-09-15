@@ -162,7 +162,7 @@ describe("RefineControls", () => {
     refine.mockRejectedValue(
       new ApiError(
         502,
-        "refine_empty_output: no usable rewrite",
+        { detail: "refine_empty_output: no usable rewrite" },
         "/api/v1/ai/refine",
       ),
     );
@@ -182,9 +182,31 @@ describe("RefineControls", () => {
     );
   });
 
+  it("names the queue switch when the backend reports the feature disabled", async () => {
+    refine.mockRejectedValue(
+      new ApiError(
+        409,
+        { detail: "refine_disabled: Refine is disabled for queue 5" },
+        "/api/v1/ai/refine",
+      ),
+    );
+    renderHarness("roh getippt");
+
+    await waitFor(() =>
+      expect(screen.getByTestId("refine-button")).toBeEnabled(),
+    );
+    fireEvent.click(screen.getByTestId("refine-button"));
+
+    await waitFor(() =>
+      expect(screen.getByTestId("refine-error").textContent).toBe(
+        i18n.t("ticket.refine.errorDisabled"),
+      ),
+    );
+  });
+
   it("shows the rate-limit hint on 429", async () => {
     refine.mockRejectedValue(
-      new ApiError(429, "limit reached", "/api/v1/ai/refine"),
+      new ApiError(429, { detail: "limit reached" }, "/api/v1/ai/refine"),
     );
     renderHarness("roh getippt");
 

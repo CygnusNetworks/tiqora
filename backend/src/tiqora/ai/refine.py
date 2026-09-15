@@ -183,6 +183,26 @@ def _extract_json_object(content: str) -> str | None:
     return candidate[start : end + 1]
 
 
+def _coerce_section_id(raw: Any) -> int | None:
+    """Section id as an int, or ``None`` if it is not one.
+
+    Models routinely answer ``"id": "2"`` even when the prompt shows an
+    unquoted number (seen in prod from Qwen3-235B), so a stringified integer
+    is accepted — rejecting it would throw away an otherwise good rewrite.
+    ``bool`` is excluded because it is an ``int`` subclass.
+    """
+    if isinstance(raw, bool):
+        return None
+    if isinstance(raw, int):
+        return raw
+    if isinstance(raw, str):
+        try:
+            return int(raw.strip())
+        except ValueError:
+            return None
+    return None
+
+
 def _parse_sections(content: str | None, expected_ids: list[int]) -> dict[int, str] | None:
     """Parse the model's JSON answer, or ``None`` if it is not usable.
 
@@ -209,9 +229,9 @@ def _parse_sections(content: str | None, expected_ids: list[int]) -> dict[int, s
     for entry in entries:
         if not isinstance(entry, dict):
             return None
-        section_id = entry.get("id")
+        section_id = _coerce_section_id(entry.get("id"))
         text_value = entry.get("text")
-        if not isinstance(section_id, int) or isinstance(section_id, bool):
+        if section_id is None:
             return None
         if not isinstance(text_value, str) or not text_value.strip():
             return None
