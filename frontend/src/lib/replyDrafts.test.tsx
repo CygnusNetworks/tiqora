@@ -209,7 +209,17 @@ describe("useSaveReplyDraft", () => {
       resolveUpsert(row({ content: JSON.stringify({ ...CONTENT, body: "first" }) }));
     });
 
-    expect(result.current.drafts[0].body).toBe("second");
+    // Retried rather than asserted synchronously: the surviving save's
+    // onSuccess lands a microtask later, and a bare assert read an empty list
+    // on a loaded CI runner while passing every time locally.
+    //
+    // NOTE: despite its name this test does not exercise the rollback guard in
+    // useSaveReplyDraft's onSuccess. React Query drops the callbacks of a
+    // superseded mutation, so the first save's onSuccess never fires and
+    // resolveUpsert above has no observable effect — confirmed by deleting the
+    // guard, which leaves this test green. Covering it needs two independent
+    // mutations, not two calls on one.
+    await waitFor(() => expect(result.current.drafts[0]?.body).toBe("second"));
   });
 });
 
