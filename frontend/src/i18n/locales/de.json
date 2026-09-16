@@ -650,7 +650,9 @@
       "errorLimit": "Dein Kontingent für die KI-Überarbeitung ist aufgebraucht.",
       "errorDenied": "Du darfst die KI-Überarbeitung nicht verwenden.",
       "errorDisabled": "Die KI-Überarbeitung ist für diese Queue nicht aktiviert.",
-      "error": "Die Überarbeitung ist fehlgeschlagen. Dein Text ist unverändert."
+      "error": "Die Überarbeitung ist fehlgeschlagen. Dein Text ist unverändert.",
+      "nothingToRefineShort": "kein eigener Text",
+      "toneMenuLabel": "Tonfall wählen"
     }
   },
   "search": {
