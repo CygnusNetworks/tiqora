@@ -1366,6 +1366,11 @@
             "title": "Enabled Summary",
             "type": "boolean"
           },
+          "enabled_triage": {
+            "default": false,
+            "title": "Enabled Triage",
+            "type": "boolean"
+          },
           "escalation_rules": {
             "anyOf": [
               {
@@ -1547,6 +1552,17 @@
             "title": "Reply Language Mode",
             "type": "string"
           },
+          "routing_description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Routing Description"
+          },
           "service_user_id": {
             "anyOf": [
               {
@@ -1615,6 +1631,69 @@
             "default": "",
             "title": "System Prompt",
             "type": "string"
+          },
+          "triage_auto_threshold": {
+            "default": 100,
+            "title": "Triage Auto Threshold",
+            "type": "integer"
+          },
+          "triage_customer_fix_auto_threshold": {
+            "default": 100,
+            "title": "Triage Customer Fix Auto Threshold",
+            "type": "integer"
+          },
+          "triage_customer_fix_enabled": {
+            "default": false,
+            "title": "Triage Customer Fix Enabled",
+            "type": "boolean"
+          },
+          "triage_delay_reply": {
+            "default": false,
+            "title": "Triage Delay Reply",
+            "type": "boolean"
+          },
+          "triage_llm_provider_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Triage Llm Provider Id"
+          },
+          "triage_model_override": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Triage Model Override"
+          },
+          "triage_samples": {
+            "default": 3,
+            "title": "Triage Samples",
+            "type": "integer"
+          },
+          "triage_suggest_threshold": {
+            "default": 50,
+            "title": "Triage Suggest Threshold",
+            "type": "integer"
+          },
+          "triage_target_queue_ids": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Triage Target Queue Ids"
           },
           "vision_provider_id": {
             "anyOf": [
@@ -1728,6 +1807,10 @@
           },
           "enabled_summary": {
             "title": "Enabled Summary",
+            "type": "boolean"
+          },
+          "enabled_triage": {
+            "title": "Enabled Triage",
             "type": "boolean"
           },
           "escalation_rules": {
@@ -1908,6 +1991,17 @@
             "title": "Reply Language Mode",
             "type": "string"
           },
+          "routing_description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Routing Description"
+          },
           "service_user_id": {
             "anyOf": [
               {
@@ -1975,6 +2069,63 @@
             "title": "System Prompt",
             "type": "string"
           },
+          "triage_auto_threshold": {
+            "title": "Triage Auto Threshold",
+            "type": "integer"
+          },
+          "triage_customer_fix_auto_threshold": {
+            "title": "Triage Customer Fix Auto Threshold",
+            "type": "integer"
+          },
+          "triage_customer_fix_enabled": {
+            "title": "Triage Customer Fix Enabled",
+            "type": "boolean"
+          },
+          "triage_delay_reply": {
+            "title": "Triage Delay Reply",
+            "type": "boolean"
+          },
+          "triage_llm_provider_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Triage Llm Provider Id"
+          },
+          "triage_model_override": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Triage Model Override"
+          },
+          "triage_samples": {
+            "title": "Triage Samples",
+            "type": "integer"
+          },
+          "triage_suggest_threshold": {
+            "title": "Triage Suggest Threshold",
+            "type": "integer"
+          },
+          "triage_target_queue_ids": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Triage Target Queue Ids"
+          },
           "valid_id": {
             "title": "Valid Id",
             "type": "integer"
@@ -2030,6 +2181,17 @@
           "reply_language_default",
           "allowed_state_types",
           "summary_detail",
+          "enabled_triage",
+          "routing_description",
+          "triage_target_queue_ids",
+          "triage_auto_threshold",
+          "triage_suggest_threshold",
+          "triage_samples",
+          "triage_customer_fix_enabled",
+          "triage_customer_fix_auto_threshold",
+          "triage_delay_reply",
+          "triage_llm_provider_id",
+          "triage_model_override",
           "valid_id",
           "create_time",
           "change_time"
@@ -2164,6 +2326,17 @@
               }
             ],
             "title": "Enabled Summary"
+          },
+          "enabled_triage": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Enabled Triage"
           },
           "escalation_rules": {
             "anyOf": [
@@ -2384,6 +2557,17 @@
             ],
             "title": "Reply Language Mode"
           },
+          "routing_description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Routing Description"
+          },
           "service_user_id": {
             "anyOf": [
               {
@@ -2464,6 +2648,105 @@
               }
             ],
             "title": "System Prompt"
+          },
+          "triage_auto_threshold": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Triage Auto Threshold"
+          },
+          "triage_customer_fix_auto_threshold": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Triage Customer Fix Auto Threshold"
+          },
+          "triage_customer_fix_enabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Triage Customer Fix Enabled"
+          },
+          "triage_delay_reply": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Triage Delay Reply"
+          },
+          "triage_llm_provider_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Triage Llm Provider Id"
+          },
+          "triage_model_override": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Triage Model Override"
+          },
+          "triage_samples": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Triage Samples"
+          },
+          "triage_suggest_threshold": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Triage Suggest Threshold"
+          },
+          "triage_target_queue_ids": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Triage Target Queue Ids"
           },
           "valid_id": {
             "anyOf": [
@@ -2849,6 +3132,16 @@
               }
             ],
             "title": "Summary Created At"
+          },
+          "triage": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AiTriageOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "required": [
@@ -2948,6 +3241,446 @@
           "content"
         ],
         "title": "AiToolTraceOut",
+        "type": "object"
+      },
+      "AiTriageBucketOut": {
+        "description": "Accept rate for one 10-point confidence band of one source queue.\n\nThis is the calibration view: ``triage_auto_threshold`` should be set to\nthe lowest bucket whose accept rate the operator is willing to live with,\nrather than to the shipped default.",
+        "properties": {
+          "accept_rate": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Accept Rate"
+          },
+          "accepted": {
+            "title": "Accepted",
+            "type": "integer"
+          },
+          "applied": {
+            "title": "Applied",
+            "type": "integer"
+          },
+          "bucket_high": {
+            "title": "Bucket High",
+            "type": "integer"
+          },
+          "bucket_low": {
+            "title": "Bucket Low",
+            "type": "integer"
+          },
+          "open": {
+            "title": "Open",
+            "type": "integer"
+          },
+          "rejected": {
+            "title": "Rejected",
+            "type": "integer"
+          },
+          "source_queue_id": {
+            "title": "Source Queue Id",
+            "type": "integer"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "source_queue_id",
+          "bucket_low",
+          "bucket_high",
+          "total",
+          "accepted",
+          "rejected",
+          "applied",
+          "open",
+          "accept_rate"
+        ],
+        "title": "AiTriageBucketOut",
+        "type": "object"
+      },
+      "AiTriageDecisionIn": {
+        "description": "Which halves of the proposal to accept. Defaults to both.",
+        "properties": {
+          "customer": {
+            "default": true,
+            "title": "Customer",
+            "type": "boolean"
+          },
+          "queue": {
+            "default": true,
+            "title": "Queue",
+            "type": "boolean"
+          }
+        },
+        "title": "AiTriageDecisionIn",
+        "type": "object"
+      },
+      "AiTriageOut": {
+        "description": "A pending triage proposal for this ticket (status ``open`` only).\n\nBoth halves are independent: a ticket can have a queue proposal, a\ncustomer proposal, or both, and an agent accepts them separately.",
+        "properties": {
+          "created_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created At"
+          },
+          "customer_confidence": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Customer Confidence"
+          },
+          "extracted_email": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Extracted Email"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "queue_confidence": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Queue Confidence"
+          },
+          "queue_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Queue Reason"
+          },
+          "queue_votes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Queue Votes"
+          },
+          "source_queue_id": {
+            "title": "Source Queue Id",
+            "type": "integer"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "suggested_customer_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Suggested Customer Name"
+          },
+          "suggested_customer_user_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Suggested Customer User Id"
+          },
+          "suggested_queue_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Suggested Queue Id"
+          },
+          "suggested_queue_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Suggested Queue Name"
+          }
+        },
+        "required": [
+          "id",
+          "status",
+          "source_queue_id"
+        ],
+        "title": "AiTriageOut",
+        "type": "object"
+      },
+      "AiTriageRejectIn": {
+        "properties": {
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          }
+        },
+        "title": "AiTriageRejectIn",
+        "type": "object"
+      },
+      "AiTriageRowOut": {
+        "properties": {
+          "article_id": {
+            "title": "Article Id",
+            "type": "integer"
+          },
+          "candidates_json": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Candidates Json"
+          },
+          "create_time": {
+            "format": "date-time",
+            "title": "Create Time",
+            "type": "string"
+          },
+          "customer_applied": {
+            "title": "Customer Applied",
+            "type": "boolean"
+          },
+          "customer_confidence": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Customer Confidence"
+          },
+          "decided_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Decided At"
+          },
+          "decided_by_user_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Decided By User Id"
+          },
+          "decided_note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Decided Note"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "extracted_email": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Extracted Email"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "queue_applied": {
+            "title": "Queue Applied",
+            "type": "boolean"
+          },
+          "queue_confidence": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Queue Confidence"
+          },
+          "queue_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Queue Reason"
+          },
+          "run_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Run Id"
+          },
+          "source_queue_id": {
+            "title": "Source Queue Id",
+            "type": "integer"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "suggested_customer_user_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Suggested Customer User Id"
+          },
+          "suggested_queue_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Suggested Queue Id"
+          },
+          "ticket_id": {
+            "title": "Ticket Id",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "ticket_id",
+          "article_id",
+          "source_queue_id",
+          "status",
+          "suggested_queue_id",
+          "queue_confidence",
+          "queue_reason",
+          "candidates_json",
+          "extracted_email",
+          "suggested_customer_user_id",
+          "customer_confidence",
+          "queue_applied",
+          "customer_applied",
+          "run_id",
+          "error",
+          "decided_by_user_id",
+          "decided_note",
+          "decided_at",
+          "create_time"
+        ],
+        "title": "AiTriageRowOut",
+        "type": "object"
+      },
+      "AiTriageStatsOut": {
+        "properties": {
+          "buckets": {
+            "items": {
+              "$ref": "#/components/schemas/AiTriageBucketOut"
+            },
+            "title": "Buckets",
+            "type": "array"
+          }
+        },
+        "required": [
+          "buckets"
+        ],
+        "title": "AiTriageStatsOut",
         "type": "object"
       },
       "AiUsageOut": {
@@ -25272,6 +26005,184 @@
           }
         },
         "summary": "Delete Ai Summary",
+        "tags": [
+          "admin:ai"
+        ]
+      }
+    },
+    "/api/v1/admin/ai/triage": {
+      "get": {
+        "description": "Triage decisions, newest first. ``status_filter=open`` is the review\nqueue; no filter gives the full record the stats view aggregates.",
+        "operationId": "list_ai_triage_api_v1_admin_ai_triage_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "status_filter",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status Filter"
+            }
+          },
+          {
+            "in": "query",
+            "name": "source_queue_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Source Queue Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 100,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/AiTriageRowOut"
+                  },
+                  "title": "Response List Ai Triage Api V1 Admin Ai Triage Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Ai Triage",
+        "tags": [
+          "admin:ai"
+        ]
+      }
+    },
+    "/api/v1/admin/ai/triage/stats": {
+      "get": {
+        "description": "Accept rate per confidence bucket per source queue.\n\nThis is what turns ``triage_auto_threshold`` from the shipped guess into\na measured number. ``accept_rate`` counts ``accepted`` + ``applied``\nagainst everything an agent actually ruled on, so buckets still sitting\nat ``open`` do not inflate it; a bucket with no decisions yet reports\n``None`` rather than a misleading 0.0.",
+        "operationId": "ai_triage_stats_api_v1_admin_ai_triage_stats_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AiTriageStatsOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Ai Triage Stats",
         "tags": [
           "admin:ai"
         ]
@@ -54733,6 +55644,194 @@
           }
         },
         "summary": "Request Summarize",
+        "tags": [
+          "ai"
+        ]
+      }
+    },
+    "/api/v1/tickets/{ticket_id}/ai/triage/{triage_id}/accept": {
+      "post": {
+        "description": "Apply a pending triage proposal, in whole or in half.\n\nApplied with **the agent's own permissions**, not the AI service user's:\nthe worker's automatic path deliberately bypasses the ``move_into``\ncheck (the admin-configured target allowlist is its authorization), but\na human confirming an action must be checked like any other human\naction. A 403 here therefore means the agent may not move into that\nqueue, even though the worker could have.\n\nIdempotent: a proposal that is no longer ``open`` returns 204 without\ndoing anything, so a double click cannot move a ticket twice.",
+        "operationId": "accept_ai_triage_api_v1_tickets__ticket_id__ai_triage__triage_id__accept_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "ticket_id",
+            "required": true,
+            "schema": {
+              "title": "Ticket Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "triage_id",
+            "required": true,
+            "schema": {
+              "title": "Triage Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/AiTriageDecisionIn"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Body"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Accept Ai Triage",
+        "tags": [
+          "ai"
+        ]
+      }
+    },
+    "/api/v1/tickets/{ticket_id}/ai/triage/{triage_id}/reject": {
+      "post": {
+        "description": "Dismiss a triage proposal. The row stays \u2014 rejections are what\ncalibrate the confidence thresholds.",
+        "operationId": "reject_ai_triage_api_v1_tickets__ticket_id__ai_triage__triage_id__reject_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "ticket_id",
+            "required": true,
+            "schema": {
+              "title": "Ticket Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "triage_id",
+            "required": true,
+            "schema": {
+              "title": "Triage Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/AiTriageRejectIn"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Body"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Reject Ai Triage",
         "tags": [
           "ai"
         ]
