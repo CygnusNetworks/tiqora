@@ -73,26 +73,65 @@ async def test_heartbeat_loop_handles_write_errors_without_raising(
     await asyncio.gather(ai_worker._heartbeat_loop(stop), _stop_soon())
 
 
-async def test_ai_tick_disabled_skips_run_auto_tick(monkeypatch: Any) -> None:
+async def test_ai_tick_disabled_skips_both_ticks(monkeypatch: Any) -> None:
     monkeypatch.setattr(ai_worker, "get_setting_bool", AsyncMock(return_value=False))
     run_auto_tick_mock = AsyncMock()
+    run_triage_tick_mock = AsyncMock()
     monkeypatch.setattr(ai_worker, "run_auto_tick", run_auto_tick_mock)
+    monkeypatch.setattr(ai_worker, "run_triage_tick", run_triage_tick_mock)
 
     result = await ai_worker._ai_tick(_fake_factory)
 
     assert result == {"enabled": False}
     run_auto_tick_mock.assert_not_called()
+    run_triage_tick_mock.assert_not_called()
 
 
-async def test_ai_tick_enabled_calls_run_auto_tick_and_merges_result(monkeypatch: Any) -> None:
+async def test_ai_tick_enabled_calls_both_ticks_and_merges_result(monkeypatch: Any) -> None:
     monkeypatch.setattr(ai_worker, "get_setting_bool", AsyncMock(return_value=True))
     run_auto_tick_mock = AsyncMock(return_value={"events": 3, "auto_replies": 1})
+    run_triage_tick_mock = AsyncMock(return_value={"triage_events": 3, "triage_applied": 1})
     monkeypatch.setattr(ai_worker, "run_auto_tick", run_auto_tick_mock)
+    monkeypatch.setattr(ai_worker, "run_triage_tick", run_triage_tick_mock)
 
     result = await ai_worker._ai_tick(_fake_factory)
 
-    assert result == {"enabled": True, "events": 3, "auto_replies": 1}
+    assert result == {
+        "enabled": True,
+        "triage_events": 3,
+        "triage_applied": 1,
+        "events": 3,
+        "auto_replies": 1,
+    }
+    run_triage_tick_mock.assert_awaited_once_with(session_factory=_fake_factory)
     run_auto_tick_mock.assert_awaited_once_with(session_factory=_fake_factory)
+
+
+async def test_triage_runs_before_auto_reply(monkeypatch: Any) -> None:
+    """Ordering is the whole point of calling triage from this tick.
+
+    Triage has to commit a queue move before run_auto_tick resolves the
+    policy for the same ArticleCreate event, otherwise a re-routed ticket is
+    answered under the *source* queue's policy. Swapping the two lines in
+    _ai_tick breaks that silently, so assert the order explicitly.
+    """
+    monkeypatch.setattr(ai_worker, "get_setting_bool", AsyncMock(return_value=True))
+    calls: list[str] = []
+
+    async def _triage(**_kwargs: Any) -> dict[str, int]:
+        calls.append("triage")
+        return {}
+
+    async def _auto(**_kwargs: Any) -> dict[str, int]:
+        calls.append("auto")
+        return {}
+
+    monkeypatch.setattr(ai_worker, "run_triage_tick", _triage)
+    monkeypatch.setattr(ai_worker, "run_auto_tick", _auto)
+
+    await ai_worker._ai_tick(_fake_factory)
+
+    assert calls == ["triage", "auto"]
 
 
 async def test_run_loop_records_success_and_stops(monkeypatch: Any) -> None:

@@ -820,6 +820,53 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/ai/triage": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Ai Triage
+         * @description Triage decisions, newest first. ``status_filter=open`` is the review
+         *     queue; no filter gives the full record the stats view aggregates.
+         */
+        get: operations["list_ai_triage_api_v1_admin_ai_triage_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/ai/triage/stats": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Ai Triage Stats
+         * @description Accept rate per confidence bucket per source queue.
+         *
+         *     This is what turns ``triage_auto_threshold`` from the shipped guess into
+         *     a measured number. ``accept_rate`` counts ``accepted`` + ``applied``
+         *     against everything an agent actually ruled on, so buckets still sitting
+         *     at ``open`` do not inflate it; a bucket with no decisions yet reports
+         *     ``None`` rather than a misleading 0.0.
+         */
+        get: operations["ai_triage_stats_api_v1_admin_ai_triage_stats_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/ai/usage": {
         parameters: {
             query?: never;
@@ -5432,6 +5479,57 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/tickets/{ticket_id}/ai/triage/{triage_id}/accept": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Accept Ai Triage
+         * @description Apply a pending triage proposal, in whole or in half.
+         *
+         *     Applied with **the agent's own permissions**, not the AI service user's:
+         *     the worker's automatic path deliberately bypasses the ``move_into``
+         *     check (the admin-configured target allowlist is its authorization), but
+         *     a human confirming an action must be checked like any other human
+         *     action. A 403 here therefore means the agent may not move into that
+         *     queue, even though the worker could have.
+         *
+         *     Idempotent: a proposal that is no longer ``open`` returns 204 without
+         *     doing anything, so a double click cannot move a ticket twice.
+         */
+        post: operations["accept_ai_triage_api_v1_tickets__ticket_id__ai_triage__triage_id__accept_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tickets/{ticket_id}/ai/triage/{triage_id}/reject": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Reject Ai Triage
+         * @description Dismiss a triage proposal. The row stays — rejections are what
+         *     calibrate the confidence thresholds.
+         */
+        post: operations["reject_ai_triage_api_v1_tickets__ticket_id__ai_triage__triage_id__reject_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/tickets/{ticket_id}/articles": {
         parameters: {
             query?: never;
@@ -6749,6 +6847,11 @@ export interface components {
              * @default false
              */
             enabled_summary: boolean;
+            /**
+             * Enabled Triage
+             * @default false
+             */
+            enabled_triage: boolean;
             /** Escalation Rules */
             escalation_rules?: string | null;
             /**
@@ -6812,6 +6915,8 @@ export interface components {
              * @enum {string}
              */
             reply_language_mode: "off" | "fixed" | "auto";
+            /** Routing Description */
+            routing_description?: string | null;
             /** Service User Id */
             service_user_id?: number | null;
             /** Summary Article Threshold */
@@ -6833,6 +6938,42 @@ export interface components {
              * @default
              */
             system_prompt: string;
+            /**
+             * Triage Auto Threshold
+             * @default 100
+             */
+            triage_auto_threshold: number;
+            /**
+             * Triage Customer Fix Auto Threshold
+             * @default 100
+             */
+            triage_customer_fix_auto_threshold: number;
+            /**
+             * Triage Customer Fix Enabled
+             * @default false
+             */
+            triage_customer_fix_enabled: boolean;
+            /**
+             * Triage Delay Reply
+             * @default false
+             */
+            triage_delay_reply: boolean;
+            /** Triage Llm Provider Id */
+            triage_llm_provider_id?: number | null;
+            /** Triage Model Override */
+            triage_model_override?: string | null;
+            /**
+             * Triage Samples
+             * @default 3
+             */
+            triage_samples: number;
+            /**
+             * Triage Suggest Threshold
+             * @default 50
+             */
+            triage_suggest_threshold: number;
+            /** Triage Target Queue Ids */
+            triage_target_queue_ids?: string | null;
             /** Vision Provider Id */
             vision_provider_id?: number | null;
         };
@@ -6873,6 +7014,8 @@ export interface components {
             enabled_refine: boolean;
             /** Enabled Summary */
             enabled_summary: boolean;
+            /** Enabled Triage */
+            enabled_triage: boolean;
             /** Escalation Rules */
             escalation_rules: string | null;
             /** Id */
@@ -6921,6 +7064,8 @@ export interface components {
              * @enum {string}
              */
             reply_language_mode: "off" | "fixed" | "auto";
+            /** Routing Description */
+            routing_description: string | null;
             /** Service User Id */
             service_user_id: number | null;
             /** Summary Article Threshold */
@@ -6938,6 +7083,24 @@ export interface components {
             summary_incremental_min_chars: number | null;
             /** System Prompt */
             system_prompt: string;
+            /** Triage Auto Threshold */
+            triage_auto_threshold: number;
+            /** Triage Customer Fix Auto Threshold */
+            triage_customer_fix_auto_threshold: number;
+            /** Triage Customer Fix Enabled */
+            triage_customer_fix_enabled: boolean;
+            /** Triage Delay Reply */
+            triage_delay_reply: boolean;
+            /** Triage Llm Provider Id */
+            triage_llm_provider_id: number | null;
+            /** Triage Model Override */
+            triage_model_override: string | null;
+            /** Triage Samples */
+            triage_samples: number;
+            /** Triage Suggest Threshold */
+            triage_suggest_threshold: number;
+            /** Triage Target Queue Ids */
+            triage_target_queue_ids: string | null;
             /** Valid Id */
             valid_id: number;
             /** Vision Provider Id */
@@ -6967,6 +7130,8 @@ export interface components {
             enabled_refine?: boolean | null;
             /** Enabled Summary */
             enabled_summary?: boolean | null;
+            /** Enabled Triage */
+            enabled_triage?: boolean | null;
             /** Escalation Rules */
             escalation_rules?: string | null;
             /** Identity Mode */
@@ -7005,6 +7170,8 @@ export interface components {
             reply_language_fixed?: string | null;
             /** Reply Language Mode */
             reply_language_mode?: ("off" | "fixed" | "auto") | null;
+            /** Routing Description */
+            routing_description?: string | null;
             /** Service User Id */
             service_user_id?: number | null;
             /** Summary Article Threshold */
@@ -7019,6 +7186,24 @@ export interface components {
             summary_incremental_min_chars?: number | null;
             /** System Prompt */
             system_prompt?: string | null;
+            /** Triage Auto Threshold */
+            triage_auto_threshold?: number | null;
+            /** Triage Customer Fix Auto Threshold */
+            triage_customer_fix_auto_threshold?: number | null;
+            /** Triage Customer Fix Enabled */
+            triage_customer_fix_enabled?: boolean | null;
+            /** Triage Delay Reply */
+            triage_delay_reply?: boolean | null;
+            /** Triage Llm Provider Id */
+            triage_llm_provider_id?: number | null;
+            /** Triage Model Override */
+            triage_model_override?: string | null;
+            /** Triage Samples */
+            triage_samples?: number | null;
+            /** Triage Suggest Threshold */
+            triage_suggest_threshold?: number | null;
+            /** Triage Target Queue Ids */
+            triage_target_queue_ids?: string | null;
             /** Valid Id */
             valid_id?: number | null;
             /** Vision Provider Id */
@@ -7146,6 +7331,7 @@ export interface components {
             summary_body: string | null;
             /** Summary Created At */
             summary_created_at: string | null;
+            triage?: components["schemas"]["AiTriageOut"] | null;
         };
         /**
          * AiSummarizeIn
@@ -7173,6 +7359,141 @@ export interface components {
             content: string;
             /** Name */
             name: string;
+        };
+        /**
+         * AiTriageBucketOut
+         * @description Accept rate for one 10-point confidence band of one source queue.
+         *
+         *     This is the calibration view: ``triage_auto_threshold`` should be set to
+         *     the lowest bucket whose accept rate the operator is willing to live with,
+         *     rather than to the shipped default.
+         */
+        AiTriageBucketOut: {
+            /** Accept Rate */
+            accept_rate: number | null;
+            /** Accepted */
+            accepted: number;
+            /** Applied */
+            applied: number;
+            /** Bucket High */
+            bucket_high: number;
+            /** Bucket Low */
+            bucket_low: number;
+            /** Open */
+            open: number;
+            /** Rejected */
+            rejected: number;
+            /** Source Queue Id */
+            source_queue_id: number;
+            /** Total */
+            total: number;
+        };
+        /**
+         * AiTriageDecisionIn
+         * @description Which halves of the proposal to accept. Defaults to both.
+         */
+        AiTriageDecisionIn: {
+            /**
+             * Customer
+             * @default true
+             */
+            customer: boolean;
+            /**
+             * Queue
+             * @default true
+             */
+            queue: boolean;
+        };
+        /**
+         * AiTriageOut
+         * @description A pending triage proposal for this ticket (status ``open`` only).
+         *
+         *     Both halves are independent: a ticket can have a queue proposal, a
+         *     customer proposal, or both, and an agent accepts them separately.
+         */
+        AiTriageOut: {
+            /** Created At */
+            created_at?: string | null;
+            /** Customer Confidence */
+            customer_confidence?: number | null;
+            /** Extracted Email */
+            extracted_email?: string | null;
+            /** Id */
+            id: number;
+            /** Queue Confidence */
+            queue_confidence?: number | null;
+            /** Queue Reason */
+            queue_reason?: string | null;
+            /** Queue Votes */
+            queue_votes?: number | null;
+            /** Source Queue Id */
+            source_queue_id: number;
+            /** Status */
+            status: string;
+            /** Suggested Customer Name */
+            suggested_customer_name?: string | null;
+            /** Suggested Customer User Id */
+            suggested_customer_user_id?: string | null;
+            /** Suggested Queue Id */
+            suggested_queue_id?: number | null;
+            /** Suggested Queue Name */
+            suggested_queue_name?: string | null;
+        };
+        /** AiTriageRejectIn */
+        AiTriageRejectIn: {
+            /** Note */
+            note?: string | null;
+        };
+        /** AiTriageRowOut */
+        AiTriageRowOut: {
+            /** Article Id */
+            article_id: number;
+            /** Candidates Json */
+            candidates_json: string | null;
+            /**
+             * Create Time
+             * Format: date-time
+             */
+            create_time: string;
+            /** Customer Applied */
+            customer_applied: boolean;
+            /** Customer Confidence */
+            customer_confidence: number | null;
+            /** Decided At */
+            decided_at: string | null;
+            /** Decided By User Id */
+            decided_by_user_id: number | null;
+            /** Decided Note */
+            decided_note: string | null;
+            /** Error */
+            error: string | null;
+            /** Extracted Email */
+            extracted_email: string | null;
+            /** Id */
+            id: number;
+            /** Queue Applied */
+            queue_applied: boolean;
+            /** Queue Confidence */
+            queue_confidence: number | null;
+            /** Queue Reason */
+            queue_reason: string | null;
+            /** Run Id */
+            run_id: string | null;
+            /** Source Queue Id */
+            source_queue_id: number;
+            /** Status */
+            status: string;
+            /** Suggested Customer User Id */
+            suggested_customer_user_id: string | null;
+            /** Suggested Queue Id */
+            suggested_queue_id: number | null;
+            /** Ticket Id */
+            ticket_id: number;
+        };
+        /** AiTriageStatsOut */
+        AiTriageStatsOut: {
+            /** Buckets */
+            buckets: components["schemas"]["AiTriageBucketOut"][];
         };
         /** AiUsageOut */
         AiUsageOut: {
@@ -15227,6 +15548,76 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_ai_triage_api_v1_admin_ai_triage_get: {
+        parameters: {
+            query?: {
+                status_filter?: string | null;
+                source_queue_id?: number | null;
+                limit?: number;
+            };
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AiTriageRowOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    ai_triage_stats_api_v1_admin_ai_triage_stats_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AiTriageStatsOut"];
+                };
             };
             /** @description Validation Error */
             422: {
@@ -27777,6 +28168,82 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["AiSummarizeOut"];
                 };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    accept_ai_triage_api_v1_tickets__ticket_id__ai_triage__triage_id__accept_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                ticket_id: number;
+                triage_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["AiTriageDecisionIn"] | null;
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    reject_ai_triage_api_v1_tickets__ticket_id__ai_triage__triage_id__reject_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                ticket_id: number;
+                triage_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["AiTriageRejectIn"] | null;
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {

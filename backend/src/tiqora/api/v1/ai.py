@@ -19,12 +19,16 @@ from typing import Literal
 import structlog
 from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel, Field, field_validator, model_validator
+from sqlalchemy import select
+from sqlalchemy import text as sa_text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from tiqora.ai import drafts as ai_drafts
+from tiqora.ai import triage as triage_service
 from tiqora.ai.acl import check_feature_access
 from tiqora.ai.context import (
     article_from_address,
+    customer_user_name,
     get_or_create_state,
     latest_customer_article_id,
     load_articles,
@@ -33,7 +37,14 @@ from tiqora.ai.gate import is_tiqora_primary
 from tiqora.ai.kb_wiring import build_llm_client, kb_bundle, kb_get_article_fn, kb_search_fn
 from tiqora.ai.listfields import parse_str_list
 from tiqora.ai.llm import LlmEmptyOutputError, LlmError, LlmHttpError, LlmTimeoutError
-from tiqora.ai.models import FEATURE_REFINE, TiqoraAiTicketState
+from tiqora.ai.models import (
+    FEATURE_REFINE,
+    TRIAGE_STATUS_ACCEPTED,
+    TRIAGE_STATUS_OPEN,
+    TRIAGE_STATUS_REJECTED,
+    TiqoraAiTicketState,
+    TiqoraAiTriage,
+)
 from tiqora.ai.policies import get_queue_policy_by_queue
 from tiqora.ai.refine import (
     MAX_TOTAL_CHARS as REFINE_MAX_TOTAL_CHARS,
@@ -74,6 +85,7 @@ from tiqora.api.deps import AppSettings, CurrentUser, DbSession
 from tiqora.config import Settings
 from tiqora.db.engine import get_session_factory
 from tiqora.domain.ticket_service import TicketAccessDenied, TicketNotFound, TicketService
+from tiqora.domain.ticket_write_service import TicketWriteService
 from tiqora.domain.ticket_write_service import resume_ai_automation as _resume_ai_automation
 from tiqora.permissions.engine import PermissionEngine
 from tiqora.znuny.sysconfig import SysConfig
@@ -118,6 +130,39 @@ class AiDraftOut(BaseModel):
     tool_trace: list[AiToolTraceOut]
 
 
+class AiTriageOut(BaseModel):
+    """A pending triage proposal for this ticket (status ``open`` only).
+
+    Both halves are independent: a ticket can have a queue proposal, a
+    customer proposal, or both, and an agent accepts them separately.
+    """
+
+    id: int
+    status: str
+    source_queue_id: int
+    suggested_queue_id: int | None = None
+    suggested_queue_name: str | None = None
+    queue_confidence: int | None = None
+    queue_reason: str | None = None
+    queue_votes: int | None = None
+    extracted_email: str | None = None
+    suggested_customer_user_id: str | None = None
+    suggested_customer_name: str | None = None
+    customer_confidence: int | None = None
+    created_at: datetime | None = None
+
+
+class AiTriageDecisionIn(BaseModel):
+    """Which halves of the proposal to accept. Defaults to both."""
+
+    queue: bool = True
+    customer: bool = True
+
+
+class AiTriageRejectIn(BaseModel):
+    note: str | None = None
+
+
 class AiStateOut(BaseModel):
     manual_assist_available: bool
     summary_available: bool
@@ -132,6 +177,7 @@ class AiStateOut(BaseModel):
     manual_run_error_code: str | None = None
     manual_run_started_at: datetime | None = None
     ai_escalated_at: datetime | None = None
+    triage: AiTriageOut | None = None
 
 
 class AiRefineSegmentIn(BaseModel):
@@ -348,6 +394,70 @@ async def _assert_note_permission(session: DbSession, user_id: int, queue_id: in
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden")
 
 
+async def _open_triage_out(session: DbSession, ticket_id: int) -> AiTriageOut | None:
+    """The pending triage proposal for this ticket, if any.
+
+    Only ``open`` rows are exposed: ``applied`` already happened, and
+    ``accepted``/``rejected``/``no_action``/``error`` are history the ticket
+    UI has nothing to ask about.
+    """
+    row = (
+        await session.execute(
+            select(TiqoraAiTriage).where(
+                TiqoraAiTriage.ticket_id == ticket_id,
+                TiqoraAiTriage.status == TRIAGE_STATUS_OPEN,
+            )
+        )
+    ).scalar_one_or_none()
+    if row is None:
+        return None
+
+    queue_name: str | None = None
+    if row.suggested_queue_id is not None:
+        queue_name = (
+            await session.execute(
+                sa_text("SELECT name FROM queue WHERE id = :qid LIMIT 1"),
+                {"qid": row.suggested_queue_id},
+            )
+        ).scalar_one_or_none()
+
+    votes: int | None = None
+    if row.candidates_json and row.suggested_queue_id is not None:
+        try:
+            wanted = triage_service.queue_key(row.suggested_queue_id)
+            votes = next(
+                (
+                    int(entry.get("votes", 0))
+                    for entry in json.loads(row.candidates_json)
+                    if entry.get("key") == wanted
+                ),
+                None,
+            )
+        except (TypeError, ValueError):
+            votes = None
+
+    customer_name: str | None = None
+    if row.suggested_customer_user_id:
+        first, last = await customer_user_name(session, row.suggested_customer_user_id)
+        customer_name = " ".join(p for p in (first, last) if p) or None
+
+    return AiTriageOut(
+        id=row.id,
+        status=row.status,
+        source_queue_id=row.source_queue_id,
+        suggested_queue_id=row.suggested_queue_id,
+        suggested_queue_name=queue_name,
+        queue_confidence=row.queue_confidence,
+        queue_reason=row.queue_reason,
+        queue_votes=votes,
+        extracted_email=row.extracted_email,
+        suggested_customer_user_id=row.suggested_customer_user_id,
+        suggested_customer_name=customer_name,
+        customer_confidence=row.customer_confidence,
+        created_at=row.create_time,
+    )
+
+
 @router.get("", response_model=AiStateOut)
 async def get_ai_state(ticket_id: int, user: CurrentUser, session: DbSession) -> AiStateOut:
     try:
@@ -410,6 +520,7 @@ async def get_ai_state(ticket_id: int, user: CurrentUser, session: DbSession) ->
         manual_run_error_code=manual_run_error_code,
         manual_run_started_at=manual_run_started_at,
         ai_escalated_at=state.ai_escalated_at if state else None,
+        triage=await _open_triage_out(session, ticket_id),
     )
 
 
@@ -691,6 +802,120 @@ async def discard_ai_draft(
         await ai_drafts.discard_draft(session, draft, actor_user_id=user.id)
     except ai_drafts.DraftStateError as exc:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+
+
+async def _load_open_triage(
+    session: DbSession, *, ticket_id: int, triage_id: int
+) -> TiqoraAiTriage:
+    row = await session.get(TiqoraAiTriage, triage_id)
+    if row is None or row.ticket_id != ticket_id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Triage not found")
+    return row
+
+
+@router.post("/triage/{triage_id}/accept", status_code=status.HTTP_204_NO_CONTENT)
+async def accept_ai_triage(
+    ticket_id: int,
+    triage_id: int,
+    user: CurrentUser,
+    session: DbSession,
+    body: AiTriageDecisionIn | None = None,
+) -> None:
+    """Apply a pending triage proposal, in whole or in half.
+
+    Applied with **the agent's own permissions**, not the AI service user's:
+    the worker's automatic path deliberately bypasses the ``move_into``
+    check (the admin-configured target allowlist is its authorization), but
+    a human confirming an action must be checked like any other human
+    action. A 403 here therefore means the agent may not move into that
+    queue, even though the worker could have.
+
+    Idempotent: a proposal that is no longer ``open`` returns 204 without
+    doing anything, so a double click cannot move a ticket twice.
+    """
+    try:
+        ticket = await TicketService(session).get_ticket(user.id, ticket_id)
+    except (TicketNotFound, TicketAccessDenied) as exc:
+        if isinstance(exc, TicketNotFound):
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not found") from exc
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden") from exc
+
+    await _assert_note_permission(session, user.id, ticket.queue_id)
+
+    row = await _load_open_triage(session, ticket_id=ticket_id, triage_id=triage_id)
+    if row.status != TRIAGE_STATUS_OPEN:
+        return
+
+    decision = body or AiTriageDecisionIn()
+    writer = TicketWriteService(session, get_session_factory(), SysConfig(session))
+
+    async def _move(new_queue_id: int) -> None:
+        await writer.move_queue(user.id, ticket_id, new_queue_id)
+
+    async def _set_customer(customer_id: str | None, customer_user_id: str | None) -> None:
+        await writer.set_customer(
+            user.id,
+            ticket_id,
+            customer_id=customer_id,
+            customer_user_id=customer_user_id,
+        )
+
+    try:
+        applied = await triage_service.apply_decision(
+            session,
+            sysconfig=SysConfig(session),
+            row=row,
+            acting_user_id=user.id,
+            apply_queue=decision.queue,
+            apply_customer=decision.customer,
+            move_fn=_move,
+            set_customer_fn=_set_customer,
+        )
+    except TicketAccessDenied as exc:
+        # The agent may note on the source queue but not move into the target.
+        # The worker's automatic path would have succeeded here (it uses the
+        # permission-free mutator, authorized by the admin's target
+        # allowlist) -- this asymmetry is deliberate and surfaced in the
+        # admin UI as a warning when configuring the allowlist.
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden") from exc
+
+    row.status = TRIAGE_STATUS_ACCEPTED
+    row.decided_by_user_id = user.id
+    row.decided_at = datetime.now(UTC).replace(tzinfo=None)
+    await session.commit()
+    logger.info(
+        "ai_triage_accepted", ticket_id=ticket_id, triage_id=triage_id, applied=applied
+    )
+
+
+@router.post("/triage/{triage_id}/reject", status_code=status.HTTP_204_NO_CONTENT)
+async def reject_ai_triage(
+    ticket_id: int,
+    triage_id: int,
+    user: CurrentUser,
+    session: DbSession,
+    body: AiTriageRejectIn | None = None,
+) -> None:
+    """Dismiss a triage proposal. The row stays — rejections are what
+    calibrate the confidence thresholds."""
+    try:
+        ticket = await TicketService(session).get_ticket(user.id, ticket_id)
+    except (TicketNotFound, TicketAccessDenied) as exc:
+        if isinstance(exc, TicketNotFound):
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not found") from exc
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden") from exc
+
+    await _assert_note_permission(session, user.id, ticket.queue_id)
+
+    row = await _load_open_triage(session, ticket_id=ticket_id, triage_id=triage_id)
+    if row.status != TRIAGE_STATUS_OPEN:
+        return
+
+    row.status = TRIAGE_STATUS_REJECTED
+    row.decided_by_user_id = user.id
+    row.decided_note = (body.note if body else None) or None
+    row.decided_at = datetime.now(UTC).replace(tzinfo=None)
+    await session.commit()
 
 
 @router.post("/resume", status_code=status.HTTP_204_NO_CONTENT)
