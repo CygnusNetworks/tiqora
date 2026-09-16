@@ -583,7 +583,9 @@
       "errorLimit": "Your quota for AI rewriting is used up.",
       "errorDenied": "You are not allowed to use AI rewriting.",
       "errorDisabled": "AI rewriting is not enabled for this queue.",
-      "error": "Refining failed. Your text is unchanged."
+      "error": "Refining failed. Your text is unchanged.",
+      "nothingToRefineShort": "nothing of your own",
+      "toneMenuLabel": "Choose tone"
     }
   },
   "search": {
