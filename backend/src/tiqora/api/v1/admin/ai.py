@@ -28,6 +28,7 @@ import json
 from datetime import datetime
 
 from fastapi import APIRouter, HTTPException, Query, status
+from sqlalchemy import select
 from starlette.concurrency import run_in_threadpool
 
 from tiqora.ai import acl as ai_acl
@@ -47,7 +48,12 @@ from tiqora.ai.gate import (
     set_auto_reply_paused,
     set_operation_mode,
 )
-from tiqora.ai.models import TiqoraAiPromptPart, TiqoraMcpClient
+from tiqora.ai.models import (
+    TRIAGE_STATUSES,
+    TiqoraAiPromptPart,
+    TiqoraAiTriage,
+    TiqoraMcpClient,
+)
 from tiqora.ai.policies import PromptPartValidationError, QueuePolicyValidationError
 from tiqora.ai.runtime import DEFAULT_MAX_TOOL_ROUNDS
 from tiqora.api.deps import DbSession
@@ -64,6 +70,9 @@ from tiqora.api.v1.admin.ai_schemas import (
     AiQueuePolicyUpdate,
     AiSettingsOut,
     AiSettingsUpdate,
+    AiTriageBucketOut,
+    AiTriageRowOut,
+    AiTriageStatsOut,
     AiUsageOut,
     AiUsagePageOut,
     EscalationHitOut,
@@ -699,3 +708,101 @@ async def delete_ai_summary(ticket_id: int, admin: AdminUser, session: DbSession
     _ = admin
     if not await ai_summary.delete_summary(session, ticket_id):
         raise _not_found("Summary", ticket_id)
+
+
+# ---------------------------------------------------------------------------
+# Triage
+# ---------------------------------------------------------------------------
+
+# Width of one confidence band in the calibration view. 10 keeps the table
+# readable while still resolving the region where the threshold sits.
+_TRIAGE_BUCKET_WIDTH = 10
+
+
+@router.get("/triage", response_model=list[AiTriageRowOut])
+async def list_ai_triage(
+    admin: AdminUser,
+    session: DbSession,
+    status_filter: str | None = None,
+    source_queue_id: int | None = None,
+    limit: int = 100,
+) -> list[AiTriageRowOut]:
+    """Triage decisions, newest first. ``status_filter=open`` is the review
+    queue; no filter gives the full record the stats view aggregates."""
+    _ = admin
+    stmt = select(TiqoraAiTriage).order_by(TiqoraAiTriage.create_time.desc())
+    if status_filter:
+        if status_filter not in TRIAGE_STATUSES:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=(
+                    f"Invalid status: {status_filter!r} (expected one of {sorted(TRIAGE_STATUSES)})"
+                ),
+            )
+        stmt = stmt.where(TiqoraAiTriage.status == status_filter)
+    if source_queue_id is not None:
+        stmt = stmt.where(TiqoraAiTriage.source_queue_id == source_queue_id)
+    stmt = stmt.limit(max(1, min(limit, 500)))
+    rows = (await session.execute(stmt)).scalars().all()
+    return [AiTriageRowOut.model_validate(row) for row in rows]
+
+
+@router.get("/triage/stats", response_model=AiTriageStatsOut)
+async def ai_triage_stats(admin: AdminUser, session: DbSession) -> AiTriageStatsOut:
+    """Accept rate per confidence bucket per source queue.
+
+    This is what turns ``triage_auto_threshold`` from the shipped guess into
+    a measured number. ``accept_rate`` counts ``accepted`` + ``applied``
+    against everything an agent actually ruled on, so buckets still sitting
+    at ``open`` do not inflate it; a bucket with no decisions yet reports
+    ``None`` rather than a misleading 0.0.
+    """
+    _ = admin
+    rows = (
+        (
+            await session.execute(
+                select(
+                    TiqoraAiTriage.source_queue_id,
+                    TiqoraAiTriage.queue_confidence,
+                    TiqoraAiTriage.status,
+                ).where(TiqoraAiTriage.queue_confidence.is_not(None))
+            )
+        )
+        .mappings()
+        .all()
+    )
+
+    tally: dict[tuple[int, int], dict[str, int]] = {}
+    for row in rows:
+        confidence = int(row["queue_confidence"] or 0)
+        low = min(100, (confidence // _TRIAGE_BUCKET_WIDTH) * _TRIAGE_BUCKET_WIDTH)
+        key = (int(row["source_queue_id"]), low)
+        entry = tally.setdefault(
+            key, {"total": 0, "accepted": 0, "rejected": 0, "applied": 0, "open": 0}
+        )
+        entry["total"] += 1
+        name = str(row["status"])
+        if name in entry:
+            entry[name] += 1
+
+    buckets: list[AiTriageBucketOut] = []
+    for (queue_id, low), entry in sorted(tally.items()):
+        ruled_on = entry["accepted"] + entry["rejected"] + entry["applied"]
+        buckets.append(
+            AiTriageBucketOut(
+                source_queue_id=queue_id,
+                bucket_low=low,
+                bucket_high=min(100, low + _TRIAGE_BUCKET_WIDTH - 1),
+                total=entry["total"],
+                accepted=entry["accepted"],
+                rejected=entry["rejected"],
+                applied=entry["applied"],
+                open=entry["open"],
+                accept_rate=(
+                    round((entry["accepted"] + entry["applied"]) / ruled_on, 3)
+                    if ruled_on
+                    else None
+                ),
+            )
+        )
+    return AiTriageStatsOut(buckets=buckets)

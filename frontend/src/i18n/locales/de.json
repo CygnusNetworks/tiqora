@@ -529,6 +529,15 @@
         "accepted": "Übernommen",
         "discarded": "Verworfen",
         "superseded": "Ersetzt"
+      },
+      "triage": {
+        "title": "KI-Triage-Vorschlag",
+        "queueLine": "Nach {{queue}} verschieben (Konfidenz {{confidence}} %)",
+        "customerLine": "Absender der weitergeleiteten Mail: {{email}} ({{name}})",
+        "customerUnknownLine": "Absender der weitergeleiteten Mail: {{email}} — kein passender Kundendatensatz",
+        "accept": "Übernehmen",
+        "reject": "Verwerfen",
+        "acceptFailed": "Konnte nicht übernommen werden — evtl. fehlt dir das Recht, in diese Queue zu verschieben."
       }
     },
     "toolbar": {
@@ -907,7 +916,8 @@
         "auto_reply": "Auto-Antwort",
         "manual_assist": "Manuelle Unterstützung",
         "mcp": "MCP",
-        "refine": "Text verfeinern"
+        "refine": "Text verfeinern",
+        "triage": "Neue Tickets in die richtige Queue einsortieren"
       },
       "providers": {
         "title": "LLM-Provider",
@@ -1055,7 +1065,8 @@
           "drafts": "Entwürfe",
           "summaries": "Zusammenfassungen",
           "auto": "Auto-Antworten",
-          "safety": "Schutz"
+          "safety": "Schutz",
+          "triage": "Triage"
         },
         "editor": {
           "newTitle": "Neue Queue-Policy",
@@ -1087,7 +1098,22 @@
           "detailed": "Ausführlich"
         },
         "kbCategories": "KB-Kategorien",
-        "kbCategoriesEmpty": "Keine Kategorien vorhanden."
+        "kbCategoriesEmpty": "Keine Kategorien vorhanden.",
+        "routingDescription": "Was gehört in diese Queue",
+        "routingDescriptionPlaceholder": "z. B. Technischer Support: Anschluss, Router, Sperren, Account, WLAN-Technik, IPTV, Diagnose, Freischaltung.",
+        "routingDescriptionHint": "Dieser Text beschreibt DIESE Queue und wird ANDEREN Queues gezeigt, die sie als Ziel eingetragen haben. Für die Triage-Entscheidung dieser Queue selbst wird er nicht verwendet.",
+        "triageTargets": "Queues, in die verschoben werden darf",
+        "triageTargetsNoDescription": "Keine Queue-Beschreibung hinterlegt für: {{queues}}. Das Modell sieht dann nur den Queue-Namen, was das Routing deutlich unzuverlässiger macht.",
+        "triageAutoThreshold": "Automatisch verschieben ab",
+        "triageSuggestThreshold": "Vorschlagen ab",
+        "triageSamples": "Stichproben",
+        "triageThresholdExplainer": "Ab {{auto}} → automatisch verschieben · {{suggestLow}}–{{suggestHigh}} → vorschlagen · unter {{suggestLow}} → nichts tun",
+        "triageDelayReply": "Nach einem Move in diese Queue erst auf die nächste Kundennachricht antworten",
+        "triageCustomerFix": "Kunden bei weitergeleiteten Mails korrigieren",
+        "triageCustomerFixThreshold": "Kunden korrigieren ab",
+        "triageProvider": "Triage-Provider",
+        "triageProviderInherit": "Provider der Queue übernehmen",
+        "triageModelOverride": "Triage-Modell"
       },
       "usage": {
         "title": "Nutzung",
@@ -1261,7 +1287,18 @@
         "allowedStateTypes": "Kommagetrennte Liste erlaubter Znuny-Status-Typen (z. B. \"open\" oder \"open,closed\"). Sie steuert beides: worauf die KI ein Ticket per update_ticket_fields setzen darf (geprüft für Status-Name und Status-ID gleichermaßen) und welchen Status Tiqora selbst setzt, nachdem es automatisch geantwortet hat — eine inhaltliche Antwort schließt das Ticket, wenn \"closed\" erlaubt ist (sonst \"open\"), eine Rückfrage öffnet es nur. Leer = Standard nur \"open\" (Wiedereröffnen erlaubt, nie schließen); eine leere Liste \"[]\" deaktiviert Statusänderungen komplett, ein automatisch beantwortetes Ticket behält dann seinen bisherigen Status.",
         "piiNer": "Erkennt Personennamen im Text per spaCy-NER (Deutsch + Englisch) und maskiert sie als [NAME_n], bevor der Inhalt den LLM-Provider erreicht — zusätzlich zu Kundenname und Absendern. Nur aktiv, wenn PII-Maskierung eingeschaltet ist. False Positives sind unkritisch (nur mehr Maskierung).",
         "summaryDetail": "Standard: kompakte Absätze, 1–2 Sätze je beigefügtem Dokument. Ausführlich: gründlichere Absätze und 3–5 Sätze je Dokument — sinnvoll bei Queues mit vielen PDF-Anhängen.",
-        "enabledRefine": "Blendet im Antwort- und Neues-Ticket-Dialog den Button „Text verfeinern“ ein. Das Modell überarbeitet nur den selbst geschriebenen Text; zitierte Passagen bleiben unverändert. Es wird nichts gespeichert und nichts versendet — der Agent sieht das Ergebnis im Editor und kann es rückgängig machen. Nicht vom Betriebsmodus-Gate betroffen."
+        "enabledRefine": "Blendet im Antwort- und Neues-Ticket-Dialog den Button „Text verfeinern“ ein. Das Modell überarbeitet nur den selbst geschriebenen Text; zitierte Passagen bleiben unverändert. Es wird nichts gespeichert und nichts versendet — der Agent sieht das Ergebnis im Editor und kann es rückgängig machen. Nicht vom Betriebsmodus-Gate betroffen.",
+        "enabledTriage": "Läuft einmal beim ersten Kundenartikel, vor dem Antwort-Agenten, und schlägt eine passendere Queue vor. Braucht Service-User, Provider und mindestens eine Ziel-Queue. Nur im Betriebsmodus tiqora_primary verfügbar.",
+        "routingDescription": "Die wichtigste Stellschraube für die Routing-Qualität. Ohne sie sieht das Modell von einer Ziel-Queue nur den Namen.",
+        "triageTargets": "Diese Liste ist zugleich die Berechtigung: der Worker verschiebt ohne move_into-Prüfung. Trage also nur Queues ein, die er wirklich erreichen soll.",
+        "triageAutoThreshold": "Konfidenz, ab der ohne Rückfrage verschoben wird. 100 heißt: nie selbst verschieben, nur vorschlagen. Erst senken, wenn die Annahmequote unter Triage-Statistik das trägt.",
+        "triageSuggestThreshold": "Konfidenz, ab der ein Vorschlag angezeigt wird, den ein Agent annehmen kann. Darunter passiert gar nichts.",
+        "triageSamples": "Wie oft das Modell pro Ticket gefragt wird. Die Übereinstimmung der Stichproben ist das wichtigste Konfidenzsignal, 1 schaltet es also ab. Jede Stichprobe ist ein eigener LLM-Aufruf pro neuem Ticket.",
+        "triageDelayReply": "Wird auf der ZIEL-Queue gesetzt. Verhindert, dass ein Routing-Fehler zu einer falschen Antwort wird — dafür bekommt der Kunde auf seine erste Mail keine KI-Antwort.",
+        "triageCustomerFix": "Bei einer weitergeleiteten Mail den ursprünglichen Absender als Ticket-Kunden setzen. Wird nur angewendet, wenn die Adresse wörtlich im Text steht und genau einen Kundendatensatz trifft.",
+        "triageCustomerFixThreshold": "100 heißt: nur vorschlagen. Eine mehrfach weitergeleitete Mail bekommt 70, weil der ursprüngliche Absender dort unsicherer ist.",
+        "triageProvider": "Triage ist eine Klassifikationsaufgabe und läuft mehrfach pro Ticket — ein kleineres, günstigeres Modell ist hier meist die richtige Wahl.",
+        "triageModelOverride": "Leer lassen, um das Standardmodell des Providers zu verwenden."
       },
       "common": {
         "validId": "Gültig/Ungültig ist ein weicher Löschstatus: „Ungültig“ blendet den Eintrag aus Auswahllisten für neue Datensätze aus, ohne bestehende Verknüpfungen (z. B. Tickets, Zuordnungen) zu löschen. Ein echtes Löschen ist nicht vorgesehen."
@@ -1820,7 +1857,15 @@
       "every": "alle",
       "olderThan": "älter als {{duration}}",
       "newerThan": "neuer als {{duration}}",
-      "weekdaysShort": ["So", "Mo", "Di", "Mi", "Do", "Fr", "Sa"],
+      "weekdaysShort": [
+        "So",
+        "Mo",
+        "Di",
+        "Mi",
+        "Do",
+        "Fr",
+        "Sa"
+      ],
       "keyLabel": {
         "StateIDs": "Status",
         "QueueIDs": "Queue",

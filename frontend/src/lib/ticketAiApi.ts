@@ -69,6 +69,29 @@ export type AiStateOut = {
   manual_run_error_code?: string | null;
   manual_run_started_at?: string | null;
   ai_escalated_at?: string | null;
+  /** Pending triage proposal, only present while its status is "open". */
+  triage?: AiTriageOut | null;
+};
+
+/**
+ * A pending triage proposal. The queue half and the customer half are
+ * independent -- either can be absent, and an agent accepts them separately.
+ */
+export type AiTriageOut = {
+  id: number;
+  status: string;
+  source_queue_id: number;
+  suggested_queue_id?: number | null;
+  suggested_queue_name?: string | null;
+  queue_confidence?: number | null;
+  queue_reason?: string | null;
+  /** How many of the samples voted for the winning queue. */
+  queue_votes?: number | null;
+  extracted_email?: string | null;
+  suggested_customer_user_id?: string | null;
+  suggested_customer_name?: string | null;
+  customer_confidence?: number | null;
+  created_at?: string | null;
 };
 
 export type SummaryDetail = "standard" | "detailed";
@@ -122,5 +145,34 @@ export const ticketAiApi = {
     return api.request<void>("POST", `/api/v1/tickets/${ticketId}/ai/resume`, {
       signal,
     });
+  },
+  /**
+   * Apply a triage proposal. Runs with the agent's own permissions, so this
+   * can 403 on a target queue the worker itself would have been allowed to
+   * move into (see the backend route docstring).
+   */
+  acceptTriage(
+    ticketId: number,
+    triageId: number,
+    parts: { queue: boolean; customer: boolean },
+    signal?: AbortSignal,
+  ) {
+    return api.request<void>(
+      "POST",
+      `/api/v1/tickets/${ticketId}/ai/triage/${triageId}/accept`,
+      { body: parts, signal },
+    );
+  },
+  rejectTriage(
+    ticketId: number,
+    triageId: number,
+    note?: string,
+    signal?: AbortSignal,
+  ) {
+    return api.request<void>(
+      "POST",
+      `/api/v1/tickets/${ticketId}/ai/triage/${triageId}/reject`,
+      { body: { note: note ?? null }, signal },
+    );
   },
 };

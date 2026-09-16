@@ -12,6 +12,8 @@ const {
   summarize,
   discardDraft,
   resume,
+  acceptTriage,
+  rejectTriage,
   adminDeleteDraft,
   adminDeleteSummary,
   listArticles,
@@ -24,6 +26,8 @@ const {
   summarize: vi.fn(),
   discardDraft: vi.fn(),
   resume: vi.fn(),
+  acceptTriage: vi.fn(),
+  rejectTriage: vi.fn(),
   adminDeleteDraft: vi.fn(),
   adminDeleteSummary: vi.fn(),
   listArticles: vi.fn(),
@@ -39,7 +43,15 @@ vi.mock("@/lib/ticketAiApi", async () => {
     );
   return {
     ...actual,
-    ticketAiApi: { getState, requestDraft, summarize, discardDraft, resume },
+    ticketAiApi: {
+      getState,
+      requestDraft,
+      summarize,
+      discardDraft,
+      resume,
+      acceptTriage,
+      rejectTriage,
+    },
   };
 });
 
@@ -969,5 +981,123 @@ describe("AiPanel", () => {
     };
     expect(payload.channel).toBe("telegram");
     expect(payload.to_address).toBeNull();
+  });
+
+  describe("triage proposal", () => {
+    const triage = {
+      id: 7,
+      status: "open",
+      source_queue_id: 3,
+      suggested_queue_id: 9,
+      suggested_queue_name: "stw-bn",
+      queue_confidence: 67,
+      queue_reason: "technische stoerung",
+      queue_votes: 2,
+      extracted_email: null as string | null,
+      suggested_customer_user_id: null as string | null,
+      suggested_customer_name: null as string | null,
+      customer_confidence: null as number | null,
+      created_at: "2026-09-16T10:00:00",
+    };
+
+    it("renders the card even when manual assist and summary are both off", async () => {
+      // A triage-only source queue enables neither feature, so the panel's
+      // usual "nothing to show" early return must not hide the proposal.
+      getState.mockResolvedValue({ ...baseState, triage });
+      wrap(<AiPanel ticketId={1} canNote />);
+
+      expect(await screen.findByTestId("ai-panel-triage")).toBeTruthy();
+      expect(screen.getByTestId("ai-panel-triage-queue").textContent).toContain(
+        "stw-bn",
+      );
+    });
+
+    it("renders nothing when there is no proposal", async () => {
+      getState.mockResolvedValue({ ...baseState, triage: null });
+      const { container } = wrap(<AiPanel ticketId={1} canNote />);
+
+      await waitFor(() => expect(getState).toHaveBeenCalled());
+      expect(container.querySelector('[data-testid="ai-panel-triage"]')).toBe(
+        null,
+      );
+    });
+
+    it("accepts only the halves the proposal actually has", async () => {
+      getState.mockResolvedValue({ ...baseState, triage });
+      acceptTriage.mockResolvedValue(undefined);
+      wrap(<AiPanel ticketId={1} canNote />);
+
+      fireEvent.click(await screen.findByTestId("ai-panel-triage-accept"));
+
+      await waitFor(() => expect(acceptTriage).toHaveBeenCalled());
+      expect(acceptTriage).toHaveBeenCalledWith(1, 7, {
+        queue: true,
+        customer: false,
+      });
+    });
+
+    it("sends the customer half when the proposal resolved a customer", async () => {
+      getState.mockResolvedValue({
+        ...baseState,
+        triage: {
+          ...triage,
+          extracted_email: "s27tgras@uni-bonn.de",
+          suggested_customer_user_id: "s27tgras@uni-bonn.de",
+          suggested_customer_name: "Sven Gras",
+          customer_confidence: 100,
+        },
+      });
+      acceptTriage.mockResolvedValue(undefined);
+      wrap(<AiPanel ticketId={1} canNote />);
+
+      expect(
+        (await screen.findByTestId("ai-panel-triage-customer")).textContent,
+      ).toContain("s27tgras@uni-bonn.de");
+
+      fireEvent.click(screen.getByTestId("ai-panel-triage-accept"));
+      await waitFor(() => expect(acceptTriage).toHaveBeenCalled());
+      expect(acceptTriage).toHaveBeenCalledWith(1, 7, {
+        queue: true,
+        customer: true,
+      });
+    });
+
+    it("rejects the proposal", async () => {
+      getState.mockResolvedValue({ ...baseState, triage });
+      rejectTriage.mockResolvedValue(undefined);
+      wrap(<AiPanel ticketId={1} canNote />);
+
+      fireEvent.click(await screen.findByTestId("ai-panel-triage-reject"));
+
+      await waitFor(() => expect(rejectTriage).toHaveBeenCalledWith(1, 7));
+    });
+
+    it("disables both actions without note permission", async () => {
+      getState.mockResolvedValue({ ...baseState, triage });
+      wrap(<AiPanel ticketId={1} canNote={false} />);
+
+      const accept = (await screen.findByTestId(
+        "ai-panel-triage-accept",
+      )) as HTMLButtonElement;
+      const reject = screen.getByTestId(
+        "ai-panel-triage-reject",
+      ) as HTMLButtonElement;
+      expect(accept.disabled).toBe(true);
+      expect(reject.disabled).toBe(true);
+    });
+
+    it("surfaces a 403 from accept instead of failing silently", async () => {
+      // The worker may move into a queue the agent cannot: the automatic
+      // path skips the move_into check, the accept path does not.
+      getState.mockResolvedValue({ ...baseState, triage });
+      acceptTriage.mockRejectedValue(
+        new ApiError(403, "Forbidden", "/api/v1/tickets/1/ai/triage/7/accept"),
+      );
+      wrap(<AiPanel ticketId={1} canNote />);
+
+      fireEvent.click(await screen.findByTestId("ai-panel-triage-accept"));
+
+      expect(await screen.findByTestId("ai-panel-triage-error")).toBeTruthy();
+    });
   });
 });
