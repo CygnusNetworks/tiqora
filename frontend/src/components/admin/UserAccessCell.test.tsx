@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, afterAll, beforeAll, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { I18nextProvider } from "react-i18next";
 import i18n from "@/i18n";
@@ -8,6 +8,20 @@ import { accessState } from "@/lib/userAccess";
 const NOW = new Date("2026-09-08T16:00:00Z");
 const FUTURE = "2026-09-15T15:43:58+00:00";
 const PAST = "2026-07-31T10:00:00+00:00";
+
+// UserAccessCell calls accessState(user) without a `now`, so it reads the real
+// clock while the unit tests below inject NOW. Freeze Date to NOW for the whole
+// file, or FUTURE silently becomes the past and the rendered state flips from
+// "invited" to "expired" — which is exactly what happened on 2026-09-16.
+// Pushing FUTURE further out would only re-arm the same trap.
+beforeAll(() => {
+  vi.useFakeTimers({ toFake: ["Date"] });
+  vi.setSystemTime(NOW);
+});
+
+afterAll(() => {
+  vi.useRealTimers();
+});
 
 describe("accessState", () => {
   it("reports an outstanding invitation while its link is still valid", () => {
@@ -46,9 +60,12 @@ describe("accessState", () => {
       last_login: null,
     };
     expect(accessState(accepted, NOW)).toBe("accepted");
-    expect(accessState({ ...accepted, last_login: "2026-09-07T09:04:00+00:00" }, NOW)).toBe(
-      "active",
-    );
+    expect(
+      accessState(
+        { ...accepted, last_login: "2026-09-07T09:04:00+00:00" },
+        NOW,
+      ),
+    ).toBe("active");
   });
 
   it("treats a signed-in account without an invitation as active, not 'no invitation'", () => {
@@ -70,7 +87,12 @@ describe("accessState", () => {
   it("falls back to 'no invitation' for an account that was never invited or used", () => {
     expect(
       accessState(
-        { invited_at: null, invite_expires: null, invite_accepted_at: null, last_login: null },
+        {
+          invited_at: null,
+          invite_expires: null,
+          invite_accepted_at: null,
+          last_login: null,
+        },
         NOW,
       ),
     ).toBe("none");
