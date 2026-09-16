@@ -2,9 +2,9 @@ import { useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { ApiError } from "@/lib/api";
-import { Button } from "@/components/ui/Button";
-import { SelectField } from "@/components/ui/SelectField";
+import { Menu, MenuItem, MenuLabel } from "@/components/ui/Menu";
 import { Spinner } from "@/components/ui/Spinner";
+import { cn } from "@/lib/cn";
 import { applyRefined, ownSections, segmentBody } from "@/lib/replyQuote";
 import {
   REFINE_TONES,
@@ -12,10 +12,17 @@ import {
   type RefineTarget,
   type RefineTone,
 } from "@/lib/refineApi";
+import { loadRefineTone, saveRefineTone } from "@/lib/refineTone";
 
 /**
- * "Text verfeinern" toolbar for a composer body: a tone picker, the trigger,
- * and an undo that reappears after every run.
+ * "Text verfeinern" for a composer body: one split button — press the left
+ * half to run, the caret to pick the tone — plus a chip naming the tone that
+ * a press would use, and an undo that appears after every run.
+ *
+ * It is a split button rather than a select plus a button because the action
+ * is one line in a dialog that is already tall, and because a `SelectField`
+ * here fought its own width: `cn()` is plain `clsx`, so a width passed in
+ * lands beside the component's own `w-full` and loses.
  *
  * Only the agent's own text is rewritten. The body is segmented by
  * `@/lib/replyQuote`; quote segments are sent along as context so an inline
@@ -43,7 +50,7 @@ export function RefineControls({
   testIdPrefix?: string;
 }) {
   const { t } = useTranslation();
-  const [tone, setTone] = useState<RefineTone>("standard");
+  const [tone, setTone] = useState<RefineTone>(loadRefineTone);
   /** The body as the agent last typed it, kept so one refine can be undone. */
   const [beforeRefine, setBeforeRefine] = useState<string | null>(null);
 
@@ -70,7 +77,13 @@ export function RefineControls({
   if (target == null || !availabilityQ.data?.available) return null;
 
   const busy = refineMutation.isPending;
-  const canRefine = !disabled && !busy && sections.length > 0;
+  const nothingToRefine = sections.length === 0;
+  const canRefine = !disabled && !busy && !nothingToRefine;
+
+  const pickTone = (next: RefineTone) => {
+    setTone(next);
+    saveRefineTone(next);
+  };
 
   const undo = () => {
     if (beforeRefine === null) return;
@@ -79,54 +92,85 @@ export function RefineControls({
     refineMutation.reset();
   };
 
+  const half =
+    "px-2 py-1 text-xs text-ink transition-colors duration-100 disabled:cursor-not-allowed disabled:text-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent";
+
   return (
-    <div className="flex flex-wrap items-center gap-1.5 text-xs">
-      <SelectField
-        items={REFINE_TONES.map((value) => ({
-          value,
-          label: t(
-            `ticket.refine.tone${value[0].toUpperCase()}${value.slice(1)}`,
-          ),
-        }))}
-        value={tone}
-        onChange={(next) => setTone(next)}
-        disabled={busy}
-        testId={`${testIdPrefix}-tone-select`}
-        aria-label={t("ticket.refine.toneLabel")}
-        className="w-36"
-      />
-      <Button
-        variant="ghost"
-        size="sm"
-        data-testid={`${testIdPrefix}-button`}
-        disabled={!canRefine}
-        title={
-          sections.length === 0
-            ? t("ticket.refine.nothingToRefine")
-            : t("ticket.refine.hint")
-        }
-        onClick={() => refineMutation.mutate()}
+    <div className="flex flex-wrap items-center gap-2 text-xs">
+      <span className="inline-flex overflow-hidden rounded-md border border-hairline bg-surface">
+        <button
+          type="button"
+          data-testid={`${testIdPrefix}-button`}
+          disabled={!canRefine}
+          title={t("ticket.refine.hint")}
+          onClick={() => refineMutation.mutate()}
+          className={cn(half, "enabled:hover:bg-surface-subtle")}
+        >
+          {busy ? (
+            <span className="flex items-center gap-1.5">
+              <Spinner className="h-3 w-3" />
+              {t("ticket.refine.running")}
+            </span>
+          ) : (
+            `✨ ${t("ticket.refine.button")}`
+          )}
+        </button>
+        <Menu
+          align="left"
+          panelTestId={`${testIdPrefix}-tone-menu`}
+          trigger={({ ref, toggleProps }) => (
+            <button
+              ref={ref}
+              type="button"
+              data-testid={`${testIdPrefix}-tone-trigger`}
+              aria-label={t("ticket.refine.toneMenuLabel")}
+              disabled={busy}
+              {...toggleProps}
+              className={cn(
+                half,
+                "border-l border-hairline text-muted hover:text-ink",
+              )}
+            >
+              ▾
+            </button>
+          )}
+        >
+          <MenuLabel>{t("ticket.refine.toneLabel")}</MenuLabel>
+          {REFINE_TONES.map((value) => (
+            <MenuItem
+              key={value}
+              testId={`${testIdPrefix}-tone-${value}`}
+              selected={value === tone}
+              onSelect={() => pickTone(value)}
+            >
+              {t(toneLabelKey(value))}
+            </MenuItem>
+          ))}
+        </Menu>
+      </span>
+
+      {/* Names what a press would do, and doubles as the reason it cannot. */}
+      <span
+        className={cn("text-muted", nothingToRefine && "italic")}
+        data-testid={`${testIdPrefix}-tone-chip`}
       >
-        {busy ? (
-          <span className="flex items-center gap-1.5">
-            <Spinner className="h-3 w-3" />
-            {t("ticket.refine.running")}
-          </span>
-        ) : (
-          `✨ ${t("ticket.refine.button")}`
-        )}
-      </Button>
+        {nothingToRefine
+          ? t("ticket.refine.nothingToRefineShort")
+          : t(toneLabelKey(tone))}
+      </span>
+
       {beforeRefine !== null && (
-        <Button
-          variant="ghost"
-          size="sm"
+        <button
+          type="button"
           data-testid={`${testIdPrefix}-undo`}
           disabled={busy}
           onClick={undo}
+          className="rounded px-1.5 py-1 text-muted transition-colors duration-100 hover:text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent"
         >
           ↩ {t("ticket.refine.undo")}
-        </Button>
+        </button>
       )}
+
       {refineMutation.isError && (
         <span className="text-danger" data-testid={`${testIdPrefix}-error`}>
           {refineErrorMessage(refineMutation.error, t)}
@@ -134,6 +178,10 @@ export function RefineControls({
       )}
     </div>
   );
+}
+
+function toneLabelKey(tone: RefineTone): string {
+  return `ticket.refine.tone${tone[0].toUpperCase()}${tone.slice(1)}`;
 }
 
 /** Maps the structured `"<code>: <message>"` detail the API returns onto a
