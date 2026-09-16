@@ -27,6 +27,9 @@ beforeEach(() => {
   qc = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   });
+  // The tone is remembered in localStorage on purpose, so it survives
+  // between tests unless each one starts from a clean slate.
+  window.localStorage.removeItem("tiqora-refine-tone");
   refine.mockReset();
   refineAvailability.mockReset();
   refineAvailability.mockResolvedValue({ available: true });
@@ -141,20 +144,50 @@ describe("RefineControls", () => {
     await waitFor(() =>
       expect(screen.getByTestId("refine-button")).toBeEnabled(),
     );
-    fireEvent.click(screen.getByTestId("refine-tone-select"));
-    fireEvent.click(
-      await screen.findByTestId("refine-tone-select-menu-option-concise"),
-    );
+    fireEvent.click(screen.getByTestId("refine-tone-trigger"));
+    fireEvent.click(await screen.findByTestId("refine-tone-concise"));
     fireEvent.click(screen.getByTestId("refine-button"));
 
     await waitFor(() => expect(refine).toHaveBeenCalled());
     expect(refine.mock.calls[0][0].tone).toBe("concise");
   });
 
-  it("disables the button when the composer holds only a quote", async () => {
+  it("disables the button and says why when the composer holds only a quote", async () => {
     renderHarness(`\n\n${QUOTE}`);
     await waitFor(() =>
       expect(screen.getByTestId("refine-button")).toBeDisabled(),
+    );
+    expect(screen.getByTestId("refine-tone-chip").textContent).toBe(
+      i18n.t("ticket.refine.nothingToRefineShort"),
+    );
+  });
+
+  it("shows the active tone next to the button so the click is predictable", async () => {
+    renderHarness("roh getippt");
+    await waitFor(() =>
+      expect(screen.getByTestId("refine-button")).toBeEnabled(),
+    );
+    expect(screen.getByTestId("refine-tone-chip").textContent).toBe(
+      i18n.t("ticket.refine.toneStandard"),
+    );
+  });
+
+  it("remembers the tone for the next composer", async () => {
+    refine.mockResolvedValue({ sections: [{ id: 0, text: "Kurz." }] });
+    const first = renderHarness("ein ziemlich langer text");
+    await waitFor(() =>
+      expect(screen.getByTestId("refine-button")).toBeEnabled(),
+    );
+    fireEvent.click(screen.getByTestId("refine-tone-trigger"));
+    fireEvent.click(await screen.findByTestId("refine-tone-concise"));
+    first.unmount();
+
+    renderHarness("noch ein text");
+    await waitFor(() =>
+      expect(screen.getByTestId("refine-button")).toBeEnabled(),
+    );
+    expect(screen.getByTestId("refine-tone-chip").textContent).toBe(
+      i18n.t("ticket.refine.toneConcise"),
     );
   });
 
