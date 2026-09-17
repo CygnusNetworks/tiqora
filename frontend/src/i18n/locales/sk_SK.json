@@ -1074,6 +1074,7 @@
           "queueLocked": "Po vytvorení už nie je možné front zmeniť."
         },
         "autoGateWarning": "Automatické odpovede vyžadujú režim „iba Tiqora“ (tiqora_primary). Momentálne: paralelná prevádzka – prepínač zostane uzamknutý.",
+        "triageGateWarning": "Triage requires \"Tiqora only\" (tiqora_primary) mode. Currently: parallel operation — the switch stays locked.",
         "ignoredSenders": "Ignorovaní odosielatelia",
         "ignoredSendersPlaceholder": "jedna adresa na riadok, napr. noreply@example.com alebo *@internal.example",
         "ignoreSendersManual": "Blokujte aj manuálne návrhy",
@@ -1153,7 +1154,9 @@
           "summary": "Zhrnutie",
           "auto_reply": "Automatická odpoveď",
           "vision": "Vízia",
-          "test": "Test pripojenia"
+          "test": "Test pripojenia",
+          "refine": "Refine text",
+          "triage": "Triage"
         },
         "allFeatures": "Všetky funkcie",
         "status": "Stav",
@@ -1291,7 +1294,7 @@
         "enabledTriage": "Runs once on a ticket's first message, before the reply agent, and proposes a better queue. Requires a service user, a provider and at least one target queue. Only available in tiqora_primary operation mode.",
         "routingDescription": "The single most important setting for routing quality. Without it a target queue is offered to the model by name alone.",
         "triageTargets": "The allowlist is also the authorization: the worker moves tickets without a move_into permission check, so only list queues you want it to reach.",
-        "triageAutoThreshold": "Confidence needed to move the ticket without asking. 100 means never move on its own, only propose. Lower it once the accept rate under Triage statistics supports it.",
+        "triageAutoThreshold": "Confidence needed to move the ticket without asking. 100 means never move on its own, only propose. Lower it once agents accept enough proposals at that confidence.",
         "triageSuggestThreshold": "Confidence needed to show a proposal an agent can accept. Below this nothing is shown at all.",
         "triageSamples": "How often the model is asked per ticket. Agreement between samples is the main confidence signal, so 1 disables it. Each sample is a separate LLM call on every new ticket.",
         "triageDelayReply": "Set on the DESTINATION queue. Protects against a routing mistake turning into a wrong answer, at the cost of the customer getting no AI reply to their first mail.",

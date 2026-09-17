@@ -58,7 +58,9 @@ from tiqora.ai.listfields import parse_str_list
 from tiqora.ai.models import (
     FEATURE_AUTO_REPLY,
     FEATURE_TRIAGE,
+    TRIAGE_STATUS_OPEN,
     TiqoraAiQueuePolicy,
+    TiqoraAiTriage,
     TiqoraAiUsage,
 )
 from tiqora.ai.outbox import (
@@ -192,6 +194,27 @@ async def _cap_reason(
     return None
 
 
+async def _has_open_triage(session: AsyncSession, ticket_id: int) -> bool:
+    """True while a triage proposal is waiting for an agent decision.
+
+    Auto-reply must not answer under the source-queue policy in that
+    window: the ticket may still move, and the agent UI is showing the
+    proposal. Skipping without touching ``last_customer_article_id`` lets
+    the same article be answered after accept/reject.
+    """
+    row = (
+        await session.execute(
+            select(TiqoraAiTriage.id)
+            .where(
+                TiqoraAiTriage.ticket_id == ticket_id,
+                TiqoraAiTriage.status == TRIAGE_STATUS_OPEN,
+            )
+            .limit(1)
+        )
+    ).first()
+    return row is not None
+
+
 async def _process_customer_article_event(
     session: AsyncSession,
     settings: Settings,
@@ -233,6 +256,14 @@ async def _process_customer_article_event(
 
     policy = await get_queue_policy_by_queue(session, ticket.queue_id)
     if policy is None or not policy.enabled_auto_reply or policy.service_user_id is None:
+        return None
+
+    if await _has_open_triage(session, ticket_id):
+        logger.info(
+            "ai_auto_worker_triage_open_skip",
+            ticket_id=ticket_id,
+            queue_id=ticket.queue_id,
+        )
         return None
 
     ignored_senders = parse_str_list(policy.ignored_senders)

@@ -4,9 +4,8 @@ Revision ID: 20260719_0006
 Revises: 20260720_0007
 Create Date: 2026-07-19
 
-Rebased onto ``20260915_0045`` (composer refine queue-policy flag) so the
-combined chain (tiqora + owned) keeps a single head — see
-``tests/test_migration_gate.py``.
+Rebased onto ``20260916_0046`` (AI queue triage) so the combined chain
+(tiqora + owned) keeps a single head — see ``tests/test_migration_gate.py``.
 
 **Gated**: only reachable once schema ownership is active (see
 ``tiqora.domain.ownership`` and ``alembic/env.py``'s dynamic

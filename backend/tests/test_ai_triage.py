@@ -3,10 +3,13 @@ extraction and self-consistency confidence. No DB, no LLM."""
 
 from __future__ import annotations
 
+from tiqora.ai.context import TicketSnapshot
 from tiqora.ai.triage import (
     NO_QUEUE_KEY,
+    QueueCandidate,
     TriageVote,
     aggregate_votes,
+    build_user_message,
     extract_forwarded_sender,
     queue_id_from_key,
     queue_key,
@@ -165,6 +168,15 @@ def test_forwarders_own_address_is_excluded() -> None:
     assert extract_forwarded_sender(body, exclude=["hausmeister@example.org"]) is None
 
 
+def test_forwarders_own_from_header_is_excluded() -> None:
+    """Worker passes the raw From header, not a bare address."""
+    body = (
+        "FYI\n\n-----Urspruengliche Nachricht-----\n"
+        "Von: Hausmeister <hausmeister@example.org>\n\nKein Internet.\n"
+    )
+    assert extract_forwarded_sender(body, exclude=["Hausmeister <hausmeister@example.org>"]) is None
+
+
 def test_exclusion_is_case_insensitive() -> None:
     body = (
         "FYI\n\n-----Urspruengliche Nachricht-----\n"
@@ -186,6 +198,28 @@ def test_display_name_with_comma_is_parsed() -> None:
     found = extract_forwarded_sender(body)
     assert found is not None
     assert found.email == "s27tgras@uni-bonn.de"
+
+
+def test_user_message_uses_masked_from_address() -> None:
+    ticket = TicketSnapshot(
+        ticket_id=1,
+        queue_id=10,
+        customer_id="CUST",
+        title="Hilfe",
+        queue_name="Intake",
+    )
+    msg = build_user_message(
+        ticket=ticket,
+        candidates=(
+            QueueCandidate(queue_id=11, key="q_11", name="Netadmin", description="Technik"),
+        ),
+        subject="Hilfe",
+        body="Mein Anschluss ist tot.",
+        from_address="[EMAIL_1]",
+    )
+    assert "Von: [EMAIL_1]" in msg
+    assert "example.org" not in msg
+    assert "sven@" not in msg.lower()
 
 
 # --------------------------------------------------------------------------

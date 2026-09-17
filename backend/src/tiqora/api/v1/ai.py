@@ -85,8 +85,15 @@ from tiqora.api.deps import AppSettings, CurrentUser, DbSession
 from tiqora.config import Settings
 from tiqora.db.engine import get_session_factory
 from tiqora.domain.ticket_service import TicketAccessDenied, TicketNotFound, TicketService
-from tiqora.domain.ticket_write_service import TicketWriteService
-from tiqora.domain.ticket_write_service import resume_ai_automation as _resume_ai_automation
+from tiqora.domain.ticket_write_service import (
+    TicketAccessDenied as TicketWriteAccessDenied,
+)
+from tiqora.domain.ticket_write_service import (
+    TicketWriteService,
+)
+from tiqora.domain.ticket_write_service import (
+    resume_ai_automation as _resume_ai_automation,
+)
 from tiqora.permissions.engine import PermissionEngine
 from tiqora.znuny.sysconfig import SysConfig
 
@@ -871,7 +878,7 @@ async def accept_ai_triage(
             move_fn=_move,
             set_customer_fn=_set_customer,
         )
-    except TicketAccessDenied as exc:
+    except (TicketAccessDenied, TicketWriteAccessDenied) as exc:
         # The agent may note on the source queue but not move into the target.
         # The worker's automatic path would have succeeded here (it uses the
         # permission-free mutator, authorized by the admin's target

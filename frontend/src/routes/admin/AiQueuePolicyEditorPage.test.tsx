@@ -96,6 +96,18 @@ const samplePolicy = {
   capabilities_json: null,
   summary_detail: "standard",
   pii_ner_enabled: true,
+  enabled_refine: false,
+  enabled_triage: false,
+  routing_description: null,
+  triage_target_queue_ids: null,
+  triage_auto_threshold: 100,
+  triage_suggest_threshold: 50,
+  triage_samples: 3,
+  triage_customer_fix_enabled: false,
+  triage_customer_fix_auto_threshold: 100,
+  triage_delay_reply: false,
+  triage_llm_provider_id: null,
+  triage_model_override: null,
   valid_id: 1,
   create_time: "2026-07-01T00:00:00Z",
   change_time: "2026-07-01T00:00:00Z",
@@ -299,6 +311,44 @@ describe("AiQueuePolicyEditorPage", () => {
 
     expect(screen.getByTestId("admin-ai-queue-form-enabled_auto_reply")).not.toBeDisabled();
     expect(screen.getByTestId("admin-ai-queue-form-enabled_auto_reply")).toBeChecked();
+  });
+
+  it("locks the triage toggle and shows a warning while operation_mode is parallel", async () => {
+    getSettings.mockResolvedValue({
+      operation_mode: "parallel",
+      disclosure_default_text: "",
+      global_max_replies_per_hour: null,
+      audit_retention_days: 30,
+      auto_reply_paused: false,
+    });
+    renderEdit();
+    await waitFor(() => expect(screen.getByTestId("admin-ai-queue-form-system_prompt")).toBeInTheDocument());
+    fireEvent.click(screen.getByText("Triage"));
+
+    expect(screen.getByTestId("admin-ai-queue-triage-gate-warning")).toBeInTheDocument();
+    expect(screen.getByTestId("admin-ai-queue-form-enabled_triage")).toBeDisabled();
+  });
+
+  it("renders the triage tab and saves routing_description", async () => {
+    renderEdit();
+    await waitFor(() => expect(screen.getByTestId("admin-ai-queue-form-system_prompt")).toBeInTheDocument());
+    fireEvent.click(screen.getByText("Triage"));
+
+    expect(screen.getByTestId("admin-ai-queue-form-enabled_triage")).not.toBeChecked();
+    fireEvent.change(screen.getByTestId("admin-ai-queue-form-routing_description"), {
+      target: { value: "Netzmentoren" },
+    });
+    fireEvent.click(screen.getByTestId("admin-ai-queue-editor-save"));
+
+    await waitFor(() => {
+      expect(updateQueuePolicy).toHaveBeenCalledWith(
+        1,
+        expect.objectContaining({
+          routing_description: "Netzmentoren",
+          enabled_triage: false,
+        }),
+      );
+    });
   });
 
   it("renders a character counter for the system prompt", async () => {
