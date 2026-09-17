@@ -7507,7 +7507,7 @@ export interface components {
              * Feature
              * @enum {string}
              */
-            feature: "summary" | "auto_reply" | "manual_assist" | "mcp";
+            feature: "summary" | "auto_reply" | "manual_assist" | "mcp" | "refine" | "triage";
             /** Id */
             id: number;
             /** Model */

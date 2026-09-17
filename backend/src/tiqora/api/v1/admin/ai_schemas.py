@@ -18,6 +18,8 @@ ReplyLanguageMode = Literal["off", "fixed", "auto"]
 SummaryDetail = Literal["standard", "detailed"]
 AclSubjectType = Literal["group", "role", "user"]
 AclFeature = Literal["summary", "auto_reply", "manual_assist", "mcp"]
+# tiqora_ai_usage.feature — includes triage (not an ACL feature) and refine.
+UsageFeature = Literal["summary", "auto_reply", "manual_assist", "mcp", "refine", "triage"]
 
 
 # ---------------------------------------------------------------------------
@@ -441,7 +443,7 @@ class AiUsageOut(BaseModel):
     user_id: int | None
     queue_id: int | None
     ticket_id: int | None
-    feature: AclFeature
+    feature: UsageFeature
     provider_id: int | None
     model: str | None
     prompt_tokens: int

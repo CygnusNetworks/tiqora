@@ -1074,6 +1074,7 @@
           "queueLocked": "隊列創建後就不能再更改。"
         },
         "autoGateWarning": "自動回覆需要「僅限 Tiqora」(tiqora_primary) 模式。目前：並聯運轉 — 開關保持鎖定狀態。",
+        "triageGateWarning": "Triage requires \"Tiqora only\" (tiqora_primary) mode. Currently: parallel operation — the switch stays locked.",
         "ignoredSenders": "被忽略的寄件者",
         "ignoredSendersPlaceholder": "每行一個地址，例如noreply@example.com 或 *@internal.example",
         "ignoreSendersManual": "也阻止手動草稿",
@@ -1153,7 +1154,9 @@
           "summary": "總結",
           "auto_reply": "自動回覆",
           "vision": "願景",
-          "test": "連接測試"
+          "test": "連接測試",
+          "refine": "Refine text",
+          "triage": "Triage"
         },
         "allFeatures": "所有功能",
         "status": "狀態",
@@ -1291,7 +1294,7 @@
         "enabledTriage": "Runs once on a ticket's first message, before the reply agent, and proposes a better queue. Requires a service user, a provider and at least one target queue. Only available in tiqora_primary operation mode.",
         "routingDescription": "The single most important setting for routing quality. Without it a target queue is offered to the model by name alone.",
         "triageTargets": "The allowlist is also the authorization: the worker moves tickets without a move_into permission check, so only list queues you want it to reach.",
-        "triageAutoThreshold": "Confidence needed to move the ticket without asking. 100 means never move on its own, only propose. Lower it once the accept rate under Triage statistics supports it.",
+        "triageAutoThreshold": "Confidence needed to move the ticket without asking. 100 means never move on its own, only propose. Lower it once agents accept enough proposals at that confidence.",
         "triageSuggestThreshold": "Confidence needed to show a proposal an agent can accept. Below this nothing is shown at all.",
         "triageSamples": "How often the model is asked per ticket. Agreement between samples is the main confidence signal, so 1 disables it. Each sample is a separate LLM call on every new ticket.",
         "triageDelayReply": "Set on the DESTINATION queue. Protects against a routing mistake turning into a wrong answer, at the cost of the customer getting no AI reply to their first mail.",
