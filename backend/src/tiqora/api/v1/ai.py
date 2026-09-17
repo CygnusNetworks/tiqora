@@ -883,9 +883,7 @@ async def accept_ai_triage(
     row.decided_by_user_id = user.id
     row.decided_at = datetime.now(UTC).replace(tzinfo=None)
     await session.commit()
-    logger.info(
-        "ai_triage_accepted", ticket_id=ticket_id, triage_id=triage_id, applied=applied
-    )
+    logger.info("ai_triage_accepted", ticket_id=ticket_id, triage_id=triage_id, applied=applied)
 
 
 @router.post("/triage/{triage_id}/reject", status_code=status.HTTP_204_NO_CONTENT)
